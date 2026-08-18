@@ -1349,9 +1349,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // The proof reconciliation just established must be *recognizable* as one.
     // `mutationIntentEvidence` identifies a proven non-execution by this
     // semantic code alone, and until r17 the reconciled outcome was written
-    // without it: the readback established that a step never ran, the campaign
-    // usage terminal did not say so, and a campaign burned as `unsafePartial`
-    // with the disproof sitting in its own journal (TASK-AIN-020).
+    // without it: the readback established that a step never ran, but the
+    // historical usage terminal did not carry that proof and remained
+    // `unsafePartial` with the disproof sitting in its own journal
+    // (TASK-AIN-020).
     //
     // Pinned here on the read-only route because it is the one that needs no
     // real archive; the branch is shared with the mutating route, which is

@@ -1360,27 +1360,6 @@ enum RuntimeCLI {
       json: json)
   }
 
-  /// The lease the runtime job lane needs for an already published archive.
-  /// The engine lane's campaign dispatcher uses this rather than a second
-  /// upload implementation, so both routes bind the identical bytes.
-  static func importFlashBundleLease(
-    client: AgentClient,
-    targetID: String,
-    archiveURL: URL,
-    profile: RockchipFlashProfile
-  ) throws -> String {
-    let result = try importFlashBundleResult(
-      client: client, targetID: targetID,
-      url: archiveURL.standardizedFileURL, expectedProfile: profile)
-    guard case .object(let fields) = result,
-      case .string(let lease)? = fields["lease"], !lease.isEmpty
-    else {
-      throw AgentClientError.malformedResponse(
-        "artifact.importFlashBundle.commit returned no artifact lease")
-    }
-    return lease
-  }
-
   /// Streams the archive to the daemon and returns the commit response. The
   /// wire name is the published member name the daemon pins; the on-disk
   /// basename is not what identifies these bytes. A campaign supplies its

@@ -34,9 +34,10 @@ final class ArkForgeIPCContractTests: XCTestCase {
 
   /// A daemon with a tool bound and no authority paired.
   private static let helloAckHex =
-    "080118022205302e312e303a134e4f5f5041495245445f415554484f52495459420d726b6465"
-    + "76656c6f70746f6f6c4a40323331613035656639616165313766396338623864333830316233"
-    + "65633266346134363533323931373832303231666536353531373631306161313163373965"
+    "080118022205302e312e303a134e4f5f5041495245445f415554484f52495459421861726b66"
+    + "6f726765642d6e61746976652d726f636b7573624a4032333161303565663961616531376639"
+    + "6338623864333830316233656332663461343635333239313738323032316665363535313736"
+    + "31306161313163373965"
 
   func testHelloAckFromALiveDaemonDecodes() throws {
     let ack = try ArkForgeHelloAck.decode(bytes(Self.helloAckHex))
@@ -55,11 +56,11 @@ final class ArkForgeIPCContractTests: XCTestCase {
     // "no" without learning which of the two is missing.
     XCTAssertFalse(ack.executionReady)
     XCTAssertEqual(ack.executionBlockers, ["NO_PAIRED_AUTHORITY"])
-    XCTAssertEqual(ack.toolchainID, "rkdeveloptool")
+    XCTAssertEqual(ack.toolchainID, "arkforged-native-rockusb")
     XCTAssertEqual(
       ack.toolchainSHA256,
       "231a05ef9aae17f9c8b8d3801b3ec2f4a4653291782021fe65517610aa11c79e",
-      "the daemon reports the bundled component this change pins (AD-023)")
+      "the daemon reports its native RockUSB backend identity")
   }
 
   func testAReadyHandshakeFromALiveDaemonDecodes() throws {
@@ -69,16 +70,17 @@ final class ArkForgeIPCContractTests: XCTestCase {
     // *derived* fact — empty blockers — and a decoder that read the two
     // independently could report ready with a blocker still listed.
     let hex =
-      "080118022205302e312e303001420d726b646576656c6f70746f6f6c4a40323331"
-      + "613035656639616165313766396338623864333830316233656332663461343635"
-      + "33323931373832303231666536353531373631306161313163373965"
+      "080118022205302e312e303001421861726b666f726765642d6e61746976652d72"
+      + "6f636b7573624a4032333161303565663961616531376639633862386433383031"
+      + "623365633266346134363533323931373832303231666536353531373631306161"
+      + "313163373965"
     let ack = try ArkForgeHelloAck.decode(bytes(hex))
 
     XCTAssertTrue(ack.executionReady)
     XCTAssertTrue(
       ack.executionBlockers.isEmpty,
       "ready and blockers are one fact stated twice; they cannot disagree")
-    XCTAssertEqual(ack.toolchainID, "rkdeveloptool")
+    XCTAssertEqual(ack.toolchainID, "arkforged-native-rockusb")
     XCTAssertEqual(
       ack.toolchainSHA256,
       "231a05ef9aae17f9c8b8d3801b3ec2f4a4653291782021fe65517610aa11c79e")

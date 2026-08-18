@@ -253,28 +253,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         criticalNonInterruptible: criticalNonInterruptible)
     }
 
-    static func sectors(begin: Int64, count: Int64) -> Data {
-      var payload = Data(repeating: 0, count: Int(count) * 512)
-      func writeHeader(at offset: Int, myLBA: Int64, alternateLBA: Int64) {
-        payload.replaceSubrange(offset..<(offset + 8), with: Array("EFI PART".utf8))
-        for (index, value) in [
-          (24, myLBA), (32, alternateLBA), (40, Int64(34)), (48, Int64(61_071_326)),
-        ] {
-          var raw = UInt64(bitPattern: value)
-          for byte in 0..<8 {
-            payload[offset + index + byte] = UInt8(raw & 0xFF)
-            raw >>= 8
-          }
-        }
-      }
-      if begin <= 1, begin + count > 1 {
-        writeHeader(at: Int(1 - begin) * 512, myLBA: 1, alternateLBA: 61_071_359)
-      }
-      if begin <= 61_071_359, begin + count > 61_071_359 {
-        writeHeader(at: Int(61_071_359 - begin) * 512, myLBA: 61_071_359, alternateLBA: 1)
-      }
-      return payload
-    }
   }
 
   private struct FixedUSBProbe: RockchipRuntimeUSBProbing {
@@ -431,49 +409,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
-  private actor ReadbackLog {
-    private var partitions: [String] = []
-
-    func append(_ partition: String) {
-      partitions.append(partition)
-    }
-
-    func snapshot() -> [String] { partitions }
-  }
-
-  private struct MaterializingReadbackRunner: RockchipRuntimeCommandRunning {
-    let imageBytes: Data
-    let baseSector: Int64
-
-    func run(
-      executable _: ResolvedExecutable,
-      arguments: [String],
-      timeoutSeconds _: Int?,
-      outputByteBudget _: Int,
-      criticalNonInterruptible _: Bool
-    ) async throws -> ProviderSubprocessReceipt {
-      guard arguments.count == 4, arguments[0] == "rl",
-        let sectorCount = Int(arguments[2])
-      else {
-        throw RuntimeDispatchFailure.failed("unexpected readback argv")
-      }
-      let offsetSectors = try XCTUnwrap(Int64(arguments[1]))
-      let byteOffset = Int((offsetSectors - baseSector) * 512)
-      let byteCount = min(sectorCount * 512, imageBytes.count - byteOffset)
-      var materialized = imageBytes.subdata(
-        in: byteOffset..<(byteOffset + byteCount))
-      materialized.append(
-        Data(repeating: 0, count: sectorCount * 512 - byteCount))
-      try materialized.write(to: URL(filePath: arguments[3]))
-      return ProviderSubprocessReceipt(
-        exitStatus: 0,
-        stdout: Data("Read LBA from device (100%)\n".utf8),
-        stderr: Data(),
-        stdoutTruncated: false,
-        durationSeconds: 0)
-    }
-  }
-
   private struct HDCFacts: HDCObservationFactsPort {
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
@@ -513,83 +448,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         exitStatus: 0, stdout: Data(provider.utf8), stderr: Data(),
         stdoutTruncated: false, durationSeconds: 0)
     }
-  }
-
-  // MARK: a refusal before the first write is not a partial write (TASK-AIN-019)
-
-  /// Serves the DAYU200 geometry the pinned table describes, and can be told
-  /// to make the backup GPT sector unreadable (the 2026-08-04 device) or to
-  /// fail the first `wl` (the case that must stay unresolved).
-  private actor WriteAttemptLog {
-    private(set) var writes: [String] = []
-    func note(_ argv: [String]) { writes.append(argv.joined(separator: " ")) }
-  }
-
-  private struct MediumRunner: RockchipRuntimeCommandRunning {
-    let log: WriteAttemptLog
-    var backupSectorIsErased = false
-    var primarySectorIsErased = false
-    var firstWriteFails = false
-
-    func run(
-      executable _: ResolvedExecutable,
-      arguments: [String],
-      timeoutSeconds _: Int?,
-      outputByteBudget _: Int,
-      criticalNonInterruptible _: Bool
-    ) async throws -> ProviderSubprocessReceipt {
-      var stdout = ""
-      switch arguments.first {
-      case "ld":
-        stdout = "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"
-      case "ppt":
-        stdout = Self.partitionTable
-      case "rl":
-        guard arguments.count == 4, let begin = Int64(arguments[1]),
-          let count = Int64(arguments[2])
-        else { throw RuntimeDispatchFailure.failed("unexpected rl argv") }
-        let erased =
-          (backupSectorIsErased && begin != 1) || primarySectorIsErased
-        let payload =
-          erased
-          ? Data(repeating: 0xCC, count: Int(count) * 512)
-          : ScriptedCommandRunner.sectors(begin: begin, count: count)
-        FileManager.default.createFile(atPath: arguments[3], contents: payload)
-        stdout = "Read LBA from device (100%)\n"
-      case "wl", "wlx":
-        await log.note(arguments)
-        if firstWriteFails {
-          throw RuntimeDispatchFailure.failed("write refused by the fixture")
-        }
-        stdout = "Write LBA from file (100%)\n"
-      default:
-        stdout = ""
-      }
-      return ProviderSubprocessReceipt(
-        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
-        stdoutTruncated: false, durationSeconds: 0)
-    }
-
-    private static let partitionTable =
-      """
-      **********Partition Info(GPT)**********
-      NO  LBA       Name
-      00  00002000  uboot
-      01  00004000  misc
-      02  00006000  bootctrl
-      03  00007000  resource
-      04  0000A000  boot_linux
-      05  0003A000  ramdisk
-      06  0003C000  system
-      07  0043C000  vendor
-      08  0063C000  sys-prod
-      09  00655000  chip-prod
-      10  0066E000  updater
-      11  0067E000  eng_system
-      12  00686000  eng_chipset
-      13  0069E000  chip_ckm
-      14  01308000  userdata
-      """
   }
 
   func testWaitForHDCReconnectSurvivesATransientMalformedTargetList() async throws {
@@ -853,36 +711,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         expectedPreviousHDCIdentitySHA256: digest("old-key")))
   }
 
-  func testGPTHeaderParseAcceptsOnlyARealHeader() throws {
-    let primary = try XCTUnwrap(
-      RockchipGPTHeader.parse(ScriptedCommandRunner.sectors(begin: 1, count: 1)))
-    XCTAssertEqual(primary.myLBA, 1)
-    XCTAssertEqual(primary.alternateLBA, 61_071_359)
-    XCTAssertEqual(primary.firstUsableLBA, 34)
-    XCTAssertEqual(primary.lastUsableLBA, 61_071_326)
-
-    let backup = try XCTUnwrap(
-      RockchipGPTHeader.parse(
-        ScriptedCommandRunner.sectors(begin: 61_071_359, count: 1)))
-    XCTAssertEqual(backup.myLBA, primary.alternateLBA)
-
-    // A sector past the addressable medium came back as uniform 0xCC on
-    // 2026-08-04 while the read itself reported success. That is the case the
-    // pre-write probe exists for, so it must not parse as a header.
-    XCTAssertNil(RockchipGPTHeader.parse(Data(repeating: 0xCC, count: 512)))
-    XCTAssertNil(RockchipGPTHeader.parse(Data(repeating: 0, count: 512)))
-    XCTAssertNil(RockchipGPTHeader.parse(Data(repeating: 0xFF, count: 512)))
-    XCTAssertNil(RockchipGPTHeader.parse(Data("EFI PART".utf8)))
-  }
-
   func testRejectedReceiptExcerptKeepsTheNewestOutputOnOneLine() throws {
     // A truncated capture ends mid-progress, so the useful part is the end.
-    let progress = (1...400).map { "Write LBA \($0) 100%\n" }.joined()
+    let progress = (1...400).map { "operation progress \($0) 100%\n" }.joined()
     let excerpt = FoundationRockchipRuntimeActionExecutor.outputExcerpt(
       Data(progress.utf8))
 
-    XCTAssertTrue(excerpt.hasSuffix("Write LBA 400 100%"), excerpt)
-    XCTAssertFalse(excerpt.contains("Write LBA 1 100%"))
+    XCTAssertTrue(excerpt.hasSuffix("operation progress 400 100%"), excerpt)
+    XCTAssertFalse(excerpt.contains("operation progress 1 100%"))
     XCTAssertFalse(excerpt.contains("\n"))
     XCTAssertFalse(excerpt.contains("\r"))
     XCTAssertLessThanOrEqual(excerpt.count, 201)
@@ -890,8 +726,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   func testRejectedReceiptExcerptSurvivesShortAndBinaryOutput() throws {
     XCTAssertEqual(
-      FoundationRockchipRuntimeActionExecutor.outputExcerpt(Data("Write LBA failed".utf8)),
-      "Write LBA failed")
+      FoundationRockchipRuntimeActionExecutor.outputExcerpt(Data("operation failed".utf8)),
+      "operation failed")
     XCTAssertEqual(FoundationRockchipRuntimeActionExecutor.outputExcerpt(Data()), "")
 
     let binary = Data([0xFF, 0xFE, 0x00]) + Data("tail".utf8)
@@ -1730,46 +1566,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       [["-t", "device-1", "target", "boot", "loader"]])
   }
 
-  func testEnterLoaderUsesOnlyBrokerRecordedCampaignTiming() async throws {
-    let root = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let identity = String(repeating: "a", count: 64)
-    let tuning = try AgentAuthorityCampaignExecutionTuning(
-      loaderDiscoveryTimeoutSeconds: 90,
-      loaderPollIntervalMilliseconds: 250,
-      hdcCommandTimeoutSeconds: 7,
-      readOnlyCommandTimeoutSeconds: 9)
-    let runner = ProbeCommandRunner(responses: [
-      .success("")
-    ])
-    let executor = FoundationRockchipRuntimeActionExecutor(
-      hdcResolver: FixedExecutableResolver(
-        table: [
-          "hdc": ResolvedExecutable(
-            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
-        ]),
-      runner: runner,
-      usbProbe: LoaderAfterInitialProbe(identity: identity),
-      loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
-    let rockchip = ResolvedExecutable(
-      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
-    let plan = try rockchipPlan(
-      action: .enterLoader(connectKey: "device-1"),
-      stepID: "enter-loader-tuned", toolSHA256: rockchip.sha256)
-    let descriptor = hostDescriptor(plan, executionTuning: tuning)
-    XCTAssertEqual(descriptor.executionTuning, tuning)
-
-    _ = try await executor.execute(
-      action: .enterLoader(connectKey: "device-1"), descriptor: descriptor,
-      providerExecutable: rockchip, actionDirectory: root)
-
-    let invocations = await runner.invocations()
-    XCTAssertEqual(
-      invocations.map(\.arguments),
-      [["-t", "device-1", "target", "boot", "loader"]])
-    XCTAssertEqual(invocations.map(\.timeoutSeconds), [7])
-  }
-
   func testEnterLoaderAlreadyInExactLoaderSkipsHDCAndRecordsReadback() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -2249,24 +2045,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   }
 
   private func hostDescriptor(
-    _ plan: TypedProcessPlan,
-    executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
+    _ plan: TypedProcessPlan
   ) -> HostManagedProcessDescriptor {
     guard case .hostManaged(let descriptor) = plan.kind else {
       preconditionFailure("expected host-managed plan")
     }
-    guard let executionTuning else { return descriptor }
-    return HostManagedProcessDescriptor(
-      identifier: descriptor.identifier,
-      jobID: descriptor.jobID,
-      stepID: descriptor.stepID,
-      targetID: descriptor.targetID,
-      bindingRevision: descriptor.bindingRevision,
-      connectKey: descriptor.connectKey,
-      expectedIdentitySHA256: descriptor.expectedIdentitySHA256,
-      providerExecutableSHA256: descriptor.providerExecutableSHA256,
-      actionSHA256: descriptor.actionSHA256,
-      executionTuning: executionTuning)
+    return descriptor
   }
 
   private func flashBundle() -> RockchipRuntimeFlashBundle {

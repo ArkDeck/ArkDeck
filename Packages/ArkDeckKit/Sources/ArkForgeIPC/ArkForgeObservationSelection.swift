@@ -23,8 +23,7 @@ import Foundation
 /// SHA-256( "arkforge/v1/device-facts\0" || locationID_be32 )
 /// ```
 ///
-/// ArkDeck already carries that `locationID` as its `usbTopology`
-/// (`RockchipFlashExecutionHost` stores `String(location.uint64Value)`), so
+/// ArkDeck already carries that `locationID` as its binding `usbTopology`, so
 /// this recomputes the digest and matches on it. Verified against the attached
 /// board on 2026-08-17: `ioreg` reports `locationID = 18874368`, and the
 /// daemon's observation is `USB-2207-5000-01200000` — `0x01200000` is that

@@ -218,163 +218,13 @@ struct ArkDeckCommandLine {
     print("device mutation dispatch: 0")
   }
 
-  // MARK: plan
-
-  // MARK: preflight
-
-  /// The non-destructive gate every confirmation phrase now sits behind.
-  ///
-  /// It exists because of what the 2026-08-04 campaigns cost: four confirmed
-  /// campaigns, one attempt each, all four killed by the same host-side tool
-  /// fault, and every retry needing a merged PR. None of those failures was a
-  /// product defect the campaign lane could repair, so none of them should
-  /// have consumed a campaign. Device mutation dispatch here is 0 — this is
-  /// three read-only observations and a refusal, never an execution stack.
-  static func requireGreenPreflight(imagesPath: String) async throws {
-    let receipt = await RockchipFlashPreflight().run(
-      archiveURL: URL(filePath: imagesPath))
-    for line in receipt.renderedLines() { print(line) }
-    guard receipt.isGreen else {
-      throw CLIError(
-        exitCode: 4,
-        message: "preflight refused before any confirmation: "
-          + receipt.failedChecks.map(\.rawValue).joined(separator: ", ")
-          + ". No campaign attempt, reservation or device mutation was spent.")
-    }
-  }
-
-  // MARK: default bounded Evolution E2 campaign
-
-  static func runCampaignPreview(_ arguments: [String]) async throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed([
-      "--images", "--max-attempts", "--max-changed-files", "--max-diff-lines",
-      "--validity-seconds",
-    ])
-    guard let images = options.value("--images"), images.hasPrefix("/"),
-      let maxAttempts = strictPositiveInt(options.value("--max-attempts") ?? "16"),
-      let maxChangedFiles = strictPositiveInt(options.value("--max-changed-files") ?? "8"),
-      let maxDiffLines = strictPositiveInt(options.value("--max-diff-lines") ?? "2000"),
-      let validitySeconds = strictPositiveInt(options.value("--validity-seconds") ?? "14400")
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "preview requires absolute --images and canonical positive budgets")
-    }
-    // Before the draft exists, not after: a preview that mints a confirmation
-    // digest against a dead host tool is how a campaign gets spent on a
-    // problem that was free to fix a second earlier.
-    try await requireGreenPreflight(imagesPath: images)
-    let preview = try await RockchipEvolutionCampaignPlanning.preview(
-      archiveURL: URL(filePath: images), maxAttempts: maxAttempts,
-      maxChangedFiles: maxChangedFiles, maxDiffLines: maxDiffLines,
-      validitySeconds: validitySeconds)
-    let assertion = preview.assertion
-    print("bounded Evolution Flash campaign preview")
-    print("campaign: \(assertion.campaignID)")
-    print("confirmation digest: \(assertion.confirmationDigestSHA256)")
-    print("protected-main base: \(assertion.baseCommitOID)")
-    print(
-      "candidate build target: "
-        + RockchipEvolutionCampaignConfirmationAssertion.candidateBuildTarget)
-    print("candidate toolchain: \(assertion.candidateToolchainDigestSHA256)")
-    print("merged broker executable: \(assertion.brokerExecutableDigestSHA256)")
-    print("allowed candidate paths: \(assertion.allowedPaths.joined(separator: ","))")
-    print(
-      "candidate budget: files<=\(assertion.maxChangedFiles), "
-        + "diff-lines<=\(assertion.maxDiffLines)")
-    print("plan: \(assertion.planDigestSHA256)")
-    print("archive: \(assertion.archiveDigestSHA256)")
-    print("step-set: \(assertion.stepSetDigestSHA256)")
-    print("target stable identity: \(assertion.targetStableIdentitySHA256)")
-    print("binding lineage root revision: \(assertion.bindingLineageRootRevision)")
-    print("data impact: \(assertion.userdataImpact)")
-    print("hard budget: attempts<=\(assertion.maxAttempts), concurrency=1")
-    print("valid until: \(assertion.validUntil)")
-    print("device mutation dispatch: \(preview.deviceMutationDispatchCount)")
-    print("")
-    print(
-      "确认本次 Evolution Flash campaign：campaign=\(assertion.confirmationDigestSHA256)，"
-        + "base=\(assertion.baseCommitOID)，plan=\(assertion.planDigestSHA256)，"
-        + "archive=\(assertion.archiveDigestSHA256)，step-set=\(assertion.stepSetDigestSHA256)，"
-        + "target=\(assertion.targetStableIdentitySHA256)，"
-        + "bindingRevision=\(assertion.bindingLineageRootRevision)，"
-        + "最多 \(assertion.maxAttempts) 次、并发 1、有效至 \(assertion.validUntil)，"
-        + "ERASE-USERDATA；unknown/unsafe partial 不重试。")
-  }
-
-  static func runCampaignContinue(_ arguments: [String]) async throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed([
-      "--images", "--target-location-id", "--campaign-id", "--runtime-target", "--socket",
-    ])
-    guard let images = options.value("--images"), images.hasPrefix("/"),
-      let location = options.value("--target-location-id"),
-      let campaignID = options.value("--campaign-id")
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "continue requires --images, --target-location-id and --campaign-id "
-          + "(plus --runtime-target for the runtime job lane)")
-    }
-    try requireCampaignAgentContext(firstAdmission: false)
-    try await requireGreenPreflight(imagesPath: images)
-    let result = try await engineLaneCampaignHost(options: options).continueCampaign(
-      campaignID: campaignID, archiveURL: URL(filePath: images),
-      targetLocationSelector: location)
-    printCampaignResult(result)
-  }
-
-  /// A campaign attempt executes on the engine lane. There is no in-process
-  /// fallback on purpose: falling back would put two flash execution stacks
-  /// back in production behind one command, which is the condition this swap
-  /// exists to end. A daemon that is not running is a loud, closed failure.
-  /// Everything the campaign host needs from the runtime job lane, from one
-  /// socket path: the dispatcher that submits attempts and the read-only
-  /// evidence reader reconciliation consults before it may settle an unknown
-  /// Loader transition.
-  private static func engineLaneCampaignHost(
-    options: CLIOptions
-  ) throws -> RockchipEvolutionCampaignHost {
-    try RockchipEvolutionCampaignHost(
-      flash: try engineLaneDispatcher(options: options),
-      attemptIntents: DaemonRockchipEvolutionAttemptIntents(
-        socketPath: options.value("--socket") ?? RuntimeCLI.defaultSocketPath()))
-  }
-
-  private static func engineLaneDispatcher(
-    options: CLIOptions
-  ) throws -> EngineLaneEvolutionFlashDispatcher {
-    guard let runtimeTarget = options.value("--runtime-target"),
-      !runtimeTarget.isEmpty
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "a campaign attempt runs on the runtime job lane and needs --runtime-target "
-          + "<adopted target id>; the runtime refuses any target whose identity is not "
-          + "the one the campaign confirmation pins")
-    }
-    let socketPath = options.value("--socket") ?? RuntimeCLI.defaultSocketPath()
-    guard FileManager.default.fileExists(atPath: socketPath) else {
-      throw CLIError(
-        exitCode: EX_UNAVAILABLE,
-        message:
-          "the runtime daemon is not listening at \(socketPath); start arkdeck-agentd "
-          + "before running a campaign attempt")
-    }
-    return try EngineLaneEvolutionFlashDispatcher(
-      socketPath: socketPath, runtimeTargetID: runtimeTarget)
-  }
-
   static func runCampaignStatus(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed(["--campaign-id"])
     guard let campaignID = options.value("--campaign-id") else {
       throw CLIError(exitCode: EX_USAGE, message: "status requires --campaign-id")
     }
-    let document = try RockchipEvolutionCampaignHost.status(campaignID: campaignID)
+    let document = try HistoricalEvolutionCampaignArchive.production().load(campaignID)
     print("campaign: \(document.campaignID)")
     print("terminal: \(document.isTerminal)")
     print("reserved attempts: \(document.reservedAttemptCount)/\(document.assertion.maxAttempts)")
@@ -393,41 +243,6 @@ struct ArkDeckCommandLine {
       // above would make the stop event unreadable.
       if let detail = event.detail { print("  detail: \(detail)") }
     }
-  }
-
-  static func requireCampaignAgentContext(firstAdmission: Bool) throws {
-    let environment = ProcessInfo.processInfo.environment
-    let authority = RockchipExecutionAuthorityResolver.resolve(
-      operatorProvided: false,
-      standardInputIsInteractive: isatty(FileHandle.standardInput.fileDescriptor) == 1,
-      environmentOverride: environment["ARKDECK_EXECUTION_AUTHORITY"])
-    let expected = firstAdmission ? "supervisedInteractiveAgent" : "boundedEvolutionAgent"
-    guard authority == .standardAgent,
-      environment["ARKDECK_EVOLUTION_CAMPAIGN_CONTEXT"] == expected,
-      environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true"
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: firstAdmission
-          ? "first campaign admission requires the current supervised interactive Agent "
-            + "confirmation context; CI/daemon/scheduler are rejected"
-          : "campaign continuation requires boundedEvolutionAgent context; CI is rejected")
-    }
-  }
-
-  static func printCampaignResult(_ result: RockchipEvolutionCampaignExecutionResult) {
-    print("campaign: \(result.campaignID)")
-    print("attempt ordinal: \(result.attemptOrdinal)")
-    print("session: \(result.flash.sessionID)")
-    print("job: \(result.flash.jobID)")
-    print("terminal status: \(result.flash.status.rawValue)")
-    print("evidence class: \(result.flash.evidenceClass.rawValue)")
-    if let manifest = result.flash.manifestURL { print("manifest: \(manifest.path)") }
-  }
-
-  static func strictPositiveInt(_ raw: String) -> Int? {
-    guard let value = Int(raw), value > 0, raw == String(value) else { return nil }
-    return value
   }
 
   // MARK: update-feed

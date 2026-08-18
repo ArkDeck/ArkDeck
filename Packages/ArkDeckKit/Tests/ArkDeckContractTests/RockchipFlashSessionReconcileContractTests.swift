@@ -4,13 +4,8 @@ import XCTest
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
-/// The flash session journal used to be write-only: nothing ever replayed it
-/// after a crash, and an interrupted standing-authorization run left an open
-/// usage reservation forever. These tests pin the read side: unresolved
-/// sessions are found from the durable journal alone, orphaned
-/// standing-authorization reservations close with an honest terminal that
-/// names the dangling destructive intents, and campaign-lane sessions are
-/// reported but never closed here (the campaign ledger has one writer).
+/// Historical flash session journals remain inspectable without reviving their
+/// retired executor or reservation writer. Current recovery belongs to Runtime.
 final class RockchipFlashSessionReconcileContractTests: XCTestCase {
 
   // MARK: - Fixture plumbing
@@ -199,22 +194,45 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
   }
 
 
-  /// Agent reservation IDs are canonical derivations; mint the real one.
-  private func reserveAgent(jobID: String) throws -> String {
-    let reservationID = try AgentAuthorityUsageReservation.canonicalReservationID(
-      authorizationRef: campaignReference(), jobID: jobID,
-      operationDigestSHA256: String(repeating: "3", count: 64),
-      targetDigestSHA256: String(repeating: "4", count: 64))
-    _ = try agentLedger.reserve(
-      AgentAuthorityUsageReservation(
-        reservationID: reservationID, authorizationRef: campaignReference(), ordinal: 1,
-        maximumUses: 8, maximumConcurrentJobs: 1, jobID: jobID,
-        operationDigestSHA256: String(repeating: "3", count: 64),
-        targetDigestSHA256: String(repeating: "4", count: 64),
-        reservedAt: Self.timestamp,
-        forwardLeaseExpiresAt: "2026-08-02T14:00:00Z",
-        compensationLeaseExpiresAt: "2026-08-02T15:00:00Z",
-        terminal: nil))
+  /// Writes a previously persisted campaign record directly. Tests must not
+  /// demonstrate a reservation API that production no longer exposes.
+  private func installHistoricalAgentReservation(jobID: String) throws -> String {
+    let campaignDigest = String(repeating: "f", count: 64)
+    let operationDigest = String(repeating: "3", count: 64)
+    let targetDigest = String(repeating: "4", count: 64)
+    let identity = [
+      "evolutionCampaignConfirmation", campaignDigest, String(repeating: "a", count: 40),
+      String(repeating: "b", count: 64), String(repeating: "c", count: 64),
+      String(repeating: "d", count: 64), String(repeating: "e", count: 64), "1",
+      Self.timestamp, "2026-08-02T14:00:00Z", "8",
+    ]
+    let digest = SHA256Hex.string(
+      of: Data((identity + [jobID, operationDigest, targetDigest]).joined(separator: "|").utf8))
+    let reservationID = "ain019-\(digest.prefix(32))"
+    let authorityData = try JSONEncoder().encode(campaignReference())
+    let authority = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: authorityData) as? [String: Any])
+    let document: [String: Any] = [
+      "documentType": "agentAuthorityUsage",
+      "schemaVersion": "1.0.0",
+      "reservations": [[
+        "reservationId": reservationID,
+        "authorizationRef": authority,
+        "ordinal": 1,
+        "maximumUses": 8,
+        "maximumConcurrentJobs": 1,
+        "jobId": jobID,
+        "operationDigestSHA256": operationDigest,
+        "targetDigestSHA256": targetDigest,
+        "reservedAt": Self.timestamp,
+        "forwardLeaseExpiresAt": "2026-08-02T14:00:00Z",
+        "compensationLeaseExpiresAt": "2026-08-02T15:00:00Z",
+        "terminal": NSNull(),
+      ]],
+    ]
+    let ledgerURL = usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]).write(to: ledgerURL)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
     return reservationID
   }
 
@@ -291,7 +309,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
   // MARK: - Authority lanes
 
   func testCampaignLaneIsReportedButClosureIsDeferred() throws {
-    let reservationID = try reserveAgent(jobID: "job-6")
+    let reservationID = try installHistoricalAgentReservation(jobID: "job-6")
     let agentBytesBefore = try Data(
       contentsOf: usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName))
     var session = try SessionBuilder(
@@ -358,7 +376,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
 
 
   func testSessionlessAgentReservationIsReportedWithCampaignHintAndDeferred() throws {
-    let reservationID = try reserveAgent(jobID: "job-agent-orphan")
+    let reservationID = try installHistoricalAgentReservation(jobID: "job-agent-orphan")
     let agentBytesBefore = try Data(
       contentsOf: usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName))
 

@@ -7,7 +7,7 @@ import Foundation
 // The flash execution host writes a durable session journal
 // (`<sessionsRoot>/<sessionID>/journal.jsonl`) but, unlike the runtime
 // engine's job store, nothing replayed those journals after a crash: a
-// killed `arkdeck flash execute` left a dangling destructive `stepIntent`
+// an interrupted retired flash host could leave a dangling destructive `stepIntent`
 // nobody decoded, and — on the standing-authorization lane — an open
 // usage-ledger reservation that nothing could ever close, permanently
 // blocking the authorization's ordinal chain.
@@ -20,9 +20,8 @@ import Foundation
 // a consumed ordinal stays consumed; recovery of the device itself remains
 // a human/E2 decision informed by this report.
 //
-// Campaign-lane sessions are reported but never closed here: the campaign
-// ledger's tombstone semantics belong to `RockchipEvolutionCampaignHost`
-// (`flash continue` reconciles them), and a second writer would race it.
+// Campaign-lane sessions are reported but never closed here. They are historical
+// decode/export records; current recovery is owned by Runtime jobs.
 
 /// Whole-run liveness protocol between the flash executor and the
 /// reconciler. The executor holds an exclusive `flock` on the session's
@@ -181,14 +180,14 @@ package struct RockchipFlashSessionFinding: Sendable, Equatable {
 
 /// An open usage reservation with no session directory left to explain it:
 /// the journal was GC'd, moved, or never survived the crash. Invisible to
-/// the session scan by construction, yet on the campaign lane it still
-/// blocks its target host-wide (one open reservation per target).
+/// the session scan by construction. This is historical debt only; it has no
+/// current admission effect.
 package struct RockchipFlashOrphanedReservation: Sendable, Equatable {
   package let reservationID: String
   public let jobID: String
   package let reservedAt: String
   /// Campaign identity from the reservation's own authority reference, so
-  /// the operator can still be pointed at `flash continue`.
+  /// the operator can inspect its historical status.
   package let campaignID: String?
 }
 
@@ -214,9 +213,8 @@ package struct RockchipFlashSessionReconciler {
     self.now = now
   }
 
-  /// Production composition: the same sessions root the flash host writes
-  /// and the same owner-only `AuthorizationUsage` directory its admission
-  /// services reserve in.
+  /// Production composition over the retired host's historical session and
+  /// owner-only AuthorizationUsage locations.
   public static func production() throws -> RockchipFlashSessionReconciler {
     let sessionsRoot = try SessionSettingsStore().load().sessionsRoot
     let applicationSupport = try FileManager.default.url(
@@ -239,8 +237,8 @@ package struct RockchipFlashSessionReconciler {
 
   /// Open reservations no session directory accounts for — the session
   /// journal was GC'd, moved, or never survived. The session scan cannot
-  /// see them; without this sweep they are permanent invisible debt (and,
-  /// on the campaign lane, a permanent target block). Read-only.
+  /// see them; without this sweep they remain invisible historical debt.
+  /// Read-only.
   package func orphanedReservations() throws -> [RockchipFlashOrphanedReservation] {
     let linked = Set(try allSessionFindings().compactMap(\.linkedReservationID))
     var orphans: [RockchipFlashOrphanedReservation] = []

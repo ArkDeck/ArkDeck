@@ -133,8 +133,8 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       authorizationBlobOID: authorizationBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
-  /// Historical decoder validation only. New products must use bounded campaign confirmation,
-  /// and the usage ledger rejects this kind on reserve.
+  /// Historical decoder validation only. Current products use Runtime-owned
+  /// capabilities, and the usage ledger cannot reserve this kind.
   private static func validatedChatConfirmation(
     confirmationDigestSHA256: String,
     planDigestSHA256: String,
@@ -161,7 +161,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       confirmedAt: confirmedAt)
   }
 
-  public static func validatedEvolutionCampaignConfirmation(
+  private static func validatedEvolutionCampaignConfirmation(
     campaignDigestSHA256: String,
     baseCommitOID: String,
     planDigestSHA256: String,
@@ -633,7 +633,6 @@ public enum AuthorizationUsageTerminalStatus: String, Codable, CaseIterable, Sen
 public enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
   case invalidRecord(String)
   case reservationConflict(String)
-  case usageLimitExceeded(authorizationID: String, maxRuns: Int)
   case reservationNotFound(String)
   case unsafePath(String)
 }
@@ -641,7 +640,7 @@ public enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
 
 
 
-// Shared durable-write fault points injected by the campaign ledger below.
+// Durable-write fault points for terminal-only historical recovery writes.
 public enum AuthorizationUsageLedgerFaultPoint: String, CaseIterable, Sendable {
   case beforeTemporaryWrite
   case afterFileSync
@@ -733,16 +732,15 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   }
 }
 
-/// Immutable campaign-only provenance that the protected broker records at
-/// reservation time. It is audit data, not authority: decoding it cannot
-/// reserve, consume, or dispatch anything.
+/// Historical campaign timing metadata. It remains decodable for audit/export,
+/// but has no public initializer and no execution consumer.
 public struct AgentAuthorityCampaignExecutionTuning: Codable, Equatable, Sendable {
   public let loaderDiscoveryTimeoutSeconds: Int
   public let loaderPollIntervalMilliseconds: Int
   public let hdcCommandTimeoutSeconds: Int
   public let readOnlyCommandTimeoutSeconds: Int
 
-  public init(
+  private init(
     loaderDiscoveryTimeoutSeconds: Int,
     loaderPollIntervalMilliseconds: Int,
     hdcCommandTimeoutSeconds: Int,
@@ -786,13 +784,10 @@ public struct AgentAuthorityCampaignExecutionTuning: Codable, Equatable, Sendabl
 
 public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
   public let candidateDigestSHA256: String
-  /// Present only on historical review-bearing campaign records. New
-  /// candidates never mint a review digest.
+  /// Present only on historical review-bearing campaign records.
   public let reviewDigestSHA256: String?
   public let brokerDigestSHA256: String
-  /// The candidate's bounded timing controls. This is carried by
-  /// the reservation rather than request inputs, so a caller cannot tune an
-  /// engine-lane attempt after the broker has admitted it.
+  /// Historical candidate timing metadata; no current execution path reads it.
   public let executionTuning: AgentAuthorityCampaignExecutionTuning?
 
   enum CodingKeys: String, CodingKey, CaseIterable {
@@ -800,18 +795,6 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
     case reviewDigestSHA256
     case brokerDigestSHA256
     case executionTuning
-  }
-
-  public init(
-    candidateDigestSHA256: String,
-    brokerDigestSHA256: String,
-    executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
-  ) throws {
-    try self.init(
-      candidateDigestSHA256: candidateDigestSHA256,
-      historicalReviewDigestSHA256: nil,
-      brokerDigestSHA256: brokerDigestSHA256,
-      executionTuning: executionTuning)
   }
 
   private init(
@@ -823,9 +806,8 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
     guard [candidateDigestSHA256, brokerDigestSHA256]
       .allSatisfy(AuthorizationUsageValidation.isSHA256),
       historicalReviewDigestSHA256.map(AuthorizationUsageValidation.isSHA256) ?? true,
-      // Review-bearing records predate execution tuning. An unreviewed record
-      // is only valid for the current broker path, which always carries its
-      // bounded timing controls.
+      // Review-bearing records predate execution tuning. The later unreviewed
+      // historical generation always carried bounded timing controls.
       historicalReviewDigestSHA256 != nil || executionTuning != nil
     else {
       throw AuthorizationUsageLedgerError.invalidRecord(
@@ -862,9 +844,9 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   public let reservedAt: String
   public let forwardLeaseExpiresAt: String
   public let compensationLeaseExpiresAt: String
-  /// Present only for reservations minted by the bounded campaign broker.
-  /// Historical reservations may omit it and remain readable, but cannot be
-  /// projected as complete V4 campaign hardware evidence.
+  /// Historical campaign evidence. Old reservations may omit it and remain
+  /// readable, but cannot be projected as complete V4 campaign hardware
+  /// evidence.
   public let campaignEvidenceProvenance: AgentAuthorityCampaignEvidenceProvenance?
   public let terminal: AgentAuthorityUsageTerminal?
 
@@ -884,7 +866,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     case terminal
   }
 
-  public static func canonicalReservationID(
+  private static func canonicalReservationID(
     authorizationRef: AgentExecutionAuthorityReference,
     jobID: String,
     operationDigestSHA256: String,
@@ -936,7 +918,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     return "\(identifierPrefix)-\(digest.prefix(32))"
   }
 
-  public init(
+  private init(
     reservationID: String,
     authorizationRef: AgentExecutionAuthorityReference,
     ordinal: Int,
@@ -1073,8 +1055,9 @@ public struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
   }
 }
 
-/// Independent consume-on-reserve ledger for E1 capabilities and bounded Evolution campaigns.
-/// Historical chat-confirmation entries remain decodable but cannot create new reservations.
+/// Historical Agent-authority usage archive. It can decode/export old reservations and
+/// durably attach a terminal to an already-persisted record so crash recovery remains honest.
+/// It has no reservation creation API and cannot admit or dispatch a new operation.
 public final class AgentAuthorityUsageLedger: @unchecked Sendable {
   public static let ledgerFileName = "agent-authority-usage.json"
   public static let lockFileName = ".agent-authority-usage.lock"
@@ -1095,66 +1078,6 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       at: self.root, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     try withLockedRoot { _ in () }
-  }
-
-  @discardableResult
-  public func reserve(_ request: AgentAuthorityUsageReservation) throws
-    -> AgentAuthorityUsageReservation
-  {
-    guard request.authorizationRef.kind != .chatConfirmation else {
-      throw AuthorizationUsageLedgerError.invalidRecord(
-        "chatConfirmation is historical read-only authority")
-    }
-    guard request.terminal == nil else {
-      throw AuthorizationUsageLedgerError.invalidRecord(
-        "Agent authority reserve request must not carry terminal")
-    }
-    return try withLockedRoot { rootDescriptor in
-      var document = try loadLocked(rootDescriptor: rootDescriptor)
-      if let existing = document.reservations.first(where: {
-        $0.reservationID == request.reservationID
-      }) {
-        guard existing == request else {
-          throw AuthorizationUsageLedgerError.reservationConflict(
-            "Agent authority reservation retry fields drifted")
-        }
-        return existing
-      }
-      let sameAuthority = document.reservations.filter {
-        $0.authorizationRef.sourceIdentifier == request.authorizationRef.sourceIdentifier
-      }
-      guard
-        sameAuthority.allSatisfy({
-          $0.authorizationRef == request.authorizationRef
-            && $0.maximumUses == request.maximumUses
-            && $0.maximumConcurrentJobs == request.maximumConcurrentJobs
-        })
-      else {
-        throw AuthorizationUsageLedgerError.reservationConflict(
-          "Agent authority identity or limits drifted")
-      }
-      let expectedOrdinal = (sameAuthority.map(\.ordinal).max() ?? 0) + 1
-      guard request.ordinal == expectedOrdinal else {
-        throw AuthorizationUsageLedgerError.reservationConflict(
-          "Agent authority ordinal must be \(expectedOrdinal)")
-      }
-      guard request.ordinal <= request.maximumUses else {
-        throw AuthorizationUsageLedgerError.usageLimitExceeded(
-          authorizationID: request.authorizationRef.sourceIdentifier,
-          maxRuns: request.maximumUses)
-      }
-      let activeForTarget = document.reservations.filter {
-        $0.targetDigestSHA256 == request.targetDigestSHA256 && $0.terminal == nil
-      }
-      guard activeForTarget.isEmpty else {
-        throw AuthorizationUsageLedgerError.reservationConflict(
-          "Agent authority target already has an active reservation")
-      }
-      document = try AgentAuthorityUsageLedgerDocument(
-        reservations: document.reservations + [request])
-      try persistLocked(document, rootDescriptor: rootDescriptor)
-      return request
-    }
   }
 
   @discardableResult
@@ -1475,10 +1398,8 @@ private enum AgentAuthorityUsageValidation {
     let historicalCampaignProvenanceKeys = campaignProvenanceKeys.subtracting([
       AgentAuthorityCampaignEvidenceProvenance.CodingKeys.executionTuning.rawValue,
     ])
-    // The no-review campaign path serializes its absent optional digest by
-    // omitting the key. It still carries bounded execution tuning, so accept
-    // exactly this current shape rather than permitting arbitrary partial
-    // provenance records.
+    // The no-review historical generation omitted its optional digest and
+    // carried bounded execution tuning. Accept exactly that persisted shape.
     let unreviewedCampaignProvenanceKeys = campaignProvenanceKeys.subtracting([
       AgentAuthorityCampaignEvidenceProvenance.CodingKeys.reviewDigestSHA256.rawValue,
     ])
