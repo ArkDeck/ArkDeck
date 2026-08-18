@@ -199,12 +199,13 @@ package enum ArkForgeLaneComposition {
     let rockchipHost: @Sendable () -> any RockchipRuntimeActionHosting
     let rockchipExecutable: ResolvedExecutable
     let approvedPlan:
-      @Sendable (String, String) -> ArkForgeExecutionAuthority.ApprovedPlan
+      @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
+      -> ArkForgeExecutionAuthority.ApprovedPlan
 
     init(
       rockchipHost: @escaping @Sendable () -> any RockchipRuntimeActionHosting,
       rockchipExecutable: ResolvedExecutable,
-      approvedPlan: @escaping @Sendable (String, String)
+      approvedPlan: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
         -> ArkForgeExecutionAuthority.ApprovedPlan
     ) {
       self.rockchipHost = rockchipHost
@@ -319,9 +320,9 @@ package enum ArkForgeLaneComposition {
             socketPath: socket,
             timeoutSeconds: ArkForgeDaemonClient.materializationTimeoutSeconds)
         },
-        makeAuthority: { jobID, planID in
+        makeAuthority: { jobID, planID, planDigest, deviceBinding in
           ArkForgeExecutionAuthority(
-            plan: dependencies.approvedPlan(jobID, planID),
+            plan: dependencies.approvedPlan(jobID, planID, planDigest, deviceBinding),
             secret: ArkForgePairingSecret(
               secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
         })))
@@ -338,7 +339,7 @@ package enum ArkForgeLaneComposition {
     runtimeDirectory: URL,
     rockchipDispatcher: BundledRockchipRuntimeDispatcher,
     rockchipExecutable: ResolvedExecutable,
-    approvedPlan: @escaping @Sendable (String, String)
+    approvedPlan: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
       -> ArkForgeExecutionAuthority.ApprovedPlan,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     pairingEpoch: UInt64 = UInt64(Date().timeIntervalSince1970)

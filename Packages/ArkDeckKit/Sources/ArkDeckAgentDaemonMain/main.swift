@@ -622,15 +622,29 @@ Task.detached {
       rockchipDispatcher: rockchipDispatcher,
       rockchipExecutable: (try? rockchipResolver.resolveExecutable(providerID: "rockchip"))
         ?? ResolvedExecutable(path: "-", sha256: String(repeating: "0", count: 64)),
-      approvedPlan: { jobID, planID in
-        // The plan facts this authority signs against. Held by the engine per
-        // job; this closure is what the lane asks when it needs them.
+      approvedPlan: { jobID, planID, planDigest, deviceBinding in
+        // The plan facts this authority signs against.
+        //
+        // These were empty until 2026-08-17, which made the authority unable to
+        // match any admission `arkforged` ever sent: the digest comparison is
+        // exact, so an empty approved digest refuses every real one and no
+        // permit is ever signed. Nothing had been written to a board because of
+        // it. They are the materialized plan's own facts, taken from the
+        // `materializePlan` reply and the binding the engine confirmed.
+        //
+        // `admittedDeviceFactsSHA256` is the plan digest because that is what
+        // the daemon puts in the snapshot's device-facts field
+        // (`arkforged` jobs.rs: `admitted_device_facts_sha256:
+        // envelope.plan_digest`). If the daemon ever narrows that to a real
+        // device-facts digest, this has to follow it.
         ArkForgeExecutionAuthority.ApprovedPlan(
-          jobID: jobID, planID: planID, planSHA256: [],
-          admittedDeviceFactsSHA256: [],
+          jobID: jobID, planID: planID, planSHA256: planDigest,
+          admittedDeviceFactsSHA256: planDigest,
           binding: ArkForgeAuthorityBinding(
-            authorityNamespace: "arkdeck", bindingID: jobID, bindingRevision: 1,
-            stableIdentityDigest: []),
+            authorityNamespace: "arkdeck", bindingID: deviceBinding.targetID,
+            bindingRevision: UInt64(max(0, deviceBinding.bindingRevision)),
+            stableIdentityDigest: ArkForgeLaneHost.digestBytes(
+              deviceBinding.stableIdentitySHA256) ?? []),
           controllerSessionID: "arkdeck-agentd")
       }
     ) {

@@ -1396,6 +1396,19 @@ public actor RuntimeJobEngine {
       current.record.operationFailure = RuntimeOperationFailure(
         code: .cancelled, category: .cancelled,
         retryability: .notAutomatic, recovery: .none)
+      // Close the capability use here, exactly as the analyzer's own
+      // cancellation closes its one. Draining to `cancelled` without recording
+      // an outcome leaves the use `pending`, and the target-lineage guard then
+      // refuses *every* later destructive job on that binding with "unresolved
+      // capability … outcome pending" — measured 2026-08-18, where one
+      // cancelled DAYU200 flash left the board unflashable by any new job.
+      //
+      // `.confirmed` is the honest outcome, for the reason the rollover comment
+      // gives: a drained cancellation is one the engine proved did not
+      // dispatch, which is a stronger statement than `succeeded` makes.
+      try await recordCapabilityOutcome(
+        for: current.record, outcome: .confirmed,
+        state: JobState.cancelled.rawValue)
     } else {
       try transition(
         &current, from: executionState, to: .finalizing, reason: "steps-complete")
