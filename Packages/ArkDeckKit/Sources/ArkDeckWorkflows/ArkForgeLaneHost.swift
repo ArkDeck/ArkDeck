@@ -296,6 +296,10 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
   }
 
+  package func latestReceipt(jobID: String) -> ArkForgeActionReceiptSummary? {
+    lastReceiptByJob[jobID]
+  }
+
   /// Drops a finished job's receipts.
   package func forget(jobID: String) {
     receiptsByJob[jobID] = nil

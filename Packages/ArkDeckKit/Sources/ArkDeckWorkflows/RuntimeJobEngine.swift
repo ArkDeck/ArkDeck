@@ -701,6 +701,12 @@ public actor RuntimeJobEngine {
       stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
       binding: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary
+
+    /// The terminal receipt of this job's completed lane run, if it ran.
+    ///
+    /// The delegated postflight still owes the engine's catalog its declared
+    /// product; the facts it is built from live in this receipt.
+    func latestReceipt(jobID: String) async -> ArkForgeActionReceiptSummary?
   }
 
   public struct Configuration: Sendable {
@@ -1633,7 +1639,7 @@ public actor RuntimeJobEngine {
       // configured for this operation, that is `arkforged`'s plan, and doing it
       // here as well leaves the lane asking for a transition already spent.
       if Self.arkForgeOwnedModeSteps.contains(step.stepID),
-        configuration.arkForgeLane != nil,
+        let lane = configuration.arkForgeLane,
         descriptor.steps.contains(where: {
           Self.arkForgeDispatchedSteps.contains($0.stepID)
         })
@@ -1641,6 +1647,16 @@ public actor RuntimeJobEngine {
         appendTimeline(
           jobID: jobID,
           entry: "delegated \(step.stepID) to the ArkForge lane's own plan")
+        if step.stepID == "rebind-and-verify-build" {
+          // Delegation moves the verification, not the obligation: this step
+          // owes the catalog `post-flash-facts.json`, and the facts it is
+          // built from are in the lane's terminal receipt — the daemon's own
+          // postflight, which verified the bound identity and the published
+          // build before the lane returned. Measured 2026-08-18: the first
+          // otherwise-green run failed at finalize on exactly this missing
+          // product.
+          try await publishLanePostflightFacts(jobID: jobID, step: step, lane: lane)
+        }
         completedStepIDs.insert(step.stepID)
         if var runtime = jobs[jobID] {
           runtime.completedStepIDs = completedStepIDs
@@ -3324,6 +3340,52 @@ public actor RuntimeJobEngine {
   /// mapping is declared in the catalog, so a step cannot invent an
   /// artifact and a declared artifact cannot silently vanish - anything
   /// the step could not produce is recorded with its reason instead.
+  /// Publishes the delegated postflight's declared product from the lane's
+  /// terminal receipt.
+  ///
+  /// The receipt's facts are the daemon's verified observation — the bound
+  /// identity, the exact product model and build — so they become the
+  /// record's evidence observation, and the catalog artifact is built from
+  /// that record the same way the engine-run step would have built it.
+  private func publishLanePostflightFacts(
+    jobID: String,
+    step: CatalogStepDescriptor,
+    lane: any ArkForgeLane
+  ) async throws {
+    guard let receipt = await lane.latestReceipt(jobID: jobID) else {
+      // No lane run has happened for this job, so nothing verified anything:
+      // the required product cannot be built from facts nobody produced.
+      throw RuntimeDispatchFailure.failed(
+        "\(step.stepID) was delegated but the lane holds no receipt for \(jobID)")
+    }
+    let facts = Dictionary(
+      receipt.facts.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
+    if var runtime = jobs[jobID] {
+      runtime.record.evidenceObservation = RuntimeEvidenceObservation(
+        targetID: runtime.record.request.target.targetID,
+        bindingRevision: runtime.record.request.target.expectedBindingRevision,
+        stableIdentitySHA256: facts["stableIdentitySHA256"]
+          ?? runtime.record.materializedStableTargetIdentitySHA256,
+        model: facts["const.product.model"],
+        firmware: facts["const.ohos.fullname"],
+        transport: "hdc",
+        providerID: runtime.record.providerID,
+        toolVersion: "",
+        toolSHA256: "",
+        confirmedAtUTC: nowUTC(),
+        confirmationMethod: "arkforge-lane-postflight",
+        preflightSteps: [])
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
+    }
+    try await publishDeclaredArtifacts(
+      jobID: jobID, step: step, summary: facts,
+      receipt: ProviderProcessReceipt(
+        exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false,
+        durationSeconds: 0, hostManagedRecordID: nil,
+        hostManagedSummary: facts, landedArtifact: nil))
+  }
+
   private func publishDeclaredArtifacts(
     jobID: String,
     step: CatalogStepDescriptor,
