@@ -7,10 +7,17 @@
 
 import ArkDeckAgentClient
 import ArkDeckCore
-import ArkDeckHarness
 import ArkDeckRuntime
 import CryptoKit
 import Foundation
+
+private enum AgentChatTaskWireField {
+  static let lifecycle = "lifecycle"
+  static let stage = "stage"
+  static let legacyStatus = "status"
+  static let legacyPhase = "phase"
+  static let humanRequired = "humanRequired"
+}
 
 package protocol AgentChatRuntimePort: Sendable {
   func request(method: String, params: [String: JSONValue]?) throws -> JSONValue
@@ -912,8 +919,8 @@ package actor NativeAgentChatRuntimeTools {
       "taskRef": .string(taskReference(for: taskID))
     ]
     for key in [
-      "type", HarnessTaskWireField.lifecycle, HarnessTaskWireField.stage, "waitReason",
-      "conditions", HarnessTaskWireField.legacyStatus, HarnessTaskWireField.legacyPhase,
+      "type", AgentChatTaskWireField.lifecycle, AgentChatTaskWireField.stage, "waitReason",
+      "conditions", AgentChatTaskWireField.legacyStatus, AgentChatTaskWireField.legacyPhase,
       "activeRound", "activeJobId", "cancelRequested", "version", "updatedAtUtc", "budgets",
       "consumedBudget", "allowedOperations", "result",
     ] {
@@ -944,7 +951,7 @@ package actor NativeAgentChatRuntimeTools {
     taskID: String,
     observedAtTurn: Int
   ) {
-    if taskLifecycle(value) == HarnessTaskLifecycle.humanRequired.rawValue {
+    if taskLifecycle(value) == AgentChatTaskWireField.humanRequired {
       if pendingTaskPause?.taskID != taskID {
         pendingTaskPause = PendingTaskPause(taskID: taskID, userTurn: observedAtTurn)
       }
@@ -955,15 +962,17 @@ package actor NativeAgentChatRuntimeTools {
 
   private func taskLifecycle(_ value: JSONValue) -> String? {
     guard case .object(let fields) = value else { return nil }
-    if case .string(let lifecycle)? = fields[HarnessTaskWireField.lifecycle] { return lifecycle }
-    if case .string(let status)? = fields[HarnessTaskWireField.legacyStatus] { return status }
+    if case .string(let lifecycle)? = fields[AgentChatTaskWireField.lifecycle] {
+      return lifecycle
+    }
+    if case .string(let status)? = fields[AgentChatTaskWireField.legacyStatus] { return status }
     return nil
   }
 
   private func taskStage(_ value: JSONValue) -> String? {
     guard case .object(let fields) = value else { return nil }
-    if case .string(let stage)? = fields[HarnessTaskWireField.stage] { return stage }
-    if case .string(let phase)? = fields[HarnessTaskWireField.legacyPhase] { return phase }
+    if case .string(let stage)? = fields[AgentChatTaskWireField.stage] { return stage }
+    if case .string(let phase)? = fields[AgentChatTaskWireField.legacyPhase] { return phase }
     return nil
   }
 
@@ -1045,7 +1054,8 @@ package actor NativeAgentChatRuntimeTools {
 
   private func targetReference(for targetID: String) -> String {
     if let existing = targetReferencesByID[targetID] { return existing }
-    let base = HarnessDecisionContext.pseudonym(forTargetID: targetID)
+    let digest = SHA256Hex.string(of: Data("arkdeck-harness-target|\(targetID)".utf8))
+    let base = "target-\(digest.prefix(12))"
     var reference = base
     var suffix = 2
     while let existing = targetIDsByReference[reference], existing != targetID {

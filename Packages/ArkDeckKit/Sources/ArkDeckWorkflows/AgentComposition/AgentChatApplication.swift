@@ -5,8 +5,16 @@
 // pseudonymous, bounded projections produced by NativeAgentChatRuntimeTools.
 
 import ArkDeckCore
-import ArkDeckHarness
 import Foundation
+
+/// The historical environment spelling remains stable for compatibility,
+/// while ownership moves out of the Harness task plane.
+package enum AgentChatConfiguration {
+  package static let providerKey = "ARKDECK_HARNESS_MODEL_PROVIDER"
+  package static let apiKeyKey = "ARKDECK_HARNESS_MODEL_API_KEY"
+  package static let modelKey = "ARKDECK_HARNESS_MODEL_NAME"
+  package static let endpointKey = "ARKDECK_HARNESS_MODEL_ENDPOINT"
+}
 
 public enum AgentChatApplicationError: Error, Equatable, Sendable, CustomStringConvertible {
   case providerRequired
@@ -60,7 +68,7 @@ package actor AgentChatApplication {
 
   private let runtimeTools: NativeAgentChatRuntimeTools
   private let session: HarnessAgentSession
-  public nonisolated let modelDescriptor: HarnessModelDescriptor
+  package nonisolated let modelDescriptor: AgentModelDescriptor
 
   public init(
     gateway: any HarnessAgentModelGateway,
@@ -96,20 +104,20 @@ package actor AgentChatApplication {
   package static func liveGateway(
     environment: [String: String]
   ) throws -> OpenAIHarnessAgentGateway {
-    guard let rawProvider = nonempty(environment[HarnessVendorConfiguration.providerKey]) else {
+    guard let rawProvider = nonempty(environment[AgentChatConfiguration.providerKey]) else {
       throw AgentChatApplicationError.providerRequired
     }
     let provider = rawProvider.lowercased()
     guard provider == "openai" else {
       throw AgentChatApplicationError.unsupportedProvider(rawProvider)
     }
-    guard let apiKey = nonempty(environment[HarnessVendorConfiguration.apiKeyKey]),
+    guard let apiKey = nonempty(environment[AgentChatConfiguration.apiKeyKey]),
       apiKey.utf8.count <= 8_192,
       !apiKey.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
     else {
       throw AgentChatApplicationError.missingCredential
     }
-    guard let model = nonempty(environment[HarnessVendorConfiguration.modelKey]),
+    guard let model = nonempty(environment[AgentChatConfiguration.modelKey]),
       model.utf8.count <= 200,
       model.allSatisfy({
         $0.isASCII && ($0.isLetter || $0.isNumber || "._:-".contains($0))
@@ -118,15 +126,15 @@ package actor AgentChatApplication {
       throw AgentChatApplicationError.malformedModelName
     }
     let endpoint =
-      nonempty(environment[HarnessVendorConfiguration.endpointKey])
-      ?? OpenAIDecisionGateway.defaultEndpoint
+      nonempty(environment[AgentChatConfiguration.endpointKey])
+      ?? OpenAIHarnessAgentGateway.defaultEndpoint
     guard let url = URL(string: endpoint), url.scheme == "https", url.host != nil,
       url.user == nil, url.password == nil, url.query == nil, url.fragment == nil
     else {
       throw AgentChatApplicationError.malformedEndpoint
     }
     return OpenAIHarnessAgentGateway(
-      credential: HarnessVendorCredential(
+      credential: AgentVendorCredential(
         apiKey: apiKey, endpoint: endpoint, modelName: model))
   }
 

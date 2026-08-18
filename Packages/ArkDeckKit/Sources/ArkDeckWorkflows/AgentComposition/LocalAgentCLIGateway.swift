@@ -40,7 +40,7 @@ package enum HarnessLocalAgentResponseChannel: String, Sendable, Equatable {
 
 /// One concrete local agent CLI: how to invoke it for a single bounded,
 /// non-interactive answer, and how to read that answer back.
-package struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
+package struct LocalAgentCLIProfile: Sendable, Equatable {
   /// Stable identifier; it names the producer in durable decision records, so
   /// it may not drift once a record exists.
   public let profileID: String
@@ -83,7 +83,7 @@ package struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// OpenAI Codex CLI. `codex exec` emits session diagnostics on stdout even
   /// with `--color never`, so its explicit output file is what keeps those
   /// diagnostics from becoming JSON input.
-  package static let codex = HarnessLocalAgentCLIProfile(
+  package static let codex = LocalAgentCLIProfile(
     profileID: "codex",
     providerLabel: "openai-codex-cli",
     responseChannel: .finalMessageFile
@@ -112,7 +112,7 @@ package struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// to route around its own approval gate and answer with prose about that
   /// instead of the decision (observed on device, 2026-08-05). The harness
   /// wants pure text-in/text-out reasoning here, not an agent with tools.
-  package static let claudeCode = HarnessLocalAgentCLIProfile(
+  package static let claudeCode = LocalAgentCLIProfile(
     profileID: "claude-code",
     providerLabel: "anthropic-claude-code-cli",
     responseChannel: .standardOutput,
@@ -127,12 +127,16 @@ package struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
 
   /// The closed set. A provider name outside it is a configuration error, not
   /// an improvised command line.
-  public static let all: [HarnessLocalAgentCLIProfile] = [codex, claudeCode]
+  public static let all: [LocalAgentCLIProfile] = [codex, claudeCode]
 
-  public static func named(_ profileID: String) -> HarnessLocalAgentCLIProfile? {
+  public static func named(_ profileID: String) -> LocalAgentCLIProfile? {
     all.first { $0.profileID == profileID.lowercased() }
   }
 }
+
+// Compatibility for the still-live Harness decision gateway until AND-003.
+// New product compositions use the plane-neutral name above.
+package typealias HarnessLocalAgentCLIProfile = LocalAgentCLIProfile
 
 package struct HarnessLocalAgentCLIRequest: Sendable, Equatable {
   public let executablePath: String

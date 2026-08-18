@@ -536,26 +536,26 @@ final class NativeAgentChatContractTests: XCTestCase {
     }
     XCTAssertThrowsError(
       try AgentChatApplication.liveGateway(environment: [
-        HarnessVendorConfiguration.providerKey: "claude",
-        HarnessVendorConfiguration.modelKey: "model",
-        HarnessVendorConfiguration.apiKeyKey: "secret",
+        AgentChatConfiguration.providerKey: "claude",
+        AgentChatConfiguration.modelKey: "model",
+        AgentChatConfiguration.apiKeyKey: "secret",
       ])) { error in
         XCTAssertEqual(error as? AgentChatApplicationError, .unsupportedProvider("claude"))
       }
     XCTAssertThrowsError(
       try AgentChatApplication.liveGateway(environment: [
-        HarnessVendorConfiguration.providerKey: "openai",
-        HarnessVendorConfiguration.modelKey: "model",
-        HarnessVendorConfiguration.apiKeyKey: "secret",
-        HarnessVendorConfiguration.endpointKey: "http://model.invalid/v1/chat/completions",
+        AgentChatConfiguration.providerKey: "openai",
+        AgentChatConfiguration.modelKey: "model",
+        AgentChatConfiguration.apiKeyKey: "secret",
+        AgentChatConfiguration.endpointKey: "http://model.invalid/v1/chat/completions",
       ])) { error in
         XCTAssertEqual(error as? AgentChatApplicationError, .malformedEndpoint)
       }
 
     let gateway = try AgentChatApplication.liveGateway(environment: [
-      HarnessVendorConfiguration.providerKey: "openai",
-      HarnessVendorConfiguration.modelKey: "gpt-test",
-      HarnessVendorConfiguration.apiKeyKey: "secret",
+      AgentChatConfiguration.providerKey: "openai",
+      AgentChatConfiguration.modelKey: "gpt-test",
+      AgentChatConfiguration.apiKeyKey: "secret",
     ])
     XCTAssertEqual(gateway.modelDescriptor.modelName, "gpt-test")
   }
@@ -578,7 +578,7 @@ final class NativeAgentChatContractTests: XCTestCase {
 }
 
 private final class ScriptedAgentModelGateway: HarnessAgentModelGateway, @unchecked Sendable {
-  let modelDescriptor = HarnessModelDescriptor(
+  let modelDescriptor = AgentModelDescriptor(
     provider: "test", modelName: "scripted", adapterVersion: "1")
   private let lock = NSLock()
   private var scripts: [[HarnessAgentModelEvent]]

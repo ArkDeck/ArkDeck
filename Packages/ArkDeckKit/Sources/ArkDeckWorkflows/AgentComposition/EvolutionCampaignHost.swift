@@ -2,12 +2,19 @@
 // (CHG-2026-025 r8, TASK-AIN-019).
 
 import ArkDeckCore
-import ArkDeckHarness
 import ArkDeckStorage
 import ArkDeckWorkflows
 import CryptoKit
 import Darwin
 import Foundation
+
+private enum EvolutionCampaignRepairConfiguration {
+  // Preserve the accepted environment spelling while severing campaign
+  // ownership from the retiring decision-plane configuration.
+  static let providerKey = "ARKDECK_HARNESS_MODEL_PROVIDER"
+  static let cliPathKey = "ARKDECK_HARNESS_CLI_PATH"
+  static let modelKey = "ARKDECK_HARNESS_MODEL_NAME"
+}
 
 package struct RockchipEvolutionCampaignPreview: Sendable, Equatable {
   public let assertion: RockchipEvolutionCampaignConfirmationAssertion
@@ -754,10 +761,11 @@ package final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   private static func repairer(
     environment: [String: String], workingDirectory: String
   ) throws -> any RockchipEvolutionStrategyRepairing {
-    guard let provider = environment[HarnessVendorConfiguration.providerKey]?.lowercased(),
-      let profile = HarnessLocalAgentCLIProfile.named(provider),
-      let path = environment[HarnessVendorConfiguration.cliPathKey],
-      let model = environment[HarnessVendorConfiguration.modelKey]
+    guard
+      let provider = environment[EvolutionCampaignRepairConfiguration.providerKey]?.lowercased(),
+      let profile = LocalAgentCLIProfile.named(provider),
+      let path = environment[EvolutionCampaignRepairConfiguration.cliPathKey],
+      let model = environment[EvolutionCampaignRepairConfiguration.modelKey]
     else { return PublishedRockchipEvolutionStrategyRepairer() }
     return try LocalAgentRockchipEvolutionStrategyRepairer(
       profile: profile, executablePath: path, modelName: model,

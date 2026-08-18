@@ -8,14 +8,16 @@
 // entries as measurements. A shared contract must live below every party
 // that speaks it, so it lives here in ArkDeckRuntime (runtime contracts) —
 // not in ArkDeckHarness, which would force the runtime engine and the
-// analyzer provider to import the harness plane. The parsing and judging
-// logic that *produces* an analysis stays in
-// `ArkDeckHarness/Evaluation/HarnessFaultLogLedger.swift`.
+// analyzer provider to import the harness plane. The parsing primitive now
+// lives beside this contract so the Workflows analyzer and the legacy Harness
+// reader can share it without a cross-plane dependency; the executable
+// producer lives beside Workflows/AnalyzerProvider.
 //
 // The `Harness` name prefix is retained: renaming a persisted, versioned
 // schema type would churn every call site and test without changing a byte
 // on the wire.
 
+import ArkDeckCore
 import Foundation
 
 /// One line of the ledger listing, decomposed. Entry names are
@@ -75,6 +77,13 @@ package struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
     self.status = status
     self.entries = entries
     self.unreadableReason = unreadableReason
+  }
+
+  /// The exact analyzer bytes recorded in the derived envelope. Keeping the
+  /// encoder at the wire-contract layer lets every consumer recompute the
+  /// digest without depending on the executable producer.
+  package func canonicalData() throws -> Data {
+    try CanonicalJSONEncoders.canonical().encode(self)
   }
 }
 
