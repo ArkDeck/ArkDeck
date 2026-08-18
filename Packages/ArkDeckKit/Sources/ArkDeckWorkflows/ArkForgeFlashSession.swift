@@ -68,6 +68,31 @@ package actor ArkForgeFlashSession {
     case outcomeUnknown(reason: String, receipts: [ArkForgeActionReceiptSummary])
   }
 
+  /// A daemon answer this session must not paper over.
+  ///
+  /// Both of these used to be discarded — the submit calls return a
+  /// `SubmissionOutcome`, the daemon says *accepted or rejected* inside an OK
+  /// response, and this session read neither. A rejected control receipt
+  /// therefore vanished: the daemon kept waiting for a receipt, this side kept
+  /// polling for events, and the operator watched a job that was neither
+  /// failing nor progressing. An answer the daemon rejected is now a named
+  /// stop, carrying the daemon's own code.
+  package enum SessionError: Error, Equatable, CustomStringConvertible {
+    case permitRejected(stepID: String, code: String, message: String)
+    case controlReceiptRejected(requestID: String, code: String, message: String)
+
+    package var description: String {
+      switch self {
+      case .permitRejected(let stepID, let code, let message):
+        return "arkforged rejected the permit for \(stepID): \(code) \(message)"
+      case .controlReceiptRejected(let requestID, let code, let message):
+        return
+          "arkforged rejected the control receipt for \(requestID): \(code) \(message). "
+          + "The job was cancelled rather than left waiting for a receipt it refuses"
+      }
+    }
+  }
+
   /// How a cancellation attempt resolved (design §6.3.1).
   ///
   /// Once dispatch leaves the ArkDeck process, that process group is no longer
@@ -174,8 +199,13 @@ package actor ArkForgeFlashSession {
           // key meant this never saw a terminal answer at all.
           switch event.facts.first(where: { $0.key == "outcome" })?.value ?? "" {
           case "outcomeUnknown", "recoveryAssessable":
+            // The daemon publishes why beside the classification. Without it
+            // the operator gets "unknown" while the one line naming the cause
+            // sits in a CBOR journal on the other side of the boundary.
+            let why = event.facts.first(where: { $0.key == "reason" })?.value
             terminal = .outcomeUnknown(
-              reason: "the daemon classified this job's outcome as unknown",
+              reason: why.map { "the daemon classified this job's outcome as unknown: \($0)" }
+                ?? "the daemon classified this job's outcome as unknown",
               receipts: self.receipts)
           case "cancelledSafe":
             terminal = .cancelledSafe(receipts: self.receipts)
@@ -248,11 +278,28 @@ package actor ArkForgeFlashSession {
   ) async throws -> Bool {
     switch await authority.admit(admission) {
     case .sign(let permit):
-      _ = try daemon.submitStepPermit(
+      let response = try daemon.submitStepPermit(
         ArkForgeSubmitStepPermitRequest(
           jobID: jobID, requestID: admission.requestID, permitCBOR: permit.signingBody,
           integrityTag: permit.integrityTag, pairingEpoch: permit.pairingEpoch.value),
         requestID: "permit-\(admission.requestID)")
+      guard response.accepted else {
+        // The daemon said no inside an OK response, and this used to be
+        // discarded — which is how three refusal codes in a row (unknownJob,
+        // planMismatch, snapshotExpired) each cost a bench session to see.
+        refusals.append(
+          "\(admission.stepID): permit rejected: "
+            + "\(response.rejectionCode) \(response.rejectionMessage)")
+        if response.rejectionCode == "SNAPSHOT_EXPIRED" {
+          // The one rejection that heals itself: the snapshot expires, the
+          // admission runs again, the next snapshot is fresher. No permit is
+          // outstanding, so nothing is owed a receipt.
+          return false
+        }
+        throw SessionError.permitRejected(
+          stepID: admission.stepID, code: response.rejectionCode,
+          message: response.rejectionMessage)
+      }
       return true
     case .refuse(let why):
       // Reported, not withheld. Silence lets the snapshot expire and admission
@@ -284,8 +331,20 @@ package actor ArkForgeFlashSession {
     let receipt = try ArkForgeManagedControlPort.receipt(
       jobID: jobID, requestID: request.requestID, action: request.action,
       observation: observation)
-    _ = try daemon.submitManagedControlReceipt(
+    let response = try daemon.submitManagedControlReceipt(
       receipt, requestID: "control-\(request.requestID)")
+    guard response.accepted else {
+      // A rejected receipt leaves the daemon still waiting on the request.
+      // Discarding the rejection — which is what happened here — left both
+      // sides waiting on the other with nothing recorded anywhere. Cancel so
+      // the daemon's job settles rather than parks, then stop with the
+      // daemon's own code. (The daemon also enforces the request deadline now,
+      // so even a session that dies right here strands nothing for long.)
+      _ = try? daemon.cancelJob(jobID: jobID, requestID: "cancel-\(request.requestID)")
+      throw SessionError.controlReceiptRejected(
+        requestID: request.requestID, code: response.rejectionCode,
+        message: response.rejectionMessage)
+    }
   }
 
   /// Requests cancellation and maps the answer into the engine's vocabulary.

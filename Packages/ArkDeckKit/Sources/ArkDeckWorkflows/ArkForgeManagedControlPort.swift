@@ -1,5 +1,6 @@
 import ArkDeckCore
 import ArkForgeIPC
+import CryptoKit
 import Foundation
 
 /// ArkDeck's side of the `ManagedDeviceControlPort`.
@@ -167,13 +168,41 @@ package enum ArkForgeManagedControlPort {
       }
     }
 
+    // The evidence digest of an accepted receipt is defined, not supplied: the
+    // canonical digest of the receipt's own facts, which the daemon recomputes
+    // before taking the receipt. A refusal made no observation and carries no
+    // evidence — and the daemon takes it that way, rather than demanding a
+    // digest of nothing.
     return ArkForgeSubmitManagedControlReceiptRequest(
       jobID: jobID, requestID: requestID, action: action, accepted: observation.accepted,
       facts: observation.facts
         .sorted { $0.key < $1.key }
         .map { ArkForgeKeyValue(key: $0.key, value: $0.value) },
-      evidenceSHA256: observation.evidenceSHA256,
+      evidenceSHA256: observation.accepted ? canonicalFactsDigest(observation.facts) : [],
       failureReason: observation.failureReason)
+  }
+
+  /// The defined evidence digest of an accepted receipt: SHA-256 over
+  /// `key=value\n` lines with the keys in byte order.
+  ///
+  /// `arkforged` recomputes exactly this before accepting a receipt
+  /// (`canonical_facts_digest`, jobs.rs), so the two spellings must stay
+  /// byte-identical — facts and evidence that can drift apart across the
+  /// boundary are how this channel failed the first time. Keys are sorted by
+  /// their UTF-8 bytes, matching Rust's `&str` ordering, not by Swift's
+  /// Unicode-aware `<`.
+  package static func canonicalFactsDigest(_ facts: [String: String]) -> [UInt8] {
+    var bytes = Data()
+    let ordered = facts.sorted {
+      Array($0.key.utf8).lexicographicallyPrecedes(Array($1.key.utf8))
+    }
+    for (key, value) in ordered {
+      bytes.append(contentsOf: Data(key.utf8))
+      bytes.append(0x3d)  // "="
+      bytes.append(contentsOf: Data(value.utf8))
+      bytes.append(0x0a)  // "\n"
+    }
+    return Array(SHA256.hash(data: bytes))
   }
 
   /// Scans anything bound for a journal or a UI event for the same leaks.

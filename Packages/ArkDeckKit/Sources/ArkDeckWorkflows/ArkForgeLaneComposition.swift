@@ -295,19 +295,21 @@ package enum ArkForgeLaneComposition {
         lane: ArkForgeLaneHost(
         connection: .init(socketPath: socket, controllerSessionID: "arkdeck-agentd"),
         makePerformer: { binding, jobID in
+          // Ingredients, not a descriptor: the performer materializes a valid
+          // per-action descriptor through the catalog. The descriptor that
+          // used to be fabricated here (`identifier: "arkforge.managedControl"`,
+          // `actionSHA256: ""`) matched no action's identifier and no action's
+          // digest, so the validating host refused every control action this
+          // lane ever attempted — the flash stalled at its first step with
+          // both sides waiting on the other.
           ArkForgeControlPerformer(
             binding: .init(
+              jobID: jobID,
+              targetID: binding.targetID,
+              bindingRevision: binding.bindingRevision,
               connectKey: binding.connectKey,
               stableIdentitySHA256: binding.stableIdentitySHA256,
               usbTopology: binding.usbTopology,
-              descriptor: HostManagedProcessDescriptor(
-                identifier: "arkforge.managedControl", jobID: jobID,
-                stepID: "managed-control", targetID: binding.targetID,
-                bindingRevision: binding.bindingRevision,
-                connectKey: binding.connectKey,
-                expectedIdentitySHA256: binding.stableIdentitySHA256,
-                providerExecutableSHA256: executable.sha256,
-                actionSHA256: "", executionTuning: nil),
               rockchipExecutable: executable),
             host: host())
         },

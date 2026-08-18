@@ -113,7 +113,11 @@ final class ArkForgeManagedControlPortContractTests: XCTestCase {
         observedDisconnect: true, observedUniqueLoaderRebind: true))
     XCTAssertTrue(receipt.accepted)
     XCTAssertEqual(receipt.facts.map(\.key), ["mode", "stableIdentitySHA256", "usbTopology"])
-    XCTAssertEqual(receipt.evidenceSHA256, evidence)
+    // The port defines the evidence rather than relaying the observation's
+    // bytes: the canonical digest of the receipt's own facts, which the daemon
+    // recomputes before taking it.
+    XCTAssertEqual(
+      receipt.evidenceSHA256, ArkForgeManagedControlPort.canonicalFactsDigest(modeFacts()))
     XCTAssertTrue(receipt.failureReason.isEmpty)
   }
 
@@ -210,5 +214,54 @@ final class ArkForgeManagedControlPortContractTests: XCTestCase {
       ArkForgeManagedControlPort.forbiddenReceiptFacts,
       ["connectKey", "hdcExecutablePath", "hdcEndpoint", "argv", "shell",
        "serverLifecycleAction"])
+  }
+
+  // MARK: - The evidence digest, shared with the daemon byte for byte
+
+  func testTheCanonicalFactsDigestMatchesTheDaemonsSpelling() {
+    // Golden vector, mirrored in arkforged's admission_surface tests
+    // (`the_canonical_facts_digest_matches_the_authoritys_spelling`). The
+    // daemon recomputes this digest before taking an accepted receipt, so if
+    // either side respells it, exactly one of the two suites goes red — which
+    // is the property the old channel lacked: its two hand-rolled halves could
+    // drift with every suite green.
+    let facts = [
+      "mode": "Loader",
+      "stableIdentitySHA256":
+        "94a25a89c9c214dc9f8a0cf1b2cb3703a466e132a97fa015dfdbebfc65546f42",
+      "usbTopology": "17956864",
+    ]
+    XCTAssertEqual(
+      SHA256Hex.lowercaseHex(ArkForgeManagedControlPort.canonicalFactsDigest(facts)),
+      "68c995f4a099a63f61c3226a70e6691889050b767100d991f383c5f09962ad1f")
+    XCTAssertEqual(
+      SHA256Hex.lowercaseHex(ArkForgeManagedControlPort.canonicalFactsDigest([:])),
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+  }
+
+  func testAnAcceptedReceiptCarriesTheFactsDigestAndARefusalCarriesNone() throws {
+    let facts = [
+      "mode": "Loader",
+      "stableIdentitySHA256": String(repeating: "ab", count: 32),
+      "usbTopology": "17956864",
+    ]
+    let accepted = try ArkForgeManagedControlPort.receipt(
+      jobID: "JOB-1", requestID: "REQ-1", action: .enterUpdater,
+      observation: .init(
+        accepted: true, facts: facts, evidenceSHA256: [],
+        observedDisconnect: true, observedUniqueLoaderRebind: true))
+    XCTAssertEqual(
+      accepted.evidenceSHA256, ArkForgeManagedControlPort.canonicalFactsDigest(facts))
+    XCTAssertEqual(accepted.evidenceSHA256.count, 32)
+
+    // A refusal made no observation; there is nothing to digest, and the
+    // daemon takes it that way. Demanding evidence of nothing is the exact
+    // shape that deadlocked the channel.
+    let refused = try ArkForgeManagedControlPort.receipt(
+      jobID: "JOB-1", requestID: "REQ-1", action: .enterUpdater,
+      observation: .init(
+        accepted: false, facts: [:], evidenceSHA256: [],
+        failureReason: "the Loader was not observed"))
+    XCTAssertTrue(refused.evidenceSHA256.isEmpty)
   }
 }
