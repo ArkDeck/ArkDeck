@@ -491,6 +491,14 @@ final class ArkForgeFlashPlanMaterializationContractTests: XCTestCase {
     XCTAssertFalse(local.contains(RuntimeJobEngine.arkForgeDispatchKind))
     XCTAssertEqual(RuntimeJobEngine.arkForgeDispatchKind, "arkforgeStepPermit")
   }
+
+  func testTheNativeDigestProducesTheStepPermitDescriptor() {
+    let nativeDigest = String(repeating: "a", count: 64)
+    XCTAssertEqual(
+      RuntimeJobEngine.arkForgeStepPermitDescriptor(
+        toolchainSHA256: nativeDigest),
+      "arkforge.stepPermit#toolchain-sha256:\(nativeDigest)")
+  }
 }
 
 /// The engine's delegated-dispatch branch.
@@ -584,6 +592,30 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       refusal: nil, executionReady: true, executionBlockers: [],
       toolchainID: "rkdeveloptool", toolchainSHA256: ArkForgeToolchainPin.signedSHA256)
     XCTAssertNoThrow(try ArkForgeLaneHost.verifyReadiness(ready))
+  }
+
+  func testAReadyNativeDaemonMustMatchTheIdentityBoundArkforgedDigest() throws {
+    let daemonDigest = String(repeating: "a", count: 64)
+    let ready = ArkForgeHelloAck(
+      protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
+      refusal: nil, executionReady: true, executionBlockers: [],
+      toolchainID: "arkforged-native-rockusb", toolchainSHA256: daemonDigest)
+    XCTAssertNoThrow(
+      try ArkForgeLaneHost.verifyReadiness(
+        ready,
+        expectedToolchain: .init(
+          id: "arkforged-native-rockusb", sha256: daemonDigest)))
+
+    let wrongBuild = ArkForgeHelloAck(
+      protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
+      refusal: nil, executionReady: true, executionBlockers: [],
+      toolchainID: "arkforged-native-rockusb",
+      toolchainSHA256: String(repeating: "b", count: 64))
+    XCTAssertThrowsError(
+      try ArkForgeLaneHost.verifyReadiness(
+        wrongBuild,
+        expectedToolchain: .init(
+          id: "arkforged-native-rockusb", sha256: daemonDigest)))
   }
 
   func testTheSecondDelegatedStepIsServedFromTheFirstRunNotASecondJob() async throws {

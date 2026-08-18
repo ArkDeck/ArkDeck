@@ -679,6 +679,11 @@ public actor RuntimeJobEngine {
   /// engine owns. Absent means this build cannot perform those steps, and the
   /// engine says so at the step rather than pretending otherwise.
   package protocol ArkForgeLane: Sendable {
+    /// Exact backend digest this lane was composed against. Immutable and
+    /// nonisolated on the production actor so materialization can bind the
+    /// StepPermit before any lane call or external effect.
+    var toolchainSHA256: String { get }
+
     /// Performs one delegated step and returns the daemon's semantic receipt.
     ///
     /// Throwing here is a dispatch failure like any other. What must never
@@ -751,6 +756,10 @@ public actor RuntimeJobEngine {
     /// of it. Composed together with the lane, and empty exactly when the lane
     /// is absent.
     package let arkForgeDeviceProfileID: String?
+    /// Exact backend digest selected by the composed ArkForge lane. `nil`
+    /// retains the vendor pin for an absent lane so plan-only behaviour stays
+    /// byte-compatible; no delegated step can dispatch without the lane.
+    package let arkForgeToolchainSHA256: String?
 
     public init(
       stateDirectory: URL,
@@ -763,6 +772,7 @@ public actor RuntimeJobEngine {
       self.testHooks = .none
       self.arkForgeLane = nil
       self.arkForgeDeviceProfileID = nil
+      self.arkForgeToolchainSHA256 = nil
     }
 
     package init(
@@ -779,6 +789,7 @@ public actor RuntimeJobEngine {
       self.testHooks = testHooks
       self.arkForgeLane = arkForgeLane
       self.arkForgeDeviceProfileID = arkForgeDeviceProfileID
+      self.arkForgeToolchainSHA256 = arkForgeLane?.toolchainSHA256
     }
   }
 
@@ -857,6 +868,12 @@ public actor RuntimeJobEngine {
 
   /// The `processKind` those steps carry in a materialized plan.
   package static let arkForgeDispatchKind = "arkforgeStepPermit"
+
+  package static func arkForgeStepPermitDescriptor(
+    toolchainSHA256: String
+  ) -> String {
+    "arkforge.stepPermit#toolchain-sha256:\(toolchainSHA256)"
+  }
 
   private struct MaterializedPlanStep: Codable {
     let stepID: String
@@ -5797,8 +5814,9 @@ public actor RuntimeJobEngine {
               // materialized for one tool and executed against another is a
               // maturity combination nobody published, and the daemon refuses
               // it at startExecution — this is so the digest disagrees first.
-              hostManagedDescriptor:
-                "arkforge.stepPermit#toolchain-sha256:\(ArkForgeToolchainPin.signedSHA256)"))
+              hostManagedDescriptor: Self.arkForgeStepPermitDescriptor(
+                toolchainSHA256: configuration.arkForgeToolchainSHA256
+                  ?? ArkForgeToolchainPin.signedSHA256)))
           continue
         }
         let action = try provider.action(

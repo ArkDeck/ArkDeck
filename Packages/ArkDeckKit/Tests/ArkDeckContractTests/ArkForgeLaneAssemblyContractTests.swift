@@ -52,12 +52,13 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   }
 
   private static func readyAck(
+    toolchainID: String = ArkForgeToolchainPin.toolchainID,
     toolchain: String = ArkForgeToolchainPin.signedSHA256
   ) -> ArkForgeHelloAck {
     ArkForgeHelloAck(
       protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
       refusal: nil, executionReady: true, executionBlockers: [],
-      toolchainID: "rkdeveloptool", toolchainSHA256: toolchain)
+      toolchainID: toolchainID, toolchainSHA256: toolchain)
   }
 
   private func dependencies() -> ArkForgeLaneComposition.Dependencies {
@@ -110,6 +111,59 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     guard case .success = result else {
       return XCTFail("a fully configured daemon must produce a lane, got \(result)")
     }
+  }
+
+  func testAFAAC7ComposesTheNativeBuildIdentityAndArgument() async throws {
+    var nativeEnvironment = environment
+    nativeEnvironment["ARKDECK_ARKFORGE_CAMPAIGN"] = "AFA-AC-7"
+    let daemonDigest = try XCTUnwrap(nativeEnvironment["ARKDECK_ARKFORGED_SHA256"])
+    let seen = LaunchRecorder()
+    let result = await ArkForgeLaneComposition.compose(
+      environment: nativeEnvironment, runtimeDirectory: URL(filePath: "/tmp/rt"),
+      pairingEpoch: 7, dependencies: dependencies(),
+      launch: { request, secret in await seen.record(request: request, secret: secret) },
+      connect: { _ in
+        (
+          SilentDaemon(),
+          Self.readyAck(
+            toolchainID: "arkforged-native-rockusb", toolchain: daemonDigest)
+        )
+      },
+      awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+    guard case .success(let composed) = result else {
+      return XCTFail("AFA-AC-7 must compose the native lane, got \(result)")
+    }
+    XCTAssertEqual(
+      composed.toolchain,
+      .init(id: "arkforged-native-rockusb", sha256: daemonDigest))
+    XCTAssertEqual(composed.lane.toolchainSHA256, daemonDigest)
+    let configuration = RuntimeJobEngine.Configuration(
+      stateDirectory: URL(filePath: "/tmp/arkdeck-native-plan-test"),
+      arkForgeLane: composed.lane)
+    XCTAssertEqual(configuration.arkForgeToolchainSHA256, daemonDigest)
+    let arguments = await seen.snapshot()?.arguments ?? []
+    let portIndex = try XCTUnwrap(arguments.firstIndex(of: "--rockusb-port"))
+    XCTAssertEqual(arguments[portIndex + 1], "native")
+    XCTAssertEqual(
+      arguments[try XCTUnwrap(arguments.firstIndex(of: "--hardware-campaign")) + 1],
+      "AFA-AC-7")
+  }
+
+  func testAFAAC7RefusesAHandshakeFromTheVendorBackend() async {
+    var nativeEnvironment = environment
+    nativeEnvironment["ARKDECK_ARKFORGE_CAMPAIGN"] = "AFA-AC-7"
+    let result = await ArkForgeLaneComposition.compose(
+      environment: nativeEnvironment, runtimeDirectory: URL(filePath: "/tmp/rt"),
+      pairingEpoch: 7, dependencies: dependencies(),
+      launch: { _, _ in },
+      connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+    guard case .failure(let why) = result else {
+      return XCTFail("a vendor handshake must not enter the native campaign lane")
+    }
+    XCTAssertTrue("\(why)".contains("arkforged-native-rockusb"), "\(why)")
   }
 
   func testTheSecretGoesToTheLaunchAndNotIntoArgv() async {
@@ -187,9 +241,11 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       pairingEpoch: 3, dependencies: dependencies(),
       launch: { _, _ in },
       connect: { _ in
-        (SilentDaemon(),
-         Self.readyAck(
-          toolchain: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"))
+        (
+          SilentDaemon(),
+          Self.readyAck(
+            toolchain: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611")
+        )
       },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
@@ -217,7 +273,10 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   }
 
   private actor LaunchRecorder {
-    struct Record { let arguments: [String]; let secret: Data }
+    struct Record {
+      let arguments: [String]
+      let secret: Data
+    }
     private var record: Record?
     func record(request: ProcessIdentityBoundRequest, secret: Data) {
       self.record = Record(arguments: request.process.arguments, secret: secret)

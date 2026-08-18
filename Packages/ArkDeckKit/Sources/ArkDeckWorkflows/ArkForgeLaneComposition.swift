@@ -14,6 +14,28 @@ import Foundation
 /// half-applied.
 package enum ArkForgeLaneComposition {
 
+  /// The RockUSB implementation selected for one daemon generation.
+  ///
+  /// Vendor remains the ordinary default until TASK-NRU-004. The AFA-AC-7
+  /// campaign is the deliberately narrow migration lane: that campaign exists
+  /// to verify the native combination, so it must not accidentally launch the
+  /// vendor backend and then attribute those receipts to native RockUSB.
+  package enum RockUsbPort: String, Sendable, Equatable {
+    case vendor
+    case native
+  }
+
+  /// The exact toolchain identity ArkDeck expects back from the daemon.
+  package struct ToolchainIdentity: Sendable, Equatable {
+    package let id: String
+    package let sha256: String
+
+    package init(id: String, sha256: String) {
+      self.id = id
+      self.sha256 = sha256.lowercased()
+    }
+  }
+
   /// Environment keys the LaunchAgent carries, in the same shape as
   /// `ARKDECK_HDC_PATH`: absolute, operator-chosen, checked at startup.
   package enum EnvironmentKey {
@@ -63,6 +85,28 @@ package enum ArkForgeLaneComposition {
     package let vendorToolPath: String
     /// Empty when this lane runs no campaign, which is the normal state.
     package let campaign: String
+
+    /// AFA-AC-7 is the native acceptance campaign approved by CHG-2026-063.
+    /// All other campaigns retain the vendor migration lane until NRU-004
+    /// changes the product default.
+    package var rockUsbPort: RockUsbPort {
+      campaign == "AFA-AC-7" ? .native : .vendor
+    }
+
+    /// Native RockUSB is part of `arkforged`, so its backend digest is the
+    /// exact daemon build the identity-bound launcher verifies. The vendor
+    /// lane keeps the independently pinned component identity.
+    package var expectedToolchain: ToolchainIdentity {
+      switch rockUsbPort {
+      case .vendor:
+        return ToolchainIdentity(
+          id: ArkForgeToolchainPin.toolchainID,
+          sha256: ArkForgeToolchainPin.signedSHA256)
+      case .native:
+        return ToolchainIdentity(
+          id: "arkforged-native-rockusb", sha256: daemonSHA256)
+      }
+    }
 
     /// Reads the four keys, or says which are missing.
     ///
@@ -152,6 +196,7 @@ package enum ArkForgeLaneComposition {
       "--pair-from-stdin", String(pairingEpoch),
       "--rkdeveloptool", inputs.vendorToolPath,
       "--rkdeveloptool-sha256", ArkForgeToolchainPin.signedSHA256,
+      "--rockusb-port", inputs.rockUsbPort.rawValue,
       "--require-release-signing",
     ]
     // Appended only when an operator named one. Without it `arkforged`
@@ -184,10 +229,15 @@ package enum ArkForgeLaneComposition {
   /// profile the daemon never loaded.
   package struct Composed: Sendable {
     package let deviceProfileID: String
+    package let toolchain: ToolchainIdentity
     package let lane: ArkForgeLaneHost
 
-    package init(deviceProfileID: String, lane: ArkForgeLaneHost) {
+    package init(
+      deviceProfileID: String, toolchain: ToolchainIdentity,
+      lane: ArkForgeLaneHost
+    ) {
       self.deviceProfileID = deviceProfileID
+      self.toolchain = toolchain
       self.lane = lane
     }
   }
@@ -295,7 +345,8 @@ package enum ArkForgeLaneComposition {
       // Both standing facts, checked before any job exists. Learning them
       // mid-job is the difference between refusing to start and stopping with
       // a capability already consumed.
-      try ArkForgeLaneHost.verifyReadiness(ack)
+      try ArkForgeLaneHost.verifyReadiness(
+        ack, expectedToolchain: inputs.expectedToolchain)
     } catch {
       return .failure(.daemonUnavailable("\(error)"))
     }
@@ -305,8 +356,10 @@ package enum ArkForgeLaneComposition {
     return .success(
       Composed(
         deviceProfileID: profileID,
+        toolchain: inputs.expectedToolchain,
         lane: ArkForgeLaneHost(
         connection: .init(socketPath: socket, controllerSessionID: "arkdeck-agentd"),
+        toolchainSHA256: inputs.expectedToolchain.sha256,
         makePerformer: { binding, jobID in
           // Ingredients, not a descriptor: the performer materializes a valid
           // per-action descriptor through the catalog. The descriptor that

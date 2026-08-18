@@ -48,6 +48,8 @@ extension ArkForgeDaemonClient: ArkForgePlanSource {}
 
 package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
+  package nonisolated let toolchainSHA256: String
+
   /// How to reach a running daemon.
   ///
   /// Deliberately not "how to start one": the daemon's lifecycle belongs to
@@ -131,6 +133,7 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
   package init(
     connection: Connection,
+    toolchainSHA256: String = ArkForgeToolchainPin.signedSHA256,
     makePerformer: @escaping @Sendable (ArkForgeLaneDeviceBinding, String)
       -> any ArkForgeFlashSession.ControlPerformer,
     makeClient: @escaping @Sendable (String) throws -> any ArkForgeFlashSession.Daemon,
@@ -139,6 +142,7 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       -> ArkForgeExecutionAuthority
   ) {
     self.connection = connection
+    self.toolchainSHA256 = toolchainSHA256.lowercased()
     self.makePerformer = makePerformer
     self.makeClient = makeClient
     self.makeMaterializer = makeMaterializer
@@ -312,14 +316,40 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// Both are standing facts, so learning them at composition time rather than
   /// mid-job is the difference between refusing to start and stopping with a
   /// capability already consumed.
-  package static func verifyReadiness(_ ack: ArkForgeHelloAck) throws {
+  package static func verifyReadiness(
+    _ ack: ArkForgeHelloAck,
+    expectedToolchain: ArkForgeLaneComposition.ToolchainIdentity
+  ) throws {
     guard ack.executionReady else {
       throw LaneError.daemonNotReady(blockers: ack.executionBlockers)
     }
-    if let mismatch = ArkForgeToolchainPin.mismatchExplanation(
-      reportedSHA256: ack.toolchainSHA256)
+    guard ack.toolchainID == expectedToolchain.id else {
+      throw LaneError.toolchainMismatch(
+        "the daemon bound toolchain \(ack.toolchainID), while this lane expects "
+          + "\(expectedToolchain.id); the backend identity is part of the published "
+          + "maturity combination")
+    }
+    if expectedToolchain.id == ArkForgeToolchainPin.toolchainID,
+      let mismatch = ArkForgeToolchainPin.mismatchExplanation(
+        reportedSHA256: ack.toolchainSHA256)
     {
       throw LaneError.toolchainMismatch(mismatch)
     }
+    guard ack.toolchainSHA256.lowercased() == expectedToolchain.sha256 else {
+      throw LaneError.toolchainMismatch(
+        "the daemon bound \(ack.toolchainSHA256.lowercased()), while this lane publishes plans "
+          + "for \(expectedToolchain.sha256); the backend digest is part of the maturity "
+          + "combination")
+    }
+  }
+
+  /// Compatibility entry point for the ordinary vendor lane. Native callers
+  /// must pass the identity selected by composition.
+  package static func verifyReadiness(_ ack: ArkForgeHelloAck) throws {
+    try verifyReadiness(
+      ack,
+      expectedToolchain: .init(
+        id: ArkForgeToolchainPin.toolchainID,
+        sha256: ArkForgeToolchainPin.signedSHA256))
   }
 }
