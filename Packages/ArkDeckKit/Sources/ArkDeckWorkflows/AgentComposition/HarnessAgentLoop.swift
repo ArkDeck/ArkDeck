@@ -8,6 +8,29 @@
 import ArkDeckCore
 import Foundation
 
+/// Model identity for the conversational Agent. This is intentionally owned
+/// by AgentComposition rather than the retiring Harness task domain.
+package struct AgentModelDescriptor: Equatable, Sendable, Codable {
+  package static let unspecified = "unspecified"
+
+  package let provider: String
+  package let modelName: String
+  package let modelRevision: String?
+  package let adapterVersion: String
+
+  package init(
+    provider: String,
+    modelName: String = AgentModelDescriptor.unspecified,
+    modelRevision: String? = nil,
+    adapterVersion: String = AgentModelDescriptor.unspecified
+  ) {
+    self.provider = provider
+    self.modelName = modelName
+    self.modelRevision = modelRevision
+    self.adapterVersion = adapterVersion
+  }
+}
+
 package enum HarnessAgentMessageRole: String, Codable, Sendable {
   case user
   case assistant
@@ -192,7 +215,7 @@ package enum HarnessAgentModelEvent: Equatable, Sendable {
 }
 
 package protocol HarnessAgentModelGateway: Sendable {
-  var modelDescriptor: HarnessModelDescriptor { get }
+  var modelDescriptor: AgentModelDescriptor { get }
   func stream(
     context: HarnessAgentContext,
     tools: [HarnessAgentTool]
@@ -251,7 +274,7 @@ public enum HarnessAgentSessionError: Error, Equatable, Sendable {
 }
 
 package actor HarnessAgentSession {
-  package let modelDescriptor: HarnessModelDescriptor
+  package let modelDescriptor: AgentModelDescriptor
 
   private let gateway: any HarnessAgentModelGateway
   private let tools: [HarnessAgentTool]

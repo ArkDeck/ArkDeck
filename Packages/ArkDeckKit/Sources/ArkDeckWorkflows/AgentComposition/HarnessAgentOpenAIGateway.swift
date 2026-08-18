@@ -25,20 +25,36 @@ public enum HarnessAgentGatewayError: Error, Equatable, Sendable {
   case streamEndedWithoutStopReason
 }
 
+/// Credentials are held only by the chat gateway and never serialized into
+/// model context, Runtime records, or tool results.
+package struct AgentVendorCredential: Sendable {
+  package let apiKey: String
+  package let endpoint: String
+  package let modelName: String
+
+  package init(apiKey: String, endpoint: String, modelName: String) {
+    self.apiKey = apiKey
+    self.endpoint = endpoint
+    self.modelName = modelName
+  }
+}
+
 package struct OpenAIHarnessAgentGateway: HarnessAgentModelGateway {
-  private let credential: HarnessVendorCredential
+  package static let defaultEndpoint = "https://api.openai.com/v1/chat/completions"
+
+  private let credential: AgentVendorCredential
   private let maximumOutputTokens: Int
 
   public init(
-    credential: HarnessVendorCredential,
+    credential: AgentVendorCredential,
     maximumOutputTokens: Int = 4_096
   ) {
     self.credential = credential
     self.maximumOutputTokens = max(256, maximumOutputTokens)
   }
 
-  package var modelDescriptor: HarnessModelDescriptor {
-    HarnessModelDescriptor(
+  package var modelDescriptor: AgentModelDescriptor {
+    AgentModelDescriptor(
       provider: "openai-compatible", modelName: credential.modelName,
       adapterVersion: "openai-agent-stream@1")
   }

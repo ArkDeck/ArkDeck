@@ -1,0 +1,7 @@
+
+----------------------------------HiviewService----------------------------------
+Fault log list:
+******
+jscrash-com.example.waterflowdemo-20010057-20260731162134
+cppcrash-com.example.waterflowdemo-20010057-20260731170000
+******

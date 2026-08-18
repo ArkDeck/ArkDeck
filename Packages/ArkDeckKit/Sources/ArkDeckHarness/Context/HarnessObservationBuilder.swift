@@ -71,31 +71,6 @@ private struct HarnessApplicationLivenessArtifact: Decodable {
   }
 }
 
-package struct HarnessCrashSignature: Equatable, Sendable {
-  /// The ledger entry's kind (`cppcrash`, `jscrash`, `appfreeze`, …). Kept
-  /// because the kinds carry different judging fields, and because a
-  /// signature rendered without it reads as a native crash whatever it was.
-  public let kind: String
-  /// The fault's reason token: a signal for `cppcrash`, an error name for
-  /// `jscrash`. Never fabricated - an entry with no reason yields no
-  /// signature at all.
-  package let signal: String
-  package let topFrame: String?
-  package let blockText: String
-
-  public init(kind: String, signal: String, topFrame: String?, blockText: String) {
-    self.kind = kind
-    self.signal = signal
-    self.topFrame = topFrame
-    self.blockText = blockText
-  }
-
-  public var rendered: String {
-    guard let topFrame else { return "\(kind):\(signal)" }
-    return "\(kind):\(signal)+\(topFrame)"
-  }
-}
-
 package struct HarnessObservationBuilder: Sendable {
   /// Read bound per artifact. Bigger evidence is not silently truncated: it
   /// becomes a blocker, because a hash over a prefix proves nothing.
@@ -396,8 +371,7 @@ package struct HarnessObservationBuilder: Sendable {
       guard
         let envelope = try? JSONDecoder().decode(
           HarnessCrashLedgerDerivedArtifact.self, from: derived.data),
-        let analyzerOutput = try? HarnessCrashLedgerDerivedAnalyzer.canonicalData(
-          envelope.result),
+        let analyzerOutput = try? envelope.result.canonicalData(),
         envelope.schemaVersion == HarnessCrashLedgerAnalysis.schemaVersion,
         envelope.analyzerRef == HarnessCrashLedgerAnalysis.analyzerRef,
         envelope.analyzerVersion == HarnessCrashLedgerAnalysis.analyzerVersion,

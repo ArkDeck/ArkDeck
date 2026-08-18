@@ -10,7 +10,8 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-AND-001 — 搬家与去耦：产品能力迁出 Harness 平面
 
-- Status:ready（仅在本 proposal 经维护者 merge 后方可开始实现 PR）
+- Status:done（2026-08-18；生产迁移、逐字节 analyzer 对照、合约测试与统一本地闸
+  均通过；见 `evidence/runs/TASK-AND-001/run-r1.md`）
 - Golden Journey:GJ-5（结构前置）；同时保护 GJ-1 的 crash-signature 采集链
 - Platform:macos
 - Requirements:`AND-REQ-003`（analyzer 搬迁契约不变）、`AND-REQ-004`

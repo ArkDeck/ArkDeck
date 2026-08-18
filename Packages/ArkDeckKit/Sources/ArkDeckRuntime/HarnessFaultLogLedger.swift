@@ -1,4 +1,5 @@
-// The device's crash ledger, read as bytes (CHG-2026-055, TASK-HFA-001).
+// The device's crash ledger, read as bytes (CHG-2026-055, TASK-HFA-001;
+// moved below both consumers by TASK-AND-001).
 //
 // TASK-HTP-002 judged crashes by scanning `hilog.txt` for cppcrash fault
 // blocks. TASK-HTP-006's r6 window disproved that on a real DAYU200: after
@@ -28,41 +29,32 @@
 // `evidence/runs/TASK-DHA-005/faultlogger-format-2026-07-31.md`.
 
 // The wire contract types (`HarnessFaultLogEntry`, `HarnessCrashLedgerAnalysis`,
-// `HarnessCrashLedgerDerivedArtifact`) live in
-// `ArkDeckRuntime/CrashLedgerAnalysisContracts.swift`: the schema is shared with
-// the analyzer provider and the runtime engine, which must not import the
-// harness plane. This file keeps the producer — parsing and judging.
-import ArkDeckCore
-import ArkDeckRuntime
+// `HarnessCrashLedgerDerivedArtifact`) live beside this parser. The parser is
+// shared by the Workflows analyzer executable and the legacy Harness reader;
+// keeping it in the runtime-contract layer prevents either plane from gaining
+// a dependency on the other. The executable producer itself lives beside the
+// AnalyzerProvider in ArkDeckWorkflows.
 import Foundation
 
-/// Pure deterministic front-end used by the pinned analyzer executable and
-/// its contract tests.  Invalid input is a structured `unreadable` result,
-/// never an empty ledger: downstream evaluation therefore fails closed.
-package enum HarnessCrashLedgerDerivedAnalyzer {
-  package static func analyze(_ bytes: Data) throws -> Data {
-    let analysis: HarnessCrashLedgerAnalysis
-    guard let text = String(data: bytes, encoding: .utf8) else {
-      analysis = HarnessCrashLedgerAnalysis(
-        status: .unreadable, unreadableReason: "invalidEncoding")
-      return try canonicalData(analysis)
-    }
-    switch HarnessFaultLogLedger.readIndex(text) {
-    case .answered(let entries):
-      analysis = HarnessCrashLedgerAnalysis(status: .answered, entries: entries)
-    case .unreadable(let reason):
-      analysis = HarnessCrashLedgerAnalysis(
-        status: .unreadable, unreadableReason: reason)
-    }
-    return try canonicalData(analysis)
+package struct HarnessCrashSignature: Equatable, Sendable {
+  /// The ledger entry's kind (`cppcrash`, `jscrash`, `appfreeze`, …).
+  public let kind: String
+  /// A measured reason token: signal for native crashes, error name for
+  /// script crashes, and never a fabricated default.
+  package let signal: String
+  package let topFrame: String?
+  package let blockText: String
+
+  public init(kind: String, signal: String, topFrame: String?, blockText: String) {
+    self.kind = kind
+    self.signal = signal
+    self.topFrame = topFrame
+    self.blockText = blockText
   }
 
-  /// The bytes whose digest the runtime records in the derived envelope.
-  /// Keeping this encoder shared lets the evaluator recompute that digest
-  /// instead of trusting a structured-looking result and a detached hash.
-  public static func canonicalData(_ analysis: HarnessCrashLedgerAnalysis) throws -> Data {
-    let encoder = CanonicalJSONEncoders.canonical()
-    return try encoder.encode(analysis)
+  public var rendered: String {
+    guard let topFrame else { return "\(kind):\(signal)" }
+    return "\(kind):\(signal)+\(topFrame)"
   }
 }
 
