@@ -6237,8 +6237,8 @@ public actor RuntimeJobEngine {
             return RuntimeCapabilityReference(capabilityID: capabilityID)
           case .confirmed:
             // A confirmed terminal closes this generation and lets the next one
-            // open. Three states qualify, and the third is the one this list
-            // was missing.
+            // open. Four states qualify, and the last two were each found by
+            // the same denial on a bench.
             //
             // `succeeded` and `recovered` are the obvious ones. `cancelled` is
             // the third: a confirmed-cancelled job is one the engine proved did
@@ -6254,6 +6254,15 @@ public actor RuntimeJobEngine {
             // `capability denied [denial:exhausted]` — the cancellation had
             // permanently closed the lane it was supposed to leave open.
             //
+            // `failed` is the fourth, by the same argument from the other
+            // side: a *confirmed* failure is one whose recorder vouched the
+            // device state is known (`outcomeUnknown` is false — a genuinely
+            // ambiguous write arrives as `.outcomeUnknown` below and is
+            // refused). What follows a known failure is a fresh attempt under
+            // a fresh generation; refusing that does not protect the device,
+            // it just answers every retry `denial:exhausted` forever.
+            // Measured 2026-08-18, where exactly that had wedged the bench.
+            //
             // An unconfirmed cancellation is untouched: it arrives as
             // `.pending` or `.outcomeUnknown` above and still returns the spent
             // capability, because a write whose outcome is unknown must not be
@@ -6262,6 +6271,7 @@ public actor RuntimeJobEngine {
               terminal.terminalState == JobState.succeeded.rawValue
                 || terminal.terminalState == JobState.recovered.rawValue
                 || terminal.terminalState == JobState.cancelled.rawValue
+                || terminal.terminalState == JobState.failed.rawValue
             else {
               return RuntimeCapabilityReference(capabilityID: capabilityID)
             }

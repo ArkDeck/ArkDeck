@@ -259,6 +259,19 @@ package enum ArkForgeLaneComposition {
         environment: [:], workingDirectory: runtimeDirectory),
       expectedSHA256: inputs.daemonSHA256)
 
+    // Stale socket files from a previous daemon generation must go before the
+    // new one is launched. `awaitSocket` watches for the file to exist — and a
+    // leftover file exists instantly, so the controller session connected to
+    // the *previous* arkforged (orphaned but still serving its bound inode)
+    // while the per-job materializer, connecting later by path, reached the
+    // new one. The plan then lived in one daemon and startExecution asked the
+    // other, which answered PLAN_NOT_STARTABLE — a split this line makes
+    // impossible: with the files gone, the only socket that can appear is the
+    // one the daemon launched below binds.
+    for name in ["controller.sock", "public.sock"] {
+      try? FileManager.default.removeItem(at: runtimeDirectory.appending(path: name))
+    }
+
     do {
       try await launch(request, secret)
     } catch {
