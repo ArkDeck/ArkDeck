@@ -1,5 +1,9 @@
 # Verification — CHG-2026-063
 
+> Change:CHG-2026-063-arkforge-native-rockusb@r1
+> Status: proposed；本文件不声称任何 merge 结论。各 AC 的台架实证在对应
+> Task 的实现 PR 中重跑并附 evidence。
+
 ## Acceptance
 
 - **NRU-AC-1**（底座）：`arkforge-usb` 在台架枚举出唯一 0x2207 设备并读回

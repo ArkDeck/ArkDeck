@@ -9,7 +9,7 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-001 — 原生只读路径：USB 底座 + 协议引擎 + 端口双轨
 
-- Status:pending（proposal merge 后 ready）
+- Status:ready（仅在本 proposal 经维护者 merge 后方可开始实现 PR）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-001（bulk 传输底座，FFI 收容于单 crate）、
@@ -37,7 +37,7 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-002 — 原生写路径 + 复位 + campaign AFA-AC-7 双轨互证
 
-- Status:pending（依赖 NRU-001 完成并在台架读比对全绿）
+- Status:blocked（依赖 TASK-NRU-001 完成并在台架读比对全绿）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-003（WRITE_LBA 按 observed_table 寻址）、
@@ -61,7 +61,7 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-003 — ArkDeck 观察半边换源（vendor `ld` 回执退场）
 
-- Status:pending（依赖 NRU-002 在台架全绿）
+- Status:blocked（依赖 TASK-NRU-002 在台架全绿）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-006（Loader 观察第二源改为 arkforged
@@ -89,7 +89,7 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-004 — 默认切原生 + vendor 全面退役
 
-- Status:pending（依赖 NRU-003；且 AFA-AC-7 已把新组合打到
+- Status:blocked（依赖 TASK-NRU-003，且 AFA-AC-7 已把新组合打到
   productionVerified）
 - Golden Journey:GJ-4
 - Platform:macos

@@ -1,6 +1,18 @@
+---
+id: CHG-2026-063-arkforge-native-rockusb
+revision: 1
+status: proposed
+class: integration
+core_change_level: none
+owner: fuhanfeng
+core_baseline: CORE-3.0.0
+platforms: [macos]
+---
+
 # CHG-2026-063 — ArkForge 原生 RockUSB：完全替换 rkdeveloptool
 
-status: draft（本 proposal 经维护者 merge 进 protected `main` 后，各 Task 方可开始实现 PR）
+> **本文件不构成批准。** 本 proposal 经维护者 review/merge 进 protected
+> `main` 后，各 Task 方可开始实现 PR；merge 同时构成 AFD-0001 修订的批准。
 
 ## 目标
 
