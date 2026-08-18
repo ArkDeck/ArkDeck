@@ -137,11 +137,7 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       return try await enterUpdater(request: request)
     case .rebootToNormal:
       return try await run(
-        .waitForBoundHDCReconnect(
-          expectation: RockchipHDCReconnectExpectation(
-            previousConnectKey: binding.connectKey,
-            previousIdentitySHA256: binding.stableIdentitySHA256,
-            usbTopology: binding.usbTopology)),
+        .waitForBoundHDCReconnect(expectation: reconnectExpectation()),
         request: request, index: 0)
     case .readProductFacts, .readBuildFacts:
       // The expectation comes from the daemon's request, never from here. An
@@ -151,10 +147,7 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
         request.expectedFacts.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
       return try await run(
         .verifyBoundBuild(
-          expectation: RockchipHDCReconnectExpectation(
-            previousConnectKey: binding.connectKey,
-            previousIdentitySHA256: binding.stableIdentitySHA256,
-            usbTopology: binding.usbTopology),
+          expectation: reconnectExpectation(),
           expectedProductModel: expected["const.product.model"] ?? "",
           expectedBuildVersion: expected["const.ohos.fullname"] ?? ""),
         request: request, index: 0)
@@ -163,6 +156,23 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       // to something that touches the device.
       throw PerformerError.unsupported(request.action)
     }
+  }
+
+  /// The reconnect expectation for the bound device, in the HDC alias
+  /// identity namespace.
+  ///
+  /// `waitForBoundHDC` requires `previousIdentitySHA256 ==
+  /// SHA256(previousConnectKey)` — the HDC-normal *alias* digest. The stable
+  /// target identity this binding also carries is a different namespace (it
+  /// derives from the Loader serial), and passing it here failed the whole
+  /// postflight as "binding expectation is malformed" on the first run that
+  /// ever reached it. The alias digest is computed from the admitted connect
+  /// key, which is exactly the invariant the guard checks.
+  private func reconnectExpectation() -> RockchipHDCReconnectExpectation {
+    RockchipHDCReconnectExpectation(
+      previousConnectKey: binding.connectKey,
+      previousIdentitySHA256: SHA256Hex.string(of: Data(binding.connectKey.utf8)),
+      usbTopology: binding.usbTopology)
   }
 
   /// The five-action sequence, reporting which of the three facts were seen.
