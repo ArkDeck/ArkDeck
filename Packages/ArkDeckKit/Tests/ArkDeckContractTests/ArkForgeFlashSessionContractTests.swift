@@ -27,6 +27,12 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     var permitSubmissions: [ArkForgeSubmitStepPermitRequest] = []
     var controlSubmissions: [ArkForgeSubmitManagedControlReceiptRequest] = []
     var cancelAnswer: Result<ArkForgeCancelJobResponse, Error>
+    /// Admission request ids whose permit submission this daemon rejects —
+    /// inside an OK response, the way the real one does.
+    var permitRejections: [String: (code: String, message: String)] = [:]
+    /// When set, every control receipt is rejected with this code.
+    var controlRejection: (code: String, message: String)?
+    var cancelRequests: [String] = []
 
     init(
       events: [ArkForgeJobEvent],
@@ -45,6 +51,10 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
       -> ArkForgeSubmitStepPermitResponse
     {
       permitSubmissions.append(body)
+      if let rejection = permitRejections[body.requestID] {
+        return ArkForgeSubmitStepPermitResponse(
+          accepted: false, rejectionCode: rejection.code, rejectionMessage: rejection.message)
+      }
       return ArkForgeSubmitStepPermitResponse(
         accepted: body.refusal == nil, rejectionCode: "", rejectionMessage: "")
     }
@@ -53,6 +63,10 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
       _ body: ArkForgeSubmitManagedControlReceiptRequest, requestID: String
     ) throws -> ArkForgeSubmitManagedControlReceiptResponse {
       controlSubmissions.append(body)
+      if let rejection = controlRejection {
+        return ArkForgeSubmitManagedControlReceiptResponse(
+          accepted: false, rejectionCode: rejection.code, rejectionMessage: rejection.message)
+      }
       return ArkForgeSubmitManagedControlReceiptResponse(
         accepted: true, rejectionCode: "", rejectionMessage: "")
     }
@@ -65,7 +79,8 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     }
 
     func cancelJob(jobID: String, requestID: String) throws -> ArkForgeCancelJobResponse {
-      try cancelAnswer.get()
+      cancelRequests.append(jobID)
+      return try cancelAnswer.get()
     }
   }
 
@@ -238,6 +253,122 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     XCTAssertFalse(receipt.accepted)
     XCTAssertTrue(receipt.failureReason.contains("did not complete"), receipt.failureReason)
     XCTAssertTrue(receipt.facts.isEmpty)
+  }
+
+  // MARK: - Rejections are answers, not noise
+
+  func testARejectedPermitSubmissionIsANamedStop() async throws {
+    // The daemon says "rejected" inside an OK response, and this session used
+    // to read neither field. Three refusal codes in a row (unknownJob,
+    // planMismatch, snapshotExpired) each cost a bench session to discover;
+    // a rejection is now a stop carrying the daemon's own code.
+    let daemon = ScriptedDaemon(events: [admissionEvent(stepID: "flash-partitions")])
+    daemon.permitRejections["ADM-flash-partitions"] = (
+      code: "PERMIT_REJECTED", message: "integrity tag does not verify"
+    )
+    let session = ArkForgeFlashSession(
+      daemon: daemon, authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    do {
+      _ = try await session.run(planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+      XCTFail("a rejected permit must stop the session")
+    } catch let error as ArkForgeFlashSession.SessionError {
+      guard case .permitRejected(let stepID, let code, _) = error else {
+        return XCTFail("unexpected session error \(error)")
+      }
+      XCTAssertEqual(stepID, "flash-partitions")
+      XCTAssertEqual(code, "PERMIT_REJECTED")
+    }
+  }
+
+  func testASnapshotExpiredRejectionIsRecordedButNotFatal() async throws {
+    // The one rejection that heals itself: the snapshot expires, admission
+    // runs again with a fresher one. The session records it and keeps polling
+    // rather than declaring the job dead.
+    let daemon = ScriptedDaemon(events: [admissionEvent(stepID: "flash-partitions")])
+    daemon.permitRejections["ADM-flash-partitions"] = (
+      code: "SNAPSHOT_EXPIRED", message: "the admission snapshot aged out"
+    )
+    let session = ArkForgeFlashSession(
+      daemon: daemon, authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    _ = try await session.run(planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+
+    let declined = await session.declinedAdmissions
+    XCTAssertEqual(declined.count, 1)
+    XCTAssertTrue(declined[0].contains("SNAPSHOT_EXPIRED"), declined[0])
+  }
+
+  func testARejectedControlReceiptCancelsTheJobAndStops() async throws {
+    // A rejected receipt leaves the daemon still waiting on its request.
+    // Discarding the rejection left both sides waiting on the other with
+    // nothing recorded anywhere — the observed shape of the stalled bench.
+    let control = ArkForgeJobEvent(
+      jobID: "JOB-1", sequence: 1, kind: .managedControlRequested, atEpochMs: 1_000_050,
+      journalRecordSHA256: [], jobState: "running", admission: nil,
+      controlRequest: ArkForgeManagedControlRequest(
+        jobID: "JOB-1", stepID: "enter-loader-mode", requestID: "CTL-1",
+        action: .enterUpdater, permitID: "PERMIT-1", expectedFacts: [],
+        deadlineEpochMs: 1_100_000),
+      receipt: nil, facts: [])
+    let daemon = ScriptedDaemon(events: [control])
+    daemon.controlRejection = (
+      code: "CONTROL_EVIDENCE_MISMATCH", message: "evidence is not the facts digest"
+    )
+    let session = ArkForgeFlashSession(
+      daemon: daemon, authority: authority(),
+      performer: StubPerformer(
+        observation: .init(
+          accepted: true,
+          facts: [
+            "mode": "Loader", "stableIdentitySHA256": String(repeating: "a", count: 64),
+            "usbTopology": "0x14200000",
+          ],
+          evidenceSHA256: [], observedDisconnect: true, observedUniqueLoaderRebind: true)),
+      controllerSessionID: "SESSION-1")
+
+    do {
+      _ = try await session.run(planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+      XCTFail("a rejected control receipt must stop the session")
+    } catch let error as ArkForgeFlashSession.SessionError {
+      guard case .controlReceiptRejected(let requestID, let code, _) = error else {
+        return XCTFail("unexpected session error \(error)")
+      }
+      XCTAssertEqual(requestID, "CTL-1")
+      XCTAssertEqual(code, "CONTROL_EVIDENCE_MISMATCH")
+    }
+    // And the daemon's job was cancelled rather than left parked on a receipt
+    // it refuses.
+    XCTAssertEqual(daemon.cancelRequests, ["JOB-1"])
+  }
+
+  func testATerminalUnknownCarriesTheDaemonsReason() async throws {
+    let classified = ArkForgeJobEvent(
+      jobID: "JOB-1", sequence: 1, kind: .outcomeClassified, atEpochMs: 1_000_050,
+      journalRecordSHA256: [], jobState: "outcomeUnknown", admission: nil,
+      controlRequest: nil, receipt: nil,
+      facts: [
+        ArkForgeKeyValue(key: "outcome", value: "outcomeUnknown"),
+        ArkForgeKeyValue(
+          key: "reason", value: "managed control enter-updater request CTL-1 expired unanswered"),
+      ])
+    let daemon = ScriptedDaemon(events: [classified])
+    let session = ArkForgeFlashSession(
+      daemon: daemon, authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    let outcome = try await session.run(
+      planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+
+    guard case .outcomeUnknown(let reason, _) = outcome else {
+      return XCTFail("expected outcomeUnknown, got \(outcome)")
+    }
+    XCTAssertTrue(reason.contains("expired unanswered"), reason)
   }
 
   // MARK: - AFA-AC-10: cancellation is not a drain proof

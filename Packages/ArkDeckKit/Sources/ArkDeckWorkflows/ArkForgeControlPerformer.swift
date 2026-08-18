@@ -76,21 +76,34 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
   /// Held rather than taken per call because the binding is what makes an
   /// observation meaningful: "a device rebound in Loader" is not evidence, and
   /// "the bound device rebound in Loader" is.
+  ///
+  /// These are descriptor *ingredients*, not a descriptor. The host validates
+  /// each action against a descriptor pinning that action's own identifier and
+  /// canonical digest, so one prebuilt descriptor can satisfy at most one of
+  /// the actions a control sequence runs — the previous shape here carried
+  /// exactly that, and the host refused every call it was ever given. The
+  /// performer now materializes a fresh descriptor per action through the same
+  /// catalog materialization uses.
   struct Binding: Sendable {
+    let jobID: String
+    let targetID: String
+    let bindingRevision: Int
     let connectKey: String
     let stableIdentitySHA256: String
     let usbTopology: String
-    let descriptor: HostManagedProcessDescriptor
     let rockchipExecutable: ResolvedExecutable
 
     init(
+      jobID: String, targetID: String, bindingRevision: Int,
       connectKey: String, stableIdentitySHA256: String, usbTopology: String,
-      descriptor: HostManagedProcessDescriptor, rockchipExecutable: ResolvedExecutable
+      rockchipExecutable: ResolvedExecutable
     ) {
+      self.jobID = jobID
+      self.targetID = targetID
+      self.bindingRevision = bindingRevision
       self.connectKey = connectKey
       self.stableIdentitySHA256 = stableIdentitySHA256
       self.usbTopology = usbTopology
-      self.descriptor = descriptor
       self.rockchipExecutable = rockchipExecutable
     }
   }
@@ -121,14 +134,15 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
   ) async throws -> ArkForgeManagedControlPort.Observation {
     switch request.action {
     case .enterUpdater:
-      return try await enterUpdater()
+      return try await enterUpdater(request: request)
     case .rebootToNormal:
       return try await run(
         .waitForBoundHDCReconnect(
           expectation: RockchipHDCReconnectExpectation(
             previousConnectKey: binding.connectKey,
             previousIdentitySHA256: binding.stableIdentitySHA256,
-            usbTopology: binding.usbTopology)))
+            usbTopology: binding.usbTopology)),
+        request: request, index: 0)
     case .readProductFacts, .readBuildFacts:
       // The expectation comes from the daemon's request, never from here. An
       // expectation this side invented is one the device is guaranteed to
@@ -142,7 +156,8 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
             previousIdentitySHA256: binding.stableIdentitySHA256,
             usbTopology: binding.usbTopology),
           expectedProductModel: expected["const.product.model"] ?? "",
-          expectedBuildVersion: expected["const.ohos.fullname"] ?? ""))
+          expectedBuildVersion: expected["const.ohos.fullname"] ?? ""),
+        request: request, index: 0)
     case .unspecified:
       // Fail closed. An action this build does not know must not fall through
       // to something that touches the device.
@@ -156,21 +171,28 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
   /// because a mode change may have taken effect before the step that failed:
   /// the receipt says what was seen and lets the daemon record the rest as
   /// unknown, which is the truthful shape.
-  private func enterUpdater() async throws -> ArkForgeManagedControlPort.Observation {
+  private func enterUpdater(
+    request: ArkForgeManagedControlRequest
+  ) async throws -> ArkForgeManagedControlPort.Observation {
     var facts: [String: String] = [:]
     var observedDisconnect = false
     var observedRebind = false
     var failure = ""
 
     do {
-      _ = try await execute(.observeHDCNormalUSB(connectKey: binding.connectKey))
-      _ = try await execute(.enterLoader(connectKey: binding.connectKey))
-      _ = try await execute(.waitForHDCDisconnect(connectKey: binding.connectKey))
+      _ = try await execute(
+        .observeHDCNormalUSB(connectKey: binding.connectKey), request: request, index: 0)
+      _ = try await execute(
+        .enterLoader(connectKey: binding.connectKey), request: request, index: 1)
+      _ = try await execute(
+        .waitForHDCDisconnect(connectKey: binding.connectKey), request: request, index: 2)
       observedDisconnect = true
       _ = try await execute(
-        .waitForLoader(stableIdentitySHA256: binding.stableIdentitySHA256))
+        .waitForLoader(stableIdentitySHA256: binding.stableIdentitySHA256),
+        request: request, index: 3)
       let rebound = try await execute(
-        .rebindLoader(stableIdentitySHA256: binding.stableIdentitySHA256))
+        .rebindLoader(stableIdentitySHA256: binding.stableIdentitySHA256),
+        request: request, index: 4)
       observedRebind = true
       facts = Self.receiptFacts(from: rebound)
     } catch {
@@ -185,10 +207,12 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
   }
 
   private func run(
-    _ action: RockchipProviderAction
+    _ action: RockchipProviderAction,
+    request: ArkForgeManagedControlRequest,
+    index: Int
   ) async throws -> ArkForgeManagedControlPort.Observation {
     do {
-      let result = try await execute(action)
+      let result = try await execute(action, request: request, index: index)
       return ArkForgeManagedControlPort.Observation(
         accepted: true, facts: Self.receiptFacts(from: result), evidenceSHA256: [])
     } catch {
@@ -200,11 +224,43 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
   }
 
   private func execute(
-    _ action: RockchipProviderAction
+    _ action: RockchipProviderAction,
+    request: ArkForgeManagedControlRequest,
+    index: Int
   ) async throws -> RockchipRuntimeActionExecutionResult {
-    try await host.execute(
-      action: action, descriptor: binding.descriptor,
+    // A fresh descriptor per action, through the same catalog materialization
+    // uses, because the host validates identifier and canonical action digest
+    // per action — one descriptor cannot vouch for five different actions.
+    let descriptor = try RockchipHostManagedActionCatalog.descriptor(
+      for: action,
+      jobID: binding.jobID,
+      stepID: Self.recordStepID(for: request, index: index),
+      targetID: binding.targetID,
+      bindingRevision: binding.bindingRevision,
+      connectKey: binding.connectKey,
+      expectedIdentitySHA256: binding.stableIdentitySHA256,
+      providerExecutableSHA256: binding.rockchipExecutable.sha256,
+      executionTuning: nil)
+    return try await host.execute(
+      action: action, descriptor: descriptor,
       rockchipExecutable: binding.rockchipExecutable)
+  }
+
+  /// The record-store step id for one action of one control request.
+  ///
+  /// The store keys durable action records by `jobID/stepID` and refuses a
+  /// second, different intent under the same key — correct for plan steps,
+  /// where a resume must replay the recorded result, and exactly why a control
+  /// sequence cannot reuse one id for five actions. The daemon's `requestID`
+  /// is unique per control attempt, so folding its digest in gives every
+  /// attempt fresh records while a crash-and-repeat of the *same* attempt
+  /// still replays. Digested rather than embedded because the id must stay a
+  /// bounded path component whatever the daemon put in the string.
+  static func recordStepID(
+    for request: ArkForgeManagedControlRequest, index: Int
+  ) -> String {
+    let attempt = SHA256Hex.string(of: Data(request.requestID.utf8)).prefix(12)
+    return "\(request.stepID)-mc-\(attempt)-a\(index)"
   }
 
   /// Keeps only what a receipt may carry.

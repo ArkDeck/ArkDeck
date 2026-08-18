@@ -1667,42 +1667,28 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     _ action: TypedProviderAction,
     descriptor: HostManagedProcessDescriptor
   ) -> Bool {
-    switch action {
-    case .rockchip(.enterLoader(let connectKey)):
-      return connectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.enter-loader.v1"
-    case .rockchip(.observeHDCNormalUSB(let connectKey)):
-      return connectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.iokit.observe-hdc-normal.v1"
-    case .rockchip(.waitForHDCDisconnect(let connectKey)):
-      return connectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.wait-disconnect.v1"
-    case .rockchip(.waitForLoader(let identity)):
-      return identity == descriptor.expectedIdentitySHA256
-        && descriptor.identifier == "rockchip.rockusb.wait-loader.v1"
-    case .rockchip(.rebindLoader(let identity)):
-      return identity == descriptor.expectedIdentitySHA256
-        && descriptor.identifier == "rockchip.rockusb.rebind-loader.v1"
-    case .rockchip(.rebootToNormal(let identity)):
-      return identity == descriptor.expectedIdentitySHA256
-        && descriptor.identifier == "rockchip.rockusb.reboot-normal.v1"
-    case .rockchip(.waitForHDCReconnect(let connectKey)):
-      return connectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.wait-reconnect.v1"
-    case .rockchip(.waitForBoundHDCReconnect(let expectation)):
-      return expectation.previousConnectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.wait-bound-reconnect.v2"
-    case .rockchip(.verifyBoundBuild(let expectation, _, _)):
-      return expectation.previousConnectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.verify-bound-build.v2"
-    case .rockchip(.capturePostFlashDiagnostics(let connectKey, _)):
-      return connectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.capture-post-flash-hilog.v1"
-    case .hdc:
-      return false
     // A host-only action never runs inside the Rockchip host-managed executor.
-    case .workspace, .analyzer:
-      return false
+    guard case .rockchip(let rockchip) = action else { return false }
+    // One identifier table, shared with materialization. The two used to be
+    // separate literal lists, and a third site invented a descriptor that
+    // matched neither; the catalog is now the only producer this check can
+    // agree with.
+    guard descriptor.identifier == RockchipHostManagedActionCatalog.identifier(for: rockchip)
+    else { return false }
+    switch rockchip {
+    case .enterLoader(let connectKey),
+      .observeHDCNormalUSB(let connectKey),
+      .waitForHDCDisconnect(let connectKey),
+      .waitForHDCReconnect(let connectKey),
+      .capturePostFlashDiagnostics(let connectKey, _):
+      return connectKey == descriptor.connectKey
+    case .waitForLoader(let identity),
+      .rebindLoader(let identity),
+      .rebootToNormal(let identity):
+      return identity == descriptor.expectedIdentitySHA256
+    case .waitForBoundHDCReconnect(let expectation),
+      .verifyBoundBuild(let expectation, _, _):
+      return expectation.previousConnectKey == descriptor.connectKey
     }
   }
 }

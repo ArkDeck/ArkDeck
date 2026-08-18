@@ -822,6 +822,23 @@ public actor RuntimeJobEngine {
     "flash-partitions", "verify-flash-readback",
   ]
 
+  /// The HDC-to-Loader transition ArkDeck performs itself **only** when no
+  /// ArkForge lane owns the write.
+  ///
+  /// `arkforged`'s own plan opens with an `enter-updater` managed control whose
+  /// `expected_mode_before` is normal, and it drives that back through ArkDeck's
+  /// control port — so with a lane configured the transition still happens here,
+  /// just under the plan that owns the write rather than beside it.
+  ///
+  /// Running this group first consumed the transition: measured 2026-08-18, the
+  /// board was already in Loader by the time the lane asked, and the ArkForge
+  /// job parked at `permitConsuming` waiting on a control receipt for a
+  /// transition that could no longer be observed. Nothing was written.
+  package static let arkForgeOwnedModeSteps: Set<String> = [
+    "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
+    "rebind-loader-identity",
+  ]
+
   /// The `processKind` those steps carry in a materialized plan.
   package static let arkForgeDispatchKind = "arkforgeStepPermit"
 
@@ -1600,6 +1617,25 @@ public actor RuntimeJobEngine {
         appendTimeline(
           jobID: jobID,
           entry: "resume skipped journal-confirmed step \(step.stepID)")
+        continue
+      }
+      // Whoever owns the write owns the transition into Loader. With a lane
+      // configured for this operation, that is `arkforged`'s plan, and doing it
+      // here as well leaves the lane asking for a transition already spent.
+      if Self.arkForgeOwnedModeSteps.contains(step.stepID),
+        configuration.arkForgeLane != nil,
+        descriptor.steps.contains(where: {
+          Self.arkForgeDispatchedSteps.contains($0.stepID)
+        })
+      {
+        appendTimeline(
+          jobID: jobID,
+          entry: "delegated \(step.stepID) to the ArkForge lane's own plan")
+        completedStepIDs.insert(step.stepID)
+        if var runtime = jobs[jobID] {
+          runtime.completedStepIDs = completedStepIDs
+          jobs[jobID] = runtime
+        }
         continue
       }
       switch step.kind {
@@ -4358,6 +4394,7 @@ public actor RuntimeJobEngine {
     guard var runtime = jobs[jobID] else {
       let record = try recordForRead(jobID: jobID)
       try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
+      try await repairTerminalCancelledLineageIfNeeded(for: record)
       return status(of: record)
     }
     guard let provider = providers.provider(id: runtime.record.providerID) else {
@@ -4807,6 +4844,36 @@ public actor RuntimeJobEngine {
       break
     }
     return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+  }
+
+  /// The twin of the repair below, for a Job that reached `cancelled` while its
+  /// capability use stayed `pending`.
+  ///
+  /// The drained-cancel path never recorded an outcome until 2026-08-18, so a
+  /// job cancelled by that code holds its use open forever and the
+  /// target-lineage guard then refuses *every* later destructive job on that
+  /// binding. The cancel path records it now; this closes the ones already
+  /// stranded, which is exactly what an operator means by reconciling a
+  /// terminal job. Nothing here touches a device.
+  ///
+  /// `.confirmed` for the reason the generation-rollover comment gives: a
+  /// drained cancellation is one the engine proved did not dispatch. A job whose
+  /// outcome *is* unknown is excluded — that is a write to reconcile against the
+  /// device, never a cancellation to declare closed.
+  private func repairTerminalCancelledLineageIfNeeded(
+    for record: RuntimeJobRecord
+  ) async throws {
+    guard !record.outcomeUnknown,
+      record.state == JobState.cancelled.rawValue,
+      let evidence = record.admissionEvidence,
+      evidence.kind == .runtimeCapability || evidence.kind == .standingAuthorization,
+      let status = try await capabilityStore.inspect(capabilityID: evidence.reference),
+      status.lineage.contains(where: {
+        $0.jobID == record.jobID && $0.outcome == .pending
+      })
+    else { return }
+    try await recordCapabilityOutcome(
+      for: record, outcome: .confirmed, state: JobState.cancelled.rawValue)
   }
 
   /// A confirmed-not-executed decision and terminal Job record become durable

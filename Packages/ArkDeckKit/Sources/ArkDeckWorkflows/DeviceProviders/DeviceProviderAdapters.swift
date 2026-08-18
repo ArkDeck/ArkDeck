@@ -3179,29 +3179,6 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
     guard case .rockchip(let rockchipAction) = action else {
       throw DeviceProviderError.unsupportedAction("non-Rockchip action given to rockchip provider")
     }
-    let descriptor: String
-    switch rockchipAction {
-    case .enterLoader:
-      descriptor = "rockchip.hdc.enter-loader.v1"
-    case .observeHDCNormalUSB:
-      descriptor = "rockchip.iokit.observe-hdc-normal.v1"
-    case .waitForHDCDisconnect:
-      descriptor = "rockchip.hdc.wait-disconnect.v1"
-    case .waitForLoader:
-      descriptor = "rockchip.rockusb.wait-loader.v1"
-    case .rebindLoader:
-      descriptor = "rockchip.rockusb.rebind-loader.v1"
-    case .rebootToNormal:
-      descriptor = "rockchip.rockusb.reboot-normal.v1"
-    case .waitForHDCReconnect:
-      descriptor = "rockchip.hdc.wait-reconnect.v1"
-    case .waitForBoundHDCReconnect:
-      descriptor = "rockchip.hdc.wait-bound-reconnect.v2"
-    case .verifyBoundBuild:
-      descriptor = "rockchip.hdc.verify-bound-build.v2"
-    case .capturePostFlashDiagnostics:
-      descriptor = "rockchip.hdc.capture-post-flash-hilog.v1"
-    }
     guard let bindingRevision = context.bindingRevision,
       let connectKey = context.connectKey, !connectKey.isEmpty,
       let expectedIdentitySHA256 = context.expectedIdentitySHA256,
@@ -3210,15 +3187,11 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
       throw DeviceProviderError.factsUnavailable(
         "\(context.stepID) has no complete host-managed target/tool correlation")
     }
-    let actionEncoder = CanonicalJSONEncoders.canonical()
-    let encodedAction = try actionEncoder.encode(
-      try PersistedTypedProviderAction(action))
-    let actionSHA256 = SHA256Hex.string(of: encodedAction)
     return TypedProcessPlan(
       action: action,
       kind: .hostManaged(
-        HostManagedProcessDescriptor(
-          identifier: descriptor,
+        try RockchipHostManagedActionCatalog.descriptor(
+          for: rockchipAction,
           jobID: context.jobID,
           stepID: context.stepID,
           targetID: context.targetID,
@@ -3226,7 +3199,6 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
           connectKey: connectKey,
           expectedIdentitySHA256: expectedIdentitySHA256,
           providerExecutableSHA256: providerExecutableSHA256,
-          actionSHA256: actionSHA256,
           executionTuning: context.campaignExecutionTuning)))
   }
 
