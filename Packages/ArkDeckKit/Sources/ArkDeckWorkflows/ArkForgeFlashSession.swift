@@ -199,13 +199,22 @@ package actor ArkForgeFlashSession {
           // key meant this never saw a terminal answer at all.
           switch event.facts.first(where: { $0.key == "outcome" })?.value ?? "" {
           case "outcomeUnknown", "recoveryAssessable":
-            // The daemon publishes why beside the classification. Without it
-            // the operator gets "unknown" while the one line naming the cause
-            // sits in a CBOR journal on the other side of the boundary.
-            let why = event.facts.first(where: { $0.key == "reason" })?.value
+            // The daemon publishes why beside the classification — a `reason`
+            // fact for control refusals and expiries, or the dispatch facts
+            // (tool exit, duration, output tail) for a write that did not
+            // confirm. Without them the operator gets "unknown" while the one
+            // line naming the cause sits in a CBOR journal on the other side
+            // of the boundary.
+            let why =
+              event.facts.first(where: { $0.key == "reason" })?.value
+              ?? event.facts
+              .filter { $0.key != "outcome" }
+              .map { "\($0.key)=\($0.value)" }
+              .joined(separator: " ")
             terminal = .outcomeUnknown(
-              reason: why.map { "the daemon classified this job's outcome as unknown: \($0)" }
-                ?? "the daemon classified this job's outcome as unknown",
+              reason: why.isEmpty
+                ? "the daemon classified this job's outcome as unknown"
+                : "the daemon classified this job's outcome as unknown: \(why)",
               receipts: self.receipts)
           case "cancelledSafe":
             terminal = .cancelledSafe(receipts: self.receipts)

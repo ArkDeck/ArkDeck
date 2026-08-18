@@ -202,7 +202,17 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       published = receipts
       receiptsByJob[jobID] = Dictionary(
         published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
-      throw RuntimeDispatchFailure.failed(reason)
+      // Unknown, not failed — the difference decides everything downstream.
+      // `.failed` records the capability use `.confirmed` with a `failed`
+      // terminal, which reads as "device state known"; the recovery scanner
+      // then finds no unresolved intent, no recovery epoch can classify, and
+      // the generation loop treats the lineage as closed. Measured 2026-08-18:
+      // a 2 GB write whose marker never arrived was relabelled `failed` here,
+      // and every later destructive submit answered
+      // `capability denied [denial:exhausted]`. An unknown outcome must reach
+      // the engine as exactly that, so the job parks `waitingForRecovery` and
+      // the complete-overwrite recovery lane can reopen the target.
+      throw RuntimeDispatchFailure.outcomeUnknown(reason)
     }
     receiptsByJob[jobID] = Dictionary(
       published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
