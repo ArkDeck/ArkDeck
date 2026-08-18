@@ -6224,7 +6224,9 @@ public actor RuntimeJobEngine {
       }
       do {
         recoveryAdmission = try await RuntimeRecoveryService(
-          stateDirectory: configuration.stateDirectory, nowUTC: nowUTC
+          stateDirectory: configuration.stateDirectory,
+          capabilityStore: capabilityStore,
+          nowUTC: nowUTC
         ).completeOverwriteAdmission(
           request: request, descriptor: descriptor,
           stableIdentitySHA256: identity, bindingRevision: bindingRevision)
@@ -6762,7 +6764,9 @@ public actor RuntimeJobEngine {
     let admission: RuntimeCompleteOverwriteAdmissionResult
     do {
       admission = try await RuntimeRecoveryService(
-        stateDirectory: configuration.stateDirectory, nowUTC: nowUTC
+        stateDirectory: configuration.stateDirectory,
+        capabilityStore: capabilityStore,
+        nowUTC: nowUTC
       ).completeOverwriteAdmission(
         request: runtime.record.request, descriptor: descriptor,
         stableIdentitySHA256: identity, bindingRevision: bindingRevision)

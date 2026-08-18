@@ -379,6 +379,43 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertNil(admission.recognizedEpoch)
   }
 
+  func testCapabilityOnlyUnknownUsesTheFullTypedPartitionPlanAsPossibleEffects()
+    async throws
+  {
+    let store = try await writeCapabilityOnlyUnknownJob(
+      jobID: "job-capability-only-unknown", persistJobRecord: true)
+
+    let admission = try await RuntimeRecoveryService(
+      stateDirectory: stateDirectory, capabilityStore: store,
+      nowUTC: { "2026-08-08T01:00:00Z" }
+    ).completeOverwriteAdmission(
+      request: try flashRequest(id: "capability-only-recovery"),
+      descriptor: try flashDescriptor(), stableIdentitySHA256: identity,
+      bindingRevision: 2)
+
+    let covered = try XCTUnwrap(admission.recoveryContext?.coveredIntents.only)
+    XCTAssertEqual(covered.jobID, "job-capability-only-unknown")
+    XCTAssertTrue(covered.intentEventID.hasPrefix("capability-CAP-RT-RECOVERY-UNKNOWN-use-1"))
+    XCTAssertEqual(
+      covered.possibleEffects,
+      try recoveryPartitions().map { "partition:\($0)" })
+    XCTAssertNil(admission.recognizedEpoch)
+  }
+
+  func testCapabilityOnlyUnknownWithoutAnExactDurableJobRecordFailsClosed()
+    async throws
+  {
+    let store = try await writeCapabilityOnlyUnknownJob(
+      jobID: "job-capability-record-missing", persistJobRecord: false)
+
+    await assertRecoveryBlocked(
+      "completeOverwriteRecovery.unboundedCapabilityLineage",
+      service: RuntimeRecoveryService(
+        stateDirectory: stateDirectory, capabilityStore: store,
+        nowUTC: { "2026-08-08T01:00:00Z" }),
+      request: try flashRequest(id: "missing-capability-record"))
+  }
+
   func testRecoveryNegativeMatrixBlocksCoverageCancellationExpiryAndAttemptSeventeen()
     async throws
   {
@@ -765,6 +802,79 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     return (
       directory.appending(path: "job-record.json"), journalURL
     )
+  }
+
+  private func writeCapabilityOnlyUnknownJob(
+    jobID: String, persistJobRecord: Bool
+  ) async throws -> RuntimeCapabilityStore {
+    let timestamp = "2026-08-08T00:00:00Z"
+    let request = try flashRequest(id: jobID)
+    let planDigest = String(repeating: "2", count: 64)
+    if persistJobRecord {
+      var record = try makeRecord(
+        jobID: jobID, createdAtUTC: timestamp, finishedAtUTC: timestamp)
+      record.state = JobState.waitingForRecovery.rawValue
+      record.outcomeUnknown = true
+      let directory = try jobDirectory(jobID)
+      try record.persist(into: directory)
+      let journal = try FileDurableJournal(
+        url: directory.appending(path: "journal.jsonl"))
+      let sequence = try appendRunningPrefix(journal: journal, record: record)
+      try journal.appendAndSynchronize(
+        try JournalEvent.stateTransition(
+          eventID: "capability-only-wait-\(jobID)", sequence: sequence,
+          sessionID: record.sessionID, jobID: jobID, timestamp: timestamp,
+          from: .running, to: .waitingForRecovery,
+          reason: "capability outcome unknown before a typed step intent was durable"))
+    }
+
+    let artifactFacts = ["imageBundleSha256": artifactSHA256]
+    let store = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appending(
+        path: "capabilities", directoryHint: .isDirectory))
+    try await store.install(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-RECOVERY-UNKNOWN",
+        targetScope: .stablePhysicalIdentity(sha256: identity),
+        operationScope: [
+          .init(
+            operationID: "flash.dayu200",
+            version: try flashDescriptor().version)
+        ],
+        effectCeiling: .destructive,
+        exactInputs: request.inputs,
+        exactArtifactFacts: artifactFacts,
+        issuedAtUTC: timestamp,
+        expiresAtUTC: "2026-08-08T04:00:00Z",
+        maximumUses: 1,
+        issuer: .init(
+          kind: .runtimeDefaultPolicy,
+          reference: "catalog:flash.dayu200"),
+        exactPlanDigest: planDigest,
+        exactBindingRevision: 2))
+    let query = RuntimeCapabilityAuthorizationQuery(
+      operationID: "flash.dayu200",
+      operationVersion: try flashDescriptor().version,
+      effect: .destructive,
+      targetStableIdentitySHA256: identity,
+      targetBindingRevision: 2,
+      planDigest: planDigest,
+      inputs: request.inputs,
+      artifactFacts: artifactFacts)
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-RECOVERY-UNKNOWN",
+      reservationID: "reservation-capability-only-unknown",
+      jobID: jobID,
+      query: query,
+      nowUTC: timestamp)
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-RECOVERY-UNKNOWN",
+      reservationID: "reservation-capability-only-unknown",
+      jobID: jobID,
+      outcome: .outcomeUnknown,
+      terminalState: JobState.waitingForRecovery.rawValue,
+      atUTC: "2026-08-08T00:01:00Z")
+    return store
   }
 
   private func writeSuccessfulRecoveryJob(

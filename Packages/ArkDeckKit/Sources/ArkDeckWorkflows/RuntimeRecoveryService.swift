@@ -60,10 +60,16 @@ private struct RuntimeHistoricalRockchipReceipt: Decodable {
 
 struct RuntimeRecoveryService {
   private let stateDirectory: URL
+  private let capabilityStore: RuntimeCapabilityStore?
   private let nowUTC: @Sendable () -> String
 
-  init(stateDirectory: URL, nowUTC: @escaping @Sendable () -> String) {
+  init(
+    stateDirectory: URL,
+    capabilityStore: RuntimeCapabilityStore? = nil,
+    nowUTC: @escaping @Sendable () -> String
+  ) {
     self.stateDirectory = stateDirectory
+    self.capabilityStore = capabilityStore
     self.nowUTC = nowUTC
   }
 
@@ -83,7 +89,7 @@ struct RuntimeRecoveryService {
     }
     let store = try RuntimeSupersedingRecoveryStore(stateDirectory: stateDirectory)
     let epochs = try await store.list()
-    let unresolved = try unresolvedDestructiveIntents(
+    let unresolved = try await unresolvedDestructiveIntents(
       stableIdentitySHA256: stableIdentitySHA256,
       bindingRevision: bindingRevision,
       epochs: epochs)
@@ -174,14 +180,14 @@ struct RuntimeRecoveryService {
     stableIdentitySHA256: String,
     bindingRevision: Int,
     epochs: [SupersedingRecoveryEpoch]
-  ) throws -> [SupersededRecoveryIntent] {
+  ) async throws -> [SupersededRecoveryIntent] {
     let jobsRoot = stateDirectory.appending(path: "jobs", directoryHint: .isDirectory)
-    guard
-      let directories = try? FileManager.default.contentsOfDirectory(
+    let directories =
+      (try? FileManager.default.contentsOfDirectory(
         at: jobsRoot, includingPropertiesForKeys: nil,
-        options: [.skipsHiddenFiles])
-    else { return [] }
+        options: [.skipsHiddenFiles])) ?? []
     var unresolved: [SupersededRecoveryIntent] = []
+    var journalDestructiveJobIDs: Set<String> = []
     for directory in directories.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
       guard let record = try? RuntimeJobRecord.load(from: directory),
         record.materializedStableTargetIdentitySHA256 == stableIdentitySHA256,
@@ -202,6 +208,9 @@ struct RuntimeRecoveryService {
         contentsOf: replay.unknownOutcomes
           .filter { $0.effect == .destructive }
           .map { ($0.correlatedIntentEventID, $0.stepID) })
+      if !destructiveIntents.isEmpty {
+        journalDestructiveJobIDs.insert(record.jobID)
+      }
       if !destructiveIntents.isEmpty,
         replay.events.contains(where: {
           guard $0.kind == .stateTransition, let transition = $0.stateTransition else {
@@ -239,6 +248,74 @@ struct RuntimeRecoveryService {
         unresolved.append(
           SupersededRecoveryIntent(
             jobID: record.jobID, intentEventID: intentEventID,
+            operationReference: record.operationReference,
+            profileReference: profile,
+            observedAtUTC: record.finishedAtUTC ?? record.createdAtUTC,
+            possibleEffects: partitions.map { "partition:\($0)" }))
+      }
+    }
+
+    // Capability consumption is the last durable boundary before mutation.
+    // A crash or delegated-provider failure can therefore leave an unknown
+    // capability use without a corresponding destructive journal intent. The
+    // absence of that intent is never treated as proof that no effect happened:
+    // bind the entire typed partitionPlan as the conservative possible-effect
+    // set. Only the published complete-overwrite contract may then supersede it.
+    let store: RuntimeCapabilityStore
+    do {
+      store = try capabilityStore
+        ?? RuntimeCapabilityStore(
+          directoryURL: stateDirectory.appending(
+            path: "capabilities", directoryHint: .isDirectory))
+    } catch {
+      throw RuntimeCompleteOverwriteRecoveryError.blocked(
+        "completeOverwriteRecovery.capabilityLineageUnavailable")
+    }
+    let capabilityStatuses: [RuntimeCapabilityStatus]
+    do {
+      capabilityStatuses = try await store.list()
+    } catch {
+      throw RuntimeCompleteOverwriteRecoveryError.blocked(
+        "completeOverwriteRecovery.capabilityLineageUnavailable")
+    }
+    for status in capabilityStatuses {
+      for entry in status.lineage
+      where entry.targetStableIdentitySHA256 == stableIdentitySHA256
+        && entry.bindingRevision == bindingRevision
+        && entry.effect == WorkflowEffect.destructive.rawValue
+        && entry.outcome != .confirmed
+        && entry.outcome != .safeToReflash
+      {
+        if journalDestructiveJobIDs.contains(entry.jobID)
+          || epochs.contains(where: { epoch in
+            epoch.stableTargetIdentitySHA256 == stableIdentitySHA256
+              && epoch.bindingRevision == bindingRevision
+              && epoch.coveredIntents.contains { $0.jobID == entry.jobID }
+          })
+        {
+          continue
+        }
+        let directory = jobsRoot.appending(
+          path: entry.jobID, directoryHint: .isDirectory)
+        guard let record = try? RuntimeJobRecord.load(from: directory),
+          record.materializedStableTargetIdentitySHA256 == stableIdentitySHA256,
+          record.materializedBindingRevision == bindingRevision,
+          record.operationReference == entry.operationReference,
+          record.actualEffect == WorkflowEffect.destructive.rawValue,
+          let profile = Self.stringInput("deviceProfile", request: record.request),
+          !profile.isEmpty,
+          let partitions = Self.stringArrayInput(
+            "partitionPlan", request: record.request),
+          !partitions.isEmpty
+        else {
+          throw RuntimeCompleteOverwriteRecoveryError.blocked(
+            "completeOverwriteRecovery.unboundedCapabilityLineage")
+        }
+        unresolved.append(
+          SupersededRecoveryIntent(
+            jobID: entry.jobID,
+            intentEventID:
+              "capability-\(status.capability.capabilityID)-use-\(entry.ordinal)",
             operationReference: record.operationReference,
             profileReference: profile,
             observedAtUTC: record.finishedAtUTC ?? record.createdAtUTC,
