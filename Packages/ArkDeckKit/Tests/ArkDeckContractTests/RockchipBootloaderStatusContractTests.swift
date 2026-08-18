@@ -7,6 +7,22 @@ import XCTest
 final class RockchipBootloaderStatusContractTests: XCTestCase {
   private var root: URL!
 
+  private struct AcceptingArkForgeLoaderObserver: ArkForgeLoaderObserving {
+    func observeLoader(
+      stableIdentitySHA256: String,
+      expectedUSBTopology: String?,
+      requestID _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      guard let expectedUSBTopology else {
+        throw ArkForgeLoaderObservationFailure.unusableObservation(
+          "fixture requires an exact topology")
+      }
+      return RockchipRuntimeLoaderIdentity(
+        serialDigestSHA256: stableIdentitySHA256,
+        topology: expectedUSBTopology)
+    }
+  }
+
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
       .appending(path: "arkdeck-loader-onboarding", directoryHint: .isDirectory)
@@ -47,7 +63,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
-      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }))
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
 
     let receipt = try coordinator.bindCurrentLoader(
       targetID: fixture.target.targetID,
@@ -81,6 +98,26 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     XCTAssertEqual(status.disposition, .exactBoundTarget)
     XCTAssertEqual(status.targetID, fixture.target.targetID)
     XCTAssertEqual(status.bindingRevision, 3)
+  }
+
+  func testLoaderBindingRefusesWhenArkForgeSecondSourceIsUnavailable() throws {
+    let fixture = try makeCurrentFixture()
+    let originalTarget = fixture.target
+    let originalBinding = try fixture.bindings.loadExisting()
+    let coordinator = ProductRockchipLoaderBindingCoordinator(
+      targetStore: fixture.targets,
+      bindingStore: fixture.bindings,
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }),
+      loaderObserver: RefusingArkForgeLoaderObserver(
+        reason: "discoverDevices returned no bound Loader"))
+
+    XCTAssertThrowsError(
+      try coordinator.bindCurrentLoader(
+        targetID: fixture.target.targetID,
+        expectedBindingRevision: fixture.target.bindingRevision))
+    XCTAssertEqual(
+      try fixture.targets.find(targetID: fixture.target.targetID), originalTarget)
+    XCTAssertEqual(try fixture.bindings.loadExisting(), originalBinding)
   }
 
   func testRuntimeActivatesOnlyTheExactSelectedRevisionOneTargetAcrossDAYU200Modes() throws {
@@ -133,7 +170,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       let coordinator = ProductRockchipLoaderBindingCoordinator(
         targetStore: targets,
         bindingStore: bindings,
-        usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.identity] }))
+        usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.identity] }),
+        loaderObserver: AcceptingArkForgeLoaderObserver())
       let receipt = try coordinator.bindCurrentLoader(
         targetID: selectedTarget.targetID,
         expectedBindingRevision: selectedTarget.bindingRevision)
@@ -181,6 +219,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
       usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.loader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver(),
       reactivationProofSource: StaticReactivationProofSource(proof: proof))
 
     let receipt = try coordinator.bindCurrentLoader(
@@ -238,6 +277,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         targetStore: fixture.targets,
         bindingStore: fixture.bindings,
         usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.loader] }),
+        loaderObserver: AcceptingArkForgeLoaderObserver(),
         reactivationProofSource: StaticReactivationProofSource(proof: proof))
 
       XCTAssertThrowsError(
@@ -429,7 +469,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: targets,
       bindingStore: bindings,
-      usbProbe: RockchipProductUSBProbe(identitySource: { [current] }))
+      usbProbe: RockchipProductUSBProbe(identitySource: { [current] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
 
     XCTAssertThrowsError(
       try coordinator.bindCurrentLoader(
@@ -444,7 +485,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
-      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }))
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
     let first = try coordinator.bindCurrentLoader(
       targetID: fixture.target.targetID, expectedBindingRevision: 2)
     let retry = try coordinator.bindCurrentLoader(
@@ -462,7 +504,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
-      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }))
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
     _ = try coordinator.bindCurrentLoader(
       targetID: fixture.target.targetID,
       expectedBindingRevision: fixture.target.bindingRevision)
@@ -504,7 +547,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
-      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }))
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
     _ = try coordinator.bindCurrentLoader(
       targetID: fixture.target.targetID,
       expectedBindingRevision: fixture.target.bindingRevision)
@@ -598,7 +642,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
-      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.loader] }))
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.loader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
     XCTAssertThrowsError(
       try coordinator.bindCurrentLoader(
         targetID: fixture.target.targetID,
@@ -624,7 +669,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
       usbProbe: RockchipProductUSBProbe(
-        identitySource: { [fixture.currentLoader, another] }))
+        identitySource: { [fixture.currentLoader, another] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
 
     XCTAssertThrowsError(
       try coordinator.bindCurrentLoader(

@@ -375,6 +375,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private let hdcResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
   private let usbProbe: any RockchipRuntimeUSBProbing
+  private let loaderObserver: any ArkForgeLoaderObserving
   /// The board carrying the facts of the bundle in hand. A seam like `stage`,
   /// so composition tests keep proving every branch without a real archive;
   /// production reads the bytes, which is the only way to know the bundle is
@@ -390,6 +391,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     hdcResolver: any RuntimeExecutableResolving,
     runner: any RockchipRuntimeCommandRunning,
     usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
+    loaderObserver: any ArkForgeLoaderObserving = RefusingArkForgeLoaderObserver(
+      reason: "no ArkForge Loader observation source was composed"),
     enterLoaderReadbackTimeoutSeconds: Int = 45,
     postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil,
     nowUTC: @escaping @Sendable () -> String = {
@@ -399,6 +402,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     self.hdcResolver = hdcResolver
     self.runner = runner
     self.usbProbe = usbProbe
+    self.loaderObserver = loaderObserver
     self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
     self.postFlashHDCBindingStore = postFlashHDCBindingStore
     self.nowUTC = nowUTC
@@ -443,23 +447,24 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       // that is demonstrably no longer on HDC: it cannot add evidence and a
       // missing HDC receipt would otherwise park an already-flashable device
       // as outcome-unknown. USB identity alone is insufficient, so pair it
-      // with the reviewed tool's `ld` receipt before treating the step as
+      // with ArkForge's independently enumerated observation before treating the step as
       // complete. If either readback is absent, retain the normal-mode path
       // below and its existing fail-closed semantics.
       if let loader = try? exactLoaderIdentity(
         stableIdentitySHA256: descriptor.expectedIdentitySHA256
       ) {
-        let loaderReceipt = try await observeLoader(
-          executable: rockchipExecutable,
-          timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        let confirmed = try observeLoader(
+          stableIdentitySHA256: descriptor.expectedIdentitySHA256,
+          expectedUSBTopology: loader.topology,
+          requestID: "\(descriptor.jobID)-\(descriptor.stepID)-already-loader")
         return result(
           summary: [
             "transition": "already-loader",
             "transitionEvidence": "exact-bound-loader-readback",
-            "loaderIdentitySha256": loader.serialDigestSHA256,
-            "usbTopology": loader.topology,
+            "loaderIdentitySha256": confirmed.serialDigestSHA256,
+            "usbTopology": confirmed.topology,
           ],
-          receipts: [loaderReceipt])
+          receipts: [])
       }
 
       let hdc = try resolveHDC()
@@ -492,19 +497,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       }
 
       do {
-        let (_, loaderReceipt) = try await waitForLoader(
+        let loader = try await waitForLoader(
           stableIdentitySHA256: descriptor.expectedIdentitySHA256,
-          rockchipExecutable: rockchipExecutable,
           timeoutSeconds: tuning?.loaderDiscoveryTimeoutSeconds
             ?? enterLoaderReadbackTimeoutSeconds,
           pollIntervalMilliseconds: tuning?.loaderPollIntervalMilliseconds ?? 1_000,
-          commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
-        var receipts = hdcReceipt.map { [$0] } ?? []
-        receipts.append(loaderReceipt)
+          requestID: "\(descriptor.jobID)-\(descriptor.stepID)-post-transition")
+        let receipts = hdcReceipt.map { [$0] } ?? []
         return result(
           summary: [
             "transition": "normal-to-loader",
             "transitionEvidence": "exact-bound-loader-readback",
+            "loaderIdentitySha256": loader.serialDigestSHA256,
+            "usbTopology": loader.topology,
           ],
           receipts: receipts)
       } catch {
@@ -551,30 +556,32 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         summary: ["hdcState": "disconnected"], receipts: receipts)
 
     case .waitForLoader(let stableIdentitySHA256):
-      let (identity, receipt) = try await waitForLoader(
+      let identity = try await waitForLoader(
         stableIdentitySHA256: stableIdentitySHA256,
-        rockchipExecutable: rockchipExecutable,
         timeoutSeconds: tuning?.loaderDiscoveryTimeoutSeconds ?? 45,
         pollIntervalMilliseconds: tuning?.loaderPollIntervalMilliseconds ?? 1_000,
-        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        requestID: "\(descriptor.jobID)-\(descriptor.stepID)-wait-loader")
       return result(
         summary: [
           "loaderIdentitySha256": identity.serialDigestSHA256,
           "usbTopology": identity.topology,
         ],
-        receipts: [receipt])
+        receipts: [])
 
     case .rebindLoader(let stableIdentitySHA256):
       let identity = try exactLoaderIdentity(
         stableIdentitySHA256: stableIdentitySHA256)
-      let receipt = try await observeLoader(executable: rockchipExecutable)
+      let confirmed = try observeLoader(
+        stableIdentitySHA256: stableIdentitySHA256,
+        expectedUSBTopology: identity.topology,
+        requestID: "\(descriptor.jobID)-\(descriptor.stepID)-rebind-loader")
       return result(
         summary: [
-          "loaderIdentitySha256": identity.serialDigestSHA256,
-          "usbTopology": identity.topology,
+          "loaderIdentitySha256": confirmed.serialDigestSHA256,
+          "usbTopology": confirmed.topology,
           "bindingRevision": String(descriptor.bindingRevision),
         ],
-        receipts: [receipt])
+        receipts: [])
 
     // flashPartitions / verifyFlashReadback were dispatched here. Both were
     // removed with the lowering they drove (CHG-2026-059): the `wlx` write,
@@ -950,19 +957,20 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
 
   private func waitForLoader(
     stableIdentitySHA256: String,
-    rockchipExecutable: ResolvedExecutable,
     timeoutSeconds: Int,
     pollIntervalMilliseconds: Int = 1_000,
-    commandTimeoutSeconds: Int = 15
-  ) async throws -> (RockchipRuntimeLoaderIdentity, ProviderSubprocessReceipt) {
+    requestID: String
+  ) async throws -> RockchipRuntimeLoaderIdentity {
     let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
     while ContinuousClock.now < deadline {
       if let identity = try? exactLoaderIdentity(
         stableIdentitySHA256: stableIdentitySHA256),
-        let receipt = try? await observeLoader(
-          executable: rockchipExecutable, timeoutSeconds: commandTimeoutSeconds)
+        let confirmed = try? observeLoader(
+          stableIdentitySHA256: stableIdentitySHA256,
+          expectedUSBTopology: identity.topology,
+          requestID: requestID)
       {
-        return (identity, receipt)
+        return confirmed
       }
       try await Task.sleep(for: .milliseconds(pollIntervalMilliseconds))
     }
@@ -990,29 +998,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   }
 
   private func observeLoader(
-    executable: ResolvedExecutable,
-    timeoutSeconds: Int = 15
-  ) async throws -> ProviderSubprocessReceipt {
-    let receipt = try await run(
-      executable: executable,
-      arguments: ["ld"],
-      timeoutSeconds: timeoutSeconds,
-      budget: 64 * 1024)
-    guard
-      case .observations(let observations) = RockchipLDOutputParser.parse(
-        stdout: receipt.stdout,
-        stderr: receipt.stderr,
-        termination: .exited(receipt.exitStatus ?? -1)),
-      observations.count == 1,
-      let observation = observations.first,
-      observation.usbVendorID == RockchipProbeEvidence.rockUSBVendorID,
-      observation.usbProductID == RockchipProbeEvidence.dayu200LoaderProductID,
-      observation.mode == .loader
-    else {
+    stableIdentitySHA256: String,
+    expectedUSBTopology: String?,
+    requestID: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
+    do {
+      return try loaderObserver.observeLoader(
+        stableIdentitySHA256: stableIdentitySHA256,
+        expectedUSBTopology: expectedUSBTopology,
+        requestID: requestID)
+    } catch {
       throw RuntimeDispatchFailure.failed(
-        "rkdeveloptool ld did not report exactly one DAYU200 Loader")
+        "ArkForge dual-source Loader observation failed: \(error)")
     }
-    return receipt
   }
 
 

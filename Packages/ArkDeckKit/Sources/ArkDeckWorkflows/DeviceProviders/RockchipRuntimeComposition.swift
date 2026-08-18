@@ -518,6 +518,9 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
         hdcResolver: hdcResolver,
         runner: FoundationRockchipRuntimeCommandRunner(
           workingDirectory: toolWorkingDirectory),
+        loaderObserver: ProductArkForgeLoaderObserver(
+          runtimeDirectory: stateDirectory.appending(
+            path: "arkforge", directoryHint: .isDirectory)),
         // The staged-image cache went with the write path it fed: only
         // `flashWrites` ever unpacked an archive here, and that lowering is
         // arkforged's now (CHG-2026-059).

@@ -362,6 +362,8 @@ package enum ArkForgeLaneComposition {
 
     let host = dependencies.rockchipHost
     let executable = dependencies.rockchipExecutable
+    let loaderObserver = ProductArkForgeLoaderObserver(
+      runtimeDirectory: runtimeDirectory)
     return .success(
       Composed(
         deviceProfileID: profileID,
@@ -386,7 +388,8 @@ package enum ArkForgeLaneComposition {
               stableIdentitySHA256: binding.stableIdentitySHA256,
               usbTopology: binding.usbTopology,
               rockchipExecutable: executable),
-            host: host())
+            host: host(),
+            loaderObserver: loaderObserver)
         },
         makeClient: { _ in daemon },
         // A second connection, deliberately. Materialization streams ~731 MB

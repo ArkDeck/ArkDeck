@@ -123,10 +123,17 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
 
   private let binding: Binding
   private let host: any RockchipRuntimeActionHosting
+  private let loaderObserver: any ArkForgeLoaderObserving
 
-  init(binding: Binding, host: any RockchipRuntimeActionHosting) {
+  init(
+    binding: Binding,
+    host: any RockchipRuntimeActionHosting,
+    loaderObserver: any ArkForgeLoaderObserving = RefusingArkForgeLoaderObserver(
+      reason: "no ArkForge Loader observation source was composed")
+  ) {
     self.binding = binding
     self.host = host
+    self.loaderObserver = loaderObserver
   }
 
   func perform(
@@ -188,6 +195,29 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
     var observedDisconnect = false
     var observedRebind = false
     var failure = ""
+
+    // `enterUpdater` is idempotent at its semantic boundary. A caller may
+    // already have put the exact board in Loader before submitting the typed
+    // request. Confirm that state through both independent read-only sources
+    // before touching HDC; requiring HDC-normal first would reject a board that
+    // is already at the requested postcondition and classify a zero-write run
+    // as outcome-unknown.
+    if let identity = try? loaderObserver.observeLoader(
+      stableIdentitySHA256: binding.stableIdentitySHA256,
+      expectedUSBTopology: binding.usbTopology,
+      requestID: "\(request.requestID)-already-loader")
+    {
+      return ArkForgeManagedControlPort.Observation(
+        accepted: true,
+        facts: [
+          "mode": "Loader",
+          "stableIdentitySHA256": identity.serialDigestSHA256,
+          "usbTopology": identity.topology,
+        ],
+        evidenceSHA256: [],
+        observedDisconnect: true,
+        observedUniqueLoaderRebind: true)
+    }
 
     do {
       _ = try await execute(

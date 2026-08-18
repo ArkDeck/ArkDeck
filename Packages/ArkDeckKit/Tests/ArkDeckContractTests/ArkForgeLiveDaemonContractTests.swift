@@ -93,6 +93,28 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
     }
   }
 
+  func testLiveDualSourceLoaderObservationMatchesTheBoundBoard() throws {
+    guard let socket = ProcessInfo.processInfo.environment[Self.socketKey],
+      let topology = ProcessInfo.processInfo.environment[Self.topologyKey],
+      let stableIdentity = ProcessInfo.processInfo.environment[
+        "ARKDECK_ARKFORGE_LIVE_STABLE_IDENTITY_SHA256"]
+    else {
+      throw XCTSkip(
+        "set \(Self.socketKey), \(Self.topologyKey), and "
+          + "ARKDECK_ARKFORGE_LIVE_STABLE_IDENTITY_SHA256 for the attached Loader")
+    }
+    let observer = ProductArkForgeLoaderObserver(
+      runtimeDirectory: URL(filePath: socket).deletingLastPathComponent())
+
+    let identity = try observer.observeLoader(
+      stableIdentitySHA256: stableIdentity,
+      expectedUSBTopology: topology,
+      requestID: "live-dual-source-loader")
+
+    XCTAssertEqual(identity.serialDigestSHA256, stableIdentity)
+    XCTAssertEqual(identity.topology, topology)
+  }
+
   // MARK: - The whole chain, against a real daemon and a real board
 
   /// Import → inspect → discover → select → materialize, end to end.

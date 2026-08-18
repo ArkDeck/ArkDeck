@@ -60,6 +60,25 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  private struct FixedArkForgeLoaderObserver: ArkForgeLoaderObserving {
+    let identity: String
+    let topology: String
+
+    func observeLoader(
+      stableIdentitySHA256: String,
+      expectedUSBTopology: String?,
+      requestID _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      guard stableIdentitySHA256 == identity,
+        expectedUSBTopology == nil || expectedUSBTopology == topology
+      else {
+        throw ArkForgeLoaderObservationFailure.identityMismatch
+      }
+      return RockchipRuntimeLoaderIdentity(
+        serialDigestSHA256: identity, topology: topology)
+    }
+  }
+
   private actor ProcessProgressLog {
     private var values: [RuntimeProcessProgress] = []
 
@@ -1380,8 +1399,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .success("const.ohos.fullname = OpenHarmony-7.0.0.35-20260728_180253\n"),
     ])
     let hdcObservation = try await FoundationRockchipLiveModeProbe(
-      hdcResolver: resolver, rockchipResolver: resolver, runner: connected,
-      usbProbe: MissingUSBProbe()
+      hdcResolver: resolver, runner: connected,
+      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal")
     ).observe(
       connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     XCTAssertEqual(hdcObservation.deviceMode, "hdc")
@@ -1404,32 +1423,29 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .exit(1),
     ])
     let partial = try await FoundationRockchipLiveModeProbe(
-      hdcResolver: resolver, rockchipResolver: resolver, runner: buildUnreadable,
-      usbProbe: MissingUSBProbe()
+      hdcResolver: resolver, runner: buildUnreadable,
+      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal")
     ).observe(
       connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     XCTAssertEqual(partial.deviceMode, "hdc")
     XCTAssertNil(partial.buildFingerprint)
 
-    // Not on HDC: the RockUSB surface names loader vs maskrom, and neither
-    // carries a build.
-    for (reported, expected) in [("Loader", "loader"), ("Maskrom", "maskrom")] {
-      let runner = ProbeCommandRunner(responses: [
-        .success("[Empty]\n"),
-        .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=17\t\(reported)\n"),
-      ])
-      let observation = try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: runner,
-        usbProbe: FixedUSBProbe(identity: String(repeating: "a", count: 64))
-      ).observe(
-        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
-      XCTAssertEqual(observation.deviceMode, expected)
-      XCTAssertNil(observation.buildFingerprint)
-      let commands = await runner.invocations()
-      XCTAssertEqual(
-        commands.map(\.arguments), [["list", "targets", "-v"], ["ld"]])
-      XCTAssertEqual(commands.last?.executable.path, rockchip.path)
-    }
+    // Not on HDC: IOKit + ArkForge discoverDevices name Loader. Maskrom is
+    // deliberately outside the native RockUSB product scope and is never
+    // inferred from this path.
+    let loaderRunner = ProbeCommandRunner(responses: [.success("[Empty]\n")])
+    let loaderIdentity = String(repeating: "a", count: 64)
+    let loaderObservation = try await FoundationRockchipLiveModeProbe(
+      hdcResolver: resolver, runner: loaderRunner,
+      loaderObserver: FixedArkForgeLoaderObserver(
+        identity: loaderIdentity, topology: "42")
+    ).observe(
+      connectKey: "device-1", stableIdentitySHA256: loaderIdentity)
+    XCTAssertEqual(loaderObservation.deviceMode, "loader")
+    XCTAssertNil(loaderObservation.buildFingerprint)
+    let loaderCommands = await loaderRunner.invocations()
+    XCTAssertEqual(loaderCommands.map(\.arguments), [["list", "targets", "-v"]])
+    XCTAssertTrue(loaderCommands.allSatisfy { $0.executable.path == hdc.path })
   }
 
   func testLiveProbeRefusesToAttributeAnAmbiguousOrMissingObservation()
@@ -1452,9 +1468,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver,
-        runner: mismatchedIdentity,
-        usbProbe: FixedUSBProbe(identity: String(repeating: "b", count: 64))
+        hdcResolver: resolver, runner: mismatchedIdentity,
+        loaderObserver: RefusingArkForgeLoaderObserver(
+          reason: "IOKit identity does not match")
       ).observe(
         connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
@@ -1472,8 +1488,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: ambiguous,
-        usbProbe: FixedUSBProbe(identity: String(repeating: "a", count: 64))
+        hdcResolver: resolver, runner: ambiguous,
+        loaderObserver: RefusingArkForgeLoaderObserver(
+          reason: "arkforged observed an ambiguous Loader set")
       ).observe(
         connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
@@ -1484,8 +1501,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: nothing,
-        usbProbe: MissingUSBProbe()
+        hdcResolver: resolver, runner: nothing,
+        loaderObserver: RefusingArkForgeLoaderObserver(reason: "no Loader")
       ).observe(
         connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
@@ -1497,8 +1514,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: malformed,
-        usbProbe: MissingUSBProbe()
+        hdcResolver: resolver, runner: malformed,
+        loaderObserver: RefusingArkForgeLoaderObserver(reason: "not reached")
       ).observe(
         connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
@@ -1507,9 +1524,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
         hdcResolver: FixedExecutableResolver(table: [:]),
-        rockchipResolver: resolver,
         runner: ProbeCommandRunner(responses: []),
-        usbProbe: MissingUSBProbe()
+        loaderObserver: RefusingArkForgeLoaderObserver(reason: "not reached")
       ).observe(
         connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
@@ -1793,8 +1809,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: root) }
     let identity = String(repeating: "a", count: 64)
     let runner = ProbeCommandRunner(responses: [
-      .outcomeUnknown("process timed out before completion"),
-      .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"),
+      .outcomeUnknown("process timed out before completion")
     ])
     let executor = FoundationRockchipRuntimeActionExecutor(
       hdcResolver: FixedExecutableResolver(
@@ -1803,7 +1818,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             path: "/product/hdc", sha256: String(repeating: "b", count: 64))
         ]),
       runner: runner,
-      usbProbe: LoaderAfterInitialProbe(identity: identity))
+      usbProbe: LoaderAfterInitialProbe(identity: identity),
+      loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
     let rockchip = ResolvedExecutable(
       path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
@@ -1818,13 +1834,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(result.summary["transition"], "normal-to-loader")
     XCTAssertEqual(
       result.summary["transitionEvidence"], "exact-bound-loader-readback")
-    XCTAssertEqual(result.subprocesses.count, 1)
+    XCTAssertEqual(result.subprocesses.count, 0)
     let invocations = await runner.invocations()
     XCTAssertEqual(
       invocations.map(\.arguments),
-      [
-        ["-t", "device-1", "target", "boot", "loader"], ["ld"],
-      ])
+      [["-t", "device-1", "target", "boot", "loader"]])
   }
 
   func testEnterLoaderUsesOnlyBrokerRecordedCampaignTiming() async throws {
@@ -1837,8 +1851,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       hdcCommandTimeoutSeconds: 7,
       readOnlyCommandTimeoutSeconds: 9)
     let runner = ProbeCommandRunner(responses: [
-      .success(""),
-      .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"),
+      .success("")
     ])
     let executor = FoundationRockchipRuntimeActionExecutor(
       hdcResolver: FixedExecutableResolver(
@@ -1847,7 +1860,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             path: "/product/hdc", sha256: String(repeating: "b", count: 64))
         ]),
       runner: runner,
-      usbProbe: LoaderAfterInitialProbe(identity: identity))
+      usbProbe: LoaderAfterInitialProbe(identity: identity),
+      loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
     let rockchip = ResolvedExecutable(
       path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
@@ -1863,19 +1877,15 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let invocations = await runner.invocations()
     XCTAssertEqual(
       invocations.map(\.arguments),
-      [
-        ["-t", "device-1", "target", "boot", "loader"], ["ld"],
-      ])
-    XCTAssertEqual(invocations.map(\.timeoutSeconds), [7, 9])
+      [["-t", "device-1", "target", "boot", "loader"]])
+    XCTAssertEqual(invocations.map(\.timeoutSeconds), [7])
   }
 
   func testEnterLoaderAlreadyInExactLoaderSkipsHDCAndRecordsReadback() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let identity = String(repeating: "a", count: 64)
-    let runner = ProbeCommandRunner(responses: [
-      .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n")
-    ])
+    let runner = ProbeCommandRunner(responses: [])
     let executor = FoundationRockchipRuntimeActionExecutor(
       hdcResolver: FixedExecutableResolver(
         table: [
@@ -1883,7 +1893,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             path: "/product/hdc", sha256: String(repeating: "b", count: 64))
         ]),
       runner: runner,
-      usbProbe: FixedUSBProbe(identity: identity))
+      usbProbe: FixedUSBProbe(identity: identity),
+      loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
     let rockchip = ResolvedExecutable(
       path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
@@ -1901,8 +1912,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(result.summary["loaderIdentitySha256"], identity)
     XCTAssertEqual(result.summary["usbTopology"], "42")
     let invocations = await runner.invocations()
-    XCTAssertEqual(invocations.map(\.arguments), [["ld"]])
-    XCTAssertEqual(result.subprocesses.count, 1)
+    XCTAssertTrue(invocations.isEmpty)
+    XCTAssertEqual(result.subprocesses.count, 0)
   }
 
   func testEnterLoaderKeepsTimedOutHDCUnknownWithoutExactLoader() async throws {
