@@ -837,6 +837,16 @@ public actor RuntimeJobEngine {
   package static let arkForgeOwnedModeSteps: Set<String> = [
     "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
     "rebind-loader-identity",
+    // The lane's plan owns the way back out as well as the way in: its own
+    // steps reset the device (`rd` through the daemon's fixed-tool port),
+    // wait out the first boot, and verify identity plus the published build
+    // through the managed-control postflight — all receipted before the lane
+    // returns. Running the engine's copies afterwards is not redundancy but
+    // failure: `reboot-device` demands a Loader readback from a board the
+    // plan already reset to normal (measured 2026-08-18, on the first run
+    // whose lane ever completed). Diagnostics capture stays engine-run — the
+    // lane's plan has no hilog step.
+    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
   ]
 
   /// The `processKind` those steps carry in a materialized plan.
