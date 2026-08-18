@@ -605,13 +605,14 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       // The bound reconnect this action waits for is the first boot after a
       // complete overwrite: userdata was just erased, so the device is
       // initializing filesystems and running first-boot setup before hdcd
-      // comes up. Measured 2026-08-18: a full nine-partition flash wrote and
-      // reset clean, then the 120-second deadline expired mid-first-boot and
-      // classified the whole job outcome-unknown. Five minutes bounds a hung
-      // boot without calling a normal one missing.
+      // comes up. Measured 2026-08-18, twice: the 120-second deadline expired
+      // mid-first-boot, and so did a 300-second one — the board answered on
+      // its known key minutes after the window closed, with the whole job
+      // already classified outcome-unknown. Ten minutes bounds a hung boot
+      // without calling this board's real first boot missing.
       let (identity, receipts) = try await waitForBoundHDC(
         expectation: expectation,
-        timeoutSeconds: 300,
+        timeoutSeconds: 600,
         commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       return result(
         summary: [
