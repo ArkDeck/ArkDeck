@@ -446,7 +446,9 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(try store.find(targetID: adopted.targetID), adopted)
   }
 
-  func testProvenAliasResolutionPreservesHistoryAndSelectsOnlyCanonicalTarget() throws {
+  func testProvenAliasResolutionUsesOnlyFreshConnectedOwnedRouteAndPreservesHistory()
+    async throws
+  {
     let store = try RuntimeTargetStore(directoryURL: directory)
     let originalIdentity = String(repeating: "a", count: 64)
     let loaderIdentity = String(repeating: "b", count: 64)
@@ -500,6 +502,51 @@ final class DeviceBootstrapContractTests: XCTestCase {
         targetID: canonical.targetID, bindingRevision: canonical.bindingRevision,
         toolVersion: canonical.toolVersion, connectKey: aliasConnectKey),
       "the HDC provider must use only the proven alias route while preserving canonical identity")
+    let refreshedCanonicalCandidates = [
+      BootstrapCandidate(connectKey: canonical.connectKey, state: "Connected")
+    ]
+    let liveObservation = ScriptedObservation(candidates: refreshedCanonicalCandidates)
+    let liveMachine = DeviceBootstrapMachine(
+      observation: liveObservation, targetStore: store,
+      nowUTC: { "2026-08-08T00:11:00Z" })
+    let refreshed = try await liveMachine.enumerateCandidates()
+    XCTAssertEqual(
+      refreshed, refreshedCanonicalCandidates,
+      "the production bootstrap refresh must publish the live route observation")
+    XCTAssertEqual(
+      try store.hdcExecutionRoute(targetID: canonical.targetID)?.connectKey,
+      canonical.connectKey,
+      "a later Flash may return the device to its canonical address; a fresh unique observation wins"
+    )
+    store.recordLiveHDCCandidates([
+      BootstrapCandidate(connectKey: aliasConnectKey, state: "Connected")
+    ])
+    XCTAssertEqual(
+      try store.hdcExecutionRoute(targetID: canonical.targetID)?.connectKey,
+      aliasConnectKey,
+      "the proven post-Flash alias remains usable when it is the sole connected route")
+    store.recordLiveHDCCandidates([
+      BootstrapCandidate(connectKey: canonical.connectKey, state: "Offline"),
+      BootstrapCandidate(connectKey: aliasConnectKey, state: "Offline"),
+    ])
+    XCTAssertThrowsError(try store.hdcExecutionRoute(targetID: canonical.targetID)) { error in
+      XCTAssertEqual(
+        error as? BootstrapError,
+        .observationFailed(
+          "fresh HDC observation found no Connected proven route for target \(canonical.targetID)"
+        ))
+    }
+    store.recordLiveHDCCandidates([
+      BootstrapCandidate(connectKey: canonical.connectKey, state: "Connected"),
+      BootstrapCandidate(connectKey: aliasConnectKey, state: "Connected"),
+    ])
+    XCTAssertThrowsError(try store.hdcExecutionRoute(targetID: canonical.targetID)) { error in
+      XCTAssertEqual(
+        error as? BootstrapError,
+        .observationFailed(
+          "fresh HDC observation found multiple Connected proven routes for target \(canonical.targetID)"
+        ))
+    }
     XCTAssertEqual(
       try store.adopt(
         stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
