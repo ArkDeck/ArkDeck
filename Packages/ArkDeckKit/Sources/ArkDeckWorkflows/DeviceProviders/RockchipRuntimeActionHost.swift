@@ -634,9 +634,20 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.failed(
           "post-flash binding verification is not fully configured")
       }
+      // This wait is the first boot after a complete overwrite: the plan's
+      // reset is arkforged's own `rd`, so the very next thing the authority is
+      // asked for is this verification — against a device that is still
+      // initializing its freshly erased userdata before hdcd comes up. The
+      // read-only command timeout (15 s) belongs to the parameter reads once
+      // the device is present, not to the boot in front of them: with it, the
+      // window closed mid-first-boot on every full flash while the board
+      // answered on its known key minutes later (measured 2026-08-18, three
+      // runs — including two where a larger budget was put on the reconnect
+      // action this plan never dispatches). Ten minutes bounds a hung boot
+      // without calling this board's real first boot missing.
       let (identity, observationReceipts) = try await waitForBoundHDC(
         expectation: expectation,
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        timeoutSeconds: 600,
         commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       let hdc = try resolveHDC()
       let modelReceipt = try await run(
