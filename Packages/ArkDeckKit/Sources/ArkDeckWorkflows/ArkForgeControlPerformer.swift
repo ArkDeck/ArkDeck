@@ -297,6 +297,17 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
     if facts["mode"] == nil, result.summary["loaderIdentitySha256"] != nil {
       facts["mode"] = "Loader"
     }
+    // The verification host answers in its own vocabulary (`model`,
+    // `firmware`); the receipt's published table speaks the device's property
+    // names. Without this mapping the first postflight that ever verified a
+    // real device was refused by the port as a success without its evidence
+    // (measured 2026-08-18) — the fact was in hand under the wrong name.
+    if let model = result.summary["model"] {
+      facts["const.product.model"] = model
+    }
+    if let firmware = result.summary["firmware"] {
+      facts["const.ohos.fullname"] = firmware
+    }
     return facts
   }
 }

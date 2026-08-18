@@ -406,6 +406,17 @@ enum JournalEventSemanticValidator {
       guard nextState == "waitingForRecovery" else {
         throw payload(event, "noAction is inconsistent")
       }
+    case "finalizeLanePostflightRecovered":
+      // An ArkForge-lane flash reconciled against the device itself: the bound
+      // HDC identity answered the declared product model and build, so the job
+      // finalizes `recovered`. Confirmed and safe by construction — the
+      // verification is read-only and the binding revision names the epoch the
+      // alias was published under.
+      guard nextState == "finalizing", certainty == "confirmed", safe,
+        event.bindingRevision.map({ $0 > 0 }) == true
+      else {
+        throw payload(event, "lane postflight recovery result is inconsistent")
+      }
     default:
       throw payload(event, "unknown reconcile result")
     }

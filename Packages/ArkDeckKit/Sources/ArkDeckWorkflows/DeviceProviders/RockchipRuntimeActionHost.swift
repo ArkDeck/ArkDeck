@@ -602,9 +602,17 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         summary: ["hdcState": "connected"], receipts: receipts)
 
     case .waitForBoundHDCReconnect(let expectation):
+      // The bound reconnect this action waits for is the first boot after a
+      // complete overwrite: userdata was just erased, so the device is
+      // initializing filesystems and running first-boot setup before hdcd
+      // comes up. Measured 2026-08-18, twice: the 120-second deadline expired
+      // mid-first-boot, and so did a 300-second one — the board answered on
+      // its known key minutes after the window closed, with the whole job
+      // already classified outcome-unknown. Ten minutes bounds a hung boot
+      // without calling this board's real first boot missing.
       let (identity, receipts) = try await waitForBoundHDC(
         expectation: expectation,
-        timeoutSeconds: 120,
+        timeoutSeconds: 600,
         commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       return result(
         summary: [
@@ -626,9 +634,20 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.failed(
           "post-flash binding verification is not fully configured")
       }
+      // This wait is the first boot after a complete overwrite: the plan's
+      // reset is arkforged's own `rd`, so the very next thing the authority is
+      // asked for is this verification — against a device that is still
+      // initializing its freshly erased userdata before hdcd comes up. The
+      // read-only command timeout (15 s) belongs to the parameter reads once
+      // the device is present, not to the boot in front of them: with it, the
+      // window closed mid-first-boot on every full flash while the board
+      // answered on its known key minutes later (measured 2026-08-18, three
+      // runs — including two where a larger budget was put on the reconnect
+      // action this plan never dispatches). Ten minutes bounds a hung boot
+      // without calling this board's real first boot missing.
       let (identity, observationReceipts) = try await waitForBoundHDC(
         expectation: expectation,
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        timeoutSeconds: 600,
         commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       let hdc = try resolveHDC()
       let modelReceipt = try await run(
@@ -817,12 +836,29 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         truncated: receipt.stdoutTruncated)
       {
       case .parsed(let list):
-        if let identity = try? usbProbe.singleHDCNormal(
+        // Two routes prove the same bound device, and either suffices when
+        // there is exactly one candidate. The recorded topology was meant to
+        // be the stable half while firmware may rotate the serial — but the
+        // measured board re-enumerates its locationID across the first boot
+        // after a flash (17956864 → 18087936 on 2026-08-18, third distinct
+        // value this bench has recorded), so a topology-only pin waits out
+        // its whole deadline on a device that is present, single, and
+        // answering on its known connect key. The known key is the other
+        // route: `previousIdentitySHA256` is its alias digest by definition.
+        // Both drifting at once stays a refusal — that is a replugged or
+        // swapped board, which is a rebind, not a reconnect.
+        let byTopology = try? usbProbe.singleHDCNormal(
           usbTopology: expectation.usbTopology)
-        {
+        let byKnownAlias = byTopology != nil
+          ? nil
+          : (try? usbProbe.singleHDCNormal(
+              stableIdentitySHA256: expectation.previousIdentitySHA256))
+            .flatMap { try? usbProbe.singleHDCNormal(usbTopology: $0.topology) }
+        if let identity = byTopology ?? byKnownAlias {
           let observedDigest = SHA256Hex.string(of: Data(identity.connectKey.utf8))
-          guard identity.topology == expectation.usbTopology,
-            identity.serialDigestSHA256 == observedDigest
+          guard identity.serialDigestSHA256 == observedDigest,
+            identity.topology == expectation.usbTopology
+              || identity.serialDigestSHA256 == expectation.previousIdentitySHA256
           else {
             throw RuntimeDispatchFailure.failed(
               "topology-bound HDC USB identity is internally inconsistent")

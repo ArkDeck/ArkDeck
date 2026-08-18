@@ -823,6 +823,57 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(retry.establishedAtUTC, "2026-08-08T01:02:03Z")
   }
 
+  func testPostFlashHDCBindingRevisionAdvanceArchivesTheSupersededEpoch() throws {
+    // A rebind opens a new alias epoch. The entry from the earlier revision is
+    // superseded evidence — archived beside the store, never blocking — while
+    // a stale lower-revision publication is still refused outright. Measured
+    // 2026-08-18: a revision-3 relic of 2026-08-14 refused every revision-4
+    // publication, failing the postflight after all nine partitions had
+    // verifiably written.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = RockchipPostFlashHDCBindingStore(rootURL: root)
+    func digest(_ key: String) -> String {
+      SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    func entry(
+      revision: Int, loader: String, key: String, at establishedAtUTC: String
+    ) -> RockchipPostFlashHDCBinding {
+      RockchipPostFlashHDCBinding(
+        targetID: "TGT-HOST", bindingRevision: revision,
+        stableLoaderIdentitySHA256: String(repeating: loader, count: 64),
+        previousHDCIdentitySHA256: digest(key),
+        hdcIdentitySHA256: digest(key), hdcConnectKey: key,
+        usbTopology: "42",
+        productModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        buildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        jobID: "job-host", establishedAtUTC: establishedAtUTC)
+    }
+
+    _ = try store.publish(
+      entry(revision: 3, loader: "a", key: "old-key", at: "2026-08-14T08:09:51Z"),
+      expectedPreviousHDCIdentitySHA256: digest("old-key"))
+
+    // The revision advance publishes despite the relic, and the relic is
+    // preserved as an archive, not deleted.
+    let advanced = try store.publish(
+      entry(revision: 4, loader: "b", key: "new-key", at: "2026-08-18T04:30:00Z"),
+      expectedPreviousHDCIdentitySHA256: digest("new-key"))
+    XCTAssertEqual(advanced.bindingRevision, 4)
+    let archived = root.appending(path: "post-flash-superseded-20260814T080951Z.json")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: archived.path))
+    let archivedEntry = try JSONDecoder().decode(
+      RockchipPostFlashHDCBinding.self, from: Data(contentsOf: archived))
+    XCTAssertEqual(archivedEntry.bindingRevision, 3)
+    XCTAssertEqual(archivedEntry.hdcConnectKey, "old-key")
+
+    // A stale lower-revision job still cannot rotate the newer route.
+    XCTAssertThrowsError(
+      try store.publish(
+        entry(revision: 3, loader: "a", key: "old-key", at: "2026-08-14T09:00:00Z"),
+        expectedPreviousHDCIdentitySHA256: digest("old-key")))
+  }
+
   func testGPTHeaderParseAcceptsOnlyARealHeader() throws {
     let primary = try XCTUnwrap(
       RockchipGPTHeader.parse(ScriptedCommandRunner.sectors(begin: 1, count: 1)))

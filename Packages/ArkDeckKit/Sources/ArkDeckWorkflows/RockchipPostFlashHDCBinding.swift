@@ -118,11 +118,28 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
       // establishment time instead of making recovery depend on timestamp
       // equality.
       if existing.sameProof(as: candidate) { return existing }
-      guard existing.targetID == candidate.targetID,
-        existing.bindingRevision == candidate.bindingRevision,
-        existing.stableLoaderIdentitySHA256 == candidate.stableLoaderIdentitySHA256,
-        existing.hdcIdentitySHA256 == expectedPreviousHDCIdentitySHA256
-      else { throw failure("post-flash binding changed before verified alias publication") }
+      if existing.targetID == candidate.targetID,
+        existing.bindingRevision < candidate.bindingRevision
+      {
+        // A binding-revision advance opens a new alias epoch. The entry from
+        // an earlier revision of the same target is superseded evidence —
+        // archived beside the store, never silently discarded — and the
+        // candidate establishes the alias for its own epoch. The chain rule
+        // (`previous` must name the trusted alias) holds *within* an epoch,
+        // and a candidate older than the store below stays refused, so a
+        // stale Job still cannot rotate a newer route.
+        //
+        // Measured 2026-08-18: the revision-3 entry of 2026-08-14 blocked
+        // every revision-4 publication, failing the postflight after all nine
+        // partitions had verifiably written.
+        try archiveSuperseded(existing, rootDescriptor: root)
+      } else {
+        guard existing.targetID == candidate.targetID,
+          existing.bindingRevision == candidate.bindingRevision,
+          existing.stableLoaderIdentitySHA256 == candidate.stableLoaderIdentitySHA256,
+          existing.hdcIdentitySHA256 == expectedPreviousHDCIdentitySHA256
+        else { throw failure("post-flash binding changed before verified alias publication") }
+      }
     }
 
     let encoder = CanonicalJSONEncoders.canonical()
@@ -156,6 +173,35 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
       throw failure("post-flash binding readback failed")
     }
     return readback
+  }
+
+  /// Archives a superseded epoch's entry beside the store.
+  ///
+  /// Named by its establishment time, so re-archiving the same epoch after a
+  /// crash between archive and commit is idempotent rather than an error.
+  /// History is preserved, not rewritten: the archive carries the entry
+  /// byte-for-byte re-encoded, and nothing ever deletes one.
+  private func archiveSuperseded(
+    _ existing: RockchipPostFlashHDCBinding, rootDescriptor: Int32
+  ) throws {
+    let stamp = existing.establishedAtUTC.unicodeScalars.filter {
+      CharacterSet.alphanumerics.contains($0)
+    }.reduce(into: "") { $0.unicodeScalars.append($1) }
+    let name = "post-flash-superseded-\(stamp.isEmpty ? "unknown" : stamp).json"
+    let encoder = CanonicalJSONEncoders.canonical()
+    var data = try encoder.encode(existing)
+    data.append(0x0A)
+    let descriptor = Darwin.openat(
+      rootDescriptor, name, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    if descriptor < 0 {
+      if errno == EEXIST { return }
+      throw failure("superseded post-flash binding archive cannot be created")
+    }
+    defer { Darwin.close(descriptor) }
+    try writeAll(data, descriptor: descriptor)
+    guard Darwin.fsync(descriptor) == 0, Darwin.fsync(rootDescriptor) == 0 else {
+      throw failure("superseded post-flash binding archive cannot be synchronized")
+    }
   }
 
   private func load(rootDescriptor: Int32) throws -> RockchipPostFlashHDCBinding? {

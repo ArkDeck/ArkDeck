@@ -124,6 +124,10 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     @Sendable (ArkForgeLaneDeviceBinding, String) -> any ArkForgeFlashSession.ControlPerformer
   /// jobID → the receipts that job's single ArkForge run published, by step id.
   private var receiptsByJob: [String: [String: ArkForgeActionReceiptSummary]] = [:]
+  /// The terminal receipt of a job whose lane already ran — both the anchor
+  /// for engine step names the daemon never uses, and the proof that a later
+  /// lane-covered step of the same job must **never** re-run the lane.
+  private var lastReceiptByJob: [String: ArkForgeActionReceiptSummary] = [:]
 
   package init(
     connection: Connection,
@@ -169,7 +173,12 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
     binding: ArkForgeLaneDeviceBinding
   ) async throws -> ArkForgeActionReceiptSummary {
-    if let cached = receiptsByJob[jobID]?[stepID] {
+    if let cached = receiptsByJob[jobID]?[stepID] ?? lastReceiptByJob[jobID] {
+      // The anchor fallback is load-bearing here, not a convenience: a second
+      // lane-covered step of the same job (`verify-flash-readback` after
+      // `flash-partitions`) misses the by-name cache — the daemon named its
+      // steps `STEP-001`… — and falling through would materialize and run the
+      // whole lane again, which is a second flash.
       return cached
     }
     // No cache yet: this is the first delegated step of this job, so it is the
@@ -216,8 +225,19 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
     receiptsByJob[jobID] = Dictionary(
       published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
+    lastReceiptByJob[jobID] = published.last
 
-    guard let receipt = receiptsByJob[jobID]?[stepID] else {
+    // The daemon names its own steps (`STEP-001`…) and this engine names its
+    // own (`flash-partitions`, `verify-flash-readback`); the two never
+    // coincide, so an exact lookup can only match a scripted daemon that
+    // echoes this engine's names. For a lane-covered step the per-step receipt
+    // is a journaling anchor, not the evidence itself — `publishedReceipts`
+    // carries every receipt the daemon produced — and the anchor for a step
+    // the daemon completed under its own names is the plan's terminal
+    // receipt: the last checkpoint of the run that subsumed this step.
+    // Measured 2026-08-18: the first plan that ever completed end to end
+    // failed here, on the name.
+    guard let receipt = receiptsByJob[jobID]?[stepID] ?? lastReceiptByJob[jobID] else {
       throw LaneError.noReceiptForStep(stepID)
     }
     return receipt
@@ -276,9 +296,14 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
   }
 
+  package func latestReceipt(jobID: String) -> ArkForgeActionReceiptSummary? {
+    lastReceiptByJob[jobID]
+  }
+
   /// Drops a finished job's receipts.
   package func forget(jobID: String) {
     receiptsByJob[jobID] = nil
+    lastReceiptByJob[jobID] = nil
   }
 
   /// Checks the daemon is ready and bound to the toolchain this authority
