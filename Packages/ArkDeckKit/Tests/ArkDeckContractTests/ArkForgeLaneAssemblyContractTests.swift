@@ -130,6 +130,42 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     XCTAssertTrue(argv.contains("--require-release-signing"))
   }
 
+  func testStaleSocketFilesAreGoneBeforeTheDaemonIsLaunched() async throws {
+    // A leftover socket file from a previous daemon generation satisfies the
+    // "socket exists" readiness probe instantly, so the controller session
+    // connected to the *orphaned* previous daemon while the per-job
+    // materializer, connecting later by path, reached the new one — the plan
+    // then lived in one daemon and startExecution asked the other
+    // (PLAN_NOT_STARTABLE, measured 2026-08-18). The files must be gone by the
+    // time the new daemon is launched.
+    let runtime = FileManager.default.temporaryDirectory.appending(
+      path: "lane-compose-\(UUID().uuidString.lowercased())")
+    try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true)
+    addTeardownBlock { try? FileManager.default.removeItem(at: runtime) }
+    for name in ["controller.sock", "public.sock"] {
+      FileManager.default.createFile(
+        atPath: runtime.appending(path: name).path, contents: Data("stale".utf8))
+    }
+
+    let observed = LaunchRecorder()
+    _ = await ArkForgeLaneComposition.compose(
+      environment: environment, runtimeDirectory: runtime,
+      pairingEpoch: 3, dependencies: dependencies(),
+      launch: { request, secret in
+        await observed.record(request: request, secret: secret)
+        for name in ["controller.sock", "public.sock"] {
+          XCTAssertFalse(
+            FileManager.default.fileExists(atPath: runtime.appending(path: name).path),
+            "\(name) must be removed before the new daemon is launched")
+        }
+      },
+      connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+    let record = await observed.snapshot()
+    XCTAssertNotNil(record, "the launch must still happen")
+  }
+
   func testADaemonThatNeverOpensItsSocketYieldsNoLane() async {
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
