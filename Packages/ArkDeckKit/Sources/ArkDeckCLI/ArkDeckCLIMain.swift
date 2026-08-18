@@ -72,14 +72,12 @@ struct ArkDeckCommandLine {
       throw CLIError(exitCode: EX_USAGE, message: "missing flash subcommand")
     }
     switch subcommand {
-    case "install-tool":
-      try runInstallTool(Array(arguments.dropFirst()))
-    case "trust-tool":
-      try runTrustTool(Array(arguments.dropFirst()))
     case "install-binding":
       try runInstallBinding(Array(arguments.dropFirst()))
     case "plan":
-      try runPlan(Array(arguments.dropFirst()))
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "legacy command handoff is retired; use Runtime plan-only for flash.dayu200")
     case "preview":
       throw CLIError(
         exitCode: EX_USAGE,
@@ -192,43 +190,6 @@ struct ArkDeckCommandLine {
     case .none:
       print("  authority: no usage reservation recorded")
     }
-  }
-
-  // MARK: install-tool
-
-  static func runInstallTool(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed(["--path"])
-    guard let path = options.value("--path"), path.hasPrefix("/") else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "install-tool requires --path with a canonical absolute file path")
-    }
-    let receipt = try RockchipToolInstallation.install(
-      executableURL: URL(filePath: path))
-    print("pinned rkdeveloptool ordinary bookmark and live trust facts installed")
-    print("tool sha256: \(receipt.executableSHA256)")
-    print("code trust: \(receipt.codeTrust.rawValue)")
-    print("quarantine present: \(receipt.quarantinePresent)")
-  }
-
-  static func runTrustTool(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed(["--path", "--expected-sha256"])
-    guard let path = options.value("--path"), path.hasPrefix("/"),
-      let expectedSHA256 = options.value("--expected-sha256")
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "trust-tool requires --path and the full --expected-sha256 product pin")
-    }
-    let receipt = try RockchipToolInstallation.trustAndInstall(
-      executableURL: URL(filePath: path),
-      expectedSHA256: expectedSHA256)
-    print("exact pinned rkdeveloptool trusted and installed")
-    print("tool sha256: \(receipt.executableSHA256)")
-    print("code trust: \(receipt.codeTrust.rawValue)")
-    print("quarantine present: \(receipt.quarantinePresent)")
   }
 
   static func runInstallBinding(_ arguments: [String]) throws {
@@ -471,7 +432,7 @@ struct ArkDeckCommandLine {
   /// fault, and every retry needing a merged PR. None of those failures was a
   /// product defect the campaign lane could repair, so none of them should
   /// have consumed a campaign. Device mutation dispatch here is 0 — this is
-  /// four read-only observations and a refusal, never an execution stack.
+  /// three read-only observations and a refusal, never an execution stack.
   static func requireGreenPreflight(imagesPath: String) async throws {
     let receipt = await RockchipFlashPreflight().run(
       archiveURL: URL(filePath: imagesPath))
@@ -936,7 +897,7 @@ struct ArkDeckCommandLine {
     return [
       RockchipPrerequisiteObservation(
         identifier: .loader,
-        status: ask("Does `sudo rkdeveloptool ld` report 0x2207:0x350a in Loader mode?")),
+        status: ask("Does ArkForge report exactly one 0x2207:0x350a Loader device?")),
       RockchipPrerequisiteObservation(
         identifier: .recoveryPath,
         status: ask(
@@ -1039,12 +1000,7 @@ struct ArkDeckCommandLine {
   static func printUsage() {
     let usage = """
       usage:
-        arkdeck flash install-tool --path <absolute-rkdeveloptool-path>
-        arkdeck flash trust-tool --path <absolute-rkdeveloptool-path> \
-      --expected-sha256 <full-product-pin>
         arkdeck flash install-binding
-        arkdeck flash plan --images <images.tar.gz> \
-      [--device-profile <dayu200>] [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash status --campaign-id <ECAMP-id>
         arkdeck flash postflight --observation <observation.json> \
       [--device-profile <dayu200>]
@@ -1062,7 +1018,7 @@ struct ArkDeckCommandLine {
        --harness-cli-timeout-seconds <1...900>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
       [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
-       --arkforge-profile <absolute-path> --rkdeveloptool <absolute-path>]
+       --arkforge-profile <absolute-path>]
         arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
       [--sensitive-evidence <artifact-name,...|none>] \
@@ -1071,7 +1027,7 @@ struct ArkDeckCommandLine {
        --harness-cli-timeout-seconds <1...900>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
       [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
-       --arkforge-profile <absolute-path> --rkdeveloptool <absolute-path>]
+       --arkforge-profile <absolute-path>]
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
         arkdeck agentd uninstall [--json]

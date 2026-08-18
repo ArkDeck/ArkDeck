@@ -91,12 +91,12 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
     let connectKey: String
     let stableIdentitySHA256: String
     let usbTopology: String
-    let rockchipExecutable: ResolvedExecutable
+    let providerIdentity: ResolvedExecutable
 
     init(
       jobID: String, targetID: String, bindingRevision: Int,
       connectKey: String, stableIdentitySHA256: String, usbTopology: String,
-      rockchipExecutable: ResolvedExecutable
+      providerIdentity: ResolvedExecutable
     ) {
       self.jobID = jobID
       self.targetID = targetID
@@ -104,7 +104,7 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       self.connectKey = connectKey
       self.stableIdentitySHA256 = stableIdentitySHA256
       self.usbTopology = usbTopology
-      self.rockchipExecutable = rockchipExecutable
+      self.providerIdentity = providerIdentity
     }
   }
 
@@ -123,10 +123,17 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
 
   private let binding: Binding
   private let host: any RockchipRuntimeActionHosting
+  private let loaderObserver: any ArkForgeLoaderObserving
 
-  init(binding: Binding, host: any RockchipRuntimeActionHosting) {
+  init(
+    binding: Binding,
+    host: any RockchipRuntimeActionHosting,
+    loaderObserver: any ArkForgeLoaderObserving = RefusingArkForgeLoaderObserver(
+      reason: "no ArkForge Loader observation source was composed")
+  ) {
     self.binding = binding
     self.host = host
+    self.loaderObserver = loaderObserver
   }
 
   func perform(
@@ -189,6 +196,29 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
     var observedRebind = false
     var failure = ""
 
+    // `enterUpdater` is idempotent at its semantic boundary. A caller may
+    // already have put the exact board in Loader before submitting the typed
+    // request. Confirm that state through both independent read-only sources
+    // before touching HDC; requiring HDC-normal first would reject a board that
+    // is already at the requested postcondition and classify a zero-write run
+    // as outcome-unknown.
+    if let identity = try? loaderObserver.observeLoader(
+      stableIdentitySHA256: binding.stableIdentitySHA256,
+      expectedUSBTopology: binding.usbTopology,
+      requestID: "\(request.requestID)-already-loader")
+    {
+      return ArkForgeManagedControlPort.Observation(
+        accepted: true,
+        facts: [
+          "mode": "Loader",
+          "stableIdentitySHA256": identity.serialDigestSHA256,
+          "usbTopology": identity.topology,
+        ],
+        evidenceSHA256: [],
+        observedDisconnect: true,
+        observedUniqueLoaderRebind: true)
+    }
+
     do {
       _ = try await execute(
         .observeHDCNormalUSB(connectKey: binding.connectKey), request: request, index: 0)
@@ -249,11 +279,11 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       bindingRevision: binding.bindingRevision,
       connectKey: binding.connectKey,
       expectedIdentitySHA256: binding.stableIdentitySHA256,
-      providerExecutableSHA256: binding.rockchipExecutable.sha256,
+      providerExecutableSHA256: binding.providerIdentity.sha256,
       executionTuning: nil)
     return try await host.execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: binding.rockchipExecutable)
+      rockchipExecutable: binding.providerIdentity)
   }
 
   /// The record-store step id for one action of one control request.

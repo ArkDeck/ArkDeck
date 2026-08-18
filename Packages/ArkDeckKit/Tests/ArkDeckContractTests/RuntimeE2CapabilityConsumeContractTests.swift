@@ -40,7 +40,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
         providerID: "rockchip",
-        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: RuntimeE2CapabilityConsumeContractTests.toolIdentity,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:

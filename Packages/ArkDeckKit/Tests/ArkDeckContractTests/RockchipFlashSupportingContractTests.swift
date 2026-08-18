@@ -555,7 +555,6 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
   private static let boundIdentity = String(repeating: "a", count: 64)
 
   private func preflightProbes(
-    rockUSB: RockchipFlashToolAliveness = .survivedSpawn(exitStatus: 0),
     hdc: RockchipFlashToolAliveness = .survivedSpawn(exitStatus: 0),
     archive: RockchipFlashArchiveIdentity? = nil,
     boundIdentity: String = RockchipFlashSupportingContractTests.boundIdentity,
@@ -572,7 +571,6 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       ?? RockchipEvolutionTargetReadback(
         stableIdentitySHA256: boundIdentity, registeredMode: .loader, usbTopology: "42")
     return RockchipFlashPreflightProbes(
-      rockUSBAliveness: { rockUSB },
       hdcAliveness: { hdc },
       // Reading the archive is one probe like every other observation here,
       // so these tests prove every branch with zero spawn, zero device and no
@@ -599,7 +597,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       targetReadback: { resolvedReadback })
   }
 
-  func testPreflightPassesWhenAllFourReadOnlyChecksAnswer() async throws {
+  func testPreflightPassesWhenAllThreeReadOnlyChecksAnswer() async throws {
     var probes = preflightProbes()
     let counter = ProbeCallCounter()
     let snapshot = probes.archiveSnapshot
@@ -647,25 +645,24 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
   }
 
   func testPreflightTreatsADeviceAbsentNonZeroExitAsAliveButASignalDeathAsRed() async throws {
-    // `rkdeveloptool ld` with no board attached exits non-zero. That is an
-    // answer, not a dead tool, and refusing it would make the gate unusable.
+    // An HDC read with no board attached may exit non-zero. That is an answer,
+    // not a dead tool, and refusing it would make the gate unusable.
     let alive = await RockchipFlashPreflight(
-      probes: preflightProbes(rockUSB: .survivedSpawn(exitStatus: 1))
+      probes: preflightProbes(hdc: .survivedSpawn(exitStatus: 1))
     ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertTrue(alive.isGreen, alive.renderedLines().joined(separator: "\n"))
 
     // A child killed before `main` is the 2026-08-04 host fault, and the
     // finding must hand the operator the two things it took a day to find.
     let dead = await RockchipFlashPreflight(
-      probes: preflightProbes(rockUSB: .diedOnSignal(6))
+      probes: preflightProbes(hdc: .diedOnSignal(6))
     ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertFalse(dead.isGreen)
-    XCTAssertEqual(dead.failedChecks, [.rockUSBToolAliveness])
+    XCTAssertEqual(dead.failedChecks, [.hdcToolAliveness])
     let rendered = dead.renderedLines().joined(separator: "\n")
     XCTAssertTrue(rendered.contains("signal 6"), rendered)
     XCTAssertTrue(rendered.contains("DiagnosticReports"), rendered)
-    XCTAssertTrue(rendered.contains("entitlement"), rendered)
-    XCTAssertTrue(rendered.contains("rockchip-component-packaging.md"), rendered)
+    XCTAssertTrue(rendered.contains("configured hdc path and digest"), rendered)
   }
 
   func testPreflightRefusesAnUnavailableHDCWithAnActionableFinding() async throws {

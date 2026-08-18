@@ -7,8 +7,10 @@ import XCTest
 /// The IPC codec against bytes a real `arkforged` produced.
 ///
 /// The golden frames below were captured on 2026-08-16 from ArkForge
-/// `d637a2e`+ running with the bundled Rockchip component
-/// (`231a05ef…`, see AD-023) — not hand-assembled from the `.proto`. That
+/// `d637a2e`+ running with the former bundled Rockchip component. These frames
+/// remain decoder-compatibility fixtures after the native backend became the
+/// product default; they are not a current toolchain pin. They were not
+/// hand-assembled from the `.proto`. That
 /// distinction matters: a codec tested only against its own encoder agrees
 /// with itself, and the failure this repository has to avoid is an authority
 /// that speaks a dialect the daemon does not.
@@ -77,7 +79,9 @@ final class ArkForgeIPCContractTests: XCTestCase {
       ack.executionBlockers.isEmpty,
       "ready and blockers are one fact stated twice; they cannot disagree")
     XCTAssertEqual(ack.toolchainID, "rkdeveloptool")
-    XCTAssertTrue(ArkForgeToolchainPin.matchesPin(reportedSHA256: ack.toolchainSHA256))
+    XCTAssertEqual(
+      ack.toolchainSHA256,
+      "231a05ef9aae17f9c8b8d3801b3ec2f4a4653291782021fe65517610aa11c79e")
     XCTAssertNil(ack.refusal)
   }
 
@@ -240,92 +244,5 @@ final class ArkForgeIPCContractTests: XCTestCase {
     XCTAssertFalse(snapshot.isFresh(atEpochMs: 1_060_001))
     // A clock that went backwards is not freshness either.
     XCTAssertFalse(snapshot.isFresh(atEpochMs: 999_999))
-  }
-}
-
-/// The toolchain choice AD-023 forced, asserted rather than commented.
-final class ArkForgeToolchainPinContractTests: XCTestCase {
-
-  func testThePinIsTheSignedBundledComponent() {
-    // The signed component in the app bundle, not the unsigned ingest the
-    // package record carries. `arkforged` hashes the file it executes.
-    XCTAssertTrue(SHA256Hex.isLowercaseSHA256(ArkForgeToolchainPin.signedSHA256))
-    XCTAssertTrue(SHA256Hex.isLowercaseSHA256(ArkForgeToolchainPin.unsignedSHA256))
-    XCTAssertNotEqual(
-      ArkForgeToolchainPin.signedSHA256, ArkForgeToolchainPin.unsignedSHA256,
-      "signing changes the bytes; pinning the wrong one refuses at daemon startup")
-  }
-
-  func testThePinAgreesWithTheComponentPackageRecord() throws {
-    // The unsigned half has an authoritative source in this repository, so it
-    // is read rather than trusted. A component rebuild that changed it without
-    // this constant moving would leave the two silently disagreeing.
-    let repoRoot = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent()
-      .deletingLastPathComponent().deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let record = repoRoot.appending(
-      path: "openspec/integrations/rockchip/bundled-component/1.0.0/package.json")
-    let json =
-      try JSONSerialization.jsonObject(with: Data(contentsOf: record)) as? [String: Any]
-    let component = try XCTUnwrap(json?["component"] as? [String: Any])
-
-    XCTAssertEqual(component["sha256"] as? String, ArkForgeToolchainPin.unsignedSHA256)
-    XCTAssertEqual(component["unsigned"] as? Bool, true)
-    XCTAssertEqual(component["bundlePath"] as? String, ArkForgeToolchainPin.bundleRelativePath)
-    XCTAssertEqual(
-      Set(try XCTUnwrap(component["dependencies"] as? [String])),
-      ArkForgeToolchainPin.permittedDependencies,
-      "AD-023 turns on this list: the rejected build linked Homebrew's libusb")
-  }
-
-  func testTheRejectedBuildsAreNamedRatherThanJustRefused() {
-    // Three digests, three different fixes. A bare "mismatch" sends an
-    // operator to compare hex strings; these send them to the cause.
-    XCTAssertNil(
-      ArkForgeToolchainPin.mismatchExplanation(
-        reportedSHA256: ArkForgeToolchainPin.signedSHA256))
-
-    let homebrew = ArkForgeToolchainPin.mismatchExplanation(
-      reportedSHA256: "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923")
-    XCTAssertEqual(homebrew?.contains("quarantine"), true)
-
-    let localBuild = ArkForgeToolchainPin.mismatchExplanation(
-      reportedSHA256: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611")
-    XCTAssertEqual(localBuild?.contains("libusb"), true)
-
-    let unsigned = ArkForgeToolchainPin.mismatchExplanation(
-      reportedSHA256: ArkForgeToolchainPin.unsignedSHA256)
-    XCTAssertEqual(unsigned?.contains("unsigned ingest"), true)
-
-    XCTAssertEqual(
-      ArkForgeToolchainPin.mismatchExplanation(reportedSHA256: "")?.contains("no tool bound"),
-      true)
-  }
-
-  func testTheLiveDaemonHandshakeMatchesThePin() throws {
-    // The captured HelloAck above came from a daemon started with this exact
-    // pin, so the two must agree — this is the assertion that would have
-    // failed had the rehearsal build been kept.
-    let ack = try ArkForgeHelloAck.decode(bytes(Self.helloAckHexForPinTest))
-    XCTAssertEqual(ack.toolchainID, ArkForgeToolchainPin.toolchainID)
-    XCTAssertTrue(ArkForgeToolchainPin.matchesPin(reportedSHA256: ack.toolchainSHA256))
-    XCTAssertNil(ArkForgeToolchainPin.mismatchExplanation(reportedSHA256: ack.toolchainSHA256))
-  }
-
-  private static let helloAckHexForPinTest =
-    "080118022205302e312e303a134e4f5f5041495245445f415554484f52495459420d726b6465"
-    + "76656c6f70746f6f6c4a40323331613035656639616165313766396338623864333830316233"
-    + "65633266346134363533323931373832303231666536353531373631306161313163373965"
-
-  private func bytes(_ hex: String) -> Data {
-    var out = [UInt8]()
-    var index = hex.startIndex
-    while index < hex.endIndex {
-      let next = hex.index(index, offsetBy: 2)
-      out.append(UInt8(hex[index..<next], radix: 16)!)
-      index = next
-    }
-    return Data(out)
   }
 }

@@ -1,229 +1,46 @@
 // Product-owned Rockchip Runtime composition for GJ-4.
 //
-// The bundled component is not a PATH/user-selected executable. It is the
-// exact nested binary from the reviewed 1.0.0 release tuple. Runtime binds the
-// signed bytes it will actually execute into target facts, the materialized
-// plan and the Runtime capability query. The historical external-tool pin remains
-// separate and cannot authorize this product-owned execution route.
+// The RockUSB identity is the same measured `arkforged` executable that owns
+// native enumeration, writes, readback and reset. The standalone recovery
+// utility bundled by ArkDeck is deliberately outside this composition: it is
+// a Maskrom rescue artifact, not a product Runtime dependency.
 
 import ArkDeckCore
-import CryptoKit
-import Darwin
 import Foundation
-import Security
 
-package enum BundledRockchipComponent {
-  package static let packageID = "arkdeck-rockchip-component-package@1.0.0"
-  package static let reportedVersion = "rkdeveloptool ver 1.32"
-  package static let bundleRelativePath = "rkdeveloptool"
-  package static let signingIdentifier = "com.arkdeck.desktop.rkdeveloptool"
-  package static let signingTeamIdentifier = "8AQTYW5FKR"
+package enum ArkForgeNativeRockUSBToolchain {
+  package static let identifier = "arkforged-native-rockusb"
+  package static let reportedVersion = "arkforged native RockUSB"
 }
 
-public enum BundledRockchipComponentError: Error, Equatable, Sendable,
-  CustomStringConvertible
-{
-  case mainExecutableUnavailable
-  case componentMissing
-  case nonCanonicalPath
-  case notRegularExecutable
-  case identityMismatch(expected: String, actual: String)
-  case codeSignatureInvalid(OSStatus)
-  case codeSignatureMetadataInvalid(String)
-  case unsupportedProvider(String)
+/// Re-measures the configured daemon for every facts/materialization read.
+/// The LaunchAgent already compared the declared digest at install time; this
+/// closes the update window between that install and a Runtime admission.
+package struct ArkForgeNativeRockUSBExecutableResolver: RuntimeExecutableResolving {
+  private let daemonPath: String?
+  private let declaredSHA256: String?
 
-  public var description: String {
-    switch self {
-    case .mainExecutableUnavailable:
-      return "the product executable location is unavailable"
-    case .componentMissing:
-      return "rkdeveloptool is missing from all fixed ArkDeck product locations"
-    case .nonCanonicalPath:
-      return "the bundled rkdeveloptool path is non-canonical or symlinked"
-    case .notRegularExecutable:
-      return "the bundled rkdeveloptool is not a regular executable"
-    case .identityMismatch(let expected, let actual):
-      return "bundled rkdeveloptool identity mismatch (expected \(expected), actual \(actual))"
-    case .codeSignatureInvalid(let status):
-      return "bundled rkdeveloptool Developer ID signature is invalid (OSStatus \(status))"
-    case .codeSignatureMetadataInvalid(let field):
-      return "bundled rkdeveloptool signature metadata is invalid (\(field))"
-    case .unsupportedProvider(let providerID):
-      return "bundled Rockchip resolver cannot resolve provider \(providerID)"
-    }
-  }
-}
-
-/// Resolves only fixed ArkDeck product locations. The package-only initializers
-/// are test seams; production callers cannot supply a path.
-package struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
-  private enum TrustPolicy: Sendable {
-    case productDeveloperID
-    case exactSHA256(String)
-  }
-
-  private let componentURLs: [URL]
-  private let trustPolicy: TrustPolicy
-
-  public init() {
-    var candidates: [URL] = []
-    if let productExecutableURL = Bundle.main.executableURL {
-      candidates.append(
-        productExecutableURL.deletingLastPathComponent()
-          .appending(path: BundledRockchipComponent.bundleRelativePath))
-    }
-    candidates.append(
-      URL(filePath: "/Applications/ArkDeck.app/Contents/MacOS")
-        .appending(path: BundledRockchipComponent.bundleRelativePath))
-    candidates.append(
-      FileManager.default.homeDirectoryForCurrentUser
-        .appending(path: "Applications/ArkDeck.app/Contents/MacOS")
-        .appending(path: BundledRockchipComponent.bundleRelativePath))
-    componentURLs = candidates.reduce(into: []) { result, candidate in
-      if !result.contains(candidate) {
-        result.append(candidate)
-      }
-    }
-    trustPolicy = .productDeveloperID
-  }
-
-  package init(productExecutableURL: URL?, expectedSHA256: String) {
-    componentURLs =
-      productExecutableURL.map {
-        [
-          $0.deletingLastPathComponent()
-            .appending(path: BundledRockchipComponent.bundleRelativePath)
-        ]
-      } ?? []
-    trustPolicy = .exactSHA256(expectedSHA256)
-  }
-
-  package init(componentURLs: [URL], expectedSHA256: String) {
-    self.componentURLs = componentURLs
-    trustPolicy = .exactSHA256(expectedSHA256)
-  }
-
-  package init(componentURLs: [URL]) {
-    self.componentURLs = componentURLs
-    trustPolicy = .productDeveloperID
+  package init(daemonPath: String?, declaredSHA256: String?) {
+    self.daemonPath = daemonPath
+    self.declaredSHA256 = declaredSHA256?.lowercased()
   }
 
   package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
     guard providerID == "rockchip" else {
-      throw BundledRockchipComponentError.unsupportedProvider(providerID)
+      throw RuntimeDispatchFailure.failed(
+        "ArkForge native RockUSB resolver cannot serve provider \(providerID)")
     }
-    guard !componentURLs.isEmpty else {
-      throw BundledRockchipComponentError.mainExecutableUnavailable
+    guard let daemonPath, let declaredSHA256, !daemonPath.isEmpty, !declaredSHA256.isEmpty else {
+      throw RuntimeDispatchFailure.failed("ArkForge native RockUSB lane is not configured")
     }
-    guard
-      let componentURL = componentURLs.first(where: {
-        FileManager.default.fileExists(atPath: $0.path)
-      })
-    else {
-      throw BundledRockchipComponentError.componentMissing
+    let resolver = try FixedExecutableResolver.hashing(
+      path: daemonPath, providerID: providerID)
+    let measured = try resolver.resolveExecutable(providerID: providerID)
+    guard measured.sha256 == declaredSHA256 else {
+      throw RuntimeDispatchFailure.failed(
+        "arkforged executable digest changed after LaunchAgent installation")
     }
-    let standardized = componentURL.standardizedFileURL
-    let canonical = standardized.resolvingSymlinksInPath().standardizedFileURL
-    guard componentURL.path == standardized.path, standardized.path == canonical.path else {
-      throw BundledRockchipComponentError.nonCanonicalPath
-    }
-    var metadata = stat()
-    guard lstat(componentURL.path, &metadata) == 0,
-      metadata.st_mode & S_IFMT == S_IFREG,
-      metadata.st_mode & 0o111 != 0
-    else {
-      throw BundledRockchipComponentError.notRegularExecutable
-    }
-    let data = try Data(contentsOf: componentURL, options: [.mappedIfSafe])
-    let actual = SHA256Hex.string(of: data)
-    switch trustPolicy {
-    case .exactSHA256(let expectedSHA256):
-      guard actual == expectedSHA256 else {
-        throw BundledRockchipComponentError.identityMismatch(
-          expected: expectedSHA256, actual: actual)
-      }
-    case .productDeveloperID:
-      try Self.validateProductSignature(componentURL)
-    }
-    return ResolvedExecutable(path: componentURL.path, sha256: actual)
-  }
-
-  private static func validateProductSignature(_ componentURL: URL) throws {
-    var staticCode: SecStaticCode?
-    var status = SecStaticCodeCreateWithPath(
-      componentURL as CFURL, SecCSFlags(), &staticCode)
-    guard status == errSecSuccess, let staticCode else {
-      throw BundledRockchipComponentError.codeSignatureInvalid(status)
-    }
-
-    let requirementText =
-      "identifier \"\(BundledRockchipComponent.signingIdentifier)\" "
-      + "and anchor apple generic "
-      + "and certificate leaf[subject.OU] = "
-      + "\"\(BundledRockchipComponent.signingTeamIdentifier)\""
-    var requirement: SecRequirement?
-    status = SecRequirementCreateWithString(
-      requirementText as CFString, SecCSFlags(), &requirement)
-    guard status == errSecSuccess, let requirement else {
-      throw BundledRockchipComponentError.codeSignatureInvalid(status)
-    }
-    status = SecStaticCodeCheckValidity(
-      staticCode,
-      SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures),
-      requirement)
-    guard status == errSecSuccess else {
-      throw BundledRockchipComponentError.codeSignatureInvalid(status)
-    }
-
-    var rawInformation: CFDictionary?
-    status = SecCodeCopySigningInformation(
-      staticCode, SecCSFlags(rawValue: kSecCSSigningInformation),
-      &rawInformation)
-    guard status == errSecSuccess,
-      let information = rawInformation as? [CFString: Any]
-    else {
-      throw BundledRockchipComponentError.codeSignatureInvalid(status)
-    }
-    guard
-      information[kSecCodeInfoIdentifier] as? String
-        == BundledRockchipComponent.signingIdentifier
-    else {
-      throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
-        "identifier")
-    }
-    guard
-      information[kSecCodeInfoTeamIdentifier] as? String
-        == BundledRockchipComponent.signingTeamIdentifier
-    else {
-      throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
-        "teamIdentifier")
-    }
-    guard let flags = information[kSecCodeInfoFlags] as? NSNumber,
-      flags.uint32Value & 0x0001_0000 != 0
-    else {
-      throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
-        "hardenedRuntime")
-    }
-    guard information[kSecCodeInfoTimestamp] is Date else {
-      throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
-        "secureTimestamp")
-    }
-    // The child entitlement dictionary is empty, matching the TASK-BRC-003
-    // packaging contract. The Runtime Broker is a standalone daemon and is not
-    // itself sandboxed, so a child declaring `com.apple.security.inherit`
-    // aborts inside `_libsecinit_appsandbox` ("Process is not in an inherited
-    // sandbox") before `main` — the shape this guard used to require could
-    // never execute here. Emptiness stays fail-closed: `get-task-allow`, App
-    // Sandbox inheritance, child USB/file/network capability and Hardened
-    // Runtime exceptions are all rejected by having no key at all.
-    let entitlements = information[kSecCodeInfoEntitlementsDict]
-    guard
-      entitlements == nil
-        || (entitlements as? [String: Any])?.isEmpty == true
-    else {
-      throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
-        "entitlements")
-    }
+    return measured
   }
 }
 
@@ -272,14 +89,13 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       component = try resolver.resolveExecutable(providerID: "rockchip")
     } catch {
       throw DeviceProviderError.factsUnavailable(
-        "product-owned Rockchip component is unavailable: \(error)")
+        "ArkForge native RockUSB identity is unavailable: \(error)")
     }
     var executionConnectKey = target.connectKey
     var coveredBinding: RockchipProductBindingSnapshot?
     var serverFacts = [
-      "componentPackage": BundledRockchipComponent.packageID,
-      "componentSigningIdentifier": BundledRockchipComponent.signingIdentifier,
-      "componentSigningTeam": BundledRockchipComponent.signingTeamIdentifier,
+      "rockusbBackend": "native",
+      "arkForgeToolchainID": ArkForgeNativeRockUSBToolchain.identifier,
     ]
     if let bindingStore {
       let covered: Bool
@@ -340,7 +156,7 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
     }
     return ProviderFacts(
       providerID: "rockchip",
-      toolVersion: BundledRockchipComponent.reportedVersion,
+      toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
       toolSHA256: component.sha256,
       serverFacts: serverFacts,
       targetID: target.targetID,
@@ -471,7 +287,7 @@ extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObservin
 /// the concrete compatibility blocker through operation.list. It must not
 /// fall back to PATH, a bookmark, the HDC dispatcher, or the old whole-plan
 /// host (which would consume a second legacy authorization).
-package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
+package struct ArkForgeNativeRockchipControlDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let host: any RockchipRuntimeActionHosting
 
@@ -500,16 +316,13 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
       ].compactMap { $0 }.joined(separator: ": "))
   }
 
-  /// `toolWorkingDirectory` must already be prepared by
-  /// `RockchipProductToolRuntimeDirectory`. It is the current directory every
-  /// RockUSB and hdc child of this lane is spawned in, so the tool's implicit
-  /// `config.ini`/`log/` land in product-owned state instead of whatever
-  /// directory the daemon happened to be started from.
+  /// `stateWorkingDirectory` is product-owned state for the remaining HDC
+  /// control reads; native RockUSB itself executes inside `arkforged`.
   package init(
     resolver: any RuntimeExecutableResolving,
     hdcResolver: any RuntimeExecutableResolving,
     stateDirectory: URL,
-    toolWorkingDirectory: URL,
+    stateWorkingDirectory: URL,
     postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil
   ) {
     self.resolver = resolver
@@ -517,7 +330,10 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
       executor: FoundationRockchipRuntimeActionExecutor(
         hdcResolver: hdcResolver,
         runner: FoundationRockchipRuntimeCommandRunner(
-          workingDirectory: toolWorkingDirectory),
+          workingDirectory: stateWorkingDirectory),
+        loaderObserver: ProductArkForgeLoaderObserver(
+          runtimeDirectory: stateDirectory.appending(
+            path: "arkforge", directoryHint: .isDirectory)),
         // The staged-image cache went with the write path it fed: only
         // `flashWrites` ever unpacked an archive here, and that lowering is
         // arkforged's now (CHG-2026-059).
@@ -538,12 +354,12 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
 
   package func unavailableReason(providerID: String) -> String? {
     guard providerID == "rockchip" else {
-      return "bundled Rockchip dispatcher cannot serve provider \(providerID)"
+      return "ArkForge native RockUSB dispatcher cannot serve provider \(providerID)"
     }
     do {
       _ = try resolver.resolveExecutable(providerID: providerID)
     } catch {
-      return "product-owned Rockchip component is unavailable: \(error)"
+      return "ArkForge native RockUSB identity is unavailable: \(error)"
     }
     return host.unavailableReason()
   }
@@ -558,7 +374,7 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   ) async throws -> ProviderProcessReceipt {
     guard case .rockchip(let action) = plan.action else {
       throw RuntimeDispatchFailure.failed(
-        "bundled Rockchip dispatcher received a non-Rockchip action")
+        "ArkForge native RockUSB dispatcher received a non-Rockchip action")
     }
     guard case .hostManaged(let descriptor) = plan.kind else {
       throw RuntimeDispatchFailure.failed(
@@ -572,11 +388,11 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
       executable = try resolver.resolveExecutable(providerID: "rockchip")
     } catch {
       throw RuntimeDispatchFailure.failed(
-        "product-owned Rockchip component is unavailable: \(error)")
+        "ArkForge native RockUSB identity is unavailable: \(error)")
     }
     guard descriptor.providerExecutableSHA256 == executable.sha256 else {
       throw RuntimeDispatchFailure.failed(
-        "bundled Rockchip executable identity changed after availability materialization")
+        "ArkForge native RockUSB identity changed after availability materialization")
     }
     let result = try await host.execute(
       action: action,

@@ -7,7 +7,7 @@
 // the same read-only (E0) surfaces the per-action host already drives.
 //
 // Everything here is E0: IOKit identity, `hdc list targets -v`, one allowlisted
-// `param get` and `rkdeveloptool ld`. Nothing here transitions a device, and
+// `param get` and ArkForge `discoverDevices`. Nothing here transitions a device, and
 // nothing here is an admission gate — see `RockchipLiveModeProbing` for that
 // boundary.
 
@@ -63,36 +63,32 @@ package protocol RockchipLiveModeProbing: Sendable {
 /// flash lane uses; it never searches PATH and never falls back to a guess.
 package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   private let hdcResolver: any RuntimeExecutableResolving
-  private let rockchipResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
-  private let usbProbe: any RockchipRuntimeUSBProbing
+  private let loaderObserver: any ArkForgeLoaderObserving
 
-  /// `toolWorkingDirectory` is the same prepared product-owned directory the
-  /// per-action host spawns in. `ld` writes the tool's implicit log exactly
-  /// like a destructive command does, so a probe that spawned in the caller's
-  /// cwd would put back the contamination the flash lane just removed.
+  /// HDC reads use the daemon's product-owned state directory. Loader mode is
+  /// observed separately through ArkForge's public read-only socket and IOKit.
   package init(
     hdcResolver: any RuntimeExecutableResolving,
-    rockchipResolver: any RuntimeExecutableResolving,
-    toolWorkingDirectory: URL
+    stateDirectory: URL
   ) {
     self.init(
-      hdcResolver: hdcResolver, rockchipResolver: rockchipResolver,
+      hdcResolver: hdcResolver,
       runner: FoundationRockchipRuntimeCommandRunner(
-        workingDirectory: toolWorkingDirectory),
-      usbProbe: ProductRockchipRuntimeUSBProbe())
+        workingDirectory: stateDirectory),
+      loaderObserver: ProductArkForgeLoaderObserver(
+        runtimeDirectory: stateDirectory.appending(
+          path: "arkforge", directoryHint: .isDirectory)))
   }
 
   init(
     hdcResolver: any RuntimeExecutableResolving,
-    rockchipResolver: any RuntimeExecutableResolving,
     runner: any RockchipRuntimeCommandRunning,
-    usbProbe: any RockchipRuntimeUSBProbing
+    loaderObserver: any ArkForgeLoaderObserving
   ) {
     self.hdcResolver = hdcResolver
-    self.rockchipResolver = rockchipResolver
     self.runner = runner
-    self.usbProbe = usbProbe
+    self.loaderObserver = loaderObserver
   }
 
   package func observe(
@@ -101,7 +97,7 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   ) async throws -> RockchipLiveModeObservation {
     // HDC first: it names this target by its connect key. Once HDC says that
     // personality is absent, RockUSB must independently match the target's
-    // stable IOKit identity before `ld` is allowed to name its mode.
+    // stable IOKit identity and ArkForge topology before it may name the mode.
     if try await isConnectedOverHDC(connectKey: connectKey) {
       return RockchipLiveModeObservation(
         deviceMode: "hdc",
@@ -174,46 +170,17 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   private func observeRockUSBMode(
     stableIdentitySHA256: String
   ) async throws -> RockchipLiveModeObservation {
-    let exactIdentity: RockchipRuntimeLoaderIdentity
     do {
-      exactIdentity = try usbProbe.singleLoader(
-        stableIdentitySHA256: stableIdentitySHA256)
+      _ = try loaderObserver.observeLoader(
+        stableIdentitySHA256: stableIdentitySHA256,
+        expectedUSBTopology: nil,
+        requestID: "live-mode-\(UUID().uuidString.lowercased())")
     } catch {
       throw RockchipLiveModeProbeFailure.notObservable(
-        "RockUSB device does not match the bound target identity: \(error)")
+        "ArkForge dual-source Loader observation failed: \(error)")
     }
-    guard exactIdentity.serialDigestSHA256 == stableIdentitySHA256 else {
-      throw RockchipLiveModeProbeFailure.notObservable(
-        "RockUSB device identity drifted from the bound target")
-    }
-    let rockchip = try resolve(rockchipResolver, providerID: "rockchip")
-    let receipt = try await read(executable: rockchip, arguments: ["ld"])
-    guard
-      case .observations(let observations) = RockchipLDOutputParser.parse(
-        stdout: receipt.stdout,
-        stderr: receipt.stderr,
-        termination: .exited(receipt.exitStatus ?? -1))
-    else {
-      throw RockchipLiveModeProbeFailure.notObservable(
-        "rkdeveloptool ld reported no usable RockUSB observation")
-    }
-    // IOKit above proves which bound target is present; `ld` still carries no
-    // serial, so its mode is usable only when it reports one RockUSB device.
-    // Multiple tool observations cannot be paired with that identity and stay
-    // unobservable.
-    guard observations.count == 1, let observation = observations.first else {
-      throw RockchipLiveModeProbeFailure.notObservable(
-        "rkdeveloptool ld reported \(observations.count) RockUSB devices; "
-          + "a mode cannot be attributed to the bound target")
-    }
-    switch observation.mode {
-    case .loader:
-      return RockchipLiveModeObservation(
-        deviceMode: "loader", buildFingerprint: nil)
-    case .maskrom:
-      return RockchipLiveModeObservation(
-        deviceMode: "maskrom", buildFingerprint: nil)
-    }
+    return RockchipLiveModeObservation(
+      deviceMode: "loader", buildFingerprint: nil)
   }
 
   private func resolve(

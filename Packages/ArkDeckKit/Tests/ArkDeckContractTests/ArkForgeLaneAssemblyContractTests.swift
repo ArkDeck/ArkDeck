@@ -47,24 +47,24 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
       "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
       "ARKDECK_ARKFORGE_PROFILE_PATH": profileURL.path,
-      "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
     ]
   }
 
   private static func readyAck(
-    toolchain: String = ArkForgeToolchainPin.signedSHA256
+    toolchainID: String = "arkforged-native-rockusb",
+    toolchain: String = String(repeating: "a", count: 64)
   ) -> ArkForgeHelloAck {
     ArkForgeHelloAck(
       protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
       refusal: nil, executionReady: true, executionBlockers: [],
-      toolchainID: "rkdeveloptool", toolchainSHA256: toolchain)
+      toolchainID: toolchainID, toolchainSHA256: toolchain)
   }
 
   private func dependencies() -> ArkForgeLaneComposition.Dependencies {
     .init(
       rockchipHost: { RefusingRockchipRuntimeActionHost(reason: "test") },
-      rockchipExecutable: ResolvedExecutable(
-        path: "/opt/rkdeveloptool", sha256: String(repeating: "c", count: 64)),
+      providerIdentity: ResolvedExecutable(
+        path: "/opt/arkforged", sha256: String(repeating: "c", count: 64)),
       approvedPlan: { jobID, planID, planDigest, _ in
         .init(
           jobID: jobID, planID: planID, planSHA256: planDigest,
@@ -112,6 +112,63 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     }
   }
 
+  func testTheDefaultComposesTheNativeBuildIdentityAndArgument() async throws {
+    var nativeEnvironment = environment
+    nativeEnvironment["ARKDECK_ARKFORGE_CAMPAIGN"] = "AFA-AC-7"
+    let daemonDigest = try XCTUnwrap(nativeEnvironment["ARKDECK_ARKFORGED_SHA256"])
+    let seen = LaunchRecorder()
+    let result = await ArkForgeLaneComposition.compose(
+      environment: nativeEnvironment, runtimeDirectory: URL(filePath: "/tmp/rt"),
+      pairingEpoch: 7, dependencies: dependencies(),
+      launch: { request, secret in await seen.record(request: request, secret: secret) },
+      connect: { _ in
+        (
+          SilentDaemon(),
+          Self.readyAck(
+            toolchainID: "arkforged-native-rockusb", toolchain: daemonDigest)
+        )
+      },
+      awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+    guard case .success(let composed) = result else {
+      return XCTFail("the default must compose the native lane, got \(result)")
+    }
+    XCTAssertEqual(
+      composed.toolchain,
+      .init(id: "arkforged-native-rockusb", sha256: daemonDigest))
+    XCTAssertEqual(composed.lane.toolchainSHA256, daemonDigest)
+    let configuration = RuntimeJobEngine.Configuration(
+      stateDirectory: URL(filePath: "/tmp/arkdeck-native-plan-test"),
+      arkForgeLane: composed.lane)
+    XCTAssertEqual(configuration.arkForgeToolchainSHA256, daemonDigest)
+    let arguments = await seen.snapshot()?.arguments ?? []
+    XCTAssertFalse(arguments.contains("--rockusb-port"))
+    XCTAssertFalse(arguments.contains("--rkdeveloptool"))
+    XCTAssertFalse(arguments.contains("--rkdeveloptool-sha256"))
+    XCTAssertFalse(arguments.contains("/opt/rkdeveloptool"))
+    XCTAssertFalse(arguments.joined(separator: " ").contains("rkdeveloptool"))
+    XCTAssertEqual(
+      arguments[try XCTUnwrap(arguments.firstIndex(of: "--hardware-campaign")) + 1],
+      "AFA-AC-7")
+  }
+
+  func testTheDefaultRefusesAHandshakeFromAnotherBackend() async {
+    let nativeEnvironment = environment
+    let result = await ArkForgeLaneComposition.compose(
+      environment: nativeEnvironment, runtimeDirectory: URL(filePath: "/tmp/rt"),
+      pairingEpoch: 7, dependencies: dependencies(),
+      launch: { _, _ in },
+      connect: { _ in
+        (SilentDaemon(), Self.readyAck(toolchainID: "other-backend"))
+      },
+      awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+    guard case .failure(let why) = result else {
+      return XCTFail("another backend must not enter the native product lane")
+    }
+    XCTAssertTrue("\(why)".contains("arkforged-native-rockusb"), "\(why)")
+  }
+
   func testTheSecretGoesToTheLaunchAndNotIntoArgv() async {
     // Asserted at the assembly point, where the two could actually diverge.
     let seen = LaunchRecorder()
@@ -127,7 +184,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     let argv = (record?.arguments ?? []).joined(separator: " ")
     XCTAssertFalse(argv.contains(SHA256Hex.lowercaseHex(record?.secret ?? Data())))
     XCTAssertTrue(argv.contains("--pair-from-stdin 3"))
-    XCTAssertTrue(argv.contains("--require-release-signing"))
+    XCTAssertFalse(argv.contains("--require-release-signing"))
   }
 
   func testStaleSocketFilesAreGoneBeforeTheDaemonIsLaunched() async throws {
@@ -180,23 +237,26 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   }
 
   func testADaemonBoundToAnotherToolYieldsNoLane() async {
-    // The rehearsal build, which AD-023 showed cannot ship. Caught at assembly
-    // rather than at the first write.
+    // A different daemon build is a different backend identity. Caught at
+    // assembly rather than at the first write.
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 3, dependencies: dependencies(),
       launch: { _, _ in },
       connect: { _ in
-        (SilentDaemon(),
-         Self.readyAck(
-          toolchain: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"))
+        (
+          SilentDaemon(),
+          Self.readyAck(
+            toolchain: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611")
+        )
       },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
     guard case .failure(let why) = result else {
-      return XCTFail("a daemon on an unshippable tool must not become a lane")
+      return XCTFail("a daemon on another build must not become a lane")
     }
-    XCTAssertTrue("\(why)".contains("libusb"), "\(why)")
+    XCTAssertTrue("\(why)".contains("038a8a0e"), "\(why)")
+    XCTAssertTrue("\(why)".contains(String(repeating: "a", count: 64)), "\(why)")
   }
 
   func testAnUnconfiguredDaemonNeverLaunchesAnything() async {
@@ -217,7 +277,10 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   }
 
   private actor LaunchRecorder {
-    struct Record { let arguments: [String]; let secret: Data }
+    struct Record {
+      let arguments: [String]
+      let secret: Data
+    }
     private var record: Record?
     func record(request: ProcessIdentityBoundRequest, secret: Data) {
       self.record = Record(arguments: request.process.arguments, secret: secret)

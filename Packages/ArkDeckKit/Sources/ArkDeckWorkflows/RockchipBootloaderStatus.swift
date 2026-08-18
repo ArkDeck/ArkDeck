@@ -246,12 +246,17 @@ package struct ProductRockchipLoaderBindingCoordinator:
   private let targetStore: RuntimeTargetStore
   private let bindingStore: RockchipProductBindingStore
   private let usbProbe: RockchipProductUSBProbe
+  private let loaderObserver: any ArkForgeLoaderObserving
   private let reactivationProofSource: any RockchipBindingReactivationProving
 
   public init(targetStore: RuntimeTargetStore, applicationSupportRoot: URL) {
     self.targetStore = targetStore
     self.bindingStore = RockchipProductBindingStore(rootURL: applicationSupportRoot)
     self.usbProbe = RockchipProductUSBProbe()
+    self.loaderObserver = ProductArkForgeLoaderObserver(
+      runtimeDirectory: applicationSupportRoot
+        .appending(path: "Agentd", directoryHint: .isDirectory)
+        .appending(path: "arkforge", directoryHint: .isDirectory))
     self.reactivationProofSource = RockchipRuntimeBindingReactivationProofSource(
       rootURL:
         applicationSupportRoot
@@ -263,11 +268,14 @@ package struct ProductRockchipLoaderBindingCoordinator:
     targetStore: RuntimeTargetStore,
     bindingStore: RockchipProductBindingStore,
     usbProbe: RockchipProductUSBProbe,
+    loaderObserver: any ArkForgeLoaderObserving = RefusingArkForgeLoaderObserver(
+      reason: "no ArkForge Loader observation source was composed"),
     reactivationProofSource: (any RockchipBindingReactivationProving)? = nil
   ) {
     self.targetStore = targetStore
     self.bindingStore = bindingStore
     self.usbProbe = usbProbe
+    self.loaderObserver = loaderObserver
     self.reactivationProofSource =
       reactivationProofSource
       ?? RockchipRuntimeBindingReactivationProofSource(
@@ -296,6 +304,22 @@ package struct ProductRockchipLoaderBindingCoordinator:
         "exactly one registered DAYU200 USB identity is required for binding")
     }
     let currentIdentity = SHA256Hex.string(of: Data(identity.serial.utf8))
+    if identity.isLoader {
+      do {
+        let confirmed = try loaderObserver.observeLoader(
+          stableIdentitySHA256: currentIdentity,
+          expectedUSBTopology: identity.topology,
+          requestID: "bind-current-loader-\(targetID)-r\(expectedBindingRevision)")
+        guard confirmed.serialDigestSHA256 == currentIdentity,
+          confirmed.topology == identity.topology
+        else {
+          throw ArkForgeLoaderObservationFailure.identityMismatch
+        }
+      } catch {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "ArkForge dual-source Loader observation is required for binding: \(error)")
+      }
+    }
     let existing = try bindingStore.loadExisting()
     let existingIdentity = SHA256Hex.string(of: Data(existing.serial.utf8))
 

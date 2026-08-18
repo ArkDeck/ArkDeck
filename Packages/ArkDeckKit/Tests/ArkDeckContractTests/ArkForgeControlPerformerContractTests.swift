@@ -19,6 +19,23 @@ import XCTest
 /// them: what is asserted is precisely the seam that was never exercised.
 final class ArkForgeControlPerformerContractTests: XCTestCase {
 
+  private struct FixedLoaderObserver: ArkForgeLoaderObserving {
+    let identity: RockchipRuntimeLoaderIdentity
+
+    func observeLoader(
+      stableIdentitySHA256: String,
+      expectedUSBTopology: String?,
+      requestID _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      guard identity.serialDigestSHA256 == stableIdentitySHA256,
+        expectedUSBTopology == nil || expectedUSBTopology == identity.topology
+      else {
+        throw ArkForgeLoaderObservationFailure.identityMismatch
+      }
+      return identity
+    }
+  }
+
   private final class RecordingExecutor: RockchipRuntimeActionExecuting,
     @unchecked Sendable
   {
@@ -63,7 +80,9 @@ final class ArkForgeControlPerformerContractTests: XCTestCase {
   }
 
   private func makePerformer(
-    executor: RecordingExecutor, storeRoot: URL
+    executor: RecordingExecutor, storeRoot: URL,
+    loaderObserver: any ArkForgeLoaderObserving = RefusingArkForgeLoaderObserver(
+      reason: "fixture starts in HDC-normal")
   ) -> ArkForgeControlPerformer {
     ArkForgeControlPerformer(
       binding: .init(
@@ -71,11 +90,12 @@ final class ArkForgeControlPerformerContractTests: XCTestCase {
         connectKey: Fixture.connectKey,
         stableIdentitySHA256: Fixture.identity,
         usbTopology: Fixture.topology,
-        rockchipExecutable: ResolvedExecutable(
+        providerIdentity: ResolvedExecutable(
           path: "/opt/rk/rkdeveloptool", sha256: String(repeating: "5c", count: 32))),
       host: DurableRockchipRuntimeActionHost(
         executor: executor,
-        records: RockchipRuntimeActionRecordStore(rootURL: storeRoot)))
+        records: RockchipRuntimeActionRecordStore(rootURL: storeRoot)),
+      loaderObserver: loaderObserver)
   }
 
   private func temporaryStore() throws -> URL {
@@ -122,6 +142,28 @@ final class ArkForgeControlPerformerContractTests: XCTestCase {
         descriptor.actionSHA256,
         try RockchipHostManagedActionCatalog.actionSHA256(of: .rockchip(action)))
     }
+  }
+
+  func testAlreadyLoaderFastPathUsesDualSourceObservationWithoutRunningHDC() async throws {
+    let executor = RecordingExecutor()
+    let performer = makePerformer(
+      executor: executor,
+      storeRoot: try temporaryStore(),
+      loaderObserver: FixedLoaderObserver(
+        identity: RockchipRuntimeLoaderIdentity(
+          serialDigestSHA256: Fixture.identity, topology: Fixture.topology)))
+
+    let observation = try await performer.perform(Fixture.request(id: "REQ-already-loader"))
+
+    XCTAssertTrue(observation.accepted)
+    XCTAssertTrue(observation.observedDisconnect)
+    XCTAssertTrue(observation.observedUniqueLoaderRebind)
+    XCTAssertEqual(observation.facts["mode"], "Loader")
+    XCTAssertEqual(observation.facts["stableIdentitySHA256"], Fixture.identity)
+    XCTAssertEqual(observation.facts["usbTopology"], Fixture.topology)
+    XCTAssertTrue(
+      executor.executed.isEmpty,
+      "an already-Loader semantic success must not send HDC or start a vendor action")
   }
 
   func testARepeatedRequestReplaysItsRecordsAndAFreshRequestDoesNot() async throws {

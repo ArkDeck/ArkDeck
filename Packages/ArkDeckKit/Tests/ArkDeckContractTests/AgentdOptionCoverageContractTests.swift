@@ -11,7 +11,7 @@ import XCTest
 /// could never be installed:
 ///
 /// ```
-/// $ arkdeck agentd update --arkforge-profile … --rkdeveloptool …
+/// $ arkdeck agentd update --arkforge-profile …
 /// arkdeck agentd: unsupported option --arkforge-profile
 /// ```
 ///
@@ -75,7 +75,7 @@ final class AgentdOptionCoverageContractTests: XCTestCase {
     // both lists were emptied. These five are what install a lane and
     // authorize a campaign; a build that accepts none of them cannot flash.
     for flag in [
-      "--arkforged", "--arkforged-sha256", "--arkforge-profile", "--rkdeveloptool",
+      "--arkforged", "--arkforged-sha256", "--arkforge-profile",
       "--arkforge-campaign",
     ] {
       XCTAssertTrue(

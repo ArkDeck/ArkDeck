@@ -6,6 +6,7 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
+@testable import ArkForgeIPC
 
 final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private let identity = String(repeating: "9", count: 64)
@@ -20,6 +21,51 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     func snapshot() -> [String] { stepIDs }
   }
 
+  /// One ArkForge execution projected through both delegated Runtime steps.
+  /// The receipt is the terminal managed-control postflight that production
+  /// `ArkForgeLaneHost` exposes only after the daemon plan completes.
+  private actor CompletedArkForgeLane: RuntimeJobEngine.ArkForgeLane {
+    nonisolated let toolchainSHA256: String
+    private let receipt: ArkForgeActionReceiptSummary
+    private var started = false
+    private var starts = 0
+
+    init(toolchainSHA256: String) {
+      self.toolchainSHA256 = toolchainSHA256
+      let facts = [
+        ArkForgeKeyValue(key: "const.product.model", value: "DAYU200"),
+        ArkForgeKeyValue(key: "const.ohos.fullname", value: "OpenHarmony-7.0.0.fixture"),
+        ArkForgeKeyValue(key: "usbTopology", value: "42"),
+      ]
+      self.receipt = ArkForgeActionReceiptSummary(
+        jobID: "JOB-RECOVERY-1", planID: "PLAN-RECOVERY-1", stepID: "STEP-023",
+        actionID: "", attemptID: "", permitID: "PERMIT-RECOVERY-23",
+        disposition: "semanticSuccess",
+        evidenceSHA256: ArkForgeManagedControlPort.canonicalFactsDigest(
+          Dictionary(uniqueKeysWithValues: facts.map { ($0.key, $0.value) })),
+        verificationOutcome: "", verificationStrength: "",
+        verifiedRangeStart: 0, verifiedRangeLength: 0,
+        typedSkipReason: "", failureClassification: "", facts: facts)
+    }
+
+    func perform(
+      stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
+      binding _: ArkForgeLaneDeviceBinding
+    ) async throws -> ArkForgeActionReceiptSummary {
+      if !started {
+        started = true
+        starts += 1
+      }
+      return receipt
+    }
+
+    func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
+      started ? receipt : nil
+    }
+
+    func startCount() -> Int { starts }
+  }
+
   private struct RecoveryFactsPort: RockchipRuntimeFactsPort {
     let identity: String
     let toolSHA256: String
@@ -27,7 +73,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
-        providerID: "rockchip", toolVersion: BundledRockchipComponent.reportedVersion,
+        providerID: "rockchip", toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: toolSHA256,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
@@ -379,6 +425,43 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertNil(admission.recognizedEpoch)
   }
 
+  func testCapabilityOnlyUnknownUsesTheFullTypedPartitionPlanAsPossibleEffects()
+    async throws
+  {
+    let store = try await writeCapabilityOnlyUnknownJob(
+      jobID: "job-capability-only-unknown", persistJobRecord: true)
+
+    let admission = try await RuntimeRecoveryService(
+      stateDirectory: stateDirectory, capabilityStore: store,
+      nowUTC: { "2026-08-08T01:00:00Z" }
+    ).completeOverwriteAdmission(
+      request: try flashRequest(id: "capability-only-recovery"),
+      descriptor: try flashDescriptor(), stableIdentitySHA256: identity,
+      bindingRevision: 2)
+
+    let covered = try XCTUnwrap(admission.recoveryContext?.coveredIntents.only)
+    XCTAssertEqual(covered.jobID, "job-capability-only-unknown")
+    XCTAssertTrue(covered.intentEventID.hasPrefix("capability-CAP-RT-RECOVERY-UNKNOWN-use-1"))
+    XCTAssertEqual(
+      covered.possibleEffects,
+      try recoveryPartitions().map { "partition:\($0)" })
+    XCTAssertNil(admission.recognizedEpoch)
+  }
+
+  func testCapabilityOnlyUnknownWithoutAnExactDurableJobRecordFailsClosed()
+    async throws
+  {
+    let store = try await writeCapabilityOnlyUnknownJob(
+      jobID: "job-capability-record-missing", persistJobRecord: false)
+
+    await assertRecoveryBlocked(
+      "completeOverwriteRecovery.unboundedCapabilityLineage",
+      service: RuntimeRecoveryService(
+        stateDirectory: stateDirectory, capabilityStore: store,
+        nowUTC: { "2026-08-08T01:00:00Z" }),
+      request: try flashRequest(id: "missing-capability-record"))
+  }
+
   func testRecoveryNegativeMatrixBlocksCoverageCancellationExpiryAndAttemptSeventeen()
     async throws
   {
@@ -438,17 +521,6 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   func testDistinctRecoveryRunsThroughRuntimeOwnedCapabilityAndTypedProvider() async throws {
-    // Drives a full `flash.dayu200` job, which cannot run in this tree: step 1
-    // of TASK-AFA-001 removed the in-process lowering and step 5 has not wired
-    // the permit route yet, so the plan is refused before authorization.
-    //
-    // Skipped rather than rewritten. What these assert — no replay, no new
-    // dispatch, supersession bookkeeping — is exactly what must still hold once
-    // arkforged performs the write, and rewriting them to assert today's
-    // refusal would throw that away. `DeviceProviderContractTests`'s
-    // `testFlashStepsAreRefusedBeforeAuthorization` covers the interim contract.
-    throw XCTSkip(
-      "flash.dayu200 has no executor until TASK-AFA-001 step 5 wires the StepPermit route")
     let old = try writeUnknownJob(
       jobID: "job-original-unknown", timestamp: "2026-08-08T00:00:00Z",
       correlatedUnknownOutcome: false)
@@ -474,8 +546,11 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
+    let lane = CompletedArkForgeLane(toolchainSHA256: providerSHA256)
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: lane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(
           factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
@@ -512,6 +587,21 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       recoveryReplay.events.allSatisfy {
         $0.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion
       })
+    let requiredRecoverySteps = [
+      "flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
+      "rebind-and-verify-build",
+    ]
+    for stepID in requiredRecoverySteps {
+      XCTAssertTrue(
+        recoveryReplay.events.contains {
+          $0.kind == .stepOutcome && $0.stepID == stepID
+            && $0.payload["result"] == .string("succeeded")
+            && $0.payload["outcomeCertainty"] == .string("confirmed")
+            && $0.payload["semanticCode"]
+              == .string(RuntimeJobEngine.arkForgePlanCompletionSemanticCode)
+        },
+        "\(stepID) must retain the typed ArkForge completion proof used by epoch finalization")
+    }
     XCTAssertThrowsError(
       try JournalEvent.stateTransition(
         eventID: "legacy-recovery-edge", sequence: 0,
@@ -522,8 +612,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         schemaVersion: JournalEvent.schemaVersion))
 
     let dispatches = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatches.filter { $0 == "flash-partitions" }.count, 1)
-    XCTAssertEqual(dispatches.filter { $0 == "enter-loader-mode" }.count, 1)
+    XCTAssertEqual(dispatches.filter { $0 == "flash-partitions" }.count, 0)
+    XCTAssertEqual(dispatches.filter { $0 == "enter-loader-mode" }.count, 0)
+    let laneStarts = await lane.startCount()
+    XCTAssertEqual(laneStarts, 1)
     let epochs = try await RuntimeSupersedingRecoveryStore(
       stateDirectory: stateDirectory
     ).list()
@@ -765,6 +857,79 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     return (
       directory.appending(path: "job-record.json"), journalURL
     )
+  }
+
+  private func writeCapabilityOnlyUnknownJob(
+    jobID: String, persistJobRecord: Bool
+  ) async throws -> RuntimeCapabilityStore {
+    let timestamp = "2026-08-08T00:00:00Z"
+    let request = try flashRequest(id: jobID)
+    let planDigest = String(repeating: "2", count: 64)
+    if persistJobRecord {
+      var record = try makeRecord(
+        jobID: jobID, createdAtUTC: timestamp, finishedAtUTC: timestamp)
+      record.state = JobState.waitingForRecovery.rawValue
+      record.outcomeUnknown = true
+      let directory = try jobDirectory(jobID)
+      try record.persist(into: directory)
+      let journal = try FileDurableJournal(
+        url: directory.appending(path: "journal.jsonl"))
+      let sequence = try appendRunningPrefix(journal: journal, record: record)
+      try journal.appendAndSynchronize(
+        try JournalEvent.stateTransition(
+          eventID: "capability-only-wait-\(jobID)", sequence: sequence,
+          sessionID: record.sessionID, jobID: jobID, timestamp: timestamp,
+          from: .running, to: .waitingForRecovery,
+          reason: "capability outcome unknown before a typed step intent was durable"))
+    }
+
+    let artifactFacts = ["imageBundleSha256": artifactSHA256]
+    let store = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appending(
+        path: "capabilities", directoryHint: .isDirectory))
+    try await store.install(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-RECOVERY-UNKNOWN",
+        targetScope: .stablePhysicalIdentity(sha256: identity),
+        operationScope: [
+          .init(
+            operationID: "flash.dayu200",
+            version: try flashDescriptor().version)
+        ],
+        effectCeiling: .destructive,
+        exactInputs: request.inputs,
+        exactArtifactFacts: artifactFacts,
+        issuedAtUTC: timestamp,
+        expiresAtUTC: "2026-08-08T04:00:00Z",
+        maximumUses: 1,
+        issuer: .init(
+          kind: .runtimeDefaultPolicy,
+          reference: "catalog:flash.dayu200"),
+        exactPlanDigest: planDigest,
+        exactBindingRevision: 2))
+    let query = RuntimeCapabilityAuthorizationQuery(
+      operationID: "flash.dayu200",
+      operationVersion: try flashDescriptor().version,
+      effect: .destructive,
+      targetStableIdentitySHA256: identity,
+      targetBindingRevision: 2,
+      planDigest: planDigest,
+      inputs: request.inputs,
+      artifactFacts: artifactFacts)
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-RECOVERY-UNKNOWN",
+      reservationID: "reservation-capability-only-unknown",
+      jobID: jobID,
+      query: query,
+      nowUTC: timestamp)
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-RECOVERY-UNKNOWN",
+      reservationID: "reservation-capability-only-unknown",
+      jobID: jobID,
+      outcome: .outcomeUnknown,
+      terminalState: JobState.waitingForRecovery.rawValue,
+      atUTC: "2026-08-08T00:01:00Z")
+    return store
   }
 
   private func writeSuccessfulRecoveryJob(

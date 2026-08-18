@@ -17,14 +17,6 @@ package struct RockchipProductionEvolutionCampaignAttemptAdmitter:
   private let port: RockchipProductionAdmissionPort
   private let makeID: @Sendable (String) -> String
 
-  /// Production composition has no caller-supplied dependency, clock, ledger
-  /// root or authorization bytes, exactly like the in-process host's.
-  public init() throws {
-    try self.init(
-      port: RockchipProductionExecutionComposition.makeAdmissionPort(
-        settings: try RockchipProductExecutionSettings.load()))
-  }
-
   init(
     port: RockchipProductionAdmissionPort,
     makeID: @escaping @Sendable (String) -> String = { prefix in

@@ -6,10 +6,10 @@
 // target that was not on the bus. Each of those burned a confirmed campaign
 // and then required a merged PR to try again.
 //
-// This runs the same four facts before the confirmation phrase is printed, so
+// This runs the same three facts before the confirmation phrase is printed, so
 // a red host is refused while it is still free to fix. Every check is E0 —
-// one pinned read-only `ld`, one read-only `hdc list targets`, a host-side
-// digest and a USB registry read. Device mutation dispatch stays 0, no
+// one read-only `hdc list targets`, a host-side digest and a USB registry
+// read. Device mutation dispatch stays 0, no
 // authority is minted, no reservation is taken and nothing here is an engine
 // admission gate: the nine gates keep their exact semantics behind it.
 
@@ -18,9 +18,9 @@ import CryptoKit
 import Foundation
 
 /// Whether a host tool child reached its own exit. The distinction that
-/// matters is *survival*, not success: `rkdeveloptool ld` with no device
-/// attached exits non-zero and has still proven the binary can run, while a
-/// child killed by a signal never executed its first instruction of work.
+/// matters is *survival*, not success: an HDC read with no device attached may
+/// exit non-zero and still prove the binary can run, while a child killed by a
+/// signal never executed its first instruction of work.
 package enum RockchipFlashToolAliveness: Sendable, Equatable {
   case survivedSpawn(exitStatus: Int32?)
   case diedOnSignal(Int32)
@@ -56,7 +56,6 @@ package struct RockchipFlashArchiveSnapshot: Sendable, Equatable {
 }
 
 package enum RockchipFlashPreflightCheck: String, Sendable, CaseIterable {
-  case rockUSBToolAliveness
   case hdcToolAliveness
   case archiveIntegrity
   case targetPresence
@@ -112,11 +111,10 @@ package struct RockchipFlashPreflightReceipt: Sendable, Equatable {
   }
 }
 
-/// The four read-only observations, as one injectable seam. Contract tests
+/// The three read-only observations, as one injectable seam. Contract tests
 /// substitute closures so every branch is provable with zero spawn and zero
 /// device.
 package struct RockchipFlashPreflightProbes: Sendable {
-  package var rockUSBAliveness: @Sendable () async -> RockchipFlashToolAliveness
   package var hdcAliveness: @Sendable () async -> RockchipFlashToolAliveness
   /// Identity and build derived from one stream of the archive's bytes. A seam
   /// like every other observation here: the preflight decides what the answer
@@ -139,7 +137,6 @@ package struct RockchipFlashPreflightProbes: Sendable {
   package var targetReadback: @Sendable () throws -> RockchipEvolutionTargetReadback
 
   public init(
-    rockUSBAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
     hdcAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
     archiveSnapshot:
       @escaping @Sendable (URL, RockchipFlashProfile) throws
@@ -150,7 +147,6 @@ package struct RockchipFlashPreflightProbes: Sendable {
       { nil },
     targetReadback: @escaping @Sendable () throws -> RockchipEvolutionTargetReadback
   ) {
-    self.rockUSBAliveness = rockUSBAliveness
     self.hdcAliveness = hdcAliveness
     self.archiveSnapshot = archiveSnapshot
     self.boundTargetIdentitySHA256 = boundTargetIdentitySHA256
@@ -168,12 +164,6 @@ package struct RockchipFlashPreflight: Sendable {
 
   public func run(archiveURL: URL) async -> RockchipFlashPreflightReceipt {
     var findings: [RockchipFlashPreflightFinding] = []
-    findings.append(
-      Self.aliveness(
-        check: .rockUSBToolAliveness, tool: "rkdeveloptool",
-        argv: RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery.exactArguments
-          .joined(separator: " "),
-        result: await probes.rockUSBAliveness()))
     findings.append(
       Self.aliveness(
         check: .hdcToolAliveness, tool: "hdc",
@@ -209,10 +199,8 @@ package struct RockchipFlashPreflight: Sendable {
         remediation: [
           "read the crash report in "
             + "\(RockchipHostProcessDiagnostics.diagnosticReportsDirectory)\(tool)-*.ips",
-          "check that the \(tool) binary carries an empty entitlement dictionary: "
-            + "com.apple.security.app-sandbox with inherit traps the child inside "
-            + "libsecinit before main (docs/release/rockchip-component-packaging.md)",
-          "re-sign or re-deploy the component, then run this preflight again",
+          "verify the configured \(tool) path and digest, re-deploy it if needed, then run "
+            + "this preflight again",
         ])
     case .unavailable(let detail):
       return RockchipFlashPreflightFinding(
@@ -220,7 +208,7 @@ package struct RockchipFlashPreflight: Sendable {
         summary: "\(tool) is unavailable to this host: \(detail)",
         remediation: [
           "confirm the \(tool) binary is deployed where the product resolves it "
-            + "and that its identity still matches the reviewed pin"
+            + "and that its identity still matches the configured digest"
         ])
     }
   }
@@ -333,9 +321,9 @@ package struct RockchipFlashPreflight: Sendable {
 }
 
 extension RockchipFlashPreflightProbes {
-  /// Production composition. Both tool probes go through the same identity-
+  /// Production composition. The HDC probe goes through the same identity-
   /// bound runner the runtime dispatches with, resolved by the same product
-  /// resolvers — a preflight that spawned differently from the runtime could
+  /// resolver — a preflight that spawned differently from the runtime could
   /// pass while the runtime still died.
   ///
   /// One honest limit: this runs in the CLI process and the flash runs in the
@@ -345,28 +333,16 @@ extension RockchipFlashPreflightProbes {
   /// declaring App Sandbox inheritance aborts under either parent — but a
   /// posture that differed between the two processes would escape it.
   ///
-  /// The runner is bound to the same product-owned tool runtime directory the
-  /// runtime spawns in, so the probe cannot drop the tool's implicit `log/`
-  /// into the directory the CLI was invoked from. A directory that cannot be
-  /// prepared makes both tool probes `unavailable` with the concrete reason;
-  /// it never degrades to an unscoped spawn.
+  /// The runner is bound to product-owned state rather than the directory the
+  /// CLI was invoked from.
   public static func production(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> RockchipFlashPreflightProbes {
     let runner = Result {
       FoundationRockchipRuntimeCommandRunner(
-        workingDirectory: try RockchipProductToolRuntimeDirectory.prepare(
-          root: try applicationSupportArkDeckRoot()))
+        workingDirectory: try applicationSupportArkDeckRoot())
     }
     return RockchipFlashPreflightProbes(
-      rockUSBAliveness: {
-        await aliveness(
-          resolve: { try BundledRockchipExecutableResolver().resolveExecutable(
-            providerID: "rockchip") },
-          arguments: RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery
-            .exactArguments,
-          runner: runner)
-      },
       hdcAliveness: {
         await aliveness(
           resolve: {
@@ -416,8 +392,7 @@ extension RockchipFlashPreflightProbes {
     do {
       commandRunner = try runner.get()
     } catch {
-      return .unavailable(
-        "the product-owned Rockchip tool runtime directory is unavailable: \(error)")
+      return .unavailable("the product-owned preflight directory is unavailable: \(error)")
     }
     let executable: ResolvedExecutable
     do {
