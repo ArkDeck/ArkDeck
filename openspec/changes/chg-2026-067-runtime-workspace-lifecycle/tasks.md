@@ -44,9 +44,15 @@ protected `main` 后生效；合入前不得开始实现 PR。实现 PR 必须�
   - `Catalog/**`
   - `scripts/catalog_gen/**`
   - `docs/**`
+  - `Packages/ArkDeckKit/LaunchAgents/README.md`（交付项 4 的操作者注记载体，
+    起草时漏列；本行是精确单文件扩权）
+  - `openspec/contracts/workflow-step-registry.yaml`（新 step kind 的封闭
+    注册表；单文件精确扩权，承 CHG-2026-061 TASK-RIW-001 同款先例——generator
+    fail-closed 要求 step kind 先登记）
   - `openspec/changes/chg-2026-067-runtime-workspace-lifecycle/**`
 - Forbidden paths:
-  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/contracts/**`、
+  - `openspec/constitution.md`、`openspec/specs/**`、
+    `openspec/contracts/**`（上列 `workflow-step-registry.yaml` 单文件除外）、
     其他 change 目录、`AGENTS.md`、`PRODUCT-LOOP.md`、`.github/**`
   - `tests/waterflow-demo/**`（主树夹具不参与本任务）
   - 既有 daemon state 的手工改写（存量树只经产品路径收养/清扫）
