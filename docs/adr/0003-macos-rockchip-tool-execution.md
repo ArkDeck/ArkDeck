@@ -1,5 +1,14 @@
 # ADR-0003 — macOS bundled Rockchip component
 
+> **Superseded product-execution boundary (NRU-004, 2026-08-18):** the
+> bundled `rkdeveloptool` described below is retained only as an
+> operator-invoked Maskrom rescue utility. Loader observation, partition
+> reads/writes/readback/reset and `flash.dayu200` now run through native
+> RockUSB in identity-bound `arkforged`; ArkDeck Runtime has no executable,
+> argv, trust, bookmark or fallback route to this child. The remainder of this
+> ADR is preserved as distribution and decision history, not current Runtime
+> implementation guidance.
+
 - Status: proposed; effective only when the maintainer reviews and merges this
   decision/evidence PR
 - Date: 2026-07-25
