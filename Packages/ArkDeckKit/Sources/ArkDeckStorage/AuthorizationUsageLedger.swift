@@ -116,7 +116,9 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       capabilityBlobOID: capabilityBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
-  public static func validatedStandingAuthorization(
+  /// Historical decoder validation only. Current products must not construct
+  /// standing-authorization references as live authority.
+  private static func validatedStandingAuthorization(
     authorizationID: String,
     mainCommitOID: String,
     authorizationBlobOID: String,

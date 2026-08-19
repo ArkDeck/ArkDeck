@@ -114,6 +114,7 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
     XCTAssertFalse(source.contains("public func reserve("))
     XCTAssertFalse(source.contains("public static func canonicalReservationID("))
+    XCTAssertFalse(source.contains("public static func validatedStandingAuthorization("))
     XCTAssertFalse(source.contains("public static func validatedEvolutionCampaignConfirmation("))
     XCTAssertFalse(source.contains("public init(\n    candidateDigestSHA256:"))
   }
