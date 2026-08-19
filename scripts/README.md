@@ -36,8 +36,8 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | --- | --- |
 | `archive_characterization/` | DAYU200 归档特征扫描器(CHG-2026-003,已归档) |
 | `m0b_capture/` | M0B DAYU200 bring-up 采集 runbook(CHG-2026-006,人工执行) |
+| `manual_ui_flash/` | 人工 Accessibility UI Flash 驱动器(原 `rockchip_component/` 内与组件无关的驱动，随 CHG-2026-065 迁入；组件构建流水线本体已退役) |
 | `partition_decode/` | DAYU200 钉定镜像分区解码器(CHG-2026-009,离线只读) |
-| `rockchip_component/` | Rockchip 组件的无签名源码钉定构建(TASK-BRC-002) |
 | `trace_capture/` | TR-001 trace 探针/最小采集 runbook(CHG-2026-021,人工执行) |
 | `ud_capture/` | 受控 UI Dump 采集 harness(CHG-2026-008) |
 | `ui_dump_diagnosis/` | R2 raw INVALID_UNICODE 只读非内容诊断(TASK-UD-R2-DIAG-001) |

@@ -6,7 +6,7 @@ import XCTest
 
 /// Historical flash session journals remain inspectable without reviving their
 /// retired executor or reservation writer. Current recovery belongs to Runtime.
-final class RockchipFlashSessionReconcileContractTests: XCTestCase {
+final class RockchipLegacyFlashJournalReconcileContractTests: XCTestCase {
 
   // MARK: - Fixture plumbing
 
@@ -30,8 +30,8 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     if let base { try? FileManager.default.removeItem(at: base) }
   }
 
-  private func reconciler() -> RockchipFlashSessionReconciler {
-    RockchipFlashSessionReconciler(
+  private func reconciler() -> RockchipLegacyFlashJournalReconciler {
+    RockchipLegacyFlashJournalReconciler(
       sessionsRoot: sessionsRoot, agentLedger: agentLedger, now: { Self.fixedNow })
   }
 
@@ -111,7 +111,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
       try append(
         JournalEvent.jobCreated(
           eventID: "evt-created", sequence: sequence, sessionID: sessionID, jobID: jobID,
-          timestamp: RockchipFlashSessionReconcileContractTests.timestamp,
+          timestamp: RockchipLegacyFlashJournalReconcileContractTests.timestamp,
           executionMode: "execute", executionAuthority: "authorizedAgent",
           coreBaseline: "CORE-2.0.0", schemaVersion: schemaVersion,
           authorizationRef: authorizationRef, agentAuthorizationRef: agentAuthorizationRef,
@@ -122,7 +122,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
       try append(
         JournalEvent.stateTransition(
           eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
-          timestamp: RockchipFlashSessionReconcileContractTests.timestamp,
+          timestamp: RockchipLegacyFlashJournalReconcileContractTests.timestamp,
           from: from, to: to, reason: "fixture", schemaVersion: schemaVersion))
     }
 
@@ -141,7 +141,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
       try append(
         JournalEvent.stepIntent(
           eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
-          timestamp: RockchipFlashSessionReconcileContractTests.timestamp,
+          timestamp: RockchipLegacyFlashJournalReconcileContractTests.timestamp,
           step: step,
           target: JournalTarget(
             scope: "device", targetID: "TGT-DAYU200-01", connectKey: "fixture-usb",
@@ -161,7 +161,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
       try append(
         JournalEvent.stepOutcome(
           eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
-          timestamp: RockchipFlashSessionReconcileContractTests.timestamp,
+          timestamp: RockchipLegacyFlashJournalReconcileContractTests.timestamp,
           stepID: stepID, attempt: 1, correlatesToIntentEventID: intentEventID,
           result: certainty == .confirmed ? "succeeded" : "failed",
           outcomeCertainty: certainty, schemaVersion: schemaVersion,
@@ -177,7 +177,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
         JournalEvent(
           schemaVersion: schemaVersion,
           eventID: "evt-finalized", sequence: sequence, sessionID: sessionID, jobID: jobID,
-          timestamp: RockchipFlashSessionReconcileContractTests.timestamp, kind: .finalized,
+          timestamp: RockchipLegacyFlashJournalReconcileContractTests.timestamp, kind: .finalized,
           payload: [
             "terminalStatus": .string("succeeded"),
             "manifestSha256": .string(String(repeating: "9", count: 64)),

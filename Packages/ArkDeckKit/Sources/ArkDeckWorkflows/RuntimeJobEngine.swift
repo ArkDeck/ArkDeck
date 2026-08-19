@@ -1004,7 +1004,6 @@ public actor RuntimeJobEngine {
   private let agentUsageLedger: AgentAuthorityUsageLedger?
   private let mutationLane = DeviceMutationLaneCoordinator()
   private let admissionService: RuntimeAdmissionService
-  private let flashStagingAvailableBytes: @Sendable (URL) throws -> Int64
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
@@ -1023,7 +1022,6 @@ public actor RuntimeJobEngine {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     powerActivityController: PowerActivityController? = nil,
     agentUsageLedger: AgentAuthorityUsageLedger? = nil,
-    flashStagingAvailableBytes: (@Sendable (URL) throws -> Int64)? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) throws {
     self.configuration = configuration
@@ -1034,9 +1032,6 @@ public actor RuntimeJobEngine {
     self.traceRuntimeProbe = traceRuntimeProbe
     self.powerActivityController = powerActivityController
     self.agentUsageLedger = agentUsageLedger
-    self.flashStagingAvailableBytes =
-      flashStagingAvailableBytes
-      ?? { try RockchipFlashStagingCapacity.availableBytes(at: $0) }
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
       at: configuration.stateDirectory.appending(path: "jobs", directoryHint: .isDirectory),
@@ -5557,20 +5552,6 @@ public actor RuntimeJobEngine {
       } catch {
         throw RuntimeDispatchFailure.failed(
           "flash bundle is not a usable DAYU200 images archive: \(error)")
-      }
-      do {
-        let requiredBytes = try RockchipFlashStagingCapacity.requiredBytes(for: profile)
-        let availableBytes = try flashStagingAvailableBytes(configuration.stateDirectory)
-        try RockchipFlashStagingCapacity.require(
-          profile: profile, availableBytes: availableBytes)
-        appendTimeline(
-          jobID: jobID,
-          entry:
-            "flash staging capacity preflight required=\(requiredBytes) "
-            + "available=\(availableBytes)")
-      } catch {
-        throw RuntimeDispatchFailure.failed(
-          "flash staging capacity preflight failed before device transition: \(error)")
       }
       appendTimeline(
         jobID: jobID,

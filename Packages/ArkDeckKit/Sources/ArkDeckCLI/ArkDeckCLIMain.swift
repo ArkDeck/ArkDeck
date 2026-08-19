@@ -118,7 +118,7 @@ struct ArkDeckCommandLine {
   static func runFlashReconcile(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed(["--session"])
-    let reconciler = try RockchipFlashSessionReconciler.production()
+    let reconciler = try RockchipLegacyFlashJournalReconciler.production()
 
     if let sessionID = options.value("--session") {
       let finding = try reconciler.inspect(sessionID: sessionID)
