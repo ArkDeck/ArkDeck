@@ -17,9 +17,3 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 
-# Upstream rkdeveloptool writes `log/log<YYYY-MM-DD>.txt` relative to its
-# current directory, and `swift test --package-path Packages/ArkDeckKit` runs
-# the test process with that package as its working directory. Any tool spawn
-# that inherits it (see FoundationRockchipRuntimeCommandRunner, which does not
-# bind RockchipProductToolRuntimeDirectory) lands the log here.
-Packages/ArkDeckKit/log/

@@ -26,11 +26,14 @@ grant no current discovery, transition, dispatch, or fallback authority. Histori
 changes, receipts, and legacy session decoders may retain their identifiers solely
 to explain or decode old records.
 
-## Maskrom rescue distribution
+## Maskrom rescue distribution — retired (CHG-2026-065, 2026-08-19)
 
-`bundled-component/1.0.0/` is retained only as the source, build, license, SBOM, and
-notice record for the separately shipped, operator-invoked Maskrom rescue utility.
-It is not a Runtime Provider, Loader-mode backend, discovery fallback, or ArkForge
-dependency. Its exact operational boundary is documented in
-`docs/release/rockchip-component-packaging.md` and
-`docs/release/rockchip-component-distribution.md`.
+The `bundled-component/1.0.0/` record and the rescue utility it described are no
+longer built or distributed; the registry directory was removed with the embed
+phases, the component CI workflow, and the build pipeline. The Maskrom scenario
+the rescue copy hedged was disproven on the DAYU200 bench (July 2026: `db` never
+connected; the working recovery channel is Loader-mode rewrite, owned by the
+native ArkForge route above). The accepted source/build/license/SBOM/notice
+history remains in `docs/release/rockchip-component-packaging.md`,
+`docs/release/rockchip-component-distribution.md`, and git history;
+reintroduction would be a new change with its own evidence.

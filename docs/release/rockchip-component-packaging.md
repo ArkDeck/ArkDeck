@@ -1,13 +1,20 @@
 # Rockchip bundled-component packaging contract
 
-> **NRU-004 retirement boundary (2026-08-18):** this component is retained in
-> `/Applications/ArkDeck.app` only as an operator-invoked **Maskrom rescue**
-> utility. Loader discovery, partition-table reads, writes, readback, reset,
-> target facts, preflight and the `flash.dayu200` Runtime path use native
-> RockUSB inside identity-bound `arkforged`. Agentd never resolves, launches,
-> trusts, bookmarks, or passes this component to ArkForge. Its presence in the
-> App bundle is distribution/compliance inventory, not product Runtime
-> availability or Flash authority.
+> **CHG-2026-065 retirement (2026-08-19):** the component described below is
+> **no longer built, embedded, or distributed at all.** NRU-004 (2026-08-18)
+> had already reduced it to an operator-invoked Maskrom rescue utility with
+> zero product-runtime references; CHG-2026-065 removes that rescue copy too —
+> the Xcode embed phases, the `rockchip-component.yml` workflow, the
+> `scripts/rockchip_component/` pipeline and the
+> `openspec/integrations/rockchip/bundled-component/` registry are deleted,
+> and the release tuple shrinks to the single App. The GPL source-offer /
+> SBOM / notice obligations below were duties of *distribution* and
+> 已随分发停止而卸除 (they lapse with the last distributed copy; DMGs already
+> shipped keep their embedded notices). The Maskrom rescue scenario this
+> hedged was disproven on the DAYU200 bench in July 2026 (`db` never
+> connected); the working recovery channel is Loader-mode rewrite, owned by
+> the native `arkforged` lane. This document is preserved as the packaging
+> contract history of the component while it shipped.
 
 This document defines the TASK-BRC-003 release boundary for
 `rkdeveloptool@1.32`. The machine-readable facts live in

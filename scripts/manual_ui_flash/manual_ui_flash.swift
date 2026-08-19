@@ -244,7 +244,7 @@ private func protectedMainActuatorCommit() throws -> String {
   let reviewed = try git(
     [
       "show", "--no-ext-diff", "--no-textconv",
-      "origin/main:scripts/rockchip_component/manual_ui_flash.swift",
+      "origin/main:scripts/manual_ui_flash/manual_ui_flash.swift",
     ],
     maximumBytes: 2 * 1_024 * 1_024)
   let current = try Data(contentsOf: scriptURL)

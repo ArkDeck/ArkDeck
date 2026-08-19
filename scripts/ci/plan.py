@@ -416,7 +416,6 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 "-packageCachePath",
                 os.fspath(cache_root / "PackageCache"),
                 "CODE_SIGNING_ALLOWED=NO",
-                "ROCKCHIP_COMPONENT_INPUT=/usr/bin/false",
                 "build-for-testing",
             )
         )
