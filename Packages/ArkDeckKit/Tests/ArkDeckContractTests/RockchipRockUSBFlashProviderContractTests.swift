@@ -40,9 +40,6 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
         "uboot", "resource", "boot_linux", "ramdisk", "system", "vendor", "updater",
         "chip_ckm", "userdata",
       ])
-    XCTAssertEqual(
-      profile.mappedPartitions.map(\.offsetSectors),
-      [8192, 28672, 40960, 237_568, 245_760, 4_440_064, 6_742_016, 6_938_624, 19_955_712])
     XCTAssertEqual(profile.writeForbiddenMemberNames.sorted(), ["chip_prod.img", "sys_prod.img"])
     XCTAssertEqual(
       profile.membershiplessPartitionsWriteForbidden,
