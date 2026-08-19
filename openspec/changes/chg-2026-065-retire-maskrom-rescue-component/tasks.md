@@ -7,7 +7,8 @@
 
 ## TASK-RRC-001 — 移除救援组件：构建、CI、打包与守卫反转
 
-- Status:blocked（本 proposal merge 后 ready）
+- Status:done（2026-08-19;#1400 合并——嵌入相位/组件 CI/构建流水线/注册表全删,
+  守卫反转,`manual_ui_flash` 迁址;证据 `evidence/runs/TASK-RRC-001/run.md`）
 - Golden Journey:GJ-4（不改其行为；只收缩发布 tuple 与工程面）
 - Platform:macos
 - Requirements:proposal「目标」全部条目
@@ -51,8 +52,8 @@
 
 ## TASK-RRC-002 — vendor 时代死代码与误导命名清理
 
-- Status:blocked（依赖 TASK-RRC-001 合入——守卫反转先落，避免 tripwire
-  语义在两个 PR 间摇摆）
+- Status:done（2026-08-19;#1403 合并——staging 死代码/容量门/无调用方端口删除,
+  两处误导命名改正;证据 `evidence/runs/TASK-RRC-002/run.md`）
 - Golden Journey:GJ-4（行为不变；删除生产不可达代码与改名）
 - Platform:macos
 - Requirements:proposal「顺带」条目

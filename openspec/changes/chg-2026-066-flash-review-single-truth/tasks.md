@@ -7,7 +7,8 @@
 
 ## TASK-SPT-001 — 分区表单一化：删除 ArkDeck 侧设备地址
 
-- Status:blocked（本 proposal merge 后 ready）
+- Status:done（2026-08-19;#1407 合并——设备地址退出 profile,partitionPlan 语义
+  注记,夹具改合成偏移;证据 `evidence/runs/TASK-SPT-001/run.md`）
 - Golden Journey:GJ-4（行为不变；删除死数据与矛盾声明）
 - Platform:macos
 - Requirements:proposal 目标 1
@@ -29,7 +30,8 @@
 
 ## TASK-SPT-002 — 计划模型单一化：评审展示只用运行时事实
 
-- Status:blocked（依赖 TASK-SPT-001 合入——profile 形状先定，展示后改）
+- Status:done（2026-08-19;#1408 合并——伪造计划模型解散,评审改引擎同源事实,
+  stepSet 摘要与台架 job record 对拍入契约;证据 `evidence/runs/TASK-SPT-002/run.md`）
 - Golden Journey:GJ-4（submit/execute 行为不变；评审内容换成真事实）
 - Platform:macos
 - Requirements:proposal 目标 2、3

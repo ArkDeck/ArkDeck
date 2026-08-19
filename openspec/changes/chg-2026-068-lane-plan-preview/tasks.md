@@ -7,7 +7,9 @@
 
 ## TASK-LPP-001 — lane 计划预物化：只读预览端到端
 
-- Status:blocked（本 proposal merge 后 ready）
+- Status:done（2026-08-19;#1415 合并——预览端到端落地,契约测试钉只读三调用
+  与全部状态;LPP-AC-3 的 env-gated 真机对拍**尚欠一次台架通过**,在此之前
+  本 change 不归档;证据 `evidence/runs/TASK-LPP-001/run.md`）
 - Golden Journey:GJ-4（不改 submit/execute 行为；评审新增只读事实）
 - Platform:macos
 - Requirements:proposal「目标」「诚实边界」全部条目
