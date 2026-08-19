@@ -403,7 +403,7 @@ package struct ProductRockchipLoaderBindingCoordinator:
         existing.evidence.contains("binding:selected-target-id=\(targetID)"),
         initialSelections.count == 1,
         let selection = initialSelections.first,
-        RockchipStandingAuthorization.isCanonicalSHA256(selection)
+        RockchipDigestValidation.isCanonicalSHA256(selection)
       {
         return RockchipLoaderBindingReceipt(
           targetID: targetID,
@@ -472,9 +472,9 @@ package struct ProductRockchipLoaderBindingCoordinator:
         proof.stableLoaderIdentitySHA256 == currentIdentity,
         proof.hdcConnectKey == target.connectKey,
         proof.hdcIdentitySHA256 == connectIdentity,
-        RockchipStandingAuthorization.isCanonicalSHA256(
+        RockchipDigestValidation.isCanonicalSHA256(
           proof.currentBindingIntentSHA256),
-        RockchipStandingAuthorization.isCanonicalSHA256(
+        RockchipDigestValidation.isCanonicalSHA256(
           proof.hdcRouteReceiptSHA256),
         !proof.hdcUSBTopology.isEmpty,
         proof.hdcUSBTopology.utf8.allSatisfy({ (48...57).contains($0) })

@@ -125,8 +125,8 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       let previousRevision = Int(previousRevisionText),
       let previousTopology = previousTopologies.first,
       let confirmation = confirmations.first,
-      RockchipStandingAuthorization.isCanonicalSHA256(previousIdentity),
-      RockchipStandingAuthorization.isCanonicalSHA256(confirmation),
+      RockchipDigestValidation.isCanonicalSHA256(previousIdentity),
+      RockchipDigestValidation.isCanonicalSHA256(confirmation),
       previousIdentity != currentIdentity,
       previousRevision > 0,
       revision == previousRevision + 1,
@@ -216,7 +216,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     let topologies = values(prefix: "binding:hdc-normal-alias-usb-topology=")
     guard identities.count == 1, topologies.count == 1,
       let identity = identities.first, let topology = topologies.first,
-      RockchipStandingAuthorization.isCanonicalSHA256(identity),
+      RockchipDigestValidation.isCanonicalSHA256(identity),
       !topology.isEmpty,
       topology.utf8.allSatisfy({ (48...57).contains($0) }),
       topology == "0" || topology.first != "0"
@@ -242,7 +242,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     else { return nil }
     let selections = values(prefix: "rebind:user-selection-sha256=")
     guard selections.count == 1, let selection = selections.first,
-      RockchipStandingAuthorization.isCanonicalSHA256(selection)
+      RockchipDigestValidation.isCanonicalSHA256(selection)
     else {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable Loader binding selection evidence is invalid or ambiguous")
@@ -370,13 +370,13 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       let selection = selections.first,
       let alias = aliases.first,
       let aliasTopology = aliasTopologies.first,
-      RockchipStandingAuthorization.isCanonicalSHA256(currentIntent),
-      RockchipStandingAuthorization.isCanonicalSHA256(routeReceipt),
+      RockchipDigestValidation.isCanonicalSHA256(currentIntent),
+      RockchipDigestValidation.isCanonicalSHA256(routeReceipt),
       currentIntent != routeReceipt,
-      RockchipStandingAuthorization.isCanonicalSHA256(replacedIdentity),
+      RockchipDigestValidation.isCanonicalSHA256(replacedIdentity),
       replacedIdentity != SHA256Hex.string(of: Data(serial.utf8)),
-      RockchipStandingAuthorization.isCanonicalSHA256(selection),
-      RockchipStandingAuthorization.isCanonicalSHA256(alias),
+      RockchipDigestValidation.isCanonicalSHA256(selection),
+      RockchipDigestValidation.isCanonicalSHA256(alias),
       !aliasTopology.isEmpty,
       aliasTopology.utf8.allSatisfy({ (48...57).contains($0) }),
       aliasTopology == "0" || aliasTopology.first != "0"

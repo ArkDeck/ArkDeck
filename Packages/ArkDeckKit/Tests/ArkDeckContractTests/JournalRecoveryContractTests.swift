@@ -160,7 +160,7 @@ final class JournalRecoveryContractTests: XCTestCase {
         "ain010-fixture", .deviceMutation
       ),
       (
-        try .validatedStandingAuthorization(
+        try historicalStandingAuthority(
           authorizationID: "AUTH-FIXTURE",
           mainCommitOID: String(repeating: "e", count: 40),
           authorizationBlobOID: String(repeating: "f", count: 40), approvalPRNumber: 700),
