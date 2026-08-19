@@ -74,21 +74,38 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
     XCTAssertTrue(composition.contains(#""rockusbBackend": "native""#))
   }
 
-  func testOnlyMaskromRescuePackagingRetainsTheStandaloneArtifact() throws {
+  func testTheRescueComponentIsFullyRetiredFromTheProject() throws {
+    // CHG-2026-065: the Maskrom rescue rkdeveloptool left the App bundle,
+    // the build, and CI. This used to assert the opposite (the embed phase
+    // had to exist); the inversion is deliberate and the source tripwire
+    // above still refuses any reintroduction of the executable by name.
     let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let repoRoot = packageRoot.deletingLastPathComponent().deletingLastPathComponent()
     let project = try String(
       contentsOf: repoRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
-    XCTAssertTrue(project.contains("rkdeveloptool in Embed Rockchip Component"))
-    XCTAssertTrue(project.contains("ROCKCHIP_COMPONENT_INPUT"))
+    XCTAssertFalse(project.contains("Embed Rockchip Component"))
+    XCTAssertFalse(project.contains("ROCKCHIP_COMPONENT"))
+    XCTAssertFalse(project.lowercased().contains("rkdeveloptool"))
+    XCTAssertFalse(project.contains("RockchipComponent.entitlements"))
+
+    for retiredPath in [
+      ".github/workflows/rockchip-component.yml",
+      "scripts/rockchip_component",
+      "openspec/integrations/rockchip/bundled-component",
+      "ArkDeckApp/RockchipComponent.entitlements",
+    ] {
+      XCTAssertFalse(
+        FileManager.default.fileExists(atPath: repoRoot.appending(path: retiredPath).path),
+        "\(retiredPath) should be gone with the rescue component")
+    }
 
     let retirementDoc = try String(
       contentsOf: repoRoot.appending(
         path: "docs/release/rockchip-component-packaging.md"), encoding: .utf8)
-    XCTAssertTrue(retirementDoc.contains("Maskrom rescue"), retirementDoc)
-    XCTAssertTrue(retirementDoc.contains("Agentd never resolves, launches"), retirementDoc)
+    XCTAssertTrue(retirementDoc.contains("CHG-2026-065"), retirementDoc)
+    XCTAssertTrue(retirementDoc.contains("已随分发停止而卸除"), retirementDoc)
   }
 
   private func sourceFiles(

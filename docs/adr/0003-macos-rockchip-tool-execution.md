@@ -1,13 +1,20 @@
 # ADR-0003 — macOS bundled Rockchip component
 
-> **Superseded product-execution boundary (NRU-004, 2026-08-18):** the
-> bundled `rkdeveloptool` described below is retained only as an
-> operator-invoked Maskrom rescue utility. Loader observation, partition
-> reads/writes/readback/reset and `flash.dayu200` now run through native
-> RockUSB in identity-bound `arkforged`; ArkDeck Runtime has no executable,
-> argv, trust, bookmark or fallback route to this child. The remainder of this
-> ADR is preserved as distribution and decision history, not current Runtime
-> implementation guidance.
+> **Superseded in full (CHG-2026-065, 2026-08-19):** the bundled
+> `rkdeveloptool` is no longer built, embedded, or distributed in any role.
+> NRU-004 (2026-08-18) first retired it from the product-execution boundary —
+> Loader observation, partition reads/writes/readback/reset and
+> `flash.dayu200` run through native RockUSB in identity-bound `arkforged`,
+> and ArkDeck Runtime kept no executable, argv, trust, bookmark or fallback
+> route to this child — leaving only an operator-invoked Maskrom rescue copy
+> in the App bundle. CHG-2026-065 removed that rescue copy too (embed phases,
+> component CI, build pipeline, integrations registry), because the Maskrom
+> scenario it hedged was disproven on this board (July 2026 rehearsals:
+> `db` never connected; the working recovery channel is Loader-mode rewrite,
+> owned by the native lane). The outcome `selected:bundledRockchipComponent`
+> below is decision history; DEC-011 carries the dated supersession note.
+> Reintroduction would be a new change with its own evidence — the pinned
+> upstream and hermetic recipe remain reproducible from git history.
 
 - Status: proposed; effective only when the maintainer reviews and merges this
   decision/evidence PR

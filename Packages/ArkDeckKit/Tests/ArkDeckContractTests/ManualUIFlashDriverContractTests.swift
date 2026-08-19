@@ -26,7 +26,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   }
 
   private func driverSource() throws -> String {
-    try repositorySource("scripts/rockchip_component/manual_ui_flash.swift")
+    try repositorySource("scripts/manual_ui_flash/manual_ui_flash.swift")
   }
 
   private func runCandidateValidator(_ candidateURL: URL) throws -> (
@@ -42,7 +42,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       "swift", "-module-cache-path", cache.path,
       repositoryRoot().appending(
         path:
-          "scripts/rockchip_component/manual_ui_flash.swift"
+          "scripts/manual_ui_flash/manual_ui_flash.swift"
       ).path,
       "--validate-candidate", candidateURL.path,
     ]
@@ -153,7 +153,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
   func testDefaultCandidateTracksTheCurrentWorkspaceFlow() throws {
     let candidateURL = repositoryRoot().appending(
-      path: "scripts/rockchip_component/manual_ui_flash_candidate.json")
+      path: "scripts/manual_ui_flash/manual_ui_flash_candidate.json")
     let object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
     let actions = try XCTUnwrap(object["actions"] as? [[String: Any]])
@@ -178,7 +178,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   func testStandaloneValidatorAcceptsNovelCompositionAndRejectsAuthorityField() throws {
     let candidateURL = repositoryRoot().appending(
       path:
-        "scripts/rockchip_component/manual_ui_flash_candidate.json")
+        "scripts/manual_ui_flash/manual_ui_flash_candidate.json")
     let accepted = try runCandidateValidator(candidateURL)
     XCTAssertEqual(accepted.status, 0, accepted.stderr)
     XCTAssertTrue(accepted.stdout.contains("CANDIDATE_VALID:"))
@@ -209,37 +209,15 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       rejected.stderr.contains("candidate UI program must have the exact published shape"))
   }
 
-  func testRockchipSourceManifestPinsCurrentRepoBuildInputsBeforePush() throws {
-    let manifestURL = repositoryRoot().appending(
-      path:
-        "openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json")
-    let manifest = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
-    let records = try XCTUnwrap(manifest["buildFiles"] as? [[String: Any]])
-    XCTAssertFalse(records.isEmpty)
-
-    for record in records {
-      let relativePath = try XCTUnwrap(record["path"] as? String)
-      let expectedSize = try XCTUnwrap(record["size"] as? Int)
-      let expectedSHA256 = try XCTUnwrap(record["sha256"] as? String)
-      let expectedGitBlob = try XCTUnwrap(record["gitBlob"] as? String)
-      let bytes = try Data(contentsOf: repositoryRoot().appending(path: relativePath))
-      let sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-      var gitBlobInput = Data("blob \(bytes.count)\0".utf8)
-      gitBlobInput.append(bytes)
-      let gitBlob = Insecure.SHA1.hash(data: gitBlobInput)
-        .map { String(format: "%02x", $0) }.joined()
-
-      XCTAssertEqual(bytes.count, expectedSize, "source manifest size drift: \(relativePath)")
-      XCTAssertEqual(sha256, expectedSHA256, "source manifest SHA-256 drift: \(relativePath)")
-      XCTAssertEqual(gitBlob, expectedGitBlob, "source manifest git blob drift: \(relativePath)")
-    }
-  }
+  // testRockchipSourceManifestPinsCurrentRepoBuildInputsBeforePush was
+  // removed with CHG-2026-065: its subject — the bundled component's
+  // source-distribution-manifest.json — left the repository along with the
+  // component build pipeline it kept honest.
 
   func testCandidateProgramCannotNameTargetArchivePlanValueOrSubmit() throws {
     let data = try Data(
       contentsOf: repositoryRoot()
-        .appending(path: "scripts/rockchip_component/manual_ui_flash_candidate.json"))
+        .appending(path: "scripts/manual_ui_flash/manual_ui_flash_candidate.json"))
     let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     XCTAssertEqual(
       Set(object.keys),
@@ -316,7 +294,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(source.contains("\"rev-parse\", \"origin/main^{commit}\""))
     XCTAssertTrue(
       source.contains(
-        "\"origin/main:scripts/rockchip_component/manual_ui_flash.swift\""))
+        "\"origin/main:scripts/manual_ui_flash/manual_ui_flash.swift\""))
     XCTAssertTrue(source.contains("guard reviewed == current"))
     XCTAssertTrue(source.contains("let protectedMainCommitOID = try protectedMainActuatorCommit()"))
     XCTAssertTrue(

@@ -1,10 +1,14 @@
 # Rockchip bundled component distribution record
 
-> **Current product role (NRU-004, 2026-08-18):** the distributed child is a
-> Maskrom rescue utility only. ArkDeck's supported Loader-mode product path is
-> native ArkForge and has no runtime reference to this child. The source,
-> license, SBOM and notice obligations below remain because the rescue binary
-> is still shipped; they do not make it an agentd provider or Flash backend.
+> **CHG-2026-065 retirement (2026-08-19):** the component is no longer built
+> or distributed in any role — the Maskrom-rescue copy NRU-004 (2026-08-18)
+> had retained is removed from the App bundle, the build, and CI. The source,
+> license, SBOM and notice obligations recorded below were obligations of
+> distribution and 已随分发停止而卸除; copies already shipped keep their
+> embedded notices, and the pinned upstream/recipe identity remains
+> reproducible from git history should a future change reintroduce it with
+> its own evidence. This record is preserved as the accepted distribution
+> history of the component while it shipped.
 
 > Task：`TASK-BRC-001`
 > Change：`CHG-2026-036-macos-bundled-rockchip-component@r1`

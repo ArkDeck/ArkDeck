@@ -196,7 +196,6 @@ jobs:
           -clonedSourcePackagesDirPath "$ARKDECK_XCODE_CACHE_ROOT/SourcePackages"
           -packageCachePath "$ARKDECK_XCODE_CACHE_ROOT/PackageCache"
           CODE_SIGNING_ALLOWED=NO
-          ROCKCHIP_COMPONENT_INPUT=/usr/bin/false
           build-for-testing
 
       - name: Save trusted Xcode build cache

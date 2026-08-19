@@ -388,7 +388,6 @@ def validate_automatic_check_contract(
         "-clonedSourcePackagesDirPath",
         "-packageCachePath",
         "CODE_SIGNING_ALLOWED=NO",
-        "ROCKCHIP_COMPONENT_INPUT=/usr/bin/false",
         "build-for-testing",
         "        if: >-\n"
         "          success() &&\n"
