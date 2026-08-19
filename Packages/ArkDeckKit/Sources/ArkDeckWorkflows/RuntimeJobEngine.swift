@@ -7596,7 +7596,10 @@ public actor RuntimeJobEngine {
       Data(components.joined(separator: "\n").utf8))
   }
 
-  private static func stepSetDigest(
+  /// The exact step-set digest the runtime pins into a RuntimeCapability's
+  /// correlation and the review presents (CHG-2026-066): one implementation,
+  /// authorization and presentation can never disagree.
+  static func stepSetDigest(
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) -> String {
@@ -8076,7 +8079,11 @@ public actor RuntimeJobEngine {
           "\(step.stepID) has no resolved flash artifact")
       }
       arguments = [
-        "providerOperationId": .string("rockusb.wl-write"),
+        // Renamed from the vendor command name "rockusb.wl-write" with
+        // CHG-2026-066: the write is the ArkForge lane's native WRITE_LBA
+        // over the mapped set. Journalled label only — no test or reader
+        // pins the old value, and each job's plan digest is its own.
+        "providerOperationId": .string("arkforge.write-partitions"),
         "partition": .string("dayu200_mapped_set"),
         "imageArtifactId": .string(artifact.artifactID),
         "imageSha256": .string(artifact.sha256),

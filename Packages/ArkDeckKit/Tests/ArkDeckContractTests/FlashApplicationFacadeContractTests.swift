@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckCore
 @testable import ArkDeckWorkflows
 
 final class FlashApplicationFacadeContractTests: XCTestCase {
@@ -321,8 +322,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
 
   func testPlanPresentationPreservesEveryTypedStepAndMarksPlanOnlyAsNotExecuted() throws {
     let profile = RockchipFlashProfile.dayu200
-    let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
-      mode: .planOnly, archiveValidation: .valid, planNonce: "ui-test")
+    let review = try XCTUnwrap(FlashPlanPresentationBuilder.reviewSteps(mode: .planOnly))
     let target = FlashTargetPresentation(
       id: "target-dayu200-a",
       bindingRevision: 4,
@@ -330,19 +330,21 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       adoptedAtUTC: "2026-08-06T08:00:00Z")
 
     let presentation = FlashPlanPresentationBuilder.presentation(
-      plan: plan,
+      mode: .planOnly,
       profile: profile,
       target: target,
       imageFileName: "dayu200_img.tar.gz")
 
-    XCTAssertEqual(presentation.steps.count, plan.steps.count)
-    XCTAssertEqual(presentation.steps.map(\.id), plan.steps.map(\.id))
+    XCTAssertEqual(presentation.steps.count, review.steps.count)
+    XCTAssertEqual(presentation.steps.map(\.id), review.steps.map(\.id))
     XCTAssertTrue(presentation.steps.allSatisfy { $0.disposition == .planned })
     XCTAssertTrue(presentation.steps.contains { $0.effect == .destructive })
     XCTAssertEqual(presentation.target, target)
     XCTAssertEqual(presentation.profileReference, profile.catalogReference)
-    XCTAssertEqual(presentation.archiveSHA256, plan.archiveSHA256)
-    XCTAssertEqual(presentation.planDigestSHA256, plan.planDigestSHA256)
+    XCTAssertEqual(presentation.archiveSHA256, profile.archiveSHA256)
+    // No fabricated digest before submission (CHG-2026-066): the engine
+    // materializes the executed plan at job.submit.
+    XCTAssertNil(presentation.planDigestSHA256)
     XCTAssertEqual(
       presentation.dataImpact,
       [
@@ -375,50 +377,68 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   }
 
   func testExecutePresentationRemainsReviewOnlyUntilRuntimeSubmission() throws {
-    let profile = RockchipFlashProfile.dayu200
-    let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
-      mode: .execute, archiveValidation: .valid, planNonce: "ui-test")
     let presentation = FlashPlanPresentationBuilder.presentation(
-      plan: plan,
-      profile: profile,
+      mode: .execute,
+      profile: RockchipFlashProfile.dayu200,
       target: nil,
       imageFileName: "dayu200_img.tar.gz")
 
     XCTAssertFalse(presentation.steps.isEmpty)
     XCTAssertTrue(presentation.steps.allSatisfy { $0.disposition == .executionLocked })
+    XCTAssertNil(presentation.planDigestSHA256)
   }
 
-  func testExecuteReviewUsesTheRuntimeCanonicalPlan() throws {
-    let provider = RockchipRockUSBFlashProvider(
-      profile: RockchipFlashProfile.dayu200)
-    let reviewedPlan = try FlashPlanPresentationBuilder.materializePlan(
-      provider: provider,
-      mode: .execute,
-      archiveValidation: .valid)
-    let campaignPlan = try provider.makePlan(
-      mode: .execute,
-      archiveValidation: .valid)
+  /// CHG-2026-066: the review presents the runtime's own facts — the step
+  /// sequence is the catalog descriptor filtered by the engine's selection
+  /// rule, and the step-set digest is the engine's own algorithm, i.e. the
+  /// value the RuntimeCapability correlation pins.
+  func testExecuteReviewPresentsTheEnginesOwnStepFacts() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+    let review = try XCTUnwrap(FlashPlanPresentationBuilder.reviewSteps(mode: .execute))
+    let selected = descriptor.steps.filter {
+      RuntimeJobEngine.stepIsRequested(
+        $0, descriptor: descriptor,
+        inputs: FlashPlanPresentationBuilder.reviewSelectionInputs)
+    }
 
-    XCTAssertEqual(reviewedPlan.planDigestSHA256, campaignPlan.planDigestSHA256)
-    XCTAssertEqual(reviewedPlan.stepSetDigestSHA256, campaignPlan.stepSetDigestSHA256)
-    XCTAssertEqual(reviewedPlan.steps.map(\.id), campaignPlan.steps.map(\.id))
+    XCTAssertEqual(review.steps.map(\.id), selected.map(\.stepID))
+    XCTAssertEqual(review.steps.map(\.kind), selected.map(\.kind.rawValue))
+    XCTAssertEqual(
+      review.steps.map(\.effect.rawValue), selected.map(\.effect.rawValue))
+    XCTAssertEqual(
+      review.steps.map(\.cancellation.rawValue),
+      selected.map(\.cancellation.rawValue))
+    XCTAssertEqual(
+      review.stepSetDigestSHA256,
+      RuntimeJobEngine.stepSetDigest(
+        descriptor: descriptor,
+        inputs: FlashPlanPresentationBuilder.reviewSelectionInputs))
+    // The exact value the bench job records pinned into the RuntimeCapability
+    // correlation for the default full-verification request (measured on
+    // job-a4b7d539… and job-b00e006a…, 2026-08-18/19). If the catalog
+    // legitimately evolves, re-pin this against a fresh job record — the
+    // point of the constant is that review and authorization move together.
+    XCTAssertEqual(
+      review.stepSetDigestSHA256,
+      "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12")
   }
 
-  func testPreviewModesCannotReuseExecutableStepIdentities() throws {
-    let provider = RockchipRockUSBFlashProvider(
-      profile: RockchipFlashProfile.dayu200)
-    let executePlan = try FlashPlanPresentationBuilder.materializePlan(
-      provider: provider,
-      mode: .execute,
-      archiveValidation: .valid)
-
+  func testAllReviewModesPresentTheSameCatalogStepIdentities() throws {
+    let execute = try XCTUnwrap(FlashPlanPresentationBuilder.reviewSteps(mode: .execute))
     for mode in [RockchipFlashExecutionMode.planOnly, .simulated] {
-      let preview = try FlashPlanPresentationBuilder.materializePlan(
-        provider: provider,
-        mode: mode,
-        archiveValidation: .valid)
-      XCTAssertNotEqual(preview.stepSetDigestSHA256, executePlan.stepSetDigestSHA256)
-      XCTAssertNotEqual(preview.steps.map(\.id), executePlan.steps.map(\.id))
+      let preview = try XCTUnwrap(FlashPlanPresentationBuilder.reviewSteps(mode: mode))
+      // There is one truth now: previews show the same catalog identities the
+      // engine will select, distinguished by disposition, not by fabricated
+      // nonce step ids (retired with the provider plan model).
+      XCTAssertEqual(preview.steps.map(\.id), execute.steps.map(\.id))
+      XCTAssertEqual(preview.stepSetDigestSHA256, execute.stepSetDigestSHA256)
+      XCTAssertNotEqual(
+        preview.steps.map(\.disposition), execute.steps.map(\.disposition))
+    }
+    for step in execute.steps {
+      XCTAssertFalse(step.id.hasPrefix("rk-"), step.id)
+      XCTAssertFalse(step.id.contains("wlx"), step.id)
     }
   }
 
@@ -472,12 +492,9 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   private func executePresentation(
     target: FlashTargetPresentation
   ) throws -> FlashExactPlanPresentation {
-    let profile = RockchipFlashProfile.dayu200
-    let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
-      mode: .execute, archiveValidation: .valid, planNonce: "ui-confirmation-test")
-    return FlashPlanPresentationBuilder.presentation(
-      plan: plan,
-      profile: profile,
+    FlashPlanPresentationBuilder.presentation(
+      mode: .execute,
+      profile: RockchipFlashProfile.dayu200,
       target: target,
       imageFileName: "dayu200_img.tar.gz")
   }

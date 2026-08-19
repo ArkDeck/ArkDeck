@@ -84,6 +84,7 @@
     "flash.plan.column.number": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"#"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"序号"}}}},
     "flash.plan.column.step": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Step"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"步骤"}}}},
     "flash.plan.digest": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Plan digest"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"计划摘要"}}}},
+    "flash.plan.digest.materializedAtSubmission": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Materialized by Runtime at submission (recorded on the job)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"提交时由 Runtime 物化（记录于任务）"}}}},
     "flash.plan.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No exact plan yet"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"尚未生成精确计划"}}}},
     "flash.plan.emptyDescription": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Choose an image bundle and target, then prepare the plan."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择镜像包和目标设备，然后生成计划。"}}}},
     "flash.plan.imageHash": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Image SHA-256"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"镜像 SHA-256"}}}},
