@@ -125,7 +125,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(source.contains("try activateApplication()"))
   }
 
-  func testDriverObservesExecuteModeAndUsesPointerForTheSwiftUIFileButton() throws {
+  func testDriverObservesWorkspaceSelectionAndUsesPointerForTheSwiftUIFileButton() throws {
     let source = try driverSource()
     XCTAssertTrue(source.contains("case .waitForSelected:"))
     XCTAssertTrue(source.contains("try driver.waitForSelected(action.identifier!"))
@@ -149,6 +149,30 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertFalse(source.contains("published UI repair envelope"))
     XCTAssertFalse(source.contains("git commit"))
     XCTAssertFalse(source.contains("gh pr"))
+  }
+
+  func testDefaultCandidateTracksTheCurrentWorkspaceFlow() throws {
+    let candidateURL = repositoryRoot().appending(
+      path: "scripts/rockchip_component/manual_ui_flash_candidate.json")
+    let object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
+    let actions = try XCTUnwrap(object["actions"] as? [[String: Any]])
+    let identifiers = actions.compactMap { $0["identifier"] as? String }
+
+    XCTAssertEqual(
+      identifiers,
+      [
+        "app.navigation.flash",
+        "flash.workspace.imageAction",
+        "flash.workspace.details",
+      ])
+    XCTAssertFalse(identifiers.contains("flash.mode"))
+    XCTAssertFalse(identifiers.contains("flash.mode.execute"))
+    XCTAssertFalse(identifiers.contains("flash.plan.prepare"))
+    XCTAssertEqual(
+      actions.first(where: { $0["identifier"] as? String == "flash.workspace.details" })?["delivery"]
+        as? String,
+      "accessibilityPress")
   }
 
   func testStandaloneValidatorAcceptsNovelCompositionAndRejectsAuthorityField() throws {
@@ -279,6 +303,8 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(source.contains("try session?.markProductVerified()"))
 
     let appSource = try repositorySource("ArkDeckApp/Features/Flash/FlashWorkspaceView.swift")
+    XCTAssertTrue(
+      appSource.contains(#".accessibilityIdentifier("flash.execute.jobId")"#))
     XCTAssertTrue(
       appSource.contains(
         #".accessibilityIdentifier("\(identifier).\(matches ? "match" : "mismatch")")"#))
