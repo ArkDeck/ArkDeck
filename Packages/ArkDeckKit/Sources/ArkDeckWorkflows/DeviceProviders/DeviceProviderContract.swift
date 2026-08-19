@@ -1398,10 +1398,6 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
   package let expectedIdentitySHA256: String
   package let providerExecutableSHA256: String
   package let actionSHA256: String
-  /// Candidate timing controls copied only from an admitted Evolution
-  /// reservation. Request inputs cannot construct this descriptor.
-  package let executionTuning: AgentAuthorityCampaignExecutionTuning?
-
   package init(
     identifier: String,
     jobID: String,
@@ -1411,8 +1407,7 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
     connectKey: String,
     expectedIdentitySHA256: String,
     providerExecutableSHA256: String,
-    actionSHA256: String,
-    executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
+    actionSHA256: String
   ) {
     self.identifier = identifier
     self.jobID = jobID
@@ -1423,7 +1418,6 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
     self.expectedIdentitySHA256 = expectedIdentitySHA256
     self.providerExecutableSHA256 = providerExecutableSHA256
     self.actionSHA256 = actionSHA256
-    self.executionTuning = executionTuning
   }
 }
 
@@ -1700,9 +1694,6 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   /// Empty for every single-package request, which is what keeps those
   /// plans byte-identical (CHG-2026-049 r4).
   package let additionalInputArtifacts: [ProviderResolvedInputArtifact]
-  /// Present only when the Runtime re-read an admitted campaign reservation
-  /// and found its broker-recorded bounded tuning controls.
-  package let campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning?
   /// The build version declared by the image bundle this job will write, read
   /// from the bundle's system image when the Runtime resolved it.
   ///
@@ -1726,7 +1717,6 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     nowUTC: String,
     resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
     additionalInputArtifacts: [ProviderResolvedInputArtifact] = [],
-    campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning? = nil,
     expectedRuntimeBuildVersion: String? = nil
   ) {
     self.jobID = jobID
@@ -1741,7 +1731,6 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     self.nowUTC = nowUTC
     self.resolvedInputArtifact = resolvedInputArtifact
     self.additionalInputArtifacts = additionalInputArtifacts
-    self.campaignExecutionTuning = campaignExecutionTuning
     self.expectedRuntimeBuildVersion = expectedRuntimeBuildVersion
   }
 }

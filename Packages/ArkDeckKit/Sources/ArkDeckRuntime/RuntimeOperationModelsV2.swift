@@ -109,10 +109,8 @@ public enum RuntimeRequestedOutput: String, Codable, Sendable, CaseIterable {
   case hardwareEvidence
 }
 
-/// Names the bounded-campaign usage reservation carrying this request's E2
-/// authority. The reservation was made by the campaign admission service
-/// (nine-gate check, merged code) and embeds the full confirmation pins the
-/// engine re-verifies; it is not a capability and never mints one.
+/// Historical wire field retained only so persisted requests can be decoded
+/// and exported. Runtime rejects any new request that contains it.
 public struct RuntimeCampaignReservationReference: Equatable, Sendable, Codable {
   public let reservationID: String
 
@@ -120,7 +118,7 @@ public struct RuntimeCampaignReservationReference: Equatable, Sendable, Codable 
     case reservationID = "reservationId"
   }
 
-  public init(reservationID: String) {
+  init(reservationID: String) {
     self.reservationID = reservationID
   }
 
@@ -207,14 +205,9 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   public let inputs: [String: JSONValue]
   public let requestedOutputs: [RuntimeRequestedOutput]
   public let authorization: RuntimeCapabilityReference?
-  /// Campaign-lane E2 authority: names an OPEN usage-ledger reservation the
-  /// bounded-campaign admission service made after its own nine-gate check.
-  /// The engine re-verifies the reservation's embedded confirmation pins
-  /// (target identity, archive digest, validity window, ordinal budget) and
-  /// closes the reservation with the job's terminal. Mutually exclusive
-  /// with `authorization`: a request carries exactly one E2 authority kind.
-  /// Schema 2.x minor addition — old decoders ignore it, old wire decodes
-  /// with it absent.
+  /// Decode/export-only schema 2.x field. New callers cannot construct it
+  /// through the typed initializer, and Runtime refuses decoded requests that
+  /// carry it before default read-only or capability admission.
   public let campaignReservation: RuntimeCampaignReservationReference?
   public let clientContext: RuntimeClientContext?
 
@@ -240,7 +233,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     inputs: [String: JSONValue] = [:],
     requestedOutputs: [RuntimeRequestedOutput] = [.derivedArtifacts],
     authorization: RuntimeCapabilityReference? = nil,
-    campaignReservation: RuntimeCampaignReservationReference? = nil,
     clientContext: RuntimeClientContext? = nil
   ) throws {
     self.requestID = requestID
@@ -250,7 +242,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     self.inputs = inputs
     self.requestedOutputs = requestedOutputs
     self.authorization = authorization
-    self.campaignReservation = campaignReservation
+    self.campaignReservation = nil
     self.clientContext = clientContext
     try validate()
   }

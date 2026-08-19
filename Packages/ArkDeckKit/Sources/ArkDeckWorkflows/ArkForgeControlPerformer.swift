@@ -279,8 +279,7 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       bindingRevision: binding.bindingRevision,
       connectKey: binding.connectKey,
       expectedIdentitySHA256: binding.stableIdentitySHA256,
-      providerExecutableSHA256: binding.providerIdentity.sha256,
-      executionTuning: nil)
+      providerExecutableSHA256: binding.providerIdentity.sha256)
     return try await host.execute(
       action: action, descriptor: descriptor,
       providerExecutable: binding.providerIdentity)

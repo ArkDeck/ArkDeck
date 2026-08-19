@@ -3198,8 +3198,7 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
           bindingRevision: bindingRevision,
           connectKey: connectKey,
           expectedIdentitySHA256: expectedIdentitySHA256,
-          providerExecutableSHA256: providerExecutableSHA256,
-          executionTuning: context.campaignExecutionTuning)))
+          providerExecutableSHA256: providerExecutableSHA256)))
   }
 
   private func hdcReconnectExpectation(

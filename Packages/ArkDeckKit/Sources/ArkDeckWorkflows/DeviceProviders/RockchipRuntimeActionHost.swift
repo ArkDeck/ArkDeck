@@ -20,37 +20,6 @@ struct RockchipRuntimeActionExecutionResult: Sendable {
   let subprocesses: [ProviderSubprocessReceipt]
 }
 
-/// Parses the primary/backup GPT identity fields used by the fail-closed
-/// native readback regression suite. The production readback is performed by
-/// ArkForge; ArkDeck retains this pure parser as a compatibility oracle only.
-package struct RockchipGPTHeader: Equatable, Sendable {
-  package static let signature = Array("EFI PART".utf8)
-
-  package let myLBA: Int64
-  package let alternateLBA: Int64
-  package let firstUsableLBA: Int64
-  package let lastUsableLBA: Int64
-
-  package static func parse(_ sector: Data) -> RockchipGPTHeader? {
-    let bytes = [UInt8](sector)
-    guard bytes.count >= 92, Array(bytes[0..<8]) == signature else { return nil }
-    func value(at offset: Int) -> Int64 {
-      var raw: UInt64 = 0
-      for index in 0..<8 {
-        raw |= UInt64(bytes[offset + index]) << (8 * UInt64(index))
-      }
-      return raw <= UInt64(Int64.max) ? Int64(raw) : -1
-    }
-    let header = Self(
-      myLBA: value(at: 24), alternateLBA: value(at: 32),
-      firstUsableLBA: value(at: 40), lastUsableLBA: value(at: 48))
-    guard header.myLBA >= 0, header.alternateLBA > 0,
-      header.firstUsableLBA >= 0, header.lastUsableLBA >= header.firstUsableLBA
-    else { return nil }
-    return header
-  }
-}
-
 protocol RockchipRuntimeActionExecuting: Sendable {
   func unavailableReason() -> String?
   func execute(
@@ -380,10 +349,6 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     actionDirectory: URL,
     progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
-    // A non-nil value was persisted by the protected broker in the admitted
-    // campaign reservation, then re-read by the Runtime while materializing
-    // this descriptor. It is never sourced from caller inputs.
-    let tuning = descriptor.executionTuning
     switch action {
     case .enterLoader(let connectKey):
       // A fresh exact Loader readback is already the postcondition of this
@@ -419,7 +384,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           executable: hdc,
           arguments: RockchipHDCIntegrationProfile.enterLoaderArguments(
             connectKey: connectKey),
-          timeoutSeconds: tuning?.hdcCommandTimeoutSeconds ?? 20,
+          timeoutSeconds: 20,
           outputByteBudget: 64 * 1024,
           criticalNonInterruptible: false)
         hdcReceipt = receipt
@@ -443,9 +408,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       do {
         let loader = try await waitForLoader(
           stableIdentitySHA256: descriptor.expectedIdentitySHA256,
-          timeoutSeconds: tuning?.loaderDiscoveryTimeoutSeconds
-            ?? enterLoaderReadbackTimeoutSeconds,
-          pollIntervalMilliseconds: tuning?.loaderPollIntervalMilliseconds ?? 1_000,
+          timeoutSeconds: enterLoaderReadbackTimeoutSeconds,
+          pollIntervalMilliseconds: 1_000,
           requestID: "\(descriptor.jobID)-\(descriptor.stepID)-post-transition")
         let receipts = hdcReceipt.map { [$0] } ?? []
         return result(
@@ -494,16 +458,16 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     case .waitForHDCDisconnect(let connectKey):
       let receipts = try await waitForHDC(
         connectKey: connectKey, expectedConnected: false,
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
-        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        timeoutSeconds: 15,
+        commandTimeoutSeconds: 15)
       return result(
         summary: ["hdcState": "disconnected"], receipts: receipts)
 
     case .waitForLoader(let stableIdentitySHA256):
       let identity = try await waitForLoader(
         stableIdentitySHA256: stableIdentitySHA256,
-        timeoutSeconds: tuning?.loaderDiscoveryTimeoutSeconds ?? 45,
-        pollIntervalMilliseconds: tuning?.loaderPollIntervalMilliseconds ?? 1_000,
+        timeoutSeconds: 45,
+        pollIntervalMilliseconds: 1_000,
         requestID: "\(descriptor.jobID)-\(descriptor.stepID)-wait-loader")
       return result(
         summary: [
@@ -537,7 +501,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     case .waitForHDCReconnect(let connectKey):
       let receipts = try await waitForHDC(
         connectKey: connectKey, expectedConnected: true, timeoutSeconds: 120,
-        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        commandTimeoutSeconds: 15)
       return result(
         summary: ["hdcState": "connected"], receipts: receipts)
 
@@ -553,7 +517,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       let (identity, receipts) = try await waitForBoundHDC(
         expectation: expectation,
         timeoutSeconds: 600,
-        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        commandTimeoutSeconds: 15)
       return result(
         summary: [
           "hdcState": "connected",
@@ -588,7 +552,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       let (identity, observationReceipts) = try await waitForBoundHDC(
         expectation: expectation,
         timeoutSeconds: 600,
-        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        commandTimeoutSeconds: 15)
       let hdc = try resolveHDC()
       let modelReceipt = try await run(
         executable: hdc,
@@ -596,7 +560,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "-t", identity.connectKey, "shell", "param", "get",
           HDCAllowlistedProperty.productModel.rawValue,
         ],
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        timeoutSeconds: 15,
         budget: 64 * 1024)
       let versionReceipt = try await run(
         executable: hdc,
@@ -604,7 +568,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "-t", identity.connectKey, "shell", "param", "get",
           HDCAllowlistedProperty.fullBuildVersion.rawValue,
         ],
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        timeoutSeconds: 15,
         budget: 64 * 1024)
       let model = try property(
         modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)

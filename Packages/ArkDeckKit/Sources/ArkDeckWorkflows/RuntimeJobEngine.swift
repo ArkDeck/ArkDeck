@@ -590,11 +590,11 @@ public enum RuntimeDispatchFailure: Error, Equatable, Sendable {
   /// The dispatcher cannot say whether the external effect happened.
   case outcomeUnknown(String)
   /// Exact provider readback proved that the attempted external effect did
-  /// not happen. This remains a failed step, but its durable intent is safe
-  /// for a bounded campaign to retry after a fresh reservation/readback.
+  /// not happen. This remains a failed step; only current Runtime policy and
+  /// fresh facts may decide whether a later operation is safe.
   case confirmedNotExecuted(String)
   /// Same as `confirmedNotExecuted`, with a closed diagnostic that is safe to
-  /// expose through a job timeline to the evolution campaign.  It must never
+  /// expose through a job timeline to the operator. It must never
   /// contain raw subprocess output or device identity.
   case confirmedNotExecutedWithDiagnostic(
     String, diagnostic: RockchipFlashRuntimeDiagnostic)
@@ -1876,9 +1876,6 @@ public actor RuntimeJobEngine {
           resolvedFacts, record: jobs[jobID]?.record,
           providerID: descriptor.provider.rawValue)
       }
-      let campaignExecutionTuning = try executionTuning(
-        for: jobs[jobID]?.record.request
-      ).tuning
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
         targetID: targetID,
@@ -1891,7 +1888,6 @@ public actor RuntimeJobEngine {
         nowUTC: nowUTC(),
         resolvedInputArtifact: resolvedArtifact,
         additionalInputArtifacts: additionalArtifacts,
-        campaignExecutionTuning: campaignExecutionTuning,
         expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
           for: descriptor, artifact: resolvedArtifact,
           artifactLeaseID: flashArtifactLeaseID))
@@ -5006,9 +5002,9 @@ public actor RuntimeJobEngine {
             // The semantic code is what makes this a *proof* rather than just
             // a failure: `mutationIntentEvidence` recognizes a proven
             // non-execution by this code alone. Without it the dedicated
-            // readback established that a destructive step never ran, the
-            // usage terminal did not say so, and the campaign burned as
-            // `unsafePartial` anyway — the product throwing away the strongest
+            // readback established that a destructive step never ran, but a
+            // historical usage terminal could not carry that proof and stayed
+            // `unsafePartial` — the product throwing away the strongest
             // evidence it owns (TASK-AIN-020).
             semanticCode: Self.confirmedNotExecutedSemanticCode,
             schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
@@ -5912,7 +5908,9 @@ public actor RuntimeJobEngine {
       }
     }
     do {
-      let runtimeTuning = try executionTuning(for: request)
+      let runtimeDebugPermit = try RuntimeDebugAttemptPermitStore.loadExact(
+        stateDirectory: configuration.stateDirectory, request: request,
+        nowUTC: nowUTC())
       var materializedSteps: [MaterializedPlanStep] = []
       for step in selectedSteps {
         switch step.kind {
@@ -5943,7 +5941,6 @@ public actor RuntimeJobEngine {
           serverFacts: facts?.serverFacts ?? [:],
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
           additionalInputArtifacts: additionalResolved,
-          campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved,
             artifactLeaseID: resolvedArtifactLeaseID))
@@ -6090,7 +6087,6 @@ public actor RuntimeJobEngine {
           toolSHA256: facts.toolSHA256,
           serverFacts: facts.serverFacts,
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
-          campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved,
             artifactLeaseID: resolvedArtifactLeaseID))
@@ -6163,8 +6159,8 @@ public actor RuntimeJobEngine {
         stableTargetIdentitySHA256: stableIdentity,
         bindingRevision: bindingRevision,
         providerID: descriptor.provider.rawValue,
-        runtimeDebugInvocationID: runtimeTuning.debug?.invocationID,
-        runtimeDebugCandidateActionSHA256: runtimeTuning.debug?.candidateActionSHA256,
+        runtimeDebugInvocationID: runtimeDebugPermit?.invocationID,
+        runtimeDebugCandidateActionSHA256: runtimeDebugPermit?.candidateActionSHA256,
         steps: materializedSteps)
       let encoder = CanonicalJSONEncoders.canonical()
       let encoded = try encoder.encode(document)
@@ -6324,6 +6320,11 @@ public actor RuntimeJobEngine {
     materialized: MaterializedAdmission
   ) async throws -> PreparedAuthorization {
     let admittedAt = nowUTC()
+    if request.campaignReservation != nil {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "legacy campaign reservations are decode/export-only and cannot admit a new execution")
+    }
     if effect <= .readOnly {
       guard descriptor.authorization[effect] == .defaultReadOnly else {
         throw RuntimeJobEngineError.rejected(
@@ -6367,12 +6368,6 @@ public actor RuntimeJobEngine {
     let query = try authorizationQuery(
       request: request, descriptor: descriptor,
       effect: effect, materialized: materialized)
-
-    if request.campaignReservation != nil {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "legacy campaign reservations are decode/export-only and cannot admit a new execution")
-    }
 
     let recoveryAdmission: RuntimeCompleteOverwriteAdmissionResult
     if effect == .destructive {
@@ -6485,140 +6480,6 @@ public actor RuntimeJobEngine {
       .storeCorrupted, .ioFailure:
       return "unclassified"
     }
-  }
-
-  /// Re-verifies a campaign reservation's embedded confirmation pins against
-  /// this request's materialized facts. The reservation is the single-use
-  /// marker (one open reservation per target, ledger-enforced); the engine
-  /// never reserves here — the campaign admission service did, after its own
-  /// nine-gate check — and the engine closes it with the job's terminal.
-  private func validateCampaignReservation(
-    _ campaign: RuntimeCampaignReservationReference,
-    effect: WorkflowEffect,
-    descriptor: CatalogOperationDescriptor,
-    query: RuntimeCapabilityAuthorizationQuery,
-    admittedAtUTC: String
-  ) throws {
-    guard let ledger = agentUsageLedger else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign authority is unavailable in this runtime (no usage ledger)")
-    }
-    guard effect == .destructive else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "a campaign reservation only authorizes a destructive flash, not \(effect.rawValue)")
-    }
-    guard
-      descriptor.reference == RockchipEvolutionCampaignConfirmationAssertion.operationReference
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign confirmations pin \(RockchipEvolutionCampaignConfirmationAssertion.operationReference), "
-          + "not \(descriptor.reference)")
-    }
-    guard
-      let reservation = try ledger.load().reservations.first(where: {
-        $0.reservationID == campaign.reservationID
-      })
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign reservation \(campaign.reservationID) does not exist")
-    }
-    guard reservation.terminal == nil else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign reservation \(campaign.reservationID) is already terminal")
-    }
-    guard
-      case .evolutionCampaignConfirmation(
-        _, _, _, _, _, let targetStableIdentitySHA256, let bindingLineageRootRevision,
-        let confirmedAt, let validUntil, let maximumAttempts) = reservation.authorizationRef
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "reservation \(campaign.reservationID) does not carry a campaign confirmation")
-    }
-    guard let admitted = ISO8601Timestamps.parse(admittedAtUTC),
-      let windowStart = ISO8601Timestamps.parse(confirmedAt),
-      let windowEnd = ISO8601Timestamps.parse(validUntil),
-      admitted >= windowStart, admitted <= windowEnd
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign confirmation validity window refused \(admittedAtUTC)")
-    }
-    guard reservation.ordinal <= maximumAttempts else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign attempt ordinal \(reservation.ordinal) exceeds \(maximumAttempts)")
-    }
-    guard let identity = query.targetStableIdentitySHA256,
-      identity == targetStableIdentitySHA256
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "campaign confirmation pins a different stable device identity")
-    }
-    guard let bindingRevision = query.targetBindingRevision,
-      bindingRevision >= bindingLineageRootRevision
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "target binding revision precedes the campaign's lineage root")
-    }
-  }
-
-  private struct RuntimeExecutionTuningContext {
-    let tuning: AgentAuthorityCampaignExecutionTuning?
-    let debug: RuntimeDebugAttemptPermitRecord?
-  }
-
-  /// Resolves a protected Runtime-owned debug permit independently from the
-  /// historical campaign timing record. A candidate permit carries no
-  /// timing, plan or Provider controls and the provenance kinds cannot mix.
-  private func executionTuning(
-    for request: RuntimeOperationRequest?
-  ) throws -> RuntimeExecutionTuningContext {
-    guard let request else {
-      return RuntimeExecutionTuningContext(tuning: nil, debug: nil)
-    }
-    let debug = try RuntimeDebugAttemptPermitStore.loadExact(
-      stateDirectory: configuration.stateDirectory, request: request,
-      nowUTC: nowUTC())
-    let campaign = try campaignExecutionTuning(for: request)
-    guard debug == nil || campaign == nil else {
-      throw RuntimeDispatchFailure.failed(
-        "a Runtime debug attempt cannot carry historical campaign tuning")
-    }
-    return RuntimeExecutionTuningContext(tuning: campaign, debug: debug)
-  }
-
-  /// Reads only the timing controls that the protected historical campaign
-  /// broker copied into this request's already-admitted reservation. The
-  /// retired campaign CLI cannot create a new reservation.
-  private func campaignExecutionTuning(
-    for request: RuntimeOperationRequest?
-  ) throws -> AgentAuthorityCampaignExecutionTuning? {
-    guard let campaign = request?.campaignReservation else { return nil }
-    guard let ledger = agentUsageLedger else {
-      throw RuntimeDispatchFailure.failed(
-        "campaign timing is unavailable in this runtime (no usage ledger)")
-    }
-    guard
-      let reservation = try ledger.load().reservations.first(where: {
-        $0.reservationID == campaign.reservationID
-      }), reservation.terminal == nil,
-      case .evolutionCampaignConfirmation = reservation.authorizationRef
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "campaign timing reservation is absent, terminal, or not a campaign authority")
-    }
-    // Historical campaign reservations did not persist execution tuning.
-    // They retain the legacy fixed timing rather than gaining a caller-owned
-    // fallback, while every new broker reservation carries the typed value.
-    return reservation.campaignEvidenceProvenance?.executionTuning
   }
 
   /// Resolves the published Runtime policy into a durable capability envelope.
@@ -7214,98 +7075,11 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// Consume-time verification for the campaign lane: re-checks the open
-  /// reservation and every re-checkable confirmation pin against the freshly
-  /// re-established subject, then persists the admission evidence. No ledger
-  /// write happens here — the open reservation is the single-use marker and
-  /// the job's terminal closes it.
-  private func verifyCampaignReservationBeforeMutation(
-    _ campaign: RuntimeCampaignReservationReference,
-    runtime: inout JobRuntime,
-    jobID: String,
-    descriptor: CatalogOperationDescriptor,
-    effect: WorkflowEffect,
-    validatedFacts: ProviderFacts?
-  ) async throws {
-    guard let ledger = agentUsageLedger else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: campaign authority is unavailable in this runtime")
-    }
-    guard
-      let openReservation = try? ledger.load().reservations.first(where: {
-        $0.reservationID == campaign.reservationID
-      }), openReservation.terminal == nil
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: campaign reservation is absent or already terminal")
-    }
-    guard
-      case .evolutionCampaignConfirmation(
-        let campaignDigestSHA256, _, _, let archiveDigestSHA256,
-        _, let targetStableIdentitySHA256, _, let confirmedAt, let validUntil, _) =
-        openReservation.authorizationRef,
-      let campaignProvenance = openReservation.campaignEvidenceProvenance
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: reservation does not carry a campaign confirmation")
-    }
-    let consumeAt = nowUTC()
-    guard let moment = ISO8601Timestamps.parse(consumeAt),
-      let windowStart = ISO8601Timestamps.parse(confirmedAt),
-      let windowEnd = ISO8601Timestamps.parse(validUntil),
-      moment >= windowStart, moment <= windowEnd
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: campaign confirmation validity window refused the mutation")
-    }
-    // The subject is the freshly re-proved one, never the admission-time
-    // snapshot.
-    guard let freshIdentity = validatedFacts?.deviceIdentitySHA256,
-      freshIdentity == targetStableIdentitySHA256
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: fresh device identity drifted from the campaign pin")
-    }
-    guard let resolved = try await resolvedInputArtifact(jobID: jobID),
-      resolved.sha256 == archiveDigestSHA256
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: leased archive digest drifted from the campaign pin")
-    }
-    runtime = try refreshedRuntimeAtCancellationSafeBoundary(
-      jobID: jobID,
-      reason: "client-cancel after campaign Artifact lease resolution")
-    guard let planDigest = runtime.record.materializedPlanDigest else {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: campaign mutation has no materialized plan digest")
-    }
-    let correlation = RuntimeCampaignEvidenceCorrelation(
-      campaignID: "ECAMP-\(campaignDigestSHA256.prefix(24).uppercased())",
-      attemptID: openReservation.reservationID,
-      attemptOrdinal: openReservation.ordinal,
-      planDigestSHA256: planDigest,
-      targetBindingDigestSHA256: openReservation.targetDigestSHA256,
-      candidateDigestSHA256: campaignProvenance.candidateDigestSHA256,
-      historicalReviewDigestSHA256: campaignProvenance.reviewDigestSHA256,
-      brokerDigestSHA256: campaignProvenance.brokerDigestSHA256)
-    runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
-      kind: .evolutionCampaignConfirmation,
-      reference: campaign.reservationID,
-      admittedAtUTC: consumeAt,
-      validUntilUTC: validUntil,
-      consumptionFingerprintSHA256: planDigest,
-      campaignCorrelation: correlation)
-    runtime.record.timeline.append(
-      "campaign reservation verified before first mutation")
-    try persistRuntimeRecord(runtime.record)
-    jobs[jobID] = runtime
-  }
-
-  /// Closes the campaign reservation with the job's terminal — the write the
-  /// campaign executor would have made, carrying the mutating intents this
-  /// engine journaled. Write-once with racer grace: an existing terminal
-  /// (recovery replay, concurrent closer) stands.
-  private func recordCampaignOutcome(
+  /// Completes terminal bookkeeping for a campaign reservation persisted by
+  /// an older release. New requests carrying these references are rejected
+  /// before admission and cannot reach dispatch. Write-once with racer grace:
+  /// an existing terminal from recovery or a concurrent closer stands.
+  private func closeHistoricalCampaignReservation(
     for record: RuntimeJobRecord,
     outcome: RuntimeCapabilityUseOutcome,
     state: String
@@ -7341,16 +7115,16 @@ public actor RuntimeJobEngine {
       }
       guard existing?.terminal != nil else {
         throw RuntimeJobEngineError.internalFailure(
-          "campaign terminal race left no terminal on \(evidence.reference)")
+          "historical reservation race left no terminal on \(evidence.reference)")
       }
     } catch let error as AuthorizationUsageLedgerError {
       throw RuntimeJobEngineError.internalFailure(
-        "campaign authority lineage could not become durable: \(error)")
+        "historical reservation lineage could not become durable: \(error)")
     }
   }
 
-  /// The mutating intents this job durably journaled — what the campaign
-  /// terminal must carry.
+  /// The mutating intents this job durably journaled — what a historical
+  /// reservation terminal must carry.
   ///
   /// Three resolutions per intent: journaled at all (`all`), proven not to
   /// have happened (`confirmedNotExecuted`), and completed with its own
@@ -7369,7 +7143,7 @@ public actor RuntimeJobEngine {
       replay = try DurableJournalRecovery.inspect(url: journalURL)
     } catch {
       throw RuntimeJobEngineError.internalFailure(
-        "campaign mutation journal is unavailable for \(jobID): \(error)")
+        "historical reservation journal is unavailable for \(jobID): \(error)")
     }
     var identifiers: [String] = []
     var stepIDByIntent: [String: String] = [:]
@@ -7411,7 +7185,8 @@ public actor RuntimeJobEngine {
     state: String
   ) async throws {
     if record.admissionEvidence?.kind == .evolutionCampaignConfirmation {
-      try await recordCampaignOutcome(for: record, outcome: outcome, state: state)
+      try await closeHistoricalCampaignReservation(
+        for: record, outcome: outcome, state: state)
       return
     }
     guard let evidence = record.admissionEvidence,

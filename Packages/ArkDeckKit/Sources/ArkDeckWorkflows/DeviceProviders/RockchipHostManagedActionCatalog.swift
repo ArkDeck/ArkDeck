@@ -59,8 +59,7 @@ package enum RockchipHostManagedActionCatalog {
     bindingRevision: Int,
     connectKey: String,
     expectedIdentitySHA256: String,
-    providerExecutableSHA256: String,
-    executionTuning: AgentAuthorityCampaignExecutionTuning?
+    providerExecutableSHA256: String
   ) throws -> HostManagedProcessDescriptor {
     HostManagedProcessDescriptor(
       identifier: identifier(for: action),
@@ -71,7 +70,6 @@ package enum RockchipHostManagedActionCatalog {
       connectKey: connectKey,
       expectedIdentitySHA256: expectedIdentitySHA256,
       providerExecutableSHA256: providerExecutableSHA256,
-      actionSHA256: try actionSHA256(of: .rockchip(action)),
-      executionTuning: executionTuning)
+      actionSHA256: try actionSHA256(of: .rockchip(action)))
   }
 }

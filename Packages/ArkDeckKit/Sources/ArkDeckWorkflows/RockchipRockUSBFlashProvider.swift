@@ -6,11 +6,10 @@ import Foundation
 // Typed RockUSB Provider for the DAYU200 forward-flash path. The published
 // plan enters Loader, verifies the observed partition table, writes and reads
 // back every mapped partition, resets, then verifies the bound postflight.
-// This Provider never dispatches a device command itself: it produces typed plans,
-// prerequisite/authorization verdicts, the GJ-4 manual recovery fallback and
-// honest outcome assessments. Runtime E2 dispatch, after the protected Runtime issues and
-// durably reserves an exact RuntimeCapability, belongs exclusively to the merged broker;
-// this Provider remains incapable of direct dispatch (POL-AGENT-002).
+// This Provider never dispatches a device command itself: it produces typed
+// plans, prerequisite verdicts and honest outcome assessments. Dispatch after
+// the protected Runtime durably reserves an exact RuntimeCapability belongs
+// exclusively to the native ArkForge lane (POL-AGENT-002).
 
 public enum RockchipFlashProviderError: Error, Equatable, Sendable {
   case archiveNotValidated([RockchipArchiveViolation])
