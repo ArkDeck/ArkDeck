@@ -63,5 +63,5 @@
 
 | GJ | 本 change 前 | 本 change 后 |
 | --- | --- | --- |
-| GJ-5 | `REAL_DEVICE_PASS`（旧判据：内嵌宿主，2026-08-01/05/06 evidence，历史记录不改写） | 判据重述为外部 agent 驱动；`IMPLEMENTING` 直至 AND-002 以新判据取得 `REAL_DEVICE_PASS` |
+| GJ-5 | `REAL_DEVICE_PASS`（旧判据：内嵌宿主，2026-08-01/05/06 evidence，历史记录不改写） | **`REAL_DEVICE_PASS`（重述判据，2026-08-19）**：headless 外部 agent 一次会话闭合含修复腿闭环，`task.*` 0、循环内人工 0；evidence = `evidence/runs/TASK-AND-002/run-r2.md`（AND-AC-4/5/6 逐条映射见该文件末节；AND-AC-1..3 已随 TASK-AND-001 实现 PR #1382 取证） |
 | GJ-1—GJ-4 | 不变 | 不变（AND-AC-1 保护 GJ-1 crash-signature 链；AND-AC-3 保护 GJ-4 campaign lane） |

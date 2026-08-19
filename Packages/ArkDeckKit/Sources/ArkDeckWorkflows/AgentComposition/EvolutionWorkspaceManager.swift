@@ -775,10 +775,14 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
       if relative == ".git", values.isDirectory != true { continue }
       if values.isSymbolicLink == true {
         let target = try FileManager.default.destinationOfSymbolicLink(atPath: entry.path)
-        guard !target.hasPrefix("/") else {
-          throw EvolutionWorkspaceError.unsafeSourceEntry(relative)
-        }
-        let resolvedTarget = entry.deletingLastPathComponent().appending(path: target)
+        // Absolute and relative targets are admitted by one criterion: the
+        // resolved destination must stay inside the source tree. An admitted
+        // absolute target is rewritten to a relative one when the link is
+        // recreated below, so the copy never addresses the primary tree.
+        let resolvedTarget =
+          target.hasPrefix("/")
+          ? URL(filePath: target)
+          : entry.deletingLastPathComponent().appending(path: target)
         let resolvedPath = resolvedTarget.resolvingSymlinksInPath().standardizedFileURL.path
         guard resolvedPath == sourcePath || resolvedPath.hasPrefix(sourcePath + "/") else {
           throw EvolutionWorkspaceError.unsafeSourceEntry(relative)
@@ -791,8 +795,20 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
           attributes: [.posixPermissions: 0o700])
       } else if values.isSymbolicLink == true {
         let target = try FileManager.default.destinationOfSymbolicLink(atPath: entry.path)
+        let destinationTarget: String
+        if target.hasPrefix("/") {
+          let resolvedPath = URL(filePath: target)
+            .resolvingSymlinksInPath().standardizedFileURL.path
+          let treeRelativeTarget =
+            resolvedPath == sourcePath
+            ? "" : String(resolvedPath.dropFirst(sourcePath.count + 1))
+          destinationTarget = Self.relativeLinkTarget(
+            fromLinkAt: relative, toTreeRelativeTarget: treeRelativeTarget)
+        } else {
+          destinationTarget = target
+        }
         try FileManager.default.createSymbolicLink(
-          atPath: output.path, withDestinationPath: target)
+          atPath: output.path, withDestinationPath: destinationTarget)
       } else if values.isRegularFile == true {
         let copiedBytes = try copyBoundedRegularFile(
           from: entry, to: output, maximumBytes: maximumFileBytes)
@@ -808,6 +824,24 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
     guard !enumerationFailed else {
       throw EvolutionWorkspaceError.unsafeSourceEntry("enumerationFailed")
     }
+  }
+
+  /// Relative link target from the directory holding `linkRelativePath` to
+  /// `treeRelativeTarget`; both inputs are tree-root-relative. The rewritten
+  /// link keeps the isolated copy self-contained wherever it lives on disk.
+  private static func relativeLinkTarget(
+    fromLinkAt linkRelativePath: String, toTreeRelativeTarget treeRelativeTarget: String
+  ) -> String {
+    let linkDirectory = linkRelativePath.split(separator: "/").dropLast()
+    let target = treeRelativeTarget.split(separator: "/")
+    var shared = 0
+    while shared < linkDirectory.count, shared < target.count,
+      linkDirectory[shared] == target[shared]
+    { shared += 1 }
+    let climbs = Array(repeating: "..", count: linkDirectory.count - shared)
+    let descents = target.dropFirst(shared).map(String.init)
+    let components = climbs + descents
+    return components.isEmpty ? "." : components.joined(separator: "/")
   }
 
   private static func copyBoundedRegularFile(

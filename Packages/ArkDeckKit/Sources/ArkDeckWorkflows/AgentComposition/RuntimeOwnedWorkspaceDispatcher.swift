@@ -58,6 +58,12 @@ package struct RuntimeOwnedWorkspaceDispatcher: RuntimeProcessDispatching {
     } catch is CancellationError {
       throw RuntimeDispatchFailure.outcomeUnknown(
         "workspace isolation cancelled before durable readback")
+    } catch let error as EvolutionWorkspaceError {
+      // Isolation refusals carry tree-relative entries, refs, revisions or
+      // reason tokens — never host paths — so the receipt can say what was
+      // refused instead of hiding the cause behind a bare string.
+      throw RuntimeDispatchFailure.failed(
+        "workspace isolation refused: \(String(describing: error))")
     } catch {
       throw RuntimeDispatchFailure.failed("workspace isolation refused")
     }

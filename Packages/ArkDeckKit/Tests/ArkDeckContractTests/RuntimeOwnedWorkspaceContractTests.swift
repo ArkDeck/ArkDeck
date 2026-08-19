@@ -217,6 +217,61 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
     XCTAssertEqual(try manager.inspect(intent), .absent)
   }
 
+  func testIsolationRefusalNamesTheOffendingEntryWithoutHostPaths() async throws {
+    let sourceRoot = try temporaryDirectory("refusal-source")
+    let externalRoot = try temporaryDirectory("refusal-external")
+    let stateRoot = try temporaryDirectory("refusal-state")
+    try FileManager.default.createDirectory(
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
+    try Data("secret\n".utf8).write(to: externalRoot.appending(path: "secret.txt"))
+    try FileManager.default.createSymbolicLink(
+      atPath: sourceRoot.appending(path: "Sources/external-link").path,
+      withDestinationPath: externalRoot.appending(path: "secret.txt").path)
+
+    let profile = try workspaceProfile(root: sourceRoot)
+    let sourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: profile.allowedFileGlobs)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: stateRoot.appending(path: "evolution"), profileRegistry: registry)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateRoot.appending(path: "artifacts"), nowUTC: { Self.fixedTimestamp })
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateRoot.appending(path: "capabilities"))
+    let provider = try workspaceProvider(
+      profile: profile, registry: registry, manager: manager, stateRoot: stateRoot,
+      suffix: "refusal")
+    let process = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: profile))
+    let dispatcher = RuntimeOwnedWorkspaceDispatcher(fallback: process, manager: manager)
+    let engine = try runtimeEngine(
+      stateRoot: stateRoot.appending(path: "refusal-engine"), provider: provider,
+      dispatcher: dispatcher, capabilityStore: capabilityStore,
+      artifactStore: artifactStore)
+
+    let prepare = try operationRequest(
+      id: "workspace.prepare-isolated-copy",
+      requestID: "request-refusal",
+      idempotencyKey: "idempotency-refusal",
+      inputs: [
+        "projectRef": .string(profile.projectRef),
+        "allowedFileGlobs": .array([.string("Sources/App.txt")]),
+        "expectedWorkspaceRevision": .string(sourceRevision),
+      ])
+    let accepted = try await engine.submit(try JSONEncoder().encode(prepare))
+    let outcome = try await engine.run(jobID: accepted.jobID)
+    let story = outcome.timeline.joined(separator: " | ")
+    XCTAssertEqual(outcome.state, "failed", story)
+    XCTAssertTrue(
+      story.contains("unsafeSourceEntry(\"Sources/external-link\")"),
+      "the refusal must name the offending tree-relative entry: \(story)")
+    XCTAssertFalse(
+      story.contains(sourceRoot.path) || story.contains(externalRoot.path),
+      "the refusal must stay free of host paths: \(story)")
+  }
+
   func testIsolationRevisionUsesTheCanonicalCopiedRootBehindAnAlias() async throws {
     let sourceRoot = try temporaryDirectory("canonical-source")
     try FileManager.default.createDirectory(
