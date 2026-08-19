@@ -49,6 +49,11 @@ protected `main` 后生效；合入前不得开始实现 PR。实现 PR 必须�
   - `openspec/contracts/workflow-step-registry.yaml`（新 step kind 的封闭
     注册表；单文件精确扩权，承 CHG-2026-061 TASK-RIW-001 同款先例——generator
     fail-closed 要求 step kind 先登记）
+  - `openspec/contracts/workflow-step.schema.json`（注册表的孪生契约：step
+    kind 词表 enum 与 per-kind 参数 schema 由 `WorkflowStepContractTests`
+    与 Core 枚举三方锁定，新 kind 必须同步三处；第一轮扩权只列了 yaml，
+    CI 全量套件暴露此文件后补——step 词表的完整落点 = Core 枚举 +
+    registry.yaml + schema.json，三处一体）
   - `openspec/changes/chg-2026-067-runtime-workspace-lifecycle/**`
 - Forbidden paths:
   - `openspec/constitution.md`、`openspec/specs/**`、
