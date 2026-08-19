@@ -58,6 +58,19 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   随 CHG-2026-020 verified 落地;后续设备/协议扩展按 REQ-FLASH-014 独立立项。
 - Reopen rule：更换/新增烧写协议或设备族、变更 pinned 镜像输入、或把本决策外推为
   超出 verified matrix 组合的支持声明,均须经 governance PR 重开/修订本条。
+- **★ 2026-08-19 修订（NRU-004,经本 governance PR 登记）**：协议决策本身不变
+  ——DAYU200 烧写通道仍是 RockUSB Loader 态、既有分区表写序、PD-002 九分区。
+  变的是**执行者**：CHG-2026-059 把执行归属移交 `arkforged`（ArkDeck 保留
+  authority）,CHG-2026-063（NRU-001..004）随后把 `arkforged` 的执行面从
+  「捆绑 rkdeveloptool 1.32 fixed-tool」换成**进程内原生 RockUSB**并移除
+  vendor 运行时。`ld`/`ppt`/`wlx`/`rd` 命令面词汇由七个语义动作承接,
+  「Write LBA (100%)」stdout 标记由 `writePayloadSha256` 写线摘要比对承接。
+  真机背书在原三次之外新增两次全量通过：2026-08-18 `job-a4b7d539…`
+  （fixed-tool 面首过）与 2026-08-19 `job-b00e006a…`（vendor 移除后原生面）,
+  见 hardware-matrix `EVD-AFA-DAYU200-20260818-001`/`EVD-NRU-DAYU200-20260819-001`
+  与 ArkForge 仓 `docs/evidence/runs/2026-08-19-dayu200-green-flash-and-native-cutover.md`。
+  Boundary 中「rkdeveloptool 1.32 的精确组合」相应读作历史组合；现行组合的
+  toolchain 身份是 `arkforged` 自身构建摘要（maturity 组合键随之更替）。
 - Required evidence（2026-07-18,来自 archived CHG-2026-003
   `package-classification.json.gaps[]`,全部 `unknown`）：
   - `GAP-DAYU200-PARTITION-SEMANTICS`:`parameter.txt` 分区表语义未解读（特征化
@@ -316,6 +329,15 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   signed E0/clean-host evidence 阻断 direct bundled route，均须重开本条。
 - Affected：ADR-0003、PLATFORM-MACOS、CHG-2026-026 handoff；
   `REQ-FLASH-001/004/005/015`、`REQ-JOB-005`、`REQ-UX-007`（零 Core delta）
+- **★ 2026-08-19 修订（NRU-004 + CHG-2026-065 提案,经本 governance PR 登记）**：
+  本条的 execute 目标形态已不再是现行实现。CHG-2026-063（NRU-004,2026-08-18）
+  把 macOS Rockchip 产品执行收敛为 `arkforged` 进程内原生 RockUSB——Loader
+  观察、分区读写/回读/复位与 `flash.dayu200` 全部不经捆绑组件（ADR-0003 已打
+  退役横幅,组件降为 operator 手动 Maskrom 救援件,agentd 零解析/零启动/零信任）。
+  随本 PR 提案的 **CHG-2026-065** 进一步提议把救援件从 App bundle、打包流水线
+  与 CI 中整体退役；该 change 实施合入后,本条 outcome
+  `selected:bundledRockchipComponent` 整体成为历史（含 metadata/SBOM/notice
+  义务——随二进制停止分发一并卸除）。
 
 ## DEC-012 DEC-011/ADR-0003 是否覆盖 agent 无人值守 CLI 的 Rockchip execute
 

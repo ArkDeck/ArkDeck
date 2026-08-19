@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "6.0.0",
+  "evidenceId": "EVD-AFA-DAYU200-20260818-001",
+  "executor": {
+    "kind": "agent",
+    "id": "af-v2-bench-agent (operator-supervised, clientContext ArkDeckApp.FlashWorkspace)",
+    "authority": {
+      "kind": "runtimeCapability",
+      "reference": "CAP-RT-POLICY-3E57846317E91A3101C146366890F9FE9A959A12-G14",
+      "reservationId": "flash-af-v2-50947344-e31e-4f95-83be-5de0751e3b3b",
+      "useOrdinal": 1,
+      "planDigest": "c8837ff0137b037e06b96129fce71951337b58d051a2bc5c006dfff015eebc5c",
+      "stepSetDigest": "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+      "targetBindingDigest": "aa4337a8657b6a12545d7cf1201091d41e1da3abbfd3cffecd003f932edb7c92",
+      "artifactDigest": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674"
+    }
+  },
+  "runtime": {
+    "operationReference": "flash.dayu200",
+    "jobId": "job-a4b7d539571082b1958ebaaf2c14bd2c",
+    "catalogDigest": "d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9e",
+    "terminalState": "succeeded",
+    "startedAt": "2026-08-18T06:39:00Z",
+    "finishedAt": "2026-08-18T06:48:49Z"
+  },
+  "targetConfirmation": {
+    "confirmedDeviceIdentitySHA256": "94a25a89c9c214dc9f8a0cf1b2cb3703a466e132a97fa015dfdbebfc65546f42",
+    "bindingRevision": 4,
+    "confirmedAt": "2026-08-18T06:48:49Z",
+    "method": "machineReadback"
+  },
+  "device": {
+    "model": "DAYU200 (RK3568)",
+    "serialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "firmware": "OpenHarmony-7.0.0.37",
+    "bindingRevision": 4
+  },
+  "toolchain": {
+    "hdcVersion": "3.2.0d",
+    "hdcSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "otherTools": [
+      {
+        "name": "arkforged (ArkForge lane daemon, fixed-tool era build; predates ArkForge NRU-001 a935798)",
+        "version": "installed 2026-08-18 11:18 CST",
+        "sha256": "aa7fe808938f335d1e54e2a801ac138f0a195ca761032d7d6dec221d389f0085"
+      },
+      {
+        "name": "rkdeveloptool (bundled hermetic build, bound and spawned only by arkforged's since-retired fixed-tool port)",
+        "version": "1.32",
+        "sha256": "231a05ef9aae17f9c8b8d3801b3ec2f4a4653291782021fe65517610aa11c79e"
+      }
+    ]
+  },
+  "transport": "usb",
+  "provider": "rockchip",
+  "effectLevel": "destructive",
+  "stepKinds": [
+    "verify-image-bundle",
+    "hash-images",
+    "enter-loader-mode",
+    "wait-loader-disconnect",
+    "wait-loader-reconnect",
+    "rebind-loader-identity",
+    "flash-partitions",
+    "verify-flash-readback",
+    "reboot-device",
+    "wait-for-hdc",
+    "rebind-and-verify-build",
+    "capture-post-flash-diagnostics",
+    "finalize-session"
+  ],
+  "acceptanceIds": ["AFA-AC-6", "AFA-AC-7", "AFA-AC-8"],
+  "executedAt": "2026-08-18T06:48:49Z",
+  "artifacts": [
+    {
+      "reference": "imported flash bundle, build OpenHarmony-7.0.0.37 (dayu200 images.tar.gz)",
+      "sha256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674"
+    },
+    {
+      "reference": "arkforged journal store/jobs/JOB-000001A013991062-0001.journal (bench Agentd store; hash-chained CBOR, 23 permits accepted and consumed)",
+      "sha256": "fa0d9d1a9de4d87eaa729f7e1ac04ab67d086e4e4f04e4c3412b922dd632b575"
+    },
+    {
+      "reference": "delegated postflight receipt rockchip-runtime/job-a4b7d539.../STEP-023-mc-16ba5a2f73f8-a0/receipt.json (verification=exact-published-profile-and-bound-hdc, firmware=OpenHarmony-7.0.0.37)",
+      "sha256": "9d8d684562204b75bec863bef0830b1558a070b1c97272e551e9d1ce22e72673"
+    }
+  ],
+  "deviations": [],
+  "notes": "First real DAYU200 full flash pass (chg-2026-059 AFA acceptance: nine partitions written and digest-compared, device reset by the lane's own plan, first-boot wait, postflight identity+build verification against the flashed bundle's declared build). Backend attribution: the daemon binary running this job predates ArkForge NRU-001 (native path landed 16:20 CST the same day), so execution went through the since-retired fixed-tool runtime; ArkDeck-side receipts carry providerExecutableSHA256=231a05ef... (the bundled build) as the pre-NRU-003 identity anchor. AFA-AC-6's wlx stdout markers were that backend's observation points. Readback evidence: uboot+resource Verified, boot_linux structurally Failed (partition straddles the measured read-window boundary), six TypedSkip. The native re-pass after vendor removal is EVD-NRU-DAYU200-20260819-001. Cross-repo record: ArkForge docs/evidence/runs/2026-08-19-dayu200-green-flash-and-native-cutover.md (run A) and ledger AD-033."
+}

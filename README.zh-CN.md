@@ -73,10 +73,20 @@ flowchart LR
     CLIENT["CLI / AI Client"] --> DAEMON
     CATALOG["操作目录"] --> RUNTIME["类型化运行时"]
     DAEMON --> RUNTIME
-    RUNTIME --> PROVIDERS["HDC / Rockchip Provider"]
+    RUNTIME --> PROVIDERS["HDC Provider"]
     PROVIDERS --> DEVICE["已绑定的 OpenHarmony 设备"]
+    RUNTIME -->|"计划与单次 permit"| LANE["arkforged — ArkForge 刷机 lane"]
+    LANE -->|"原生 RockUSB"| DEVICE
     RUNTIME --> STORE["持久任务与本地产物"]
 ```
+
+刷机执行在 `arkforged` 里——一个在姊妹仓库
+[ArkForge](https://github.com/ArkDeck/ArkForge) 构建、由 `arkdeck-agentd`
+拉起的身份绑定 daemon。这个拆分按 authority 划界：ArkDeck 决定谁、对哪台
+已绑定设备、做什么——经 daemon 物化计划、签发单次使用的 step permit、以
+观察回答 daemon 的设备控制请求，且从不移交 HDC 与 connect key；`arkforged`
+决定这份已授权计划如何落到设备上——RockUSB 协议在其进程内原生实现，产品
+路径不运行任何厂商刷机工具。
 
 详细模块边界见 [Architecture Rules](./docs/ArchitectureRules.md)。
 
@@ -112,7 +122,7 @@ python3 scripts/ci/plan.py \
 
 ArkDeckKit 测试使用 worktree 之外的稳定缓存。App 与 UI 测试改动会通过 `build-for-testing` 编译 Xcode scheme；这不会启动模拟器，也不构成真机验收。
 
-桌面应用方面，用 Xcode 打开 `ArkDeck.xcodeproj`，运行共享的 `ArkDeck` scheme。这足以进行应用开发和宿主侧测试。安装后台 Runtime 需要单独构建已签名的 helper；真正刷写 DAYU200 还需要经过评审的 Rockchip 组件和 Release 打包路径。
+桌面应用方面，用 Xcode 打开 `ArkDeck.xcodeproj`，运行共享的 `ArkDeck` scheme。这足以进行应用开发和宿主侧测试。安装后台 Runtime 需要单独构建已签名的 helper；真正刷写 DAYU200 还需要姊妹仓库 [ArkForge](https://github.com/ArkDeck/ArkForge) 出的已签名 `arkforged` daemon——刷机路径是该 daemon 内的原生 RockUSB，产品路径不涉及任何厂商刷机工具。
 
 ### 安装运行时
 

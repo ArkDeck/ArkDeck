@@ -11,6 +11,14 @@ platforms: [macos]
 
 # ArkDeck 保留 authority，把 Rockchip lowering 交给 ArkForge
 
+> **NRU-004 超越声明（2026-08-19）**：本提案中 ArkForge 侧「Rockchip
+> fixed-tool Provider / 封闭命令面 `ld`/`ppt`/`wlx`/`rl`/`rd`」与「`rd` 由
+> fixed-tool port 发出」的表述已随 CHG-2026-063 退役——执行面现为 `arkforged`
+> 内建原生 RockUSB。「设备写入次数 0」也已过时：2026-08-18 真机首过
+> （`EVD-AFA-DAYU200-20260818-001`），2026-08-19 原生面复验
+> （`EVD-NRU-DAYU200-20260819-001`）。本提案的 authority 分界本身不受影响，
+> 仍是现行事实。
+
 > 恰四类声明：本 change 不新增 published operation——`flash.dayu200` 保持原样。
 > 它改变的是该 operation 的**实现归属**：ArkDeck 继续做 authority 与 HDC owner，
 > 停止在自己进程里降解 Rockchip 命令与扇区地址，改为向 `arkforged` 签发 StepPermit。

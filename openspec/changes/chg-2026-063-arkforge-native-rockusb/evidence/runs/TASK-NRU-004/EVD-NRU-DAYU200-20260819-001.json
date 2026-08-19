@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "6.0.0",
+  "evidenceId": "EVD-NRU-DAYU200-20260819-001",
+  "executor": {
+    "kind": "human",
+    "id": "lvye (ArkDeckApp.FlashWorkspace UI; reservation prefix flash-ui)",
+    "authority": {
+      "kind": "runtimeCapability",
+      "reference": "CAP-RT-POLICY-C67A6163CE0C3B3F964A33F68B1D8B729E865B3F-G1",
+      "reservationId": "flash-ui-f776ab25-0b1b-4fa2-ac57-a8fa35d5df94",
+      "useOrdinal": 1,
+      "planDigest": "dde51435593d77027d5c111d00711c95b69bd2331ea6137fae2c025efe30c4cb",
+      "stepSetDigest": "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+      "targetBindingDigest": "aa4337a8657b6a12545d7cf1201091d41e1da3abbfd3cffecd003f932edb7c92",
+      "artifactDigest": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674"
+    }
+  },
+  "runtime": {
+    "operationReference": "flash.dayu200",
+    "jobId": "job-b00e006a1fbe9d6de388efab4138b9a2",
+    "catalogDigest": "d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9e",
+    "terminalState": "succeeded",
+    "startedAt": "2026-08-19T03:19:18Z",
+    "finishedAt": "2026-08-19T03:30:24Z"
+  },
+  "targetConfirmation": {
+    "confirmedDeviceIdentitySHA256": "94a25a89c9c214dc9f8a0cf1b2cb3703a466e132a97fa015dfdbebfc65546f42",
+    "bindingRevision": 4,
+    "confirmedAt": "2026-08-19T03:30:24Z",
+    "method": "machineReadback"
+  },
+  "device": {
+    "model": "DAYU200 (RK3568)",
+    "serialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "firmware": "OpenHarmony-7.0.0.37",
+    "bindingRevision": 4
+  },
+  "toolchain": {
+    "hdcVersion": "3.2.0d",
+    "hdcSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "otherTools": [
+      {
+        "name": "arkforged (ArkForge lane daemon, native RockUSB; built after ArkForge c049a11 removed the vendor runtime — binary contains zero 'rkdeveloptool' strings and the native-only usage literal; the delegated receipts' providerExecutableSHA256 self-attributes this digest)",
+        "version": "NRU-004 (installed 2026-08-19 10:29 CST)",
+        "sha256": "f3dfc624f24c0e7ebd586b12acd0d64c145721f17e96db5557e07b2fbb1766d9"
+      }
+    ]
+  },
+  "transport": "usb",
+  "provider": "rockchip",
+  "effectLevel": "destructive",
+  "stepKinds": [
+    "verify-image-bundle",
+    "hash-images",
+    "enter-loader-mode",
+    "wait-loader-disconnect",
+    "wait-loader-reconnect",
+    "rebind-loader-identity",
+    "flash-partitions",
+    "verify-flash-readback",
+    "reboot-device",
+    "wait-for-hdc",
+    "rebind-and-verify-build",
+    "capture-post-flash-diagnostics",
+    "finalize-session"
+  ],
+  "acceptanceIds": ["NRU-AC-10"],
+  "executedAt": "2026-08-19T03:30:24Z",
+  "artifacts": [
+    {
+      "reference": "imported flash bundle, build OpenHarmony-7.0.0.37 (dayu200 images.tar.gz; same bundle as EVD-AFA-DAYU200-20260818-001)",
+      "sha256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674"
+    },
+    {
+      "reference": "arkforged journal store/jobs/JOB-000001A0180894B7-0001.journal (bench Agentd store; 23 permits accepted and consumed, readback verdicts uboot/resource Verified, boot_linux structurally Failed at the read-window boundary, six TypedSkip — identical shape to run A)",
+      "sha256": "2d6ea3fc3046c79ae0aeb1ff4f4919b24dc6d14482632082b03a291f0e452797"
+    },
+    {
+      "reference": "delegated postflight receipt rockchip-runtime/job-b00e006a.../STEP-023-mc-aa51b53b8e92-a0/receipt.json (verification=exact-published-profile-and-bound-hdc, firmware=OpenHarmony-7.0.0.37, providerExecutableSHA256=f3dfc624...)",
+      "sha256": "d3f54c012c1e9c54cf25f2b5198e266c46178a1b8b7ce4ea4768d99b92ee2300"
+    }
+  ],
+  "deviations": [],
+  "notes": "NRU-AC-10 final regression: full flash.dayu200 succeeded end to end on the default (and only) native configuration after the vendor RockUSB runtime was removed (ArkForge c049a11). No vendor process exists in the daemon binary or appears in any receipt; toolchain identity is the daemon's own build digest. NRU-AC-9's packaging half (no rkdeveloptool in the arkforged package) is pinned by ArkForge packaging_contract/evidence_ledger tests. Cross-repo record: ArkForge docs/evidence/runs/2026-08-19-dayu200-green-flash-and-native-cutover.md (run B) and ledger AD-033."
+}

@@ -3,6 +3,17 @@
 > Change:CHG-2026-059-arkdeck-arkforge-authority@r6
 > Status:planned；proposal merge 只批准 scope，不代表实现或真机通过
 
+> **NRU-004 超越声明（2026-08-19，ArkForge main `c049a11`）**：本矩阵的
+> AFA-AC-6/7/8 已于 2026-08-18 以**当时的 fixed-tool 执行面**真机通过
+> （`EVD-AFA-DAYU200-20260818-001`，`evidence/task-afa-001/`；AC-6 的
+> 「九条 `wlx` 全部 `Write LBA from file (100%)`」正是那个执行面的观测点）。
+> 其后 CHG-2026-063 退役了该执行面：Environment 中「pinned rkdeveloptool
+> （homebrew 那份不算，quarantine 会挂死在 dyld）」一条作废，`arkforged`
+> 原生执行、不再绑定任何外部工具；AC-6 的观测点在原生面由 `write-partition`
+> 语义回执承担（`writePayloadSha256` 与 staged digest 逐一比对），
+> 2026-08-19 原生面全量复验全绿（`EVD-NRU-DAYU200-20260819-001`）。
+> AC-9/AC-10 的真机半仍未做，`evidence/README.md` 如实登记。
+
 ## Environment
 
 - macOS 14+ 登录用户 LaunchAgent；Swift 6 / ArkDeckKit；当前 protected-main Catalog digest。

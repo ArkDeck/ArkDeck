@@ -8,6 +8,27 @@
 > 第 8 节列了逐项状态。还没有的是**在真机上跑一次**——现有端到端测试用的是
 > 脚本化 tool port，不是设备（AF-V2.4）。
 
+> **NRU-004 超越声明（2026-08-19，ArkForge main `c049a11`）**：本稿描述的
+> vendor fixed-tool 执行面已被 CHG-2026-063 整体退役，正文保持原样仅作实施
+> 记录。照抄以下契约今天会失败：
+>
+> - **§8.2/§8.6 的启动契约已删除。** `--rkdeveloptool <路径>` 与
+>   `--rkdeveloptool-sha256` 不再是合法旗标（`unknown argument`，daemon 拒绝
+>   启动）；原生 RockUSB port 内建，不存在「不给工具就没有 dispatcher」的
+>   形态；§8.6 的 `-v` 自检与 quarantine 关卡随外部工具一起消失。§9 表格里
+>   钉 `231a05ef…` 的行同此。
+> - **§8.5 的 `HelloAck` 示例值已变**：`toolchain_id = "arkforged-native-rockusb"`，
+>   `toolchain_sha256` = daemon 启动时自量的自身构建摘要。比对义务不变。
+> - **§0/§8 的 `wlx`/`ppt`/`rl`/`rd` 词汇仅存于历史**：封闭面现为七个语义动作，
+>   `Write LBA (100%)` stdout 标记由 `writePayloadSha256` 写线摘要比对承接。
+> - **顶注「还没有真机跑一次」已过时**：2026-08-18 首过
+>   （`EVD-AFA-DAYU200-20260818-001`，本 change `evidence/task-afa-001/`），
+>   2026-08-19 vendor 移除后原生面复验全绿
+>   （`EVD-NRU-DAYU200-20260819-001`，chg-2026-063 evidence）。
+>
+> authority 分界本身（permit 签发、managed control、connectKey 永不过界）
+> 不受 NRU-004 影响，仍是现行事实。ArkForge 仓的草稿正本已带同等声明。
+
 ---
 
 ## 0. 一句话架构
