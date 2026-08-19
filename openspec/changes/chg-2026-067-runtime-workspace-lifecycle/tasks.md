@@ -40,6 +40,9 @@ protected `main` 后生效；合入前不得开始实现 PR。实现 PR 必须�
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/**`（Core 侧的 operation 名册、
+    step 词表锁定与逐 kind 构造样例都在此 target；新增 operation/step kind
+    必然触碰，起草时漏列——与上一行同为测试目录授权）
   - `Packages/ArkDeckKit/APIBaseline/**`
   - `Catalog/**`
   - `scripts/catalog_gen/**`
