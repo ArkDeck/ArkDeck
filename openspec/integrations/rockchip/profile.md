@@ -1,48 +1,36 @@
-# Rockchip Integration Profile
+# Rockchip Integration Boundary
 
-> ID: `ROCKCHIP-ROCKUSB-DISCOVERY`
-> Version: `1.0.0`
-> Platform: macOS
-> Registered by: CHG-2026-026 / TASK-RKFUI-001
+> Current product route: native ArkForge (`arkforged-native-rockusb`)
+> Provider: `rockchip`
+> Catalog operation: `flash.dayu200`
 
-This profile registers one E0/read-only discovery operation for the user-selected,
-hash-pinned `rkdeveloptool` build. It grants no generic Rockchip command authority.
+ArkDeck's supported Loader-mode Rockchip product path is implemented by the protected
+Runtime through ArkForge's native RockUSB backend. Runtime availability and dispatch
+are bound to the measured `arkforged` daemon and publish `rockusbBackend: native`.
+There is no external Rockchip executable selection, security-scoped executable
+bookmark, PATH lookup, caller-provided argv, or external child process in this path.
 
-- Executable source: explicit user selection plus app-scoped security-scoped bookmark.
-- Tool identity: `rkdeveloptool ver 1.32`, SHA-256
-  `bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923`, upstream
-  commit `304f073752fd25c854e1bcf05d8e7f925b1f4e14`.
-- Exact argv: `ld`.
-- Effect: read-only observation.
-- `maximumOutputBytes` is the combined limit for stdout and stderr.
-- Unknown output, unknown mode, duplicate device number/location, stderr, identity drift,
-  stale bookmark, rejected platform trust, timeout, or cancellation fails closed.
-- `Loader` and `Maskrom` are the only registered mode tokens. Only
-  `0x2207:0x350a + Loader` is applicable to the existing Provider; Maskrom and similar
-  device families remain visible as typed blocked observations.
-- `sudo`, shell, helper/driver installation, ACL/group/system-rule mutation, HDC mode
-  switching, `ppt`, `wlx`, `rd`, and every destructive operation are outside this profile.
+The published `flash.dayu200` operation materializes the exact typed plan. HDC may
+perform the catalogued `enterUpdater` step for a durably bound target; Loader
+observation and all RockUSB reads, writes, reset, rebind, and postflight proof use the
+native ArkForge route. Destructive execution remains gated by the protected Runtime's
+exact `RuntimeCapability`, fresh target/binding/tool facts, artifact lease, durable
+reservation, and complete-overwrite/recovery rules.
 
-The canonical machine-readable registry is
-`rockusb-discovery/1.0.0/registry.yaml`; fixture byte identities are pinned by
-`rockusb-discovery/1.0.0/resources.json`.
+## Retired external-tool profiles
 
-## DAYU200 HDC → Loader characterization
+The former RockUSB discovery registry and HDC-to-Loader characterization registry
+were experimental external-tool profiles. They are retired and are not members of
+`INTEGRATION-PROFILES.lock.yaml`. Their registries are intentionally absent: they
+grant no current discovery, transition, dispatch, or fallback authority. Historical
+changes, receipts, and legacy session decoders may retain their identifiers solely
+to explain or decode old records.
 
-CHG-2026-026/TASK-RKFUI-001A separately registers one exact, one-run E1 characterization for
-DAYU200/OpenHarmony 7.0.0.33 over USB. It does not broaden the E0 discovery profile or the
-destructive Provider identity.
+## Maskrom rescue distribution
 
-- The only possible mutation argv is
-  `hdc -t <durable-connect-key> shell reboot loader`, materialized from a durable revision-1
-  binding after impact confirmation and a durable `enterUpdater` intent.
-- Success requires HDC disconnect plus one semantic `0x2207:0x350a + Loader` observation from the
-  clean E0 tool; HDC exit `0` alone is insufficient.
-- The run remains non-destructive: HDC server lifecycle mutation, default target, caller argv,
-  host shell, `sudo`, `ppt`, `wlx`, `rd`, Flash/erase/format/unlock/update and retry are forbidden.
-- Capability support and Core auto-rebind eligibility are separate verdicts. A supported mode
-  transition does not authorize automatic rebind when cross-mode identity/topology evidence is
-  insufficient.
-
-The canonical machine-readable registry is
-`loader-transition/1.0.0/registry.yaml`.
+`bundled-component/1.0.0/` is retained only as the source, build, license, SBOM, and
+notice record for the separately shipped, operator-invoked Maskrom rescue utility.
+It is not a Runtime Provider, Loader-mode backend, discovery fallback, or ArkForge
+dependency. Its exact operational boundary is documented in
+`docs/release/rockchip-component-packaging.md` and
+`docs/release/rockchip-component-distribution.md`.
