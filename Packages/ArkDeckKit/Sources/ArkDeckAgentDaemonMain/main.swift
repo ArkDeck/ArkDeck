@@ -746,6 +746,44 @@ Task.detached {
             + "; run `arkdeck agentd update` to regenerate the LaunchAgent plist\n").utf8))
       exit(78)  // EX_CONFIG
     }
+    /// The production lane plan previewer (CHG-2026-068): resolves the bound
+    /// target's confirmed HDC-normal port path from the same provider facts
+    /// the engine dispatches with, then asks the composed lane for a
+    /// read-only pre-materialization. Only built when a lane and its
+    /// DeviceProfile id were composed together — a preview against a profile
+    /// the daemon never loaded would be an answer about nothing.
+    struct ComposedLanePlanPreviewer: FlashLanePlanPreviewing {
+      let lane: ArkForgeLaneHost
+      let profileID: String
+      let providers: DeviceProviderRegistry
+
+      func preview(
+        targetID: String, profileReference _: String, archiveSHA256: String
+      ) async -> ArkForgeLanePlanPreviewOutcome {
+        let facts: ProviderFacts
+        do {
+          facts = try await providers.resolveFacts(
+            providerID: "rockchip", targetID: targetID)
+        } catch {
+          return .deviceNotObserved("target facts could not be resolved: \(error)")
+        }
+        guard
+          let topology = facts.serverFacts[
+            TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
+          !topology.isEmpty
+        else {
+          return .deviceNotObserved(
+            "no confirmed HDC-normal USB topology for \(targetID)")
+        }
+        return await lane.previewPlan(
+          archiveSHA256: archiveSHA256, profileID: profileID, usbTopology: topology)
+      }
+    }
+    let lanePlanPreviewer: (any FlashLanePlanPreviewing)? = arkForgeLane.flatMap { lane in
+      arkForgeDeviceProfileID.map { profileID in
+        ComposedLanePlanPreviewer(lane: lane, profileID: profileID, providers: providers)
+      }
+    }
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,
@@ -759,6 +797,7 @@ Task.detached {
         path:
           "flash-bundle-imports", directoryHint: .isDirectory),
       flashPrerequisiteObserver: rockchipFactsPort,
+      flashLanePlanPreviewer: lanePlanPreviewer,
       rockchipBootloaderStatusObserver: ProductRockchipBootloaderStatusObserver(
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       rockchipLoaderBindingCoordinator: ProductRockchipLoaderBindingCoordinator(

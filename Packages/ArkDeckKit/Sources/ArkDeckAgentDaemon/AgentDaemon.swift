@@ -70,6 +70,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
+  private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
   private let rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
@@ -94,6 +95,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
@@ -110,6 +112,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
+      flashLanePlanPreviewer: flashLanePlanPreviewer,
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       traceRuntimeProbe: traceRuntimeProbe,
@@ -130,6 +133,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
@@ -146,6 +150,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
+    self.flashLanePlanPreviewer = flashLanePlanPreviewer
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
     self.rockchipLoaderBindingCoordinator = rockchipLoaderBindingCoordinator
     self.traceRuntimeProbe = traceRuntimeProbe
@@ -281,6 +286,72 @@ public struct RuntimeControlPlaneHandler: Sendable {
             (availability?.reasonCodes ?? [.providerNotRegistered])
               .map { .string($0.origin.rawValue) }),
         ]))
+
+    case "flash.lanePlanPreview":
+      // Read-only preview of the arkforged plan the permits would anchor
+      // (CHG-2026-068). Never imports, never starts anything; every state is
+      // an honest fact the review renders as-is.
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .string(let profileReference)? = request.params?["profileReference"],
+        case .string(let archiveSHA256)? = request.params?["archiveSha256"],
+        RockchipFlashProfile.board(reference: profileReference) != nil,
+        archiveSHA256.count == 64,
+        archiveSHA256.allSatisfy(\.isHexDigit)
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message:
+            "a supported targetId, profileReference and 64-hex archiveSha256 are required")
+      }
+      guard let targetStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "lane plan preview is not configured")
+      }
+      do {
+        guard let target = try targetStore.find(targetID: targetID) else {
+          return failure(id: request.id, code: .notFound, message: "target is not adopted")
+        }
+        var fields: [String: JSONValue] = [
+          "targetId": .string(target.targetID),
+          "bindingRevision": .integer(Int64(target.bindingRevision)),
+        ]
+        guard let flashLanePlanPreviewer else {
+          fields["state"] = .string("laneNotComposed")
+          return success(id: request.id, result: .object(fields))
+        }
+        switch await flashLanePlanPreviewer.preview(
+          targetID: target.targetID,
+          profileReference: profileReference,
+          archiveSHA256: archiveSHA256.lowercased())
+        {
+        case .available(let planID, let planSHA256, let observationMode):
+          fields["state"] = .string("available")
+          fields["planId"] = .string(planID)
+          fields["planSha256"] = .string(planSHA256)
+          fields["observationMode"] = .string(observationMode)
+        case .bundleNotInLaneStore:
+          fields["state"] = .string("bundleNotInLaneStore")
+        case .deviceNotObserved(let reason):
+          fields["state"] = .string("deviceNotObserved")
+          fields["reason"] = .string(reason)
+        case .planNotExecutable(let availability, let reason, let unknowns):
+          fields["state"] = .string("planNotExecutable")
+          fields["availability"] = .string(availability)
+          fields["reason"] = .string(reason)
+          fields["unknowns"] = .array(
+            unknowns.sorted { $0.key < $1.key }
+              .map { .string("\($0.key): \($0.value)") })
+        case .previewFailed(let detail):
+          fields["state"] = .string("previewFailed")
+          fields["reason"] = .string(detail)
+        }
+        return success(id: request.id, result: .object(fields))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "lane plan preview could not resolve the target: \(error)")
+      }
 
     case "flash.prerequisites":
       guard case .string(let targetID)? = request.params?["targetId"],
