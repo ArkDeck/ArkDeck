@@ -224,9 +224,12 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   }
 
   func testADaemonThatNeverOpensItsSocketYieldsNoLane() async {
+    let stopped = StopRecorder()
+    let lifecycle = ArkForgeLaneComposition.DaemonLifecycle()
+    lifecycle.install { stopped.record() }
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
-      pairingEpoch: 3, dependencies: dependencies(),
+      pairingEpoch: 3, dependencies: dependencies(), daemonLifecycle: lifecycle,
       launch: { _, _ in }, connect: { _ in (SilentDaemon(), Self.readyAck()) },
       awaitSocket: { _ in nil })
 
@@ -234,6 +237,9 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       return XCTFail("a daemon that never opened its socket has no lane")
     }
     XCTAssertTrue("\(why)".contains("never opened"), "\(why)")
+    XCTAssertEqual(stopped.count, 1, "failed composition must stop its exact daemon generation")
+    lifecycle.stop()
+    XCTAssertEqual(stopped.count, 1, "daemon shutdown must be idempotent")
   }
 
   func testADaemonBoundToAnotherToolYieldsNoLane() async {
@@ -287,6 +293,23 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     }
     func snapshot() -> Record? { record }
   }
+
+  private final class StopRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    var count: Int {
+      lock.lock()
+      defer { lock.unlock() }
+      return value
+    }
+
+    func record() {
+      lock.lock()
+      value += 1
+      lock.unlock()
+    }
+  }
 }
 
 /// The composition root actually calls the composition.
@@ -336,5 +359,11 @@ final class ArkForgeCompositionRootContractTests: XCTestCase {
     XCTAssertTrue(
       source.contains("\\(absence)"),
       "an absent lane must write the reason, not fail silently")
+  }
+
+  func testTheComposedDaemonIsStoppedOnAgentShutdown() throws {
+    let source = try mainSource()
+    XCTAssertTrue(source.contains("startedArkForgeDaemon = composed.daemonLifecycle"))
+    XCTAssertTrue(source.contains("startedArkForgeDaemon?.stop()"))
   }
 }
