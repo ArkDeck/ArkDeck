@@ -104,30 +104,25 @@ M0A 必须同时验证：
 
 工具/镜像 bookmark 使用只读 scope，只有输出目录需要 read-write。用户选择文件权限不等于允许执行任意外部程序；把 POSIX path 交给 child 也不能假定转移了运行时 PowerBox 动态扩展。外部 HDC 读取镜像、key 和输出目录必须端到端验证。
 
-### Rockchip tool execution（DEC-011 / ADR-0003）
+### Rockchip Loader-mode execution（NRU-004）
 
-Decision outcome：`selected:bundledRockchipComponent`（仅在维护者 review/merge
-CHG-2026-035 decision/evidence PR 后生效）。
+macOS 上受支持的 Rockchip 产品路径是 protected Runtime 经已测量的 `arkforged`
+daemon 使用 native RockUSB backend；toolchain identity 为
+`arkforged-native-rockusb`。ArkDeck 的 typed workflow 不选择或启动外部 Rockchip
+executable，不接受 executable bookmark、caller argv、PATH/shell、动态下载、helper
+或 copy-to-container fallback。
 
-macOS Rockchip execute 的目标形态是 App-owned、source-pinned
-`rkdeveloptool` nested component，直接由 product-owned typed workflow 通过
-bundle-relative absolute URL、fixed argv、empty caller environment 与 identity-bound
-prepared launch 启动。它不使用 user-selected external executable、XPC/broker、
-login item、LaunchAgent、LaunchDaemon、privileged helper、PATH/shell、动态下载或
-copy-to-container fallback。
+`flash.dayu200` 的 HDC `enterUpdater` 步骤仍使用已绑定 target 的 external-first HDC；
+Loader 枚举、分区表读取、写入、逐分区读回、reset、rebind 与 postflight proof 全部走
+native ArkForge。破坏性执行仍由 protected Runtime 在 exact plan、artifact lease、fresh
+target/binding/tool facts 与 durable reservation 闭合后生成并消费 `RuntimeCapability`；
+本 profile 不新增 fallback 或调用方授权面。
 
-本决定保持 ADR-0002 的 Sandboxed 单一 DMG 与现行精确六项 App entitlement；候选
-component 自身只能在后续独立 approved change 中采用
-`com.apple.security.app-sandbox + com.apple.security.inherit` 并完成 Code Sign On
-Copy、Hardened Runtime、inside-out Developer ID signing、notarization/ticket 与
-update/rollback 验证。DEC-007 不变，HDC 继续 external-first、不捆绑。
-
-当前 profile **不声称 component 已存在或可运行**。实现前必须单独关闭：exact
-source→artifact 可复现构建、GPL-2.0 notice/source-offer/legal acceptance、libusb/
-libiconv dependency 与 SBOM/CVE owner、architecture、child image/key/output lease、
-signed Sandbox E0 USB、clean-host/clean-VM，以及 CHG-2026-026 的显式 revision/
-readiness。任一 gate 未满足，Rockchip App execute 保持 blocked；不得隐式切换其他
-候选。
+DEC-011 / ADR-0003 选择的 App-owned bundled child 已被 NRU-004 在 Loader-mode 产品
+路径上取代。该 child 只作为单独的、operator-invoked Maskrom rescue utility 随 App
+分发；它不是 Runtime Provider、Loader-mode backend、discovery fallback 或 ArkForge
+依赖。其 source/license/SBOM/notarization 与发布义务继续由
+`openspec/integrations/rockchip/bundled-component/1.0.0/` 和对应 release 文档承载。
 
 ## Gatekeeper and quarantine
 
