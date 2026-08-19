@@ -38,13 +38,13 @@ package enum RockchipFlashSessionRunLock {
     let path = sessionRoot.appending(path: fileName).path
     let descriptor = Darwin.open(path, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard descriptor >= 0 else {
-      throw RockchipFlashSessionReconcileError.sessionsRootUnavailable(
+      throw RockchipLegacyFlashJournalReconcileError.sessionsRootUnavailable(
         "cannot create run lock at \(path): errno \(errno)")
     }
     guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
       let heldErrno = errno
       Darwin.close(descriptor)
-      throw RockchipFlashSessionReconcileError.sessionsRootUnavailable(
+      throw RockchipLegacyFlashJournalReconcileError.sessionsRootUnavailable(
         "session run lock is already held (errno \(heldErrno)); a live run owns \(path)")
     }
     return descriptor
@@ -193,12 +193,12 @@ package struct RockchipFlashOrphanedReservation: Sendable, Equatable {
 
 
 
-public enum RockchipFlashSessionReconcileError: Error, Equatable, Sendable {
+public enum RockchipLegacyFlashJournalReconcileError: Error, Equatable, Sendable {
   case sessionNotFound(String)
   case sessionsRootUnavailable(String)
 }
 
-package struct RockchipFlashSessionReconciler {
+package struct RockchipLegacyFlashJournalReconciler {
   package let sessionsRoot: URL
   private let agentLedger: AgentAuthorityUsageLedger
   private let now: @Sendable () -> Date
@@ -215,7 +215,7 @@ package struct RockchipFlashSessionReconciler {
 
   /// Production composition over the retired host's historical session and
   /// owner-only AuthorizationUsage locations.
-  public static func production() throws -> RockchipFlashSessionReconciler {
+  public static func production() throws -> RockchipLegacyFlashJournalReconciler {
     let sessionsRoot = try SessionSettingsStore().load().sessionsRoot
     let applicationSupport = try FileManager.default.url(
       for: .applicationSupportDirectory, in: .userDomainMask,
@@ -224,7 +224,7 @@ package struct RockchipFlashSessionReconciler {
       applicationSupport
       .appending(path: "ArkDeck", directoryHint: .isDirectory)
       .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
-    return RockchipFlashSessionReconciler(
+    return RockchipLegacyFlashJournalReconciler(
       sessionsRoot: sessionsRoot,
       agentLedger: try AgentAuthorityUsageLedger(root: usageRoot))
   }
@@ -287,7 +287,7 @@ package struct RockchipFlashSessionReconciler {
   public func inspect(sessionID: String) throws -> RockchipFlashSessionFinding {
     let root = sessionsRoot.appending(path: sessionID, directoryHint: .isDirectory)
     guard let finding = try finding(sessionRoot: root) else {
-      throw RockchipFlashSessionReconcileError.sessionNotFound(sessionID)
+      throw RockchipLegacyFlashJournalReconcileError.sessionNotFound(sessionID)
     }
     return finding
   }

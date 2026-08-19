@@ -72,6 +72,37 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     }
   }
 
+  // The retired RockchipProductExecutePlanFactPort's composition, kept here
+  // as the contract under test: describe -> forBuild -> validate -> makePlan
+  // is the same shape FlashApplicationFacade materializes previews with
+  // (CHG-2026-065 removed the package wrapper, which had no production
+  // caller left after the lowering moved to the ArkForge lane).
+  private enum PlanFactFailure: Error, Equatable { case archiveValidationFailed }
+
+  private func makeValidatedExecutePlanFacts(
+    summary: GzipTarArchiveSummary,
+    board: RockchipFlashProfile = .dayu200
+  ) throws -> (plan: RockchipFlashPlan, archiveProfile: RockchipFlashProfile) {
+    let profile: RockchipFlashProfile
+    do {
+      profile = try board.forBuild(
+        RockchipImageArchiveIntrospection.describe(summary: summary, board: board))
+    } catch {
+      throw PlanFactFailure.archiveValidationFailed
+    }
+    let provider = RockchipRockUSBFlashProvider(profile: profile)
+    let verdict = provider.profile.validate(summary.archiveObservation())
+    guard verdict == .valid else { throw PlanFactFailure.archiveValidationFailed }
+    return (try provider.makePlan(mode: .execute, archiveValidation: verdict), profile)
+  }
+
+  private func makeValidatedExecutePlan(
+    summary: GzipTarArchiveSummary,
+    board: RockchipFlashProfile = .dayu200
+  ) throws -> RockchipFlashPlan {
+    try makeValidatedExecutePlanFacts(summary: summary, board: board).plan
+  }
+
   func testOpenHarmony70035ProfilePinsEveryMemberAndExactNinePartitionPlan() throws {
     let profile = RockchipFlashProfile.dayu200
     XCTAssertEqual(profile.catalogReference, "dayu200")
@@ -254,9 +285,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
   /// unreadable version — not that nobody had met it before.
   func testAuthorizedExecutePlanFactsPlanForWhateverFitsTheBoard() throws {
     let profile = RockchipFlashProfile.dayu200
-    let port = RockchipProductExecutePlanFactPort()
-
-    let plan = try port.makeValidatedExecutePlan(summary: summary(for: profile))
+    let plan = try makeValidatedExecutePlan(summary: summary(for: profile))
     let expected = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .execute, archiveValidation: .valid)
     XCTAssertEqual(plan, expected)
@@ -265,7 +294,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     // Admission receives both values from this one summary. Dispatcher may
     // therefore reuse the invocation-local profile without a second archive
     // description pass, while upload/import still validate the actual file.
-    let validated = try port.makeValidatedExecutePlanFacts(
+    let validated = try makeValidatedExecutePlanFacts(
       summary: summary(for: profile), board: profile)
     XCTAssertEqual(validated.plan, plan)
     XCTAssertEqual(validated.archiveProfile.catalogReference, profile.catalogReference)
@@ -282,11 +311,11 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
 
     // A build nobody enumerated plans, and its plan records its own digest.
     let unknownDigest = String(repeating: "0", count: 64)
-    let unknownPlan = try port.makeValidatedExecutePlan(
+    let unknownPlan = try makeValidatedExecutePlan(
       summary: summary(for: profile, archiveSHA256: unknownDigest))
     XCTAssertEqual(unknownPlan.archiveSHA256, unknownDigest)
     XCTAssertEqual(unknownPlan.steps.count, plan.steps.count)
-    let unknownValidated = try port.makeValidatedExecutePlanFacts(
+    let unknownValidated = try makeValidatedExecutePlanFacts(
       summary: summary(for: profile, archiveSHA256: unknownDigest), board: profile)
     XCTAssertEqual(unknownValidated.plan.archiveSHA256, unknownDigest)
     XCTAssertEqual(unknownValidated.archiveProfile.archiveSHA256, unknownDigest)
@@ -298,26 +327,26 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let missingImage = profile.members.filter { $0.name != "system.img" }
       .map { GzipTarMemberSummary(name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256) }
     XCTAssertThrowsError(
-      try port.makeValidatedExecutePlan(summary: summary(for: profile, members: missingImage))
+      try makeValidatedExecutePlan(summary: summary(for: profile, members: missingImage))
     ) { error in
-      XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
+      XCTAssertEqual(error as? PlanFactFailure, .archiveValidationFailed)
     }
 
     // So does an archive whose system image declares no version, which would
     // otherwise leave post-flash verification with nothing to compare against.
     XCTAssertThrowsError(
-      try port.makeValidatedExecutePlan(summary: summary(for: profile, version: nil))
+      try makeValidatedExecutePlan(summary: summary(for: profile, version: nil))
     ) { error in
-      XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
+      XCTAssertEqual(error as? PlanFactFailure, .archiveValidationFailed)
     }
 
     // And a partition table naming something this board does not know.
     XCTAssertThrowsError(
-      try port.makeValidatedExecutePlan(
+      try makeValidatedExecutePlan(
         summary: summary(
           for: profile, partitionTable: "CMDLINE:mtdparts=rk29xxnand:0x1@0x1(vendor-secrets)"))
     ) { error in
-      XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
+      XCTAssertEqual(error as? PlanFactFailure, .archiveValidationFailed)
     }
   }
 
@@ -337,8 +366,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       fileAt: archiveURL,
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: profile))
     XCTAssertEqual(profile.validate(summary.archiveObservation()), .valid)
-    let executePlan = try RockchipProductExecutePlanFactPort().makeValidatedExecutePlan(
-      summary: summary)
+    let executePlan = try makeValidatedExecutePlan(summary: summary)
     XCTAssertEqual(executePlan.executionMode, .execute)
     XCTAssertEqual(executePlan.archiveSHA256, profile.archiveSHA256)
     XCTAssertEqual(executePlan.planDigestSHA256.count, 64)

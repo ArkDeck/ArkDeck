@@ -1196,7 +1196,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       return (partition.imageMemberName, bytes)
     }
     members.append((RockchipFlashProfile.partitionTableMemberName, parameter))
-    return try RockchipExecutionTestFixture.makeGzipTar(members: members)
+    return try GzipTarTestArchive.makeGzipTar(members: members)
   }
 
   private func recoveryPartitions() throws -> [String] {
