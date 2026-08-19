@@ -60,6 +60,8 @@
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `ArkDeckApp/Features/Flash/**`
+  - `ArkDeckApp/Resources/FlashLocalizable.xcstrings`（评审摘要行的本地化
+    词条与 Flash 界面同 change 演进）
   - `Packages/ArkDeckKit/Tests/**`
   - `ArkDeckAppUITests/**`
   - `openspec/changes/chg-2026-066-flash-review-single-truth/**`
