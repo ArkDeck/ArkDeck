@@ -7,7 +7,6 @@
 import ArkDeckAgentComposition
 import ArkDeckAgentDaemon
 import ArkDeckCore
-import ArkDeckHarness
 import ArkDeckRuntime
 import ArkDeckStorage
 import ArkDeckWorkflows
@@ -213,7 +212,6 @@ let ready = DispatchSemaphore(value: 0)
 nonisolated(unsafe) var startupFailure: (any Error)?
 nonisolated(unsafe) var startedServer: AgentDaemonServer?
 nonisolated(unsafe) var startedXPCListener: AgentXPCListener?
-nonisolated(unsafe) var autoDriveTask: Task<Void, Never>?
 nonisolated(unsafe) var startedHDCServerHost: HeadlessHDCServerHost?
 nonisolated(unsafe) var startedArkForgeDaemon: ArkForgeLaneComposition.DaemonLifecycle?
 
@@ -722,83 +720,26 @@ Task.detached {
           + "\(recovery.proof.currentRevision)")
       fflush(stdout)
     }
-    // Harness task plane (CHG-2026-054): one composition root, not a second
-    // daemon. It reaches execution only through the engine port below.
-    let harnessStore = try HarnessTaskStore(
-      rootURL: resolvedStateDirectory.appending(path: "harness", directoryHint: .isDirectory))
-    // Model egress is opt-in per project and off unless the operator names
-    // them: `ARKDECK_HARNESS_EGRESS_PROJECTS=app-a,app-b`. With none named no
-    // decision context leaves this host and the loop runs on the built-in
-    // deterministic handler (CHG-2026-054 HTP-INV-10).
-    let egressProjects = Set(
-      (ProcessInfo.processInfo.environment["ARKDECK_HARNESS_EGRESS_PROJECTS"] ?? "")
-        .split(separator: ",")
-        .map { $0.trimmingCharacters(in: .whitespaces) }
-        .filter { !$0.isEmpty })
-    let sensitiveEvidence = Set(
-      (ProcessInfo.processInfo.environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"] ?? "")
-        .split(separator: ",")
-        .map { $0.trimmingCharacters(in: .whitespaces) }
-        .filter { !$0.isEmpty })
-    if !sensitiveEvidence.isEmpty {
-      print(
-        "harness may measure sensitive evidence: "
-          + sensitiveEvidence.sorted().joined(separator: ","))
-      fflush(stdout)
+    // The in-process task plane was removed by CHG-2026-064: decisions come
+    // from external agents through the published caller surface. A leftover
+    // gateway configuration is a misconfiguration, not something to ignore —
+    // fail loud so the operator regenerates the LaunchAgent plist with
+    // `arkdeck agentd update` instead of assuming the loop still exists.
+    // (`ARKDECK_HARNESS_MODEL_*` stays: `arkdeck agent chat` reads it from
+    // its own process environment; it was never daemon configuration.)
+    let removedHarnessKeys = [
+      "ARKDECK_HARNESS_CLI_PATH", "ARKDECK_HARNESS_CLI_WORKDIR",
+      "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS", "ARKDECK_HARNESS_EGRESS_PROJECTS",
+      "ARKDECK_HARNESS_SENSITIVE_EVIDENCE",
+    ].filter { ProcessInfo.processInfo.environment[$0] != nil }
+    guard removedHarnessKeys.isEmpty else {
+      FileHandle.standardError.write(
+        Data(
+          ("arkdeck-agentd: configuration removed by CHG-2026-064 is still set: "
+            + removedHarnessKeys.sorted().joined(separator: ",")
+            + "; run `arkdeck agentd update` to regenerate the LaunchAgent plist\n").utf8))
+      exit(78)  // EX_CONFIG
     }
-    if !egressProjects.isEmpty {
-      print("harness decision egress enabled for \(egressProjects.sorted().joined(separator: ","))")
-      fflush(stdout)
-    }
-    let decisionGateway = try HarnessVendorConfiguration.gateway(
-      environment: ProcessInfo.processInfo.environment)
-    if let decisionGateway {
-      print(
-        "harness decision gateway ready: \(decisionGateway.producerID) "
-          + "model=\(decisionGateway.modelDescriptor.modelName)")
-      fflush(stdout)
-    }
-    let harness = HarnessTaskCoordinator(
-      store: harnessStore,
-      jobPort: RuntimeJobEngineHarnessPort(engine: engine),
-      // Evidence access is what makes a verdict possible at all; without it
-      // the loop stops honestly instead of guessing (CHG-2026-054 TASK-HTP-002).
-      artifactPort: RuntimeArtifactStoreHarnessPort(
-        store: artifactStore, sensitiveEvidenceAllowList: sensitiveEvidence),
-      repairPort: workspaceRepairConfiguration.map {
-        WorkspaceHarnessRepairPort(
-          profile: $0.profile, profileRegistry: $0.profiles,
-          attemptStore: $0.attempts, artifactStore: artifactStore)
-      },
-      evolutionWorkspacePort: workspaceRepairConfiguration?.evolution,
-      nowUTC: utcNow,
-      policyGuard: HarnessPolicyGuard(
-        availability: RuntimeEngineAvailabilityPort(engine: engine),
-        capabilities: RuntimeCapabilityStoreHarnessPort(
-          store: capabilityStore, nowUTC: utcNow)),
-      decisionGateway: decisionGateway,
-      egressPolicy: HarnessEgressPolicy(enabledProjects: egressProjects),
-      // Privacy-sensitive evidence the operator allows this run to measure,
-      // by artifact name: `ARKDECK_HARNESS_SENSITIVE_EVIDENCE=hilog.txt`.
-      // With none named the evaluator reports every sensitive artifact as a
-      // collection blocker instead of reading it, which is why a crash task
-      // whose criteria require `hilog.txt` cannot be judged at all until an
-      // operator says it may be (TASK-HTP-006).
-      sensitiveEvidenceAllowList: sensitiveEvidence)
-    // Recovery resolves dispatch intents whose outcome was lost; it starts
-    // no new work, so a restart cannot become a burst of dispatches.
-    // Said at startup, not discovered later: a task whose isolated workspace
-    // this process cannot adopt will fail every workspace decision it makes,
-    // and the failure reads as something else entirely if nobody names it here.
-    let unadopted = try await harness.adoptPersistedEvolutionWorkspaces()
-    for entry in unadopted {
-      print("harness workspace not adopted for \(entry.htaskID): \(entry.reason)")
-    }
-    let recoveredTasks = try await harness.recoverTasks()
-    if !recoveredTasks.isEmpty {
-      print("recovered \(recoveredTasks.count) harness task dispatch intent(s)")
-    }
-    if !unadopted.isEmpty || !recoveredTasks.isEmpty { fflush(stdout) }
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,
@@ -818,8 +759,7 @@ Task.detached {
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
-      debugInvocationController: debugInvocationController,
-      harnessCoordinator: harness)
+      debugInvocationController: debugInvocationController)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)
     switch try server.start() {
@@ -840,25 +780,6 @@ Task.detached {
       // Redirected stdout is block-buffered: without this flush an operator
       // tailing the log sees nothing until the daemon exits.
       fflush(stdout)
-      // Auto-drive turns the harness crank so a single bounded `task.submit`
-      // converges without anyone poking `task.reconcile`. The accepted task
-      // policy and budgets are the boundary; the environment only overrides
-      // cadence or explicitly disables scheduling for maintenance.
-      if let interval = HarnessAutoDriveTicker.configuredIntervalSeconds(
-        ProcessInfo.processInfo.environment)
-      {
-        print("harness auto-drive every \(interval)s")
-        fflush(stdout)
-        let ticker = HarnessAutoDriveTicker(
-          target: harness, intervalSeconds: interval,
-          log: { message in
-            print(message)
-            fflush(stdout)
-          })
-        // Started only after the socket is serving, so a failure to bind
-        // cannot leave a timer dispatching against a daemon nobody can reach.
-        autoDriveTask = Task.detached { _ = await ticker.run() }
-      }
     case .alreadyRunning(let instance):
       // This candidate may have started a foreground HDC child before the
       // instance lock proved that another daemon already owns the session.
@@ -907,7 +828,6 @@ let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal
     shutdownStarted = true
     shutdownLock.unlock()
     guard shouldStart else { return }
-    autoDriveTask?.cancel()
     Task.detached {
       // Do not release the instance lock or terminate while a request still
       // owns a Runtime durability boundary.  The 20-second cap is explicit:

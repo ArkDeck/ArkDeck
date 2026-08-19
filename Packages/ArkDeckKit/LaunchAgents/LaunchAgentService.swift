@@ -12,18 +12,6 @@ public enum ArkDeckLaunchAgent {
   public static let devecoSDKEnvironmentKey = "ARKDECK_DEVECO_SDK_HOME"
   public static let analyzerEnvironmentKey = "ARKDECK_ANALYZER_PATH"
   public static let workspaceInspectorEnvironmentKey = "ARKDECK_WORKSPACE_INSPECTOR"
-  public static let harnessSensitiveEvidenceEnvironmentKey =
-    "ARKDECK_HARNESS_SENSITIVE_EVIDENCE"
-  public static let harnessModelProviderEnvironmentKey =
-    "ARKDECK_HARNESS_MODEL_PROVIDER"
-  public static let harnessModelNameEnvironmentKey = "ARKDECK_HARNESS_MODEL_NAME"
-  public static let harnessCLIPathEnvironmentKey = "ARKDECK_HARNESS_CLI_PATH"
-  public static let harnessCLIWorkingDirectoryEnvironmentKey =
-    "ARKDECK_HARNESS_CLI_WORKDIR"
-  public static let harnessCLITimeoutEnvironmentKey =
-    "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"
-  public static let harnessEgressProjectsEnvironmentKey =
-    "ARKDECK_HARNESS_EGRESS_PROJECTS"
   public static let arkTraceDescriptorEnvironmentKey =
     "ARKDECK_ARKTRACE_DESCRIPTOR"
   /// The three the ArkForge lane needs. All three or none: two of them is a
@@ -48,7 +36,6 @@ public enum ArkDeckLaunchAgent {
     arkForgeProfileEnvironmentKey,
   ]
   public static let waterFlowProjectRef = "demo-app"
-  public static let harnessLocalModelProviders = ["claude-code", "codex"]
 }
 
 public struct LaunchAgentCommandResult: Sendable, Equatable {
@@ -134,12 +121,6 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
   public let hdcSHA256: String
   public let workspaceProjectPath: String?
   public let devecoSDKPath: String?
-  /// Optional keeps receipts written before this setting was productized
-  /// decodable; new receipts always write a (possibly empty) sorted array.
-  public let harnessSensitiveEvidence: [String]?
-  /// Optional keeps receipts written before headless model composition was
-  /// productized decodable. Local CLI configuration contains no credential.
-  public let harnessModel: LaunchAgentHarnessModelStatus?
   /// Optional keeps receipts written before the reviewed ArkTrace profile was
   /// selectable through the production LaunchAgent installer decodable.
   public let arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
@@ -147,8 +128,7 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
   public init(
     installedAtUTC: String, daemonPath: String, daemonSHA256: String,
     hdcPath: String, hdcSHA256: String, workspaceProjectPath: String? = nil,
-    devecoSDKPath: String? = nil, harnessSensitiveEvidence: [String] = [],
-    harnessModel: LaunchAgentHarnessModelStatus? = nil,
+    devecoSDKPath: String? = nil,
     arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus? = nil
   ) {
     self.schemaVersion = "arkdeck-launchagent-install/v1"
@@ -159,8 +139,6 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
     self.hdcSHA256 = hdcSHA256
     self.workspaceProjectPath = workspaceProjectPath
     self.devecoSDKPath = devecoSDKPath
-    self.harnessSensitiveEvidence = harnessSensitiveEvidence
-    self.harnessModel = harnessModel
     self.arkTraceDescriptor = arkTraceDescriptor
   }
 }
@@ -173,37 +151,6 @@ public struct LaunchAgentWorkspaceConfiguration: Sendable, Equatable {
     self.projectRoot = projectRoot
     self.devecoSDKRoot = devecoSDKRoot
   }
-}
-
-/// Explicit, credential-free composition for an already signed-in local
-/// model CLI. The LaunchAgent never accepts an API key or arbitrary argv.
-public struct LaunchAgentHarnessModelConfiguration: Sendable, Equatable {
-  public let provider: String
-  public let modelName: String
-  public let cliExecutable: URL
-  public let cliWorkingDirectory: URL
-  public let cliTimeoutSeconds: Int
-
-  public init(
-    provider: String, modelName: String, cliExecutable: URL,
-    cliWorkingDirectory: URL, cliTimeoutSeconds: Int = 600
-  ) {
-    self.provider = provider
-    self.modelName = modelName
-    self.cliExecutable = cliExecutable
-    self.cliWorkingDirectory = cliWorkingDirectory
-    self.cliTimeoutSeconds = cliTimeoutSeconds
-  }
-}
-
-public struct LaunchAgentHarnessModelStatus: Codable, Sendable, Equatable {
-  public let provider: String
-  public let modelName: String
-  public let cliPath: String
-  public let cliSHA256: String
-  public let cliWorkingDirectory: String
-  public let cliTimeoutSeconds: Int
-  public let egressProjects: [String]
 }
 
 public struct LaunchAgentArkTraceDescriptorStatus: Codable, Sendable, Equatable {
@@ -330,8 +277,6 @@ public struct LaunchAgentStatus: Codable, Sendable, Equatable {
   public let hdcSHA256: String?
   public let workspaceProjectPath: String?
   public let devecoSDKPath: String?
-  public let harnessSensitiveEvidence: [String]
-  public let harnessModel: LaunchAgentHarnessModelStatus?
   public let arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
   public let socketPath: String
   public let socketPresent: Bool
@@ -416,14 +361,11 @@ public final class LaunchAgentService: @unchecked Sendable {
   public func install(
     daemonBundleSource: URL, hdcExecutable: URL,
     workspace: LaunchAgentWorkspaceConfiguration? = nil,
-    harnessSensitiveEvidence: [String] = [],
-    harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
     try install(
       daemonBundleSource: daemonBundleSource, hdcExecutable: hdcExecutable,
-      workspace: workspace, harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel, arkTraceDescriptor: nil, arkForgeLane: nil,
+      workspace: workspace, arkTraceDescriptor: nil, arkForgeLane: nil,
       beforeBootstrap: beforeBootstrap)
   }
 
@@ -431,8 +373,6 @@ public final class LaunchAgentService: @unchecked Sendable {
   public func install(
     daemonBundleSource: URL, hdcExecutable: URL,
     workspace: LaunchAgentWorkspaceConfiguration? = nil,
-    harnessSensitiveEvidence: [String] = [],
-    harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
     arkTraceDescriptor: URL?,
     arkForgeLane: LaunchAgentArkForgeLaneStatus?,
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
@@ -443,10 +383,6 @@ public final class LaunchAgentService: @unchecked Sendable {
         "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     let hdcExecutable = try validatedExecutable(hdcExecutable, name: "HDC")
     let workspace = try workspace.map(validatedWorkspace)
-    let harnessSensitiveEvidence = try validatedSensitiveEvidence(harnessSensitiveEvidence)
-    let harnessModel = try harnessModel.map {
-      try validatedHarnessModel($0, workspace: workspace)
-    }
     let arkTraceDescriptor = try arkTraceDescriptor.map(validatedArkTraceDescriptor)
     let daemonSHA256 = try sha256(daemonSource)
     let hdcSHA256 = try sha256(hdcExecutable)
@@ -481,8 +417,6 @@ public final class LaunchAgentService: @unchecked Sendable {
       stdoutPath: paths.standardOutput.path,
       stderrPath: paths.standardError.path,
       workspace: workspace,
-      harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel,
       arkTraceDescriptor: arkTraceDescriptor, arkForgeLane: arkForgeLane)
     try renderedPlist.write(to: paths.plist, options: .atomic)
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.plist.path)
@@ -493,8 +427,6 @@ public final class LaunchAgentService: @unchecked Sendable {
       hdcSHA256: hdcSHA256,
       workspaceProjectPath: workspace?.projectRoot.path,
       devecoSDKPath: workspace?.devecoSDKRoot.path,
-      harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel?.status,
       arkTraceDescriptor: arkTraceDescriptor?.status)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
@@ -574,8 +506,6 @@ public final class LaunchAgentService: @unchecked Sendable {
     var hdcSHA256: String?
     var workspaceProjectPath: String?
     var devecoSDKPath: String?
-    var harnessSensitiveEvidence: [String] = []
-    var harnessModel: LaunchAgentHarnessModelStatus?
     var arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
 
     if installed {
@@ -585,8 +515,6 @@ public final class LaunchAgentService: @unchecked Sendable {
         hdcPath = configuration.hdc
         workspaceProjectPath = configuration.workspace?.projectRoot.path
         devecoSDKPath = configuration.workspace?.devecoSDKRoot.path
-        harnessSensitiveEvidence = configuration.harnessSensitiveEvidence
-        harnessModel = configuration.harnessModel?.status
         arkTraceDescriptor = configuration.arkTraceDescriptor?.status
         do {
           let validatedBundle = try daemonBundleValidator(paths.installedDaemonBundle)
@@ -640,12 +568,6 @@ public final class LaunchAgentService: @unchecked Sendable {
         {
           diagnostics.append("workspace configuration drifted since installation")
         }
-        if (receipt.harnessSensitiveEvidence ?? []) != harnessSensitiveEvidence {
-          diagnostics.append("Harness sensitive-evidence opt-in drifted since installation")
-        }
-        if receipt.harnessModel != harnessModel {
-          diagnostics.append("Harness local model configuration drifted since installation")
-        }
         if receipt.arkTraceDescriptor != arkTraceDescriptor {
           diagnostics.append("ArkTrace distribution descriptor drifted since installation")
         }
@@ -669,8 +591,6 @@ public final class LaunchAgentService: @unchecked Sendable {
       plistPath: paths.plist.path, daemonPath: daemonPath,
       daemonSHA256: daemonSHA256, hdcPath: hdcPath, hdcSHA256: hdcSHA256,
       workspaceProjectPath: workspaceProjectPath, devecoSDKPath: devecoSDKPath,
-      harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel,
       arkTraceDescriptor: arkTraceDescriptor,
       socketPath: paths.socket.path, socketPresent: socketPresent,
       standardOutputPath: paths.standardOutput.path,
@@ -699,14 +619,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     let daemon: String
     let hdc: String
     let workspace: LaunchAgentWorkspaceConfiguration?
-    let harnessSensitiveEvidence: [String]
-    let harnessModel: ValidatedHarnessModel?
     let arkTraceDescriptor: ValidatedArkTraceDescriptor?
-  }
-
-  private struct ValidatedHarnessModel {
-    let configuration: LaunchAgentHarnessModelConfiguration
-    let status: LaunchAgentHarnessModelStatus
   }
 
   private struct ValidatedArkTraceDescriptor {
@@ -746,10 +659,6 @@ public final class LaunchAgentService: @unchecked Sendable {
     let sdk = environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey]
     let analyzer = environment[ArkDeckLaunchAgent.analyzerEnvironmentKey]
     let inspector = environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey]
-    let harnessSensitiveEvidence = try validatedSensitiveEvidence(
-      environment[ArkDeckLaunchAgent.harnessSensitiveEvidenceEnvironmentKey].map {
-        $0.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
-      } ?? [])
     let workspaceValues = [projectEntry, activeProject, sdk, analyzer, inspector]
     let workspace: LaunchAgentWorkspaceConfiguration?
     if workspaceValues.allSatisfy({ $0 == nil }) {
@@ -769,21 +678,19 @@ public final class LaunchAgentService: @unchecked Sendable {
           projectRoot: URL(filePath: String(projectEntry.dropFirst(prefix.count))),
           devecoSDKRoot: URL(filePath: sdk)))
     }
-    let harnessModel = try configuredHarnessModel(
-      environment: environment, workspace: workspace)
+    // Legacy harness gateway keys from a pre-CHG-2026-064 installation are
+    // deliberately ignored here: `agentd update` reads this configuration and
+    // regenerates the plist, which is exactly how those keys get retired.
     let arkTraceDescriptor = try environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey]
       .map { try validatedArkTraceDescriptor(URL(filePath: $0)) }
     return ConfiguredPaths(
       daemon: daemon, hdc: hdc, workspace: workspace,
-      harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel,
       arkTraceDescriptor: arkTraceDescriptor)
   }
 
   private func renderTemplate(
     daemonPath: String, hdcPath: String, stdoutPath: String, stderrPath: String,
-    workspace: LaunchAgentWorkspaceConfiguration?, harnessSensitiveEvidence: [String],
-    harnessModel: ValidatedHarnessModel?,
+    workspace: LaunchAgentWorkspaceConfiguration?,
     arkTraceDescriptor: ValidatedArkTraceDescriptor?,
     arkForgeLane: LaunchAgentArkForgeLaneStatus?
   ) throws -> Data {
@@ -815,24 +722,6 @@ public final class LaunchAgentService: @unchecked Sendable {
       environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey] = workspace.devecoSDKRoot.path
       environment[ArkDeckLaunchAgent.analyzerEnvironmentKey] = daemonPath
       environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey] = "/usr/bin/grep"
-    }
-    if !harnessSensitiveEvidence.isEmpty {
-      environment[ArkDeckLaunchAgent.harnessSensitiveEvidenceEnvironmentKey] =
-        harnessSensitiveEvidence.joined(separator: ",")
-    }
-    if let harnessModel {
-      environment[ArkDeckLaunchAgent.harnessModelProviderEnvironmentKey] =
-        harnessModel.configuration.provider
-      environment[ArkDeckLaunchAgent.harnessModelNameEnvironmentKey] =
-        harnessModel.configuration.modelName
-      environment[ArkDeckLaunchAgent.harnessCLIPathEnvironmentKey] =
-        harnessModel.configuration.cliExecutable.path
-      environment[ArkDeckLaunchAgent.harnessCLIWorkingDirectoryEnvironmentKey] =
-        harnessModel.configuration.cliWorkingDirectory.path
-      environment[ArkDeckLaunchAgent.harnessCLITimeoutEnvironmentKey] =
-        String(harnessModel.configuration.cliTimeoutSeconds)
-      environment[ArkDeckLaunchAgent.harnessEgressProjectsEnvironmentKey] =
-        ArkDeckLaunchAgent.waterFlowProjectRef
     }
     if let arkTraceDescriptor {
       environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey] =
@@ -1199,106 +1088,6 @@ public final class LaunchAgentService: @unchecked Sendable {
         "DevEco SDK does not contain default/openharmony")
     }
     return LaunchAgentWorkspaceConfiguration(projectRoot: project, devecoSDKRoot: sdk)
-  }
-
-  private func validatedSensitiveEvidence(_ names: [String]) throws -> [String] {
-    guard names.count <= 16 else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness sensitive-evidence opt-in accepts at most 16 artifact names")
-    }
-    let normalized = Array(Set(names)).sorted()
-    guard normalized.count == names.count,
-      normalized.allSatisfy({ name in
-        !name.isEmpty && name.utf8.count <= 128
-          && name.range(
-            of: #"^[A-Za-z0-9][A-Za-z0-9._-]*$"#,
-            options: .regularExpression) != nil
-      })
-    else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness sensitive-evidence opt-in must contain unique safe artifact basenames")
-    }
-    return normalized
-  }
-
-  private func configuredHarnessModel(
-    environment: [String: String], workspace: LaunchAgentWorkspaceConfiguration?
-  ) throws -> ValidatedHarnessModel? {
-    let provider = environment[ArkDeckLaunchAgent.harnessModelProviderEnvironmentKey]
-    let model = environment[ArkDeckLaunchAgent.harnessModelNameEnvironmentKey]
-    let executable = environment[ArkDeckLaunchAgent.harnessCLIPathEnvironmentKey]
-    let workdir = environment[ArkDeckLaunchAgent.harnessCLIWorkingDirectoryEnvironmentKey]
-    let timeout = environment[ArkDeckLaunchAgent.harnessCLITimeoutEnvironmentKey]
-    let egress = environment[ArkDeckLaunchAgent.harnessEgressProjectsEnvironmentKey]
-    let values = [provider, model, executable, workdir, timeout, egress]
-    if values.allSatisfy({ $0 == nil }) { return nil }
-    guard let provider, let model, let executable, let workdir, let rawTimeout = timeout,
-      let timeout = Int(rawTimeout), egress == ArkDeckLaunchAgent.waterFlowProjectRef
-    else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness local model environment must be complete and scoped to demo-app")
-    }
-    return try validatedHarnessModel(
-      LaunchAgentHarnessModelConfiguration(
-        provider: provider, modelName: model,
-        cliExecutable: URL(filePath: executable),
-        cliWorkingDirectory: URL(filePath: workdir),
-        cliTimeoutSeconds: timeout),
-      workspace: workspace)
-  }
-
-  private func validatedHarnessModel(
-    _ configuration: LaunchAgentHarnessModelConfiguration,
-    workspace: LaunchAgentWorkspaceConfiguration?
-  ) throws -> ValidatedHarnessModel {
-    guard let workspace else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness local model requires the validated demo-app workspace configuration")
-    }
-    let provider = configuration.provider.lowercased()
-    guard ArkDeckLaunchAgent.harnessLocalModelProviders.contains(provider) else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness local model provider must be codex or claude-code")
-    }
-    guard configuration.modelName.utf8.count <= 200,
-      configuration.modelName.range(
-        of: #"^[A-Za-z0-9][A-Za-z0-9._:-]*$"#,
-        options: .regularExpression) != nil
-    else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness model name must be a non-empty safe identifier")
-    }
-    guard (1...900).contains(configuration.cliTimeoutSeconds) else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness local CLI timeout must be between 1 and 900 seconds")
-    }
-    let executable = try validatedExecutable(
-      configuration.cliExecutable, name: "Harness local model CLI")
-    guard configuration.cliWorkingDirectory.path.hasPrefix("/") else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness local CLI working directory must be absolute")
-    }
-    let workdir = configuration.cliWorkingDirectory.resolvingSymlinksInPath()
-      .standardizedFileURL
-    var isDirectory: ObjCBool = false
-    guard fileManager.fileExists(atPath: workdir.path, isDirectory: &isDirectory),
-      isDirectory.boolValue, workdir.path == workspace.projectRoot.path
-    else {
-      throw LaunchAgentServiceError.configuration(
-        "Harness local CLI working directory must be the validated demo-app project")
-    }
-    let normalized = LaunchAgentHarnessModelConfiguration(
-      provider: provider, modelName: configuration.modelName,
-      cliExecutable: executable, cliWorkingDirectory: workdir,
-      cliTimeoutSeconds: configuration.cliTimeoutSeconds)
-    return ValidatedHarnessModel(
-      configuration: normalized,
-      status: LaunchAgentHarnessModelStatus(
-        provider: provider, modelName: configuration.modelName,
-        cliPath: executable.path, cliSHA256: try sha256(executable),
-        cliWorkingDirectory: workdir.path,
-        cliTimeoutSeconds: configuration.cliTimeoutSeconds,
-        egressProjects: [ArkDeckLaunchAgent.waterFlowProjectRef]))
   }
 
   private func sha256(_ url: URL) throws -> String {

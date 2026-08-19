@@ -167,7 +167,7 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(reopenedStatus, completed)
   }
 
-  func testBrokerRejectsOrdinaryDebugSeedsAndRoutesThemToTheHarnessPlane() async throws {
+  func testBrokerRejectsOrdinaryDebugSeedsAndNamesThePublishedJobSurface() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(outcomes: [.succeeded], permitStateDirectory: root)
@@ -182,13 +182,13 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       operation: RuntimeOperationReference(id: "observe.device", version: 1))
     do {
       _ = try await controller.start(seedRequestData: encode(seed))
-      XCTFail("ordinary read-only debugging belongs to a bounded Harness task")
+      XCTFail("ordinary read-only debugging belongs to the published job surface")
     } catch let error as RuntimeDebugInvocationError {
       guard case .invalidSeedRequest(let detail) = error else {
         return XCTFail("unexpected error \(error)")
       }
       XCTAssertTrue(detail.contains("ordinary Agent debugging"))
-      XCTAssertTrue(detail.contains("Harness task"))
+      XCTAssertTrue(detail.contains("published job surface"))
     }
     let preparationCount = await driver.preparations()
     let dispatchedRequests = await driver.requests()

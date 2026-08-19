@@ -52,8 +52,6 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
       case "artifact":
         try RuntimeCLI.runArtifact(Array(arguments.dropFirst()))
-      case "task":
-        try RuntimeCLI.runTask(Array(arguments.dropFirst()))
       default:
         printUsage()
         exit(EX_USAGE)
@@ -408,19 +406,11 @@ struct ArkDeckCommandLine {
         arkdeck doctor [--socket <path>] [--json]
         arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
-      [--sensitive-evidence <artifact-name,...|none>] \
-      [--harness-model-provider <codex|claude-code|none> \
-       --harness-model-name <name> --harness-cli <absolute-cli-path> \
-       --harness-cli-timeout-seconds <1...900>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
       [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
        --arkforge-profile <absolute-path>]
         arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
-      [--sensitive-evidence <artifact-name,...|none>] \
-      [--harness-model-provider <codex|claude-code|none> \
-       --harness-model-name <name> --harness-cli <absolute-cli-path> \
-       --harness-cli-timeout-seconds <1...900>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
       [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
        --arkforge-profile <absolute-path>]
@@ -460,24 +450,6 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
       [--device-profile <dayu200>] [--json]
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
-        arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
-      [--intake <text>] [--project <ref>] [--max-rounds <n>] \
-      [--bundle-name <reverse-dns>] [--ability-name <name>] [--process-name <name>] \
-      [--baseline-hap-artifact-lease <lease-v1:job:artifact>] \
-      [--build-preset <ref>] [--test-preset <ref>] [--device-profile <ref>] \
-      [--base-workspace-revision <sha256>] [--component <name>] \
-      [--expected-binding-revision <n>] \
-      [--workspace-allowed-paths <glob,...>] \
-      [--workspace-allowed-operations <id@v,...>] [--max-attempts <n>] \
-      [--max-changed-files <n>] [--max-diff-lines <n>] \
-      [--max-wall-clock-seconds <n>] [--max-no-progress-rounds <n>] \
-      [--max-action-retries-per-run <n>] [--max-e1-mutations <n>] \
-      [--max-model-calls <n>] [--json]
-        arkdeck task list|status|result|events|evaluations|attempts|humanActions|memory|reconcile|\
-      pause|cancel --task <HTASK-id> [--json]
-        arkdeck task workspace-gc [--retain-days <n>] [--retain-last <n>] [--dry-run] [--json]
-        arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
-        arkdeck task promotion --task <HTASK-id> [--destination <directory>] [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
         arkdeck agent chat [--prompt <text>] [--socket <path>] \

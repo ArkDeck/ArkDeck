@@ -1013,7 +1013,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     //
     // One workspace revision, computed one way, everywhere. `create-checkpoint`
     // used to compare against a digest of just `checkpointFilePaths`, which no
-    // caller can produce: the harness states the revision it planned against,
+    // caller can produce: the caller states the revision it planned against,
     // and that is the profile-scoped workspace revision the authorization
     // facts, the issued capability's scope and `apply-patch` all speak. The two
     // digests could only agree by accident, so the checkpoint leg refused every

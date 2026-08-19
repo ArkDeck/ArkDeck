@@ -6,22 +6,20 @@
 // example a carved-out target directory silently merging back into its
 // parent target, or a shell-shaped public API appearing anywhere).
 //
-// The intended shape they defend:
+// The intended shape they defend (CHG-2026-064):
 //
-//   AI decides -> Harness controls -> Runtime executes -> Provider operates
-//   -> Artifact proves -> Evaluation judges
+//   External agent decides -> Runtime admits and executes -> Provider
+//   operates -> Artifact proves
 //
 // Concretely:
-//   - ArkDeckHarness (task control plane) cannot import ArkDeckProcess or
-//     any provider module: the harness produces typed decisions, never
-//     processes, shell, hdc or git.
-//   - ArkDeckWorkflows (runtime control plane + providers) cannot import
-//     ArkDeckHarness: the engine and providers must not understand the
-//     plane that drives them.
-//   - ArkDeckAgentComposition (harness<->runtime glue), ArkDeckAgentDaemon
-//     (service-side task adapter), and the executable composition roots may
-//     see both planes at once.
-//   - Storage and the artifact store know nothing about harness tasks.
+//   - There is no in-process decision plane. No target named ArkDeckHarness
+//     exists, nothing imports one, and the only way any caller — human, App
+//     or external agent — reaches execution is a published operation
+//     reference with typed inputs through admission.
+//   - The chat composition may hold a model gateway for its conversational
+//     front-end, but every side effect it produces still enters through the
+//     same admission gate as everyone else's.
+//   - Storage and the artifact store know nothing about task identity.
 //
 // When one of these tests fails, the fix is almost never to edit the test:
 // move the code to the layer that owns the concern, or descend the shared
@@ -52,7 +50,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckStorage": ["ArkDeckCore"],
-    "ArkDeckHarness": ["ArkDeckCore", "ArkDeckRuntime"],
     // ArkForgeIPC is the runtime control plane's route to the mechanics daemon:
     // the engine issues permits and reads receipts across it. Widened here in
     // the same review as the code that needs it (CHG-2026-059 step 5).
@@ -61,21 +58,20 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       "ArkForgeIPC",
     ],
     "ArkDeckAgentComposition": [
-      "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckHarness",
+      "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
       "ArkDeckWorkflows", "ArkDeckAgentClient",
     ],
     "ArkDeckAgentClient": ["ArkDeckCore"],
     "ArkDeckLaunchAgent": ["ArkDeckCore"],
-    "ArkDeckAgentDaemon": ["ArkDeckCore", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"],
+    "ArkDeckAgentDaemon": ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"],
     "ArkDeckCLI": [
       "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
       "ArkDeckAgentClient", "ArkDeckLaunchAgent",
     ],
     "ArkDeckAgentDaemonMain": [
-      "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore", "ArkDeckHarness",
+      "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
       "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckWorkflows",
     ],
-    "ArkDeckEvolutionCandidate": [],
   ]
 
   /// Where each target's sources live, relative to the package root, plus
@@ -88,8 +84,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
     ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
     ("ArkDeckStorage", "Sources/ArkDeckStorage", []),
-    ("ArkDeckHarness", "Sources/ArkDeckHarness", ["Candidate"]),
-    ("ArkDeckEvolutionCandidate", "Sources/ArkDeckHarness/Candidate", []),
     ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
     ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
     ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
@@ -119,14 +113,17 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
         "Package.swift target \(name) declares forbidden dependencies \(violations.sorted()); "
           + "allowed: \(allowed.sorted()) (docs/ArchitectureRules.md)")
     }
-    // The two load-bearing absences, asserted directly so a failure names
-    // the rule rather than a set difference.
-    XCTAssertFalse(
-      targets["ArkDeckWorkflows", default: []].contains("ArkDeckHarness"),
-      "the runtime plane must not depend on the harness plane")
-    XCTAssertFalse(
-      targets["ArkDeckHarness", default: []].contains("ArkDeckProcess"),
-      "the harness plane must not be able to spawn processes")
+    // The load-bearing absence, asserted directly so a failure names the
+    // rule rather than a set difference: the in-process decision plane was
+    // removed by CHG-2026-064 and no manifest edit may bring it back.
+    XCTAssertNil(
+      targets["ArkDeckHarness"],
+      "no target named ArkDeckHarness may exist; the decision plane is external agents")
+    for (name, dependencies) in targets {
+      XCTAssertFalse(
+        dependencies.contains("ArkDeckHarness"),
+        "\(name) depends on ArkDeckHarness; the in-process decision plane does not exist")
+    }
   }
 
   /// The exact set of targets that claim strict memory safety.
@@ -174,9 +171,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertTrue(
       manifest.contains("exclude: [\"AgentComposition\"]"),
       "ArkDeckWorkflows must exclude AgentComposition/ (it is the ArkDeckAgentComposition target)")
-    XCTAssertTrue(
-      manifest.contains("exclude: [\"Candidate\"]"),
-      "ArkDeckHarness must exclude Candidate/ (it is the ArkDeckEvolutionCandidate target)")
   }
 
   // MARK: - 2. Source-level import matrix
@@ -202,41 +196,24 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertGreaterThan(checkedFiles, 100, "layout drifted: too few files scanned")
   }
 
-  // MARK: - 3. Harness purity: no process, no shell, no device tooling
+  // MARK: - 3. The in-process decision plane stays removed
 
-  /// The harness plane produces typed decisions. It must contain no process
-  /// spawning, no shell strings, and no file whose name suggests an
-  /// executor. The guard denylist in HarnessGuard.swift legitimately spells
-  /// shell fragments, so this scans tokens, not words in comments.
-  func testHarnessPlaneCannotReachProcessOrShell() throws {
-    let forbiddenTokens = [
-      "Process(", "posix_spawn", "NSTask", "popen(", "system(", "/bin/sh", "/bin/bash",
-    ]
-    // HarnessGuard.swift is the anti-injection denylist: it names shell
-    // fragments in string literals precisely to refuse them.
-    let denylistFiles: Set<String> = ["HarnessGuard.swift"]
-    for file in try swiftFiles(under: "Sources/ArkDeckHarness", skippingSubdirectories: []) {
-      let name = file.lastPathComponent
-      for fragment in ["ProcessExecutor", "ShellRunner", "Shell", "HDC"] {
+  /// CHG-2026-064 removed the harness plane. Its directory must not exist,
+  /// and no production source may import a module by its name — a returning
+  /// plane should fail here by name, not as a matrix set difference.
+  func testTheInProcessDecisionPlaneStaysRemoved() throws {
+    var isDirectory: ObjCBool = false
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: packageRoot().appending(path: "Sources/ArkDeckHarness").path,
+        isDirectory: &isDirectory),
+      "Sources/ArkDeckHarness returned; the decision plane is external agents (CHG-2026-064)")
+    for (_, path, _) in Self.targetRoots {
+      for file in try swiftFiles(under: path, skippingSubdirectories: []) {
+        let code = try codeWithoutComments(of: file)
         XCTAssertFalse(
-          name.contains(fragment),
-          "\(relative(file)): file name suggests an executor; execution lives in providers")
-      }
-      guard !denylistFiles.contains(name) else { continue }
-      let code = try codeWithoutComments(of: file)
-      for token in forbiddenTokens {
-        if token == "Process(" {
-          // Word-boundary variant: `HarnessLocalAgentCLIRequest(` is a typed
-          // request name, `Process(` is a spawn.
-          let pattern = "(^|[^A-Za-z0-9_])Process\\("
-          XCTAssertNil(
-            code.range(of: pattern, options: .regularExpression),
-            "\(relative(file)): Foundation.Process construction inside the harness plane")
-        } else {
-          XCTAssertFalse(
-            code.contains(token),
-            "\(relative(file)): forbidden token \(token) inside the harness plane")
-        }
+          code.contains("import ArkDeckHarness"),
+          "\(relative(file)): imports the removed in-process decision plane")
       }
     }
   }
@@ -262,18 +239,17 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
   // MARK: - 5. LLM surface isolation
 
-  /// Model gateways, prompts and the local agent CLI transport belong to the
-  /// harness plane and the composition target only. The runtime engine,
-  /// providers, storage and clients must not name them.
-  func testLLMSurfaceStaysInHarnessAndComposition() throws {
+  /// The chat front-end's model gateway belongs to the composition target
+  /// and its CLI entry only. The runtime engine, providers, storage and
+  /// clients must not name a model surface.
+  func testLLMSurfaceStaysInTheChatComposition() throws {
     let llmTokens = [
-      "HarnessDecisionGateway", "HarnessLocalAgentCLITransport", "HarnessModelTransport",
-      "HarnessVendorConfiguration", "LocalAgentCLI",
+      "HarnessAgentModelGateway", "HarnessAgentOpenAIGateway", "HarnessAgentLoop",
+      "ARKDECK_HARNESS_MODEL_",
     ]
     let allowedPrefixes = [
-      "Sources/ArkDeckHarness/",
       "Sources/ArkDeckWorkflows/AgentComposition/",
-      "Sources/ArkDeckAgentDaemonMain/",
+      "Sources/ArkDeckCLI/",
     ]
     for (_, path, carveOuts) in Self.targetRoots {
       for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {

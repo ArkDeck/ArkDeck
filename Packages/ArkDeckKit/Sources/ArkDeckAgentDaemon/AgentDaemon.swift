@@ -8,7 +8,6 @@
 // start returns the existing instance's info instead of competing.
 
 import ArkDeckCore
-import ArkDeckHarness
 import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin
@@ -76,9 +75,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   private let debugRuntimeProbe: (any DebugRuntimeProbing)?
   private let debugInvocationController: RuntimeDebugInvocationController?
-  /// Absent means the harness plane is not configured in this composition;
-  /// `task.*` then fails closed instead of half-existing.
-  let harnessCoordinator: HarnessTaskCoordinator?
   private let hapImports: HAPArtifactImportCoordinator
   private let workspacePatchImports: WorkspacePatchArtifactImportCoordinator
   private let flashBundleImports: FlashBundleArtifactImportCoordinator
@@ -103,7 +99,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
-    harnessCoordinator: HarnessTaskCoordinator? = nil,
     methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
     self.init(
@@ -120,7 +115,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
       debugInvocationController: debugInvocationController,
-      harnessCoordinator: harnessCoordinator,
       methodObserver: methodObserver)
   }
 
@@ -141,7 +135,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
-    harnessCoordinator: HarnessTaskCoordinator?,
     methodObserver: (@Sendable (String) -> Void)?
   ) {
     self.engine = engine
@@ -158,7 +151,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.traceRuntimeProbe = traceRuntimeProbe
     self.debugRuntimeProbe = debugRuntimeProbe
     self.debugInvocationController = debugInvocationController
-    self.harnessCoordinator = harnessCoordinator
     self.hapImports = HAPArtifactImportCoordinator()
     self.workspacePatchImports = WorkspacePatchArtifactImportCoordinator()
     if let flashBundleImportDirectory {
@@ -1782,9 +1774,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .rejected, message: reason)
       }
 
-    case let method where method.hasPrefix("task."):
-      return await handleTaskMethod(method, request)
-
     default:
       return failure(
         id: request.id, code: .unknownMethod, message: "unknown method \(request.method)")
@@ -2200,9 +2189,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
     ])
   }
 
-  // Internal, not private: the `task.*` methods live in a sibling file so
-  // this file stays the closed method table rather than growing a second
-  // plane inside it.
   func success(id: String, result: JSONValue) -> AgentWireProtocol.Response {
     AgentWireProtocol.Response(id: id, ok: true, result: result, error: nil)
   }

@@ -1,7 +1,6 @@
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckHarness
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
@@ -1884,10 +1883,10 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   /// The GJ-5 window's revoked-envelope repro, driven through the real engine
   /// (CHG-2026-025, TASK-AIN-019). What matters here is not that the refusal
   /// happens — the store already guaranteed that — but that the *reason*
-  /// leaves the engine as a machine token. Without it the harness can only see
-  /// that authorization was involved, and reports a withdrawn grant as a
-  /// missing one.
-  func testARevokedCapabilityRejectionNamesItsReasonForTheHarness() async throws {
+  /// leaves the engine as a machine token. Without it a caller — today an
+  /// external agent reading the refusal — can only see that authorization was
+  /// involved, and reports a withdrawn grant as a missing one.
+  func testARevokedCapabilityRejectionNamesItsReasonAsAMachineToken() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
     let lease = try await publishHAPLease(artifacts)
@@ -1909,10 +1908,6 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       XCTAssertTrue(
         detail.contains("\(RuntimeJobEngine.capabilityDenialMarker)revoked]"),
         "the denial reason must survive as a token, not only as reflected prose: \(detail)")
-      // End to end: the harness classifies this exact production message as a
-      // revocation rather than as the generic authorization code.
-      XCTAssertEqual(
-        HarnessTaskCoordinator.semanticCode(from: detail), "authorizationRevoked")
     }
 
     XCTAssertTrue(

@@ -174,11 +174,10 @@ Data Protection Keychain 查询。未包装、未 provision 的 SwiftPM build �
 Keychain 不可读时，operation 都会 `UNAVAILABLE`/fail closed，不会猜 `PATH`、默认口令或
 DevEco 安装位置。
 
-安装 preset 后，本地签名也是 GJ-5 repair route 的默认方式：WaterFlow profile 固定读取
-Hvigor 的 `entry-default-unsigned.hap`，Harness 在 tests 与 `debug.hap@1` 之间自动提交
-`workspace.sign-openharmony-hap@1`，并把 verify-app 确认的 `signed.hap` lease 交给 debug。
-该进度持久化在 repair attempt 中；daemon 重启不会把 unsigned lease 当成已签名产物，也不会
-跳过 Runtime 直接调用工具。下面的手动 typed sign 命令保留给独立签名诊断和非 Harness 调用。
+安装 preset 后，本地签名也是 GJ-5 repair route 的默认方式：外部 agent 在 build 与
+`debug.hap@1` 之间提交 `workspace.sign-openharmony-hap@1`，并把 verify-app 确认的
+`signed.hap` lease 交给 debug。daemon 不会把 unsigned lease 当成已签名产物，也不会
+跳过 Runtime 直接调用工具。下面的手动 typed sign 命令同样适用于诊断场景。
 
 把 Hvigor 产生的 unsigned HAP 导入同一个 Runtime Artifact store，记录命令返回的 lease，
 再用同一个 UDS 运行 typed sign（JSON 中只能出现这三个 published inputs）：
@@ -227,96 +226,21 @@ HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony 
 绕过 HarmonyOS 授权的通用方案。无论哪一种签名来源，设备信任、签名身份和 profile 漂移都
 必须 fail closed。
 
-Harness 默认不读取 sensitive Artifact。GJ-5/debugCrash 的成功标准需要本机读取
-`crash-index.txt`（需要分析 HiLog 时再加入 `hilog.txt`），因此必须由操作者明确把所需的
-Artifact basename 固化到 LaunchAgent：
+## CHG-2026-064:进程内决策平面已移除(操作者迁移注记)
 
-```text
-arkdeck agentd update --sensitive-evidence crash-index.txt,hilog.txt
-```
+`arkdeck task ...`、daemon 的 `task.*` 方法、`--sensitive-evidence` 与
+`--harness-model-provider/--harness-model-name/--harness-cli/--harness-cli-timeout-seconds`
+安装 flag 均已移除:有界调试循环由**外部 agent**(如 headless Claude Code / codex)
+通过已发布的 job/artifact/workspace 面驱动,证据见
+`openspec/changes/chg-2026-064-agent-native-decision-plane/evidence/runs/TASK-AND-002/`。
 
-该设置只允许同一 daemon 内的 Harness 按 Artifact ID 读取这些精确名称；不会允许任意路径、
-不会开启 Artifact 导出，也不会开启模型网络 egress。`status --json` 与安装收据会显示并核对
-这份排序后的 allowlist。使用
-`arkdeck agentd update --sensitive-evidence none` 可撤销；默认值和撤销后均为空。无需 sensitive
-证据的任务不应启用此项。
-
-GJ-5 需要模型 producer 提出 bounded patch 时，前台 Terminal 的临时环境不会被 LaunchAgent
-继承。应把一个**已经登录**的本地 CLI 显式装进同一服务配置：
-
-```text
-arkdeck agentd update \
-  --harness-model-provider claude-code \
-  --harness-model-name sonnet \
-  --harness-cli /absolute/canonical/path/to/claude \
-  --harness-cli-timeout-seconds 900
-```
-
-provider 只允许 `codex` 或 `claude-code`，两者都使用代码中固定的无交互、只读 argv profile；
-安装器不接受 shell 字符串、额外 argv、API key 或 endpoint。CLI 必须是可执行的 canonical
-绝对路径（不要传会随自动升级漂移的 symlink）；安装收据和 `status` 会记录并核对 SHA-256。
-workdir 和 model egress 自动收窄到已验证的 `demo-app` workspace，不能借此访问另一工程。
-`update` 未重述这些参数时会保留原配置；运行
-
-```text
-arkdeck agentd update --harness-model-provider none
-```
-
-可完整撤销 producer/egress 配置。CLI 自己的登录凭据仍由其原生凭据存储管理，不会复制到
-plist 或 ArkDeck receipt。未配置 producer 时，Harness 会如实停在
-`producerProposalRequired`，不会把确定性 fallback 伪装成 AI 修复。
-
-## 锁屏运行与诊断
-
-在登录用户仍处于登录状态时，CLI 或 Agent 可继续通过默认 socket 提交 published typed
-operation；SwiftUI 窗口和 Terminal 都可关闭。锁屏和显示器熄灭不终止 LaunchAgent。真实
-Job 执行期间 Runtime 仅持有 idle-system-sleep assertion：它允许锁屏和显示器熄灭，不修改
-`pmset`，也不阻止合盖或用户主动睡眠。
-
-```text
-arkdeck agentd status --json
-arkdeck operation list
-arkdeck agentd verify --target <target-id> --json
-```
-
-状态命令会核对 plist、launchd load 状态、daemon/HDC/本地模型 CLI 当前 SHA-256、安装收据、
-socket 和 daemon health。只有 loopback HDC server 已通过启动期 typed readiness，daemon 才会
-开放 socket；持续不就绪时查看下方日志，不要另起 raw HDC server。`verify` 进一步固定走完整的无头产品链：identity-checked LaunchAgent → 默认
-用户私有 UDS → native Agent executor → published `observe.device@1` → daemon-owned terminal
-receipt → immutable Artifact inventory 与 Runtime postflight。它不接受自定义 socket、raw HDC、
-argv 或 capability 管理参数；多台已采用设备时必须显式传 `--target`，不会猜测设备。
-显式 target 只会使用 daemon 当前 `device.candidates` 中与该 durable target 精确关联的唯一
-transport face；Flash 后的 HDC 地址变化也必须已有 Runtime 写入的完整 alias proof。映射缺失
-或歧义时命令会要求重新连接且不创建 Job，不会把其他设备的 connect key 当作可选捷径。
-daemon 启动时会先恢复 durable Job；更新后第一次 `status` 若只报告 socket 尚未出现，可再次
-运行 `status`，持续不就绪再查看错误日志。
-
-`runtimeVerified: true` 只表示该次 Runtime receipt、Artifact 和 postflight 机械闭合。仓库中的
-fake/simulation 测试仍不得据此声称真实硬件通过；只有命令确实连接真机时，才可把脱敏 target、
-Job、时间与 Artifact hash 如实记录为真实设备证据。需要运行其他已发布 typed operation 时，
-仍使用同一个 native Agent 入口，例如：
-
-```text
-arkdeck agent run --operation capture.diagnostics@1 --target <target-id> \
-  --inputs-file <typed-inputs.json> --json
-```
-
-日志位于：
-
-```text
-~/Library/Logs/ArkDeck/agentd.log
-~/Library/Logs/ArkDeck/agentd.error.log
-```
-
-服务只属于 Aqua 登录会话；本说明不声称登出后、重启后的登录前阶段或合盖睡眠期间仍能
-执行设备 Job。
-
-## 卸载
-
-```text
-arkdeck agentd uninstall
-```
-
-卸载会 bootout 当前用户服务并删除生成的 plist、已安装 daemon 和身份收据。为避免误删
-诊断或运行历史，`~/Library/Application Support/ArkDeck/Agentd` 与日志目录会保留，并在
-命令结果中明确报告其路径。
+- **plist 迁移**:旧安装的 LaunchAgent env 若仍带 `ARKDECK_HARNESS_*` 网关键,
+  运行一次 `arkdeck agentd update` 即可再生成不含这些键的 plist(update 读取旧
+  配置时会忽略并丢弃它们)。手工编辑保留这些键的 plist 会让 daemon 启动时
+  具名 fail-loud(exit 78)。`ARKDECK_HARNESS_MODEL_*` 仍被 `arkdeck agent chat`
+  从其自身进程环境读取,与 daemon 无关。
+- **历史数据**:daemon state 下的 `harness/` 私有 SQLite 目录不再被读取;
+  保留在盘上作只读历史,操作者可自行删除。
+- **host-loop**:若本机曾安装 `com.arkdeck.host-loop.runtime` LaunchAgent
+  (每 900 秒驱动一轮旧循环),它已无对象可驱动,建议
+  `launchctl bootout gui/$UID/com.arkdeck.host-loop.runtime` 并删除其 plist。

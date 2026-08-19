@@ -31,7 +31,6 @@
 		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
-		E10000000000000000000001 /* AutomationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AutomationWorkspaceView.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -67,7 +66,6 @@
 		A100000000000000000000D2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
-		E10000000000000000000002 /* AutomationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationWorkspaceView.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -118,7 +116,6 @@
 				B10000000000000000000009 /* Trace Feature */,
 				A100000000000000000000D4 /* Settings Feature */,
 				D10000000000000000000003 /* Devices Feature */,
-				E10000000000000000000003 /* Automation Feature */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 			);
 			path = ArkDeckApp;
@@ -240,14 +237,6 @@
 				D10000000000000000000002 /* DeviceWorkspace.swift */,
 			);
 			path = Features/Devices;
-			sourceTree = "<group>";
-		};
-		E10000000000000000000003 /* Automation Feature */ = {
-			isa = PBXGroup;
-			children = (
-				E10000000000000000000002 /* AutomationWorkspaceView.swift */,
-			);
-			path = Features/Automation;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000039 /* Shared Features */ = {
@@ -386,7 +375,6 @@
 				B10000000000000000000003 /* TraceProgressArtifactsView.swift in Sources */,
 				A100000000000000000000D0 /* SettingsRootView.swift in Sources */,
 				C10000000000000000000001 /* FlashLocalization.swift in Sources */,
-				E10000000000000000000001 /* AutomationWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

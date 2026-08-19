@@ -1810,7 +1810,7 @@ public actor RuntimeJobEngine {
             // package-readback step.  That step must receive the same
             // engine-resolved immutable Artifact facts as the send/install
             // legs; otherwise the provider can prove only that a bundle name
-            // exists and the harness cannot bind deployment to the build
+            // exists and no caller can bind deployment to the build
             // digest it just verified.
             || (descriptor.reference == "debug.hap@1"
               && (step.kind == .installPackage
@@ -2416,7 +2416,7 @@ public actor RuntimeJobEngine {
   /// `stop-ability` is the case that forced the distinction. GJ-5 needs the
   /// application under debug to still be alive while something else observes
   /// it, and no request could leave it that way, because this step ran
-  /// unconditionally (measured on the 2026-07-31 window: the harness then
+  /// unconditionally (measured on the 2026-07-31 window: the debug loop then
   /// measured "liveness" on a device whose application was not running).
   /// Declaring it `optional` did switch it off - and also made a stop that
   /// reported `stopIneffective` a tolerable skip, so a job that left a process
@@ -6440,7 +6440,7 @@ public actor RuntimeJobEngine {
   }
 
   /// Opens the machine-readable half of a capability rejection message, closed
-  /// by `]`. Its counterpart is `HarnessTaskCoordinator.capabilityDenialMarker`;
+  /// by `]`. External callers parse it as a machine token from the refusal;
   /// the two planes are deliberately decoupled and cannot share a constant, so
   /// a contract test pins them to each other instead.
   static let capabilityDenialMarker = "[denial:"

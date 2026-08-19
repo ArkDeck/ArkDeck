@@ -161,7 +161,6 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableHAPImportMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableRockchipBindingMethods.contains(request.method)
-      || ArkDeckAgentXPC.forwardableAutomationMethods.contains(request.method)
     {
       return .direct(method: request.method)
     }

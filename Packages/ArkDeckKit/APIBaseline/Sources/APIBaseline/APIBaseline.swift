@@ -11,7 +11,6 @@
 import ArkDeckAgentClient
 import ArkDeckAgentDaemon
 import ArkDeckCore
-import ArkDeckHarness
 import ArkDeckLaunchAgent
 import ArkDeckOpenHarmony
 import ArkDeckProcess
@@ -66,26 +65,6 @@ private enum DaemonSurface {
       try body()
       return nil
     } catch let error as AgentDaemonError {
-      return "\(error)"
-    } catch {
-      return nil
-    }
-  }
-}
-
-// MARK: - ArkDeckHarness: coordinator entry point and error contract
-
-private enum HarnessSurface {
-  static let coordinator: HarnessTaskCoordinator.Type = HarnessTaskCoordinator.self
-  static let submit = HarnessTaskCoordinator.submit(_:)
-  static let reconcile = HarnessTaskCoordinator.reconcile(_:)
-  static let dispatchedJobID = \HarnessReconcileOutcome.dispatchedJobID
-
-  static func branches(_ body: () throws -> Void) -> String? {
-    do {
-      try body()
-      return nil
-    } catch let error as HarnessCoordinatorError {
       return "\(error)"
     } catch {
       return nil
@@ -151,8 +130,7 @@ private enum LaunchAgentSurface {
   static let makeService = LaunchAgentService.init(
     paths:runner:fileManager:uid:nowUTC:)
   static let install = LaunchAgentService.install(
-    daemonBundleSource:hdcExecutable:workspace:harnessSensitiveEvidence:harnessModel:
-    beforeBootstrap:)
+    daemonBundleSource:hdcExecutable:workspace:beforeBootstrap:)
   static let status = LaunchAgentService.status
   static let installed = \LaunchAgentStatus.installed
   static let loaded = \LaunchAgentStatus.loaded

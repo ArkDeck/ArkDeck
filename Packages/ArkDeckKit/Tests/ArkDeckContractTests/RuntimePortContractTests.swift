@@ -5,7 +5,6 @@ import Darwin
 import Foundation
 import XCTest
 
-@testable import ArkDeckHarness
 
 /// Anti-hang bound for the rendezvous waits in this file — semaphores handed
 /// to a background thread, polls for an asynchronously delivered event, and

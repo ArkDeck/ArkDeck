@@ -393,7 +393,6 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "uiDumpWorkspace.refresh()",
       "debugWorkspace.refresh()",
       "traceWorkspace.refresh()",
-      "automationWorkspace.refresh()",
     ] {
       XCTAssertFalse(
         startup.contains(nonCritical),
@@ -429,7 +428,6 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "lazy var uiDumpWorkspace",
       "lazy var debugWorkspace",
       "lazy var traceWorkspace",
-      "lazy var automationWorkspace",
       "lazy var settingsWorkspace",
     ] {
       XCTAssertTrue(
@@ -512,7 +510,6 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "uiDumpWorkspace.refresh()",
       "debugWorkspace.refresh()",
       "traceWorkspace.refresh()",
-      "automationWorkspace.refresh()",
     ] {
       XCTAssertTrue(
         demand.contains(visibleRefresh),

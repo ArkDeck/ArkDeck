@@ -13,13 +13,6 @@
 
 import Foundation
 
-/// Method names shared by control-plane producers and consumers whose drift
-/// would otherwise be discovered only after a daemon request. Add entries
-/// here when a method crosses independently compiled product surfaces.
-package enum ArkDeckAgentMethod {
-  package static let taskContext = "task.context"
-}
-
 /// Shared filesystem layout for the CLI and daemon composition roots.
 package enum ArkDeckAgentFilesystemLayout {
   package static let applicationSupportRelativeStateDirectory = "ArkDeck/Agentd"
@@ -151,24 +144,12 @@ package enum ArkDeckAgentXPC {
     "job.submit",
   ]
 
-  /// Existing Harness tasks are already closed typed runtime records. The App
-  /// may list them and request only bounded lifecycle transitions; it cannot
-  /// submit a new task, provide a human-resolution string, propose source,
-  /// export promotion material, or administer a capability.
-  package static let forwardableAutomationMethods: Set<String> = [
-    "task.cancel",
-    "task.list",
-    "task.pause",
-    "task.reconcile",
-  ]
-
   package static let forwardableMethods =
     forwardableReadOnlyMethods
     .union(forwardableFlashBundleMethods)
     .union(forwardableHAPImportMethods)
     .union(forwardableRockchipBindingMethods)
     .union(gatedAppJobMethods)
-    .union(forwardableAutomationMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.
   /// They are stable strings so the App can present an accurate cause rather

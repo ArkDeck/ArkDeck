@@ -270,7 +270,7 @@ public enum WorkspaceIsolationInspection: Sendable, Equatable {
 
 /// Composition-owned isolated workspace lifecycle. ArkDeckWorkflows owns the
 /// typed contract; ArkDeckAgentComposition supplies the persistent copier so
-/// the runtime plane never learns Harness internals or accepts a host path.
+/// the runtime plane never learns caller internals or accepts a host path.
 package protocol WorkspaceIsolationManaging: Sendable {
   func prepare(_ intent: WorkspaceIsolationIntent) async throws -> WorkspaceIsolationResult
   func inspect(_ intent: WorkspaceIsolationIntent) throws -> WorkspaceIsolationInspection

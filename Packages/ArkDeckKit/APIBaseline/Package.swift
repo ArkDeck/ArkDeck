@@ -27,7 +27,6 @@ let package = Package(
         .product(name: "ArkDeckProcess", package: "ArkDeckKit"),
         .product(name: "ArkDeckRuntime", package: "ArkDeckKit"),
         .product(name: "ArkDeckOpenHarmony", package: "ArkDeckKit"),
-        .product(name: "ArkDeckHarness", package: "ArkDeckKit"),
         .product(name: "ArkDeckWorkflows", package: "ArkDeckKit"),
         .product(name: "ArkDeckStorage", package: "ArkDeckKit"),
         .product(name: "ArkDeckAgentDaemon", package: "ArkDeckKit"),

@@ -103,8 +103,6 @@ private final class ArkDeckAppModelStore {
     provider: DebugApplicationFacade.make())
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
     provider: TraceApplicationFacade.make())
-  @ObservationIgnored lazy var automationWorkspace = AutomationWorkspaceViewModel(
-    provider: AutomationApplicationFacade.make())
   @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
 
@@ -150,7 +148,6 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   case debug
   case uiDump
   case trace
-  case automation
   case history
 
   var id: String { rawValue }
@@ -162,7 +159,6 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "app.navigation.debug"
     case .uiDump: "app.navigation.uiDump"
     case .trace: "app.navigation.trace"
-    case .automation: "app.navigation.automation"
     case .history: "app.navigation.history"
     }
   }
@@ -174,7 +170,6 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "ladybug"
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
-    case .automation: "gearshape.2"
     case .history: "clock.arrow.circlepath"
     }
   }
@@ -340,7 +335,6 @@ private struct AppShellView: View {
             navigationRow(.debug)
             navigationRow(.uiDump)
             navigationRow(.trace)
-            navigationRow(.automation)
           }
           Section("app.navigation.section.records") {
             navigationRow(.history)
@@ -466,8 +460,6 @@ private struct AppShellView: View {
       models.uiDumpWorkspace.refresh()
     case .navigation(.trace):
       models.traceWorkspace.refresh()
-    case .navigation(.automation):
-      models.automationWorkspace.refresh()
     }
   }
 
@@ -597,8 +589,6 @@ private struct AppShellView: View {
       UIDumpWorkspaceView(model: models.uiDumpWorkspace)
     case .trace:
       TraceWorkspaceView(model: models.traceWorkspace)
-    case .automation:
-      AutomationWorkspaceView(model: models.automationWorkspace)
     }
   }
 
