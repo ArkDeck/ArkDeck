@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9e`
+Catalog digest: `2f9d397dcb6add105c7a297577f229b3699be978d2262efe41d8cc3862ede0eb`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -30,6 +30,7 @@ Catalog digest: `d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9
 | `workspace.revert-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.run-tests@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |
 | `workspace.sign-openharmony-hap@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 600 | 134217728 |
+| `workspace.sweep-isolated-copies@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 1048576 |
 | `workspace.symbolize-crash@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 300 | 67108864 |
 
 ## Profiles

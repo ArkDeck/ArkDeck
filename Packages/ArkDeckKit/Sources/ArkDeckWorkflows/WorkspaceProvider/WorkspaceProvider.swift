@@ -193,7 +193,8 @@ package struct WorkspaceProvider: DeviceProvider {
             inspection.projectRoot,
           ],
           timeoutSeconds: 120))
-    case .prepareIsolatedCopy, .applyPatch, .buildOpenHarmony, .runTests,
+    case .prepareIsolatedCopy, .sweepIsolatedCopies, .applyPatch,
+      .buildOpenHarmony, .runTests,
       .symbolizeCrash, .revertPatch, .inspectGitStatus, .inspectDiff,
       .readSourceRange, .createCheckpoint, .createArchiveCheckpoint,
       .signOpenHarmonyHap:
@@ -242,7 +243,8 @@ package struct WorkspaceProvider: DeviceProvider {
             "inspectorExit\(receipt.exitStatus.map(String.init) ?? "missing")",
           detail: "workspace inspector failed for \(inspection.projectRef)")
       }
-    case .prepareIsolatedCopy, .applyPatch, .buildOpenHarmony, .runTests,
+    case .prepareIsolatedCopy, .sweepIsolatedCopies, .applyPatch,
+      .buildOpenHarmony, .runTests,
       .symbolizeCrash, .revertPatch, .inspectGitStatus, .inspectDiff,
       .readSourceRange, .createCheckpoint, .createArchiveCheckpoint,
       .signOpenHarmonyHap:
@@ -266,7 +268,8 @@ package struct WorkspaceProvider: DeviceProvider {
     switch action {
     case .inspectSource:
       return .confirmedNotExecuted
-    case .prepareIsolatedCopy, .applyPatch, .buildOpenHarmony, .runTests,
+    case .prepareIsolatedCopy, .sweepIsolatedCopies, .applyPatch,
+      .buildOpenHarmony, .runTests,
       .symbolizeCrash, .revertPatch, .inspectGitStatus, .inspectDiff,
       .readSourceRange, .createCheckpoint, .createArchiveCheckpoint,
       .signOpenHarmonyHap:

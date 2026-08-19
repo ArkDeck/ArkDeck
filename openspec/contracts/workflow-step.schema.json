@@ -50,6 +50,7 @@
         "finalizeSession",
         "inspectWorkspaceSource",
         "prepareWorkspaceIsolation",
+          "sweepWorkspaceIsolation",
         "applyWorkspacePatch",
         "buildWorkspaceOpenHarmony",
         "signWorkspaceOpenHarmonyHap",
@@ -2428,6 +2429,25 @@
           "if": {
             "properties": {
               "kind": {
+                "const": "sweepWorkspaceIsolation"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/sweepWorkspaceIsolationArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
                 "const": "inspectWorkspaceGitStatus"
               }
             },
@@ -3127,6 +3147,38 @@
         },
         "workspaceProjectRef": {
           "$ref": "#/$defs/id"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "sweepWorkspaceIsolationArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retainLatestCount",
+        "minimumQuiescentSeconds",
+        "dryRun",
+        "artifactId"
+      ],
+      "properties": {
+        "retainLatestCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "minimumQuiescentSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7776000
+        },
+        "dryRun": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
         },
         "artifactId": {
           "$ref": "#/$defs/id"

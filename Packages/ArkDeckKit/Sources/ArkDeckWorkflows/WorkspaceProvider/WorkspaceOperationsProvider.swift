@@ -622,7 +622,7 @@ public struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
 extension WorkspaceProviderAction {
   var operationInvocation: WorkspaceResolvedInvocation? {
     switch self {
-    case .inspectSource, .prepareIsolatedCopy:
+    case .inspectSource, .prepareIsolatedCopy, .sweepIsolatedCopies:
       return nil
     case .signOpenHarmonyHap:
       return nil
@@ -638,6 +638,14 @@ extension WorkspaceProviderAction {
       return value.invocation
     }
   }
+}
+
+/// Read-only lineage over the durable patch attempts of one derived profile.
+/// Workspace adoption verifies a measured revision against the history the
+/// runtime itself recorded, instead of refusing every legitimate patch as
+/// drift (CHG-2026-067 RWL-REQ-001).
+package protocol WorkspacePatchLineageReading: Sendable {
+  func patchAttempts(forProjectRef projectRef: String) throws -> [WorkspacePatchAttempt]
 }
 
 package final class WorkspacePatchAttemptStore: @unchecked Sendable {
@@ -723,6 +731,29 @@ package final class WorkspacePatchAttemptStore: @unchecked Sendable {
     return rootURL.appending(path: "\(reference).json")
   }
 
+  /// Every durable attempt record whose `projectRef` matches, ordered by
+  /// `appliedAtUTC`. Payload (`.patch`) and checkpoint files are not attempt
+  /// records; a record that fails to decode is surfaced as an error rather
+  /// than silently skipped — a lineage with unreadable links must not vouch.
+  package func attemptRecords(forProjectRef projectRef: String) throws
+    -> [WorkspacePatchAttempt]
+  {
+    try lock.withLock {
+      let entries =
+        (try? FileManager.default.contentsOfDirectory(
+          at: rootURL, includingPropertiesForKeys: nil, options: [])) ?? []
+      var attempts: [WorkspacePatchAttempt] = []
+      for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+        let name = entry.lastPathComponent
+        guard name.hasPrefix("patch-"), name.hasSuffix(".json") else { continue }
+        let attempt = try JSONDecoder().decode(
+          WorkspacePatchAttempt.self, from: Data(contentsOf: entry))
+        if attempt.projectRef == projectRef { attempts.append(attempt) }
+      }
+      return attempts.sorted { $0.appliedAtUTC < $1.appliedAtUTC }
+    }
+  }
+
   private func patchURL(for reference: String) throws -> URL {
     try validate(reference)
     return rootURL.appending(path: "\(reference).patch")
@@ -734,6 +765,14 @@ package final class WorkspacePatchAttemptStore: @unchecked Sendable {
     else {
       throw DeviceProviderError.unsupportedAction("workspace patch attempt ref is malformed")
     }
+  }
+}
+
+extension WorkspacePatchAttemptStore: WorkspacePatchLineageReading {
+  package func patchAttempts(forProjectRef projectRef: String) throws
+    -> [WorkspacePatchAttempt]
+  {
+    try attemptRecords(forProjectRef: projectRef)
   }
 }
 
@@ -883,6 +922,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     switch operation.reference {
     case "workspace.prepare-isolated-copy@1":
       hasPreset = isolationManager != nil && profile.kind == .primary
+    case "workspace.sweep-isolated-copies@1":
+      hasPreset = isolationManager != nil && profile.kind == .primary
     case "workspace.apply-patch@1", "workspace.revert-patch@1":
       hasPreset = true
     case "workspace.build-openharmony@1":
@@ -989,6 +1030,37 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
+    // The sweep takes no projectRef: its subject is the whole isolation
+    // store, and its testimony comes from the runtime ledger at dispatch —
+    // route it before the shared per-project preamble below.
+    if operation.reference == "workspace.sweep-isolated-copies@1",
+      step.kind == .sweepWorkspaceIsolation
+    {
+      guard profile.kind == .primary, isolationManager != nil else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.isolationManagerUnavailable")
+      }
+      let retainLatestCount = try integer("retainLatestCount", in: inputs)
+      let minimumQuiescentSeconds = try integer("minimumQuiescentSeconds", in: inputs)
+      guard (0...64).contains(retainLatestCount),
+        (0...7_776_000).contains(minimumQuiescentSeconds)
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.sweepInputsOutOfBounds")
+      }
+      guard case .bool(let dryRun)? = inputs["dryRun"] else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.sweepInputsIncomplete:dryRun")
+      }
+      return .workspace(
+        .sweepIsolatedCopies(
+          WorkspaceSweepIntent(
+            runtimeOwnerID: "runtime-\(context.jobID)",
+            retainLatestCount: retainLatestCount,
+            minimumQuiescentSeconds: minimumQuiescentSeconds,
+            dryRun: dryRun,
+            createdAtUTC: context.nowUTC)))
+    }
     let projectRef = try string("projectRef", in: inputs)
     if projectRef != profile.projectRef {
       guard let selected = profileRegistry.profile(for: projectRef) else {
@@ -1340,6 +1412,21 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
             jobID: context.jobID, stepID: context.stepID,
             actionSHA256: isolation.actionSHA256)))
     }
+    if case .workspace(.sweepIsolatedCopies(let sweep)) = action {
+      guard isolationManager != nil,
+        sweep.runtimeOwnerID == "runtime-\(context.jobID)"
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace sweep action is not owned by this Job")
+      }
+      return TypedProcessPlan(
+        action: action,
+        kind: .hostWorkspace(
+          HostWorkspaceProcessDescriptor(
+            identifier: "workspace.sweep-isolated-copies/v1",
+            jobID: context.jobID, stepID: context.stepID,
+            actionSHA256: sweep.actionSHA256)))
+    }
     if case .workspace(.signOpenHarmonyHap(let signing)) = action {
       guard signing.output == signingAttempts?.paths(jobID: context.jobID),
         signing.jobID == context.jobID,
@@ -1425,6 +1512,22 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> ProviderSemanticOutcome {
+    if case .workspace(.sweepIsolatedCopies(let sweep)) = action {
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+        receipt.hostManagedRecordID == sweep.actionSHA256,
+        receipt.hostManagedSummary["findingsSha256"]
+          == WorkspaceProviderSupport.sha256(receipt.stdout),
+        receipt.hostManagedSummary["dryRun"] == String(sweep.dryRun),
+        let destroyed = receipt.hostManagedSummary["destroyed"].flatMap(Int.init),
+        let retained = receipt.hostManagedSummary["retained"].flatMap(Int.init),
+        destroyed >= 0, retained >= 0
+      else {
+        return .failed(
+          code: "workspace.sweepReceiptInvalid",
+          detail: "sweep receipt is absent or disagrees with the typed action")
+      }
+      return .verified(summary: receipt.hostManagedSummary)
+    }
     if case .workspace(.prepareIsolatedCopy(let isolation)) = action {
       guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
         receipt.hostManagedRecordID == isolation.workspaceID,
@@ -1506,6 +1609,10 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         detail: "bounded output was truncated; semantic result is incomplete")
     }
     switch workspace {
+    case .sweepIsolatedCopies:
+      return .failed(
+        code: "workspace.sweepRoutingFailed",
+        detail: "sweep verification did not use the closed sweep receipt")
     case .signOpenHarmonyHap:
       return .failed(
         code: "workspace.signingRoutingFailed",
@@ -1743,6 +1850,12 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return .stillUnknown(reason: "workspace reconcile received a foreign action")
     }
     switch workspace {
+    case .sweepIsolatedCopies:
+      // Which trees a crashed sweep destroyed is readable only from its
+      // findings; interrupted teardowns resume safely on the next sweep, so
+      // recovery parks the unknown instead of guessing (CHG-2026-067).
+      return .stillUnknown(
+        reason: "sweep outcome is derivable only from its findings; submit a fresh sweep")
     case .inspectGitStatus, .inspectDiff, .readSourceRange:
       // A read writes nothing, so there is no external effect for recovery
       // to confirm and re-running it cannot double anything.

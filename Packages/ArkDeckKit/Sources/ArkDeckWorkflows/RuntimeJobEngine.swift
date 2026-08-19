@@ -8193,6 +8193,17 @@ public actor RuntimeJobEngine {
         "workspaceProjectRef": .string(isolation.workspaceProjectRef),
         "artifactId": .string("isolated-workspace.json"),
       ]
+    case .sweepWorkspaceIsolation:
+      guard case .workspace(.sweepIsolatedCopies(let sweep))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed workspace sweep action")
+      }
+      arguments = [
+        "retainLatestCount": .integer(Int64(sweep.retainLatestCount)),
+        "minimumQuiescentSeconds": .integer(Int64(sweep.minimumQuiescentSeconds)),
+        "dryRun": .string(String(sweep.dryRun)),
+        "artifactId": .string("sweep-findings.json"),
+      ]
     case .createWorkspaceCheckpoint:
       let projectRef: String
       switch action {
@@ -8342,4 +8353,70 @@ public actor RuntimeJobEngine {
     ).runtimeBuildVersion
   }
 
+}
+
+/// What the runtime's own durable ledger can say about the jobs referencing
+/// one Runtime-owned isolated workspace: how many reference it, whether every
+/// one of them is terminal, and the newest transition among them. The sweep
+/// dispatcher composes its quiescence testimony exclusively from this —
+/// callers have no field through which to supply or bias it (CHG-2026-067
+/// RWL-REQ-002).
+public struct WorkspaceReferenceLedgerFacts: Sendable, Equatable {
+  public let referencingJobCount: Int
+  public let allTerminal: Bool
+  public let newestTransitionUTC: String?
+
+  public init(referencingJobCount: Int, allTerminal: Bool, newestTransitionUTC: String?) {
+    self.referencingJobCount = referencingJobCount
+    self.allTerminal = allTerminal
+    self.newestTransitionUTC = newestTransitionUTC
+  }
+}
+
+public protocol WorkspaceReferenceLedgerReading: Sendable {
+  func referenceFacts(
+    prepareRuntimeOwnerID: String, derivedProjectRef: String
+  ) async throws -> WorkspaceReferenceLedgerFacts
+}
+
+extension RuntimeJobEngine: WorkspaceReferenceLedgerReading {
+  /// Terminality comes from the repository's own active-set filter rather
+  /// than from re-parsing state strings; a job is a reference if it created
+  /// the workspace or if its persisted typed request names the derived
+  /// projectRef in its inputs.
+  public func referenceFacts(
+    prepareRuntimeOwnerID: String, derivedProjectRef: String
+  ) async throws -> WorkspaceReferenceLedgerFacts {
+    let prepareJobID = prepareRuntimeOwnerID.hasPrefix("runtime-")
+      ? String(prepareRuntimeOwnerID.dropFirst("runtime-".count))
+      : prepareRuntimeOwnerID
+    let all = try admissionService.allJobs()
+    let active = Set(try admissionService.activeJobs().map(\.jobID))
+    var count = 0
+    var allTerminal = true
+    var newest: String?
+    for job in all {
+      let references: Bool
+      if job.jobID == prepareJobID {
+        references = true
+      } else if let data = job.initialRecordData,
+        let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data),
+        case .string(derivedProjectRef)? = record.request.inputs["projectRef"]
+      {
+        references = true
+      } else {
+        references = false
+      }
+      guard references else { continue }
+      count += 1
+      if active.contains(job.jobID) {
+        allTerminal = false
+      } else if newest.map({ job.updatedAtUTC > $0 }) ?? true {
+        newest = job.updatedAtUTC
+      }
+    }
+    return WorkspaceReferenceLedgerFacts(
+      referencingJobCount: count, allTerminal: allTerminal,
+      newestTransitionUTC: newest)
+  }
 }

@@ -65,17 +65,40 @@ package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
 
   private let rootURL: URL
   private let profiles: WorkspaceProjectProfileRegistry
+  private let patchLineage: (any WorkspacePatchLineageReading)?
   private let lock = NSLock()
 
   public init(
     rootURL: URL,
-    profileRegistry: WorkspaceProjectProfileRegistry
+    profileRegistry: WorkspaceProjectProfileRegistry,
+    patchLineage: (any WorkspacePatchLineageReading)? = nil
   ) throws {
     self.rootURL = rootURL.standardizedFileURL
     self.profiles = profileRegistry
+    self.patchLineage = patchLineage
     try FileManager.default.createDirectory(
       at: self.rootURL, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
+  }
+
+  /// Folds the durable patch lineage into the revision the tree should
+  /// measure right now. `nil` means the chain cannot vouch — a broken link,
+  /// a fork, or a record whose `before` does not extend the current state —
+  /// and adoption must keep its named refusal (RWL-REQ-001).
+  package static func lineageDerivedRevision(
+    base: String, attempts: [WorkspacePatchAttempt]
+  ) -> String? {
+    var current = base
+    for attempt in attempts.sorted(by: { $0.appliedAtUTC < $1.appliedAtUTC }) {
+      guard let before = attempt.workspaceRevisionBefore,
+        let after = attempt.workspaceRevisionAfter,
+        before == current
+      else { return nil }
+      // A reverted attempt restored `before`, which is already `current`;
+      // an applied one advanced the tree to `after`.
+      if attempt.revertedAtUTC == nil { current = after }
+    }
+    return current
   }
 
   /// Re-registers a workspace this process did not create.
@@ -370,6 +393,71 @@ package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
   /// removed in-process task plane carried their policy in task records;
   /// these copies have no such record, so their complete narrowing policy
   /// lives in the versioned manifest instead.
+  /// One read-only row per persisted Runtime-owned workspace, with the same
+  /// vouching the adoption path applies (metadata, scopes, base-or-lineage
+  /// revision). The sweep dispatcher composes testimony only for vouched
+  /// rows; everything else stays untouched by construction (RWL-REQ-003).
+  package struct RuntimeWorkspaceInventoryEntry: Sendable, Equatable {
+    package let workspaceID: String
+    package let runtimeOwnerID: String
+    package let derivedProjectRef: String
+    package let createdAtUTC: String
+    package let vouched: Bool
+  }
+
+  package func runtimeWorkspaceInventory() -> [RuntimeWorkspaceInventoryEntry] {
+    lock.withLock {
+      let entries =
+        (try? FileManager.default.contentsOfDirectory(
+          at: rootURL, includingPropertiesForKeys: [.isDirectoryKey], options: []))
+        ?? []
+      guard entries.count <= 4_096 else { return [] }
+      var inventory: [RuntimeWorkspaceInventoryEntry] = []
+      for enumerated in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+        let entry = rootURL.appending(
+          path: enumerated.lastPathComponent, directoryHint: .isDirectory)
+        let manifestURL = entry.appending(path: "workspace.json")
+        guard let data = try? Data(contentsOf: manifestURL),
+          let stored = try? JSONDecoder().decode(Manifest.self, from: data),
+          stored.workspace.htaskID.hasPrefix("runtime-")
+        else { continue }
+        var vouched = false
+        if let allowedPaths = stored.allowedPaths,
+          let source = profiles.profile(for: stored.workspace.sourceProjectRef),
+          source.kind == .primary,
+          Self.allowedPathsDigest(allowedPaths) == stored.workspace.allowedPathsDigest,
+          let revision = try? WorkspaceProviderSupport.workspaceRevision(
+            root: entry.appending(path: "workspace", directoryHint: .isDirectory).path,
+            profileVersion: source.profileID, globs: allowedPaths)
+        {
+          // Same acceptance as adoption: the base vouches for an unpatched
+          // tree, the durable patch lineage for every revision it derives.
+          if revision == stored.workspace.baseRevision {
+            vouched = true
+          } else if let lineage = patchLineage,
+            let derived =
+              (try? lineage.patchAttempts(forProjectRef: stored.workspace.projectRef))
+              .flatMap({
+                Self.lineageDerivedRevision(
+                  base: stored.workspace.baseRevision, attempts: $0)
+              }),
+            derived == revision
+          {
+            vouched = true
+          }
+        }
+        inventory.append(
+          RuntimeWorkspaceInventoryEntry(
+            workspaceID: stored.workspace.workspaceID,
+            runtimeOwnerID: stored.workspace.htaskID,
+            derivedProjectRef: stored.workspace.projectRef,
+            createdAtUTC: stored.workspace.createdAtUTC,
+            vouched: vouched))
+      }
+      return inventory
+    }
+  }
+
   package func adoptRuntimeWorkspaces() -> [String] {
     lock.withLock {
       let entries =
@@ -404,7 +492,21 @@ package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
           let revision = try WorkspaceProviderSupport.workspaceRevision(
             root: workspaceRoot.path, profileVersion: source.profileID,
             globs: allowedPaths)
-          guard revision == stored.workspace.baseRevision else {
+          // The base revision vouches for an unpatched tree; the durable
+          // patch lineage vouches for every revision it derives from that
+          // base. Anything else — including a lineage the store cannot read —
+          // keeps the named refusal (RWL-REQ-001).
+          let lineageDerived: String? =
+            revision == stored.workspace.baseRevision
+            ? revision
+            : patchLineage.flatMap { lineage in
+              (try? lineage.patchAttempts(forProjectRef: stored.workspace.projectRef))
+                .flatMap {
+                  Self.lineageDerivedRevision(
+                    base: stored.workspace.baseRevision, attempts: $0)
+                }
+            }
+          guard lineageDerived == revision else {
             failures.append("\(stored.workspace.workspaceID):revision")
             continue
           }

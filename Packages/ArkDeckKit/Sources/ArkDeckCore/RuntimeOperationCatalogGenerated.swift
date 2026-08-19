@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9e"
+  public static let catalogDigest = "2f9d397dcb6add105c7a297577f229b3699be978d2262efe41d8cc3862ede0eb"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -844,6 +844,36 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "signed.hap", role: .derived, mediaType: "application/vnd.openharmony.hap", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified),
         CatalogArtifactDescriptor(name: "signing-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.sweep-isolated-copies",
+      version: 1,
+      title: "Sweep quiescent Runtime-owned isolated ProjectProfile copies",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "dryRun", type: .boolean, isRequired: true),
+        CatalogFieldDescriptor(name: "minimumQuiescentSeconds", type: .integer, isRequired: true, minimum: 0, maximum: 7776000),
+        CatalogFieldDescriptor(name: "retainLatestCount", type: .integer, isRequired: true, minimum: 0, maximum: 64)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "sweepFindings", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "sweep-isolated-copies", kind: .sweepWorkspaceIsolation, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 900,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "sweep-findings.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
       ],
       profiles: ["workspace-host@1"]
     ),
