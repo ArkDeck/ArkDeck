@@ -1,6 +1,6 @@
 import Foundation
 
-/// Product-facing RockUSB modes. Discovery itself is owned by ArkForge; ArkDeck
+/// Product-facing RockUSB modes. Device observation is owned by ArkForge; ArkDeck
 /// only projects the daemon's typed observations into App advice.
 public enum RockchipDeviceMode: String, Sendable, Equatable {
   case loader = "Loader"

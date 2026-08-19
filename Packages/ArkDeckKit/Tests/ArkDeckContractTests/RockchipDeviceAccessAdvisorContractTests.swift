@@ -3,9 +3,9 @@ import XCTest
 
 @testable import ArkDeckWorkflows
 
-/// Product-facing discovery is a typed projection of ArkForge observations.
+/// Product-facing access advice is a typed projection of ArkForge observations.
 /// ArkDeck no longer selects, launches, parses or trusts a separate vendor tool.
-final class RockchipDeviceDiscoveryContractTests: XCTestCase {
+final class RockchipDeviceAccessAdvisorContractTests: XCTestCase {
   func testAccessAdvisorKeepsFailureFamiliesDistinctAndActionable() {
     let cases:
       [(
