@@ -1222,7 +1222,14 @@ struct FlashWorkspaceView: View {
         "flash.plan.size",
         ByteCountFormatter.string(fromByteCount: plan.archiveSizeBytes, countStyle: .file))
       summaryRow("flash.plan.archiveHash", plan.archiveSHA256, monospaced: true)
-      summaryRow("flash.plan.digest", plan.planDigestSHA256, monospaced: true)
+      // Before submission there is no executed-plan digest to show: the
+      // engine materializes it at job.submit and pins it in the job record
+      // (CHG-2026-066). The step-set digest below is the exact value the
+      // RuntimeCapability correlation carries.
+      summaryRow(
+        "flash.plan.digest",
+        plan.planDigestSHA256 ?? flashText("flash.plan.digest.materializedAtSubmission"),
+        monospaced: plan.planDigestSHA256 != nil)
       summaryRow("flash.plan.stepSetDigest", plan.stepSetDigestSHA256, monospaced: true)
     }
   }

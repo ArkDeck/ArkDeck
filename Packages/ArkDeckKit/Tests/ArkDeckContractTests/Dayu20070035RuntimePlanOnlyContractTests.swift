@@ -72,17 +72,17 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     }
   }
 
-  // The retired RockchipProductExecutePlanFactPort's composition, kept here
-  // as the contract under test: describe -> forBuild -> validate -> makePlan
-  // is the same shape FlashApplicationFacade materializes previews with
-  // (CHG-2026-065 removed the package wrapper, which had no production
-  // caller left after the lowering moved to the ArkForge lane).
+  // The archive fail-closed composition under contract: describe -> forBuild
+  // -> validate is exactly the shape FlashPlanPresentationBuilder.prepare
+  // runs before the review renders. The plan-fabrication tail that used to
+  // follow it was dissolved by CHG-2026-066 — the executed plan is the
+  // engine's, materialized at submission.
   private enum PlanFactFailure: Error, Equatable { case archiveValidationFailed }
 
-  private func makeValidatedExecutePlanFacts(
+  private func validatedArchiveProfile(
     summary: GzipTarArchiveSummary,
     board: RockchipFlashProfile = .dayu200
-  ) throws -> (plan: RockchipFlashPlan, archiveProfile: RockchipFlashProfile) {
+  ) throws -> RockchipFlashProfile {
     let profile: RockchipFlashProfile
     do {
       profile = try board.forBuild(
@@ -90,17 +90,10 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     } catch {
       throw PlanFactFailure.archiveValidationFailed
     }
-    let provider = RockchipRockUSBFlashProvider(profile: profile)
-    let verdict = provider.profile.validate(summary.archiveObservation())
-    guard verdict == .valid else { throw PlanFactFailure.archiveValidationFailed }
-    return (try provider.makePlan(mode: .execute, archiveValidation: verdict), profile)
-  }
-
-  private func makeValidatedExecutePlan(
-    summary: GzipTarArchiveSummary,
-    board: RockchipFlashProfile = .dayu200
-  ) throws -> RockchipFlashPlan {
-    try makeValidatedExecutePlanFacts(summary: summary, board: board).plan
+    guard profile.validate(summary.archiveObservation()) == .valid else {
+      throw PlanFactFailure.archiveValidationFailed
+    }
+    return profile
   }
 
   func testOpenHarmony70035ProfilePinsEveryMemberAndExactNinePartitionPlan() throws {
@@ -274,58 +267,48 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       scannedValue: version)
   }
 
-  /// The fact port plans for the archive it is given.
+  /// Archive validation plans for the archive it is given.
   ///
   /// It used to select a profile by matching the archive's digest against the
   /// builds compiled into the product, so a firmware daily published after the
   /// last release could not be planned at all. "Drift" now means the archive
   /// does not fit the board — a missing image, an unknown partition, an
   /// unreadable version — not that nobody had met it before.
-  func testAuthorizedExecutePlanFactsPlanForWhateverFitsTheBoard() throws {
+  func testAuthorizedArchiveValidationAcceptsWhateverFitsTheBoard() throws {
     let profile = RockchipFlashProfile.dayu200
-    let plan = try makeValidatedExecutePlan(summary: summary(for: profile))
-    let expected = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
-      mode: .execute, archiveValidation: .valid)
-    XCTAssertEqual(plan, expected)
-    XCTAssertEqual(plan.archiveSHA256, profile.archiveSHA256)
 
-    // Admission receives both values from this one summary. Dispatcher may
+    // Admission receives the profile from this one summary. Dispatcher may
     // therefore reuse the invocation-local profile without a second archive
     // description pass, while upload/import still validate the actual file.
-    let validated = try makeValidatedExecutePlanFacts(
+    let validated = try validatedArchiveProfile(
       summary: summary(for: profile), board: profile)
-    XCTAssertEqual(validated.plan, plan)
-    XCTAssertEqual(validated.archiveProfile.catalogReference, profile.catalogReference)
-    XCTAssertEqual(validated.archiveProfile.archiveSizeBytes, profile.archiveSizeBytes)
-    XCTAssertEqual(validated.archiveProfile.archiveSHA256, profile.archiveSHA256)
-    XCTAssertEqual(validated.archiveProfile.members, profile.members)
-    XCTAssertEqual(validated.archiveProfile.mappedPartitions, profile.mappedPartitions)
+    XCTAssertEqual(validated.catalogReference, profile.catalogReference)
+    XCTAssertEqual(validated.archiveSizeBytes, profile.archiveSizeBytes)
+    XCTAssertEqual(validated.archiveSHA256, profile.archiveSHA256)
+    XCTAssertEqual(validated.members, profile.members)
+    XCTAssertEqual(validated.mappedPartitions, profile.mappedPartitions)
     XCTAssertEqual(
-      validated.archiveProfile.membershiplessPartitionsWriteForbidden,
+      validated.membershiplessPartitionsWriteForbidden,
       profile.membershiplessPartitionsWriteForbidden)
-    XCTAssertEqual(validated.archiveProfile.prerequisites, profile.prerequisites)
-    XCTAssertEqual(validated.archiveProfile.runtimeBuildVersion, profile.runtimeBuildVersion)
-    XCTAssertEqual(validated.archiveProfile.firmwareVersion, profile.runtimeBuildVersion)
+    XCTAssertEqual(validated.prerequisites, profile.prerequisites)
+    XCTAssertEqual(validated.runtimeBuildVersion, profile.runtimeBuildVersion)
+    XCTAssertEqual(validated.firmwareVersion, profile.runtimeBuildVersion)
 
-    // A build nobody enumerated plans, and its plan records its own digest.
+    // A build nobody enumerated validates, and its profile records its own
+    // digest.
     let unknownDigest = String(repeating: "0", count: 64)
-    let unknownPlan = try makeValidatedExecutePlan(
-      summary: summary(for: profile, archiveSHA256: unknownDigest))
-    XCTAssertEqual(unknownPlan.archiveSHA256, unknownDigest)
-    XCTAssertEqual(unknownPlan.steps.count, plan.steps.count)
-    let unknownValidated = try makeValidatedExecutePlanFacts(
+    let unknownValidated = try validatedArchiveProfile(
       summary: summary(for: profile, archiveSHA256: unknownDigest), board: profile)
-    XCTAssertEqual(unknownValidated.plan.archiveSHA256, unknownDigest)
-    XCTAssertEqual(unknownValidated.archiveProfile.archiveSHA256, unknownDigest)
+    XCTAssertEqual(unknownValidated.archiveSHA256, unknownDigest)
     XCTAssertEqual(
-      unknownValidated.archiveProfile.runtimeBuildVersion,
+      unknownValidated.runtimeBuildVersion,
       profile.runtimeBuildVersion)
 
     // Structural drift still fails closed: an image the board maps is absent.
     let missingImage = profile.members.filter { $0.name != "system.img" }
       .map { GzipTarMemberSummary(name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256) }
     XCTAssertThrowsError(
-      try makeValidatedExecutePlan(summary: summary(for: profile, members: missingImage))
+      try validatedArchiveProfile(summary: summary(for: profile, members: missingImage))
     ) { error in
       XCTAssertEqual(error as? PlanFactFailure, .archiveValidationFailed)
     }
@@ -333,14 +316,14 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     // So does an archive whose system image declares no version, which would
     // otherwise leave post-flash verification with nothing to compare against.
     XCTAssertThrowsError(
-      try makeValidatedExecutePlan(summary: summary(for: profile, version: nil))
+      try validatedArchiveProfile(summary: summary(for: profile, version: nil))
     ) { error in
       XCTAssertEqual(error as? PlanFactFailure, .archiveValidationFailed)
     }
 
     // And a partition table naming something this board does not know.
     XCTAssertThrowsError(
-      try makeValidatedExecutePlan(
+      try validatedArchiveProfile(
         summary: summary(
           for: profile, partitionTable: "CMDLINE:mtdparts=rk29xxnand:0x1@0x1(vendor-secrets)"))
     ) { error in
@@ -364,10 +347,9 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       fileAt: archiveURL,
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: profile))
     XCTAssertEqual(profile.validate(summary.archiveObservation()), .valid)
-    let executePlan = try makeValidatedExecutePlan(summary: summary)
-    XCTAssertEqual(executePlan.executionMode, .execute)
-    XCTAssertEqual(executePlan.archiveSHA256, profile.archiveSHA256)
-    XCTAssertEqual(executePlan.planDigestSHA256.count, 64)
+    let validated = try validatedArchiveProfile(summary: summary)
+    XCTAssertEqual(validated.archiveSHA256, profile.archiveSHA256)
+    XCTAssertEqual(validated.runtimeBuildVersion, profile.runtimeBuildVersion)
 
     let root = FileManager.default.temporaryDirectory.appending(
       path:

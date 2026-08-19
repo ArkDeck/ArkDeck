@@ -156,7 +156,11 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let mappedPartitionCount: Int
-  public let planDigestSHA256: String
+  /// The engine materializes the executed plan at submission and pins its
+  /// digest into the job record and the RuntimeCapability; before submission
+  /// there is honestly no plan digest to show, so this is nil (CHG-2026-066 —
+  /// the review no longer fabricates one).
+  public let planDigestSHA256: String?
   public let stepSetDigestSHA256: String
   public let steps: [FlashPlanStepPresentation]
   public let dataImpact: [FlashDataImpactPresentation]
@@ -182,7 +186,7 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     archiveSizeBytes: Int64,
     archiveSHA256: String,
     mappedPartitionCount: Int,
-    planDigestSHA256: String,
+    planDigestSHA256: String?,
     stepSetDigestSHA256: String,
     steps: [FlashPlanStepPresentation],
     dataImpact: [FlashDataImpactPresentation],
@@ -865,24 +869,17 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
     guard let board = RockchipFlashProfile.board(reference: profileReference) else {
       return .failed(code: .unsupportedBundle, detail: profileReference)
     }
-    let provider = RockchipRockUSBFlashProvider(profile: board)
-    do {
-      let plan = try provider.makePlan(
-        mode: mode, archiveValidation: .valid, planNonce: "ui-fixture")
-      let presentation = FlashPlanPresentationBuilder.presentation(
-        plan: plan,
-        profile: board,
-        target: target,
-        imageFileName: archiveURL.lastPathComponent)
-      let observations = RockchipPrerequisiteIdentifier.allCases.map {
-        RockchipPrerequisiteObservation(
-          identifier: $0,
-          status: $0 == .stablePower ? .unknown : .satisfied)
-      }
-      return .ready(presentation.withPrerequisiteObservations(observations))
-    } catch {
-      return .failed(code: .planMaterializationFailed, detail: String(describing: error))
+    let presentation = FlashPlanPresentationBuilder.presentation(
+      mode: mode,
+      profile: board,
+      target: target,
+      imageFileName: archiveURL.lastPathComponent)
+    let observations = RockchipPrerequisiteIdentifier.allCases.map {
+      RockchipPrerequisiteObservation(
+        identifier: $0,
+        status: $0 == .stablePower ? .unknown : .satisfied)
     }
+    return .ready(presentation.withPrerequisiteObservations(observations))
   }
 
   func submit(
@@ -1166,14 +1163,14 @@ enum FlashPlanPresentationBuilder {
           RockchipArchiveMemberObservation(
             name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256)
         })
-      let provider = RockchipRockUSBFlashProvider(profile: profile)
-      let plan = try materializePlan(
-        provider: provider,
-        mode: mode,
-        archiveValidation: profile.validate(observation))
+      guard profile.validate(observation) == .valid else {
+        return .failed(
+          code: .planMaterializationFailed,
+          detail: "archive observation failed profile validation")
+      }
       return .ready(
         presentation(
-          plan: plan,
+          mode: mode,
           profile: profile,
           target: target,
           imageFileName: archiveURL.lastPathComponent))
@@ -1192,57 +1189,77 @@ enum FlashPlanPresentationBuilder {
     }
   }
 
-  /// Execute review must materialize the same canonical plan used by the
-  /// protected campaign path. Preview-only modes retain a separate nonce so
-  /// their step identities cannot be mistaken for executable facts.
-  static func materializePlan(
-    provider: RockchipRockUSBFlashProvider,
-    mode: RockchipFlashExecutionMode,
-    archiveValidation: RockchipArchiveValidationVerdict
-  ) throws -> RockchipFlashPlan {
-    switch mode {
-    case .execute:
-      return try provider.makePlan(mode: mode, archiveValidation: archiveValidation)
-    case .planOnly, .simulated:
-      return try provider.makePlan(
-        mode: mode,
-        archiveValidation: archiveValidation,
-        planNonce: "app-preview")
-    }
-  }
+  /// The default `flash.dayu200` request inputs the FlashWorkspace submits.
+  /// The review's step selection and step-set digest run against exactly this
+  /// shape, so what the user reviews is what the engine authorizes.
+  static let reviewSelectionInputs: [String: JSONValue] = [
+    "postFlashVerification": .string("full")
+  ]
 
-  static func presentation(
-    plan: RockchipFlashPlan,
-    profile: RockchipFlashProfile,
-    target: FlashTargetPresentation?,
-    imageFileName: String
-  ) -> FlashExactPlanPresentation {
+  /// The catalog steps the engine will select for the default request, with
+  /// their real execution disposition. Same descriptor, same selection rule,
+  /// same digest algorithm as `RuntimeJobEngine` — presentation and
+  /// authorization cannot disagree (CHG-2026-066).
+  static func reviewSteps(
+    mode: RockchipFlashExecutionMode
+  ) -> (steps: [FlashPlanStepPresentation], stepSetDigestSHA256: String)? {
+    guard
+      let descriptor = RuntimeOperationCatalog.descriptor(reference: "flash.dayu200")
+    else { return nil }
     let disposition: FlashPlanStepDisposition
-    switch plan.executionMode {
+    switch mode {
     case .execute: disposition = .executionLocked
     case .planOnly: disposition = .planned
     case .simulated: disposition = .simulatedPreview
     }
+    let laneOwned = RuntimeJobEngine.arkForgeOwnedModeSteps
+      .union(RuntimeJobEngine.arkForgeDispatchedSteps)
+    let steps = descriptor.steps
+      .filter {
+        RuntimeJobEngine.stepIsRequested(
+          $0, descriptor: descriptor, inputs: reviewSelectionInputs)
+      }
+      .map { step in
+        FlashPlanStepPresentation(
+          id: step.stepID,
+          kind: step.kind.rawValue,
+          argumentSummary: laneOwned.contains(step.stepID)
+            ? "ArkForge lane (delegated)" : "engine host step",
+          effect: FlashPlanEffect(rawValue: step.effect.rawValue) ?? .hostOnly,
+          cancellation: FlashPlanCancellation(rawValue: step.cancellation.rawValue)
+            ?? .immediate,
+          disposition: disposition)
+      }
+    return (
+      steps,
+      RuntimeJobEngine.stepSetDigest(
+        descriptor: descriptor, inputs: reviewSelectionInputs)
+    )
+  }
+
+  static func presentation(
+    mode: RockchipFlashExecutionMode,
+    profile: RockchipFlashProfile,
+    target: FlashTargetPresentation?,
+    imageFileName: String
+  ) -> FlashExactPlanPresentation {
+    guard let review = reviewSteps(mode: mode) else {
+      preconditionFailure("flash.dayu200 is not in the generated operation catalog")
+    }
     return FlashExactPlanPresentation(
-      mode: plan.executionMode,
+      mode: mode,
       target: target,
       profileReference: profile.catalogReference,
       imageFileName: imageFileName,
       runtimeBuildVersion: profile.runtimeBuildVersion,
       archiveSizeBytes: profile.archiveSizeBytes,
-      archiveSHA256: plan.archiveSHA256,
+      archiveSHA256: profile.archiveSHA256,
       mappedPartitionCount: profile.mappedPartitions.count,
-      planDigestSHA256: plan.planDigestSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      steps: plan.steps.map { step in
-        FlashPlanStepPresentation(
-          id: step.id,
-          kind: step.kind.rawValue,
-          argumentSummary: argumentSummary(step.arguments),
-          effect: FlashPlanEffect(rawValue: step.effect.rawValue) ?? .hostOnly,
-          cancellation: FlashPlanCancellation(rawValue: step.cancellation.rawValue) ?? .immediate,
-          disposition: disposition)
-      },
+      // The executed plan's digest exists only once the engine materializes
+      // it at submission (job record / capability `exactPlanDigest`).
+      planDigestSHA256: nil,
+      stepSetDigestSHA256: review.stepSetDigestSHA256,
+      steps: review.steps,
       dataImpact: [
         .mappedPartitionsOverwritten(count: profile.mappedPartitions.count),
         .userDataDestroyed,
@@ -1268,30 +1285,6 @@ enum FlashPlanPresentationBuilder {
       })
   }
 
-  private static func argumentSummary(_ arguments: [String: JSONValue]) -> String {
-    let preferredKeys = [
-      "partition", "imageArtifactId", "imageSize", "probeId", "targetMode", "expectedMode",
-      "riskClass",
-    ]
-    let values = preferredKeys.compactMap { key -> String? in
-      guard let value = arguments[key] else { return nil }
-      return "\(key)=\(display(value))"
-    }
-    return values.isEmpty ? "—" : values.joined(separator: " · ")
-  }
-
-  private static func display(_ value: JSONValue) -> String {
-    switch value {
-    case .null: "null"
-    case .bool(let value): value ? "true" : "false"
-    case .integer(let value): String(value)
-    case .unsignedInteger(let value): String(value)
-    case .number(let value): String(value)
-    case .string(let value): value
-    case .array(let values): "[\(values.map(display).joined(separator: ", "))]"
-    case .object: "{…}"
-    }
-  }
 }
 
 enum FlashXPCReadFailure: Error, Sendable, Equatable {
