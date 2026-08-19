@@ -31,7 +31,8 @@ enum RuntimeCLI {
   static let agentdInstallOptions: Set<String> = [
     "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
     "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
-    "--harness-cli", "--harness-cli-timeout-seconds", "--arktrace-descriptor",
+    "--harness-cli", "--harness-cli-timeout-seconds",  // refused by name below
+    "--arktrace-descriptor",
     "--arkforged", "--arkforged-sha256", "--arkforge-profile", "--arkforge-campaign",
   ]
 
@@ -218,72 +219,17 @@ enum RuntimeCLI {
       } else {
         workspace = nil
       }
-      let harnessSensitiveEvidence: [String]
-      if let raw = options.value("--sensitive-evidence") {
-        if raw == "none" {
-          harnessSensitiveEvidence = []
-        } else {
-          harnessSensitiveEvidence = raw.split(
-            separator: ",", omittingEmptySubsequences: false
-          ).map { $0.trimmingCharacters(in: .whitespaces) }
-        }
-      } else {
-        harnessSensitiveEvidence = previousStatus?.harnessSensitiveEvidence ?? []
-      }
-      let harnessModel: LaunchAgentHarnessModelConfiguration?
-      let suppliedProvider = options.value("--harness-model-provider")
-      let suppliedModel = options.value("--harness-model-name")
-      let suppliedCLI = options.value("--harness-cli")
-      let suppliedTimeout = options.value("--harness-cli-timeout-seconds")
-      if suppliedProvider == "none" {
-        guard suppliedModel == nil, suppliedCLI == nil, suppliedTimeout == nil else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "--harness-model-provider none cannot be combined with model CLI options")
-        }
-        harnessModel = nil
-      } else if let suppliedProvider {
-        guard let suppliedModel, let suppliedCLI, suppliedCLI.hasPrefix("/") else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message:
-              "local Harness model setup requires --harness-model-name and an absolute "
-              + "--harness-cli")
-        }
-        let timeout: Int
-        if let suppliedTimeout {
-          guard let parsed = Int(suppliedTimeout), (1...900).contains(parsed) else {
-            throw CLIError(
-              exitCode: EX_USAGE,
-              message: "--harness-cli-timeout-seconds must be between 1 and 900")
-          }
-          timeout = parsed
-        } else {
-          timeout = 600
-        }
-        guard let workspaceProject else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "local Harness model setup requires the demo-app workspace")
-        }
-        harnessModel = LaunchAgentHarnessModelConfiguration(
-          provider: suppliedProvider, modelName: suppliedModel,
-          cliExecutable: URL(filePath: suppliedCLI),
-          cliWorkingDirectory: URL(filePath: workspaceProject),
-          cliTimeoutSeconds: timeout)
-      } else {
-        guard suppliedModel == nil, suppliedCLI == nil, suppliedTimeout == nil else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "Harness model CLI options require --harness-model-provider")
-        }
-        harnessModel = previousStatus?.harnessModel.map {
-          LaunchAgentHarnessModelConfiguration(
-            provider: $0.provider, modelName: $0.modelName,
-            cliExecutable: URL(filePath: $0.cliPath),
-            cliWorkingDirectory: URL(filePath: $0.cliWorkingDirectory),
-            cliTimeoutSeconds: $0.cliTimeoutSeconds)
-        }
+      // The in-process decision plane and its evaluator were removed by
+      // CHG-2026-064; their configuration flags are refused by name so an
+      // operator's muscle memory gets a real answer instead of silence.
+      for removed in [
+        "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
+        "--harness-cli", "--harness-cli-timeout-seconds",
+      ] where options.value(removed) != nil {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "\(removed) was removed by CHG-2026-064: decisions come from external "
+            + "agents through the published caller surface; re-run without it")
       }
       let arkTraceDescriptor: URL?
       if let supplied = options.value("--arktrace-descriptor") {
@@ -353,8 +299,6 @@ enum RuntimeCLI {
       let receipt = try service.install(
         daemonBundleSource: URL(filePath: daemonBundlePath, directoryHint: .isDirectory),
         hdcExecutable: URL(filePath: hdcPath), workspace: workspace,
-        harnessSensitiveEvidence: harnessSensitiveEvidence,
-        harnessModel: harnessModel,
         arkTraceDescriptor: arkTraceDescriptor,
         arkForgeLane: arkForgeLane,
         beforeBootstrap: beforeBootstrap)
@@ -1938,10 +1882,10 @@ enum RuntimeCLI {
   }
 
   /// Protected destructive Flash recovery only. Ordinary Agent debugging is
-  /// submitted once through `arkdeck task`; the Harness owns its bounded
-  /// patch/build/test/deploy/verify loop. The candidate file here is the
-  /// closed recovery decision document; the CLI has no target, inputs, plan,
-  /// argv or capability flag on the evaluation path.
+  /// driven by an external agent through the published job/artifact surface.
+  /// The candidate file here is the closed recovery decision document; the
+  /// CLI has no target, inputs, plan, argv or capability flag on the
+  /// evaluation path.
   static func runDebug(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
@@ -2013,308 +1957,6 @@ enum RuntimeCLI {
 
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported debug subcommand")
-    }
-  }
-
-  // `arkdeck task` (CHG-2026-054, TASK-HTP-001): the autonomous debug face.
-  //
-  // A caller states a target and a goal. There is no flag here that can
-  // carry an operation argv, a remote path or a device selector - the
-  // daemon's harness decides the next typed operation, one per wake, and
-  // the engine still owns admission and execution.
-  static func runTask(_ arguments: [String]) throws {
-    guard let subcommand = arguments.first else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "missing task subcommand (submit|list|status|result|events|evaluations|"
-          + "attempts|humanActions|memory|reconcile|context|propose-patch|promotion|pause|"
-          + "resume|cancel|workspace-gc)")
-    }
-    var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
-
-    func value(_ flag: String) -> String? {
-      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
-      return rest[index + 1]
-    }
-    func requiredTask() throws -> String {
-      guard let id = value("--task") else {
-        throw CLIError(exitCode: EX_USAGE, message: "task \(subcommand) requires --task <HTASK-id>")
-      }
-      return id
-    }
-
-    switch subcommand {
-    case "submit":
-      guard let target = value("--target"), let goal = value("--goal") else {
-        throw CLIError(
-          exitCode: EX_USAGE, message: "task submit requires --target <id> --goal <text>")
-      }
-      var params: [String: JSONValue] = [
-        "targetId": .string(target),
-        "goal": .string(goal),
-      ]
-      let obsoleteWorkspaceFlags = [
-        "--execution-mode", "--evolution-allowed-paths", "--evolution-allowed-operations",
-      ]
-      if let obsolete = obsoleteWorkspaceFlags.first(where: rest.contains) {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "\(obsolete) was removed; workspace policy is now the default Agent path")
-      }
-      if let paths = value("--workspace-allowed-paths") {
-        params["workspaceAllowedPaths"] = .array(
-          paths.split(separator: ",").map {
-            .string($0.trimmingCharacters(in: .whitespaces))
-          })
-      }
-      if let operations = value("--workspace-allowed-operations") {
-        params["workspaceAllowedOperations"] = .array(
-          operations.split(separator: ",").map {
-            .string($0.trimmingCharacters(in: .whitespaces))
-          })
-      }
-      if let attempts = value("--max-attempts"), let parsed = Int64(attempts) {
-        params["maxAttempts"] = .integer(parsed)
-      }
-      if let files = value("--max-changed-files"), let parsed = Int64(files) {
-        params["maxChangedFiles"] = .integer(parsed)
-      }
-      if let lines = value("--max-diff-lines"), let parsed = Int64(lines) {
-        params["maxDiffLines"] = .integer(parsed)
-      }
-      if let intake = value("--intake") { params["intake"] = .string(intake) }
-      if let signature = value("--crash-signature") {
-        params["crashSignature"] = .string(signature)
-      }
-      if let project = value("--project") { params["projectRef"] = .string(project) }
-      if let bundle = value("--bundle-name") { params["bundleName"] = .string(bundle) }
-      if let ability = value("--ability-name") { params["abilityName"] = .string(ability) }
-      if let process = value("--process-name") { params["processName"] = .string(process) }
-      if let lease = value("--baseline-hap-artifact-lease") {
-        params["baselineHapArtifactLease"] = .string(lease)
-      }
-      if let preset = value("--build-preset") { params["buildPresetRef"] = .string(preset) }
-      if let preset = value("--test-preset") { params["testPresetRef"] = .string(preset) }
-      if let profile = value("--device-profile") {
-        params["deviceProfile"] = .string(profile)
-      }
-      if let revision = value("--base-workspace-revision") {
-        params["baseWorkspaceRevision"] = .string(revision)
-      }
-      if let component = value("--component") {
-        params["component"] = .string(component)
-      }
-      if let rounds = value("--max-rounds"), let parsed = Int64(rounds) {
-        params["maxRounds"] = .integer(parsed)
-      }
-      if let seconds = value("--max-wall-clock-seconds"), let parsed = Int64(seconds) {
-        params["maxWallClockSeconds"] = .integer(parsed)
-      }
-      if let rounds = value("--max-no-progress-rounds"), let parsed = Int64(rounds) {
-        params["maxNoProgressRounds"] = .integer(parsed)
-      }
-      if let retries = value("--max-action-retries-per-run"), let parsed = Int64(retries) {
-        params["maxActionRetriesPerRun"] = .integer(parsed)
-      }
-      if let mutations = value("--max-e1-mutations"), let parsed = Int64(mutations) {
-        params["maxE1Mutations"] = .integer(parsed)
-      }
-      if let calls = value("--max-model-calls"), let parsed = Int64(calls) {
-        params["maxModelCalls"] = .integer(parsed)
-      }
-      if let revision = value("--expected-binding-revision"), let parsed = Int64(revision) {
-        params["expectedBindingRevision"] = .integer(parsed)
-      }
-      emit(try client.request(method: "task.submit", params: params), json: json)
-    case "list":
-      emit(try client.request(method: "task.list"), json: json)
-    case "status", "result", "events", "evaluations", "attempts", "humanActions", "memory",
-      "reconcile", "pause", "cancel":
-      emit(
-        try client.request(
-          method: "task.\(subcommand)", params: ["htaskId": .string(try requiredTask())]),
-        json: json)
-    case "workspace-gc":
-      // Reclaims the isolated trees of terminal evolution tasks. Audit
-      // metadata survives daemon-side; active tasks are untouchable, so the
-      // widest possible request is still bounded to terminal trees.
-      var params: [String: JSONValue] = [:]
-      if let days = value("--retain-days") {
-        guard let parsed = Int64(days), parsed >= 0 else {
-          throw CLIError(
-            exitCode: EX_USAGE, message: "--retain-days requires a nonnegative integer")
-        }
-        params["retainDays"] = .integer(parsed)
-      }
-      if let last = value("--retain-last") {
-        guard let parsed = Int64(last), parsed >= 0 else {
-          throw CLIError(
-            exitCode: EX_USAGE, message: "--retain-last requires a nonnegative integer")
-        }
-        params["retainLast"] = .integer(parsed)
-      }
-      if rest.contains("--dry-run") { params["dryRun"] = .bool(true) }
-      emit(try client.request(method: "task.workspaceGC", params: params), json: json)
-    case "resume":
-      guard let resolution = value("--resolution") else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "task resume requires --resolution <typed reason>: a human block is only left "
-            + "through a recorded decision")
-      }
-      emit(
-        try client.request(
-          method: "task.resume",
-          params: [
-            "htaskId": .string(try requiredTask()), "resolution": .string(resolution),
-          ]),
-        json: json)
-    case "promotion":
-      // Read-only export of a recorded promotion candidate: the daemon
-      // assembles the persisted facts and the rendered PR-ready documents;
-      // this command only prints them or writes them into a maintainer-chosen
-      // directory. Promotion stays a document - nothing here can push a
-      // branch, create a commit or merge.
-      let response = try client.request(
-        method: "task.promotion", params: ["htaskId": .string(try requiredTask())])
-      if let destination = value("--destination") {
-        emit(try writePromotionBundle(response, destinationPath: destination), json: json)
-      } else {
-        emit(response, json: json)
-      }
-    case "context":
-      // The bounded decision context, exactly as a producer would receive
-      // it: assembled, trimmed and identity-screened by the daemon. An
-      // external agent reads this, then answers via `task propose-patch`.
-      emit(
-        try client.request(
-          method: ArkDeckAgentMethod.taskContext,
-          params: ["htaskId": .string(try requiredTask())]),
-        json: json)
-    case "propose-patch":
-      let maximumProposalBytes = 512 * 1024
-      guard let path = value("--proposal-file") else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "task propose-patch requires --proposal-file <proposal.json>")
-      }
-      let url = URL(filePath: path).standardizedFileURL
-      let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-      guard values?.isRegularFile == true,
-        let size = values?.fileSize, size > 0,
-        size <= maximumProposalBytes,
-        let proposalJSON = try? String(contentsOf: url, encoding: .utf8)
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "proposal must be a non-empty regular UTF-8 JSON file no larger than "
-            + "\(maximumProposalBytes) bytes")
-      }
-      var proposeParams: [String: JSONValue] = [
-        "htaskId": .string(try requiredTask()),
-        "proposalJson": .string(proposalJSON),
-      ]
-      // Optional ledger label; the daemon enforces the closed producer set.
-      if let producer = value("--producer") {
-        proposeParams["producer"] = .string(producer)
-      }
-      emit(
-        try client.request(method: "task.proposePatch", params: proposeParams),
-        json: json)
-    default:
-      throw CLIError(exitCode: EX_USAGE, message: "unsupported task subcommand")
-    }
-  }
-
-  /// Writes the daemon-rendered promotion bundle verbatim into a new or
-  /// empty-enough destination directory. The daemon already verified the
-  /// diff bytes against the candidate metadata; this side re-hashes
-  /// `final.patch` before writing anything, so the maintainer's bundle can
-  /// never contain bytes the wire mangled.
-  private static func writePromotionBundle(
-    _ response: JSONValue, destinationPath: String
-  ) throws -> JSONValue {
-    guard case .object(let fields) = response,
-      case .string(let diffDigest)? = fields["diffDigest"],
-      case .array(let fileValues)? = fields["files"], !fileValues.isEmpty
-    else {
-      throw AgentClientError.malformedResponse(
-        "task.promotion returned no exportable bundle")
-    }
-    var files: [(name: String, contents: String)] = []
-    for value in fileValues {
-      guard case .object(let file) = value,
-        case .string(let name)? = file["name"],
-        case .string(let contents)? = file["contents"],
-        isSafePromotionFileName(name)
-      else {
-        throw AgentClientError.malformedResponse(
-          "task.promotion returned a bundle file with an unsafe name")
-      }
-      files.append((name, contents))
-    }
-    guard let patch = files.first(where: { $0.name == "final.patch" }) else {
-      throw AgentClientError.malformedResponse(
-        "task.promotion returned a bundle without final.patch")
-    }
-    let patchDigest = SHA256Hex.string(of: Data(patch.contents.utf8))
-    guard patchDigest == diffDigest else {
-      throw AgentClientError.malformedResponse(
-        "refusing to write final.patch: bytes hash to \(patchDigest) "
-          + "but the candidate metadata names \(diffDigest)")
-    }
-    let directory = URL(filePath: destinationPath, directoryHint: .isDirectory)
-      .standardizedFileURL
-    var isDirectory: ObjCBool = false
-    if FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
-      guard isDirectory.boolValue,
-        (try? FileManager.default.attributesOfItem(atPath: directory.path))?[.type]
-          as? FileAttributeType != .typeSymbolicLink
-      else {
-        throw CLIError(
-          exitCode: EX_CANTCREAT,
-          message: "--destination must be a directory (not a symlink): \(directory.path)")
-      }
-    } else {
-      try FileManager.default.createDirectory(
-        at: directory, withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700])
-    }
-    // Refuse every collision before writing anything: a bundle is delivered
-    // whole or not at all.
-    for (name, _) in files {
-      let target = directory.appending(path: name)
-      guard !FileManager.default.fileExists(atPath: target.path) else {
-        throw CLIError(
-          exitCode: EX_CANTCREAT,
-          message: "refusing to overwrite existing \(target.path)")
-      }
-    }
-    var written: [String] = []
-    for (name, contents) in files {
-      try Data(contents.utf8).write(
-        to: directory.appending(path: name), options: [.atomic])
-      written.append(name)
-    }
-    return .object([
-      "htaskId": fields["htaskId"] ?? .null,
-      "promotionCandidateId": fields["promotionCandidateId"] ?? .null,
-      "disposition": fields["disposition"] ?? .null,
-      "diffDigest": .string(diffDigest),
-      "destinationDirectory": .string(directory.path),
-      "writtenFiles": .array(written.map(JSONValue.string)),
-    ])
-  }
-
-  private static func isSafePromotionFileName(_ name: String) -> Bool {
-    guard !name.isEmpty, name.utf8.count <= 128,
-      let first = name.first, first.isASCII, first.isLetter || first.isNumber
-    else { return false }
-    return name.allSatisfy {
-      $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0))
     }
   }
 

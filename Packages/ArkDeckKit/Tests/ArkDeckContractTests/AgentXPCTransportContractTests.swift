@@ -83,7 +83,6 @@ final class AgentXPCTransportContractTests: XCTestCase {
       .union(ArkDeckAgentXPC.forwardableFlashBundleMethods)
       .union(ArkDeckAgentXPC.forwardableHAPImportMethods)
       .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
-      .union(ArkDeckAgentXPC.forwardableAutomationMethods)
     {
       XCTAssertEqual(
         AgentXPCEndpoint.admission(of: frame(method: method)), .direct(method: method),
@@ -129,10 +128,11 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")
-    XCTAssertEqual(
-      ArkDeckAgentXPC.forwardableAutomationMethods,
-      ["task.cancel", "task.list", "task.pause", "task.reconcile"],
-      "Automation may control existing typed tasks but cannot create or widen them")
+    for removed in ["task.cancel", "task.list", "task.pause", "task.reconcile", "task.submit"] {
+      XCTAssertNotEqual(
+        AgentXPCEndpoint.admission(of: frame(method: removed)), .direct(method: removed),
+        "the in-process task plane was removed by CHG-2026-064; \(removed) must not forward")
+    }
   }
 
   func testOnlyPublishedTypedAppSubmitsAndTheirJobShapeReachTheGate() throws {

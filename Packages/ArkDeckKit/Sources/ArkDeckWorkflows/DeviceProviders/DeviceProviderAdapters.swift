@@ -2050,7 +2050,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       var summary = ["bundleName": bundle.bundleName, "installed": "true"]
       // Bind the package readback to the exact immutable Artifact whose lease
-      // this job resolved.  The harness repair leg compares this value with
+      // this job resolved.  A repairing caller compares this value with
       // the build-output digest before it may enter VERIFYING; an install exit
       // code or bundle-name match alone is not that gate (TASK-HFA-003).
       if let digest = context.resolvedInputArtifact?.sha256 {

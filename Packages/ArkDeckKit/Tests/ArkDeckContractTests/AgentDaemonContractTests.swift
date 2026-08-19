@@ -230,7 +230,6 @@ final class AgentDaemonContractTests: XCTestCase {
       flashPrerequisiteObserver: flashPrerequisiteObserver,
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
-      harnessCoordinator: nil,
       methodObserver: nil)
     return (handler, engine)
   }

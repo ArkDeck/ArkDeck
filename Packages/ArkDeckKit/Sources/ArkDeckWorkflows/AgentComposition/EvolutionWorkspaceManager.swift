@@ -1,11 +1,10 @@
-// Isolated Workspace lifecycle for Harness Evolution Mode.
+// Isolated workspace lifecycle for Runtime-owned evolution copies.
 //
 // This is deliberately a lifecycle adapter for the existing workspace
 // provider. It owns directories and ProjectProfile registration only; all
 // build/test/patch effects still travel through RuntimeJobEngine.
 
 import ArkDeckCore
-import ArkDeckHarness
 import ArkDeckWorkflows
 import CryptoKit
 import Darwin
@@ -22,17 +21,17 @@ public enum EvolutionWorkspaceError: Error, Equatable, Sendable {
   case workspaceAlreadyDestroyed(String)
 }
 
-package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
+package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
   WorkspaceIsolationManaging, @unchecked Sendable
 {
   private struct Manifest: Codable, Equatable {
-    let workspace: HarnessEvolutionWorkspace
+    let workspace: EvolutionWorkspaceRecord
     /// Present on manifests written by the current implementation. Keeping it
-    /// optional preserves exact decoding of older Harness workspaces, whose
-    /// task record still supplies the policy during adoption.
+    /// optional preserves exact decoding of older manifests from the removed
+    /// in-process task plane, whose task record supplied the policy instead.
     let allowedPaths: [String]?
 
-    init(workspace: HarnessEvolutionWorkspace, allowedPaths: [String]? = nil) {
+    init(workspace: EvolutionWorkspaceRecord, allowedPaths: [String]? = nil) {
       self.workspace = workspace
       self.allowedPaths = allowedPaths?.sorted()
     }
@@ -92,8 +91,8 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
   /// deciding whether to make a copy and the wrong one when deciding whether a
   /// copy that already exists is still itself. Adoption asks only the second.
   package func adoptPersistedWorkspace(
-    _ workspace: HarnessEvolutionWorkspace,
-    policy: HarnessEvolutionPolicy
+    _ workspace: EvolutionWorkspaceRecord,
+    policy: EvolutionWorkspacePolicy
   ) async throws {
     try lock.withLock {
       guard let source = profiles.profile(for: workspace.sourceProjectRef),
@@ -143,9 +142,9 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
   package func prepareWorkspace(
     htaskID: String,
     sourceProjectRef: String,
-    policy: HarnessEvolutionPolicy,
+    policy: EvolutionWorkspacePolicy,
     createdAtUTC: String
-  ) async throws -> HarnessEvolutionWorkspace {
+  ) async throws -> EvolutionWorkspaceRecord {
     try await prepareWorkspaceBound(
       htaskID: htaskID,
       sourceProjectRef: sourceProjectRef,
@@ -157,10 +156,10 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
   private func prepareWorkspaceBound(
     htaskID: String,
     sourceProjectRef: String,
-    policy: HarnessEvolutionPolicy,
+    policy: EvolutionWorkspacePolicy,
     expectedSourceRevision: String?,
     createdAtUTC: String
-  ) async throws -> HarnessEvolutionWorkspace {
+  ) async throws -> EvolutionWorkspaceRecord {
     try lock.withLock {
       guard WorkspaceProviderSupport.isIdentifier(htaskID) else {
         throw EvolutionWorkspaceError.malformedTaskID
@@ -197,7 +196,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
       let workspaceRoot = taskRoot.appending(path: "workspace", directoryHint: .isDirectory)
       let manifestURL = taskRoot.appending(path: "workspace.json")
       let allowedDigest = Self.allowedPathsDigest(policy.allowedPaths)
-      let workspace = HarnessEvolutionWorkspace(
+      let workspace = EvolutionWorkspaceRecord(
         workspaceID: workspaceID, htaskID: htaskID,
         sourceProjectRef: sourceProjectRef, projectRef: projectRef,
         baseRevision: policy.baseRevision, allowedPathsDigest: allowedDigest,
@@ -277,7 +276,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
   package func prepare(_ intent: WorkspaceIsolationIntent) async throws
     -> WorkspaceIsolationResult
   {
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: intent.isolatedWorkspaceRevision,
       allowedPaths: intent.allowedFileGlobs,
       maxAttempts: 1,
@@ -367,10 +366,10 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
     }
   }
 
-  /// Daemon startup adoption for Runtime-owned copies. Harness-owned copies
-  /// are restored from task records by HarnessTaskCoordinator; these copies
-  /// have no Harness task, so their complete narrowing policy lives in the
-  /// versioned manifest instead.
+  /// Daemon startup adoption for Runtime-owned copies. Copies made by the
+  /// removed in-process task plane carried their policy in task records;
+  /// these copies have no such record, so their complete narrowing policy
+  /// lives in the versioned manifest instead.
   package func adoptRuntimeWorkspaces() -> [String] {
     lock.withLock {
       let entries =
@@ -427,7 +426,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
   }
 
   package func prepareAttemptDirectory(
-    workspace: HarnessEvolutionWorkspace,
+    workspace: EvolutionWorkspaceRecord,
     attemptID: String,
     ordinal: Int,
     createdAtUTC: String
@@ -468,13 +467,13 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
   }
 
   package func sweepTerminalWorkspaces(
-    tasks: [HarnessEvolutionWorkspaceGCTaskReference],
-    retention: HarnessEvolutionWorkspaceRetention,
+    tasks: [EvolutionWorkspaceGCTaskReference],
+    retention: EvolutionWorkspaceRetention,
     nowUTC: String
-  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
+  ) async throws -> [EvolutionWorkspaceGCFinding] {
     try lock.withLock {
       // A workspaceID the store claims twice is vouched for by nobody.
-      var references: [String: HarnessEvolutionWorkspaceGCTaskReference] = [:]
+      var references: [String: EvolutionWorkspaceGCTaskReference] = [:]
       var conflicted: Set<String> = []
       for task in tasks where references.updateValue(task, forKey: task.workspaceID) != nil {
         conflicted.insert(task.workspaceID)
@@ -482,11 +481,11 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
 
       struct Candidate {
         let taskRoot: URL
-        let reference: HarnessEvolutionWorkspaceGCTaskReference
+        let reference: EvolutionWorkspaceGCTaskReference
         let projectRef: String
         let hasMaterial: Bool
       }
-      var findings: [HarnessEvolutionWorkspaceGCFinding] = []
+      var findings: [EvolutionWorkspaceGCFinding] = []
       var candidates: [Candidate] = []
 
       let entries =
@@ -507,14 +506,14 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
           manifest.workspace.htaskID == reference.htaskID
         else {
           findings.append(
-            HarnessEvolutionWorkspaceGCFinding(
+            EvolutionWorkspaceGCFinding(
               workspaceID: name, htaskID: references[name]?.htaskID,
               disposition: .unknownTaskRetained, reclaimedBytes: 0))
           continue
         }
         guard reference.lifecycle.isTerminal else {
           findings.append(
-            HarnessEvolutionWorkspaceGCFinding(
+            EvolutionWorkspaceGCFinding(
               workspaceID: name, htaskID: reference.htaskID,
               disposition: .activeRetained, reclaimedBytes: 0))
           continue
@@ -526,7 +525,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
             atPath: entry.appending(path: "teardown.json").path)
         {
           findings.append(
-            HarnessEvolutionWorkspaceGCFinding(
+            EvolutionWorkspaceGCFinding(
               workspaceID: name, htaskID: reference.htaskID,
               disposition: .alreadyDestroyed, reclaimedBytes: 0))
           continue
@@ -561,7 +560,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
       for candidate in candidates {
         if candidate.hasMaterial, retained.contains(candidate.reference.workspaceID) {
           findings.append(
-            HarnessEvolutionWorkspaceGCFinding(
+            EvolutionWorkspaceGCFinding(
               workspaceID: candidate.reference.workspaceID,
               htaskID: candidate.reference.htaskID,
               disposition: .retainedByPolicy, reclaimedBytes: 0))
@@ -570,7 +569,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
         let reclaimed = Self.measureBytes(Self.destroyableEntries(under: candidate.taskRoot))
         if retention.dryRun {
           findings.append(
-            HarnessEvolutionWorkspaceGCFinding(
+            EvolutionWorkspaceGCFinding(
               workspaceID: candidate.reference.workspaceID,
               htaskID: candidate.reference.htaskID,
               disposition: .wouldDestroy, reclaimedBytes: reclaimed))
@@ -595,7 +594,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
             to: teardownURL)
         }
         findings.append(
-          HarnessEvolutionWorkspaceGCFinding(
+          EvolutionWorkspaceGCFinding(
             workspaceID: candidate.reference.workspaceID,
             htaskID: candidate.reference.htaskID,
             disposition: .destroyed, reclaimedBytes: reclaimed))

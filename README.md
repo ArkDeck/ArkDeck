@@ -34,7 +34,7 @@ Callers cannot submit arbitrary `hdc` or shell command strings, executable paths
 - Captures bounded HiLog, screenshots, ArkUI component trees, traces and crash records into an immutable local artifact store.
 - Creates verified, target-bound port forwards and atomically deploys app-owned native libraries with rollback.
 - Flashes a DAYU200 (RK3568) from a verified image bundle, then rebinds the device and verifies the resulting system.
-- Runs a budgeted AI debug loop that analyzes artifacts, changes an isolated declared workspace, rebuilds, signs, retests and stops at success or a safety/budget boundary.
+- Lets an external agent close a budgeted debug loop: it analyzes artifacts, patches a runtime-owned isolated workspace, rebuilds, signs, redeploys and verifies — every side effect through the same typed admission as any other caller.
 
 Three surfaces drive the same runtime:
 
@@ -156,7 +156,7 @@ Then check that everything is wired up:
 ## Repository map
 
 - [`ArkDeckApp/`](./ArkDeckApp/) — the SwiftUI desktop app
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — runtime, providers, storage, daemon, CLI and harness
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — runtime, providers, storage, daemon and CLI
 - [`Catalog/`](./Catalog/) — published operations, profiles and schemas
 - [`docs/`](./docs/) — architecture notes, ADRs and product design
 - [`openspec/`](./openspec/) — product contracts, safety invariants and change history

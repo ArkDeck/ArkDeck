@@ -4,24 +4,11 @@ import XCTest
 
 @testable import ArkDeckAgentComposition
 @testable import ArkDeckCore
-@testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
-private actor EvolutionNoopJobPort: HarnessRuntimeJobPort {
-  func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
-    XCTFail("submission must not dispatch a runtime job")
-    return HarnessJobAcceptance(jobID: "JOB-UNEXPECTED", deduplicated: false)
-  }
-  func startRun(jobID: String) async throws {}
-  func observe(jobID: String) async throws -> HarnessJobObservation {
-    throw HarnessJobPortError.unknownJob(jobID)
-  }
-  func requestCancel(jobID: String) async throws {}
-}
-
-final class HarnessEvolutionContractTests: XCTestCase {
+final class EvolutionWorkspaceContractTests: XCTestCase {
   private var roots: [URL] = []
 
   override func tearDownWithError() throws {
@@ -44,7 +31,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
     try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: sourceRoot)
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
         root: profile.projectRoot, profileVersion: profile.profileID,
         globs: ["Sources/**"]),
@@ -89,7 +76,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
     try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: sourceRoot)
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
         root: profile.projectRoot, profileVersion: profile.profileID,
         globs: ["Sources/**"]),
@@ -109,7 +96,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     // The same workspace identity claiming a base revision the manifest never
     // recorded. Rebuilding it silently would substitute one isolated tree for
     // another under a reference the task already holds.
-    let drifted = HarnessEvolutionWorkspace(
+    let drifted = EvolutionWorkspaceRecord(
       workspaceID: workspace.workspaceID, htaskID: workspace.htaskID,
       sourceProjectRef: workspace.sourceProjectRef, projectRef: workspace.projectRef,
       baseRevision: String(repeating: "9", count: 64),
@@ -137,7 +124,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let revision = try WorkspaceProviderSupport.workspaceRevision(
       root: profile.projectRoot, profileVersion: profile.profileID,
       globs: ["Sources/**"])
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: revision, allowedPaths: ["Sources/**"], maxAttempts: 3,
       maxChangedFiles: 2, maxDiffLines: 20,
       allowedOperations: ["workspace.build-openharmony@1"])
@@ -189,276 +176,13 @@ final class HarnessEvolutionContractTests: XCTestCase {
       isolated.projectRoot)
   }
 
-  func testCandidatePatchIsPublishedAsDiffAndMetadataArtifacts() async throws {
-    let root = try temporaryDirectory("candidate-source")
-    let state = try temporaryDirectory("candidate-state")
-    try FileManager.default.createDirectory(
-      at: root.appending(path: "Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
-    let profile = try workspaceProfile(root: root)
-    let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appending(path: "artifacts"),
-      nowUTC: { "2026-08-02T00:00:00Z" })
-    let port = WorkspaceHarnessRepairPort(
-      profile: profile,
-      attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appending(path: "attempts")),
-      artifactStore: artifactStore)
-    let proposal = try patchProposal(root: root)
-    let task = try taskSnapshot(
-      baseRevision: proposal.baseWorkspaceRevision,
-      policy: HarnessEvolutionPolicy(
-        baseRevision: proposal.baseWorkspaceRevision,
-        allowedPaths: ["Sources/**"], maxAttempts: 3,
-        maxChangedFiles: 2, maxDiffLines: 20,
-        allowedOperations: evolutionOperations))
-    let prepared = try await port.preparePatch(
-      proposal, projectRef: profile.projectRef, task: task, decisionID: "dec-evolution")
-    let candidate = try await port.candidatePatch(
-      proposal: proposal, prepared: prepared, task: task,
-      attemptID: "ATTEMPT-001", createdBy: .agent, createdAtUTC: timestamp)
-
-    XCTAssertEqual(candidate.diffArtifactID, prepared.artifactID)
-    XCTAssertNotNil(candidate.metadataArtifactID)
-    XCTAssertEqual(candidate.changedLines, 2)
-    XCTAssertEqual(candidate.files, ["Sources/App.txt"])
-    let metadata = try await artifactStore.list(jobID: "hcandidate-attempt-001")
-    XCTAssertEqual(metadata.map(\.name), ["candidate-patch.json"])
-    XCTAssertEqual(metadata.first?.artifactID, candidate.metadataArtifactID)
-  }
-
-  func testTaskSubmissionCreatesEvolutionWorkspaceWithoutDispatching() async throws {
-    let source = try temporaryDirectory("submission-source")
-    let state = try temporaryDirectory("submission-state")
-    try FileManager.default.createDirectory(
-      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
-    let profile = try workspaceProfile(root: source)
-    let registry = WorkspaceProjectProfileRegistry(profile: profile)
-    let base = try WorkspaceProviderSupport.workspaceRevision(
-      root: profile.projectRoot, profileVersion: profile.profileID,
-      globs: ["Sources/**"])
-    let evolutionPolicy = try HarnessEvolutionPolicy(
-      baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 3,
-      maxChangedFiles: 2, maxDiffLines: 20,
-      allowedOperations: evolutionOperations)
-    let workspaceManager = try EvolutionWorkspaceManager(
-      rootURL: state.appending(path: "evolution"), profileRegistry: registry)
-    let coordinator = HarnessTaskCoordinator(
-      store: try HarnessTaskStore(rootURL: state.appending(path: "harness")),
-      jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: workspaceManager,
-      nowUTC: { "2026-08-02T00:00:00Z" },
-      taskIDFactory: { "HTASK-ABCDEF012345" })
-    let submission = HarnessTaskSubmission(
-      type: .debugCrash, projectRef: profile.projectRef,
-      target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(
-        summary: "fix crash",
-        desiredState: ["baseWorkspaceRevision": .string(base)]),
-      budgets: budgets, policy: HarnessTaskPolicy(allowedOperations: evolutionOperations),
-      evolutionPolicy: evolutionPolicy)
-
-    let snapshot = try await coordinator.submit(submission)
-    XCTAssertTrue(snapshot.requiresWorkspaceIsolation)
-    XCTAssertEqual(snapshot.evolutionPolicy, evolutionPolicy)
-    XCTAssertEqual(snapshot.executionProjectRef, snapshot.evolutionWorkspace?.projectRef)
-    XCTAssertNotEqual(snapshot.executionProjectRef, snapshot.projectRef)
-    XCTAssertNotNil(registry.profile(for: try XCTUnwrap(snapshot.executionProjectRef)))
-    let attempts = try await coordinator.attempts(snapshot.htaskID)
-    XCTAssertTrue(attempts.isEmpty)
-  }
-
-  func testCurrentWorkspaceWireCreatesIsolatedTaskWithoutModeFields() async throws {
-    let source = try temporaryDirectory("workspace-wire-source")
-    let state = try temporaryDirectory("workspace-wire-state")
-    try FileManager.default.createDirectory(
-      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
-    let profile = try workspaceProfile(root: source)
-    let registry = WorkspaceProjectProfileRegistry(profile: profile)
-    let base = try WorkspaceProviderSupport.workspaceRevision(
-      root: profile.projectRoot, profileVersion: profile.profileID,
-      globs: ["Sources/**"])
-    let manager = try EvolutionWorkspaceManager(
-      rootURL: state.appending(path: "workspace"), profileRegistry: registry)
-    let coordinator = HarnessTaskCoordinator(
-      store: try HarnessTaskStore(rootURL: state.appending(path: "harness")),
-      jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: manager,
-      nowUTC: { "2026-08-02T00:00:00Z" },
-      taskIDFactory: { "HTASK-ABCDEF012346" })
-    let service = HarnessTaskMethodService(
-      coordinator: coordinator, applicationReferenceValidator: { _, _ in })
-
-    let response = await service.handle(
-      "task.submit", requestID: "wire-current",
-      params: [
-        "targetId": .string("device"), "goal": .string("repair"),
-        "projectRef": .string(profile.projectRef), "baseWorkspaceRevision": .string(base),
-        "workspaceAllowedPaths": .array([.string("Sources/**")]),
-        "workspaceAllowedOperations": .array([.string("workspace.apply-patch@1")]),
-      ])
-    XCTAssertNil(response.errorCode, response.errorMessage ?? "unexpected task.submit error")
-    guard case .object(let fields)? = response.result else {
-      return XCTFail("task.submit must return the task object")
-    }
-    XCTAssertNil(fields["executionMode"])
-    XCTAssertNotEqual(fields["evolutionPolicy"], .null)
-    XCTAssertNotEqual(fields["evolutionWorkspace"], .null)
-  }
-
-  func testTaskAttemptPatchBuildEvaluationAndPromotionPipeline() throws {
-    let base = String(repeating: "a", count: 64)
-    let patchRevision = String(repeating: "b", count: 64)
-    let buildDigest = String(repeating: "c", count: 64)
-    let policy = try HarnessEvolutionPolicy(
-      baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 4,
-      maxChangedFiles: 4, maxDiffLines: 50,
-      allowedOperations: evolutionOperations)
-    let proposal = try inMemoryProposal(baseRevision: base)
-    let candidate = HarnessCandidatePatch.create(
-      proposal: proposal, diffArtifactID: "ART-DIFF",
-      htaskID: "HTASK-EVOLUTION", attemptID: "ATTEMPT-001",
-      createdBy: .agent, createdAtUTC: timestamp
-    ).recordingMetadataArtifact("ART-CANDIDATE")
-    let strategy = try HarnessStrategyDescriptor(
-      hypothesisClass: "repair", selectedOperationFamily: "workspace.apply-patch",
-      patchFingerprint: proposal.patchSHA256, baseWorkspaceRevision: base,
-      artifactSourceSet: ["ART-BASELINE"], prerequisiteSet: ["crash-reproduced"],
-      executionExpectation: HarnessStrategyExecutionExpectation(
-        targetProfile: "device-profile", toolchainProfile: "build-ok",
-        expectedNextObservation: "no-crash"))
-    let evaluation = passingEvaluation()
-    let attempt = HarnessAttempt(
-      attemptID: "ATTEMPT-001", htaskID: "HTASK-EVOLUTION", ordinal: 1,
-      hypothesis: "Fix the measured failure", strategy: strategy,
-      patchRevision: patchRevision, evaluationIDs: [evaluation.evaluationID],
-      candidatePatch: candidate, buildArtifactIDs: ["ART-BUILD"],
-      runtimeArtifactIDs: ["ART-RUNTIME"], latestEvaluationVerdict: .pass,
-      createdAtUTC: timestamp, updatedAtUTC: timestamp)
-    let repair = HarnessRepairAttempt(
-      proposal: proposal, checkpointJobID: "JOB-CHECKPOINT",
-      patchAttemptRef: "patch-attempt", patchRevision: patchRevision,
-      buildSourceRevision: patchRevision, buildOutputDigest: buildDigest,
-      buildOutputArtifactLease: "lease-v1:build:ART-BUILD", buildOutputSigned: true,
-      testsPassed: true,
-      deployedDigest: buildDigest)
-    let snapshot = try taskSnapshot(
-      baseRevision: base, policy: policy,
-      observedState: [HarnessRepairAttempt.observedStateKey: repair.json])
-    let promotion = try HarnessPromotionGate.evaluate(
-      snapshot: snapshot, attempt: attempt, evaluation: evaluation,
-      promotionCandidateID: "PROMOTION-001",
-      createdAtUTC: timestamp)
-    XCTAssertEqual(promotion.disposition, "READY_FOR_NORMAL_PR")
-    XCTAssertEqual(promotion.workspaceRevision, patchRevision)
-    XCTAssertTrue(promotion.artifactIDs.contains("ART-DIFF"))
-    XCTAssertTrue(promotion.artifactIDs.contains("ART-BUILD"))
-    XCTAssertTrue(promotion.artifactIDs.contains("ART-RUNTIME"))
-  }
-
-  func testEveryPromotionFailureHasAnExplicitAutonomousDebugDisposition() {
-    let retryable: [HarnessPromotionGateFailure] = [
-      .candidatePatchMissing,
-      .candidateArtifactMissing,
-      .buildNotPassed,
-      .buildArtifactMissing,
-      .testsNotPassed,
-      .deviceVerificationNotPassed,
-      .deviceEvidenceMissing,
-      .evaluationNotPassed,
-      .scopeCheckFailed("outside"),
-      .stalePatch,
-    ]
-    XCTAssertTrue(
-      retryable.allSatisfy { $0.coordinatorDisposition == .retryCandidate })
-    XCTAssertEqual(
-      HarnessPromotionGateFailure.evolutionPolicyMissing.coordinatorDisposition,
-      .evidenceIntegrityBlock)
-  }
-
-  func testPolicyRejectsOutOfScopeOverBudgetAndStalePatches() throws {
-    let base = String(repeating: "a", count: 64)
-    let policy = try HarnessEvolutionPolicy(
-      baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 2,
-      maxChangedFiles: 1, maxDiffLines: 1,
-      allowedOperations: ["workspace.apply-patch@1"])
-    var corruptPolicy = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: JSONEncoder().encode(policy)) as? [String: Any])
-    corruptPolicy["maxAttempts"] = 0
-    XCTAssertThrowsError(
-      try JSONDecoder().decode(
-        HarnessEvolutionPolicy.self,
-        from: JSONSerialization.data(withJSONObject: corruptPolicy)))
-    let proposal = try inMemoryProposal(baseRevision: base)
-    let normal = HarnessCandidatePatch.create(
-      proposal: proposal, diffArtifactID: "ART-DIFF", htaskID: "HTASK-EVOLUTION",
-      attemptID: "ATTEMPT-001", createdBy: .agent, createdAtUTC: timestamp)
-    XCTAssertThrowsError(try policy.validate(candidate: normal)) { error in
-      XCTAssertEqual(
-        error as? HarnessEvolutionPolicyError,
-        .diffLineBudgetExceeded(actual: 2, limit: 1))
-    }
-    let outside = HarnessCandidatePatch(
-      candidatePatchID: "candidate-outside", htaskID: "HTASK-EVOLUTION",
-      attemptID: "ATTEMPT-001", baseRevision: base,
-      files: ["Secrets/key.txt"], diffDigest: proposal.patchSHA256,
-      changedLines: 1, createdBy: .agent, diffArtifactID: "ART-DIFF",
-      createdAtUTC: timestamp)
-    XCTAssertThrowsError(try policy.validate(candidate: outside)) { error in
-      XCTAssertEqual(
-        error as? HarnessEvolutionPolicyError, .pathOutsideScope("Secrets/key.txt"))
-    }
-    let stale = HarnessCandidatePatch(
-      candidatePatchID: "candidate-stale", htaskID: "HTASK-EVOLUTION",
-      attemptID: "ATTEMPT-001", baseRevision: String(repeating: "d", count: 64),
-      files: ["Sources/App.txt"], diffDigest: proposal.patchSHA256,
-      changedLines: 1, createdBy: .agent, diffArtifactID: "ART-DIFF",
-      createdAtUTC: timestamp)
-    XCTAssertThrowsError(try policy.validate(candidate: stale)) { error in
-      XCTAssertEqual(
-        error as? HarnessEvolutionPolicyError, .candidateBaseRevisionMismatch)
-    }
-  }
-
-  func testEvolutionLoopBoundsRemainEnforced() throws {
-    let base = String(repeating: "a", count: 64)
-    XCTAssertThrowsError(
-      try HarnessEvolutionPolicy(
-        baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 65,
-        allowedOperations: ["workspace.apply-patch@1"])
-    ) { error in
-      XCTAssertEqual(
-        error as? HarnessEvolutionPolicyError, .invalidBudget("maxAttempts"))
-    }
-
-    let strategy = try HarnessStrategyDescriptor(
-      hypothesisClass: "repair", selectedOperationFamily: "workspace.apply-patch",
-      patchFingerprint: String(repeating: "b", count: 64), baseWorkspaceRevision: base,
-      artifactSourceSet: [], prerequisiteSet: [],
-      executionExpectation: HarnessStrategyExecutionExpectation(
-        targetProfile: "device", toolchainProfile: "build-ok",
-        expectedNextObservation: "verify"))
-    let attempt = HarnessAttempt(
-      attemptID: "ATTEMPT-001", htaskID: "HTASK-EVOLUTION", ordinal: 1,
-      hypothesis: "strategy", strategy: strategy,
-      createdAtUTC: timestamp, updatedAtUTC: timestamp)
-    let failed = attempt.recordingFailure(
-      String(repeating: "f", count: 64), outcome: .failed, atUTC: timestamp)
-    XCTAssertEqual(
-      HarnessAttemptPlanner.classify(
-        attempts: [failed], candidateStrategyFingerprint: strategy.fingerprint,
-        identicalActionRunCount: 0, failure: nil, retrySafe: false,
-        maxActionRetriesPerRun: 1),
-      .duplicateStrategy(attemptID: failed.attemptID))
-  }
-
   func testInvalidAndStaleWorkspaceRevisionFailClosed() async throws {
     XCTAssertThrowsError(
-      try HarnessEvolutionPolicy(
+      try EvolutionWorkspacePolicy(
         baseRevision: "not-a-revision", allowedPaths: ["Sources/**"],
         allowedOperations: ["workspace.apply-patch@1"])
     ) { error in
-      XCTAssertEqual(error as? HarnessEvolutionPolicyError, .invalidBaseRevision)
+      XCTAssertEqual(error as? EvolutionWorkspacePolicyError, .invalidBaseRevision)
     }
 
     let root = try temporaryDirectory("stale-source")
@@ -470,7 +194,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let manager = try EvolutionWorkspaceManager(
       rootURL: state.appending(path: "evolution"),
       profileRegistry: WorkspaceProjectProfileRegistry(profile: profile))
-    let stale = try HarnessEvolutionPolicy(
+    let stale = try EvolutionWorkspacePolicy(
       baseRevision: String(repeating: "f", count: 64), allowedPaths: ["Sources/**"],
       allowedOperations: ["workspace.apply-patch@1"])
     do {
@@ -506,7 +230,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let base = try WorkspaceProviderSupport.workspaceRevision(
       root: profile.projectRoot, profileVersion: profile.profileID,
       globs: ["Sources/Safe/**"])
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: base, allowedPaths: ["Sources/Safe/**"],
       allowedOperations: ["workspace.apply-patch@1"])
     let manager = try EvolutionWorkspaceManager(
@@ -537,7 +261,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       withDestinationPath: app.path)
     let profile = try workspaceProfile(root: source)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
         root: profile.projectRoot, profileVersion: profile.profileID,
         globs: ["Sources/Safe/**"]),
@@ -581,7 +305,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       atPath: source.appending(path: "Other/external-link").path,
       withDestinationPath: external.appending(path: "secret.txt").path)
     let profile = try workspaceProfile(root: source)
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
         root: profile.projectRoot, profileVersion: profile.profileID,
         globs: ["Sources/Safe/**"]),
@@ -613,7 +337,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     try handle.truncate(atOffset: UInt64(512 * 1_024 * 1_024 + 1))
     try handle.close()
     let profile = try workspaceProfile(root: source)
-    let policy = try HarnessEvolutionPolicy(
+    let policy = try EvolutionWorkspacePolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
         root: profile.projectRoot, profileVersion: profile.profileID,
         globs: ["Sources/Safe/**"]),
@@ -633,36 +357,19 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
-  func testWorkspacePolicyDirectlyDrivesIsolationWithoutAModeProjection() throws {
+  func testWorkspacePolicyConstructionEnforcesItsClosedBounds() throws {
     let base = String(repeating: "a", count: 64)
-    let deviceOnly = HarnessTaskSubmission(
-      type: .debugCrash, projectRef: "TestProject",
-      target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(summary: "device-only"), budgets: budgets,
-      policy: HarnessTaskPolicy(allowedOperations: ["debug.observe-device@1"]))
-    XCTAssertFalse(deviceOnly.requiresWorkspaceIsolation)
     XCTAssertNoThrow(
-      try deviceOnly.validate(permittedOperations: ["debug.observe-device@1"]))
-
-    let evolutionPolicy = try HarnessEvolutionPolicy(
-      baseRevision: base, allowedPaths: ["Sources/**"],
-      allowedOperations: ["workspace.apply-patch@1"])
-    let evolution = HarnessTaskSubmission(
-      type: .debugCrash, projectRef: "TestProject",
-      target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(summary: "evolve"), budgets: budgets,
-      policy: HarnessTaskPolicy(allowedOperations: ["workspace.apply-patch@1"]),
-      evolutionPolicy: evolutionPolicy)
-    XCTAssertTrue(evolution.requiresWorkspaceIsolation)
-    XCTAssertNoThrow(
-      try evolution.validate(permittedOperations: ["workspace.apply-patch@1"]))
+      try EvolutionWorkspacePolicy(
+        baseRevision: base, allowedPaths: ["Sources/**"],
+        allowedOperations: ["workspace.apply-patch@1"]))
     XCTAssertThrowsError(
-      try HarnessEvolutionPolicy(
+      try EvolutionWorkspacePolicy(
         baseRevision: base, allowedPaths: ["Sources/**"],
         allowedOperations: ["flash.dayu200"])
     ) { error in
       XCTAssertEqual(
-        error as? HarnessEvolutionPolicyError,
+        error as? EvolutionWorkspacePolicyError,
         .destructiveOperationNotAllowed("flash.dayu200"))
     }
   }
@@ -677,14 +384,14 @@ final class HarnessEvolutionContractTests: XCTestCase {
 
     let findings = try await fixture.manager.sweepTerminalWorkspaces(
       tasks: [
-        HarnessEvolutionWorkspaceGCTaskReference(
+        EvolutionWorkspaceGCTaskReference(
           workspaceID: terminal.workspaceID, htaskID: terminal.htaskID,
-          lifecycle: .succeeded, updatedAtUTC: "2026-08-01T00:00:00Z"),
-        HarnessEvolutionWorkspaceGCTaskReference(
+          lifecycle: .init(rawValue: "succeeded", isTerminal: true), updatedAtUTC: "2026-08-01T00:00:00Z"),
+        EvolutionWorkspaceGCTaskReference(
           workspaceID: active.workspaceID, htaskID: active.htaskID,
-          lifecycle: .running, updatedAtUTC: "2026-08-01T00:00:00Z"),
+          lifecycle: .init(rawValue: "running", isTerminal: false), updatedAtUTC: "2026-08-01T00:00:00Z"),
       ],
-      retention: try HarnessEvolutionWorkspaceRetention(
+      retention: try EvolutionWorkspaceRetention(
         minimumTerminalAgeSeconds: 0, retainLatestTerminalCount: 0),
       nowUTC: "2026-08-02T12:00:00Z")
 
@@ -741,11 +448,11 @@ final class HarnessEvolutionContractTests: XCTestCase {
     // A second sweep is idempotent: nothing new to reclaim.
     let second = try await fixture.manager.sweepTerminalWorkspaces(
       tasks: [
-        HarnessEvolutionWorkspaceGCTaskReference(
+        EvolutionWorkspaceGCTaskReference(
           workspaceID: terminal.workspaceID, htaskID: terminal.htaskID,
-          lifecycle: .succeeded, updatedAtUTC: "2026-08-01T00:00:00Z")
+          lifecycle: .init(rawValue: "succeeded", isTerminal: true), updatedAtUTC: "2026-08-01T00:00:00Z")
       ],
-      retention: try HarnessEvolutionWorkspaceRetention(
+      retention: try EvolutionWorkspaceRetention(
         minimumTerminalAgeSeconds: 0, retainLatestTerminalCount: 0),
       nowUTC: "2026-08-02T13:00:00Z")
     XCTAssertEqual(
@@ -759,23 +466,23 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let young = try await fixture.prepare("HTASK-GCAGE0000002")
     let newest = try await fixture.prepare("HTASK-GCAGE0000003")
     let references = [
-      HarnessEvolutionWorkspaceGCTaskReference(
+      EvolutionWorkspaceGCTaskReference(
         workspaceID: oldest.workspaceID, htaskID: oldest.htaskID,
-        lifecycle: .failed, updatedAtUTC: "2026-07-20T00:00:00Z"),
-      HarnessEvolutionWorkspaceGCTaskReference(
+        lifecycle: .init(rawValue: "failed", isTerminal: true), updatedAtUTC: "2026-07-20T00:00:00Z"),
+      EvolutionWorkspaceGCTaskReference(
         workspaceID: young.workspaceID, htaskID: young.htaskID,
-        lifecycle: .cancelled, updatedAtUTC: "2026-07-30T00:00:00Z"),
-      HarnessEvolutionWorkspaceGCTaskReference(
+        lifecycle: .init(rawValue: "cancelled", isTerminal: true), updatedAtUTC: "2026-07-30T00:00:00Z"),
+      EvolutionWorkspaceGCTaskReference(
         workspaceID: newest.workspaceID, htaskID: newest.htaskID,
-        lifecycle: .succeeded, updatedAtUTC: "2026-08-02T11:00:00Z"),
+        lifecycle: .init(rawValue: "succeeded", isTerminal: true), updatedAtUTC: "2026-08-02T11:00:00Z"),
     ]
-    let retention = try HarnessEvolutionWorkspaceRetention(
+    let retention = try EvolutionWorkspaceRetention(
       minimumTerminalAgeSeconds: 7 * 86_400, retainLatestTerminalCount: 1)
 
     // Dry run decides identically but touches nothing.
     let preview = try await fixture.manager.sweepTerminalWorkspaces(
       tasks: references,
-      retention: try HarnessEvolutionWorkspaceRetention(
+      retention: try EvolutionWorkspaceRetention(
         minimumTerminalAgeSeconds: retention.minimumTerminalAgeSeconds,
         retainLatestTerminalCount: retention.retainLatestTerminalCount, dryRun: true),
       nowUTC: "2026-08-02T12:00:00Z")
@@ -823,11 +530,11 @@ final class HarnessEvolutionContractTests: XCTestCase {
 
     let findings = try await fixture.manager.sweepTerminalWorkspaces(
       tasks: [
-        HarnessEvolutionWorkspaceGCTaskReference(
+        EvolutionWorkspaceGCTaskReference(
           workspaceID: workspace.workspaceID, htaskID: workspace.htaskID,
-          lifecycle: .failed, updatedAtUTC: "2026-08-01T00:00:00Z")
+          lifecycle: .init(rawValue: "failed", isTerminal: true), updatedAtUTC: "2026-08-01T00:00:00Z")
       ],
-      retention: try HarnessEvolutionWorkspaceRetention(
+      retention: try EvolutionWorkspaceRetention(
         minimumTerminalAgeSeconds: 0, retainLatestTerminalCount: 0),
       nowUTC: "2026-08-02T12:00:00Z")
 
@@ -841,101 +548,21 @@ final class HarnessEvolutionContractTests: XCTestCase {
       FileManager.default.fileExists(atPath: taskRoot.appending(path: "teardown.json").path))
   }
 
-  func testTaskWorkspaceGCWireSweepsCancelledTaskAndValidatesBounds() async throws {
-    let source = try temporaryDirectory("gc-wire-source")
-    let state = try temporaryDirectory("gc-wire-state")
-    try FileManager.default.createDirectory(
-      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
-    let profile = try workspaceProfile(root: source)
-    let registry = WorkspaceProjectProfileRegistry(profile: profile)
-    let base = try WorkspaceProviderSupport.workspaceRevision(
-      root: profile.projectRoot, profileVersion: profile.profileID,
-      globs: ["Sources/**"])
-    let manager = try EvolutionWorkspaceManager(
-      rootURL: state.appending(path: "evolution"), profileRegistry: registry)
-    let coordinator = HarnessTaskCoordinator(
-      store: try HarnessTaskStore(rootURL: state.appending(path: "harness")),
-      jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: manager,
-      nowUTC: { "2026-08-02T00:00:00Z" },
-      taskIDFactory: { "HTASK-ABCDEF0123AA" })
-    let service = HarnessTaskMethodService(
-      coordinator: coordinator, applicationReferenceValidator: { _, _ in })
-    let submission = HarnessTaskSubmission(
-      type: .debugCrash, projectRef: profile.projectRef,
-      target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(
-        summary: "fix crash",
-        desiredState: ["baseWorkspaceRevision": .string(base)]),
-      budgets: budgets, policy: HarnessTaskPolicy(allowedOperations: evolutionOperations),
-      evolutionPolicy: try HarnessEvolutionPolicy(
-        baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 3,
-        maxChangedFiles: 2, maxDiffLines: 20,
-        allowedOperations: evolutionOperations))
-    let snapshot = try await coordinator.submit(submission)
-    let workspaceID = try XCTUnwrap(snapshot.evolutionWorkspace?.workspaceID)
-
-    // Default retention keeps the freshly terminal tree (latest-count 2).
-    _ = try await coordinator.cancel(snapshot.htaskID)
-    let retainedResponse = await service.handle(
-      "task.workspaceGC", requestID: "gc-default", params: nil)
-    XCTAssertNil(retainedResponse.errorCode)
-    guard case .object(let retainedFields)? = retainedResponse.result,
-      case .array(let retainedRows)? = retainedFields["workspaces"],
-      case .object(let retainedRow)? = retainedRows.first
-    else { return XCTFail("task.workspaceGC must report per-workspace findings") }
-    XCTAssertEqual(retainedRow["workspaceId"], .string(workspaceID))
-    XCTAssertEqual(retainedRow["disposition"], .string("retainedByPolicy"))
-
-    // An explicit zero-retention sweep reclaims it and reports the bytes.
-    let response = await service.handle(
-      "task.workspaceGC", requestID: "gc-now",
-      params: ["retainDays": .integer(0), "retainLast": .integer(0)])
-    XCTAssertNil(response.errorCode)
-    guard case .object(let fields)? = response.result,
-      case .array(let rows)? = fields["workspaces"],
-      case .object(let row)? = rows.first
-    else { return XCTFail("task.workspaceGC must report per-workspace findings") }
-    XCTAssertEqual(row["workspaceId"], .string(workspaceID))
-    XCTAssertEqual(row["htaskId"], .string(snapshot.htaskID))
-    XCTAssertEqual(row["disposition"], .string("destroyed"))
-    guard case .integer(let reclaimed)? = fields["reclaimedBytes"] else {
-      return XCTFail("task.workspaceGC must report reclaimed bytes")
-    }
-    XCTAssertGreaterThan(reclaimed, 0)
-
-    // Bounds are validated at the wire, and a composition without the
-    // workspace port fails closed instead of pretending to sweep.
-    let malformed = await service.handle(
-      "task.workspaceGC", requestID: "gc-bad", params: ["retainDays": .integer(-1)])
-    XCTAssertEqual(malformed.errorCode, .invalidParams)
-    let portless = HarnessTaskMethodService(
-      coordinator: HarnessTaskCoordinator(
-        store: try HarnessTaskStore(rootURL: state.appending(path: "harness-portless")),
-        jobPort: EvolutionNoopJobPort(),
-        nowUTC: { "2026-08-02T00:00:00Z" },
-        taskIDFactory: { "HTASK-ABCDEF0123AB" }),
-      applicationReferenceValidator: { _, _ in })
-    let unavailable = await portless.handle(
-      "task.workspaceGC", requestID: "gc-portless", params: nil)
-    XCTAssertEqual(unavailable.errorCode, .rejected)
-  }
-
   private struct EvolutionGCFixture {
     let manager: EvolutionWorkspaceManager
     let registry: WorkspaceProjectProfileRegistry
     let managerRoot: URL
     let sourceProjectRef: String
-    let policy: HarnessEvolutionPolicy
+    let policy: EvolutionWorkspacePolicy
     let createdAtUTC: String
 
-    func prepare(_ htaskID: String) async throws -> HarnessEvolutionWorkspace {
+    func prepare(_ htaskID: String) async throws -> EvolutionWorkspaceRecord {
       try await manager.prepareWorkspace(
         htaskID: htaskID, sourceProjectRef: sourceProjectRef,
         policy: policy, createdAtUTC: createdAtUTC)
     }
 
-    func workspaceRoot(_ workspace: HarnessEvolutionWorkspace) -> URL {
+    func workspaceRoot(_ workspace: EvolutionWorkspaceRecord) -> URL {
       managerRoot.appending(path: workspace.workspaceID, directoryHint: .isDirectory)
     }
   }
@@ -958,7 +585,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       registry: registry,
       managerRoot: managerRoot,
       sourceProjectRef: profile.projectRef,
-      policy: try HarnessEvolutionPolicy(
+      policy: try EvolutionWorkspacePolicy(
         baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 3,
         maxChangedFiles: 2, maxDiffLines: 20,
         allowedOperations: evolutionOperations),
@@ -972,12 +599,6 @@ final class HarnessEvolutionContractTests: XCTestCase {
       "workspace.run-tests@1", "debug.hap@1", "workspace.revert-patch@1",
     ]
   }
-  private var budgets: HarnessTaskBudgets {
-    HarnessTaskBudgets(
-      maxRounds: 20, maxWallClockSeconds: 3_600,
-      maxArtifactBytes: 10_000_000, maxE1Mutations: 8)
-  }
-
   private func temporaryDirectory(_ prefix: String) throws -> URL {
     let url = FileManager.default.temporaryDirectory.appending(
       path:
@@ -1007,69 +628,5 @@ final class HarnessEvolutionContractTests: XCTestCase {
       inspectionPreset: inspection, patchPreset: patching,
       buildPresets: [build.presetID: build], testPresets: [tests.presetID: tests],
       symbolPresets: [:])
-  }
-
-  private func patchProposal(root: URL) throws -> HarnessPatchProposal {
-    let snapshots = try WorkspaceProviderSupport.snapshots(
-      relativePaths: ["Sources/App.txt"], root: root.path)
-    return try inMemoryProposal(baseRevision: WorkspaceProviderSupport.revision(snapshots))
-  }
-
-  private func inMemoryProposal(baseRevision: String) throws -> HarnessPatchProposal {
-    let diff = """
-      diff --git a/Sources/App.txt b/Sources/App.txt
-      --- a/Sources/App.txt
-      +++ b/Sources/App.txt
-      @@ -1 +1 @@
-      -old
-      +new
-
-      """
-    let digest = SHA256.hash(data: Data(diff.utf8))
-      .map { String(format: "%02x", $0) }.joined()
-    return try HarnessPatchProposal(
-      baseWorkspaceRevision: baseRevision, patchSHA256: digest,
-      unifiedDiff: diff, touchedFiles: ["Sources/App.txt"],
-      expectedChangedSymbols: ["App"])
-  }
-
-  private func passingEvaluation() -> HarnessEvaluation {
-    HarnessEvaluation(
-      evaluationID: "EVAL-001", htaskID: "HTASK-EVOLUTION", round: 5,
-      verdict: .pass,
-      criterionResults: [
-        HarnessCriterionResult(
-          criterionID: "no-crash", verdict: .pass, metric: "crashes",
-          observed: .integer(0), expected: .integer(0), samples: 5,
-          requiredSamples: 5, blockers: [])
-      ], measurements: ["crashes": .integer(0)], samples: ["crashes": 5],
-      evidence: [
-        HarnessEvidenceRecord(
-          artifactID: "ART-RUNTIME", name: "crash-index.json", byteCount: 10,
-          sha256: String(repeating: "e", count: 64), verified: true)
-      ], blockers: [], createdAtUTC: timestamp)
-  }
-
-  private func taskSnapshot(
-    baseRevision: String,
-    policy: HarnessEvolutionPolicy,
-    observedState: [String: JSONValue] = [:]
-  ) throws -> HarnessTaskSnapshot {
-    HarnessTaskSnapshot(
-      htaskID: "HTASK-EVOLUTION", type: .debugCrash, intakeDescription: nil,
-      projectRef: "TestProject", target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(
-        summary: "fix crash",
-        desiredState: ["baseWorkspaceRevision": .string(baseRevision)]),
-      successCriteria: [], budgets: budgets,
-      policy: HarnessTaskPolicy(allowedOperations: evolutionOperations),
-      evolutionPolicy: policy,
-      evolutionWorkspace: HarnessEvolutionWorkspace(
-        workspaceID: "evo-test", htaskID: "HTASK-EVOLUTION",
-        sourceProjectRef: "TestProject", projectRef: "evolution-test",
-        baseRevision: baseRevision, allowedPathsDigest: String(repeating: "d", count: 64),
-        createdAtUTC: timestamp),
-      observedState: observedState, createdAtUTC: timestamp, updatedAtUTC: timestamp,
-      lifecycle: .running, stage: .verifying)
   }
 }

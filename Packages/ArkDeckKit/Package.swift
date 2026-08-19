@@ -11,7 +11,6 @@ let package = Package(
     .library(name: "ArkForgeIPC", targets: ["ArkForgeIPC"]),
     .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
     .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
-    .library(name: "ArkDeckHarness", targets: ["ArkDeckHarness"]),
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
@@ -19,7 +18,6 @@ let package = Package(
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
     .library(name: "ArkDeckLaunchAgent", targets: ["ArkDeckLaunchAgent"]),
     .executable(name: "arkdeck-agentd", targets: ["ArkDeckAgentDaemonMain"]),
-    .executable(name: "ArkDeckEvolutionCandidate", targets: ["ArkDeckEvolutionCandidate"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
     .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
@@ -42,23 +40,10 @@ let package = Package(
     .target(name: "ArkForgeIPC", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
-    // Dependency direction is load-bearing (see ArchitectureBoundaryContractTests):
-    // the harness plane decides, the runtime plane executes, and only
-    // ArkDeckAgentComposition plus ArkDeckAgentDaemon may see both as library
-    // targets. ArkDeckHarness deliberately does not depend on ArkDeckProcess —
-    // the harness cannot spawn a process.
-    .target(
-      name: "ArkDeckHarness",
-      dependencies: ["ArkDeckCore", "ArkDeckRuntime"],
-      exclude: ["Candidate"],
-      linkerSettings: [.linkedLibrary("sqlite3")]
-    ),
-    .executableTarget(
-      name: "ArkDeckEvolutionCandidate",
-      path: "Sources/ArkDeckHarness/Candidate"),
-    // The runtime control plane and providers. Deliberately does not depend on
-    // ArkDeckHarness: the engine and providers must not understand the plane
-    // that drives them.
+    // The runtime control plane and providers. The harness plane was removed
+    // by CHG-2026-064: decisions come from external agents through the
+    // published caller surface, so no target may reintroduce an in-process
+    // decision plane (see ArchitectureBoundaryContractTests).
     .target(
       name: "ArkDeckWorkflows",
       dependencies: [
@@ -73,19 +58,16 @@ let package = Package(
         .linkedFramework("Security"),
         .linkedFramework("LocalAuthentication"),
       ]),
-    // Harness <-> runtime glue: harness port adapters, the evolution workspace
-    // and campaign hosts, and the LLM gateway composition (including the
-    // process-executing Codex CLI transport). This and ArkDeckAgentDaemon are
-    // the two library composition points allowed to import both
-    // ArkDeckHarness and ArkDeckWorkflows; the daemon owns the service-side
-    // task-method adapter. This target lives under
-    // Sources/ArkDeckWorkflows/AgentComposition (same carve-out pattern as
-    // ArkDeckEvolutionCandidate inside ArkDeckHarness).
+    // Product composition above the runtime plane: the runtime-owned isolated
+    // workspace machinery, the flash evolution campaign host, and the native
+    // agent-chat composition. This target lives under
+    // Sources/ArkDeckWorkflows/AgentComposition as a carve-out so
+    // ArkDeckWorkflows itself never gains a composition edge.
     .target(
       name: "ArkDeckAgentComposition",
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
-        "ArkDeckHarness", "ArkDeckWorkflows", "ArkDeckAgentClient",
+        "ArkDeckWorkflows", "ArkDeckAgentClient",
       ],
       path: "Sources/ArkDeckWorkflows/AgentComposition"),
     .target(
@@ -102,7 +84,7 @@ let package = Package(
     ),
     .target(
       name: "ArkDeckAgentDaemon",
-      dependencies: ["ArkDeckCore", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"]
+      dependencies: ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
     ),
     .target(
       name: "ArkDeckAgentClient",
@@ -119,7 +101,7 @@ let package = Package(
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",
       dependencies: [
-        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore", "ArkDeckHarness",
+        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
         "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckWorkflows",
       ]
     ),
@@ -163,7 +145,6 @@ let package = Package(
         "ArkForgeIPC",
         "ArkDeckRuntime",
         "ArkDeckOpenHarmony",
-        "ArkDeckHarness",
         "ArkDeckWorkflows",
         "ArkDeckAgentComposition",
         "ArkDeckStorage",

@@ -123,11 +123,14 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-AND-003 — 移除 Harness 决策平面
 
-- Status:ready（2026-08-19 三道门全部满足：TASK-AND-001 done（#1382）；
-  TASK-AND-002 新判据 `REAL_DEVICE_PASS`（run-r2.md）；隔离工作区前置由
-  生产实证解除——`workspace.prepare-isolated-copy@1` 在修复后 daemon 上
-  于真机会话成功制备 `evolution-*` 副本（r2 job-f7bbc8f5），CHG-2026-061
-  路线生产可用）
+- Status:done（2026-08-19；三道门满足后实施：`ArkDeckHarness` 模块与
+  `ArkDeckEvolutionCandidate` target、daemon `task.*` 面（方法路由/组合块/
+  XPC 允许表）、CLI `task` 族、App Automation 投影、chat 任务桥工具、
+  agentd 网关配置面全部删除；Evolution workspace 域类型迁入 runtime 平面
+  （见 design.md §5 勘误）；架构断言收紧为「决策平面不存在」三条并全绿；
+  APIBaseline 再生；已移除配置键 CLI 具名拒绝 + daemon fail-loud +
+  `agentd update` plist 迁移均有合约测试；README/ArchitectureRules/
+  LaunchAgents README 同车改写含操作者迁移注记）
 - Golden Journey:GJ-5（终态结构）；GJ-1—GJ-4 共享的迭代减负
 - Platform:macos
 - Requirements:`AND-REQ-001`（宿主唯一性）、`AND-REQ-002`（安全内核零降级）、

@@ -370,7 +370,7 @@ public actor RuntimeDebugInvocationController {
     guard isDestructiveRecovery else {
       throw RuntimeDebugInvocationError.invalidSeedRequest(
         "Runtime debug is the protected destructive-recovery broker; "
-          + "ordinary Agent debugging must use one bounded Harness task")
+          + "ordinary Agent debugging is an external agent driving the published job surface")
     }
     guard request.target.expectedBindingRevision != nil else {
       throw RuntimeDebugInvocationError.invalidSeedRequest(

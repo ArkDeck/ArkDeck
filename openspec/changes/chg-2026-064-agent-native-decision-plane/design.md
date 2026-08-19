@@ -120,3 +120,28 @@
 - 不动 `PRODUCT-LOOP.md` / `AGENTS.md` / spec 正本；
 - 不迁移、不删除、不解读既有 `harness/` SQLite 数据；
 - 不为「删掉的能力可能有人要」保留任何运行时开关。
+
+## 5. 实施勘误(TASK-AND-003 实测,2026-08-19)
+
+按 §0 规则 2/4「删除前必 rg、清单差异如实登记」,实施与 §1/§2 清单的差异:
+
+1. **`EvolutionWorkspaceManager` 保留并去 Harness 化,不删除**——它是
+   `workspace.prepare-isolated-copy@1`(CHG-2026-061 路线)的生产实现体,
+   AND-002 r2 在真机实证其可用。其依赖的 Evolution 域类型自
+   `ArkDeckHarness/Domain/HarnessEvolution.swift` 迁入
+   `AgentComposition/EvolutionWorkspaceModel.swift` 并更名
+   (`EvolutionWorkspacePolicy`/`EvolutionWorkspaceRecord`/GC 族);manifest
+   Codable 键不变,旧工作区可继续 adoption。GC 的任务生命周期证词改为
+   `EvolutionWorkspaceGCLifecycle`(rawValue+isTerminal),sweep 机器保留
+   (共享工作区存储的卫生能力),其调用面(原 `task.workspace-gc`)移除,
+   runtime 侧 GC 面为后续任务。
+2. **chat 的任务桥工具随平面移除**——`arkdeck_start_debug_task` 等四个工具
+   与 overview 的 `task.list` 投影以字符串方法名指向已删除的 `task.*` 面,
+   保留即为运行时假面;AND-REQ-004 的「行为不变」以 AND-001 交割时点为准,
+   本任务如实收缩 chat 工具面(observe/capture/artifact/resume 保留)。
+3. **`EvolutionCampaignAttemptIntents`/`LocalAgentEvolutionStrategyRepairer`
+   在开工前已不存在**(先行 PR 清理),清单相应作废;campaign 本体
+   (Workflows 五文件)如 §0 规则 1 承诺零改动。
+4. **`agentd update` 即迁移通道**:读取旧 plist 时忽略并丢弃
+   `ARKDECK_HARNESS_*` 网关键,再生成即清洁;daemon 对显式残留键具名
+   fail-loud(exit 78);合约测试覆盖迁移正例与 CLI flag 具名拒绝。

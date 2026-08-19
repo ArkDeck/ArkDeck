@@ -34,14 +34,14 @@ ArkDeck 是一个面向真实 OpenHarmony 开发板的本地优先工作台。ma
 - 把有界 HiLog、截图、ArkUI 组件树、Trace 和崩溃记录收进不可变的本地产物库。
 - 创建经过验证、绑定目标设备的端口转发，并原子化部署应用自有的 native 库，失败时回滚。
 - 用已验证的镜像包刷写 DAYU200（RK3568），随后重新绑定设备并验证刷机后的系统。
-- 运行带预算的 AI 调试循环：分析产物，在声明的隔离工作区中修改、重新构建、签名和复验，达到成功、安全边界或预算上限时停止。
+- 让外部 agent 闭合带预算的调试循环：分析产物、在 Runtime 持有的隔离工作区打补丁、重建、签名、重新部署并复验——每个副作用与其他调用方走同一条 typed admission。
 
 三个入口共用同一个运行时：
 
 | 入口 | 是什么 |
 | --- | --- |
 | macOS 应用 | Overview 与设备视图，以及 Flash、Debug、UI Dump、Trace、Automation 和 History 工作区；应用设置位于标准 Settings 窗口 |
-| `arkdeck` | 配置守护进程与签名、接管设备、控制操作与任务、访问产物、发起类型化 Agent 运行和有界调试任务 |
+| `arkdeck` | 配置守护进程与签名、接管设备、控制操作与作业、访问产物、发起类型化 Agent 运行 |
 | `arkdeck-agentd` | 用户级本地守护进程：负责实际执行、故障恢复和私有控制 socket |
 
 ## 为什么这样设计
@@ -149,7 +149,7 @@ SwiftPM 直接生成的可执行文件只用于开发，不能作为生产 Launc
 ## 仓库结构
 
 - [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI 桌面应用
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 运行时、Provider、存储、守护进程、CLI 与 Harness
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 运行时、Provider、存储、守护进程与 CLI
 - [`Catalog/`](./Catalog/) — 已发布的操作、Profile 与 Schema
 - [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
 - [`openspec/`](./openspec/) — 产品契约、安全不变量与变更历史

@@ -1,28 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "app.navigation.automation": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Automation"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"自动化"}}}},
-    "automation.action.cancel": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Cancel task"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"取消任务"}}}},
-    "automation.action.inProgress": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Updating Harness task"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在更新 Harness 任务"}}}},
-    "automation.action.pause": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Pause"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"暂停"}}}},
-    "automation.action.reconcile": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Reconcile next step"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"核对并推进下一步"}}}},
-    "automation.action.refresh": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Refresh tasks"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"刷新任务"}}}},
-    "automation.boundary": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This console controls existing typed Harness tasks only. New task submission, human-resolution input, patch proposals, promotion export, and capability administration remain unavailable in the App."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此控制台仅管理已有的 typed Harness 任务。App 不提供新建任务、人工裁决输入、补丁提案、promotion 导出或 capability 管理。"}}}},
-    "automation.empty.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime has no Harness tasks to monitor on this host."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 在本机没有可监控的 Harness 任务。"}}}},
-    "automation.empty.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Automation Tasks"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"暂无自动化任务"}}}},
-    "automation.fact.activeJob": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Active Job"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"当前 Job"}}}},
-    "automation.fact.round": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Round"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"轮次"}}}},
-    "automation.fact.target": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Target"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"目标"}}}},
-    "automation.fact.task": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Harness task"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Harness 任务"}}}},
-    "automation.fact.updated": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Updated"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"更新时间"}}}},
-    "automation.fact.version": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Version"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"版本"}}}},
-    "automation.fact.waitReason": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Wait reason"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"等待原因"}}}},
-    "automation.facts.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime facts"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 事实"}}}},
-    "automation.operations.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No operations are allowed for this task."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此任务未获准执行任何 operation。"}}}},
-    "automation.operations.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Allowed typed operations"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"允许的 typed operations"}}}},
-    "automation.select.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select an Automation task"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择自动化任务"}}}},
-    "automation.unavailable.guidance": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Start the production daemon with its Harness composition, then refresh."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请使用 Harness composition 启动生产 daemon，然后刷新。"}}}},
-    "automation.unavailable.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Automation is unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"自动化不可用"}}}},
     "app.devices.gone": {
       "localizations": {
         "en": {
@@ -359,22 +337,6 @@
         }
       }
     },
-    "device.detail.recheckNote": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting and re-checking refresh the latest timestamped HDC observation. They send nothing to the device and can be repeated freely."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待与重新检测会刷新带时间的最新 HDC 观测；不向设备发送任何内容，可随时重复。"
-          }
-        }
-      }
-    },
     "device.detail.factsTitle": {
       "localizations": {
         "en": {
@@ -387,6 +349,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Runtime 事实"
+          }
+        }
+      }
+    },
+    "device.detail.recheckNote": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting and re-checking refresh the latest timestamped HDC observation. They send nothing to the device and can be repeated freely."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待与重新检测会刷新带时间的最新 HDC 观测；不向设备发送任何内容，可随时重复。"
           }
         }
       }
@@ -1449,6 +1427,167 @@
         }
       }
     },
+    "overview.capabilities.column.capability": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capability"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "能力"
+          }
+        }
+      }
+    },
+    "overview.capabilities.column.evidence": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Probe evidence"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "探测证据"
+          }
+        }
+      }
+    },
+    "overview.capabilities.column.state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "overview.capabilities.loading": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Probing device capabilities…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在探测设备能力…"
+          }
+        }
+      }
+    },
+    "overview.capabilities.state.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用"
+          }
+        }
+      }
+    },
+    "overview.capabilities.state.limited": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limited"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受限"
+          }
+        }
+      }
+    },
+    "overview.capabilities.state.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "overview.capabilities.state.unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法确认"
+          }
+        }
+      }
+    },
+    "overview.capabilities.title.noTarget": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device capability matrix"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备能力矩阵"
+          }
+        }
+      }
+    },
+    "overview.capabilities.title.target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device capability matrix (%1$@ · binding %2$lld)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备能力矩阵（%1$@ · binding %2$lld）"
+          }
+        }
+      }
+    },
     "overview.channel.encryptedVerified": {
       "localizations": {
         "en": {
@@ -1479,67 +1618,6 @@
             "value": "未验证"
           }
         }
-      }
-    },
-    "overview.capabilities.column.capability": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Capability" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "能力" } }
-      }
-    },
-    "overview.capabilities.column.evidence": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Probe evidence" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "探测证据" } }
-      }
-    },
-    "overview.capabilities.column.state": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "State" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "状态" } }
-      }
-    },
-    "overview.capabilities.loading": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Probing device capabilities…" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在探测设备能力…" } }
-      }
-    },
-    "overview.capabilities.state.available": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Available" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可用" } }
-      }
-    },
-    "overview.capabilities.state.limited": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Limited" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "受限" } }
-      }
-    },
-    "overview.capabilities.state.unavailable": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Unavailable" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不可用" } }
-      }
-    },
-    "overview.capabilities.state.unknown": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Unknown" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法确认" } }
-      }
-    },
-    "overview.capabilities.title.noTarget": {
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Device capability matrix" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设备能力矩阵" } }
-      }
-    },
-    "overview.capabilities.title.target": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Device capability matrix (%1$@ · binding %2$lld)" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设备能力矩阵（%1$@ · binding %2$lld）" } }
       }
     },
     "overview.field.authorization": {

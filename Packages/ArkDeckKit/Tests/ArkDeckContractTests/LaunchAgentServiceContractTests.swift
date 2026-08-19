@@ -139,10 +139,6 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   func testInstallClosesTemplateExecutableHDCAndUserDomainLifecycle() throws {
-    XCTAssertEqual(
-      ArkDeckLaunchAgent.harnessLocalModelProviders,
-      HarnessLocalAgentCLIProfile.all.map(\.profileID).sorted(),
-      "the installer and daemon composition must keep one closed local-provider vocabulary")
     let receipt = try service.install(
       daemonBundleSource: daemonBundle, hdcExecutable: hdc)
 
@@ -420,25 +416,12 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     try FileManager.default.createDirectory(
       at: sdk.appending(path: "default/openharmony", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
-    let modelCLI = root.appending(path: "model-cli/claude")
-    try makeExecutable(modelCLI, bytes: "claude-cli-v1")
-    let harnessModel = LaunchAgentHarnessModelConfiguration(
-      provider: "claude-code", modelName: "sonnet", cliExecutable: modelCLI,
-      cliWorkingDirectory: project, cliTimeoutSeconds: 900)
-
     let receipt = try service.install(
       daemonBundleSource: daemonBundle, hdcExecutable: hdc,
       workspace: LaunchAgentWorkspaceConfiguration(
-        projectRoot: project, devecoSDKRoot: sdk),
-      harnessSensitiveEvidence: ["hilog.txt", "crash-index.txt"],
-      harnessModel: harnessModel)
+        projectRoot: project, devecoSDKRoot: sdk))
     XCTAssertEqual(receipt.workspaceProjectPath, project.path)
     XCTAssertEqual(receipt.devecoSDKPath, sdk.path)
-    XCTAssertEqual(receipt.harnessSensitiveEvidence, ["crash-index.txt", "hilog.txt"])
-    XCTAssertEqual(receipt.harnessModel?.provider, "claude-code")
-    XCTAssertEqual(receipt.harnessModel?.cliPath, modelCLI.path)
-    XCTAssertEqual(receipt.harnessModel?.cliSHA256, try digest(modelCLI))
-    XCTAssertEqual(receipt.harnessModel?.egressProjects, ["demo-app"])
 
     var environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
@@ -447,15 +430,6 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(environment["ARKDECK_DEVECO_SDK_HOME"], sdk.path)
     XCTAssertEqual(environment["ARKDECK_ANALYZER_PATH"], paths.installedDaemon.path)
     XCTAssertEqual(environment["ARKDECK_WORKSPACE_INSPECTOR"], "/usr/bin/grep")
-    XCTAssertEqual(
-      environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"],
-      "crash-index.txt,hilog.txt")
-    XCTAssertEqual(environment["ARKDECK_HARNESS_MODEL_PROVIDER"], "claude-code")
-    XCTAssertEqual(environment["ARKDECK_HARNESS_MODEL_NAME"], "sonnet")
-    XCTAssertEqual(environment["ARKDECK_HARNESS_CLI_PATH"], modelCLI.path)
-    XCTAssertEqual(environment["ARKDECK_HARNESS_CLI_WORKDIR"], project.path)
-    XCTAssertEqual(environment["ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"], "900")
-    XCTAssertEqual(environment["ARKDECK_HARNESS_EGRESS_PROJECTS"], "demo-app")
 
     try FileManager.default.createDirectory(
       at: paths.stateDirectory, withIntermediateDirectories: true)
@@ -464,8 +438,6 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertTrue(status.ready, "\(status.diagnostics)")
     XCTAssertEqual(status.workspaceProjectPath, project.path)
     XCTAssertEqual(status.devecoSDKPath, sdk.path)
-    XCTAssertEqual(status.harnessSensitiveEvidence, ["crash-index.txt", "hilog.txt"])
-    XCTAssertEqual(status.harnessModel, receipt.harnessModel)
 
     try makeExecutable(daemon, bytes: "daemon-v2")
     try RuntimeCLI.runAgentDaemon(
@@ -474,36 +446,41 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
     XCTAssertEqual(environment["ARKDECK_DEVECO_SDK_HOME"], sdk.path)
-    XCTAssertEqual(
-      environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"],
-      "crash-index.txt,hilog.txt")
-    XCTAssertEqual(environment["ARKDECK_HARNESS_MODEL_PROVIDER"], "claude-code")
-    XCTAssertEqual(environment["ARKDECK_HARNESS_CLI_PATH"], modelCLI.path)
     status = try service.status()
     XCTAssertEqual(status.workspaceProjectPath, project.path)
-    XCTAssertEqual(status.harnessSensitiveEvidence, ["crash-index.txt", "hilog.txt"])
-    XCTAssertEqual(status.harnessModel, receipt.harnessModel)
+
+    // Migration (CHG-2026-064): a plist installed before the decision-plane
+    // removal still carries gateway keys. `agentd update` reads the legacy
+    // configuration, ignores those keys, and regenerates the plist without
+    // them — that is how a live machine sheds the removed plane.
+    var document = try XCTUnwrap(try plist(at: paths.plist))
+    var legacyEnvironment = try XCTUnwrap(
+      document["EnvironmentVariables"] as? [String: String])
+    legacyEnvironment["ARKDECK_HARNESS_MODEL_PROVIDER"] = "codex"
+    legacyEnvironment["ARKDECK_HARNESS_MODEL_NAME"] = "gpt-5.6-terra"
+    legacyEnvironment["ARKDECK_HARNESS_CLI_PATH"] = "/usr/bin/true"
+    legacyEnvironment["ARKDECK_HARNESS_CLI_WORKDIR"] = project.path
+    legacyEnvironment["ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"] = "300"
+    legacyEnvironment["ARKDECK_HARNESS_EGRESS_PROJECTS"] = "demo-app"
+    legacyEnvironment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"] = "hilog.txt"
+    document["EnvironmentVariables"] = legacyEnvironment
+    try PropertyListSerialization.data(
+      fromPropertyList: document, format: .xml, options: 0
+    ).write(to: paths.plist, options: .atomic)
 
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemonBundle.path, "--sensitive-evidence", "none", "--json"],
-      service: service)
+      ["update", "--daemon", daemonBundle.path, "--json"], service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
-    XCTAssertNil(environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"])
-    XCTAssertEqual(try service.status().harnessSensitiveEvidence, [])
-
-    try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemonBundle.path, "--harness-model-provider", "none", "--json"],
-      service: service)
-    environment = try XCTUnwrap(
-      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
-    XCTAssertNil(environment["ARKDECK_HARNESS_MODEL_PROVIDER"])
-    XCTAssertNil(environment["ARKDECK_HARNESS_MODEL_NAME"])
-    XCTAssertNil(environment["ARKDECK_HARNESS_CLI_PATH"])
-    XCTAssertNil(environment["ARKDECK_HARNESS_CLI_WORKDIR"])
-    XCTAssertNil(environment["ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"])
-    XCTAssertNil(environment["ARKDECK_HARNESS_EGRESS_PROJECTS"])
-    XCTAssertNil(try service.status().harnessModel)
+    for removed in [
+      "ARKDECK_HARNESS_MODEL_PROVIDER", "ARKDECK_HARNESS_MODEL_NAME",
+      "ARKDECK_HARNESS_CLI_PATH", "ARKDECK_HARNESS_CLI_WORKDIR",
+      "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS", "ARKDECK_HARNESS_EGRESS_PROJECTS",
+      "ARKDECK_HARNESS_SENSITIVE_EVIDENCE",
+    ] {
+      XCTAssertNil(environment[removed], removed)
+    }
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
   }
 
   func testWorkspaceConfigurationFailsClosedUnlessProjectAndSDKAreBothValid() throws {
@@ -552,79 +529,20 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertTrue(runner.commands.isEmpty)
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
 
-    for invalid in [["../crash-index.txt"], ["hilog.txt", "hilog.txt"], [""]] {
+    // Removed by CHG-2026-064: the gateway flags are refused by name so an
+    // operator's muscle memory gets a real answer instead of silence.
+    for removed in [
+      "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
+      "--harness-cli", "--harness-cli-timeout-seconds",
+    ] {
       XCTAssertThrowsError(
-        try service.install(
-          daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-          harnessSensitiveEvidence: invalid)
+        try RuntimeCLI.runAgentDaemon(
+          ["install", "--daemon", daemonBundle.path, "--hdc", hdc.path, removed, "x"],
+          service: service)
       ) { error in
-        XCTAssertTrue("\(error)".contains("unique safe artifact basenames"))
+        XCTAssertTrue("\(error)".contains("removed by CHG-2026-064"), "\(error)")
       }
     }
-
-    let modelCLI = root.appending(path: "model-cli/codex")
-    try makeExecutable(modelCLI, bytes: "codex-cli-v1")
-    XCTAssertThrowsError(
-      try service.install(
-        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-        harnessModel: LaunchAgentHarnessModelConfiguration(
-          provider: "codex", modelName: "gpt-5", cliExecutable: modelCLI,
-          cliWorkingDirectory: root))
-    ) { error in
-      XCTAssertTrue("\(error)".contains("requires the validated demo-app workspace"))
-    }
-    XCTAssertThrowsError(
-      try RuntimeCLI.runAgentDaemon(
-        [
-          "install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
-          "--harness-cli", modelCLI.path,
-        ],
-        service: service)
-    ) { error in
-      XCTAssertTrue("\(error)".contains("require --harness-model-provider"))
-    }
-  }
-
-  func testHarnessLocalModelConfigurationFailsClosedOnProviderAndIdentityDrift() throws {
-    let project = root.appending(path: "WaterFlowLayoutDemo", directoryHint: .isDirectory)
-    let module = project.appending(path: "entry/src/main", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
-    try Data("{}".utf8).write(to: module.appending(path: "module.json5"))
-    let sdk = root.appending(path: "DevEco/sdk", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(
-      at: sdk.appending(path: "default/openharmony", directoryHint: .isDirectory),
-      withIntermediateDirectories: true)
-    let modelCLI = root.appending(path: "model-cli/codex")
-    try makeExecutable(modelCLI, bytes: "codex-cli-v1")
-    let workspace = LaunchAgentWorkspaceConfiguration(
-      projectRoot: project, devecoSDKRoot: sdk)
-
-    XCTAssertThrowsError(
-      try service.install(
-        daemonBundleSource: daemonBundle, hdcExecutable: hdc, workspace: workspace,
-        harnessModel: LaunchAgentHarnessModelConfiguration(
-          provider: "shell", modelName: "anything", cliExecutable: modelCLI,
-          cliWorkingDirectory: project))
-    ) { error in
-      XCTAssertTrue("\(error)".contains("must be codex or claude-code"))
-    }
-
-    _ = try service.install(
-      daemonBundleSource: daemonBundle, hdcExecutable: hdc, workspace: workspace,
-      harnessModel: LaunchAgentHarnessModelConfiguration(
-        provider: "codex", modelName: "gpt-5", cliExecutable: modelCLI,
-        cliWorkingDirectory: project))
-    try FileManager.default.createDirectory(
-      at: paths.stateDirectory, withIntermediateDirectories: true)
-    XCTAssertTrue(FileManager.default.createFile(atPath: paths.socket.path, contents: Data()))
-    try makeExecutable(modelCLI, bytes: "unreviewed-model-cli-replacement")
-
-    let status = try service.status()
-    XCTAssertFalse(status.ready)
-    XCTAssertTrue(
-      status.diagnostics.contains(
-        "Harness local model configuration drifted since installation"))
   }
 
   func testStatusNamesHDCIdentityDriftAndUninstallPreservesStateAndLogs() throws {
