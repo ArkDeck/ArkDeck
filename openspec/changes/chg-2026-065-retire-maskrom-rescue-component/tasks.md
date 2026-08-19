@@ -77,6 +77,8 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
   - `Packages/ArkDeckKit/Tests/**`
+  - `scripts/README.md`（RRC-001 删除 `scripts/rockchip_component/` 后其索引行
+    的清理——RRC-001 的 base 授权未列此文件，顺延至此）
   - `openspec/changes/chg-2026-065-retire-maskrom-rescue-component/**`
 
 ## 证据留存
