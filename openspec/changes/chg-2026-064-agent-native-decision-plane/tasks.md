@@ -65,7 +65,14 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-AND-002 — 外部 agent 真机实证：反转后的 GJ-5 不需要任务平面
 
-- Status:ready（仅在本 proposal 经维护者 merge 后方可开始；与 AND-001 可并行）
+- Status:done（2026-08-19；headless 外部 agent 会话 r2 在真机一次闭合
+  复现→分析→隔离副本修补→重建→签名→部署→五个干净样本→负向用例，循环内
+  人工步骤 0、`task.*` 调用 0——GJ-5 按重述判据记 `REAL_DEVICE_PASS`，
+  evidence = `evidence/runs/TASK-AND-002/run-r2.md`。r1 暴露的两处隔离制备
+  产品缺陷（绝对 symlink 无条件拒绝、dispatcher 吞错）已同任务垂直修复并
+  经维护者部署至生产 daemon 后由 r2 实证（`run-r1.md`）。如实登记的环境
+  残留：`workspace.run-tests@1` 因 demo 树缺 `@ohos/hypium` 依赖库预先存在
+  地失败，与补丁不相交，不冒充绿）
 - Golden Journey:GJ-5（按重述判据翻转状态的唯一载体）
 - Platform:macos
 - Requirements:`AND-REQ-002`（安全内核零降级的真机侧证明）、`AND-REQ-005`
@@ -116,8 +123,11 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-AND-003 — 移除 Harness 决策平面
 
-- Status:blocked（门 = TASK-AND-001 done 且 TASK-AND-002 新判据
-  `REAL_DEVICE_PASS`；另见隔离工作区前置）
+- Status:ready（2026-08-19 三道门全部满足：TASK-AND-001 done（#1382）；
+  TASK-AND-002 新判据 `REAL_DEVICE_PASS`（run-r2.md）；隔离工作区前置由
+  生产实证解除——`workspace.prepare-isolated-copy@1` 在修复后 daemon 上
+  于真机会话成功制备 `evolution-*` 副本（r2 job-f7bbc8f5），CHG-2026-061
+  路线生产可用）
 - Golden Journey:GJ-5（终态结构）；GJ-1—GJ-4 共享的迭代减负
 - Platform:macos
 - Requirements:`AND-REQ-001`（宿主唯一性）、`AND-REQ-002`（安全内核零降级）、

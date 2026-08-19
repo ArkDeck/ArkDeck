@@ -523,7 +523,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
-  func testEvolutionWorkspaceRejectsAbsoluteSymlinkBackIntoThePrimaryTree() async throws {
+  func testEvolutionWorkspaceRewritesAbsoluteInSourceSymlinkToARelativeLink() async throws {
     let source = try temporaryDirectory("absolute-symlink-source")
     let state = try temporaryDirectory("absolute-symlink-state")
     try FileManager.default.createDirectory(
@@ -535,6 +535,51 @@ final class HarnessEvolutionContractTests: XCTestCase {
     try FileManager.default.createSymbolicLink(
       atPath: source.appending(path: "Other/primary-link").path,
       withDestinationPath: app.path)
+    let profile = try workspaceProfile(root: source)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: ["Sources/Safe/**"]),
+      allowedPaths: ["Sources/Safe/**"],
+      allowedOperations: ["workspace.apply-patch@1"])
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: state.appending(path: "evolution"),
+      profileRegistry: registry)
+
+    let workspace = try await manager.prepareWorkspace(
+      htaskID: "HTASK-ABSOLUTE-SYMLINK", sourceProjectRef: profile.projectRef,
+      policy: policy, createdAtUTC: timestamp)
+
+    // The invariant is unchanged — the copy must never retain a reference to
+    // the primary tree. An absolute target that resolves inside the source is
+    // admitted by rewriting it into the equivalent relative link.
+    let isolated = try XCTUnwrap(registry.profile(for: workspace.projectRef))
+    let copiedLink = URL(filePath: isolated.projectRoot)
+      .appending(path: "Other/primary-link")
+    let rewritten = try FileManager.default.destinationOfSymbolicLink(
+      atPath: copiedLink.path)
+    XCTAssertEqual(rewritten, "../Sources/Safe/App.txt")
+    XCTAssertFalse(rewritten.hasPrefix("/"))
+    XCTAssertEqual(try String(contentsOf: copiedLink, encoding: .utf8), "old\n")
+    // Reading through the copy must not depend on the primary tree at all.
+    try FileManager.default.removeItem(at: app)
+    XCTAssertEqual(try String(contentsOf: copiedLink, encoding: .utf8), "old\n")
+  }
+
+  func testEvolutionWorkspaceRejectsAbsoluteSymlinkLeavingTheSourceTree() async throws {
+    let source = try temporaryDirectory("absolute-escape-source")
+    let external = try temporaryDirectory("absolute-escape-external")
+    let state = try temporaryDirectory("absolute-escape-state")
+    try FileManager.default.createDirectory(
+      at: source.appending(path: "Sources/Safe"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appending(path: "Sources/Safe/App.txt"))
+    try Data("secret\n".utf8).write(to: external.appending(path: "secret.txt"))
+    try FileManager.default.createDirectory(
+      at: source.appending(path: "Other"), withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(
+      atPath: source.appending(path: "Other/external-link").path,
+      withDestinationPath: external.appending(path: "secret.txt").path)
     let profile = try workspaceProfile(root: source)
     let policy = try HarnessEvolutionPolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
@@ -548,11 +593,11 @@ final class HarnessEvolutionContractTests: XCTestCase {
 
     do {
       _ = try await manager.prepareWorkspace(
-        htaskID: "HTASK-ABSOLUTE-SYMLINK", sourceProjectRef: profile.projectRef,
+        htaskID: "HTASK-ABSOLUTE-ESCAPE", sourceProjectRef: profile.projectRef,
         policy: policy, createdAtUTC: timestamp)
-      XCTFail("an absolute symlink must never retain a reference to the primary tree")
+      XCTFail("an absolute symlink leaving the source tree must be refused")
     } catch let error as EvolutionWorkspaceError {
-      XCTAssertEqual(error, .unsafeSourceEntry("Other/primary-link"))
+      XCTAssertEqual(error, .unsafeSourceEntry("Other/external-link"))
     }
   }
 
