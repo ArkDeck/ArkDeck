@@ -9,7 +9,9 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-001 — 原生只读路径：USB 底座 + 协议引擎 + 端口双轨
 
-- Status:ready（仅在本 proposal 经维护者 merge 后方可开始实现 PR）
+- Status:done（2026-08-18;ArkForge main `a935798` 实现 + `26aa527` 真机 Loader
+  读 parity——证据在 ArkForge 仓 `crates/arkforged/tests/evidence/
+  2026-08-18-task-nru-001-read-parity.txt`）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-001（bulk 传输底座，FFI 收容于单 crate）、
@@ -37,7 +39,8 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-002 — 原生写路径 + 复位 + campaign AFA-AC-7 双轨互证
 
-- Status:blocked（依赖 TASK-NRU-001 完成并在台架读比对全绿）
+- Status:done（2026-08-18;ArkForge main `3567484`——原生 WRITE_LBA/RESET、
+  toolchain 身份换源;当晚两次全量 `succeeded` 落在双轨/默认切换窗口内）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-003（WRITE_LBA 按 observed_table 寻址）、
@@ -61,7 +64,9 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-003 — ArkDeck 观察半边换源（vendor `ld` 回执退场）
 
-- Status:blocked（依赖 TASK-NRU-002 在台架全绿）
+- Status:done（2026-08-19;ArkDeck #1395（本 task tag）完成观察半边换源与
+  advice 面重命名;vendor 可执行零引用由 `AuthorizationSurfaceGuardContractTests`
+  的全源码 tripwire 守卫）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-006（Loader 观察第二源改为 arkforged
@@ -89,8 +94,11 @@ ArkDeck 侧实现 PR 必须匹配 Allowed paths（`scripts/check_pr_paths.py`
 
 ## TASK-NRU-004 — 默认切原生 + vendor 全面退役
 
-- Status:blocked（依赖 TASK-NRU-003，且 AFA-AC-7 已把新组合打到
-  productionVerified）
+- Status:done（2026-08-19;ArkForge main `8129a7a` 默认原生 + `c049a11`
+  移除 vendor 运行时;终局回归 NRU-AC-10 = `EVD-NRU-DAYU200-20260819-001`
+  （本 change `evidence/runs/TASK-NRU-004/`,亦入 hardware-matrix）。
+  **交付内容第 4 条的「rkdeveloptool 保留为 Maskrom 救援工具」半句被
+  CHG-2026-065 提案取代**——维护者已决定救援件整体退役,见该 change）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:NRU-REQ-007（信任面收敛为 arkforged 自身签名与摘要）

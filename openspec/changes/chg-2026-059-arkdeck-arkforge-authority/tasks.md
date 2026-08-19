@@ -3,6 +3,11 @@
 单任务垂直交付。`status: approved` 与本 Task 的 `ready` 只有在 proposal PR 经维护者
 review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR。
 
+> **NRU-004 超越声明（2026-08-19）**：下文所有 fixed-tool/`--rkdeveloptool`/
+> `wlx`/`231a05ef…` 表述为历史实施记录；执行面现为 `arkforged` 原生 RockUSB
+> （CHG-2026-063）。真机通过记录见 `evidence/task-afa-001/`
+> （AFA-AC-6/7/8 done；AC-9/AC-10 真机半仍缺）。
+
 ## TASK-AFA-001 — ArkDeck 做 authority，ArkForge 做 Rockchip 执行
 
 - Status:in-progress（proposal PR #1317 已 merge。已完成：第 2 步 permit 签发

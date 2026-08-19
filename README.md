@@ -73,10 +73,22 @@ flowchart LR
     CLIENT["CLI / AI client"] --> DAEMON
     CATALOG["Operation catalog"] --> RUNTIME["Typed runtime"]
     DAEMON --> RUNTIME
-    RUNTIME --> PROVIDERS["HDC / Rockchip providers"]
+    RUNTIME --> PROVIDERS["HDC providers"]
     PROVIDERS --> DEVICE["Bound OpenHarmony device"]
+    RUNTIME -->|"plans, single-use permits"| LANE["arkforged — ArkForge flash lane"]
+    LANE -->|"native RockUSB"| DEVICE
     RUNTIME --> STORE["Durable jobs, local artifacts"]
 ```
+
+Flash execution lives in `arkforged`, an identity-bound daemon built in the
+sibling [ArkForge repository](https://github.com/ArkDeck/ArkForge) and spawned
+by `arkdeck-agentd`. The split is by authority, not by convenience: ArkDeck
+decides who may do what to which bound device — it materializes the plan
+through the daemon, signs single-use step permits, answers the daemon's
+device-control requests with observations, and never hands over HDC or the
+connect key. `arkforged` owns how that authorized plan lands on the device —
+the RockUSB protocol is implemented natively in-process, and no vendor
+flashing tool runs on the product path.
 
 Module boundaries are documented in [Architecture Rules](./docs/ArchitectureRules.md).
 
@@ -117,7 +129,7 @@ ArkDeckKit tests use a stable cache outside individual worktrees. App and UI
 test changes compile the Xcode scheme with `build-for-testing`; this does not
 launch a simulator or claim device acceptance.
 
-For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. This is enough for app development and host-side tests. Installing the background runtime is a separate signed-helper flow; flashing a DAYU200 also requires the reviewed Rockchip component and release packaging path.
+For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. This is enough for app development and host-side tests. Installing the background runtime is a separate signed-helper flow; flashing a DAYU200 also requires the signed `arkforged` daemon from the sibling [ArkForge repository](https://github.com/ArkDeck/ArkForge) — the flash path is native RockUSB inside that daemon, with no vendor flashing tool on the product path.
 
 ### Installing the runtime
 
