@@ -604,6 +604,10 @@ final class WorkflowStepContractTests: XCTestCase {
       arguments["expectedWorkspaceRevision"] = .string(String(repeating: "a", count: 64))
       arguments["workspaceRevision"] = .string(String(repeating: "b", count: 64))
       arguments["allowedFileScopesDigest"] = .string(String(repeating: "c", count: 64))
+    case .sweepWorkspaceIsolation:
+      arguments["retainLatestCount"] = .integer(2)
+      arguments["minimumQuiescentSeconds"] = .integer(3_600)
+      arguments["dryRun"] = .string("true")
     default:
       break
     }

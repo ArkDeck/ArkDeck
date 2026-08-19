@@ -374,6 +374,115 @@ final class EvolutionWorkspaceContractTests: XCTestCase {
     }
   }
 
+  func testLineageDerivationFoldsAppliedAndRevertedAttemptsAndRefusesBrokenChains() {
+    func attempt(
+      _ ref: String, before: String, after: String, applied: String,
+      reverted: String? = nil
+    ) -> WorkspacePatchAttempt {
+      WorkspacePatchAttempt(
+        patchAttemptRef: ref, projectRef: "evolution-x", projectRoot: "/dev/null",
+        patchArtifactID: "ART-x", patchFilePath: "/dev/null", patchSHA256: "",
+        allowedFileGlobs: ["Sources/**"], before: [], after: [],
+        workspaceRevisionBefore: before, workspaceRevisionAfter: after,
+        appliedAtUTC: applied, revertedAtUTC: reverted)
+    }
+    let base = "b0"
+    // No history vouches for exactly the base.
+    XCTAssertEqual(
+      EvolutionWorkspaceManager.lineageDerivedRevision(base: base, attempts: []), base)
+    // Applied chain advances; a reverted attempt is a verified no-op.
+    XCTAssertEqual(
+      EvolutionWorkspaceManager.lineageDerivedRevision(
+        base: base,
+        attempts: [
+          attempt("a", before: "b0", after: "r1", applied: "2026-01-01T00:00:00Z"),
+          attempt("b", before: "r1", after: "r2", applied: "2026-01-02T00:00:00Z"),
+          attempt(
+            "c", before: "r2", after: "r3", applied: "2026-01-03T00:00:00Z",
+            reverted: "2026-01-04T00:00:00Z"),
+        ]), "r2")
+    // A link whose `before` does not extend the current state cannot vouch.
+    XCTAssertNil(
+      EvolutionWorkspaceManager.lineageDerivedRevision(
+        base: base,
+        attempts: [
+          attempt("a", before: "b0", after: "r1", applied: "2026-01-01T00:00:00Z"),
+          attempt("b", before: "b0", after: "r2", applied: "2026-01-02T00:00:00Z"),
+        ]))
+    // A record without measured revisions cannot vouch for anything.
+    XCTAssertNil(
+      EvolutionWorkspaceManager.lineageDerivedRevision(
+        base: base,
+        attempts: [
+          WorkspacePatchAttempt(
+            patchAttemptRef: "a", projectRef: "evolution-x", projectRoot: "/dev/null",
+            patchArtifactID: "ART-x", patchFilePath: "/dev/null", patchSHA256: "",
+            allowedFileGlobs: [], before: [], after: [],
+            workspaceRevisionBefore: nil, workspaceRevisionAfter: nil,
+            appliedAtUTC: "2026-01-01T00:00:00Z", revertedAtUTC: nil)
+        ]))
+  }
+
+  func testAdoptionAcceptsALineageDerivedRevisionAndStillRefusesTampering() async throws {
+    let source = try temporaryDirectory("lineage-source")
+    let state = try temporaryDirectory("lineage-state")
+    try FileManager.default.createDirectory(
+      at: source.appending(path: "Sources/Safe"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appending(path: "Sources/Safe/App.txt"))
+    let profile = try workspaceProfile(root: source)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let allowedPaths = ["Sources/Safe/**"]
+    let policy = try EvolutionWorkspacePolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID, globs: allowedPaths),
+      allowedPaths: allowedPaths,
+      allowedOperations: ["workspace.apply-patch@1"])
+    let attempts = try WorkspacePatchAttemptStore(
+      rootURL: state.appending(path: "patch-attempts"))
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: state.appending(path: "evolution"),
+      profileRegistry: registry, patchLineage: attempts)
+    let workspace = try await manager.prepareWorkspace(
+      htaskID: "runtime-job-lineage", sourceProjectRef: profile.projectRef,
+      policy: policy, createdAtUTC: timestamp)
+    let isolated = try XCTUnwrap(registry.profile(for: workspace.projectRef))
+    let copiedFile = URL(filePath: isolated.projectRoot)
+      .appending(path: "Sources/Safe/App.txt")
+
+    // The runtime's own patch history vouches for the drifted revision.
+    let before = try WorkspaceProviderSupport.workspaceRevision(
+      root: isolated.projectRoot, profileVersion: profile.profileID, globs: allowedPaths)
+    XCTAssertEqual(before, workspace.baseRevision)
+    try Data("patched\n".utf8).write(to: copiedFile)
+    let after = try WorkspaceProviderSupport.workspaceRevision(
+      root: isolated.projectRoot, profileVersion: profile.profileID, globs: allowedPaths)
+    try attempts.save(
+      WorkspacePatchAttempt(
+        patchAttemptRef: "patch-" + String(repeating: "a", count: 32),
+        projectRef: workspace.projectRef, projectRoot: isolated.projectRoot,
+        patchArtifactID: "ART-lineage", patchFilePath: "/dev/null", patchSHA256: "",
+        allowedFileGlobs: allowedPaths, before: [], after: [],
+        workspaceRevisionBefore: before, workspaceRevisionAfter: after,
+        appliedAtUTC: "2026-08-19T00:00:00Z", revertedAtUTC: nil))
+
+    let restartedRegistry = WorkspaceProjectProfileRegistry(profile: profile)
+    let restarted = try EvolutionWorkspaceManager(
+      rootURL: state.appending(path: "evolution"),
+      profileRegistry: restartedRegistry, patchLineage: attempts)
+    XCTAssertEqual(restarted.adoptRuntimeWorkspaces(), [])
+    XCTAssertNotNil(restartedRegistry.profile(for: workspace.projectRef))
+
+    // A mutation the lineage never recorded keeps the named refusal.
+    try Data("tampered\n".utf8).write(to: copiedFile)
+    let tamperedRegistry = WorkspaceProjectProfileRegistry(profile: profile)
+    let tampered = try EvolutionWorkspaceManager(
+      rootURL: state.appending(path: "evolution"),
+      profileRegistry: tamperedRegistry, patchLineage: attempts)
+    XCTAssertEqual(
+      tampered.adoptRuntimeWorkspaces(), ["\(workspace.workspaceID):revision"])
+    XCTAssertNil(tamperedRegistry.profile(for: workspace.projectRef))
+  }
+
   func testWorkspaceGCDestroysOnlyTerminalTreesAndKeepsAuditMetadata() async throws {
     let fixture = try gcFixture("gc-basic")
     let terminal = try await fixture.prepare("HTASK-GC0000000001")

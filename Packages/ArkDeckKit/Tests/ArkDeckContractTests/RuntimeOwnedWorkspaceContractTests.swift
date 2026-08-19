@@ -272,6 +272,177 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
       "the refusal must stay free of host paths: \(story)")
   }
 
+  func testSweepDestroysOnlyLedgerQuiescentTreesAndItsAuditSurvives() async throws {
+    let sourceRoot = try temporaryDirectory("sweep-source")
+    let stateRoot = try temporaryDirectory("sweep-state")
+    try FileManager.default.createDirectory(
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
+    let hap = Data([0x50, 0x4b, 0x03, 0x04, 0x41, 0x52, 0x4b])
+    try hap.write(to: sourceRoot.appending(path: "Sources/Input.hap"))
+
+    let profile = try workspaceProfile(root: sourceRoot)
+    let sourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: profile.allowedFileGlobs)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: stateRoot.appending(path: "evolution"), profileRegistry: registry)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateRoot.appending(path: "artifacts"), nowUTC: { Self.fixedTimestamp })
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateRoot.appending(path: "capabilities"))
+    let provider = try workspaceProvider(
+      profile: profile, registry: registry, manager: manager, stateRoot: stateRoot,
+      suffix: "sweep")
+    let process = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: profile))
+    let ledger = WorkspaceReferenceLedgerHandle()
+    let dispatcher = RuntimeOwnedWorkspaceDispatcher(
+      fallback: process, manager: manager, sweeper: manager, referenceLedger: ledger)
+    let engine = try runtimeEngine(
+      stateRoot: stateRoot.appending(path: "sweep-engine"), provider: provider,
+      dispatcher: dispatcher, capabilityStore: capabilityStore,
+      artifactStore: artifactStore)
+    ledger.install(engine)
+
+    func preparedCopy(_ suffix: String) async throws -> String {
+      let request = try operationRequest(
+        id: "workspace.prepare-isolated-copy",
+        requestID: "request-sweep-prepare-\(suffix)",
+        idempotencyKey: "idempotency-sweep-prepare-\(suffix)",
+        inputs: [
+          "projectRef": .string(profile.projectRef),
+          "allowedFileGlobs": .array([.string("Sources/App.txt")]),
+          "expectedWorkspaceRevision": .string(sourceRevision),
+        ])
+      let accepted = try await engine.submit(try JSONEncoder().encode(request))
+      let prepared = try await engine.run(jobID: accepted.jobID)
+      XCTAssertEqual(prepared.state, "succeeded", prepared.timeline.joined(separator: " | "))
+      let artifacts = try await artifactStore.list(jobID: accepted.jobID)
+      let isolation = try XCTUnwrap(
+        artifacts.first { $0.name == "isolated-workspace.json" && $0.status.isPublished })
+      let lease = try await artifactStore.leaseReference(
+        jobID: accepted.jobID, artifactID: isolation.artifactID)
+      let bytes = try Data(contentsOf: try await artifactStore.resolveLease(lease).fileURL)
+      let document = try JSONDecoder().decode([String: JSONValue].self, from: bytes)
+      guard case .string(let ref)? = document["projectRef"] else {
+        throw RuntimeJobEngineError.internalFailure("isolation artifact has no projectRef")
+      }
+      return ref
+    }
+
+    let quiescentRef = try await preparedCopy("a")
+    let activeRef = try await preparedCopy("b")
+    // A submitted-but-never-run job is a live reference in the durable
+    // ledger; its workspace must be untouchable however old it looks.
+    let holdOpen = try operationRequest(
+      id: "workspace.build-openharmony",
+      requestID: "request-sweep-hold",
+      idempotencyKey: "idempotency-sweep-hold",
+      inputs: [
+        "projectRef": .string(activeRef),
+        "buildPresetRef": .string("copy-hap"),
+        "expectedWorkspaceRevision": .string(
+          try WorkspaceProviderSupport.workspaceRevision(
+            root: try XCTUnwrap(registry.profile(for: activeRef)).projectRoot,
+            profileVersion: profile.profileID,
+            globs: ["Sources/App.txt"])),
+      ])
+    _ = try await engine.submit(try JSONEncoder().encode(holdOpen))
+
+    let inventoryByRef = Dictionary(
+      uniqueKeysWithValues: manager.runtimeWorkspaceInventory().map {
+        ($0.derivedProjectRef, $0.workspaceID)
+      })
+    let quiescentID = try XCTUnwrap(inventoryByRef[quiescentRef])
+    let activeID = try XCTUnwrap(inventoryByRef[activeRef])
+
+    func sweep(_ suffix: String, dryRun: Bool) async throws -> (
+      state: String, findings: [String: (String, Int64)], summary: [String: String],
+      jobID: String
+    ) {
+      let request = try operationRequest(
+        id: "workspace.sweep-isolated-copies",
+        requestID: "request-sweep-\(suffix)",
+        idempotencyKey: "idempotency-sweep-\(suffix)",
+        inputs: [
+          "retainLatestCount": .integer(0),
+          "minimumQuiescentSeconds": .integer(0),
+          "dryRun": .bool(dryRun),
+        ])
+      let accepted = try await engine.submit(try JSONEncoder().encode(request))
+      let outcome = try await engine.run(jobID: accepted.jobID)
+      let artifacts = try await artifactStore.list(jobID: accepted.jobID)
+      let findingsArtifact = try XCTUnwrap(
+        artifacts.first { $0.name == "sweep-findings.json" && $0.status.isPublished },
+        outcome.timeline.joined(separator: " | "))
+      let lease = try await artifactStore.leaseReference(
+        jobID: accepted.jobID, artifactID: findingsArtifact.artifactID)
+      let bytes = try Data(contentsOf: try await artifactStore.resolveLease(lease).fileURL)
+      XCTAssertFalse(
+        String(decoding: bytes, as: UTF8.self).contains(stateRoot.path),
+        "findings must stay free of host paths")
+      let document = try JSONDecoder().decode([String: JSONValue].self, from: bytes)
+      var findings: [String: (String, Int64)] = [:]
+      if case .array(let entries)? = document["findings"] {
+        for entry in entries {
+          guard case .object(let fields) = entry,
+            case .string(let id)? = fields["workspaceId"],
+            case .string(let disposition)? = fields["disposition"],
+            case .integer(let reclaimed)? = fields["reclaimedBytes"]
+          else { continue }
+          findings[id] = (disposition, reclaimed)
+        }
+      }
+      return (outcome.state, findings, [:], accepted.jobID)
+    }
+
+    let dry = try await sweep("dry", dryRun: true)
+    XCTAssertEqual(dry.state, "succeeded")
+    XCTAssertEqual(dry.findings[quiescentID]?.0, "wouldDestroy")
+    XCTAssertEqual(dry.findings[activeID]?.0, "activeRetained")
+    let quiescentTree = URL(
+      filePath: try XCTUnwrap(registry.profile(for: quiescentRef)).projectRoot)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: quiescentTree.path))
+
+    let wet = try await sweep("wet", dryRun: false)
+    XCTAssertEqual(wet.state, "succeeded")
+    XCTAssertEqual(wet.findings[quiescentID]?.0, "destroyed")
+    XCTAssertEqual(wet.findings[activeID]?.0, "activeRetained")
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: quiescentTree.path),
+      "the quiescent tree must be gone")
+    let quiescentRoot = quiescentTree.deletingLastPathComponent()
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: quiescentRoot.appending(path: "workspace.json").path),
+      "the audit manifest must survive destruction")
+    let activeTree = URL(
+      filePath: try XCTUnwrap(registry.profile(for: activeRef)).projectRoot)
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: activeTree.path),
+      "a live reference must keep its tree byte-for-byte")
+
+    // The input surface is closed: testimony cannot be supplied.
+    let forged = try operationRequest(
+      id: "workspace.sweep-isolated-copies",
+      requestID: "request-sweep-forged",
+      idempotencyKey: "idempotency-sweep-forged",
+      inputs: [
+        "retainLatestCount": .integer(0),
+        "minimumQuiescentSeconds": .integer(0),
+        "dryRun": .bool(true),
+        "testimony": .array([.string(activeID)]),
+      ])
+    do {
+      _ = try await engine.submit(try JSONEncoder().encode(forged))
+      XCTFail("an undeclared testimony input must be refused at admission")
+    } catch {
+      // Named refusal from the closed catalog input schema.
+    }
+  }
+
   func testIsolationRevisionUsesTheCanonicalCopiedRootBehindAnAlias() async throws {
     let sourceRoot = try temporaryDirectory("canonical-source")
     try FileManager.default.createDirectory(

@@ -466,7 +466,8 @@ Task.detached {
           rootURL: resolvedStateDirectory.appending(
             path:
               "evolution-workspaces", directoryHint: .isDirectory),
-          profileRegistry: profiles)
+          profileRegistry: profiles,
+          patchLineage: attempts)
         let unadoptedRuntimeWorkspaces = evolution.adoptRuntimeWorkspaces()
         for workspaceID in unadoptedRuntimeWorkspaces {
           print("runtime workspace not adopted for \(workspaceID)")
@@ -498,9 +499,11 @@ Task.detached {
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
     }
+    let workspaceReferenceLedger = WorkspaceReferenceLedgerHandle()
     if let evolution = workspaceRepairConfiguration?.evolution {
       workspaceDispatcher = RuntimeOwnedWorkspaceDispatcher(
-        fallback: workspaceDispatcher, manager: evolution)
+        fallback: workspaceDispatcher, manager: evolution,
+        sweeper: evolution, referenceLedger: workspaceReferenceLedger)
     }
     workspaceDispatcher = OpenHarmonySigningWorkspaceDispatcher(
       fallback: workspaceDispatcher, presetStore: signingPresetStore)
@@ -659,6 +662,9 @@ Task.detached {
       powerActivityController: PowerActivityController(),
       agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
       nowUTC: utcNow)
+    // The engine is the reference ledger for sweep testimony; it exists
+    // only now, so the handle the dispatcher already holds is filled here.
+    workspaceReferenceLedger.install(engine)
     let debugInvocationController = try RuntimeDebugInvocationController(
       stateDirectory: resolvedStateDirectory,
       driver: RuntimeJobEngineDebugAttemptDriver(engine: engine),

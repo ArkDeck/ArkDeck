@@ -225,6 +225,38 @@ public struct WorkspaceIsolationIntent: Sendable, Equatable, Codable {
   }
 }
 
+/// The durable typed intent behind `workspace.sweep-isolated-copies@1`:
+/// closed retention bounds and nothing else. The per-workspace testimony is
+/// composed at execution from the runtime's own durable job ledger — callers
+/// have no field through which to supply or bias it (CHG-2026-067
+/// RWL-REQ-002/003).
+public struct WorkspaceSweepIntent: Sendable, Equatable, Codable {
+  public let runtimeOwnerID: String
+  public let retainLatestCount: Int
+  public let minimumQuiescentSeconds: Int
+  public let dryRun: Bool
+  public let createdAtUTC: String
+
+  package init(
+    runtimeOwnerID: String,
+    retainLatestCount: Int,
+    minimumQuiescentSeconds: Int,
+    dryRun: Bool,
+    createdAtUTC: String
+  ) {
+    self.runtimeOwnerID = runtimeOwnerID
+    self.retainLatestCount = retainLatestCount
+    self.minimumQuiescentSeconds = minimumQuiescentSeconds
+    self.dryRun = dryRun
+    self.createdAtUTC = createdAtUTC
+  }
+
+  package var actionSHA256: String {
+    let encoder = CanonicalJSONEncoders.canonical()
+    return SHA256Hex.string(of: (try? encoder.encode(self)) ?? Data())
+  }
+}
+
 public struct WorkspaceIsolationResult: Sendable, Equatable {
   public let workspaceID: String
   public let projectRef: String
@@ -290,8 +322,9 @@ extension WorkspaceProviderAction {
     case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch,
       .createCheckpoint, .createArchiveCheckpoint:
       return true
-    case .inspectSource, .prepareIsolatedCopy, .signOpenHarmonyHap,
-      .symbolizeCrash, .inspectGitStatus, .inspectDiff, .readSourceRange:
+    case .inspectSource, .prepareIsolatedCopy, .sweepIsolatedCopies,
+      .signOpenHarmonyHap, .symbolizeCrash, .inspectGitStatus, .inspectDiff,
+      .readSourceRange:
       return false
     }
   }
@@ -325,6 +358,7 @@ public struct WorkspaceAuthorizationFacts: Sendable, Equatable {
 public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectSource(WorkspaceSourceInspection)
   case prepareIsolatedCopy(WorkspaceIsolationIntent)
+  case sweepIsolatedCopies(WorkspaceSweepIntent)
   case applyPatch(WorkspacePatchIntent)
   case buildOpenHarmony(WorkspaceResolvedInvocation)
   case signOpenHarmonyHap(WorkspaceOpenHarmonySigningAction)

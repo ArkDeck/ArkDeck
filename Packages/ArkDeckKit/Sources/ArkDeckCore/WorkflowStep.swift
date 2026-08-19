@@ -150,6 +150,11 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   /// private namespace. The returned projectRef is opaque; no host path is
   /// admitted from or disclosed to the caller.
   case prepareWorkspaceIsolation
+  /// Host-only: destroy quiescent Runtime-owned isolated copies under the
+  /// composition-owned workspace root. Testimony comes from the runtime's
+  /// own durable job ledger; callers supply only closed retention bounds
+  /// (CHG-2026-067).
+  case sweepWorkspaceIsolation
   case applyWorkspacePatch
   case buildWorkspaceOpenHarmony
   /// Host-only local signing of one Runtime-owned HAP Artifact. Tool and
@@ -359,6 +364,12 @@ package enum WorkflowStepRegistry {
         required: [
           "sourceProjectRef", "expectedWorkspaceRevision", "allowedFileScopesDigest",
           "workspaceRevision", "workspaceProjectRef", "artifactId",
+        ])
+    case .sweepWorkspaceIsolation:
+      metadata(
+        .hostOnly, .atSafeBoundary, .none,
+        required: [
+          "retainLatestCount", "minimumQuiescentSeconds", "dryRun", "artifactId",
         ])
     case .inspectWorkspaceGitStatus:
       host(required: ["projectRef", "artifactId"])
@@ -978,6 +989,11 @@ private enum WorkflowStepValidator {
       try reader.sha256("workspaceRevision")
       try reader.sha256("allowedFileScopesDigest")
       try reader.identifier("workspaceProjectRef")
+      try reader.identifier("artifactId")
+    case .sweepWorkspaceIsolation:
+      try reader.integer("retainLatestCount", minimum: 0, maximum: 64)
+      try reader.integer("minimumQuiescentSeconds", minimum: 0, maximum: 7_776_000)
+      _ = try reader.string("dryRun", minimumLength: 4, maximumLength: 5)
       try reader.identifier("artifactId")
     case .applyWorkspacePatch:
       try reader.identifier("projectRef")

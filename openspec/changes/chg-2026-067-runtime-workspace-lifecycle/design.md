@@ -83,3 +83,20 @@ reverted 的 attempt 到 `aed6966b…`，引用 job 全部终态）：
   `workspace.json`/attempt manifests/teardown 记录幸存。
 
 Hardware required: no——全部证据来自宿主侧真实存量，不连设备。
+
+## 5. 实施勘误（TASK-RWL-001 实测，2026-08-19）
+
+1. **证词合成点从「materialize 冻结」改为「dispatch 时经 typed 端口合成」**：
+   workspace 清单归组合层（manager）、job 台账归 engine（Workflows），二者
+   只在 dispatcher 会合；且执行时合成对竞态方向严格更安全（新增引用只会
+   多保全，不会误毁）。审计面由 findings artifact + `findingsSha256` 钉合
+   承担；retention 时钟取 durable intent 的 `createdAtUTC`，replay 与 journal
+   推理同一时刻。engine 以 `WorkspaceReferenceLedgerReading` 落于
+   `RuntimeJobEngine.swift`，经 `WorkspaceReferenceLedgerHandle` 后装进
+   dispatcher（engine 构造晚于 dispatcher）。
+2. **sweep 在 provider 的共享 per-project 前奏之前分流**——它没有
+   `projectRef` 输入，主体是整个隔离存储。
+3. **harness 遗留树的处置以生产实证定格**：54 棵 `HTASK-*` 时代的树
+   （含两棵失败制备的空 taskRoot）不在 runtime 库存的 `runtime-` 前缀内，
+   永不被证词覆盖，逐次 `unknownTaskRetained`——它们的清理属于操作者手册
+   （LaunchAgents README 的 064 注记），不属于本 operation。

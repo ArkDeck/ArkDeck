@@ -7,7 +7,10 @@ protected `main` 后生效；合入前不得开始实现 PR。实现 PR 必须�
 
 ## TASK-RWL-001 — Runtime-owned 工作区生命周期：血统收养 + 清扫面
 
-- Status:ready（仅在本 proposal 经维护者 merge 后方可开始实现 PR）
+- Status:done（2026-08-19；血统收养与清扫面全链实现并在生产 daemon 的真实
+  存量上取证——`evo-360b54f8…` 由血统收养恢复注册后经 dry/wet 清扫送走
+  （18MB 回收、审计三件套幸存），54 棵 harness 遗留树 fail-closed 保全；
+  证词合成点的实施勘误见 design.md §5 与 evidence run-r1.md）
 - Golden Journey:GJ-5（跨重启修复会话的 durable 前提 + 会话遗留有界；
   本任务不翻转任何 GJ 状态）
 - Platform:macos

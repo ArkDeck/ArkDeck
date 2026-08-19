@@ -241,6 +241,10 @@ HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony 
   从其自身进程环境读取,与 daemon 无关。
 - **历史数据**:daemon state 下的 `harness/` 私有 SQLite 目录不再被读取;
   保留在盘上作只读历史,操作者可自行删除。
+- **存量隔离工作区**(CHG-2026-067):被合法修补过的 `evolution-*` 树在重启后
+  由血统收养自动恢复;安静的树用已发布的
+  `workspace.sweep-isolated-copies@1`(先 `dryRun: true` 复核 findings)清扫,
+  审计元数据在摧毁后保留。
 - **host-loop**:若本机曾安装 `com.arkdeck.host-loop.runtime` LaunchAgent
   (每 900 秒驱动一轮旧循环),它已无对象可驱动,建议
   `launchctl bootout gui/$UID/com.arkdeck.host-loop.runtime` 并删除其 plist。

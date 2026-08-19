@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.sweep-isolated-copies",
+  "version": 1,
+  "title": "Sweep quiescent Runtime-owned isolated ProjectProfile copies",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "retainLatestCount": {
+        "type": "integer",
+        "required": true,
+        "minimum": 0,
+        "maximum": 64,
+        "description": "Newest quiescent trees kept regardless of age."
+      },
+      "minimumQuiescentSeconds": {
+        "type": "integer",
+        "required": true,
+        "minimum": 0,
+        "maximum": 7776000,
+        "description": "How long every referencing runtime job must already be terminal before a tree may be destroyed."
+      },
+      "dryRun": {
+        "type": "boolean",
+        "required": true,
+        "description": "Classify without destroying; dispositions must match a subsequent wet sweep."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "sweepFindings": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "sweep-isolated-copies",
+      "kind": "sweepWorkspaceIsolation",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Destroys only composition-owned quiescent trees; testimony comes from the runtime's own durable job ledger, audit metadata survives, and no host path is admitted from or disclosed to the caller."
+    }
+  ],
+  "timeoutSeconds": 900,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "sweep-findings.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true,
+      "retentionClass": "pinnedUntilVerified"
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ]
+}

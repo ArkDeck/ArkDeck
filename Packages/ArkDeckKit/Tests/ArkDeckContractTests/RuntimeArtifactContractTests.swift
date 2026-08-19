@@ -539,6 +539,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
         "workspace.prepare-isolated-copy@1/isolated-workspace.json",
         "workspace.sign-openharmony-hap@1/signed.hap",
         "workspace.sign-openharmony-hap@1/signing-report.json",
+        "workspace.sweep-isolated-copies@1/sweep-findings.json",
       ],
       "a new pinnedUntilVerified artifact is never reclaimed; add it here deliberately")
   }

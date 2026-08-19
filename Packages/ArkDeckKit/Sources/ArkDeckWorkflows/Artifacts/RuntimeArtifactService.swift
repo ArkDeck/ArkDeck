@@ -130,6 +130,7 @@ enum RuntimeArtifactService {
 
   static let workspaceOperationReferences: Set<String> = [
     "workspace.prepare-isolated-copy@1",
+    "workspace.sweep-isolated-copies@1",
     "workspace.apply-patch@1",
     "workspace.build-openharmony@1",
     "workspace.create-checkpoint@1",
@@ -176,6 +177,9 @@ enum RuntimeArtifactService {
     ],
     "workspace.prepare-isolated-copy@1": [
       "prepare-isolated-copy": ["isolated-workspace.json"]
+    ],
+    "workspace.sweep-isolated-copies@1": [
+      "sweep-isolated-copies": ["sweep-findings.json"]
     ],
     "workspace.apply-patch@1": [
       "apply-patch": ["applied-patch.json"]
@@ -431,6 +435,10 @@ enum RuntimeArtifactService {
       // ArkTrace's validated machine envelope is already deterministic and
       // carries its own complete request/tool/parser/source provenance.
       // Publishing a wrapper would change those reviewed bytes.
+      return receipt.stdout
+    case "sweep-findings.json":
+      // The dispatcher's canonical findings document is the Artifact; its
+      // digest is pinned in the verified summary (`findingsSha256`).
       return receipt.stdout
     case "trace-analysis.json"
     where descriptor.reference == AnalyzerProvider.traceAnalysis:
