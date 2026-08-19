@@ -239,11 +239,22 @@ private struct TargetStoreDocument: Codable, Equatable {
 
 /// Durable, flock-guarded target registry in the daemon state directory.
 public final class RuntimeTargetStore: @unchecked Sendable {
+  private struct LiveHDCCandidateObservation {
+    let candidates: [BootstrapCandidate]
+    let observedAt: Date
+  }
+
   private let url: URL
   private let lockURL: URL
   private let queue = DispatchQueue(label: "arkdeck.target-store")
+  private let routeObservationNow: @Sendable () -> Date
+  private let routeObservationFreshnessSeconds: TimeInterval = 5
+  private var liveHDCCandidateObservation: LiveHDCCandidateObservation?
 
-  public init(directoryURL: URL) throws {
+  public init(
+    directoryURL: URL,
+    routeObservationNow: @escaping @Sendable () -> Date = { Date() }
+  ) throws {
     do {
       try FileManager.default.createDirectory(
         at: directoryURL, withIntermediateDirectories: true,
@@ -253,6 +264,18 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     }
     self.url = directoryURL.appending(path: "targets.json")
     self.lockURL = directoryURL.appending(path: ".targets.lock")
+    self.routeObservationNow = routeObservationNow
+  }
+
+  /// Publishes one provider-verified candidate snapshot for live route
+  /// selection. This is deliberately memory-only: it cannot create, rewrite
+  /// or widen durable target/alias ownership, and it expires quickly when HDC
+  /// stops producing fresh observations.
+  package func recordLiveHDCCandidates(_ candidates: [BootstrapCandidate]) {
+    queue.sync {
+      liveHDCCandidateObservation = LiveHDCCandidateObservation(
+        candidates: candidates, observedAt: routeObservationNow())
+    }
   }
 
   public func list() throws -> [RuntimeTargetRecord] {
@@ -301,8 +324,12 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 
   /// Resolves the address the HDC provider must use without rewriting the
   /// canonical target record. A target with no proven alias uses its adopted
-  /// connect key. Multiple routes are refused: ordering or recency cannot
-  /// substitute for an exact durable identity proof.
+  /// connect key. When a later Flash has proven an alias, both the canonical
+  /// address and that exact alias remain durably owned by the same target. A
+  /// fresh provider-verified candidate snapshot may select the sole Connected
+  /// member of that closed set; zero or multiple live members fail closed.
+  /// Without a fresh snapshot the existing proven-alias fallback is retained
+  /// for startup and host-only Artifact binding.
   public func hdcExecutionRoute(targetID: String) throws -> RuntimeTargetHDCRoute? {
     try queue.sync {
       let document = try load()
@@ -328,7 +355,31 @@ public final class RuntimeTargetStore: @unchecked Sendable {
           throw BootstrapError.storeFailure(
             "HDC execution route lacks its proven alias target")
         }
-        connectKey = alias.connectKey
+        let fallbackConnectKey = alias.connectKey
+        let observationAge = liveHDCCandidateObservation.map {
+          routeObservationNow().timeIntervalSince($0.observedAt)
+        }
+        if let observation = liveHDCCandidateObservation,
+          let observationAge,
+          observationAge >= 0,
+          observationAge <= routeObservationFreshnessSeconds
+        {
+          let allowedConnectKeys = Set([target.connectKey, alias.connectKey])
+          let connected = Set(
+            observation.candidates.compactMap { candidate in
+              candidate.state == "Connected" && allowedConnectKeys.contains(candidate.connectKey)
+                ? candidate.connectKey : nil
+            })
+          guard connected.count == 1, let liveConnectKey = connected.first else {
+            let reason =
+              connected.isEmpty ? "no Connected proven route" : "multiple Connected proven routes"
+            throw BootstrapError.observationFailed(
+              "fresh HDC observation found \(reason) for target \(targetID)")
+          }
+          connectKey = liveConnectKey
+        } else {
+          connectKey = fallbackConnectKey
+        }
       } else {
         connectKey = target.connectKey
       }
@@ -1021,6 +1072,7 @@ public actor DeviceBootstrapMachine {
         latestCandidateSnapshot = snapshot
         latestCandidateSnapshotObservedAt = candidateClock.now
         latestCandidateRefreshFailed = false
+        targetStore.recordLiveHDCCandidates(snapshot.candidates)
       }
       return snapshot
     } catch {
@@ -1042,6 +1094,7 @@ public actor DeviceBootstrapMachine {
       phase = .observeHDCServer
       phase = .enumerateDeviceCandidates
       let candidates = try await observation.listCandidates()
+      targetStore.recordLiveHDCCandidates(candidates)
       guard !candidates.isEmpty else {
         return .failed(reason: "no device candidates observed; connect a device and retry")
       }
