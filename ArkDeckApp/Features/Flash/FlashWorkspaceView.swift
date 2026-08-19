@@ -754,6 +754,13 @@ struct FlashWorkspaceView: View {
             .font(.callout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+          if let submission = model.submission {
+            Text(submission.jobID)
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+              .accessibilityIdentifier("flash.execute.jobId")
+          }
           if let plan = model.plan, let evidence = model.postflightEvidence {
             flashPostflight(plan: plan, evidence: evidence)
           }

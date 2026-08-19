@@ -31,6 +31,27 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     }
   }
 
+  func testFlashImageArchiveSelectionPolicyAcceptsContentAddressedRuntimeArtifacts() throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "flash-artifact-selection-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    for (name, magic) in [
+      ("ART-gzip", [UInt8](arrayLiteral: 0x1F, 0x8B, 0x08)),
+      ("ART-zip", [UInt8](arrayLiteral: 0x50, 0x4B, 0x03, 0x04)),
+      ("ART-7z", [UInt8](arrayLiteral: 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C)),
+    ] {
+      let artifact = root.appending(path: name)
+      try Data(magic).write(to: artifact)
+      XCTAssertTrue(FlashImageArchiveSelectionPolicy.allows(artifact), name)
+    }
+
+    let unknown = root.appending(path: "ART-unknown")
+    try Data("not an archive".utf8).write(to: unknown)
+    XCTAssertFalse(FlashImageArchiveSelectionPolicy.allows(unknown))
+  }
+
   func testPostflightBindingKeepsTheSubmittedPlanRevision() {
     let confirmed = FlashPostflightPresentationBuilder.binding(
       plannedRevision: 3,

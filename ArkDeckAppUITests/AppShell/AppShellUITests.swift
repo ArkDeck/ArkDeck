@@ -1089,6 +1089,10 @@ final class AppShellUITests: XCTestCase {
       element("flash.execute.terminal", in: app).waitForExistenceFast(timeout: 10),
       "the same Flash click must continue into the fixture execution",
       file: file, line: line)
+    XCTAssertTrue(
+      element("flash.execute.jobId", in: app).waitForExistenceFast(timeout: 5),
+      "the result card must expose the durable Runtime Job identifier",
+      file: file, line: line)
   }
 
   private func writeFixtureState(

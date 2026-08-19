@@ -246,10 +246,31 @@ public enum FlashImageArchiveSelectionPolicy {
 
   public static func allows(_ url: URL) -> Bool {
     let filename = url.lastPathComponent.lowercased()
-    return allowedFilenameExtensions.contains { filenameExtension in
+    if allowedFilenameExtensions.contains(where: { filenameExtension in
       let suffix = ".\(filenameExtension)"
       return filename.count > suffix.count && filename.hasSuffix(suffix)
+    }) {
+      return true
     }
+
+    // Runtime Artifact storage deliberately uses content-addressed `ART-*`
+    // names without preserving a caller-controlled suffix. Those immutable
+    // files are still valid Flash inputs, so use the bounded archive magic as
+    // the fallback instead of rejecting them by presentation name alone.
+    guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+    defer { try? handle.close() }
+    let prefix: Data
+    do {
+      prefix = try handle.read(upToCount: 6) ?? Data()
+    } catch {
+      return false
+    }
+    let bytes = [UInt8](prefix)
+    return bytes.starts(with: [0x1F, 0x8B])
+      || bytes.starts(with: [0x50, 0x4B, 0x03, 0x04])
+      || bytes.starts(with: [0x50, 0x4B, 0x05, 0x06])
+      || bytes.starts(with: [0x50, 0x4B, 0x07, 0x08])
+      || bytes.starts(with: [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C])
   }
 }
 

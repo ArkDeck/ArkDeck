@@ -12,20 +12,11 @@
       "delivery": "pointerClick",
       "fallbackStrings": ["Flash", "刷机"]
     },
-    {"kind": "waitForPresence", "identifier": "flash.mode"},
-    {
-      "kind": "perform",
-      "identifier": "flash.mode.execute",
-      "delivery": "pointerClick",
-      "fallbackStrings": []
-    },
-    {"kind": "waitForSelected", "identifier": "flash.mode.execute"},
+    {"kind": "waitForPresence", "identifier": "flash.workspace.imageAction"},
     {"kind": "choosePinnedArchive", "delivery": "pointerClick"},
-    {"kind": "selectPinnedTarget"},
-    {"kind": "waitForEnabled", "identifier": "flash.plan.prepare"},
     {
       "kind": "perform",
-      "identifier": "flash.plan.prepare",
+      "identifier": "flash.workspace.details",
       "delivery": "accessibilityPress",
       "fallbackStrings": []
     },
