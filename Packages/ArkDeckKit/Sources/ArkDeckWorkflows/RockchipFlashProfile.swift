@@ -40,20 +40,24 @@ package struct RockchipImagesArchiveMember: Equatable, Sendable {
   }
 }
 
+/// One entry of the board's overwrite-scope declaration: which partition a
+/// flash covers and which archive member fills it, in the order the review
+/// presents and the `partitionPlan` request input echoes.
+///
+/// Deliberately NOT a device address and NOT the write-order authority
+/// (CHG-2026-066). Sector addressing and the executed order belong to
+/// `arkforged`, which validates its own DeviceProfile against the partition
+/// table read back from the device before any write; ArkDeck carrying
+/// addresses of its own was unreconciled duplication.
 package struct RockchipMappedPartition: Equatable, Sendable {
   public let writeOrder: Int
   public let partitionName: String
   public let imageMemberName: String
-  /// FA-001 §2 sector offset consumed by the native typed write plan. No caller
-  /// or human computes an address at execution time.
-  package let offsetSectors: Int64
 
-  public init(writeOrder: Int, partitionName: String, imageMemberName: String, offsetSectors: Int64)
-  {
+  public init(writeOrder: Int, partitionName: String, imageMemberName: String) {
     self.writeOrder = writeOrder
     self.partitionName = partitionName
     self.imageMemberName = imageMemberName
-    self.offsetSectors = offsetSectors
   }
 }
 
@@ -132,11 +136,6 @@ package struct RockchipFlashProfile: Equatable, Sendable {
     guard mappedPartitions.map(\.writeOrder) == Array(1...mappedPartitions.count) else {
       throw RockchipFlashProfileError.invalidProfileDefinition(
         "write order must be contiguous starting at 1")
-    }
-    guard mappedPartitions.map(\.offsetSectors) == mappedPartitions.map(\.offsetSectors).sorted()
-    else {
-      throw RockchipFlashProfileError.invalidProfileDefinition(
-        "write order must be lowest offset first")
     }
     let mappedPartitionNames = Set(mappedPartitions.map(\.partitionName))
     guard mappedPartitionNames.isDisjoint(with: membershiplessPartitionsWriteForbidden) else {
@@ -246,33 +245,15 @@ package struct RockchipFlashProfile: Equatable, Sendable {
           classification: .mappedPartitionImage),
       ],
       mappedPartitions: [
-        .init(
-          writeOrder: 1, partitionName: "uboot", imageMemberName: "uboot.img",
-          offsetSectors: 8192),
-        .init(
-          writeOrder: 2, partitionName: "resource", imageMemberName: "resource.img",
-          offsetSectors: 28672),
-        .init(
-          writeOrder: 3, partitionName: "boot_linux", imageMemberName: "boot_linux.img",
-          offsetSectors: 40960),
-        .init(
-          writeOrder: 4, partitionName: "ramdisk", imageMemberName: "ramdisk.img",
-          offsetSectors: 237_568),
-        .init(
-          writeOrder: 5, partitionName: "system", imageMemberName: "system.img",
-          offsetSectors: 245_760),
-        .init(
-          writeOrder: 6, partitionName: "vendor", imageMemberName: "vendor.img",
-          offsetSectors: 4_440_064),
-        .init(
-          writeOrder: 7, partitionName: "updater", imageMemberName: "updater.img",
-          offsetSectors: 6_742_016),
-        .init(
-          writeOrder: 8, partitionName: "chip_ckm", imageMemberName: "chip_ckm.img",
-          offsetSectors: 6_938_624),
-        .init(
-          writeOrder: 9, partitionName: "userdata", imageMemberName: "userdata.img",
-          offsetSectors: 19_955_712),
+        .init(writeOrder: 1, partitionName: "uboot", imageMemberName: "uboot.img"),
+        .init(writeOrder: 2, partitionName: "resource", imageMemberName: "resource.img"),
+        .init(writeOrder: 3, partitionName: "boot_linux", imageMemberName: "boot_linux.img"),
+        .init(writeOrder: 4, partitionName: "ramdisk", imageMemberName: "ramdisk.img"),
+        .init(writeOrder: 5, partitionName: "system", imageMemberName: "system.img"),
+        .init(writeOrder: 6, partitionName: "vendor", imageMemberName: "vendor.img"),
+        .init(writeOrder: 7, partitionName: "updater", imageMemberName: "updater.img"),
+        .init(writeOrder: 8, partitionName: "chip_ckm", imageMemberName: "chip_ckm.img"),
+        .init(writeOrder: 9, partitionName: "userdata", imageMemberName: "userdata.img"),
       ],
       membershiplessPartitionsWriteForbidden: [
         "misc", "bootctrl", "sys-prod", "chip-prod", "eng_system", "eng_chipset",

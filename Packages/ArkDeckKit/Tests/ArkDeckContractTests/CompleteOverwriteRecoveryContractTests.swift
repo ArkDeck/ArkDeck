@@ -1180,8 +1180,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private func recoveryArchive() throws -> Data {
     let profile = RockchipFlashProfile.dayu200
     let partitionEntries =
-      profile.mappedPartitions.map {
-        "0x1@0x\(String($0.offsetSectors, radix: 16))(\($0.partitionName))"
+      profile.mappedPartitions.enumerated().map {
+        "0x1@0x\(String(($0.offset + 1) * 0x2000, radix: 16))(\($0.element.partitionName))"
       }
       + profile.membershiplessPartitionsWriteForbidden.enumerated().map {
         "0x1@0x\(String(0x2000000 + $0.offset * 0x1000, radix: 16))(\($0.element))"

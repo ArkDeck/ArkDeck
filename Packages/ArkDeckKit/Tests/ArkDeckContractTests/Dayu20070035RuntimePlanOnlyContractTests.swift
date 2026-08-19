@@ -177,9 +177,6 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
         "uboot", "resource", "boot_linux", "ramdisk", "system", "vendor",
         "updater", "chip_ckm", "userdata",
       ])
-    XCTAssertEqual(
-      profile.mappedPartitions.map(\.offsetSectors),
-      [8192, 28672, 40960, 237_568, 245_760, 4_440_064, 6_742_016, 6_938_624, 19_955_712])
     XCTAssertEqual(profile.writeForbiddenMemberNames.sorted(), ["chip_prod.img", "sys_prod.img"])
 
     let descriptor = try XCTUnwrap(
@@ -258,7 +255,8 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let table =
       partitionTable
       ?? ("CMDLINE:mtdparts=rk29xxnand:"
-        + profile.mappedPartitions.map { "0x1@0x\($0.offsetSectors)(\($0.partitionName))" }
+        + profile.mappedPartitions.enumerated()
+          .map { "0x1@0x\(String(($0.offset + 1) * 0x2000, radix: 16))(\($0.element.partitionName))" }
         .joined(separator: ",")
         + ","
         + profile.membershiplessPartitionsWriteForbidden.map { "0x1@0x1(\($0))" }

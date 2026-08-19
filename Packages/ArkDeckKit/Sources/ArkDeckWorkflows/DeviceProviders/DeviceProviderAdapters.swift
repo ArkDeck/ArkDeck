@@ -3343,6 +3343,12 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
       }
       return name
     }
+    // `partitionPlan` is the caller's explicit overwrite-scope confirmation —
+    // an echo of the pinned declaration, not an addressing instruction. The
+    // executed write order and every sector address come from `arkforged`
+    // validating its own profile against the device's read-back table
+    // (CHG-2026-066); a caller can therefore only restate the published
+    // scope, never steer it.
     let expected = profile.mappedPartitions.map(\.partitionName)
     guard partitions == expected else {
       throw DeviceProviderError.unsupportedAction(
