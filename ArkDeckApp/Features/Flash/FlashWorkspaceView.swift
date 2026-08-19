@@ -1231,6 +1231,38 @@ struct FlashWorkspaceView: View {
         plan.planDigestSHA256 ?? flashText("flash.plan.digest.materializedAtSubmission"),
         monospaced: plan.planDigestSHA256 != nil)
       summaryRow("flash.plan.stepSetDigest", plan.stepSetDigestSHA256, monospaced: true)
+      lanePlanSummaryRow(model.lanePlanPreview)
+    }
+  }
+
+  /// One honest row per preview state (CHG-2026-068). The digest shown for
+  /// `available` is the lane plan the permits would anchor for these inputs;
+  /// execution re-materializes and its digest governs.
+  @ViewBuilder
+  private func lanePlanSummaryRow(
+    _ preview: FlashLanePlanPreviewPresentation?
+  ) -> some View {
+    switch preview {
+    case .available(_, let planSHA256, _):
+      summaryRow("flash.plan.lanePlan", planSHA256, monospaced: true)
+    case .bundleNotInLaneStore:
+      summaryRow(
+        "flash.plan.lanePlan", flashText("flash.plan.lanePlan.bundleNotInLaneStore"))
+    case .laneNotComposed:
+      summaryRow("flash.plan.lanePlan", flashText("flash.plan.lanePlan.laneNotComposed"))
+    case .deviceNotObserved(let reason):
+      summaryRow(
+        "flash.plan.lanePlan",
+        flashText("flash.plan.lanePlan.deviceNotObserved") + " — " + reason)
+    case .planNotExecutable(_, let reason):
+      summaryRow(
+        "flash.plan.lanePlan",
+        flashText("flash.plan.lanePlan.planNotExecutable") + " — " + reason)
+    case .unavailable(let reason):
+      summaryRow(
+        "flash.plan.lanePlan", flashText("flash.plan.lanePlan.unavailable") + " — " + reason)
+    case nil:
+      summaryRow("flash.plan.lanePlan", flashText("flash.plan.lanePlan.pending"))
     }
   }
 
@@ -1375,6 +1407,9 @@ final class FlashWorkspaceViewModel {
   private(set) var selectedTargetID = ""
   private(set) var selectedArchiveURL: URL?
   private(set) var plan: FlashExactPlanPresentation?
+  /// Read-only arkforged plan pre-materialization (CHG-2026-068); nil while
+  /// no plan is prepared or the async fetch is still in flight.
+  private(set) var lanePlanPreview: FlashLanePlanPreviewPresentation?
   private(set) var planFailureCode: FlashPlanFailureCode?
   private(set) var planFailureDetail: String?
   private(set) var submission: FlashSubmissionPresentation?
@@ -1581,6 +1616,7 @@ final class FlashWorkspaceViewModel {
     }
     isPreparingPlan = true
     plan = nil
+    lanePlanPreview = nil
     submission = nil
     liveStatus = nil
     submissionFailure = nil
@@ -1615,6 +1651,7 @@ final class FlashWorkspaceViewModel {
       switch result {
       case .ready(let plan):
         self.plan = plan
+        self.fetchLanePlanPreview(plan: plan, target: target)
       case .failed(let code, let detail):
         self.planFailureCode = code
         self.planFailureDetail = detail
@@ -1622,9 +1659,34 @@ final class FlashWorkspaceViewModel {
     }
   }
 
+  /// Asks agentd for the arkforged lane plan pre-materialization
+  /// (CHG-2026-068). Async and advisory: the review renders without it, every
+  /// state it returns is shown as-is, and the executed job re-materializes —
+  /// the permits anchor that one.
+  private func fetchLanePlanPreview(
+    plan: FlashExactPlanPresentation, target: FlashTargetPresentation?
+  ) {
+    lanePlanPreview = nil
+    guard let target else { return }
+    let provider = provider
+    let profileReference = plan.profileReference
+    let archiveSHA256 = plan.archiveSHA256
+    Task { [weak self] in
+      let preview = await provider.lanePlanPreview(
+        target: target, profileReference: profileReference, archiveSHA256: archiveSHA256)
+      guard let self,
+        self.plan?.archiveSHA256 == archiveSHA256,
+        self.selectedTarget == target,
+        !Task.isCancelled
+      else { return }
+      self.lanePlanPreview = preview
+    }
+  }
+
   func resetForAnotherFlash() {
     guard !isSubmitting else { return }
     selectedArchiveURL = nil
+    lanePlanPreview = nil
     mode = .execute
     invalidatePlan()
   }

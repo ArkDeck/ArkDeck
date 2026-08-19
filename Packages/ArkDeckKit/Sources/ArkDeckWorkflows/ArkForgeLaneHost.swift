@@ -46,6 +46,34 @@ package protocol ArkForgePlanSource: Sendable {
 /// is a compile error instead of a surprise on the bench.
 extension ArkForgeDaemonClient: ArkForgePlanSource {}
 
+/// What a read-only lane plan preview learned (CHG-2026-068).
+public enum ArkForgeLanePlanPreviewOutcome: Sendable, Equatable {
+  /// The daemon materialized an executable plan; this digest is what the
+  /// permits would anchor if a job ran now with the same inputs.
+  case available(planID: String, planSHA256: String, observationMode: String)
+  /// The bundle's bytes are not in the daemon's content store. The preview
+  /// deliberately does not import them — one flash puts them there, and the
+  /// store is content-addressed, so every later preview of the same bundle
+  /// answers from the digest alone.
+  case bundleNotInLaneStore
+  case deviceNotObserved(String)
+  case planNotExecutable(availability: String, reason: String, unknowns: [String: String])
+  /// Transport or daemon failure. Text is for the operator; nothing was
+  /// dispatched and nothing durable was produced.
+  case previewFailed(String)
+}
+
+/// Serves the review's read-only lane plan preview (CHG-2026-068).
+///
+/// A protocol so the XPC handler can be contract-tested against a scripted
+/// previewer; the production conformance resolves the bound target's facts
+/// and asks the composed `ArkForgeLaneHost`.
+public protocol FlashLanePlanPreviewing: Sendable {
+  func preview(
+    targetID: String, profileReference: String, archiveSHA256: String
+  ) async -> ArkForgeLanePlanPreviewOutcome
+}
+
 package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
   package nonisolated let toolchainSHA256: String
@@ -158,6 +186,59 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     self.makeClient = makeClient
     self.makeMaterializer = makeMaterializer
     self.makeAuthority = makeAuthority
+  }
+
+  /// Pre-materializes this bundle's lane plan without running a job.
+  ///
+  /// The exact read-only prefix of `materialize(artifact:binding:jobID:)`
+  /// with the import branch removed: inspect (presence probe by content
+  /// digest — the daemon's artifact id *is* the sha256), discover, select the
+  /// bound port path, materialize. No permit exists, `startExecution` is
+  /// never called, and a miss is an honest state, not an error.
+  ///
+  /// The digest this returns is a preview: execution re-materializes, and the
+  /// permits anchor that materialization. Same daemon process and same inputs
+  /// reproduce the same digest; device-fact drift or a daemon upgrade is
+  /// exactly the case where the executed one must win.
+  package func previewPlan(
+    archiveSHA256: String, profileID: String, usbTopology: String
+  ) -> ArkForgeLanePlanPreviewOutcome {
+    let nonce = UUID().uuidString.lowercased().prefix(8)
+    do {
+      let client = try makeMaterializer(connection.socketPath)
+      if (try? client.inspectArtifact(
+        artifactID: archiveSHA256, requestID: "preview-inspect-\(nonce)"))
+        == nil
+      {
+        return .bundleNotInLaneStore
+      }
+      let observations = try client.discoverDevices(requestID: "preview-discover-\(nonce)")
+      let observation: ArkForgeDeviceObservation
+      switch ArkForgeObservationSelection.select(
+        observations: observations, usbTopology: usbTopology)
+      {
+      case .success(let selected): observation = selected
+      case .failure(let why): return .deviceNotObserved("\(why)")
+      }
+      switch try client.materializePlan(
+        ArkForgeMaterializePlanRequest(
+          artifactID: archiveSHA256, profileID: profileID,
+          observationID: observation.observationID),
+        requestID: "preview-materialize-\(nonce)")
+      {
+      case .plan(let plan):
+        return .available(
+          planID: plan.planID, planSHA256: plan.planSHA256,
+          observationMode: observation.mode)
+      case .assessment(let assessment):
+        return .planNotExecutable(
+          availability: assessment.availability,
+          reason: assessment.unavailableReason,
+          unknowns: assessment.unknowns)
+      }
+    } catch {
+      return .previewFailed(String(describing: error))
+    }
   }
 
   /// Decodes a 64-character lowercase hex digest into its 32 raw bytes.

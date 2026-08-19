@@ -187,6 +187,7 @@ final class AgentDaemonContractTests: XCTestCase {
     includeDefaultArtifactStore: Bool = true,
     flashBundleImportPolicy: FlashBundleImportPolicy = .production,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
@@ -228,6 +229,7 @@ final class AgentDaemonContractTests: XCTestCase {
           "flash-bundle-imports-\(UUID().uuidString)", directoryHint: .isDirectory),
       flashBundleImportPolicy: flashBundleImportPolicy,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
+      flashLanePlanPreviewer: flashLanePlanPreviewer,
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       methodObserver: nil)
@@ -558,6 +560,112 @@ final class AgentDaemonContractTests: XCTestCase {
       ])
     XCTAssertFalse(missing.ok)
     XCTAssertEqual(missing.error?.code, "notFound")
+  }
+
+  /// CHG-2026-068 LPP-AC-2/5: every preview state crosses the wire as itself,
+  /// a runtime without a composed lane answers with an honest state rather
+  /// than an error, and the parameter gate fails closed.
+  func testLanePlanPreviewIsHonestPerStateAndFailsClosedOnParams() async throws {
+    struct ScriptedPreviewer: FlashLanePlanPreviewing {
+      let outcome: ArkForgeLanePlanPreviewOutcome
+      func preview(
+        targetID _: String, profileReference _: String, archiveSHA256: String
+      ) async -> ArkForgeLanePlanPreviewOutcome {
+        XCTAssertEqual(
+          archiveSHA256, archiveSHA256.lowercased(),
+          "the handler normalizes the digest before it reaches the lane")
+        return outcome
+      }
+    }
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-lane-preview", directoryHint: .isDirectory))
+    let target = try targets.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
+    let digest = String(repeating: "E", count: 64)
+
+    let (available, _) = try makeStack(
+      targetStore: targets,
+      flashLanePlanPreviewer: ScriptedPreviewer(
+        outcome: .available(
+          planID: "PLAN-preview", planSHA256: String(repeating: "d", count: 64),
+          observationMode: "hdc-normal")))
+    let response = try await request(
+      available, method: "flash.lanePlanPreview",
+      params: [
+        "targetId": .string(target.targetID),
+        "profileReference": .string("dayu200"),
+        "archiveSha256": .string(digest),
+      ])
+    guard case .object(let result)? = response.result else {
+      return XCTFail("an available preview must return a structured result")
+    }
+    XCTAssertTrue(response.ok)
+    XCTAssertEqual(result["state"], .string("available"))
+    XCTAssertEqual(result["planId"], .string("PLAN-preview"))
+    XCTAssertEqual(result["planSha256"], .string(String(repeating: "d", count: 64)))
+    XCTAssertEqual(result["observationMode"], .string("hdc-normal"))
+    XCTAssertEqual(result["targetId"], .string(target.targetID))
+    XCTAssertEqual(result["bindingRevision"], .integer(Int64(target.bindingRevision)))
+
+    let (assessment, _) = try makeStack(
+      targetStore: targets,
+      flashLanePlanPreviewer: ScriptedPreviewer(
+        outcome: .planNotExecutable(
+          availability: "unavailable", reason: "maturity is hardwareGated",
+          unknowns: ["RK-M02": "combination is hardwareGated"])))
+    let gated = try await request(
+      assessment, method: "flash.lanePlanPreview",
+      params: [
+        "targetId": .string(target.targetID),
+        "profileReference": .string("dayu200"),
+        "archiveSha256": .string(digest),
+      ])
+    guard case .object(let gatedResult)? = gated.result else {
+      return XCTFail("an assessment preview must return a structured result")
+    }
+    XCTAssertEqual(gatedResult["state"], .string("planNotExecutable"))
+    XCTAssertEqual(gatedResult["reason"], .string("maturity is hardwareGated"))
+    XCTAssertEqual(
+      gatedResult["unknowns"],
+      .array([.string("RK-M02: combination is hardwareGated")]))
+
+    let (bare, _) = try makeStack(targetStore: targets)
+    let notComposed = try await request(
+      bare, method: "flash.lanePlanPreview",
+      params: [
+        "targetId": .string(target.targetID),
+        "profileReference": .string("dayu200"),
+        "archiveSha256": .string(digest),
+      ])
+    guard case .object(let bareResult)? = notComposed.result else {
+      return XCTFail("a runtime without a lane must still answer with a state")
+    }
+    XCTAssertTrue(notComposed.ok)
+    XCTAssertEqual(bareResult["state"], .string("laneNotComposed"))
+
+    let invalid = try await request(
+      available, method: "flash.lanePlanPreview",
+      params: [
+        "targetId": .string(target.targetID),
+        "profileReference": .string("dayu200"),
+        "archiveSha256": .string("not-a-digest"),
+      ])
+    XCTAssertFalse(invalid.ok)
+    XCTAssertEqual(invalid.error?.code, "invalidParams")
+
+    let unknownTarget = try await request(
+      available, method: "flash.lanePlanPreview",
+      params: [
+        "targetId": .string("target-missing"),
+        "profileReference": .string("dayu200"),
+        "archiveSha256": .string(digest),
+      ])
+    XCTAssertFalse(unknownTarget.ok)
+    XCTAssertEqual(unknownTarget.error?.code, "notFound")
   }
 
   func testBootloaderStatusAndClosedLoaderBindingHaveRedactedWireShapes() async throws {

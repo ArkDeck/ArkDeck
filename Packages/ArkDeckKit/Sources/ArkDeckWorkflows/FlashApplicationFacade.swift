@@ -553,6 +553,18 @@ public enum FlashLoaderBindingResult: Sendable, Equatable {
   case failed(String)
 }
 
+/// What the review knows about the arkforged lane plan before submission
+/// (CHG-2026-068). Every case is a fact the UI renders as-is; `available`
+/// carries the digest the permits would anchor for the same inputs.
+public enum FlashLanePlanPreviewPresentation: Sendable, Equatable {
+  case available(planID: String, planSHA256: String, observationMode: String)
+  case bundleNotInLaneStore
+  case laneNotComposed
+  case deviceNotObserved(String)
+  case planNotExecutable(availability: String, reason: String)
+  case unavailable(String)
+}
+
 public protocol FlashApplicationProviding: Sendable {
   func refreshWorkspace() async -> FlashWorkspacePresentation
   func preparePlan(
@@ -561,6 +573,11 @@ public protocol FlashApplicationProviding: Sendable {
     mode: RockchipFlashExecutionMode,
     target: FlashTargetPresentation?
   ) async -> FlashPlanPreparationResult
+  func lanePlanPreview(
+    target: FlashTargetPresentation,
+    profileReference: String,
+    archiveSHA256: String
+  ) async -> FlashLanePlanPreviewPresentation
   func submit(
     archiveURL: URL,
     plan: FlashExactPlanPresentation
@@ -630,6 +647,53 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       // The exact plan remains reviewable, but every unobserved prerequisite
       // stays unknown. Runtime performs the authoritative probe before write.
       return local
+    }
+  }
+
+  func lanePlanPreview(
+    target: FlashTargetPresentation,
+    profileReference: String,
+    archiveSHA256: String
+  ) async -> FlashLanePlanPreviewPresentation {
+    let response = await FlashXPCTransport.request(
+      method: "flash.lanePlanPreview",
+      params: [
+        "targetId": .string(target.id),
+        "profileReference": .string(profileReference),
+        "archiveSha256": .string(archiveSHA256),
+      ])
+    do {
+      let result = try await FlashXPCResponseDecoding.resultObject(response)
+      guard let state = result["state"] as? String else {
+        return .unavailable("Runtime returned no preview state")
+      }
+      switch state {
+      case "available":
+        guard let planID = result["planId"] as? String,
+          let planSHA256 = result["planSha256"] as? String,
+          let observationMode = result["observationMode"] as? String
+        else { return .unavailable("Runtime preview facts were incomplete") }
+        return .available(
+          planID: planID, planSHA256: planSHA256, observationMode: observationMode)
+      case "bundleNotInLaneStore":
+        return .bundleNotInLaneStore
+      case "laneNotComposed":
+        return .laneNotComposed
+      case "deviceNotObserved":
+        return .deviceNotObserved(result["reason"] as? String ?? "device not observed")
+      case "planNotExecutable":
+        return .planNotExecutable(
+          availability: result["availability"] as? String ?? "unavailable",
+          reason: result["reason"] as? String ?? "assessment gave no reason")
+      case "previewFailed":
+        return .unavailable(result["reason"] as? String ?? "preview failed")
+      default:
+        return .unavailable("Runtime returned an unknown preview state: \(state)")
+      }
+    } catch let failure as FlashResponseFailure {
+      return .unavailable(failure.message)
+    } catch {
+      return .unavailable(String(describing: error))
     }
   }
 
@@ -926,6 +990,17 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
         bindingRevision: target.bindingRevision + 1,
         toolVersion: target.toolVersion,
         adoptedAtUTC: target.adoptedAtUTC))
+  }
+
+  func lanePlanPreview(
+    target _: FlashTargetPresentation,
+    profileReference _: String,
+    archiveSHA256 _: String
+  ) async -> FlashLanePlanPreviewPresentation {
+    .available(
+      planID: "PLAN-ui-fixture",
+      planSHA256: String(repeating: "f", count: 64),
+      observationMode: "hdc-normal")
   }
 
   func cancel(jobID _: String) async -> Bool { true }
