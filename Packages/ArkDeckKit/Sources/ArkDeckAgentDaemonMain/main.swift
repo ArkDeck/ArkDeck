@@ -215,6 +215,7 @@ nonisolated(unsafe) var startedServer: AgentDaemonServer?
 nonisolated(unsafe) var startedXPCListener: AgentXPCListener?
 nonisolated(unsafe) var autoDriveTask: Task<Void, Never>?
 nonisolated(unsafe) var startedHDCServerHost: HeadlessHDCServerHost?
+nonisolated(unsafe) var startedArkForgeDaemon: ArkForgeLaneComposition.DaemonLifecycle?
 
 // Detached on purpose: the top level is @MainActor-isolated, so a plain
 // `Task { }` would inherit the main actor and deadlock against the
@@ -638,11 +639,13 @@ Task.detached {
     case .success(let composed):
       arkForgeLane = composed.lane
       arkForgeDeviceProfileID = composed.deviceProfileID
+      startedArkForgeDaemon = composed.daemonLifecycle
       FileHandle.standardError.write(
         Data("arkforge lane: composed for \(composed.deviceProfileID)\n".utf8))
     case .failure(let absence):
       arkForgeLane = nil
       arkForgeDeviceProfileID = nil
+      startedArkForgeDaemon = nil
       FileHandle.standardError.write(Data("\(absence)\n".utf8))
     }
 
@@ -863,6 +866,8 @@ Task.detached {
       // the serving daemon keeps ownership of its own server.
       await startedHDCServerHost?.stop()
       startedHDCServerHost = nil
+      startedArkForgeDaemon?.stop()
+      startedArkForgeDaemon = nil
       print(
         "arkdeck-agentd already running: pid \(instance.pid), socket \(instance.socketPath), "
           + "protocol \(instance.protocolVersion)")
@@ -873,6 +878,8 @@ Task.detached {
     // failed daemon startup must not orphan that foreground process group.
     await startedHDCServerHost?.stop()
     startedHDCServerHost = nil
+    startedArkForgeDaemon?.stop()
+    startedArkForgeDaemon = nil
     startupFailure = error
   }
 }
@@ -906,6 +913,8 @@ let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal
       // owns a Runtime durability boundary.  The 20-second cap is explicit:
       // an unresponsive client cannot block macOS service shutdown forever.
       server.drainAndStop(deadline: 20)
+      startedArkForgeDaemon?.stop()
+      startedArkForgeDaemon = nil
       await startedHDCServerHost?.stop()
       print("arkdeck-agentd stopped")
       fflush(stdout)

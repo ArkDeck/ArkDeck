@@ -1,6 +1,7 @@
 import ArkDeckCore
 import ArkDeckProcess
 import ArkForgeIPC
+import Darwin
 import Foundation
 
 /// Builds the ArkForge lane from what an operator installed, or explains why
@@ -12,6 +13,49 @@ import Foundation
 /// input is required, none is guessed from `PATH` or a default location, and a
 /// partial configuration is refused rather than half-applied.
 package enum ArkForgeLaneComposition {
+
+  /// Owns the `arkforged` process for exactly one agentd generation.
+  ///
+  /// Composition used to discard `IdentityBoundDaemonLauncher.Handle` after
+  /// startup. launchd could then stop agentd while arkforged remained alive,
+  /// reparented to PID 1 and still holding the shared runtime directory and
+  /// RockUSB surface. Keeping the stop action beside the composed lane makes
+  /// every startup failure and normal daemon shutdown close the same process
+  /// generation exactly once.
+  package final class DaemonLifecycle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stopImplementation: (@Sendable () -> Void)?
+    private var stopped = false
+
+    package init() {}
+
+    package func install(_ implementation: @escaping @Sendable () -> Void) {
+      lock.lock()
+      precondition(stopImplementation == nil, "arkforged lifecycle may be installed once")
+      if stopped {
+        lock.unlock()
+        implementation()
+        return
+      }
+      stopImplementation = implementation
+      lock.unlock()
+    }
+
+    package func stop() {
+      lock.lock()
+      guard !stopped else {
+        lock.unlock()
+        return
+      }
+      stopped = true
+      let implementation = stopImplementation
+      stopImplementation = nil
+      lock.unlock()
+      implementation?()
+    }
+
+    deinit { stop() }
+  }
 
   /// The exact toolchain identity ArkDeck expects back from the daemon.
   package struct ToolchainIdentity: Sendable, Equatable {
@@ -193,14 +237,16 @@ package enum ArkForgeLaneComposition {
     package let deviceProfileID: String
     package let toolchain: ToolchainIdentity
     package let lane: ArkForgeLaneHost
+    package let daemonLifecycle: DaemonLifecycle
 
     package init(
       deviceProfileID: String, toolchain: ToolchainIdentity,
-      lane: ArkForgeLaneHost
+      lane: ArkForgeLaneHost, daemonLifecycle: DaemonLifecycle
     ) {
       self.deviceProfileID = deviceProfileID
       self.toolchain = toolchain
       self.lane = lane
+      self.daemonLifecycle = daemonLifecycle
     }
   }
 
@@ -237,6 +283,7 @@ package enum ArkForgeLaneComposition {
   static func compose(
     environment: [String: String], runtimeDirectory: URL,
     pairingEpoch: UInt64, dependencies: Dependencies,
+    daemonLifecycle: DaemonLifecycle = DaemonLifecycle(),
     launch: @Sendable (ProcessIdentityBoundRequest, Data) async throws -> Void,
     connect: @Sendable (String) throws -> (any ArkForgeFlashSession.Daemon, ArkForgeHelloAck),
     awaitSocket: @Sendable (URL) async -> String?
@@ -290,10 +337,11 @@ package enum ArkForgeLaneComposition {
       return .failure(.daemonUnavailable("arkforged did not start: \(error)"))
     }
     guard let socket = await awaitSocket(runtimeDirectory) else {
+      daemonLifecycle.stop()
       return .failure(
         .daemonUnavailable(
-          "arkforged started but never opened its controller socket; it is left running for "
-          + "its log rather than killed, because why it did not open is the useful fact"))
+          "arkforged started but never opened its controller socket; the owned process "
+          + "generation was stopped before returning the failure"))
     }
 
     let daemon: any ArkForgeFlashSession.Daemon
@@ -301,6 +349,7 @@ package enum ArkForgeLaneComposition {
     do {
       (daemon, ack) = try connect(socket)
     } catch {
+      daemonLifecycle.stop()
       return .failure(.daemonUnavailable("could not open a controller session: \(error)"))
     }
     do {
@@ -310,6 +359,7 @@ package enum ArkForgeLaneComposition {
       try ArkForgeLaneHost.verifyReadiness(
         ack, expectedToolchain: inputs.expectedToolchain)
     } catch {
+      daemonLifecycle.stop()
       return .failure(.daemonUnavailable("\(error)"))
     }
 
@@ -358,7 +408,8 @@ package enum ArkForgeLaneComposition {
             plan: dependencies.approvedPlan(jobID, planID, planDigest, deviceBinding),
             secret: ArkForgePairingSecret(
               secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
-        })))
+        }),
+        daemonLifecycle: daemonLifecycle))
   }
 
   /// What `main.swift` calls: composes the lane from the process environment,
@@ -378,14 +429,19 @@ package enum ArkForgeLaneComposition {
     pairingEpoch: UInt64 = UInt64(Date().timeIntervalSince1970)
   ) async -> Result<Composed, Absence> {
     let host = rockchipDispatcher.actionHost
+    let daemonLifecycle = DaemonLifecycle()
     return await compose(
       environment: environment, runtimeDirectory: runtimeDirectory,
       pairingEpoch: pairingEpoch,
       dependencies: .init(
         rockchipHost: { host }, providerIdentity: providerIdentity,
         approvedPlan: approvedPlan),
+      daemonLifecycle: daemonLifecycle,
       launch: { request, secret in
-        _ = try await IdentityBoundDaemonLauncher().launch(request, secret: secret)
+        let handle = try await IdentityBoundDaemonLauncher().launch(request, secret: secret)
+        daemonLifecycle.install {
+          stopDaemonProcessGroup(handle)
+        }
       },
       connect: { socket in
         let client = try ArkForgeDaemonClient(socketPath: socket)
@@ -398,6 +454,50 @@ package enum ArkForgeLaneComposition {
         await awaitControllerSocket(
           runtimeDirectory: directory, deadline: Date().addingTimeInterval(10))
       })
+  }
+
+  /// Stops and reaps the exact child generation without leaving a PID-1
+  /// orphan. SIGTERM gets a bounded grace period; SIGKILL is confined to the
+  /// launcher's dedicated process group and is used only when that exact child
+  /// has not exited. The grace period is deliberately shorter than launchd's
+  /// service-exit budget: waiting longer lets launchd kill agentd before it can
+  /// reach the group cleanup, which is precisely how the orphan is created.
+  private static func stopDaemonProcessGroup(
+    _ handle: IdentityBoundDaemonLauncher.Handle
+  ) {
+    handle.terminate()
+    let gracefulDeadline = Date().addingTimeInterval(0.5)
+    var status: Int32 = 0
+    while Date() < gracefulDeadline {
+      let result = waitpid(handle.processIdentifier, &status, WNOHANG)
+      if result == handle.processIdentifier { return }
+      if result < 0 && errno == ECHILD {
+        if !processGroupExists(handle.processIdentifier) { return }
+        usleep(50_000)
+        continue
+      }
+      if result < 0 && errno != EINTR { return }
+      usleep(50_000)
+    }
+
+    guard kill(-handle.processIdentifier, SIGKILL) == 0 || errno != ESRCH else { return }
+    let forcedDeadline = Date().addingTimeInterval(0.5)
+    while Date() < forcedDeadline {
+      let result = waitpid(handle.processIdentifier, &status, WNOHANG)
+      if result == handle.processIdentifier { return }
+      if result < 0 && errno == ECHILD {
+        if !processGroupExists(handle.processIdentifier) { return }
+        usleep(50_000)
+        continue
+      }
+      if result < 0 && errno != EINTR { return }
+      usleep(50_000)
+    }
+  }
+
+  private static func processGroupExists(_ leader: pid_t) -> Bool {
+    if kill(-leader, 0) == 0 { return true }
+    return errno == EPERM
   }
 
   /// Waits for the daemon's controller socket to appear.
