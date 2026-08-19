@@ -35,12 +35,9 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | 条目 | 职责(出处 change) |
 | --- | --- |
 | `archive_characterization/` | DAYU200 归档特征扫描器(CHG-2026-003,已归档) |
-| `e0_readback/` | E0 只读身份/模式读回 crib(CHG-2026-025) |
 | `m0b_capture/` | M0B DAYU200 bring-up 采集 runbook(CHG-2026-006,人工执行) |
 | `partition_decode/` | DAYU200 钉定镜像分区解码器(CHG-2026-009,离线只读) |
 | `rockchip_component/` | Rockchip 组件的无签名源码钉定构建(TASK-BRC-002) |
-| `rockchip_e0_probe/` | 本地签名 Sandbox E0 探针(Hardened Runtime 特征化) |
-| `rockchip_loader_transition_probe/` | HDC → Loader 转换特征化探针(CHG-2026-026) |
 | `trace_capture/` | TR-001 trace 探针/最小采集 runbook(CHG-2026-021,人工执行) |
 | `ud_capture/` | 受控 UI Dump 采集 harness(CHG-2026-008) |
 | `ui_dump_diagnosis/` | R2 raw INVALID_UNICODE 只读非内容诊断(TASK-UD-R2-DIAG-001) |
