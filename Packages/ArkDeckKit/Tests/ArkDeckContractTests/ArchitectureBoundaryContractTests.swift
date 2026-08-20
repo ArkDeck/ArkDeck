@@ -267,38 +267,58 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
   // MARK: - 6. Git execution stays read-only and confined
 
-  /// Exactly two files may reference the git executable, and neither may
-  /// spell a history-mutating subcommand as a string literal. Evolution
-  /// promotion produces a PR candidate document; nothing in the package can
-  /// push, merge, commit or move a ref.
+  /// One file may reference the git executable, and it may not spell a
+  /// history-mutating subcommand as a string literal. Evolution promotion
+  /// produces a PR candidate document; nothing in the package can push, merge,
+  /// commit or move a ref.
+  ///
+  /// The allowlist is checked as an exact set, not as an upper bound. Written
+  /// as a one-way "nothing outside this list" rule it silently widened when
+  /// `EvolutionCandidatePipeline.swift` was deleted with the retired campaign
+  /// stack: the entry stayed, so any future file recreated at that exact path
+  /// would have inherited a reviewed git grant without review. A grant nothing
+  /// uses has to fail here so it gets revoked rather than lying in wait.
   func testGitExecutionConfinedAndReadOnly() throws {
     let allowedGitFiles: Set<String> = [
-      "Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceOperationsProvider.swift",
-      "Sources/ArkDeckWorkflows/EvolutionCandidatePipeline.swift",
+      "Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceOperationsProvider.swift"
     ]
     let writeVerbs = [
       "push", "merge", "commit", "checkout", "clone", "rebase", "reset", "fetch", "pull",
       "cherry-pick", "switch", "restore", "worktree", "update-ref", "symbolic-ref",
       "filter-branch", "gc",
     ]
+    // A declared path outside every scanned root would never be observed
+    // below, so the set comparison alone could not tell "revoked" from
+    // "unscanned".
+    for declared in allowedGitFiles.sorted() {
+      XCTAssertTrue(
+        FileManager.default.fileExists(atPath: packageRoot().appending(path: declared).path),
+        "\(declared): declared as a git execution site but no such file exists; "
+          + "remove the entry (docs/ArchitectureRules.md §4)")
+    }
+
+    var observedGitFiles: Set<String> = []
     for (_, path, carveOuts) in Self.targetRoots {
       for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {
         let rel = relative(file)
         let code = try codeWithoutComments(of: file)
-        if !allowedGitFiles.contains(rel) {
-          XCTAssertFalse(
-            code.contains("/usr/bin/git"),
-            "\(rel): git executable referenced outside the two declared sites")
-        } else {
-          for verb in writeVerbs {
-            XCTAssertNil(
-              code.range(of: "\"\(verb)\"", options: .literal),
-              "\(rel): git write verb \"\(verb)\" as a string literal; the git surface is "
-                + "read-only (status/diff/stash create + read-only plumbing)")
-          }
+        guard code.contains("/usr/bin/git") else { continue }
+        observedGitFiles.insert(rel)
+        for verb in writeVerbs {
+          XCTAssertNil(
+            code.range(of: "\"\(verb)\"", options: .literal),
+            "\(rel): git write verb \"\(verb)\" as a string literal; the git surface is "
+              + "read-only (status/diff/stash create + read-only plumbing)")
         }
       }
     }
+    XCTAssertEqual(
+      observedGitFiles, allowedGitFiles,
+      "the git execution sites and the declared allowlist must match exactly: "
+        + "unlisted \(observedGitFiles.subtracting(allowedGitFiles).sorted()) reference the "
+        + "git executable without a reviewed grant, and listed "
+        + "\(allowedGitFiles.subtracting(observedGitFiles).sorted()) no longer use it and must "
+        + "be removed rather than left standing")
   }
 
   // MARK: - 7. Storage and the artifact store are task-ignorant

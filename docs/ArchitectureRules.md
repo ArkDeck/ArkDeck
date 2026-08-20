@@ -112,8 +112,9 @@ Storage / RuntimeArtifactStore -> 任务身份(HTASK)      (存储层任务无�
 任何模块公开 API -> command: String / shell script     (typed argv-only)
 chat 模型符号(HarnessAgentModelGateway/OpenAIGateway/AgentLoop/ARKDECK_HARNESS_MODEL_)
           -> 只准出现在 AgentComposition 与 ArkDeckCLI
-git 可执行 -> 只有 WorkspaceOperationsProvider 与 EvolutionCandidatePipeline
-          两个声明点,且 push/merge/commit/checkout/clone/… 写动词为字面量违规
+git 可执行 -> 只有 WorkspaceOperationsProvider 一个声明点(集合精确相等:
+          未登记的新引用与已失效的旧登记同样违规),且
+          push/merge/commit/checkout/clone/… 写动词为字面量违规
 ```
 
 对应测试(`ArchitectureBoundaryContractTests`):manifest 依赖矩阵(含
