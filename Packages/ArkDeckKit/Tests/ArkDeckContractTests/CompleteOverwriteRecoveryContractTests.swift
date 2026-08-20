@@ -50,7 +50,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
     func perform(
       stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
-      binding _: ArkForgeLaneDeviceBinding
+      binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
     ) async throws -> ArkForgeActionReceiptSummary {
       if !started {
         started = true
@@ -110,34 +110,6 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         stdoutTruncated: false, durationSeconds: 0.001,
         hostManagedRecordID: "fixture-record-\(descriptor.stepID)")
     }
-  }
-
-  private struct HostIntentRecord: Codable {
-    let schemaVersion: String
-    let jobID: String
-    let stepID: String
-    let targetID: String
-    let bindingRevision: Int
-    let stableIdentitySHA256: String
-    let providerExecutableSHA256: String
-    let actionSHA256: String
-    let action: PersistedTypedProviderAction
-  }
-
-  private struct HostReceiptRecord: Codable {
-    let schemaVersion: String
-    let jobID: String
-    let stepID: String
-    let targetID: String
-    let bindingRevision: Int
-    let stableIdentitySHA256: String
-    let providerExecutableSHA256: String
-    let actionSHA256: String
-    let summary: [String: String]
-    let stdoutSHA256: String
-    let stderrSHA256: String
-    let stdoutTruncated: Bool
-    let subprocessCount: Int
   }
 
   override func setUpWithError() throws {
@@ -210,139 +182,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     }
   }
 
-  func testUniqueLoaderBindingClosesOnlyOutstandingEnterLoaderIntentWithoutReplay()
-    async throws
-  {
-    // Drives a full `flash.dayu200` job, which cannot run in this tree: step 1
-    // of TASK-AFA-001 removed the in-process lowering and step 5 has not wired
-    // the permit route yet, so the plan is refused before authorization.
-    //
-    // Skipped rather than rewritten. What these assert — no replay, no new
-    // dispatch, supersession bookkeeping — is exactly what must still hold once
-    // arkforged performs the write, and rewriting them to assert today's
-    // refusal would throw that away. `DeviceProviderContractTests`'s
-    // `testFlashStepsAreRefusedBeforeAuthorization` covers the interim contract.
-    throw XCTSkip(
-      "flash.dayu200 has no executor until TASK-AFA-001 step 5 wires the StepPermit route")
-    try await assertLoaderBindingSettlement(currentBindingRevision: 3)
-  }
-
-  func testFreshAttestationAtTheSameRevisionClosesEnterLoaderIntentWithoutReplay()
-    async throws
-  {
-    // Drives a full `flash.dayu200` job, which cannot run in this tree: step 1
-    // of TASK-AFA-001 removed the in-process lowering and step 5 has not wired
-    // the permit route yet, so the plan is refused before authorization.
-    //
-    // Skipped rather than rewritten. What these assert — no replay, no new
-    // dispatch, supersession bookkeeping — is exactly what must still hold once
-    // arkforged performs the write, and rewriting them to assert today's
-    // refusal would throw that away. `DeviceProviderContractTests`'s
-    // `testFlashStepsAreRefusedBeforeAuthorization` covers the interim contract.
-    throw XCTSkip(
-      "flash.dayu200 has no executor until TASK-AFA-001 step 5 wires the StepPermit route")
-    try await assertLoaderBindingSettlement(currentBindingRevision: 2)
-  }
-
-  private func assertLoaderBindingSettlement(currentBindingRevision: Int) async throws {
-    let archive = try recoveryArchive()
-    let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
-      nowUTC: { "2026-08-08T01:00:00Z" })
-    let artifact = try await artifactStore.publish(
-      RuntimeArtifactPublicationRequest(
-        jobID: "job-loader-input", sessionID: "session-loader-input",
-        stepID: "import-flash-bundle", name: "images.tar.gz",
-        mediaType: "application/gzip", privacy: .standard,
-        retentionClass: .pinnedUntilVerified,
-        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
-        bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
-          stableIdentitySHA256: identity),
-        contents: archive))
-    let lease = try await artifactStore.leaseReference(
-      jobID: artifact.jobID, artifactID: artifact.artifactID)
-    let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
-    let dispatchLog = DispatchLog()
-    let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
-      providers: DeviceProviderRegistry(providers: [
-        RockchipFlashProviderAdapter(
-          factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
-          availability: .available)
-      ]),
-      dispatcher: ConfirmingDispatcher(
-        log: dispatchLog, outcomeUnknownStepID: "enter-loader-mode"),
-      capabilityStore: capabilityStore,
-      artifactStore: artifactStore,
-      nowUTC: { "2026-08-08T01:00:00Z" })
-    let request = try flashRequest(id: "loader-binding", lease: lease)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let accepted = try await engine.submit(encoder.encode(request))
-    let expectedBindingRevision = try XCTUnwrap(
-      request.target.expectedBindingRevision)
-
-    let parked = try await engine.run(jobID: accepted.jobID)
-    XCTAssertEqual(parked.state, JobState.waitingForRecovery.rawValue)
-    XCTAssertTrue(parked.outcomeUnknown)
-    let pendingJobID = try await engine.loaderTransitionAwaitingBinding(
-      targetID: request.target.targetID,
-      expectedBindingRevision: expectedBindingRevision)
-    XCTAssertEqual(pendingJobID, accepted.jobID)
-
-    let selectionEvidence = String(repeating: "a", count: 64)
-    let settled = try await engine.settleLoaderTransitionAfterBinding(
-      jobID: accepted.jobID,
-      targetID: request.target.targetID,
-      previousBindingRevision: 2,
-      currentBindingRevision: currentBindingRevision,
-      selectionEvidenceSHA256: selectionEvidence)
-    XCTAssertEqual(settled.state, JobState.failed.rawValue)
-    XCTAssertFalse(settled.outcomeUnknown)
-    XCTAssertTrue(
-      settled.timeline.contains {
-        $0.contains("original action not replayed")
-      })
-    let pendingAfterSettlement = try await engine.loaderTransitionAwaitingBinding(
-      targetID: request.target.targetID,
-      expectedBindingRevision: expectedBindingRevision)
-    XCTAssertNil(pendingAfterSettlement)
-
-    let dispatches = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatches, ["enter-loader-mode"])
-    let replay = try DurableJournalRecovery.inspect(
-      url: stateDirectory.appending(
-        path:
-          "jobs/\(accepted.jobID)/journal.jsonl"))
-    XCTAssertTrue(replay.outstandingIntents.isEmpty)
-    XCTAssertTrue(replay.unknownOutcomes.isEmpty)
-    XCTAssertEqual(replay.currentState, .failed)
-    XCTAssertTrue(
-      replay.events.contains {
-        $0.kind == .stepOutcome
-          && $0.stepID == "enter-loader-mode"
-          && $0.payload["outcomeCertainty"] == .string("confirmed")
-      })
-    let capabilityStatuses = try await capabilityStore.list()
-    let consumed = try XCTUnwrap(capabilityStatuses.only)
-    XCTAssertEqual(consumed.lineage.last?.outcome, .confirmed)
-    XCTAssertEqual(consumed.lineage.last?.outcomeHistory.last?.terminalState, "failed")
-  }
-
   func testCompleteLaterFlashHistoryAppendsSupersessionWithoutChangingUnknownJobs() async throws {
-    // Drives a full `flash.dayu200` job, which cannot run in this tree: step 1
-    // of TASK-AFA-001 removed the in-process lowering and step 5 has not wired
-    // the permit route yet, so the plan is refused before authorization.
-    //
-    // Skipped rather than rewritten. What these assert — no replay, no new
-    // dispatch, supersession bookkeeping — is exactly what must still hold once
-    // arkforged performs the write, and rewriting them to assert today's
-    // refusal would throw that away. `DeviceProviderContractTests`'s
-    // `testFlashStepsAreRefusedBeforeAuthorization` covers the interim contract.
-    throw XCTSkip(
-      "flash.dayu200 has no executor until TASK-AFA-001 step 5 wires the StepPermit route")
     let first = try writeUnknownJob(
       jobID: "job-old-outstanding", timestamp: "2026-08-08T00:00:00Z",
       correlatedUnknownOutcome: false)
@@ -353,7 +193,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let originalSecond = try Data(contentsOf: second.recordURL)
     try writeSuccessfulRecoveryJob(
       jobID: "job-later-complete", createdAtUTC: "2026-08-08T00:10:00Z",
-      finishedAtUTC: "2026-08-08T00:20:00Z", omitHostProofStepID: nil)
+      finishedAtUTC: "2026-08-08T00:20:00Z", omitSemanticReceiptStepID: nil)
 
     let admission = try await recoveryService().completeOverwriteAdmission(
       request: try flashRequest(id: "new-request"),
@@ -392,7 +232,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     try writeSuccessfulRecoveryJob(
       jobID: "job-incomplete", createdAtUTC: "2026-08-08T00:10:00Z",
       finishedAtUTC: "2026-08-08T00:20:00Z",
-      omitHostProofStepID: "rebind-and-verify-build")
+      omitSemanticReceiptStepID: "rebind-and-verify-build")
 
     let admission = try await recoveryService().completeOverwriteAdmission(
       request: try flashRequest(id: "new-recovery"),
@@ -669,17 +509,6 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   func testUnpreparedCrossModeBindingRejectsBeforeCapabilityAndDispatch() async throws {
-    // Drives a full `flash.dayu200` job, which cannot run in this tree: step 1
-    // of TASK-AFA-001 removed the in-process lowering and step 5 has not wired
-    // the permit route yet, so the plan is refused before authorization.
-    //
-    // Skipped rather than rewritten. What these assert — no replay, no new
-    // dispatch, supersession bookkeeping — is exactly what must still hold once
-    // arkforged performs the write, and rewriting them to assert today's
-    // refusal would throw that away. `DeviceProviderContractTests`'s
-    // `testFlashStepsAreRefusedBeforeAuthorization` covers the interim contract.
-    throw XCTSkip(
-      "flash.dayu200 has no executor until TASK-AFA-001 step 5 wires the StepPermit route")
     let archive = try recoveryArchive()
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
@@ -700,8 +529,11 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
+    let lane = CompletedArkForgeLane(toolchainSHA256: providerSHA256)
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: lane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(
           factsPort: RecoveryFactsPort(
@@ -934,12 +766,24 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   private func writeSuccessfulRecoveryJob(
     jobID: String, createdAtUTC: String, finishedAtUTC: String,
-    omitHostProofStepID: String?
+    omitSemanticReceiptStepID: String?
   ) throws {
     var record = try makeRecord(
       jobID: jobID, createdAtUTC: createdAtUTC, finishedAtUTC: finishedAtUTC)
     record.state = JobState.succeeded.rawValue
     record.outcomeUnknown = false
+    var admission = RuntimeAdmissionEvidence(
+      kind: .runtimeCapability, reference: "CAP-RT-HISTORICAL-FLASH",
+      admittedAtUTC: createdAtUTC, validUntilUTC: nil,
+      consumptionFingerprintSHA256: String(repeating: "a", count: 64),
+      runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation(
+        reservationID: "reservation-historical-flash", useOrdinal: 1,
+        planDigestSHA256: String(repeating: "2", count: 64),
+        stepSetDigestSHA256: String(repeating: "3", count: 64),
+        targetBindingDigestSHA256: String(repeating: "5", count: 64),
+        artifactSHA256: artifactSHA256))
+    admission.recoveryProviderExecutableSHA256 = providerSHA256
+    record.admissionEvidence = admission
     let directory = try jobDirectory(jobID)
     try record.persist(into: directory)
     let journal = try FileDurableJournal(
@@ -963,11 +807,14 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
           eventID: "outcome-\(stepID)", sequence: sequence,
           sessionID: record.sessionID, jobID: jobID, timestamp: finishedAtUTC,
           stepID: stepID, attempt: 1, correlatesToIntentEventID: intentID,
-          result: "succeeded", outcomeCertainty: .confirmed))
+          result: "succeeded", outcomeCertainty: .confirmed,
+          semanticCode: stepID == omitSemanticReceiptStepID
+            ? nil : RuntimeJobEngine.arkForgePlanCompletionSemanticCode,
+          summary: stepID == omitSemanticReceiptStepID
+            ? nil
+            : "arkforge-plan=PLAN-HISTORICAL; daemon-job=JOB-HISTORICAL; "
+              + "terminal-step=STEP-023; evidence-sha256=\(String(repeating: "b", count: 64))"))
       sequence += 1
-      if stepID != "inspect-recovery-target", stepID != omitHostProofStepID {
-        try writeHostProof(record: record, stepID: stepID)
-      }
     }
     try journal.appendAndSynchronize(
       try JournalEvent.stateTransition(
@@ -1094,87 +941,6 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     default:
       throw NSError(domain: "fixture", code: 1)
     }
-  }
-
-  private func writeHostProof(record: RuntimeJobRecord, stepID: String) throws {
-    let action: RockchipProviderAction
-    let partitions = try XCTUnwrap(
-      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200")
-    ).coveredEffects.map { String($0.dropFirst("partition:".count)) }
-    let bundle = RockchipRuntimeFlashBundle(
-      artifactLeaseID: "lease-fixture", artifactID: "artifact-fixture",
-      fileURL: URL(filePath: "/private/tmp/fixture-images.tar.gz"),
-      sha256: artifactSHA256, byteCount: 1, partitionNames: partitions)
-    let legacyKind: String?
-    switch stepID {
-    case "flash-partitions", "verify-flash-readback":
-      // A journal written before CHG-2026-059. These two kinds can no longer be
-      // *constructed* — the actions are gone — so the fixture writes what a
-      // real legacy journal holds: the persisted bytes themselves. That is a
-      // truer fixture than the old one, because it is what a device in the
-      // field actually left behind.
-      _ = bundle
-      legacyKind =
-        stepID == "flash-partitions"
-        ? "rockchip.flashPartitions" : "rockchip.verifyFlashReadback"
-      action = .rebootToNormal(stableIdentitySHA256: identity)  // unused
-    case "reboot-device":
-      legacyKind = nil
-      action = .rebootToNormal(stableIdentitySHA256: identity)
-    case "wait-for-hdc":
-      legacyKind = nil
-      action = .waitForHDCReconnect(connectKey: "fixture-connect-key")
-    case "rebind-and-verify-build":
-      // The bound verification, which is what a real post-flash proof holds:
-      // the unbound one this fixture used to write proved no device identity
-      // and no longer exists.
-      legacyKind = nil
-      action = .verifyBoundBuild(
-        expectation: RockchipHDCReconnectExpectation(
-          previousConnectKey: "fixture-connect-key",
-          previousIdentitySHA256: identity,
-          usbTopology: "42"),
-        expectedProductModel: "DAYU200",
-        expectedBuildVersion: "OpenHarmony fixture")
-    default: throw NSError(domain: "fixture", code: 2)
-    }
-    let persisted =
-      try legacyKind.map {
-        try JSONDecoder().decode(
-          PersistedTypedProviderAction.self,
-          from: Data(#"{"kind":"\#($0)","arguments":{}}"#.utf8))
-      } ?? PersistedTypedProviderAction(.rockchip(action))
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let actionSHA256 = sha256(try encoder.encode(persisted))
-    let directory =
-      stateDirectory
-      .appending(path: "rockchip-runtime/\(record.jobID)/\(stepID)", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(
-      at: directory, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    let intent = HostIntentRecord(
-      schemaVersion: "1.0.0", jobID: record.jobID, stepID: stepID,
-      targetID: record.request.target.targetID, bindingRevision: 2,
-      stableIdentitySHA256: identity, providerExecutableSHA256: providerSHA256,
-      actionSHA256: actionSHA256, action: persisted)
-    let summary =
-      stepID == "flash-partitions"
-      ? ["partitionCount": String(partitions.count), "bundleSha256": artifactSHA256]
-      : ["status": "confirmed"]
-    let receipt = HostReceiptRecord(
-      schemaVersion: "1.0.0", jobID: record.jobID, stepID: stepID,
-      targetID: record.request.target.targetID, bindingRevision: 2,
-      stableIdentitySHA256: identity, providerExecutableSHA256: providerSHA256,
-      actionSHA256: actionSHA256, summary: summary,
-      stdoutSHA256: sha256(Data("ok".utf8)), stderrSHA256: sha256(Data()),
-      stdoutTruncated: false, subprocessCount: 1)
-    try DurableFileWriter.createOrReplaceAtomically(
-      destination: directory.appending(path: "intent.json"),
-      data: try encoder.encode(intent))
-    try DurableFileWriter.createOrReplaceAtomically(
-      destination: directory.appending(path: "receipt.json"),
-      data: try encoder.encode(receipt))
   }
 
   private func recoveryArchive() throws -> Data {

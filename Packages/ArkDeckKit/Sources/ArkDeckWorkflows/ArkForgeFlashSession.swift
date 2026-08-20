@@ -246,20 +246,23 @@ package actor ArkForgeFlashSession {
       if terminal != nil { break }
       if sawEvent {
         quietPolls = 0
-      } else if awaitingReceipts.isEmpty {
-        // Nothing new, nothing to answer, and no permit still owing evidence:
-        // the daemon has said everything it has to say.
-        return .completed(receipts: receipts)
       } else {
-        // A signed permit is outstanding, so the daemon is mid-write and a
-        // partition write is minutes of exactly this silence. Back off instead
-        // of spinning, and outlast the operation's own timeout rather than
-        // calling a still-running write missing.
+        // Silence is never a terminal answer. In particular, the daemon can
+        // checkpoint a reboot receipt, return one empty watch poll, and only
+        // then publish the normal-mode postflight admission. Treating that
+        // empty poll as completion abandons the final admission and leaves a
+        // 21/22 job behind even though the device booted successfully.
+        //
+        // An outstanding permit is one reason for silence (a partition write
+        // can take minutes), but it is not the only one. Completion is stated
+        // exclusively by `outcomeClassified`, so keep polling in both cases
+        // and fail unknown only after the operation-wide quiet bound.
         quietPolls += 1
         if quietPolls > Self.quietPollLimit {
           return .outcomeUnknown(
-            reason: "arkforged produced no further events for "
-              + "\(Self.quietPollLimit * Int(Self.pollIntervalMilliseconds) / 1000)s",
+            reason: "arkforged produced no explicit terminal outcome for "
+              + "\(Self.quietPollLimit * Int(Self.pollIntervalMilliseconds) / 1000)s"
+              + (awaitingReceipts.isEmpty ? "" : " while a signed permit still owed evidence"),
             receipts: receipts)
         }
         try await Task.sleep(nanoseconds: Self.pollIntervalMilliseconds * 1_000_000)
@@ -353,6 +356,9 @@ package actor ArkForgeFlashSession {
       throw SessionError.controlReceiptRejected(
         requestID: request.requestID, code: response.rejectionCode,
         message: response.rejectionMessage)
+    }
+    if observation.accepted {
+      await authority.recordManagedControlFacts(observation.facts)
     }
   }
 

@@ -821,7 +821,7 @@ public actor RuntimeJobEngine {
     /// and the device — rather than a conclusion this side reached alone.
     func perform(
       stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
-      binding: ArkForgeLaneDeviceBinding
+      binding: ArkForgeLaneDeviceBinding, executionPurpose: String
     ) async throws -> ArkForgeActionReceiptSummary
 
     /// The terminal receipt of this job's *completed* lane run, if it ran.
@@ -2880,7 +2880,9 @@ public actor RuntimeJobEngine {
         connectKey: connectKey, stableIdentitySHA256: identity,
         targetID: runtime.record.request.target.targetID,
         bindingRevision: runtime.record.request.target.expectedBindingRevision ?? 1,
-        usbTopology: topology))
+        usbTopology: topology),
+      executionPurpose: runtime.record.admissionEvidence?.completeOverwriteRecovery == nil
+        ? "primaryFlash" : "supersedingRecovery")
     // `ArkForgeLaneHost.perform` runs the whole daemon plan on first use and
     // returns its terminal managed-control receipt. Validate that typed
     // receipt before reducing it to Runtime's journal vocabulary; otherwise a

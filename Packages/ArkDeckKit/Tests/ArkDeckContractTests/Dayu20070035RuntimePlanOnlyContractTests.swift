@@ -32,7 +32,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
 
     func perform(
       stepID: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
-      binding _: ArkForgeLaneDeviceBinding
+      binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
     ) async throws -> ArkForgeActionReceiptSummary {
       throw RuntimeDispatchFailure.failed(
         "planOnly must never execute delegated ArkForge step \(stepID)")

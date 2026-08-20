@@ -621,20 +621,16 @@ Task.detached {
         // it. They are the materialized plan's own facts, taken from the
         // `materializePlan` reply and the binding the engine confirmed.
         //
-        // `admittedDeviceFactsSHA256` is the plan digest because that is what
-        // the daemon puts in the snapshot's device-facts field
-        // (`arkforged` jobs.rs: `admitted_device_facts_sha256:
-        // envelope.plan_digest`). If the daemon ever narrows that to a real
-        // device-facts digest, this has to follow it.
         ArkForgeExecutionAuthority.ApprovedPlan(
           jobID: jobID, planID: planID, planSHA256: planDigest,
-          admittedDeviceFactsSHA256: planDigest,
+          admittedDeviceFactsSHA256: ArkForgeLaneHost.digestBytes(
+            deviceBinding.stableIdentitySHA256) ?? [],
           binding: ArkForgeAuthorityBinding(
             authorityNamespace: "arkdeck", bindingID: deviceBinding.targetID,
             bindingRevision: UInt64(max(0, deviceBinding.bindingRevision)),
             stableIdentityDigest: ArkForgeLaneHost.digestBytes(
               deviceBinding.stableIdentitySHA256) ?? []),
-          controllerSessionID: "arkdeck-agentd")
+          controllerSessionID: "arkdeck-agentd", usbTopology: deviceBinding.usbTopology)
       }
     ) {
     case .success(let composed):

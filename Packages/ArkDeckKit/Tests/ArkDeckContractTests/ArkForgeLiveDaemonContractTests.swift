@@ -140,7 +140,10 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
     guard let archive = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE"],
       let digest = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE_SHA256"],
       let topology = ProcessInfo.processInfo.environment[Self.topologyKey],
-      let profileID = ProcessInfo.processInfo.environment["ARKDECK_ARKFORGE_PROFILE_ID"]
+      let profileID = ProcessInfo.processInfo.environment["ARKDECK_ARKFORGE_PROFILE_ID"],
+      let stableIdentity = ProcessInfo.processInfo.environment[
+        "ARKDECK_ARKFORGE_LIVE_STABLE_IDENTITY_SHA256"],
+      let stableIdentityBytes = ArkForgeLaneHost.digestBytes(stableIdentity)
     else {
       throw XCTSkip(
         "set ARKDECK_DAYU200_ARCHIVE, ARKDECK_DAYU200_ARCHIVE_SHA256, \(Self.topologyKey) "
@@ -168,7 +171,11 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
 
     let answer = try client.materializePlan(
       ArkForgeMaterializePlanRequest(
-        artifactID: digest, profileID: profileID, observationID: observation.observationID),
+        artifactID: digest, profileID: profileID, observationID: observation.observationID,
+        intent: "fullRestore", toolchainID: "arkforged-native-rockusb",
+        authorityNamespace: "arkdeck", bindingID: "LIVE-DAYU200",
+        bindingRevision: 1, stableIdentitySHA256: stableIdentityBytes,
+        executionPurpose: "primaryFlash"),
       requestID: "live-materialize")
     switch answer {
     case .plan(let plan):
@@ -243,7 +250,10 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
       timeoutSeconds: ArkForgeDaemonClient.materializationTimeoutSeconds)
     guard let digest = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE_SHA256"],
       let topology = ProcessInfo.processInfo.environment[Self.topologyKey],
-      let profileID = ProcessInfo.processInfo.environment["ARKDECK_ARKFORGE_PROFILE_ID"]
+      let profileID = ProcessInfo.processInfo.environment["ARKDECK_ARKFORGE_PROFILE_ID"],
+      let stableIdentity = ProcessInfo.processInfo.environment[
+        "ARKDECK_ARKFORGE_LIVE_STABLE_IDENTITY_SHA256"],
+      let stableIdentityBytes = ArkForgeLaneHost.digestBytes(stableIdentity)
     else {
       throw XCTSkip("needs the archive digest, the USB topology and the profile id")
     }
@@ -263,7 +273,11 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
     guard
       case .plan(let plan) = try client.materializePlan(
         ArkForgeMaterializePlanRequest(
-          artifactID: digest, profileID: profileID, observationID: observation.observationID),
+          artifactID: digest, profileID: profileID, observationID: observation.observationID,
+          intent: "fullRestore", toolchainID: "arkforged-native-rockusb",
+          authorityNamespace: "arkdeck", bindingID: "LIVE-DAYU200",
+          bindingRevision: 1, stableIdentitySHA256: stableIdentityBytes,
+          executionPurpose: "primaryFlash"),
         requestID: "start-materialize")
     else {
       return XCTFail("no executable plan; the daemon needs --hardware-campaign")
@@ -271,7 +285,7 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
 
     let started = try client.startExecution(
       ArkForgeStartExecutionRequest(
-        planID: plan.planID, planSHA256: plan.planSHA256, executionPurpose: "flash",
+        planID: plan.planID, planSHA256: plan.planSHA256, executionPurpose: "primaryFlash",
         controllerSessionID: "arkdeck-live-contract"),
       requestID: "start-execution")
     XCTAssertFalse(started.jobID.isEmpty, "a materialized plan must be startable")

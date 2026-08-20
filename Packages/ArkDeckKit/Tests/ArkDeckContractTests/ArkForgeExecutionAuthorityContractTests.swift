@@ -54,6 +54,23 @@ final class ArkForgeExecutionAuthorityContractTests: XCTestCase {
       + (0..<32).map { UInt8(truncatingIfNeeded: text.hashValue &+ $0) }
   }
 
+  private func hexBytes(_ hex: String) -> [UInt8]? {
+    guard hex.count == 64 else { return nil }
+    var bytes: [UInt8] = []
+    bytes.reserveCapacity(32)
+    var high: UInt8?
+    for character in hex {
+      guard let value = character.hexDigitValue else { return nil }
+      if let first = high {
+        bytes.append(first << 4 | UInt8(value))
+        high = nil
+      } else {
+        high = UInt8(value)
+      }
+    }
+    return high == nil && bytes.count == 32 ? bytes : nil
+  }
+
   private let planDigest = [UInt8](repeating: 0x11, count: 32)
   private let deviceFacts = [UInt8](repeating: 0x22, count: 32)
 
@@ -105,6 +122,86 @@ final class ArkForgeExecutionAuthorityContractTests: XCTestCase {
     XCTAssertFalse(permit.integrityTag.isEmpty)
     let count = await authority.issuedCount
     XCTAssertEqual(count, 1)
+  }
+
+  func testLoaderControlReceiptExtendsTheExactLoaderAdmissionLineage() async throws {
+    let topology = "17956864"
+    let topologyHex = try XCTUnwrap(
+      ArkForgeObservationSelection.topologyDigest(usbTopology: topology))
+    let topologyDigest = try XCTUnwrap(hexBytes(topologyHex))
+    let authority = authority()
+
+    // The managed-control receipt publishes `Loader`, while ArkForge's live
+    // admission publishes `rockusb-loader`. They are the same measured mode
+    // lineage and must share one canonical key. This exact case reached a real
+    // DAYU200 Loader on 2026-08-20 and was then refused before STEP-002 because
+    // the authority had stored the capitalized spelling as a different mode.
+    await authority.recordManagedControlFacts([
+      "mode": "Loader", "usbTopology": topology,
+    ])
+
+    func rawSnapshot(admittedDigest: [UInt8]) -> ArkForgeStepAdmissionSnapshot {
+      ArkForgeStepAdmissionSnapshot(
+        jobID: "JOB-1", planID: "PLAN-1", planSHA256: planDigest,
+        stepID: "STEP-002", attemptID: "ATTEMPT-2",
+        publicStepSHA256: [UInt8](repeating: 0x44, count: 32),
+        privateActionSHA256: [UInt8](repeating: 0x55, count: 32),
+        effectSetSHA256: [UInt8](repeating: 0x66, count: 32),
+        admittedDeviceFactsSHA256: admittedDigest, observedMode: "rockusb-loader",
+        observedAtEpochMs: 1_000_000, snapshotLifetimeMs: 60_000,
+        requestID: "ADM-LOADER", topologySHA256: topologyDigest,
+        descriptorSHA256: [UInt8](repeating: 0x77, count: 32),
+        serialSHA256: [UInt8](repeating: 0x88, count: 32),
+        serialEvidenceKind: "descriptor", identityStrength: "serialAndTopology",
+        transportSessionSHA256: [UInt8](repeating: 0x99, count: 32))
+    }
+
+    let unsigned = rawSnapshot(admittedDigest: [UInt8](repeating: 0, count: 32))
+    let admission = rawSnapshot(
+      admittedDigest: ArkForgeExecutionAuthority.deviceFactsDigest(unsigned))
+    guard case .sign = await authority.admit(admission) else {
+      return XCTFail("the accepted Loader receipt must authorize the exact Loader admission")
+    }
+  }
+
+  func testAPlanMaterializedWhileAlreadyInLoaderSeedsItsInitialModeLineage() async throws {
+    let topology = "17956864"
+    let topologyHex = try XCTUnwrap(
+      ArkForgeObservationSelection.topologyDigest(usbTopology: topology))
+    let topologyDigest = try XCTUnwrap(hexBytes(topologyHex))
+    let loaderPlan = ArkForgeExecutionAuthority.ApprovedPlan(
+      jobID: "JOB-1", planID: "PLAN-1", planSHA256: planDigest,
+      admittedDeviceFactsSHA256: deviceFacts,
+      binding: ArkForgeAuthorityBinding(
+        authorityNamespace: "arkdeck", bindingID: "TGT-1", bindingRevision: 2,
+        stableIdentityDigest: [UInt8](repeating: 0x33, count: 32)),
+      controllerSessionID: "SESSION-1", usbTopology: topology)
+    let authority = ArkForgeExecutionAuthority(
+      plan: loaderPlan, secret: secret, now: { 1_000_100 })
+    await authority.recordMaterializedObservationMode("rockusb-loader")
+
+    func rawSnapshot(admittedDigest: [UInt8]) -> ArkForgeStepAdmissionSnapshot {
+      ArkForgeStepAdmissionSnapshot(
+        jobID: "JOB-1", planID: "PLAN-1", planSHA256: planDigest,
+        stepID: "STEP-001", attemptID: "ATTEMPT-1",
+        publicStepSHA256: [UInt8](repeating: 0x44, count: 32),
+        privateActionSHA256: [UInt8](repeating: 0x55, count: 32),
+        effectSetSHA256: [UInt8](repeating: 0x66, count: 32),
+        admittedDeviceFactsSHA256: admittedDigest, observedMode: "rockusb-loader",
+        observedAtEpochMs: 1_000_000, snapshotLifetimeMs: 60_000,
+        requestID: "ADM-LOADER-START", topologySHA256: topologyDigest,
+        descriptorSHA256: [UInt8](repeating: 0x77, count: 32),
+        serialSHA256: [UInt8](repeating: 0x88, count: 32),
+        serialEvidenceKind: "descriptor", identityStrength: "serialAndTopology",
+        transportSessionSHA256: [UInt8](repeating: 0x99, count: 32))
+    }
+
+    let unsigned = rawSnapshot(admittedDigest: [UInt8](repeating: 0, count: 32))
+    let admission = rawSnapshot(
+      admittedDigest: ArkForgeExecutionAuthority.deviceFactsDigest(unsigned))
+    guard case .sign = await authority.admit(admission) else {
+      return XCTFail("the sealed initial Loader observation must authorize STEP-001")
+    }
   }
 
   func testEveryPermitIsSingleUseAndTimeBounded() async {

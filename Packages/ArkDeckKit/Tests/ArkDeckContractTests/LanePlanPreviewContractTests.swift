@@ -38,7 +38,7 @@ final class LanePlanPreviewContractTests: XCTestCase {
       ArkForgeExecutablePlan(
         planID: "PLAN-preview", planSHA256: String(repeating: "d", count: 64),
         providerExecutionPlanSHA256: "", publicProjectionSHA256: "",
-        expiresAtEpochMS: .max))
+        expiresAtEpochMS: .max, executionPurpose: "primaryFlash"))
 
     func importArtifact(
       contentsOf _: URL, expectedSHA256: String, requestID _: String
