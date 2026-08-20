@@ -28,13 +28,13 @@ struct PendingReconcileTransition: Equatable, Sendable {
   let nextState: JobState
 }
 
-public enum RecoveryAbandonmentPhase: String, CaseIterable, Equatable, Sendable {
+package enum RecoveryAbandonmentPhase: String, CaseIterable, Equatable, Sendable {
   case intentDurable
   case requested
   case outcomeDurable
 }
 
-public struct PendingRecoveryAbandonment: Equatable, Sendable {
+package struct PendingRecoveryAbandonment: Equatable, Sendable {
   public let intentEventID: String
   package let phase: RecoveryAbandonmentPhase
   package let outcomeEventID: String?

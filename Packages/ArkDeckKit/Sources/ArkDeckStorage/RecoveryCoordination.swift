@@ -128,7 +128,7 @@ public struct SupersedingRecoveryEpoch: Codable, Equatable, Sendable {
   }
 }
 
-public enum SupersedingRecoveryStoreError: Error, Equatable, Sendable {
+package enum SupersedingRecoveryStoreError: Error, Equatable, Sendable {
   case corrupt(String)
   case invalidEpoch(String)
   case conflictingEpoch(String)

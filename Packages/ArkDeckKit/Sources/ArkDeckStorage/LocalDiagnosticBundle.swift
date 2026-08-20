@@ -15,7 +15,7 @@ package enum DiagnosticPlaceholderState: String, Codable, CaseIterable, Sendable
   case redacted
 }
 
-public enum LocalDiagnosticBundleError: Error, Equatable, Sendable {
+package enum LocalDiagnosticBundleError: Error, Equatable, Sendable {
   case explicitUserInitiationRequired
   case previewScopeMismatch
   case invalidInput(String)

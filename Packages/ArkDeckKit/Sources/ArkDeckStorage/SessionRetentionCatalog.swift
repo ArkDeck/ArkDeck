@@ -2,7 +2,7 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-public enum SessionRetentionCatalogError: Error, Equatable, Sendable {
+package enum SessionRetentionCatalogError: Error, Equatable, Sendable {
   case invalidRoot
   case invalidRetentionDays
   case metadataUnavailable

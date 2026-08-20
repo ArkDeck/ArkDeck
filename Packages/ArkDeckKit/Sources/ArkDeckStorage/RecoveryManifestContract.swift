@@ -258,7 +258,7 @@ package struct RecoveryManifestRecord: Codable, Equatable, Sendable {
   }
 }
 
-public enum RecoveryManifestContractError: Error, Equatable, Sendable {
+package enum RecoveryManifestContractError: Error, Equatable, Sendable {
   case unknownOrMissingFields
   case invalidField(String)
 }
