@@ -112,8 +112,10 @@ final class TraceAdapterGoldenTests: XCTestCase {
       guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
         continue
       }
-      actualFiles.insert(
-        url.path.replacingOccurrences(of: packRoot.path + "/", with: ""))
+      guard let relative = relativePathInsideBundleResource(url, root: packRoot) else {
+        continue
+      }
+      actualFiles.insert(relative)
     }
     XCTAssertEqual(
       actualFiles,
