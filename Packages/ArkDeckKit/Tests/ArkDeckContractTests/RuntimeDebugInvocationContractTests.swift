@@ -50,7 +50,14 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
             effect: request.operation.id == "flash.dayu200"
               ? WorkflowEffect.destructive.rawValue : WorkflowEffect.readOnly.rawValue,
             cancellation: "atSafeBoundary", binding: "exactTarget", isOptional: false)
-        ], jobAdmitted: false, dispatchDisposition: "notDispatched")
+        ],
+        effectiveEffect: request.operation.id == "flash.dayu200"
+          ? WorkflowEffect.destructive.rawValue : WorkflowEffect.readOnly.rawValue,
+        authorizationPolicy: request.operation.id == "flash.dayu200"
+          ? RuntimeOperationAuthorizationPolicy.runtimeCapability.rawValue
+          : RuntimeOperationAuthorizationPolicy.defaultReadOnly.rawValue,
+        providerAdmissionBlocker: nil,
+        jobAdmitted: false, dispatchDisposition: "notDispatched")
     }
 
     func execute(_ requestData: Data) async -> RuntimeDebugDriverResult {
