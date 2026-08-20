@@ -2547,6 +2547,30 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(
       inspectFields["stableIdentitySha256"],
       .string(aliasIdentity))
+
+    // The import reply has always carried the lease; discovery did not, so an
+    // Artifact found through `artifact.list`/`inspect` rather than imported in
+    // this session could not be passed to any `artifactLease` input without
+    // the caller reconstructing the grammar itself. Both projections now
+    // answer the same way, and the answer is the one `resolveLease` accepts.
+    XCTAssertEqual(inspectFields["lease"], .string(lease))
+
+    let listed = try await request(
+      handler, method: "artifact.list", params: ["jobId": .string(jobID)])
+    guard case .array(let rows)? = listed.result,
+      case .object(let row)? = rows.first(where: { value in
+        guard case .object(let fields) = value else { return false }
+        return fields["artifactId"] == .string(artifactID)
+      })
+    else {
+      return XCTFail("artifact.list must project the imported Artifact")
+    }
+    XCTAssertEqual(row["lease"], .string(lease))
+    // Discovery must not hand out a reference the store would refuse; a lease
+    // taken straight from the listing has to resolve to the same bytes.
+    let listedResolution = try await artifactStore.resolveLease(
+      { if case .string(let value)? = row["lease"] { return value } else { return "" } }())
+    XCTAssertEqual(listedResolution.sha256, digest)
   }
 
   func testHAPImportRejectsUnknownTargetAndInvalidContainerWithoutPublication() async throws {
