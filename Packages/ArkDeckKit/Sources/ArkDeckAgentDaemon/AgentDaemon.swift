@@ -1907,9 +1907,25 @@ public struct RuntimeControlPlaneHandler: Sendable {
       status = "truncated"
       detail = .integer(Int64(atBytes))
     }
+    // Every operation that consumes an Artifact declares its input as
+    // `artifactLease`, but the lease grammar appeared on no published surface:
+    // a caller held `jobId` and `artifactId` and still had to know they
+    // concatenate. Emitting it here grants nothing — both halves are already
+    // in this same object, the reference carries no secret, and
+    // `RuntimeArtifactStore.resolveLease` still re-inspects the index,
+    // re-checks publication and re-resolves a symlink-free payload before any
+    // provider sees a byte. `RuntimeArtifactStore.leaseReference` remains the
+    // grammar's source of truth; it refuses unpublished bytes, so this
+    // projection reports `null` for exactly the same rows rather than handing
+    // out a reference that would fail to resolve.
+    let lease: JSONValue =
+      metadata.status.isPublished
+      ? .string("lease-v1:\(metadata.jobID):\(metadata.artifactID)")
+      : .null
     return .object([
       "artifactId": .string(metadata.artifactID),
       "jobId": .string(metadata.jobID),
+      "lease": lease,
       "name": .string(metadata.name),
       "mediaType": .string(metadata.mediaType),
       "byteCount": .integer(Int64(metadata.byteCount)),
