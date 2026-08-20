@@ -1,17 +1,21 @@
 // Crash-ledger analysis wire contract (CHG-2026-055, TASK-HFA-001/005).
 //
-// These types are the schema shared by three planes: the pinned analyzer
+// These types are the schema shared along one chain: the pinned analyzer
 // executable emits `HarnessCrashLedgerAnalysis` bytes, `AnalyzerProvider`
-// gates that stdout against the schema, `RuntimeJobEngine` wraps it in the
-// `HarnessCrashLedgerDerivedArtifact` provenance envelope it publishes, and
-// the harness observation builder verifies the envelope before using the
-// entries as measurements. A shared contract must live below every party
-// that speaks it, so it lives here in ArkDeckRuntime (runtime contracts) —
-// not in ArkDeckHarness, which would force the runtime engine and the
-// analyzer provider to import the harness plane. The parsing primitive now
-// lives beside this contract so the Workflows analyzer and the legacy Harness
-// reader can share it without a cross-plane dependency; the executable
-// producer lives beside Workflows/AnalyzerProvider.
+// gates that stdout against the schema, and `RuntimeJobEngine` wraps it in
+// the `HarnessCrashLedgerDerivedArtifact` provenance envelope it publishes.
+// A fourth party used to sit at the end of that chain — the harness
+// observation builder, which verified the envelope before treating the
+// entries as measurements — and CHG-2026-064 removed it along with the rest
+// of the in-process decision plane. Whoever consumes the published envelope
+// now is an external agent reading an Artifact, which is not a party to this
+// schema's placement.
+//
+// A shared contract must live below every party that speaks it, so it lives
+// here in ArkDeckRuntime (runtime contracts): the runtime engine and the
+// analyzer provider both reach it without either importing the other. The
+// parsing primitive lives beside this contract for the same reason; the
+// executable producer lives beside Workflows/AnalyzerProvider.
 //
 // The `Harness` name prefix is retained: renaming a persisted, versioned
 // schema type would churn every call site and test without changing a byte
@@ -47,8 +51,11 @@ package struct HarnessFaultLogEntry: Codable, Equatable, Sendable {
 
 /// Stable payload emitted by the pinned crash-ledger analyzer.  The runtime
 /// wraps these bytes with source-artifact provenance before publishing the
-/// derived Artifact; the harness consumes this structure and no longer has
-/// to parse the raw ledger listing in-process (TASK-HFA-005).
+/// derived Artifact, which is where any reader picks it up. TASK-HFA-005
+/// introduced it so the in-process harness would stop parsing the raw ledger
+/// listing itself; CHG-2026-064 then removed that reader entirely, and the
+/// structure kept its value for the reason it was worth having — the parse
+/// happens once, in a pinned executable, with provenance attached.
 package struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
   public static let analyzerRef = "crash-signature@1"

@@ -15,8 +15,11 @@
 // the last N seconds; the ledger returns every fault the device still
 // keeps, including ones that predate the task. Counting it directly would
 // re-count history every round and `matchingCrashCount == 0` could never
-// pass, so the builder counts only what appeared after a watermark it set
-// itself (see `HarnessObservationBuilder`).
+// pass, so a counting reader must count only what appeared after a watermark
+// it set itself. The reader that did so was `HarnessObservationBuilder`,
+// removed with the decision plane by CHG-2026-064; the constraint is recorded
+// here because it belongs to the ledger's shape, not to that reader, and the
+// next consumer to count these entries inherits it.
 //
 // And its timestamps are *device-local*: the entry measured on 2026-07-31
 // reads `20260731162134` while the host clock said 08:21 UTC. Comparing
@@ -29,11 +32,17 @@
 // `evidence/runs/TASK-DHA-005/faultlogger-format-2026-07-31.md`.
 
 // The wire contract types (`HarnessFaultLogEntry`, `HarnessCrashLedgerAnalysis`,
-// `HarnessCrashLedgerDerivedArtifact`) live beside this parser. The parser is
-// shared by the Workflows analyzer executable and the legacy Harness reader;
-// keeping it in the runtime-contract layer prevents either plane from gaining
-// a dependency on the other. The executable producer itself lives beside the
-// AnalyzerProvider in ArkDeckWorkflows.
+// `HarnessCrashLedgerDerivedArtifact`) live beside this parser. Its one
+// consumer is the analyzer executable in ArkDeckWorkflows; the second reader
+// this note used to name was the harness plane, which CHG-2026-064 removed.
+// Keeping the parser in the runtime-contract layer is still what stops the
+// engine and the analyzer provider from depending on each other. The
+// executable producer itself lives beside the AnalyzerProvider in
+// ArkDeckWorkflows.
+//
+// The `Harness` prefix on these type names is deliberate: they name a
+// persisted, versioned schema, and renaming one would churn every call site
+// and test without changing a byte on the wire.
 import Foundation
 
 package struct HarnessCrashSignature: Equatable, Sendable {

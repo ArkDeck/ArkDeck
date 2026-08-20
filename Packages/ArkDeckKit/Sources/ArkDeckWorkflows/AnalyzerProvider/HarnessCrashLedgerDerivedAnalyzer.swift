@@ -1,8 +1,11 @@
 // The pinned crash-ledger analyzer executable front-end (TASK-AND-001).
 //
-// Parsing is a pure runtime-contract primitive because both the analyzer and
-// the retiring Harness observation reader consume it. Production reachability
-// and ownership live here, beside AnalyzerProvider: bytes enter through the
+// Parsing sits in the runtime-contract layer because two planes consumed it
+// when it was placed there — this analyzer and the harness observation
+// reader. CHG-2026-064 removed the second, so the primitive now has one
+// consumer; it stays below both the engine and this provider because that is
+// what keeps either from importing the other. Production reachability and
+// ownership live here, beside AnalyzerProvider: bytes enter through the
 // one-shot daemon mode and leave as the unchanged canonical analysis payload.
 
 import ArkDeckRuntime
