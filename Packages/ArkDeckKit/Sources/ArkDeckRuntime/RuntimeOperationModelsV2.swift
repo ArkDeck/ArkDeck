@@ -303,10 +303,43 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
         path: "$.documentType",
         message: "expected \(Self.documentType)")
     }
-    self.requestID = try container.decode(String.self, forKey: .requestID)
-    self.idempotencyKey = try container.decode(String.self, forKey: .idempotencyKey)
-    self.target = try container.decode(DurableTargetReference.self, forKey: .target)
-    self.operation = try container.decode(RuntimeOperationReference.self, forKey: .operation)
+    // A missing or wrong-typed required key used to escape as a Swift
+    // `DecodingError`, which the codec reported at `path: "$"` with the
+    // reflected description as its message. A caller reading `path` to learn
+    // what to fix learned nothing, and one reading `message` got Swift's
+    // internal spelling of the problem rather than a contract. Each required
+    // key now answers for itself, at its own path.
+    func required<Value: Decodable>(
+      _ type: Value.Type, _ key: CodingKeys, path: String, shape: String
+    ) throws -> Value {
+      do {
+        guard let value = try container.decodeIfPresent(type, forKey: key) else {
+          throw RuntimeOperationRequestRejection(
+            code: .invalidRequest, path: path, message: "\(path) is required (\(shape))")
+        }
+        return value
+      } catch let rejection as RuntimeOperationRequestRejection {
+        // A nested model that rejected its own content already named the
+        // exact field; reporting it as this key's problem would be less
+        // precise, not more.
+        throw rejection
+      } catch {
+        throw RuntimeOperationRequestRejection(
+          code: .invalidRequest, path: path, message: "\(path) is malformed (\(shape))")
+      }
+    }
+
+    self.requestID = try required(
+      String.self, .requestID, path: "$.requestId", shape: "an identifier string")
+    self.idempotencyKey = try required(
+      String.self, .idempotencyKey, path: "$.idempotencyKey",
+      shape: "an identifier string of at least 8 characters")
+    self.target = try required(
+      DurableTargetReference.self, .target, path: "$.target",
+      shape: "an object carrying targetId")
+    self.operation = try required(
+      RuntimeOperationReference.self, .operation, path: "$.operation",
+      shape: "an object carrying id and an optional version")
     self.inputs =
       try container.decodeIfPresent([String: JSONValue].self, forKey: .inputs) ?? [:]
     self.requestedOutputs =
@@ -551,23 +584,32 @@ package enum RuntimeOperationCodec {
       }
     }
     guard case .string(let version)? = topLevel["schemaVersion"] else {
+      // Naming the accepted value here is the whole point. Answering only
+      // "required" sends the caller back to guess one, and the obvious guess
+      // is "1.0.0", which then costs a second round trip to learn that major
+      // 2 is the one. Interpolated rather than spelled so this cannot drift
+      // from the value the gate below enforces.
       throw RuntimeOperationRequestRejection(
         code: .unsupportedVersion,
         path: "$.schemaVersion",
-        message: "schemaVersion is required")
+        message: "schemaVersion is required; this runtime accepts "
+          + "\"\(RuntimeOperationRequest.schemaVersion)\"")
     }
     let majorText = version.split(separator: ".", maxSplits: 1).first.map(String.init) ?? ""
     guard let major = Int(majorText) else {
       throw RuntimeOperationRequestRejection(
         code: .unsupportedVersion,
         path: "$.schemaVersion",
-        message: "malformed schemaVersion \(version)")
+        message: "malformed schemaVersion \(version); this runtime accepts "
+          + "\"\(RuntimeOperationRequest.schemaVersion)\"")
     }
     guard major == RuntimeOperationRequest.requiredMajorVersion else {
       throw RuntimeOperationRequestRejection(
         code: .unsupportedVersion,
         path: "$.schemaVersion",
-        message: "unsupported major version \(major); this runtime accepts major 2")
+        message: "unsupported major version \(major); this runtime accepts major "
+          + "\(RuntimeOperationRequest.requiredMajorVersion), for example "
+          + "\"\(RuntimeOperationRequest.schemaVersion)\"")
     }
     do {
       // JSONDecoder ignores unknown keys: minor-version additions stay
