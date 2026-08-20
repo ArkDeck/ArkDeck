@@ -61,7 +61,8 @@
       "pid": {
         "type": "integer",
         "required": false,
-        "minimum": 0
+        "minimum": 0,
+        "description": "Operating-system process id to filter to, as recorded in the trace; omit for every process. Distinct from processKey, which is the trace's own internal identity."
       },
       "threadKey": {
         "type": "integer",
@@ -71,7 +72,8 @@
       "tid": {
         "type": "integer",
         "required": false,
-        "minimum": 0
+        "minimum": 0,
+        "description": "Operating-system thread id to filter to, as recorded in the trace; omit for every thread. Distinct from threadKey, which is the trace's own internal identity."
       },
       "thresholdNs": {
         "type": "integer",
@@ -90,25 +92,29 @@
         "type": "integer",
         "required": true,
         "minimum": 100,
-        "maximum": 120000
+        "maximum": 120000,
+        "description": "Wall-clock budget for the analyzer process. The provider also derives its own process deadline from this, rounded up to whole seconds and capped at 120."
       },
       "maxRows": {
         "type": "integer",
         "required": true,
         "minimum": 1,
-        "maximum": 100000
+        "maximum": 100000,
+        "description": "Upper bound on rows the analyzer may return, applied on top of `limit`. Bounds the answer's size independently of how many the query would match."
       },
       "maxEvents": {
         "type": "integer",
         "required": true,
         "minimum": 1,
-        "maximum": 100000
+        "maximum": 100000,
+        "description": "Upper bound on trace events the analyzer may read while producing the answer. Bounds the work, where maxRows bounds the result."
       },
       "maxOutputBytes": {
         "type": "integer",
         "required": true,
         "minimum": 1024,
-        "maximum": 67108864
+        "maximum": 67108864,
+        "description": "Upper bound on the analysis document's size in bytes. The analyzer fails rather than truncating, so a bound this small for the requested kind is a refusal, not a shorter answer."
       }
     }
   },

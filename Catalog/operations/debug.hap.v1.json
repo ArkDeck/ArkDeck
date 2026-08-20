@@ -25,25 +25,29 @@
         "type": "string",
         "required": true,
         "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
-        "maxLength": 200
+        "maxLength": 200,
+        "description": "Application bundle name exactly as the package declares it, for example `com.example.waterflow`. The provider matches package readback against this, so a bundle that is not installed by this exact name reads as a failed install."
       },
       "abilityName": {
         "type": "string",
         "required": true,
         "pattern": "^[a-zA-Z][a-zA-Z0-9_.]*$",
-        "maxLength": 200
+        "maxLength": 200,
+        "description": "Ability to start within the bundle, as declared in module.json5, for example `EntryAbility`. Never lowered as caller-supplied argv."
       },
       "installPolicy": {
         "type": "string",
         "required": false,
         "enum": ["installOrReplace", "installFresh"],
-        "default": "installOrReplace"
+        "default": "installOrReplace",
+        "description": "How an already-installed package is treated. Only `installOrReplace` has a published plan; `installFresh` is refused before authorization because no pre-install absence readback exists to make it honest."
       },
       "cleanupPolicy": {
         "type": "string",
         "required": false,
         "enum": ["uninstall", "retain", "restorePrevious"],
-        "default": "uninstall"
+        "default": "uninstall",
+        "description": "What happens to the package when the job ends. `uninstall` removes it, `retain` leaves it installed — which is what an external observer needs, together with postRunAbilityState `running`, to keep watching after the job succeeds. `restorePrevious` is refused before authorization: no snapshot/restore step is published."
       },
       "postRunAbilityState": {
         "type": "string",
@@ -52,19 +56,24 @@
         "default": "stopped",
         "description": "Whether the started ability is stopped before cleanup. `running` skips stop-ability so the application is still live when the job succeeds, which is what an external observer needs; the operator then owns stopping it. A failed job still stops the ability during compensation."
       },
-      "captureDiagnostics": { "type": "boolean", "required": false, "default": true },
+      "captureDiagnostics": {
+        "type": "boolean", "required": false, "default": true,
+        "description": "Collect the bounded HiLog window while the ability runs. Read-only, and its absence does not fail the job — the diagnostics artifact is optional."
+      },
       "diagnosticsDurationSeconds": {
         "type": "integer",
         "required": false,
         "minimum": 1,
         "maximum": 300,
-        "default": 30
+        "default": 30,
+        "description": "Length of the bounded HiLog window in seconds. A crash that happens after this window is not in the artifact, so a delayed fault needs a window that outlasts it."
       },
       "portForwardProfile": {
         "type": "string",
         "required": false,
         "enum": ["none", "debugger-default"],
-        "default": "none"
+        "default": "none",
+        "description": "Port forwarding to establish alongside the run. Only `none` has a published plan; `debugger-default` is refused before authorization because this operation publishes no port-forward steps — use `port-forward.create@1` separately."
       }
     }
   },

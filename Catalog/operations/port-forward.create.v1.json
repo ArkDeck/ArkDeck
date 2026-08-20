@@ -13,19 +13,22 @@
       "direction": {
         "type": "string",
         "required": true,
-        "enum": ["forward", "reverse"]
+        "enum": ["forward", "reverse"],
+        "description": "Which way the rule points. `forward` lowers to hdc `fport` — a host port reaching a device port; `reverse` lowers to `rport` — a device port reaching a host port."
       },
       "localPort": {
         "type": "integer",
         "required": true,
         "minimum": 1024,
-        "maximum": 65535
+        "maximum": 65535,
+        "description": "Port on the host side of the rule. Unprivileged range only."
       },
       "remotePort": {
         "type": "integer",
         "required": true,
         "minimum": 1024,
-        "maximum": 65535
+        "maximum": 65535,
+        "description": "Port on the device side of the rule. Unprivileged range only."
       }
     }
   },

@@ -20,7 +20,8 @@
       "projectRef": {
         "type": "string",
         "required": true,
-        "maxLength": 128
+        "maxLength": 128,
+        "description": "Registered workspace project whose signing material this uses. Availability additionally requires `arkdeck signing install` to have run for that same project."
       },
       "signingPresetRef": {
         "type": "string",

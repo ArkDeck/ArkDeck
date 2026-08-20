@@ -26,30 +26,35 @@
         "type": "string",
         "required": true,
         "pattern": "^lib[a-zA-Z0-9_.-]+\\.so$",
-        "maxLength": 128
+        "maxLength": 128,
+        "description": "File name the library is published under inside the application's own directory. Must match `lib<name>.so` and be at most 128 characters; it names a file, never a path."
       },
       "expectedABI": {
         "type": "string",
         "required": true,
-        "enum": ["arm64-v8a", "armeabi-v7a", "x86_64"]
+        "enum": ["arm64-v8a", "armeabi-v7a", "x86_64"],
+        "description": "ABI the uploaded ELF must declare. Verified against the artifact's own header before anything is sent, so a mismatch fails on the host rather than on the device."
       },
       "restartProfile": {
         "type": "string",
         "required": false,
         "enum": ["restartAbility", "restartProcess", "none"],
-        "default": "restartAbility"
+        "default": "restartAbility",
+        "description": "How the application is restarted so it loads the new library. Only `restartAbility` has a published restart/readback plan; `restartProcess` and `none` are refused before authorization."
       },
       "verificationProfile": {
         "type": "string",
         "required": false,
         "enum": ["hashOnly", "hashAndProcess", "hashProcessAndMaps"],
-        "default": "hashAndProcess"
+        "default": "hashAndProcess",
+        "description": "How much of the deployment is proven after publication. `hashOnly` compares the published bytes, `hashAndProcess` also requires the process to be live, `hashProcessAndMaps` additionally requires the library to appear in the process's loaded maps."
       },
       "rollbackPolicy": {
         "type": "string",
         "required": false,
         "enum": ["autoRollback", "retainBackup"],
-        "default": "autoRollback"
+        "default": "autoRollback",
+        "description": "What happens to the previous library when verification fails. `autoRollback` restores it; `retainBackup` leaves the new one in place and keeps the backup for a later decision."
       }
     }
   },

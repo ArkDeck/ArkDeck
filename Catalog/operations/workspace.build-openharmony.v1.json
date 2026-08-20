@@ -20,12 +20,14 @@
       "projectRef": {
         "type": "string",
         "required": true,
-        "maxLength": 128
+        "maxLength": 128,
+        "description": "Registered workspace project. This build ships `demo-app` and `ArkDeck`; which one a host offers depends on how its daemon was configured."
       },
       "buildPresetRef": {
         "type": "string",
         "required": true,
-        "maxLength": 128
+        "maxLength": 128,
+        "description": "Build preset within that project's profile: `waterflow-debug` for `demo-app`, `arkdeck-debug` for `ArkDeck`. The preset owns the executable and every argument; the request selects one and supplies none."
       },
       "expectedWorkspaceRevision": {
         "type": "string",

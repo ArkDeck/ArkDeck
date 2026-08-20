@@ -10,9 +10,18 @@
   "concurrencyKey": "host-exclusive",
   "inputs": {
     "fields": {
-      "projectRef": { "type": "string", "required": true, "maxLength": 128 },
-      "dumpArtifactRef": { "type": "artifactLease", "required": true },
-      "symbolPresetRef": { "type": "string", "required": true, "maxLength": 128 }
+      "projectRef": {
+        "type": "string", "required": true, "maxLength": 128,
+        "description": "Registered workspace project whose source maps resolve the stack. `demo-app` is the project that ships a symbolizer."
+      },
+      "dumpArtifactRef": {
+        "type": "artifactLease", "required": true,
+        "description": "Lease of the crash text to symbolize, in the form `lease-v1:<jobId>:<artifactId>`. It wants an obfuscated ArkTS stack — a `crash-log.txt` published by `capture.diagnostics@1` with `crashLogName` set — not the Faultlogger index that lists entries."
+      },
+      "symbolPresetRef": {
+        "type": "string", "required": true, "maxLength": 128,
+        "description": "Symbolizer preset within that project's profile. `arkts-sourcemap` is the only published one, and it exists only once the daemon is configured with an analyzer (`ARKDECK_ANALYZER_PATH`, which `arkdeck agentd install`/`update` sets)."
+      }
     }
   },
   "outputs": {

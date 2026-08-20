@@ -18,7 +18,8 @@
       "deviceProfile": {
         "type": "string",
         "required": true,
-        "enum": ["dayu200"]
+        "enum": ["dayu200"],
+        "description": "Board profile whose partition vocabulary and layout the plan is checked against. `dayu200` is the only published board."
       },
       "partitionPlan": {
         "type": "stringArray",
@@ -31,7 +32,8 @@
         "type": "string",
         "required": false,
         "enum": ["basic", "full"],
-        "default": "full"
+        "default": "full",
+        "description": "How much is verified after the write. `full` additionally captures post-flash diagnostics; `basic` omits that one optional leg and verifies the rest."
       }
     }
   },

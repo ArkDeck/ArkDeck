@@ -46,7 +46,7 @@
         "required": false,
         "pattern": "^[0-9a-f]{64}$",
         "maxLength": 64,
-        "description": "Harness-owned expected digest of the deployment whose liveness is being sampled."
+        "description": "Caller-supplied expected digest of the deployment whose liveness is being sampled. Recorded with the observation so a later reader can tell which build was live; it is not trusted as a fact about the device."
       },
       "hilogFilters": {
         "type": "stringArray",
@@ -67,9 +67,13 @@
         "required": false,
         "minimum": 1024,
         "maximum": 65536,
-        "default": 8192
+        "default": 8192,
+        "description": "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise."
       },
-      "uiDump": { "type": "boolean", "required": false, "default": true },
+      "uiDump": {
+        "type": "boolean", "required": false, "default": true,
+        "description": "Capture the accessibility/window dump. Read-only: unlike the trace, screenshot and component-tree legs this does not raise the effective effect."
+      },
       "crashLogs": {
         "type": "boolean",
         "required": false,
@@ -100,13 +104,15 @@
         "required": false,
         "minimum": 1048576,
         "maximum": 536870912,
-        "default": 134217728
+        "default": 134217728,
+        "description": "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product."
       },
       "redactionProfile": {
         "type": "string",
         "required": false,
         "enum": ["standard", "strict"],
-        "default": "standard"
+        "default": "standard",
+        "description": "Redaction applied to published text. Only `standard` has a published implementation; `strict` is refused before authorization, so selecting it costs a round trip and gains nothing."
       }
     }
   },

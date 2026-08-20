@@ -80,12 +80,31 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     XCTAssertEqual(
       withDefaults.count, 18,
       "the catalog declares eighteen input defaults; the runtime must see all of them")
-    let described = RuntimeOperationCatalog.operations
-      .flatMap(\.inputs)
-      .filter { $0.summary?.isEmpty == false }
-    XCTAssertGreaterThanOrEqual(
-      described.count, 59,
-      "field descriptions must reach the runtime rather than stopping at the catalog")
+  }
+
+  /// Every published input says what it is for.
+  ///
+  /// Forty-seven did not, and the silence was not evenly spread: all three
+  /// inputs of `workspace.symbolize-crash@1` were mute, so the only way to
+  /// learn that `symbolPresetRef` accepts exactly `arkts-sourcemap` was to
+  /// read this repository — not a surface a caller talking to an installed
+  /// daemon has.
+  ///
+  /// Asserted as coverage rather than as a count, so the next input added
+  /// without a description fails here instead of shipping mute.
+  func testEveryPublishedInputCarriesADescription() {
+    var silent: [String] = []
+    for descriptor in RuntimeOperationCatalog.operations {
+      for field in descriptor.inputs where field.summary?.isEmpty != false {
+        silent.append("\(descriptor.reference).\(field.name)")
+      }
+    }
+    XCTAssertEqual(
+      silent.sorted(), [],
+      """
+      these published inputs carry no description, so the only way to fill them \
+      correctly is to read the catalog source: \(silent.sorted().joined(separator: ", "))
+      """)
   }
 
   /// Omitting an input and passing the catalog's own default for it must

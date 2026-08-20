@@ -20,17 +20,20 @@
       "projectRef": {
         "type": "string",
         "required": true,
-        "maxLength": 128
+        "maxLength": 128,
+        "description": "Registered workspace project. This build ships `demo-app` (the WaterFlow OpenHarmony app) and `ArkDeck` (this repository); which one a host offers depends on how its daemon was configured."
       },
       "patchArtifactRef": {
         "type": "artifactLease",
-        "required": true
+        "required": true,
+        "description": "Lease of the unified diff to apply, in the form `lease-v1:<jobId>:<artifactId>` from `arkdeck artifact import-workspace-patch`. Arbitrary local paths are rejected."
       },
       "allowedFileGlobs": {
         "type": "stringArray",
         "required": true,
         "maxItems": 64,
-        "maxLength": 512
+        "maxLength": 512,
+        "description": "Paths the patch may touch, and it may not touch anything outside them. Narrower than the project profile's own globs, never wider — the request cannot widen its own scope."
       },
       "expectedWorkspaceRevision": {
         "type": "string",
