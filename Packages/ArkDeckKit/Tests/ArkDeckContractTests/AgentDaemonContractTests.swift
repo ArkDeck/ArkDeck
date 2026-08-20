@@ -314,6 +314,76 @@ final class AgentDaemonContractTests: XCTestCase {
       """.utf8)
   }
 
+  // MARK: - describe publishes the input contract
+
+  /// `operation.describe` existed and answered with title, provider, effect,
+  /// binding and availability — everything except what a caller needs to build
+  /// a request. Field names were discoverable only by being refused for
+  /// omitting one, and meanings only by reading the catalog source.
+  ///
+  /// The example is the load-bearing part and the assertion is behavioural:
+  /// every published operation's example must survive the real decode path. A
+  /// hand-kept example would be a second statement of the contract; one that
+  /// silently stopped being valid is worse than none, because a caller copies
+  /// it.
+  func testDescribePublishesEveryOperationsInputContractAndAUsableExample() async throws {
+    let (handler, _) = try makeStack()
+    for descriptor in RuntimeOperationCatalog.operations {
+      let described = try await request(
+        handler, method: "operation.describe",
+        params: ["reference": .string(descriptor.reference)])
+      XCTAssertTrue(described.ok, "\(descriptor.reference): \(described.error?.message ?? "-")")
+      guard case .object(let fields)? = described.result,
+        case .array(let inputs)? = fields["inputs"],
+        case .array(let outputs)? = fields["outputs"]
+      else {
+        return XCTFail("\(descriptor.reference): describe must project the input contract")
+      }
+
+      // Same source, not a parallel transcription.
+      XCTAssertEqual(
+        inputs.count, descriptor.inputs.count, descriptor.reference)
+      XCTAssertEqual(
+        outputs.count, descriptor.outputs.count, descriptor.reference)
+      for (projected, field) in zip(inputs, descriptor.inputs) {
+        guard case .object(let row) = projected else {
+          return XCTFail("\(descriptor.reference): a field must project as an object")
+        }
+        XCTAssertEqual(row["name"], .string(field.name))
+        XCTAssertEqual(row["type"], .string(field.type.rawValue))
+        XCTAssertEqual(row["required"], .bool(field.isRequired))
+        XCTAssertEqual(row["default"], field.defaultValue, "\(field.name) default")
+        XCTAssertEqual(
+          row["description"], field.summary.map(JSONValue.string), "\(field.name) description")
+      }
+
+      guard let example = fields["exampleRequest"], example != .null else {
+        return XCTFail("\(descriptor.reference): describe must carry an example request")
+      }
+      let encoded = try CanonicalJSONEncoders.canonical().encode(example)
+      let decoded = try RuntimeOperationCodec.decodeRequest(encoded)
+      XCTAssertEqual(
+        decoded.operation.reference, descriptor.reference,
+        "the example must be a request for the operation it describes")
+      // Every required input is present, so a caller who fills in the
+      // placeholders is not still missing a field.
+      for field in descriptor.inputs where field.isRequired {
+        XCTAssertNotNil(
+          decoded.inputs[field.name],
+          "\(descriptor.reference): the example omits required input \(field.name)")
+      }
+    }
+  }
+
+  func testDescribeFailsClosedOnAnOperationThatDoesNotExist() async throws {
+    let (handler, _) = try makeStack()
+    let described = try await request(
+      handler, method: "operation.describe",
+      params: ["reference": .string("observe.galaxy@9")])
+    XCTAssertFalse(described.ok)
+    XCTAssertEqual(described.error?.code, AgentDaemonErrorCode.notFound.rawValue)
+  }
+
   // MARK: - Transport-free protocol negatives
 
   func testProtocolNegativesAreStructural() async throws {

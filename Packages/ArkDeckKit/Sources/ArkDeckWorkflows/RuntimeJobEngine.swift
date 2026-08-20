@@ -51,6 +51,69 @@ package enum RuntimeCallerAuthorityBoundary {
 /// nothing compares.
 public enum RuntimeRequestEnvelope {
   public static let schemaVersion = RuntimeOperationRequest.schemaVersion
+
+  /// A complete, decodable request for this operation, with every required
+  /// input present.
+  ///
+  /// Built from the descriptor rather than written down. A hand-kept example
+  /// is a second statement of the contract and drifts from it; this one cannot
+  /// say anything the catalog does not, and a contract test requires it to
+  /// survive the real decode path — so an example that stopped being valid
+  /// fails here rather than in a caller's first submit.
+  ///
+  /// It is a shape, not a submittable document: identifiers, artifact leases
+  /// and pattern-constrained names are placeholders the caller replaces. What
+  /// it is authoritative about is the envelope — which is the part that cost a
+  /// round trip per field to discover.
+  /// The same example as a JSON document, for callers that may not import the
+  /// runtime contract layer — `ArkDeckAgentDaemon` publishes this and sees
+  /// Core, Storage and Workflows only (docs/ArchitectureRules.md §2).
+  public static func exampleRequestJSON(
+    for descriptor: CatalogOperationDescriptor
+  ) -> JSONValue? {
+    guard let request = example(for: descriptor),
+      let encoded = try? RuntimeOperationCodec.encodeRequest(request)
+    else { return nil }
+    return try? JSONDecoder().decode(JSONValue.self, from: encoded)
+  }
+
+  package static func example(
+    for descriptor: CatalogOperationDescriptor
+  ) -> RuntimeOperationRequest? {
+    var inputs: [String: JSONValue] = [:]
+    for field in descriptor.inputs where field.isRequired {
+      inputs[field.name] = placeholder(for: field)
+    }
+    return try? RuntimeOperationRequest.operatorFlagForm(
+      targetID: "TGT-REPLACE-ME",
+      expectedBindingRevision: descriptor.binding == .confirmedDevice ? 1 : nil,
+      operationID: descriptor.id,
+      version: descriptor.version,
+      inputs: inputs,
+      requestID: "req-example",
+      idempotencyKey: "idem-example-0001")
+  }
+
+  private static func placeholder(for field: CatalogFieldDescriptor) -> JSONValue {
+    if let declared = field.defaultValue { return declared }
+    if let first = field.enumValues?.first { return .string(first) }
+    switch field.type {
+    case .string:
+      return .string("REPLACE_ME")
+    case .integer:
+      return .integer(Int64(field.minimum ?? 1))
+    case .boolean:
+      return .bool(false)
+    case .stringArray:
+      return .array([.string("REPLACE_ME")])
+    case .artifactLease, .artifactReference:
+      // Spelled out rather than elided: the lease grammar is the other thing
+      // a caller could not discover without reading the source.
+      return .string("lease-v1:JOB-REPLACE-ME:ART-REPLACE-ME")
+    case .artifactLeaseArray:
+      return .array([.string("lease-v1:JOB-REPLACE-ME:ART-REPLACE-ME")])
+    }
+  }
 }
 
 public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {

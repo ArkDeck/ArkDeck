@@ -774,21 +774,108 @@ enum RuntimeCLI {
   }
 
   static func runOperation(_ arguments: [String]) throws {
-    guard arguments.first == "list" else {
+    guard let subcommand = arguments.first, ["list", "describe"].contains(subcommand) else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "usage: arkdeck operation list [--socket <path>] [--json]")
+        message:
+          "usage: arkdeck operation list [--socket <path>] [--json] | "
+          + "arkdeck operation describe --operation <reference> [--socket <path>] [--json]")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
     rest.removeAll { $0 == "--json" }
     let client = client(&rest)
-    guard rest.isEmpty else {
+
+    if subcommand == "list" {
+      guard rest.isEmpty else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "operation list received unsupported arguments")
+      }
+      emit(try client.request(method: "operation.list"), json: json)
+      return
+    }
+
+    guard let index = rest.firstIndex(of: "--operation"), index + 1 < rest.count else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "operation list received unsupported arguments")
+        message: "operation describe requires --operation <reference>")
     }
-    emit(try client.request(method: "operation.list"), json: json)
+    let described = try client.request(
+      method: "operation.describe", params: ["reference": .string(rest[index + 1])])
+    // One fact source, two shapes. `--json` is the machine's copy; without it
+    // the same reply is laid out for a person. Neither is a second description
+    // of the operation — they are the same reply rendered twice.
+    if json {
+      emit(described, json: true)
+      return
+    }
+    printOperationDescription(described)
+  }
+
+  private static func printOperationDescription(_ response: JSONValue) {
+    guard case .object(let fields) = response else {
+      emit(response, json: false)
+      return
+    }
+    func string(_ key: String) -> String {
+      if case .string(let value)? = fields[key] { return value }
+      return "-"
+    }
+    print("\(string("reference"))  \(string("title"))")
+    print(
+      "  provider \(string("provider"))   effect \(string("minimumEffect"))   "
+        + "binding \(string("binding"))   availability \(string("availability"))")
+    if case .array(let reasons)? = fields["availabilityReasons"], !reasons.isEmpty {
+      for case .string(let reason) in reasons { print("  unavailable: \(reason)") }
+      if case .array(let origins)? = fields["availabilityReasonOrigins"],
+        case .string(let origin) = origins.first ?? .null
+      {
+        print(
+          "  fixable by: "
+            + (origin == "host_configuration"
+              ? "configuring this host" : "a different build of ArkDeck"))
+      }
+    }
+    for (label, key) in [("inputs", "inputs"), ("outputs", "outputs")] {
+      guard case .array(let rows)? = fields[key], !rows.isEmpty else { continue }
+      print("  \(label):")
+      for case .object(let row) in rows {
+        var head = "    "
+        if case .string(let name)? = row["name"] { head += name }
+        if case .string(let type)? = row["type"] { head += ": \(type)" }
+        if row["required"] == .bool(true) { head += " (required)" }
+        if let declared = row["default"] { head += " [default \(render(declared))]" }
+        print(head)
+        if case .array(let values)? = row["enum"] {
+          print("      one of: " + values.map(render).joined(separator: ", "))
+        }
+        if case .string(let description)? = row["description"] {
+          print("      \(description)")
+        }
+      }
+    }
+    if let example = fields["exampleRequest"], example != .null {
+      print("  example request (identifiers and leases are placeholders):")
+      let encoder = CanonicalJSONEncoders.canonicalPretty()
+      if let data = try? encoder.encode(example),
+        let text = String(data: data, encoding: .utf8)
+      {
+        for line in text.split(separator: "\n") { print("    \(line)") }
+      }
+    }
+  }
+
+  private static func render(_ value: JSONValue) -> String {
+    switch value {
+    case .string(let text): return text
+    case .integer(let number): return String(number)
+    case .unsignedInteger(let number): return String(number)
+    case .number(let number): return String(number)
+    case .bool(let flag): return String(flag)
+    case .null: return "null"
+    case .array, .object: return "…"
+    }
   }
 
   static func runDevice(_ arguments: [String]) throws {
