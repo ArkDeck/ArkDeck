@@ -16,6 +16,16 @@
     "workspace.sign-openharmony-hap@1",
     "workspace.run-tests@1",
     "workspace.symbolize-crash@1",
-    "workspace.revert-patch@1"
+    "workspace.revert-patch@1",
+    "analyzer.analyze-trace@1",
+    "analyzer.extract-crash-signature@1",
+    "analyzer.summarize-hilog@1",
+    "analyzer.summarize-trace@1",
+    "workspace.create-checkpoint@1",
+    "workspace.inspect-diff@1",
+    "workspace.inspect-git-status@1",
+    "workspace.prepare-isolated-copy@1",
+    "workspace.read-source-range@1",
+    "workspace.sweep-isolated-copies@1"
   ]
 }

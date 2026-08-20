@@ -676,7 +676,33 @@ def load_catalog(
             raise CatalogError(
                 f"profile {profile_id}: an unversioned profile cannot coexist with versioned variants"
             )
+    # Both sides name each other, so both sides have to agree. Checking only
+    # that each name resolves let the two drift apart while every reference
+    # stayed valid: fourteen operations claimed a profile that did not list
+    # them, and the generated authorisation matrix — the only published view of
+    # what a profile supports — showed workspace-host@1 with seven operations
+    # when seventeen claimed it.
+    claimed: dict[str, set[str]] = {}
+    for doc in operations:
+        for profile_ref in doc["profiles"]:
+            claimed.setdefault(profile_ref, set()).add(operation_reference(doc))
+    for doc in profiles:
+        profile_ref = profile_reference(doc)
+        listed = set(doc["supportedOperations"])
+        unlisted = claimed.get(profile_ref, set()) - listed
+        if unlisted:
+            raise CatalogError(
+                f"profile {profile_ref}: operations {sorted(unlisted)} declare this profile "
+                f"but it does not list them"
+            )
+        unclaimed = listed - claimed.get(profile_ref, set())
+        if unclaimed:
+            raise CatalogError(
+                f"profile {profile_ref}: lists operations {sorted(unclaimed)} that do not "
+                f"declare it"
+            )
     return operations, profiles
+
 
 
 def catalog_digest(operations: list[dict]) -> str:
