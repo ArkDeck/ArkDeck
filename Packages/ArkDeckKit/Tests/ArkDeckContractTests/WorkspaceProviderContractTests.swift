@@ -211,6 +211,79 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ])
   }
 
+  /// Symbolization is reachable from this host, and reaching for it badly
+  /// costs one operation rather than the profile.
+  ///
+  /// Both halves matter and neither was covered. The first is the claim the
+  /// availability answer used to deny outright. The second is what made the
+  /// denial hard to see: a configured-but-unresolvable analyzer threw out of
+  /// the factory, so the daemon reported `projectProfileUnavailable` and every
+  /// `workspace.*` operation went dark at once, naming none of them.
+  func testSymbolizerFollowsHostConfigurationAndAStalePathCostsOnlyThatOperation() throws {
+    let project = state.appending(path: "waterflow-symbolizer", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: project.appending(path: "entry/src/main", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(to: project.appending(path: "entry/src/main/module.json5"))
+    let script = project.appending(path: "hvigorw.js")
+    try Data("// fixture".utf8).write(to: script)
+
+    let symbolize = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.symbolize-crash@1"))
+    let build = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.build-openharmony@1"))
+
+    func provider(
+      _ profile: WorkspaceProjectProfile, _ label: String
+    ) throws -> WorkspaceOperationsProvider {
+      WorkspaceOperationsProvider(
+        profile: profile,
+        attemptStore: try WorkspacePatchAttemptStore(
+          rootURL: state.appending(path: label, directoryHint: .isDirectory)),
+        nowUTC: { "2026-08-20T00:00:00Z" })
+    }
+
+    // Configured. `/usr/bin/true` stands in for the pinned analyzer daemon the
+    // LaunchAgent installs; what matters is that the path resolves.
+    let configured = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, nodePath: "/usr/bin/true", hvigorScriptPath: script.path,
+      symbolizerPath: "/usr/bin/true")
+    XCTAssertEqual(configured.symbolPresets["arkts-sourcemap"]?.executable.path, "/usr/bin/true")
+    XCTAssertEqual(
+      try provider(configured, "configured").runtimeAvailability(for: symbolize), .available,
+      "an analyzer this host has configured must reach symbolize-crash")
+
+    // Not configured. Unavailable, but as something this host is missing.
+    let unconfigured = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, nodePath: "/usr/bin/true", hvigorScriptPath: script.path)
+    guard
+      case .unavailable(let code, _) = try provider(unconfigured, "unconfigured")
+        .runtimeAvailability(for: symbolize)
+    else {
+      return XCTFail("symbolize-crash is unavailable without an analyzer")
+    }
+    XCTAssertEqual(code.origin, .hostConfiguration)
+
+    // Configured at a path that no longer resolves. The profile still builds,
+    // and only the symbolizer is missing from it.
+    let stale = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, nodePath: "/usr/bin/true", hvigorScriptPath: script.path,
+      symbolizerPath: project.appending(path: "analyzer-that-was-removed").path)
+    XCTAssertTrue(stale.symbolPresets.isEmpty)
+    let staleProvider = try provider(stale, "stale")
+    XCTAssertEqual(
+      staleProvider.runtimeAvailability(for: build), .available,
+      "a stale analyzer path must not take unrelated workspace operations down with it")
+    guard case .unavailable(let staleCode, let staleReason) = staleProvider
+      .runtimeAvailability(for: symbolize)
+    else {
+      return XCTFail("a stale analyzer path leaves symbolize-crash unavailable")
+    }
+    XCTAssertEqual(staleCode, .workspacePresetUnavailable)
+    XCTAssertEqual(staleReason, "workspace.symbolPresetUnavailable")
+  }
+
   func testWaterFlowProfilePinsTheRealBuildTestAndDeployProduct() throws {
     let project = root.appending(path: "WaterFlow", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
@@ -666,14 +739,16 @@ final class WorkspaceProviderContractTests: XCTestCase {
       attemptStore: try WorkspacePatchAttemptStore(
         rootURL: state.appending(path: "unavailable-attempts")),
       nowUTC: { "2026-07-31T00:00:00Z" })
-    // A profile without symbol presets is every profile this build ships, so
-    // the answer names the one thing an operator cannot install rather than
-    // the generic "a preset is missing" it used to share with presets that a
-    // different project root or a signing install would supply.
+    // A profile without symbol presets is a host that has not configured an
+    // analyzer, not a build that cannot symbolize: `waterFlowDemo` ships the
+    // preset once `ARKDECK_ANALYZER_PATH` resolves. The answer names which
+    // preset is missing, and its origin says configuring this machine helps.
     XCTAssertEqual(
       unavailable.runtimeAvailability(for: symbolDescriptor),
-      .unavailable(code: .workspacePresetNotOffered, reason: "workspace.presetNotOffered"))
-    XCTAssertEqual(RuntimeAvailabilityReasonCode.workspacePresetNotOffered.origin, .productBuild)
+      .unavailable(
+        code: .workspacePresetUnavailable, reason: "workspace.symbolPresetUnavailable"))
+    XCTAssertEqual(
+      RuntimeAvailabilityReasonCode.workspacePresetUnavailable.origin, .hostConfiguration)
 
     XCTAssertNoThrow(
       try RuntimeOperationRequest(
