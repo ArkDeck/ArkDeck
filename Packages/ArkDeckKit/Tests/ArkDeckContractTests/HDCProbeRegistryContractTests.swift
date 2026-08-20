@@ -367,7 +367,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
       guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
         continue
       }
-      let relative = url.path.replacingOccurrences(of: root.path + "/", with: "")
+      guard let relative = relativePathInsideBundleResource(url, root: root) else { continue }
       // TASK-I24-001 (CHG-2026-024): this pack's exactness claim covers its own version
       // subtree. Enumerating the whole Probes root also asserted "no sibling pack may exist
       // here", which is authority this test never meant to hold — a second registered family

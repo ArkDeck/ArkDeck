@@ -68,7 +68,7 @@ final class HDCGoldenResourceContractTests: XCTestCase {
       guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
         continue
       }
-      let relative = url.path.replacingOccurrences(of: root.path + "/", with: "")
+      guard let relative = relativePathInsideBundleResource(url, root: root) else { continue }
       packagedFiles.insert(relative)
     }
     // `.gitattributes` pins the raw fixture bytes as binary so eol/text normalization can
