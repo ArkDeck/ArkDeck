@@ -694,6 +694,22 @@ def _swift_string(value: str) -> str:
     return f'"{escaped}"'
 
 
+def _swift_json_value(value, where: str) -> str:
+    """Render a catalog literal as an ArkDeckCore.JSONValue expression.
+
+    Fails closed on a shape it cannot express. A silently dropped default is
+    the defect this function exists to end: the runtime would go on restating
+    the value by hand with nothing comparing the two.
+    """
+    if isinstance(value, bool):
+        return f".bool({'true' if value else 'false'})"
+    if isinstance(value, int):
+        return f".integer({value})"
+    if isinstance(value, str):
+        return f".string({_swift_string(value)})"
+    raise CatalogError(f"{where}: default of type {type(value).__name__} is not expressible")
+
+
 def _swift_field(name: str, spec: dict) -> str:
     parts = [
         f"name: {_swift_string(name)}",
@@ -713,6 +729,16 @@ def _swift_field(name: str, spec: dict) -> str:
         parts.append(f"maxLength: {spec['maxLength']}")
     if "maxItems" in spec:
         parts.append(f"maxItems: {spec['maxItems']}")
+    # The two the runtime could not see. `description` says what the field
+    # means and `default` says what it is when omitted; both were validated
+    # here and then dropped, so callers could learn a field's shape and never
+    # its meaning, and the runtime restated defaults the catalog declares.
+    if "description" in spec:
+        parts.append(f"summary: {_swift_string(spec['description'])}")
+    if "default" in spec:
+        parts.append(
+            f"defaultValue: {_swift_json_value(spec['default'], f'field {name}.default')}"
+        )
     return "CatalogFieldDescriptor(" + ", ".join(parts) + ")"
 
 

@@ -88,6 +88,27 @@ public struct CatalogFieldDescriptor: Equatable, Sendable {
   public let maximum: Int?
   public let maxLength: Int?
   public let maxItems: Int?
+  /// The field's `description` from its catalog document — what the value
+  /// means, where an acceptable one comes from, and how it interacts with the
+  /// other inputs.
+  ///
+  /// The catalog has always carried this and the generator dropped it, so the
+  /// runtime knew a field's shape and nothing about its meaning. That is the
+  /// half a caller needs to fill the field correctly the first time, and with
+  /// it absent the only place to read it was the repository — which is not
+  /// available to anything talking to an installed daemon.
+  ///
+  /// Named `summary` rather than `description` so the property cannot be
+  /// mistaken for `CustomStringConvertible`; the wire and catalog spelling
+  /// stays `description`.
+  public let summary: String?
+  /// The field's catalog `default`, as the typed value the runtime applies
+  /// when the input is absent.
+  ///
+  /// Also dropped by the generator until now, which is why three separate
+  /// places in the runtime restate defaults the catalog already declares and
+  /// nothing compares them.
+  public let defaultValue: JSONValue?
 
   public init(
     name: String,
@@ -98,7 +119,9 @@ public struct CatalogFieldDescriptor: Equatable, Sendable {
     minimum: Int? = nil,
     maximum: Int? = nil,
     maxLength: Int? = nil,
-    maxItems: Int? = nil
+    maxItems: Int? = nil,
+    summary: String? = nil,
+    defaultValue: JSONValue? = nil
   ) {
     self.name = name
     self.type = type
@@ -109,6 +132,8 @@ public struct CatalogFieldDescriptor: Equatable, Sendable {
     self.maximum = maximum
     self.maxLength = maxLength
     self.maxItems = maxItems
+    self.summary = summary
+    self.defaultValue = defaultValue
   }
 }
 

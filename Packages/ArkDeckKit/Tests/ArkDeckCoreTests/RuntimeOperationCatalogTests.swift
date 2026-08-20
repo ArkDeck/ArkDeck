@@ -40,6 +40,54 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       RuntimeOperationCatalog.catalogDigest, pattern: "^[0-9a-f]{64}$")
   }
 
+  /// Field semantics have to survive the generator, not just the catalog.
+  ///
+  /// `description` and `default` were validated as legal catalog keys and then
+  /// dropped on the way to Swift, so the runtime knew every field's shape and
+  /// nothing about its meaning or its omitted value. Anything talking to an
+  /// installed daemon could only recover them by reading this repository.
+  func testPublishedFieldsCarryTheirCatalogMeaningAndDefault() throws {
+    let debugHAP = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "debug.hap@1"))
+    func input(_ name: String) throws -> CatalogFieldDescriptor {
+      try XCTUnwrap(debugHAP.inputs.first { $0.name == name }, name)
+    }
+
+    // The pair that has to be discovered together: observing a delayed crash
+    // needs the ability left running *and* the package retained, and neither
+    // field's shape says so.
+    XCTAssertEqual(try input("postRunAbilityState").defaultValue, .string("stopped"))
+    XCTAssertEqual(try input("cleanupPolicy").defaultValue, .string("uninstall"))
+    let postRun = try XCTUnwrap(try input("postRunAbilityState").summary)
+    XCTAssertTrue(
+      postRun.contains("running"),
+      "the description must name the value that changes the behaviour: \(postRun)")
+
+    // Defaults are typed, not stringly.
+    XCTAssertEqual(try input("captureDiagnostics").defaultValue, .bool(true))
+    XCTAssertEqual(try input("diagnosticsDurationSeconds").defaultValue, .integer(30))
+
+    // A required field has no default, and that is expressed as absence rather
+    // than as some empty value a caller might send.
+    XCTAssertNil(try input("bundleName").defaultValue)
+
+    // Every default the catalog declares reaches the runtime, for every
+    // published operation — the count is what makes this fail if the generator
+    // silently drops the branch again rather than only for debug.hap.
+    let withDefaults = RuntimeOperationCatalog.operations
+      .flatMap(\.inputs)
+      .filter { $0.defaultValue != nil }
+    XCTAssertEqual(
+      withDefaults.count, 18,
+      "the catalog declares eighteen input defaults; the runtime must see all of them")
+    let described = RuntimeOperationCatalog.operations
+      .flatMap(\.inputs)
+      .filter { $0.summary?.isEmpty == false }
+    XCTAssertGreaterThanOrEqual(
+      described.count, 59,
+      "field descriptions must reach the runtime rather than stopping at the catalog")
+  }
+
   func testDescriptorLookupIsExactAndFailClosed() {
     XCTAssertNotNil(RuntimeOperationCatalog.descriptor(id: "observe.device", version: 1))
     XCTAssertNil(RuntimeOperationCatalog.descriptor(id: "observe.device", version: 2))

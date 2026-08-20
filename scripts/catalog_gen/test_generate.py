@@ -595,7 +595,17 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
         for doc in operations:
             self.assertEqual(swift.count(f'id: "{doc["id"]}",'), 1)
         self.assertIn("GENERATED FILE - DO NOT EDIT", swift)
-        self.assertNotIn("argv", swift)
+        # No executable surface reaches the generated vocabulary. Asserted on
+        # the positions that would carry one — a field name or an enum value —
+        # rather than on the file text. The text form held only while the
+        # generated file was names, types and enums; field descriptions now
+        # flow through it, and two of them say "never lowered as caller-supplied
+        # argv" and "no shell fragments", which is the invariant being stated
+        # rather than broken. `validate_field` already refuses these as field
+        # names (FORBIDDEN_FIELD_NAMES), so this is the belt to that brace.
+        for token in sorted(generate.FORBIDDEN_FIELD_NAMES):
+            self.assertNotIn(f'name: "{token}"', swift)
+            self.assertNotIn(f'"{token}"]', swift)
 
     def test_generated_swift_carries_digest(self):
         operations, _ = _real_operations()
