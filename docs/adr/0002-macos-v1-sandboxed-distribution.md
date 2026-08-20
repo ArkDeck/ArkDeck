@@ -1,7 +1,8 @@
 # ADR-0002 — macOS v1 Sandboxed distribution(supersedes ADR-0001)
 
-- Status: proposed; effective only when this PR is reviewed and merged by the
-  maintainer(merge 即构成 DEC-004 决策与本 ADR 生效,V2 治理)
+- Status: accepted(2026-07-21,由 `f465809b` 合入 protected `main` 生效;该 commit
+  同车把 DEC-004 翻为 decided。原文写「proposed; effective only when this PR is
+  reviewed and merged」——那个条件当天即满足,状态未随之更新,此处补记,正文不改写)
 - Date: 2026-07-21
 - Decision carrier: DEC-004 decision PR(open-questions.md 同 PR 翻转 decided)
 - Decision owner: maintainer(`@lvye`)
