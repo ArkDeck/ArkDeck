@@ -267,8 +267,11 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       patchPreset: patching,
       buildPresets: [build.presetID: build],
       testPresets: [tests.presetID: tests],
-      // No generic symbolizer is guessed. A profile without an exact symbol
-      // preset publishes workspace.symbolize-crash as UNAVAILABLE.
+      // This repository is not an ArkTS project, so there is no obfuscated
+      // stack here to resolve and no symbolizer to point at. That is a fact
+      // about this project rather than about the build: the WaterFlow profile
+      // does ship one once the daemon is configured with an analyzer, so
+      // `symbolize-crash` reports host configuration either way.
       symbolPresets: [:])
   }
 
@@ -363,9 +366,19 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     //
     // The map path is the one under `outputs`, which is produced with the HAP
     // itself rather than an intermediate that a later task may rewrite.
+    //
+    // A configured analyzer path that no longer resolves is a misconfiguration
+    // of one preset, so it costs one operation. Hashing it with `try` made it
+    // cost the whole profile: the throw escaped this factory, the daemon's
+    // composition caught it as `projectProfileUnavailable`, and every
+    // `workspace.*` operation went dark with a reason that named none of them.
+    // Declining the preset instead lets `symbolize-crash` report
+    // `workspace.symbolPresetUnavailable` — which is exactly what is wrong —
+    // and leaves the rest of the profile answering for itself.
     var symbols: [String: WorkspaceCommandPreset] = [:]
-    if let symbolizerPath {
-      let symbolizer = try WorkspaceExecutableIdentity.hashing(path: symbolizerPath)
+    if let symbolizerPath,
+      let symbolizer = try? WorkspaceExecutableIdentity.hashing(path: symbolizerPath)
+    {
       let preset = try WorkspaceCommandPreset(
         presetID: "arkts-sourcemap", executable: symbolizer,
         fixedArguments: [
@@ -913,12 +926,11 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         code: .operationNotSupported, reason: "workspace.unsupportedProvider")
     }
     let hasPreset: Bool
-    // Whether a missing preset is one no build of ArkDeck offers, as opposed
-    // to one this host has not configured yet. Most presets here are the
-    // second: `sourceControlPreset` exists exactly when the configured project
-    // root is a git working copy, so pointing `--workspace-project` at one
-    // makes those operations available. Only the symbolizer is the first.
-    var presetIsNeverOffered = false
+    // Every preset on this path is host configuration: `sourceControlPreset`
+    // exists exactly when the configured project root is a git working copy,
+    // the signing presets exist once `arkdeck signing install` has run, and
+    // the symbolizer exists once the daemon is configured with an analyzer.
+    // Nothing here is a capability only a different build could supply.
     switch operation.reference {
     case "workspace.prepare-isolated-copy@1":
       hasPreset = isolationManager != nil && profile.kind == .primary
@@ -939,12 +951,22 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     case "workspace.run-tests@1":
       hasPreset = !profile.testPresets.isEmpty
     case "workspace.symbolize-crash@1":
-      hasPreset = !profile.symbolPresets.isEmpty
-      // No profile this build ships populates `symbolPresets`; both factories
-      // pass `[:]` because no generic symbolizer may be guessed, and the
-      // isolated-copy manager only rebases what it inherited. There is
-      // therefore nothing an operator can install to reach this one.
-      presetIsNeverOffered = true
+      // This used to answer `workspacePresetNotOffered`, whose documented
+      // meaning is that nothing an operator installs can reach the operation
+      // and only a different build of ArkDeck could. That was true when the
+      // flag was written and stopped being true hours later in the same day:
+      // `waterFlowDemo` gained a `symbolizerPath` parameter, the daemon feeds
+      // it from `ARKDECK_ANALYZER_PATH`, and `agentd install`/`update` set that
+      // key to the installed daemon by default. The flag and its comment were
+      // never revisited, so the answer told every caller to give up on an
+      // operation that host configuration reaches — a wrong "stop looking" is
+      // more expensive than no reason at all.
+      guard !profile.symbolPresets.isEmpty else {
+        return .unavailable(
+          code: .workspacePresetUnavailable,
+          reason: "workspace.symbolPresetUnavailable")
+      }
+      hasPreset = true
     case "workspace.inspect-git-status@1", "workspace.inspect-diff@1":
       hasPreset = profile.sourceControlPreset != nil
     case "workspace.create-checkpoint@1":
@@ -957,9 +979,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     }
     guard hasPreset else {
       return .unavailable(
-        code: presetIsNeverOffered ? .workspacePresetNotOffered : .workspacePresetUnavailable,
-        reason: presetIsNeverOffered
-          ? "workspace.presetNotOffered" : "workspace.presetUnavailable")
+        code: .workspacePresetUnavailable, reason: "workspace.presetUnavailable")
     }
     do {
       for identity in profile.executableIdentities {

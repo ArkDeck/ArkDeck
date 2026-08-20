@@ -201,11 +201,17 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     }
   }
 
-  /// The symbolizer is the one preset on this path an operator cannot reach.
-  /// Both profile factories pass `symbolPresets: [:]` because no generic
-  /// symbolizer may be guessed, so it must not be reported the same way as a
-  /// source-control preset that a different project root would supply.
-  func testTheSymbolizerIsReportedAsOneNoBuildOffers() throws {
+  /// A missing symbolizer is host configuration, and this test used to assert
+  /// the opposite.
+  ///
+  /// It was written against a build where both profile factories really did
+  /// pass `symbolPresets: [:]`, and it kept passing after `waterFlowDemo`
+  /// gained a `symbolizerPath` the daemon feeds from `ARKDECK_ANALYZER_PATH` —
+  /// it asserted what the code did rather than what was true. The reason it
+  /// pinned, `productBuild`, is documented as "no local configuration reaches
+  /// this", so a caller that believed it stopped looking for a setting that
+  /// exists.
+  func testTheSymbolizerIsReportedAsHostConfigurationRatherThanAMissingCapability() throws {
     let bare = try makeProfile(withSourceControl: false)
     let bareProvider = makeProvider(bare)
     let descriptor = try XCTUnwrap(
@@ -215,9 +221,13 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     else {
       return XCTFail("symbolize-crash must be unavailable without a symbol preset")
     }
-    XCTAssertEqual(code, .workspacePresetNotOffered)
-    XCTAssertEqual(reason, "workspace.presetNotOffered")
-    XCTAssertEqual(code.origin, .productBuild)
+    XCTAssertEqual(code, .workspacePresetUnavailable)
+    // Named apart from the generic preset reason so the caller learns which
+    // preset is missing, the same way the signing lane already answers.
+    XCTAssertEqual(reason, "workspace.symbolPresetUnavailable")
+    XCTAssertEqual(
+      code.origin, .hostConfiguration,
+      "configuring an analyzer reaches this operation, so the caller must not be told to stop")
   }
 
   // MARK: - Semantics: an empty read is an observation
