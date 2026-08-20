@@ -396,8 +396,9 @@ struct ArkDeckCommandLine {
   static func printUsage() {
     let usage = """
       usage:
-        arkdeck flash install-binding
+        arkdeck flash install-binding [--rebind]
         arkdeck flash status --campaign-id <ECAMP-id>
+        arkdeck flash reconcile [--session <id>]
         arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
       --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> \
       --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <dir>
@@ -408,14 +409,15 @@ struct ArkDeckCommandLine {
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
       [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
-       --arkforge-profile <absolute-path>]
+       --arkforge-profile <absolute-path> [--arkforge-campaign <id>]]
         arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
       [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
-       --arkforge-profile <absolute-path>]
+       --arkforge-profile <absolute-path> [--arkforge-campaign <id>]]
         arkdeck agentd status [--json]
-        arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
+        arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] \
+      [--execution-id <id>] [--json]
         arkdeck agentd uninstall [--json]
         arkdeck signing install-sdk-release --sdk <absolute-openharmony-sdk-path> \
       --java <absolute-java-path> --bundle-name <application-bundle-name> \
@@ -434,7 +436,8 @@ struct ArkDeckCommandLine {
         arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <reference> \
       [--expected-binding-revision <n>] [--wait] [--json]
-        arkdeck job status --job <id> [--json] | arkdeck job list [--json]
+        arkdeck job status --job <id> [--json]
+        arkdeck job list [--page-size <1...1000>] [--cursor <token>] [--json]
         arkdeck job run|cancel|reconcile --job <id> [--json]
         arkdeck debug start --request-file <destructive-flash-request.json> [--json]
         arkdeck debug evaluate --invocation <id> --action-file <effect-action.json> \
@@ -455,7 +458,7 @@ struct ArkDeckCommandLine {
         arkdeck agent chat [--prompt <text>] [--socket <path>] \
       [--allow-sensitive-artifacts]
         arkdeck agent run --operation <reference> [--target <id>] [--inputs-file <path>] \
-      [--capability <CAP-RT-...>] [--json]
+      [--capability <CAP-RT-...>] [--execution-id <id>] [--json]
         arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
 
       doctor/operation/device/trace/job/debug talk only to arkdeck-agentd over its user-private socket:
