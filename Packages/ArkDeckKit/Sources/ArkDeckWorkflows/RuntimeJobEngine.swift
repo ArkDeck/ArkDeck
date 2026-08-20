@@ -2370,13 +2370,14 @@ public actor RuntimeJobEngine {
     if completedStepIDs.contains("start-ability") {
       compensationStepIDs.append("stop-ability")
     }
-    let cleanupPolicy: String
-    if case .string(let policy)? = runtime.record.request.inputs["cleanupPolicy"] {
-      cleanupPolicy = policy
-    } else {
-      cleanupPolicy = "uninstall"
-    }
-    if cleanupPolicy == "uninstall", completedStepIDs.contains("install-hap") {
+    // Which cleanup this job asked for, read the same way admission read it:
+    // the input if it gave one, otherwise the catalog's declared default.
+    // Restating "uninstall" here made compensation depend on a value the
+    // catalog also declares, with nothing comparing the two.
+    let cleanupPolicy =
+      CatalogOperationEffectResolver.resolvedInputValue(
+        "cleanupPolicy", descriptor: descriptor, inputs: runtime.record.request.inputs)
+    if cleanupPolicy == .string("uninstall"), completedStepIDs.contains("install-hap") {
       compensationStepIDs.append("cleanup-uninstall")
     }
     if completedStepIDs.contains("send-hap") {
