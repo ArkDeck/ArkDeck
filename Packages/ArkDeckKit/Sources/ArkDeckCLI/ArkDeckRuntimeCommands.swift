@@ -1700,6 +1700,119 @@ enum RuntimeCLI {
     }
   }
 
+  /// Builds the typed v2 request document `job plan` and `job submit` send.
+  ///
+  /// Both used to demand a hand-written document the moment an operation had
+  /// typed inputs, which is nearly all of them: the flag form could express
+  /// only target and operation. So a caller wanting to pass `durationSeconds`
+  /// also had to get `schemaVersion`, `requestId` and `idempotencyKey` right,
+  /// and the only way to learn those was to be refused once for each. The
+  /// envelope is not the caller's problem, so the CLI writes it — exactly as
+  /// `arkdeck agent run` already did.
+  ///
+  /// `--request-file` stays for a caller that wants to control the document
+  /// byte for byte; it is still passed through verbatim so the daemon, not
+  /// this CLI, remains the validator.
+  private static func operationRequestJSON(
+    _ rest: [String], subcommand: String
+  ) throws -> String {
+    func value(_ flag: String) -> String? {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
+      return rest[index + 1]
+    }
+
+    let requestFile = value("--request-file")
+    let inputsFile = value("--inputs-file")
+    guard requestFile == nil || inputsFile == nil else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "\(subcommand) takes --request-file (a complete document) or --inputs-file "
+          + "(typed inputs the CLI wraps), not both")
+    }
+
+    if let requestFile {
+      let url = URL(filePath: requestFile)
+      guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
+      }
+      return text
+    }
+
+    guard let targetID = value("--target"), let reference = value("--operation") else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "\(subcommand) requires --target <id> --operation <reference> "
+          + "[--inputs-file <typed-inputs.json>], or --request-file <path>")
+    }
+    let parts = reference.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+    guard parts.count == 1 || parts.count == 2 else {
+      throw CLIError(exitCode: EX_USAGE, message: "invalid operation reference")
+    }
+    var version: Int?
+    if parts.count == 2 {
+      guard let parsed = Int(parts[1]), parsed > 0 else {
+        throw CLIError(exitCode: EX_USAGE, message: "invalid operation version")
+      }
+      version = parsed
+    }
+    var pinnedRevision: Int?
+    if let raw = value("--expected-binding-revision") {
+      guard let parsed = Int(raw), parsed >= 1 else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "--expected-binding-revision takes a positive integer")
+      }
+      pinnedRevision = parsed
+    }
+    // Typed inputs only: the file is the `inputs` object, not a request. A
+    // whole document here would silently lose its envelope, so it is refused
+    // with the flag that does take one.
+    var inputs: [String: JSONValue] = [:]
+    if let inputsFile {
+      let url = URL(filePath: inputsFile)
+      guard let data = try? Data(contentsOf: url) else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
+      }
+      guard let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "--inputs-file must be a JSON object of typed inputs: \(url.path)")
+      }
+      if decoded["schemaVersion"] != nil || decoded["operation"] != nil {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "--inputs-file looks like a complete request document; pass it with "
+            + "--request-file, or reduce it to the inputs object")
+      }
+      inputs = decoded
+    }
+
+    let request: RuntimeOperationRequest
+    do {
+      // The request model owns the rules a caller keeps getting wrong —
+      // a device-bound operation must pin its binding revision, a host-only
+      // one must not — so the refusal is its wording, not a second one here.
+      request = try RuntimeOperationRequest.operatorFlagForm(
+        targetID: targetID,
+        expectedBindingRevision: pinnedRevision,
+        operationID: String(parts[0]),
+        version: version,
+        inputs: inputs,
+        requestID: "cli-\(UUID().uuidString.prefix(8).lowercased())",
+        idempotencyKey: "cli-\(UUID().uuidString.lowercased())")
+    } catch let rejection as RuntimeOperationRequestRejection {
+      throw CLIError(exitCode: EX_USAGE, message: rejection.message)
+    }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let text = String(data: try encoder.encode(request), encoding: .utf8) else {
+      throw CLIError(exitCode: 1, message: "could not encode the operation request")
+    }
+    return text
+  }
+
   static func runJob(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
@@ -1711,20 +1824,10 @@ enum RuntimeCLI {
     let client = client(&rest)
     switch subcommand {
     case "plan":
-      guard let fileIndex = rest.firstIndex(of: "--request-file"),
-        fileIndex + 1 < rest.count
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "job plan requires --request-file <typed-request.json>")
-      }
-      let url = URL(filePath: rest[fileIndex + 1])
-      guard let requestJSON = try? String(contentsOf: url, encoding: .utf8) else {
-        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
-      }
+      let planJSON = try operationRequestJSON(rest, subcommand: "job plan")
       emit(
         try client.request(
-          method: "job.plan", params: ["requestJson": .string(requestJSON)]),
+          method: "job.plan", params: ["requestJson": .string(planJSON)]),
         json: json)
     case "list":
       let pageSize: Int?
@@ -1799,77 +1902,7 @@ enum RuntimeCLI {
         try client.request(method: "job.reconcile", params: ["jobId": .string(rest[index + 1])]),
         json: json)
     case "submit":
-      // A prepared request file carries typed inputs the flag form cannot
-      // express; it is passed through verbatim so the daemon, not the CLI,
-      // remains the validator.
-      if let fileIndex = rest.firstIndex(of: "--request-file"), fileIndex + 1 < rest.count {
-        let url = URL(filePath: rest[fileIndex + 1])
-        guard let json = try? String(contentsOf: url, encoding: .utf8) else {
-          throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
-        }
-        let submitted = try client.request(
-          method: "job.submit", params: ["requestJson": .string(json)])
-        emit(submitted, json: json2Bool(rest))
-        if rest.contains("--wait") {
-          try completeWaitedSubmit(submitted, client: client, json: json2Bool(rest))
-        }
-        return
-      }
-      guard let targetIndex = rest.firstIndex(of: "--target"), targetIndex + 1 < rest.count,
-        let operationIndex = rest.firstIndex(of: "--operation"), operationIndex + 1 < rest.count
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "job submit requires --target <id> --operation <reference>, "
-            + "or --request-file <path> for typed inputs")
-      }
-      let reference = rest[operationIndex + 1]
-      let parts = reference.split(
-        separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
-      guard parts.count == 1 || parts.count == 2 else {
-        throw CLIError(exitCode: EX_USAGE, message: "invalid operation reference")
-      }
-      let version: Int?
-      if parts.count == 2 {
-        guard let parsed = Int(parts[1]), parsed > 0 else {
-          throw CLIError(exitCode: EX_USAGE, message: "invalid operation version")
-        }
-        version = parsed
-      } else {
-        version = nil
-      }
-      // The CLI builds a typed v2 request: no governance identifiers exist
-      // in this surface to pass along even by accident. The document itself is
-      // built by the request model, which refuses a device-bound operation
-      // whose binding revision was not pinned - the flag form used to hand
-      // that request to the daemon and get a generic `evidenceIncomplete`
-      // back (2026-07-31 GJ-5 window, first leg).
-      var pinnedRevision: Int?
-      if let index = rest.firstIndex(of: "--expected-binding-revision"), index + 1 < rest.count {
-        guard let parsed = Int(rest[index + 1]), parsed >= 1 else {
-          throw CLIError(
-            exitCode: EX_USAGE, message: "--expected-binding-revision takes a positive integer")
-        }
-        pinnedRevision = parsed
-      }
-      let request: RuntimeOperationRequest
-      do {
-        request = try RuntimeOperationRequest.operatorFlagForm(
-          targetID: rest[targetIndex + 1],
-          expectedBindingRevision: pinnedRevision,
-          operationID: String(parts[0]),
-          version: version,
-          requestID: "cli-\(UUID().uuidString.prefix(8).lowercased())",
-          idempotencyKey: "cli-\(UUID().uuidString.lowercased())")
-      } catch let rejection as RuntimeOperationRequestRejection {
-        throw CLIError(exitCode: EX_USAGE, message: rejection.message)
-      }
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys]
-      guard let requestJSON = String(data: try encoder.encode(request), encoding: .utf8) else {
-        throw CLIError(exitCode: 1, message: "could not encode the operation request")
-      }
+      let requestJSON = try operationRequestJSON(rest, subcommand: "job submit")
       let submitted = try client.request(
         method: "job.submit", params: ["requestJson": .string(requestJSON)])
       emit(submitted, json: json)
