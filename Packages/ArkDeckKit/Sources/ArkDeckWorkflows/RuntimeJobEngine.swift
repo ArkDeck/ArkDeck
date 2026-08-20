@@ -40,6 +40,19 @@ package enum RuntimeCallerAuthorityBoundary {
   }
 }
 
+/// The request envelope this runtime accepts, forwarded from the wire model
+/// that defines it.
+///
+/// `ArkDeckAgentDaemon` publishes this on `doctor` but may not import
+/// `ArkDeckRuntime` (docs/ArchitectureRules.md §2: it sees Core, Storage and
+/// Workflows only). Forwarding here runs with the dependency arrows rather
+/// than against them, and keeps one definition: spelling `"2.0.0"` a second
+/// time in the daemon would put the envelope contract in two places that
+/// nothing compares.
+public enum RuntimeRequestEnvelope {
+  public static let schemaVersion = RuntimeOperationRequest.schemaVersion
+}
+
 public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
   public let stepID: String
   public let kind: String

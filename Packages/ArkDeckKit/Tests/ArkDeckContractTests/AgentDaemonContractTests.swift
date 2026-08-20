@@ -257,6 +257,63 @@ final class AgentDaemonContractTests: XCTestCase {
     return server
   }
 
+  // MARK: - Doctor publishes what the first request needs
+
+  /// A caller with no prior context starts at `doctor`, and the envelope
+  /// contract was the one thing it was about to need and could not ask for.
+  ///
+  /// The assertion is deliberately not "equals 2.0.0" and not "equals the
+  /// constant the handler read" — either would pass while admission enforced
+  /// something else entirely. Instead a request built with exactly the
+  /// advertised version has to survive the real decode path, and the adjacent
+  /// major has to be refused by it. That is what makes the advertised string a
+  /// fact about admission rather than a number the report happens to carry.
+  func testDoctorPublishesTheRequestEnvelopeAdmissionActuallyEnforces() async throws {
+    let (handler, _) = try makeStack()
+    let doctor = try await request(handler, method: "doctor")
+    XCTAssertTrue(doctor.ok, doctor.error?.message ?? "-")
+    guard case .object(let report)? = doctor.result,
+      case .string(let advertised)? = report["runtimeRequestSchemaVersion"],
+      case .integer(let operationCount)? = report["operationCount"]
+    else {
+      return XCTFail("doctor must publish the request envelope and the catalog size")
+    }
+
+    let accepted = try RuntimeOperationCodec.decodeRequest(
+      envelopeProbe(schemaVersion: advertised))
+    XCTAssertEqual(accepted.operation.reference, "observe.device@1")
+
+    let advertisedMajor = Int(advertised.split(separator: ".").first.map(String.init) ?? "")
+    let neighbouringMajor = "\((try XCTUnwrap(advertisedMajor)) + 1).0.0"
+    XCTAssertThrowsError(
+      try RuntimeOperationCodec.decodeRequest(
+        envelopeProbe(schemaVersion: neighbouringMajor))
+    ) { error in
+      XCTAssertEqual(
+        (error as? RuntimeOperationRequestRejection)?.code, .unsupportedVersion,
+        "doctor would be advertising a version admission does not gate on")
+    }
+
+    // Counted from the catalog rather than restated, so a published operation
+    // cannot appear or disappear without this number following it.
+    XCTAssertEqual(operationCount, Int64(RuntimeOperationCatalog.operations.count))
+    XCTAssertGreaterThan(operationCount, 0)
+  }
+
+  private func envelopeProbe(schemaVersion: String) -> Data {
+    Data(
+      """
+      {
+        "documentType": "runtime-operation-request",
+        "schemaVersion": "\(schemaVersion)",
+        "requestId": "req-doctor-probe",
+        "idempotencyKey": "idem-doctor-probe",
+        "target": { "targetId": "TGT-DAYU200-01" },
+        "operation": { "id": "observe.device", "version": 1 }
+      }
+      """.utf8)
+  }
+
   // MARK: - Transport-free protocol negatives
 
   func testProtocolNegativesAreStructural() async throws {
