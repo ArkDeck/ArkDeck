@@ -1235,6 +1235,65 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(recoveredCapability?.remainingUses, 9_999)
   }
 
+  // MARK: - plan-only answers what a submit would need
+
+  /// `capture.diagnostics@1` is `readOnly` at its floor and mutates the device
+  /// once inputs select a file-producing leg, so the authorization a caller
+  /// needs depends on inputs it chose rather than on the operation it named.
+  /// Before this, the only way to find that out was to submit.
+  ///
+  /// The plan preview reports the effect these exact inputs select and the
+  /// policy the catalog attaches to it, and acquires nothing to do so.
+  func testPlanOnlyReportsTheEscalationItsOwnInputsCauseWithoutAcquiringAnything()
+    async throws
+  {
+    let (engine, capabilityStore) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .observationHappy))
+
+    func preview(inputs: String) async throws -> RuntimePlanOnlyPreview {
+      try await engine.planOnly(
+        Data(
+          """
+          {
+            "documentType": "runtime-operation-request",
+            "schemaVersion": "2.0.0",
+            "requestId": "req-plan-effect",
+            "idempotencyKey": "idem-plan-effect-01",
+            "target": { "targetId": "TGT-DAYU200-01", "expectedBindingRevision": 7 },
+            "operation": { "id": "capture.diagnostics", "version": 1 },
+            "inputs": { "durationSeconds": 5\(inputs) }
+          }
+          """.utf8))
+    }
+
+    let readOnly = try await preview(inputs: "")
+    XCTAssertEqual(readOnly.effectiveEffect, WorkflowEffect.readOnly.rawValue)
+    XCTAssertEqual(
+      readOnly.authorizationPolicy,
+      RuntimeOperationAuthorizationPolicy.defaultReadOnly.rawValue,
+      "a bounded read is admitted by the default policy, and the caller can see that")
+
+    let mutating = try await preview(
+      inputs: ", \"traceCategories\": [\"sched\"]")
+    XCTAssertEqual(
+      mutating.effectiveEffect, WorkflowEffect.deviceMutation.rawValue,
+      "selecting the remote-file trace leg escalates the effect, and the preview says so")
+    XCTAssertNotEqual(
+      mutating.authorizationPolicy, readOnly.authorizationPolicy,
+      "the same operation now needs a different authorization; that is the whole answer")
+
+    // Nothing was acquired to answer the question. Asserted on the store's
+    // durable state rather than on call counts: if the preview had issued,
+    // reserved or consumed anything, a capability would exist here.
+    let issued = try await capabilityStore.list()
+    XCTAssertEqual(
+      issued, [],
+      "plan-only must remain free of authorization side effects; found \(issued)")
+    XCTAssertFalse(readOnly.jobAdmitted)
+    XCTAssertFalse(mutating.jobAdmitted)
+    XCTAssertEqual(mutating.dispatchDisposition, "notDispatched")
+  }
+
   func testMissingRequiredInputIsRejected() async throws {
     let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let bad = Data(

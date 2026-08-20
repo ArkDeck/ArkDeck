@@ -89,6 +89,23 @@ public struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
   public let materializedPlanDigest: String
   public let inputs: [String: JSONValue]
   public let steps: [RuntimePlanOnlyStep]
+  /// The effect these exact inputs select, not the operation's floor.
+  ///
+  /// `capture.diagnostics@1` is `readOnly` until `traceCategories`,
+  /// `uiScreenshot` or `uiComponentTree` selects a file-producing leg, at
+  /// which point it mutates the device and needs a capability. That is
+  /// decided here from the same rule admission uses, so a caller can see the
+  /// escalation its own inputs caused before submitting anything.
+  public let effectiveEffect: String
+  /// Which authorization the catalog attaches to that effect —
+  /// `defaultReadOnly`, `standingCapability` or `runtimeCapability`. Absent
+  /// when the catalog declares none, which is itself a refusal at submit.
+  public let authorizationPolicy: String?
+  /// A provider prerequisite that would refuse this plan before any
+  /// capability is issued, read from the same resolved facts admission reads.
+  /// Absent means the provider raised none at preview time; it is not a
+  /// promise about a later submit, because facts are re-read then.
+  public let providerAdmissionBlocker: String?
   public let jobAdmitted: Bool
   public let dispatchDisposition: String
 }
@@ -1133,6 +1150,22 @@ public actor RuntimeJobEngine {
     let selectedSteps = descriptor.steps.filter {
       Self.stepIsRequested($0, descriptor: descriptor, inputs: request.inputs)
     }
+    // What this plan would need, answered without acquiring any of it.
+    //
+    // `planOnly` stops before `preauthorize` on purpose and still does: the
+    // three values below are read from what materialization already produced.
+    // Nothing here reserves, consumes, issues or looks up a capability, and
+    // no lineage or ledger row is written — the preview only reports which
+    // gate a submit would meet, which is the question a caller previously had
+    // to answer by submitting.
+    let effectiveEffect = Self.effectiveEffect(
+      descriptor: descriptor, inputs: request.inputs)
+    let providerBlocker: String? = {
+      guard let facts = materialized.providerFacts,
+        let provider = providers.provider(id: descriptor.provider.rawValue)
+      else { return nil }
+      return provider.executionAdmissionBlocker(for: descriptor, facts: facts)
+    }()
     return RuntimePlanOnlyPreview(
       executionMode: "planOnly",
       operationReference: descriptor.reference,
@@ -1151,6 +1184,9 @@ public actor RuntimeJobEngine {
           cancellation: $0.cancellation.rawValue,
           binding: $0.binding.rawValue, isOptional: $0.isOptional)
       },
+      effectiveEffect: effectiveEffect.rawValue,
+      authorizationPolicy: descriptor.authorization[effectiveEffect]?.rawValue,
+      providerAdmissionBlocker: providerBlocker,
       jobAdmitted: false,
       dispatchDisposition: "notDispatched")
   }
