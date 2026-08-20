@@ -34,7 +34,7 @@ package struct RuntimeJobRepositoryPage: Sendable, Equatable {
   public let nextCursor: String?
 }
 
-public enum RuntimeJobRepositoryError: Error, Equatable, Sendable {
+package enum RuntimeJobRepositoryError: Error, Equatable, Sendable {
   case ioFailure(String)
   case corrupt(String)
 }

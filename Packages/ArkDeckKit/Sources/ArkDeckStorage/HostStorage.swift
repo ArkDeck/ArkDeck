@@ -727,7 +727,7 @@ package enum StorageClaimExecution<Value: Sendable>: Sendable {
   case queued(StorageQueueReason)
 }
 
-public struct StorageOperationFinalizationError: Error, @unchecked Sendable {
+package struct StorageOperationFinalizationError: Error, @unchecked Sendable {
   public let operationError: any Error
   public let finalizationError: any Error
 

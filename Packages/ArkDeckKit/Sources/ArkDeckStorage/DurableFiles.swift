@@ -28,7 +28,7 @@ public struct DurabilityFaultInjector: @unchecked Sendable {
   public static let none = DurabilityFaultInjector { _ in }
 }
 
-public enum DurableFileError: Error, Equatable, Sendable {
+package enum DurableFileError: Error, Equatable, Sendable {
   case pathMustBeAbsolute(String)
   case symbolicLinkRejected(String)
   case openFailed(path: String, errno: Int32)
