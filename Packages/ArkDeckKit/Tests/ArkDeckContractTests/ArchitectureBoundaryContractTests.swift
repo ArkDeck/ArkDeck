@@ -534,6 +534,78 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     }
     return lines.joined(separator: "\n")
   }
+  // MARK: - 8. The runtime engine gains no new per-operation knowledge
+
+  /// The engine names fourteen specific published operations, and each naming
+  /// is catalog or provider knowledge that migrated into the generic kernel:
+  /// mutation/readback pairings, evidence eligibility, per-operation
+  /// compensation, per-operation input handling. That is why publishing a new
+  /// operation currently costs an edit to the execution kernel.
+  ///
+  /// Refactoring it out is frozen — PRODUCT-LOOP §12 and §20 bar large module
+  /// restructuring and this meets none of §12's exceptions — so this stops the
+  /// bleeding rather than draining it. The set may shrink as each fact moves
+  /// to the Catalog or a provider; it may not grow.
+  ///
+  /// Compared as an exact set in both directions. An upper-bound-only rule is
+  /// precisely how the git execution allowlist quietly widened: one of its two
+  /// declared files was deleted, the entry stayed, and nothing failed.
+  ///
+  /// Scope is this one file on purpose. A provider naming the operations it
+  /// implements is doing its job; the kernel doing it is the layering problem,
+  /// and the kernel is here.
+  private static let engineDeclaredOperations: Set<String> = [
+    "analyzer.analyze-trace@1",
+    "analyzer.extract-crash-signature@1",
+    "analyzer.summarize-hilog@1",
+    "analyzer.summarize-trace@1",
+    "capture.diagnostics@1",
+    "debug.hap@1",
+    "deploy.native-library.app-owned@1",
+    "flash.dayu200",
+    "observe.device@1",
+    "port-forward.create@1",
+    "port-forward.remove@1",
+    "workspace.apply-patch@1",
+    "workspace.create-checkpoint@1",
+    "workspace.symbolize-crash@1",
+  ]
+
+  func testTheRuntimeEngineNamesNoNewPublishedOperation() throws {
+    let engine = packageRoot().appending(
+      path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
+    let code = try codeWithoutComments(of: engine)
+    let pattern =
+      #""(?:analyzer|workspace|debug|capture|observe|flash|deploy|port-forward)"#
+      + #"\.[a-z0-9.\-]+(?:@[0-9]+)?""#
+    let expression = try NSRegularExpression(pattern: pattern)
+    var observed: Set<String> = []
+    for match in expression.matches(
+      in: code, range: NSRange(code.startIndex..., in: code))
+    {
+      guard let range = Range(match.range, in: code) else { continue }
+      observed.insert(String(code[range].dropFirst().dropLast()))
+    }
+    XCTAssertFalse(
+      observed.isEmpty, "the scan found no operation references; it tests nothing now")
+
+    let added = observed.subtracting(Self.engineDeclaredOperations).sorted()
+    XCTAssertEqual(
+      added, [],
+      """
+      the execution kernel gained per-operation knowledge for \(added.joined(separator: ", ")); \
+      that belongs to the Catalog descriptor or the provider that implements it, and adding it \
+      here makes publishing an operation an edit to the engine
+      """)
+    let stale = Self.engineDeclaredOperations.subtracting(observed).sorted()
+    XCTAssertEqual(
+      stale, [],
+      """
+      \(stale.joined(separator: ", ")) is declared here but the engine no longer names it — \
+      the point of this list is that it shrinks, so record the win by removing the entry
+      """)
+  }
+
 }
 
 /// `AFA-AC-1`: the Rockchip lowering is gone from product code.
