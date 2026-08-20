@@ -39,21 +39,40 @@ run_lane() {
   peak_memory_footprint=$(sed -n -E \
     's/^[[:space:]]*([0-9]+)  peak memory footprint$/\1/p' "$log" | tail -n 1)
   rm -f "$log"
+  # `filter` is printed because the lane name is not a statement of coverage.
+  # `medium` used to run fewer tests than `fast`, and nothing in the output
+  # said so — the reader had to know the case statement to tell.
   printf \
-    'ArkDeck test lane: %s; exitCode=%s; testCount=%s; durationSeconds=%s; maximumResidentSetBytes=%s; peakMemoryFootprintBytes=%s; slowTest=%s\n' \
+    'ArkDeck test lane: %s; exitCode=%s; testCount=%s; durationSeconds=%s; maximumResidentSetBytes=%s; peakMemoryFootprintBytes=%s; slowTest=%s; filter=%s\n' \
     "$label" "$status" "${test_count:-unavailable}" "$((finished - started))" \
-    "${maximum_resident_set:-unavailable}" "${peak_memory_footprint:-unavailable}" "$label"
+    "${maximum_resident_set:-unavailable}" "${peak_memory_footprint:-unavailable}" "$label" \
+    "${lane_filter:-<whole suite>}"
   return "$status"
 }
 
 case "$lane" in
   fast)
+    lane_filter='ArkDeckCoreTests'
     run_lane fast "$swiftpm" test --parallel --num-workers "$workers" \
-      --filter ArkDeckCoreTests
+      --filter "$lane_filter"
     ;;
   medium)
+    # Now a superset of `fast`, which it was not: it named two contract
+    # classes and ran eighty-four tests where `fast` ran ninety-four, so
+    # moving up a tier narrowed coverage and the name said the opposite.
+    lane_filter='ArkDeckCoreTests|RuntimeJobEngineContractTests|AgentDaemonContractTests'
     run_lane medium "$swiftpm" test --parallel --num-workers "$workers" \
-      --filter 'RuntimeJobEngineContractTests|AgentDaemonContractTests'
+      --filter "$lane_filter"
+    ;;
+  provider)
+    lane_filter='WorkspaceProvider|DeviceProvider|AnalyzerProvider|Diagnostics'
+    run_lane provider "$swiftpm" test --parallel --num-workers "$workers" \
+      --filter "$lane_filter"
+    ;;
+  storage)
+    lane_filter='Storage|Artifact|Journal|Retention|Capability'
+    run_lane storage "$swiftpm" test --parallel --num-workers "$workers" \
+      --filter "$lane_filter"
     ;;
   slow)
     ARKDECK_RUN_SLOW_ARTIFACT_TESTS=1 \
@@ -80,7 +99,7 @@ case "$lane" in
     run_lane full "$swiftpm" test --parallel --num-workers "$workers"
     ;;
   *)
-    echo "usage: sh Packages/ArkDeckKit/Scripts/run-test-lane.sh {fast|medium|slow|full|focus <test-filter>}" >&2
+    echo "usage: sh Packages/ArkDeckKit/Scripts/run-test-lane.sh {fast|medium|provider|storage|slow|full|focus <test-filter>}" >&2
     exit 64
     ;;
 esac
