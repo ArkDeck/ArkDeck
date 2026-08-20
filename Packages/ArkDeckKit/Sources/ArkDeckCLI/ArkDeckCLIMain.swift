@@ -433,9 +433,13 @@ struct ArkDeckCommandLine {
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck trace probe --target <id> [--socket <path>] [--json]
+        arkdeck job plan --target <id> --operation <reference> \
+      [--inputs-file <typed-inputs.json>] [--expected-binding-revision <n>] \
+      [--socket <path>] [--json]
         arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <reference> \
-      [--expected-binding-revision <n>] [--wait] [--json]
+      [--inputs-file <typed-inputs.json>] [--expected-binding-revision <n>] \
+      [--wait] [--json]
         arkdeck job status --job <id> [--json]
         arkdeck job list [--page-size <1...1000>] [--cursor <token>] [--json]
         arkdeck job run|cancel|reconcile --job <id> [--json]

@@ -262,11 +262,19 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   /// A host-only operation must *not* carry a revision: there is no binding to
   /// pin, and the engine refuses a host-only request that pins one
   /// (CHG-2026-054 HTP-AC-20).
+  /// The envelope an operator or agent would otherwise hand-write.
+  ///
+  /// `inputs` is the parameter that makes this usable for more than the two
+  /// operations that take none. Without it the flag form could express only
+  /// target and operation, so anything with typed inputs — which is nearly
+  /// everything — had to be submitted as a full v2 document, and the envelope
+  /// around those inputs was the caller's problem to get right.
   public static func operatorFlagForm(
     targetID: String,
     expectedBindingRevision: Int?,
     operationID: String,
     version: Int?,
+    inputs: [String: JSONValue] = [:],
     requestID: String,
     idempotencyKey: String
   ) throws -> RuntimeOperationRequest {
@@ -291,7 +299,8 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
       idempotencyKey: idempotencyKey,
       target: DurableTargetReference(
         targetID: targetID, expectedBindingRevision: expectedBindingRevision),
-      operation: RuntimeOperationReference(id: operationID, version: version))
+      operation: RuntimeOperationReference(id: operationID, version: version),
+      inputs: inputs)
   }
 
   public init(from decoder: Decoder) throws {

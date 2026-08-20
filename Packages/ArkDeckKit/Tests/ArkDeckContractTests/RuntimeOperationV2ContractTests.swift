@@ -290,6 +290,83 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     assertRejected(data, code: .invalidRequest)
   }
 
+  // MARK: - The envelope is not the caller's problem
+
+  /// The flag form used to express only target and operation, so any
+  /// operation with typed inputs — nearly all of them — forced the caller to
+  /// hand-write the whole v2 document. The envelope around those inputs then
+  /// cost one refusal per field to learn.
+  ///
+  /// Asserted as byte equality against the hand-written document rather than
+  /// by inspecting fields: the point is that the two produce the *same*
+  /// request, so a caller gains nothing by writing it themselves.
+  func testTheFlagFormWithInputsProducesTheSameDocumentAsWritingItByHand() throws {
+    let byHand = try RuntimeOperationCodec.decodeRequest(
+      Data(
+        """
+        {
+          "documentType": "runtime-operation-request",
+          "schemaVersion": "2.0.0",
+          "requestId": "req-envelope",
+          "idempotencyKey": "idem-envelope-01",
+          "target": { "targetId": "TGT-DAYU200-01", "expectedBindingRevision": 7 },
+          "operation": { "id": "capture.diagnostics", "version": 1 },
+          "inputs": { "durationSeconds": 30, "hilogFilters": ["ArkUI:Info"] }
+        }
+        """.utf8))
+    let fromFlags = try RuntimeOperationRequest.operatorFlagForm(
+      targetID: "TGT-DAYU200-01",
+      expectedBindingRevision: 7,
+      operationID: "capture.diagnostics",
+      version: 1,
+      inputs: [
+        "durationSeconds": .integer(30),
+        "hilogFilters": .array([.string("ArkUI:Info")]),
+      ],
+      requestID: "req-envelope",
+      idempotencyKey: "idem-envelope-01")
+
+    XCTAssertEqual(
+      try RuntimeOperationCodec.encodeRequest(fromFlags),
+      try RuntimeOperationCodec.encodeRequest(byHand),
+      "the CLI-built envelope must be the document a caller would have written")
+  }
+
+  /// The rules a caller keeps getting wrong stay owned by the request model,
+  /// so the flag form refuses in its words rather than inventing a second
+  /// message that could drift from it.
+  func testTheFlagFormKeepsTheBindingRulesAndTheirWording() {
+    XCTAssertThrowsError(
+      try RuntimeOperationRequest.operatorFlagForm(
+        targetID: "TGT-DAYU200-01",
+        expectedBindingRevision: nil,
+        operationID: "capture.diagnostics",
+        version: 1,
+        inputs: ["durationSeconds": .integer(30)],
+        requestID: "req-unpinned",
+        idempotencyKey: "idem-unpinned-01")
+    ) { error in
+      let rejection = error as? RuntimeOperationRequestRejection
+      XCTAssertEqual(rejection?.path, "$.target.expectedBindingRevision")
+      XCTAssertTrue(
+        rejection?.message.contains("--expected-binding-revision") == true,
+        "the refusal must name the flag that fixes it: \(rejection?.message ?? "-")")
+    }
+
+    XCTAssertThrowsError(
+      try RuntimeOperationRequest.operatorFlagForm(
+        targetID: "TGT-1",
+        expectedBindingRevision: 7,
+        operationID: "workspace.inspect-source",
+        version: 1,
+        requestID: "req-host-only",
+        idempotencyKey: "idem-host-only-01")
+    ) { error in
+      XCTAssertTrue(
+        (error as? RuntimeOperationRequestRejection)?.message.contains("host-only") == true)
+    }
+  }
+
   // MARK: - Bundle manifest
 
   func testBundleManifestSourceFieldsAreAllOptional() throws {
