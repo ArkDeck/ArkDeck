@@ -431,6 +431,7 @@ struct ArkDeckCommandLine {
         arkdeck signing status [--json]
         arkdeck signing remove [--json]
         arkdeck operation list [--socket <path>] [--json]
+        arkdeck operation describe --operation <reference> [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck trace probe --target <id> [--socket <path>] [--json]
         arkdeck job plan --target <id> --operation <reference> \

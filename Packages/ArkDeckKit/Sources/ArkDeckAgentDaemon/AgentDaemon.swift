@@ -285,6 +285,13 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "availabilityReasonOrigins": .array(
             (availability?.reasonCodes ?? [.providerNotRegistered])
               .map { .string($0.origin.rawValue) }),
+          // The input contract, which this reply carried none of. A caller
+          // could learn a field's name only by being refused for omitting it,
+          // and its meaning only by reading the catalog source — which is not
+          // a surface anything talking to an installed daemon has.
+          "inputs": .array(descriptor.inputs.map(Self.encodeCatalogField)),
+          "outputs": .array(descriptor.outputs.map(Self.encodeCatalogField)),
+          "exampleRequest": RuntimeRequestEnvelope.exampleRequestJSON(for: descriptor) ?? .null,
         ]))
 
     case "flash.lanePlanPreview":
@@ -1903,6 +1910,28 @@ public struct RuntimeControlPlaneHandler: Sendable {
       .predecessorBlocksContinuation:
       return .rejected
     }
+  }
+
+  /// One catalog field, projected whole.
+  ///
+  /// Absent constraints stay absent rather than becoming nulls a caller has to
+  /// tell apart from "unconstrained": every key present here is a rule that
+  /// applies.
+  private static func encodeCatalogField(_ field: CatalogFieldDescriptor) -> JSONValue {
+    var projected: [String: JSONValue] = [
+      "name": .string(field.name),
+      "type": .string(field.type.rawValue),
+      "required": .bool(field.isRequired),
+    ]
+    if let summary = field.summary { projected["description"] = .string(summary) }
+    if let declared = field.defaultValue { projected["default"] = declared }
+    if let values = field.enumValues { projected["enum"] = .array(values.map(JSONValue.string)) }
+    if let pattern = field.pattern { projected["pattern"] = .string(pattern) }
+    if let minimum = field.minimum { projected["minimum"] = .integer(Int64(minimum)) }
+    if let maximum = field.maximum { projected["maximum"] = .integer(Int64(maximum)) }
+    if let maxLength = field.maxLength { projected["maxLength"] = .integer(Int64(maxLength)) }
+    if let maxItems = field.maxItems { projected["maxItems"] = .integer(Int64(maxItems)) }
+    return .object(projected)
   }
 
   private static func encodeArtifact(_ metadata: RuntimeArtifactMetadata) -> JSONValue {
