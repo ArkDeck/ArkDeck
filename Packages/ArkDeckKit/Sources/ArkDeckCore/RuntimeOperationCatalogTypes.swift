@@ -352,13 +352,35 @@ package enum CatalogOperationEffectResolver {
     }
     switch step.stepID {
     case "stop-ability":
-      if case .string(let state)? = inputs["postRunAbilityState"] {
+      if case .string(let state)? = value("postRunAbilityState", descriptor, inputs) {
         return state == "stopped"
       }
       return true
     default:
       return true
     }
+  }
+
+  /// The value these inputs give a field, or the one the catalog declares when
+  /// they give none.
+  ///
+  /// The selection rules below used to encode the second half themselves: an
+  /// absent `cleanupPolicy` fell through to `return true` because the catalog
+  /// default happens to be `uninstall`. That restated a value the catalog
+  /// already declares, in a place nothing compared against it, so changing the
+  /// catalog default moved the document and not the behaviour. The rules now
+  /// ask for the value and compare it; only which value *means* what stays
+  /// here, because that is a fact about the step rather than about the field.
+  package static func resolvedInputValue(
+    _ name: String, descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
+  ) -> JSONValue? {
+    inputs[name] ?? descriptor.inputs.first { $0.name == name }?.defaultValue
+  }
+
+  private static func value(
+    _ name: String, _ descriptor: CatalogOperationDescriptor, _ inputs: [String: JSONValue]
+  ) -> JSONValue? {
+    resolvedInputValue(name, descriptor: descriptor, inputs: inputs)
   }
 
   /// Typed selection rules for published optional steps. Defaults mirror the
@@ -371,40 +393,40 @@ package enum CatalogOperationEffectResolver {
   ) -> Bool {
     switch step.stepID {
     case "capture-trace", "receive-trace-artifact", "cleanup-remote-temp":
-      if case .array(let categories)? = inputs["traceCategories"] {
+      if case .array(let categories)? = value("traceCategories", descriptor, inputs) {
         return !categories.isEmpty
       }
       return false
     case "capture-ui-dump":
-      if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
+      if case .bool(let enabled)? = value("uiDump", descriptor, inputs) { return enabled }
       return true
     case "capture-crash-index":
-      if case .bool(let enabled)? = inputs["crashLogs"] { return enabled }
+      if case .bool(let enabled)? = value("crashLogs", descriptor, inputs) { return enabled }
       return false
     case "capture-crash-log":
-      if case .string(let name)? = inputs["crashLogName"] { return !name.isEmpty }
+      if case .string(let name)? = value("crashLogName", descriptor, inputs) { return !name.isEmpty }
       return false
     case "observe-application-liveness":
-      if case .string(let bundleName)? = inputs["bundleName"] {
+      if case .string(let bundleName)? = value("bundleName", descriptor, inputs) {
         return !bundleName.isEmpty
       }
       return false
     case "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp":
-      if case .bool(let enabled)? = inputs["uiScreenshot"] { return enabled }
+      if case .bool(let enabled)? = value("uiScreenshot", descriptor, inputs) { return enabled }
       return false
     case "capture-ui-tree", "receive-ui-tree", "cleanup-ui-tree-temp":
-      if case .bool(let enabled)? = inputs["uiComponentTree"] { return enabled }
+      if case .bool(let enabled)? = value("uiComponentTree", descriptor, inputs) { return enabled }
       return false
     case "capture-diagnostics":
-      if case .bool(let enabled)? = inputs["captureDiagnostics"] { return enabled }
+      if case .bool(let enabled)? = value("captureDiagnostics", descriptor, inputs) { return enabled }
       return true
     case "cleanup-uninstall":
-      if case .string(let policy)? = inputs["cleanupPolicy"] {
+      if case .string(let policy)? = value("cleanupPolicy", descriptor, inputs) {
         return policy == "uninstall"
       }
       return true
     case "capture-post-flash-diagnostics":
-      if case .string(let profile)? = inputs["postFlashVerification"] {
+      if case .string(let profile)? = value("postFlashVerification", descriptor, inputs) {
         return profile == "full"
       }
       return true

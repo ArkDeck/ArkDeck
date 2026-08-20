@@ -88,6 +88,50 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       "field descriptions must reach the runtime rather than stopping at the catalog")
   }
 
+  /// Omitting an input and passing the catalog's own default for it must
+  /// select the same plan.
+  ///
+  /// The selection rules used to restate each default themselves — an absent
+  /// `cleanupPolicy` fell through to "run cleanup-uninstall" because the
+  /// declared default happens to be `uninstall`. Nothing compared the two, so
+  /// editing the catalog default moved the document and left the behaviour
+  /// where it was, and the effect admission charges is computed from these
+  /// same rules.
+  ///
+  /// This holds the property rather than the values: it reads each default out
+  /// of the catalog and requires the two paths to agree, for every published
+  /// operation and every step it declares.
+  func testOmittingAnInputSelectsTheSamePlanAsPassingItsCatalogDefault() {
+    var checked = 0
+    for descriptor in RuntimeOperationCatalog.operations {
+      for field in descriptor.inputs {
+        guard let declared = field.defaultValue else { continue }
+        checked += 1
+        let explicit: [String: JSONValue] = [field.name: declared]
+        for step in descriptor.steps {
+          XCTAssertEqual(
+            CatalogOperationEffectResolver.stepIsSelected(
+              step, descriptor: descriptor, inputs: [:]),
+            CatalogOperationEffectResolver.stepIsSelected(
+              step, descriptor: descriptor, inputs: explicit),
+            """
+            \(descriptor.reference) step \(step.stepID): omitting \(field.name) selects a \
+            different plan than passing its declared default \(declared) — the rule restates \
+            a default instead of reading it
+            """)
+        }
+        XCTAssertEqual(
+          CatalogOperationEffectResolver.effectiveEffect(descriptor: descriptor, inputs: [:]),
+          CatalogOperationEffectResolver.effectiveEffect(
+            descriptor: descriptor, inputs: explicit),
+          "\(descriptor.reference): \(field.name)'s default changes the charged effect")
+      }
+    }
+    XCTAssertEqual(
+      checked, 18,
+      "the catalog declares eighteen input defaults; all of them must be exercised here")
+  }
+
   func testDescriptorLookupIsExactAndFailClosed() {
     XCTAssertNotNil(RuntimeOperationCatalog.descriptor(id: "observe.device", version: 1))
     XCTAssertNil(RuntimeOperationCatalog.descriptor(id: "observe.device", version: 2))
