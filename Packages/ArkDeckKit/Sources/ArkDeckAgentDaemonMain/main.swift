@@ -726,22 +726,20 @@ Task.detached {
           + "\(recovery.proof.currentRevision)")
       fflush(stdout)
     }
-    // The in-process task plane was removed by CHG-2026-064: decisions come
-    // from external agents through the published caller surface. A leftover
-    // gateway configuration is a misconfiguration, not something to ignore —
-    // fail loud so the operator regenerates the LaunchAgent plist with
-    // `arkdeck agentd update` instead of assuming the loop still exists.
-    // (`ARKDECK_HARNESS_MODEL_*` stays: `arkdeck agent chat` reads it from
-    // its own process environment; it was never daemon configuration.)
-    let removedHarnessKeys = [
-      "ARKDECK_HARNESS_CLI_PATH", "ARKDECK_HARNESS_CLI_WORKDIR",
-      "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS", "ARKDECK_HARNESS_EGRESS_PROJECTS",
-      "ARKDECK_HARNESS_SENSITIVE_EVIDENCE",
-    ].filter { ProcessInfo.processInfo.environment[$0] != nil }
+    // `ARKDECK_HARNESS_*` is a retired namespace, not a list of retired keys.
+    // The in-process task plane went with CHG-2026-064 and the model keys went
+    // with `arkdeck agent chat`; nothing in this repository reads the prefix
+    // any more. Rejecting by prefix rather than by roster is what makes that
+    // true rather than merely current — a host still carrying a key nobody
+    // remembered to enumerate fails loud instead of starting up with a stale
+    // model credential in the environment of every process the daemon spawns.
+    let removedHarnessKeys = ProcessInfo.processInfo.environment.keys.filter {
+      $0.hasPrefix("ARKDECK_HARNESS_")
+    }
     guard removedHarnessKeys.isEmpty else {
       FileHandle.standardError.write(
         Data(
-          ("arkdeck-agentd: configuration removed by CHG-2026-064 is still set: "
+          ("arkdeck-agentd: retired configuration is still set: "
             + removedHarnessKeys.sorted().joined(separator: ",")
             + "; run `arkdeck agentd update` to regenerate the LaunchAgent plist\n").utf8))
       exit(78)  // EX_CONFIG

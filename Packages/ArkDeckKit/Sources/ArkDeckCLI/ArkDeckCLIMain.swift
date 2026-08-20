@@ -460,8 +460,6 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
-        arkdeck agent chat [--prompt <text>] [--socket <path>] \
-      [--allow-sensitive-artifacts]
         arkdeck agent run --operation <reference> [--target <id>] [--inputs-file <path>] \
       [--capability <CAP-RT-...>] [--execution-id <id>] [--json]
         arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
@@ -469,10 +467,10 @@ struct ArkDeckCommandLine {
       doctor/operation/device/trace/job/debug talk only to arkdeck-agentd over its user-private socket:
       this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
 
-      agent chat uses ArkDeck's native bounded conversation and typed-tool loop. Configure its
-      OpenAI-compatible model with ARKDECK_HARNESS_MODEL_PROVIDER=openai plus
-      ARKDECK_HARNESS_MODEL_NAME and ARKDECK_HARNESS_MODEL_API_KEY. Sensitive Artifact text
-      stays local unless you explicitly pass --allow-sensitive-artifacts for that chat session.
+      ArkDeck runs no model of its own. Decisions come from whichever agent you already use;
+      it reaches ArkDeck through this same published surface, and every side effect it causes
+      passes the admission every other caller passes. `operation describe` publishes an
+      operation's typed inputs and an example request.
 
       Flash execution is available only through the ArkDeck Flash UI or the typed Job API. The
       historical campaign and standing-authorization records exposed by `flash status` and

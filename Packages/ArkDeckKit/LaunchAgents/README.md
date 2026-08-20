@@ -237,8 +237,10 @@ HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony 
 - **plist 迁移**:旧安装的 LaunchAgent env 若仍带 `ARKDECK_HARNESS_*` 网关键,
   运行一次 `arkdeck agentd update` 即可再生成不含这些键的 plist(update 读取旧
   配置时会忽略并丢弃它们)。手工编辑保留这些键的 plist 会让 daemon 启动时
-  具名 fail-loud(exit 78)。`ARKDECK_HARNESS_MODEL_*` 仍被 `arkdeck agent chat`
-  从其自身进程环境读取,与 daemon 无关。
+  具名 fail-loud(exit 78)。`ARKDECK_HARNESS_MODEL_*` 同样在这个列表里:
+  `arkdeck agent chat` 已删除,仓内无人再读这些键,而旧 plist 里可能还躺着一枚
+  API key——`agentd update` 会把它一并洗掉,这是升级到本版本后应当立即跑一次
+  `update` 的实际理由。
 - **历史数据**:daemon state 下的 `harness/` 私有 SQLite 目录不再被读取;
   保留在盘上作只读历史,操作者可自行删除。
 - **存量隔离工作区**(CHG-2026-067):被合法修补过的 `evolution-*` 树在重启后

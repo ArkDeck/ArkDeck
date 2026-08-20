@@ -110,8 +110,8 @@ CLI / AgentDaemonMain(可执行组合根)→ 宽,但仍在矩阵内
 任何生产源码 import ArkDeckHarness                     (同上,按文件点名)
 Storage / RuntimeArtifactStore -> 任务身份(HTASK)      (存储层任务无知)
 任何模块公开 API -> command: String / shell script     (typed argv-only)
-chat 模型符号(HarnessAgentModelGateway/OpenAIGateway/AgentLoop/ARKDECK_HARNESS_MODEL_)
-          -> 只准出现在 AgentComposition 与 ArkDeckCLI
+任何模型面(模型网关符号/ARKDECK_HARNESS_MODEL_/厂商端点/Bearer 凭据)
+          -> 全仓零出现,白名单为空(不是"限制在某目录",是不存在)
 git 可执行 -> 只有 WorkspaceOperationsProvider 一个声明点(集合精确相等:
           未登记的新引用与已失效的旧登记同样违规),且
           push/merge/commit/checkout/clone/… 写动词为字面量违规
@@ -119,7 +119,8 @@ git 可执行 -> 只有 WorkspaceOperationsProvider 一个声明点(集合精确
 
 对应测试(`ArchitectureBoundaryContractTests`):manifest 依赖矩阵(含
 「无 ArkDeckHarness target」断言)、逐文件 import 矩阵、决策平面移除保持、
-raw-command 公开 API 扫描、chat 模型面隔离、git 执行点收敛、存储任务无知、
+raw-command 公开 API 扫描、全仓零模型面(空白名单)、chat 组合体保持删除、
+git 执行点收敛、存储任务无知、
 carve-out `exclude:` 防回流。
 文件级扫描不是 manifest 检查的冗余:SwiftPM 允许同包未声明依赖的 import
 通过编译,测试是那个洞的唯一护栏。

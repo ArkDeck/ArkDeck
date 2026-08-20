@@ -925,21 +925,29 @@ enum RuntimeCLI {
       json: json)
   }
 
-  /// `arkdeck agent chat|run|resume` - the Device Runtime Agent entry point.
-  /// Chat keeps conversation and tool-loop state inside ArkDeck, while every
-  /// device action still enters through the typed Runtime executor.
-  /// A persisted resume token keeps physical assistance inside the same
+  /// `arkdeck agent run|resume` - the Device Runtime Agent entry point.
+  /// Every device action enters through the typed Runtime executor. A
+  /// persisted resume token keeps physical assistance inside the same
   /// execution instead of asking a maintainer to restart host commands.
   static func runAgent(_ arguments: [String]) async throws {
     if arguments.first == "chat" {
-      try await AgentChatCLI.run(Array(arguments.dropFirst()))
-      return
+      // A tombstone rather than "unsupported subcommand", the same shape the
+      // retired `flash` verbs use: muscle memory gets a real answer and the
+      // replacement is named. ArkDeck no longer runs a conversation of its
+      // own — the decisions come from whichever agent the operator already
+      // has, through the published operation surface.
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "agent chat is retired: ArkDeck holds no model. Drive it from your own "
+          + "agent through the published surface — `arkdeck operation describe` to "
+          + "learn an operation, `arkdeck agent run` to execute one")
     }
     guard let subcommand = arguments.first, subcommand == "run" || subcommand == "resume" else {
       throw CLIError(
         exitCode: EX_USAGE,
         message:
-          "usage: arkdeck agent chat | agent run --operation <id@v> "
+          "usage: arkdeck agent run --operation <id@v> "
           + "| agent resume --resume-token <token>"
       )
     }
