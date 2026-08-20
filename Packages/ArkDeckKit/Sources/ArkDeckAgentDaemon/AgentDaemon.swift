@@ -971,9 +971,19 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "doctor":
+      // `doctor` is the first call a caller with no prior context makes, and
+      // the envelope contract was the thing it was about to need and could not
+      // ask for: submitting without `schemaVersion` answered "required" without
+      // naming a value, and guessing "1.0.0" only then reported that major 2 is
+      // accepted. Two round trips to learn one constant the daemon already
+      // holds. Both values below are forwarded from their definitions rather
+      // than restated, so this report cannot drift away from what admission
+      // actually enforces.
       var report: [String: JSONValue] = [
         "protocolVersion": .string(AgentWireProtocol.version),
+        "runtimeRequestSchemaVersion": .string(RuntimeRequestEnvelope.schemaVersion),
         "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
+        "operationCount": .integer(Int64(RuntimeOperationCatalog.operations.count)),
         "providers": .array(providerIDs.map(JSONValue.string)),
         "targetStore": .string(targetStore == nil ? "unavailable" : "ready"),
         "bootstrap": .string(bootstrap == nil ? "unavailable" : "ready"),
