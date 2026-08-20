@@ -458,6 +458,15 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       document["EnvironmentVariables"] as? [String: String])
     legacyEnvironment["ARKDECK_HARNESS_MODEL_PROVIDER"] = "codex"
     legacyEnvironment["ARKDECK_HARNESS_MODEL_NAME"] = "gpt-5.6-terra"
+    // The credential pair is the reason this assertion matters. `agent chat`
+    // is deleted, so nothing reads these any more — but a machine that ran the
+    // old build still has an API key sitting in a plist that every process the
+    // daemon spawns would inherit. `update` regenerates from the bundled
+    // template rather than editing the old plist, so the key is dropped by
+    // construction; this pins that, because the daemon now refuses to start
+    // while any `ARKDECK_HARNESS_*` key survives.
+    legacyEnvironment["ARKDECK_HARNESS_MODEL_API_KEY"] = "sk-live-should-not-survive"
+    legacyEnvironment["ARKDECK_HARNESS_MODEL_ENDPOINT"] = "https://api.openai.com/v1"
     legacyEnvironment["ARKDECK_HARNESS_CLI_PATH"] = "/usr/bin/true"
     legacyEnvironment["ARKDECK_HARNESS_CLI_WORKDIR"] = project.path
     legacyEnvironment["ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"] = "300"
@@ -474,6 +483,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     for removed in [
       "ARKDECK_HARNESS_MODEL_PROVIDER", "ARKDECK_HARNESS_MODEL_NAME",
+      "ARKDECK_HARNESS_MODEL_API_KEY", "ARKDECK_HARNESS_MODEL_ENDPOINT",
       "ARKDECK_HARNESS_CLI_PATH", "ARKDECK_HARNESS_CLI_WORKDIR",
       "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS", "ARKDECK_HARNESS_EGRESS_PROJECTS",
       "ARKDECK_HARNESS_SENSITIVE_EVIDENCE",

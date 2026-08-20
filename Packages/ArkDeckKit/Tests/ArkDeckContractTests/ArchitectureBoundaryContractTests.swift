@@ -237,30 +237,60 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     }
   }
 
-  // MARK: - 5. LLM surface isolation
+  // MARK: - 5. No model surface anywhere
 
-  /// The chat front-end's model gateway belongs to the composition target
-  /// and its CLI entry only. The runtime engine, providers, storage and
-  /// clients must not name a model surface.
-  func testLLMSurfaceStaysInTheChatComposition() throws {
-    let llmTokens = [
+  /// ArkDeck holds no model. Not a confined one — none.
+  ///
+  /// This used to permit a model gateway inside the chat composition and the
+  /// CLI, and assert only that it stayed there. `arkdeck agent chat` was the
+  /// thing behind that carve-out, and deleting it lets the rule say what the
+  /// architecture actually claims: decisions come from external agents, so no
+  /// target names a model surface, reads a model credential, or addresses a
+  /// vendor endpoint.
+  ///
+  /// The empty allowlist is the load-bearing part. While it had entries, "no
+  /// in-process model" was a convention two directories were exempt from; with
+  /// none, it is a property of the tree.
+  func testNoModelSurfaceExistsAnywhere() throws {
+    let modelTokens = [
       "HarnessAgentModelGateway", "HarnessAgentOpenAIGateway", "HarnessAgentLoop",
       "ARKDECK_HARNESS_MODEL_",
+      // A gateway that returned under another name would still need these.
+      "api.openai.com", "Authorization: Bearer", "chat/completions",
     ]
-    let allowedPrefixes = [
-      "Sources/ArkDeckWorkflows/AgentComposition/",
-      "Sources/ArkDeckCLI/",
-    ]
+    let allowedPrefixes: [String] = []
+    XCTAssertTrue(
+      allowedPrefixes.isEmpty,
+      "a carve-out here turns the absence of an in-process model back into a convention")
+    var scanned = 0
     for (_, path, carveOuts) in Self.targetRoots {
       for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {
         let rel = relative(file)
         guard !allowedPrefixes.contains(where: { rel.hasPrefix($0) }) else { continue }
+        scanned += 1
         let code = try codeWithoutComments(of: file)
-        for token in llmTokens {
+        for token in modelTokens {
           XCTAssertFalse(
             code.contains(token),
-            "\(rel): LLM surface token \(token) outside the harness/composition planes")
+            "\(rel): names a model surface (\(token)); decisions come from external agents")
         }
+      }
+    }
+    XCTAssertGreaterThan(scanned, 100, "the scan covered almost nothing")
+  }
+
+  /// The chat composition is gone by name, so a file cannot quietly return
+  /// under it.
+  func testTheChatCompositionStaysDeleted() throws {
+    for name in [
+      "AgentChatApplication.swift", "AgentChatCLI.swift", "HarnessAgentLoop.swift",
+      "HarnessAgentOpenAIGateway.swift", "NativeAgentChatRuntimeTools.swift",
+    ] {
+      for directory in ["Sources/ArkDeckWorkflows/AgentComposition", "Sources/ArkDeckCLI"] {
+        XCTAssertFalse(
+          FileManager.default.fileExists(
+            atPath: packageRoot().appending(path: "\(directory)/\(name)").path),
+          "\(directory)/\(name) returned; ArkDeck runs no conversation of its own")
       }
     }
   }
