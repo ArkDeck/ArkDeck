@@ -124,6 +124,88 @@ final class WorkflowStepContractTests: XCTestCase {
     XCTAssertEqual(WorkflowStepRegistry.schemaIdentifier, contract["$id"] as? String)
   }
 
+  /// The locked contract and the code that enforces it must agree on what
+  /// each step's arguments are.
+  ///
+  /// Two comparisons already existed — the kind vocabulary, and the registry's
+  /// effect/cancellation/binding rows — and neither reached the part that is
+  /// three thousand lines of the contract: the per-kind argument objects. A
+  /// new step kind writes its required keys twice, once in
+  /// `WorkflowStepRegistry` and once in `$defs.<kind>Arguments`, and until now
+  /// nothing compared them. Measured before writing this, they agreed
+  /// everywhere; the exposure was structural rather than realised, and this
+  /// keeps it that way.
+  ///
+  /// `WorkflowStepMetadata` is the right side to compare against because it is
+  /// the enforcement point: `WorkflowStepValidator.validate(arguments:for:)`
+  /// reads `requiredArgumentKeys` and `allowedArgumentKeys` directly, so this
+  /// asserts the document against the executor rather than against a third
+  /// transcription of the same list.
+  func testEveryStepKindsArgumentContractMatchesTheRegistryItIsEnforcedBy() throws {
+    let contract = try loadContract(named: "workflow-step.schema.json")
+    let definitions = try XCTUnwrap(contract["$defs"] as? [String: Any])
+    let chain = try XCTUnwrap(
+      (definitions["typedArgumentsByKind"] as? [String: Any])?["allOf"] as? [[String: Any]])
+
+    // The chain maps kinds to argument objects two ways — one kind by `const`,
+    // a group of kinds sharing an object by `enum` — and then refines: a kind
+    // may additionally require a key, or be forbidden one the shared object
+    // allows. All three shapes have to be read, or the comparison silently
+    // covers only part of the vocabulary.
+    var referenced: [String: String] = [:]
+    var additionalRequired: [String: Set<String>] = [:]
+    var forbidden: [String: Set<String>] = [:]
+    for entry in chain {
+      let condition =
+        ((entry["if"] as? [String: Any])?["properties"] as? [String: Any])?["kind"]
+        as? [String: Any]
+      let kinds: [String]
+      if let single = condition?["const"] as? String {
+        kinds = [single]
+      } else if let group = condition?["enum"] as? [String] {
+        kinds = group
+      } else {
+        continue
+      }
+      guard
+        let arguments =
+          ((entry["then"] as? [String: Any])?["properties"] as? [String: Any])?["arguments"]
+          as? [String: Any]
+      else { continue }
+      if let reference = arguments["$ref"] as? String {
+        for kind in kinds { referenced[kind] = String(reference.split(separator: "/").last ?? "") }
+      } else if let required = arguments["required"] as? [String] {
+        for kind in kinds { additionalRequired[kind, default: []].formUnion(required) }
+      } else if let absent = (arguments["not"] as? [String: Any])?["required"] as? [String] {
+        for kind in kinds { forbidden[kind, default: []].formUnion(absent) }
+      }
+    }
+
+    for kind in WorkflowStepKind.allCases {
+      let raw = kind.rawValue
+      let name = try XCTUnwrap(referenced[raw], "\(raw): the contract maps it to no arguments object")
+      let object = try XCTUnwrap(definitions[name] as? [String: Any], name)
+      let metadata = WorkflowStepRegistry.metadata(for: kind)
+
+      let contractRequired =
+        Set(object["required"] as? [String] ?? []).union(additionalRequired[raw] ?? [])
+      XCTAssertEqual(
+        contractRequired, metadata.requiredArgumentKeys,
+        "\(raw): the contract and the validator disagree on which arguments are required")
+
+      let contractAllowed =
+        Set((object["properties"] as? [String: Any])?.keys ?? [:].keys)
+        .subtracting(forbidden[raw] ?? [])
+      XCTAssertEqual(
+        contractAllowed, metadata.allowedArgumentKeys,
+        "\(raw): the contract and the validator disagree on which arguments are accepted")
+
+      XCTAssertEqual(
+        object["additionalProperties"] as? Bool, false,
+        "\(raw): the arguments object must be closed, as the validator is")
+    }
+  }
+
   func testRegistryMetadataExactlyMatchesTheLockedRegistry() throws {
     let records = try loadInlineYAMLRecords(named: "workflow-step-registry.yaml")
     XCTAssertEqual(records.count, WorkflowStepKind.allCases.count)

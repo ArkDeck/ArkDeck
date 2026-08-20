@@ -50,7 +50,7 @@
         "finalizeSession",
         "inspectWorkspaceSource",
         "prepareWorkspaceIsolation",
-          "sweepWorkspaceIsolation",
+        "sweepWorkspaceIsolation",
         "applyWorkspacePatch",
         "buildWorkspaceOpenHarmony",
         "signWorkspaceOpenHarmonyHap",
