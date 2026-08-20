@@ -155,6 +155,119 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     assertRejected(data, code: .unsupportedVersion)
   }
 
+  // MARK: - A rejection has to say what to fix
+
+  /// The negatives above assert only `code`, which an answer of `path: "$"`
+  /// carrying a reflected Swift `DecodingError` satisfies just as well. These
+  /// assert the two halves a caller actually reads.
+  ///
+  /// The version half is deliberately not "the message contains 2.0.0" and not
+  /// "the message contains the constant the code read" — both pass while the
+  /// advertised value is one admission rejects. It takes the version out of
+  /// the refusal, builds a request with it, and requires that request to
+  /// decode.
+  func testAVersionRefusalNamesAVersionThatThenWorks() throws {
+    let withoutVersion = Data(
+      String(decoding: minimalJSON(), as: UTF8.self)
+        .replacingOccurrences(of: "\"schemaVersion\": \"2.0.0\",", with: "").utf8)
+    let wrongMajor = Data(
+      String(decoding: minimalJSON(), as: UTF8.self)
+        .replacingOccurrences(of: "\"2.0.0\"", with: "\"1.0.0\"").utf8)
+    let malformed = Data(
+      String(decoding: minimalJSON(), as: UTF8.self)
+        .replacingOccurrences(of: "\"2.0.0\"", with: "\"not-a-version\"").utf8)
+
+    for (label, data) in [
+      ("missing", withoutVersion), ("wrong major", wrongMajor), ("malformed", malformed),
+    ] {
+      var reported: String?
+      XCTAssertThrowsError(try RuntimeOperationCodec.decodeRequest(data), label) { error in
+        guard let rejection = error as? RuntimeOperationRequestRejection else {
+          return XCTFail("\(label): expected a typed rejection, got \(error)")
+        }
+        XCTAssertEqual(rejection.code, .unsupportedVersion, label)
+        XCTAssertEqual(rejection.path, "$.schemaVersion", label)
+        reported = Self.firstQuotedVersion(in: rejection.message)
+      }
+      let suggested = try XCTUnwrap(
+        reported, "\(label): the refusal names no version the caller could use")
+      let repaired = Data(
+        String(decoding: minimalJSON(), as: UTF8.self)
+          .replacingOccurrences(of: "\"2.0.0\"", with: "\"\(suggested)\"").utf8)
+      XCTAssertNoThrow(
+        try RuntimeOperationCodec.decodeRequest(repaired),
+        "\(label): the version the refusal named is itself refused")
+    }
+  }
+
+  func testEachRequiredKeyIsRefusedAtItsOwnPathWithoutLeakingDecodingError() {
+    let required: [(line: String, path: String)] = [
+      ("\"requestId\": \"req-001\",", "$.requestId"),
+      ("\"idempotencyKey\": \"idem-0001\",", "$.idempotencyKey"),
+      ("\"target\": { \"targetId\": \"TGT-DAYU200-01\" },", "$.target"),
+      ("\"operation\": { \"id\": \"observe.device\", \"version\": 1 }", "$.operation"),
+    ]
+    for (line, path) in required {
+      var text = String(decoding: minimalJSON(), as: UTF8.self)
+      XCTAssertTrue(text.contains(line), "fixture drifted; \(line) is no longer present")
+      text = text.replacingOccurrences(of: line, with: "")
+      // Removing the last entry leaves a dangling comma before the closing
+      // brace. Left in place the document is malformed, and `path: "$"` would
+      // then be the correct answer — the assertion below would be measuring
+      // the fixture rather than the contract.
+      text = text.replacingOccurrences(
+        of: ",\\s*\\n\\s*\\}", with: "\n}", options: .regularExpression)
+      XCTAssertNotNil(
+        try? JSONSerialization.jsonObject(with: Data(text.utf8)),
+        "\(path): the fixture must stay well-formed JSON so the refusal is about the key")
+      XCTAssertThrowsError(
+        try RuntimeOperationCodec.decodeRequest(Data(text.utf8)), path
+      ) { error in
+        guard let rejection = error as? RuntimeOperationRequestRejection else {
+          return XCTFail("\(path): expected a typed rejection, got \(error)")
+        }
+        XCTAssertEqual(rejection.code, .invalidRequest, path)
+        XCTAssertEqual(
+          rejection.path, path,
+          "a caller that reads `path` to know what to fix must be told this key")
+        for leak in ["DecodingError", "CodingKeys", "Swift."] {
+          XCTAssertFalse(
+            rejection.message.contains(leak),
+            "\(path): the refusal leaks Swift's internal spelling (\(leak)): "
+              + rejection.message)
+        }
+      }
+    }
+  }
+
+  /// Naming the key must not cost the precision the nested models already
+  /// had: a present-but-invalid `target` still answers for the exact field.
+  func testANestedModelStillReportsItsOwnFieldRatherThanTheKeyAboveIt() {
+    let data = Data(
+      String(decoding: minimalJSON(), as: UTF8.self)
+        .replacingOccurrences(
+          of: "\"target\": { \"targetId\": \"TGT-DAYU200-01\" },",
+          with: "\"target\": { \"targetId\": \"\" },").utf8)
+    XCTAssertThrowsError(try RuntimeOperationCodec.decodeRequest(data)) { error in
+      XCTAssertEqual(
+        (error as? RuntimeOperationRequestRejection)?.path, "$.target.targetId")
+    }
+  }
+
+  private static func firstQuotedVersion(in message: String) -> String? {
+    var rest = Substring(message)
+    while let open = rest.firstIndex(of: "\"") {
+      let body = rest[rest.index(after: open)...]
+      guard let close = body.firstIndex(of: "\"") else { return nil }
+      let candidate = body[body.startIndex..<close]
+      if candidate.contains("."), candidate.allSatisfy({ $0.isNumber || $0 == "." }) {
+        return String(candidate)
+      }
+      rest = body[body.index(after: close)...]
+    }
+    return nil
+  }
+
   func testOversizedRequestIsRejected() {
     var text = String(decoding: minimalJSON(extra: ",\n  \"pad\": \"@\""), as: UTF8.self)
     text = text.replacingOccurrences(
