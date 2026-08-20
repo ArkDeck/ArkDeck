@@ -20,12 +20,14 @@
       "projectRef": {
         "type": "string",
         "required": true,
-        "maxLength": 128
+        "maxLength": 128,
+        "description": "Registered workspace project. This build ships `demo-app` and `ArkDeck`; which one a host offers depends on how its daemon was configured."
       },
       "patchAttemptRef": {
         "type": "string",
         "required": true,
-        "maxLength": 64
+        "maxLength": 64,
+        "description": "The attempt to revert, as returned in the `patchAttemptRef` summary field of the `workspace.apply-patch@1` job that applied it. The runtime reverts from its own durable copy of that patch, not from anything the caller supplies."
       },
       "expectedWorkspaceRevision": {
         "type": "string",

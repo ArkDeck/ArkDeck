@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "2f9d397dcb6add105c7a297577f229b3699be978d2262efe41d8cc3862ede0eb"
+  public static let catalogDigest = "53b52b97937030c322416841b16a7d1a19317c5227c9d163ed0886f6341f802b"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -22,17 +22,17 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "endNs", type: .integer, isRequired: false, minimum: 1, summary: "Exclusive range end; required together with startNs and greater than startNs."),
         CatalogFieldDescriptor(name: "kind", type: .string, isRequired: true, enumValues: ["context", "cpu", "scheduling", "slices", "range", "hot-intervals"], summary: "Closed ArkTrace context or deterministic analysis family."),
         CatalogFieldDescriptor(name: "limit", type: .integer, isRequired: false, minimum: 1, maximum: 1000, summary: "Per-analysis section limit, additionally bounded by maxRows and maxEvents."),
-        CatalogFieldDescriptor(name: "maxEvents", type: .integer, isRequired: true, minimum: 1, maximum: 100000),
-        CatalogFieldDescriptor(name: "maxOutputBytes", type: .integer, isRequired: true, minimum: 1024, maximum: 67108864),
-        CatalogFieldDescriptor(name: "maxRows", type: .integer, isRequired: true, minimum: 1, maximum: 100000),
-        CatalogFieldDescriptor(name: "pid", type: .integer, isRequired: false, minimum: 0),
+        CatalogFieldDescriptor(name: "maxEvents", type: .integer, isRequired: true, minimum: 1, maximum: 100000, summary: "Upper bound on trace events the analyzer may read while producing the answer. Bounds the work, where maxRows bounds the result."),
+        CatalogFieldDescriptor(name: "maxOutputBytes", type: .integer, isRequired: true, minimum: 1024, maximum: 67108864, summary: "Upper bound on the analysis document's size in bytes. The analyzer fails rather than truncating, so a bound this small for the requested kind is a refusal, not a shorter answer."),
+        CatalogFieldDescriptor(name: "maxRows", type: .integer, isRequired: true, minimum: 1, maximum: 100000, summary: "Upper bound on rows the analyzer may return, applied on top of `limit`. Bounds the answer's size independently of how many the query would match."),
+        CatalogFieldDescriptor(name: "pid", type: .integer, isRequired: false, minimum: 0, summary: "Operating-system process id to filter to, as recorded in the trace; omit for every process. Distinct from processKey, which is the trace's own internal identity."),
         CatalogFieldDescriptor(name: "processKey", type: .integer, isRequired: false, summary: "Stable process internal identity; zero is the absent sentinel and is rejected."),
         CatalogFieldDescriptor(name: "sourceArtifactRef", type: .artifactLease, isRequired: true, summary: "Existing immutable trace artifact resolved by the Runtime lease boundary."),
         CatalogFieldDescriptor(name: "startNs", type: .integer, isRequired: false, minimum: 0, summary: "Inclusive range start; required together with endNs and mutually exclusive with timestampNs."),
         CatalogFieldDescriptor(name: "threadKey", type: .integer, isRequired: false, summary: "Stable thread internal identity; zero is the absent sentinel and is rejected."),
         CatalogFieldDescriptor(name: "thresholdNs", type: .integer, isRequired: false, minimum: 0, summary: "Minimum long-slice duration for analysis kinds; absent means zero."),
-        CatalogFieldDescriptor(name: "tid", type: .integer, isRequired: false, minimum: 0),
-        CatalogFieldDescriptor(name: "timeoutMs", type: .integer, isRequired: true, minimum: 100, maximum: 120000),
+        CatalogFieldDescriptor(name: "tid", type: .integer, isRequired: false, minimum: 0, summary: "Operating-system thread id to filter to, as recorded in the trace; omit for every thread. Distinct from threadKey, which is the trace's own internal identity."),
+        CatalogFieldDescriptor(name: "timeoutMs", type: .integer, isRequired: true, minimum: 100, maximum: 120000, summary: "Wall-clock budget for the analyzer process. The provider also derives its own process deadline from this, rounded up to whole seconds and capped at 120."),
         CatalogFieldDescriptor(name: "timestampNs", type: .integer, isRequired: false, minimum: 0, summary: "Center timestamp for the reviewed 100 ms context/range window; mutually exclusive with startNs/endNs.")
       ],
       outputs: [
@@ -150,15 +150,15 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "crashLogName", type: .string, isRequired: false, pattern: "^[a-z]+-[A-Za-z0-9._-]{1,180}$", maxLength: 200, summary: "One Faultlogger entry to fetch, named exactly as the index lists it. An entry name, never a path."),
         CatalogFieldDescriptor(name: "crashLogs", type: .boolean, isRequired: false, summary: "Capture the device's Faultlogger index. Read-only: unlike the trace, tree and screenshot legs this does not raise the effective effect.", defaultValue: .bool(false)),
         CatalogFieldDescriptor(name: "durationSeconds", type: .integer, isRequired: true, minimum: 1, maximum: 600, summary: "Bounded HiLog capture window."),
-        CatalogFieldDescriptor(name: "expectedDeployedArtifactDigest", type: .string, isRequired: false, pattern: "^[0-9a-f]{64}$", maxLength: 64, summary: "Harness-owned expected digest of the deployment whose liveness is being sampled."),
+        CatalogFieldDescriptor(name: "expectedDeployedArtifactDigest", type: .string, isRequired: false, pattern: "^[0-9a-f]{64}$", maxLength: 64, summary: "Caller-supplied expected digest of the deployment whose liveness is being sampled. Recorded with the observation so a later reader can tell which build was live; it is not trusted as a fact about the device."),
         CatalogFieldDescriptor(name: "hilogFilters", type: .stringArray, isRequired: false, maxLength: 200, maxItems: 16, summary: "Typed HiLog filter expressions; no shell fragments."),
         CatalogFieldDescriptor(name: "processName", type: .string, isRequired: false, pattern: "^[a-zA-Z][a-zA-Z0-9_.:]*$", maxLength: 200, summary: "Optional process identity. Defaults to bundleName and is lowered only by the HDC provider."),
-        CatalogFieldDescriptor(name: "redactionProfile", type: .string, isRequired: false, enumValues: ["standard", "strict"], defaultValue: .string("standard")),
-        CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912, defaultValue: .integer(134217728)),
-        CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536, defaultValue: .integer(8192)),
+        CatalogFieldDescriptor(name: "redactionProfile", type: .string, isRequired: false, enumValues: ["standard", "strict"], summary: "Redaction applied to published text. Only `standard` has a published implementation; `strict` is refused before authorization, so selecting it costs a round trip and gains nothing.", defaultValue: .string("standard")),
+        CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912, summary: "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product.", defaultValue: .integer(134217728)),
+        CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536, summary: "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise.", defaultValue: .integer(8192)),
         CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: false, maxLength: 64, maxItems: 24, summary: "Trace categories; presence selects the remote-file trace leg and escalates the effective effect to deviceMutation."),
         CatalogFieldDescriptor(name: "uiComponentTree", type: .boolean, isRequired: false, summary: "Capture the on-screen component tree. Presence selects the file-producing dumpLayout leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.", defaultValue: .bool(false)),
-        CatalogFieldDescriptor(name: "uiDump", type: .boolean, isRequired: false, defaultValue: .bool(true)),
+        CatalogFieldDescriptor(name: "uiDump", type: .boolean, isRequired: false, summary: "Capture the accessibility/window dump. Read-only: unlike the trace, screenshot and component-tree legs this does not raise the effective effect.", defaultValue: .bool(true)),
         CatalogFieldDescriptor(name: "uiScreenshot", type: .boolean, isRequired: false, summary: "Capture a PNG screenshot of the display. Presence selects the file-producing snapshot_display leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.", defaultValue: .bool(false))
       ],
       outputs: [
@@ -219,15 +219,15 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "abilityName", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_.]*$", maxLength: 200),
+        CatalogFieldDescriptor(name: "abilityName", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_.]*$", maxLength: 200, summary: "Ability to start within the bundle, as declared in module.json5, for example `EntryAbility`. Never lowered as caller-supplied argv."),
         CatalogFieldDescriptor(name: "additionalHapArtifactLeases", type: .artifactLeaseArray, isRequired: false, maxItems: 16, summary: "Feature HAPs and HSPs of the same bundle. Present means the packages are sent into one provider-owned directory and installed by a single bm install -p <dir>; absent leaves the single-package plan unchanged."),
-        CatalogFieldDescriptor(name: "bundleName", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$", maxLength: 200),
-        CatalogFieldDescriptor(name: "captureDiagnostics", type: .boolean, isRequired: false, defaultValue: .bool(true)),
-        CatalogFieldDescriptor(name: "cleanupPolicy", type: .string, isRequired: false, enumValues: ["uninstall", "retain", "restorePrevious"], defaultValue: .string("uninstall")),
-        CatalogFieldDescriptor(name: "diagnosticsDurationSeconds", type: .integer, isRequired: false, minimum: 1, maximum: 300, defaultValue: .integer(30)),
+        CatalogFieldDescriptor(name: "bundleName", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$", maxLength: 200, summary: "Application bundle name exactly as the package declares it, for example `com.example.waterflow`. The provider matches package readback against this, so a bundle that is not installed by this exact name reads as a failed install."),
+        CatalogFieldDescriptor(name: "captureDiagnostics", type: .boolean, isRequired: false, summary: "Collect the bounded HiLog window while the ability runs. Read-only, and its absence does not fail the job — the diagnostics artifact is optional.", defaultValue: .bool(true)),
+        CatalogFieldDescriptor(name: "cleanupPolicy", type: .string, isRequired: false, enumValues: ["uninstall", "retain", "restorePrevious"], summary: "What happens to the package when the job ends. `uninstall` removes it, `retain` leaves it installed — which is what an external observer needs, together with postRunAbilityState `running`, to keep watching after the job succeeds. `restorePrevious` is refused before authorization: no snapshot/restore step is published.", defaultValue: .string("uninstall")),
+        CatalogFieldDescriptor(name: "diagnosticsDurationSeconds", type: .integer, isRequired: false, minimum: 1, maximum: 300, summary: "Length of the bounded HiLog window in seconds. A crash that happens after this window is not in the artifact, so a delayed fault needs a window that outlasts it.", defaultValue: .integer(30)),
         CatalogFieldDescriptor(name: "hapArtifactLease", type: .artifactLease, isRequired: true, summary: "Entry HAP; must come from an artifact lease, arbitrary local paths are rejected."),
-        CatalogFieldDescriptor(name: "installPolicy", type: .string, isRequired: false, enumValues: ["installOrReplace", "installFresh"], defaultValue: .string("installOrReplace")),
-        CatalogFieldDescriptor(name: "portForwardProfile", type: .string, isRequired: false, enumValues: ["none", "debugger-default"], defaultValue: .string("none")),
+        CatalogFieldDescriptor(name: "installPolicy", type: .string, isRequired: false, enumValues: ["installOrReplace", "installFresh"], summary: "How an already-installed package is treated. Only `installOrReplace` has a published plan; `installFresh` is refused before authorization because no pre-install absence readback exists to make it honest.", defaultValue: .string("installOrReplace")),
+        CatalogFieldDescriptor(name: "portForwardProfile", type: .string, isRequired: false, enumValues: ["none", "debugger-default"], summary: "Port forwarding to establish alongside the run. Only `none` has a published plan; `debugger-default` is refused before authorization because this operation publishes no port-forward steps — use `port-forward.create@1` separately.", defaultValue: .string("none")),
         CatalogFieldDescriptor(name: "postRunAbilityState", type: .string, isRequired: false, enumValues: ["stopped", "running"], summary: "Whether the started ability is stopped before cleanup. `running` skips stop-ability so the application is still live when the job succeeds, which is what an external observer needs; the operator then owns stopping it. A failed job still stops the ability during compensation.", defaultValue: .string("stopped"))
       ],
       outputs: [
@@ -273,13 +273,13 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "expectedABI", type: .string, isRequired: true, enumValues: ["arm64-v8a", "armeabi-v7a", "x86_64"]),
+        CatalogFieldDescriptor(name: "expectedABI", type: .string, isRequired: true, enumValues: ["arm64-v8a", "armeabi-v7a", "x86_64"], summary: "ABI the uploaded ELF must declare. Verified against the artifact's own header before anything is sent, so a mismatch fails on the host rather than on the device."),
         CatalogFieldDescriptor(name: "libraryArtifactLease", type: .artifactLease, isRequired: true, summary: "The .so must come from an artifact lease; arbitrary local paths are rejected."),
-        CatalogFieldDescriptor(name: "libraryLogicalName", type: .string, isRequired: true, pattern: "^lib[a-zA-Z0-9_.-]+\\.so$", maxLength: 128),
-        CatalogFieldDescriptor(name: "restartProfile", type: .string, isRequired: false, enumValues: ["restartAbility", "restartProcess", "none"], defaultValue: .string("restartAbility")),
-        CatalogFieldDescriptor(name: "rollbackPolicy", type: .string, isRequired: false, enumValues: ["autoRollback", "retainBackup"], defaultValue: .string("autoRollback")),
+        CatalogFieldDescriptor(name: "libraryLogicalName", type: .string, isRequired: true, pattern: "^lib[a-zA-Z0-9_.-]+\\.so$", maxLength: 128, summary: "File name the library is published under inside the application's own directory. Must match `lib<name>.so` and be at most 128 characters; it names a file, never a path."),
+        CatalogFieldDescriptor(name: "restartProfile", type: .string, isRequired: false, enumValues: ["restartAbility", "restartProcess", "none"], summary: "How the application is restarted so it loads the new library. Only `restartAbility` has a published restart/readback plan; `restartProcess` and `none` are refused before authorization.", defaultValue: .string("restartAbility")),
+        CatalogFieldDescriptor(name: "rollbackPolicy", type: .string, isRequired: false, enumValues: ["autoRollback", "retainBackup"], summary: "What happens to the previous library when verification fails. `autoRollback` restores it; `retainBackup` leaves the new one in place and keeps the backup for a later decision.", defaultValue: .string("autoRollback")),
         CatalogFieldDescriptor(name: "targetBundle", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$", maxLength: 200, summary: "Remote destination is derived from this bundle's app-owned profile directory; callers cannot submit a remote path."),
-        CatalogFieldDescriptor(name: "verificationProfile", type: .string, isRequired: false, enumValues: ["hashOnly", "hashAndProcess", "hashProcessAndMaps"], defaultValue: .string("hashAndProcess"))
+        CatalogFieldDescriptor(name: "verificationProfile", type: .string, isRequired: false, enumValues: ["hashOnly", "hashAndProcess", "hashProcessAndMaps"], summary: "How much of the deployment is proven after publication. `hashOnly` compares the published bytes, `hashAndProcess` also requires the process to be live, `hashProcessAndMaps` additionally requires the library to appear in the process's loaded maps.", defaultValue: .string("hashAndProcess"))
       ],
       outputs: [
         CatalogFieldDescriptor(name: "publishReport", type: .artifactReference, isRequired: true),
@@ -319,11 +319,11 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "expectedABI", type: .string, isRequired: true, enumValues: ["arm64-v8a", "armeabi-v7a", "x86_64"]),
+        CatalogFieldDescriptor(name: "expectedABI", type: .string, isRequired: true, enumValues: ["arm64-v8a", "armeabi-v7a", "x86_64"], summary: "ABI the uploaded ELF must declare, verified against the artifact's own header before anything is sent."),
         CatalogFieldDescriptor(name: "expectedBuildFingerprint", type: .string, isRequired: true, maxLength: 200, summary: "Must equal the device's current build fingerprint at preflight; drift invalidates the capability."),
-        CatalogFieldDescriptor(name: "libraryArtifactLease", type: .artifactLease, isRequired: true),
-        CatalogFieldDescriptor(name: "originalFileSHA256", type: .string, isRequired: true, pattern: "^[0-9a-f]{64}$"),
-        CatalogFieldDescriptor(name: "restartPlan", type: .string, isRequired: true, enumValues: ["restartService", "rebootDevice"]),
+        CatalogFieldDescriptor(name: "libraryArtifactLease", type: .artifactLease, isRequired: true, summary: "Lease of the imported ELF to publish, in the form `lease-v1:<jobId>:<artifactId>` from `arkdeck artifact import-native-library`. Arbitrary local paths are rejected."),
+        CatalogFieldDescriptor(name: "originalFileSHA256", type: .string, isRequired: true, pattern: "^[0-9a-f]{64}$", summary: "Digest of the file currently at the target path, as proof the caller is replacing what it believes it is replacing. A mismatch fails closed rather than overwriting an unexpected file."),
+        CatalogFieldDescriptor(name: "restartPlan", type: .string, isRequired: true, enumValues: ["restartService", "rebootDevice"], summary: "How the system is brought back to a consistent state after replacement: restart the owning service, or reboot the device."),
         CatalogFieldDescriptor(name: "targetPathProfile", type: .string, isRequired: true, pattern: "^[a-z][a-z0-9-]*$", maxLength: 128, summary: "Named system-path profile resolved by the provider; the capability pins the exact absolute path. Callers can never submit a raw remote path, and app-owned inputs can never resolve to a system path.")
       ],
       outputs: [
@@ -365,10 +365,10 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "deviceProfile", type: .string, isRequired: true, enumValues: ["dayu200"]),
+        CatalogFieldDescriptor(name: "deviceProfile", type: .string, isRequired: true, enumValues: ["dayu200"], summary: "Board profile whose partition vocabulary and layout the plan is checked against. `dayu200` is the only published board."),
         CatalogFieldDescriptor(name: "imageBundleLease", type: .artifactLease, isRequired: true, summary: "Trusted image bundle; every image hash is pinned by the Runtime-owned capability."),
         CatalogFieldDescriptor(name: "partitionPlan", type: .stringArray, isRequired: true, maxLength: 32, maxItems: 16, summary: "Ordered partition names from the profile's closed vocabulary; the Runtime capability pins the exact plan digest."),
-        CatalogFieldDescriptor(name: "postFlashVerification", type: .string, isRequired: false, enumValues: ["basic", "full"], defaultValue: .string("full"))
+        CatalogFieldDescriptor(name: "postFlashVerification", type: .string, isRequired: false, enumValues: ["basic", "full"], summary: "How much is verified after the write. `full` additionally captures post-flash diagnostics; `basic` omits that one optional leg and verifies the rest.", defaultValue: .string("full"))
       ],
       outputs: [
         CatalogFieldDescriptor(name: "flashReport", type: .artifactReference, isRequired: true),
@@ -454,9 +454,9 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "direction", type: .string, isRequired: true, enumValues: ["forward", "reverse"]),
-        CatalogFieldDescriptor(name: "localPort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535),
-        CatalogFieldDescriptor(name: "remotePort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535)
+        CatalogFieldDescriptor(name: "direction", type: .string, isRequired: true, enumValues: ["forward", "reverse"], summary: "Which way the rule points. `forward` lowers to hdc `fport` — a host port reaching a device port; `reverse` lowers to `rport` — a device port reaching a host port."),
+        CatalogFieldDescriptor(name: "localPort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535, summary: "Port on the host side of the rule. Unprivileged range only."),
+        CatalogFieldDescriptor(name: "remotePort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535, summary: "Port on the device side of the rule. Unprivileged range only.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "ruleReadback", type: .artifactReference, isRequired: true)
@@ -489,9 +489,9 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "direction", type: .string, isRequired: true, enumValues: ["forward", "reverse"]),
-        CatalogFieldDescriptor(name: "localPort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535),
-        CatalogFieldDescriptor(name: "remotePort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535)
+        CatalogFieldDescriptor(name: "direction", type: .string, isRequired: true, enumValues: ["forward", "reverse"], summary: "Which rule to remove; must match the direction the rule was created with. `forward` is hdc `fport`, `reverse` is `rport`."),
+        CatalogFieldDescriptor(name: "localPort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535, summary: "Host-side port of the rule to remove; must match the rule exactly."),
+        CatalogFieldDescriptor(name: "remotePort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535, summary: "Device-side port of the rule to remove; must match the rule exactly.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "ruleReadback", type: .artifactReference, isRequired: true)
@@ -524,10 +524,10 @@ extension RuntimeOperationCatalog {
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "allowedFileGlobs", type: .stringArray, isRequired: true, maxLength: 512, maxItems: 64),
+        CatalogFieldDescriptor(name: "allowedFileGlobs", type: .stringArray, isRequired: true, maxLength: 512, maxItems: 64, summary: "Paths the patch may touch, and it may not touch anything outside them. Narrower than the project profile's own globs, never wider — the request cannot widen its own scope."),
         CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128, summary: "Workspace revision the caller decided against; the provider refuses if the tree moved."),
-        CatalogFieldDescriptor(name: "patchArtifactRef", type: .artifactLease, isRequired: true),
-        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+        CatalogFieldDescriptor(name: "patchArtifactRef", type: .artifactLease, isRequired: true, summary: "Lease of the unified diff to apply, in the form `lease-v1:<jobId>:<artifactId>` from `arkdeck artifact import-workspace-patch`. Arbitrary local paths are rejected."),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128, summary: "Registered workspace project. This build ships `demo-app` (the WaterFlow OpenHarmony app) and `ArkDeck` (this repository); which one a host offers depends on how its daemon was configured.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "appliedPatch", type: .artifactReference, isRequired: true),
@@ -556,9 +556,9 @@ extension RuntimeOperationCatalog {
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "buildPresetRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "buildPresetRef", type: .string, isRequired: true, maxLength: 128, summary: "Build preset within that project's profile: `waterflow-debug` for `demo-app`, `arkdeck-debug` for `ArkDeck`. The preset owns the executable and every argument; the request selects one and supplies none."),
         CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128, summary: "Workspace revision the caller decided against; the provider refuses if the tree moved."),
-        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128, summary: "Registered workspace project. This build ships `demo-app` and `ArkDeck`; which one a host offers depends on how its daemon was configured.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "buildLog", type: .artifactReference, isRequired: true),
@@ -768,8 +768,8 @@ extension RuntimeOperationCatalog {
       concurrencyKey: .hostExclusive,
       inputs: [
         CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128, summary: "Workspace revision the caller decided against; the provider refuses if the tree moved."),
-        CatalogFieldDescriptor(name: "patchAttemptRef", type: .string, isRequired: true, maxLength: 64),
-        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+        CatalogFieldDescriptor(name: "patchAttemptRef", type: .string, isRequired: true, maxLength: 64, summary: "The attempt to revert, as returned in the `patchAttemptRef` summary field of the `workspace.apply-patch@1` job that applied it. The runtime reverts from its own durable copy of that patch, not from anything the caller supplies."),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128, summary: "Registered workspace project. This build ships `demo-app` and `ArkDeck`; which one a host offers depends on how its daemon was configured.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "revertReport", type: .artifactReference, isRequired: true)
@@ -798,8 +798,8 @@ extension RuntimeOperationCatalog {
       concurrencyKey: .hostExclusive,
       inputs: [
         CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128, summary: "Workspace revision the caller decided against; the provider refuses if the tree moved."),
-        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
-        CatalogFieldDescriptor(name: "testPresetRef", type: .string, isRequired: true, maxLength: 128)
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128, summary: "Registered workspace project. This build ships `demo-app` and `ArkDeck`; which one a host offers depends on how its daemon was configured."),
+        CatalogFieldDescriptor(name: "testPresetRef", type: .string, isRequired: true, maxLength: 128, summary: "Test preset within that project's profile: `waterflow-tests` for `demo-app`, `arkdeck-tests` for `ArkDeck`. The preset owns the executable and every argument.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "testOutput", type: .artifactReference, isRequired: true)
@@ -827,7 +827,7 @@ extension RuntimeOperationCatalog {
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128, summary: "Registered workspace project whose signing material this uses. Availability additionally requires `arkdeck signing install` to have run for that same project."),
         CatalogFieldDescriptor(name: "signingPresetRef", type: .string, isRequired: true, maxLength: 128, summary: "Closed ArkDeck signing preset identity; it is not a path or key alias."),
         CatalogFieldDescriptor(name: "unsignedHapArtifactLease", type: .artifactLease, isRequired: true, summary: "Immutable ZIP-based unsigned HAP resolved by the Runtime Artifact store.")
       ],
@@ -889,9 +889,9 @@ extension RuntimeOperationCatalog {
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "dumpArtifactRef", type: .artifactLease, isRequired: true),
-        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
-        CatalogFieldDescriptor(name: "symbolPresetRef", type: .string, isRequired: true, maxLength: 128)
+        CatalogFieldDescriptor(name: "dumpArtifactRef", type: .artifactLease, isRequired: true, summary: "Lease of the crash text to symbolize, in the form `lease-v1:<jobId>:<artifactId>`. It wants an obfuscated ArkTS stack — a `crash-log.txt` published by `capture.diagnostics@1` with `crashLogName` set — not the Faultlogger index that lists entries."),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128, summary: "Registered workspace project whose source maps resolve the stack. `demo-app` is the project that ships a symbolizer."),
+        CatalogFieldDescriptor(name: "symbolPresetRef", type: .string, isRequired: true, maxLength: 128, summary: "Symbolizer preset within that project's profile. `arkts-sourcemap` is the only published one, and it exists only once the daemon is configured with an analyzer (`ARKDECK_ANALYZER_PATH`, which `arkdeck agentd install`/`update` sets).")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "symbolizedCrash", type: .artifactReference, isRequired: true)

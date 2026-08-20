@@ -13,19 +13,22 @@
       "direction": {
         "type": "string",
         "required": true,
-        "enum": ["forward", "reverse"]
+        "enum": ["forward", "reverse"],
+        "description": "Which rule to remove; must match the direction the rule was created with. `forward` is hdc `fport`, `reverse` is `rport`."
       },
       "localPort": {
         "type": "integer",
         "required": true,
         "minimum": 1024,
-        "maximum": 65535
+        "maximum": 65535,
+        "description": "Host-side port of the rule to remove; must match the rule exactly."
       },
       "remotePort": {
         "type": "integer",
         "required": true,
         "minimum": 1024,
-        "maximum": 65535
+        "maximum": 65535,
+        "description": "Device-side port of the rule to remove; must match the rule exactly."
       }
     }
   },

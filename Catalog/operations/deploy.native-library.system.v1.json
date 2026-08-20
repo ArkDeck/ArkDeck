@@ -11,7 +11,10 @@
   "concurrencyKey": "device-exclusive",
   "inputs": {
     "fields": {
-      "libraryArtifactLease": { "type": "artifactLease", "required": true },
+      "libraryArtifactLease": {
+        "type": "artifactLease", "required": true,
+        "description": "Lease of the imported ELF to publish, in the form `lease-v1:<jobId>:<artifactId>` from `arkdeck artifact import-native-library`. Arbitrary local paths are rejected."
+      },
       "targetPathProfile": {
         "type": "string",
         "required": true,
@@ -28,17 +31,20 @@
       "originalFileSHA256": {
         "type": "string",
         "required": true,
-        "pattern": "^[0-9a-f]{64}$"
+        "pattern": "^[0-9a-f]{64}$",
+        "description": "Digest of the file currently at the target path, as proof the caller is replacing what it believes it is replacing. A mismatch fails closed rather than overwriting an unexpected file."
       },
       "expectedABI": {
         "type": "string",
         "required": true,
-        "enum": ["arm64-v8a", "armeabi-v7a", "x86_64"]
+        "enum": ["arm64-v8a", "armeabi-v7a", "x86_64"],
+        "description": "ABI the uploaded ELF must declare, verified against the artifact's own header before anything is sent."
       },
       "restartPlan": {
         "type": "string",
         "required": true,
-        "enum": ["restartService", "rebootDevice"]
+        "enum": ["restartService", "rebootDevice"],
+        "description": "How the system is brought back to a consistent state after replacement: restart the owning service, or reboot the device."
       }
     }
   },
