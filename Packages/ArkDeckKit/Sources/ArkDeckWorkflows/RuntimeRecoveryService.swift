@@ -8,7 +8,6 @@
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
-import Darwin
 import Foundation
 
 struct RuntimeRecoveredJob {
@@ -28,34 +27,6 @@ struct RuntimeCompleteOverwriteAdmissionResult: Equatable, Sendable {
 
   static let noRecovery = RuntimeCompleteOverwriteAdmissionResult(
     recoveryContext: nil, recognizedEpoch: nil)
-}
-
-private struct RuntimeHistoricalRockchipIntent: Decodable {
-  let schemaVersion: String
-  let jobID: String
-  let stepID: String
-  let targetID: String
-  let bindingRevision: Int
-  let stableIdentitySHA256: String
-  let providerExecutableSHA256: String
-  let actionSHA256: String
-  let action: PersistedTypedProviderAction
-}
-
-private struct RuntimeHistoricalRockchipReceipt: Decodable {
-  let schemaVersion: String
-  let jobID: String
-  let stepID: String
-  let targetID: String
-  let bindingRevision: Int
-  let stableIdentitySHA256: String
-  let providerExecutableSHA256: String
-  let actionSHA256: String
-  let summary: [String: String]
-  let stdoutSHA256: String
-  let stderrSHA256: String
-  let stdoutTruncated: Bool
-  let subprocessCount: Int
 }
 
 struct RuntimeRecoveryService {
@@ -397,7 +368,7 @@ struct RuntimeRecoveryService {
       guard Set(requiredSteps).isSubset(of: Set(confirmedIntentByStep.keys)),
         let recoveryIntentEventID = confirmedIntentByStep[contract.overwriteStepID],
         let proof = try historicalHostProof(
-          record: record, requiredStepIDs: requiredSteps,
+          record: record, replay: replay, requiredStepIDs: requiredSteps,
           expectedPartitions: expectedPartitions)
       else { continue }
       let resultingEpoch = Self.sha256(
@@ -430,76 +401,40 @@ struct RuntimeRecoveryService {
   }
 
   private func historicalHostProof(
-    record: RuntimeJobRecord,
+    record: RuntimeJobRecord, replay: JournalReplay,
     requiredStepIDs: [String],
     expectedPartitions: [String]
   ) throws -> (artifactSHA256: String, providerExecutableSHA256: String)? {
-    // Historical recognition rested on re-materializing the durable flash
-    // intent and checking the bundle it named against the host receipt. That
-    // intent's action was the in-process lowering, removed in CHG-2026-059,
-    // so a journal holding one now decodes to a refusal.
-    //
-    // The receipt on its own is not accepted in its place: it records a
-    // partition count and a digest but not the partition names, and this
-    // proof decides whether a device may be treated as already carrying a
-    // complete overwrite. A weaker proof wearing the old one's name is the
-    // failure mode worth avoiding here, so recognition is withheld and the
-    // job stays unresolved — which is what the refusal means.
-    //
-    // Step 5 restores this from the other side: arkforged's semantic receipts
-    // carry the write's own evidence, and recognition can be rebuilt on those
-    // rather than on an intent ArkDeck can no longer execute.
-    if requiredStepIDs.contains("flash-partitions") { return nil }
+    // The removed in-process Rockchip lowering used host-side intent/receipt
+    // files. The current proof source is the ArkForge terminal receipt that
+    // Runtime validated before reducing it to each catalog outcome. The
+    // journal hash chain makes those typed outcomes durable; immutable
+    // capability facts retain the exact artifact and daemon tool identity.
+    guard !expectedPartitions.isEmpty,
+      Set(expectedPartitions).count == expectedPartitions.count,
+      let evidence = record.admissionEvidence,
+      evidence.kind == .runtimeCapability,
+      let artifact = evidence.runtimeCapabilityCorrelation?.artifactSHA256,
+      let executable = evidence.recoveryProviderExecutableSHA256,
+      Self.isSHA256(artifact), Self.isSHA256(executable)
+    else { return nil }
 
-    let root =
-      stateDirectory
-      .appending(path: "rockchip-runtime", directoryHint: .isDirectory)
-      .appending(path: record.jobID, directoryHint: .isDirectory)
-    var executable: String?
-    // Never assigned while the flash step is withheld above; kept so the loop
-    // below stays the shape step 5 will re-source from arkforged's receipts.
-    let artifact: String? = nil
     for stepID in requiredStepIDs {
-      let directory = root.appending(path: stepID, directoryHint: .isDirectory)
-      let intent: RuntimeHistoricalRockchipIntent
-      let receipt: RuntimeHistoricalRockchipReceipt
-      do {
-        intent = try JSONDecoder().decode(
-          RuntimeHistoricalRockchipIntent.self,
-          from: try Self.readOwnerOnlyRecord(
-            directory.appending(path: "intent.json")))
-        receipt = try JSONDecoder().decode(
-          RuntimeHistoricalRockchipReceipt.self,
-          from: try Self.readOwnerOnlyRecord(
-            directory.appending(path: "receipt.json")))
-      } catch { return nil }
-      let actionEncoder = CanonicalJSONEncoders.canonical()
-      guard let encodedAction = try? actionEncoder.encode(intent.action),
-        Self.sha256(encodedAction) == intent.actionSHA256
+      guard let outcome = replay.events.first(where: {
+        $0.kind == .stepOutcome && $0.stepID == stepID
+          && $0.payload["result"] == .string("succeeded")
+          && $0.payload["outcomeCertainty"] == .string("confirmed")
+          && $0.payload["semanticCode"]
+            == .string(RuntimeJobEngine.arkForgePlanCompletionSemanticCode)
+      }),
+        let intentEventID = outcome.correlatedIntentEventID,
+        replay.events.contains(where: {
+          $0.kind == .stepIntent && $0.eventID == intentEventID && $0.stepID == stepID
+        }),
+        case .string(let summary)? = outcome.payload["summary"],
+        summary.contains("arkforge-plan="), summary.contains("evidence-sha256=")
       else { return nil }
-      guard intent.schemaVersion == "1.0.0", receipt.schemaVersion == "1.0.0",
-        intent.jobID == record.jobID, receipt.jobID == record.jobID,
-        intent.stepID == stepID, receipt.stepID == stepID,
-        intent.targetID == record.request.target.targetID,
-        receipt.targetID == record.request.target.targetID,
-        intent.bindingRevision == record.materializedBindingRevision,
-        receipt.bindingRevision == record.materializedBindingRevision,
-        intent.stableIdentitySHA256 == record.materializedStableTargetIdentitySHA256,
-        receipt.stableIdentitySHA256 == record.materializedStableTargetIdentitySHA256,
-        intent.providerExecutableSHA256 == receipt.providerExecutableSHA256,
-        intent.actionSHA256 == receipt.actionSHA256,
-        Self.isSHA256(intent.providerExecutableSHA256),
-        Self.isSHA256(receipt.stdoutSHA256), Self.isSHA256(receipt.stderrSHA256),
-        !receipt.stdoutTruncated, receipt.subprocessCount > 0,
-        !receipt.summary.isEmpty
-      else { return nil }
-      if let executable, executable != intent.providerExecutableSHA256 { return nil }
-      executable = intent.providerExecutableSHA256
-      // `flash-partitions` never reaches here — the guard at the top of this
-      // function withholds recognition for it. Every other required step is
-      // still checked exactly as before.
     }
-    guard let artifact, let executable else { return nil }
     return (artifact, executable)
   }
 
@@ -531,65 +466,10 @@ struct RuntimeRecoveryService {
     RuntimeJobRecord.sha256Hex(Data(value.utf8))
   }
 
-  private static func sha256(_ data: Data) -> String {
-    RuntimeJobRecord.sha256Hex(data)
-  }
-
   private static func isSHA256(_ value: String) -> Bool {
     let bytes = Array(value.utf8)
     return bytes.count == 64
       && bytes.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
-  }
-
-  private static func readOwnerOnlyRecord(_ url: URL) throws -> Data {
-    let maximumBytes = 1_048_576
-    let descriptor = Darwin.open(
-      url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw RuntimeCompleteOverwriteRecoveryError.blocked(
-        "completeOverwriteRecovery.hostProofUnavailable")
-    }
-    defer { Darwin.close(descriptor) }
-    var metadata = stat()
-    guard fstat(descriptor, &metadata) == 0,
-      metadata.st_mode & S_IFMT == S_IFREG,
-      metadata.st_uid == geteuid(), metadata.st_nlink == 1,
-      metadata.st_mode & (S_IRWXG | S_IRWXO) == 0,
-      metadata.st_size >= 0, metadata.st_size <= maximumBytes
-    else {
-      throw RuntimeCompleteOverwriteRecoveryError.blocked(
-        "completeOverwriteRecovery.unsafeHostProof")
-    }
-    let expectedCount = Int(metadata.st_size)
-    var data = Data(count: expectedCount)
-    var offset = 0
-    while offset < expectedCount {
-      let count = data.withUnsafeMutableBytes { buffer in
-        Darwin.pread(
-          descriptor, buffer.baseAddress!.advanced(by: offset), expectedCount - offset,
-          off_t(offset))
-      }
-      if count < 0, errno == EINTR { continue }
-      guard count > 0 else {
-        throw RuntimeCompleteOverwriteRecoveryError.blocked(
-          "completeOverwriteRecovery.shortHostProof")
-      }
-      offset += count
-    }
-    var finalMetadata = stat()
-    guard fstat(descriptor, &finalMetadata) == 0,
-      finalMetadata.st_dev == metadata.st_dev,
-      finalMetadata.st_ino == metadata.st_ino,
-      finalMetadata.st_size == metadata.st_size,
-      finalMetadata.st_mtimespec.tv_sec == metadata.st_mtimespec.tv_sec,
-      finalMetadata.st_mtimespec.tv_nsec == metadata.st_mtimespec.tv_nsec,
-      finalMetadata.st_ctimespec.tv_sec == metadata.st_ctimespec.tv_sec,
-      finalMetadata.st_ctimespec.tv_nsec == metadata.st_ctimespec.tv_nsec
-    else {
-      throw RuntimeCompleteOverwriteRecoveryError.blocked(
-        "completeOverwriteRecovery.hostProofChangedDuringRead")
-    }
-    return data
   }
 
   /// Recreates only the wholly absent projection left by a process loss after

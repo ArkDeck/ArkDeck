@@ -196,6 +196,7 @@ public struct ArkForgeExecutablePlan: Sendable, Equatable {
   public let providerExecutionPlanSHA256: String
   public let publicProjectionSHA256: String
   public let expiresAtEpochMS: UInt64
+  public let executionPurpose: String
 
   static func decode(_ body: [UInt8], within reader: ProtobufReader) throws
     -> ArkForgeExecutablePlan
@@ -206,6 +207,7 @@ public struct ArkForgeExecutablePlan: Sendable, Equatable {
     var providerDigest = ""
     var projectionDigest = ""
     var expiresAt: UInt64 = 0
+    var executionPurpose = ""
     while let field = try nested.next() {
       switch field.field {
       case 1: planID = try field.value.asString(field: 1)
@@ -213,13 +215,15 @@ public struct ArkForgeExecutablePlan: Sendable, Equatable {
       case 3: providerDigest = try field.value.asString(field: 3)
       case 4: projectionDigest = try field.value.asString(field: 4)
       case 9: expiresAt = try field.value.asUInt64()
+      case 10: executionPurpose = try field.value.asString(field: 10)
       default: break
       }
     }
     return ArkForgeExecutablePlan(
       planID: planID, planSHA256: planSHA256,
       providerExecutionPlanSHA256: providerDigest,
-      publicProjectionSHA256: projectionDigest, expiresAtEpochMS: expiresAt)
+      publicProjectionSHA256: projectionDigest, expiresAtEpochMS: expiresAt,
+      executionPurpose: executionPurpose)
   }
 }
 
@@ -290,11 +294,30 @@ public struct ArkForgeMaterializePlanRequest: Sendable {
   public let artifactID: String
   public let profileID: String
   public let observationID: String
+  public let intent: String
+  public let toolchainID: String
+  public let authorityNamespace: String
+  public let bindingID: String
+  public let bindingRevision: UInt64
+  public let stableIdentitySHA256: [UInt8]
+  public let executionPurpose: String
 
-  public init(artifactID: String, profileID: String, observationID: String) {
+  public init(
+    artifactID: String, profileID: String, observationID: String,
+    intent: String, toolchainID: String, authorityNamespace: String,
+    bindingID: String, bindingRevision: UInt64, stableIdentitySHA256: [UInt8],
+    executionPurpose: String
+  ) {
     self.artifactID = artifactID
     self.profileID = profileID
     self.observationID = observationID
+    self.intent = intent
+    self.toolchainID = toolchainID
+    self.authorityNamespace = authorityNamespace
+    self.bindingID = bindingID
+    self.bindingRevision = bindingRevision
+    self.stableIdentitySHA256 = stableIdentitySHA256
+    self.executionPurpose = executionPurpose
   }
 
   public var encoded: Data {
@@ -302,6 +325,13 @@ public struct ArkForgeMaterializePlanRequest: Sendable {
     writer.string(1, artifactID)
     writer.string(2, profileID)
     writer.string(3, observationID)
+    writer.string(4, intent)
+    writer.string(5, toolchainID)
+    writer.string(6, authorityNamespace)
+    writer.string(7, bindingID)
+    writer.uint64(8, bindingRevision)
+    writer.bytes(9, stableIdentitySHA256)
+    writer.string(10, executionPurpose)
     return writer.data
   }
 }

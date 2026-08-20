@@ -32,6 +32,8 @@ public enum ArkForgeApi: Int32, Sendable {
   case getRecoveryGuide = 11
   case submitStepPermit = 12
   case submitManagedControlReceipt = 13
+  case getJob = 14
+  case listJobs = 15
 }
 
 public enum ArkForgeStatus: Int32, Sendable {
@@ -327,6 +329,47 @@ public struct ArkForgeStepAdmissionSnapshot: Sendable, Equatable {
   public let observedAtEpochMs: UInt64
   public let snapshotLifetimeMs: UInt64
   public let requestID: String
+  public let topologySHA256: [UInt8]
+  public let descriptorSHA256: [UInt8]
+  public let serialSHA256: [UInt8]
+  public let serialEvidenceKind: String
+  public let protocolIdentity: [ArkForgeKeyValue]
+  public let identityStrength: String
+  public let malformedDescriptor: Bool
+  public let transportSessionSHA256: [UInt8]
+
+  public init(
+    jobID: String, planID: String, planSHA256: [UInt8], stepID: String,
+    attemptID: String, publicStepSHA256: [UInt8], privateActionSHA256: [UInt8],
+    effectSetSHA256: [UInt8], admittedDeviceFactsSHA256: [UInt8], observedMode: String,
+    observedAtEpochMs: UInt64, snapshotLifetimeMs: UInt64, requestID: String,
+    topologySHA256: [UInt8] = [], descriptorSHA256: [UInt8] = [],
+    serialSHA256: [UInt8] = [], serialEvidenceKind: String = "",
+    protocolIdentity: [ArkForgeKeyValue] = [], identityStrength: String = "",
+    malformedDescriptor: Bool = false, transportSessionSHA256: [UInt8] = []
+  ) {
+    self.jobID = jobID
+    self.planID = planID
+    self.planSHA256 = planSHA256
+    self.stepID = stepID
+    self.attemptID = attemptID
+    self.publicStepSHA256 = publicStepSHA256
+    self.privateActionSHA256 = privateActionSHA256
+    self.effectSetSHA256 = effectSetSHA256
+    self.admittedDeviceFactsSHA256 = admittedDeviceFactsSHA256
+    self.observedMode = observedMode
+    self.observedAtEpochMs = observedAtEpochMs
+    self.snapshotLifetimeMs = snapshotLifetimeMs
+    self.requestID = requestID
+    self.topologySHA256 = topologySHA256
+    self.descriptorSHA256 = descriptorSHA256
+    self.serialSHA256 = serialSHA256
+    self.serialEvidenceKind = serialEvidenceKind
+    self.protocolIdentity = protocolIdentity
+    self.identityStrength = identityStrength
+    self.malformedDescriptor = malformedDescriptor
+    self.transportSessionSHA256 = transportSessionSHA256
+  }
 
   /// Whether this snapshot may still be signed against at `now`.
   ///
@@ -344,6 +387,11 @@ public struct ArkForgeStepAdmissionSnapshot: Sendable, Equatable {
     var jobID = "", planID = "", stepID = "", attemptID = "", mode = "", requestID = ""
     var planDigest: [UInt8] = [], publicStep: [UInt8] = [], privateAction: [UInt8] = []
     var effectSet: [UInt8] = [], deviceFacts: [UInt8] = []
+    var topology: [UInt8] = [], descriptor: [UInt8] = [], serial: [UInt8] = []
+    var serialKind = "", identityStrength = ""
+    var protocolIdentity: [ArkForgeKeyValue] = []
+    var malformedDescriptor = false
+    var transportSession: [UInt8] = []
     var observedAt: UInt64 = 0, lifetime: UInt64 = 0
     while let field = try nested.next() {
       switch field.field {
@@ -360,6 +408,16 @@ public struct ArkForgeStepAdmissionSnapshot: Sendable, Equatable {
       case 11: observedAt = try field.value.asUInt64()
       case 12: lifetime = try field.value.asUInt64()
       case 13: requestID = try field.value.asString(field: 13)
+      case 14: topology = try field.value.asBytes()
+      case 15: descriptor = try field.value.asBytes()
+      case 16: serial = try field.value.asBytes()
+      case 17: serialKind = try field.value.asString(field: 17)
+      case 18:
+        protocolIdentity.append(
+          try ArkForgeKeyValue.decode(try field.value.asBytes(), within: nested))
+      case 19: identityStrength = try field.value.asString(field: 19)
+      case 20: malformedDescriptor = try field.value.asBool()
+      case 21: transportSession = try field.value.asBytes()
       default: break
       }
     }
@@ -367,7 +425,11 @@ public struct ArkForgeStepAdmissionSnapshot: Sendable, Equatable {
       jobID: jobID, planID: planID, planSHA256: planDigest, stepID: stepID,
       attemptID: attemptID, publicStepSHA256: publicStep, privateActionSHA256: privateAction,
       effectSetSHA256: effectSet, admittedDeviceFactsSHA256: deviceFacts, observedMode: mode,
-      observedAtEpochMs: observedAt, snapshotLifetimeMs: lifetime, requestID: requestID)
+      observedAtEpochMs: observedAt, snapshotLifetimeMs: lifetime, requestID: requestID,
+      topologySHA256: topology, descriptorSHA256: descriptor, serialSHA256: serial,
+      serialEvidenceKind: serialKind, protocolIdentity: protocolIdentity,
+      identityStrength: identityStrength, malformedDescriptor: malformedDescriptor,
+      transportSessionSHA256: transportSession)
   }
 }
 
@@ -687,5 +749,68 @@ public struct ArkForgeCancelJobResponse: Sendable, Equatable {
       if field.field == 1 { state = try field.value.asString(field: 1) }
     }
     return ArkForgeCancelJobResponse(cancellationState: state)
+  }
+}
+
+/// Durable point-in-time progress, available independently of the event
+/// cursor and reconstructed from ArkForge's journal after a daemon restart.
+public struct ArkForgeJobSummary: Sendable, Equatable {
+  public let jobID: String
+  public let planID: String
+  public let planSHA256: [UInt8]
+  public let state: String
+  public let terminal: Bool
+  public let currentStepID: String
+  public let completedSteps: UInt64
+  public let totalSteps: UInt64
+  public let lastSequence: UInt64
+  public let stoppedReason: String
+
+  static func decode(_ body: [UInt8], within reader: ProtobufReader) throws
+    -> ArkForgeJobSummary
+  {
+    var nested = try reader.nested(body)
+    var jobID = "", planID = "", state = "", stepID = "", reason = ""
+    var planDigest: [UInt8] = []
+    var terminal = false
+    var completed: UInt64 = 0, total: UInt64 = 0, sequence: UInt64 = 0
+    while let field = try nested.next() {
+      switch field.field {
+      case 1: jobID = try field.value.asString(field: 1)
+      case 2: planID = try field.value.asString(field: 2)
+      case 3: planDigest = try field.value.asBytes()
+      case 4: state = try field.value.asString(field: 4)
+      case 5: terminal = try field.value.asBool()
+      case 6: stepID = try field.value.asString(field: 6)
+      case 7: completed = try field.value.asUInt64()
+      case 8: total = try field.value.asUInt64()
+      case 9: sequence = try field.value.asUInt64()
+      case 10: reason = try field.value.asString(field: 10)
+      default: break
+      }
+    }
+    return ArkForgeJobSummary(
+      jobID: jobID, planID: planID, planSHA256: planDigest, state: state,
+      terminal: terminal, currentStepID: stepID, completedSteps: completed,
+      totalSteps: total, lastSequence: sequence, stoppedReason: reason)
+  }
+
+  static func decodeResponse(_ body: Data) throws -> ArkForgeJobSummary {
+    var reader = ProtobufReader(body)
+    while let field = try reader.next() {
+      guard field.field == 1 else { continue }
+      return try decode(try field.value.asBytes(), within: reader)
+    }
+    throw ProtobufWireError.missingField(message: "GetJobResponse", field: 1)
+  }
+
+  static func decodeList(_ body: Data) throws -> [ArkForgeJobSummary] {
+    var reader = ProtobufReader(body)
+    var jobs: [ArkForgeJobSummary] = []
+    while let field = try reader.next() {
+      guard field.field == 1 else { continue }
+      jobs.append(try decode(try field.value.asBytes(), within: reader))
+    }
+    return jobs
   }
 }

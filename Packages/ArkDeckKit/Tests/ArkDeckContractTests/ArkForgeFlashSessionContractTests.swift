@@ -76,6 +76,18 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
       handle: (ArkForgeJobEvent) throws -> Bool
     ) throws {
       for event in events where try !handle(event) { return }
+      let hasTerminal = events.contains { $0.kind == .outcomeClassified }
+      let finalSequence = events.map(\.sequence).max() ?? 0
+      if !hasTerminal,
+        events.isEmpty || (finalSequence > 0 && body.fromSequence >= finalSequence)
+      {
+        _ = try handle(
+          ArkForgeJobEvent(
+            jobID: "JOB-1", sequence: finalSequence + 1, kind: .outcomeClassified,
+            atEpochMs: 1_000_070, journalRecordSHA256: [], jobState: "succeeded",
+            admission: nil, controlRequest: nil, receipt: nil,
+            facts: [ArkForgeKeyValue(key: "outcome", value: "succeeded")]))
+      }
     }
 
     func cancelJob(jobID: String, requestID: String) throws -> ArkForgeCancelJobResponse {
@@ -175,6 +187,114 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     }
     XCTAssertEqual(receipts.count, 1)
     XCTAssertEqual(receipts.first?.disposition, "semanticSuccess")
+  }
+
+  func testAnEmptyPollBetweenAReceiptAndTheNextAdmissionIsNotCompletion() async throws {
+    final class GappedDaemon: ArkForgeFlashSession.Daemon, @unchecked Sendable {
+      var poll = 0
+      var permitSubmissions: [ArkForgeSubmitStepPermitRequest] = []
+
+      func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
+        -> ArkForgeStartExecutionResponse
+      { ArkForgeStartExecutionResponse(jobID: "JOB-1") }
+
+      func submitStepPermit(_ body: ArkForgeSubmitStepPermitRequest, requestID: String) throws
+        -> ArkForgeSubmitStepPermitResponse
+      {
+        permitSubmissions.append(body)
+        return ArkForgeSubmitStepPermitResponse(
+          accepted: true, rejectionCode: "", rejectionMessage: "")
+      }
+
+      func submitManagedControlReceipt(
+        _ body: ArkForgeSubmitManagedControlReceiptRequest, requestID: String
+      ) throws -> ArkForgeSubmitManagedControlReceiptResponse {
+        ArkForgeSubmitManagedControlReceiptResponse(
+          accepted: true, rejectionCode: "", rejectionMessage: "")
+      }
+
+      func watchJob(
+        _ body: ArkForgeWatchJobRequest, requestID: String,
+        handle: (ArkForgeJobEvent) throws -> Bool
+      ) throws {
+        poll += 1
+        switch poll {
+        case 1:
+          _ = try handle(
+            ArkForgeJobEvent(
+              jobID: "JOB-1", sequence: 1, kind: .actionReceipt,
+              atEpochMs: 1_000_040, journalRecordSHA256: [], jobState: "running",
+              admission: nil, controlRequest: nil,
+              receipt: ArkForgeActionReceiptSummary(
+                jobID: "JOB-1", planID: "PLAN-1", stepID: "reboot", actionID: "A-1",
+                attemptID: "ATTEMPT-1", permitID: "PERMIT-REBOOT",
+                disposition: "semanticSuccess", evidenceSHA256: [],
+                verificationOutcome: "verified", verificationStrength: "semantic",
+                verifiedRangeStart: 0, verifiedRangeLength: 0, typedSkipReason: "",
+                failureClassification: "", facts: []),
+              facts: []))
+        case 2:
+          // The real daemon exposed exactly this gap after DEVICE_RESET.
+          break
+        case 3:
+          _ = try handle(
+            ArkForgeJobEvent(
+              jobID: "JOB-1", sequence: 2, kind: .stepAdmissionRequested,
+              atEpochMs: 1_000_050, journalRecordSHA256: [], jobState: "postflight",
+              admission: ArkForgeStepAdmissionSnapshot(
+                jobID: "JOB-1", planID: "PLAN-1",
+                planSHA256: [UInt8](repeating: 0x11, count: 32),
+                stepID: "postflight", attemptID: "ATTEMPT-2",
+                publicStepSHA256: [UInt8](repeating: 0x44, count: 32),
+                privateActionSHA256: [UInt8](repeating: 0x55, count: 32),
+                effectSetSHA256: [UInt8](repeating: 0x66, count: 32),
+                admittedDeviceFactsSHA256: [UInt8](repeating: 0x22, count: 32),
+                observedMode: "hdc-normal", observedAtEpochMs: 1_000_000,
+                snapshotLifetimeMs: 60_000, requestID: "ADM-postflight"),
+              controlRequest: nil, receipt: nil, facts: []))
+        case 4:
+          _ = try handle(
+            ArkForgeJobEvent(
+              jobID: "JOB-1", sequence: 3, kind: .actionReceipt,
+              atEpochMs: 1_000_060, journalRecordSHA256: [], jobState: "postflight",
+              admission: nil, controlRequest: nil,
+              receipt: ArkForgeActionReceiptSummary(
+                jobID: "JOB-1", planID: "PLAN-1", stepID: "postflight", actionID: "A-2",
+                attemptID: "ATTEMPT-2", permitID: "PERMIT-POSTFLIGHT",
+                disposition: "semanticSuccess", evidenceSHA256: [],
+                verificationOutcome: "verified", verificationStrength: "semantic",
+                verifiedRangeStart: 0, verifiedRangeLength: 0, typedSkipReason: "",
+                failureClassification: "", facts: []),
+              facts: []))
+        default:
+          _ = try handle(
+            ArkForgeJobEvent(
+              jobID: "JOB-1", sequence: 4, kind: .outcomeClassified,
+              atEpochMs: 1_000_070, journalRecordSHA256: [], jobState: "succeeded",
+              admission: nil, controlRequest: nil, receipt: nil,
+              facts: [ArkForgeKeyValue(key: "outcome", value: "succeeded")]))
+        }
+      }
+
+      func cancelJob(jobID: String, requestID: String) throws -> ArkForgeCancelJobResponse {
+        ArkForgeCancelJobResponse(cancellationState: "cancelledSafe")
+      }
+    }
+
+    let daemon = GappedDaemon()
+    let session = ArkForgeFlashSession(
+      daemon: daemon, authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    let outcome = try await session.run(
+      planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+
+    XCTAssertEqual(daemon.permitSubmissions.map(\.requestID), ["ADM-postflight"])
+    guard case .completed(let receipts) = outcome else {
+      return XCTFail("expected completion after the explicit terminal event, got \(outcome)")
+    }
+    XCTAssertEqual(receipts.map(\.stepID), ["reboot", "postflight"])
   }
 
   func testARefusedAdmissionIsReportedRatherThanWithheld() async throws {
@@ -638,11 +758,11 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
         ArkForgeJobEvent(
           jobID: "JOB-1", sequence: 1, kind: .actionReceipt, atEpochMs: 0,
           journalRecordSHA256: [], jobState: "running", admission: nil, controlRequest: nil,
-          receipt: receipt("flash-partitions"), facts: []),
+          receipt: receipt("STEP-004"), facts: []),
         ArkForgeJobEvent(
           jobID: "JOB-1", sequence: 2, kind: .actionReceipt, atEpochMs: 0,
           journalRecordSHA256: [], jobState: "running", admission: nil, controlRequest: nil,
-          receipt: receipt("verify-flash-readback"), facts: []),
+          receipt: receipt("STEP-023"), facts: []),
       ])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
@@ -672,10 +792,63 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       stepID: "verify-flash-readback", jobID: "JOB-1", artifact: scriptedArtifact(),
       binding: binding)
 
-    XCTAssertEqual(first.stepID, "flash-partitions")
-    XCTAssertEqual(second.stepID, "verify-flash-readback")
+    XCTAssertEqual(first.stepID, "STEP-023")
+    XCTAssertEqual(second.stepID, "STEP-023")
+    do {
+      _ = try await host.perform(
+        stepID: "unrelated-catalog-step", jobID: "JOB-1", artifact: scriptedArtifact(),
+        binding: binding)
+      XCTFail("an unrelated step must not inherit the terminal receipt")
+    } catch {
+      XCTAssertEqual(
+        error as? ArkForgeLaneHost.LaneError, .noReceiptForStep("unrelated-catalog-step"))
+    }
     let starts = started.value
     XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
+  }
+
+  func testSupersedingRecoveryPurposeCrossesMaterializationAndStartUnchanged() async throws {
+    let started = StartCounter()
+    let daemon = CountingDaemon(
+      counter: started,
+      events: [
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 1, kind: .actionReceipt, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "running", admission: nil,
+          controlRequest: nil, receipt: receipt("STEP-023"), facts: [])
+      ],
+      expectedExecutionPurpose: "supersedingRecovery")
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
+      makePerformer: { _, _ in SilentPerformer() },
+      makeClient: { _ in daemon },
+      makeMaterializer: { _ in
+        ScriptedPlanSource.executable(executionPurpose: "supersedingRecovery")
+      },
+      makeAuthority: { _, _, _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [],
+            admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    let result = try await host.perform(
+      stepID: "flash-partitions", jobID: "ARKDECK-RECOVERY-1",
+      artifact: scriptedArtifact(),
+      binding: ArkForgeLaneDeviceBinding(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+        targetID: "TGT-1", bindingRevision: 2, usbTopology: ScriptedPlanSource.topology),
+      executionPurpose: "supersedingRecovery")
+
+    XCTAssertEqual(result.stepID, "STEP-023")
+    XCTAssertEqual(started.value, 1)
   }
 
   func testCancelledSafeNeverPublishesACompletedPlanReceipt() async throws {
@@ -896,15 +1069,26 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
   private final class CountingDaemon: ArkForgeFlashSession.Daemon, @unchecked Sendable {
     let counter: StartCounter
     let events: [ArkForgeJobEvent]
+    let expectedExecutionPurpose: String?
 
-    init(counter: StartCounter, events: [ArkForgeJobEvent]) {
+    init(
+      counter: StartCounter, events: [ArkForgeJobEvent],
+      expectedExecutionPurpose: String? = nil
+    ) {
       self.counter = counter
       self.events = events
+      self.expectedExecutionPurpose = expectedExecutionPurpose
     }
 
     func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
       -> ArkForgeStartExecutionResponse
     {
+      if let expectedExecutionPurpose,
+        body.executionPurpose != expectedExecutionPurpose
+      {
+        throw ProtobufWireError.missingField(
+          message: "StartExecution executionPurpose mismatch", field: 3)
+      }
       counter.increment()
       return ArkForgeStartExecutionResponse(jobID: "JOB-1")
     }
@@ -922,6 +1106,18 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       handle: (ArkForgeJobEvent) throws -> Bool
     ) throws {
       for event in events where try !handle(event) { return }
+      let hasTerminal = events.contains { $0.kind == .outcomeClassified }
+      let finalSequence = events.map(\.sequence).max() ?? 0
+      if !hasTerminal,
+        events.isEmpty || (finalSequence > 0 && body.fromSequence >= finalSequence)
+      {
+        _ = try handle(
+          ArkForgeJobEvent(
+            jobID: "JOB-1", sequence: finalSequence + 1, kind: .outcomeClassified,
+            atEpochMs: 1, journalRecordSHA256: [], jobState: "succeeded",
+            admission: nil, controlRequest: nil, receipt: nil,
+            facts: [ArkForgeKeyValue(key: "outcome", value: "succeeded")]))
+      }
     }
     func cancelJob(jobID: String, requestID: String) throws -> ArkForgeCancelJobResponse {
       ArkForgeCancelJobResponse(cancellationState: "cancelledSafe")
@@ -944,6 +1140,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 struct ScriptedPlanSource: ArkForgePlanSource {
   static let topology = "18874368"
   let answer: ArkForgeMaterializePlanResponse
+  let expectedExecutionPurpose: String
 
   func importArtifact(contentsOf url: URL, expectedSHA256: String, requestID: String) throws
     -> ArkForgeImportArtifactResponse
@@ -974,15 +1171,24 @@ struct ScriptedPlanSource: ArkForgePlanSource {
 
   func materializePlan(_ body: ArkForgeMaterializePlanRequest, requestID: String) throws
     -> ArkForgeMaterializePlanResponse
-  { answer }
+  {
+    guard body.executionPurpose == expectedExecutionPurpose else {
+      throw ProtobufWireError.missingField(
+        message: "MaterializePlanRequest executionPurpose mismatch", field: 10)
+    }
+    return answer
+  }
 
-  static func executable(planID: String = "PLAN-1") -> ScriptedPlanSource {
+  static func executable(
+    planID: String = "PLAN-1", executionPurpose: String = "primaryFlash"
+  ) -> ScriptedPlanSource {
     ScriptedPlanSource(
       answer: .plan(
         ArkForgeExecutablePlan(
           planID: planID, planSHA256: String(repeating: "d", count: 64),
           providerExecutionPlanSHA256: "", publicProjectionSHA256: "",
-          expiresAtEpochMS: .max)))
+          expiresAtEpochMS: .max, executionPurpose: executionPurpose)),
+      expectedExecutionPurpose: executionPurpose)
   }
 
   /// The shape a `hardwareGated` combination produces.
@@ -995,7 +1201,8 @@ struct ScriptedPlanSource: ArkForgePlanSource {
             "materialization is complete but execution is gated; maturity is hardwareGated",
           unknowns: [
             "RK-M02": "provider/profile/artifact/toolchain/platform combination is hardwareGated"
-          ])))
+          ])),
+      expectedExecutionPurpose: "primaryFlash")
   }
 }
 

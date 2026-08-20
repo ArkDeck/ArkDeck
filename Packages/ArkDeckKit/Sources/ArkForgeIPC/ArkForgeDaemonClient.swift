@@ -227,6 +227,23 @@ public final class ArkForgeDaemonClient: @unchecked Sendable {
     return try ArkForgeCancelJobResponse.decode(payload)
   }
 
+  /// Point-in-time durable status. Unlike `watchJob`, callers need no event
+  /// cursor, and the daemon reconstructs this after restart.
+  public func getJob(jobID: String, requestID: String) throws -> ArkForgeJobSummary {
+    var writer = ProtobufWriter()
+    writer.string(1, jobID)
+    let payload = try callExpectingOK(
+      ArkForgeRequest(requestID: requestID, api: .getJob, payload: writer.data))
+    return try ArkForgeJobSummary.decodeResponse(payload)
+  }
+
+  /// Every known ArkForge job with bounded progress fields and no timelines.
+  public func listJobs(requestID: String) throws -> [ArkForgeJobSummary] {
+    let payload = try callExpectingOK(
+      ArkForgeRequest(requestID: requestID, api: .listJobs, payload: Data()))
+    return try ArkForgeJobSummary.decodeList(payload)
+  }
+
   // MARK: - Putting a plan in the daemon's store
 
   /// Streams an archive into the daemon's content-addressed store.

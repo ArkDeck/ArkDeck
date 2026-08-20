@@ -77,6 +77,7 @@ public protocol FlashLanePlanPreviewing: Sendable {
 package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
   package nonisolated let toolchainSHA256: String
+  private nonisolated let toolchainID = "arkforged-native-rockusb"
 
   /// How to reach a running daemon.
   ///
@@ -154,10 +155,17 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     @Sendable (ArkForgeLaneDeviceBinding, String) -> any ArkForgeFlashSession.ControlPerformer
   /// jobID → the receipts that job's single ArkForge run published, by step id.
   private var receiptsByJob: [String: [String: ArkForgeActionReceiptSummary]] = [:]
-  /// The terminal receipt of a job whose lane already ran — both the anchor
-  /// for engine step names the daemon never uses, and the proof that a later
-  /// lane-covered step of the same job must **never** re-run the lane.
-  private var lastReceiptByJob: [String: ArkForgeActionReceiptSummary] = [:]
+  /// The terminal semantic receipt of a completed daemon plan.
+  private var completedPlanReceiptByJob: [String: ArkForgeActionReceiptSummary] = [:]
+  /// ArkDeck catalog steps that deliberately project the one completed
+  /// ArkForge plan rather than claim to share its internal `STEP-*` identity.
+  ///
+  /// Keeping this mapping closed is important: an arbitrary unknown catalog
+  /// step must never be satisfied by whichever daemon receipt happened to be
+  /// last.
+  private static let completedPlanProjectionStepIDs: Set<String> = [
+    "flash-partitions", "verify-flash-readback",
+  ]
   /// Jobs for which the daemon reached its completed terminal.
   ///
   /// Kept separately from the receipt cache because a safe cancellation may
@@ -169,6 +177,9 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// must return the same classification, never a cached partial receipt that
   /// happens to share the requested step id.
   private var terminalFailureByJob: [String: RuntimeDispatchFailure] = [:]
+  /// Purpose is part of the immutable ArkForge plan identity. One ArkDeck job
+  /// may not switch from primary execution to recovery after materialization.
+  private var executionPurposeByJob: [String: String] = [:]
 
   package init(
     connection: Connection,
@@ -223,7 +234,12 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       switch try client.materializePlan(
         ArkForgeMaterializePlanRequest(
           artifactID: archiveSHA256, profileID: profileID,
-          observationID: observation.observationID),
+          observationID: observation.observationID,
+          intent: "fullRestore", toolchainID: toolchainID,
+          authorityNamespace: "arkdeck.preview",
+          bindingID: "PREVIEW-\(archiveSHA256.prefix(12))", bindingRevision: 1,
+          stableIdentitySHA256: Self.sha256Bytes(of: usbTopology),
+          executionPurpose: "primaryFlash"),
         requestID: "preview-materialize-\(nonce)")
       {
       case .plan(let plan):
@@ -267,25 +283,39 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// delegated step from what that run published.
   package func perform(
     stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
-    binding: ArkForgeLaneDeviceBinding
+    binding: ArkForgeLaneDeviceBinding, executionPurpose: String = "primaryFlash"
   ) async throws -> ArkForgeActionReceiptSummary {
+    if let sealedPurpose = executionPurposeByJob[jobID], sealedPurpose != executionPurpose {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "ArkDeck job \(jobID) is already bound to executionPurpose=\(sealedPurpose)",
+        unknowns: ["executionPurpose": executionPurpose])
+    }
     if let terminalFailure = terminalFailureByJob[jobID] {
       throw terminalFailure
     }
-    if completedJobs.contains(jobID),
-      let cached = receiptsByJob[jobID]?[stepID] ?? lastReceiptByJob[jobID]
-    {
-      // The anchor fallback is load-bearing here, not a convenience: a second
-      // lane-covered step of the same job (`verify-flash-readback` after
-      // `flash-partitions`) misses the by-name cache — the daemon named its
-      // steps `STEP-001`… — and falling through would materialize and run the
-      // whole lane again, which is a second flash.
+    if completedJobs.contains(jobID) {
+      guard let cached = projectedReceipt(jobID: jobID, stepID: stepID) else {
+        throw LaneError.noReceiptForStep(stepID)
+      }
+      // A second lane-covered step is an explicit projection of the already
+      // completed daemon plan. It must not materialize and run the lane again.
       return cached
     }
     // No cache yet: this is the first delegated step of this job, so it is the
     // one that materializes the plan and runs the ArkForge job.
     let client = try makeClient(connection.socketPath)
-    let plan = try await materialize(artifact: artifact, binding: binding, jobID: jobID)
+    let materialized = try await materialize(
+      artifact: artifact, binding: binding, jobID: jobID,
+      executionPurpose: executionPurpose)
+    let plan = materialized.plan
+    guard plan.executionPurpose == executionPurpose else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "arkforged returned executionPurpose=\(plan.executionPurpose), expected \(executionPurpose)",
+        unknowns: ["executionPurpose": plan.executionPurpose])
+    }
+    executionPurposeByJob[jobID] = plan.executionPurpose
     // `arkforged` states the plan digest as hex here and sends it as raw bytes in
     // every admission, so it is decoded once, at the boundary between the two.
     guard let planDigest = Self.digestBytes(plan.planSHA256) else {
@@ -294,18 +324,20 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
         reason: "arkforged returned a plan digest that is not 32 hex-encoded bytes",
         unknowns: ["planSHA256": plan.planSHA256])
     }
+    let authority = makeAuthority(jobID, plan.planID, planDigest, binding)
+    await authority.recordMaterializedObservationMode(materialized.observedMode)
     let session = ArkForgeFlashSession(
-      daemon: client, authority: makeAuthority(jobID, plan.planID, planDigest, binding),
+      daemon: client, authority: authority,
       performer: makePerformer(binding, jobID),
       controllerSessionID: connection.controllerSessionID)
 
     let outcome = try await session.run(
-      planID: plan.planID, planSHA256: plan.planSHA256, executionPurpose: "flash")
+      planID: plan.planID, planSHA256: plan.planSHA256,
+      executionPurpose: plan.executionPurpose)
     let published: [ArkForgeActionReceiptSummary]
     switch outcome {
     case .completed(let receipts):
       published = receipts
-      completedJobs.insert(jobID)
     case .cancelledSafe(let receipts):
       published = receipts
       receiptsByJob[jobID] = Dictionary(
@@ -337,19 +369,16 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
     receiptsByJob[jobID] = Dictionary(
       published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
-    lastReceiptByJob[jobID] = published.last
+    guard let completion = published.last else {
+      throw LaneError.noReceiptForStep(stepID)
+    }
+    completedPlanReceiptByJob[jobID] = completion
+    completedJobs.insert(jobID)
 
-    // The daemon names its own steps (`STEP-001`…) and this engine names its
-    // own (`flash-partitions`, `verify-flash-readback`); the two never
-    // coincide, so an exact lookup can only match a scripted daemon that
-    // echoes this engine's names. For a lane-covered step the per-step receipt
-    // is a journaling anchor, not the evidence itself — `publishedReceipts`
-    // carries every receipt the daemon produced — and the anchor for a step
-    // the daemon completed under its own names is the plan's terminal
-    // receipt: the last checkpoint of the run that subsumed this step.
-    // Measured 2026-08-18: the first plan that ever completed end to end
-    // failed here, on the name.
-    guard let receipt = receiptsByJob[jobID]?[stepID] ?? lastReceiptByJob[jobID] else {
+    // Exact daemon ids remain exact. Only the two named catalog steps above
+    // may project the terminal plan receipt; there is no generic "last
+    // receipt" fallback.
+    guard let receipt = projectedReceipt(jobID: jobID, stepID: stepID) else {
       throw LaneError.noReceiptForStep(stepID)
     }
     return receipt
@@ -366,8 +395,9 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// so a re-import would be correct but would stream ~731 MB to learn what a
   /// digest already answered.
   private func materialize(
-    artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding, jobID: String
-  ) async throws -> ArkForgeExecutablePlan {
+    artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding, jobID: String,
+    executionPurpose: String
+  ) async throws -> (plan: ArkForgeExecutablePlan, observedMode: String) {
     let client = try makeMaterializer(connection.socketPath)
 
     if (try? client.inspectArtifact(artifactID: artifact.sha256, requestID: "inspect-\(jobID)"))
@@ -392,11 +422,16 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     let answer = try client.materializePlan(
       ArkForgeMaterializePlanRequest(
         artifactID: artifact.sha256, profileID: artifact.profileID,
-        observationID: observation.observationID),
+        observationID: observation.observationID,
+        intent: "fullRestore", toolchainID: toolchainID,
+        authorityNamespace: "arkdeck", bindingID: binding.targetID,
+        bindingRevision: UInt64(max(1, binding.bindingRevision)),
+        stableIdentitySHA256: Self.digestBytes(binding.stableIdentitySHA256) ?? [],
+        executionPurpose: executionPurpose),
       requestID: "materialize-\(jobID)")
     switch answer {
     case .plan(let plan):
-      return plan
+      return (plan, observation.mode)
     case .assessment(let assessment):
       // Not a transport failure and not retryable. The daemon built the whole
       // plan and declined to make it executable, and the reasons are the only
@@ -410,15 +445,32 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
   package func completedPlanReceipt(jobID: String) -> ArkForgeActionReceiptSummary? {
     guard completedJobs.contains(jobID) else { return nil }
-    return lastReceiptByJob[jobID]
+    return completedPlanReceiptByJob[jobID]
+  }
+
+  private func projectedReceipt(
+    jobID: String, stepID: String
+  ) -> ArkForgeActionReceiptSummary? {
+    if let exact = receiptsByJob[jobID]?[stepID] {
+      return exact
+    }
+    guard Self.completedPlanProjectionStepIDs.contains(stepID) else {
+      return nil
+    }
+    return completedPlanReceiptByJob[jobID]
+  }
+
+  private static func sha256Bytes(of value: String) -> [UInt8] {
+    digestBytes(SHA256Hex.string(of: Data(value.utf8))) ?? []
   }
 
   /// Drops a finished job's receipts.
   package func forget(jobID: String) {
     receiptsByJob[jobID] = nil
-    lastReceiptByJob[jobID] = nil
+    completedPlanReceiptByJob[jobID] = nil
     completedJobs.remove(jobID)
     terminalFailureByJob[jobID] = nil
+    executionPurposeByJob[jobID] = nil
   }
 
   /// Checks the daemon is ready and bound to the toolchain this authority

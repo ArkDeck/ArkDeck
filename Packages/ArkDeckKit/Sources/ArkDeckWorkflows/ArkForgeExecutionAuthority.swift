@@ -1,5 +1,6 @@
 import ArkDeckCore
 import ArkForgeIPC
+import CryptoKit
 import Foundation
 
 /// ArkDeck's half of the split: it decides whether a step may run, and says so
@@ -42,6 +43,9 @@ package actor ArkForgeExecutionAuthority {
     package let planSHA256: [UInt8]
     /// The device facts digest of the binding this authority confirmed.
     package let admittedDeviceFactsSHA256: [UInt8]
+    /// ArkDeck's independently bound normal-mode USB location id. Admissions
+    /// carry ArkForge's digest of this fact and are checked against it.
+    package let usbTopology: String?
     package let binding: ArkForgeAuthorityBinding
     package let controllerSessionID: String
     /// How long a permit stays valid once signed. Bounded because an
@@ -51,12 +55,14 @@ package actor ArkForgeExecutionAuthority {
     package init(
       jobID: String, planID: String, planSHA256: [UInt8],
       admittedDeviceFactsSHA256: [UInt8], binding: ArkForgeAuthorityBinding,
-      controllerSessionID: String, permitLifetimeMs: UInt64 = 60_000
+      controllerSessionID: String, permitLifetimeMs: UInt64 = 60_000,
+      usbTopology: String? = nil
     ) {
       self.jobID = jobID
       self.planID = planID
       self.planSHA256 = planSHA256
       self.admittedDeviceFactsSHA256 = admittedDeviceFactsSHA256
+      self.usbTopology = usbTopology
       self.binding = binding
       self.controllerSessionID = controllerSessionID
       self.permitLifetimeMs = permitLifetimeMs
@@ -123,6 +129,10 @@ package actor ArkForgeExecutionAuthority {
   /// `startExecution` reply, before any admission exists, and it can be set
   /// only once, so no later admission can move the job this authority approved.
   private var daemonJobID: String?
+  /// Mode → topology digest confirmed independently by ArkDeck. The initial
+  /// normal-mode value comes from the durable device binding; mode-transition
+  /// values come from accepted managed-control observations.
+  private var approvedTopologyByMode: [String: [UInt8]] = [:]
 
   /// Records the job identity the daemon assigned. Ignored after the first call.
   package func adoptDaemonJob(_ jobID: String) {
@@ -139,6 +149,36 @@ package actor ArkForgeExecutionAuthority {
     self.plan = plan
     self.secret = secret
     self.now = now
+    if let topology = plan.usbTopology,
+      let hex = ArkForgeObservationSelection.topologyDigest(usbTopology: topology),
+      let digest = Self.hexBytes(hex)
+    {
+      approvedTopologyByMode["hdc-normal"] = digest
+    }
+  }
+
+  /// Extends the binding lineage only after the daemon accepted ArkDeck's
+  /// managed-control receipt. This is how Loader's deliberately different USB
+  /// topology becomes independently admissible without weakening selection to
+  /// VID/PID or "the first Rockchip device".
+  package func recordManagedControlFacts(_ facts: [String: String]) {
+    guard let mode = facts["mode"], let topology = facts["usbTopology"],
+      let hex = ArkForgeObservationSelection.topologyDigest(usbTopology: topology),
+      let digest = Self.hexBytes(hex)
+    else { return }
+    approvedTopologyByMode[Self.canonicalMode(mode)] = digest
+  }
+
+  /// Registers the mode of the exact observation ArkDeck selected by its own
+  /// bound topology and then asked ArkForge to seal into this plan. This is
+  /// needed when a recovery job starts with the board already in Loader: there
+  /// is no preceding managed-control receipt from which to learn that mode.
+  package func recordMaterializedObservationMode(_ mode: String) {
+    guard let topology = plan.usbTopology,
+      let hex = ArkForgeObservationSelection.topologyDigest(usbTopology: topology),
+      let digest = Self.hexBytes(hex)
+    else { return }
+    approvedTopologyByMode[Self.canonicalMode(mode)] = digest
   }
 
   /// Answers one admission.
@@ -167,8 +207,19 @@ package actor ArkForgeExecutionAuthority {
     guard snapshot.planID == plan.planID, snapshot.planSHA256 == plan.planSHA256 else {
       return .refuse(.planMismatch)
     }
-    guard snapshot.admittedDeviceFactsSHA256 == plan.admittedDeviceFactsSHA256 else {
-      return .refuse(.deviceFactsMismatch)
+    if snapshot.hasRawDeviceFacts {
+      guard snapshot.transportSessionSHA256.count == 32, !snapshot.malformedDescriptor,
+        Self.deviceFactsDigest(snapshot) == snapshot.admittedDeviceFactsSHA256,
+        let expectedTopology = approvedTopologyByMode[Self.canonicalMode(snapshot.observedMode)],
+        snapshot.topologySHA256 == expectedTopology
+      else { return .refuse(.deviceFactsMismatch) }
+    } else {
+      // Compatibility for recorded v1 fixtures. A live daemon sends the raw
+      // fact fields and therefore always takes the independently recomputed
+      // branch above.
+      guard snapshot.admittedDeviceFactsSHA256 == plan.admittedDeviceFactsSHA256 else {
+        return .refuse(.deviceFactsMismatch)
+      }
     }
 
     let currentTime = now()
@@ -206,7 +257,7 @@ package actor ArkForgeExecutionAuthority {
       privateActionDigest: snapshot.privateActionSHA256,
       effectSetDigest: snapshot.effectSetSHA256,
       authorityBinding: plan.binding,
-      admittedDeviceFactsDigest: plan.admittedDeviceFactsSHA256,
+      admittedDeviceFactsDigest: snapshot.admittedDeviceFactsSHA256,
       issuedAtEpochMs: currentTime,
       expiresAtEpochMs: currentTime + plan.permitLifetimeMs,
       // Never configurable. A permit that could be spent twice is not a
@@ -237,5 +288,66 @@ package actor ArkForgeExecutionAuthority {
   /// permit that was already handed out.
   package func issuedPermit(_ permitID: String) -> ArkForgeSignedPermit? {
     issued[permitID]
+  }
+
+  private static let deviceFactsDomain = Array("arkforge/v1/device-facts\0".utf8)
+
+  package static func deviceFactsDigest(_ snapshot: ArkForgeStepAdmissionSnapshot) -> [UInt8] {
+    let serialDigest: CanonicalCBOR.Value =
+      snapshot.serialEvidenceKind == "absent" ? .null : .bytes(snapshot.serialSHA256)
+    let serial = CanonicalCBOR.Value.map([
+      ("kind", .text(snapshot.serialEvidenceKind)),
+      ("digest", serialDigest),
+    ])
+    let protocolIdentity: [CanonicalCBOR.Value] = snapshot.protocolIdentity.map {
+      .map([("key", .text($0.key)), ("value", .text($0.value))])
+    }
+    let value = CanonicalCBOR.Value.map([
+      ("mode", .text(snapshot.observedMode)),
+      ("topologyDigest", .bytes(snapshot.topologySHA256)),
+      ("descriptorDigest", .bytes(snapshot.descriptorSHA256)),
+      ("serialEvidence", serial),
+      ("protocolIdentity", .array(protocolIdentity)),
+      ("identityStrength", .text(snapshot.identityStrength)),
+      ("malformedDescriptor", .bool(snapshot.malformedDescriptor)),
+    ])
+    var hasher = SHA256()
+    hasher.update(data: Data(deviceFactsDomain))
+    hasher.update(data: CanonicalCBOR.encodedData(value))
+    return Array(hasher.finalize())
+  }
+
+  package static func canonicalMode(_ mode: String) -> String {
+    switch mode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "normal", "hdc-normal": return "hdc-normal"
+    case "loader", "updater", "rockusb-loader": return "rockusb-loader"
+    case "maskrom", "rockusb-maskrom": return "rockusb-maskrom"
+    default: return mode.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+  }
+
+  private static func hexBytes(_ hex: String) -> [UInt8]? {
+    guard hex.count == 64 else { return nil }
+    var bytes: [UInt8] = []
+    bytes.reserveCapacity(32)
+    var high: UInt8?
+    for character in hex {
+      guard let value = character.hexDigitValue else { return nil }
+      if let first = high {
+        bytes.append(first << 4 | UInt8(value))
+        high = nil
+      } else {
+        high = UInt8(value)
+      }
+    }
+    return high == nil && bytes.count == 32 ? bytes : nil
+  }
+}
+
+extension ArkForgeStepAdmissionSnapshot {
+  fileprivate var hasRawDeviceFacts: Bool {
+    topologySHA256.count == 32 && descriptorSHA256.count == 32
+      && admittedDeviceFactsSHA256.count == 32 && !serialEvidenceKind.isEmpty
+      && !identityStrength.isEmpty
   }
 }

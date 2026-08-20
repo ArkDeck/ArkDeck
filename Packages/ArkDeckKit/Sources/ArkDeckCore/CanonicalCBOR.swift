@@ -30,6 +30,8 @@ package enum CanonicalCBOR {
     case bytes([UInt8])
     case text(String)
     case bool(Bool)
+    case array([Value])
+    case null
     /// Key order here is irrelevant: `encoded` sorts by the encoded key, so a
     /// caller cannot produce a non-canonical map by listing fields in a
     /// convenient order.
@@ -41,6 +43,8 @@ package enum CanonicalCBOR {
       case let (.bytes(left), .bytes(right)): return left == right
       case let (.text(left), .text(right)): return left == right
       case let (.bool(left), .bool(right)): return left == right
+      case let (.array(left), .array(right)): return left == right
+      case (.null, .null): return true
       case let (.map(left), .map(right)):
         guard left.count == right.count else { return false }
         return zip(left, right).allSatisfy { $0.0 == $1.0 && $0.1 == $1.1 }
@@ -77,6 +81,11 @@ package enum CanonicalCBOR {
       // as the integer 0 or 1 is the single most common way a second
       // implementation drifts from the first.
       out.append(flag ? 0xf5 : 0xf4)
+    case .array(let values):
+      appendHead(major: 4, argument: UInt64(values.count), to: &out)
+      for entry in values { append(entry, to: &out) }
+    case .null:
+      out.append(0xf6)
     case .map(let entries):
       // RFC 8949 §4.2.1: sort by the *encoded* key, bytewise lexicographic.
       // Not by the Swift string ordering — "z" sorts before "aa" here,
