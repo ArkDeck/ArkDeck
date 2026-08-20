@@ -1,5 +1,18 @@
 # ADR-0009: `outcomeUnknown` 的两个写入者,与和解读回的适用面
 
+> **本 ADR 论证所依据的多个符号已不存在(2026-08-20 复核)。** CHG-2026-065/066
+> 移除 campaign 执行栈后,正文点名的这四个在 `Packages/ArkDeckKit/Sources/`
+> 全仓零命中:`settlesUnknownLoaderTransition`、`recordCampaignOutcome`、
+> `reconcileUnresolved`、`closeAttempt`。同族仍在的是 `finishReconcile`(1 个
+> 文件)、`AgentAuthorityUsageTerminal` 与 `confirmedNotExecutedIntentEventIDs`
+> (各 2 个),`outcomeUnknown` 本身仍广泛存在(40 个文件)。
+>
+> 按 ADR-0001/0003 的惯例,正文保留不改写。**尚未裁定的是:决策 1/3/5 所依附的
+> 读回、`classify` 与 `attemptTerminal.detail` 随其代码消失后,决策 2(崩溃尝试
+> 保持 `outcomeUnknown`、不得被描述为可恢复)与决策 4(已存在的证明不得丢弃)
+> 是否仍然约束当前 runtime,以及它们今天由什么承载。** 这是安全语义判断,留待
+> 维护者签发;本注记只登记可复查的事实,不代为裁决,也不改变本 ADR 的现有效力。
+
 - Status: accepted(CHG-2026-025 r17,TASK-AIN-020,2026-08-07)
 - Deciders: lvye(merge 即批准)
 - Context: `settlesUnknownLoaderTransition` 是 `outcomeUnknown` 尝试唯一的和解出路。
