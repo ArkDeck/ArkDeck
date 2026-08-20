@@ -75,6 +75,55 @@ class RealCatalogTests(unittest.TestCase):
             ["dayu200", "openharmony-standard@1", "workspace-host@1"],
         )
 
+    def test_operation_and_profile_rosters_agree_in_both_directions(self):
+        """The two hand-written rosters must name each other, not merely resolve.
+
+        Checking only that each reference existed let them drift while every
+        name stayed valid: fourteen operations declared a profile that did not
+        list them, and the generated authorisation matrix — the only published
+        view of what a profile supports — showed workspace-host@1 with seven
+        operations while seventeen claimed it.
+        """
+        operations, profiles = _real_operations()
+        claimed = {}
+        for doc in operations:
+            for profile_ref in doc["profiles"]:
+                claimed.setdefault(profile_ref, set()).add(generate.operation_reference(doc))
+        for doc in profiles:
+            ref = generate.profile_reference(doc)
+            self.assertEqual(
+                set(doc["supportedOperations"]), claimed.get(ref, set()),
+                f"{ref}: the profile's list and the operations claiming it must be one set")
+
+    def test_a_profile_that_omits_a_claiming_operation_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            profile_path = profiles_dir / "workspace-host.v1.json"
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            dropped = profile["supportedOperations"].pop()
+            profile_path.write_text(json.dumps(profile), encoding="utf-8")
+            with self.assertRaisesRegex(generate.CatalogError, "does not list them"):
+                generate.load_catalog(operations_dir, profiles_dir)
+            self.assertTrue(dropped)
+
+    def test_a_profile_listing_an_operation_that_does_not_claim_it_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            profile_path = profiles_dir / "workspace-host.v1.json"
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            profile["supportedOperations"].append("flash.dayu200")
+            profile_path.write_text(json.dumps(profile), encoding="utf-8")
+            with self.assertRaisesRegex(generate.CatalogError, "do not\\s+declare it|do not declare it"):
+                generate.load_catalog(operations_dir, profiles_dir)
+
     def test_dayu200_is_the_only_unversioned_singleton_profile(self):
         _, profiles = _real_operations()
         dayu200 = [profile for profile in profiles if profile["id"] == "dayu200"]

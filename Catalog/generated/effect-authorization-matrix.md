@@ -37,6 +37,6 @@ Catalog digest: `2f9d397dcb6add105c7a297577f229b3699be978d2262efe41d8cc3862ede0e
 
 | Profile | Provider | Supported operations |
 | --- | --- | --- |
-| `dayu200` | rockchip | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1`, `flash.dayu200` |
-| `openharmony-standard@1` | hdc | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1` |
-| `workspace-host@1` | workspace | `workspace.inspect-source@1`, `workspace.apply-patch@1`, `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1`, `workspace.run-tests@1`, `workspace.symbolize-crash@1`, `workspace.revert-patch@1` |
+| `dayu200` | rockchip | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1`, `flash.dayu200`, `port-forward.create@1`, `port-forward.remove@1` |
+| `openharmony-standard@1` | hdc | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1`, `port-forward.create@1`, `port-forward.remove@1` |
+| `workspace-host@1` | workspace | `workspace.inspect-source@1`, `workspace.apply-patch@1`, `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1`, `workspace.run-tests@1`, `workspace.symbolize-crash@1`, `workspace.revert-patch@1`, `analyzer.analyze-trace@1`, `analyzer.extract-crash-signature@1`, `analyzer.summarize-hilog@1`, `analyzer.summarize-trace@1`, `workspace.create-checkpoint@1`, `workspace.inspect-diff@1`, `workspace.inspect-git-status@1`, `workspace.prepare-isolated-copy@1`, `workspace.read-source-range@1`, `workspace.sweep-isolated-copies@1` |
