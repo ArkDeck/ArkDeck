@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import XCTest
 
 @testable import ArkDeckAgentClient
@@ -52,6 +53,31 @@ private final class DispatchGate: @unchecked Sendable {
       }
     }
   }
+}
+
+private func availableDaemonLoopbackPort() throws -> UInt16 {
+  let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+  guard descriptor >= 0 else { throw POSIXError(.ENOTSOCK) }
+  defer { close(descriptor) }
+  var address = sockaddr_in(
+    sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
+    sin_family: sa_family_t(AF_INET), sin_port: 0,
+    sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")),
+    sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
+  let bound = withUnsafePointer(to: &address) { pointer in
+    pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+      Darwin.bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+    }
+  }
+  guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EADDRINUSE) }
+  var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+  let named = withUnsafeMutablePointer(to: &address) { pointer in
+    pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+      getsockname(descriptor, $0, &length)
+    }
+  }
+  guard named == 0 else { throw POSIXError(.EADDRNOTAVAIL) }
+  return UInt16(bigEndian: address.sin_port)
 }
 
 final class AgentDaemonContractTests: XCTestCase {
@@ -1696,8 +1722,10 @@ final class AgentDaemonContractTests: XCTestCase {
       throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
     }
 
+    let hdcPort = try availableDaemonLoopbackPort()
     let process = try launchProductionDaemon(
-      binary: binary, stateDirectory: shortState, hdcPath: hdcFixture.path)
+      binary: binary, stateDirectory: shortState, hdcPath: hdcFixture.path,
+      extraEnvironment: ["OHOS_HDC_SERVER_PORT": String(hdcPort)])
     defer {
       if process.isRunning { process.terminate() }
     }
@@ -3181,5 +3209,74 @@ final class HeadlessHDCServerHostContractTests: XCTestCase {
     XCTAssertEqual(arguments, ["-s", "127.0.0.1:8710", "checkserver"])
     XCTAssertEqual(timeout, 2)
     XCTAssertEqual(readiness.action, .hdc(.observeServer))
+  }
+
+  func testColdStartReturnsOnlyAfterTheForegroundListenerIsReachable() async throws {
+    let fixture = productsDirectory.appending(path: "ArkDeckFakeHDCFixture")
+    guard FileManager.default.isExecutableFile(atPath: fixture.path) else {
+      throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
+    }
+    let port = try availableDaemonLoopbackPort()
+    let endpoint = HDCServerEndpointSelection(
+      endpoint: HDCServerEndpoint("127.0.0.1:\(port)"),
+      source: .inheritedEnvironment,
+      childEnvironment: ["OHOS_HDC_SERVER_PORT": String(port)])
+    let executable = try resolvedExecutable(at: fixture)
+
+    let host = try await HeadlessHDCServerHost.start(
+      executable: executable, endpoint: endpoint)
+    XCTAssertTrue(
+      HeadlessHDCServerHost.loopbackListenerIsReachable(endpoint: endpoint.endpoint),
+      "semantic checkserver output must not make startup ready before the managed listener")
+    XCTAssertEqual(host.diagnostics.endpoint, "127.0.0.1:\(port)")
+    XCTAssertEqual(host.diagnostics.endpointSource, "inheritedEnvironment")
+    XCTAssertEqual(host.diagnostics.clientVersion, "3.2.0d")
+    XCTAssertEqual(host.diagnostics.serverVersion, "3.2.0d")
+
+    await host.stop()
+    let deadline = Date().addingTimeInterval(2)
+    while HeadlessHDCServerHost.loopbackListenerIsReachable(endpoint: endpoint.endpoint),
+      Date() < deadline
+    {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    XCTAssertFalse(
+      HeadlessHDCServerHost.loopbackListenerIsReachable(endpoint: endpoint.endpoint),
+      "stopping the host must drain the foreground listener")
+  }
+
+  func testForegroundExitFailsReadinessWithTheClosedProcessOutcome() async throws {
+    let falseExecutable = URL(filePath: "/usr/bin/false")
+    guard FileManager.default.isExecutableFile(atPath: falseExecutable.path) else {
+      throw XCTSkip("/usr/bin/false is unavailable")
+    }
+    let port = try availableDaemonLoopbackPort()
+    let endpoint = HDCServerEndpointSelection(
+      endpoint: HDCServerEndpoint("127.0.0.1:\(port)"), source: .inheritedEnvironment,
+      childEnvironment: ["OHOS_HDC_SERVER_PORT": String(port)])
+
+    do {
+      _ = try await HeadlessHDCServerHost.start(
+        executable: resolvedExecutable(at: falseExecutable), endpoint: endpoint)
+      XCTFail("an exited foreground server must not wait out the startup deadline")
+    } catch let error as HeadlessHDCServerHostError {
+      XCTAssertEqual(
+        error, .serverDidNotBecomeReady("foreground HDC server exited with status 1"))
+    }
+  }
+
+  private func resolvedExecutable(at url: URL) throws -> ResolvedExecutable {
+    let digest = SHA256.hash(data: try Data(contentsOf: url))
+      .map { String(format: "%02x", $0) }.joined()
+    return ResolvedExecutable(path: url.path, sha256: digest)
+  }
+
+  private var productsDirectory: URL {
+    #if os(macOS)
+      for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
+        return bundle.bundleURL.deletingLastPathComponent()
+      }
+    #endif
+    return Bundle.main.bundleURL
   }
 }
