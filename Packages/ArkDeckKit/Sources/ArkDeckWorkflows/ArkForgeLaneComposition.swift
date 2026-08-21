@@ -181,26 +181,31 @@ package enum ArkForgeLaneComposition {
     static let dayu200 = "org.openharmony.dayu200"
   }
 
-  /// The id a DeviceProfile document declares.
+  /// The exact selector a DeviceProfile document declares.
   ///
   /// Read from the same file the daemon was handed, rather than configured
-  /// separately: `materializePlan` looks a profile up by the id the document
-  /// declares, and an operator-supplied id could name a profile the daemon
-  /// never loaded. Same file, same field, no room to disagree.
+  /// separately: `materializePlan` looks a loaded profile up by `id@version`,
+  /// and an operator-supplied selector could name a profile the daemon never
+  /// loaded. Same file, same fields, no room to disagree.
   ///
   /// The shape is `arkforge.device-profile/v1`:
   ///
   /// ```yaml
   /// profile:
   ///   id: org.openharmony.dayu200
+  ///   version: 1.0.0
   /// ```
   ///
-  /// A targeted read rather than a YAML parser, because this needs exactly one
-  /// scalar and a parser would be a dependency and a surface. `nil` when the
-  /// document does not have that shape, which the caller turns into a refusal
-  /// rather than a guess.
-  package static func deviceProfileID(inDocument source: String) -> String? {
+  /// A targeted read rather than a YAML parser, because this needs exactly two
+  /// scalars and a parser would be a dependency and a surface. `nil` when the
+  /// document does not have exactly that shape — including duplicate or empty
+  /// fields — which the caller turns into a refusal rather than a guess.
+  package static func deviceProfileSelector(inDocument source: String) -> (
+    id: String, version: String, exactReference: String
+  )? {
     var insideProfile = false
+    var id: String?
+    var version: String?
     for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
       let text = String(line)
       if text.hasPrefix("#") { continue }
@@ -215,11 +220,20 @@ package enum ArkForgeLaneComposition {
       }
       guard insideProfile else { continue }
       let trimmed = text.trimmingCharacters(in: .whitespaces)
-      guard trimmed.hasPrefix("id:") else { continue }
-      let value = trimmed.dropFirst("id:".count).trimmingCharacters(in: .whitespaces)
-      return value.isEmpty ? nil : value
+      if trimmed.hasPrefix("id:") {
+        guard id == nil else { return nil }
+        let value = trimmed.dropFirst("id:".count).trimmingCharacters(in: .whitespaces)
+        guard !value.isEmpty else { return nil }
+        id = value
+      } else if trimmed.hasPrefix("version:") {
+        guard version == nil else { return nil }
+        let value = trimmed.dropFirst("version:".count).trimmingCharacters(in: .whitespaces)
+        guard !value.isEmpty else { return nil }
+        version = value
+      }
     }
-    return nil
+    guard let id, let version else { return nil }
+    return (id: id, version: version, exactReference: "\(id)@\(version)")
   }
 
   /// The argv the daemon is started with.
@@ -259,12 +273,12 @@ package enum ArkForgeLaneComposition {
     return Data(bytes)
   }
 
-  /// A composed lane and the profile id it materializes against.
+  /// A composed lane and the exact profile reference it materializes against.
   ///
   /// Two things rather than one because the engine needs both and they must
-  /// come from the same composition: a lane paired with a profile id read from
-  /// some other configuration is a lane that could materialize against a
-  /// profile the daemon never loaded.
+  /// come from the same composition: a lane paired with a profile reference
+  /// read from some other configuration is a lane that could materialize
+  /// against a profile version the daemon never loaded.
   package struct Composed: Sendable {
     package let deviceProfileID: String
     package let toolchain: ToolchainIdentity
@@ -334,17 +348,18 @@ package enum ArkForgeLaneComposition {
       return .failure(
         .daemonUnavailable("cannot read the DeviceProfile at \(inputs.deviceProfilePath)"))
     }
-    guard let profileID = deviceProfileID(inDocument: source) else {
+    guard let profile = deviceProfileSelector(inDocument: source) else {
       return .failure(
         .daemonUnavailable(
-          "the DeviceProfile at \(inputs.deviceProfilePath) declares no profile.id; "
-            + "materializePlan addresses a profile by that id, and this lane will not guess one"))
+          "the DeviceProfile at \(inputs.deviceProfilePath) must declare exactly one "
+            + "profile.id and profile.version; materializePlan addresses a loaded profile by "
+            + "id@version, and this lane will not guess either field"))
     }
-    guard profileID == LaunchAgentArkForgeProfile.dayu200 else {
+    guard profile.id == LaunchAgentArkForgeProfile.dayu200 else {
       return .failure(
         .daemonUnavailable(
           "the bundle manifest selected \(LaunchAgentArkForgeProfile.dayu200), but the "
-            + "DeviceProfile declares \(profileID)"))
+            + "DeviceProfile declares \(profile.id)"))
     }
 
     let secret = freshPairingSecret()
@@ -407,7 +422,7 @@ package enum ArkForgeLaneComposition {
       runtimeDirectory: runtimeDirectory)
     return .success(
       Composed(
-        deviceProfileID: profileID,
+        deviceProfileID: profile.exactReference,
         toolchain: inputs.expectedToolchain,
         lane: ArkForgeLaneHost(
         connection: .init(socketPath: socket, controllerSessionID: "arkdeck-agentd"),

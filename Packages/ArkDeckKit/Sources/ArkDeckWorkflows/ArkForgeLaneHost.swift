@@ -305,10 +305,29 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
     // No cache yet: this is the first delegated step of this job, so it is the
     // one that materializes the plan and runs the ArkForge job.
-    let client = try makeClient(connection.socketPath)
-    let materialized = try await materialize(
-      artifact: artifact, binding: binding, jobID: jobID,
-      executionPurpose: executionPurpose)
+    let client: any ArkForgeFlashSession.Daemon
+    let materialized: (plan: ArkForgeExecutablePlan, observedMode: String)
+    do {
+      client = try makeClient(connection.socketPath)
+      materialized = try await materialize(
+        artifact: artifact, binding: binding, jobID: jobID,
+        executionPurpose: executionPurpose)
+    } catch let failure as RuntimeDispatchFailure {
+      terminalFailureByJob[jobID] = failure
+      throw failure
+    } catch {
+      // No execution exists yet: this boundary contains only client creation,
+      // host-side artifact import/inspection, discovery and materialization.
+      // Classifying that refusal as a generic thrown error lets it escape the
+      // Runtime terminalization path and leaves the Job durably `running`.
+      // It is confirmed-not-executed specifically because `startExecution`
+      // is below this block and has not been called.
+      let failure = RuntimeDispatchFailure.confirmedNotExecuted(
+        "arkforged refused before startExecution; nothing was dispatched and the device was "
+          + "not touched: \(error)")
+      terminalFailureByJob[jobID] = failure
+      throw failure
+    }
     let plan = materialized.plan
     guard plan.executionPurpose == executionPurpose else {
       throw LaneError.planNotExecutable(

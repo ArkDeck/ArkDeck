@@ -615,7 +615,28 @@ struct RuntimeRecoveryService {
       inspection.hasTornTail || !inspection.outstandingIntents.isEmpty
       || !inspection.unknownOutcomes.isEmpty
       || inspection.lastReconcileOutcomeCertainty == .outcomeUnknown
-    if hasUnresolvedProviderIntent,
+    // An ArkForge Flash execution lives behind one delegated Runtime step.
+    // Until `perform` returns, its daemon job id, receipts and completed-plan
+    // projection exist only in the process-owned lane actor. A process loss
+    // can therefore leave a clean Runtime journal even after ArkForge started
+    // an external execution. Resuming that Job would create a new lane actor
+    // and could materialize the same destructive plan again. Park it unknown;
+    // only a distinct complete-overwrite recovery Job may act on the durable
+    // capability lineage.
+    let lostArkForgeExecutionState: Bool = {
+      guard ArkForgeFlashOperation.containsDurableRecordReference(record.operationReference)
+      else { return false }
+      switch inspection.currentState {
+      case .running, .waitingForDevice, .awaitingRebindConfirmation,
+        .cancelRequested, .cancellingAtSafeBoundary,
+        .recoveringByCompleteOverwrite, .resumeAtConfirmedSafeBoundary:
+        return true
+      default:
+        return false
+      }
+    }()
+    let mustParkWithoutRedispatch = hasUnresolvedProviderIntent || lostArkForgeExecutionState
+    if mustParkWithoutRedispatch,
       let currentState = inspection.currentState,
       currentState != .waitingForRecovery,
       currentState != .reconciling,
@@ -625,11 +646,13 @@ struct RuntimeRecoveryService {
       try appendTransition(
         to: journal, record: record, sequence: &nextSequence,
         from: currentState, to: .waitingForRecovery,
-        reason: "durably park unresolved provider intent after restart")
+        reason: lostArkForgeExecutionState
+          ? "durably park non-resumable ArkForge execution after restart"
+          : "durably park unresolved provider intent after restart")
       inspection = try DurableJournalRecovery.inspect(url: journalURL)
     }
 
-    if hasUnresolvedProviderIntent {
+    if mustParkWithoutRedispatch {
       record.state = (inspection.currentState ?? .waitingForRecovery).rawValue
       record.outcomeUnknown = true
       if record.recoveryStepID == nil {
@@ -637,7 +660,17 @@ struct RuntimeRecoveryService {
           inspection.unknownOutcomes.last?.stepID
           ?? inspection.outstandingIntents.last?.stepID
       }
-      record.timeline.append("recovered: outstanding intents or unknown outcomes; no redispatch")
+      if lostArkForgeExecutionState {
+        record.operationFailure = RuntimeOperationFailure(
+          code: .outcomeUnknown, category: .unknownOutcome,
+          retryability: .runtimeDecisionRequired,
+          recovery: .awaitRuntimeReconciliation)
+        record.finishedAtUTC = record.finishedAtUTC ?? nowUTC()
+        record.timeline.append(
+          "recovered: ArkForge execution state was process-owned; parked unknown; no redispatch")
+      } else {
+        record.timeline.append("recovered: outstanding intents or unknown outcomes; no redispatch")
+      }
     } else {
       // A clean non-terminal cancellation/finalization journal has no resume
       // lane. Complete only these already-durable decisions; recovery never

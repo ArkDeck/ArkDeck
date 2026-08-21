@@ -20,9 +20,10 @@ import XCTest
 /// what prevents producing it again.
 final class ArkForgeLaneAssemblyContractTests: XCTestCase {
 
-  /// A real file, because composition reads the profile's declared id out of
-  /// it before launching anything: `materializePlan` addresses a profile by
-  /// that id, and a lane that cannot name one cannot materialize a plan.
+  /// A real file, because composition reads the profile's declared id and
+  /// version out of it before launching anything: `materializePlan` addresses
+  /// a profile by `id@version`, and a lane that cannot name the exact selector
+  /// cannot materialize a plan.
   private var bundleRoot: URL!
   private var fixture: ArkForgeBundleFixture!
 
@@ -98,9 +99,66 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
-    guard case .success = result else {
+    guard case .success(let composed) = result else {
       return XCTFail("a fully configured daemon must produce a lane, got \(result)")
     }
+    XCTAssertEqual(composed.deviceProfileID, "org.openharmony.dayu200@1.0.0")
+  }
+
+  func testAProfileWithoutAnExactVersionNeverLaunchesTheDaemon() async throws {
+    try Data(
+      """
+      schemaVersion: arkforge.device-profile/v1
+      profile:
+        id: org.openharmony.dayu200
+      """.utf8
+    ).write(to: fixture.profile)
+    try ArkForgeBundleManifestWriter.write(
+      bundleURL: fixture.root, version: "0.1.0-test",
+      declarations: [
+        .init(path: "Contents/MacOS/arkforge", role: .cli),
+        .init(path: "Contents/MacOS/arkforged", role: .daemon),
+        .init(
+          path: "Contents/Resources/profiles/dayu200.yaml", role: .profile,
+          profileID: "org.openharmony.dayu200"),
+      ])
+    let seen = LaunchRecorder()
+    let daemonDigest = fixture.daemonSHA256
+
+    let result = await ArkForgeLaneComposition.compose(
+      environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
+      pairingEpoch: 3, dependencies: dependencies(),
+      launch: { request, secret in await seen.record(request: request, secret: secret) },
+      connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
+      awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+    guard case .failure(let why) = result else {
+      return XCTFail("an unversioned profile must not compose a lane")
+    }
+    XCTAssertTrue("\(why)".contains("id@version"), "\(why)")
+    let record = await seen.snapshot()
+    XCTAssertNil(record, "an ambiguous profile selector must fail before daemon launch")
+  }
+
+  func testDuplicateProfileSelectorFieldsAreRefusedRatherThanGuessed() {
+    XCTAssertNil(
+      ArkForgeLaneComposition.deviceProfileSelector(
+        inDocument: """
+          schemaVersion: arkforge.device-profile/v1
+          profile:
+            id: org.openharmony.dayu200
+            id: org.openharmony.another
+            version: 1.0.0
+          """))
+    XCTAssertNil(
+      ArkForgeLaneComposition.deviceProfileSelector(
+        inDocument: """
+          schemaVersion: arkforge.device-profile/v1
+          profile:
+            id: org.openharmony.dayu200
+            version: 1.0.0
+            version: 2.0.0
+          """))
   }
 
   func testTheDefaultComposesTheNativeBuildIdentityAndArgument() async throws {
