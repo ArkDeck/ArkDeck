@@ -38,9 +38,9 @@
       "restartProfile": {
         "type": "string",
         "required": false,
-        "enum": ["restartAbility", "restartProcess", "none"],
+        "enum": ["restartAbility"],
         "default": "restartAbility",
-        "description": "How the application is restarted so it loads the new library. Only `restartAbility` has a published restart/readback plan; `restartProcess` and `none` are refused before authorization."
+        "description": "How the application is restarted so it loads the new library. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `restartAbility`. Other restart modes are not published until they have complete restart/readback plans."
       },
       "verificationProfile": {
         "type": "string",

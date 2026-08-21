@@ -1359,7 +1359,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
   }
 
-  func testUnimplementedStrictRedactionFailsClosedBeforeDispatch() async throws {
+  func testRemovedStrictRedactionValueFailsAtSchemaBeforeDispatch() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
     do {
@@ -1372,7 +1372,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       guard case .rejected(.invalidInput, let message) = error else {
         return XCTFail("expected invalidInput, got \(error)")
       }
-      XCTAssertTrue(message.contains("strict redaction"), message)
+      XCTAssertEqual(message, "input redactionProfile value is outside its enum")
     }
     XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
   }
@@ -2185,18 +2185,18 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let unsupported: [(String, String, String)] = [
       (
         "restore", "\"cleanupPolicy\": \"restorePrevious\"",
-        "snapshot/restore"
+        "cleanupPolicy"
       ),
       (
         "forward", "\"portForwardProfile\": \"debugger-default\"",
-        "port-forward"
+        "portForwardProfile"
       ),
       (
         "fresh", "\"installPolicy\": \"installFresh\"",
-        "pre-install absence"
+        "installPolicy"
       ),
     ]
-    for (suffix, input, expectedDetail) in unsupported {
+    for (suffix, input, field) in unsupported {
       do {
         _ = try await engine.submit(
           hapRequest(
@@ -2207,12 +2207,40 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         guard case .rejected(.invalidInput, let detail) = error else {
           return XCTFail("expected invalidInput, got \(error)")
         }
-        XCTAssertTrue(detail.contains(expectedDetail), detail)
+        XCTAssertEqual(detail, "input \(field) value is outside its enum")
       }
     }
     let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
     XCTAssertEqual(capability?.consumptionCount, 0)
     XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+  }
+
+  func testRemovedEnumValuesHaveNoManualAdmissionBranches() throws {
+    let source = try String(
+      contentsOf: URL(filePath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift"),
+      encoding: .utf8)
+    let start = try XCTUnwrap(
+      source.range(of: "  private func validateSupportedPlanInputs("))
+    let tail = source[start.lowerBound...]
+    let end = try XCTUnwrap(tail.range(of: "\n  /// Builds the single authorization subject"))
+    let validator = String(tail[..<end.lowerBound])
+
+    for deadBranch in [
+      #"inputs["redactionProfile"] == .string("strict")"#,
+      #"profile != HDCNativeRestartProfile.restartAbility.rawValue"#,
+      #"inputs["installPolicy"] == .string("installFresh")"#,
+      #"inputs["cleanupPolicy"] == .string("restorePrevious")"#,
+      #"inputs["portForwardProfile"] == .string("debugger-default")"#,
+    ] {
+      XCTAssertFalse(
+        validator.contains(deadBranch),
+        "schema-rejected enum values must not retain a second manual admission branch: \(deadBranch)")
+    }
+    XCTAssertFalse(validator.contains("deploy.native-library.app-owned@1"))
+    XCTAssertFalse(validator.contains("debug.hap@1"))
   }
 
   func testInvalidCatalogBoundFailsBeforeCapabilityConsumption() async throws {
