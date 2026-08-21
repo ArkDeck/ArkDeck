@@ -27,14 +27,13 @@ import Foundation
 /// reports that rather than synthesising one. A receipt is the evidence a write
 /// happened; a manufactured one would make an unperformed step look confirmed,
 /// which is the single worst thing this lane could do.
-/// The four calls that put a plan in the daemon's store.
+
+/// The assessment-only calls shared by the public and controller clients.
 ///
 /// A protocol so a scripted source can drive the lane in tests, and so the
 /// session's `Daemon` surface stays the five calls a running job makes. The
 /// real client satisfies both.
-package protocol ArkForgePlanSource: Sendable {
-  func importArtifact(contentsOf url: URL, expectedSHA256: String, requestID: String) throws
-    -> ArkForgeImportArtifactResponse
+package protocol ArkForgeAssessmentSource: Sendable {
   func inspectArtifact(artifactID: String, requestID: String) throws
     -> ArkForgeInspectArtifactResponse
   func discoverDevices(requestID: String) throws -> [ArkForgeDeviceObservation]
@@ -42,10 +41,17 @@ package protocol ArkForgePlanSource: Sendable {
     -> ArkForgeMaterializePlanResponse
 }
 
+/// The one mutating store call available only to a controller materializer.
+package protocol ArkForgePlanSource: ArkForgeAssessmentSource {
+  func importArtifact(contentsOf url: URL, expectedSHA256: String, requestID: String) throws
+    -> ArkForgeImportArtifactResponse
+}
+
 /// The real client is the plan source, for the same reason it is the daemon:
 /// the protocol was extracted from it rather than invented beside it, so drift
 /// is a compile error instead of a surprise on the bench.
 extension ArkForgeControllerClient: ArkForgePlanSource {}
+extension ArkForgePublicClient: ArkForgeAssessmentSource {}
 
 /// What a read-only lane plan preview learned (CHG-2026-068).
 public enum ArkForgeLanePlanPreviewOutcome: Sendable, Equatable {
@@ -88,10 +94,15 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// voids every unconsumed permit.
   package struct Connection: Sendable {
     package let socketPath: String
+    package let publicSocketPath: String
     package let controllerSessionID: String
 
-    package init(socketPath: String, controllerSessionID: String) {
+    package init(
+      socketPath: String, publicSocketPath: String? = nil,
+      controllerSessionID: String
+    ) {
       self.socketPath = socketPath
+      self.publicSocketPath = publicSocketPath ?? socketPath
       self.controllerSessionID = controllerSessionID
     }
   }
@@ -143,6 +154,13 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// before a job exists. Widening `Daemon` would have made every scripted
   /// test daemon implement calls it never receives.
   private let makeMaterializer: @Sendable (String) throws -> any ArkForgePlanSource
+  /// Public, assessment-only evidence for the mechanics maturity key.
+  ///
+  /// Production always points this at `public.sock`. The controller cannot
+  /// vouch for its own mechanics key without the independently constrained
+  /// public endpoint agreeing on the exact same combination.
+  private let makeAssessmentSource: @Sendable (String) throws -> any ArkForgeAssessmentSource
+  private let authoritySupport: ArkForgeAuthoritySupport.Configuration
   /// Built from the plan that was actually materialized, not from the job alone.
   ///
   /// The authority signs against the plan digest and the device it approved, and
@@ -185,11 +203,17 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   package init(
     connection: Connection,
     toolchainSHA256: String,
-    makePerformer: @escaping @Sendable (ArkForgeLaneDeviceBinding, String)
+    makePerformer:
+      @escaping @Sendable (ArkForgeLaneDeviceBinding, String)
       -> any ArkForgeFlashSession.ControlPerformer,
     makeClient: @escaping @Sendable (String) throws -> any ArkForgeFlashSession.Daemon,
     makeMaterializer: @escaping @Sendable (String) throws -> any ArkForgePlanSource,
-    makeAuthority: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
+    makeAssessmentSource:
+      @escaping @Sendable (String) throws
+      -> any ArkForgeAssessmentSource,
+    authoritySupport: ArkForgeAuthoritySupport.Configuration,
+    makeAuthority:
+      @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
       -> ArkForgeExecutionAuthority
   ) {
     self.connection = connection
@@ -197,16 +221,18 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     self.makePerformer = makePerformer
     self.makeClient = makeClient
     self.makeMaterializer = makeMaterializer
+    self.makeAssessmentSource = makeAssessmentSource
+    self.authoritySupport = authoritySupport
     self.makeAuthority = makeAuthority
   }
 
   /// Pre-materializes this bundle's lane plan without running a job.
   ///
-  /// The exact read-only prefix of `materialize(artifact:binding:jobID:)`
-  /// with the import branch removed: inspect (presence probe by content
-  /// digest — the daemon's artifact id *is* the sha256), discover, select the
-  /// bound port path, materialize. No permit exists, `startExecution` is
-  /// never called, and a miss is an honest state, not an error.
+  /// The same fail-closed evidence chain as execution with the import branch
+  /// removed: inspect (the artifact id *is* the sha256), public assessment,
+  /// controller assessment under a pending hardware gate, then controller
+  /// materialization with ArkDeck's exact support seal. No permit exists,
+  /// `startExecution` is never called, and a miss is an honest state.
   ///
   /// The digest this returns is a preview: execution re-materializes, and the
   /// permits anchor that materialization. Same daemon process and same inputs
@@ -217,41 +243,34 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   ) -> ArkForgeLanePlanPreviewOutcome {
     let nonce = UUID().uuidString.lowercased().prefix(8)
     do {
-      let client = try makeMaterializer(connection.socketPath)
-      if (try? client.inspectArtifact(
+      let controller = try makeMaterializer(connection.socketPath)
+      if (try? controller.inspectArtifact(
         artifactID: archiveSHA256, requestID: "preview-inspect-\(nonce)"))
         == nil
       {
         return .bundleNotInLaneStore
       }
-      let observations = try client.discoverDevices(requestID: "preview-discover-\(nonce)")
-      let observation: ArkForgeDeviceObservation
-      switch ArkForgeObservationSelection.select(
-        observations: observations, usbTopology: usbTopology)
-      {
-      case .success(let selected): observation = selected
-      case .failure(let why): return .deviceNotObserved("\(why)")
-      }
-      switch try client.materializePlan(
-        ArkForgeMaterializePlanRequest(
-          artifactID: archiveSHA256, profileID: profileID,
-          observationID: observation.observationID,
-          intent: "fullRestore", toolchainID: toolchainID,
-          authorityNamespace: "arkdeck.preview",
-          bindingID: "PREVIEW-\(archiveSHA256.prefix(12))", bindingRevision: 1,
-          stableIdentitySHA256: Self.sha256Bytes(of: usbTopology),
-          executionPurpose: "primaryFlash"),
-        requestID: "preview-materialize-\(nonce)")
-      {
-      case .plan(let plan):
-        return .available(
-          planID: plan.planID, planSHA256: plan.planSHA256,
-          observationMode: observation.mode)
-      case .assessment(let assessment):
+      let publicSource = try makeAssessmentSource(connection.publicSocketPath)
+      let materialized = try materializeStoredArtifact(
+        controller: controller, publicSource: publicSource,
+        artifactID: archiveSHA256, profileID: profileID,
+        usbTopology: usbTopology,
+        stableIdentitySHA256: Self.sha256Bytes(of: usbTopology),
+        bindingID: "PREVIEW-\(archiveSHA256.prefix(12))", bindingRevision: 1,
+        executionPurpose: "primaryFlash", requestStem: "preview-\(nonce)")
+      return .available(
+        planID: materialized.plan.planID,
+        planSHA256: materialized.plan.planSHA256,
+        observationMode: materialized.observedMode)
+    } catch let error as LaneError {
+      switch error {
+      case .deviceNotObserved(let reason):
+        return .deviceNotObserved(reason)
+      case .planNotExecutable(let availability, let reason, let unknowns):
         return .planNotExecutable(
-          availability: assessment.availability,
-          reason: assessment.unavailableReason,
-          unknowns: assessment.unknowns)
+          availability: availability, reason: reason, unknowns: unknowns)
+      default:
+        return .previewFailed(error.description)
       }
     } catch {
       return .previewFailed(String(describing: error))
@@ -332,7 +351,8 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     guard plan.executionPurpose == executionPurpose else {
       throw LaneError.planNotExecutable(
         availability: "unusable",
-        reason: "arkforged returned executionPurpose=\(plan.executionPurpose), expected \(executionPurpose)",
+        reason:
+          "arkforged returned executionPurpose=\(plan.executionPurpose), expected \(executionPurpose)",
         unknowns: ["executionPurpose": plan.executionPurpose])
     }
     executionPurposeByJob[jobID] = plan.executionPurpose
@@ -418,49 +438,253 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding, jobID: String,
     executionPurpose: String
   ) async throws -> (plan: ArkForgeExecutablePlan, observedMode: String) {
-    let client = try makeMaterializer(connection.socketPath)
+    let controller = try makeMaterializer(connection.socketPath)
 
-    if (try? client.inspectArtifact(artifactID: artifact.sha256, requestID: "inspect-\(jobID)"))
+    if (try? controller.inspectArtifact(
+      artifactID: artifact.sha256, requestID: "inspect-\(jobID)"))
       == nil
     {
-      _ = try client.importArtifact(
+      _ = try controller.importArtifact(
         contentsOf: artifact.fileURL, expectedSHA256: artifact.sha256,
         requestID: "import-\(jobID)")
-      _ = try client.inspectArtifact(
+      _ = try controller.inspectArtifact(
         artifactID: artifact.sha256, requestID: "inspect-after-import-\(jobID)")
     }
 
-    let observations = try client.discoverDevices(requestID: "discover-\(jobID)")
-    let observation: ArkForgeDeviceObservation
-    switch ArkForgeObservationSelection.select(
-      observations: observations, usbTopology: binding.usbTopology)
-    {
-    case .success(let selected): observation = selected
-    case .failure(let why): throw LaneError.deviceNotObserved("\(why)")
+    let publicSource = try makeAssessmentSource(connection.publicSocketPath)
+    return try materializeStoredArtifact(
+      controller: controller, publicSource: publicSource,
+      artifactID: artifact.sha256, profileID: artifact.profileID,
+      usbTopology: binding.usbTopology,
+      stableIdentitySHA256: Self.digestBytes(binding.stableIdentitySHA256) ?? [],
+      bindingID: binding.targetID,
+      bindingRevision: UInt64(max(1, binding.bindingRevision)),
+      executionPurpose: executionPurpose, requestStem: jobID)
+  }
+
+  /// Builds an executable controller plan only after two non-executable
+  /// assessments agree on the mechanics key.
+  ///
+  /// The public endpoint is structurally unable to publish an executable plan.
+  /// A first controller pass then uses a fixed `hardwareGated` support binding,
+  /// which is also structurally unable to become executable. Only after those
+  /// passes agree does ArkDeck derive its independent support key and ask for
+  /// the final plan. Every mismatch refuses before `startExecution`.
+  private func materializeStoredArtifact(
+    controller: any ArkForgePlanSource,
+    publicSource: any ArkForgeAssessmentSource,
+    artifactID: String, profileID: String, usbTopology: String,
+    stableIdentitySHA256: [UInt8], bindingID: String, bindingRevision: UInt64,
+    executionPurpose: String, requestStem: String
+  ) throws -> (plan: ArkForgeExecutablePlan, observedMode: String) {
+    guard stableIdentitySHA256.count == 32 else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "the ArkDeck binding has no exact 32-byte stable identity digest",
+        unknowns: ["stableIdentitySHA256": "malformed or absent"])
     }
 
-    let answer = try client.materializePlan(
-      ArkForgeMaterializePlanRequest(
-        artifactID: artifact.sha256, profileID: artifact.profileID,
-        observationID: observation.observationID,
-        intent: "fullRestore", toolchainID: toolchainID,
-        authorityNamespace: "arkdeck", bindingID: binding.targetID,
-        bindingRevision: UInt64(max(1, binding.bindingRevision)),
-        stableIdentitySHA256: Self.digestBytes(binding.stableIdentitySHA256) ?? [],
-        executionPurpose: executionPurpose),
-      requestID: "materialize-\(jobID)")
+    _ = try publicSource.inspectArtifact(
+      artifactID: artifactID, requestID: "public-inspect-\(requestStem)")
+    let publicObservation = try selectObservation(
+      try publicSource.discoverDevices(requestID: "public-discover-\(requestStem)"),
+      usbTopology: usbTopology)
+    let publicAnswer = try publicSource.materializePlan(
+      materializeRequest(
+        artifactID: artifactID, profileID: profileID,
+        observationID: publicObservation.observationID,
+        stableIdentitySHA256: stableIdentitySHA256,
+        bindingID: bindingID, bindingRevision: bindingRevision,
+        executionPurpose: executionPurpose,
+        authoritySupportKeySHA256: [], authoritySupportState: "",
+        authoritySupportDetail: ""),
+      requestID: "public-materialize-\(requestStem)")
+    guard case .assessment(let publicAssessment) = publicAnswer else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "the public ArkForge endpoint returned an executable plan",
+        unknowns: ["publicPlan": "assessment-only boundary was bypassed"])
+    }
+    guard Self.digestBytes(publicAssessment.mechanicsMaturityKeySHA256) != nil else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "the public assessment carries no usable mechanics maturity key",
+        unknowns: [
+          "mechanicsMaturityKeySHA256": publicAssessment.mechanicsMaturityKeySHA256
+        ])
+    }
+
+    let controllerObservation = try selectObservation(
+      try controller.discoverDevices(requestID: "controller-discover-\(requestStem)"),
+      usbTopology: usbTopology)
+    guard Self.sameObservationEvidence(publicObservation, controllerObservation) else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "public and controller sessions did not observe the same bound device facts",
+        unknowns: [
+          "publicObservation": publicObservation.observationID,
+          "controllerObservation": controllerObservation.observationID,
+        ])
+    }
+
+    let pendingAnswer = try controller.materializePlan(
+      materializeRequest(
+        artifactID: artifactID, profileID: profileID,
+        observationID: controllerObservation.observationID,
+        stableIdentitySHA256: stableIdentitySHA256,
+        bindingID: bindingID, bindingRevision: bindingRevision,
+        executionPurpose: executionPurpose,
+        authoritySupportKeySHA256: ArkForgeAuthoritySupport.pendingKeySHA256,
+        authoritySupportState: "hardwareGated",
+        authoritySupportDetail: ArkForgeAuthoritySupport.pendingDetail),
+      requestID: "controller-assess-\(requestStem)")
+    guard case .assessment(let mechanicsAssessment) = pendingAnswer else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "ArkForge returned an executable plan for a hardware-gated authority binding",
+        unknowns: ["authorityGate": "pending assessment became executable"])
+    }
+    let pendingKeyHex = SHA256Hex.lowercaseHex(
+      Data(ArkForgeAuthoritySupport.pendingKeySHA256))
+    guard mechanicsAssessment.authoritySupportKeySHA256 == pendingKeyHex,
+      mechanicsAssessment.authoritySupportState == "hardwareGated"
+    else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "ArkForge did not echo the pending authority-support seal",
+        unknowns: [
+          "authoritySupportKeySHA256": mechanicsAssessment.authoritySupportKeySHA256,
+          "authoritySupportState": mechanicsAssessment.authoritySupportState,
+        ])
+    }
+    guard
+      mechanicsAssessment.mechanicsMaturityKeySHA256
+        == publicAssessment.mechanicsMaturityKeySHA256
+    else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "public and controller materialization disagree on the mechanics maturity key",
+        unknowns: [
+          "publicMechanicsKey": publicAssessment.mechanicsMaturityKeySHA256,
+          "controllerMechanicsKey": mechanicsAssessment.mechanicsMaturityKeySHA256,
+        ])
+    }
+    guard Self.executionSupportStatePermits(mechanicsAssessment.mechanicsMaturityState) else {
+      throw LaneError.planNotExecutable(
+        availability: mechanicsAssessment.availability,
+        reason: mechanicsAssessment.unavailableReason,
+        unknowns: mechanicsAssessment.unknowns)
+    }
+
+    let support = try authoritySupport.seal(
+      mechanicsMaturityKeySHA256: mechanicsAssessment.mechanicsMaturityKeySHA256)
+    guard support.permitsExecution else {
+      var unknowns = mechanicsAssessment.unknowns
+      unknowns["RK-A01"] = support.detail
+      throw LaneError.planNotExecutable(
+        availability: "unavailable",
+        reason:
+          "authority support is \(support.state) for the exact ArkDeck authority key; "
+          + "mechanics maturity does not bypass this independent gate",
+        unknowns: unknowns)
+    }
+
+    let answer = try controller.materializePlan(
+      materializeRequest(
+        artifactID: artifactID, profileID: profileID,
+        observationID: controllerObservation.observationID,
+        stableIdentitySHA256: stableIdentitySHA256,
+        bindingID: bindingID, bindingRevision: bindingRevision,
+        executionPurpose: executionPurpose,
+        authoritySupportKeySHA256: support.keySHA256,
+        authoritySupportState: support.state,
+        authoritySupportDetail: support.detail),
+      requestID: "controller-materialize-\(requestStem)")
     switch answer {
     case .plan(let plan):
-      return (plan, observation.mode)
+      try requireSeals(
+        plan: plan, mechanicsAssessment: mechanicsAssessment, support: support)
+      return (plan, controllerObservation.mode)
     case .assessment(let assessment):
-      // Not a transport failure and not retryable. The daemon built the whole
-      // plan and declined to make it executable, and the reasons are the only
-      // actionable part — a maturity gate and a profile violation need
-      // different people.
       throw LaneError.planNotExecutable(
         availability: assessment.availability, reason: assessment.unavailableReason,
         unknowns: assessment.unknowns)
     }
+  }
+
+  private func materializeRequest(
+    artifactID: String, profileID: String, observationID: String,
+    stableIdentitySHA256: [UInt8], bindingID: String, bindingRevision: UInt64,
+    executionPurpose: String, authoritySupportKeySHA256: [UInt8],
+    authoritySupportState: String, authoritySupportDetail: String
+  ) -> ArkForgeMaterializePlanRequest {
+    ArkForgeMaterializePlanRequest(
+      artifactID: artifactID, profileID: profileID,
+      observationID: observationID,
+      intent: "fullRestore", toolchainID: toolchainID,
+      authorityNamespace: "arkdeck", bindingID: bindingID,
+      bindingRevision: bindingRevision,
+      stableIdentitySHA256: stableIdentitySHA256,
+      executionPurpose: executionPurpose,
+      authoritySupportKeySHA256: authoritySupportKeySHA256,
+      authoritySupportState: authoritySupportState,
+      authoritySupportDetail: authoritySupportDetail)
+  }
+
+  private func selectObservation(
+    _ observations: [ArkForgeDeviceObservation], usbTopology: String
+  ) throws -> ArkForgeDeviceObservation {
+    switch ArkForgeObservationSelection.select(
+      observations: observations, usbTopology: usbTopology)
+    {
+    case .success(let selected): return selected
+    case .failure(let why): throw LaneError.deviceNotObserved("\(why)")
+    }
+  }
+
+  private func requireSeals(
+    plan: ArkForgeExecutablePlan, mechanicsAssessment: ArkForgePlanAssessment,
+    support: ArkForgeAuthoritySupport.Seal
+  ) throws {
+    let expectedMechanicsCampaign =
+      mechanicsAssessment.mechanicsMaturityState == "hardwareCampaign"
+      ? authoritySupport.hardwareCampaign : ""
+    guard
+      plan.mechanicsMaturityKeySHA256 == mechanicsAssessment.mechanicsMaturityKeySHA256,
+      plan.mechanicsMaturityState == mechanicsAssessment.mechanicsMaturityState,
+      plan.mechanicsMaturityCampaign == expectedMechanicsCampaign,
+      plan.authoritySupportKeySHA256 == support.keyHex,
+      plan.authoritySupportState == support.state,
+      plan.authoritySupportCampaign == support.campaign
+    else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "ArkForge did not seal the exact mechanics and authority-support evidence supplied",
+        unknowns: [
+          "mechanicsMaturityKeySHA256": plan.mechanicsMaturityKeySHA256,
+          "mechanicsMaturityState": plan.mechanicsMaturityState,
+          "mechanicsMaturityCampaign": plan.mechanicsMaturityCampaign,
+          "authoritySupportKeySHA256": plan.authoritySupportKeySHA256,
+          "authoritySupportState": plan.authoritySupportState,
+          "authoritySupportCampaign": plan.authoritySupportCampaign,
+        ])
+    }
+  }
+
+  private static func executionSupportStatePermits(_ state: String) -> Bool {
+    state == "productionVerified" || state == "hardwareCampaign"
+  }
+
+  private static func sameObservationEvidence(
+    _ lhs: ArkForgeDeviceObservation, _ rhs: ArkForgeDeviceObservation
+  ) -> Bool {
+    lhs.observationID == rhs.observationID
+      && lhs.mode == rhs.mode
+      && lhs.topologyDigest == rhs.topologyDigest
+      && lhs.descriptorDigest == rhs.descriptorDigest
+      && lhs.identityStrength == rhs.identityStrength
+      && lhs.malformedDescriptor == rhs.malformedDescriptor
+      && lhs.protocolIdentity == rhs.protocolIdentity
   }
 
   package func completedPlanReceipt(jobID: String) -> ArkForgeActionReceiptSummary? {

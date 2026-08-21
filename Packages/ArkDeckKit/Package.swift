@@ -27,7 +27,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/ArkDeck/ArkForge.git",
-      revision: "9587988ed819048817c3afd2a4a0c8855e6f35d9")
+      revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92")
   ],
   targets: [
     .target(

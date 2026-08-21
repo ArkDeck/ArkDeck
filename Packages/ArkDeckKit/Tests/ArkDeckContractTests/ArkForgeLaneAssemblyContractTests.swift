@@ -51,11 +51,16 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       toolchainID: toolchainID, toolchainSHA256: toolchain)
   }
 
-  private func dependencies() -> ArkForgeLaneComposition.Dependencies {
+  private func dependencies(
+    authorityImplementationSHA256: String = String(repeating: "a", count: 64),
+    managedControlToolSHA256: String = String(repeating: "b", count: 64)
+  ) -> ArkForgeLaneComposition.Dependencies {
     .init(
       rockchipHost: { RefusingRockchipRuntimeActionHost(reason: "test") },
       providerIdentity: ResolvedExecutable(
         path: fixture.daemon.path, sha256: fixture.daemonSHA256),
+      authorityImplementationSHA256: authorityImplementationSHA256,
+      managedControlToolSHA256: managedControlToolSHA256,
       approvedPlan: { jobID, planID, planDigest, _ in
         .init(
           jobID: jobID, planID: planID, planSHA256: planDigest,
@@ -103,6 +108,31 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       return XCTFail("a fully configured daemon must produce a lane, got \(result)")
     }
     XCTAssertEqual(composed.deviceProfileID, "org.openharmony.dayu200@1.0.0")
+  }
+
+  func testMissingAuthorityOrHDCDigestRefusesBeforeDaemonLaunch() async {
+    let daemonDigest = fixture.daemonSHA256
+    for dependencies in [
+      dependencies(authorityImplementationSHA256: ""),
+      dependencies(managedControlToolSHA256: "not-a-digest"),
+    ] {
+      let seen = LaunchRecorder()
+      let result = await ArkForgeLaneComposition.compose(
+        environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
+        pairingEpoch: 3, dependencies: dependencies,
+        launch: { request, secret in await seen.record(request: request, secret: secret) },
+        connect: { _ in
+          (SilentDaemon(), Self.readyAck(toolchain: daemonDigest))
+        },
+        awaitSocket: { _ in "/tmp/rt/controller.sock" })
+
+      guard case .failure(let why) = result else {
+        return XCTFail("an unmeasured authority axis must not compose a lane")
+      }
+      XCTAssertTrue("\(why)".contains("authority support"), "\(why)")
+      let record = await seen.snapshot()
+      XCTAssertNil(record, "identity refusal must happen before arkforged launches")
+    }
   }
 
   func testAProfileWithoutAnExactVersionNeverLaunchesTheDaemon() async throws {

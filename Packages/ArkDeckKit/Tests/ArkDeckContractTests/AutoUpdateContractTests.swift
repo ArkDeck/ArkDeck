@@ -706,15 +706,16 @@ final class AutoUpdateContractTests: XCTestCase {
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
-    let arkForgeRevision = "9587988ed819048817c3afd2a4a0c8855e6f35d9"
+    let arkForgeRevision = "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"
     XCTAssertEqual(
       package.components(separatedBy: ".package(").count - 1, 1,
       "ArkForge is the package's only remote source dependency")
     XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkForge.git"))
     XCTAssertTrue(package.contains("revision: \"\(arkForgeRevision)\""))
-    let packageResolution = try JSONSerialization.jsonObject(
-      with: Data(
-        contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.resolved")))
+    let packageResolution =
+      try JSONSerialization.jsonObject(
+        with: Data(
+          contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.resolved")))
       as? [String: Any]
     let pins = try XCTUnwrap(packageResolution?["pins"] as? [[String: Any]])
     XCTAssertEqual(pins.count, 1)

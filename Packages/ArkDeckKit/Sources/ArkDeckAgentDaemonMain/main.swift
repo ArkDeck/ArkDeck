@@ -590,7 +590,8 @@ Task.detached {
     // release bundle, and absence is written to the log with what it means for
     // the product — a daemon with no lane and a daemon that failed to build one
     // look identical from outside, and only one of them is a problem.
-    let arkForgeRuntimeDirectory = resolvedStateDirectory
+    let arkForgeRuntimeDirectory =
+      resolvedStateDirectory
       .appending(path: "arkforge", directoryHint: .isDirectory)
     try? FileManager.default.createDirectory(
       at: arkForgeRuntimeDirectory, withIntermediateDirectories: true,
@@ -601,11 +602,26 @@ Task.detached {
     // profile this daemon never loaded.
     let arkForgeDeviceProfileID: String?
     let arkForgeAvailability: ProviderOperationAvailability
+    let authorityImplementationSHA256: String
+    if let executableURL = Bundle.main.executableURL,
+      let resolver = try? FixedExecutableResolver.hashing(
+        path: executableURL.path, providerID: "arkdeck-agentd-authority"),
+      let resolved = try? resolver.resolveExecutable(providerID: "arkdeck-agentd-authority")
+    {
+      authorityImplementationSHA256 = resolved.sha256
+    } else {
+      // Composition below turns this into lane unavailability. Other providers
+      // remain usable, but no ArkForge authority key is invented for an
+      // executable this process could not identify and measure.
+      authorityImplementationSHA256 = ""
+    }
     switch await ArkForgeLaneComposition.composeFromEnvironment(
       runtimeDirectory: arkForgeRuntimeDirectory,
       rockchipDispatcher: rockchipDispatcher,
       providerIdentity: (try? rockchipResolver.resolveExecutable(providerID: "rockchip"))
         ?? ResolvedExecutable(path: "-", sha256: String(repeating: "0", count: 64)),
+      authorityImplementationSHA256: authorityImplementationSHA256,
+      managedControlToolSHA256: executableSHA,
       approvedPlan: { jobID, planID, planDigest, deviceBinding in
         // The plan facts this authority signs against.
         //
