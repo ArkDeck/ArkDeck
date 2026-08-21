@@ -3186,6 +3186,68 @@ final class AgentDaemonContractTests: XCTestCase {
 
 }
 
+final class ManualUIFlashBridgeContractTests: XCTestCase {
+  private static let moduleCache = FileManager.default.temporaryDirectory
+    .appending(
+      path: "manual-ui-xpc-modules-\(UUID().uuidString)", directoryHint: .isDirectory)
+
+  private var repositoryRoot: URL {
+    var root = URL(filePath: #filePath)
+    for _ in 0..<5 { root.deleteLastPathComponent() }
+    return root
+  }
+
+  func testBridgeAOTCompilesBeforeConstructingTheClangBackedXPCInterface() throws {
+    let driverURL = repositoryRoot.appending(
+      path: "scripts/manual_ui_flash/manual_ui_flash.swift")
+    let source = try String(contentsOf: driverURL, encoding: .utf8)
+    XCTAssertTrue(source.contains("manualUIAOTCompilerPath = \"/usr/bin/swiftc\""))
+    XCTAssertTrue(source.contains("--manual-ui-aot-child"))
+    XCTAssertTrue(source.contains("arkdeck-manual-ui-flash-aot"))
+    XCTAssertTrue(source.contains("lstat($0, &value)"))
+    XCTAssertTrue(source.contains("try reexecManualUIAOT(arguments: arguments)"))
+
+    let dispatchStart = try XCTUnwrap(
+      source.range(of: #"} else if arguments.first == "--xpc-flash-bridge" {"#)?.lowerBound)
+    let dispatchEnd = try XCTUnwrap(
+      source.range(
+        of: #"} else if arguments == ["--validate-xpc-interface"] {"#,
+        range: dispatchStart..<source.endIndex)?.lowerBound)
+    let dispatch = source[dispatchStart..<dispatchEnd]
+    let protectedMain = try XCTUnwrap(dispatch.range(of: "protectedMainActuatorCommit()"))
+    let reexec = try XCTUnwrap(dispatch.range(of: "reexecManualUIAOT(arguments: arguments)"))
+    XCTAssertLessThan(protectedMain.lowerBound, reexec.lowerBound)
+
+    let bridgeStart = try XCTUnwrap(source.range(of: "func runFlashBridge(")?.lowerBound)
+    let bridgeEnd = try XCTUnwrap(
+      source.range(of: "func validateCandidate(", range: bridgeStart..<source.endIndex)?.lowerBound)
+    XCTAssertTrue(
+      source[bridgeStart..<bridgeEnd].contains(
+        "let protectedMainCommitOID = try protectedMainActuatorCommit()"))
+
+    try FileManager.default.createDirectory(
+      at: Self.moduleCache, withIntermediateDirectories: true)
+    let output = Pipe()
+    let errors = Pipe()
+    let process = Process()
+    process.executableURL = URL(filePath: "/usr/bin/xcrun")
+    process.arguments = [
+      "swift", "-module-cache-path", Self.moduleCache.path,
+      driverURL.path, "--validate-xpc-interface",
+    ]
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    let stdout = output.fileHandleForReading.readDataToEndOfFile()
+    let stderr = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    let errorText = String(decoding: stderr, as: UTF8.self)
+    XCTAssertEqual(process.terminationStatus, 0, errorText)
+    XCTAssertTrue(String(decoding: stdout, as: UTF8.self).contains("XPC_INTERFACE_VALID: aot"))
+    XCTAssertFalse(errorText.contains("NSInvalidArgumentException"))
+  }
+}
+
 final class HeadlessHDCServerHostContractTests: XCTestCase {
   func testForegroundHostUsesExactLoopbackEndpointAndClosedEnvironment() throws {
     let executable = ResolvedExecutable(

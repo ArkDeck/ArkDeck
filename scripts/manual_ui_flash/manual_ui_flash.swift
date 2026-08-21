@@ -193,6 +193,151 @@ private func sha256(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
+private let manualUIAOTChildArgument = "--manual-ui-aot-child"
+private let manualUIAOTCompilerPath = "/usr/bin/swiftc"
+
+private struct ManualUIAOTPaths {
+  let source: URL
+  let digestDirectory: URL
+  let moduleCache: URL
+  let executable: URL
+}
+
+private func manualUIAOTPaths() throws -> ManualUIAOTPaths {
+  let source = URL(fileURLWithPath: #filePath).standardizedFileURL
+  let sourceData = try Data(contentsOf: source)
+  guard !sourceData.isEmpty, sourceData.count <= 2 * 1_024 * 1_024 else {
+    throw DriverFailure.message("manual UI actuator source is outside the AOT size bound")
+  }
+  let root = FileManager.default.temporaryDirectory.standardizedFileURL
+    .appendingPathComponent("arkdeck-manual-ui-flash-aot", isDirectory: true)
+  let digestDirectory = root.appendingPathComponent(sha256(sourceData), isDirectory: true)
+  return ManualUIAOTPaths(
+    source: source,
+    digestDirectory: digestDirectory,
+    moduleCache: digestDirectory.appendingPathComponent("modules", isDirectory: true),
+    executable: digestDirectory.appendingPathComponent("manual_ui_flash", isDirectory: false))
+}
+
+private func manualUIFileStatus(_ url: URL) throws -> stat {
+  var value = stat()
+  let result = url.path.withCString { lstat($0, &value) }
+  guard result == 0 else {
+    throw DriverFailure.message(
+      "could not inspect AOT path \(url.path): \(String(cString: strerror(errno)))")
+  }
+  return value
+}
+
+private func ensureOwnerPrivateDirectory(_ url: URL) throws {
+  let result = url.path.withCString { mkdir($0, S_IRWXU) }
+  guard result == 0 || errno == EEXIST else {
+    throw DriverFailure.message(
+      "could not create AOT directory \(url.path): \(String(cString: strerror(errno)))")
+  }
+  let value = try manualUIFileStatus(url)
+  guard value.st_mode & S_IFMT == S_IFDIR, value.st_uid == geteuid(),
+    value.st_mode & (S_IRWXG | S_IRWXO) == 0
+  else {
+    throw DriverFailure.message("AOT directory is not an owner-private real directory: \(url.path)")
+  }
+}
+
+private func validateManualUIAOTExecutable(_ url: URL) throws {
+  let value = try manualUIFileStatus(url)
+  guard value.st_mode & S_IFMT == S_IFREG, value.st_uid == geteuid(),
+    value.st_mode & (S_IWGRP | S_IWOTH) == 0,
+    value.st_mode & S_IXUSR != 0
+  else {
+    throw DriverFailure.message("AOT actuator is not an owner-controlled executable: \(url.path)")
+  }
+}
+
+private func compileManualUIAOT() throws -> URL {
+  let paths = try manualUIAOTPaths()
+  let root = paths.digestDirectory.deletingLastPathComponent()
+  try ensureOwnerPrivateDirectory(root)
+  try ensureOwnerPrivateDirectory(paths.digestDirectory)
+  try ensureOwnerPrivateDirectory(paths.moduleCache)
+
+  let staging = paths.digestDirectory.appendingPathComponent(
+    ".manual_ui_flash.\(UUID().uuidString).tmp", isDirectory: false)
+  defer { try? FileManager.default.removeItem(at: staging) }
+
+  let errors = Pipe()
+  let compiler = Process()
+  compiler.executableURL = URL(fileURLWithPath: manualUIAOTCompilerPath)
+  compiler.arguments = [
+    "-module-cache-path", paths.moduleCache.path,
+    paths.source.path,
+    "-o", staging.path,
+  ]
+  compiler.environment = [
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "TMPDIR": FileManager.default.temporaryDirectory.path,
+  ]
+  compiler.standardOutput = FileHandle.nullDevice
+  compiler.standardError = errors
+  try compiler.run()
+  let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+  compiler.waitUntilExit()
+  guard compiler.terminationStatus == 0 else {
+    let detail = String(decoding: errorData.prefix(4_096), as: UTF8.self)
+    throw DriverFailure.message("could not AOT-compile XPC bridge: \(detail)")
+  }
+  guard staging.path.withCString({ chmod($0, S_IRWXU) }) == 0 else {
+    throw DriverFailure.message(
+      "could not protect AOT actuator: \(String(cString: strerror(errno)))")
+  }
+  try validateManualUIAOTExecutable(staging)
+  guard staging.path.withCString({ sourcePath in
+    paths.executable.path.withCString { destinationPath in
+      rename(sourcePath, destinationPath)
+    }
+  }) == 0 else {
+    throw DriverFailure.message(
+      "could not publish AOT actuator: \(String(cString: strerror(errno)))")
+  }
+  try validateManualUIAOTExecutable(paths.executable)
+  return paths.executable
+}
+
+private func manualUIAOTInvocation(_ arguments: [String]) throws -> (
+  isAOTChild: Bool, arguments: [String]
+) {
+  guard arguments.first == manualUIAOTChildArgument else {
+    return (false, arguments)
+  }
+  let paths = try manualUIAOTPaths()
+  try ensureOwnerPrivateDirectory(paths.digestDirectory.deletingLastPathComponent())
+  try ensureOwnerPrivateDirectory(paths.digestDirectory)
+  try ensureOwnerPrivateDirectory(paths.moduleCache)
+  let executable = paths.executable.standardizedFileURL
+  guard URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL == executable else {
+    throw DriverFailure.message("manual UI AOT child marker did not match the compiled actuator")
+  }
+  try validateManualUIAOTExecutable(executable)
+  return (true, Array(arguments.dropFirst()))
+}
+
+private func reexecManualUIAOT(arguments: [String]) throws -> Never {
+  let executable = try compileManualUIAOT()
+  var argv: [UnsafeMutablePointer<CChar>?] =
+    ([executable.path, manualUIAOTChildArgument] + arguments).map { strdup($0) }
+  guard !argv.contains(where: { $0 == nil }) else {
+    for case let pointer? in argv { free(pointer) }
+    throw DriverFailure.message("could not allocate AOT actuator arguments")
+  }
+  argv.append(nil)
+  defer {
+    for case let pointer? in argv { free(pointer) }
+  }
+  let result = executable.path.withCString { execv($0, &argv) }
+  throw DriverFailure.message(
+    "could not exec AOT actuator (\(result)): \(String(cString: strerror(errno)))")
+}
+
 private func canonicalData<T: Encodable>(_ value: T) throws -> Data {
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -291,6 +436,11 @@ private func applicationExecutableSHA256(_ appURL: URL) throws -> String {
   func sendRequestFrame(
     _ frame: Data,
     with reply: @escaping @Sendable (Data?, String?) -> Void)
+}
+
+private func validateManualFlashXPCInterface() {
+  _ = NSXPCInterface(with: ManualFlashXPCProtocol.self)
+  print("XPC_INTERFACE_VALID: aot")
 }
 
 /// Manual-only adapter for a daemon that is already running from a shell and
@@ -1718,11 +1868,21 @@ func requestAccessibilityPermission() -> Never {
 }
 
 do {
-  let arguments = Array(CommandLine.arguments.dropFirst())
+  let invocation = try manualUIAOTInvocation(Array(CommandLine.arguments.dropFirst()))
+  let arguments = invocation.arguments
   if arguments == ["--request-accessibility"] {
     requestAccessibilityPermission()
   } else if arguments.first == "--xpc-flash-bridge" {
+    if !invocation.isAOTChild {
+      _ = try protectedMainActuatorCommit()
+      try reexecManualUIAOT(arguments: arguments)
+    }
     try runFlashBridge(Array(arguments.dropFirst()))
+  } else if arguments == ["--validate-xpc-interface"] {
+    if !invocation.isAOTChild {
+      try reexecManualUIAOT(arguments: arguments)
+    }
+    validateManualFlashXPCInterface()
   } else if arguments.first == "--validate-candidate" {
     try validateCandidate(Array(arguments.dropFirst()))
   } else if arguments.first == "--debug-session-status" {
