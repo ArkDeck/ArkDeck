@@ -17,7 +17,6 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "capture.diagnostics@1",
         "debug.hap@1",
         "deploy.native-library.app-owned@1",
-        "deploy.native-library.system@1",
         "flash.dayu200",
         "observe.device@1",
         "port-forward.create@1",
@@ -261,11 +260,7 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     }
   }
 
-  func testDestructiveOperationsRemainPinnedAndRuntimeIssuable() throws {
-    let system = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(id: "deploy.native-library.system", version: 1))
-    XCTAssertEqual(system.permittedEffects, [.destructive])
-    XCTAssertTrue(system.defaultPolicyIssuanceEnabled)
+  func testPublishedDestructiveFlashRemainsPinnedAndRuntimeIssuable() throws {
     let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(id: "flash.dayu200", version: nil))
     XCTAssertEqual(flash.permittedEffects, [.destructive])
     XCTAssertEqual(flash.provider, .rockchip)

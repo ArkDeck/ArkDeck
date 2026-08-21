@@ -1587,6 +1587,9 @@ final class AgentDaemonContractTests: XCTestCase {
     else {
       return XCTFail("arkdeck operation list must expose daemon availability")
     }
+    XCTAssertEqual(
+      listedOperations.count, 24,
+      "the production CLI must expose exactly the executable catalog roster")
     XCTAssertEqual(listedFlash["availability"], .string("unavailable"))
     XCTAssertEqual(listedFlash["reasons"], .array(flash.reasons.map(JSONValue.string)))
 
