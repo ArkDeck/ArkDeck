@@ -27,7 +27,8 @@ final class OverviewCapabilityApplicationFacadeContractTests: XCTestCase {
 
     XCTAssertTrue(source.contains("method: \"trace.probe\""))
     XCTAssertTrue(source.contains("method: \"debug.template.run\""))
-    XCTAssertTrue(source.contains("flash.dayu200"))
+    XCTAssertTrue(source.contains("ArkForgeFlashOperation.canonicalReference"))
+    XCTAssertFalse(source.contains("flash.dayu200"))
     XCTAssertFalse(source.contains("flashd"))
     XCTAssertTrue(source.contains("TraceRuntimeToolDisposition"))
   }

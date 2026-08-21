@@ -581,7 +581,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(
       flashReasons.contains { value in
         guard case .string(let reason) = value else { return false }
-        return reason.contains("rockchip") && reason.contains("not registered")
+        return reason.contains("arkforge") && reason.contains("not registered")
       })
     let describe = await handler.handleFrame(
       Data(
@@ -593,7 +593,7 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("describe must return an object")
     }
     XCTAssertEqual(fields["minimumEffect"], .string("destructive"))
-    XCTAssertEqual(fields["provider"], .string("rockchip"))
+    XCTAssertEqual(fields["provider"], .string("arkforge"))
     XCTAssertEqual(fields["availability"], .string("unavailable"))
     guard case .array(let reasons)? = fields["availabilityReasons"] else {
       return XCTFail("describe must include availability reasons")
@@ -1588,7 +1588,7 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("arkdeck operation list must expose daemon availability")
     }
     XCTAssertEqual(
-      listedOperations.count, 24,
+      listedOperations.count, RuntimeOperationCatalog.operations.count,
       "the production CLI must expose exactly the executable catalog roster")
     XCTAssertEqual(listedFlash["availability"], .string("unavailable"))
     XCTAssertEqual(listedFlash["reasons"], .array(flash.reasons.map(JSONValue.string)))

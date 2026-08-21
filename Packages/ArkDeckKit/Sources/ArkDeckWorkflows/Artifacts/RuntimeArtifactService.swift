@@ -231,7 +231,7 @@ enum RuntimeArtifactService {
       "atomic-publish": ["publish-report.json"],
       "verify-loaded-library": ["verification-report.json"],
     ],
-    "flash.dayu200": [
+    ArkForgeFlashOperation.canonicalReference: [
       "rebind-and-verify-build": ["post-flash-facts.json"],
       "capture-post-flash-diagnostics": ["post-flash-hilog.txt"],
     ],
@@ -240,8 +240,18 @@ enum RuntimeArtifactService {
   /// Products synthesized at finalization rather than by one typed step.
   static let finalizeArtifacts: [String: [String]] = [
     "capture.diagnostics@1": ["capture.log", "artifact-index.json", "capture-summary.json"],
-    "flash.dayu200": ["flash-report.json"],
+    ArkForgeFlashOperation.canonicalReference: ["flash-report.json"],
   ]
+
+  static func artifacts(reference: String, stepID: String) -> [String]? {
+    let key = ArkForgeFlashOperation.canonicalReference(for: reference) ?? reference
+    return artifactMapping[key]?[stepID]
+  }
+
+  static func finalArtifacts(reference: String) -> [String]? {
+    let key = ArkForgeFlashOperation.canonicalReference(for: reference) ?? reference
+    return finalizeArtifacts[key]
+  }
 
   /// A Runtime without an Artifact store cannot admit an operation whose
   /// contract consumes or produces durable Artifact bytes. Keep this derived
@@ -249,8 +259,15 @@ enum RuntimeArtifactService {
   /// product cannot accidentally inherit an optional-store admission path.
   static func requiresArtifactStore(reference: String) -> Bool {
     workspaceOperationReferences.contains(reference)
-      || artifactMapping[reference] != nil
-      || finalizeArtifacts[reference] != nil
+      || artifactsByOperation(reference: reference) != nil
+      || finalArtifacts(reference: reference) != nil
+  }
+
+  private static func artifactsByOperation(
+    reference: String
+  ) -> [String: [String]]? {
+    let key = ArkForgeFlashOperation.canonicalReference(for: reference) ?? reference
+    return artifactMapping[key]
   }
 
   static func finalArtifactContents(
@@ -311,16 +328,14 @@ enum RuntimeArtifactService {
       payload["missingRequired"] = .array(
         missingRequired.map { .string($0.name) })
     }
-    if descriptor.reference == "flash.dayu200" {
+    if ArkForgeFlashOperation.contains(descriptor.reference) {
       appendFlashArtifactLineage(to: &payload, record: record)
       payload["verifiedSteps"] = .array(
         completedStepIDs.sorted().map { .string($0) })
       var requestFields: [String: JSONValue] = [:]
-      for key in ["deviceProfile", "partitionPlan", "postFlashVerification"] {
-        if let value = record.request.inputs[key] {
-          requestFields[key] = value
-        }
-      }
+      requestFields = (try? ArkForgeFlashRequest.canonicalInputs(
+        submittedReference: descriptor.reference,
+        inputs: record.request.inputs)) ?? [:]
       payload["request"] = .object(requestFields)
     }
     if descriptor.reference == "capture.diagnostics@1",
@@ -479,7 +494,7 @@ enum RuntimeArtifactService {
         fields["expectedBindingRevision"] = .integer(Int64(revision))
       }
     }
-    if descriptor.reference == "flash.dayu200" {
+    if ArkForgeFlashOperation.contains(descriptor.reference) {
       appendFlashArtifactLineage(to: &fields, record: record)
     }
     let encoder = CanonicalJSONEncoders.canonicalPretty()

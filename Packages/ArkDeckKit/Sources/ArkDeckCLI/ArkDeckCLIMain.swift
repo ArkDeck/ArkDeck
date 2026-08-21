@@ -75,7 +75,7 @@ struct ArkDeckCommandLine {
     case "plan":
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "legacy command handoff is retired; use Runtime plan-only for flash.dayu200")
+        message: "legacy command handoff is retired; use Runtime plan-only for flash.full-restore@1")
     case "preview":
       throw CLIError(
         exitCode: EX_USAGE,
@@ -83,7 +83,7 @@ struct ArkDeckCommandLine {
     case "execute":
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "use the ArkDeck Flash UI or submit flash.dayu200 through the typed Job API")
+        message: "use the ArkDeck Flash UI or submit flash.full-restore@1 through the typed Job API")
     case "continue":
       throw CLIError(
         exitCode: EX_USAGE,

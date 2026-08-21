@@ -187,7 +187,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   func testRuntimeAvailabilityAndTargetFactsDecodeWithoutInventingDefaults() throws {
     let operations = try response([
       [
-        "reference": "flash.dayu200",
+        "reference": "flash.full-restore@1",
         "availability": "available",
         "reasons": [],
       ]
@@ -221,7 +221,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   func testUnavailableOperationKeepsRuntimeReasonsVisible() throws {
     let operations = try response([
       [
-        "reference": "flash.dayu200",
+        "reference": "flash.full-restore@1",
         "availability": "unavailable",
         "reasons": ["provider_not_registered", "target facts are incomplete"],
       ]
@@ -240,7 +240,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     let presentation = FlashWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
-          ["reference": "flash.dayu200", "availability": "available", "reasons": []]
+          ["reference": "flash.full-restore@1", "availability": "available", "reasons": []]
         ])),
       targetResponse: .success(
         try response([
@@ -268,7 +268,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     let presentation = FlashWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
-          ["reference": "flash.dayu200", "availability": "available", "reasons": []]
+          ["reference": "flash.full-restore@1", "availability": "available", "reasons": []]
         ])),
       targetResponse: .success(try response([])),
       bootloaderResponse: .success(bootloader))
@@ -297,7 +297,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     let presentation = FlashWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
-          ["reference": "flash.dayu200", "availability": "available", "reasons": []]
+          ["reference": "flash.full-restore@1", "availability": "available", "reasons": []]
         ])),
       targetResponse: .success(
         try response([
@@ -394,7 +394,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   /// value the RuntimeCapability correlation pins.
   func testExecuteReviewPresentsTheEnginesOwnStepFacts() throws {
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1"))
     let review = try XCTUnwrap(FlashPlanPresentationBuilder.reviewSteps(mode: .execute))
     let selected = descriptor.steps.filter {
       RuntimeJobEngine.stepIsRequested(

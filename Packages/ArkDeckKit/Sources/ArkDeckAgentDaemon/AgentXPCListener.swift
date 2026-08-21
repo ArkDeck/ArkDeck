@@ -204,10 +204,18 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       case .object(let context)? = request["clientContext"],
       case .string(let clientName)? = context["clientName"]
     else { return nil }
+    if clientName == ArkDeckAgentClientName.flashWorkspace {
+      let reference: String
+      if case .integer(let version)? = operation["version"] {
+        reference = "\(operationID)@\(version)"
+      } else if operation["version"] == nil {
+        reference = operationID
+      } else {
+        return nil
+      }
+      return ArkForgeFlashOperation.contains(reference) ? .flash : nil
+    }
     switch (clientName, operationID) {
-    case (ArkDeckAgentClientName.flashWorkspace, "flash.dayu200"):
-      guard operation["version"] == nil else { return nil }
-      return .flash
     case (ArkDeckAgentClientName.traceWorkspace, "capture.diagnostics"):
       guard case .integer(1)? = operation["version"] else { return nil }
       return .trace

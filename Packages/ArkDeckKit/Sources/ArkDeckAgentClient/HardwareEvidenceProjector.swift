@@ -694,7 +694,8 @@ package enum HardwareEvidenceProjector {
         || recovery.recoveryIntentEventID.isEmpty
         || recovery.coverageContractVersion.isEmpty
         || !validOperationReference(recovery.operationReference)
-        || recovery.operationReference != "flash.dayu200"
+        || !ArkForgeFlashOperation.containsDurableRecordReference(
+          recovery.operationReference)
         || recovery.profileReference != "dayu200"
       {
         reasons.append("recovery identity, plan, Artifact, tool, or epoch facts are malformed")

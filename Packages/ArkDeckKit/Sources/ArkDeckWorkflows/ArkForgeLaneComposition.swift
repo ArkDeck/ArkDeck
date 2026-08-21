@@ -98,7 +98,7 @@ package enum ArkForgeLaneComposition {
       case .notConfigured:
         return
           "no ArkForge lane: \(EnvironmentKey.bundlePath) is unset, so this daemon performs "
-          + "no Rockchip writes. flash.dayu200 refuses before authorization"
+          + "no Rockchip writes. canonical ArkForge Flash refuses before authorization"
       case .partiallyConfigured(let missing):
         return
           "no ArkForge lane: \(missing.joined(separator: ", ")) missing. A partial "

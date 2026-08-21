@@ -452,7 +452,7 @@ package struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
     switch providerID {
     case "hdc":
       return hdc.unavailableReason(providerID: providerID)
-    case "rockchip":
+    case "arkforge", "rockchip":
       return rockchip.unavailableReason(providerID: providerID)
     case "workspace":
       guard let workspace else {

@@ -18,6 +18,7 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "debug.hap@1",
         "deploy.native-library.app-owned@1",
         "flash.dayu200",
+        "flash.full-restore@1",
         "observe.device@1",
         "port-forward.create@1",
         "port-forward.remove@1",
@@ -116,8 +117,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     XCTAssertEqual(
-      withDefaults.count, 18,
-      "the catalog declares eighteen input defaults; the runtime must see all of them")
+      withDefaults.count, 19,
+      "the catalog declares nineteen input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -185,8 +186,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       }
     }
     XCTAssertEqual(
-      checked, 18,
-      "the catalog declares eighteen input defaults; all of them must be exercised here")
+      checked, 19,
+      "the catalog declares nineteen input defaults; all of them must be exercised here")
   }
 
   func testDescriptorLookupIsExactAndFailClosed() {
@@ -199,6 +200,11 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "debug.hap@x"))
     XCTAssertNotNil(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    XCTAssertFalse(ArkForgeFlashOperation.contains("flash.dayu200@1"))
+    XCTAssertTrue(
+      ArkForgeFlashOperation.containsDurableRecordReference("flash.dayu200@1"))
+    XCTAssertNotNil(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1"))
+    XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore"))
   }
 
   func testEveryStepRespectsWorkflowStepRegistryMinimums() {
@@ -260,12 +266,21 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     }
   }
 
-  func testPublishedDestructiveFlashRemainsPinnedAndRuntimeIssuable() throws {
-    let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(id: "flash.dayu200", version: nil))
-    XCTAssertEqual(flash.permittedEffects, [.destructive])
-    XCTAssertEqual(flash.provider, .rockchip)
-    XCTAssertTrue(flash.defaultPolicyIssuanceEnabled)
-    XCTAssertTrue(flash.steps.contains { $0.kind == .flashPartition })
+  func testPublishedDestructiveFlashHasOneCanonicalOperationAndOneAlias() throws {
+    let canonical = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: ArkForgeFlashOperation.canonicalReference))
+    let alias = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+    XCTAssertEqual(canonical.permittedEffects, [.destructive])
+    XCTAssertEqual(canonical.provider, .arkforge)
+    XCTAssertNil(canonical.aliasFor)
+    XCTAssertTrue(canonical.defaultPolicyIssuanceEnabled)
+    XCTAssertTrue(canonical.steps.contains { $0.kind == .flashPartition })
+    XCTAssertEqual(alias.provider, .arkforge)
+    XCTAssertEqual(alias.aliasFor, canonical.reference)
+    XCTAssertEqual(alias.steps, canonical.steps)
+    XCTAssertEqual(alias.authorization, canonical.authorization)
+    XCTAssertEqual(alias.completeOverwriteRecovery, canonical.completeOverwriteRecovery)
   }
 
   /// Restated, not relaxed (CHG-2026-055, TASK-HFA-009 r2).

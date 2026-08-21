@@ -1,4 +1,4 @@
-// Product-owned per-action control host for flash.dayu200.
+// Product-owned per-action managed-control host for ArkForge Flash.
 //
 // RuntimeJobEngine owns capability admission and the outer write-ahead
 // intent. This host does not construct another authorization/session model:
@@ -1123,8 +1123,8 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     for record: RuntimeJobRecord
   ) -> RuntimeEvidenceObservation? {
     let stepID = "rebind-and-verify-build"
-    guard record.operationReference == "flash.dayu200",
-      record.providerID == "rockchip",
+    guard ArkForgeFlashOperation.containsDurableRecordReference(record.operationReference),
+      [CatalogProvider.arkforge.rawValue, "rockchip"].contains(record.providerID),
       ["succeeded", "recovered"].contains(record.state),
       !record.outcomeUnknown,
       let bindingRevision = record.request.target.expectedBindingRevision,

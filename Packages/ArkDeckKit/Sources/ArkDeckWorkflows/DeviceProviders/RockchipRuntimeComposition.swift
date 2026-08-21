@@ -155,7 +155,7 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       }
     }
     return ProviderFacts(
-      providerID: "rockchip",
+      providerID: CatalogProvider.arkforge.rawValue,
       toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
       toolSHA256: component.sha256,
       serverFacts: serverFacts,
@@ -353,11 +353,11 @@ package struct ArkForgeNativeRockchipControlDispatcher: RuntimeProcessDispatchin
   }
 
   package func unavailableReason(providerID: String) -> String? {
-    guard providerID == "rockchip" else {
+    guard [CatalogProvider.arkforge.rawValue, "rockchip"].contains(providerID) else {
       return "ArkForge native RockUSB dispatcher cannot serve provider \(providerID)"
     }
     do {
-      _ = try resolver.resolveExecutable(providerID: providerID)
+      _ = try resolver.resolveExecutable(providerID: "rockchip")
     } catch {
       return "ArkForge native RockUSB identity is unavailable: \(error)"
     }
@@ -380,7 +380,7 @@ package struct ArkForgeNativeRockchipControlDispatcher: RuntimeProcessDispatchin
       throw RuntimeDispatchFailure.failed(
         "Rockchip runtime actions must use their closed host-managed descriptors")
     }
-    if let reason = unavailableReason(providerID: "rockchip") {
+    if let reason = unavailableReason(providerID: CatalogProvider.arkforge.rawValue) {
       throw RuntimeDispatchFailure.failed(reason)
     }
     let executable: ResolvedExecutable

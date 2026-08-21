@@ -67,7 +67,8 @@ struct RuntimeRecoveryService {
     guard !unresolved.isEmpty else { return .noRecovery }
 
     guard let contract = descriptor.completeOverwriteRecovery,
-      let profile = Self.stringInput("deviceProfile", request: request),
+      let profile = Self.flashProfile(
+        operationReference: descriptor.reference, request: request),
       let profileContract = contract.profile(reference: profile)
     else {
       throw RuntimeCompleteOverwriteRecoveryError.blocked(
@@ -77,10 +78,11 @@ struct RuntimeRecoveryService {
       String($0.dropFirst("partition:".count))
     }
     guard
-      let requestedPartitions = Self.stringArrayInput(
-        "partitionPlan", request: request),
+      let requestedPartitions = Self.flashPartitions(
+        operationReference: descriptor.reference, request: request),
       requestedPartitions == expectedPartitions,
-      Self.stringInput("postFlashVerification", request: request) == "full"
+      Self.flashVerification(
+        operationReference: descriptor.reference, request: request) == "full"
     else {
       throw RuntimeCompleteOverwriteRecoveryError.blocked(
         "completeOverwriteRecovery.incompleteRequestedCoverage")
@@ -88,7 +90,8 @@ struct RuntimeRecoveryService {
     let coveredEffects = Set(profileContract.coveredEffects)
     guard
       unresolved.allSatisfy({
-        $0.operationReference == descriptor.reference
+        ArkForgeFlashOperation.canonicalReference(for: $0.operationReference)
+          == ArkForgeFlashOperation.canonicalReference(for: descriptor.reference)
           && $0.profileReference == profile
           && Set($0.possibleEffects).isSubset(of: coveredEffects)
       })
@@ -170,8 +173,10 @@ struct RuntimeRecoveryService {
         throw RuntimeCompleteOverwriteRecoveryError.blocked(
           "completeOverwriteRecovery.tornHistoricalJournal")
       }
-      let profile = Self.stringInput("deviceProfile", request: record.request) ?? ""
-      let partitions = Self.stringArrayInput("partitionPlan", request: record.request)
+      let profile = Self.flashProfile(
+        operationReference: record.operationReference, request: record.request) ?? ""
+      let partitions = Self.flashPartitions(
+        operationReference: record.operationReference, request: record.request)
       var destructiveIntents = replay.outstandingIntents
         .filter { $0.effect == .destructive }
         .map { ($0.eventID, $0.stepID) }
@@ -205,7 +210,8 @@ struct RuntimeRecoveryService {
         }) {
           continue
         }
-        guard record.operationReference == "flash.dayu200",
+        guard ArkForgeFlashOperation.containsDurableRecordReference(
+          record.operationReference),
           stepID == "flash-partitions", !profile.isEmpty,
           let partitions, !partitions.isEmpty,
           replay.events.contains(where: {
@@ -273,10 +279,11 @@ struct RuntimeRecoveryService {
           record.materializedBindingRevision == bindingRevision,
           record.operationReference == entry.operationReference,
           record.actualEffect == WorkflowEffect.destructive.rawValue,
-          let profile = Self.stringInput("deviceProfile", request: record.request),
+          let profile = Self.flashProfile(
+            operationReference: record.operationReference, request: record.request),
           !profile.isEmpty,
-          let partitions = Self.stringArrayInput(
-            "partitionPlan", request: record.request),
+          let partitions = Self.flashPartitions(
+            operationReference: record.operationReference, request: record.request),
           !partitions.isEmpty
         else {
           throw RuntimeCompleteOverwriteRecoveryError.blocked(
@@ -327,12 +334,17 @@ struct RuntimeRecoveryService {
         finishedAt > latestUnknown,
         record.state == JobState.succeeded.rawValue,
         !record.outcomeUnknown,
-        record.operationReference == descriptor.reference,
+        ArkForgeFlashOperation.canonicalReference(for: record.operationReference)
+          == ArkForgeFlashOperation.canonicalReference(for: descriptor.reference),
         record.materializedStableTargetIdentitySHA256 == stableIdentitySHA256,
         record.materializedBindingRevision == bindingRevision,
-        Self.stringInput("deviceProfile", request: record.request) == profile,
-        Self.stringArrayInput("partitionPlan", request: record.request) == expectedPartitions,
-        Self.stringInput("postFlashVerification", request: record.request) == "full",
+        Self.flashProfile(
+          operationReference: record.operationReference, request: record.request) == profile,
+        Self.flashPartitions(
+          operationReference: record.operationReference, request: record.request)
+          == expectedPartitions,
+        Self.flashVerification(
+          operationReference: record.operationReference, request: record.request) == "full",
         let materializedPlanDigest = record.materializedPlanDigest,
         Self.isSHA256(materializedPlanDigest)
       else { return nil }
@@ -456,6 +468,38 @@ struct RuntimeRecoveryService {
       result.append(item)
     }
     return result
+  }
+
+  private static func flashProfile(
+    operationReference: String,
+    request: RuntimeOperationRequest
+  ) -> String? {
+    ArkForgeFlashRequest.profileReference(
+      submittedReference: operationReference, inputs: request.inputs)
+  }
+
+  private static func flashPartitions(
+    operationReference: String,
+    request: RuntimeOperationRequest
+  ) -> [String]? {
+    if operationReference == ArkForgeFlashOperation.canonicalReference {
+      guard request.inputs["intent"] == .string("fullRestore"),
+        let profileReference = flashProfile(
+          operationReference: operationReference, request: request),
+        let profile = RockchipFlashProfile.profile(reference: profileReference)
+      else { return nil }
+      return profile.mappedPartitions.map(\.partitionName)
+    }
+    return stringArrayInput("partitionPlan", request: request)
+  }
+
+  private static func flashVerification(
+    operationReference: String,
+    request: RuntimeOperationRequest
+  ) -> String? {
+    let key = operationReference == ArkForgeFlashOperation.canonicalReference
+      ? "verification" : "postFlashVerification"
+    return stringInput(key, request: request) ?? "full"
   }
 
   private static func effectDigest(_ effects: [String]) -> String {
@@ -722,7 +766,8 @@ struct RuntimeRecoveryService {
   }
 
   private func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
-    record.operationReference == "flash.dayu200"
+    ArkForgeFlashOperation.containsDurableRecordReference(
+      record.operationReference)
       ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
   }
 

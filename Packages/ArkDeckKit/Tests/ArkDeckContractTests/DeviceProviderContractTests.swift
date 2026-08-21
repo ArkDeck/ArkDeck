@@ -54,18 +54,21 @@ final class DeviceProviderContractTests: XCTestCase {
 
   func testRegistryHoldsBothProviders() {
     let registry = DeviceProviderRegistry(providers: [
-      hdc, RockchipFlashProviderAdapter(factsPort: RockchipFactsPort()),
+      hdc, ArkForgeFlashProviderAdapter(factsPort: RockchipFactsPort()),
     ])
-    XCTAssertEqual(registry.registeredProviderIDs, ["hdc", "rockchip"])
+    XCTAssertEqual(registry.registeredProviderIDs, ["arkforge", "hdc"])
     XCTAssertNotNil(registry.provider(id: "hdc"))
-    XCTAssertNotNil(registry.provider(id: "rockchip"))
+    XCTAssertNotNil(registry.provider(id: "arkforge"))
+    XCTAssertNotNil(
+      registry.provider(id: "rockchip"),
+      "legacy durable provider identities must resolve through the ArkForge adapter")
     XCTAssertNil(registry.provider(id: "adb"))
   }
 
   func testRockchipExecutionAdmissionRequiresCrossModeBindingFact() async throws {
     let operation = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
-    let provider = RockchipFlashProviderAdapter(
+    let provider = ArkForgeFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
     let ready = try await provider.resolveFacts(targetID: "TGT-1")
     XCTAssertNil(provider.executionAdmissionBlocker(for: operation, facts: ready))
@@ -273,7 +276,7 @@ final class DeviceProviderContractTests: XCTestCase {
   }
 
   func testRockchipVerifyRequiresDurableRecordReference() throws {
-    let rockchip = RockchipFlashProviderAdapter(factsPort: RockchipFactsPort())
+    let rockchip = ArkForgeFlashProviderAdapter(factsPort: RockchipFactsPort())
     let action = TypedProviderAction.rockchip(
       .enterLoader(connectKey: "150100424a544e4600"))
     let withoutRecord = ProviderProcessReceipt(
@@ -327,7 +330,7 @@ final class DeviceProviderContractTests: XCTestCase {
   func testRockchipMaterializesEveryPublishedRuntimeStepWithoutLegacyAuthorization() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
-    let provider = RockchipFlashProviderAdapter(
+    let provider = ArkForgeFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
     let inputs: [String: JSONValue] = [
       "deviceProfile": .string("dayu200"),
@@ -406,7 +409,7 @@ final class DeviceProviderContractTests: XCTestCase {
   func testRockchipRejectsPartitionDriftBeforeAuthorization() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
-    let provider = RockchipFlashProviderAdapter(
+    let provider = ArkForgeFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
     let flashStep = try XCTUnwrap(
       descriptor.steps.first { $0.stepID == "flash-partitions" })
@@ -433,13 +436,22 @@ final class DeviceProviderContractTests: XCTestCase {
   func testFlashStepsAreRefusedBeforeAuthorization() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
-    let provider = RockchipFlashProviderAdapter(
+    let provider = ArkForgeFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
+    let legacyInputs: [String: JSONValue] = [
+      "imageBundleLease": .string("lease-v1:input-flash:ART-0123456789abcdef0123456789abcdef"),
+      "deviceProfile": .string("dayu200"),
+      "partitionPlan": .array(
+        RockchipFlashProfile.dayu200.mappedPartitions.map {
+          .string($0.partitionName)
+        }),
+      "postFlashVerification": .string("full"),
+    ]
     for stepID in ["flash-partitions", "verify-flash-readback"] {
       let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == stepID })
       XCTAssertThrowsError(
         try provider.action(
-          for: step, operation: descriptor, inputs: [:], context: flashContext),
+          for: step, operation: descriptor, inputs: legacyInputs, context: flashContext),
         stepID
       ) { error in
         guard case DeviceProviderError.unsupportedAction(let detail) = error else {
@@ -553,7 +565,7 @@ final class DeviceProviderContractTests: XCTestCase {
       nowUTC: flashContext.nowUTC,
       resolvedInputArtifact: flashContext.resolvedInputArtifact,
       expectedRuntimeBuildVersion: "OpenHarmony-7.0.0.36")
-    let action = try RockchipFlashProviderAdapter(
+    let action = try ArkForgeFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available
     ).action(
       for: step, operation: descriptor,

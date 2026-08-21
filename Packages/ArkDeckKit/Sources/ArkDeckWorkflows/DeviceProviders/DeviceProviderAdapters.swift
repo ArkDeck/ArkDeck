@@ -4,7 +4,7 @@
 // existing observation surfaces behind injected ports; the Rockchip adapter
 // lowers each typed action for the engine's per-action host. It used to wrap
 // the in-process RockchipFlashExecutionHost whole — that host was retired in
-// T25, and the engine is now the only thing that executes flash.dayu200.
+// T25, and the engine is now the only thing that executes ArkForge Flash.
 
 import ArkDeckCore
 import ArkDeckOpenHarmony
@@ -3014,14 +3014,14 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   }
 }
 
-// MARK: - Rockchip adapter
+// MARK: - ArkForge Flash adapter
 
 package protocol RockchipRuntimeFactsPort: Sendable {
   func currentFacts(targetID: String) async throws -> ProviderFacts
 }
 
-package struct RockchipFlashProviderAdapter: DeviceProvider {
-  public let providerID = "rockchip"
+package struct ArkForgeFlashProviderAdapter: DeviceProvider {
+  public let providerID = CatalogProvider.arkforge.rawValue
   private let factsPort: (any RockchipRuntimeFactsPort)?
   private let availability: ProviderOperationAvailability
 
@@ -3029,7 +3029,7 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
     factsPort: (any RockchipRuntimeFactsPort)? = nil,
     availability: ProviderOperationAvailability = .unavailable(
       code: .providerToolUnavailable,
-      reason: "production Rockchip dispatcher is not registered")
+      reason: "production ArkForge Flash lane is not registered")
   ) {
     self.factsPort = factsPort
     self.availability = availability
@@ -3038,10 +3038,10 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
   package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
-    guard operation.reference == "flash.dayu200" else {
+    guard ArkForgeFlashOperation.contains(operation.reference) else {
       return .unavailable(
         code: .operationNotSupported,
-        reason: "Rockchip provider has no typed plan for \(operation.reference)")
+        reason: "ArkForge provider has no typed Flash plan for \(operation.reference)")
     }
     return availability
   }
@@ -3049,7 +3049,7 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
   package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     guard let factsPort else {
       throw DeviceProviderError.factsUnavailable(
-        "production Rockchip target facts are not registered")
+        "production ArkForge target facts are not registered")
     }
     return try await factsPort.currentFacts(targetID: targetID)
   }
@@ -3058,7 +3058,7 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
     for operation: CatalogOperationDescriptor,
     facts: ProviderFacts
   ) -> String? {
-    guard operation.reference == "flash.dayu200" else { return nil }
+    guard ArkForgeFlashOperation.contains(operation.reference) else { return nil }
     guard
       facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey]
         == TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
@@ -3100,10 +3100,12 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
-    guard operation.reference == "flash.dayu200" else {
+    guard ArkForgeFlashOperation.contains(operation.reference) else {
       throw DeviceProviderError.unsupportedStepKind(
-        "\(step.kind.rawValue) has no Rockchip action for \(operation.reference)")
+        "\(step.kind.rawValue) has no ArkForge Flash action for \(operation.reference)")
     }
+    let inputs = try ArkForgeFlashRequest.canonicalInputs(
+      submittedReference: operation.reference, inputs: inputs)
     guard let connectKey = context.connectKey, !connectKey.isEmpty,
       let identity = context.expectedIdentitySHA256,
       identity.count == 64,
@@ -3320,40 +3322,23 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> RockchipRuntimeFlashBundle {
-    guard case .string(let profileReference)? = inputs["deviceProfile"],
+    guard case .string(let profileReference)? = inputs["deviceProfileRef"],
       let profile = RockchipFlashProfile.profile(reference: profileReference)
     else {
       throw DeviceProviderError.unsupportedAction(
         "flash requires the published DAYU200 device profile")
     }
-    guard case .string(let artifactLeaseID)? = inputs["imageBundleLease"],
+    guard case .string(let artifactLeaseID)? = inputs["artifactLease"],
       !artifactLeaseID.isEmpty
     else {
       throw DeviceProviderError.unsupportedAction(
         "flash requires the engine-resolved imageBundleLease")
     }
-    guard case .array(let values)? = inputs["partitionPlan"] else {
+    guard inputs["intent"] == .string("fullRestore") else {
       throw DeviceProviderError.unsupportedAction(
-        "flash requires an ordered partitionPlan")
+        "flash requires the closed fullRestore intent")
     }
-    let partitions: [String] = try values.map { value in
-      guard case .string(let name) = value else {
-        throw DeviceProviderError.unsupportedAction(
-          "partitionPlan contains a non-string value")
-      }
-      return name
-    }
-    // `partitionPlan` is the caller's explicit overwrite-scope confirmation —
-    // an echo of the pinned declaration, not an addressing instruction. The
-    // executed write order and every sector address come from `arkforged`
-    // validating its own profile against the device's read-back table
-    // (CHG-2026-066); a caller can therefore only restate the published
-    // scope, never steer it.
-    let expected = profile.mappedPartitions.map(\.partitionName)
-    guard partitions == expected else {
-      throw DeviceProviderError.unsupportedAction(
-        "partitionPlan must exactly match the pinned DAYU200 order")
-    }
+    let partitions = profile.mappedPartitions.map(\.partitionName)
     guard let artifact = context.resolvedInputArtifact else {
       throw DeviceProviderError.unsupportedAction(
         "flash requires an engine-resolved image bundle")

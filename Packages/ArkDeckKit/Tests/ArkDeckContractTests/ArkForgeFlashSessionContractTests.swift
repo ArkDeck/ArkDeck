@@ -1238,7 +1238,8 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
     XCTAssertEqual(why, .notConfigured)
     // The message has to say what it means for the product, not just that a
     // variable is unset.
-    XCTAssertTrue(why.description.contains("flash.dayu200 refuses"), why.description)
+    XCTAssertTrue(
+      why.description.contains("canonical ArkForge Flash refuses"), why.description)
   }
 
   func testLegacyConfigurationIsRefusedUntilTheInstallerMigratesIt() {

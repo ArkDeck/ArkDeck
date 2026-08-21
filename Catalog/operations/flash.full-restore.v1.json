@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
-  "id": "flash.dayu200",
-  "aliasFor": "flash.full-restore@1",
-  "title": "Flash a bound DAYU200 (RK3568) from a trusted image bundle with rebind and post-flash verification",
+  "id": "flash.full-restore",
+  "version": 1,
+  "title": "Fully restore a bound device from a trusted image bundle with rebind and post-flash verification",
   "provider": "arkforge",
   "effect": { "minimum": "destructive", "permitted": ["destructive"] },
   "authorization": { "destructive": "runtimeCapability" },
@@ -11,30 +11,29 @@
   "concurrencyKey": "device-exclusive",
   "inputs": {
     "fields": {
-      "imageBundleLease": {
+      "artifactLease": {
         "type": "artifactLease",
         "required": true,
-        "description": "Trusted image bundle; every image hash is pinned by the Runtime-owned capability."
+        "description": "Trusted full-restore image bundle lease; Runtime resolves immutable Artifact bytes before authorization."
       },
-      "deviceProfile": {
+      "deviceProfileRef": {
         "type": "string",
         "required": true,
         "enum": ["dayu200"],
-        "description": "Board profile whose partition vocabulary and layout the plan is checked against. `dayu200` is the only published board."
+        "description": "Published device profile reference selected after target admission; DAYU200 is the currently published profile."
       },
-      "partitionPlan": {
-        "type": "stringArray",
+      "intent": {
+        "type": "string",
         "required": true,
-        "maxItems": 16,
-        "maxLength": 32,
-        "description": "Ordered partition names from the profile's closed vocabulary; the Runtime capability pins the exact plan digest."
+        "enum": ["fullRestore"],
+        "description": "Closed restore intent. It requests the profile's complete overwrite contract and cannot name partitions, addresses or tools."
       },
-      "postFlashVerification": {
+      "verification": {
         "type": "string",
         "required": false,
         "enum": ["basic", "full"],
         "default": "full",
-        "description": "How much is verified after the write. `full` additionally captures post-flash diagnostics; `basic` omits that one optional leg and verifies the rest."
+        "description": "Post-restore verification depth. `full` additionally captures bounded diagnostics after required readback and rebind checks."
       }
     }
   },

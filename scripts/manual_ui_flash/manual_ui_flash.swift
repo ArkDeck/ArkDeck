@@ -406,7 +406,7 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
         typed["authorization"] == nil,
         typed["campaignReservation"] == nil,
         let operation = typed["operation"] as? [String: Any],
-        operation["id"] as? String == "flash.dayu200",
+        operation["id"] as? String == "flash.full-restore",
         operation["version"] as? Int == 1,
         let context = typed["clientContext"] as? [String: Any],
         context["clientName"] as? String == "ArkDeckApp.FlashWorkspace"
