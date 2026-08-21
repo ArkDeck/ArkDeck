@@ -1239,6 +1239,22 @@ private final class AccessibilityDriver {
       "UI did not expose expected facts before timeout: \(missing.joined(separator: ", "))")
   }
 
+  func waitForValue(
+    _ expected: String, identifier: String, timeout: TimeInterval
+  ) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if let current = element(identifier: identifier),
+        stringAttribute(current, kAXValueAttribute as CFString) == expected
+      {
+        return
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    throw DriverFailure.message(
+      "UI element \(identifier) did not expose the expected value")
+  }
+
   func waitForPresence(_ identifier: String, timeout: TimeInterval) throws {
     _ = try waitForElement(identifier: identifier, timeout: timeout)
   }
@@ -1392,14 +1408,21 @@ private final class AccessibilityDriver {
     _ url: URL, delivery: CandidateControlDelivery, timeout: TimeInterval
   ) throws {
     try perform("flash.image.choose", delivery: delivery, timeout: timeout)
-    try waitForPresence("open-panel", timeout: timeout)
+    // On macOS 26 NSSavePanel is hosted by a remote view. Its undocumented
+    // `open-panel` identifier is no longer a descendant of the owning App,
+    // even though the button action has synchronously entered runModal().
+    // The Go-to-Folder field and OK button are the stable, actionable panel
+    // contract. If the pointer action did not open a panel, this bounded
+    // shortcut probe fails without selecting or submitting anything.
     try openGoToFolder(timeout: timeout)
     try setValue(url.path, identifier: "PathTextField")
     try commitGoToFolder(timeout: timeout)
     try waitForEnabled("OKButton", timeout: timeout)
     try press("OKButton", timeout: timeout)
-    try waitForAbsence("open-panel", timeout: timeout)
-    try waitForFacts([url.lastPathComponent], timeout: max(timeout, 30))
+    // Prove that the owning workspace accepted the pinned file. Merely seeing
+    // the filename in the remote panel would be a false positive.
+    try waitForValue(
+      url.lastPathComponent, identifier: "flash.image.value", timeout: max(timeout, 30))
   }
 
   private func waitForElement(

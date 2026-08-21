@@ -501,6 +501,12 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       encoding: .utf8)
     XCTAssertTrue(manualDriver.contains("flash.full-restore"))
     XCTAssertFalse(manualDriver.contains("flash.dayu200"))
+    XCTAssertFalse(manualDriver.contains("waitForPresence(\"open-panel\""))
+    XCTAssertFalse(manualDriver.contains("waitForAbsence(\"open-panel\""))
+    XCTAssertTrue(manualDriver.contains("try openGoToFolder(timeout: timeout)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "url.lastPathComponent, identifier: \"flash.image.value\", timeout: max(timeout, 30)"))
   }
 
   private func relative(_ url: URL) -> String {
