@@ -1933,7 +1933,7 @@ public actor RuntimeJobEngine {
             || step.kind == .signWorkspaceOpenHarmonyHap
             || step.kind == .symbolizeWorkspaceCrash
             || step.kind == .runDeterministicAnalyzer
-            || descriptor.reference == "flash.dayu200"
+            || ArkForgeFlashOperation.contains(descriptor.reference)
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
         additionalArtifacts =
@@ -2025,9 +2025,13 @@ public actor RuntimeJobEngine {
       }
       let action: TypedProviderAction
       do {
+        let operation =
+          ArkForgeFlashOperation.canonicalDescriptor(for: descriptor.reference) ?? descriptor
+        let inputs = try ArkForgeFlashRequest.canonicalInputs(
+          submittedReference: descriptor.reference,
+          inputs: jobs[jobID]?.record.request.inputs ?? [:])
         action = try provider.action(
-          for: step, operation: descriptor,
-          inputs: jobs[jobID]?.record.request.inputs ?? [:],
+          for: step, operation: operation, inputs: inputs,
           context: context)
       } catch  where step.isOptional {
         try await recordSkippedOptionalStep(
@@ -2787,7 +2791,8 @@ public actor RuntimeJobEngine {
       jobs[jobID] = runtime
     }
     guard let artifactStore, let runtime = jobs[jobID],
-      let names = RuntimeArtifactService.artifactMapping[descriptor.reference]?[step.stepID]
+      let names = RuntimeArtifactService.artifacts(
+        reference: descriptor.reference, stepID: step.stepID)
     else { return }
     let binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
     for name in names {
@@ -3673,7 +3678,8 @@ public actor RuntimeJobEngine {
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: runtime.record.operationReference)
     else { return }
-    guard let mapping = RuntimeArtifactService.artifactMapping[descriptor.reference]?[step.stepID]
+    guard let mapping = RuntimeArtifactService.artifacts(
+      reference: descriptor.reference, stepID: step.stepID)
     else {
       return  // this step owns no declared product
     }
@@ -3853,10 +3859,10 @@ public actor RuntimeJobEngine {
     jobID: String, descriptor: CatalogOperationDescriptor
   ) async throws {
     guard let runtime = jobs[jobID],
-      let names = RuntimeArtifactService.finalizeArtifacts[descriptor.reference]
+      let names = RuntimeArtifactService.finalArtifacts(reference: descriptor.reference)
     else { return }
     guard let artifactStore else {
-      if descriptor.reference == "flash.dayu200" {
+      if ArkForgeFlashOperation.contains(descriptor.reference) {
         throw RuntimeArtifactPublicationFailure(
           detail: "Artifact store is required for \(descriptor.reference)")
       }
@@ -3958,7 +3964,7 @@ public actor RuntimeJobEngine {
       appendTimeline(
         jobID: jobID,
         entry: "incomplete: missing required \(missingRequired.map(\.name).sorted())")
-      if descriptor.reference == "flash.dayu200" {
+      if ArkForgeFlashOperation.contains(descriptor.reference) {
         throw RuntimeArtifactPublicationFailure(
           detail: "required Flash artifacts are missing: "
             + missingRequired.map(\.name).sorted().joined(separator: ", "))
@@ -4176,7 +4182,7 @@ public actor RuntimeJobEngine {
     }
     return Set(
       omittedSteps.flatMap {
-        RuntimeArtifactService.artifactMapping[descriptor.reference]?[$0] ?? []
+        RuntimeArtifactService.artifacts(reference: descriptor.reference, stepID: $0) ?? []
       })
   }
 
@@ -4863,7 +4869,9 @@ public actor RuntimeJobEngine {
       // in `arkforged` under step permits, and their receipts live in that
       // daemon's journal — not this engine's to parse. The device itself is
       // the ground truth such a job reconciles against.
-      if runtime.record.operationReference == "flash.dayu200" {
+      if ArkForgeFlashOperation.containsDurableRecordReference(
+        runtime.record.operationReference)
+      {
         return try await reconcileLaneFlashAgainstDevice(
           runtime: &runtime, inspection: inspection, provider: provider)
       }
@@ -5297,7 +5305,7 @@ public actor RuntimeJobEngine {
       })
     else {
       throw RuntimeJobEngineError.internalFailure(
-        "flash.dayu200 lost its rebind-and-verify-build step")
+        "ArkForge Flash operation lost its rebind-and-verify-build step")
     }
 
     var verified = false
@@ -5331,8 +5339,13 @@ public actor RuntimeJobEngine {
           artifactLeaseID: Self.flashArtifactLeaseID(
             in: runtime.record.request.inputs)))
       let action = try provider.action(
-        for: verifyStep, operation: descriptor,
-        inputs: runtime.record.request.inputs, context: context)
+        for: verifyStep,
+        operation: ArkForgeFlashOperation.canonicalDescriptor(
+          for: descriptor.reference) ?? descriptor,
+        inputs: try ArkForgeFlashRequest.canonicalInputs(
+          submittedReference: descriptor.reference,
+          inputs: runtime.record.request.inputs),
+        context: context)
       guard action.effect <= .readOnly else {
         throw RuntimeJobEngineError.internalFailure(
           "lane postflight reconciliation produced a non-read-only action")
@@ -5522,7 +5535,8 @@ public actor RuntimeJobEngine {
   static func isDayu200Flash(_ record: RuntimeJobRecord) -> Bool {
     // operationReference is durable presentation data and may contain the pre-singleton "@1" alias.
     // The typed request operation ID is the stable identity for recovery and journal compatibility.
-    record.request.operation.id == "flash.dayu200"
+    ArkForgeFlashOperation.containsDurableRecordReference(
+      record.request.operation.reference)
   }
 
   static func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
@@ -5640,10 +5654,11 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     step: CatalogStepDescriptor
   ) async throws {
-    if descriptor.reference == "flash.dayu200" {
+    if ArkForgeFlashOperation.contains(descriptor.reference) {
       guard let runtime = jobs[jobID],
-        case .string(let artifactLeaseID)? =
-          runtime.record.request.inputs["imageBundleLease"],
+        let artifactLeaseID = ArkForgeFlashRequest.artifactLeaseID(
+          submittedReference: descriptor.reference,
+          inputs: runtime.record.request.inputs),
         let resolved = try await resolvedInputArtifact(jobID: jobID)
       else {
         throw RuntimeDispatchFailure.failed(
@@ -5651,8 +5666,9 @@ public actor RuntimeJobEngine {
       }
       let board = RockchipFlashProfile.dayu200
       guard
-        case .string(let profileReference)? =
-          runtime.record.request.inputs["deviceProfile"],
+        let profileReference = ArkForgeFlashRequest.profileReference(
+          submittedReference: descriptor.reference,
+          inputs: runtime.record.request.inputs),
         RockchipFlashProfile.board(reference: profileReference) != nil
       else {
         throw RuntimeDispatchFailure.failed(
@@ -5767,10 +5783,9 @@ public actor RuntimeJobEngine {
           runtime.record.request.inputs["libraryArtifactLease"]
       else { return nil }
       lease = value
-    case "flash.dayu200":
-      guard
-        case .string(let value)? =
-          runtime.record.request.inputs["imageBundleLease"]
+    case let reference where ArkForgeFlashOperation.contains(reference):
+      guard let value = ArkForgeFlashRequest.artifactLeaseID(
+        submittedReference: reference, inputs: runtime.record.request.inputs)
       else { return nil }
       lease = value
     case "workspace.apply-patch@1":
@@ -5859,11 +5874,15 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     jobID: String
   ) async throws -> MaterializedAdmission {
+    let implementationDescriptor =
+      ArkForgeFlashOperation.canonicalDescriptor(for: descriptor.reference) ?? descriptor
+    let implementationInputs = try ArkForgeFlashRequest.canonicalInputs(
+      submittedReference: descriptor.reference, inputs: request.inputs)
     guard let provider = providers.provider(id: descriptor.provider.rawValue) else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "provider \(descriptor.provider.rawValue) is not registered")
     }
-    if case .unavailable(let reason) = provider.runtimeAvailability(for: descriptor) {
+    if case .unavailable(_, let reason) = provider.runtimeAvailability(for: descriptor) {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "\(descriptor.reference) is runtime unavailable: \(reason)")
     }
@@ -5923,8 +5942,9 @@ public actor RuntimeJobEngine {
     case "deploy.native-library.app-owned@1":
       leaseInputName = "libraryArtifactLease"
       artifactLabel = "native library"
-    case "flash.dayu200":
-      leaseInputName = "imageBundleLease"
+    case let reference where ArkForgeFlashOperation.contains(reference):
+      leaseInputName = reference == ArkForgeFlashOperation.canonicalReference
+        ? "artifactLease" : "imageBundleLease"
       artifactLabel = "flash bundle"
     case "workspace.apply-patch@1":
       leaseInputName = "patchArtifactRef"
@@ -6054,9 +6074,9 @@ public actor RuntimeJobEngine {
               "\(descriptor.reference) is runtime unavailable: ArkForge lane is not configured")
           }
           let workflowStep = try Self.journalStep(
-            for: step, jobID: context.jobID, inputs: request.inputs,
+            for: step, jobID: context.jobID, inputs: implementationInputs,
             action: nil, resolvedInputArtifact: resolved,
-            operationReference: descriptor.reference)
+            operationReference: implementationDescriptor.reference)
           materializedSteps.append(
             MaterializedPlanStep(
               stepID: step.stepID, kind: step.kind.rawValue,
@@ -6075,7 +6095,7 @@ public actor RuntimeJobEngine {
           continue
         }
         let action = try provider.action(
-          for: step, operation: descriptor, inputs: request.inputs,
+          for: step, operation: implementationDescriptor, inputs: implementationInputs,
           context: context)
         guard action.effect == step.effect else {
           throw RuntimeJobEngineError.internalFailure(
@@ -6088,9 +6108,9 @@ public actor RuntimeJobEngine {
             "\(step.stepID) lowering returned a plan for a different typed action")
         }
         let workflowStep = try Self.journalStep(
-          for: step, jobID: context.jobID, inputs: request.inputs,
+          for: step, jobID: context.jobID, inputs: implementationInputs,
           action: action, resolvedInputArtifact: resolved,
-          operationReference: descriptor.reference)
+          operationReference: implementationDescriptor.reference)
         switch plan.kind {
         case .process(let executableSHA256, let argumentSummary, let timeoutSeconds):
           materializedSteps.append(
@@ -6249,13 +6269,13 @@ public actor RuntimeJobEngine {
         bindingRevision = nil
       }
       let document = MaterializedPlanDocument(
-        operationReference: descriptor.reference,
+        operationReference: implementationDescriptor.reference,
         catalogDigest: RuntimeOperationCatalog.catalogDigest,
-        inputs: request.inputs,
+        inputs: implementationInputs,
         targetID: request.target.targetID,
         stableTargetIdentitySHA256: stableIdentity,
         bindingRevision: bindingRevision,
-        providerID: descriptor.provider.rawValue,
+        providerID: implementationDescriptor.provider.rawValue,
         runtimeDebugInvocationID: runtimeDebugPermit?.invocationID,
         runtimeDebugCandidateActionSHA256: runtimeDebugPermit?.candidateActionSHA256,
         steps: materializedSteps)
@@ -7758,7 +7778,7 @@ public actor RuntimeJobEngine {
       ]
     case .probeDevice:
       if delegatedArkForgePlanCompletion,
-        operationReference == "flash.dayu200",
+        operationReference.map(ArkForgeFlashOperation.contains) == true,
         step.stepID == "rebind-and-verify-build"
       {
         arguments = ["evidencePolicy": .string("postFlashBuild")]
@@ -7783,7 +7803,7 @@ public actor RuntimeJobEngine {
       ]
     case .waitForReconnect:
       if delegatedArkForgePlanCompletion,
-        operationReference == "flash.dayu200",
+        operationReference.map(ArkForgeFlashOperation.contains) == true,
         step.stepID == "wait-for-hdc"
       {
         arguments = [
@@ -8178,7 +8198,7 @@ public actor RuntimeJobEngine {
     case .rebootDevice:
       guard
         (delegatedArkForgePlanCompletion
-          && operationReference == "flash.dayu200"
+          && operationReference.map(ArkForgeFlashOperation.contains) == true
           && step.stepID == "reboot-device")
           || {
             if case .rockchip(.rebootToNormal)? = action { return true }
@@ -8391,10 +8411,10 @@ public actor RuntimeJobEngine {
   private static func flashArtifactLeaseID(
     in inputs: [String: JSONValue]?
   ) -> String? {
-    guard case .string(let lease)? = inputs?["imageBundleLease"], !lease.isEmpty else {
-      return nil
-    }
-    return lease
+    guard let inputs else { return nil }
+    if case .string(let lease)? = inputs["artifactLease"], !lease.isEmpty { return lease }
+    if case .string(let lease)? = inputs["imageBundleLease"], !lease.isEmpty { return lease }
+    return nil
   }
 
   /// Returns the complete board profile derived from one exact, already
@@ -8427,7 +8447,7 @@ public actor RuntimeJobEngine {
     artifact: ProviderResolvedInputArtifact?,
     artifactLeaseID: String?
   ) -> String? {
-    guard descriptor.reference == "flash.dayu200", let artifact,
+    guard ArkForgeFlashOperation.contains(descriptor.reference), let artifact,
       let artifactLeaseID
     else { return nil }
     return try? resolvedFlashArchiveProfile(

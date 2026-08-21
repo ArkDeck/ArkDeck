@@ -100,7 +100,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
       configuration: .init(
         stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
-        RockchipFlashProviderAdapter(
+        ArkForgeFlashProviderAdapter(
           factsPort: FactsPort(), availability: .available)
       ]),
       dispatcher: RecordingRefusingDispatcher(log: dispatchLog),

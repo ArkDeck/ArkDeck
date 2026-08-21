@@ -37,6 +37,12 @@
       "type": "integer",
       "minimum": 1
     },
+    "aliasFor": {
+      "description": "Exact versioned canonical operation reference selected by this compatibility descriptor.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z][a-z0-9]*)*@[1-9][0-9]*$",
+      "maxLength": 80
+    },
     "title": {
       "type": "string",
       "minLength": 1,
@@ -46,6 +52,7 @@
       "enum": [
         "hdc",
         "rockchip",
+        "arkforge",
         "workspace",
         "analyzer"
       ]

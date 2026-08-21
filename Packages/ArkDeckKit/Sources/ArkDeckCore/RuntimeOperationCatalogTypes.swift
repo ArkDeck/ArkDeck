@@ -9,6 +9,9 @@
 public enum CatalogProvider: String, CaseIterable, Codable, Sendable {
   case hdc
   case rockchip
+  /// ArkForge owns Flash plan execution. ArkDeck still owns admission,
+  /// capability use and durable product policy around that execution lane.
+  case arkforge
   /// Host-only provider: source inspection, patching and builds on this
   /// machine. It has no device target and no connect key by construction.
   case workspace
@@ -239,6 +242,10 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
   public let version: Int?
   public let title: String
   public let provider: CatalogProvider
+  /// Compatibility descriptor target. The submitted reference remains
+  /// durable presentation data; implementation selection normalizes to this
+  /// exact canonical reference.
+  public let aliasFor: String?
   public let minimumEffect: WorkflowEffect
   public let permittedEffects: [WorkflowEffect]
   public let authorization: [WorkflowEffect: RuntimeOperationAuthorizationPolicy]
@@ -260,6 +267,7 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
     version: Int?,
     title: String,
     provider: CatalogProvider,
+    aliasFor: String? = nil,
     minimumEffect: WorkflowEffect,
     permittedEffects: [WorkflowEffect],
     authorization: [WorkflowEffect: RuntimeOperationAuthorizationPolicy],
@@ -280,6 +288,7 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
     self.version = version
     self.title = title
     self.provider = provider
+    self.aliasFor = aliasFor
     self.minimumEffect = minimumEffect
     self.permittedEffects = permittedEffects
     self.authorization = authorization

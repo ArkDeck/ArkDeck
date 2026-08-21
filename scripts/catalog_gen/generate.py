@@ -50,7 +50,7 @@ EFFECTS = ("hostOnly", "readOnly", "deviceMutation", "destructive")
 CANCELLATIONS = ("immediate", "atSafeBoundary", "criticalNonInterruptible")
 BINDINGS = ("none", "confirmedDevice")
 AUTHORIZATION_POLICIES = ("defaultReadOnly", "standingCapability", "runtimeCapability")
-PROVIDERS = ("hdc", "rockchip", "workspace", "analyzer")
+PROVIDERS = ("hdc", "rockchip", "arkforge", "workspace", "analyzer")
 CONCURRENCY_KEYS = ("device-exclusive", "device-shared-readonly", "host-exclusive")
 COMPENSATIONS = ("none", "bestEffortCleanup", "rollbackPublished")
 ACTION_REFERENCE_REQUIRED_OPERATIONS = frozenset(
@@ -95,7 +95,9 @@ TOP_LEVEL_REQUIRED = (
     "artifacts",
     "profiles",
 )
-TOP_LEVEL_OPTIONAL = ("version", "defaultPolicyIssuance", "completeOverwriteRecovery")
+TOP_LEVEL_OPTIONAL = (
+    "version", "aliasFor", "defaultPolicyIssuance", "completeOverwriteRecovery"
+)
 STEP_REQUIRED = ("stepID", "kind", "effect", "cancellation", "binding", "compensation")
 STEP_OPTIONAL = ("actionRef", "optional", "notes")
 FIELD_REQUIRED = ("type", "required")
@@ -359,6 +361,16 @@ def validate_operation(
     _require_enum(doc["concurrencyKey"], CONCURRENCY_KEYS, f"{where}.concurrencyKey")
     if "version" in doc:
         _require_int(doc["version"], f"{where}.version", 1, 10_000)
+    if "aliasFor" in doc:
+        alias_for = doc["aliasFor"]
+        if (
+            not isinstance(alias_for, str)
+            or "@" not in alias_for
+            or alias_for == operation_reference(doc)
+        ):
+            raise CatalogError(
+                f"{where}.aliasFor: must be a different versioned operation reference"
+            )
     _require_int(doc["timeoutSeconds"], f"{where}.timeoutSeconds", 1, 7200)
     _require_int(doc["outputByteBudget"], f"{where}.outputByteBudget", 1024, 1 << 30)
 
@@ -499,9 +511,11 @@ def validate_operation(
         if not isinstance(recovery, dict):
             raise CatalogError(f"{where}.completeOverwriteRecovery: must be an object")
         _require_keys(recovery, recovery_required, (), f"{where}.completeOverwriteRecovery")
-        if doc["effect"]["minimum"] != "destructive" or doc["provider"] != "rockchip":
+        if doc["effect"]["minimum"] != "destructive" or doc["provider"] not in {
+            "rockchip", "arkforge"
+        }:
             raise CatalogError(
-                f"{where}.completeOverwriteRecovery: only a destructive rockchip operation may declare coverage"
+                f"{where}.completeOverwriteRecovery: only a destructive RockUSB/ArkForge operation may declare coverage"
             )
         if recovery["contractVersion"] != "1.0.0":
             raise CatalogError(
@@ -642,8 +656,27 @@ def load_catalog(
         profiles.append(doc)
 
     operation_refs = {operation_reference(doc) for doc in operations}
+    operations_by_reference = {
+        operation_reference(doc): doc for doc in operations
+    }
     profile_refs = {profile_reference(doc) for doc in profiles}
     for doc in operations:
+        if "aliasFor" in doc:
+            target = operations_by_reference.get(doc["aliasFor"])
+            if target is None:
+                raise CatalogError(
+                    f"operation {operation_reference(doc)}: unknown alias target {doc['aliasFor']}"
+                )
+            for key in (
+                "provider", "effect", "authorization", "binding", "concurrencyKey",
+                "steps", "outputs", "timeoutSeconds", "outputByteBudget", "retry",
+                "unknownOutcome", "completeOverwriteRecovery", "artifacts", "profiles",
+            ):
+                if doc.get(key) != target.get(key):
+                    raise CatalogError(
+                        f"operation {operation_reference(doc)}: alias {key} must match "
+                        f"canonical target {doc['aliasFor']}"
+                    )
         missing = set(doc["profiles"]) - profile_refs
         if missing:
             raise CatalogError(
@@ -827,6 +860,8 @@ def generate_swift(operations: list[dict], digest: str) -> str:
         lines.append(f"      version: {version},")
         lines.append(f"      title: {_swift_string(doc['title'])},")
         lines.append(f"      provider: .{doc['provider']},")
+        if "aliasFor" in doc:
+            lines.append(f"      aliasFor: {_swift_string(doc['aliasFor'])},")
         lines.append(f"      minimumEffect: .{doc['effect']['minimum']},")
         lines.append(f"      permittedEffects: [{permitted}],")
         lines.append(f"      authorization: [{authorization}],")

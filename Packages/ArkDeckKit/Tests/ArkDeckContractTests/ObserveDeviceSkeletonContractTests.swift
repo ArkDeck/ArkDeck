@@ -226,7 +226,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
   func testHostManagedPlansAreRefusedByThisDispatcher() async throws {
     let resolver = try FixedExecutableResolver.hashing(path: toolURL.path, providerID: "rockchip")
     let dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
-    let rockchip = RockchipFlashProviderAdapter()
+    let rockchip = ArkForgeFlashProviderAdapter()
     let plan = try rockchip.lower(
       action: .rockchip(.enterLoader(connectKey: "fixture-connect-key")),
       context: ProviderExecutionContext(

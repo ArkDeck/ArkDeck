@@ -3,7 +3,7 @@ import ArkForgeClient
 import ArkForgeProtocol
 import Foundation
 
-/// Drives one `flash.dayu200` job across the ArkForge boundary.
+/// Drives one canonical ArkForge full-restore job across the daemon boundary.
 ///
 /// The daemon never calls out. It *asks* on the `watchJob` stream and waits for
 /// this side to call back in, which is what keeps every message
@@ -277,7 +277,7 @@ package actor ArkForgeFlashSession {
   private static let pollIntervalMilliseconds: UInt64 = 500
 
   /// How many consecutive quiet polls before the outcome is unknown. The
-  /// catalog gives `flash.dayu200` 1800 seconds, so this outlasts the operation
+  /// the Flash catalog gives a full restore 1800 seconds, so this outlasts the operation
   /// instead of deciding a still-running write has gone missing.
   private static let quietPollLimit = 4200
 

@@ -1034,7 +1034,8 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
-    let isFlash = operationReference == "flash.dayu200"
+    let isFlash = ArkForgeFlashOperation.containsDurableRecordReference(
+      operationReference)
     let isInterruptedHistoryFixture = jobID == "job-fixture-0002"
     return RuntimeJobDetailPresentation(
       jobID: jobID,
@@ -1048,7 +1049,7 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
       evidence: RuntimeJobEvidencePresentation(
         catalogDigest: String(repeating: "a", count: 64),
         bindingRevision: 1,
-        providerID: isFlash ? "rockchip" : "openharmony-hdc",
+        providerID: isFlash ? CatalogProvider.arkforge.rawValue : "openharmony-hdc",
         actualEffect: isFlash ? "destructive" : "readOnly",
         executionMode: "execute",
         terminalState: isFlash ? "outcomeUnknown" : "succeeded",

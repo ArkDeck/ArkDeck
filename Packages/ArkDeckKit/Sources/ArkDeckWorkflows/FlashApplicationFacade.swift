@@ -3,7 +3,7 @@
 // The production provider reads operation availability and adopted target
 // facts from the daemon, materializes an exact Rockchip plan in-process from a
 // user-selected archive, imports that archive, and submits the published
-// `flash.dayu200` typed operation. Runtime owns capability creation and all
+// `flash.full-restore@1` typed operation. Runtime owns capability creation and all
 // target/plan/artifact admission; the App cannot supply or administer one.
 
 import ArkDeckCore
@@ -359,10 +359,15 @@ public enum FlashLiveProgressProjector {
     guard let status else {
       return FlashLiveProgressPresentation(phase: .importingImage)
     }
+    guard let descriptor = RuntimeOperationCatalog.descriptor(
+      reference: ArkForgeFlashOperation.canonicalReference)
+    else {
+      return FlashLiveProgressPresentation(phase: .validatingImage)
+    }
     let timeline = status.timeline
-    let latestKnownStep = latestStep(in: timeline)
+    let latestKnownStep = latestStep(in: timeline, descriptor: descriptor)
     if let progress = status.processProgress,
-      progress.stepID == "flash-partitions"
+      descriptor.steps.first(where: { $0.stepID == progress.stepID })?.kind == .flashPartition
     {
       if progress.phase == .staging {
         return FlashLiveProgressPresentation(phase: .extractingImage)
@@ -376,46 +381,52 @@ public enum FlashLiveProgressProjector {
         currentPartitionPercent: progress.currentUnitPercent,
         writeFractionCompleted: fraction)
     }
-    switch latestKnownStep?.id {
-    case "verify-image-bundle", "hash-images", "confirm-flash-intent":
-      return FlashLiveProgressPresentation(phase: .validatingImage)
-    case "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
-      "rebind-loader-identity":
-      return FlashLiveProgressPresentation(phase: .enteringBootloader)
-    case "flash-partitions":
-      return FlashLiveProgressPresentation(phase: .extractingImage)
-    case "verify-flash-readback":
-      return FlashLiveProgressPresentation(phase: .verifyingPartitions)
-    case "reboot-device":
-      return FlashLiveProgressPresentation(phase: .rebootingDevice)
-    case "wait-for-hdc":
-      return FlashLiveProgressPresentation(phase: .reconnectingDevice)
-    case "rebind-and-verify-build", "capture-post-flash-diagnostics", "finalize-session":
-      return FlashLiveProgressPresentation(phase: .verifyingSystem)
-    default:
-      return FlashLiveProgressPresentation(phase: .validatingImage)
-    }
+    return FlashLiveProgressPresentation(
+      phase: phase(for: latestKnownStep, descriptor: descriptor))
   }
 
-  private struct TimelineStep {
-    let id: String
-  }
-
-  private static let runtimeStepIDs = [
-    "verify-image-bundle", "hash-images", "confirm-flash-intent",
-    "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
-    "rebind-loader-identity", "flash-partitions", "verify-flash-readback",
-    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
-    "capture-post-flash-diagnostics", "finalize-session",
-  ]
-
-  private static func latestStep(in timeline: [String]) -> TimelineStep? {
+  private static func latestStep(
+    in timeline: [String],
+    descriptor: CatalogOperationDescriptor
+  ) -> CatalogStepDescriptor? {
     for index in timeline.indices.reversed() {
-      if let id = runtimeStepIDs.first(where: { timeline[index].contains($0) }) {
-        return TimelineStep(id: id)
+      if let step = descriptor.steps.first(where: {
+        timeline[index].contains($0.stepID)
+      }) {
+        return step
       }
     }
     return nil
+  }
+
+  private static func phase(
+    for step: CatalogStepDescriptor?,
+    descriptor: CatalogOperationDescriptor
+  ) -> FlashLiveProgressPhase {
+    guard let step,
+      let index = descriptor.steps.firstIndex(where: { $0.stepID == step.stepID }),
+      let overwriteIndex = descriptor.steps.firstIndex(where: { $0.kind == .flashPartition })
+    else { return .validatingImage }
+    switch step.kind {
+    case .verifyArtifact, .hashFile, .requestConfirmation:
+      return .validatingImage
+    case .enterUpdater, .waitForDisconnect:
+      return .enteringBootloader
+    case .waitForReconnect:
+      return index < overwriteIndex ? .enteringBootloader : .reconnectingDevice
+    case .probeDevice:
+      return index < overwriteIndex ? .enteringBootloader : .verifyingSystem
+    case .flashPartition:
+      return .extractingImage
+    case .verifyRemoteState:
+      return .verifyingPartitions
+    case .rebootDevice:
+      return .rebootingDevice
+    case .captureRemoteStdout, .finalizeSession:
+      return .verifyingSystem
+    default:
+      return index < overwriteIndex ? .validatingImage : .verifyingSystem
+    }
   }
 
   private static func writeFraction(
@@ -776,14 +787,12 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         target: DurableTargetReference(
           targetID: target.id,
           expectedBindingRevision: target.bindingRevision),
-        operation: RuntimeOperationReference(id: "flash.dayu200"),
+        operation: RuntimeOperationReference(id: "flash.full-restore", version: 1),
         inputs: [
-          "imageBundleLease": .string(lease),
-          "deviceProfile": .string(plan.profileReference),
-          "partitionPlan": .array(
-            plan.partitions.sorted { $0.writeOrder < $1.writeOrder }
-              .map { .string($0.partitionName) }),
-          "postFlashVerification": .string("full"),
+          "artifactLease": .string(lease),
+          "deviceProfileRef": .string(plan.profileReference),
+          "intent": .string("fullRestore"),
+          "verification": .string("full"),
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
@@ -1094,10 +1103,13 @@ enum FlashWorkspaceResponseDecoding {
         return .unavailable(reasons: [failure.message])
       case .success(let entries):
         guard
-          let flash = entries.first(where: { $0["reference"] as? String == "flash.dayu200" }),
+          let flash = entries.first(where: {
+            $0["reference"] as? String == ArkForgeFlashOperation.canonicalReference
+          }),
           let state = flash["availability"] as? String
         else {
-          return .unavailable(reasons: ["flash.dayu200 is not published by this Runtime"])
+          return .unavailable(
+            reasons: ["\(ArkForgeFlashOperation.canonicalReference) is not published by this Runtime"])
         }
         let reasons = flash["reasons"] as? [String] ?? []
         return state == "available"
@@ -1264,11 +1276,11 @@ enum FlashPlanPresentationBuilder {
     }
   }
 
-  /// The default `flash.dayu200` request inputs the FlashWorkspace submits.
+  /// The default canonical full-restore inputs the FlashWorkspace submits.
   /// The review's step selection and step-set digest run against exactly this
   /// shape, so what the user reviews is what the engine authorizes.
   static let reviewSelectionInputs: [String: JSONValue] = [
-    "postFlashVerification": .string("full")
+    "verification": .string("full")
   ]
 
   /// The catalog steps the engine will select for the default request, with
@@ -1279,7 +1291,8 @@ enum FlashPlanPresentationBuilder {
     mode: RockchipFlashExecutionMode
   ) -> (steps: [FlashPlanStepPresentation], stepSetDigestSHA256: String)? {
     guard
-      let descriptor = RuntimeOperationCatalog.descriptor(reference: "flash.dayu200")
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        reference: ArkForgeFlashOperation.canonicalReference)
     else { return nil }
     let disposition: FlashPlanStepDisposition
     switch mode {
@@ -1319,7 +1332,7 @@ enum FlashPlanPresentationBuilder {
     imageFileName: String
   ) -> FlashExactPlanPresentation {
     guard let review = reviewSteps(mode: mode) else {
-      preconditionFailure("flash.dayu200 is not in the generated operation catalog")
+      preconditionFailure("canonical ArkForge Flash operation is not in the generated catalog")
     }
     return FlashExactPlanPresentation(
       mode: mode,

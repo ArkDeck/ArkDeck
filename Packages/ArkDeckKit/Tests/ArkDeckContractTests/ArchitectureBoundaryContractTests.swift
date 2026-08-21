@@ -451,6 +451,58 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       .deletingLastPathComponent()
   }
 
+  func testArkForgeFullRestoreConsumersUseTheCanonicalIdentityPolicy() throws {
+    let sourceRoot = packageRoot().appending(path: "Sources")
+    let allowedAliasFiles: Set<String> = [
+      "ArkDeckCore/ArkForgeFlashOperation.swift",
+      "ArkDeckCore/RuntimeOperationCatalogGenerated.swift",
+      "ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift",
+    ]
+    guard
+      let enumerator = FileManager.default.enumerator(
+        at: sourceRoot, includingPropertiesForKeys: nil)
+    else { return XCTFail("cannot enumerate ArkDeckKit sources") }
+    var aliasFiles: Set<String> = []
+    var obsoleteAdapterFiles: [String] = []
+    for case let url as URL in enumerator where url.pathExtension == "swift" {
+      let source = try String(contentsOf: url, encoding: .utf8)
+      let relative = String(url.path.dropFirst(sourceRoot.path.count + 1))
+      if source.contains("flash.dayu200") { aliasFiles.insert(relative) }
+      if source.contains("RockchipFlashProviderAdapter") {
+        obsoleteAdapterFiles.append(relative)
+      }
+    }
+    XCTAssertEqual(aliasFiles, allowedAliasFiles)
+    XCTAssertEqual(obsoleteAdapterFiles, [])
+
+    let flashFacade = try String(
+      contentsOf: sourceRoot.appending(
+        path: "ArkDeckWorkflows/FlashApplicationFacade.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(flashFacade.contains("ArkForgeFlashOperation.canonicalReference"))
+    XCTAssertFalse(flashFacade.contains("flash.dayu200"))
+    let progressStart = try XCTUnwrap(
+      flashFacade.range(of: "public enum FlashLiveProgressProjector"))
+    let progressTail = flashFacade[progressStart.lowerBound...]
+    let progressEnd = try XCTUnwrap(
+      progressTail.range(of: "enum FlashJobStatusResponseDecoding"))
+    let progressSource = String(progressTail[..<progressEnd.lowerBound])
+    for legacyStepID in [
+      "flash-partitions", "verify-flash-readback", "rebind-and-verify-build",
+    ] {
+      XCTAssertFalse(
+        progressSource.contains(legacyStepID),
+        "typed Flash progress must derive phases from catalog step kinds")
+    }
+
+    let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
+    let manualDriver = try String(
+      contentsOf: repoRoot.appending(path: "scripts/manual_ui_flash/manual_ui_flash.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(manualDriver.contains("flash.full-restore"))
+    XCTAssertFalse(manualDriver.contains("flash.dayu200"))
+  }
+
   private func relative(_ url: URL) -> String {
     let root = packageRoot().standardizedFileURL.path + "/"
     let path = url.standardizedFileURL.path
@@ -597,7 +649,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "capture.diagnostics@1",
     "debug.hap@1",
     "deploy.native-library.app-owned@1",
-    "flash.dayu200",
     "observe.device@1",
     "port-forward.create@1",
     "port-forward.remove@1",

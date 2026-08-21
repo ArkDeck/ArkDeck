@@ -204,7 +204,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
         byteCount: Int(profile.archiveSizeBytes)))
     let inputs = flashInputs(
       lease: "lease-v1:gj4:ART-70035", profile: profile)
-    let provider = RockchipFlashProviderAdapter(availability: .available)
+    let provider = ArkForgeFlashProviderAdapter(availability: .available)
     // The flash step no longer lowers to an ArkDeck provider action: the write
     // is arkforged's, reached by StepPermit (CHG-2026-059). The adapter says so
     // rather than producing a different action, because a plan that quietly
@@ -387,7 +387,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
         arkForgeLane: NonDispatchingArkForgeLane(toolchainSHA256: Self.toolIdentity),
         arkForgeDeviceProfileID: "dayu200"),
       providers: DeviceProviderRegistry(providers: [
-        RockchipFlashProviderAdapter(
+        ArkForgeFlashProviderAdapter(
           factsPort: FactsPort(), availability: .available)
       ]),
       dispatcher: RefusingDispatcher(log: dispatchLog),

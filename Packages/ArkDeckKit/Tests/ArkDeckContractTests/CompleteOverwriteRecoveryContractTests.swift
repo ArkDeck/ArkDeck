@@ -74,7 +74,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
-        providerID: "rockchip", toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
+        providerID: "arkforge", toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: toolSHA256,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
@@ -124,6 +124,70 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   override func tearDownWithError() throws {
     try? FileManager.default.removeItem(at: stateDirectory)
+  }
+
+  func testCanonicalAndDAYU200AliasMaterializeTheSameArkForgePlan() async throws {
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let artifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-alias-parity-input", sessionID: "session-alias-parity-input",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
+          stableIdentitySHA256: identity),
+        contents: try recoveryArchive()))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
+    let dispatchLog = DispatchLog()
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: stateDirectory,
+        arkForgeLane: CompletedArkForgeLane(toolchainSHA256: providerSHA256),
+        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
+      providers: DeviceProviderRegistry(providers: [
+        ArkForgeFlashProviderAdapter(
+          factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
+          availability: .available)
+      ]),
+      dispatcher: ConfirmingDispatcher(log: dispatchLog),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let alias = try flashRequest(id: "alias-parity", lease: lease)
+    let canonical = try RuntimeOperationRequest(
+      requestID: alias.requestID, idempotencyKey: alias.idempotencyKey,
+      target: alias.target,
+      operation: RuntimeOperationReference(id: "flash.full-restore", version: 1),
+      inputs: [
+        "artifactLease": .string(lease),
+        "deviceProfileRef": .string("dayu200"),
+        "intent": .string("fullRestore"),
+        "verification": .string("full"),
+      ])
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+
+    let aliasPreview = try await engine.planOnly(encoder.encode(alias))
+    let canonicalPreview = try await engine.planOnly(encoder.encode(canonical))
+
+    XCTAssertEqual(aliasPreview.operationReference, "flash.dayu200")
+    XCTAssertEqual(canonicalPreview.operationReference, "flash.full-restore@1")
+    XCTAssertEqual(aliasPreview.providerID, "arkforge")
+    XCTAssertEqual(aliasPreview.materializedPlanDigest, canonicalPreview.materializedPlanDigest)
+    XCTAssertEqual(aliasPreview.steps, canonicalPreview.steps)
+    XCTAssertEqual(aliasPreview.effectiveEffect, canonicalPreview.effectiveEffect)
+    XCTAssertEqual(aliasPreview.authorizationPolicy, canonicalPreview.authorizationPolicy)
+    XCTAssertEqual(aliasPreview.providerAdmissionBlocker, canonicalPreview.providerAdmissionBlocker)
+    let dispatches = await dispatchLog.snapshot()
+    let capabilities = try await capabilityStore.list()
+    XCTAssertEqual(dispatches, [])
+    XCTAssertEqual(capabilities, [])
   }
 
   func testRecoveryStoreIsAppendOnlyIdempotentAndRejectsConflictingProof() async throws {
@@ -393,7 +457,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         stateDirectory: stateDirectory, arkForgeLane: lane,
         arkForgeDeviceProfileID: "org.openharmony.dayu200"),
       providers: DeviceProviderRegistry(providers: [
-        RockchipFlashProviderAdapter(
+        ArkForgeFlashProviderAdapter(
           factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
           availability: .available)
       ]),
@@ -536,7 +600,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         stateDirectory: stateDirectory, arkForgeLane: lane,
         arkForgeDeviceProfileID: "org.openharmony.dayu200"),
       providers: DeviceProviderRegistry(providers: [
-        RockchipFlashProviderAdapter(
+        ArkForgeFlashProviderAdapter(
           factsPort: RecoveryFactsPort(
             identity: identity, toolSHA256: providerSHA256,
             crossModeBinding:

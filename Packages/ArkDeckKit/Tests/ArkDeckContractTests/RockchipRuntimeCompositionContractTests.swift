@@ -754,7 +754,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let hdcPlan = try hdcProvider.lower(action: hdcAction, context: context)
     _ = try await router.dispatch(hdcPlan)
 
-    let rockchipProvider = RockchipFlashProviderAdapter(availability: .available)
+    let rockchipProvider = ArkForgeFlashProviderAdapter(availability: .available)
     let rockchipPlan = try rockchipProvider.lower(
       action: .rockchip(.enterLoader(connectKey: "device-1")), context: context)
     _ = try await router.dispatch(rockchipPlan)
@@ -813,7 +813,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       nowUTC: { "2026-07-31T01:02:03Z" })
 
     let facts = try await factsPort.currentFacts(targetID: adopted.targetID)
-    XCTAssertEqual(facts.providerID, "rockchip")
+    XCTAssertEqual(facts.providerID, "arkforge")
     XCTAssertEqual(facts.targetID, adopted.targetID)
     XCTAssertEqual(facts.bindingRevision, adopted.bindingRevision)
     XCTAssertEqual(facts.deviceIdentitySHA256, identity)
@@ -1734,7 +1734,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
               "rockchip-runtime", directoryHint: .isDirectory))))
     XCTAssertNil(dispatcher.unavailableReason(providerID: "rockchip"))
 
-    let signedPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
+    let signedPlan = try ArkForgeFlashProviderAdapter(availability: .available).lower(
       action: .rockchip(.enterLoader(connectKey: "device-1")),
       context: ProviderExecutionContext(
         jobID: "job-signed", stepID: "enter-loader", targetID: "TGT-1",
@@ -1748,7 +1748,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let signedSnapshot = await actionLog.snapshot()
     XCTAssertEqual(signedSnapshot.0.count, 1)
 
-    let mismatchedPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
+    let mismatchedPlan = try ArkForgeFlashProviderAdapter(availability: .available).lower(
       action: .rockchip(.enterLoader(connectKey: "device-1")),
       context: ProviderExecutionContext(
         jobID: "job-mismatch", stepID: "enter-loader", targetID: "TGT-1",
@@ -1873,7 +1873,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(
         providers: [
-          RockchipFlashProviderAdapter(availability: .available)
+          ArkForgeFlashProviderAdapter(availability: .available)
         ]),
       dispatcher: dispatcher,
       capabilityStore: try RuntimeCapabilityStore(
@@ -1938,7 +1938,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     stepID: String,
     toolSHA256: String
   ) throws -> TypedProcessPlan {
-    try RockchipFlashProviderAdapter(availability: .available).lower(
+    try ArkForgeFlashProviderAdapter(availability: .available).lower(
       action: .rockchip(action),
       context: ProviderExecutionContext(
         jobID: "job-host",

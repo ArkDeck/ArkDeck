@@ -1,8 +1,9 @@
 # Tasks — CHG-2026-070
 
 CHG-2026-070@r1 已由维护者通过 PR #1443 review/merge，TASK-AFG-001 已通过
-PR #1444 review/merge。CHG-2026-069 的 catalog window 已关闭；本 readiness
-只固化 TASK-AFG-002 的机器可解析精确文件授权，generic operation 实现仍须独立 PR。
+PR #1444 review/merge。CHG-2026-069 的 catalog window 已关闭；TASK-AFG-002
+在本实现 PR 内完成 contract stage，待维护者 review/merge 后进入 real-device
+cutover。
 
 ## TASK-AFG-001 — ArkForge Swift SDK and release bundle
 
@@ -24,7 +25,7 @@ manifest, one-key LaunchAgent configuration and legacy receipt migration.
 
 ## TASK-AFG-002 — Generic operation and alias cutover
 
-- Status:in-progress（前置已合入；本 readiness 经维护者 review/merge 后才授权实现 PR）
+- Status:in-progress（AFG-AC-4..8 已通过；本实现待维护者 review/merge）
 - Platform: macos
 - Hardware required: no for contract stage; yes for final cutover
 - Golden Journey: GJ-4
@@ -83,7 +84,7 @@ from production consumers.
 
 ## TASK-AFG-003 — Real-device cutover
 
-- Status: blocked (TASK-AFG-002)
+- Status:blocked（等待 TASK-AFG-002 review/merge 与 DAYU200 实机窗口）
 - Platform: macos
 - Hardware required: yes, DAYU200
 - Golden Journey: GJ-4

@@ -95,14 +95,16 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
       url: establishingFlashDirectory.appending(path: "journal.jsonl"))
     guard establishingFlash.jobID == route.jobID,
       RuntimeJobEngine.isDayu200Flash(establishingFlash),
-      establishingFlash.providerID == "rockchip",
+      [CatalogProvider.arkforge.rawValue, "rockchip"].contains(establishingFlash.providerID),
       establishingFlash.request.target.targetID == canonical.targetID,
       establishingFlash.request.target.expectedBindingRevision == canonical.bindingRevision,
       establishingFlash.materializedStableTargetIdentitySHA256
         == canonical.stablePhysicalIdentitySHA256,
       establishingFlash.materializedBindingRevision == canonical.bindingRevision,
-      Self.stringInput("deviceProfile", record: establishingFlash) == "dayu200",
-      Self.stringInput("postFlashVerification", record: establishingFlash) == "full",
+      ArkForgeFlashRequest.profileReference(
+        submittedReference: establishingFlash.operationReference,
+        inputs: establishingFlash.request.inputs) == "dayu200",
+      Self.verification(record: establishingFlash) == "full",
       Self.partitionPlan(record: establishingFlash) == Self.publishedPartitionPlan()
     else {
       throw BootstrapError.storeFailure(
@@ -281,6 +283,10 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
   }
 
   private static func partitionPlan(record: RuntimeJobRecord) -> [String]? {
+    if record.operationReference == ArkForgeFlashOperation.canonicalReference {
+      guard record.request.inputs["intent"] == .string("fullRestore") else { return nil }
+      return publishedPartitionPlan()
+    }
     guard case .array(let values)? = record.request.inputs["partitionPlan"] else { return nil }
     var partitions: [String] = []
     for value in values {
@@ -290,8 +296,14 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
     return partitions
   }
 
+  private static func verification(record: RuntimeJobRecord) -> String? {
+    let key = record.operationReference == ArkForgeFlashOperation.canonicalReference
+      ? "verification" : "postFlashVerification"
+    return stringInput(key, record: record) ?? "full"
+  }
+
   private static func publishedPartitionPlan() -> [String]? {
-    RuntimeOperationCatalog.descriptor(reference: "flash.dayu200")?
+    RuntimeOperationCatalog.descriptor(reference: ArkForgeFlashOperation.canonicalReference)?
       .completeOverwriteRecovery?.profile(reference: "dayu200")?.coveredEffects
       .compactMap {
         guard $0.hasPrefix("partition:") else { return nil }

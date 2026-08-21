@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "id": "dayu200",
-  "provider": "rockchip",
+  "provider": "arkforge",
   "title": "DAYU200 (RK3568)",
   "constraints": {
     "deviceModel": "DAYU200 (RK3568)",
@@ -27,6 +27,7 @@
     "debug.hap@1",
     "deploy.native-library.app-owned@1",
     "flash.dayu200",
+    "flash.full-restore@1",
     "port-forward.create@1",
     "port-forward.remove@1"
   ]

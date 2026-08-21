@@ -2020,7 +2020,9 @@ extension DeviceProvider {
   }
 }
 
-/// Closed provider registry keyed by providerID ("hdc", "rockchip").
+/// Closed provider registry keyed by providerID. `rockchip` is accepted only
+/// as a durable-record compatibility key for jobs created before ArkForge
+/// became the published provider.
 public struct DeviceProviderRegistry: Sendable {
   private let providers: [String: any DeviceProvider]
 
@@ -2033,16 +2035,35 @@ public struct DeviceProviderRegistry: Sendable {
   }
 
   public func provider(id: String) -> (any DeviceProvider)? {
-    providers[id]
+    providers[id] ?? (id == "rockchip" ? providers[CatalogProvider.arkforge.rawValue] : nil)
   }
 
   public func resolveFacts(
     providerID: String, targetID: String
   ) async throws -> ProviderFacts {
-    guard let provider = providers[providerID] else {
+    guard let provider = provider(id: providerID) else {
       throw DeviceProviderError.factsUnavailable("provider \(providerID) is not registered")
     }
-    return try await provider.resolveFacts(targetID: targetID)
+    let facts = try await provider.resolveFacts(targetID: targetID)
+    guard providerID == "rockchip", facts.providerID == CatalogProvider.arkforge.rawValue else {
+      return facts
+    }
+    return ProviderFacts(
+      providerID: providerID,
+      toolVersion: facts.toolVersion,
+      toolSHA256: facts.toolSHA256,
+      serverFacts: facts.serverFacts,
+      targetID: facts.targetID,
+      bindingRevision: facts.bindingRevision,
+      deviceIdentitySHA256: facts.deviceIdentitySHA256,
+      executionConnectKey: facts.executionConnectKey,
+      deviceModel: facts.deviceModel,
+      deviceMode: facts.deviceMode,
+      buildFingerprint: facts.buildFingerprint,
+      transport: facts.transport,
+      profileID: facts.profileID,
+      collectedAtUTC: facts.collectedAtUTC,
+      sourceObservedAtUTC: facts.sourceObservedAtUTC)
   }
 
   public var registeredProviderIDs: [String] {

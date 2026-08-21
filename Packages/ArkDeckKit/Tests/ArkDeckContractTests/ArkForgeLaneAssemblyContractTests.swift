@@ -277,7 +277,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     let record = await seen.snapshot()
     XCTAssertNil(record, "an unconfigured daemon must not spawn anything")
     guard case .failure(let why) = result else { return XCTFail("expected no lane") }
-    XCTAssertTrue("\(why)".contains("flash.dayu200 refuses"), "\(why)")
+    XCTAssertTrue("\(why)".contains("canonical ArkForge Flash refuses"), "\(why)")
   }
 
   private actor LaunchRecorder {

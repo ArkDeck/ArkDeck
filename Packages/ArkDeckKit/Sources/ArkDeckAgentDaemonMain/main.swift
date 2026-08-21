@@ -359,7 +359,7 @@ Task.detached {
       bindingStore: RockchipProductBindingStore(rootURL: rockchipRoot),
       postFlashHDCBindingStore: postFlashHDCBindingStore,
       nowUTC: utcNow)
-    let rockchipProvider = RockchipFlashProviderAdapter(
+    let arkForgeProvider = ArkForgeFlashProviderAdapter(
       factsPort: rockchipFactsPort,
       // The closed typed plan is present. Executable/HDC/state availability
       // belongs to the live dispatcher so an installed product component can
@@ -579,7 +579,7 @@ Task.detached {
         resolver: try AnalyzerExecutableResolver(profiles: analyzerProfiles))
     }
     let providers = DeviceProviderRegistry(providers: [
-      hdcProvider, rockchipProvider, workspaceProvider, analyzerProvider,
+      hdcProvider, arkForgeProvider, workspaceProvider, analyzerProvider,
     ])
     let dispatcher = RuntimeProcessDispatcherRouter(
       hdc: hdcDispatcher, rockchip: rockchipDispatcher, workspace: workspaceDispatcher,
@@ -760,7 +760,7 @@ Task.detached {
         let facts: ProviderFacts
         do {
           facts = try await providers.resolveFacts(
-            providerID: "rockchip", targetID: targetID)
+            providerID: CatalogProvider.arkforge.rawValue, targetID: targetID)
         } catch {
           return .deviceNotObserved("target facts could not be resolved: \(error)")
         }

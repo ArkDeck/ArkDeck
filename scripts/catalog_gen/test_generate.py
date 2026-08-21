@@ -51,6 +51,7 @@ class RealCatalogTests(unittest.TestCase):
                 "debug.hap@1",
                 "deploy.native-library.app-owned@1",
                 "flash.dayu200",
+                "flash.full-restore@1",
                 "observe.device@1",
                 "port-forward.create@1",
                 "port-forward.remove@1",
@@ -185,9 +186,40 @@ class RealCatalogTests(unittest.TestCase):
 
     def test_published_e2_flash_operation_is_pinned(self):
         operations, _ = _real_operations()
-        flash = next(op for op in operations if op["id"] == "flash.dayu200")
-        self.assertEqual(flash["effect"]["permitted"], ["destructive"])
-        self.assertEqual(flash["authorization"], {"destructive": "runtimeCapability"})
+        alias = next(op for op in operations if op["id"] == "flash.dayu200")
+        canonical = next(
+            op for op in operations if op["id"] == "flash.full-restore"
+        )
+        self.assertEqual(alias["aliasFor"], "flash.full-restore@1")
+        self.assertEqual(alias["provider"], "arkforge")
+        self.assertEqual(canonical["provider"], "arkforge")
+        self.assertEqual(canonical["effect"]["permitted"], ["destructive"])
+        self.assertEqual(
+            canonical["authorization"], {"destructive": "runtimeCapability"}
+        )
+        self.assertEqual(
+            list(canonical["inputs"]["fields"]),
+            ["artifactLease", "deviceProfileRef", "intent", "verification"],
+        )
+        self.assertEqual(
+            canonical["inputs"]["fields"]["intent"]["enum"], ["fullRestore"]
+        )
+
+    def test_flash_alias_drift_from_canonical_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            alias_path = operations_dir / "flash.dayu200.json"
+            alias = json.loads(alias_path.read_text(encoding="utf-8"))
+            alias["timeoutSeconds"] -= 1
+            alias_path.write_text(json.dumps(alias), encoding="utf-8")
+            with self.assertRaisesRegex(
+                generate.CatalogError, "alias timeoutSeconds must match"
+            ):
+                generate.load_catalog(operations_dir, profiles_dir)
 
     def test_workspace_checkpoint_uses_runtime_owned_exact_policy(self):
         operations, _ = _real_operations()
@@ -232,6 +264,9 @@ class RealCatalogTests(unittest.TestCase):
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
                 "flash.dayu200/capture-post-flash-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "flash.full-restore@1/capture-post-flash-diagnostics": (
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
             },
@@ -667,7 +702,7 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")'
             ),
-            3,
+            4,
         )
         self.assertEqual(
             swift.count(

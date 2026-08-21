@@ -547,10 +547,11 @@ final class RuntimeArtifactContractTests: XCTestCase {
     var missing: [String] = []
     for descriptor in RuntimeOperationCatalog.operations {
       let mapped = Set(
-        RuntimeArtifactService.artifactMapping[descriptor.reference, default: [:]]
-          .values.flatMap { $0 }
-      ).union(
-        RuntimeArtifactService.finalizeArtifacts[descriptor.reference, default: []])
+        descriptor.steps.flatMap {
+          RuntimeArtifactService.artifacts(
+            reference: descriptor.reference, stepID: $0.stepID) ?? []
+        }
+      ).union(RuntimeArtifactService.finalArtifacts(reference: descriptor.reference) ?? [])
       for artifact in descriptor.artifacts
       where artifact.isRequired && !mapped.contains(artifact.name) {
         missing.append("\(descriptor.reference)/\(artifact.name)")
