@@ -3,7 +3,8 @@
 > Change:CHG-2026-070-arkforge-generic-integration@r1
 >
 > Status: AFG-AC-1..8 implemented and contract-verified; AFG-AC-9 remains
-> blocked on TASK-AFG-002 review/merge and a maintainer-operated DAYU200 run.
+> blocked on the TASK-AFG-002 AOT XPC bridge remediation review/merge, typed
+> reconciliation of an earlier outcome-unknown Job, and the canonical run.
 
 | AC | Method | Expected result |
 | --- | --- | --- |
@@ -43,6 +44,45 @@
 
 AFG-AC-9 is intentionally not claimed by this evidence. A mock, plan-only run
 or prior digest cannot substitute for the maintainer-operated destructive run.
+
+## Protected-main cutover preflight — 2026-08-22
+
+- ArkDeck protected main `9b82b82aa98a284a82483801600c69b55ae9041f`
+  and ArkForge protected main `3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92`
+  reached `execution: ready`; the Runtime composed the
+  `org.openharmony.dayu200@1.0.0` ArkForge lane against one adopted target.
+- Typed artifact import pinned the supplied archive at 730783514 bytes and
+  SHA-256
+  `4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674`.
+  The imported lease and target binding revision were reused unchanged for
+  both plan-only requests.
+- `flash.full-restore@1` and the `flash.dayu200` compatibility alias both
+  materialized 14 identical steps, plan digest
+  `3a00e9737487c812676b040f04e14bf5d01071b2783a5f64bbfb5123cb7a6445`,
+  and step-set digest
+  `c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12`.
+  Effect, authorization and catalog facts matched; both responses remained
+  `planOnly`, `notDispatched`, and `jobAdmitted=false`.
+- Runtime catalog digest was
+  `7eec3b89228be6acf8be5b419f953d430a7349f38c99ee928cd261aeba7ad2a7`.
+  The locally assembled manifest-valid preflight bundle pinned ArkForge CLI
+  SHA-256
+  `3dac10687416c3c65ac6c60173ec420ad0c70b80b1027a7194c6a643ceae254d`
+  and daemon/toolchain SHA-256
+  `408b9bc7520275fde0eacfa4fe63db49ba5982fbcdb9c6e3c2797dcd81853d66`.
+  It was unsigned and is preflight evidence only, not release acceptance.
+- The App bridge then failed before submit on macOS 26: interpreted Swift
+  protocol metadata could not construct `NSXPCInterface` and raised
+  `NSInvalidArgumentException`. No new Runtime Job or device dispatch occurred.
+  The actuator now compiles the exact source into an owner-private,
+  source-digest-addressed AOT executable and `execv`s it before constructing
+  the interface. `ManualUIFlashBridgeContractTests` executes this real
+  interpreter-to-AOT path and passes; the existing 16
+  `ManualUIFlashDriverContractTests` also remain green.
+- Runtime exposed an earlier canonical full-restore Job with
+  `outcomeUnknown=true`. It was not created or replayed in this preflight. The
+  typed status contract requires reconciliation, while preserving the rule
+  that the original destructive effect is never redispatched.
 
 Real-device verification must not be inferred from a mock, scripted process or
 prior catalog digest. Alias execution parity is established from materialized
