@@ -10,9 +10,9 @@ also depends on CHG-2026-069 merge and digest closure.
 - Hardware required: no
 - Production reachability: ArkDeck agentd → ArkForgeClient → local daemon
 - Acceptance: AFG-AC-1..3
-- Allowed paths: `Packages/ArkDeckKit/Package.swift`, ArkForge SDK dependency
-  integration, ArkForge lane composition/install sources and their tests,
-  this change directory
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - 本 change `**`
 - Forbidden: capability/admission/journal/recovery semantics
 
 Deliver the cross-language SDK, byte-identical golden frames, validated bundle
@@ -47,4 +47,3 @@ Run canonical and alias plan-parity checks against the same artifact/target,
 then one canonical full restore with postflight verification. Record exact
 catalog/bundle/toolchain digests. Do not replay a destructive alias job merely
 to prove naming parity.
-

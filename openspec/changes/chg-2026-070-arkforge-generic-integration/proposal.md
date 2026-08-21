@@ -1,3 +1,14 @@
+---
+id: CHG-2026-070-arkforge-generic-integration
+revision: 1
+status: proposed
+class: capability
+core_change_level: none
+owner: fuhanfeng
+core_baseline: CORE-3.0.0
+platforms: [macos]
+---
+
 # Proposal — CHG-2026-070 ArkForge generic integration
 
 > Status: proposed
@@ -93,4 +104,3 @@ as release configuration.
 - removal of the `flash.dayu200` alias or legacy history decoder;
 - changes to ArkForge permit/admission, recovery or native USB semantics;
 - Windows packaging (tracked in ArkForge independently).
-

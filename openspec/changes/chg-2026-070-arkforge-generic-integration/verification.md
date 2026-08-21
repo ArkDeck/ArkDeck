@@ -1,5 +1,7 @@
 # Verification — CHG-2026-070
 
+> Change:CHG-2026-070-arkforge-generic-integration@r1
+>
 > Status: planned; proposal merge approves scope, not implementation or PASS.
 
 | AC | Method | Expected result |
@@ -17,4 +19,3 @@
 Real-device verification must not be inferred from a mock, scripted process or
 prior catalog digest. Alias execution parity is established from materialized
 plans; only the canonical operation is destructively executed in this change.
-

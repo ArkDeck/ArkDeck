@@ -57,13 +57,13 @@ validated installed bundle. Partial or cross-bundle migration refuses.
 ## 5. Ordering
 
 1. ArkForge publishes and tests the Swift SDK and bundle-manifest reader/writer.
-2. After CHG-2026-069 is merged and its digest window closed, generate the new
+2. ArkDeck consumes the pinned SDK and switches LaunchAgent composition to one
+   bundle in TASK-AFG-001.
+3. After CHG-2026-069 is merged and its digest window closed, generate the new
    operation descriptors and Core identity normalizer.
-3. Add the generic adapter and switch all new App submissions.
-4. Switch LaunchAgent install/composition to the bundle input.
+4. Add the generic adapter and switch all new App submissions.
 5. Run alias parity, history/recovery and real-device cutover acceptance.
 
 The catalog tasks are intentionally serial; generated catalog changes cannot
 be rebased by accepting conflict markers or regenerating over an unreviewed
 digest.
-
