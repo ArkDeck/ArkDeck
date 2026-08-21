@@ -8,8 +8,9 @@ import XCTest
 /// The launcher that hands a pairing secret to a long-lived child.
 ///
 /// `/bin/dd` is the child: it reads stdin and writes it to a file, it is a
-/// plain executable rather than a shell, and it exits at EOF — which makes it
-/// prove both halves at once. The secret arrived, and stdin was closed.
+/// plain executable rather than a shell, and it waits for EOF after receiving
+/// the secret. That proves both halves separately: the bytes arrive, while EOF
+/// does not arrive until the owning handle ends the authority generation.
 ///
 /// The secret never appears in argv here, and that is the property the whole
 /// type exists for: argv is readable by other processes and cannot be erased
@@ -40,24 +41,26 @@ final class IdentityBoundDaemonLauncherContractTests: XCTestCase {
       expectedSHA256: digest)
   }
 
-  func testTheSecretReachesTheChildOnStdinAndStdinIsClosed() async throws {
+  func testTheSecretReachesTheChildAndAuthorityStaysLiveUntilTermination() async throws {
     let destination = root.appending(path: "delivered")
     let secret = Data("pairing-secret-not-in-argv".utf8)
 
     let handle = try await IdentityBoundDaemonLauncher().launch(
       try ddRequest(writingTo: destination), secret: secret)
 
-    // `dd` exits at EOF. Waiting for it therefore proves stdin was closed —
-    // a launcher that left it open would hang here rather than fail loudly,
-    // and a daemon in that state never finishes pairing and never opens its
-    // sockets.
-    var exited = false
-    for _ in 0..<200 where !exited {
-      if handle.reap() != nil { exited = true; break }
-      try await Task.sleep(nanoseconds: 25_000_000)
-    }
-    XCTAssertTrue(exited, "the child must reach EOF once the parent closes stdin")
-    XCTAssertEqual(try Data(contentsOf: destination), secret)
+    try await Task.sleep(nanoseconds: 100_000_000)
+    XCTAssertNil(
+      handle.reap(),
+      "the child must not see EOF while its parent-authority handle is retained")
+
+    handle.terminate()
+    let reapedAfterTermination = await waitUntilReaped(handle)
+    XCTAssertTrue(
+      reapedAfterTermination,
+      "terminating the handle must close liveness and stop the child generation")
+    XCTAssertEqual(
+      try Data(contentsOf: destination), secret,
+      "closing liveness must expose exactly the bytes delivered before EOF")
   }
 
   func testTheSecretIsNotInArgvOrTheEnvironment() async throws {
@@ -97,20 +100,28 @@ final class IdentityBoundDaemonLauncherContractTests: XCTestCase {
     }
   }
 
-  func testAnEmptySecretStillClosesStdin() async throws {
-    // A daemon started with no secret is unpaired, not hung. The distinction
-    // matters: unpaired refuses `startExecution` with a standing reason, while
-    // hung looks like a daemon that is about to work.
+  func testAnEmptySecretStillRetainsAuthorityLiveness() async throws {
+    // The protocol currently uses a non-empty secret, but the launcher itself
+    // must preserve its lifetime rule independently of payload length.
     let destination = root.appending(path: "empty")
     let handle = try await IdentityBoundDaemonLauncher().launch(
       try ddRequest(writingTo: destination), secret: Data())
 
-    var exited = false
-    for _ in 0..<200 where !exited {
-      if handle.reap() != nil { exited = true; break }
-      try await Task.sleep(nanoseconds: 25_000_000)
+    try await Task.sleep(nanoseconds: 100_000_000)
+    XCTAssertNil(handle.reap(), "an empty payload must not be confused with parent death")
+    handle.terminate()
+    let reapedAfterTermination = await waitUntilReaped(handle)
+    XCTAssertTrue(reapedAfterTermination)
+    XCTAssertEqual((try? Data(contentsOf: destination)) ?? Data(), Data())
+  }
+
+  private func waitUntilReaped(
+    _ handle: IdentityBoundDaemonLauncher.Handle
+  ) async -> Bool {
+    for _ in 0..<200 {
+      if handle.reap() != nil { return true }
+      try? await Task.sleep(nanoseconds: 25_000_000)
     }
-    XCTAssertTrue(exited, "an empty secret must still produce EOF")
-    XCTAssertEqual(try Data(contentsOf: destination), Data())
+    return false
   }
 }
