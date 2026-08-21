@@ -150,7 +150,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       configuration: .init(
         stateDirectory: stateDirectory,
         arkForgeLane: CompletedArkForgeLane(toolchainSHA256: providerSHA256),
-        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
       providers: DeviceProviderRegistry(providers: [
         ArkForgeFlashProviderAdapter(
           factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
@@ -367,6 +367,52 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       request: try flashRequest(id: "missing-capability-record"))
   }
 
+  func testCleanRunningArkForgeExecutionParksUnknownWithoutRedispatch() async throws {
+    // The ArkForge daemon job and its completed-plan receipt cache live in the
+    // lane actor, not the Runtime journal. A restart after materialization can
+    // therefore look journal-clean while an external execution did start.
+    // Recreating the actor and resuming would be a destructive replay.
+    let jobID = "job-clean-delegated-execution"
+    let timestamp = "2026-08-08T00:00:00Z"
+    var record = try makeRecord(
+      jobID: jobID, createdAtUTC: timestamp, finishedAtUTC: timestamp)
+    record.state = JobState.running.rawValue
+    record.finishedAtUTC = nil
+    record.timeline.append("capability consumed before first mutation")
+    let directory = try jobDirectory(jobID)
+    try record.persist(into: directory)
+    let journalURL = directory.appending(path: "journal.jsonl")
+    let journal = try FileDurableJournal(url: journalURL)
+    _ = try appendRunningPrefix(
+      journal: journal, record: record,
+      schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion)
+
+    let recovered = try await recoveryService().replay(
+      RuntimePersistedJob(
+        jobID: jobID, idempotencyKey: record.request.idempotencyKey,
+        requestHash: String(repeating: "f", count: 64),
+        state: JobState.running.rawValue, createdAtUTC: timestamp,
+        updatedAtUTC: timestamp, version: 1, initialRecordData: nil))
+
+    XCTAssertEqual(recovered.record.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertTrue(recovered.record.outcomeUnknown)
+    XCTAssertEqual(recovered.record.operationFailure?.code, .outcomeUnknown)
+    XCTAssertEqual(recovered.record.finishedAtUTC, "2026-08-08T01:00:00Z")
+    XCTAssertTrue(
+      recovered.record.timeline.contains(
+        "recovered: ArkForge execution state was process-owned; parked unknown; no redispatch"))
+    let replay = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertEqual(replay.currentState, .waitingForRecovery)
+    XCTAssertTrue(replay.outstandingIntents.isEmpty)
+    XCTAssertTrue(replay.unknownOutcomes.isEmpty)
+    XCTAssertTrue(
+      replay.events.contains {
+        $0.kind == .stateTransition
+          && $0.stateTransition?.from == .running
+          && $0.stateTransition?.to == .waitingForRecovery
+      })
+  }
+
   func testRecoveryNegativeMatrixBlocksCoverageCancellationExpiryAndAttemptSeventeen()
     async throws
   {
@@ -455,7 +501,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: stateDirectory, arkForgeLane: lane,
-        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
       providers: DeviceProviderRegistry(providers: [
         ArkForgeFlashProviderAdapter(
           factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
@@ -598,7 +644,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: stateDirectory, arkForgeLane: lane,
-        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
       providers: DeviceProviderRegistry(providers: [
         ArkForgeFlashProviderAdapter(
           factsPort: RecoveryFactsPort(
@@ -921,25 +967,27 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   private func appendRunningPrefix(
-    journal: FileDurableJournal, record: RuntimeJobRecord
+    journal: FileDurableJournal, record: RuntimeJobRecord,
+    schemaVersion: String = JournalEvent.schemaVersion
   ) throws -> Int {
     try journal.appendAndSynchronize(
       try JournalEvent.jobCreated(
         eventID: "created-\(record.jobID)", sequence: 0,
         sessionID: record.sessionID, jobID: record.jobID,
-        timestamp: record.createdAtUTC, executionMode: "execute"))
+        timestamp: record.createdAtUTC, executionMode: "execute",
+        schemaVersion: schemaVersion))
     try journal.appendAndSynchronize(
       try JournalEvent.stateTransition(
         eventID: "preflight-\(record.jobID)", sequence: 1,
         sessionID: record.sessionID, jobID: record.jobID,
         timestamp: record.createdAtUTC, from: .queued, to: .preflight,
-        reason: "fixture"))
+        reason: "fixture", schemaVersion: schemaVersion))
     try journal.appendAndSynchronize(
       try JournalEvent.stateTransition(
         eventID: "running-\(record.jobID)", sequence: 2,
         sessionID: record.sessionID, jobID: record.jobID,
         timestamp: record.createdAtUTC, from: .preflight, to: .running,
-        reason: "fixture"))
+        reason: "fixture", schemaVersion: schemaVersion))
     return 3
   }
 

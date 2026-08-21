@@ -865,12 +865,11 @@ public actor RuntimeJobEngine {
     /// Absent in every build that has not composed one. A delegated step then
     /// refuses by name instead of failing somewhere less legible.
     package let arkForgeLane: (any ArkForgeLane)?
-    /// The id `arkforged` filed its DeviceProfile under.
+    /// The exact `id@version` selector `arkforged` filed its DeviceProfile under.
     ///
-    /// `materializePlan` looks a profile up by the id the document declares,
-    /// so this travels with the lane rather than being derived from a path:
-    /// the daemon was given a file, and only the daemon knows what id came out
-    /// of it. Composed together with the lane, and empty exactly when the lane
+    /// `materializePlan` looks a profile up by both fields the document
+    /// declares, so this travels with the lane rather than being derived from
+    /// a path. Composed together with the lane, and empty exactly when the lane
     /// is absent.
     package let arkForgeDeviceProfileID: String?
     /// Exact backend digest selected by the composed ArkForge lane. `nil`
@@ -2850,7 +2849,8 @@ public actor RuntimeJobEngine {
     guard let profileID = configuration.arkForgeDeviceProfileID, !profileID.isEmpty else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput,
-        "\(step.stepID) needs the DeviceProfile id arkforged loaded, and this build composed a "
+        "\(step.stepID) needs the exact DeviceProfile id@version arkforged loaded, and this "
+          + "build composed a "
           + "lane without one; nothing was dispatched and the device was not touched")
     }
     // The port path this job's device was confirmed at, named by the constant

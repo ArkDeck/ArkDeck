@@ -954,17 +954,59 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
           connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
           targetID: "TGT-1", bindingRevision: 2, usbTopology: ScriptedPlanSource.topology))
       XCTFail("an assessment must not produce a receipt")
-    } catch let error as ArkForgeLaneHost.LaneError {
-      guard case .planNotExecutable(let availability, _, let unknowns) = error else {
-        return XCTFail("expected planNotExecutable, got \(error)")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted(let reason) = failure else {
+        return XCTFail("expected confirmedNotExecuted, got \(failure)")
       }
-      XCTAssertEqual(availability, "unavailable")
-      XCTAssertEqual(
-        unknowns["RK-M02"],
-        "provider/profile/artifact/toolchain/platform combination is hardwareGated",
-        "the blocker is the actionable part and must survive to the operator")
+      XCTAssertTrue(reason.contains("hardwareGated"), reason)
+      XCTAssertTrue(reason.contains("RK-M02"), reason)
     }
     XCTAssertEqual(counter.value, 0, "no ArkForge job may be started without an executable plan")
+  }
+
+  func testAMaterializeRefusalTerminatesAsConfirmedNotExecuted() async throws {
+    // Measured on DAYU200: ArkForge rejected an unversioned profile selector
+    // before `startExecution`, but the untyped error escaped Runtime and left
+    // the durable Job in `running`. This boundary has proof that no execution
+    // exists, so it must return the typed terminal classification Runtime owns.
+    let counter = StartCounter()
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
+      makePerformer: { _, _ in SilentPerformer() },
+      makeClient: { _ in CountingDaemon(counter: counter, events: []) },
+      makeMaterializer: { _ in RefusingPlanSource() },
+      makeAuthority: { _, _, _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    for _ in 0..<2 {
+      do {
+        _ = try await host.perform(
+          stepID: "flash-partitions", jobID: "JOB-PROFILE-NOT-FOUND",
+          artifact: scriptedArtifact(),
+          binding: ArkForgeLaneDeviceBinding(
+            connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+            targetID: "TGT-1", bindingRevision: 2,
+            usbTopology: ScriptedPlanSource.topology))
+        XCTFail("a refused materialization must not produce a receipt")
+      } catch let failure as RuntimeDispatchFailure {
+        guard case .confirmedNotExecuted(let reason) = failure else {
+          return XCTFail("expected confirmedNotExecuted, got \(failure)")
+        }
+        XCTAssertTrue(reason.contains("PROFILE_NOT_FOUND"), reason)
+        XCTAssertTrue(reason.contains("before startExecution"), reason)
+      }
+    }
+    XCTAssertEqual(counter.value, 0, "the refusal must stay sticky without starting a job")
   }
 
   func testADeviceTheDaemonCannotSeeStopsTheJobBeforeItStarts() async throws {
@@ -999,10 +1041,11 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
           connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
           targetID: "TGT-1", bindingRevision: 2, usbTopology: "18874369"))
       XCTFail("a device the daemon cannot see must not be materialized against")
-    } catch let error as ArkForgeLaneHost.LaneError {
-      guard case .deviceNotObserved = error else {
-        return XCTFail("expected deviceNotObserved, got \(error)")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted(let reason) = failure else {
+        return XCTFail("expected confirmedNotExecuted, got \(failure)")
       }
+      XCTAssertTrue(reason.contains("cannot materialize a plan"), reason)
     }
     XCTAssertEqual(counter.value, 0)
   }
@@ -1207,11 +1250,47 @@ struct ScriptedPlanSource: ArkForgePlanSource {
   }
 }
 
+struct RefusingPlanSource: ArkForgePlanSource {
+  private enum Refusal: Error, CustomStringConvertible {
+    case profileNotFound
+
+    var description: String {
+      "PROFILE_NOT_FOUND: no loaded profile org.openharmony.dayu200"
+    }
+  }
+
+  private let base = ScriptedPlanSource.executable()
+
+  func importArtifact(contentsOf url: URL, expectedSHA256: String, requestID: String) throws
+    -> ArkForgeImportArtifactResponse
+  {
+    try base.importArtifact(
+      contentsOf: url, expectedSHA256: expectedSHA256, requestID: requestID)
+  }
+
+  func inspectArtifact(artifactID: String, requestID: String) throws
+    -> ArkForgeInspectArtifactResponse
+  {
+    try base.inspectArtifact(artifactID: artifactID, requestID: requestID)
+  }
+
+  func discoverDevices(requestID: String) throws -> [ArkForgeDeviceObservation] {
+    try base.discoverDevices(requestID: requestID)
+  }
+
+  func materializePlan(_ body: ArkForgeMaterializePlanRequest, requestID: String) throws
+    -> ArkForgeMaterializePlanResponse
+  {
+    throw Refusal.profileNotFound
+  }
+}
+
 /// The artifact a lane test writes, with the topology the scripted source sees.
 func scriptedArtifact() -> ArkForgeLaneArtifact {
   ArkForgeLaneArtifact(
     fileURL: URL(filePath: "/tmp/dayu200_img.tar.gz"),
-    sha256: String(repeating: "e", count: 64), profileID: "org.openharmony.dayu200")
+    sha256: String(repeating: "e", count: 64),
+    profileID: "org.openharmony.dayu200@1.0.0")
 }
 
 /// Composing the lane from what an operator installed.
