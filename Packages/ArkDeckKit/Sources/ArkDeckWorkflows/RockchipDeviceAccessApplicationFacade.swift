@@ -1,4 +1,5 @@
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import Foundation
 
 public enum RockchipDeviceAccessPresentationAvailability: Sendable, Equatable {
@@ -58,8 +59,7 @@ private actor RockchipDeviceAccessProductionProvider:
         appropriateFor: nil, create: false)
       let socket = applicationSupport
         .appending(path: "ArkDeck/Agentd/arkforge/public.sock").path
-      let client = try ArkForgeDaemonClient(
-        socketPath: socket, sessionKind: .publicSession, timeoutSeconds: 15)
+      let client = try ArkForgePublicClient(socketPath: socket, timeoutSeconds: 15)
       observations = try client.discoverDevices(
         requestID: "app-device-access-\(UUID().uuidString.lowercased())")
     } catch {

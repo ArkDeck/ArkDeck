@@ -325,11 +325,14 @@ Task.detached {
       factsPort: TargetStoreFactsPort(
         targetStore: targetStore, executablePath: configuredHDC ?? "-",
         executableSHA256: executableSHA))
+    let resolvedArkForgeInputs: ArkForgeLaneComposition.Inputs?
+    switch ArkForgeLaneComposition.Inputs.read(ProcessInfo.processInfo.environment) {
+    case .success(let inputs): resolvedArkForgeInputs = inputs
+    case .failure: resolvedArkForgeInputs = nil
+    }
     let rockchipResolver = ArkForgeNativeRockUSBExecutableResolver(
-      daemonPath: ProcessInfo.processInfo.environment[
-        ArkForgeLaneComposition.EnvironmentKey.daemonPath],
-      declaredSHA256: ProcessInfo.processInfo.environment[
-        ArkForgeLaneComposition.EnvironmentKey.daemonSHA256])
+      daemonPath: resolvedArkForgeInputs?.daemonPath,
+      declaredSHA256: resolvedArkForgeInputs?.daemonSHA256)
     let rockchipDispatcher: ArkForgeNativeRockchipControlDispatcher
     // Facts are measured only where the same per-action tool runtime is
     // composed. Without a descriptor-bound HDC there is no read-only surface
@@ -592,9 +595,9 @@ Task.detached {
     )
     .appending(path: "ArkDeck", directoryHint: .isDirectory)
     .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
-    // The ArkForge lane. Absent unless an operator installed and named all three
-    // inputs, and absence is written to the log with what it means for the
-    // product — a daemon with no lane and a daemon that failed to build one
+    // The ArkForge lane. Absent unless an operator installed one validated
+    // release bundle, and absence is written to the log with what it means for
+    // the product — a daemon with no lane and a daemon that failed to build one
     // look identical from outside, and only one of them is a problem.
     let arkForgeRuntimeDirectory = resolvedStateDirectory
       .appending(path: "arkforge", directoryHint: .isDirectory)

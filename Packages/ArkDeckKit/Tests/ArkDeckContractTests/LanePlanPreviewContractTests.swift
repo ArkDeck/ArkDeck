@@ -2,7 +2,8 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 // CHG-2026-068 LPP-AC-1/2: the lane plan preview is exactly three read-only
 // calls, and every state it can return is an honest mapping of what the

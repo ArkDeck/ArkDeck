@@ -3,7 +3,8 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// ArkDeck driving a live `arkforged`, which is the only place the last mile
 /// can be tested at all.
@@ -28,16 +29,16 @@ import XCTest
 final class ArkForgeLiveDaemonContractTests: XCTestCase {
 
   private static let socketKey = "ARKDECK_ARKFORGE_LIVE_SOCKET"
-  private static let daemonSHAKey = "ARKDECK_ARKFORGED_SHA256"
+  private static let daemonSHAKey = "ARKDECK_ARKFORGE_LIVE_DAEMON_SHA256"
 
   private func liveClient(
     timeoutSeconds: Int = 30
-  ) throws -> ArkForgeDaemonClient {
+  ) throws -> ArkForgeControllerClient {
     guard let socket = ProcessInfo.processInfo.environment[Self.socketKey] else {
       throw XCTSkip(
         "set \(Self.socketKey) to a running arkforged controller.sock to run the live tests")
     }
-    return try ArkForgeDaemonClient(socketPath: socket, timeoutSeconds: timeoutSeconds)
+    return try ArkForgeControllerClient(socketPath: socket, timeoutSeconds: timeoutSeconds)
   }
 
   /// The USB location id of the board this bench runs against, when one is
@@ -136,7 +137,7 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
   /// nothing, and this case deliberately stops before `startExecution`.
   func testTheWholeMaterializationChainProducesAnExecutablePlan() throws {
     let client = try liveClient(
-      timeoutSeconds: ArkForgeDaemonClient.materializationTimeoutSeconds)
+      timeoutSeconds: ArkForgeControllerClient.materializationTimeoutSeconds)
     guard let archive = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE"],
       let digest = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE_SHA256"],
       let topology = ProcessInfo.processInfo.environment[Self.topologyKey],
@@ -247,7 +248,7 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
   /// group was torn down", and the only acceptable outcome for a test.
   func testAMaterializedPlanIdentityStartsAJob() throws {
     let client = try liveClient(
-      timeoutSeconds: ArkForgeDaemonClient.materializationTimeoutSeconds)
+      timeoutSeconds: ArkForgeControllerClient.materializationTimeoutSeconds)
     guard let digest = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE_SHA256"],
       let topology = ProcessInfo.processInfo.environment[Self.topologyKey],
       let profileID = ProcessInfo.processInfo.environment["ARKDECK_ARKFORGE_PROFILE_ID"],

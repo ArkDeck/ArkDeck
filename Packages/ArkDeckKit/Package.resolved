@@ -1,0 +1,14 @@
+{
+  "originHash" : "e94736daeb189f44ba368a166f0039247af242ca9d621806bc8b1f59d0103922",
+  "pins" : [
+    {
+      "identity" : "arkforge",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ArkDeck/ArkForge.git",
+      "state" : {
+        "revision" : "9587988ed819048817c3afd2a4a0c8855e6f35d9"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -1,3 +1,4 @@
+import ArkForgeProtocol
 import CryptoKit
 import Foundation
 
@@ -71,10 +72,11 @@ public enum ArkForgeObservationSelection {
     guard let location = UInt32(trimmed) else { return nil }
     var hasher = SHA256()
     hasher.update(data: Data(deviceFactsDomain))
-    hasher.update(data: Data([
-      UInt8(truncatingIfNeeded: location >> 24), UInt8(truncatingIfNeeded: location >> 16),
-      UInt8(truncatingIfNeeded: location >> 8), UInt8(truncatingIfNeeded: location),
-    ]))
+    hasher.update(
+      data: Data([
+        UInt8(truncatingIfNeeded: location >> 24), UInt8(truncatingIfNeeded: location >> 16),
+        UInt8(truncatingIfNeeded: location >> 8), UInt8(truncatingIfNeeded: location),
+      ]))
     return hasher.finalize().map { String(format: "%02x", $0) }.joined()
   }
 

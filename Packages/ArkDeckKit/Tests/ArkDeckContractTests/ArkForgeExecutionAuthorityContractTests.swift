@@ -3,7 +3,8 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// `AFA-AC-3` and `AFA-AC-4` from the issuing side.
 ///

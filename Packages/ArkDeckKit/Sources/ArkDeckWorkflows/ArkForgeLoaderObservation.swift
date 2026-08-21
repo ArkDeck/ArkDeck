@@ -1,4 +1,5 @@
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import Foundation
 
 /// The read-only half of Loader identity that ArkDeck and ArkForge must agree on.
@@ -60,8 +61,7 @@ struct ProductArkForgeLoaderObserver: ArkForgeLoaderObserving {
     self.usbProbe = usbProbe
     let socketPath = runtimeDirectory.appending(path: "public.sock").path
     self.discover = { requestID in
-      let client = try ArkForgeDaemonClient(
-        socketPath: socketPath, sessionKind: .publicSession, timeoutSeconds: 15)
+      let client = try ArkForgePublicClient(socketPath: socketPath, timeoutSeconds: 15)
       return try client.discoverDevices(requestID: requestID)
     }
   }

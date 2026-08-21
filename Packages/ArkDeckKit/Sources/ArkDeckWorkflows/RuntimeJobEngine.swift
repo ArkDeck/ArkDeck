@@ -11,7 +11,8 @@
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import CryptoKit
 import Foundation
 

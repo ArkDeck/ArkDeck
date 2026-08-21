@@ -3,7 +3,8 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// `AFA-AC-5`: the four semantic control actions, and what a receipt may carry.
 ///

@@ -2,7 +2,8 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// The IPC codec against bytes a real `arkforged` produced.
 ///

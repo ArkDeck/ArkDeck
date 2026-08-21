@@ -1,5 +1,6 @@
 import ArkDeckCore
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import CryptoKit
 import Foundation
 
