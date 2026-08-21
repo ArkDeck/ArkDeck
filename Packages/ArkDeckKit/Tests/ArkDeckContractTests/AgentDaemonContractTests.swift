@@ -1461,8 +1461,9 @@ final class AgentDaemonContractTests: XCTestCase {
   /// The daemon runs here with no ARKDECK_* configuration at all - see
   /// `launchProductionDaemon`, which declares that instead of inheriting it -
   /// so the operation availability asserted below is the unconfigured
-  /// composition's. `testConfiguredHDCFlipsTheDescriptorBoundBlockers` covers
-  /// the configured one.
+  /// composition's.
+  /// `testConfiguredHDCDoesNotPublishFlashWhenTheArkForgeLaneIsAbsent` covers
+  /// the HDC-configured but lane-absent one.
   func testDaemonBinaryStaysAliveAndServesRequests() throws {
     let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
@@ -1493,24 +1494,27 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("health must answer from the real binary")
     }
     XCTAssertEqual(health["status"], .string("ok"))
-    guard let flash = try listOperations(socketPath: socketURL.path)["flash.dayu200"] else {
-      return XCTFail("production daemon must publish flash.dayu200 availability")
+    let operations = try listOperations(socketPath: socketURL.path)
+    for reference in ["flash.full-restore@1", "flash.dayu200"] {
+      guard let flash = operations[reference] else {
+        return XCTFail("production daemon must publish \(reference) availability")
+      }
+      XCTAssertEqual(flash.availability, "unavailable", reference)
+      XCTAssertTrue(
+        flash.reasons.contains { $0.contains("ARKDECK_ARKFORGE_BUNDLE_PATH is unset") },
+        "the provider must publish its absent lane: \(flash.reasons)")
+      XCTAssertTrue(
+        flash.reasons.contains { text in
+          Self.unconfiguredRockchipBlockers.contains { text.contains($0) }
+        },
+        "the Rockchip route must also refuse through its own composition: \(flash.reasons)")
+      // A composition that forgot to register the provider reports a generic
+      // blocker and still looks unavailable for the right-looking reason.
+      XCTAssertFalse(
+        flash.reasons.contains { $0.contains("is not registered") },
+        "the production daemon must register the ArkForge provider: \(flash.reasons)")
     }
-    XCTAssertEqual(flash.availability, "unavailable")
-    XCTAssertEqual(flash.reasons.count, 1, "\(flash.reasons)")
-    XCTAssertTrue(
-      flash.reasons.allSatisfy { text in
-        Self.unconfiguredRockchipBlockers.contains { text.contains($0) }
-      },
-      "the Rockchip route must refuse through its own composition: \(flash.reasons)")
-    // The defect this whole assertion exists for: a composition that forgot to
-    // register the provider reports a generic blocker and still looks
-    // "unavailable" for the right-looking reason. Matched on the engine's own
-    // wording - it says "provider rockchip is not registered", so the
-    // `provider_not_registered` spelling this replaces could never fire.
-    XCTAssertFalse(
-      flash.reasons.contains { $0.contains("is not registered") },
-      "the production daemon must register the rockchip provider: \(flash.reasons)")
+    let expectedAliasFlash = try XCTUnwrap(operations["flash.dayu200"])
 
     // Every operation the production registry can answer for carries a
     // machine-readable code beside its prose (PRODUCT-LOOP §8).
@@ -1591,7 +1595,8 @@ final class AgentDaemonContractTests: XCTestCase {
       listedOperations.count, RuntimeOperationCatalog.operations.count,
       "the production CLI must expose exactly the executable catalog roster")
     XCTAssertEqual(listedFlash["availability"], .string("unavailable"))
-    XCTAssertEqual(listedFlash["reasons"], .array(flash.reasons.map(JSONValue.string)))
+    XCTAssertEqual(
+      listedFlash["reasons"], .array(expectedAliasFlash.reasons.map(JSONValue.string)))
 
     process.terminate()
     let stopDeadline = Date().addingTimeInterval(10)
@@ -1673,7 +1678,7 @@ final class AgentDaemonContractTests: XCTestCase {
   /// blocker; otherwise the test passes on a daemon that is permanently
   /// refusing for some unrelated reason. Same binary, one declared
   /// environment difference.
-  func testConfiguredHDCFlipsTheDescriptorBoundBlockers() throws {
+  func testConfiguredHDCDoesNotPublishFlashWhenTheArkForgeLaneIsAbsent() throws {
     let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
@@ -1711,21 +1716,28 @@ final class AgentDaemonContractTests: XCTestCase {
       observe.availability, "available",
       "a configured ARKDECK_HDC_PATH must admit observation: \(observe.reasons)")
 
-    // The Rockchip half. Whether flash.dayu200 becomes available also depends
-    // on a complete native ArkForge lane. What is host-independent is the
-    // direction: configuring HDC must retire the descriptor-bound blocker,
-    // leaving only the missing-lane identity blocker in this fixture.
-    guard let flash = operations["flash.dayu200"] else {
-      return XCTFail("production daemon must publish flash.dayu200 availability")
+    // The Rockchip half. HDC alone is not a Flash lane: both the generic
+    // operation and the compatibility alias must publish the same startup
+    // composition failure instead of claiming that a dispatcher which has no
+    // live controller can execute them.
+    for reference in ["flash.full-restore@1", "flash.dayu200"] {
+      guard let flash = operations[reference] else {
+        return XCTFail("production daemon must publish \(reference) availability")
+      }
+      XCTAssertEqual(flash.availability, "unavailable", reference)
+      XCTAssertTrue(
+        flash.reasons.contains {
+          $0.contains("ARKDECK_ARKFORGE_BUNDLE_PATH is unset")
+        },
+        "\(reference) must name the absent lane configuration: \(flash.reasons)")
+      XCTAssertTrue(
+        flash.reasonCodes.contains("provider_tool_unavailable"),
+        "\(reference) must classify the missing lane as host configuration")
+      XCTAssertTrue(flash.reasonOrigins.contains("host_configuration"), reference)
+      XCTAssertFalse(
+        flash.reasons.contains { $0.contains("requires descriptor-bound HDC") },
+        "configured HDC must retire its own blocker: \(flash.reasons)")
     }
-    XCTAssertFalse(
-      flash.reasons.contains { $0.contains("requires descriptor-bound HDC") },
-      "configuring HDC must retire the descriptor-bound blocker: \(flash.reasons)")
-    XCTAssertTrue(
-      flash.reasons.allSatisfy { $0.contains("ArkForge native RockUSB identity is unavailable") },
-      "the only blocker left for flash must be the native lane: \(flash.reasons)")
-    XCTAssertEqual(
-      flash.availability, flash.reasons.isEmpty ? "available" : "unavailable")
 
     process.terminate()
     let stopDeadline = Date().addingTimeInterval(10)

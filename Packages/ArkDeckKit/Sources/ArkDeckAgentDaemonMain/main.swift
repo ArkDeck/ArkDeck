@@ -359,12 +359,6 @@ Task.detached {
       bindingStore: RockchipProductBindingStore(rootURL: rockchipRoot),
       postFlashHDCBindingStore: postFlashHDCBindingStore,
       nowUTC: utcNow)
-    let arkForgeProvider = ArkForgeFlashProviderAdapter(
-      factsPort: rockchipFactsPort,
-      // The closed typed plan is present. Executable/HDC/state availability
-      // belongs to the live dispatcher so an installed product component can
-      // become visible without caching a startup-only rejection.
-      availability: .available)
     // Host-only workspace provider (CHG-2026-054 TASK-HTP-007/005). Project
     // roots and the optional inspector are explicit configuration; operation
     // presets come from the built-in ProjectProfile. Missing pieces report
@@ -578,9 +572,6 @@ Task.detached {
       analyzerDispatcher = DescriptorBoundProcessDispatcher(
         resolver: try AnalyzerExecutableResolver(profiles: analyzerProfiles))
     }
-    let providers = DeviceProviderRegistry(providers: [
-      hdcProvider, arkForgeProvider, workspaceProvider, analyzerProvider,
-    ])
     let dispatcher = RuntimeProcessDispatcherRouter(
       hdc: hdcDispatcher, rockchip: rockchipDispatcher, workspace: workspaceDispatcher,
       analyzer: analyzerDispatcher)
@@ -609,6 +600,7 @@ Task.detached {
     // it was not composed with is a lane that could materialize against a
     // profile this daemon never loaded.
     let arkForgeDeviceProfileID: String?
+    let arkForgeAvailability: ProviderOperationAvailability
     switch await ArkForgeLaneComposition.composeFromEnvironment(
       runtimeDirectory: arkForgeRuntimeDirectory,
       rockchipDispatcher: rockchipDispatcher,
@@ -639,15 +631,29 @@ Task.detached {
     case .success(let composed):
       arkForgeLane = composed.lane
       arkForgeDeviceProfileID = composed.deviceProfileID
+      arkForgeAvailability = .available
       startedArkForgeDaemon = composed.daemonLifecycle
       FileHandle.standardError.write(
         Data("arkforge lane: composed for \(composed.deviceProfileID)\n".utf8))
     case .failure(let absence):
       arkForgeLane = nil
       arkForgeDeviceProfileID = nil
+      arkForgeAvailability = .unavailable(
+        code: .providerToolUnavailable, reason: absence.description)
       startedArkForgeDaemon = nil
       FileHandle.standardError.write(Data("\(absence)\n".utf8))
     }
+
+    // Catalog presence is not runtime availability. The native daemon and its
+    // controller lane are one startup composition; if that composition fails,
+    // publishing Flash as available would admit work into a route that cannot
+    // execute it. Both the canonical operation and its compatibility alias use
+    // this same provider fact.
+    let arkForgeProvider = ArkForgeFlashProviderAdapter(
+      factsPort: rockchipFactsPort, availability: arkForgeAvailability)
+    let providers = DeviceProviderRegistry(providers: [
+      hdcProvider, arkForgeProvider, workspaceProvider, analyzerProvider,
+    ])
 
     let engine = try RuntimeJobEngine(
       configuration: .init(
