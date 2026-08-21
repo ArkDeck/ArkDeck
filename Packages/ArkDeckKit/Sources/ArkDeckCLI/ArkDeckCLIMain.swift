@@ -408,13 +408,13 @@ struct ArkDeckCommandLine {
         arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
-      [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
-       --arkforge-profile <absolute-path> [--arkforge-campaign <id>]]
+      [--arkforge-bundle <absolute-ArkForge.bundle|none> [--arkforge-campaign <id>]]
         arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
       [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
-      [--arkforged <absolute-path>|none --arkforged-sha256 <digest>
-       --arkforge-profile <absolute-path> [--arkforge-campaign <id>]]
+      [--arkforge-bundle <absolute-ArkForge.bundle|none> [--arkforge-campaign <id>]]
+        legacy ArkForge options are rejected with migration guidance: \
+      --arkforged --arkforged-sha256 --arkforge-profile
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] \
       [--execution-id <id>] [--json]

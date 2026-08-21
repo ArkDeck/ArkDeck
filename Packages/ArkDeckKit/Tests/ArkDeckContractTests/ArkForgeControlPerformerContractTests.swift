@@ -3,7 +3,8 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// The performer's descriptors, validated by the host that will actually see
 /// them.

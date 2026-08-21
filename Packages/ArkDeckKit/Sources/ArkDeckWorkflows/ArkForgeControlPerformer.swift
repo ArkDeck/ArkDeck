@@ -1,5 +1,6 @@
 import ArkDeckCore
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import Foundation
 
 /// The archive a delegated step writes, carried from the engine to the lane.

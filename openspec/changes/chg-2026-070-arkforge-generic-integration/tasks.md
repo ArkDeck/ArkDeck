@@ -1,15 +1,19 @@
 # Tasks — CHG-2026-070
 
-All tasks are blocked until this proposal is reviewed and merged. Catalog work
-also depends on CHG-2026-069 merge and digest closure.
+CHG-2026-070@r1 已由维护者通过 PR #1443 review/merge。TASK-AFG-001 在
+本实现 PR 内进入 in-progress；Catalog/generic operation 工作保持 blocked，
+并依赖 TASK-AFG-001、CHG-2026-069 merge 与 digest closure。
 
 ## TASK-AFG-001 — ArkForge Swift SDK and release bundle
 
-- Status: blocked (proposal review/merge)
+- Status:in-progress（proposal #1443 已合入；本实现仍待维护者 review/merge）
 - Platform: macos
 - Hardware required: no
 - Production reachability: ArkDeck agentd → ArkForgeClient → local daemon
 - Acceptance: AFG-AC-1..3
+- Review boundary:`CHG-2026-070-arkforge-generic-integration@r1` was merged by
+  PR #1443. This implementation PR contains no catalog or generic-operation
+  change and becomes protected-main behavior only after maintainer review.
 - Allowed paths:
   - `Packages/ArkDeckKit/**`
   - 本 change `**`

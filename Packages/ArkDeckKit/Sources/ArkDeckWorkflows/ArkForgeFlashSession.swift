@@ -1,5 +1,6 @@
 import ArkDeckCore
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import Foundation
 
 /// Drives one `flash.dayu200` job across the ArkForge boundary.
@@ -22,7 +23,7 @@ package actor ArkForgeFlashSession {
   ///
   /// A protocol rather than the concrete client so a scripted daemon can drive
   /// the whole loop in tests. The real hardware run is the same code path with
-  /// `ArkForgeDaemonClient` behind it.
+  /// `ArkForgeControllerClient` behind it.
   package protocol Daemon: Sendable {
     func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
       -> ArkForgeStartExecutionResponse
@@ -389,4 +390,4 @@ package actor ArkForgeFlashSession {
 /// point: the protocol was extracted from the client rather than invented
 /// beside it, so a drift between them is a compile error rather than a
 /// surprise on the bench.
-extension ArkForgeDaemonClient: ArkForgeFlashSession.Daemon {}
+extension ArkForgeControllerClient: ArkForgeFlashSession.Daemon {}

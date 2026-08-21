@@ -1,5 +1,6 @@
 import ArkDeckCore
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import Foundation
 
 /// The lane the engine dispatches a delegated step through.
@@ -44,7 +45,7 @@ package protocol ArkForgePlanSource: Sendable {
 /// The real client is the plan source, for the same reason it is the daemon:
 /// the protocol was extracted from it rather than invented beside it, so drift
 /// is a compile error instead of a surprise on the bench.
-extension ArkForgeDaemonClient: ArkForgePlanSource {}
+extension ArkForgeControllerClient: ArkForgePlanSource {}
 
 /// What a read-only lane plan preview learned (CHG-2026-068).
 public enum ArkForgeLanePlanPreviewOutcome: Sendable, Equatable {

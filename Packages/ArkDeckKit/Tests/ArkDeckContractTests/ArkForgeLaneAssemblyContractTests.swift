@@ -4,7 +4,8 @@ import XCTest
 @testable import ArkDeckCore
 @testable import ArkDeckProcess
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// The assertion this work needed from the start and did not have.
 ///
@@ -22,37 +23,26 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   /// A real file, because composition reads the profile's declared id out of
   /// it before launching anything: `materializePlan` addresses a profile by
   /// that id, and a lane that cannot name one cannot materialize a plan.
-  private var profileURL: URL!
+  private var bundleRoot: URL!
+  private var fixture: ArkForgeBundleFixture!
 
   override func setUpWithError() throws {
-    profileURL = FileManager.default.temporaryDirectory
-      .appending(path: "arkforge-assembly-\(UUID().uuidString).yaml")
-    try Data(
-      """
-      schemaVersion: arkforge.device-profile/v1
-
-      profile:
-        id: org.openharmony.dayu200
-        version: 1.0.0
-      """.utf8
-    ).write(to: profileURL)
+    bundleRoot = FileManager.default.temporaryDirectory
+      .appending(path: "arkforge-assembly-\(UUID().uuidString)", directoryHint: .isDirectory)
+    fixture = try makeArkForgeBundle(at: bundleRoot.appending(path: "ArkForge.bundle"))
   }
 
   override func tearDownWithError() throws {
-    if let profileURL { try? FileManager.default.removeItem(at: profileURL) }
+    if let bundleRoot { try? FileManager.default.removeItem(at: bundleRoot) }
   }
 
   private var environment: [String: String] {
-    [
-      "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
-      "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
-      "ARKDECK_ARKFORGE_PROFILE_PATH": profileURL.path,
-    ]
+    fixture.environment
   }
 
   private static func readyAck(
     toolchainID: String = "arkforged-native-rockusb",
-    toolchain: String = String(repeating: "a", count: 64)
+    toolchain: String
   ) -> ArkForgeHelloAck {
     ArkForgeHelloAck(
       protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
@@ -64,7 +54,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     .init(
       rockchipHost: { RefusingRockchipRuntimeActionHost(reason: "test") },
       providerIdentity: ResolvedExecutable(
-        path: "/opt/arkforged", sha256: String(repeating: "c", count: 64)),
+        path: fixture.daemon.path, sha256: fixture.daemonSHA256),
       approvedPlan: { jobID, planID, planDigest, _ in
         .init(
           jobID: jobID, planID: planID, planSHA256: planDigest,
@@ -100,11 +90,12 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
 
   func testAConfiguredDaemonActuallyComesOutWithALane() async {
     // The whole point. Not "the parts exist" — a lane, out the other end.
+    let daemonDigest = fixture.daemonSHA256
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 3, dependencies: dependencies(),
       launch: { _, _ in },
-      connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
     guard case .success = result else {
@@ -115,7 +106,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   func testTheDefaultComposesTheNativeBuildIdentityAndArgument() async throws {
     var nativeEnvironment = environment
     nativeEnvironment["ARKDECK_ARKFORGE_CAMPAIGN"] = "AFA-AC-7"
-    let daemonDigest = try XCTUnwrap(nativeEnvironment["ARKDECK_ARKFORGED_SHA256"])
+    let daemonDigest = fixture.daemonSHA256
     let seen = LaunchRecorder()
     let result = await ArkForgeLaneComposition.compose(
       environment: nativeEnvironment, runtimeDirectory: URL(filePath: "/tmp/rt"),
@@ -154,12 +145,13 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
 
   func testTheDefaultRefusesAHandshakeFromAnotherBackend() async {
     let nativeEnvironment = environment
+    let daemonDigest = fixture.daemonSHA256
     let result = await ArkForgeLaneComposition.compose(
       environment: nativeEnvironment, runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 7, dependencies: dependencies(),
       launch: { _, _ in },
       connect: { _ in
-        (SilentDaemon(), Self.readyAck(toolchainID: "other-backend"))
+        (SilentDaemon(), Self.readyAck(toolchainID: "other-backend", toolchain: daemonDigest))
       },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
@@ -172,11 +164,12 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   func testTheSecretGoesToTheLaunchAndNotIntoArgv() async {
     // Asserted at the assembly point, where the two could actually diverge.
     let seen = LaunchRecorder()
+    let daemonDigest = fixture.daemonSHA256
     _ = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 3, dependencies: dependencies(),
       launch: { request, secret in await seen.record(request: request, secret: secret) },
-      connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
     let record = await seen.snapshot()
@@ -205,6 +198,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     }
 
     let observed = LaunchRecorder()
+    let daemonDigest = fixture.daemonSHA256
     _ = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: runtime,
       pairingEpoch: 3, dependencies: dependencies(),
@@ -216,7 +210,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
             "\(name) must be removed before the new daemon is launched")
         }
       },
-      connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
     let record = await observed.snapshot()
@@ -226,11 +220,13 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   func testADaemonThatNeverOpensItsSocketYieldsNoLane() async {
     let stopped = StopRecorder()
     let lifecycle = ArkForgeLaneComposition.DaemonLifecycle()
+    let daemonDigest = fixture.daemonSHA256
     lifecycle.install { stopped.record() }
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 3, dependencies: dependencies(), daemonLifecycle: lifecycle,
-      launch: { _, _ in }, connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      launch: { _, _ in },
+      connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
       awaitSocket: { _ in nil })
 
     guard case .failure(let why) = result else {
@@ -245,6 +241,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
   func testADaemonBoundToAnotherToolYieldsNoLane() async {
     // A different daemon build is a different backend identity. Caught at
     // assembly rather than at the first write.
+    let expectedDigest = fixture.daemonSHA256
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 3, dependencies: dependencies(),
@@ -262,18 +259,19 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       return XCTFail("a daemon on another build must not become a lane")
     }
     XCTAssertTrue("\(why)".contains("038a8a0e"), "\(why)")
-    XCTAssertTrue("\(why)".contains(String(repeating: "a", count: 64)), "\(why)")
+    XCTAssertTrue("\(why)".contains(expectedDigest), "\(why)")
   }
 
   func testAnUnconfiguredDaemonNeverLaunchesAnything() async {
     // Absent is the normal state, and it must not start a process to discover
     // that. Nothing is launched, and the reason names the product effect.
     let seen = LaunchRecorder()
+    let daemonDigest = fixture.daemonSHA256
     let result = await ArkForgeLaneComposition.compose(
       environment: [:], runtimeDirectory: URL(filePath: "/tmp/rt"),
       pairingEpoch: 3, dependencies: dependencies(),
       launch: { request, secret in await seen.record(request: request, secret: secret) },
-      connect: { _ in (SilentDaemon(), Self.readyAck()) },
+      connect: { _ in (SilentDaemon(), Self.readyAck(toolchain: daemonDigest)) },
       awaitSocket: { _ in "/tmp/rt/controller.sock" })
 
     let record = await seen.snapshot()

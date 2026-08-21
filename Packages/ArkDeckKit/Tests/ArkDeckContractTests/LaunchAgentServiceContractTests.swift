@@ -53,13 +53,15 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ArkDeckAgentFilesystemLayout.socketFilename)
   }
 
-  func testPreservingUpdateMigratesALegacyFourKeyArkForgePlistToThreeKeys() throws {
+  func testPreservingUpdateMigratesLegacyThreeKeyLaneToOneBundle() throws {
+    let bundle = try makeArkForgeBundle(
+      at: root.appending(path: "ArkForge.bundle", directoryHint: .isDirectory))
     try FileManager.default.createDirectory(
       at: paths.plist.deletingLastPathComponent(), withIntermediateDirectories: true)
     let environment = [
-      "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
-      "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
-      "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
+      "ARKDECK_ARKFORGED_PATH": bundle.daemon.path,
+      "ARKDECK_ARKFORGED_SHA256": bundle.daemonSHA256,
+      "ARKDECK_ARKFORGE_PROFILE_PATH": bundle.profile.path,
       "ARKDECK_RKDEVELOPTOOL_PATH": "/legacy/rkdeveloptool",
       "ARKDECK_ARKFORGE_CAMPAIGN": "AFA-AC-7",
     ]
@@ -70,7 +72,9 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     let migrated = try XCTUnwrap(service.arkForgeLaneForPreservingUpdate())
 
-    XCTAssertEqual(migrated.daemonPath, "/opt/arkforged")
+    XCTAssertEqual(migrated.bundlePath, bundle.root.path)
+    XCTAssertEqual(migrated.manifestSHA256, bundle.manifestSHA256)
+    XCTAssertEqual(migrated.daemonPath, bundle.daemon.path)
     XCTAssertEqual(migrated.campaign, "AFA-AC-7")
     XCTAssertEqual(
       Set(migrated.environment.keys),
@@ -78,6 +82,54 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey
       ]))
     XCTAssertNil(migrated.environment["ARKDECK_RKDEVELOPTOOL_PATH"])
+  }
+
+  func testInstallReceiptAndPlistPinOneArkForgeBundle() throws {
+    let bundle = try makeArkForgeBundle(
+      at: root.appending(path: "ArkForge.bundle", directoryHint: .isDirectory))
+    let lane = try LaunchAgentArkForgeLaneStatus.measuring(bundlePath: bundle.root.path)
+
+    let receipt = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      arkTraceDescriptor: nil, arkForgeLane: lane)
+
+    XCTAssertEqual(receipt.arkForgeLane, lane)
+    let environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_ARKFORGE_BUNDLE_PATH"], bundle.root.path)
+    for key in ArkDeckLaunchAgent.legacyArkForgeEnvironmentKeys {
+      XCTAssertNil(environment[key])
+    }
+    XCTAssertEqual(try service.status().arkForgeLane, lane)
+  }
+
+  func testLegacyMigrationRefusesPartialOrCrossBundleInputs() throws {
+    let first = try makeArkForgeBundle(
+      at: root.appending(path: "First.bundle", directoryHint: .isDirectory))
+    let second = try makeArkForgeBundle(
+      at: root.appending(path: "Second.bundle", directoryHint: .isDirectory))
+    try FileManager.default.createDirectory(
+      at: paths.plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+    func writeEnvironment(_ environment: [String: String]) throws {
+      try PropertyListSerialization.data(
+        fromPropertyList: ["EnvironmentVariables": environment], format: .xml, options: 0
+      ).write(to: paths.plist)
+    }
+
+    try writeEnvironment(["ARKDECK_ARKFORGED_PATH": first.daemon.path])
+    XCTAssertThrowsError(try service.arkForgeLaneForPreservingUpdate()) { error in
+      XCTAssertTrue("\(error)".contains("partial"), "\(error)")
+    }
+
+    try writeEnvironment([
+      "ARKDECK_ARKFORGED_PATH": first.daemon.path,
+      "ARKDECK_ARKFORGED_SHA256": first.daemonSHA256,
+      "ARKDECK_ARKFORGE_PROFILE_PATH": second.profile.path,
+    ])
+    XCTAssertThrowsError(try service.arkForgeLaneForPreservingUpdate()) { error in
+      XCTAssertTrue("\(error)".contains("one validated"), "\(error)")
+    }
   }
 
   func testDistributionHelpersShareOnlyTheProvisionedKeychainGroup() throws {

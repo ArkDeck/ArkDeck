@@ -72,11 +72,12 @@ final class AgentdOptionCoverageContractTests: XCTestCase {
 
   func testTheLaneFlagsAreAllPresent() throws {
     // Named individually as well, because the scan above would also pass if
-    // both lists were emptied. These five are what install a lane and
-    // authorize a campaign; a build that accepts none of them cannot flash.
+    // both lists were emptied. The bundle installs one release unit and the
+    // campaign separately authorizes it. Legacy names remain recognized only
+    // so callers receive the migration error rather than "unsupported".
     for flag in [
+      "--arkforge-bundle", "--arkforge-campaign",
       "--arkforged", "--arkforged-sha256", "--arkforge-profile",
-      "--arkforge-campaign",
     ] {
       XCTAssertTrue(
         RuntimeCLI.agentdInstallOptions.contains(flag),

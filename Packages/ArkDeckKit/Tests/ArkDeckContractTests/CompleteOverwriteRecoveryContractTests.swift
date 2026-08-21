@@ -6,7 +6,8 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private let identity = String(repeating: "9", count: 64)

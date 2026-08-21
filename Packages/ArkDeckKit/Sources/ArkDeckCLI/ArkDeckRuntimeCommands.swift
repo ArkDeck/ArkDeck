@@ -33,7 +33,10 @@ enum RuntimeCLI {
     "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
     "--harness-cli", "--harness-cli-timeout-seconds",  // refused by name below
     "--arktrace-descriptor",
-    "--arkforged", "--arkforged-sha256", "--arkforge-profile", "--arkforge-campaign",
+    "--arkforge-bundle", "--arkforge-campaign",
+    // Read only to return a precise migration error for one compatibility
+    // cycle; they can no longer construct a lane.
+    "--arkforged", "--arkforged-sha256", "--arkforge-profile",
   ]
 
   static func defaultSocketPath() -> String {
@@ -248,49 +251,44 @@ enum RuntimeCLI {
       } else {
         arkTraceDescriptor = nil
       }
-      // The ArkForge lane: three inputs that go in together or not at all. A
-      // partial set is refused here rather than written, because the lane
-      // ignores an incomplete configuration and the daemon would start looking
-      // configured while having no lane at all.
+      // The ArkForge lane is one release bundle. Its manifest binds the daemon
+      // and profile bytes; callers no longer assemble three unrelated values.
       let arkForgeLane: LaunchAgentArkForgeLaneStatus?
-      let laneFlags = [
-        "--arkforged": options.value("--arkforged"),
-        "--arkforged-sha256": options.value("--arkforged-sha256"),
-        "--arkforge-profile": options.value("--arkforge-profile"),
-      ]
-      if laneFlags.values.contains(where: { $0 == "none" }) {
-        guard laneFlags.values.allSatisfy({ $0 == nil || $0 == "none" }) else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "--arkforged none revokes the whole lane; it cannot be combined with "
-              + "the other ArkForge options")
+      let legacyLaneFlags = ["--arkforged", "--arkforged-sha256", "--arkforge-profile"]
+      if let legacy = legacyLaneFlags.first(where: { options.value($0) != nil }) {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "\(legacy) was replaced by --arkforge-bundle; pass one validated "
+            + "ArkForge.bundle or run update without lane flags to migrate an existing plist")
+      }
+      if let bundle = options.value("--arkforge-bundle") {
+        if bundle == "none" {
+          guard options.value("--arkforge-campaign") == nil else {
+            throw CLIError(
+              exitCode: EX_USAGE,
+              message: "--arkforge-bundle none cannot authorize an ArkForge campaign")
+          }
+          arkForgeLane = nil
+        } else {
+          guard bundle.hasPrefix("/") else {
+            throw CLIError(
+              exitCode: EX_USAGE,
+              message: "--arkforge-bundle must be an absolute ArkForge.bundle path or none")
+          }
+          do {
+            arkForgeLane = try LaunchAgentArkForgeLaneStatus.measuring(
+              bundlePath: bundle,
+              // Optional and separate: the bundle installs a lane; this
+              // authorizes one named hardware combination.
+              campaign: options.value("--arkforge-campaign") ?? "")
+          } catch let refusal as LaunchAgentArkForgeLaneStatus.Refusal {
+            throw CLIError(exitCode: EX_USAGE, message: "\(refusal)")
+          }
         }
-        arkForgeLane = nil
-      } else if laneFlags.values.contains(where: { $0 != nil }) {
-        let missing = laneFlags.filter { $0.value == nil }.keys.sorted()
-        guard missing.isEmpty else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "the ArkForge lane needs all of --arkforged, --arkforged-sha256, "
-              + "and --arkforge-profile; missing "
-              + missing.joined(separator: ", "))
-        }
-        do {
-          arkForgeLane = try LaunchAgentArkForgeLaneStatus.measuring(
-            daemonPath: laneFlags["--arkforged"]!!,
-            declaredDaemonSHA256: laneFlags["--arkforged-sha256"]!!,
-            deviceProfilePath: laneFlags["--arkforge-profile"]!!,
-            // Optional and separate: the three above install a lane, this
-            // authorizes it to execute a combination nobody has verified yet.
-            // Omitted means hardwareGated, which is what every ordinary
-            // install wants.
-            campaign: options.value("--arkforge-campaign") ?? "")
-        } catch let refusal as LaunchAgentArkForgeLaneStatus.Refusal {
-          // Measured at install time on purpose: this executable performs
-          // destructive writes, and a mistyped path should be found
-          // now rather than with a board half-written.
-          throw CLIError(exitCode: EX_USAGE, message: "\(refusal)")
-        }
+      } else if options.value("--arkforge-campaign") != nil {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "--arkforge-campaign requires an explicit --arkforge-bundle")
       } else if subcommand == "update" {
         arkForgeLane = try service.arkForgeLaneForPreservingUpdate()
       } else {

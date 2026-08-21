@@ -1,17 +1,16 @@
 import ArkDeckCore
 import ArkDeckProcess
-import ArkForgeIPC
+import ArkForgeClient
+import ArkForgeProtocol
 import Darwin
 import Foundation
 
 /// Builds the ArkForge lane from what an operator installed, or explains why
 /// there isn't one.
 ///
-/// Absent is the normal state. `arkforged` and a DeviceProfile have to be
-/// deployed and named before this lane can exist, and a daemon that quietly
-/// ran without them would be a daemon that appears able to flash. So every
-/// input is required, none is guessed from `PATH` or a default location, and a
-/// partial configuration is refused rather than half-applied.
+/// Absent is the normal state. A validated ArkForge release bundle must be
+/// named before this lane can exist; the manifest, rather than three unrelated
+/// environment values, selects and binds the daemon and DeviceProfile.
 package enum ArkForgeLaneComposition {
 
   /// Owns the `arkforged` process for exactly one agentd generation.
@@ -71,15 +70,16 @@ package enum ArkForgeLaneComposition {
   /// Environment keys the LaunchAgent carries, in the same shape as
   /// `ARKDECK_HDC_PATH`: absolute, operator-chosen, checked at startup.
   package enum EnvironmentKey {
-    package static let daemonPath = "ARKDECK_ARKFORGED_PATH"
-    package static let daemonSHA256 = "ARKDECK_ARKFORGED_SHA256"
-    package static let deviceProfilePath = "ARKDECK_ARKFORGE_PROFILE_PATH"
+    package static let bundlePath = "ARKDECK_ARKFORGE_BUNDLE_PATH"
+    package static let legacyDaemonPath = "ARKDECK_ARKFORGED_PATH"
+    package static let legacyDaemonSHA256 = "ARKDECK_ARKFORGED_SHA256"
+    package static let legacyDeviceProfilePath = "ARKDECK_ARKFORGE_PROFILE_PATH"
     /// The acceptance campaign this lane is authorized to run, if any.
     ///
-    /// Deliberately outside the all-or-nothing set above. Those three decide
-    /// whether a lane exists; this one decides whether the lane may execute a
-    /// combination nobody has verified yet, which is a separate decision and a
-    /// larger one. Unset is the normal state: `arkforged` then publishes
+    /// Deliberately outside the release-identity input above. The bundle
+    /// decides whether a lane exists; this value decides whether the lane may
+    /// execute a combination nobody has verified yet, which is a separate and
+    /// larger decision. Unset is the normal state: `arkforged` then publishes
     /// `hardwareGated`, materializes assessments only, and no write can reach
     /// a device.
     package static let campaign = "ARKDECK_ARKFORGE_CAMPAIGN"
@@ -89,19 +89,27 @@ package enum ArkForgeLaneComposition {
   package enum Absence: Error, Equatable, CustomStringConvertible {
     case notConfigured
     case partiallyConfigured(missing: [String])
+    case legacyConfiguration
+    case mixedConfiguration
     case daemonUnavailable(String)
 
     package var description: String {
       switch self {
       case .notConfigured:
         return
-          "no ArkForge lane: \(EnvironmentKey.daemonPath) is unset, so this daemon performs "
+          "no ArkForge lane: \(EnvironmentKey.bundlePath) is unset, so this daemon performs "
           + "no Rockchip writes. flash.dayu200 refuses before authorization"
       case .partiallyConfigured(let missing):
         return
           "no ArkForge lane: \(missing.joined(separator: ", ")) missing. A partial "
           + "configuration is refused rather than half-applied — a lane composed from some "
           + "of its inputs is one nobody chose"
+      case .legacyConfiguration:
+        return
+          "no ArkForge lane: legacy three-key configuration must be migrated by agentd update "
+          + "to one validated \(EnvironmentKey.bundlePath)"
+      case .mixedConfiguration:
+        return "no ArkForge lane: current bundle and legacy three-key configuration are mixed"
       case .daemonUnavailable(let detail):
         return "no ArkForge lane: \(detail)"
       }
@@ -122,31 +130,55 @@ package enum ArkForgeLaneComposition {
       ToolchainIdentity(id: "arkforged-native-rockusb", sha256: daemonSHA256)
     }
 
-    /// Reads the three keys, or says which are missing.
-    ///
-    /// The all-or-nothing shape is deliberate. Two of three set is not a lane
-    /// with one gap — it is a configuration nobody reviewed, and starting from
-    /// it would put an unreviewed combination in front of a destructive write.
+    /// Reads one bundle path and derives all release identity from its verified
+    /// manifest. Legacy keys are accepted only by the LaunchAgent migration
+    /// path; the daemon never assembles them directly.
     package static func read(
       _ environment: [String: String]
     ) -> Result<Inputs, Absence> {
-      let keys = [
-        EnvironmentKey.daemonPath, EnvironmentKey.daemonSHA256,
-        EnvironmentKey.deviceProfilePath,
+      let legacyKeys = [
+        EnvironmentKey.legacyDaemonPath, EnvironmentKey.legacyDaemonSHA256,
+        EnvironmentKey.legacyDeviceProfilePath,
       ]
-      let present = keys.filter { (environment[$0]?.isEmpty == false) }
-      if present.isEmpty { return .failure(.notConfigured) }
-      let missing = keys.filter { environment[$0]?.isEmpty != false }
-      guard missing.isEmpty else { return .failure(.partiallyConfigured(missing: missing)) }
+      let legacyPresent = legacyKeys.filter { environment[$0] != nil }
+      guard let configured = environment[EnvironmentKey.bundlePath] else {
+        return .failure(legacyPresent.isEmpty ? .notConfigured : .legacyConfiguration)
+      }
+      guard legacyPresent.isEmpty else { return .failure(.mixedConfiguration) }
+      guard !configured.isEmpty else {
+        return .failure(.partiallyConfigured(missing: [EnvironmentKey.bundlePath]))
+      }
+      let bundle: ArkForgeReleaseBundle
+      do {
+        bundle = try ArkForgeReleaseBundleReader.load(
+          bundleURL: URL(filePath: configured, directoryHint: .isDirectory))
+      } catch {
+        return .failure(.daemonUnavailable("ArkForge.bundle is invalid: \(error)"))
+      }
+      guard let profile = bundle.profileURLs[LaunchAgentArkForgeProfile.dayu200] else {
+        return .failure(
+          .daemonUnavailable(
+            "ArkForge.bundle does not publish \(LaunchAgentArkForgeProfile.dayu200)"))
+      }
+      let daemonDigest: String
+      do {
+        daemonDigest = SHA256Hex.string(of: try Data(contentsOf: bundle.daemonURL))
+      } catch {
+        return .failure(.daemonUnavailable("cannot remeasure arkforged: \(error)"))
+      }
       return .success(
         Inputs(
-          daemonPath: environment[EnvironmentKey.daemonPath]!,
-          daemonSHA256: environment[EnvironmentKey.daemonSHA256]!,
-          deviceProfilePath: environment[EnvironmentKey.deviceProfilePath]!,
-          // Absent is not missing. The three above are a lane; this is an
+          daemonPath: bundle.daemonURL.path,
+          daemonSHA256: daemonDigest,
+          deviceProfilePath: profile.path,
+          // Absent is not missing. The bundle above is a lane; this is an
           // authorization on top of one, and its absence is the safe state.
           campaign: environment[EnvironmentKey.campaign] ?? ""))
     }
+  }
+
+  private enum LaunchAgentArkForgeProfile {
+    static let dayu200 = "org.openharmony.dayu200"
   }
 
   /// The id a DeviceProfile document declares.
@@ -308,6 +340,12 @@ package enum ArkForgeLaneComposition {
           "the DeviceProfile at \(inputs.deviceProfilePath) declares no profile.id; "
             + "materializePlan addresses a profile by that id, and this lane will not guess one"))
     }
+    guard profileID == LaunchAgentArkForgeProfile.dayu200 else {
+      return .failure(
+        .daemonUnavailable(
+          "the bundle manifest selected \(LaunchAgentArkForgeProfile.dayu200), but the "
+            + "DeviceProfile declares \(profileID)"))
+    }
 
     let secret = freshPairingSecret()
     let request = ProcessIdentityBoundRequest(
@@ -399,9 +437,9 @@ package enum ArkForgeLaneComposition {
         // and the controller session is the one the job's event stream runs
         // on; sharing it would hold that stream for the length of an import.
         makeMaterializer: { socket in
-          try ArkForgeDaemonClient(
+          try ArkForgeControllerClient(
             socketPath: socket,
-            timeoutSeconds: ArkForgeDaemonClient.materializationTimeoutSeconds)
+            timeoutSeconds: ArkForgeControllerClient.materializationTimeoutSeconds)
         },
         makeAuthority: { jobID, planID, planDigest, deviceBinding in
           ArkForgeExecutionAuthority(
@@ -444,7 +482,7 @@ package enum ArkForgeLaneComposition {
         }
       },
       connect: { socket in
-        let client = try ArkForgeDaemonClient(socketPath: socket)
+        let client = try ArkForgeControllerClient(socketPath: socket)
         return (client, client.helloAck)
       },
       awaitSocket: { directory in

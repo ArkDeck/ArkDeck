@@ -3,13 +3,14 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 /// Step 5's wiring, and `AFA-AC-10`.
 ///
 /// The session is driven by a scripted daemon rather than a real one so every
 /// branch — including the ones a healthy run never reaches — is exercised. The
-/// hardware run is this same code path with `ArkForgeDaemonClient` behind the
+/// hardware run is this same code path with `ArkForgeControllerClient` behind the
 /// protocol.
 ///
 /// The assertion that matters most is the cancellation mapping. Once dispatch
@@ -1215,12 +1216,20 @@ func scriptedArtifact() -> ArkForgeLaneArtifact {
 
 /// Composing the lane from what an operator installed.
 final class ArkForgeLaneCompositionContractTests: XCTestCase {
+  private var root: URL!
+  private var fixture: ArkForgeBundleFixture!
 
-  private let full: [String: String] = [
-    "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
-    "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
-    "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
-  ]
+  override func setUpWithError() throws {
+    root = FileManager.default.temporaryDirectory.appending(
+      path: "arkforge-inputs-\(UUID().uuidString)", directoryHint: .isDirectory)
+    fixture = try makeArkForgeBundle(at: root.appending(path: "ArkForge.bundle"))
+  }
+
+  override func tearDownWithError() throws {
+    if let root { try? FileManager.default.removeItem(at: root) }
+  }
+
+  private var full: [String: String] { fixture.environment }
 
   func testNothingConfiguredIsTheNormalStateAndSaysWhatItMeans() {
     guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read([:]) else {
@@ -1232,27 +1241,25 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
     XCTAssertTrue(why.description.contains("flash.dayu200 refuses"), why.description)
   }
 
-  func testAPartialConfigurationIsRefusedRatherThanHalfApplied() {
-    // Two of three is not a lane with one gap — it is a configuration nobody
-    // reviewed, and starting from it would put an unreviewed combination in
-    // front of a destructive write.
-    for omitted in full.keys {
-      var partial = full
-      partial[omitted] = nil
-      guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read(partial) else {
-        return XCTFail("\(omitted) missing must refuse")
-      }
-      XCTAssertEqual(why, .partiallyConfigured(missing: [omitted]))
-    }
+  func testLegacyConfigurationIsRefusedUntilTheInstallerMigratesIt() {
+    let legacy = [
+      "ARKDECK_ARKFORGED_PATH": fixture.daemon.path,
+      "ARKDECK_ARKFORGED_SHA256": fixture.daemonSHA256,
+      "ARKDECK_ARKFORGE_PROFILE_PATH": fixture.profile.path,
+    ]
+    XCTAssertEqual(
+      ArkForgeLaneComposition.Inputs.read(legacy), .failure(.legacyConfiguration))
   }
 
   func testAnEmptyValueCountsAsMissing() {
     // An exported-but-empty variable is the shape a broken install takes.
     var blank = full
-    blank["ARKDECK_ARKFORGED_SHA256"] = ""
-    guard case .failure = ArkForgeLaneComposition.Inputs.read(blank) else {
+    blank["ARKDECK_ARKFORGE_BUNDLE_PATH"] = ""
+    guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read(blank) else {
       return XCTFail("an empty value is not a configured value")
     }
+    XCTAssertEqual(
+      why, .partiallyConfigured(missing: ["ARKDECK_ARKFORGE_BUNDLE_PATH"]))
   }
 
   func testTheToolchainDigestIsTheIdentityBoundNativeDaemon() throws {
@@ -1263,7 +1270,7 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
       inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 9)
 
     XCTAssertEqual(inputs.expectedToolchain.id, "arkforged-native-rockusb")
-    XCTAssertEqual(inputs.expectedToolchain.sha256, String(repeating: "a", count: 64))
+    XCTAssertEqual(inputs.expectedToolchain.sha256, fixture.daemonSHA256)
     XCTAssertFalse(argv.contains("--rockusb-port"))
     XCTAssertFalse(argv.contains("--require-release-signing"))
     XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--pair-from-stdin")) + 1], "9")

@@ -706,7 +706,22 @@ final class AutoUpdateContractTests: XCTestCase {
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
-    XCTAssertFalse(package.contains(".package("))
+    let arkForgeRevision = "9587988ed819048817c3afd2a4a0c8855e6f35d9"
+    XCTAssertEqual(
+      package.components(separatedBy: ".package(").count - 1, 1,
+      "ArkForge is the package's only remote source dependency")
+    XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkForge.git"))
+    XCTAssertTrue(package.contains("revision: \"\(arkForgeRevision)\""))
+    let packageResolution = try JSONSerialization.jsonObject(
+      with: Data(
+        contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.resolved")))
+      as? [String: Any]
+    let pins = try XCTUnwrap(packageResolution?["pins"] as? [[String: Any]])
+    XCTAssertEqual(pins.count, 1)
+    let pin = try XCTUnwrap(pins.first)
+    XCTAssertEqual(pin["identity"] as? String, "arkforge")
+    XCTAssertEqual(pin["location"] as? String, "https://github.com/ArkDeck/ArkForge.git")
+    XCTAssertEqual((pin["state"] as? [String: Any])?["revision"] as? String, arkForgeRevision)
     let project = try String(
       contentsOf: repository.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)

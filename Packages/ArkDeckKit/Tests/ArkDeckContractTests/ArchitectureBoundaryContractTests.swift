@@ -43,19 +43,13 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private static let allowedImports: [String: Set<String>] = [
     "ArkDeckCore": [],
     "ArkDeckProcess": ["ArkDeckCore"],
-    // The ArkForge trust boundary carries bytes and holds no admission
-    // opinion, so it sees the permit types in Core and nothing else. Widened
-    // here in the same review as the code that needs it (CHG-2026-059).
-    "ArkForgeIPC": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckStorage": ["ArkDeckCore"],
-    // ArkForgeIPC is the runtime control plane's route to the mechanics daemon:
-    // the engine issues permits and reads receipts across it. Widened here in
-    // the same review as the code that needs it (CHG-2026-059 step 5).
+    // ArkForgeProtocol and ArkForgeClient are external SDK products owned by
+    // ArkForge. This matrix lists only ArkDeck-to-ArkDeck edges.
     "ArkDeckWorkflows": [
       "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony", "ArkDeckStorage",
-      "ArkForgeIPC",
     ],
     "ArkDeckAgentComposition": [
       "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
@@ -80,7 +74,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private static let targetRoots: [(target: String, path: String, carveOuts: [String])] = [
     ("ArkDeckCore", "Sources/ArkDeckCore", []),
     ("ArkDeckProcess", "Sources/ArkDeckProcess", []),
-    ("ArkForgeIPC", "Sources/ArkForgeIPC", []),
     ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
     ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
     ("ArkDeckStorage", "Sources/ArkDeckStorage", []),
@@ -124,6 +117,18 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
         dependencies.contains("ArkDeckHarness"),
         "\(name) depends on ArkDeckHarness; the in-process decision plane does not exist")
     }
+  }
+
+  func testArkForgeCodecIsOwnedByThePinnedSDK() throws {
+    let manifest = try String(
+      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
+    XCTAssertTrue(manifest.contains("ArkForgeProtocol"))
+    XCTAssertTrue(manifest.contains("ArkForgeClient"))
+    XCTAssertTrue(manifest.contains("9587988ed819048817c3afd2a4a0c8855e6f35d9"))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: packageRoot().appending(path: "Sources/ArkForgeIPC").path),
+      "ArkDeck must not keep a second copy of ArkForge's wire codec")
   }
 
   /// The exact set of targets that claim strict memory safety.

@@ -1,4 +1,5 @@
 import ArkDeckCore
+import ArkForgeClient
 import CryptoKit
 import Darwin
 import Foundation
@@ -14,9 +15,11 @@ public enum ArkDeckLaunchAgent {
   public static let workspaceInspectorEnvironmentKey = "ARKDECK_WORKSPACE_INSPECTOR"
   public static let arkTraceDescriptorEnvironmentKey =
     "ARKDECK_ARKTRACE_DESCRIPTOR"
-  /// The three the ArkForge lane needs. All three or none: two of them is a
-  /// configuration nobody reviewed, and the daemon refuses to compose a lane
-  /// from a partial set rather than starting one somebody has to guess about.
+  /// The only release-identity input the ArkForge lane needs. The manifest
+  /// below this canonical bundle root binds the daemon and every profile.
+  public static let arkForgeBundleEnvironmentKey = "ARKDECK_ARKFORGE_BUNDLE_PATH"
+  /// Read-only migration names for one compatibility cycle. New plists never
+  /// write them and a mixed old/new configuration is refused.
   public static let arkForgedPathEnvironmentKey = "ARKDECK_ARKFORGED_PATH"
   public static let arkForgedSHA256EnvironmentKey = "ARKDECK_ARKFORGED_SHA256"
   public static let arkForgeProfileEnvironmentKey = "ARKDECK_ARKFORGE_PROFILE_PATH"
@@ -28,10 +31,10 @@ public enum ArkDeckLaunchAgent {
   /// `hardwareGated`, materializes assessments only, and reaches no device.
   public static let arkForgeCampaignEnvironmentKey = "ARKDECK_ARKFORGE_CAMPAIGN"
 
-  /// Every key the lane requires, so callers cannot set some and forget others.
-  /// The campaign key is not among them — it is an authorization on a lane, not
-  /// part of one.
-  public static let arkForgeEnvironmentKeys = [
+  /// Every current release-identity key the lane requires. The campaign is an
+  /// authorization on a lane, not part of the release unit.
+  public static let arkForgeEnvironmentKeys = [arkForgeBundleEnvironmentKey]
+  public static let legacyArkForgeEnvironmentKeys = [
     arkForgedPathEnvironmentKey, arkForgedSHA256EnvironmentKey,
     arkForgeProfileEnvironmentKey,
   ]
@@ -124,12 +127,16 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
   /// Optional keeps receipts written before the reviewed ArkTrace profile was
   /// selectable through the production LaunchAgent installer decodable.
   public let arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
+  /// Optional keeps v1 receipts written before single-bundle ArkForge
+  /// configuration decodable. New receipts pin the manifest digest here.
+  public let arkForgeLane: LaunchAgentArkForgeLaneStatus?
 
   public init(
     installedAtUTC: String, daemonPath: String, daemonSHA256: String,
     hdcPath: String, hdcSHA256: String, workspaceProjectPath: String? = nil,
     devecoSDKPath: String? = nil,
-    arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus? = nil
+    arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus? = nil,
+    arkForgeLane: LaunchAgentArkForgeLaneStatus? = nil
   ) {
     self.schemaVersion = "arkdeck-launchagent-install/v1"
     self.installedAtUTC = installedAtUTC
@@ -140,6 +147,7 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
     self.workspaceProjectPath = workspaceProjectPath
     self.devecoSDKPath = devecoSDKPath
     self.arkTraceDescriptor = arkTraceDescriptor
+    self.arkForgeLane = arkForgeLane
   }
 }
 
@@ -167,12 +175,15 @@ public struct LaunchAgentArkTraceDescriptorStatus: Codable, Sendable, Equatable 
 
 /// The ArkForge lane's installed configuration, as recorded in the receipt.
 ///
-/// Every field is measured rather than taken on trust: the paths are
-/// canonical, the executable is hashed at install time, and `status` compares
-/// its digest against what is on disk. That is the same discipline
-/// the HDC path and the ArkTrace descriptor already get, and it matters more
-/// here — one of these executables performs destructive writes.
+/// One validated ArkForge release unit, as recorded in the receipt.
+///
+/// The public configuration is only `bundlePath`; the remaining fields are
+/// manifest-derived evidence retained so status can detect drift.
 public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
+  public static let deviceProfileID = "org.openharmony.dayu200"
+
+  public let bundlePath: String
+  public let manifestSHA256: String
   public let daemonPath: String
   public let daemonSHA256: String
   public let deviceProfilePath: String
@@ -180,9 +191,12 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
   public let campaign: String
 
   public init(
+    bundlePath: String, manifestSHA256: String,
     daemonPath: String, daemonSHA256: String, deviceProfilePath: String,
     campaign: String = ""
   ) {
+    self.bundlePath = bundlePath
+    self.manifestSHA256 = manifestSHA256
     self.daemonPath = daemonPath
     self.daemonSHA256 = daemonSHA256
     self.deviceProfilePath = deviceProfilePath
@@ -192,70 +206,68 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
   /// Why a lane configuration was refused. Each names something to fix.
   public enum Refusal: Error, Equatable, CustomStringConvertible {
     case notAbsolute(String)
-    case notARegularFile(String)
-    case symlink(String)
+    case invalidBundle(String)
+    case missingProfile(String)
+    case mixedLegacyConfiguration
+    case partialLegacyConfiguration(missing: [String])
+    case crossBundleLegacyConfiguration
     case digestMismatch(path: String, declared: String, measured: String)
-    case unreadable(String)
 
     public var description: String {
       switch self {
       case .notAbsolute(let path):
-        return "\(path) is not an absolute path; the daemon resolves no PATH"
-      case .notARegularFile(let path):
-        return "\(path) is not a regular file"
-      case .symlink(let path):
+        return "\(path) is not an absolute ArkForge.bundle path"
+      case .invalidBundle(let detail):
+        return "ArkForge.bundle is invalid: \(detail)"
+      case .missingProfile(let id):
+        return "ArkForge.bundle does not publish required profile \(id)"
+      case .mixedLegacyConfiguration:
         return
-          "\(path) is a symlink; install the file, not a name for it — a name can be "
-          + "repointed after it was verified"
+          "current ArkForge bundle configuration cannot be mixed with legacy three-key "
+          + "configuration"
+      case .partialLegacyConfiguration(let missing):
+        return
+          "legacy ArkForge configuration is partial; missing "
+          + missing.joined(separator: ", ")
+      case .crossBundleLegacyConfiguration:
+        return
+          "legacy ArkForge daemon and profile do not resolve to one validated ArkForge.bundle"
       case .digestMismatch(let path, let declared, let measured):
         return
           "\(path) hashes to \(measured) and was declared as \(declared). An unpinned "
           + "executable is one nobody chose"
-      case .unreadable(let path):
-        return "\(path) could not be read"
       }
     }
   }
 
-  /// Measures the three inputs, or refuses.
-  ///
-  /// `declaredDaemonSHA256` is compared rather than trusted: the operator says
-  /// which bytes they mean, and this checks the file agrees.
+  /// Resolves and independently verifies every manifest-declared member.
   public static func measuring(
-    daemonPath: String, declaredDaemonSHA256: String, deviceProfilePath: String,
+    bundlePath: String,
     campaign: String = ""
   ) throws -> LaunchAgentArkForgeLaneStatus {
-    func verify(_ path: String) throws -> Data {
-      guard path.hasPrefix("/") else { throw Refusal.notAbsolute(path) }
-      let url = URL(filePath: path)
-      let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-      guard values?.isSymbolicLink != true else { throw Refusal.symlink(path) }
-      guard values?.isRegularFile == true else { throw Refusal.notARegularFile(path) }
-      guard let data = try? Data(contentsOf: url) else { throw Refusal.unreadable(path) }
-      return data
+    guard bundlePath.hasPrefix("/") else { throw Refusal.notAbsolute(bundlePath) }
+    let bundle: ArkForgeReleaseBundle
+    do {
+      bundle = try ArkForgeReleaseBundleReader.load(
+        bundleURL: URL(filePath: bundlePath, directoryHint: .isDirectory))
+    } catch {
+      throw Refusal.invalidBundle(String(describing: error))
     }
-
-    let daemon = try verify(daemonPath)
-    let measured = SHA256Hex.string(of: daemon)
-    guard measured == declaredDaemonSHA256.lowercased() else {
-      throw Refusal.digestMismatch(
-        path: daemonPath, declared: declaredDaemonSHA256, measured: measured)
+    guard let profile = bundle.profileURLs[deviceProfileID] else {
+      throw Refusal.missingProfile(deviceProfileID)
     }
-    _ = try verify(deviceProfilePath)
+    let daemonDigest = SHA256Hex.string(of: try Data(contentsOf: bundle.daemonURL))
 
     return LaunchAgentArkForgeLaneStatus(
-      daemonPath: daemonPath, daemonSHA256: measured,
-      deviceProfilePath: deviceProfilePath,
+      bundlePath: bundle.rootURL.path, manifestSHA256: bundle.manifestSHA256,
+      daemonPath: bundle.daemonURL.path, daemonSHA256: daemonDigest,
+      deviceProfilePath: profile.path,
       campaign: campaign.trimmingCharacters(in: .whitespaces))
   }
 
   /// The environment the daemon is started with.
   public var environment: [String: String] {
-    var out = [
-      ArkDeckLaunchAgent.arkForgedPathEnvironmentKey: daemonPath,
-      ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey: daemonSHA256,
-      ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey: deviceProfilePath,
-    ]
+    var out = [ArkDeckLaunchAgent.arkForgeBundleEnvironmentKey: bundlePath]
     // Written only when authorized. An empty value in the plist would read as
     // an unnamed campaign, and an unnamed campaign is one nobody can be held
     // to a result on.
@@ -278,6 +290,7 @@ public struct LaunchAgentStatus: Codable, Sendable, Equatable {
   public let workspaceProjectPath: String?
   public let devecoSDKPath: String?
   public let arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
+  public let arkForgeLane: LaunchAgentArkForgeLaneStatus?
   public let socketPath: String
   public let socketPresent: Bool
   public let standardOutputPath: String
@@ -427,7 +440,8 @@ public final class LaunchAgentService: @unchecked Sendable {
       hdcSHA256: hdcSHA256,
       workspaceProjectPath: workspace?.projectRoot.path,
       devecoSDKPath: workspace?.devecoSDKRoot.path,
-      arkTraceDescriptor: arkTraceDescriptor?.status)
+      arkTraceDescriptor: arkTraceDescriptor?.status,
+      arkForgeLane: arkForgeLane)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     try encoder.encode(receipt).write(to: paths.receipt, options: .atomic)
@@ -484,17 +498,7 @@ public final class LaunchAgentService: @unchecked Sendable {
       from: try Data(contentsOf: paths.plist), options: [], format: nil) as? [String: Any],
       let environment = document["EnvironmentVariables"] as? [String: String]
     else { return nil }
-    let values = ArkDeckLaunchAgent.arkForgeEnvironmentKeys.map { environment[$0] }
-    guard values.allSatisfy({ ($0?.isEmpty == false) }) else { return nil }
-    return LaunchAgentArkForgeLaneStatus(
-      daemonPath: environment[ArkDeckLaunchAgent.arkForgedPathEnvironmentKey]!,
-      daemonSHA256: environment[ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey]!,
-      deviceProfilePath: environment[ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey]!,
-      // Preserved too. An `update` that said nothing about the lane and
-      // silently dropped the campaign would turn an authorized bench back into
-      // a hardwareGated one — a change nobody asked for, discovered at the
-      // step rather than at the command.
-      campaign: environment[ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey] ?? "")
+    return try configuredArkForgeLane(environment)
   }
 
   public func status() throws -> LaunchAgentStatus {
@@ -507,6 +511,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     var workspaceProjectPath: String?
     var devecoSDKPath: String?
     var arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
+    var arkForgeLane: LaunchAgentArkForgeLaneStatus?
 
     if installed {
       do {
@@ -516,6 +521,7 @@ public final class LaunchAgentService: @unchecked Sendable {
         workspaceProjectPath = configuration.workspace?.projectRoot.path
         devecoSDKPath = configuration.workspace?.devecoSDKRoot.path
         arkTraceDescriptor = configuration.arkTraceDescriptor?.status
+        arkForgeLane = configuration.arkForgeLane
         do {
           let validatedBundle = try daemonBundleValidator(paths.installedDaemonBundle)
           if validatedBundle.path != paths.installedDaemonBundle.path {
@@ -571,6 +577,9 @@ public final class LaunchAgentService: @unchecked Sendable {
         if receipt.arkTraceDescriptor != arkTraceDescriptor {
           diagnostics.append("ArkTrace distribution descriptor drifted since installation")
         }
+        if receipt.arkForgeLane != arkForgeLane {
+          diagnostics.append("ArkForge release bundle drifted since installation")
+        }
       } catch {
         diagnostics.append("install receipt is unavailable or invalid: \(error)")
       }
@@ -591,7 +600,7 @@ public final class LaunchAgentService: @unchecked Sendable {
       plistPath: paths.plist.path, daemonPath: daemonPath,
       daemonSHA256: daemonSHA256, hdcPath: hdcPath, hdcSHA256: hdcSHA256,
       workspaceProjectPath: workspaceProjectPath, devecoSDKPath: devecoSDKPath,
-      arkTraceDescriptor: arkTraceDescriptor,
+      arkTraceDescriptor: arkTraceDescriptor, arkForgeLane: arkForgeLane,
       socketPath: paths.socket.path, socketPresent: socketPresent,
       standardOutputPath: paths.standardOutput.path,
       standardErrorPath: paths.standardError.path,
@@ -620,6 +629,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     let hdc: String
     let workspace: LaunchAgentWorkspaceConfiguration?
     let arkTraceDescriptor: ValidatedArkTraceDescriptor?
+    let arkForgeLane: LaunchAgentArkForgeLaneStatus?
   }
 
   private struct ValidatedArkTraceDescriptor {
@@ -683,9 +693,66 @@ public final class LaunchAgentService: @unchecked Sendable {
     // regenerates the plist, which is exactly how those keys get retired.
     let arkTraceDescriptor = try environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey]
       .map { try validatedArkTraceDescriptor(URL(filePath: $0)) }
+    let arkForgeLane = try configuredArkForgeLane(environment)
     return ConfiguredPaths(
       daemon: daemon, hdc: hdc, workspace: workspace,
-      arkTraceDescriptor: arkTraceDescriptor)
+      arkTraceDescriptor: arkTraceDescriptor, arkForgeLane: arkForgeLane)
+  }
+
+  /// Reads the current one-key configuration, or migrates one exact legacy
+  /// three-key plist for the next `agentd update`.
+  ///
+  /// Migration is deliberately structural rather than heuristic: the old
+  /// daemon path must be the canonical daemon member, the old profile must be
+  /// the canonical DAYU200 member, and the old digest must match the manifest-
+  /// verified daemon. Partial, aliased and cross-bundle configurations fail.
+  private func configuredArkForgeLane(
+    _ environment: [String: String]
+  ) throws -> LaunchAgentArkForgeLaneStatus? {
+    let current = environment[ArkDeckLaunchAgent.arkForgeBundleEnvironmentKey]
+    let legacyPresent = ArkDeckLaunchAgent.legacyArkForgeEnvironmentKeys.filter {
+      environment[$0] != nil
+    }
+    let campaign = environment[ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey] ?? ""
+
+    if let current {
+      guard legacyPresent.isEmpty else {
+        throw LaunchAgentArkForgeLaneStatus.Refusal.mixedLegacyConfiguration
+      }
+      return try LaunchAgentArkForgeLaneStatus.measuring(
+        bundlePath: current, campaign: campaign)
+    }
+    guard !legacyPresent.isEmpty else { return nil }
+    let missing = ArkDeckLaunchAgent.legacyArkForgeEnvironmentKeys.filter {
+      environment[$0]?.isEmpty != false
+    }
+    guard missing.isEmpty else {
+      throw LaunchAgentArkForgeLaneStatus.Refusal.partialLegacyConfiguration(missing: missing)
+    }
+
+    let legacyDaemon = environment[ArkDeckLaunchAgent.arkForgedPathEnvironmentKey]!
+    let legacyDigest = environment[ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey]!
+    let legacyProfile = environment[ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey]!
+    let daemonURL = URL(filePath: legacyDaemon).standardizedFileURL
+    let inferredRoot = daemonURL.deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let migrated: LaunchAgentArkForgeLaneStatus
+    do {
+      migrated = try LaunchAgentArkForgeLaneStatus.measuring(
+        bundlePath: inferredRoot.path, campaign: campaign)
+    } catch {
+      throw LaunchAgentArkForgeLaneStatus.Refusal.crossBundleLegacyConfiguration
+    }
+    guard migrated.daemonPath == daemonURL.path,
+      migrated.deviceProfilePath == URL(filePath: legacyProfile).standardizedFileURL.path
+    else {
+      throw LaunchAgentArkForgeLaneStatus.Refusal.crossBundleLegacyConfiguration
+    }
+    guard migrated.daemonSHA256 == legacyDigest.lowercased() else {
+      throw LaunchAgentArkForgeLaneStatus.Refusal.digestMismatch(
+        path: legacyDaemon, declared: legacyDigest, measured: migrated.daemonSHA256)
+    }
+    return migrated
   }
 
   private func renderTemplate(

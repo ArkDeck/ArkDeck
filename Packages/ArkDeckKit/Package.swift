@@ -8,7 +8,6 @@ let package = Package(
   products: [
     .library(name: "ArkDeckCore", targets: ["ArkDeckCore"]),
     .library(name: "ArkDeckProcess", targets: ["ArkDeckProcess"]),
-    .library(name: "ArkForgeIPC", targets: ["ArkForgeIPC"]),
     .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
     .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
@@ -25,6 +24,11 @@ let package = Package(
     .executable(name: "ArkDeckRuntimeSoakFixture", targets: ["ArkDeckRuntimeSoakFixture"]),
     .executable(name: "ArkDeckFakeHapSignerFixture", targets: ["ArkDeckFakeHapSignerFixture"]),
   ],
+  dependencies: [
+    .package(
+      url: "https://github.com/ArkDeck/ArkForge.git",
+      revision: "9587988ed819048817c3afd2a4a0c8855e6f35d9")
+  ],
   targets: [
     .target(
       name: "ArkDeckCore",
@@ -32,12 +36,6 @@ let package = Package(
     .target(
       name: "ArkDeckProcess", dependencies: ["ArkDeckCore"],
       swiftSettings: [.strictMemorySafety()]),
-    // The trust boundary to the ArkForge mechanics daemon. It carries bytes
-    // and nothing else: it can encode a permit the authority signed and a
-    // refusal the authority chose, and has no way to construct either. Kept
-    // out of ArkDeckWorkflows so the codec cannot quietly acquire an opinion
-    // about admission (CHG-2026-059).
-    .target(name: "ArkForgeIPC", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
     // The runtime control plane and providers. The harness plane was removed
@@ -48,7 +46,9 @@ let package = Package(
       name: "ArkDeckWorkflows",
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
-        "ArkDeckStorage", "ArkForgeIPC",
+        "ArkDeckStorage",
+        .product(name: "ArkForgeProtocol", package: "ArkForge"),
+        .product(name: "ArkForgeClient", package: "ArkForge"),
       ],
       exclude: ["AgentComposition"],
       resources: [
@@ -92,7 +92,10 @@ let package = Package(
     ),
     .target(
       name: "ArkDeckLaunchAgent",
-      dependencies: ["ArkDeckCore"],
+      dependencies: [
+        "ArkDeckCore",
+        .product(name: "ArkForgeClient", package: "ArkForge"),
+      ],
       path: "LaunchAgents",
       exclude: ["README.md"],
       resources: [.copy("com.arkdeck.agentd.plist")],
@@ -142,7 +145,8 @@ let package = Package(
       dependencies: [
         "ArkDeckCore",
         "ArkDeckProcess",
-        "ArkForgeIPC",
+        .product(name: "ArkForgeProtocol", package: "ArkForge"),
+        .product(name: "ArkForgeClient", package: "ArkForge"),
         "ArkDeckRuntime",
         "ArkDeckOpenHarmony",
         "ArkDeckWorkflows",

@@ -6,7 +6,8 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
   private static let archiveEnvironmentKey = "ARKDECK_DAYU200_70035_IMAGE"

@@ -2,7 +2,8 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckWorkflows
-@testable import ArkForgeIPC
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
 final class ArkForgeLoaderObservationContractTests: XCTestCase {
   private struct USBProbe: RockchipRuntimeUSBProbing {
