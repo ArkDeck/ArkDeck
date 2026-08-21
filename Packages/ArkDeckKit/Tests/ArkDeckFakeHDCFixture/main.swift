@@ -181,9 +181,7 @@ case .unknown:
   FileHandle.standardOutput.write(Data("unregistered fixture output\n".utf8))
 case .subserver:
   break
-case .headlessServer:
-  while true { RunLoop.current.run(until: Date(timeIntervalSinceNow: 1)) }
-case .managedServer:
+case .headlessServer, .managedServer:
   guard let endpointIndex = suppliedArguments.firstIndex(of: "-s"),
     suppliedArguments.indices.contains(endpointIndex + 1),
     let separator = suppliedArguments[endpointIndex + 1].lastIndex(of: ":"),
@@ -193,6 +191,13 @@ case .managedServer:
         suppliedArguments[endpointIndex + 1].index(after: separator)...]),
     port > 0
   else { exit(64) }
+  if mode == .headlessServer {
+    // A real cold HDC server does not publish its listener at posix_spawn
+    // return. Keep that startup interval visible so the host contract proves
+    // it waits for transport readiness before accepting semantic checkserver
+    // output.
+    Thread.sleep(forTimeInterval: 1)
+  }
   let listener = socket(AF_INET, SOCK_STREAM, 0)
   guard listener >= 0 else { exit(65) }
   var reuse: Int32 = 1
@@ -212,6 +217,9 @@ case .managedServer:
       Darwin.bind(listener, socketAddress, socklen_t(MemoryLayout<sockaddr_in>.size))
     }
   }
-  guard bindResult == 0, listen(listener, 1) == 0 else { exit(67) }
-  while true { RunLoop.current.run(until: Date(timeIntervalSinceNow: 1)) }
+  guard bindResult == 0, listen(listener, 4) == 0 else { exit(67) }
+  while true {
+    let client = accept(listener, nil, nil)
+    if client >= 0 { close(client) }
+  }
 }

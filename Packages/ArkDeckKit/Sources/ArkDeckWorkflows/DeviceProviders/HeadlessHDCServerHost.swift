@@ -1,5 +1,6 @@
 import ArkDeckOpenHarmony
 import ArkDeckProcess
+import Darwin
 import Foundation
 
 public enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
@@ -43,6 +44,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     private let lock = NSLock()
     private var armed = false
     private var exited = false
+    private var exitReason: String?
     private var stopping = false
 
     func arm() -> Bool {
@@ -59,11 +61,18 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
       lock.unlock()
     }
 
-    func recordExit() -> Bool {
+    func recordExit(reason: String) -> Bool {
       lock.lock()
       defer { lock.unlock() }
       exited = true
+      exitReason = reason
       return armed && !stopping
+    }
+
+    func recordedExitReason() -> String? {
+      lock.lock()
+      defer { lock.unlock() }
+      return exitReason
     }
   }
 
@@ -85,17 +94,35 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     onUnexpectedExit: @escaping @Sendable () -> Void = {}
   ) async throws -> HeadlessHDCServerHost {
     let selection = try HDCServerEndpointSelector.select()
+    return try await start(
+      executable: executable, endpoint: selection, onUnexpectedExit: onUnexpectedExit)
+  }
+
+  package static func start(
+    executable: ResolvedExecutable,
+    endpoint selection: HDCServerEndpointSelection,
+    onUnexpectedExit: @escaping @Sendable () -> Void = {}
+  ) async throws -> HeadlessHDCServerHost {
     let request = foregroundRequest(executable: executable, endpoint: selection)
     let lifecycle = Lifecycle()
     let task = Task.detached {
-      _ = try? await FoundationProcessExecutor().executeIdentityBound(
-        request, captureLimit: 256 * 1024)
-      if lifecycle.recordExit() {
+      let reason: String
+      do {
+        let result = try await FoundationProcessExecutor().executeIdentityBound(
+          request, captureLimit: 256 * 1024)
+        reason = foregroundExitReason(result.execution.termination)
+      } catch {
+        // The process boundary can include an authorized executable pathname.
+        // Startup callers need the outcome class, never that pathname.
+        reason = "foreground HDC server launch was refused"
+      }
+      if lifecycle.recordExit(reason: reason) {
         onUnexpectedExit()
       }
     }
     do {
-      let check = try await awaitReadiness(executable: executable, endpoint: selection)
+      let check = try await awaitReadiness(
+        executable: executable, endpoint: selection, lifecycle: lifecycle)
       let host = HeadlessHDCServerHost(
         task: task, lifecycle: lifecycle,
         diagnostics: HDCManagedRuntimeDiagnostics(
@@ -106,7 +133,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
           endpointSource: selection.source.rawValue))
       guard lifecycle.arm() else {
         throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
-          "foreground HDC server exited during readiness")
+          lifecycle.recordedExitReason() ?? "foreground HDC server exited during readiness")
       }
       return host
     } catch {
@@ -151,18 +178,66 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
         timeoutSeconds: 2))
   }
 
+  private static func foregroundExitReason(_ termination: ProcessTermination) -> String {
+    switch termination {
+    case .exited(let status):
+      return "foreground HDC server exited with status \(status)"
+    case .signalled(let signal):
+      return "foreground HDC server exited after signal \(signal)"
+    case .timedOut:
+      return "foreground HDC server exceeded its lifecycle bound"
+    case .cancelled:
+      return "foreground HDC server was cancelled"
+    case .waitFailed(let code), .unrecognizedWaitStatus(let code):
+      return "foreground HDC server wait status was unresolved (\(code))"
+    }
+  }
+
   private static func awaitReadiness(
     executable: ResolvedExecutable,
-    endpoint: HDCServerEndpointSelection
+    endpoint: HDCServerEndpointSelection,
+    lifecycle: Lifecycle
   ) async throws -> HDCParsedServerCheck {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(30))
+
+    // An HDC client automatically bootstraps a background server when no
+    // listener exists. Running checkserver while the managed `-m` process is
+    // still binding can therefore create a competing server and keep the
+    // bounded probe attached until timeout. Establish the loopback listener
+    // fact first; the semantic HDC probe below still proves that the listener
+    // is the compatible server we launched.
+    var listenerIsReachable = false
+    while clock.now < deadline {
+      if Task.isCancelled {
+        throw CancellationError()
+      }
+      if let reason = lifecycle.recordedExitReason() {
+        throw HeadlessHDCServerHostError.serverDidNotBecomeReady(reason)
+      }
+      if loopbackListenerIsReachable(endpoint: endpoint.endpoint) {
+        listenerIsReachable = true
+        break
+      }
+      try await Task.sleep(for: .milliseconds(100))
+    }
+    guard listenerIsReachable else {
+      let reason = lifecycle.recordedExitReason()
+        ?? "foreground HDC loopback listener did not become reachable before startup deadline"
+      throw HeadlessHDCServerHostError.serverDidNotBecomeReady(reason)
+    }
+
     let resolver = FixedExecutableResolver(table: ["hdc": executable])
     let dispatcher = DescriptorBoundProcessDispatcher(
       resolver: resolver, childEnvironment: endpoint.childEnvironment)
     let plan = readinessPlan(endpoint: endpoint)
     var lastReason = "no completed server observation"
-    for _ in 0..<10 {
+    while clock.now < deadline {
       if Task.isCancelled {
         throw CancellationError()
+      }
+      if let reason = lifecycle.recordedExitReason() {
+        throw HeadlessHDCServerHostError.serverDidNotBecomeReady(reason)
       }
       do {
         let receipt = try await dispatcher.dispatch(plan)
@@ -183,5 +258,42 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
       try await Task.sleep(for: .milliseconds(100))
     }
     throw HeadlessHDCServerHostError.serverDidNotBecomeReady(lastReason)
+  }
+
+  /// A bounded, nonblocking reachability probe for the selector's loopback
+  /// endpoint. It establishes only that a listener exists; HDC identity and
+  /// version remain gated by the registered checkserver semantic parser.
+  package static func loopbackListenerIsReachable(endpoint: HDCServerEndpoint) -> Bool {
+    guard let separator = endpoint.rawValue.lastIndex(of: ":"),
+      endpoint.rawValue[..<separator] == "127.0.0.1",
+      let port = UInt16(endpoint.rawValue[endpoint.rawValue.index(after: separator)...])
+    else { return false }
+
+    let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+    guard descriptor >= 0 else { return false }
+    defer { close(descriptor) }
+    guard fcntl(descriptor, F_SETFL, O_NONBLOCK) == 0 else { return false }
+
+    var address = sockaddr_in()
+    address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+    address.sin_family = sa_family_t(AF_INET)
+    address.sin_port = in_port_t(port).bigEndian
+    address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+    let result = withUnsafePointer(to: &address) { pointer in
+      pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+      }
+    }
+    if result == 0 { return true }
+    guard errno == EINPROGRESS else { return false }
+
+    var pollDescriptor = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
+    guard poll(&pollDescriptor, 1, 100) == 1 else { return false }
+    var socketError: Int32 = 0
+    var socketErrorLength = socklen_t(MemoryLayout<Int32>.size)
+    guard getsockopt(
+      descriptor, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLength) == 0
+    else { return false }
+    return socketError == 0
   }
 }
