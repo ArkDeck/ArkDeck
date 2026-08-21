@@ -18,6 +18,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "agent-pr.yml"
 SDD_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "sdd-guard.yml"
 SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
+ARKFORGE_AUTH_PATH = REPOSITORY_ROOT / "scripts" / "ci" / "arkforge-package-auth.sh"
 EXPECTED_PATTERNS = ("agent/**", "!agent/host-loop/**")
 EXPECTED_PUSH_FLOW = '    branches: [main, "agent/**"]'
 
@@ -290,6 +291,12 @@ def validate_automatic_check_contract(
             "one-time bootstrap must be wired exactly once per Agent PR job"
         )
 
+    allowed_swift_secret = "${{ secrets.ARKFORGE_DEPLOY_KEY }}"
+    if swift_text.count(allowed_swift_secret) != 2:
+        raise WorkflowContractError(
+            "Swift CI must expose the ArkForge deploy key only to both setup steps"
+        )
+    capability_text = agent_text + sdd_text + swift_text.replace(allowed_swift_secret, "")
     forbidden = (
         "pull_request_target:",
         "secrets.",
@@ -303,7 +310,7 @@ def validate_automatic_check_contract(
         "administration: write",
     )
     for token in forbidden:
-        if token in agent_text + sdd_text + swift_text:
+        if token in capability_text:
             raise WorkflowContractError(f"forbidden workflow capability: {token}")
 
     if extract_event_names(sdd_text) != ("push", "pull_request"):
@@ -424,6 +431,72 @@ def validate_automatic_check_contract(
             )
 
 
+def validate_arkforge_private_package_auth(swift_text: str, auth_text: str) -> None:
+    """Pin least-privilege private Swift-package access in both compiled lanes."""
+
+    setup = """      - name: Configure read-only ArkForge package access
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh scripts/ci/arkforge-package-auth.sh setup
+"""
+    cleanup = """      - name: Remove ArkForge package credential
+        if: always()
+        run: sh scripts/ci/arkforge-package-auth.sh cleanup
+"""
+    if swift_text.count(setup) != 2:
+        raise WorkflowContractError(
+            "both compiled lanes must configure the ArkForge deploy key exactly once"
+        )
+    if swift_text.count(cleanup) != 2:
+        raise WorkflowContractError(
+            "both compiled lanes must always remove the ArkForge deploy key"
+        )
+
+    swift_tests_job = _job_block(swift_text, "swift-tests")
+    app_build_job = _job_block(swift_text, "app-build")
+    for job_name, job_block, build_token in (
+        ("Swift test", swift_tests_job, "ArkDeckKit full test suite (8 workers)"),
+        ("App build", app_build_job, "Build ArkDeck app and UI-test bundle"),
+    ):
+        setup_index = job_block.find(setup)
+        build_index = job_block.find(build_token)
+        cleanup_index = job_block.find(cleanup)
+        if not (0 <= setup_index < build_index < cleanup_index):
+            raise WorkflowContractError(
+                f"{job_name} ArkForge credential lifetime does not bracket the build"
+            )
+
+    required_auth = (
+        "set -eu",
+        "umask 077",
+        "${ARKFORGE_DEPLOY_KEY:-}",
+        "ssh-keygen -y -f \"$key_path\" </dev/null >/dev/null 2>&1",
+        "github.com ssh-ed25519 "
+        "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",
+        "StrictHostKeyChecking=yes",
+        "GIT_CONFIG_KEY_0=url.git@github.com:.insteadOf",
+        "GIT_CONFIG_VALUE_0=https://github.com/",
+        'rm -f "$key_path" "$known_hosts_path"',
+    )
+    for token in required_auth:
+        if token not in auth_text:
+            raise WorkflowContractError(
+                f"ArkForge package authentication missing contract token: {token}"
+            )
+    forbidden_auth = (
+        "StrictHostKeyChecking=no",
+        "ssh-keyscan",
+        "secrets.GITHUB_TOKEN",
+        "github.token",
+        "PERSONAL_ACCESS_TOKEN",
+    )
+    for token in forbidden_auth:
+        if token in auth_text:
+            raise WorkflowContractError(
+                f"ArkForge package authentication contains forbidden token: {token}"
+            )
+
+
 def _glob_regex(pattern: str) -> re.Pattern[str]:
     pieces = [r"\A"]
     index = 0
@@ -506,6 +579,23 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             SDD_WORKFLOW_PATH.read_text(encoding="utf-8"),
             SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8"),
         )
+        validate_arkforge_private_package_auth(
+            SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8"),
+            ARKFORGE_AUTH_PATH.read_text(encoding="utf-8"),
+        )
+
+    def test_arkforge_private_package_auth_rejects_credential_regressions(self) -> None:
+        swift = SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8")
+        auth = ARKFORGE_AUTH_PATH.read_text(encoding="utf-8")
+        mutations = (
+            (swift.replace("        if: always()\n", "        if: success()\n", 1), auth),
+            (swift, auth.replace("StrictHostKeyChecking=yes", "StrictHostKeyChecking=no")),
+            (swift, auth.replace("GIT_CONFIG_VALUE_0=https://github.com/", "")),
+            (swift, auth + "\nssh-keyscan github.com\n"),
+        )
+        for mutated_swift, mutated_auth in mutations:
+            with self.assertRaises(WorkflowContractError):
+                validate_arkforge_private_package_auth(mutated_swift, mutated_auth)
 
     def test_automatic_check_contract_rejects_permission_event_and_dependency_drift(
         self,
@@ -575,7 +665,11 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "missing stable aggregator",
                 agent,
                 sdd,
-                swift.replace("    if: always()\n", "    if: success()\n", 1),
+                swift.replace(
+                    "  swift:\n    if: always()\n",
+                    "  swift:\n    if: success()\n",
+                    1,
+                ),
             ),
             (
                 "runner context at job scope",

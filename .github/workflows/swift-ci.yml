@@ -110,6 +110,11 @@ jobs:
       - name: SwiftPM stable-workspace contract tests
         run: python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py
 
+      - name: Configure read-only ArkForge package access
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh scripts/ci/arkforge-package-auth.sh setup
+
       - name: Restore trusted stable SwiftPM cache
         id: swift-build-cache
         continue-on-error: true
@@ -129,6 +134,10 @@ jobs:
           test
           --parallel
           --num-workers 8
+
+      - name: Remove ArkForge package credential
+        if: always()
+        run: sh scripts/ci/arkforge-package-auth.sh cleanup
 
       - name: Save trusted stable SwiftPM cache
         if: >-
@@ -170,6 +179,11 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Configure read-only ArkForge package access
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh scripts/ci/arkforge-package-auth.sh setup
+
       - name: Restore trusted Xcode build cache
         id: app-build-cache
         continue-on-error: true
@@ -197,6 +211,10 @@ jobs:
           -packageCachePath "$ARKDECK_XCODE_CACHE_ROOT/PackageCache"
           CODE_SIGNING_ALLOWED=NO
           build-for-testing
+
+      - name: Remove ArkForge package credential
+        if: always()
+        run: sh scripts/ci/arkforge-package-auth.sh cleanup
 
       - name: Save trusted Xcode build cache
         if: >-
