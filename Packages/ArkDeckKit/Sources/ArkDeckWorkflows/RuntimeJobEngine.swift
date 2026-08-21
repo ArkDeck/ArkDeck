@@ -6307,11 +6307,6 @@ public actor RuntimeJobEngine {
       // honest rather than optimistic. DHA-CAP-001 specifies this
       // orchestration; the E1 capability, not this refusal, is what gates
       // the device mutation.
-      if inputs["redactionProfile"] == .string("strict") {
-        throw RuntimeJobEngineError.rejected(
-          .invalidInput,
-          "strict redaction has no published implementation; refusing before authorization")
-      }
       if inputs["bundleName"] == nil,
         ["abilityName", "processName", "expectedDeployedArtifactDigest"].contains(where: {
           inputs[$0] != nil
@@ -6322,33 +6317,6 @@ public actor RuntimeJobEngine {
           "application liveness fields require bundleName; refusing before authorization")
       }
       return
-    }
-    if descriptor.reference == "deploy.native-library.app-owned@1" {
-      if case .string(let profile)? = inputs["restartProfile"],
-        profile != HDCNativeRestartProfile.restartAbility.rawValue
-      {
-        throw RuntimeJobEngineError.rejected(
-          .invalidInput,
-          "\(profile) has no complete app-owned restart/readback plan; "
-            + "refusing before authorization")
-      }
-      return
-    }
-    guard descriptor.reference == "debug.hap@1" else { return }
-    if inputs["installPolicy"] == .string("installFresh") {
-      throw RuntimeJobEngineError.rejected(
-        .invalidInput,
-        "installFresh has no published pre-install absence readback; refusing before authorization")
-    }
-    if inputs["cleanupPolicy"] == .string("restorePrevious") {
-      throw RuntimeJobEngineError.rejected(
-        .invalidInput,
-        "restorePrevious has no published snapshot/restore step; refusing before authorization")
-    }
-    if inputs["portForwardProfile"] == .string("debugger-default") {
-      throw RuntimeJobEngineError.rejected(
-        .invalidInput,
-        "debugger-default has no published port-forward steps; refusing before authorization")
     }
   }
 

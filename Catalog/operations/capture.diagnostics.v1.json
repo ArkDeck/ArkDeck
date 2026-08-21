@@ -110,9 +110,9 @@
       "redactionProfile": {
         "type": "string",
         "required": false,
-        "enum": ["standard", "strict"],
+        "enum": ["standard"],
         "default": "standard",
-        "description": "Redaction applied to published text. Only `standard` has a published implementation; `strict` is refused before authorization, so selecting it costs a round trip and gains nothing."
+        "description": "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists."
       }
     }
   },

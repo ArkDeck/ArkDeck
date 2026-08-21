@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `53b52b97937030c322416841b16a7d1a19317c5227c9d163ed0886f6341f802b`
+Catalog digest: `dd13fa57f6d90315038abd8bedf7ef288fa38998a24ef9dbb7cd2e1c4b68ecc7`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

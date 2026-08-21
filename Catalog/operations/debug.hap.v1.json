@@ -38,16 +38,16 @@
       "installPolicy": {
         "type": "string",
         "required": false,
-        "enum": ["installOrReplace", "installFresh"],
+        "enum": ["installOrReplace"],
         "default": "installOrReplace",
-        "description": "How an already-installed package is treated. Only `installOrReplace` has a published plan; `installFresh` is refused before authorization because no pre-install absence readback exists to make it honest."
+        "description": "How an already-installed package is treated. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `installOrReplace`. A fresh-only install is not published until a pre-install absence readback exists."
       },
       "cleanupPolicy": {
         "type": "string",
         "required": false,
-        "enum": ["uninstall", "retain", "restorePrevious"],
+        "enum": ["uninstall", "retain"],
         "default": "uninstall",
-        "description": "What happens to the package when the job ends. `uninstall` removes it, `retain` leaves it installed — which is what an external observer needs, together with postRunAbilityState `running`, to keep watching after the job succeeds. `restorePrevious` is refused before authorization: no snapshot/restore step is published."
+        "description": "What happens to the package when the job ends. `uninstall` removes it; `retain` leaves it installed, which an external observer needs together with postRunAbilityState `running` to keep watching after the job succeeds. Restoring a previous package is not published until a snapshot/restore plan exists."
       },
       "postRunAbilityState": {
         "type": "string",
@@ -71,9 +71,9 @@
       "portForwardProfile": {
         "type": "string",
         "required": false,
-        "enum": ["none", "debugger-default"],
+        "enum": ["none"],
         "default": "none",
-        "description": "Port forwarding to establish alongside the run. Only `none` has a published plan; `debugger-default` is refused before authorization because this operation publishes no port-forward steps — use `port-forward.create@1` separately."
+        "description": "Port forwarding to establish alongside the run. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `none`. This operation publishes no port-forward steps; use `port-forward.create@1` separately."
       }
     }
   },

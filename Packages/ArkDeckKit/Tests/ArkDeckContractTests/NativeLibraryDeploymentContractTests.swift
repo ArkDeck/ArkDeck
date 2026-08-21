@@ -699,6 +699,31 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       ])
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    for (index, profile) in ["restartProcess", "none"].enumerated() {
+      let invalid = try RuntimeOperationRequest(
+        requestID: "request-native-restart-schema-\(index)",
+        idempotencyKey: "execution-native-restart-schema-\(index)",
+        target: DurableTargetReference(
+          targetID: "TGT-001", expectedBindingRevision: 7),
+        operation: RuntimeOperationReference(
+          id: "deploy.native-library.app-owned", version: 1),
+        inputs: [
+          "libraryArtifactLease": .string("lease-v1:unresolved:ART-unresolved"),
+          "targetBundle": .string("com.example.nativegj"),
+          "libraryLogicalName": .string("libarkdeck_gj.so"),
+          "expectedABI": .string("arm64-v8a"),
+          "restartProfile": .string(profile),
+        ])
+      do {
+        _ = try await engine.submit(try encoder.encode(invalid))
+        XCTFail("\(profile) must not survive the published enum")
+      } catch let error as RuntimeJobEngineError {
+        guard case .rejected(.invalidInput, let detail) = error else {
+          return XCTFail("expected invalidInput, got \(error)")
+        }
+        XCTAssertEqual(detail, "input restartProfile value is outside its enum")
+      }
+    }
     do {
       _ = try await engine.submit(try encoder.encode(request))
       XCTFail("unresolved native Artifact must reject")

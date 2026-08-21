@@ -40,6 +40,45 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       RuntimeOperationCatalog.catalogDigest, pattern: "^[0-9a-f]{64}$")
   }
 
+  func testPublishedEnumsContainOnlyExecutableValues() throws {
+    func field(
+      _ operation: String, _ name: String
+    ) throws -> CatalogFieldDescriptor {
+      let descriptor = try XCTUnwrap(
+        RuntimeOperationCatalog.descriptor(reference: operation), operation)
+      return try XCTUnwrap(
+        descriptor.inputs.first { $0.name == name }, "\(operation).\(name)")
+    }
+
+    XCTAssertEqual(
+      try field("debug.hap@1", "installPolicy").enumValues,
+      ["installOrReplace"])
+    XCTAssertEqual(
+      try field("debug.hap@1", "cleanupPolicy").enumValues,
+      ["uninstall", "retain"])
+    XCTAssertEqual(
+      try field("debug.hap@1", "portForwardProfile").enumValues,
+      ["none"])
+    XCTAssertEqual(
+      try field("deploy.native-library.app-owned@1", "restartProfile").enumValues,
+      ["restartAbility"])
+    XCTAssertEqual(
+      try field("capture.diagnostics@1", "redactionProfile").enumValues,
+      ["standard"])
+
+    for (operation, name) in [
+      ("debug.hap@1", "installPolicy"),
+      ("debug.hap@1", "portForwardProfile"),
+      ("deploy.native-library.app-owned@1", "restartProfile"),
+      ("capture.diagnostics@1", "redactionProfile"),
+    ] {
+      let summary = try XCTUnwrap(try field(operation, name).summary)
+      XCTAssertTrue(
+        summary.contains("currently has one executable value"),
+        "\(operation).\(name) must explain why its single-value enum remains published")
+    }
+  }
+
   /// Field semantics have to survive the generator, not just the catalog.
   ///
   /// `description` and `default` were validated as legal catalog keys and then
