@@ -26,7 +26,6 @@
     "capture.diagnostics@1",
     "debug.hap@1",
     "deploy.native-library.app-owned@1",
-    "deploy.native-library.system@1",
     "flash.dayu200",
     "port-forward.create@1",
     "port-forward.remove@1"

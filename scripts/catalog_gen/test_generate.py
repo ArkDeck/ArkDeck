@@ -50,7 +50,6 @@ class RealCatalogTests(unittest.TestCase):
                 "capture.diagnostics@1",
                 "debug.hap@1",
                 "deploy.native-library.app-owned@1",
-                "deploy.native-library.system@1",
                 "flash.dayu200",
                 "observe.device@1",
                 "port-forward.create@1",
@@ -184,14 +183,11 @@ class RealCatalogTests(unittest.TestCase):
         mutated[0]["timeoutSeconds"] += 1
         self.assertNotEqual(generate.catalog_digest(mutated), digest)
 
-    def test_e2_operations_are_pinned(self):
+    def test_published_e2_flash_operation_is_pinned(self):
         operations, _ = _real_operations()
-        for op_id in ("deploy.native-library.system", "flash.dayu200"):
-            doc = next(op for op in operations if op["id"] == op_id)
-            self.assertEqual(doc["effect"]["permitted"], ["destructive"], op_id)
-            self.assertEqual(doc["authorization"], {"destructive": "runtimeCapability"}, op_id)
-        system = next(op for op in operations if op["id"] == "deploy.native-library.system")
-        self.assertEqual(system.get("defaultPolicyIssuance"), "enabled")
+        flash = next(op for op in operations if op["id"] == "flash.dayu200")
+        self.assertEqual(flash["effect"]["permitted"], ["destructive"])
+        self.assertEqual(flash["authorization"], {"destructive": "runtimeCapability"})
 
     def test_workspace_checkpoint_uses_runtime_owned_exact_policy(self):
         operations, _ = _real_operations()

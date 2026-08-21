@@ -533,7 +533,6 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertEqual(
       pinnedArtifacts.sorted(),
       [
-        "deploy.native-library.system@1/backup-receipt.json",
         "workspace.apply-patch@1/applied-patch.json",
         "workspace.build-openharmony@1/unsigned.hap",
         "workspace.prepare-isolated-copy@1/isolated-workspace.json",
@@ -542,6 +541,24 @@ final class RuntimeArtifactContractTests: XCTestCase {
         "workspace.sweep-isolated-copies@1/sweep-findings.json",
       ],
       "a new pinnedUntilVerified artifact is never reclaimed; add it here deliberately")
+  }
+
+  func testEveryRequiredCatalogArtifactHasAPublicationOwner() {
+    var missing: [String] = []
+    for descriptor in RuntimeOperationCatalog.operations {
+      let mapped = Set(
+        RuntimeArtifactService.artifactMapping[descriptor.reference, default: [:]]
+          .values.flatMap { $0 }
+      ).union(
+        RuntimeArtifactService.finalizeArtifacts[descriptor.reference, default: []])
+      for artifact in descriptor.artifacts
+      where artifact.isRequired && !mapped.contains(artifact.name) {
+        missing.append("\(descriptor.reference)/\(artifact.name)")
+      }
+    }
+    XCTAssertEqual(
+      missing.sorted(), [],
+      "every required catalog Artifact needs a step mapping or finalizer publication owner")
   }
 
   func testGarbageCollectionComparesParsedUTCInsteadOfTimestampText() async throws {

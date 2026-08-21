@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "dd13fa57f6d90315038abd8bedf7ef288fa38998a24ef9dbb7cd2e1c4b68ecc7"
+  public static let catalogDigest = "a046da31766a49edd150d6b8bccecb4da153b6b4b05d78460be1ed8f33ae2e33"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -304,52 +304,6 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "publish-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "verification-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
-      ],
-      profiles: ["openharmony-standard@1", "dayu200"]
-    ),
-    CatalogOperationDescriptor(
-      id: "deploy.native-library.system",
-      version: 1,
-      title: "Replace a system/vendor partition native library through Runtime-owned exact-plan admission",
-      provider: .hdc,
-      minimumEffect: .destructive,
-      permittedEffects: [.destructive],
-      authorization: [.destructive: .runtimeCapability],
-      defaultPolicyIssuanceEnabled: true,
-      binding: .confirmedDevice,
-      concurrencyKey: .deviceExclusive,
-      inputs: [
-        CatalogFieldDescriptor(name: "expectedABI", type: .string, isRequired: true, enumValues: ["arm64-v8a", "armeabi-v7a", "x86_64"], summary: "ABI the uploaded ELF must declare, verified against the artifact's own header before anything is sent."),
-        CatalogFieldDescriptor(name: "expectedBuildFingerprint", type: .string, isRequired: true, maxLength: 200, summary: "Must equal the device's current build fingerprint at preflight; drift invalidates the capability."),
-        CatalogFieldDescriptor(name: "libraryArtifactLease", type: .artifactLease, isRequired: true, summary: "Lease of the imported ELF to publish, in the form `lease-v1:<jobId>:<artifactId>` from `arkdeck artifact import-native-library`. Arbitrary local paths are rejected."),
-        CatalogFieldDescriptor(name: "originalFileSHA256", type: .string, isRequired: true, pattern: "^[0-9a-f]{64}$", summary: "Digest of the file currently at the target path, as proof the caller is replacing what it believes it is replacing. A mismatch fails closed rather than overwriting an unexpected file."),
-        CatalogFieldDescriptor(name: "restartPlan", type: .string, isRequired: true, enumValues: ["restartService", "rebootDevice"], summary: "How the system is brought back to a consistent state after replacement: restart the owning service, or reboot the device."),
-        CatalogFieldDescriptor(name: "targetPathProfile", type: .string, isRequired: true, pattern: "^[a-z][a-z0-9-]*$", maxLength: 128, summary: "Named system-path profile resolved by the provider; the capability pins the exact absolute path. Callers can never submit a raw remote path, and app-owned inputs can never resolve to a system path.")
-      ],
-      outputs: [
-        CatalogFieldDescriptor(name: "publishReport", type: .artifactReference, isRequired: true),
-        CatalogFieldDescriptor(name: "verificationReport", type: .artifactReference, isRequired: true)
-      ],
-      steps: [
-        CatalogStepDescriptor(stepID: "verify-elf-locally", kind: .verifyArtifact, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
-        CatalogStepDescriptor(stepID: "hash-library", kind: .hashFile, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
-        CatalogStepDescriptor(stepID: "preflight-system-state", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
-        CatalogStepDescriptor(stepID: "remount-writable", kind: .runApprovedRemoteMutation, effect: .destructive, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .rollbackPublished),
-        CatalogStepDescriptor(stepID: "send-to-staging", kind: .sendFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .bestEffortCleanup),
-        CatalogStepDescriptor(stepID: "backup-original", kind: .runApprovedRemoteMutation, effect: .destructive, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .rollbackPublished),
-        CatalogStepDescriptor(stepID: "atomic-replace", kind: .runApprovedRemoteMutation, effect: .destructive, cancellation: .criticalNonInterruptible, binding: .confirmedDevice, isOptional: false, compensation: .rollbackPublished),
-        CatalogStepDescriptor(stepID: "restart-per-plan", kind: .rebootDevice, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
-        CatalogStepDescriptor(stepID: "wait-for-reconnect", kind: .waitForReconnect, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
-        CatalogStepDescriptor(stepID: "verify-system-state", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
-        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
-      ],
-      timeoutSeconds: 1800,
-      outputByteBudget: 134217728,
-      preflightAttempts: 1,
-      artifacts: [
-        CatalogArtifactDescriptor(name: "publish-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
-        CatalogArtifactDescriptor(name: "verification-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
-        CatalogArtifactDescriptor(name: "backup-receipt.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),
