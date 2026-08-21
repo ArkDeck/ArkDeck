@@ -1,19 +1,19 @@
 # Tasks — CHG-2026-070
 
-CHG-2026-070@r1 已由维护者通过 PR #1443 review/merge。TASK-AFG-001 在
-本实现 PR 内进入 in-progress；Catalog/generic operation 工作保持 blocked，
-并依赖 TASK-AFG-001、CHG-2026-069 merge 与 digest closure。
+CHG-2026-070@r1 已由维护者通过 PR #1443 review/merge，TASK-AFG-001 已通过
+PR #1444 review/merge。CHG-2026-069 的 catalog window 已关闭；本 readiness
+只固化 TASK-AFG-002 的机器可解析精确文件授权，generic operation 实现仍须独立 PR。
 
 ## TASK-AFG-001 — ArkForge Swift SDK and release bundle
 
-- Status:in-progress（proposal #1443 已合入；本实现仍待维护者 review/merge）
+- Status:done（proposal #1443、实现 #1444 已由维护者 review/merge）
 - Platform: macos
 - Hardware required: no
 - Production reachability: ArkDeck agentd → ArkForgeClient → local daemon
 - Acceptance: AFG-AC-1..3
 - Review boundary:`CHG-2026-070-arkforge-generic-integration@r1` was merged by
-  PR #1443. This implementation PR contains no catalog or generic-operation
-  change and becomes protected-main behavior only after maintainer review.
+  PR #1443 and the implementation was merged by PR #1444. This readiness PR
+  changes no product/catalog code.
 - Allowed paths:
   - `Packages/ArkDeckKit/**`
   - 本 change `**`
@@ -24,14 +24,56 @@ manifest, one-key LaunchAgent configuration and legacy receipt migration.
 
 ## TASK-AFG-002 — Generic operation and alias cutover
 
-- Status: blocked (TASK-AFG-001, CHG-2026-069 and proposal merge)
+- Status:in-progress（前置已合入；本 readiness 经维护者 review/merge 后才授权实现 PR）
 - Platform: macos
 - Hardware required: no for contract stage; yes for final cutover
 - Golden Journey: GJ-4
 - Acceptance: AFG-AC-4..8
-- Allowed paths: `Catalog/**`, generated catalog, Core operation identity,
-  ArkForge flash adapter/runtime/facade/history/recovery consumers and tests,
-  this change directory
+- Allowed paths:
+  - `Catalog/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentXPCListener.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/ArkForgeFlashOperation.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogTypes.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeFlashRequest.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeFlashSession.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeLaneComposition.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactService.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DescriptorBoundProcessDispatcher.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderContract.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeActionHost.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeComposition.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/FlashApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewCapabilityApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipTargetAliasReconciliation.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArchitectureBoundaryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkForgeFlashSessionContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkForgeLaneAssemblyContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/CompleteOverwriteRecoveryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Dayu20070035RuntimePlanOnlyContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/DeviceProviderContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/FlashApplicationFacadeContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/FlashArtifactContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ObserveDeviceSkeletonContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/OverviewCapabilityApplicationFacadeContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipRuntimeCompositionContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeArtifactContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeE2CapabilityConsumeContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeOperationCatalogContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/RuntimeOperationCatalogTests.swift`
+  - `scripts/catalog_gen/generate.py`
+  - `scripts/catalog_gen/test_generate.py`
+  - `scripts/manual_ui_flash/manual_ui_flash.swift`
+  - `openspec/changes/chg-2026-070-arkforge-generic-integration/tasks.md`
+  - `openspec/changes/chg-2026-070-arkforge-generic-integration/verification.md`
 - Forbidden: raw RockUSB commands/addresses in ArkDeck production lowering;
   changes to permit integrity, durable single-use or recovery classification
 
