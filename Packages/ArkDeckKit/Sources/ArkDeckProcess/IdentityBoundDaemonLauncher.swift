@@ -7,8 +7,9 @@ import Foundation
 /// This exists because a pairing secret must not travel any other way. Put it
 /// in `argv` and every process that can read `/proc`-equivalent state sees it;
 /// put it in the environment and the child cannot erase it after reading. Both
-/// outlive the moment they are needed. A pipe the parent closes immediately
-/// does not.
+/// outlive the moment they are needed. A pipe whose write end is retained only
+/// by the parent gives the child both the one-shot secret and a process-lifetime
+/// authority signal: EOF proves the owning parent generation is gone.
 ///
 /// It is a sibling of `IdentityBoundPTYExecutor`, not a replacement: that one
 /// answers a prompt from a short-lived tool and waits for it to exit. This one
@@ -29,6 +30,17 @@ package struct IdentityBoundDaemonLauncher: Sendable {
   package struct Handle: Sendable {
     package let processIdentifier: pid_t
     package let executableIdentity: ProcessExecutableIdentityReceipt
+    private let authorityLiveness: AuthorityLiveness
+
+    fileprivate init(
+      processIdentifier: pid_t,
+      executableIdentity: ProcessExecutableIdentityReceipt,
+      authorityLivenessDescriptor: Int32
+    ) {
+      self.processIdentifier = processIdentifier
+      self.executableIdentity = executableIdentity
+      authorityLiveness = AuthorityLiveness(descriptor: authorityLivenessDescriptor)
+    }
 
     /// Ends the child and its process group.
     ///
@@ -36,6 +48,10 @@ package struct IdentityBoundDaemonLauncher: Sendable {
     /// group precisely so a service that spawned helpers cannot leave them
     /// behind when it goes.
     package func terminate() {
+      // EOF is the child's fail-closed signal that the exact parent authority
+      // generation is gone. Close first so a child handling SIGTERM cannot
+      // briefly keep serving against an authority that no longer exists.
+      authorityLiveness.close()
       kill(-processIdentifier, SIGTERM)
     }
 
@@ -68,14 +84,16 @@ package struct IdentityBoundDaemonLauncher: Sendable {
     }
   }
 
-  /// Launches the child and writes `secret` to its stdin, then closes it.
+  /// Launches the child, writes `secret` to stdin and retains the pipe in the
+  /// returned handle as the child's parent-authority liveness capability.
   ///
   /// `secret` is taken by value and never stored, logged, or returned. The
   /// caller is responsible for clearing its own copy; nothing here keeps one.
   ///
-  /// Closing stdin is part of the contract rather than tidiness: the daemon
-  /// reads until EOF, so a stdin left open is a daemon that never finishes
-  /// pairing and never opens its sockets.
+  /// The child reads the protocol-defined secret length, not until EOF. The
+  /// write end must stay open after delivery: EOF means the owning parent died,
+  /// at which point a destructive service must stop rather than become an
+  /// orphan that can continue accepting work.
   package func launch(
     _ request: ProcessIdentityBoundRequest,
     secret: Data,
@@ -152,10 +170,6 @@ package struct IdentityBoundDaemonLauncher: Sendable {
     }
     guard spawnResult == 0 else { throw LaunchError.spawnFailed(spawnResult) }
 
-    let handle = Handle(
-      processIdentifier: pid,
-      executableIdentity: prepared.executable.receipt)
-
     var written = 0
     let delivered: Bool = secret.withUnsafeBytes { raw -> Bool in
       guard let base = raw.baseAddress else { return secret.isEmpty }
@@ -169,17 +183,23 @@ package struct IdentityBoundDaemonLauncher: Sendable {
       }
       return true
     }
-    // EOF is the daemon's signal that pairing is complete. Closed here, in both
-    // the success and failure paths, so a child never waits on a parent that
-    // has already given up.
-    Darwin.close(writeEnd)
-    writeEndOpen = false
-
     guard delivered else {
-      handle.terminate()
+      // A partial secret can never pair. Close the liveness capability and
+      // terminate the dedicated group so no unpaired child survives failure.
+      Darwin.close(writeEnd)
+      writeEndOpen = false
+      kill(-pid, SIGTERM)
       throw LaunchError.secretNotDelivered("wrote \(written) of \(secret.count) bytes")
     }
-    return handle
+
+    // Ownership transfers to the handle. It closes on explicit termination or
+    // when the last handle copy is released; the surrounding defer must no
+    // longer touch this descriptor.
+    writeEndOpen = false
+    return Handle(
+      processIdentifier: pid,
+      executableIdentity: prepared.executable.receipt,
+      authorityLivenessDescriptor: writeEnd)
   }
 
   // MARK: - argv/envp marshalling
@@ -197,5 +217,28 @@ package struct IdentityBoundDaemonLauncher: Sendable {
   private static func freeCStrings(_ values: inout [UnsafeMutablePointer<CChar>?]) {
     for value in values where value != nil { free(value) }
     values = []
+  }
+
+  /// Reference ownership makes copies of `Handle` share one idempotent close.
+  /// A raw descriptor stored directly in the value would either double-close
+  /// after a copy or leak to avoid doing so; either outcome breaks the
+  /// authority-lifetime guarantee.
+  private final class AuthorityLiveness: @unchecked Sendable {
+    private let lock = NSLock()
+    private var descriptor: Int32?
+
+    init(descriptor: Int32) {
+      self.descriptor = descriptor
+    }
+
+    func close() {
+      lock.lock()
+      let owned = descriptor
+      descriptor = nil
+      lock.unlock()
+      if let owned { Darwin.close(owned) }
+    }
+
+    deinit { close() }
   }
 }
