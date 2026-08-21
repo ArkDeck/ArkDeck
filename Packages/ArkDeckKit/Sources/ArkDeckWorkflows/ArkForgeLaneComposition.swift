@@ -302,18 +302,27 @@ package enum ArkForgeLaneComposition {
   struct Dependencies: Sendable {
     let rockchipHost: @Sendable () -> any RockchipRuntimeActionHosting
     let providerIdentity: ResolvedExecutable
+    /// Exact running `arkdeck-agentd` build that owns permits.
+    let authorityImplementationSHA256: String
+    /// Exact HDC build that performs ArkDeck's managed-control half.
+    let managedControlToolSHA256: String
     let approvedPlan:
       @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
-      -> ArkForgeExecutionAuthority.ApprovedPlan
+        -> ArkForgeExecutionAuthority.ApprovedPlan
 
     init(
       rockchipHost: @escaping @Sendable () -> any RockchipRuntimeActionHosting,
       providerIdentity: ResolvedExecutable,
-      approvedPlan: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
+      authorityImplementationSHA256: String,
+      managedControlToolSHA256: String,
+      approvedPlan:
+        @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
         -> ArkForgeExecutionAuthority.ApprovedPlan
     ) {
       self.rockchipHost = rockchipHost
       self.providerIdentity = providerIdentity
+      self.authorityImplementationSHA256 = authorityImplementationSHA256.lowercased()
+      self.managedControlToolSHA256 = managedControlToolSHA256.lowercased()
       self.approvedPlan = approvedPlan
     }
   }
@@ -361,6 +370,18 @@ package enum ArkForgeLaneComposition {
           "the bundle manifest selected \(LaunchAgentArkForgeProfile.dayu200), but the "
             + "DeviceProfile declares \(profile.id)"))
     }
+    guard ArkForgeLaneHost.digestBytes(dependencies.authorityImplementationSHA256) != nil else {
+      return .failure(
+        .daemonUnavailable(
+          "cannot bind ArkForge authority support: the exact running arkdeck-agentd digest "
+            + "is absent or malformed"))
+    }
+    guard ArkForgeLaneHost.digestBytes(dependencies.managedControlToolSHA256) != nil else {
+      return .failure(
+        .daemonUnavailable(
+          "cannot bind ArkForge authority support: the managed-control HDC digest is absent "
+            + "or malformed"))
+    }
 
     let secret = freshPairingSecret()
     let request = ProcessIdentityBoundRequest(
@@ -394,7 +415,7 @@ package enum ArkForgeLaneComposition {
       return .failure(
         .daemonUnavailable(
           "arkforged started but never opened its controller socket; the owned process "
-          + "generation was stopped before returning the failure"))
+            + "generation was stopped before returning the failure"))
     }
 
     let daemon: any ArkForgeFlashSession.Daemon
@@ -425,43 +446,55 @@ package enum ArkForgeLaneComposition {
         deviceProfileID: profile.exactReference,
         toolchain: inputs.expectedToolchain,
         lane: ArkForgeLaneHost(
-        connection: .init(socketPath: socket, controllerSessionID: "arkdeck-agentd"),
-        toolchainSHA256: inputs.expectedToolchain.sha256,
-        makePerformer: { binding, jobID in
-          // Ingredients, not a descriptor: the performer materializes a valid
-          // per-action descriptor through the catalog. The descriptor that
-          // used to be fabricated here (`identifier: "arkforge.managedControl"`,
-          // `actionSHA256: ""`) matched no action's identifier and no action's
-          // digest, so the validating host refused every control action this
-          // lane ever attempted — the flash stalled at its first step with
-          // both sides waiting on the other.
-          ArkForgeControlPerformer(
-            binding: .init(
-              jobID: jobID,
-              targetID: binding.targetID,
-              bindingRevision: binding.bindingRevision,
-              connectKey: binding.connectKey,
-              stableIdentitySHA256: binding.stableIdentitySHA256,
-              usbTopology: binding.usbTopology,
-              providerIdentity: providerIdentity),
-            host: host(),
-            loaderObserver: loaderObserver)
-        },
-        makeClient: { _ in daemon },
-        // A second connection, deliberately. Materialization streams ~731 MB
-        // and the controller session is the one the job's event stream runs
-        // on; sharing it would hold that stream for the length of an import.
-        makeMaterializer: { socket in
-          try ArkForgeControllerClient(
+          connection: .init(
             socketPath: socket,
-            timeoutSeconds: ArkForgeControllerClient.materializationTimeoutSeconds)
-        },
-        makeAuthority: { jobID, planID, planDigest, deviceBinding in
-          ArkForgeExecutionAuthority(
-            plan: dependencies.approvedPlan(jobID, planID, planDigest, deviceBinding),
-            secret: ArkForgePairingSecret(
-              secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
-        }),
+            publicSocketPath: runtimeDirectory.appending(path: "public.sock").path,
+            controllerSessionID: "arkdeck-agentd"),
+          toolchainSHA256: inputs.expectedToolchain.sha256,
+          makePerformer: { binding, jobID in
+            // Ingredients, not a descriptor: the performer materializes a valid
+            // per-action descriptor through the catalog. The descriptor that
+            // used to be fabricated here (`identifier: "arkforge.managedControl"`,
+            // `actionSHA256: ""`) matched no action's identifier and no action's
+            // digest, so the validating host refused every control action this
+            // lane ever attempted — the flash stalled at its first step with
+            // both sides waiting on the other.
+            ArkForgeControlPerformer(
+              binding: .init(
+                jobID: jobID,
+                targetID: binding.targetID,
+                bindingRevision: binding.bindingRevision,
+                connectKey: binding.connectKey,
+                stableIdentitySHA256: binding.stableIdentitySHA256,
+                usbTopology: binding.usbTopology,
+                providerIdentity: providerIdentity),
+              host: host(),
+              loaderObserver: loaderObserver)
+          },
+          makeClient: { _ in daemon },
+          // A second connection, deliberately. Materialization streams ~731 MB
+          // and the controller session is the one the job's event stream runs
+          // on; sharing it would hold that stream for the length of an import.
+          makeMaterializer: { socket in
+            try ArkForgeControllerClient(
+              socketPath: socket,
+              timeoutSeconds: ArkForgeControllerClient.materializationTimeoutSeconds)
+          },
+          makeAssessmentSource: { socket in
+            try ArkForgePublicClient(
+              socketPath: socket,
+              timeoutSeconds: ArkForgeControllerClient.materializationTimeoutSeconds)
+          },
+          authoritySupport: .init(
+            authorityImplementationSHA256: dependencies.authorityImplementationSHA256,
+            managedControlToolSHA256: dependencies.managedControlToolSHA256,
+            hardwareCampaign: inputs.campaign),
+          makeAuthority: { jobID, planID, planDigest, deviceBinding in
+            ArkForgeExecutionAuthority(
+              plan: dependencies.approvedPlan(jobID, planID, planDigest, deviceBinding),
+              secret: ArkForgePairingSecret(
+                secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
+          }),
         daemonLifecycle: daemonLifecycle))
   }
 
@@ -476,7 +509,10 @@ package enum ArkForgeLaneComposition {
     runtimeDirectory: URL,
     rockchipDispatcher: ArkForgeNativeRockchipControlDispatcher,
     providerIdentity: ResolvedExecutable,
-    approvedPlan: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
+    authorityImplementationSHA256: String,
+    managedControlToolSHA256: String,
+    approvedPlan:
+      @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
       -> ArkForgeExecutionAuthority.ApprovedPlan,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     pairingEpoch: UInt64 = UInt64(Date().timeIntervalSince1970)
@@ -488,6 +524,8 @@ package enum ArkForgeLaneComposition {
       pairingEpoch: pairingEpoch,
       dependencies: .init(
         rockchipHost: { host }, providerIdentity: providerIdentity,
+        authorityImplementationSHA256: authorityImplementationSHA256,
+        managedControlToolSHA256: managedControlToolSHA256,
         approvedPlan: approvedPlan),
       daemonLifecycle: daemonLifecycle,
       launch: { request, secret in

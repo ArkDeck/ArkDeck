@@ -681,6 +681,48 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       failureClassification: "", facts: [])
   }
 
+  private func sealTestHost(
+    controller: any ArkForgePlanSource,
+    publicSource: any ArkForgeAssessmentSource,
+    counter: StartCounter,
+    campaign: String = "AFA-SEAL"
+  ) -> ArkForgeLaneHost {
+    let daemon = CountingDaemon(
+      counter: counter,
+      events: [
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 1, kind: .actionReceipt, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "running", admission: nil,
+          controlRequest: nil, receipt: receipt("STEP-023"), facts: [])
+      ])
+    return ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/controller.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
+      makePerformer: { _, _ in SilentPerformer() },
+      makeClient: { _ in daemon },
+      makeMaterializer: { _ in controller },
+      makeAssessmentSource: { _ in publicSource },
+      authoritySupport: scriptedAuthoritySupport(campaign: campaign),
+      makeAuthority: { _, _, _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [],
+            admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+  }
+
+  private var sealTestBinding: ArkForgeLaneDeviceBinding {
+    ArkForgeLaneDeviceBinding(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+      targetID: "TGT-1", bindingRevision: 2, usbTopology: ScriptedPlanSource.topology)
+  }
+
   func testReadinessIsCheckedBeforeAnyJobStarts() throws {
     // Both are standing facts. Learning them at composition time rather than
     // mid-job is the difference between refusing to start and stopping with a
@@ -747,6 +789,67 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
           id: "arkforged-native-rockusb", sha256: daemonDigest)))
   }
 
+  func testControllerReceivesExactAuthoritySupportKeyAndCampaign() async throws {
+    let recorder = MaterializeRequestRecorder()
+    let source = ScriptedPlanSource.executable(requestRecorder: recorder)
+    let counter = StartCounter()
+    let host = sealTestHost(
+      controller: source, publicSource: source, counter: counter, campaign: "AFA-EXACT")
+
+    _ = try await host.perform(
+      stepID: "flash-partitions", jobID: "JOB-SEAL-EXACT",
+      artifact: scriptedArtifact(), binding: sealTestBinding)
+
+    let final = try XCTUnwrap(
+      recorder.requests.last { $0.authoritySupportState == "hardwareCampaign" })
+    XCTAssertEqual(final.authoritySupportKeySHA256.count, 32)
+    XCTAssertEqual(final.authoritySupportDetail, "AFA-EXACT")
+    XCTAssertEqual(counter.value, 1)
+  }
+
+  func testInvalidPublicMechanicsKeyRefusesBeforeControllerMaterializeOrStart() async throws {
+    let recorder = MaterializeRequestRecorder()
+    let controller = ScriptedPlanSource.executable(requestRecorder: recorder)
+    let publicSource = ScriptedPlanSource.executable(publicMechanicsKey: "not-a-digest")
+    let counter = StartCounter()
+    let host = sealTestHost(
+      controller: controller, publicSource: publicSource, counter: counter)
+
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "JOB-BAD-MECHANICS",
+        artifact: scriptedArtifact(), binding: sealTestBinding)
+      XCTFail("an invalid public mechanics key must refuse")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted(let reason) = failure else {
+        return XCTFail("expected confirmedNotExecuted, got \(failure)")
+      }
+      XCTAssertTrue(reason.contains("no usable mechanics maturity key"), reason)
+    }
+    XCTAssertTrue(recorder.requests.isEmpty, "the controller must not materialize")
+    XCTAssertEqual(counter.value, 0)
+  }
+
+  func testReturnedAuthoritySealMismatchRefusesBeforeStartExecution() async throws {
+    let source = ScriptedPlanSource.executable(
+      finalAuthoritySupportKeyOverride: String(repeating: "0", count: 64))
+    let counter = StartCounter()
+    let host = sealTestHost(controller: source, publicSource: source, counter: counter)
+
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "JOB-SEAL-MISMATCH",
+        artifact: scriptedArtifact(), binding: sealTestBinding)
+      XCTFail("a mismatched returned support seal must refuse")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted(let reason) = failure else {
+        return XCTFail("expected confirmedNotExecuted, got \(failure)")
+      }
+      XCTAssertTrue(reason.contains("did not seal the exact mechanics"), reason)
+    }
+    XCTAssertEqual(counter.value, 0)
+  }
+
   func testTheSecondDelegatedStepIsServedFromTheFirstRunNotASecondJob() async throws {
     // The property the whole host exists for. Starting an ArkForge job per
     // delegated step would mean two admissions and two permits for what the
@@ -771,6 +874,8 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAssessmentSource: { _ in ScriptedPlanSource.executable() },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -827,6 +932,10 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makeMaterializer: { _ in
         ScriptedPlanSource.executable(executionPurpose: "supersedingRecovery")
       },
+      makeAssessmentSource: { _ in
+        ScriptedPlanSource.executable(executionPurpose: "supersedingRecovery")
+      },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -869,6 +978,8 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAssessmentSource: { _ in ScriptedPlanSource.executable() },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -935,6 +1046,8 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in ScriptedPlanSource.gated() },
+      makeAssessmentSource: { _ in ScriptedPlanSource.gated() },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -976,6 +1089,8 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in RefusingPlanSource() },
+      makeAssessmentSource: { _ in ScriptedPlanSource.executable() },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -1021,6 +1136,8 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAssessmentSource: { _ in ScriptedPlanSource.executable() },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -1059,6 +1176,8 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAssessmentSource: { _ in ScriptedPlanSource.executable() },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -1183,8 +1302,16 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 /// which is the part of this lane that decides *which* device gets written.
 struct ScriptedPlanSource: ArkForgePlanSource {
   static let topology = "18874368"
-  let answer: ArkForgeMaterializePlanResponse
+  static let mechanicsKey = String(repeating: "9", count: 64)
+  enum Result {
+    case executable(planID: String)
+    case gated
+  }
+  let result: Result
   let expectedExecutionPurpose: String
+  let publicMechanicsKey: String
+  let finalAuthoritySupportKeyOverride: String?
+  let requestRecorder: MaterializeRequestRecorder?
 
   func importArtifact(contentsOf url: URL, expectedSHA256: String, requestID: String) throws
     -> ArkForgeImportArtifactResponse
@@ -1216,38 +1343,127 @@ struct ScriptedPlanSource: ArkForgePlanSource {
   func materializePlan(_ body: ArkForgeMaterializePlanRequest, requestID: String) throws
     -> ArkForgeMaterializePlanResponse
   {
+    requestRecorder?.record(body)
     guard body.executionPurpose == expectedExecutionPurpose else {
       throw ProtobufWireError.missingField(
         message: "MaterializePlanRequest executionPurpose mismatch", field: 10)
     }
-    return answer
-  }
-
-  static func executable(
-    planID: String = "PLAN-1", executionPurpose: String = "primaryFlash"
-  ) -> ScriptedPlanSource {
-    ScriptedPlanSource(
-      answer: .plan(
+    if body.authoritySupportKeySHA256.isEmpty {
+      return .assessment(
+        ArkForgePlanAssessment(
+          availability: "unavailable",
+          unavailableReason: "public sessions cannot publish executable plans",
+          unknowns: ["RK-A01": "public assessment"],
+          mechanicsMaturityKeySHA256: publicMechanicsKey,
+          mechanicsMaturityState: "hardwareGated",
+          authoritySupportKeySHA256: String(repeating: "8", count: 64),
+          authoritySupportState: "hardwareGated"))
+    }
+    let pendingHex = SHA256Hex.lowercaseHex(Data(ArkForgeAuthoritySupport.pendingKeySHA256))
+    if SHA256Hex.lowercaseHex(Data(body.authoritySupportKeySHA256)) == pendingHex {
+      switch result {
+      case .executable:
+        return .assessment(
+          ArkForgePlanAssessment(
+            availability: "unavailable",
+            unavailableReason: "authority support is hardwareGated",
+            unknowns: ["RK-A01": "pending authority support"],
+            mechanicsMaturityKeySHA256: Self.mechanicsKey,
+            mechanicsMaturityState: "hardwareCampaign",
+            authoritySupportKeySHA256: pendingHex,
+            authoritySupportState: "hardwareGated"))
+      case .gated:
+        return .assessment(
+          ArkForgePlanAssessment(
+            availability: "unavailable",
+            unavailableReason:
+              "materialization is complete but execution is gated; maturity is hardwareGated",
+            unknowns: [
+              "RK-M02":
+                "provider/profile/artifact/toolchain/platform combination is hardwareGated"
+            ],
+            mechanicsMaturityKeySHA256: Self.mechanicsKey,
+            mechanicsMaturityState: "hardwareGated",
+            authoritySupportKeySHA256: pendingHex,
+            authoritySupportState: "hardwareGated"))
+      }
+    }
+    switch result {
+    case .executable(let planID):
+      return .plan(
         ArkForgeExecutablePlan(
           planID: planID, planSHA256: String(repeating: "d", count: 64),
           providerExecutionPlanSHA256: "", publicProjectionSHA256: "",
-          expiresAtEpochMS: .max, executionPurpose: executionPurpose)),
-      expectedExecutionPurpose: executionPurpose)
+          expiresAtEpochMS: .max, executionPurpose: expectedExecutionPurpose,
+          mechanicsMaturityKeySHA256: Self.mechanicsKey,
+          mechanicsMaturityState: "hardwareCampaign",
+          mechanicsMaturityCampaign: body.authoritySupportDetail,
+          authoritySupportKeySHA256: finalAuthoritySupportKeyOverride
+            ?? SHA256Hex.lowercaseHex(Data(body.authoritySupportKeySHA256)),
+          authoritySupportState: body.authoritySupportState,
+          authoritySupportCampaign: body.authoritySupportDetail))
+    case .gated:
+      return .assessment(
+        ArkForgePlanAssessment(
+          availability: "unavailable", unavailableReason: "hardwareGated",
+          unknowns: ["RK-M02": "hardwareGated"],
+          mechanicsMaturityKeySHA256: Self.mechanicsKey,
+          mechanicsMaturityState: "hardwareGated",
+          authoritySupportKeySHA256: SHA256Hex.lowercaseHex(
+            Data(body.authoritySupportKeySHA256)),
+          authoritySupportState: body.authoritySupportState))
+    }
+  }
+
+  static func executable(
+    planID: String = "PLAN-1", executionPurpose: String = "primaryFlash",
+    publicMechanicsKey: String = mechanicsKey,
+    finalAuthoritySupportKeyOverride: String? = nil,
+    requestRecorder: MaterializeRequestRecorder? = nil
+  ) -> ScriptedPlanSource {
+    ScriptedPlanSource(
+      result: .executable(planID: planID),
+      expectedExecutionPurpose: executionPurpose,
+      publicMechanicsKey: publicMechanicsKey,
+      finalAuthoritySupportKeyOverride: finalAuthoritySupportKeyOverride,
+      requestRecorder: requestRecorder)
   }
 
   /// The shape a `hardwareGated` combination produces.
   static func gated() -> ScriptedPlanSource {
     ScriptedPlanSource(
-      answer: .assessment(
-        ArkForgePlanAssessment(
-          availability: "unavailable",
-          unavailableReason:
-            "materialization is complete but execution is gated; maturity is hardwareGated",
-          unknowns: [
-            "RK-M02": "provider/profile/artifact/toolchain/platform combination is hardwareGated"
-          ])),
-      expectedExecutionPurpose: "primaryFlash")
+      result: .gated,
+      expectedExecutionPurpose: "primaryFlash",
+      publicMechanicsKey: mechanicsKey,
+      finalAuthoritySupportKeyOverride: nil,
+      requestRecorder: nil)
   }
+}
+
+final class MaterializeRequestRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var recorded: [ArkForgeMaterializePlanRequest] = []
+
+  func record(_ request: ArkForgeMaterializePlanRequest) {
+    lock.lock()
+    recorded.append(request)
+    lock.unlock()
+  }
+
+  var requests: [ArkForgeMaterializePlanRequest] {
+    lock.lock()
+    defer { lock.unlock() }
+    return recorded
+  }
+}
+
+func scriptedAuthoritySupport(
+  campaign: String = "AFA-CONTRACT"
+) -> ArkForgeAuthoritySupport.Configuration {
+  .init(
+    authorityImplementationSHA256: String(repeating: "a", count: 64),
+    managedControlToolSHA256: String(repeating: "b", count: 64),
+    hardwareCampaign: campaign)
 }
 
 struct RefusingPlanSource: ArkForgePlanSource {

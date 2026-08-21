@@ -1,13 +1,13 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckCore
 @testable import ArkDeckWorkflows
 @testable import ArkForgeClient
 @testable import ArkForgeProtocol
 
-// CHG-2026-068 LPP-AC-1/2: the lane plan preview is exactly three read-only
-// calls, and every state it can return is an honest mapping of what the
-// daemon said. Nothing here imports, starts, permits, or persists.
+// CHG-2026-068 LPP-AC-1/2: the lane plan preview performs only assessment and
+// materialization calls. Nothing here imports, starts, permits, or persists.
 
 final class LanePlanPreviewContractTests: XCTestCase {
   private static let topology = "17956864"
@@ -32,19 +32,19 @@ final class LanePlanPreviewContractTests: XCTestCase {
   private struct StoreMiss: Error {}
 
   private struct RecordingPlanSource: ArkForgePlanSource {
+    enum Role: String { case controller, publicAssessment }
     let recorder: CallRecorder
+    var role: Role = .controller
     var inspectKnowsArtifact = true
     var observedTopology = LanePlanPreviewContractTests.topology
-    var answer: ArkForgeMaterializePlanResponse = .plan(
-      ArkForgeExecutablePlan(
-        planID: "PLAN-preview", planSHA256: String(repeating: "d", count: 64),
-        providerExecutionPlanSHA256: "", publicProjectionSHA256: "",
-        expiresAtEpochMS: .max, executionPurpose: "primaryFlash"))
+    var mechanicsState = "hardwareCampaign"
+    var unavailableReason = "maturity is hardwareGated"
+    static let mechanicsKey = String(repeating: "9", count: 64)
 
     func importArtifact(
       contentsOf _: URL, expectedSHA256: String, requestID _: String
     ) throws -> ArkForgeImportArtifactResponse {
-      recorder.record("importArtifact")
+      recorder.record("\(role.rawValue).importArtifact")
       return ArkForgeImportArtifactResponse(
         artifactID: expectedSHA256, contentSHA256: expectedSHA256, sizeBytes: 1,
         deduplicated: false)
@@ -53,7 +53,7 @@ final class LanePlanPreviewContractTests: XCTestCase {
     func inspectArtifact(
       artifactID: String, requestID _: String
     ) throws -> ArkForgeInspectArtifactResponse {
-      recorder.record("inspectArtifact")
+      recorder.record("\(role.rawValue).inspectArtifact")
       guard inspectKnowsArtifact else { throw StoreMiss() }
       return ArkForgeInspectArtifactResponse(
         formatID: "rockchip.dayu200", contentSHA256: artifactID, sizeBytes: 1,
@@ -61,7 +61,7 @@ final class LanePlanPreviewContractTests: XCTestCase {
     }
 
     func discoverDevices(requestID _: String) throws -> [ArkForgeDeviceObservation] {
-      recorder.record("discoverDevices")
+      recorder.record("\(role.rawValue).discoverDevices")
       return [
         ArkForgeDeviceObservation(
           observationID: "USB-2207-5000-01200000", observedAtEpochMS: 0,
@@ -77,33 +77,80 @@ final class LanePlanPreviewContractTests: XCTestCase {
     func materializePlan(
       _ body: ArkForgeMaterializePlanRequest, requestID _: String
     ) throws -> ArkForgeMaterializePlanResponse {
-      recorder.record("materializePlan")
+      recorder.record("\(role.rawValue).materializePlan")
       XCTAssertEqual(body.artifactID, LanePlanPreviewContractTests.archive)
       XCTAssertEqual(body.profileID, LanePlanPreviewContractTests.profileID)
-      return answer
+      if role == .publicAssessment {
+        XCTAssertTrue(body.authoritySupportKeySHA256.isEmpty)
+        return .assessment(
+          ArkForgePlanAssessment(
+            availability: "unavailable",
+            unavailableReason: "public sessions cannot publish executable plans",
+            unknowns: ["RK-A01": "public assessment"],
+            mechanicsMaturityKeySHA256: Self.mechanicsKey,
+            mechanicsMaturityState: "hardwareGated",
+            authoritySupportKeySHA256: String(repeating: "8", count: 64),
+            authoritySupportState: "hardwareGated"))
+      }
+      let keyHex = SHA256Hex.lowercaseHex(Data(body.authoritySupportKeySHA256))
+      let pendingHex = SHA256Hex.lowercaseHex(Data(ArkForgeAuthoritySupport.pendingKeySHA256))
+      if keyHex == pendingHex {
+        return .assessment(
+          ArkForgePlanAssessment(
+            availability: "unavailable", unavailableReason: unavailableReason,
+            unknowns: mechanicsState == "hardwareCampaign"
+              ? ["RK-A01": "pending authority support"] : ["RK-M02": "hardwareGated"],
+            mechanicsMaturityKeySHA256: Self.mechanicsKey,
+            mechanicsMaturityState: mechanicsState,
+            authoritySupportKeySHA256: pendingHex,
+            authoritySupportState: "hardwareGated"))
+      }
+      return .plan(
+        ArkForgeExecutablePlan(
+          planID: "PLAN-preview", planSHA256: String(repeating: "d", count: 64),
+          providerExecutionPlanSHA256: "", publicProjectionSHA256: "",
+          expiresAtEpochMS: .max, executionPurpose: "primaryFlash",
+          mechanicsMaturityKeySHA256: Self.mechanicsKey,
+          mechanicsMaturityState: mechanicsState,
+          mechanicsMaturityCampaign: body.authoritySupportDetail,
+          authoritySupportKeySHA256: keyHex,
+          authoritySupportState: body.authoritySupportState,
+          authoritySupportCampaign: body.authoritySupportDetail))
     }
   }
 
   private func host(_ source: RecordingPlanSource) -> ArkForgeLaneHost {
-    ArkForgeLaneHost(
+    var publicSource = source
+    publicSource.role = .publicAssessment
+    let assessmentSource = publicSource
+    return ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
       toolchainSHA256: String(repeating: "0", count: 64),
       makePerformer: { _, _ in preconditionFailure("a preview never builds a performer") },
       makeClient: { _ in preconditionFailure("a preview never opens the job client") },
       makeMaterializer: { _ in source },
+      makeAssessmentSource: { _ in assessmentSource },
+      authoritySupport: scriptedAuthoritySupport(),
       makeAuthority: { _, _, _, _ in
         preconditionFailure("a preview never builds an authority")
       })
   }
 
-  func testPreviewIsExactlyThreeReadOnlyCalls() async {
+  func testPreviewUsesTwoFailClosedAssessmentsBeforeTheExecutablePlan() async {
     let recorder = CallRecorder()
     let outcome = await host(RecordingPlanSource(recorder: recorder)).previewPlan(
       archiveSHA256: Self.archive, profileID: Self.profileID, usbTopology: Self.topology)
 
     XCTAssertEqual(
-      recorder.calls, ["inspectArtifact", "discoverDevices", "materializePlan"],
-      "the preview is the read-only prefix of materialization and nothing else")
+      recorder.calls,
+      [
+        "controller.inspectArtifact", "publicAssessment.inspectArtifact",
+        "publicAssessment.discoverDevices", "publicAssessment.materializePlan",
+        "controller.discoverDevices", "controller.materializePlan",
+        "controller.materializePlan",
+      ],
+      "the preview gets a public mechanics key and a gated controller assessment before "
+        + "materializing the sealed plan")
     XCTAssertEqual(
       outcome,
       .available(
@@ -120,7 +167,7 @@ final class LanePlanPreviewContractTests: XCTestCase {
 
     XCTAssertEqual(outcome, .bundleNotInLaneStore)
     XCTAssertEqual(
-      recorder.calls, ["inspectArtifact"],
+      recorder.calls, ["controller.inspectArtifact"],
       "a store miss stops the preview; importing 731 MB to answer a preview is the "
         + "exact cost this state exists to avoid")
   }
@@ -136,17 +183,19 @@ final class LanePlanPreviewContractTests: XCTestCase {
       return XCTFail("a port-path mismatch must be an observation state, got \(outcome)")
     }
     XCTAssertTrue(reason.contains(Self.topology), reason)
-    XCTAssertEqual(recorder.calls, ["inspectArtifact", "discoverDevices"])
+    XCTAssertEqual(
+      recorder.calls,
+      [
+        "controller.inspectArtifact", "publicAssessment.inspectArtifact",
+        "publicAssessment.discoverDevices",
+      ])
   }
 
   func testAssessmentSurfacesAsPlanNotExecutableWithItsReasons() async {
     let recorder = CallRecorder()
     var source = RecordingPlanSource(recorder: recorder)
-    source.answer = .assessment(
-      ArkForgePlanAssessment(
-        availability: "unavailable",
-        unavailableReason: "maturity is hardwareGated",
-        unknowns: ["RK-M02": "combination is hardwareGated"]))
+    source.mechanicsState = "hardwareGated"
+    source.unavailableReason = "maturity is hardwareGated"
     let outcome = await host(source).previewPlan(
       archiveSHA256: Self.archive, profileID: Self.profileID, usbTopology: Self.topology)
 
@@ -154,6 +203,6 @@ final class LanePlanPreviewContractTests: XCTestCase {
       outcome,
       .planNotExecutable(
         availability: "unavailable", reason: "maturity is hardwareGated",
-        unknowns: ["RK-M02": "combination is hardwareGated"]))
+        unknowns: ["RK-M02": "hardwareGated"]))
   }
 }
