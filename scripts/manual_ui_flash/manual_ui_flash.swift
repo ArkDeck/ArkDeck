@@ -1431,7 +1431,7 @@ private final class AccessibilityDriver {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if let element = element(identifier: identifier) { return element }
-      if let element = element(displayingAny: fallbackStrings) { return element }
+      if let element = element(displayingNavigationFallback: fallbackStrings) { return element }
       RunLoop.current.run(until: Date().addingTimeInterval(0.2))
     } while Date() < deadline
     throw DriverFailure.message("UI element not found: \(identifier)")
@@ -1443,16 +1443,40 @@ private final class AccessibilityDriver {
     }
   }
 
-  private func element(displayingAny strings: [String]) -> AXUIElement? {
-    guard !strings.isEmpty else { return nil }
-    let attributes = [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute]
-      .map { $0 as CFString }
-    return descendants(of: application).first { element in
-      attributes.contains { attribute in
-        guard let value = stringAttribute(element, attribute) else { return false }
-        return strings.contains(value)
+  /// Finds the one localized sidebar destination admitted by the candidate
+  /// grammar when SwiftUI does not publish its accessibility identifier.
+  ///
+  /// macOS 26 can flatten a NavigationLink into an AXRow whose computed label
+  /// includes its symbol or surrounding whitespace.  Match only selectable
+  /// control roles, prefer rows, and inspect their bounded descendant strings;
+  /// a window or workspace paragraph containing the word "Flash" must never
+  /// become the click target.
+  private func element(displayingNavigationFallback fallbackStrings: [String]) -> AXUIElement? {
+    guard !fallbackStrings.isEmpty else { return nil }
+    let expected = fallbackStrings.map(normalizedNavigationText)
+    let candidates = descendants(of: application)
+    let permittedRoles = [
+      kAXRowRole as String, kAXButtonRole as String,
+    ]
+
+    for role in permittedRoles {
+      for element in candidates
+      where stringAttribute(element, kAXRoleAttribute as CFString) == role {
+        let observed = strings(near: element).map(normalizedNavigationText)
+        if observed.contains(where: { value in
+          expected.contains(where: { value == $0 || value.contains($0) })
+        }) {
+          return element
+        }
       }
     }
+    return nil
+  }
+
+  private func normalizedNavigationText(_ value: String) -> String {
+    value
+      .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   private func descendants(of root: AXUIElement) -> [AXUIElement] {

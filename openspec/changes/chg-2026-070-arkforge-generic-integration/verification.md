@@ -3,8 +3,8 @@
 > Change:CHG-2026-070-arkforge-generic-integration@r1
 >
 > Status: AFG-AC-1..8 implemented and contract-verified; AFG-AC-9 remains
-> blocked on the TASK-AFG-002 AOT XPC bridge remediation review/merge, typed
-> reconciliation of an earlier outcome-unknown Job, and the canonical run.
+> blocked on the TASK-AFG-002 macOS 26 sidebar navigation fallback
+> remediation review/merge and the canonical run.
 
 | AC | Method | Expected result |
 | --- | --- | --- |
@@ -36,7 +36,7 @@
 - AFG-AC-7: Flash application contracts prove new UI requests use only
   `flash.full-restore@1`; typed progress derives phases from catalog step kinds
   without DAYU200 step-id branching.
-- AFG-AC-8: the full ArkDeckKit suite passes 1473 tests with 17 environment-
+- AFG-AC-8: the full ArkDeckKit suite passes 1487 tests with 17 environment-
   gated tests skipped and zero failures. The API baseline consumer builds, and
   `testFlashSingletonPersistedAliasKeepsRecoveryJournalSchema` proves old
   `flash.dayu200@1` records remain decode-only readable/recoverable without
@@ -47,7 +47,7 @@ or prior digest cannot substitute for the maintainer-operated destructive run.
 
 ## Protected-main cutover preflight — 2026-08-22
 
-- ArkDeck protected main `9b82b82aa98a284a82483801600c69b55ae9041f`
+- ArkDeck protected main `2f6b1979a13a5fd1d2e370db8fe78461dd78df0d`
   and ArkForge protected main `3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92`
   reached `execution: ready`; the Runtime composed the
   `org.openharmony.dayu200@1.0.0` ArkForge lane against one adopted target.
@@ -71,18 +71,23 @@ or prior digest cannot substitute for the maintainer-operated destructive run.
   and daemon/toolchain SHA-256
   `408b9bc7520275fde0eacfa4fe63db49ba5982fbcdb9c6e3c2797dcd81853d66`.
   It was unsigned and is preflight evidence only, not release acceptance.
-- The App bridge then failed before submit on macOS 26: interpreted Swift
-  protocol metadata could not construct `NSXPCInterface` and raised
-  `NSInvalidArgumentException`. No new Runtime Job or device dispatch occurred.
-  The actuator now compiles the exact source into an owner-private,
-  source-digest-addressed AOT executable and `execv`s it before constructing
-  the interface. `ManualUIFlashBridgeContractTests` executes this real
-  interpreter-to-AOT path and passes; the existing 16
-  `ManualUIFlashDriverContractTests` also remain green.
-- Runtime exposed an earlier canonical full-restore Job with
-  `outcomeUnknown=true`. It was not created or replayed in this preflight. The
-  typed status contract requires reconciliation, while preserving the rule
-  that the original destructive effect is never redispatched.
+- PR #1455 moved the interpreted Swift XPC bridge to an exact-source,
+  owner-private AOT executable; PR #1456 replaced the undocumented remote-view
+  file-panel identifier with stable panel controls and workspace readback.
+- The next protected-main stop-before-submit run reached the App but macOS 26
+  exposed the SwiftUI Flash sidebar destination as a selectable AX row without
+  its stable identifier. Computer-use inspection proved the row was visible,
+  selected normally and opened the exact Flash workspace. The actuator refused
+  before archive selection because its fallback required a byte-exact raw AX
+  label. No Runtime Job or device dispatch occurred and the debug session used
+  zero destructive epochs.
+- The remediation confines localized substring matching to row/button
+  roles already admitted for the exact Flash navigation action; window titles
+  and workspace prose cannot become click targets. The script typechecks and
+  the architecture boundary contract passes.
+- Typed Runtime pagination reports no current Job. Historical unknown records
+  are either superseded or carry an explicit target-alias resolution owner;
+  none was replayed during this preflight.
 
 Real-device verification must not be inferred from a mock, scripted process or
 prior catalog digest. Alias execution parity is established from materialized

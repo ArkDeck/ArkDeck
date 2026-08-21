@@ -2,9 +2,11 @@
 
 CHG-2026-070@r1 已由维护者通过 PR #1443 review/merge；TASK-AFG-001 原实现
 已通过 PR #1444、launcher authority-liveness 修复已通过 PR #1454，TASK-AFG-002
-contract stage 已通过 PR #1449。protected-main 真机预检已到达 Runtime ready 并完成
-canonical/alias plan parity；macOS 26 暴露 interpreted Swift XPC protocol 无法构造
-`NSXPCInterface` 的产品缺陷，本轮在原职责边界内修复 actuator 后再继续 cutover。
+contract stage 已通过 PR #1449。AOT XPC bridge 与 remote-view file panel 修复已分别
+通过 PR #1455、#1456；protected-main 真机预检已到达 Runtime ready 并完成
+canonical/alias plan parity。macOS 26 将 SwiftUI sidebar destination 压平为无稳定
+identifier 的 AX row，本轮在同一 actuator 职责边界内收紧本地化导航 fallback 后继续
+cutover。
 
 ## TASK-AFG-001 — ArkForge Swift SDK and release bundle
 
@@ -32,8 +34,8 @@ preflight reached `execution: ready` and composed the DAYU200 lane.
 
 ## TASK-AFG-002 — Generic operation and alias cutover
 
-- Status:in-progress（AFG-AC-4..8 已通过、实现 #1449 已合入；修复 macOS 26
-  interpreted Swift XPC bridge 后继续真机 cutover）
+- Status:in-progress（AFG-AC-4..8 已通过、实现 #1449 及 actuator 修复 #1455、
+  #1456 已合入；修复 macOS 26 identifier-less AX sidebar row 后继续真机 cutover）
 - Platform: macos
 - Hardware required: no for contract stage; yes for final cutover
 - Golden Journey: GJ-4
@@ -92,8 +94,9 @@ from production consumers.
 
 ## TASK-AFG-003 — Real-device cutover
 
-- Status:blocked（等待 TASK-AFG-002 AOT XPC bridge 修复合入，并通过 typed
-  reconcile 处置既有 outcome-unknown Job；禁止重放原 destructive effect）
+- Status:blocked（等待 TASK-AFG-002 macOS 26 sidebar navigation fallback 修复合入；
+  typed Job 队列为空，既有 unknown lineage 已有 Runtime resolution 归属，禁止重放原
+  destructive effect）
 - Platform: macos
 - Hardware required: yes, DAYU200
 - Golden Journey: GJ-4
