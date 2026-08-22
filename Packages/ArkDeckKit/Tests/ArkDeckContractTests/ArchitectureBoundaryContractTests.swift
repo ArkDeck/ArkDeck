@@ -505,6 +505,14 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertFalse(manualDriver.contains("waitForAbsence(\"open-panel\""))
     XCTAssertTrue(manualDriver.contains("try openGoToFolder(timeout: timeout)"))
     XCTAssertTrue(
+      manualDriver.contains("com.apple.appkit.xpc.openAndSavePanelService"))
+    XCTAssertTrue(
+      manualDriver.contains("try keyForExactApplicationOwnedFilePanel("))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "try pressExactApplicationOwnedFilePanel(\"OKButton\", timeout: timeout)"))
+    XCTAssertTrue(manualDriver.contains("guard !runningApplication.isTerminated"))
+    XCTAssertTrue(
       manualDriver.contains(
         "url.lastPathComponent, identifier: \"flash.image.value\", timeout: max(timeout, 30)"))
     XCTAssertTrue(
