@@ -89,3 +89,22 @@ export type {
   TagPickerProps,
   TagOption,
 } from "./components/forms.js";
+
+export {
+  ViewerWorkspace,
+  ViewerInspectorStack,
+  ViewerScreenshot,
+  ComponentTree,
+  DumpInspector,
+} from "./components/viewer.js";
+export type {
+  ViewerWorkspaceProps,
+  ViewerInspectorStackProps,
+  ViewerScreenshotProps,
+  ViewerRegion,
+  ViewerBounds,
+  ComponentTreeProps,
+  ComponentTreeNode,
+  DumpInspectorProps,
+  DumpField,
+} from "./components/viewer.js";

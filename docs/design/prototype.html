@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArkDeck 交互原型 v0.6</title>
+<title>ArkDeck 交互原型 v0.8</title>
 <style>
 :root{
   color-scheme:light dark;
@@ -227,6 +227,59 @@ select.inp{cursor:pointer}
 .acmode .acin{display:inline-block}
 .two{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
 @media(max-width:940px){.two{grid-template-columns:1fr}}
+.viewer-page{padding:0;gap:0;overflow:hidden}
+.viewer-lead{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);min-width:0}
+.viewer-lead h1{white-space:nowrap}.viewer-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;flex:1}
+.viewer-toolbar .inp{height:29px;min-width:150px;max-width:220px}.viewer-toolbar .btn{white-space:nowrap}
+.viewer-status{display:flex;align-items:center;gap:7px;color:var(--ink2);font-size:11.5px;white-space:nowrap}
+.viewer-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.viewer-workspace{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(460px,1.38fr);min-height:0;flex:1;background:var(--panel)}
+.viewer-pane{display:flex;flex-direction:column;min-width:0;min-height:0;border-inline-end:1px solid var(--line);background:var(--panel)}
+.viewer-pane-head{min-height:43px;display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);flex:none}
+.viewer-pane-head h2{white-space:nowrap}.viewer-pane-head .meta{font-size:11px;color:var(--ink2);white-space:nowrap}
+.viewer-devtools{--viewer-tree-size:60%;display:grid;grid-template-rows:minmax(150px,var(--viewer-tree-size)) 7px minmax(130px,1fr);min-width:0;min-height:0;background:var(--panel)}
+.viewer-tree-pane{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--panel)}
+.viewer-inspector{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--panel)}
+.viewer-splitter{position:relative;z-index:2;border:0;border-block:1px solid var(--line);background:var(--panel2);cursor:row-resize;touch-action:none}
+.viewer-splitter::after{content:"";position:absolute;inset-block-start:50%;inset-inline-start:50%;width:36px;height:2px;border-radius:2px;background:var(--ink3);opacity:.65;transform:translate(-50%,-50%)}
+.viewer-splitter:hover,.viewer-splitter:focus-visible{background:var(--accent-weak)}.viewer-splitter:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.viewer-splitter:focus-visible::after{background:var(--accent);opacity:1}
+.viewer-screen-canvas{position:relative;flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:14px;background-color:var(--ground);background-image:linear-gradient(45deg,var(--line) 25%,transparent 25%),linear-gradient(-45deg,var(--line) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,var(--line) 75%),linear-gradient(-45deg,transparent 75%,var(--line) 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
+.viewer-screen{width:min(260px,calc(100% - 16px));aspect-ratio:10/17;position:relative;overflow:hidden;border-radius:14px;background:#f5f6f8;color:#202124;outline:1px solid rgba(0,0,0,.1);box-shadow:0 10px 30px rgba(0,0,0,.14);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;flex:none}
+.viewer-screen-status{height:25px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:9px;font-weight:600}
+.viewer-screen-title{height:39px;padding:5px 15px;font-size:18px;font-weight:700}
+.viewer-search{height:31px;margin:0 12px 8px;border-radius:17px;background:white;color:#7a7d81;display:flex;align-items:center;padding:0 12px;font-size:10px}
+.viewer-profile{height:55px;margin:0 10px 8px;border-radius:11px;background:white;display:flex;align-items:center;gap:9px;padding:8px 12px}
+.viewer-avatar{width:32px;height:32px;border-radius:50%;background:#d4d7dc;display:grid;place-items:center;color:white;font-size:16px}
+.viewer-profile b{font-size:12px}.viewer-profile small{display:block;color:#81858b;font-size:8.5px;margin-top:2px}
+.viewer-settings{margin:0 10px;display:flex;flex-direction:column;gap:6px}
+.viewer-setting{height:43px;border-radius:10px;background:white;display:flex;align-items:center;gap:9px;padding:0 11px}
+.viewer-setting-icon{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:white;font-size:11px;font-weight:700;flex:none}
+.viewer-setting-copy{min-width:0;flex:1;font-size:11px;font-weight:600}
+.viewer-setting-copy small{display:block;color:#81858b;font-size:8.5px;font-weight:400}.viewer-setting .chev{color:#a6a9ae;font-size:15px}
+.viewer-switch{width:34px;height:19px;border-radius:12px;background:#2f80ed;padding:2px;display:flex;justify-content:flex-end}
+.viewer-switch::after{content:"";width:15px;height:15px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.viewer-hit{position:absolute;z-index:3;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 5%,transparent);padding:0;cursor:pointer;border-radius:4px;color:transparent}.viewer-hit:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 11%,transparent)}.viewer-hit.on{z-index:4;border:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--panel-solid) 72%,transparent)}
+.viewer-hit.on::after{content:attr(data-label);position:absolute;inset-block-start:-22px;inset-inline-end:-2px;height:18px;padding:1px 5px;border-radius:4px;background:var(--accent-fill);color:var(--accent-ink);font:9px/16px var(--mono);white-space:nowrap;box-shadow:var(--control-shadow)}
+.viewer-tree{overflow:auto;flex:1;min-height:0;padding:6px 4px;scrollbar-gutter:stable}
+.viewer-tree-row{width:max-content;min-width:100%;min-height:27px;border:0;border-radius:6px;background:transparent;color:var(--ink);display:grid;grid-template-columns:14px 16px max-content auto;align-items:center;gap:4px;padding-block:3px;padding-inline-end:7px;padding-inline-start:calc(7px + (var(--level,1) - 1)*14px);font-size:11.5px;text-align:start;cursor:pointer}
+.viewer-tree-row:hover{background:var(--selection)}.viewer-tree-row.on{background:var(--accent-fill);color:var(--accent-ink)}.viewer-tree-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.viewer-tree-row .label{white-space:nowrap}.viewer-tree-row .sub{font-weight:400;opacity:.72;margin-inline-start:4px}
+.viewer-tree-id{font:10.5px var(--mono);opacity:.72}
+.viewer-chevron{font-size:9px;text-align:center}
+.viewer-node-icon{width:13px;height:13px;border:1px solid currentColor;border-radius:3px;opacity:.65}
+.viewer-inspector-head{padding:8px 12px 7px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.viewer-inspector-title{display:flex;align-items:center;gap:7px}
+.viewer-inspector-title strong{font-size:14px}
+.viewer-section-label{color:var(--ink2);font-size:11px;font-weight:600;margin-inline-end:2px}
+.viewer-breadcrumb{font-size:10.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer-inspector-body{overflow:auto;min-height:0;flex:1}
+.viewer-kv{display:grid;grid-template-columns:minmax(96px,.8fr) minmax(120px,1.2fr);margin:0;font-size:11.5px}
+.viewer-kv dt,.viewer-kv dd{padding:6px 10px;border-bottom:1px solid var(--line);margin:0;min-width:0}.viewer-kv dt{color:var(--ink2)}.viewer-kv dd{font-family:var(--mono);font-size:10.8px;overflow-wrap:anywhere}
+.viewer-disclosure{margin:8px 10px;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.viewer-disclosure summary{padding:7px 9px;font-size:11.5px;font-weight:600;cursor:pointer}.viewer-disclosure .viewer-kv dt,.viewer-disclosure .viewer-kv dd{padding:5px 8px}
+.viewer-raw{margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font:10.5px/1.55 var(--mono);color:var(--ink);background:var(--panel2)}
+.viewer-footer{min-height:29px;display:flex;align-items:center;gap:6px;padding:5px 12px;border-top:1px solid var(--line);color:var(--ink2);font:10.5px var(--mono);flex:none}
+@media(max-width:1050px){.viewer-lead{align-items:flex-start}.viewer-toolbar{flex-wrap:wrap}.viewer-workspace{grid-template-columns:minmax(250px,.72fr) minmax(400px,1.28fr)}}
+@media(max-width:760px){.viewer-page{overflow-y:auto}.viewer-workspace{grid-template-columns:1fr;flex:none;min-height:auto}.viewer-pane{min-height:500px;border-inline-end:0;border-bottom:1px solid var(--line)}.viewer-devtools{min-height:720px}.viewer-lead{flex-direction:column}.viewer-toolbar{justify-content:flex-start;width:100%}}
 .device-layout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(420px,1.18fr);gap:24px;max-width:920px}
 .device-section{display:flex;flex-direction:column;gap:12px;min-width:0}
 .device-section h2{padding-bottom:7px;border-bottom:1px solid var(--line)}
@@ -319,7 +372,7 @@ select.inp{cursor:pointer}
   </defs>
 </svg>
 
-<p class="note"><b>ArkDeck macOS 交互原型 v0.6</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v0.6）同版本。v0.6 将 Flash 收敛为选择镜像、执行真实刷机、查看估算进度与结果；技术与安全事实默认收进“刷机详情”。工具栏可切换语言、外观与 AC 标注。所有数据均为演示数据，不连接设备，也不构成真实硬件验收。</p>
+<p class="note"><b>ArkDeck macOS 交互原型 v0.8</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v0.8）同版本。Viewer 使用 DevTools 式双区检查器：左侧设备截图，右侧上方完整 UI 树、下方当前节点属性。工具栏可切换语言、外观与 AC 标注。所有数据均为演示数据，不连接设备，也不构成真实硬件验收。</p>
 
 <div class="window" id="win" aria-label="ArkDeck 设计原型窗口">
   <div class="titlebar" role="toolbar" aria-label="窗口工具栏">
@@ -382,7 +435,7 @@ const S = {
   recovery:{archived:false},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
-  dump:{policy:"none", ran:false, running:false, recipe:"elementTree", win:12, comp:"33"},
+  viewer:{selected:42, showBounds:true, query:"", tab:"attributes", capturedAt:"刚刚采集", treeSize:60, expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
   trace:{running:false, done:false, mode:"preset", preset:0, dur:15,
          tags:new Set(["ace","app","ability","graphic","ohos","sched","freq","sync"])},
   lg:{on:false, paused:false, pend:0, shard:11.8, piece:3, lvl:"W", tag:"", timer:null, ms:12400,
@@ -409,7 +462,7 @@ const DEVICES=[
   {id:"tab01", name:"Unknown tablet", tp:"USB", state:"unauthorized", build:"—", key:"connect key 已脱敏"}
 ];
 const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug","debug","Debug"],
-  ["dump","dump","UI Dump"],["trace","trace","Trace"],["history","history","History"],
+  ["dump","dump","Viewer"],["trace","trace","Trace"],["history","history","History"],
   ["automation","automation","Automation"]];
 const HIST=[
   {id:"S-0713-06", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
@@ -417,7 +470,7 @@ const HIST=[
   {id:"S-0712-02", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200", when:"07-12 15:40"},
   {id:"S-0712-03", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景(reconcile 一致)", when:"07-12 16:11"},
   {id:"S-0711-04", st:"interrupted", mode:"execute",   dev:"DAYU200", what:"Flash · flash-partitions(outcomeUnknown)", when:"07-11 23:47"},
-  {id:"S-0711-05", st:"failed",      mode:"execute",   dev:"DAYU200", what:"UI Dump · elementTree(设备离线)", when:"07-11 20:15"}
+  {id:"S-0711-05", st:"failed",      mode:"execute",   dev:"DAYU200", what:"Viewer · elementTree(设备离线)", when:"07-11 20:15"}
 ];
 const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span class="chip danger">✕ 失败</span>',
   planned:'<span class="chip planned">◇ PLANNED</span>',cancelled:'<span class="chip dim">⊘ 已取消</span>',
@@ -756,94 +809,192 @@ function pAuth(){
   </div></div>`;
 }
 
-/* ---------- UI Dump ---------- */
-const RECIPES={
-  elementTree:{label:"elementTree",cmd:(w,c)=>`-w ${w} -element -c`},
-  nodeSummary:{label:"nodeSummary",cmd:(w,c)=>`-w ${w} -default`},
-  fullDefaultTree:{label:"fullDefaultTree",cmd:(w,c)=>`-w ${w} -default -all`},
-  componentDetail:{label:"componentDetail",cmd:(w,c)=>`-w ${w} -element -lastpage ${c}`}
-};
-function dumpCmd(){return RECIPES[S.dump.recipe].cmd(S.dump.win,S.dump.comp||"<compId>");}
-function pickWin(id){S.dump.win=id;renderPage();}
-function setComp(el){
-  S.dump.comp=el.value.replace(/[^0-9]/g,"");el.value=S.dump.comp;
-  const c=$("dumpcmd");if(c)c.textContent=dumpCmd();
+/* ---------- Viewer ---------- */
+const VIEWER_NODES=[
+  {id:1,parent:null,level:1,type:"Root",text:"",bounds:"[0, 0, 1080, 1920]"},
+  {id:3,parent:1,level:2,type:"Stage",text:"",bounds:"[0, 0, 1080, 1920]"},
+  {id:8,parent:3,level:3,type:"Column",text:"",bounds:"[0, 0, 1080, 1920]"},
+  {id:12,parent:8,level:4,type:"Navigation",text:"设置",bounds:"[0, 0, 1080, 176]"},
+  {id:15,parent:8,level:4,type:"Search",text:"搜索设置项",bounds:"[48, 178, 1032, 286]",interactive:true},
+  {id:18,parent:8,level:4,type:"ProfileCard",text:"小艺",bounds:"[40, 310, 1040, 520]",interactive:true},
+  {id:23,parent:18,level:5,type:"Column",text:"AccountSummaryContent",bounds:"[64, 326, 1016, 504]"},
+  {id:24,parent:23,level:6,type:"Row",text:"ProfileIdentityContainer",bounds:"[76, 338, 1004, 492]"},
+  {id:25,parent:24,level:7,type:"CustomComponent",text:"HarmonyAccountAvatarAndCloudStatus",bounds:"[88, 350, 992, 480]"},
+  {id:26,parent:25,level:8,type:"BuilderNode",text:"AccountDetailActionSlot",bounds:"[100, 362, 980, 468]"},
+  {id:27,parent:26,level:9,type:"ConditionalContent",text:"CloudStorageSubscriptionSummary",bounds:"[112, 374, 968, 456]"},
+  {id:21,parent:8,level:4,type:"List",text:"",bounds:"[40, 548, 1040, 1710]"},
+  {id:22,parent:21,level:5,type:"ListItem",text:"WLAN",bounds:"[40, 548, 1040, 694]",interactive:true},
+  {id:31,parent:22,level:6,type:"Row",text:"WLAN",bounds:"[62, 560, 1018, 684]",interactive:true},
+  {id:32,parent:31,level:7,type:"Image",text:"wifi",bounds:"[72, 580, 144, 652]"},
+  {id:38,parent:31,level:7,type:"Text",text:"WLAN",bounds:"[176, 582, 410, 650]"},
+  {id:40,parent:31,level:7,type:"Row",text:"已连接",bounds:"[650, 570, 1008, 674]",interactive:true},
+  {id:41,parent:40,level:8,type:"Text",text:"已连接",bounds:"[650, 586, 812, 652]"},
+  {id:42,parent:40,level:8,type:"Toggle",text:"WLAN",bounds:"[824, 286, 892, 326]",interactive:true,inspectorId:"wifi_switch",checked:true},
+  {id:50,parent:21,level:5,type:"ListItem",text:"蓝牙",bounds:"[40, 704, 1040, 850]",interactive:true},
+  {id:51,parent:50,level:6,type:"Text",text:"蓝牙",bounds:"[176, 738, 410, 806]"},
+  {id:58,parent:21,level:5,type:"ListItem",text:"移动网络",bounds:"[40, 860, 1040, 1006]",interactive:true},
+  {id:66,parent:21,level:5,type:"ListItem",text:"超级终端",bounds:"[40, 1016, 1040, 1162]",interactive:true},
+  {id:74,parent:21,level:5,type:"ListItem",text:"更多连接",bounds:"[40, 1172, 1040, 1318]",interactive:true},
+  {id:82,parent:21,level:5,type:"ListItem",text:"显示和亮度",bounds:"[40, 1340, 1040, 1486]",interactive:true},
+  {id:90,parent:21,level:5,type:"ListItem",text:"声音和振动",bounds:"[40, 1496, 1040, 1642]",interactive:true},
+  {id:98,parent:21,level:5,type:"ListItem",text:"通知和状态栏",bounds:"[40, 1652, 1040, 1798]",interactive:true},
+  {id:120,parent:8,level:4,type:"Column",text:"safe-area",bounds:"[0, 1800, 1080, 1920]"}
+];
+function viewerNode(id){return VIEWER_NODES.find(n=>n.id===Number(id))||VIEWER_NODES[0];}
+function viewerChildren(id){return VIEWER_NODES.filter(n=>n.parent===id);}
+function viewerPath(node){const p=[];let n=node;while(n){p.unshift(n.type);n=n.parent==null?null:viewerNode(n.parent);}return p.join(" / ");}
+function viewerRaw(node){
+  return {id:node.id,type:node.type,inspectorId:node.inspectorId||"",text:node.text,bounds:node.bounds,
+    enabled:true,visible:true,clickable:!!node.interactive,focusable:!!node.interactive,checked:!!node.checked,
+    selected:false,focused:false,accessibilityText:node.text||node.type,accessibilityGroup:false,
+    accessibilityLevel:"auto",importantForAccessibility:"auto",opacity:1,zIndex:0,hitTestBehavior:"Default",
+    position:{x:0,y:0},size:{width:"auto",height:"auto"},margin:{top:0,right:0,bottom:0,left:0},
+    padding:{top:0,right:0,bottom:0,left:0},borderWidth:0,borderRadius:node.type==="Toggle"?18:0,
+    backgroundColor:"transparent",foregroundColor:"#202124",clip:false,transform:"identity",scale:{x:1,y:1},
+    rotation:0,layoutWeight:0,flexGrow:0,flexShrink:1,alignSelf:"auto",justifyContent:"start",alignItems:"stretch",
+    direction:"LTR",visibility:"Visible",renderGroup:false,responseRegion:node.bounds,gestureJudgeBegin:false,
+    monopolizeEvents:false,focusOnTouch:false,key:"node-"+node.id,debugLine:"Settings.ets:"+(80+node.id)};
 }
-function pDump(){
-  const d=S.dump;
-  return recoveryHTML()+`
-  <h1>UI Dump <span class="acin">REQ-DUMP-*</span></h1>
-  <p class="hint">仅 ArkUI UI Dump(窗口/组件树/组件详情)。Fault/Crash Artifact 与整机诊断快照首版不支持。<span class="acin">scope 区分</span></p>
-  <div class="two">
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="card" data-acin><span class="ac">AC-DUMP-001-01</span>
-        <h2>窗口清单 <button class="btn" style="margin-left:auto" onclick="renderPage()">刷新</button></h2>
-        <div class="tablewrap"><table>
-          <tr><th>windowId</th><th>名称</th><th>焦点</th></tr>
-          <tr class="${d.win===12?"sel-row":""}" style="cursor:pointer" onclick="pickWin(12)"><td class="mono">12</td><td>com.example.settings / MainAbility</td><td>●</td></tr>
-          <tr class="${d.win===8?"sel-row":""}" style="cursor:pointer" onclick="pickWin(8)"><td class="mono">8</td><td>com.ohos.launcher</td><td></td></tr>
-        </table></div>
-        <p class="hint">来源:<span class="mono">hidumper -s WindowManagerService -a -a</span>。解析失败时保留 raw 输出并允许安全手输 windowId。</p>
-      </div>
-      <div class="card" data-acin><span class="ac">AC-DUMP-003-01</span>
-        <h2>Recipe <span class="mono" id="dumpcmd" style="margin-left:auto;color:var(--accent)">${dumpCmd()}</span></h2>
-        <div class="radio">
-          <label><input type="radio" name="rc" ${d.recipe==="elementTree"?"checked":""} onchange="S.dump.recipe='elementTree';renderPage()"> elementTree — <span class="mono">-w &lt;w&gt; -element -c</span></label>
-          <label><input type="radio" name="rc" ${d.recipe==="nodeSummary"?"checked":""} onchange="S.dump.recipe='nodeSummary';renderPage()"> nodeSummary — <span class="mono">-w &lt;w&gt; -default</span></label>
-          <label><input type="radio" name="rc" ${d.recipe==="fullDefaultTree"?"checked":""} onchange="S.dump.recipe='fullDefaultTree';renderPage()"> fullDefaultTree — <span class="mono">-w &lt;w&gt; -default -all</span></label>
-          <label><input type="radio" name="rc" ${d.recipe==="componentDetail"?"checked":""} onchange="S.dump.recipe='componentDetail';renderPage()"> componentDetail — <span class="mono">-w &lt;w&gt; -element -lastpage &lt;compId&gt;</span></label>
-        </div>
-        ${d.recipe==="componentDetail"?`
-        <div style="display:flex;gap:8px;align-items:center;font-size:12.5px">
-          <span class="hint">compId(安全手输,只接受数字):</span>
-          <input class="inp mono" style="width:100px" value="${esc(d.comp)}" oninput="setComp(this)">
-        </div>`:""}
-      </div>
-      <div class="card" data-acin><span class="ac">AC-DUMP-004-01</span>
-        <h2>Debug 参数策略</h2>
-        <div class="radio">
-          <label><input type="radio" name="pp" ${d.policy==="none"?"checked":""} onchange="S.dump.policy='none'"> 不改变参数<span class="rd">— 以设备当前状态采集</span></label>
-          <label><input type="radio" name="pp" ${d.policy==="temp"?"checked":""} onchange="S.dump.policy='temp'"> 临时开启,结束后恢复<span class="rd">— 仅当原值可读且可写回时可选</span></label>
-          <label><input type="radio" name="pp" ${d.policy==="keep"?"checked":""} onchange="S.dump.policy='keep'"> 保持开启<span class="rd">— 需要二次确认,状态栏持续提醒</span></label>
-        </div>
-        <button class="btn pri" style="align-self:flex-start" onclick="runDump()" ${d.running?"disabled":""}>${d.running?"采集中…":"采集"}</button>
-      </div>
-    </div>
-    <div class="card" data-acin><span class="ac">AC-DUMP-005-01</span>
-      <h2>产物</h2>
-      ${d.ran?`<div class="tablewrap"><table>
-        <tr><th>Artifact</th><th>来源</th><th>SHA-256</th></tr>
-        <tr><td class="mono">stdout.${d.recipe.toLowerCase()}.txt</td><td>stdout</td><td class="mono">artifact.list → SHA-256</td></tr>
-        <tr><td class="mono">sidecar.arkui.dump</td><td>remote sidecar</td><td class="mono">artifact.list → SHA-256</td></tr>
-        <tr><td class="mono">merged.${d.recipe.toLowerCase()}.json</td><td>derived(可重建)</td><td class="mono">artifact.list → SHA-256</td></tr>
-      </table></div>
-      <p class="hint">⚠ Dump 可能包含页面文本/包名/标识符,按敏感数据处理;导出前将提示。raw 永不原地修改。</p>`
-      :'<p class="empty">尚未采集。产物将按 stdout / remote sidecar / merged 派生分行列出并标注来源。</p>'}
-    </div>
-  </div>`;
-}
-function runDump(){
-  if(S.dump.running)return;
-  if(S.dump.policy==="keep"){
-    modal(`<div class="modal dangerm" role="dialog" aria-modal="true"><h3>⚠ 保持 Debug 参数开启?</h3>
-      <div class="impact">persist.ace.debug.enabled 等参数将<b>持久</b>保留在设备上,可能影响性能与后续测量;设备状态栏将持续显示提醒,且该变更计入审计。</div>
-      <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn danger" onclick="closeModal();doDump()">确认保持开启</button></div></div>`);
-  } else doDump();
-}
-function doDump(){
-  S.dump.running=true;
-  const pol=S.dump.policy;
-  const phases=pol==="none"
-    ?["Preflight","WindowInventory","Capture","Sidecars","Receive","Validate","Complete"]
-    :pol==="temp"
-    ?["Preflight","WindowInventory","SnapshotParam","Capture","Sidecars","Receive","Validate","RestoreParam","Complete"]
-    :["Preflight","WindowInventory","SnapshotParam","Capture","Sidecars","Receive","Validate","Complete"];
-  startJob(addJob({title:"UI Dump · "+RECIPES[S.dump.recipe].label+" · w"+S.dump.win+" · DAYU200",
-    mode:"execute",dev:"DAYU200",risk:pol==="none"?1:2,state:"running",
-    phases,phaseIdx:0,safeBoundary:Math.min(3,phases.length-1),tick:420,log:["→ Preflight"],pages:["dump"],
-    onDone:st=>{S.dump.running=false;if(st==="succeeded")S.dump.ran=true;renderPageIf(["dump"]);}}));
+function selectViewerNode(id,focusTree=false){
+  const source=document.activeElement?.classList.contains("viewer-hit")?"hit":document.activeElement?.classList.contains("viewer-tree-row")?"tree":null;
+  S.viewer.selected=Number(id);
+  let parent=viewerNode(id).parent;while(parent!=null){S.viewer.expanded.add(parent);parent=viewerNode(parent).parent;}
   renderPage();
+  requestAnimationFrame(()=>{
+    const row=document.querySelector(`[data-viewer-node="${id}"]`);row?.scrollIntoView({block:"nearest"});
+    if(focusTree||source==="tree")row?.focus();
+    else if(source==="hit")document.querySelector(`.viewer-hit[data-viewer-hit="${id}"]`)?.focus();
+  });
+}
+function toggleViewerBounds(){S.viewer.showBounds=!S.viewer.showBounds;renderPage();}
+function setViewerQuery(input){S.viewer.query=input.value;const tree=$("viewerTree");if(tree)tree.innerHTML=viewerTreeHTML();const count=$("viewerNodeCount");if(count)count.textContent="ArkUI dump · "+viewerVisibleNodes().length+" / "+VIEWER_NODES.length;}
+function setViewerTab(tab){S.viewer.tab=tab;renderPage();requestAnimationFrame(()=>document.querySelector(`[data-viewer-tab="${tab}"]`)?.focus());}
+function viewerTabKey(event,tab){
+  const tabs=["attributes","layout","accessibility","raw"],index=tabs.indexOf(tab);let next=index;
+  if(event.key==="ArrowRight")next=(index+1)%tabs.length;else if(event.key==="ArrowLeft")next=(index-1+tabs.length)%tabs.length;else if(event.key==="Home")next=0;else if(event.key==="End")next=tabs.length-1;else return;
+  event.preventDefault();setViewerTab(tabs[next]);
+}
+function recaptureViewer(){S.viewer.capturedAt="刚刚重新抓取";renderPage();}
+function viewerAncestorsExpanded(node){
+  let parent=node.parent;
+  while(parent!=null){if(!S.viewer.expanded.has(parent))return false;parent=viewerNode(parent).parent;}
+  return true;
+}
+function toggleViewerExpanded(id,focusAfter=true){
+  if(S.viewer.expanded.has(id))S.viewer.expanded.delete(id);else S.viewer.expanded.add(id);
+  renderPage();
+  if(focusAfter)requestAnimationFrame(()=>document.querySelector(`[data-viewer-node="${id}"]`)?.focus());
+}
+function setViewerTreeSize(value,host=document.querySelector(".viewer-devtools")){
+  S.viewer.treeSize=Math.max(35,Math.min(68,Math.round(value)));
+  host?.style.setProperty("--viewer-tree-size",S.viewer.treeSize+"%");
+  const splitter=host?.querySelector(".viewer-splitter");
+  splitter?.setAttribute("aria-valuenow",String(S.viewer.treeSize));
+  splitter?.setAttribute("aria-valuetext",`UI 树占右侧工作区 ${S.viewer.treeSize}%`);
+}
+function resizeViewerStart(event){
+  event.preventDefault();
+  const splitter=event.currentTarget,host=splitter.parentElement,rect=host.getBoundingClientRect();
+  splitter.setPointerCapture(event.pointerId);
+  const move=e=>setViewerTreeSize((e.clientY-rect.top)/rect.height*100,host);
+  const stop=e=>{if(splitter.hasPointerCapture(e.pointerId))splitter.releasePointerCapture(e.pointerId);splitter.removeEventListener("pointermove",move);splitter.removeEventListener("pointerup",stop);splitter.removeEventListener("pointercancel",stop);};
+  splitter.addEventListener("pointermove",move);splitter.addEventListener("pointerup",stop);splitter.addEventListener("pointercancel",stop);
+}
+function resizeViewerKey(event){
+  let next=S.viewer.treeSize;
+  if(event.key==="ArrowUp")next-=4;else if(event.key==="ArrowDown")next+=4;else if(event.key==="Home")next=35;else if(event.key==="End")next=68;else return;
+  event.preventDefault();setViewerTreeSize(next,event.currentTarget.parentElement);
+}
+function viewerVisibleNodes(){
+  const q=S.viewer.query.trim().toLowerCase();
+  return VIEWER_NODES.filter(n=>(!q||`${n.type} ${n.text} ${n.id} ${n.inspectorId||""}`.toLowerCase().includes(q))&&(q||viewerAncestorsExpanded(n)));
+}
+function viewerTreeHTML(){
+  const rows=viewerVisibleNodes(),selectedVisible=rows.some(n=>n.id===S.viewer.selected),tabId=selectedVisible?S.viewer.selected:rows[0]?.id;
+  if(!rows.length)return '<p class="empty" style="padding:12px">没有匹配的组件。请调整或清除搜索内容。</p>';
+  return rows.map(n=>{const hasChildren=viewerChildren(n.id).length>0;return `
+    <button class="viewer-tree-row ${n.id===S.viewer.selected?"on":""}" style="--level:${n.level}" data-viewer-node="${n.id}"
+      role="treeitem" aria-level="${n.level}" aria-selected="${n.id===S.viewer.selected}" tabindex="${n.id===tabId?0:-1}"
+      ${hasChildren?`aria-expanded="${S.viewer.expanded.has(n.id)}"`:""} onclick="viewerTreeClick(event,${n.id})" onkeydown="viewerTreeKey(event,${n.id})">
+      <span class="viewer-chevron" aria-hidden="true">${hasChildren?(S.viewer.expanded.has(n.id)?"▾":"▸"):""}</span><span class="viewer-node-icon" aria-hidden="true"></span>
+      <span class="label">${esc(n.type)}${n.text?`<span class="sub">${esc(n.text)}</span>`:""}</span><span class="viewer-tree-id">#${n.id}</span>
+    </button>`;}).join("");
+}
+function viewerTreeClick(event,id){
+  if(event.target.closest(".viewer-chevron")&&viewerChildren(id).length){toggleViewerExpanded(id);return;}
+  selectViewerNode(id);
+}
+function viewerTreeKey(event,id){
+  const rows=[...document.querySelectorAll(".viewer-tree-row")],index=rows.indexOf(event.currentTarget);
+  let target=null;
+  if(event.key==="ArrowDown")target=rows[Math.min(index+1,rows.length-1)];
+  else if(event.key==="ArrowUp")target=rows[Math.max(index-1,0)];
+  else if(event.key==="Home")target=rows[0];
+  else if(event.key==="End")target=rows[rows.length-1];
+  else if(event.key==="ArrowLeft"){
+    if(viewerChildren(id).length&&S.viewer.expanded.has(id)){event.preventDefault();toggleViewerExpanded(id);}
+    else{const parent=viewerNode(id).parent;if(parent){event.preventDefault();selectViewerNode(parent,true);}}
+    return;
+  }
+  else if(event.key==="ArrowRight"){
+    const child=viewerChildren(id)[0];
+    if(child&&!S.viewer.expanded.has(id)){event.preventDefault();toggleViewerExpanded(id);}
+    else if(child){event.preventDefault();selectViewerNode(child.id,true);}
+    return;
+  }
+  if(target){event.preventDefault();event.currentTarget.tabIndex=-1;target.tabIndex=0;target.focus();}
+}
+function viewerHit(id,style){const n=viewerNode(id);return `<button class="viewer-hit ${S.viewer.selected===id?"on":""}" style="${style}" data-viewer-hit="${id}" data-label="#${id} ${esc(n.type)}" aria-label="选择组件 ${esc(n.type)} #${id}" onclick="selectViewerNode(${id})"></button>`;}
+function viewerScreenshotHTML(){return `
+  <div class="viewer-screen" aria-label="OpenHarmony 设置页截图">
+    <div class="viewer-screen-status"><span>08:08</span><span>●●● ▰</span></div>
+    <div class="viewer-screen-title">设置</div>
+    <div class="viewer-search">⌕　搜索设置项</div>
+    <div class="viewer-profile"><span class="viewer-avatar">●</span><span><b>小艺</b><small>华为账号、付款与账单、云空间</small></span></div>
+    <div class="viewer-settings">
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#2f80ed">Wi</span><span class="viewer-setting-copy">WLAN<small>已连接</small></span><span class="viewer-switch"></span></div>
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#3887d6">B</span><span class="viewer-setting-copy">蓝牙<small>已开启</small></span><span class="chev">›</span></div>
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#42a85b">M</span><span class="viewer-setting-copy">移动网络</span><span class="chev">›</span></div>
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#37a1d6">N</span><span class="viewer-setting-copy">超级终端<small>已开启</small></span><span class="chev">›</span></div>
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#e99422">C</span><span class="viewer-setting-copy">更多连接</span><span class="chev">›</span></div>
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#4fb14f">☼</span><span class="viewer-setting-copy">显示和亮度</span><span class="chev">›</span></div>
+      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#5a62df">♪</span><span class="viewer-setting-copy">声音和振动</span><span class="chev">›</span></div>
+    </div>
+    ${S.viewer.showBounds?[
+      viewerHit(12,"inset-inline:5%;inset-block-start:5.5%;height:8%"),viewerHit(15,"inset-inline:5%;inset-block-start:14.5%;height:7%"),
+      viewerHit(18,"inset-inline:4%;inset-block-start:23%;height:11%"),viewerHit(22,"inset-inline:4%;inset-block-start:35%;height:9.5%"),
+      viewerHit(38,"inset-inline-start:31%;inset-block-start:37%;width:23%;height:5%"),viewerHit(42,"inset-inline-start:78%;inset-block-start:36.5%;width:17%;height:5.5%"),
+      viewerHit(50,"inset-inline:4%;inset-block-start:45.5%;height:9%"),viewerHit(58,"inset-inline:4%;inset-block-start:56%;height:9%"),
+      viewerHit(74,"inset-inline:4%;inset-block-start:66.5%;height:9%"),viewerHit(82,"inset-inline:4%;inset-block-start:77%;height:9%"),viewerHit(90,"inset-inline:4%;inset-block-start:87.5%;height:9%")
+    ].join(""):""}
+  </div>`;}
+function viewerInspectorHTML(node){
+  const raw=viewerRaw(node),tabs=[['attributes','属性'],['layout','布局'],['accessibility','无障碍'],['raw','Raw dump']];
+  let body;
+  if(S.viewer.tab==="raw")body=`<pre class="viewer-raw">${esc(JSON.stringify(raw,null,2))}</pre>`;
+  else if(S.viewer.tab==="layout")body=`<dl class="viewer-kv"><dt>bounds</dt><dd>${esc(raw.bounds)}</dd><dt>position</dt><dd>${esc(JSON.stringify(raw.position))}</dd><dt>size</dt><dd>${esc(JSON.stringify(raw.size))}</dd><dt>margin</dt><dd>${esc(JSON.stringify(raw.margin))}</dd><dt>padding</dt><dd>${esc(JSON.stringify(raw.padding))}</dd><dt>zIndex</dt><dd>${raw.zIndex}</dd><dt>opacity</dt><dd>${raw.opacity}</dd><dt>clip</dt><dd>${raw.clip}</dd><dt>transform</dt><dd>${raw.transform}</dd></dl>`;
+  else if(S.viewer.tab==="accessibility")body=`<dl class="viewer-kv"><dt>accessibilityText</dt><dd>${esc(raw.accessibilityText)}</dd><dt>important</dt><dd>${raw.importantForAccessibility}</dd><dt>group</dt><dd>${raw.accessibilityGroup}</dd><dt>level</dt><dd>${raw.accessibilityLevel}</dd><dt>focusable</dt><dd>${raw.focusable}</dd><dt>focused</dt><dd>${raw.focused}</dd><dt>focusOnTouch</dt><dd>${raw.focusOnTouch}</dd></dl>`;
+  else body=`<dl class="viewer-kv"><dt>id</dt><dd>${raw.id}</dd><dt>type</dt><dd>${esc(raw.type)}</dd><dt>inspectorId</dt><dd>${esc(raw.inspectorId||"—")}</dd><dt>text</dt><dd>${esc(raw.text||"—")}</dd><dt>bounds</dt><dd>${esc(raw.bounds)}</dd><dt>enabled</dt><dd>${raw.enabled}</dd><dt>visible</dt><dd>${raw.visible}</dd><dt>clickable</dt><dd>${raw.clickable}</dd><dt>focusable</dt><dd>${raw.focusable}</dd><dt>checked</dt><dd>${raw.checked}</dd><dt>opacity</dt><dd>${raw.opacity}</dd><dt>zIndex</dt><dd>${raw.zIndex}</dd><dt>hitTestBehavior</dt><dd>${raw.hitTestBehavior}</dd></dl>
+    <details class="viewer-disclosure"><summary>布局与渲染</summary><dl class="viewer-kv"><dt>responseRegion</dt><dd>${esc(raw.responseRegion)}</dd><dt>borderRadius</dt><dd>${raw.borderRadius}</dd><dt>renderGroup</dt><dd>${raw.renderGroup}</dd></dl></details>
+    <details class="viewer-disclosure"><summary>无障碍</summary><dl class="viewer-kv"><dt>accessibilityText</dt><dd>${esc(raw.accessibilityText)}</dd><dt>important</dt><dd>${raw.importantForAccessibility}</dd></dl></details>
+    <details class="viewer-disclosure"><summary>原始 dump（${Object.keys(raw).length} 项）</summary><pre class="viewer-raw">${esc(JSON.stringify(raw,null,2))}</pre></details>`;
+  return `<div class="viewer-inspector-head"><div class="viewer-inspector-title"><span class="viewer-section-label">节点属性</span><strong>${esc(node.type)}</strong><span class="chip dim">#${node.id}</span>${node.interactive?'<span class="chip ok">可交互</span>':""}<span class="chip ok">可见</span></div><div class="viewer-breadcrumb" title="${esc(viewerPath(node))}">${esc(viewerPath(node))}</div></div>
+    <div class="tabs" role="tablist" aria-label="组件 dump 信息">${tabs.map(([id,label])=>`<button id="viewerTab-${id}" role="tab" aria-selected="${S.viewer.tab===id}" aria-controls="viewerTabPanel" tabindex="${S.viewer.tab===id?0:-1}" class="${S.viewer.tab===id?"on":""}" data-viewer-tab="${id}" onclick="setViewerTab('${id}')" onkeydown="viewerTabKey(event,'${id}')">${label}</button>`).join("")}</div>
+    <div class="viewer-inspector-body" id="viewerTabPanel" role="tabpanel" aria-labelledby="viewerTab-${S.viewer.tab}" tabindex="0">${body}</div>`;
+}
+function pViewer(){
+  const node=viewerNode(S.viewer.selected),visible=viewerVisibleNodes();
+  return `<div class="viewer-lead" data-acin><span class="ac">VIEWER-LINKED-SELECTION</span><h1>Viewer</h1>
+    <div class="viewer-toolbar"><select class="inp" aria-label="选择 Viewer 目标与窗口"><option>DAYU200 · w12</option></select><span class="viewer-status" role="status">${esc(S.viewer.capturedAt)}</span>
+      <button class="btn" onclick="recaptureViewer()">重新抓取</button><input class="inp" type="search" aria-label="搜索组件、ID 或文本" placeholder="搜索组件 / ID / 文本" value="${esc(S.viewer.query)}" oninput="setViewerQuery(this)"></div></div>
+    <div class="viewer-workspace">
+      <section class="viewer-pane" aria-labelledby="viewerScreenshotTitle"><div class="viewer-pane-head"><h2 id="viewerScreenshotTitle">设备截图</h2><label class="hint" style="margin-inline-start:auto"><input type="checkbox" ${S.viewer.showBounds?"checked":""} onchange="toggleViewerBounds()"> 显示组件边界</label></div><div class="viewer-screen-canvas">${viewerScreenshotHTML()}</div></section>
+      <div class="viewer-devtools" style="--viewer-tree-size:${S.viewer.treeSize}%">
+        <section class="viewer-tree-pane" aria-labelledby="viewerTreeTitle"><div class="viewer-pane-head"><h2 id="viewerTreeTitle">UI 树</h2><span class="meta" id="viewerNodeCount">ArkUI dump · ${visible.length} / ${VIEWER_NODES.length}</span></div><div class="viewer-tree" id="viewerTree" role="tree" aria-label="完整 UI 树">${viewerTreeHTML()}</div></section>
+        <div class="viewer-splitter" role="separator" tabindex="0" aria-label="调整 UI 树和节点属性的高度" aria-orientation="horizontal" aria-valuemin="35" aria-valuemax="68" aria-valuenow="${S.viewer.treeSize}" aria-valuetext="UI 树占右侧工作区 ${S.viewer.treeSize}%" onpointerdown="resizeViewerStart(event)" onkeydown="resizeViewerKey(event)"></div>
+        <section class="viewer-inspector" aria-label="当前节点属性">${viewerInspectorHTML(node)}</section>
+      </div>
+    </div><div class="viewer-footer" role="status" aria-live="polite">ArkUI dump · ${VIEWER_NODES.length} nodes · selected #${node.id} ${esc(node.type)} · 本地数据</div>`;
 }
 
 /* ---------- Trace ---------- */
@@ -1155,7 +1306,7 @@ function pFlash(){
         <button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady?"":"disabled"}>${tx("startFlash")}</button></div>
     </div>`;
   }
-  return `<div class="flash-shell" data-acin><span class="ac">Flash v0.6 · real execution only</span>
+  return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
     <div class="flash-lead"><h1>${tx("flashTitle")}</h1><p>${tx("flashSubtitle")}</p></div>
     <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
       <span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span></div>
@@ -1392,7 +1543,7 @@ function diagModal(){
 }
 
 /* ---------- render ---------- */
-const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pDump,trace:pTrace,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
+const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pViewer,trace:pTrace,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
 function renderDevs(){
   $("devlist").innerHTML=DEVICES.map(d=>`
     <button class="dev ${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"on":""}" onclick="pickDevice('${d.id}')" oncontextmenu="openDeviceMenu(event,'${d.id}')" aria-current="${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"page":"false"}">
@@ -1405,11 +1556,13 @@ function renderNav(){
   $("nav").innerHTML=NAV.map(([k,ic,l,badge])=>`<button class="${S.nav===k?"on":""}" onclick="go('${k}')" ${S.nav===k?'aria-current="page"':""}><span class="ic">${icon(ic)}</span>${l}${badge?`<span class="preview">${badge}</span>`:""}</button>`).join("");
 }
 function renderPage(){
+  $("page").classList.toggle("viewer-page",S.nav==="dump");
   $("page").innerHTML=PAGES[S.nav]();
   const detail=$("page").querySelector("[data-page-title]"),title=$("page").querySelector("h1");
   if(detail){document.querySelector(".titlebar .t").textContent=detail.dataset.pageTitle;$("page").setAttribute("aria-label",detail.dataset.pageTitle);}
   else if(title){title.id="pageTitle";$("page").setAttribute("aria-labelledby","pageTitle");document.querySelector(".titlebar .t").textContent="ArkDeck — "+title.childNodes[0].textContent.trim();}
   const ls=$("logstream");if(ls)ls.scrollTop=ls.scrollHeight;
+  if(S.nav==="dump")requestAnimationFrame(()=>document.querySelector(`[data-viewer-node="${S.viewer.selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"}));
 }
 function renderShellText(){
   document.documentElement.lang=S.language==="en"?"en":"zh-CN";
