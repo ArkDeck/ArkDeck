@@ -227,59 +227,151 @@ select.inp{cursor:pointer}
 .acmode .acin{display:inline-block}
 .two{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
 @media(max-width:940px){.two{grid-template-columns:1fr}}
-.viewer-page{padding:0;gap:0;overflow:hidden}
-.viewer-lead{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);min-width:0}
-.viewer-lead h1{white-space:nowrap}.viewer-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;flex:1}
-.viewer-toolbar .inp{height:29px;min-width:150px;max-width:220px}.viewer-toolbar .btn{white-space:nowrap}
-.viewer-status{display:flex;align-items:center;gap:7px;color:var(--ink2);font-size:11.5px;white-space:nowrap}
-.viewer-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
-.viewer-workspace{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(460px,1.38fr);min-height:0;flex:1;background:var(--panel)}
-.viewer-pane{display:flex;flex-direction:column;min-width:0;min-height:0;border-inline-end:1px solid var(--line);background:var(--panel)}
-.viewer-pane-head{min-height:43px;display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);flex:none}
-.viewer-pane-head h2{white-space:nowrap}.viewer-pane-head .meta{font-size:11px;color:var(--ink2);white-space:nowrap}
-.viewer-devtools{--viewer-tree-size:60%;display:grid;grid-template-rows:minmax(150px,var(--viewer-tree-size)) 7px minmax(130px,1fr);min-width:0;min-height:0;background:var(--panel)}
-.viewer-tree-pane{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--panel)}
-.viewer-inspector{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--panel)}
-.viewer-splitter{position:relative;z-index:2;border:0;border-block:1px solid var(--line);background:var(--panel2);cursor:row-resize;touch-action:none}
-.viewer-splitter::after{content:"";position:absolute;inset-block-start:50%;inset-inline-start:50%;width:36px;height:2px;border-radius:2px;background:var(--ink3);opacity:.65;transform:translate(-50%,-50%)}
-.viewer-splitter:hover,.viewer-splitter:focus-visible{background:var(--accent-weak)}.viewer-splitter:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.viewer-splitter:focus-visible::after{background:var(--accent);opacity:1}
-.viewer-screen-canvas{position:relative;flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:14px;background-color:var(--ground);background-image:linear-gradient(45deg,var(--line) 25%,transparent 25%),linear-gradient(-45deg,var(--line) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,var(--line) 75%),linear-gradient(-45deg,transparent 75%,var(--line) 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
-.viewer-screen{width:min(260px,calc(100% - 16px));aspect-ratio:10/17;position:relative;overflow:hidden;border-radius:14px;background:#f5f6f8;color:#202124;outline:1px solid rgba(0,0,0,.1);box-shadow:0 10px 30px rgba(0,0,0,.14);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;flex:none}
-.viewer-screen-status{height:25px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:9px;font-weight:600}
-.viewer-screen-title{height:39px;padding:5px 15px;font-size:18px;font-weight:700}
-.viewer-search{height:31px;margin:0 12px 8px;border-radius:17px;background:white;color:#7a7d81;display:flex;align-items:center;padding:0 12px;font-size:10px}
-.viewer-profile{height:55px;margin:0 10px 8px;border-radius:11px;background:white;display:flex;align-items:center;gap:9px;padding:8px 12px}
-.viewer-avatar{width:32px;height:32px;border-radius:50%;background:#d4d7dc;display:grid;place-items:center;color:white;font-size:16px}
-.viewer-profile b{font-size:12px}.viewer-profile small{display:block;color:#81858b;font-size:8.5px;margin-top:2px}
-.viewer-settings{margin:0 10px;display:flex;flex-direction:column;gap:6px}
-.viewer-setting{height:43px;border-radius:10px;background:white;display:flex;align-items:center;gap:9px;padding:0 11px}
-.viewer-setting-icon{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:white;font-size:11px;font-weight:700;flex:none}
-.viewer-setting-copy{min-width:0;flex:1;font-size:11px;font-weight:600}
-.viewer-setting-copy small{display:block;color:#81858b;font-size:8.5px;font-weight:400}.viewer-setting .chev{color:#a6a9ae;font-size:15px}
-.viewer-switch{width:34px;height:19px;border-radius:12px;background:#2f80ed;padding:2px;display:flex;justify-content:flex-end}
-.viewer-switch::after{content:"";width:15px;height:15px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.viewer-hit{position:absolute;z-index:3;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 5%,transparent);padding:0;cursor:pointer;border-radius:4px;color:transparent}.viewer-hit:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 11%,transparent)}.viewer-hit.on{z-index:4;border:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--panel-solid) 72%,transparent)}
-.viewer-hit.on::after{content:attr(data-label);position:absolute;inset-block-start:-22px;inset-inline-end:-2px;height:18px;padding:1px 5px;border-radius:4px;background:var(--accent-fill);color:var(--accent-ink);font:9px/16px var(--mono);white-space:nowrap;box-shadow:var(--control-shadow)}
-.viewer-tree{overflow:auto;flex:1;min-height:0;padding:6px 4px;scrollbar-gutter:stable}
-.viewer-tree-row{width:max-content;min-width:100%;min-height:27px;border:0;border-radius:6px;background:transparent;color:var(--ink);display:grid;grid-template-columns:14px 16px max-content auto;align-items:center;gap:4px;padding-block:3px;padding-inline-end:7px;padding-inline-start:calc(7px + (var(--level,1) - 1)*14px);font-size:11.5px;text-align:start;cursor:pointer}
-.viewer-tree-row:hover{background:var(--selection)}.viewer-tree-row.on{background:var(--accent-fill);color:var(--accent-ink)}.viewer-tree-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.viewer-tree-row .label{white-space:nowrap}.viewer-tree-row .sub{font-weight:400;opacity:.72;margin-inline-start:4px}
-.viewer-tree-id{font:10.5px var(--mono);opacity:.72}
-.viewer-chevron{font-size:9px;text-align:center}
-.viewer-node-icon{width:13px;height:13px;border:1px solid currentColor;border-radius:3px;opacity:.65}
-.viewer-inspector-head{padding:8px 12px 7px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
-.viewer-inspector-title{display:flex;align-items:center;gap:7px}
-.viewer-inspector-title strong{font-size:14px}
-.viewer-section-label{color:var(--ink2);font-size:11px;font-weight:600;margin-inline-end:2px}
-.viewer-breadcrumb{font-size:10.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ---------- Viewer ----------
+   1. 页面回到全站语言:page 留白 + 一张 .card 容器,不再全屏裸拼。
+   2. 颜色纪律:var(--accent-fill) = 选中填充;var(--accent) = 焦点 / 悬停 / 当前 tab。
+   3. 字阶只用 20 / 13 / 12 / 11;左对齐轴统一 12px;间距只用 2 / 4 / 6 / 8 / 10 / 12 / 16。
+   4. 设备 mock 与热区共用 VIEWER_NODES 的 1080x1920 bounds,mock 字号用 cqi 随缩放,
+      所以任何宽度下框都框在它标注的那个节点上。 */
+.viewer-page{padding:14px 16px 10px;gap:10px;overflow:hidden}
+.viewer-page>.viewer-workspace{flex:1;min-height:0}
+.viewer-lead{display:flex;align-items:center;gap:12px;min-width:0}
+.viewer-lead h1{white-space:nowrap}
+.viewer-toolbar{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.viewer-toolbar .spacer{flex:1;min-width:8px}
+.viewer-toolbar select.inp{flex:0 1 auto;min-width:0}
+.viewer-toolbar input.inp{flex:0 1 240px;min-width:120px}
+.viewer-toolbar .btn{white-space:nowrap}
+.viewer-status{display:flex;align-items:center;gap:6px;color:var(--ink2);font-size:11px;white-space:nowrap}
+/* 中性点:"刚刚采集"是事实,不是"健康",不占用 --ok 绿。 */
+.viewer-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:none}
+.viewer-footer{display:flex;align-items:center;gap:6px;padding:0 2px;flex:none;color:var(--ink2);font:11px/1.4 var(--mono)}
+
+.viewer-workspace{display:grid;grid-template-columns:minmax(180px,.85fr) minmax(310px,1.35fr);min-width:0;min-height:0;
+  background:var(--panel-solid);border:1px solid var(--line);border-radius:11px;box-shadow:var(--control-shadow);overflow:hidden}
+.viewer-pane,.viewer-devtools{min-width:0;min-height:0}
+.viewer-pane{display:flex;flex-direction:column;border-inline-end:1px solid var(--line)}
+.viewer-pane-head{min-height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;flex:none;
+  border-bottom:1px solid var(--line);background:var(--panel2)}
+.viewer-pane-head h2{white-space:nowrap;font-size:12px}
+.viewer-pane-head .trailing{margin-inline-start:auto;display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--ink2);white-space:nowrap}
+.viewer-pane-head .trailing.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.viewer-devtools{--viewer-tree-size:60%;display:grid;grid-template-rows:minmax(150px,var(--viewer-tree-size)) 1px minmax(130px,1fr)}
+.viewer-tree-pane,.viewer-inspector{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+/* macOS 分隔条是 1px hairline,拖拽热区靠伪元素撑到 9px,不画 7px 灰带。 */
+.viewer-splitter{position:relative;z-index:2;border:0;padding:0;background:var(--line);cursor:row-resize;touch-action:none}
+.viewer-splitter::before{content:"";position:absolute;inset-inline:0;inset-block:-4px}
+.viewer-splitter:hover,.viewer-splitter:focus-visible{background:var(--accent)}
+.viewer-splitter:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.viewer-screen-canvas{position:relative;flex:1;min-height:0;overflow:hidden;display:grid;place-items:center;
+  padding:16px;background:var(--ground);container-type:size}
+.viewer-screen{position:relative;flex:none;container-type:size;aspect-ratio:1080/1920;inline-size:auto;
+  block-size:min(100%,calc(100cqi * 1920 / 1080));overflow:hidden;border-radius:14px;
+  background:#eef0f4;color:#1f2124;outline:1px solid rgba(0,0,0,.14);box-shadow:var(--shadow);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.viewer-screen [data-vs]{position:absolute;box-sizing:border-box}
+.vs-card{background:#fff;border-radius:2.6cqi;box-shadow:0 .3cqi .9cqi rgba(20,24,32,.06)}
+.vs-nav{display:flex;flex-direction:column;justify-content:space-between;padding:2.4cqi 4.2cqi 1.4cqi}
+.vs-statusbar{display:flex;align-items:center;justify-content:space-between;font-size:2.4cqi;font-weight:600;letter-spacing:.02em}
+.vs-statusbar span:last-child{display:flex;align-items:center;gap:1.2cqi}
+.vs-si{height:2.2cqi;width:auto;display:block}
+.vs-title{font-size:6cqi;font-weight:700;letter-spacing:-.02em}
+.vs-search{display:flex;align-items:center;gap:1.8cqi;padding:0 3.2cqi;border-radius:4.8cqi;color:#8b8f95;font-size:2.8cqi}
+.vs-search svg{width:3.2cqi;height:3.2cqi;stroke:currentColor;stroke-width:1.6;fill:none;flex:none}
+.vs-avatar{border-radius:50%;background:linear-gradient(155deg,#d3d9e4,#a9b3c3)}
+.vs-name{display:flex;align-items:center;font-size:3.2cqi;font-weight:600;white-space:nowrap}
+.vs-sub{display:flex;align-items:center;font-size:2.2cqi;color:#83878d;white-space:nowrap}
+.vs-icon{display:grid;place-items:center;border-radius:2.1cqi;color:#fff}
+.vs-icon svg{width:62%;height:62%;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.vs-label{display:flex;align-items:center;font-size:3cqi;font-weight:500;white-space:nowrap}
+.vs-value{display:flex;align-items:center;justify-content:flex-end;font-size:2.6cqi;color:#83878d;white-space:nowrap}
+.vs-switch{border-radius:99cqi;background:#3478f6;display:flex;align-items:center;justify-content:flex-end;padding:.5cqi}
+.vs-switch::after{content:"";aspect-ratio:1;height:100%;border-radius:50%;background:#fff;box-shadow:0 .3cqi .7cqi rgba(20,24,32,.24)}
+.vs-chev{display:grid;place-items:center;color:#bcc0c6}
+.vs-chev svg{width:2.8cqi;height:2.8cqi;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.vs-safe{display:grid;place-items:center}
+.vs-safe i{width:32%;height:.9cqi;border-radius:99cqi;background:#c2c6cc}
+
+/* 热区永远存在(任何有 bounds 的节点都可选),"显示组件边界"只控制描边。 */
+.viewer-hit{position:absolute;margin:0;padding:0;-webkit-appearance:none;appearance:none;
+  border:1px solid transparent;border-radius:1.2cqi;background:transparent;color:transparent;cursor:pointer}
+.viewer-hit.show{border-color:color-mix(in srgb,var(--accent) 26%,transparent)}
+.viewer-hit:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.viewer-hit.on{z-index:5;border:2px solid var(--accent-fill);background:color-mix(in srgb,var(--accent-fill) 12%,transparent);
+  box-shadow:0 0 0 1px rgba(255,255,255,.72)}
+.viewer-hit:focus-visible{outline:2px solid var(--accent);outline-offset:1px;z-index:6}
+.viewer-hit.on::after{content:attr(data-label);position:absolute;inset-block-end:calc(100% + 4px);inset-inline-start:-2px;
+  padding:0 6px;border-radius:6px;background:var(--accent-fill);color:var(--accent-ink);
+  font:11px/16px var(--mono);white-space:nowrap;box-shadow:var(--control-shadow)}
+.viewer-hit.on.label-end::after{inset-inline-start:auto;inset-inline-end:-2px}
+.viewer-hit.on.label-inside::after{inset-block-end:auto;inset-block-start:2px}
+
+.viewer-tree{overflow:auto;flex:1;min-height:0;padding:6px;scroll-padding-block:6px;scrollbar-gutter:stable}
+/* 选中态是内缩胶囊,不是通栏色带;#id 靠 auto 列右对齐成一列,标签超长省略而不是硬切。 */
+.viewer-tree-row{width:100%;min-height:26px;display:grid;grid-template-columns:16px 16px minmax(0,1fr) auto;
+  align-items:center;gap:6px;border:0;border-radius:6px;background:transparent;color:var(--ink);
+  padding-block:2px;padding-inline-end:8px;padding-inline-start:calc(6px + (var(--level,1) - 1) * 14px);
+  font-size:12px;text-align:start;cursor:pointer}
+.viewer-tree-row:hover{background:var(--selection)}
+.viewer-tree-row.on{background:var(--accent-fill);color:var(--accent-ink)}
+.viewer-tree-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.viewer-tree-row .label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.viewer-tree-row .sub{opacity:.66;margin-inline-start:6px}
+.viewer-tree-row.on .sub{opacity:.84}
+.viewer-tree-id{font:11px var(--mono);opacity:.55;font-variant-numeric:tabular-nums}
+.viewer-tree-row.on .viewer-tree-id{opacity:.85}
+.viewer-chevron{display:grid;place-items:center;width:16px;height:16px;color:var(--ink2)}
+.viewer-tree-row.on .viewer-chevron{color:inherit}
+.viewer-chevron svg{width:10px;height:10px;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.viewer-tree-row[aria-expanded="true"] .viewer-chevron svg{transform:rotate(90deg)}
+/* 按节点类型分形,不是给每一行发一个同样的空方框。 */
+.viewer-node-icon{width:16px;height:16px;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;
+  fill:none;opacity:.6;flex:none}
+.viewer-tree-row.on .viewer-node-icon{opacity:.92}
+
+.viewer-inspector-head{flex:none;display:flex;flex-direction:column;gap:6px;padding:8px 12px;
+  border-bottom:1px solid var(--line);background:var(--panel2)}
+.viewer-inspector-title{display:flex;align-items:center;gap:8px;min-width:0}
+.viewer-inspector-title strong{font-size:13px;font-weight:650}
+.viewer-inspector-title .viewer-node-icon{opacity:.8}
+.viewer-breadcrumb{font:11px var(--mono);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer-inspector .tabs{flex:none;padding-inline:6px;gap:8px}
+.viewer-inspector .tabs button{padding:6px;font-size:12px}
 .viewer-inspector-body{overflow:auto;min-height:0;flex:1}
-.viewer-kv{display:grid;grid-template-columns:minmax(96px,.8fr) minmax(120px,1.2fr);margin:0;font-size:11.5px}
-.viewer-kv dt,.viewer-kv dd{padding:6px 10px;border-bottom:1px solid var(--line);margin:0;min-width:0}.viewer-kv dt{color:var(--ink2)}.viewer-kv dd{font-family:var(--mono);font-size:10.8px;overflow-wrap:anywhere}
-.viewer-disclosure{margin:8px 10px;border:1px solid var(--line);border-radius:7px;overflow:hidden}
-.viewer-disclosure summary{padding:7px 9px;font-size:11.5px;font-weight:600;cursor:pointer}.viewer-disclosure .viewer-kv dt,.viewer-disclosure .viewer-kv dd{padding:5px 8px}
-.viewer-raw{margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font:10.5px/1.55 var(--mono);color:var(--ink);background:var(--panel2)}
-.viewer-footer{min-height:29px;display:flex;align-items:center;gap:6px;padding:5px 12px;border-top:1px solid var(--line);color:var(--ink2);font:10.5px var(--mono);flex:none}
-@media(max-width:1050px){.viewer-lead{align-items:flex-start}.viewer-toolbar{flex-wrap:wrap}.viewer-workspace{grid-template-columns:minmax(250px,.72fr) minmax(400px,1.28fr)}}
-@media(max-width:760px){.viewer-page{overflow-y:auto}.viewer-workspace{grid-template-columns:1fr;flex:none;min-height:auto}.viewer-pane{min-height:500px;border-inline-end:0;border-bottom:1px solid var(--line)}.viewer-devtools{min-height:720px}.viewer-lead{flex-direction:column}.viewer-toolbar{justify-content:flex-start;width:100%}}
+.viewer-group-title{position:sticky;inset-block-start:0;z-index:1;margin:0;padding:6px 12px;
+  background:var(--chrome);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);
+  font-size:11px;font-weight:600;color:var(--ink2)}
+.viewer-kv{display:grid;grid-template-columns:150px minmax(0,1fr);margin:0;font-size:12px}
+.viewer-kv dt,.viewer-kv dd{margin:0;min-width:0;padding:6px 12px;border-bottom:1px solid var(--line)}
+.viewer-kv dt{color:var(--ink2)}
+.viewer-kv dd{font-family:var(--mono);overflow-wrap:anywhere}
+.viewer-disclosure{margin:10px 12px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.viewer-disclosure summary{padding:8px 10px;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer}
+.viewer-disclosure .viewer-raw{border-top:1px solid var(--line)}
+.viewer-raw{margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;
+  font:12px/1.55 var(--mono);color:var(--ink);background:var(--panel2)}
+
+@media (prefers-reduced-motion:no-preference){
+  .viewer-tree-row,.viewer-hit,.viewer-splitter,.viewer-inspector .tabs button{
+    transition-property:background-color,border-color,color;transition-duration:120ms;
+    transition-timing-function:cubic-bezier(.2,0,0,1)}
+  .viewer-chevron svg{transition:transform 120ms cubic-bezier(.2,0,0,1)}
+}
+@media(max-width:1050px){
+  .viewer-workspace{grid-template-columns:minmax(160px,.75fr) minmax(280px,1.25fr)}
+  .viewer-toolbar{flex-wrap:wrap}
+}
+@media(max-width:760px){
+  .viewer-page{overflow-y:auto;gap:12px}
+  .viewer-lead{flex-direction:column;align-items:flex-start}
+  .viewer-toolbar{width:100%}
+  .viewer-workspace{grid-template-columns:1fr;flex:none;min-height:auto}
+  .viewer-pane{min-height:460px;border-inline-end:0;border-bottom:1px solid var(--line)}
+  .viewer-devtools{min-height:640px}
+}
 .device-layout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(420px,1.18fr);gap:24px;max-width:920px}
 .device-section{display:flex;flex-direction:column;gap:12px;min-width:0}
 .device-section h2{padding-bottom:7px;border-bottom:1px solid var(--line)}
@@ -369,6 +461,22 @@ select.inp{cursor:pointer}
     <symbol id="i-jobs" viewBox="0 0 20 20"><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8"/></symbol>
     <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></symbol>
     <symbol id="i-host" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="9" rx="1.5"/><path d="M1.5 16.5h17"/></symbol><symbol id="i-eye" viewBox="0 0 20 20"><path d="M1.8 10S5 4.8 10 4.8 18.2 10 18.2 10 15 15.2 10 15.2 1.8 10 1.8 10Z"/><circle cx="10" cy="10" r="2.4"/></symbol><symbol id="i-pencil" viewBox="0 0 20 20"><path d="M13.6 3.4a1.9 1.9 0 0 1 2.7 2.7L7.2 15.2l-3.6.9.9-3.6z"/></symbol><symbol id="i-warning" viewBox="0 0 20 20"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></symbol>
+    <symbol id="i-chev-right" viewBox="0 0 20 20"><path d="m7.5 4 6 6-6 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.8" cy="8.8" r="5.3"/><path d="m12.8 12.8 4 4"/></symbol>
+    <symbol id="i-n-container" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/></symbol>
+    <symbol id="i-n-stack" viewBox="0 0 20 20"><rect x="3.2" y="3.4" width="13.6" height="4.2" rx="1.2"/><rect x="3.2" y="12.4" width="13.6" height="4.2" rx="1.2"/><path d="M10 7.6v4.8"/></symbol>
+    <symbol id="i-n-text" viewBox="0 0 20 20"><path d="M4.6 5.4h10.8M10 5.4V15M7.2 15h5.6"/></symbol>
+    <symbol id="i-n-image" viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="2"/><circle cx="7.4" cy="8.6" r="1.2"/><path d="m3.6 14.2 3.8-3.4 2.9 2.5 2.3-1.9 3.4 2.8"/></symbol>
+    <symbol id="i-n-control" viewBox="0 0 20 20"><rect x="2.6" y="6.6" width="14.8" height="6.8" rx="3.4"/><circle cx="13.6" cy="10" r="1.9"/></symbol>
+    <symbol id="i-n-custom" viewBox="0 0 20 20"><path d="M8 3.6c-1.7 0-2 1.3-2 2.7s-.3 2.6-1.9 3.2c1.6.6 1.9 1.8 1.9 3.2s.3 2.7 2 2.7M12 3.6c1.7 0 2 1.3 2 2.7s.3 2.6 1.9 3.2c-1.6.6-1.9 1.8-1.9 3.2s-.3 2.7-2 2.7"/></symbol>
+    <symbol id="i-vs-wifi" viewBox="0 0 20 20"><path d="M2.8 7.2a11.6 11.6 0 0 1 14.4 0M5.5 10.4a7.7 7.7 0 0 1 9 0M8.1 13.6a3.5 3.5 0 0 1 3.8 0"/><circle cx="10" cy="16.3" r=".85" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-vs-bt" viewBox="0 0 20 20"><path d="m7 6.4 6 6.4-3 2.7V4.5l3 2.7-6 6.4"/></symbol>
+    <symbol id="i-vs-cell" viewBox="0 0 20 20"><rect x="6.2" y="2.6" width="7.6" height="14.8" rx="2"/><path d="M8.8 14.9h2.4"/></symbol>
+    <symbol id="i-vs-link" viewBox="0 0 20 20"><rect x="2.6" y="4.8" width="8" height="10.4" rx="1.8"/><rect x="12.6" y="7.4" width="4.8" height="7.8" rx="1.4"/></symbol>
+    <symbol id="i-vs-more" viewBox="0 0 20 20"><circle cx="4.8" cy="10" r="1.35" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.2" cy="10" r="1.35" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-vs-display" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.3"/><path d="M10 2.6v1.8M10 15.6v1.8M2.6 10h1.8M15.6 10h1.8M4.8 4.8l1.3 1.3M13.9 13.9l1.3 1.3M15.2 4.8 13.9 6.1M6.1 13.9l-1.3 1.3"/></symbol>
+    <symbol id="i-vs-sound" viewBox="0 0 20 20"><path d="M4 7.6h2.7L10.5 4.2v11.6L6.7 12.4H4z"/><path d="M13.4 7.6a3.5 3.5 0 0 1 0 4.8"/></symbol>
+    <symbol id="i-vs-bell" viewBox="0 0 20 20"><path d="M5.5 8.7a4.5 4.5 0 0 1 9 0c0 3.3 1.2 4.5 1.2 4.5H4.3s1.2-1.2 1.2-4.5Z"/><path d="M8.4 15.5a1.8 1.8 0 0 0 3.2 0"/></symbol>
   </defs>
 </svg>
 
@@ -810,35 +918,50 @@ function pAuth(){
 }
 
 /* ---------- Viewer ---------- */
+/* 设备空间。截图 mock 和热区都只从 VIEWER_NODES 的 bounds 推导,是同一个事实源。 */
+const VIEWER_SCREEN={w:1080,h:1920};
 const VIEWER_NODES=[
   {id:1,parent:null,level:1,type:"Root",text:"",bounds:"[0, 0, 1080, 1920]"},
   {id:3,parent:1,level:2,type:"Stage",text:"",bounds:"[0, 0, 1080, 1920]"},
   {id:8,parent:3,level:3,type:"Column",text:"",bounds:"[0, 0, 1080, 1920]"},
-  {id:12,parent:8,level:4,type:"Navigation",text:"设置",bounds:"[0, 0, 1080, 176]"},
-  {id:15,parent:8,level:4,type:"Search",text:"搜索设置项",bounds:"[48, 178, 1032, 286]",interactive:true},
-  {id:18,parent:8,level:4,type:"ProfileCard",text:"小艺",bounds:"[40, 310, 1040, 520]",interactive:true},
-  {id:23,parent:18,level:5,type:"Column",text:"AccountSummaryContent",bounds:"[64, 326, 1016, 504]"},
-  {id:24,parent:23,level:6,type:"Row",text:"ProfileIdentityContainer",bounds:"[76, 338, 1004, 492]"},
-  {id:25,parent:24,level:7,type:"CustomComponent",text:"HarmonyAccountAvatarAndCloudStatus",bounds:"[88, 350, 992, 480]"},
-  {id:26,parent:25,level:8,type:"BuilderNode",text:"AccountDetailActionSlot",bounds:"[100, 362, 980, 468]"},
-  {id:27,parent:26,level:9,type:"ConditionalContent",text:"CloudStorageSubscriptionSummary",bounds:"[112, 374, 968, 456]"},
-  {id:21,parent:8,level:4,type:"List",text:"",bounds:"[40, 548, 1040, 1710]"},
-  {id:22,parent:21,level:5,type:"ListItem",text:"WLAN",bounds:"[40, 548, 1040, 694]",interactive:true},
-  {id:31,parent:22,level:6,type:"Row",text:"WLAN",bounds:"[62, 560, 1018, 684]",interactive:true},
-  {id:32,parent:31,level:7,type:"Image",text:"wifi",bounds:"[72, 580, 144, 652]"},
-  {id:38,parent:31,level:7,type:"Text",text:"WLAN",bounds:"[176, 582, 410, 650]"},
-  {id:40,parent:31,level:7,type:"Row",text:"已连接",bounds:"[650, 570, 1008, 674]",interactive:true},
-  {id:41,parent:40,level:8,type:"Text",text:"已连接",bounds:"[650, 586, 812, 652]"},
-  {id:42,parent:40,level:8,type:"Toggle",text:"WLAN",bounds:"[824, 286, 892, 326]",interactive:true,inspectorId:"wifi_switch",checked:true},
-  {id:50,parent:21,level:5,type:"ListItem",text:"蓝牙",bounds:"[40, 704, 1040, 850]",interactive:true},
-  {id:51,parent:50,level:6,type:"Text",text:"蓝牙",bounds:"[176, 738, 410, 806]"},
-  {id:58,parent:21,level:5,type:"ListItem",text:"移动网络",bounds:"[40, 860, 1040, 1006]",interactive:true},
-  {id:66,parent:21,level:5,type:"ListItem",text:"超级终端",bounds:"[40, 1016, 1040, 1162]",interactive:true},
-  {id:74,parent:21,level:5,type:"ListItem",text:"更多连接",bounds:"[40, 1172, 1040, 1318]",interactive:true},
-  {id:82,parent:21,level:5,type:"ListItem",text:"显示和亮度",bounds:"[40, 1340, 1040, 1486]",interactive:true},
-  {id:90,parent:21,level:5,type:"ListItem",text:"声音和振动",bounds:"[40, 1496, 1040, 1642]",interactive:true},
-  {id:98,parent:21,level:5,type:"ListItem",text:"通知和状态栏",bounds:"[40, 1652, 1040, 1798]",interactive:true},
-  {id:120,parent:8,level:4,type:"Column",text:"safe-area",bounds:"[0, 1800, 1080, 1920]"}
+  {id:12,parent:8,level:4,type:"Navigation",text:"设置",bounds:"[0, 0, 1080, 232]"},
+  {id:15,parent:8,level:4,type:"Search",text:"搜索设置项",bounds:"[48, 252, 1032, 352]",interactive:true},
+  {id:18,parent:8,level:4,type:"ProfileCard",text:"小艺",bounds:"[40, 382, 1040, 542]",interactive:true},
+  {id:23,parent:18,level:5,type:"Column",text:"AccountSummaryContent",bounds:"[64, 398, 1016, 526]"},
+  {id:24,parent:23,level:6,type:"Row",text:"ProfileIdentityContainer",bounds:"[76, 410, 1004, 514]"},
+  {id:25,parent:24,level:7,type:"CustomComponent",text:"HarmonyAccountAvatarAndCloudStatus",bounds:"[92, 420, 172, 500]"},
+  {id:26,parent:24,level:7,type:"BuilderNode",text:"AccountDetailActionSlot",bounds:"[196, 416, 268, 458]"},
+  {id:27,parent:24,level:7,type:"ConditionalContent",text:"CloudStorageSubscriptionSummary",bounds:"[196, 466, 536, 504]"},
+  {id:21,parent:8,level:4,type:"List",text:"",bounds:"[40, 578, 1040, 1794]"},
+  {id:22,parent:21,level:5,type:"ListItem",text:"WLAN",bounds:"[40, 578, 1040, 714]",interactive:true},
+  {id:31,parent:22,level:6,type:"Row",text:"WLAN",bounds:"[62, 590, 1018, 702]",interactive:true},
+  {id:32,parent:31,level:7,type:"Image",text:"wifi",bounds:"[86, 614, 150, 678]"},
+  {id:38,parent:31,level:7,type:"Text",text:"WLAN",bounds:"[186, 622, 288, 670]"},
+  {id:40,parent:31,level:7,type:"Row",text:"已连接",bounds:"[640, 600, 996, 692]",interactive:true},
+  {id:41,parent:40,level:8,type:"Text",text:"已连接",bounds:"[724, 622, 806, 670]"},
+  {id:42,parent:40,level:8,type:"Toggle",text:"WLAN",bounds:"[886, 614, 996, 678]",interactive:true,inspectorId:"wifi_switch",checked:true},
+  {id:50,parent:21,level:5,type:"ListItem",text:"蓝牙",bounds:"[40, 730, 1040, 866]",interactive:true},
+  {id:52,parent:50,level:6,type:"Image",text:"bluetooth",bounds:"[86, 766, 150, 830]"},
+  {id:53,parent:50,level:6,type:"Text",text:"蓝牙",bounds:"[186, 774, 258, 822]"},
+  {id:58,parent:21,level:5,type:"ListItem",text:"移动网络",bounds:"[40, 882, 1040, 1018]",interactive:true},
+  {id:59,parent:58,level:6,type:"Image",text:"cellular",bounds:"[86, 918, 150, 982]"},
+  {id:60,parent:58,level:6,type:"Text",text:"移动网络",bounds:"[186, 926, 326, 974]"},
+  {id:66,parent:21,level:5,type:"ListItem",text:"超级终端",bounds:"[40, 1034, 1040, 1170]",interactive:true},
+  {id:67,parent:66,level:6,type:"Image",text:"superDevice",bounds:"[86, 1070, 150, 1134]"},
+  {id:68,parent:66,level:6,type:"Text",text:"超级终端",bounds:"[186, 1078, 326, 1126]"},
+  {id:74,parent:21,level:5,type:"ListItem",text:"更多连接",bounds:"[40, 1186, 1040, 1322]",interactive:true},
+  {id:75,parent:74,level:6,type:"Image",text:"moreConnections",bounds:"[86, 1222, 150, 1286]"},
+  {id:76,parent:74,level:6,type:"Text",text:"更多连接",bounds:"[186, 1230, 326, 1278]"},
+  {id:82,parent:21,level:5,type:"ListItem",text:"显示和亮度",bounds:"[40, 1338, 1040, 1474]",interactive:true},
+  {id:83,parent:82,level:6,type:"Image",text:"display",bounds:"[86, 1374, 150, 1438]"},
+  {id:84,parent:82,level:6,type:"Text",text:"显示和亮度",bounds:"[186, 1382, 360, 1430]"},
+  {id:90,parent:21,level:5,type:"ListItem",text:"声音和振动",bounds:"[40, 1490, 1040, 1626]",interactive:true},
+  {id:91,parent:90,level:6,type:"Image",text:"sound",bounds:"[86, 1526, 150, 1590]"},
+  {id:92,parent:90,level:6,type:"Text",text:"声音和振动",bounds:"[186, 1534, 360, 1582]"},
+  {id:98,parent:21,level:5,type:"ListItem",text:"通知和状态栏",bounds:"[40, 1642, 1040, 1778]",interactive:true},
+  {id:99,parent:98,level:6,type:"Image",text:"notification",bounds:"[86, 1678, 150, 1742]"},
+  {id:100,parent:98,level:6,type:"Text",text:"通知和状态栏",bounds:"[186, 1686, 394, 1734]"},
+  {id:120,parent:8,level:4,type:"Column",text:"safe-area",bounds:"[0, 1810, 1080, 1920]"}
 ];
 function viewerNode(id){return VIEWER_NODES.find(n=>n.id===Number(id))||VIEWER_NODES[0];}
 function viewerChildren(id){return VIEWER_NODES.filter(n=>n.parent===id);}
@@ -867,7 +990,7 @@ function selectViewerNode(id,focusTree=false){
   });
 }
 function toggleViewerBounds(){S.viewer.showBounds=!S.viewer.showBounds;renderPage();}
-function setViewerQuery(input){S.viewer.query=input.value;const tree=$("viewerTree");if(tree)tree.innerHTML=viewerTreeHTML();const count=$("viewerNodeCount");if(count)count.textContent="ArkUI dump · "+viewerVisibleNodes().length+" / "+VIEWER_NODES.length;}
+function setViewerQuery(input){S.viewer.query=input.value;const tree=$("viewerTree");if(tree)tree.innerHTML=viewerTreeHTML();const count=$("viewerNodeCount");if(count)count.textContent=viewerVisibleNodes().length+" / "+VIEWER_NODES.length;}
 function setViewerTab(tab){S.viewer.tab=tab;renderPage();requestAnimationFrame(()=>document.querySelector(`[data-viewer-tab="${tab}"]`)?.focus());}
 function viewerTabKey(event,tab){
   const tabs=["attributes","layout","accessibility","raw"],index=tabs.indexOf(tab);let next=index;
@@ -916,7 +1039,7 @@ function viewerTreeHTML(){
     <button class="viewer-tree-row ${n.id===S.viewer.selected?"on":""}" style="--level:${n.level}" data-viewer-node="${n.id}"
       role="treeitem" aria-level="${n.level}" aria-selected="${n.id===S.viewer.selected}" tabindex="${n.id===tabId?0:-1}"
       ${hasChildren?`aria-expanded="${S.viewer.expanded.has(n.id)}"`:""} onclick="viewerTreeClick(event,${n.id})" onkeydown="viewerTreeKey(event,${n.id})">
-      <span class="viewer-chevron" aria-hidden="true">${hasChildren?(S.viewer.expanded.has(n.id)?"▾":"▸"):""}</span><span class="viewer-node-icon" aria-hidden="true"></span>
+      <span class="viewer-chevron" aria-hidden="true">${hasChildren?'<svg><use href="#i-chev-right"></use></svg>':""}</span><svg class="viewer-node-icon" aria-hidden="true"><use href="#i-${viewerNodeIcon(n.type)}"></use></svg>
       <span class="label">${esc(n.type)}${n.text?`<span class="sub">${esc(n.text)}</span>`:""}</span><span class="viewer-tree-id">#${n.id}</span>
     </button>`;}).join("");
 }
@@ -944,57 +1067,113 @@ function viewerTreeKey(event,id){
   }
   if(target){event.preventDefault();event.currentTarget.tabIndex=-1;target.tabIndex=0;target.focus();}
 }
-function viewerHit(id,style){const n=viewerNode(id);return `<button class="viewer-hit ${S.viewer.selected===id?"on":""}" style="${style}" data-viewer-hit="${id}" data-label="#${id} ${esc(n.type)}" aria-label="选择组件 ${esc(n.type)} #${id}" onclick="selectViewerNode(${id})"></button>`;}
-function viewerScreenshotHTML(){return `
-  <div class="viewer-screen" aria-label="OpenHarmony 设置页截图">
-    <div class="viewer-screen-status"><span>08:08</span><span>●●● ▰</span></div>
-    <div class="viewer-screen-title">设置</div>
-    <div class="viewer-search">⌕　搜索设置项</div>
-    <div class="viewer-profile"><span class="viewer-avatar">●</span><span><b>小艺</b><small>华为账号、付款与账单、云空间</small></span></div>
-    <div class="viewer-settings">
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#2f80ed">Wi</span><span class="viewer-setting-copy">WLAN<small>已连接</small></span><span class="viewer-switch"></span></div>
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#3887d6">B</span><span class="viewer-setting-copy">蓝牙<small>已开启</small></span><span class="chev">›</span></div>
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#42a85b">M</span><span class="viewer-setting-copy">移动网络</span><span class="chev">›</span></div>
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#37a1d6">N</span><span class="viewer-setting-copy">超级终端<small>已开启</small></span><span class="chev">›</span></div>
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#e99422">C</span><span class="viewer-setting-copy">更多连接</span><span class="chev">›</span></div>
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#4fb14f">☼</span><span class="viewer-setting-copy">显示和亮度</span><span class="chev">›</span></div>
-      <div class="viewer-setting"><span class="viewer-setting-icon" style="background:#5a62df">♪</span><span class="viewer-setting-copy">声音和振动</span><span class="chev">›</span></div>
-    </div>
-    ${S.viewer.showBounds?[
-      viewerHit(12,"inset-inline:5%;inset-block-start:5.5%;height:8%"),viewerHit(15,"inset-inline:5%;inset-block-start:14.5%;height:7%"),
-      viewerHit(18,"inset-inline:4%;inset-block-start:23%;height:11%"),viewerHit(22,"inset-inline:4%;inset-block-start:35%;height:9.5%"),
-      viewerHit(38,"inset-inline-start:31%;inset-block-start:37%;width:23%;height:5%"),viewerHit(42,"inset-inline-start:78%;inset-block-start:36.5%;width:17%;height:5.5%"),
-      viewerHit(50,"inset-inline:4%;inset-block-start:45.5%;height:9%"),viewerHit(58,"inset-inline:4%;inset-block-start:56%;height:9%"),
-      viewerHit(74,"inset-inline:4%;inset-block-start:66.5%;height:9%"),viewerHit(82,"inset-inline:4%;inset-block-start:77%;height:9%"),viewerHit(90,"inset-inline:4%;inset-block-start:87.5%;height:9%")
-    ].join(""):""}
-  </div>`;}
+/* ---- 截图:mock 与热区共用 bounds ---- */
+function viewerBounds(node){const n=String(node.bounds).match(/-?\d+/g).map(Number);return {l:n[0],t:n[1],r:n[2],b:n[3]};}
+function viewerRect(node){const b=viewerBounds(node);
+  return {x:b.l/VIEWER_SCREEN.w*100,y:b.t/VIEWER_SCREEN.h*100,w:(b.r-b.l)/VIEWER_SCREEN.w*100,h:(b.b-b.t)/VIEWER_SCREEN.h*100};}
+function viewerRectStyle(node){const r=viewerRect(node);
+  return `inset-inline-start:${r.x.toFixed(3)}%;inset-block-start:${r.y.toFixed(3)}%;width:${r.w.toFixed(3)}%;height:${r.h.toFixed(3)}%`;}
+function viewerArea(node){const r=viewerRect(node);return r.w*r.h;}
+function vsIcon(name){return `<svg aria-hidden="true"><use href="#i-${name}"></use></svg>`;}
+const VS_STATUS=`<svg class="vs-si" viewBox="0 0 22 12" aria-hidden="true"><rect x="0" y="7.6" width="3.2" height="4.4" rx="1" fill="currentColor"/><rect x="4.9" y="5.1" width="3.2" height="6.9" rx="1" fill="currentColor"/><rect x="9.8" y="2.6" width="3.2" height="9.4" rx="1" fill="currentColor"/><rect x="14.7" y="0" width="3.2" height="12" rx="1" fill="currentColor"/></svg><svg class="vs-si" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 4.1a10.2 10.2 0 0 1 14 0M3.6 6.9a6.4 6.4 0 0 1 8.8 0M6.2 9.6a2.8 2.8 0 0 1 3.6 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11.3" r=".75" fill="currentColor"/></svg><svg class="vs-si" viewBox="0 0 26 12" aria-hidden="true"><rect x="0.7" y="1" width="21" height="10" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".45"/><rect x="2.7" y="3" width="14.6" height="6" rx="1.6" fill="currentColor"/><path d="M23.5 4.6v2.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity=".45"/></svg>`;
+/* 每一条 paint 都挂在一个节点 id 上:画出来的每个像素都能在树里找到。 */
+const VIEWER_PAINT={
+  12:{cls:"vs-nav",html:`<div class="vs-statusbar"><span>08:08</span><span>${VS_STATUS}</span></div><div class="vs-title">设置</div>`},
+  15:{cls:"vs-search vs-card",icon:"search",html:`<span>搜索设置项</span>`},
+  18:{cls:"vs-card"},
+  25:{cls:"vs-avatar"},
+  26:{cls:"vs-name",html:"小艺"},
+  27:{cls:"vs-sub",html:"华为账号、付款与账单、云空间"},
+  22:{cls:"vs-card"},32:{cls:"vs-icon",tint:"#3478f6",icon:"vs-wifi"},38:{cls:"vs-label",html:"WLAN"},
+  41:{cls:"vs-value",html:"已连接"},42:{cls:"vs-switch"},
+  50:{cls:"vs-card",chev:true},52:{cls:"vs-icon",tint:"#2f7fe0",icon:"vs-bt"},53:{cls:"vs-label",html:"蓝牙"},
+  58:{cls:"vs-card",chev:true},59:{cls:"vs-icon",tint:"#3aa15a",icon:"vs-cell"},60:{cls:"vs-label",html:"移动网络"},
+  66:{cls:"vs-card",chev:true},67:{cls:"vs-icon",tint:"#2f9fd0",icon:"vs-link"},68:{cls:"vs-label",html:"超级终端"},
+  74:{cls:"vs-card",chev:true},75:{cls:"vs-icon",tint:"#dd9328",icon:"vs-more"},76:{cls:"vs-label",html:"更多连接"},
+  82:{cls:"vs-card",chev:true},83:{cls:"vs-icon",tint:"#48ab48",icon:"vs-display"},84:{cls:"vs-label",html:"显示和亮度"},
+  90:{cls:"vs-card",chev:true},91:{cls:"vs-icon",tint:"#5b63e0",icon:"vs-sound"},92:{cls:"vs-label",html:"声音和振动"},
+  98:{cls:"vs-card",chev:true},99:{cls:"vs-icon",tint:"#dd6140",icon:"vs-bell"},100:{cls:"vs-label",html:"通知和状态栏"},
+  120:{cls:"vs-safe",html:"<i></i>"}
+};
+function viewerPaintHTML(){
+  return VIEWER_NODES.filter(n=>VIEWER_PAINT[n.id]).map(n=>{
+    const p=VIEWER_PAINT[n.id];
+    const chev=p.chev?`<span class="vs-chev" style="position:absolute;inset-inline-end:3cqi;inset-block:0">${vsIcon("chev-right")}</span>`:"";
+    return `<div data-vs class="${p.cls}" style="${viewerRectStyle(n)}${p.tint?";background:"+p.tint:""}" aria-hidden="true">${p.icon?vsIcon(p.icon):""}${p.html||""}${chev}</div>`;
+  }).join("");
+}
+/* 面积大的先排,深节点后排 => 视觉映射和指针命中用的是同一套 hit test。 */
+function viewerHitsHTML(){
+  return [...VIEWER_NODES].sort((a,b)=>viewerArea(b)-viewerArea(a)).map(n=>{
+    const sel=S.viewer.selected===n.id,r=viewerRect(n);
+    const outline=S.viewer.showBounds&&!(r.w>98&&r.h>98);
+    const cls=["viewer-hit",outline?"show":"",sel?"on":"",r.y<3?"label-inside":"",r.x+r.w/2>55?"label-end":""].filter(Boolean).join(" ");
+    return `<button type="button" class="${cls}" style="${viewerRectStyle(n)}" data-viewer-hit="${n.id}"
+      data-label="#${n.id} ${esc(n.type)}" aria-pressed="${sel}" aria-label="选择组件 ${esc(n.type)} #${n.id}"
+      onclick="selectViewerNode(${n.id})"></button>`;
+  }).join("");
+}
+function viewerScreenshotHTML(){return `<div class="viewer-screen">${viewerPaintHTML()}${viewerHitsHTML()}</div>`;}
+/* ---- 检查器:分组 + 固定 key 列,不再是一张 13 行的平铺 dump ---- */
+function viewerNodeIcon(type){
+  if(/^(Text|Search|Span)$/.test(type))return "n-text";
+  if(/^(Image|Icon)$/.test(type))return "n-image";
+  if(/^(Toggle|Button|Slider|Checkbox)$/.test(type))return "n-control";
+  if(/^(CustomComponent|BuilderNode|ConditionalContent)$/.test(type))return "n-custom";
+  if(/^(Column|Row|List|Stack|Flex)$/.test(type))return "n-stack";
+  return "n-container";
+}
+function viewerKV(pairs){return `<dl class="viewer-kv">${pairs.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v))}</dd>`).join("")}</dl>`;}
+function viewerGroup(title,pairs){return `<h3 class="viewer-group-title">${esc(title)}</h3>${viewerKV(pairs)}`;}
 function viewerInspectorHTML(node){
   const raw=viewerRaw(node),tabs=[['attributes','属性'],['layout','布局'],['accessibility','无障碍'],['raw','Raw dump']];
   let body;
   if(S.viewer.tab==="raw")body=`<pre class="viewer-raw">${esc(JSON.stringify(raw,null,2))}</pre>`;
-  else if(S.viewer.tab==="layout")body=`<dl class="viewer-kv"><dt>bounds</dt><dd>${esc(raw.bounds)}</dd><dt>position</dt><dd>${esc(JSON.stringify(raw.position))}</dd><dt>size</dt><dd>${esc(JSON.stringify(raw.size))}</dd><dt>margin</dt><dd>${esc(JSON.stringify(raw.margin))}</dd><dt>padding</dt><dd>${esc(JSON.stringify(raw.padding))}</dd><dt>zIndex</dt><dd>${raw.zIndex}</dd><dt>opacity</dt><dd>${raw.opacity}</dd><dt>clip</dt><dd>${raw.clip}</dd><dt>transform</dt><dd>${raw.transform}</dd></dl>`;
-  else if(S.viewer.tab==="accessibility")body=`<dl class="viewer-kv"><dt>accessibilityText</dt><dd>${esc(raw.accessibilityText)}</dd><dt>important</dt><dd>${raw.importantForAccessibility}</dd><dt>group</dt><dd>${raw.accessibilityGroup}</dd><dt>level</dt><dd>${raw.accessibilityLevel}</dd><dt>focusable</dt><dd>${raw.focusable}</dd><dt>focused</dt><dd>${raw.focused}</dd><dt>focusOnTouch</dt><dd>${raw.focusOnTouch}</dd></dl>`;
-  else body=`<dl class="viewer-kv"><dt>id</dt><dd>${raw.id}</dd><dt>type</dt><dd>${esc(raw.type)}</dd><dt>inspectorId</dt><dd>${esc(raw.inspectorId||"—")}</dd><dt>text</dt><dd>${esc(raw.text||"—")}</dd><dt>bounds</dt><dd>${esc(raw.bounds)}</dd><dt>enabled</dt><dd>${raw.enabled}</dd><dt>visible</dt><dd>${raw.visible}</dd><dt>clickable</dt><dd>${raw.clickable}</dd><dt>focusable</dt><dd>${raw.focusable}</dd><dt>checked</dt><dd>${raw.checked}</dd><dt>opacity</dt><dd>${raw.opacity}</dd><dt>zIndex</dt><dd>${raw.zIndex}</dd><dt>hitTestBehavior</dt><dd>${raw.hitTestBehavior}</dd></dl>
-    <details class="viewer-disclosure"><summary>布局与渲染</summary><dl class="viewer-kv"><dt>responseRegion</dt><dd>${esc(raw.responseRegion)}</dd><dt>borderRadius</dt><dd>${raw.borderRadius}</dd><dt>renderGroup</dt><dd>${raw.renderGroup}</dd></dl></details>
-    <details class="viewer-disclosure"><summary>无障碍</summary><dl class="viewer-kv"><dt>accessibilityText</dt><dd>${esc(raw.accessibilityText)}</dd><dt>important</dt><dd>${raw.importantForAccessibility}</dd></dl></details>
-    <details class="viewer-disclosure"><summary>原始 dump（${Object.keys(raw).length} 项）</summary><pre class="viewer-raw">${esc(JSON.stringify(raw,null,2))}</pre></details>`;
-  return `<div class="viewer-inspector-head"><div class="viewer-inspector-title"><span class="viewer-section-label">节点属性</span><strong>${esc(node.type)}</strong><span class="chip dim">#${node.id}</span>${node.interactive?'<span class="chip ok">可交互</span>':""}<span class="chip ok">可见</span></div><div class="viewer-breadcrumb" title="${esc(viewerPath(node))}">${esc(viewerPath(node))}</div></div>
+  else if(S.viewer.tab==="layout")body=
+    viewerGroup("几何",[["bounds",raw.bounds],["position",JSON.stringify(raw.position)],["size",JSON.stringify(raw.size)],["margin",JSON.stringify(raw.margin)],["padding",JSON.stringify(raw.padding)]])+
+    viewerGroup("绘制",[["zIndex",raw.zIndex],["opacity",raw.opacity],["clip",raw.clip],["transform",raw.transform],["renderGroup",raw.renderGroup]]);
+  else if(S.viewer.tab==="accessibility")body=
+    viewerGroup("语义",[["accessibilityText",raw.accessibilityText],["important",raw.importantForAccessibility],["group",raw.accessibilityGroup],["level",raw.accessibilityLevel]])+
+    viewerGroup("焦点",[["focusable",raw.focusable],["focused",raw.focused],["focusOnTouch",raw.focusOnTouch]]);
+  else body=
+    viewerGroup("身份",[["id",raw.id],["type",raw.type],["inspectorId",raw.inspectorId||"—"],["text",raw.text||"—"],["key",raw.key],["debugLine",raw.debugLine]])+
+    viewerGroup("状态",[["enabled",raw.enabled],["visible",raw.visible],["clickable",raw.clickable],["focusable",raw.focusable],["checked",raw.checked]])+
+    viewerGroup("布局与渲染",[["bounds",raw.bounds],["responseRegion",raw.responseRegion],["borderRadius",raw.borderRadius],["opacity",raw.opacity],["hitTestBehavior",raw.hitTestBehavior]])+
+    `<details class="viewer-disclosure"><summary>原始 dump（${Object.keys(raw).length} 项）</summary><pre class="viewer-raw">${esc(JSON.stringify(raw,null,2))}</pre></details>`;
+  return `<div class="viewer-inspector-head"><div class="viewer-inspector-title">
+      <svg class="viewer-node-icon" aria-hidden="true"><use href="#i-${viewerNodeIcon(node.type)}"></use></svg>
+      <strong>${esc(node.type)}</strong><span class="chip dim">#${node.id}</span>${node.interactive?'<span class="chip dim">可交互</span>':""}<span class="chip dim">可见</span></div>
+    <div class="viewer-breadcrumb" title="${esc(viewerPath(node))}">${esc(viewerPath(node))}</div></div>
     <div class="tabs" role="tablist" aria-label="组件 dump 信息">${tabs.map(([id,label])=>`<button id="viewerTab-${id}" role="tab" aria-selected="${S.viewer.tab===id}" aria-controls="viewerTabPanel" tabindex="${S.viewer.tab===id?0:-1}" class="${S.viewer.tab===id?"on":""}" data-viewer-tab="${id}" onclick="setViewerTab('${id}')" onkeydown="viewerTabKey(event,'${id}')">${label}</button>`).join("")}</div>
     <div class="viewer-inspector-body" id="viewerTabPanel" role="tabpanel" aria-labelledby="viewerTab-${S.viewer.tab}" tabindex="0">${body}</div>`;
 }
 function pViewer(){
   const node=viewerNode(S.viewer.selected),visible=viewerVisibleNodes();
   return `<div class="viewer-lead" data-acin><span class="ac">VIEWER-LINKED-SELECTION</span><h1>Viewer</h1>
-    <div class="viewer-toolbar"><select class="inp" aria-label="选择 Viewer 目标与窗口"><option>DAYU200 · w12</option></select><span class="viewer-status" role="status">${esc(S.viewer.capturedAt)}</span>
-      <button class="btn" onclick="recaptureViewer()">重新抓取</button><input class="inp" type="search" aria-label="搜索组件、ID 或文本" placeholder="搜索组件 / ID / 文本" value="${esc(S.viewer.query)}" oninput="setViewerQuery(this)"></div></div>
+    <div class="viewer-toolbar">
+      <select class="inp" aria-label="选择 Viewer 目标与窗口"><option>DAYU200 · w12</option></select>
+      <input class="inp" type="search" aria-label="搜索组件、ID 或文本" placeholder="搜索组件 / ID / 文本" value="${esc(S.viewer.query)}" oninput="setViewerQuery(this)">
+      <span class="spacer"></span>
+      <span class="viewer-status" role="status">${esc(S.viewer.capturedAt)}</span>
+      <button class="btn pri" onclick="recaptureViewer()">重新抓取</button>
+    </div></div>
     <div class="viewer-workspace">
-      <section class="viewer-pane" aria-labelledby="viewerScreenshotTitle"><div class="viewer-pane-head"><h2 id="viewerScreenshotTitle">设备截图</h2><label class="hint" style="margin-inline-start:auto"><input type="checkbox" ${S.viewer.showBounds?"checked":""} onchange="toggleViewerBounds()"> 显示组件边界</label></div><div class="viewer-screen-canvas">${viewerScreenshotHTML()}</div></section>
+      <section class="viewer-pane" aria-labelledby="viewerScreenshotTitle">
+        <div class="viewer-pane-head"><h2 id="viewerScreenshotTitle">设备截图</h2>
+          <label class="trailing"><input type="checkbox" ${S.viewer.showBounds?"checked":""} onchange="toggleViewerBounds()"> 显示组件边界</label></div>
+        <div class="viewer-screen-canvas">${viewerScreenshotHTML()}</div>
+      </section>
       <div class="viewer-devtools" style="--viewer-tree-size:${S.viewer.treeSize}%">
-        <section class="viewer-tree-pane" aria-labelledby="viewerTreeTitle"><div class="viewer-pane-head"><h2 id="viewerTreeTitle">UI 树</h2><span class="meta" id="viewerNodeCount">ArkUI dump · ${visible.length} / ${VIEWER_NODES.length}</span></div><div class="viewer-tree" id="viewerTree" role="tree" aria-label="完整 UI 树">${viewerTreeHTML()}</div></section>
+        <section class="viewer-tree-pane" aria-labelledby="viewerTreeTitle">
+          <div class="viewer-pane-head"><h2 id="viewerTreeTitle">UI 树</h2>
+            <span class="trailing mono" id="viewerNodeCount">${visible.length} / ${VIEWER_NODES.length}</span></div>
+          <div class="viewer-tree" id="viewerTree" role="tree" aria-label="完整 UI 树">${viewerTreeHTML()}</div>
+        </section>
         <div class="viewer-splitter" role="separator" tabindex="0" aria-label="调整 UI 树和节点属性的高度" aria-orientation="horizontal" aria-valuemin="35" aria-valuemax="68" aria-valuenow="${S.viewer.treeSize}" aria-valuetext="UI 树占右侧工作区 ${S.viewer.treeSize}%" onpointerdown="resizeViewerStart(event)" onkeydown="resizeViewerKey(event)"></div>
         <section class="viewer-inspector" aria-label="当前节点属性">${viewerInspectorHTML(node)}</section>
       </div>
-    </div><div class="viewer-footer" role="status" aria-live="polite">ArkUI dump · ${VIEWER_NODES.length} nodes · selected #${node.id} ${esc(node.type)} · 本地数据</div>`;
+    </div>
+    <div class="viewer-footer" role="status" aria-live="polite">ArkUI dump · ${VIEWER_NODES.length} nodes · selected #${node.id} ${esc(node.type)} · 本地数据</div>`;
 }
 
 /* ---------- Trace ---------- */

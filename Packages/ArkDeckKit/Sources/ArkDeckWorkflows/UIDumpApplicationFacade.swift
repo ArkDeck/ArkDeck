@@ -212,6 +212,10 @@ public struct ViewerCapture: Sendable, Equatable {
   public let rawDumpDocument: Data?
   public let identity: ViewerCaptureIdentity
   public let coordinatesAreVerified: Bool
+  /// What this capture cost to produce. `nil` for a capture that was not
+  /// measured — a fixture, or a decode in a test — so the UI can say "not
+  /// measured" instead of reporting a fabricated zero.
+  public let metrics: ViewerCaptureMetrics?
   private let nodeIndex: [String: ViewerNode]
 
   public init(
@@ -222,7 +226,8 @@ public struct ViewerCapture: Sendable, Equatable {
     nodes: [ViewerNode],
     rawDumpDocument: Data?,
     identity: ViewerCaptureIdentity,
-    coordinatesAreVerified: Bool
+    coordinatesAreVerified: Bool,
+    metrics: ViewerCaptureMetrics? = nil
   ) {
     self.screenshotData = screenshotData
     self.screenshotWidth = screenshotWidth
@@ -232,6 +237,7 @@ public struct ViewerCapture: Sendable, Equatable {
     self.rawDumpDocument = rawDumpDocument
     self.identity = identity
     self.coordinatesAreVerified = coordinatesAreVerified
+    self.metrics = metrics
     // A capture is immutable. Build its lookup table exactly once so Viewer
     // rendering never turns a large device tree into repeated linear scans.
     var index: [String: ViewerNode] = [:]
@@ -243,6 +249,17 @@ public struct ViewerCapture: Sendable, Equatable {
 
   public func node(identity: String) -> ViewerNode? {
     nodeIndex[identity]
+  }
+
+  /// Returns the same capture with its measured cost attached. Parsing is
+  /// itself one of the measured stages, so the number cannot exist until after
+  /// the capture does.
+  public func withMetrics(_ metrics: ViewerCaptureMetrics) -> ViewerCapture {
+    ViewerCapture(
+      screenshotData: screenshotData, screenshotWidth: screenshotWidth,
+      screenshotHeight: screenshotHeight, roots: roots, nodes: nodes,
+      rawDumpDocument: rawDumpDocument, identity: identity,
+      coordinatesAreVerified: coordinatesAreVerified, metrics: metrics)
   }
 
   public func ancestors(of identity: String) -> [String] {
@@ -659,23 +676,30 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed Viewer request")
       }
-      let submitted = try resultObject(
-        await UIDumpXPCTransport.request(
-          method: "job.submit", params: ["requestJson": .string(requestJSON)]),
-        label: "Viewer capture submission")
+      let (submitted, submitMilliseconds) = try await ViewerSignpost.measure("viewer.submit") {
+        try resultObject(
+          await UIDumpXPCTransport.request(
+            method: "job.submit", params: ["requestJson": .string(requestJSON)]),
+          label: "Viewer capture submission")
+      }
       guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
         return .failed("Runtime accepted Viewer capture without returning a Job ID")
       }
-      let terminal = try resultObject(
-        await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
-        label: "Viewer capture")
+      let (terminal, runMilliseconds) = try await ViewerSignpost.measure("viewer.run") {
+        try resultObject(
+          await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
+          label: "Viewer capture")
+      }
       let facts = try terminalFacts(terminal, jobID: jobID, target: target)
       guard facts.state == "succeeded", !facts.outcomeUnknown,
         !facts.waitingForHuman, facts.outstandingResidueCount == 0
       else {
         return .failed("Viewer capture did not produce a safe terminal result (\(facts.state))")
       }
-      return .captured(try await loadCapture(facts: facts, target: target))
+      return .captured(
+        try await loadCapture(
+          facts: facts, target: target,
+          submitMilliseconds: submitMilliseconds, runMilliseconds: runMilliseconds))
     } catch let failure as ViewerTransportFailure {
       return .failed(failure.message)
     } catch let failure as ViewerArtifactFailure {
@@ -697,37 +721,66 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
 
   private func loadCapture(
     facts: ViewerTerminalFacts,
-    target: UIDumpTargetPresentation
+    target: UIDumpTargetPresentation,
+    submitMilliseconds: Double = 0,
+    runMilliseconds: Double = 0
   ) async throws -> ViewerCapture {
-    let entries = try artifactList(
-      await UIDumpXPCTransport.request(
-        method: "artifact.list", params: ["jobId": .string(facts.jobID)]),
-      jobID: facts.jobID)
-    let screenshot = try requiredArtifact(named: "screenshot.png", mediaType: "image/png", entries: entries)
-    let tree = try requiredArtifact(named: "ui-tree.json", mediaType: "application/json", entries: entries)
-    let rawDump = try optionalArtifact(named: "ui-dump.json", mediaType: "application/json", entries: entries)
-    let selected = [screenshot, tree] + (rawDump.map { [$0] } ?? [])
-    let total = selected.reduce(Int64(0)) { $0 + $1.byteCount }
-    guard total <= Int64(Self.maximumCaptureBytes) else {
-      throw ViewerArtifactFailure(message: "Viewer Artifact set exceeds its in-memory safety limit")
+    let (selection, listMilliseconds) = try await ViewerSignpost.measure("viewer.artifactList") {
+      let entries = try artifactList(
+        await UIDumpXPCTransport.request(
+          method: "artifact.list", params: ["jobId": .string(facts.jobID)]),
+        jobID: facts.jobID)
+      let screenshot = try requiredArtifact(
+        named: "screenshot.png", mediaType: "image/png", entries: entries)
+      let tree = try requiredArtifact(
+        named: "ui-tree.json", mediaType: "application/json", entries: entries)
+      let rawDump = try optionalArtifact(
+        named: "ui-dump.json", mediaType: "application/json", entries: entries)
+      let total = ([screenshot, tree] + (rawDump.map { [$0] } ?? []))
+        .reduce(Int64(0)) { $0 + $1.byteCount }
+      guard total <= Int64(Self.maximumCaptureBytes) else {
+        throw ViewerArtifactFailure(
+          message: "Viewer Artifact set exceeds its in-memory safety limit")
+      }
+      return (screenshot: screenshot, tree: tree, rawDump: rawDump)
     }
-    let screenshotData = try await readArtifact(screenshot, jobID: facts.jobID)
-    let treeData = try await readArtifact(tree, jobID: facts.jobID)
-    let rawDumpData: Data?
-    if let rawDump { rawDumpData = try await readArtifact(rawDump, jobID: facts.jobID) }
-    else { rawDumpData = nil }
+    let screenshot = selection.screenshot
+    let tree = selection.tree
+    let rawDump = selection.rawDump
+    let (payload, readMilliseconds) = try await ViewerSignpost.measure("viewer.artifactRead") {
+      let screenshotData = try await readArtifact(screenshot, jobID: facts.jobID)
+      let treeData = try await readArtifact(tree, jobID: facts.jobID)
+      let rawDumpData: Data?
+      if let rawDump { rawDumpData = try await readArtifact(rawDump, jobID: facts.jobID) }
+      else { rawDumpData = nil }
+      return (screenshotData: screenshotData, treeData: treeData, rawDumpData: rawDumpData)
+    }
+    let screenshotData = payload.screenshotData
+    let treeData = payload.treeData
+    let rawDumpData = payload.rawDumpData
     guard let capturedAtUTC = facts.finishedAtUTC, !capturedAtUTC.isEmpty else {
       throw ViewerArtifactFailure(message: "Runtime did not report a terminal Viewer capture time")
     }
-    return try ViewerCaptureParser.parse(
-      screenshotData: screenshotData,
-      treeData: treeData,
-      rawDumpData: rawDumpData,
-      identity: ViewerCaptureIdentity(
-        jobID: facts.jobID,
-        targetID: target.id,
-        bindingRevision: target.bindingRevision,
-        capturedAtUTC: capturedAtUTC))
+    let (capture, parseMilliseconds) = try ViewerSignpost.measureSync("viewer.parse") {
+      try ViewerCaptureParser.parse(
+        screenshotData: screenshotData,
+        treeData: treeData,
+        rawDumpData: rawDumpData,
+        identity: ViewerCaptureIdentity(
+          jobID: facts.jobID,
+          targetID: target.id,
+          bindingRevision: target.bindingRevision,
+          capturedAtUTC: capturedAtUTC))
+    }
+    return capture.withMetrics(
+      ViewerCaptureMetrics(
+        submitMilliseconds: submitMilliseconds,
+        runMilliseconds: runMilliseconds,
+        listMilliseconds: listMilliseconds,
+        readMilliseconds: readMilliseconds,
+        readBytes: screenshotData.count + treeData.count + (rawDumpData?.count ?? 0),
+        parseMilliseconds: parseMilliseconds,
+        nodeCount: capture.nodes.count))
   }
 
   private func readArtifact(_ artifact: ViewerArtifactMetadata, jobID: String) async throws -> Data {

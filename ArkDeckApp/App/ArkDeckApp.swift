@@ -97,8 +97,10 @@ private final class ArkDeckAppModelStore {
     provider: OverviewCapabilityApplicationFacade.make())
   @ObservationIgnored lazy var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
+  // A launch without `--ui-test-viewer…` never reaches the fixture, so the
+  // production path stays the XPC facade and nothing else.
   @ObservationIgnored lazy var uiDumpWorkspace = UIDumpWorkspaceViewModel(
-    provider: UIDumpApplicationFacade.make())
+    provider: ViewerUIFixture.provider() ?? UIDumpApplicationFacade.make())
   @ObservationIgnored lazy var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(

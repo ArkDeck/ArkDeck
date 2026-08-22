@@ -7,6 +7,8 @@ import SwiftUI
 /// remote-path, Recipe, or parameter-policy input.
 struct UIDumpWorkspaceView: View {
   var model: UIDumpWorkspaceViewModel
+  @FocusState private var separatorFocused: Bool
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     GeometryReader { geometry in
@@ -32,13 +34,17 @@ struct UIDumpWorkspaceView: View {
         } else {
           emptyState
         }
+        if let capture = model.capture {
+          Divider()
+          footer(capture)
+        }
       }
     }
     .task { model.refresh() }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button { model.refresh() } label: {
-          Label("Refresh Viewer", systemImage: "arrow.clockwise")
+          Label(viewerText("viewer.toolbar.refresh"), systemImage: "arrow.clockwise")
         }
         .disabled(model.isRefreshing || model.isCapturing)
         .accessibilityIdentifier("viewer.refresh")
@@ -49,8 +55,8 @@ struct UIDumpWorkspaceView: View {
   private var toolbar: some View {
     HStack(spacing: 10) {
       Text("Viewer").font(.title2.weight(.semibold))
-      Picker("Exact target", selection: targetBinding) {
-        Text("No target").tag("")
+      Picker(viewerText("viewer.toolbar.exactTarget"), selection: targetBinding) {
+        Text(viewerText("viewer.toolbar.noTarget")).tag("")
         ForEach(model.workspace.targets) { target in
           Text(target.pickerTitle).tag(target.id)
         }
@@ -59,9 +65,9 @@ struct UIDumpWorkspaceView: View {
       .accessibilityIdentifier("viewer.target")
 
       if let capture = model.capture {
-        Picker("Current screen", selection: rootBinding) {
+        Picker(viewerText("viewer.toolbar.currentScreen"), selection: rootBinding) {
           ForEach(capture.roots, id: \.self) { identity in
-            Text(model.nodeTitle(identity) ?? "Current screen").tag(identity)
+            Text(model.nodeTitle(identity) ?? viewerText("viewer.toolbar.currentScreen")).tag(identity)
           }
         }
         .frame(maxWidth: 190)
@@ -73,15 +79,15 @@ struct UIDumpWorkspaceView: View {
       }
 
       Spacer(minLength: 8)
-      TextField("Search component, ID, or text", text: queryBinding)
+      TextField(viewerText("viewer.toolbar.search"), text: queryBinding)
         .textFieldStyle(.roundedBorder)
         .frame(maxWidth: 250)
         .accessibilityIdentifier("viewer.search")
-      Toggle("Show component bounds", isOn: boundsBinding)
-        .toggleStyle(.checkbox)
-        .accessibilityIdentifier("viewer.showBounds")
       Button { model.recapture() } label: {
-        Label(model.isCapturing ? "Capturing…" : "Recapture", systemImage: "camera.viewfinder")
+        Label(
+          model.isCapturing
+            ? viewerText("viewer.toolbar.capturing") : viewerText("viewer.toolbar.recapture"),
+          systemImage: "camera.viewfinder")
       }
       .buttonStyle(.borderedProminent)
       .disabled(!model.canRecapture)
@@ -95,7 +101,7 @@ struct UIDumpWorkspaceView: View {
     VStack(spacing: 12) {
       Image(systemName: "rectangle.on.rectangle.angled")
         .font(.largeTitle).foregroundStyle(.secondary)
-      Text("No verified capture").font(.title3.weight(.semibold))
+      Text(viewerText("viewer.empty.title")).font(.title3.weight(.semibold))
       Text(model.emptyMessage)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
@@ -113,9 +119,19 @@ struct UIDumpWorkspaceView: View {
 
   private func screenshot(_ capture: ViewerCapture) -> some View {
     VStack(spacing: 0) {
-      paneHeader("Device screenshot", detail: capture.coordinatesAreVerified
-        ? "Verified capture · Click to inspect"
-        : "Coordinates cannot be verified")
+      paneHeader(
+        viewerText("viewer.pane.screenshot"),
+        identifier: "viewer.pane.screenshot",
+        detail: capture.coordinatesAreVerified
+          ? "" : viewerText("viewer.pane.coordinatesUnverified")
+      ) {
+        // The toggle only changes this pane, so it belongs to this pane rather
+        // than to a window-wide toolbar.
+        Toggle(viewerText("viewer.pane.showBounds"), isOn: boundsBinding)
+          .toggleStyle(.checkbox)
+          .font(.system(size: 11))
+          .accessibilityIdentifier("viewer.showBounds")
+      }
       GeometryReader { proxy in
         ZStack {
           Color(nsColor: .windowBackgroundColor)
@@ -137,13 +153,13 @@ struct UIDumpWorkspaceView: View {
             }
             .frame(width: content.width, height: content.height)
           } else {
-            ContentUnavailableView("Screenshot is unavailable", systemImage: "photo")
+            ContentUnavailableView(viewerText("viewer.screenshot.unavailable"), systemImage: "photo")
           }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
       if !capture.coordinatesAreVerified {
-        Label("The tree bounds do not prove this screenshot's coordinate space. Tree and Raw dump remain available, but screenshot selection is disabled.", systemImage: "exclamationmark.triangle")
+        Label(viewerText("viewer.screenshot.unverifiedDetail"), systemImage: "exclamationmark.triangle")
           .font(.footnote)
           .foregroundStyle(.orange)
           .padding(10)
@@ -151,7 +167,6 @@ struct UIDumpWorkspaceView: View {
       }
     }
     .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityIdentifier("viewer.screenshot")
   }
 
   @ViewBuilder
@@ -162,37 +177,50 @@ struct UIDumpWorkspaceView: View {
   ) -> some View {
     if let bounds = node.bounds {
       let selected = node.identity == model.selectedNodeIdentity
-      if model.showBounds || selected {
-        ZStack(alignment: .topTrailing) {
-          Rectangle()
-            .fill(selected ? Color.accentColor.opacity(0.10) : .clear)
-            .overlay {
+      let outlined = model.showBounds || selected
+      ZStack(alignment: .topTrailing) {
+        Rectangle()
+          .fill(selected ? Color.accentColor.opacity(0.10) : .clear)
+          .overlay {
+            if outlined {
               Rectangle().stroke(
                 selected ? Color.accentColor : Color.accentColor.opacity(0.35),
                 lineWidth: selected ? 2 : 1)
             }
-          if selected {
-            Text("#\(node.deviceID ?? "—") \(node.type)")
-              .font(.caption2.monospaced())
-              .padding(.horizontal, 4).padding(.vertical, 2)
-              .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
-              .foregroundStyle(Color.primary)
-            .fixedSize()
           }
+        if selected {
+          Text("#\(node.deviceID ?? "—") \(node.type)")
+            .font(.caption2.monospaced())
+            .padding(.horizontal, 4).padding(.vertical, 2)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
+            .foregroundStyle(Color.primary)
+            .fixedSize()
         }
-        .frame(
-          width: max(1, content.width * bounds.width / Double(capture.screenshotWidth)),
-          height: max(1, content.height * bounds.height / Double(capture.screenshotHeight)))
-        .position(
-          x: content.width * (bounds.x + bounds.width / 2) / Double(capture.screenshotWidth),
-          y: content.height * (bounds.y + bounds.height / 2) / Double(capture.screenshotHeight))
-        .zIndex(Double(node.depth) + (node.zIndex ?? 0))
-        // The visual bounds must never compete with the single coordinate
-        // hit target below. Hundreds of transparent native buttons made the
-        // screenshot appear unclickable when bounds were hidden.
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
       }
+      .frame(
+        width: max(1, content.width * bounds.width / Double(capture.screenshotWidth)),
+        height: max(1, content.height * bounds.height / Double(capture.screenshotHeight)))
+      .position(
+        x: content.width * (bounds.x + bounds.width / 2) / Double(capture.screenshotWidth),
+        y: content.height * (bounds.y + bounds.height / 2) / Double(capture.screenshotHeight))
+      .zIndex(Double(node.depth) + (node.zIndex ?? 0))
+      // Pointer selection stays with the single coordinate target below, which
+      // resolves the deepest node under the point. Real dumps stack several
+      // full-screen containers, so turning these into click targets lets the
+      // shallowest one swallow every click — that is what once made the
+      // screenshot "appear unclickable", and it is an occlusion problem rather
+      // than a cost problem.
+      .allowsHitTesting(false)
+      // Assistive technology is a different matter: it needs to reach each
+      // node spatially, and it addresses elements by name rather than by
+      // position, so nothing occludes anything. These stay present whether or
+      // not the bounds are drawn — showing bounds is a visual preference, not
+      // an accessibility one.
+      .accessibilityElement()
+      .accessibilityLabel(model.nodeTitle(node.identity) ?? node.type)
+      .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+      .accessibilityAction { model.select(node.identity) }
+      .accessibilityIdentifier("viewer.screenshot.node.\(node.identity)")
     }
   }
 
@@ -205,8 +233,8 @@ struct UIDumpWorkspaceView: View {
       .gesture(SpatialTapGesture().onEnded { value in
         model.select(in: capture, at: value.location, renderedSize: content)
       })
-      .accessibilityLabel("Select component in screenshot")
-      .accessibilityHint("Use the UI tree to select a component with the keyboard.")
+      .accessibilityLabel(viewerText("viewer.screenshot.selectLabel"))
+      .accessibilityHint(viewerText("viewer.screenshot.selectHint"))
       .accessibilityIdentifier("viewer.screenshot.hitTest")
   }
 
@@ -220,81 +248,176 @@ struct UIDumpWorkspaceView: View {
       }
     }
     .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityIdentifier("viewer.inspector")
   }
 
   private func tree(_ capture: ViewerCapture) -> some View {
     let rows = model.visibleNodes
     return VStack(spacing: 0) {
-      HStack {
-        paneHeader("UI tree", detail: "\(rows.count) / \(capture.nodes.count) matches")
-        Spacer()
-      }
-      ScrollViewReader { reader in
-        ScrollView([.horizontal, .vertical]) {
-          LazyVStack(alignment: .leading, spacing: 1) {
-            ForEach(rows) { node in
-              treeRow(node)
-                .id(node.identity)
+      paneHeader(
+        viewerText("viewer.pane.tree"),
+        identifier: "viewer.pane.tree",
+        detail: "\(rows.count) / \(capture.nodes.count)")
+      // A row inside a horizontally scrolling outline has no bounded width, so
+      // it must size to its own content and only borrow the viewport width as
+      // a floor. Asking for `maxWidth: .infinity` here made every row claim the
+      // scroll content width in turn and cascaded the tree diagonally.
+      GeometryReader { proxy in
+        ScrollViewReader { reader in
+          ScrollView([.horizontal, .vertical]) {
+            LazyVStack(alignment: .leading, spacing: 1) {
+              ForEach(rows) { node in
+                treeRow(node, viewportWidth: proxy.size.width)
+                  .id(node.identity)
+              }
+              if rows.isEmpty {
+                Text(viewerText("viewer.tree.noMatches"))
+                  .foregroundStyle(.secondary).padding(12)
+              }
             }
-            if rows.isEmpty {
-              Text("No matching components. The current selection is unchanged.")
-                .foregroundStyle(.secondary).padding(12)
+            .padding(.vertical, 6)
+          }
+          .onChange(of: model.selectedNodeIdentity) { _, identity in
+            guard let identity else { return }
+            // Reduce Motion users get the same reveal without the slide, and a
+            // selection change never becomes a large moving surface.
+            if reduceMotion {
+              reader.scrollTo(identity, anchor: .center)
+            } else {
+              withAnimation(.easeOut(duration: 0.15)) { reader.scrollTo(identity, anchor: .center) }
             }
           }
-          .padding(6)
-        }
-        .onChange(of: model.selectedNodeIdentity) { _, identity in
-          guard let identity else { return }
-          withAnimation(.easeOut(duration: 0.15)) { reader.scrollTo(identity, anchor: .center) }
         }
       }
+      // The outline keyboard model lives on the scrolling row set, not on each
+      // row: rows are recycled by LazyVStack, so per-row key handlers would
+      // stop responding as soon as a deep tree scrolled the focused row away.
+      .focusable()
+      .onKeyPress(.upArrow) { model.moveSelection(by: -1); return .handled }
+      .onKeyPress(.downArrow) { model.moveSelection(by: 1); return .handled }
+      .onKeyPress(.leftArrow) { model.collapseOrSelectParent(); return .handled }
+      .onKeyPress(.rightArrow) { model.expandOrSelectFirstChild(); return .handled }
+      .onKeyPress(.home) { model.moveSelectionToEdge(first: true); return .handled }
+      .onKeyPress(.end) { model.moveSelectionToEdge(first: false); return .handled }
+      .accessibilityLabel(viewerText("viewer.tree.label"))
     }
-    .accessibilityIdentifier("viewer.tree")
   }
 
-  private func treeRow(_ node: ViewerNode) -> some View {
+  /// One row, one button, sized to its own content.
+  ///
+  /// The selection fill is an inset capsule rather than a full-bleed band, and
+  /// the disclosure chevron lives inside the row's hit area so the row never
+  /// needs two competing controls. `#id` trails the label inline: a deep tree
+  /// scrolls horizontally, so there is no fixed right edge to align a column
+  /// to, and the node's own name must never be truncated to make one.
+  private func treeRow(_ node: ViewerNode, viewportWidth: CGFloat) -> some View {
     let selected = node.identity == model.selectedNodeIdentity
-    return HStack(spacing: 5) {
-      if !node.children.isEmpty {
-        Button { model.toggleExpansion(node.identity) } label: {
-          Image(systemName: model.expandedNodeIdentities.contains(node.identity) ? "chevron.down" : "chevron.right")
-            .font(.caption.weight(.semibold)).frame(width: 16, height: 20)
+    let expanded = model.expandedNodeIdentities.contains(node.identity)
+    return Button { model.select(node.identity) } label: {
+      HStack(spacing: 6) {
+        Group {
+          if node.children.isEmpty {
+            Color.clear
+          } else {
+            Image(systemName: "chevron.right")
+              .font(.system(size: 9, weight: .semibold))
+              .rotationEffect(.degrees(expanded ? 90 : 0))
+          }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(model.expandedNodeIdentities.contains(node.identity) ? "Collapse \(node.type)" : "Expand \(node.type)")
-      } else {
-        Color.clear.frame(width: 16, height: 20)
-      }
-      Button { model.select(node.identity) } label: {
-        HStack(spacing: 5) {
-          Image(systemName: "square.dashed").foregroundStyle(.secondary)
-          Text(node.type).font(.callout.monospaced()).lineLimit(1)
-          if let text = node.text, !text.isEmpty { Text(text).foregroundStyle(.secondary).lineLimit(1) }
-          if let id = node.deviceID { Text("#\(id)").font(.caption.monospaced()).foregroundStyle(.secondary) }
+        .frame(width: 16, height: 16)
+        .contentShape(Rectangle())
+        .onTapGesture { model.toggleExpansion(node.identity) }
+
+        Image(systemName: Self.symbol(for: node.type))
+          .font(.system(size: 11))
+          .frame(width: 16, height: 16)
+          .opacity(selected ? 0.95 : 0.65)
+
+        Text(node.type)
+          .font(.system(size: 12))
+          .lineLimit(1)
+          .fixedSize()
+        if let text = node.text, !text.isEmpty {
+          Text(text)
+            .font(.system(size: 12))
+            .opacity(selected ? 0.85 : 0.62)
+            .lineLimit(1)
+            .fixedSize()
         }
-        .padding(.horizontal, 6).frame(minHeight: 24, alignment: .leading)
-        .background(selected ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 4))
+        if let id = node.deviceID {
+          Text("#\(id)")
+            .font(.system(size: 11).monospaced())
+            .monospacedDigit()
+            .opacity(selected ? 0.85 : 0.55)
+            .fixedSize()
+        }
       }
-      .buttonStyle(.plain)
-      .accessibilityValue(selected ? "Selected" : "Not selected")
-      .accessibilityIdentifier("viewer.tree.node.\(node.identity)")
+      .padding(.leading, 6 + CGFloat(node.depth) * 14)
+      .padding(.trailing, 8)
+      .frame(minHeight: 26, alignment: .leading)
+      // The floor keeps the selection capsule spanning the visible pane; the
+      // content decides the real width so nothing is truncated or wrapped.
+      .frame(minWidth: max(0, viewportWidth - 12), alignment: .leading)
+      .contentShape(Rectangle())
+      .foregroundStyle(selected ? Color.white : Color.primary)
+      .background(selected ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 6))
     }
-    .padding(.leading, CGFloat(node.depth) * 14)
+    .buttonStyle(.plain)
+    .padding(.horizontal, 6)
+    .accessibilityValue(
+      selected ? viewerText("viewer.tree.selected") : viewerText("viewer.tree.notSelected"))
+    .accessibilityIdentifier("viewer.tree.node.\(node.identity)")
   }
 
+  /// Node kind, not decoration. One identical outline square on every row told
+  /// the reader nothing; these five shapes separate containers from leaves at a
+  /// glance and are the only thing distinguishing a `Text` from an `Image` when
+  /// a deep tree has scrolled the labels out of alignment.
+  static func symbol(for type: String) -> String {
+    switch type {
+    // Not `textformat`: SF Symbols localizes it, and in a Simplified Chinese
+    // run it renders the word 格式 inside the outline instead of a glyph.
+    case "Text", "Span", "Search", "RichText": "text.alignleft"
+    case "Image", "Icon", "ImageSpan": "photo"
+    case "Toggle", "Button", "Slider", "Checkbox", "Radio", "Select": "switch.2"
+    case "CustomComponent", "BuilderNode", "ConditionalContent", "LazyForEach", "ForEach":
+      "curlybraces"
+    case "Column", "Row", "List", "ListItem", "Stack", "Flex", "Grid", "Scroll", "Swiper":
+      "rectangle.split.2x1"
+    default: "rectangle"
+    }
+  }
+
+  /// macOS splits panes with a hairline. The visible rule stays 1 pt; the drag
+  /// and focus target is the 9 pt transparent band around it.
   private var resizeHandle: some View {
-    Rectangle().fill(Color(nsColor: .separatorColor).opacity(0.8)).frame(height: 7)
-      .overlay(Capsule().fill(Color.secondary.opacity(0.65)).frame(width: 36, height: 2))
+    Color.clear
+      .frame(height: 9)
+      .overlay {
+        Rectangle()
+          .fill(separatorFocused ? Color.accentColor : Color(nsColor: .separatorColor))
+          .frame(height: 1)
+      }
       .contentShape(Rectangle())
       .gesture(DragGesture(minimumDistance: 0).onChanged { value in
         model.adjustInspectorTree(by: value.translation.height)
       })
       .focusable()
-      .accessibilityLabel("Resize UI tree and node properties")
-      .accessibilityValue("UI tree uses \(Int(model.inspectorTreePercent)) percent of the inspector")
+      .focused($separatorFocused)
+      .onKeyPress(.upArrow) { model.adjustInspectorTree(by: 32); return .handled }
+      .onKeyPress(.downArrow) { model.adjustInspectorTree(by: -32); return .handled }
+      .onKeyPress(.home) { model.setInspectorTree(percent: 35); return .handled }
+      .onKeyPress(.end) { model.setInspectorTree(percent: 68); return .handled }
+      // A hairline drawn on `Color.clear` publishes nothing on its own, so the
+      // splitter has to be declared an element before it can carry a name, a
+      // value, or a keyboard action for VoiceOver.
+      .accessibilityElement()
+      .accessibilityLabel(viewerText("viewer.separator.label"))
+      .accessibilityValue(
+        String(
+          localized: LocalizedStringResource.UIDumpLocalizable.viewerSeparatorValue(
+            Int32(clamping: Int(model.inspectorTreePercent)))))
       .accessibilityAdjustableAction { direction in
-        model.adjustInspectorTree(by: direction == .increment ? -4 : 4)
+        model.adjustInspectorTree(by: direction == .increment ? -32 : 32)
       }
       .accessibilityIdentifier("viewer.inspector.separator")
   }
@@ -302,81 +425,241 @@ struct UIDumpWorkspaceView: View {
   private func properties(_ capture: ViewerCapture) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       if let node = model.selectedNode {
-        VStack(alignment: .leading, spacing: 4) {
-          HStack {
-            Text(node.type).font(.headline)
-            if let id = node.deviceID { Text("#\(id)").font(.headline.monospaced()) }
-            Spacer()
-            if node.visible { Label("Visible", systemImage: "eye") }
-            if node.clickable == true { Label("Interactive", systemImage: "hand.tap") }
-          }.font(.caption)
-          Text(model.breadcrumb(for: node.identity)).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+        VStack(alignment: .leading, spacing: 6) {
+          HStack(spacing: 8) {
+            Image(systemName: Self.symbol(for: node.type))
+              .font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(node.type).font(.system(size: 13, weight: .semibold))
+            if let id = node.deviceID { statusChip("#\(id)") }
+            // Neutral, not green: "visible" and "interactive" are facts about
+            // the node, not a health verdict. Semantic green stays reserved
+            // for outcomes that are actually good news.
+            if node.clickable == true { statusChip(viewerText("viewer.chip.interactive")) }
+            if node.visible { statusChip(viewerText("viewer.chip.visible")) }
+            Spacer(minLength: 0)
+          }
+          Text(model.breadcrumb(for: node.identity))
+            .font(.system(size: 11).monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(1).truncationMode(.head)
+            .help(model.breadcrumb(for: node.identity))
         }
-        .padding(10)
-        HStack(spacing: 6) {
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+        Divider()
+        HStack(spacing: 0) {
           inspectorTabButton(.properties)
           inspectorTabButton(.layout)
           inspectorTabButton(.accessibility)
           inspectorTabButton(.rawDump)
+          Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 6)
         Divider()
         ScrollView {
           inspectorContent(node, capture: capture)
-            .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
       } else {
-        ContentUnavailableView("Select a component", systemImage: "cursorarrow.click")
+        ContentUnavailableView(viewerText("viewer.properties.selectPrompt"), systemImage: "cursorarrow.click")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .accessibilityIdentifier("viewer.properties")
   }
 
+  /// Live telemetry for the capture on screen, in the pipeline's own stage
+  /// names so a line here and a signpost interval in Instruments read the
+  /// same. A capture that was not measured says so rather than showing zeros.
+  private func footer(_ capture: ViewerCapture) -> some View {
+    HStack(spacing: 6) {
+      Text(
+        String(
+          localized: LocalizedStringResource.UIDumpLocalizable.viewerFooterNodes(
+            Int32(clamping: capture.nodes.count))))
+      if let metrics = capture.metrics {
+        Text("· submit \(milliseconds(metrics.submitMilliseconds))")
+        Text("· run \(milliseconds(metrics.runMilliseconds))")
+        Text("· list \(milliseconds(metrics.listMilliseconds))")
+        Text("· read \(bytes(metrics.readBytes))/\(milliseconds(metrics.readMilliseconds))")
+        if let throughput = metrics.readMegabytesPerSecond {
+          Text("(\(throughput.formatted(.number.precision(.fractionLength(1)))) MB/s)")
+        }
+        Text("· parse \(milliseconds(metrics.parseMilliseconds))")
+        Text("· Σ \(milliseconds(metrics.totalMilliseconds))")
+      } else {
+        Text("· \(viewerText("viewer.footer.notMeasured"))")
+      }
+      Spacer(minLength: 0)
+    }
+    .font(.system(size: 11).monospaced())
+    .foregroundStyle(.secondary)
+    .lineLimit(1)
+    .padding(.horizontal, 12)
+    .frame(height: 26)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("viewer.footer")
+  }
+
+  /// `FormatStyle` rather than the C varargs formatter: the App target builds
+  /// with strict memory safety, and a contract test bans that form outright —
+  /// by scanning source text, so even naming it in a comment fails the gate.
+  private func milliseconds(_ value: Double) -> String {
+    value >= 1000
+      ? "\((value / 1000).formatted(.number.precision(.fractionLength(2))))s"
+      : "\(value.formatted(.number.precision(.fractionLength(0))))ms"
+  }
+
+  private func bytes(_ value: Int) -> String {
+    value >= 1_048_576
+      ? "\((Double(value) / 1_048_576).formatted(.number.precision(.fractionLength(1))))MB"
+      : "\((Double(value) / 1024).formatted(.number.precision(.fractionLength(0))))KB"
+  }
+
+  private func statusChip(_ text: String) -> some View {
+    Text(text)
+      .font(.system(size: 11).monospaced())
+      .foregroundStyle(.secondary)
+      .padding(.horizontal, 6).padding(.vertical, 1)
+      .overlay(Capsule().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+  }
+
+  /// Grouped, because a flat run of a dozen identical rows reads as a dump
+  /// rather than an inspector. Identity, state, and geometry answer different
+  /// questions and are scanned separately.
   @ViewBuilder
   private func inspectorContent(_ node: ViewerNode, capture: ViewerCapture) -> some View {
     switch model.inspectorTab {
     case .properties:
-      keyValues([("Type", node.type), ("ID", node.deviceID ?? "Unavailable"), ("Text", node.text ?? "Unavailable"), ("Inspector ID", node.inspectorID ?? "Unavailable"), ("Enabled", state(node.enabled)), ("Clickable", state(node.clickable))])
+      keyValueGroup(viewerText("viewer.group.identity"), [
+        ("id", node.deviceID ?? viewerText("viewer.value.unavailable")),
+        ("type", node.type),
+        ("inspectorId", node.inspectorID ?? viewerText("viewer.value.unavailable")),
+        ("text", node.text ?? viewerText("viewer.value.unavailable")),
+      ])
+      keyValueGroup(viewerText("viewer.group.state"), [
+        ("enabled", state(node.enabled)),
+        ("visible", state(node.visible)),
+        ("clickable", state(node.clickable)),
+        ("focusable", state(node.focusable)),
+      ])
     case .layout:
-      keyValues([("Screenshot mapping", capture.coordinatesAreVerified ? "Verified" : "Unavailable"), ("Bounds", boundsText(node.bounds)), ("z-order", node.zIndex.map { String($0) } ?? "Unavailable"), ("Hit test", node.bounds != nil && capture.coordinatesAreVerified ? "Available" : "Unavailable")])
+      keyValueGroup(viewerText("viewer.group.geometry"), [
+        ("bounds", boundsText(node.bounds)),
+        (viewerText("viewer.field.screenshotMapping"),
+         capture.coordinatesAreVerified
+           ? viewerText("viewer.value.verified") : viewerText("viewer.value.unavailable")),
+        (viewerText("viewer.field.hitTest"),
+         node.bounds != nil && capture.coordinatesAreVerified
+           ? viewerText("viewer.value.available") : viewerText("viewer.value.unavailable")),
+      ])
+      keyValueGroup(viewerText("viewer.group.paint"), [
+        ("zIndex", node.zIndex.map { String($0) } ?? viewerText("viewer.value.unavailable")),
+      ])
     case .accessibility:
-      keyValues([("Visible", state(node.visible)), ("Focusable", state(node.focusable)), ("Accessible label", node.text ?? "Unavailable"), ("Description", node.inspectorID ?? "Unavailable")])
+      keyValueGroup(viewerText("viewer.group.semantics"), [
+        (viewerText("viewer.field.accessibleLabel"), node.text ?? viewerText("viewer.value.unavailable")),
+        (viewerText("viewer.field.description"), node.inspectorID ?? viewerText("viewer.value.unavailable")),
+      ])
+      keyValueGroup(viewerText("viewer.group.focus"), [
+        ("visible", state(node.visible)),
+        ("focusable", state(node.focusable)),
+      ])
     case .rawDump:
-      Text(capture.formattedRawFields(for: node.identity) ?? "Raw fields are unavailable")
-        .font(.callout.monospaced()).textSelection(.enabled)
+      Text(capture.formattedRawFields(for: node.identity) ?? viewerText("viewer.properties.rawUnavailable"))
+        .font(.system(size: 12).monospaced()).textSelection(.enabled)
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("viewer.rawDump")
     }
   }
 
-  private func keyValues(_ rows: [(String, String)]) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+  private func keyValueGroup(_ title: String, _ rows: [(String, String)]) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(title)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+      Divider()
       ForEach(rows, id: \.0) { name, value in
-        GridRow {
-          Text(name).foregroundStyle(.secondary)
-          Text(value).font(.callout.monospaced()).textSelection(.enabled)
+        HStack(alignment: .top, spacing: 0) {
+          // A fixed key column. A fluid one let two-character keys claim 40%
+          // of the inspector and pushed their values half a pane away.
+          Text(name)
+            .font(.system(size: 12)).foregroundStyle(.secondary)
+            .frame(width: 150, alignment: .leading)
+          Text(value)
+            .font(.system(size: 12).monospaced())
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        Divider()
       }
     }
   }
 
   private func inspectorTabButton(_ tab: ViewerInspectorTab) -> some View {
-    Button(tab.title) { model.setInspectorTab(tab) }
-      .buttonStyle(.bordered)
-      .controlSize(.small)
-      .accessibilityLabel("Show \(tab.title)")
+    let active = model.inspectorTab == tab
+    return Button { model.setInspectorTab(tab) } label: {
+      Text(tab.title)
+        .font(.system(size: 12, weight: active ? .semibold : .regular))
+        .foregroundStyle(active ? Color.accentColor : Color.secondary)
+        .padding(.horizontal, 6).padding(.vertical, 6)
+        .frame(minHeight: 32)
+        .overlay(alignment: .bottom) {
+          Rectangle()
+            .fill(active ? Color.accentColor : .clear)
+            .frame(height: 2)
+        }
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    // Before the padding, not after: a later modifier would attach the
+    // identifier to the padding container and leave the button itself
+    // anonymous in the accessibility tree.
+    .accessibilityLabel(
+      String(localized: LocalizedStringResource.UIDumpLocalizable.viewerActionShow(tab.title)))
+    .accessibilityAddTraits(active ? [.isSelected] : [])
+    .padding(.trailing, 8)
+    .accessibilityIdentifier("viewer.inspector.tab.\(tab.id)")
   }
 
-  private func paneHeader(_ title: String, detail: String) -> some View {
+  /// Pane chrome, not page chrome: a 12 pt content axis shared with the rows
+  /// and the inspector below, with the detail trailing so titles stay flush
+  /// left down the whole column.
+  private func paneHeader<Trailing: View>(
+    _ title: String, identifier: String, detail: String,
+    @ViewBuilder trailing: () -> Trailing
+  ) -> some View {
     HStack(spacing: 8) {
-      Text(title).font(.headline)
-      Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-      Spacer()
+      // The identifier rides the title, not the header container: a container
+      // identifier overwrites every descendant's, which is how the inspector
+      // tabs and the separator once became unreachable.
+      Text(title)
+        .font(.system(size: 12, weight: .semibold))
+        .accessibilityIdentifier(identifier)
+      Spacer(minLength: 8)
+      if !detail.isEmpty {
+        Text(detail)
+          .font(.system(size: 11).monospaced())
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+      trailing()
     }
-    .padding(.horizontal, 12).padding(.vertical, 9)
+    .padding(.horizontal, 12)
+    .frame(height: 32)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(.bar)
+  }
+
+  private func paneHeader(_ title: String, identifier: String, detail: String) -> some View {
+    paneHeader(title, identifier: identifier, detail: detail) { EmptyView() }
   }
 
   private func fittedSize(container: CGSize, aspect: CGFloat) -> CGSize {
@@ -384,9 +667,12 @@ struct UIDumpWorkspaceView: View {
     let width = min(container.width - 24, (container.height - 24) * aspect)
     return CGSize(width: max(1, width), height: max(1, width / aspect))
   }
-  private func state(_ value: Bool?) -> String { value.map { $0 ? "Yes" : "No" } ?? "Unavailable" }
+  private func state(_ value: Bool?) -> String {
+    value.map { $0 ? viewerText("viewer.value.yes") : viewerText("viewer.value.no") }
+      ?? viewerText("viewer.value.unavailable")
+  }
   private func boundsText(_ value: ViewerBounds?) -> String {
-    guard let value else { return "Unavailable" }
+    guard let value else { return viewerText("viewer.value.unavailable") }
     return "x \(value.x), y \(value.y), \(value.width) × \(value.height)"
   }
   private var targetBinding: Binding<String> {
@@ -406,7 +692,14 @@ struct UIDumpWorkspaceView: View {
 enum ViewerInspectorTab: String {
   case properties, layout, accessibility, rawDump
   var id: String { rawValue }
-  var title: String { switch self { case .properties: "Properties"; case .layout: "Layout"; case .accessibility: "Accessibility"; case .rawDump: "Raw dump" } }
+  var title: String {
+    switch self {
+    case .properties: viewerText("viewer.tab.properties")
+    case .layout: viewerText("viewer.tab.layout")
+    case .accessibility: viewerText("viewer.tab.accessibility")
+    case .rawDump: viewerText("viewer.tab.rawDump")
+    }
+  }
 }
 
 @MainActor
@@ -432,12 +725,14 @@ final class UIDumpWorkspaceViewModel {
   var selectedNode: ViewerNode? { selectedNodeIdentity.flatMap { capture?.node(identity: $0) } }
   var emptyMessage: String {
     if let failure = workspace.targetLoadFailure { return failure }
-    if selectedTarget == nil { return "Select an adopted target with a complete binding, then recapture." }
+    if selectedTarget == nil { return viewerText("viewer.empty.selectTarget") }
     if let reason = selectedTarget?.connection.failureReason {
-      return "\(selectedTarget?.id ?? "This target") cannot be recaptured: \(reason). Select a Connected target."
+      return String(
+        localized: LocalizedStringResource.UIDumpLocalizable.viewerEmptyTargetBlocked(
+          selectedTarget?.id ?? "", reason))
     }
     if case .unavailable(let reasons) = workspace.operation.availability { return reasons.joined(separator: "\n") }
-    return "Recapture creates a typed Runtime Job and shows only verified, same-Job Artifacts."
+    return viewerText("viewer.empty.explain")
   }
   var canRecapture: Bool {
     guard !isCapturing, selectedTarget?.isCaptureReady == true else { return false }
@@ -510,7 +805,10 @@ final class UIDumpWorkspaceViewModel {
   func setShowBounds(_ value: Bool) { showBounds = value }
   func setInspectorTab(_ value: ViewerInspectorTab) { inspectorTab = value }
   func toggleExpansion(_ identity: String) { if !expandedNodeIdentities.insert(identity).inserted { expandedNodeIdentities.remove(identity) } }
-  func adjustInspectorTree(by delta: Double) { inspectorTreePercent = min(68, max(35, inspectorTreePercent - delta / 8)) }
+  func adjustInspectorTree(by delta: Double) { setInspectorTree(percent: inspectorTreePercent - delta / 8) }
+  /// Resizing is presentation only. It must never touch `selectedNodeIdentity`,
+  /// or dragging the separator would silently move the inspected node.
+  func setInspectorTree(percent: Double) { inspectorTreePercent = min(68, max(35, percent)) }
   func select(in capture: ViewerCapture, at location: CGPoint, renderedSize: CGSize) {
     guard renderedSize.width > 0, renderedSize.height > 0 else { return }
     let screenshotX = Double(location.x / renderedSize.width) * Double(capture.screenshotWidth)
@@ -525,6 +823,55 @@ final class UIDumpWorkspaceViewModel {
     selectedNodeIdentity = node.identity
     expandedNodeIdentities.formUnion(capture.ancestors(of: node.identity))
   }
+  // MARK: - macOS outline keyboard model
+  //
+  // Movement walks `visibleNodes`, which is the same collapsed/filtered row set
+  // the tree draws. Anything else would let the keyboard land on a row the user
+  // cannot see. Every move is a selection change only: it never edits the
+  // capture, and left/right only touch expansion state.
+
+  /// Moves the selection `offset` rows through the currently visible set.
+  func moveSelection(by offset: Int) {
+    let rows = visibleNodes
+    guard !rows.isEmpty else { return }
+    guard let current = selectedNodeIdentity,
+      let index = rows.firstIndex(where: { $0.identity == current })
+    else {
+      select(rows[0].identity)
+      return
+    }
+    let next = min(rows.count - 1, max(0, index + offset))
+    select(rows[next].identity)
+  }
+
+  func moveSelectionToEdge(first: Bool) {
+    let rows = visibleNodes
+    guard let node = first ? rows.first : rows.last else { return }
+    select(node.identity)
+  }
+
+  /// Left: collapse an open node, otherwise step out to the parent.
+  func collapseOrSelectParent() {
+    guard let identity = selectedNodeIdentity, let node = capture?.node(identity: identity) else { return }
+    if !node.children.isEmpty, expandedNodeIdentities.contains(identity) {
+      expandedNodeIdentities.remove(identity)
+      return
+    }
+    if let parent = node.parentIdentity { select(parent) }
+  }
+
+  /// Right: open a closed node, otherwise step into its first child.
+  func expandOrSelectFirstChild() {
+    guard let identity = selectedNodeIdentity, let node = capture?.node(identity: identity),
+      !node.children.isEmpty
+    else { return }
+    if !expandedNodeIdentities.contains(identity) {
+      expandedNodeIdentities.insert(identity)
+      return
+    }
+    if let child = node.children.first { select(child) }
+  }
+
   func nodeTitle(_ identity: String) -> String? { capture?.node(identity: identity).map { "#\($0.deviceID ?? "—") \($0.type)" } }
   func breadcrumb(for identity: String) -> String {
     guard let capture else { return "" }
