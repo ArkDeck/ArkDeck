@@ -165,6 +165,13 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       return .direct(method: request.method)
     }
     switch request.method {
+    case "job.plan":
+      guard
+        request.params?.count == 1,
+        case .string(let requestJSON)? = request.params?["requestJson"],
+        typedAppJobKind(requestJSON) != nil
+      else { return nil }
+      return .direct(method: request.method)
     case "job.submit":
       guard
         request.params?.count == 1,

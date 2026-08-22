@@ -501,6 +501,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       encoding: .utf8)
     XCTAssertTrue(manualDriver.contains("flash.full-restore"))
     XCTAssertFalse(manualDriver.contains("flash.dayu200"))
+    XCTAssertTrue(manualDriver.contains("\"job.list-page\", \"job.plan\", \"job.status\""))
+    XCTAssertTrue(manualDriver.contains("params.count == 1"))
     XCTAssertFalse(manualDriver.contains("waitForPresence(\"open-panel\""))
     XCTAssertFalse(manualDriver.contains("waitForAbsence(\"open-panel\""))
     XCTAssertTrue(manualDriver.contains("try openGoToFolder(timeout: timeout)"))
@@ -512,6 +514,26 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       manualDriver.contains(
         "try pressExactApplicationOwnedFilePanel(\"OKButton\", timeout: timeout)"))
     XCTAssertTrue(manualDriver.contains("guard !runningApplication.isTerminated"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "let panel = elementAttribute(okButton, kAXWindowAttribute as CFString)"))
+    XCTAssertTrue(manualDriver.contains("isSameExactApplicationWindow(panel, requiredWindow)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "let raised = AXUIElementPerformAction(panel, kAXRaiseAction as CFString)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "runningApplication.activate(options: [.activateAllWindows])"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "elementAttribute(application, kAXFocusedWindowAttribute as CFString)"))
+    XCTAssertTrue(manualDriver.contains("isSameExactApplicationWindow(panel, focusedWindow)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "lhsPID == runningApplication.processIdentifier"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "an unrelated application remained frontmost; no file-panel input was dispatched"))
     XCTAssertTrue(
       manualDriver.contains(
         "url.lastPathComponent, identifier: \"flash.image.value\", timeout: max(timeout, 30)"))

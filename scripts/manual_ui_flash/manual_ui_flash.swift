@@ -461,7 +461,7 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
     "artifact.importFlashBundle.abort", "artifact.importFlashBundle.append",
     "artifact.importFlashBundle.begin", "artifact.importFlashBundle.commit",
     "artifact.inspect", "artifact.list", "job.evidence", "job.list",
-    "job.list-page", "job.status", "operation.list", "target.list",
+    "job.list-page", "job.plan", "job.status", "operation.list", "target.list",
   ]
 
   private let socketPath: String
@@ -1600,30 +1600,80 @@ private final class AccessibilityDriver {
     }
   }
 
-  /// macOS 26 hosts NSSavePanel in AppKit's open/save XPC service. While that
-  /// remote panel is active, the owning NSRunningApplication and AX application
-  /// are intentionally not reported as frontmost even though the panel remains
-  /// inside the exact App's accessibility tree. Admit input only while the
-  /// exact App is alive, a stable panel control is present in that exact tree,
-  /// and no unrelated application owns the foreground.
+  /// macOS 26 hosts NSSavePanel in AppKit's open/save XPC service. Opening the
+  /// remote panel may leave some other application reported as frontmost even
+  /// though the panel and its controls remain in the exact ArkDeck AX tree.
+  /// Before dispatching a global shortcut, raise the AXWindow that owns the
+  /// stable panel control, activate the exact reviewed App, and prove that the
+  /// same owned window became focused. This retains the exact-App boundary
+  /// without trusting stale NSWorkspace foreground state.
   private func requireExactApplicationOwnedFilePanel(containing identifier: String) throws {
     guard !runningApplication.isTerminated,
-      element(identifier: "OKButton") != nil,
-      element(identifier: identifier) != nil
+      let okButton = element(identifier: "OKButton"),
+      let requiredControl = element(identifier: identifier),
+      let panel = elementAttribute(okButton, kAXWindowAttribute as CFString),
+      let requiredWindow = elementAttribute(requiredControl, kAXWindowAttribute as CFString),
+      isSameExactApplicationWindow(panel, requiredWindow)
     else {
       throw DriverFailure.message(
         "exact ArkDeck application does not own the expected system file panel")
     }
 
-    if let frontmost = NSWorkspace.shared.frontmostApplication {
-      guard
-        frontmost.processIdentifier == runningApplication.processIdentifier
-          || frontmost.bundleIdentifier == Self.appKitFilePanelServiceBundleIdentifier
-      else {
-        throw DriverFailure.message(
-          "an unrelated application became frontmost; no file-panel input was dispatched")
-      }
+    let raised = AXUIElementPerformAction(panel, kAXRaiseAction as CFString)
+    if raised != .success {
+      throw DriverFailure.message(
+        "could not focus the exact ArkDeck system file panel")
     }
+    guard runningApplication.activate(options: [.activateAllWindows]) else {
+      throw DriverFailure.message(
+        "could not focus the exact ArkDeck system file panel")
+    }
+    RunLoop.current.run(
+      until: Date().addingTimeInterval(
+        TimeInterval(candidate.activationSettleMilliseconds) / 1_000))
+
+    guard
+      let focusedWindow = elementAttribute(application, kAXFocusedWindowAttribute as CFString),
+      isSameExactApplicationWindow(panel, focusedWindow)
+    else {
+      throw DriverFailure.message(
+        "exact ArkDeck system file panel did not become the focused App window")
+    }
+
+    guard let frontmost = NSWorkspace.shared.frontmostApplication,
+      frontmost.processIdentifier == runningApplication.processIdentifier
+        || frontmost.bundleIdentifier == Self.appKitFilePanelServiceBundleIdentifier
+    else {
+      throw DriverFailure.message(
+        "an unrelated application remained frontmost; no file-panel input was dispatched")
+    }
+  }
+
+  private func elementAttribute(_ element: AXUIElement, _ name: CFString) -> AXUIElement? {
+    guard let raw = attribute(element, name),
+      CFGetTypeID(raw) == AXUIElementGetTypeID()
+    else { return nil }
+    return (raw as! AXUIElement)
+  }
+
+  private func isSameExactApplicationWindow(
+    _ lhs: AXUIElement, _ rhs: AXUIElement
+  ) -> Bool {
+    var lhsPID: pid_t = 0
+    var rhsPID: pid_t = 0
+    guard AXUIElementGetPid(lhs, &lhsPID) == .success,
+      AXUIElementGetPid(rhs, &rhsPID) == .success,
+      lhsPID == runningApplication.processIdentifier,
+      rhsPID == runningApplication.processIdentifier,
+      stringAttribute(lhs, kAXRoleAttribute as CFString) == (kAXWindowRole as String),
+      stringAttribute(rhs, kAXRoleAttribute as CFString) == (kAXWindowRole as String),
+      let lhsIdentifier = stringAttribute(lhs, kAXIdentifierAttribute as CFString),
+      !lhsIdentifier.isEmpty,
+      lhsIdentifier == stringAttribute(rhs, kAXIdentifierAttribute as CFString),
+      stringAttribute(lhs, kAXTitleAttribute as CFString)
+        == stringAttribute(rhs, kAXTitleAttribute as CFString)
+    else { return false }
+    return true
   }
 
   private func waitForExactApplicationOwnedFilePanel(
