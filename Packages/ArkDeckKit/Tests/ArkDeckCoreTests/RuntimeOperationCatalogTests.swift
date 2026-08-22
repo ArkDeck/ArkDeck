@@ -117,8 +117,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     XCTAssertEqual(
-      withDefaults.count, 19,
-      "the catalog declares nineteen input defaults; the runtime must see all of them")
+      withDefaults.count, 20,
+      "the catalog declares twenty input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -186,8 +186,28 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       }
     }
     XCTAssertEqual(
-      checked, 19,
-      "the catalog declares nineteen input defaults; all of them must be exercised here")
+      checked, 20,
+      "the catalog declares twenty input defaults; all of them must be exercised here")
+  }
+
+  func testViewerCanOmitHilogWithoutChangingTheDefaultDiagnosticsPlan() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let hilog = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-hilog" })
+    let hilogArtifact = try XCTUnwrap(descriptor.artifacts.first { $0.name == "hilog.txt" })
+
+    XCTAssertTrue(hilog.isOptional)
+    XCTAssertFalse(
+      hilogArtifact.isRequired,
+      "A Viewer capture can deliberately omit HiLog, so its artifact cannot make an otherwise verified UI snapshot incomplete")
+    XCTAssertEqual(
+      CatalogOperationEffectResolver.stepIsSelected(
+        hilog, descriptor: descriptor, inputs: [:]),
+      true)
+    XCTAssertEqual(
+      CatalogOperationEffectResolver.stepIsSelected(
+        hilog, descriptor: descriptor, inputs: ["captureHilog": .bool(false)]),
+      false)
   }
 
   func testDescriptorLookupIsExactAndFailClosed() {

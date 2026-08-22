@@ -1,779 +1,412 @@
+import AppKit
 import ArkDeckWorkflows
 import Observation
 import SwiftUI
 
-/// ArkUI UI Dump's single, leading-edge workflow.
-///
-/// The current App transport can read production Runtime facts but cannot
-/// submit a diagnostics job. The complete form is still useful for reviewing
-/// exact target, recipe candidates, policy and artifact separation; its final
-/// action stays fail-closed until the published operation carries the accepted
-/// window-scoped inputs and a reviewed App submission path exists.
+/// A Job-bound inspection surface. It deliberately has no command, argv,
+/// remote-path, Recipe, or parameter-policy input.
 struct UIDumpWorkspaceView: View {
   var model: UIDumpWorkspaceViewModel
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        availability
-        relatedJobs
-        workflowSection(
-          number: 1,
-          title: string("uiDump.window.title"),
-          subtitle: string("uiDump.window.subtitle")
-        ) {
-          targetAndWindow
+    GeometryReader { geometry in
+      VStack(spacing: 0) {
+        toolbar
+        Divider()
+        if let capture = model.capture {
+          if geometry.size.width >= 880 {
+            HStack(spacing: 0) {
+              screenshot(capture)
+              Divider()
+              inspector(capture)
+            }
+          } else {
+            ScrollView {
+              VStack(spacing: 0) {
+                screenshot(capture).frame(minHeight: 420)
+                Divider()
+                inspector(capture).frame(minHeight: 520)
+              }
+            }
+          }
+        } else {
+          emptyState
         }
-        workflowSection(
-          number: 2,
-          title: string("uiDump.recipe.title"),
-          subtitle: string("uiDump.recipe.subtitle")
-        ) {
-          recipeSelection
-        }
-        workflowSection(
-          number: 3,
-          title: string("uiDump.policy.title"),
-          subtitle: string("uiDump.policy.subtitle")
-        ) {
-          policySelection
-        }
-        workflowSection(
-          number: 4,
-          title: string("uiDump.review.title"),
-          subtitle: string("uiDump.review.subtitle")
-        ) {
-          review
-        }
-        scopeNote
       }
-      .frame(maxWidth: 960, alignment: .topLeading)
-      .padding(20)
     }
+    .task { model.refresh() }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Button {
-          model.refresh()
-        } label: {
-          Label(string("uiDump.action.refreshFacts"), systemImage: "arrow.clockwise")
+        Button { model.refresh() } label: {
+          Label("Refresh Viewer", systemImage: "arrow.clockwise")
         }
-        .accessibilityIdentifier("uiDump.refreshFacts")
-        .disabled(model.isRefreshing)
+        .disabled(model.isRefreshing || model.isCapturing)
+        .accessibilityIdentifier("viewer.refresh")
       }
     }
   }
 
-  private var availability: some View {
-    GroupBox(string("uiDump.availability.title")) {
-      VStack(alignment: .leading, spacing: 10) {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-          availabilityLabel
-          Spacer(minLength: 12)
-          Text(model.workspace.operation.reference)
-            .font(.callout.monospaced())
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-        }
-
-        HStack(spacing: 16) {
-          capability(
-            string("uiDump.availability.inventory"),
-            supported: model.workspace.operation.supportsWindowInventory)
-          capability(
-            string("uiDump.availability.screenTree"),
-            supported: model.workspace.operation.supportsScreenComponentTree)
-          capability(
-            string("uiDump.availability.windowRecipes"),
-            supported: model.workspace.operation.supportsCanonicalWindowRecipes)
-        }
-
-        if !model.workspace.operation.supportsCanonicalWindowRecipes {
-          notice(
-            string("uiDump.availability.recipeGap"),
-            systemImage: "exclamationmark.lock",
-            color: .orange,
-            identifier: "uiDump.availability.recipeGap")
+  private var toolbar: some View {
+    HStack(spacing: 10) {
+      Text("Viewer").font(.title2.weight(.semibold))
+      Picker("Exact target", selection: targetBinding) {
+        Text("No target").tag("")
+        ForEach(model.workspace.targets) { target in
+          Text(target.pickerTitle).tag(target.id)
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
-    }
-  }
+      .frame(maxWidth: 220)
+      .accessibilityIdentifier("viewer.target")
 
-  @ViewBuilder
-  private var availabilityLabel: some View {
-    switch model.workspace.operation.availability {
-    case .checking:
-      Label(string("uiDump.availability.checking"), systemImage: "hourglass")
-        .accessibilityIdentifier("uiDump.availability.status")
-    case .available:
-      Label(string("uiDump.availability.available"), systemImage: "checkmark.circle.fill")
-        .foregroundStyle(.green)
-        .accessibilityIdentifier("uiDump.availability.status")
-    case .unavailable(let reasons):
-      VStack(alignment: .leading, spacing: 4) {
-        Label(string("uiDump.availability.unavailable"), systemImage: "xmark.octagon.fill")
-          .foregroundStyle(.red)
-          .accessibilityIdentifier("uiDump.availability.status")
-        ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
-          Text(reason)
-            .font(.caption.monospaced())
-            .textSelection(.enabled)
-        }
-      }
-    }
-  }
-
-  @ViewBuilder
-  private var relatedJobs: some View {
-    if let failure = model.workspace.jobLoadFailure {
-      notice(
-        failure,
-        systemImage: "exclamationmark.triangle",
-        color: .orange,
-        identifier: "uiDump.jobs.failure")
-    } else if !model.workspace.relatedJobs.isEmpty {
-      GroupBox(string("uiDump.jobs.title")) {
-        VStack(alignment: .leading, spacing: 8) {
-          ForEach(model.workspace.relatedJobs.prefix(3)) { job in
-            HStack(spacing: 8) {
-              Image(systemName: job.needsAttention ? "exclamationmark.triangle.fill" : "clock")
-                .foregroundStyle(job.needsAttention ? .orange : .secondary)
-              Text(job.id).font(.callout.monospaced())
-              Spacer(minLength: 12)
-              Text(job.state).font(.callout)
-              Text(job.targetID).font(.caption.monospaced()).foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-          }
-          Text(string("uiDump.jobs.readOnly"))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
-      }
-    }
-  }
-
-  private var targetAndWindow: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      VStack(alignment: .leading, spacing: 6) {
-        Text(string("uiDump.target.label"))
-          .font(.subheadline.weight(.semibold))
-        if model.workspace.targets.isEmpty {
-          notice(
-            model.workspace.targetLoadFailure ?? string("uiDump.target.empty"),
-            systemImage: "externaldrive.badge.questionmark",
-            color: .secondary,
-            identifier: "uiDump.target.empty")
-        } else {
-          Picker(string("uiDump.target.label"), selection: targetBinding) {
-            ForEach(model.workspace.targets) { target in
-              Text(target.id).tag(target.id)
-            }
-          }
-          .labelsHidden()
-          .frame(maxWidth: 420, alignment: .leading)
-          .accessibilityLabel(string("uiDump.target.label"))
-          .accessibilityIdentifier("uiDump.target.picker")
-        }
-
-        if let target = model.selectedTarget {
-          Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
-            reviewRow(
-              string("uiDump.target.binding"), String(target.bindingRevision), monospaced: true)
-            reviewRow(string("uiDump.target.tool"), target.toolVersion, monospaced: true)
-            reviewRow(string("uiDump.target.adopted"), target.adoptedAtUTC, monospaced: true)
+      if let capture = model.capture {
+        Picker("Current screen", selection: rootBinding) {
+          ForEach(capture.roots, id: \.self) { identity in
+            Text(model.nodeTitle(identity) ?? "Current screen").tag(identity)
           }
         }
+        .frame(maxWidth: 190)
+        Text(capture.identity.capturedAtUTC)
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .help(capture.identity.capturedAtUTC)
       }
 
-      Divider()
-
-      VStack(alignment: .leading, spacing: 8) {
-        HStack {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(string("uiDump.inventory.title"))
-              .font(.subheadline.weight(.semibold))
-            Text(string("uiDump.inventory.description"))
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-          }
-          Spacer(minLength: 12)
-          Button(string("uiDump.inventory.refresh")) {}
-            .accessibilityIdentifier("uiDump.inventory.refresh")
-            .disabled(true)
-            .help(string("uiDump.inventory.refreshBlocked"))
-        }
-
-        HStack(spacing: 10) {
-          Image(systemName: "rectangle.on.rectangle.slash")
-            .foregroundStyle(.secondary)
-          VStack(alignment: .leading, spacing: 2) {
-            Text(string("uiDump.inventory.notLoaded"))
-              .font(.callout.weight(.medium))
-            Text(string("uiDump.inventory.refreshBlocked"))
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
-
-        DisclosureGroup(string("uiDump.inventory.raw.title")) {
-          Text(string("uiDump.inventory.raw.empty"))
-            .font(.callout.monospaced())
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 6)
-        }
-        .accessibilityIdentifier("uiDump.inventory.raw")
+      Spacer(minLength: 8)
+      TextField("Search component, ID, or text", text: queryBinding)
+        .textFieldStyle(.roundedBorder)
+        .frame(maxWidth: 250)
+        .accessibilityIdentifier("viewer.search")
+      Toggle("Show component bounds", isOn: boundsBinding)
+        .toggleStyle(.checkbox)
+        .accessibilityIdentifier("viewer.showBounds")
+      Button { model.recapture() } label: {
+        Label(model.isCapturing ? "Capturing…" : "Recapture", systemImage: "camera.viewfinder")
       }
-
-      Divider()
-
-      VStack(alignment: .leading, spacing: 6) {
-        Text(string("uiDump.window.manual.label"))
-          .font(.subheadline.weight(.semibold))
-        TextField(string("uiDump.window.manual.placeholder"), text: windowIDBinding)
-          .textFieldStyle(.roundedBorder)
-          .frame(maxWidth: 300)
-          .accessibilityLabel(string("uiDump.window.manual.label"))
-          .accessibilityHint(string("uiDump.window.manual.hint"))
-          .accessibilityIdentifier("uiDump.window.manual")
-        Text(windowValidationMessage)
-          .font(.footnote)
-          .foregroundStyle(windowIDIsValid ? Color.secondary : Color.red)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("uiDump.window.validation")
-      }
+      .buttonStyle(.borderedProminent)
+      .disabled(!model.canRecapture)
+      .accessibilityIdentifier("viewer.recapture")
     }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
   }
 
-  private var recipeSelection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      // The section's live echo: the exact hidumper arguments the current
-      // recipe and window id resolve to, updated as either changes.
-      HStack {
-        Spacer(minLength: 12)
-        Text(
-          model.selectedRecipe.displayArguments(
-            windowID: model.manualWindowID, componentID: model.componentID)
-        )
-        .font(.callout.monospaced())
-        .foregroundStyle(Color.accentColor)
-        .textSelection(.enabled)
-        .accessibilityIdentifier("uiDump.recipe.liveArguments")
-      }
-      ForEach(UIDumpRecipeCatalog.definitions) { definition in
-        recipeRow(definition)
-      }
-      notice(
-        string("uiDump.recipe.candidateNote"),
-        systemImage: "info.circle",
-        color: .secondary,
-        identifier: "uiDump.recipe.candidateNote")
-
-      if model.selectedRecipe.requiresComponentID {
-        VStack(alignment: .leading, spacing: 6) {
-          Text(string("uiDump.component.label"))
-            .font(.subheadline.weight(.semibold))
-          TextField(string("uiDump.component.placeholder"), text: componentIDBinding)
-            .textFieldStyle(.roundedBorder)
-            .frame(maxWidth: 300)
-            .accessibilityLabel(string("uiDump.component.label"))
-            .accessibilityHint(string("uiDump.component.hint"))
-            .accessibilityIdentifier("uiDump.component.input")
-          Text(componentValidationMessage)
-            .font(.footnote)
-            .foregroundStyle(componentIDIsValid ? Color.secondary : Color.red)
-            .accessibilityIdentifier("uiDump.component.validation")
-        }
-        .padding(.top, 4)
-      }
-    }
-  }
-
-  private var policySelection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      policyRow(.unchanged)
-      policyRow(.temporaryRestore)
-      policyRow(.persistentlyEnabled)
-
-      // The second confirmation is an answer, not an acknowledgement gate:
-      // a danger callout stating the cost, then Cancel or an explicit
-      // destructive-styled confirm. No checkbox stands between them.
-      if model.debugPolicy == .persistentlyEnabled {
-        if model.persistentEnableConfirmed {
-          Label(
-            string("uiDump.policy.persist.confirmed"),
-            systemImage: "checkmark.circle.fill"
-          )
-          .font(.callout)
+  private var emptyState: some View {
+    VStack(spacing: 12) {
+      Image(systemName: "rectangle.on.rectangle.angled")
+        .font(.largeTitle).foregroundStyle(.secondary)
+      Text("No verified capture").font(.title3.weight(.semibold))
+      Text(model.emptyMessage)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: 480)
+      if let failure = model.captureFailure {
+        Label(failure, systemImage: "exclamationmark.triangle.fill")
           .foregroundStyle(.orange)
-          .padding(.leading, 28)
-          .accessibilityIdentifier("uiDump.policy.persist.confirmed")
-        } else {
-          VStack(alignment: .leading, spacing: 10) {
-            notice(
-              string("uiDump.policy.persist.callout"),
-              systemImage: "exclamationmark.triangle.fill",
-              color: .red,
-              identifier: "uiDump.policy.persist.callout")
-            HStack(spacing: 10) {
-              Button(string("uiDump.policy.persist.cancel")) {
-                model.setDebugPolicy(.unchanged)
-              }
-              .accessibilityIdentifier("uiDump.policy.persist.cancel")
-              Button(role: .destructive) {
-                model.setPersistentEnableConfirmed(true)
-              } label: {
-                Text(string("uiDump.policy.persist.confirm"))
-              }
-              .accessibilityIdentifier("uiDump.policy.persist.confirm")
-            }
-          }
-          .padding(.leading, 28)
-        }
-      }
-
-      notice(
-        string("uiDump.policy.originalUnknown"),
-        systemImage: "lock.trianglebadge.exclamationmark",
-        color: .orange,
-        identifier: "uiDump.policy.originalUnknown")
-    }
-  }
-
-  private var review: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 7) {
-        reviewRow(
-          string("uiDump.review.target"),
-          model.selectedTarget?.id ?? string("uiDump.value.notSelected"),
-          monospaced: model.selectedTarget != nil)
-        reviewRow(
-          string("uiDump.review.binding"),
-          model.selectedTarget.map { String($0.bindingRevision) } ?? string("uiDump.value.pending"),
-          monospaced: model.selectedTarget != nil)
-        reviewRow(string("uiDump.review.recipe"), recipeName(model.selectedRecipe.id))
-        reviewRow(
-          string("uiDump.review.arguments"),
-          model.selectedRecipe.displayArguments(
-            windowID: model.manualWindowID, componentID: model.componentID),
-          monospaced: true)
-        reviewRow(string("uiDump.review.policy"), policyName(model.debugPolicy))
-        reviewRow(
-          string("uiDump.review.effect"),
-          "\(model.workspace.operation.minimumEffect) (\(string("uiDump.review.catalogFloor")))",
-          monospaced: true)
-      }
-
-      Divider()
-
-      VStack(alignment: .leading, spacing: 8) {
-        Text(string("uiDump.artifacts.title"))
-          .font(.subheadline.weight(.semibold))
-        Text(string("uiDump.artifacts.description"))
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-        if model.runtimeArtifacts.isEmpty {
-          Table(artifactExpectations) {
-            TableColumn(string("uiDump.artifacts.name")) { artifact in
-              Text(artifact.name).font(.callout.monospaced())
-            }
-            TableColumn(string("uiDump.artifacts.role")) { artifact in
-              Text(artifact.role)
-            }
-            TableColumn(string("uiDump.artifacts.origin")) { artifact in
-              Text(artifact.origin)
-            }
-          }
-          .frame(minHeight: 145)
-          .accessibilityIdentifier("uiDump.artifacts.table")
-          if let failure = model.runtimeArtifactFailures.first {
-            notice(
-              failure,
-              systemImage: "exclamationmark.triangle",
-              color: .orange,
-              identifier: "uiDump.artifacts.runtimeFailure")
-          }
-        } else {
-          Table(model.runtimeArtifacts) {
-            TableColumn(string("uiDump.artifacts.name")) { artifact in
-              Text(artifact.name).font(.callout.monospaced())
-            }
-            TableColumn(string("uiDump.artifacts.role")) { artifact in
-              Text(artifact.role ?? "—")
-            }
-            TableColumn(string("uiDump.artifacts.size")) { artifact in
-              Text(ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file))
-                .monospacedDigit()
-            }
-            TableColumn(string("uiDump.artifacts.sha256")) { artifact in
-              Text(artifact.sha256)
-                .font(.caption.monospaced())
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(artifact.sha256)
-            }
-            TableColumn(string("uiDump.artifacts.privacy")) { artifact in
-              Text(artifact.privacy)
-            }
-            TableColumn(string("uiDump.artifacts.status")) { artifact in
-              Text(artifact.status)
-            }
-          }
-          .frame(minHeight: 145)
-          .accessibilityIdentifier("uiDump.artifacts.table")
-        }
-        Text(string("uiDump.artifacts.sensitivityNote"))
-          .font(.footnote)
-          .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("uiDump.artifacts.sensitivityNote")
+          .accessibilityIdentifier("viewer.captureFailure")
       }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(24)
+  }
 
-      Divider()
-
-      VStack(alignment: .leading, spacing: 8) {
-        if blockers.isEmpty {
-          notice(
-            string("uiDump.review.ready"),
-            systemImage: "checkmark.circle.fill",
-            color: .green,
-            identifier: "uiDump.review.ready")
-        } else {
-          Text(string("uiDump.review.blockers"))
-            .font(.subheadline.weight(.semibold))
-          ForEach(Array(blockers.enumerated()), id: \.offset) { _, blocker in
-            Label(blocker, systemImage: "xmark.circle")
-              .font(.callout)
-              .foregroundStyle(.red)
-              .fixedSize(horizontal: false, vertical: true)
+  private func screenshot(_ capture: ViewerCapture) -> some View {
+    VStack(spacing: 0) {
+      paneHeader("Device screenshot", detail: capture.coordinatesAreVerified
+        ? "Verified capture · Click to inspect"
+        : "Coordinates cannot be verified")
+      GeometryReader { proxy in
+        ZStack {
+          Color(nsColor: .windowBackgroundColor)
+          if let image = NSImage(data: capture.screenshotData) {
+            let content = fittedSize(
+              container: proxy.size,
+              aspect: CGFloat(capture.screenshotWidth) / CGFloat(capture.screenshotHeight))
+            ZStack {
+              Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+              if capture.coordinatesAreVerified {
+                ForEach(model.screenshotNodes(capture)) { node in
+                  screenshotRegion(node, in: capture, content: content)
+                }
+                screenshotHitTest(capture, content: content)
+              }
+            }
+            .frame(width: content.width, height: content.height)
+          } else {
+            ContentUnavailableView("Screenshot is unavailable", systemImage: "photo")
           }
         }
-
-        HStack {
-          Spacer()
-          Button(string("uiDump.action.run")) {}
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("uiDump.run")
-            .disabled(true)
-            .help(blockers.joined(separator: "\n"))
-        }
-        Text(string("uiDump.review.noDispatch"))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+      if !capture.coordinatesAreVerified {
+        Label("The tree bounds do not prove this screenshot's coordinate space. Tree and Raw dump remain available, but screenshot selection is disabled.", systemImage: "exclamationmark.triangle")
           .font(.footnote)
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .trailing)
+          .foregroundStyle(.orange)
+          .padding(10)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+    .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityIdentifier("viewer.screenshot")
+  }
+
+  @ViewBuilder
+  private func screenshotRegion(
+    _ node: ViewerNode,
+    in capture: ViewerCapture,
+    content: CGSize
+  ) -> some View {
+    if let bounds = node.bounds {
+      let selected = node.identity == model.selectedNodeIdentity
+      if model.showBounds || selected {
+        ZStack(alignment: .topTrailing) {
+          Rectangle()
+            .fill(selected ? Color.accentColor.opacity(0.10) : .clear)
+            .overlay {
+              Rectangle().stroke(
+                selected ? Color.accentColor : Color.accentColor.opacity(0.35),
+                lineWidth: selected ? 2 : 1)
+            }
+          if selected {
+            Text("#\(node.deviceID ?? "—") \(node.type)")
+              .font(.caption2.monospaced())
+              .padding(.horizontal, 4).padding(.vertical, 2)
+              .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
+              .foregroundStyle(Color.primary)
+            .fixedSize()
+          }
+        }
+        .frame(
+          width: max(1, content.width * bounds.width / Double(capture.screenshotWidth)),
+          height: max(1, content.height * bounds.height / Double(capture.screenshotHeight)))
+        .position(
+          x: content.width * (bounds.x + bounds.width / 2) / Double(capture.screenshotWidth),
+          y: content.height * (bounds.y + bounds.height / 2) / Double(capture.screenshotHeight))
+        .zIndex(Double(node.depth) + (node.zIndex ?? 0))
+        // The visual bounds must never compete with the single coordinate
+        // hit target below. Hundreds of transparent native buttons made the
+        // screenshot appear unclickable when bounds were hidden.
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
       }
     }
   }
 
-  // A hard boundary, not a roadmap: one fixed sentence at the page footer.
-  // Greyed rows for Fault/Crash and system snapshots would read as disabled
-  // entries — as if the capabilities existed and were merely switched off.
-  private var scopeNote: some View {
-    Text(string("uiDump.scope.note"))
-      .font(.footnote)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityIdentifier("uiDump.scope.note")
+  /// The tree remains the keyboard-accessible component selector. This
+  /// surface gives pointer users one stable coordinate target regardless of
+  /// whether visual bounds are currently shown.
+  private func screenshotHitTest(_ capture: ViewerCapture, content: CGSize) -> some View {
+    Color.clear
+      .contentShape(Rectangle())
+      .gesture(SpatialTapGesture().onEnded { value in
+        model.select(in: capture, at: value.location, renderedSize: content)
+      })
+      .accessibilityLabel("Select component in screenshot")
+      .accessibilityHint("Use the UI tree to select a component with the keyboard.")
+      .accessibilityIdentifier("viewer.screenshot.hitTest")
   }
 
-  private var blockers: [String] {
-    var values: [String] = []
-    switch model.workspace.operation.availability {
-    case .checking:
-      values.append(string("uiDump.blocker.checking"))
-    case .unavailable(let reasons):
-      values.append(string("uiDump.blocker.unavailable"))
-      values.append(contentsOf: reasons)
-    case .available:
-      break
+  private func inspector(_ capture: ViewerCapture) -> some View {
+    GeometryReader { proxy in
+      let treeHeight = max(150, proxy.size.height * model.inspectorTreePercent / 100)
+      VStack(spacing: 0) {
+        tree(capture).frame(height: treeHeight)
+        resizeHandle
+        properties(capture).frame(maxHeight: .infinity)
+      }
     }
-    if model.selectedTarget == nil {
-      values.append(string("uiDump.blocker.target"))
-    }
-    if !windowIDIsValid {
-      values.append(string("uiDump.blocker.window"))
-    }
-    if model.selectedRecipe.requiresComponentID, !componentIDIsValid {
-      values.append(string("uiDump.blocker.component"))
-    }
-    if model.debugPolicy == .persistentlyEnabled, !model.persistentEnableConfirmed {
-      values.append(string("uiDump.blocker.persistConfirmation"))
-    }
-    if !model.workspace.operation.supportsCanonicalWindowRecipes {
-      values.append(string("uiDump.blocker.recipeInputs"))
-    }
-    values.append(string("uiDump.blocker.readOnlyTransport"))
-    return values
+    .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityIdentifier("viewer.inspector")
   }
 
-  private var artifactExpectations: [UIDumpExpectedArtifact] {
-    [
-      UIDumpExpectedArtifact(
-        id: "stdout",
-        name: string("uiDump.artifacts.stdout.name"),
-        role: string("uiDump.artifacts.raw"),
-        origin: string("uiDump.artifacts.stdout.origin")),
-      UIDumpExpectedArtifact(
-        id: "sidecar",
-        name: string("uiDump.artifacts.sidecar.name"),
-        role: string("uiDump.artifacts.raw"),
-        origin: string("uiDump.artifacts.sidecar.origin")),
-      UIDumpExpectedArtifact(
-        id: "merged",
-        name: string("uiDump.artifacts.merged.name"),
-        role: string("uiDump.artifacts.derived"),
-        origin: string("uiDump.artifacts.merged.origin")),
-    ]
+  private func tree(_ capture: ViewerCapture) -> some View {
+    let rows = model.visibleNodes
+    return VStack(spacing: 0) {
+      HStack {
+        paneHeader("UI tree", detail: "\(rows.count) / \(capture.nodes.count) matches")
+        Spacer()
+      }
+      ScrollViewReader { reader in
+        ScrollView([.horizontal, .vertical]) {
+          LazyVStack(alignment: .leading, spacing: 1) {
+            ForEach(rows) { node in
+              treeRow(node)
+                .id(node.identity)
+            }
+            if rows.isEmpty {
+              Text("No matching components. The current selection is unchanged.")
+                .foregroundStyle(.secondary).padding(12)
+            }
+          }
+          .padding(6)
+        }
+        .onChange(of: model.selectedNodeIdentity) { _, identity in
+          guard let identity else { return }
+          withAnimation(.easeOut(duration: 0.15)) { reader.scrollTo(identity, anchor: .center) }
+        }
+      }
+    }
+    .accessibilityIdentifier("viewer.tree")
   }
 
+  private func treeRow(_ node: ViewerNode) -> some View {
+    let selected = node.identity == model.selectedNodeIdentity
+    return HStack(spacing: 5) {
+      if !node.children.isEmpty {
+        Button { model.toggleExpansion(node.identity) } label: {
+          Image(systemName: model.expandedNodeIdentities.contains(node.identity) ? "chevron.down" : "chevron.right")
+            .font(.caption.weight(.semibold)).frame(width: 16, height: 20)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(model.expandedNodeIdentities.contains(node.identity) ? "Collapse \(node.type)" : "Expand \(node.type)")
+      } else {
+        Color.clear.frame(width: 16, height: 20)
+      }
+      Button { model.select(node.identity) } label: {
+        HStack(spacing: 5) {
+          Image(systemName: "square.dashed").foregroundStyle(.secondary)
+          Text(node.type).font(.callout.monospaced()).lineLimit(1)
+          if let text = node.text, !text.isEmpty { Text(text).foregroundStyle(.secondary).lineLimit(1) }
+          if let id = node.deviceID { Text("#\(id)").font(.caption.monospaced()).foregroundStyle(.secondary) }
+        }
+        .padding(.horizontal, 6).frame(minHeight: 24, alignment: .leading)
+        .background(selected ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 4))
+      }
+      .buttonStyle(.plain)
+      .accessibilityValue(selected ? "Selected" : "Not selected")
+      .accessibilityIdentifier("viewer.tree.node.\(node.identity)")
+    }
+    .padding(.leading, CGFloat(node.depth) * 14)
+  }
+
+  private var resizeHandle: some View {
+    Rectangle().fill(Color(nsColor: .separatorColor).opacity(0.8)).frame(height: 7)
+      .overlay(Capsule().fill(Color.secondary.opacity(0.65)).frame(width: 36, height: 2))
+      .contentShape(Rectangle())
+      .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+        model.adjustInspectorTree(by: value.translation.height)
+      })
+      .focusable()
+      .accessibilityLabel("Resize UI tree and node properties")
+      .accessibilityValue("UI tree uses \(Int(model.inspectorTreePercent)) percent of the inspector")
+      .accessibilityAdjustableAction { direction in
+        model.adjustInspectorTree(by: direction == .increment ? -4 : 4)
+      }
+      .accessibilityIdentifier("viewer.inspector.separator")
+  }
+
+  private func properties(_ capture: ViewerCapture) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if let node = model.selectedNode {
+        VStack(alignment: .leading, spacing: 4) {
+          HStack {
+            Text(node.type).font(.headline)
+            if let id = node.deviceID { Text("#\(id)").font(.headline.monospaced()) }
+            Spacer()
+            if node.visible { Label("Visible", systemImage: "eye") }
+            if node.clickable == true { Label("Interactive", systemImage: "hand.tap") }
+          }.font(.caption)
+          Text(model.breadcrumb(for: node.identity)).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .padding(10)
+        HStack(spacing: 6) {
+          inspectorTabButton(.properties)
+          inspectorTabButton(.layout)
+          inspectorTabButton(.accessibility)
+          inspectorTabButton(.rawDump)
+        }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 8)
+        Divider()
+        ScrollView {
+          inspectorContent(node, capture: capture)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+        }
+      } else {
+        ContentUnavailableView("Select a component", systemImage: "cursorarrow.click")
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .accessibilityIdentifier("viewer.properties")
+  }
+
+  @ViewBuilder
+  private func inspectorContent(_ node: ViewerNode, capture: ViewerCapture) -> some View {
+    switch model.inspectorTab {
+    case .properties:
+      keyValues([("Type", node.type), ("ID", node.deviceID ?? "Unavailable"), ("Text", node.text ?? "Unavailable"), ("Inspector ID", node.inspectorID ?? "Unavailable"), ("Enabled", state(node.enabled)), ("Clickable", state(node.clickable))])
+    case .layout:
+      keyValues([("Screenshot mapping", capture.coordinatesAreVerified ? "Verified" : "Unavailable"), ("Bounds", boundsText(node.bounds)), ("z-order", node.zIndex.map { String($0) } ?? "Unavailable"), ("Hit test", node.bounds != nil && capture.coordinatesAreVerified ? "Available" : "Unavailable")])
+    case .accessibility:
+      keyValues([("Visible", state(node.visible)), ("Focusable", state(node.focusable)), ("Accessible label", node.text ?? "Unavailable"), ("Description", node.inspectorID ?? "Unavailable")])
+    case .rawDump:
+      Text(capture.formattedRawFields(for: node.identity) ?? "Raw fields are unavailable")
+        .font(.callout.monospaced()).textSelection(.enabled)
+        .accessibilityIdentifier("viewer.rawDump")
+    }
+  }
+
+  private func keyValues(_ rows: [(String, String)]) -> some View {
+    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+      ForEach(rows, id: \.0) { name, value in
+        GridRow {
+          Text(name).foregroundStyle(.secondary)
+          Text(value).font(.callout.monospaced()).textSelection(.enabled)
+        }
+      }
+    }
+  }
+
+  private func inspectorTabButton(_ tab: ViewerInspectorTab) -> some View {
+    Button(tab.title) { model.setInspectorTab(tab) }
+      .buttonStyle(.bordered)
+      .controlSize(.small)
+      .accessibilityLabel("Show \(tab.title)")
+  }
+
+  private func paneHeader(_ title: String, detail: String) -> some View {
+    HStack(spacing: 8) {
+      Text(title).font(.headline)
+      Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+      Spacer()
+    }
+    .padding(.horizontal, 12).padding(.vertical, 9)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.bar)
+  }
+
+  private func fittedSize(container: CGSize, aspect: CGFloat) -> CGSize {
+    guard aspect > 0 else { return .zero }
+    let width = min(container.width - 24, (container.height - 24) * aspect)
+    return CGSize(width: max(1, width), height: max(1, width / aspect))
+  }
+  private func state(_ value: Bool?) -> String { value.map { $0 ? "Yes" : "No" } ?? "Unavailable" }
+  private func boundsText(_ value: ViewerBounds?) -> String {
+    guard let value else { return "Unavailable" }
+    return "x \(value.x), y \(value.y), \(value.width) × \(value.height)"
+  }
   private var targetBinding: Binding<String> {
     Binding(get: { model.selectedTargetID }, set: { model.setTargetID($0) })
   }
-
-  private var windowIDBinding: Binding<String> {
-    Binding(get: { model.manualWindowID }, set: { model.setManualWindowID($0) })
+  private var rootBinding: Binding<String> {
+    Binding(get: { model.selectedRootIdentity }, set: { model.setRoot($0) })
   }
-
-  private var componentIDBinding: Binding<String> {
-    Binding(get: { model.componentID }, set: { model.setComponentID($0) })
+  private var queryBinding: Binding<String> {
+    Binding(get: { model.searchQuery }, set: { model.setSearchQuery($0) })
   }
-
-  private var windowIDIsValid: Bool {
-    if case .valid = UIDumpIdentifierValidator.validate(model.manualWindowID) { return true }
-    return false
+  private var boundsBinding: Binding<Bool> {
+    Binding(get: { model.showBounds }, set: { model.setShowBounds($0) })
   }
+}
 
-  private var componentIDIsValid: Bool {
-    if case .valid = UIDumpIdentifierValidator.validate(model.componentID) { return true }
-    return false
-  }
-
-  private var windowValidationMessage: String {
-    validationMessage(
-      UIDumpIdentifierValidator.validate(model.manualWindowID),
-      validKey: "uiDump.window.manual.valid")
-  }
-
-  private var componentValidationMessage: String {
-    validationMessage(
-      UIDumpIdentifierValidator.validate(model.componentID),
-      validKey: "uiDump.component.valid")
-  }
-
-  private func validationMessage(
-    _ validation: UIDumpIdentifierValidation,
-    validKey: String
-  ) -> String {
-    switch validation {
-    case .valid:
-      string(validKey)
-    case .invalid(.missing):
-      string("uiDump.validation.missing")
-    case .invalid(.notDecimal):
-      string("uiDump.validation.decimal")
-    case .invalid(.tooLong):
-      string("uiDump.validation.tooLong")
-    }
-  }
-
-  private func workflowSection<Content: View>(
-    number: Int,
-    title: String,
-    subtitle: String,
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    HStack(alignment: .top, spacing: 14) {
-      Text(String(number))
-        .font(.headline.monospacedDigit())
-        .foregroundStyle(.white)
-        .frame(width: 28, height: 28)
-        .background(Color.accentColor, in: Circle())
-        .accessibilityHidden(true)
-
-      VStack(alignment: .leading, spacing: 12) {
-        VStack(alignment: .leading, spacing: 3) {
-          Text(title)
-            .font(.title3.weight(.semibold))
-            .accessibilityAddTraits(.isHeader)
-          Text(subtitle)
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        content()
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(16)
-      .background(.background, in: RoundedRectangle(cornerRadius: 12))
-      .overlay {
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(.separator.opacity(0.6), lineWidth: 1)
-      }
-    }
-  }
-
-  private func capability(_ title: String, supported: Bool) -> some View {
-    Label(title, systemImage: supported ? "checkmark.circle.fill" : "xmark.circle.fill")
-      .font(.callout)
-      .foregroundStyle(supported ? .green : .secondary)
-      .accessibilityValue(
-        supported ? string("uiDump.value.supported") : string("uiDump.value.unavailable"))
-  }
-
-  private func recipeRow(_ definition: UIDumpRecipeDefinition) -> some View {
-    let selected = model.selectedRecipeID == definition.id
-    return Button {
-      model.setRecipe(definition.id)
-    } label: {
-      HStack(alignment: .top, spacing: 10) {
-        Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-          .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-          .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 3) {
-          Text(recipeName(definition.id))
-            .font(.callout.weight(.semibold))
-          Text(recipeDescription(definition.id))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-          Text(
-            definition.displayArguments(
-              windowID: model.manualWindowID, componentID: model.componentID)
-          )
-          .font(.callout.monospaced())
-          .textSelection(.enabled)
-        }
-        Spacer(minLength: 8)
-        Text(string("uiDump.recipe.candidate"))
-          .font(.caption2.weight(.semibold))
-          .foregroundStyle(.orange)
-          .padding(.horizontal, 6)
-          .padding(.vertical, 3)
-          .background(.orange.opacity(0.12), in: Capsule())
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(10)
-      .background(selected ? Color.accentColor.opacity(0.08) : Color.clear)
-      .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(selected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1)
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(recipeName(definition.id))
-    .accessibilityValue(
-      selected ? string("uiDump.value.selected") : string("uiDump.value.notSelected")
-    )
-    .accessibilityHint(definition.displayArguments(windowID: nil, componentID: nil))
-    .accessibilityIdentifier("uiDump.recipe.\(definition.id.rawValue)")
-  }
-
-  private func policyRow(_ policy: UIDumpDebugParameterPolicy) -> some View {
-    let selected = model.debugPolicy == policy
-    let enabled = policy != .temporaryRestore || model.canUseTemporaryRestore
-    return Button {
-      model.setDebugPolicy(policy)
-    } label: {
-      HStack(alignment: .top, spacing: 10) {
-        Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-          .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-          .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 3) {
-          Text(policyName(policy)).font(.callout.weight(.semibold))
-          Text(policyDescription(policy))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: 8)
-        Text(
-          policy.requiresMutation
-            ? string("uiDump.policy.mutation") : string("uiDump.policy.readOnly")
-        )
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(policy.requiresMutation ? .orange : .green)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(10)
-      .background(selected ? Color.accentColor.opacity(0.08) : Color.clear)
-      .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(selected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1)
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .disabled(!enabled)
-    .accessibilityLabel(policyName(policy))
-    .accessibilityValue(
-      selected ? string("uiDump.value.selected") : string("uiDump.value.notSelected")
-    )
-    .accessibilityIdentifier("uiDump.policy.\(policy.rawValue)")
-  }
-
-  private func notice(
-    _ text: String,
-    systemImage: String,
-    color: Color,
-    identifier: String
-  ) -> some View {
-    Label {
-      Text(text).fixedSize(horizontal: false, vertical: true)
-    } icon: {
-      Image(systemName: systemImage).foregroundStyle(color)
-    }
-    .font(.callout)
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-    .accessibilityIdentifier(identifier)
-  }
-
-  private func reviewRow(
-    _ label: String,
-    _ value: String,
-    monospaced: Bool = false
-  ) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(label)
-        .foregroundStyle(.secondary)
-        .gridColumnAlignment(.trailing)
-      Text(value)
-        .font(monospaced ? .body.monospaced() : .body)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-        .gridColumnAlignment(.leading)
-    }
-  }
-
-  private func recipeName(_ recipe: UIDumpRecipeID) -> String {
-    string("uiDump.recipe.\(recipe.rawValue).name")
-  }
-
-  private func recipeDescription(_ recipe: UIDumpRecipeID) -> String {
-    string("uiDump.recipe.\(recipe.rawValue).description")
-  }
-
-  private func policyName(_ policy: UIDumpDebugParameterPolicy) -> String {
-    string("uiDump.policy.\(policy.rawValue).name")
-  }
-
-  private func policyDescription(_ policy: UIDumpDebugParameterPolicy) -> String {
-    string("uiDump.policy.\(policy.rawValue).description")
-  }
-
-  private func string(_ key: String) -> String {
-    String(localized: String.LocalizationValue(key), table: "UIDumpLocalizable")
-  }
+enum ViewerInspectorTab: String {
+  case properties, layout, accessibility, rawDump
+  var id: String { rawValue }
+  var title: String { switch self { case .properties: "Properties"; case .layout: "Layout"; case .accessibility: "Accessibility"; case .rawDump: "Raw dump" } }
 }
 
 @MainActor
@@ -781,130 +414,120 @@ struct UIDumpWorkspaceView: View {
 final class UIDumpWorkspaceViewModel {
   private(set) var workspace = UIDumpWorkspacePresentation.loading
   private(set) var selectedTargetID = ""
-  private(set) var manualWindowID = ""
-  private(set) var selectedRecipeID = UIDumpRecipeID.elementTree
-  private(set) var componentID = ""
-  private(set) var debugPolicy = UIDumpDebugParameterPolicy.unchanged
-  private(set) var persistentEnableConfirmed = false
+  private(set) var capture: ViewerCapture?
+  private(set) var selectedNodeIdentity: String?
+  private(set) var selectedRootIdentity = ""
+  private(set) var expandedNodeIdentities: Set<String> = []
+  private(set) var searchQuery = ""
+  private(set) var showBounds = true
+  private(set) var inspectorTreePercent: Double = 60
+  private(set) var inspectorTab: ViewerInspectorTab = .properties
   private(set) var isRefreshing = false
-  private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
-  private(set) var artifactFailuresByJobID: [String: String] = [:]
-
-  let canUseTemporaryRestore = false
+  private(set) var isCapturing = false
+  private(set) var captureFailure: String?
   private let provider: any UIDumpApplicationProviding
-  private let detailProvider: any RuntimeJobDetailApplicationProviding
 
-  init(
-    provider: any UIDumpApplicationProviding,
-    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil
-  ) {
-    self.provider = provider
-    self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
+  init(provider: any UIDumpApplicationProviding) { self.provider = provider }
+  var selectedTarget: UIDumpTargetPresentation? { workspace.targets.first { $0.id == selectedTargetID } }
+  var selectedNode: ViewerNode? { selectedNodeIdentity.flatMap { capture?.node(identity: $0) } }
+  var emptyMessage: String {
+    if let failure = workspace.targetLoadFailure { return failure }
+    if selectedTarget == nil { return "Select an adopted target with a complete binding, then recapture." }
+    if let reason = selectedTarget?.connection.failureReason {
+      return "\(selectedTarget?.id ?? "This target") cannot be recaptured: \(reason). Select a Connected target."
+    }
+    if case .unavailable(let reasons) = workspace.operation.availability { return reasons.joined(separator: "\n") }
+    return "Recapture creates a typed Runtime Job and shows only verified, same-Job Artifacts."
   }
-
-  var selectedTarget: UIDumpTargetPresentation? {
-    workspace.targets.first { $0.id == selectedTargetID }
+  var canRecapture: Bool {
+    guard !isCapturing, selectedTarget?.isCaptureReady == true else { return false }
+    if case .available = workspace.operation.availability { return true }
+    return false
   }
-
-  var runtimeArtifacts: [RuntimeArtifactPresentation] {
-    workspace.relatedJobs
-      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
-      .flatMap { artifactsByJobID[$0.id] ?? [] }
+  var visibleNodes: [ViewerNode] {
+    guard let capture else { return [] }
+    return capture.visibleTreeNodes(
+      rootIdentity: selectedRootIdentity,
+      query: searchQuery,
+      expandedNodeIdentities: expandedNodeIdentities)
   }
-
-  var runtimeArtifactFailures: [String] {
-    workspace.relatedJobs
-      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
-      .compactMap { artifactFailuresByJobID[$0.id] }
+  func screenshotNodes(_ capture: ViewerCapture) -> [ViewerNode] {
+    capture.subtreeNodes(rootIdentity: selectedRootIdentity).filter { node in
+      node.bounds != nil && node.visible
+    }.sorted { $0.depth < $1.depth }
   }
-
-  var selectedRecipe: UIDumpRecipeDefinition {
-    UIDumpRecipeCatalog.definition(selectedRecipeID)
-  }
-
   func refresh() {
     guard !isRefreshing else { return }
     isRefreshing = true
     let provider = provider
-    let detailProvider = detailProvider
     Task { [weak self] in
       let next = await provider.refreshWorkspace()
-      guard let self else { return }
-      defer { self.isRefreshing = false }
-      guard !Task.isCancelled else { return }
-      let previousTarget = self.selectedTarget
-      let nextTargetID =
-        next.targets.contains(where: { $0.id == self.selectedTargetID })
-        ? self.selectedTargetID
-        : next.targets.first?.id ?? ""
+      guard let self, !Task.isCancelled else { return }
       self.workspace = next
-      self.selectedTargetID = nextTargetID
-      var artifacts: [String: [RuntimeArtifactPresentation]] = [:]
-      var failures: [String: String] = [:]
-      for job in next.relatedJobs.prefix(3) {
-        let detail = await detailProvider.loadJobDetail(
-          jobID: job.id,
-          operationReference: UIDumpApplicationFacade.operationReference)
-        switch detail.artifactAvailability {
-        case .available:
-          artifacts[job.id] = detail.artifacts
-        case .unavailable(let reason):
-          failures[job.id] = reason
-        }
-      }
-      guard !Task.isCancelled else { return }
-      self.artifactsByJobID = artifacts
-      self.artifactFailuresByJobID = failures
-      if previousTarget != self.selectedTarget {
-        self.clearTargetScopedInput()
-      }
+      self.selectedTargetID = self.preferredTargetID(in: next.targets)
+      if self.selectedTarget?.isCaptureReady == false { self.captureFailure = nil }
+      self.isRefreshing = false
     }
   }
-
-  func setTargetID(_ targetID: String) {
-    guard selectedTargetID != targetID else { return }
-    selectedTargetID = targetID
-    clearTargetScopedInput()
+  private func preferredTargetID(in targets: [UIDumpTargetPresentation]) -> String {
+    // Preserve an explicit exact selection even if it goes offline. Replacing
+    // it behind the user's back could send a capture to a different device.
+    if !selectedTargetID.isEmpty, targets.contains(where: { $0.id == selectedTargetID }) {
+      return selectedTargetID
+    }
+    // With no existing selection (including first launch), make the safe and
+    // useful default the first target with a fresh Connected route.
+    return targets.first(where: \.isCaptureReady)?.id ?? targets.first?.id ?? ""
   }
-
-  func setManualWindowID(_ value: String) {
-    manualWindowID = value
-  }
-
-  func setRecipe(_ recipe: UIDumpRecipeID) {
-    guard selectedRecipeID != recipe else { return }
-    selectedRecipeID = recipe
-    if !selectedRecipe.requiresComponentID {
-      componentID = ""
+  func recapture() {
+    guard let target = selectedTarget, canRecapture else { return }
+    isCapturing = true; captureFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let result = await provider.recapture(target: target)
+      guard let self, !Task.isCancelled else { return }
+      self.isCapturing = false
+      switch result {
+      case .captured(let next):
+        self.capture = next
+        self.selectedRootIdentity = next.roots.first ?? ""
+        // A previous screen's query must not leave a fresh capture looking
+        // empty or hide the row selected from the screenshot.
+        self.searchQuery = ""
+        self.expandedNodeIdentities = Set(next.nodes.filter { !$0.children.isEmpty }.map(\.identity))
+        self.select(next.nodes.first?.identity ?? "")
+      case .failed(let reason): self.captureFailure = reason
+      }
+      self.refresh()
     }
   }
-
-  func setComponentID(_ value: String) {
-    componentID = value
+  func setTargetID(_ value: String) {
+    selectedTargetID = value
+    captureFailure = nil
   }
-
-  func setDebugPolicy(_ policy: UIDumpDebugParameterPolicy) {
-    guard policy != .temporaryRestore || canUseTemporaryRestore else { return }
-    guard debugPolicy != policy else { return }
-    debugPolicy = policy
-    persistentEnableConfirmed = false
+  func setRoot(_ value: String) { selectedRootIdentity = value }
+  func setSearchQuery(_ value: String) { searchQuery = value }
+  func setShowBounds(_ value: Bool) { showBounds = value }
+  func setInspectorTab(_ value: ViewerInspectorTab) { inspectorTab = value }
+  func toggleExpansion(_ identity: String) { if !expandedNodeIdentities.insert(identity).inserted { expandedNodeIdentities.remove(identity) } }
+  func adjustInspectorTree(by delta: Double) { inspectorTreePercent = min(68, max(35, inspectorTreePercent - delta / 8)) }
+  func select(in capture: ViewerCapture, at location: CGPoint, renderedSize: CGSize) {
+    guard renderedSize.width > 0, renderedSize.height > 0 else { return }
+    let screenshotX = Double(location.x / renderedSize.width) * Double(capture.screenshotWidth)
+    let screenshotY = Double(location.y / renderedSize.height) * Double(capture.screenshotHeight)
+    guard let node = ViewerHitTesting.node(in: capture, x: screenshotX, y: screenshotY) else {
+      return
+    }
+    select(node.identity)
   }
-
-  func setPersistentEnableConfirmed(_ confirmed: Bool) {
-    guard debugPolicy == .persistentlyEnabled else { return }
-    persistentEnableConfirmed = confirmed
+  func select(_ identity: String) {
+    guard let capture, let node = capture.node(identity: identity) else { return }
+    selectedNodeIdentity = node.identity
+    expandedNodeIdentities.formUnion(capture.ancestors(of: node.identity))
   }
-
-  private func clearTargetScopedInput() {
-    manualWindowID = ""
-    componentID = ""
-    persistentEnableConfirmed = false
+  func nodeTitle(_ identity: String) -> String? { capture?.node(identity: identity).map { "#\($0.deviceID ?? "—") \($0.type)" } }
+  func breadcrumb(for identity: String) -> String {
+    guard let capture else { return "" }
+    return (capture.ancestors(of: identity) + [identity]).compactMap { nodeTitle($0) }.joined(separator: " › ")
   }
-}
-
-private struct UIDumpExpectedArtifact: Identifiable {
-  let id: String
-  let name: String
-  let role: String
-  let origin: String
 }

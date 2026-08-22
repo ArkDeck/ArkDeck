@@ -20,6 +20,12 @@
         "maximum": 600,
         "description": "Bounded HiLog capture window."
       },
+      "captureHilog": {
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "description": "Capture the bounded HiLog artifact. Set false for a typed UI snapshot that needs the component tree and PNG but not diagnostic logs."
+      },
       "bundleName": {
         "type": "string",
         "required": false,
@@ -192,8 +198,9 @@
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",
+      "optional": true,
       "compensation": "none",
-      "notes": "Bounded by durationSeconds and per-stream byte budget; partial success is recorded per artifact."
+      "notes": "Selected unless captureHilog is false. When selected it is bounded by durationSeconds and per-stream byte budget; partial success is recorded per artifact."
     },
     {
       "stepID": "capture-ui-dump",
@@ -348,7 +355,7 @@
   "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
   "unknownOutcome": "reconcileRequired",
   "artifacts": [
-    { "name": "hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": true },
+    { "name": "hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "ui-dump.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "ui-tree.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "screenshot.png", "role": "raw", "mediaType": "image/png", "privacy": "sensitive", "required": false },

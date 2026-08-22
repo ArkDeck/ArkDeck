@@ -401,6 +401,9 @@ package enum CatalogOperationEffectResolver {
     inputs: [String: JSONValue]
   ) -> Bool {
     switch step.stepID {
+    case "capture-hilog":
+      if case .bool(let enabled)? = value("captureHilog", descriptor, inputs) { return enabled }
+      return true
     case "capture-trace", "receive-trace-artifact", "cleanup-remote-temp":
       if case .array(let categories)? = value("traceCategories", descriptor, inputs) {
         return !categories.isEmpty
