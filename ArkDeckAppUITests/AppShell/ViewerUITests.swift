@@ -167,6 +167,72 @@ final class ViewerUITests: XCTestCase {
     attach(app, name: "viewer-raw-dump")
   }
 
+  // MARK: - Real hardware
+
+  private static let realDeviceEnvironmentKey = "ARKDECK_UI_TEST_VIEWER_REAL_DEVICE"
+
+  /// Opt-in hardware acceptance. This one launches without the fixture, so the
+  /// capture comes from the production XPC facade and a connected device, and
+  /// the stage timings in the footer are the ones that capture actually cost.
+  ///
+  /// Like the startup acceptance test, it reports timings only — no target id,
+  /// no job id, and nothing read off the device's screen goes into the output.
+  func testRealDeviceCaptureFillsTheStageTimings() throws {
+    guard ProcessInfo.processInfo.environment[Self.realDeviceEnvironmentKey] == "1" else {
+      throw XCTSkip(
+        "Set \(Self.realDeviceEnvironmentKey)=1 for real-device Viewer acceptance")
+    }
+
+    let app = XCUIApplication()
+    if app.state != .notRunning { app.terminate() }
+    app.launchArguments = [
+      "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+      "--ui-test-auto-update-idle",
+    ]
+    app.launch()
+    app.activate()
+    XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
+    openViewer(in: app)
+
+    let recapture = app.buttons["viewer.recapture"]
+    XCTAssertTrue(recapture.waitForExistence(timeout: 15), "Viewer must offer Recapture")
+    // The button exists before the workspace knows whether any target has a
+    // fresh Connected route — that answer comes from a device probe. Waiting
+    // for the control to appear is not waiting for the App to be ready.
+    let live = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "isEnabled == true"), object: recapture)
+    XCTAssertEqual(
+      XCTWaiter().wait(for: [live], timeout: 60), .completed,
+      "no adopted target reported a fresh Connected route within 60s")
+    recapture.click()
+
+    // A device round trip plus three bounded artifact reads. The budget is
+    // generous on purpose: this asserts that the pipeline completes and
+    // reports, not how fast the hardware happened to be.
+    let firstRow = app.descendants(matching: .any).matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "viewer.tree.node.")).firstMatch
+    XCTAssertTrue(
+      firstRow.waitForExistence(timeout: 180),
+      "a verified real capture must render a tree")
+
+    let footer = app.descendants(matching: .any)["viewer.footer"]
+    XCTAssertTrue(footer.waitForExistence(timeout: 10), "the footer must publish stage timings")
+    let readout = (footer.value as? String) ?? footer.label
+    XCTAssertFalse(
+      readout.isEmpty, "the footer must publish something for a real capture")
+    for stage in ["submit", "run", "list", "read", "parse"] {
+      XCTAssertTrue(
+        readout.contains(stage),
+        "the footer must report the \(stage) stage of a measured capture")
+    }
+
+    let evidence = XCTAttachment(string: readout)
+    evidence.name = "real-device-stage-timings"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+    attach(app, name: "viewer-real-device")
+  }
+
   // MARK: - Helpers
 
   private func launchViewer(extra: [String] = []) -> XCUIApplication {
