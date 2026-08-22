@@ -182,13 +182,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "ArkUI UI Dump"
+            "value": "Viewer"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "ArkUI UI 导出"
+            "value": "Viewer"
           }
         }
       }

@@ -4,230 +4,171 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class UIDumpApplicationFacadeContractTests: XCTestCase {
-  func testCatalogProjectsExactlyFourCanonicalCandidateRecipes() {
-    // elementTree leads: it is the workspace's default selection.
-    XCTAssertEqual(
-      UIDumpRecipeCatalog.definitions.map(\.id),
-      [.elementTree, .nodeSummary, .fullDefaultTree, .componentDetail])
-    XCTAssertEqual(
-      UIDumpRecipeCatalog.definition(.nodeSummary).displayArguments(
-        windowID: "42", componentID: nil),
-      "-w 42 -default")
-    XCTAssertEqual(
-      UIDumpRecipeCatalog.definition(.elementTree).displayArguments(
-        windowID: "42", componentID: nil),
-      "-w 42 -element -c")
-    XCTAssertEqual(
-      UIDumpRecipeCatalog.definition(.fullDefaultTree).displayArguments(
-        windowID: "42", componentID: nil),
-      "-w 42 -default -all")
-    XCTAssertEqual(
-      UIDumpRecipeCatalog.definition(.componentDetail).displayArguments(
-        windowID: "42", componentID: "73"),
-      "-w 42 -element -lastpage 73")
-    XCTAssertFalse(UIDumpRecipeCatalog.definition(.nodeSummary).requiresComponentID)
-    XCTAssertTrue(UIDumpRecipeCatalog.definition(.componentDetail).requiresComponentID)
+  func testViewerRequestPinsTargetAndEnablesOnlyPublishedCaptureInputs() throws {
+    let target = UIDumpTargetPresentation(
+      id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f", adoptedAtUTC: "2026-08-22T00:00:00Z")
+    let request = try ViewerCaptureRequestBuilder.request(target: target, nonce: "test")
+
+    XCTAssertEqual(request.operation.reference, "capture.diagnostics@1")
+    XCTAssertEqual(request.target.targetID, "target-a")
+    XCTAssertEqual(request.target.expectedBindingRevision, 7)
+    XCTAssertEqual(request.inputs["durationSeconds"], .integer(1))
+    XCTAssertEqual(request.inputs["captureHilog"], .bool(false))
+    XCTAssertEqual(request.inputs["hilogFilters"], .array([]))
+    XCTAssertEqual(request.inputs["uiDump"], .bool(true))
+    XCTAssertEqual(request.inputs["crashLogs"], .bool(false))
+    XCTAssertEqual(request.inputs["uiScreenshot"], .bool(true))
+    XCTAssertEqual(request.inputs["uiComponentTree"], .bool(true))
+    XCTAssertEqual(request.inputs["redactionProfile"], .string("standard"))
   }
 
-  func testIdentifierValidatorAcceptsOnlyBoundedDecimalIdentifiers() {
-    XCTAssertEqual(UIDumpIdentifierValidator.validate("0"), .valid("0"))
-    XCTAssertEqual(UIDumpIdentifierValidator.validate("1234567890"), .valid("1234567890"))
-    XCTAssertEqual(UIDumpIdentifierValidator.validate(""), .invalid(.missing))
-    XCTAssertEqual(UIDumpIdentifierValidator.validate("-w"), .invalid(.notDecimal))
-    XCTAssertEqual(UIDumpIdentifierValidator.validate(" 42"), .invalid(.notDecimal))
-    XCTAssertEqual(UIDumpIdentifierValidator.validate("42\n"), .invalid(.notDecimal))
-    XCTAssertEqual(UIDumpIdentifierValidator.validate("42;id"), .invalid(.notDecimal))
+  func testViewerOnlyTreatsFreshConnectedCandidateAsCaptureReady() {
+    let connected = DeviceCandidatePresentation(
+      connectKey: "usb-a", state: "Connected", adoptedTargetID: "target-a", bindingRevision: 7)
+    let offline = DeviceCandidatePresentation(
+      connectKey: "usb-b", state: "Offline", adoptedTargetID: "target-b", bindingRevision: 8)
+    let stale = DeviceCandidatePresentation(
+      connectKey: "usb-c", state: "Connected", adoptedTargetID: "target-c", bindingRevision: 9,
+      stateObservationHealth: .stale)
+
+    XCTAssertEqual(UIDumpWorkspaceResponseDecoding.targetConnection(for: connected), .connected)
+    XCTAssertFalse(UIDumpWorkspaceResponseDecoding.targetConnection(for: offline).isCaptureReady)
+    XCTAssertFalse(UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).isCaptureReady)
     XCTAssertEqual(
-      UIDumpIdentifierValidator.validate("123456789012345678901"),
-      .invalid(.tooLong))
+      UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).failureReason,
+      "HDC reported Connected, but that observation is stale")
   }
 
-  func testPublishedOperationFactsDoNotPretendCanonicalRecipeInputsExist() {
-    let operation = UIDumpApplicationFacade.operationPresentation(availability: .available)
+  func testParserRetainsRawFieldsAndUsesDeviceIdentityWhenUnique() throws {
+    let capture = try ViewerCaptureParser.parse(
+      screenshotData: png(width: 720, height: 1280),
+      treeData: Data("""
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true},"children":[]}]}
+      """.utf8),
+      rawDumpData: Data(#"{"windows":[{"id":"w1"}]}"#.utf8),
+      identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
 
-    XCTAssertEqual(operation.reference, "capture.diagnostics@1")
-    XCTAssertTrue(operation.supportsWindowInventory)
-    XCTAssertTrue(operation.supportsScreenComponentTree)
-    XCTAssertFalse(operation.supportsCanonicalWindowRecipes)
-    XCTAssertFalse(operation.inputNames.contains("recipeId"))
-    XCTAssertFalse(operation.inputNames.contains("windowId"))
-    XCTAssertFalse(operation.inputNames.contains("componentId"))
+    XCTAssertTrue(capture.coordinatesAreVerified)
+    let toggle = try XCTUnwrap(capture.nodes.first { $0.deviceID == "42" })
+    XCTAssertEqual(toggle.identity, "device:42")
+    XCTAssertEqual(toggle.parentIdentity, "device:1")
+    XCTAssertTrue(try XCTUnwrap(capture.formattedRawFields(for: "device:1")).contains("unknown"))
+    XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID, "42")
   }
 
-  func testWorkspaceDecoderPreservesCompleteRuntimeFacts() throws {
-    let presentation = UIDumpWorkspaceResponseDecoding.presentation(
-      operationResponse: .success(
-        try response([
-          [
-            "reference": "capture.diagnostics@1",
-            "availability": "available",
-            "reasons": [],
-          ]
-        ])),
-      targetResponse: .success(
-        try response([
-          [
-            "targetId": "target-a",
-            "bindingRevision": 7,
-            "toolVersion": "3.2.0f",
-            "adoptedAtUtc": "2026-08-06T08:00:00Z",
-          ]
-        ])),
-      jobResponse: .success(
-        try response([
-          [
-            "jobId": "job-ui-dump",
-            "operation": "capture.diagnostics@1",
-            "targetId": "target-a",
-            "state": "waitingForHuman",
-            "waitingForHuman": true,
-            "outcomeUnknown": false,
-            "outstandingResidueCount": 1,
-          ],
-          [
-            "jobId": "job-other",
-            "operation": "debug.logs@1",
-            "targetId": "target-a",
-            "state": "succeeded",
-            "waitingForHuman": false,
-            "outcomeUnknown": false,
-            "outstandingResidueCount": 0,
-          ],
-        ])))
+  func testParserFallsBackToStablePathForDuplicateDeviceIDsAndDisablesUnprovenCoordinates() throws {
+    let capture = try ViewerCaptureParser.parse(
+      screenshotData: png(width: 720, height: 1280),
+      treeData: Data("""
+      {"attributes":{"id":"same","type":"Page","bounds":"[0,0][700,1280]"},"children":[{"attributes":{"id":"same","type":"Text"},"children":[]}]}
+      """.utf8),
+      rawDumpData: nil,
+      identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
 
-    XCTAssertEqual(presentation.operation.availability, .available)
-    XCTAssertEqual(
-      presentation.targets,
-      [
-        UIDumpTargetPresentation(
-          id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f",
-          adoptedAtUTC: "2026-08-06T08:00:00Z")
-      ])
-    XCTAssertEqual(presentation.relatedJobs.count, 1)
-    XCTAssertEqual(presentation.relatedJobs.first?.id, "job-ui-dump")
-    XCTAssertEqual(presentation.relatedJobs.first?.needsAttention, true)
-    XCTAssertNil(presentation.targetLoadFailure)
-    XCTAssertNil(presentation.jobLoadFailure)
+    XCTAssertFalse(capture.coordinatesAreVerified)
+    XCTAssertEqual(capture.nodes.map(\.identity), ["path:0", "path:0.0"])
+    XCTAssertNil(ViewerHitTesting.node(in: capture, x: 1, y: 1))
   }
 
-  func testMalformedRuntimeFactsFailClosed() throws {
-    let presentation = UIDumpWorkspaceResponseDecoding.presentation(
-      operationResponse: .success(
-        try response([
-          [
-            "reference": "capture.diagnostics@1",
-            "availability": "available",
-          ]
-        ])),
-      targetResponse: .success(
-        try response([
-          ["targetId": "unbound"]
-        ])),
-      jobResponse: .success(
-        try response([
-          [
-            "jobId": "incomplete",
-            "operation": "capture.diagnostics@1",
-          ]
-        ])))
+  func testVisibleTreeProjectionIsLinearAndCycleSafe() {
+    let root = viewerNode(identity: "root", parent: nil, children: ["section"])
+    let section = viewerNode(
+      identity: "section", parent: "root", children: ["target"], type: "Stack")
+    // Provider data should not contain a cycle, but a malformed capture must
+    // still leave Viewer responsive rather than recursively repainting forever.
+    let target = viewerNode(
+      identity: "target", parent: "section", children: ["section"], type: "Text", text: "Wi-Fi")
+    let capture = ViewerCapture(
+      screenshotData: png(width: 720, height: 1280),
+      screenshotWidth: 720,
+      screenshotHeight: 1280,
+      roots: ["root"],
+      nodes: [root, section, target],
+      rawDumpDocument: nil,
+      identity: ViewerCaptureIdentity(
+        jobID: "job-cycle", targetID: "target-a", bindingRevision: 1,
+        capturedAtUTC: "2026-08-22T00:00:00Z"),
+      coordinatesAreVerified: true)
 
     XCTAssertEqual(
-      presentation.operation.availability,
-      .unavailable(reasons: ["capture.diagnostics@1 is missing complete availability facts"]))
-    XCTAssertTrue(presentation.targets.isEmpty)
-    XCTAssertTrue(presentation.relatedJobs.isEmpty)
+      capture.visibleTreeNodes(
+        rootIdentity: nil, query: "", expandedNodeIdentities: ["root", "section", "target"])
+        .map(\.identity),
+      ["root", "section", "target"])
     XCTAssertEqual(
-      presentation.targetLoadFailure,
-      "Runtime returned a target without complete binding facts")
-    XCTAssertEqual(
-      presentation.jobLoadFailure,
-      "Runtime returned an incomplete diagnostics job")
+      capture.visibleTreeNodes(rootIdentity: nil, query: "wi-fi", expandedNodeIdentities: [])
+        .map(\.identity),
+      ["root", "section", "target"])
+    XCTAssertEqual(capture.subtreeNodes(rootIdentity: "section").map(\.identity), ["section", "target"])
   }
 
-  func testAppFacadeExposesOneReadAndNoMutationTransport() throws {
-    let protocolSource = try source(
-      "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift")
-    let protocolBody = try XCTUnwrap(
-      protocolSource.split(separator: "public protocol UIDumpApplicationProviding", maxSplits: 1)
-        .last?.split(separator: "public enum UIDumpApplicationFacade", maxSplits: 1).first)
+  func testParserRetainsOpaqueOptionalRawDumpWithoutRejectingVerifiedTree() throws {
+    let rawDump = Data("Window #0: opaque provider inventory\\n".utf8)
+    let capture = try ViewerCaptureParser.parse(
+      screenshotData: png(width: 720, height: 1280),
+      treeData: Data("""
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]"},"children":[]}
+      """.utf8),
+      rawDumpData: rawDump,
+      identity: ViewerCaptureIdentity(jobID: "job-opaque", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
 
-    XCTAssertTrue(protocolBody.contains("refreshWorkspace"))
-    XCTAssertFalse(protocolBody.contains("submit"))
-    XCTAssertFalse(protocolBody.contains("cancel"))
-    XCTAssertFalse(protocolBody.contains("export"))
-    XCTAssertTrue(protocolSource.contains("method: \"operation.list\""))
-    XCTAssertTrue(protocolSource.contains("method: \"target.list\""))
-    XCTAssertTrue(protocolSource.contains("method: \"job.list\""))
-    for forbidden in [
-      "method: \"job.submit\"", "method: \"job.cancel\"",
-      "method: \"artifact.import\"", "method: \"artifact.export\"",
-    ] {
-      XCTAssertFalse(protocolSource.contains(forbidden), forbidden)
-    }
+    XCTAssertEqual(capture.rawDumpDocument, rawDump)
+    XCTAssertTrue(capture.coordinatesAreVerified)
   }
 
-  func testAppRoutesUIDumpToItsWorkspaceAndKeepsDispatchLocked() throws {
-    let appSource = try source("ArkDeckApp/App/ArkDeckApp.swift")
-    let viewSource = try source("ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift")
-
-    XCTAssertTrue(appSource.contains("case .uiDump:\n      UIDumpWorkspaceView"))
-    XCTAssertTrue(
-      viewSource.contains(
-        "String.LocalizationValue(key), table: \"UIDumpLocalizable\""))
-    XCTAssertTrue(viewSource.contains("Button(string(\"uiDump.action.run\")) {}"))
-    XCTAssertTrue(viewSource.contains(".disabled(true)"))
-    XCTAssertFalse(viewSource.contains("job.submit"))
-    XCTAssertFalse(viewSource.contains("artifact.import"))
-    XCTAssertFalse(viewSource.contains("renderTreeLegacy"))
-  }
-
-  func testNamedLocalizationCatalogCoversBothSupportedLanguagesAndScopeLabels() throws {
-    let data = try Data(
+  func testProductionFacadeContainsNoFixtureOrRawCommandFallback() throws {
+    let source = try String(
       contentsOf: repository.appending(
-        path: "ArkDeckApp/Resources/UIDumpLocalizable.xcstrings"))
-    let object = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: data) as? [String: Any])
-    let strings = try XCTUnwrap(object["strings"] as? [String: Any])
-    // The scope boundary is one fixed sentence at the page footer; the old
-    // per-row scope labels (arkui/crash/system/notMVP) were retired with the
-    // greyed rows that read as disabled entries.
-    let requiredKeys = [
-      "uiDump.recipe.nodeSummary.name",
-      "uiDump.recipe.elementTree.name",
-      "uiDump.recipe.fullDefaultTree.name",
-      "uiDump.recipe.componentDetail.name",
-      "uiDump.policy.unchanged.name",
-      "uiDump.policy.temporaryRestore.name",
-      "uiDump.policy.persistentlyEnabled.name",
-      "uiDump.policy.persist.callout",
-      "uiDump.policy.persist.confirm",
-      "uiDump.artifacts.sensitivityNote",
-      "uiDump.scope.note",
-    ]
+        path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(source.contains("method: \"job.submit\""))
+    XCTAssertTrue(source.contains("method: \"artifact.read\""))
+    XCTAssertTrue(source.contains("allowSensitive\": .bool(true)"))
+    XCTAssertFalse(source.contains("FixtureApplicationProvider"))
+    XCTAssertFalse(source.contains("hidumper"))
+    XCTAssertFalse(source.contains("candidateArguments"))
+  }
 
-    for key in requiredKeys {
-      let entry = try XCTUnwrap(strings[key] as? [String: Any], key)
-      let localizations = try XCTUnwrap(
-        entry["localizations"] as? [String: Any], key)
-      XCTAssertNotNil(localizations["en"], key)
-      XCTAssertNotNil(localizations["zh-Hans"], key)
+  private func png(width: Int, height: Int) -> Data {
+    var bytes: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]
+    for value in [width, height] {
+      bytes.append(UInt8((value >> 24) & 0xff))
+      bytes.append(UInt8((value >> 16) & 0xff))
+      bytes.append(UInt8((value >> 8) & 0xff))
+      bytes.append(UInt8(value & 0xff))
     }
+    return Data(bytes)
   }
 
-  private func response(_ result: [[String: Any]]) throws -> Data {
-    try JSONSerialization.data(withJSONObject: ["id": "test", "ok": true, "result": result])
-  }
-
-  private func source(_ relativePath: String) throws -> String {
-    try String(contentsOf: repository.appending(path: relativePath), encoding: .utf8)
+  private func viewerNode(
+    identity: String,
+    parent: String?,
+    children: [String],
+    type: String = "Page",
+    text: String? = nil
+  ) -> ViewerNode {
+    ViewerNode(
+      identity: identity,
+      deviceID: identity,
+      parentIdentity: parent,
+      children: children,
+      type: type,
+      text: text,
+      inspectorID: nil,
+      bounds: nil,
+      visible: true,
+      enabled: nil,
+      clickable: nil,
+      focusable: nil,
+      zIndex: nil,
+      depth: 0,
+      rawFields: Data("{}".utf8))
   }
 
   private var repository: URL {
     URL(filePath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
   }
 }
