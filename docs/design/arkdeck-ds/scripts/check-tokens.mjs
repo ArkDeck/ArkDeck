@@ -28,7 +28,7 @@ function srcFiles(dir) {
 // Bump ONLY after re-reading the docs and confirming this package still
 // expresses them. This is the deliberate acknowledgement step: a docs version
 // bump is exactly the event that silently invalidated the library once.
-const ALIGNED_VERSION = "v0.6";
+const ALIGNED_VERSION = "v0.8";
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const designDir = join(pkgRoot, "..");
@@ -309,6 +309,27 @@ for (const name of dsLight.keys()) {
     banner: "RecoveryBanner", ritem: "RecoveryBanner",
     drawer: "JobInspector", job: "JobInspector", rebind: "JobInspector",
     inp: "TextField", radio: "RadioGroup", tagpick: "TagPicker",
+    "viewer-page": "ViewerWorkspace", "viewer-lead": "ViewerWorkspace",
+    "viewer-toolbar": "ViewerWorkspace", "viewer-status": "ViewerWorkspace",
+    "viewer-workspace": "ViewerWorkspace", "viewer-pane": "ViewerWorkspace",
+    "viewer-pane-head": "ViewerWorkspace", "viewer-footer": "ViewerWorkspace",
+    "viewer-devtools": "ViewerInspectorStack", "viewer-tree-pane": "ViewerInspectorStack",
+    "viewer-splitter": "ViewerInspectorStack",
+    "viewer-screen-canvas": "ViewerScreenshot", "viewer-screen": "ViewerScreenshot",
+    "viewer-screen-status": "ViewerScreenshot", "viewer-screen-title": "ViewerScreenshot",
+    "viewer-search": "ViewerScreenshot", "viewer-profile": "ViewerScreenshot",
+    "viewer-avatar": "ViewerScreenshot", "viewer-settings": "ViewerScreenshot",
+    "viewer-setting": "ViewerScreenshot", "viewer-setting-icon": "ViewerScreenshot",
+    "viewer-setting-copy": "ViewerScreenshot", "viewer-switch": "ViewerScreenshot",
+    "viewer-hit": "ViewerScreenshot",
+    "viewer-tree": "ComponentTree", "viewer-tree-row": "ComponentTree",
+    "viewer-tree-id": "ComponentTree", "viewer-chevron": "ComponentTree",
+    "viewer-node-icon": "ComponentTree",
+    "viewer-inspector": "DumpInspector", "viewer-inspector-head": "DumpInspector",
+    "viewer-inspector-title": "DumpInspector", "viewer-breadcrumb": "DumpInspector",
+    "viewer-section-label": "DumpInspector",
+    "viewer-inspector-body": "DumpInspector", "viewer-kv": "DumpInspector",
+    "viewer-disclosure": "DumpInspector", "viewer-raw": "DumpInspector",
   };
 
   /** Never becomes a component. */

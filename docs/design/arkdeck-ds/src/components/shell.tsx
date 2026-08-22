@@ -60,7 +60,7 @@ export interface ToolbarButtonProps extends React.ButtonHTMLAttributes<HTMLButto
   children?: React.ReactNode;
 }
 
-/** A control for the window's unified toolbar (spec v0.6 §3), not for page
+/** A control for the window's unified toolbar (spec v0.8 §3), not for page
  *  content — it is 28px tall with a translucent fill so it reads as chrome.
  *  Use `Button` inside the content area instead. */
 export function ToolbarButton({ iconOnly, className, children, ...rest }: ToolbarButtonProps) {
@@ -91,7 +91,7 @@ export interface StatusStripProps {
   className?: string;
 }
 
-/** The dense summary row that opens a page (spec v0.6 §5.1) — the four things
+/** The dense summary row that opens a page (spec v0.8 §5.1) — the four things
  *  you check before reading anything else. Deliberately not a row of Cards:
  *  §1 asks for fewer bounded containers and more grouping. */
 export function StatusStrip({ cells, className }: StatusStripProps) {

@@ -1,21 +1,22 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.6（design input，非 normative；2026-08-12 完成 Flash 主流程减法与进度表达对齐）
+> Status：draft v0.8（design input，非 normative；2026-08-22 完成 Viewer DevTools 式上下检查器对齐）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v0.6 目标与当前实现边界
+## 0. v0.8 目标与当前实现边界
 
-v0.6 延续 v0.5 已确定的设备导航、已接管设备详情和宽屏信息密度，先把开发者最常用的 Flash 路径收敛为「选择镜像 → 开始刷机 → 查看进度与结果」。复杂的 Runtime 与安全事实不删除，但默认降到可展开详情；进度只表达有事实分母的已确认写入量。
+v0.8 延续 v0.7 的 `Viewer` 命名与选中联动，将检查器重排为 Chrome DevTools 式结构：左侧设备截图；右侧上方为可展开、可双向滚动的完整 UI 树，下方为当前节点属性。树与属性共享垂直空间并可拖动分隔条调整比例，以容纳很深的组件层级。数据源仍是 ArkUI dump，但用户可见的功能名始终为 `Viewer`。
 
 当前代码与目标设计的边界必须如实呈现：
 
-| Surface | 当前实现 | v0.6 设计方向 |
+| Surface | 当前实现 | v0.8 设计方向 |
 | --- | --- | --- |
-| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / UI Dump / Trace / History / Automation 均有实际工作区 | 保留原生 split view；设备行只导航到设备详情，工作流目标保持显式选择；统一 toolbar、全局 Job inspector 与窗口自适应 |
+| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / Viewer / Trace / History / Automation 均有实际工作区 | 保留原生 split view；导航及页面用户可见名统一为 `Viewer`；统一 toolbar、全局 Job inspector 与窗口自适应 |
 | Device detail | 未授权设备有接管引导；已接管设备能显示真实 binding / observation facts，并有原生右键重命名和重新检测 | 删除重复内容标题；宽屏拆分状态操作与事实；名称只是 App 展示别名，重新检测只刷新候选事实 |
 | Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
+| Viewer | `UIDumpWorkspaceView` 仍是窗口、Recipe、参数策略与产物审核表单 | 改为左侧截图 + 右侧上下检查器；UI 树在上、当前节点属性在下，截图区域、树节点与属性选中态双向同步 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
 | Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
 | Runtime data | Trace tag / 参数快照、Debug probe、Flash prerequisite / postflight、Artifact metadata 均有生产 facade | 缺失字段显示 unknown / unavailable，不使用 fixture、占位行或默认值补齐 |
@@ -113,19 +114,25 @@ Primary Window
 
 ### 5.2 设备接管与授权（REQ-HDC-007）
 
-- 设备行是**设备详情导航**，不是全局 scope：选择 ready / offline 行进入该设备详情，选择 unauthorized 行进入同一详情中的接管引导。Flash、Debug、UI Dump、Trace 等工作区必须继续展示并提交自己的显式 target / binding，不得暗中继承最近选中的设备行。
+- 设备行是**设备详情导航**，不是全局 scope：选择 ready / offline 行进入该设备详情，选择 unauthorized 行进入同一详情中的接管引导。Flash、Debug、Viewer、Trace 等工作区必须继续展示并提交自己的显式 target / binding，不得暗中继承最近选中的设备行。
 - Sidebar 未授权设备行显示 warning symbol +「需要信任」，选中后 detail 显示三步 onboarding：解锁 → 设备端信任 → 有界等待。
 - 已接管设备详情只在 toolbar 保留一个主标题。内容按「当前状态与操作」和「Runtime 事实」组织：参考宽屏左右双栏，窄窗按阅读顺序垂直堆叠；connect key、target、binding revision、model、firmware、transport 和确认时间都来自 Runtime projection，缺失即不显示，不以演示值补齐。
 - 设备行右键使用原生 context menu：`重命名…` 只修改 App 本地展示别名，不改变 connect key、target identity 或 binding；`重新检测` 重新读取整个候选列表，既不向设备发送 mutation，也不承诺候选仍存在。菜单项同时提供键盘可达的详情内操作。
 - E000002（等待）与 E000003（拒绝/超时）分状态；retry 是普通按钮。重启 shared HDC server 属独立危险 sheet，绝不成为默认修复。
 - production authorization verdict 由 `device.candidates` 的 domain-owned durable binding 刷新入口生成；App 只解码并展示 `authorized` / `pending` / `timedOut` 等闭集事实，不构造 `DurableCurrentDeviceBinding`。`denied` 在生产 probe 尚无判据时不得由 fixture 推断。
 
-### 5.3 UI Dump
+### 5.3 Viewer
 
-- 使用单一工作流表单：Window inventory → Recipe → Debug parameter policy → Review。当前步骤在 leading edge 对齐，避免四张孤立卡片。
-- Recipe 只提供四个 canonical option；componentDetail 才显示 component ID。解析失败时提供 raw read-only view 和校验后的安全手输 ID。
-- 结果用 Artifact table：name、role、origin、size、hash、sensitivity；stdout、sidecar、merged 分行，raw 永不被 merged 覆盖。
-- 页尾固定 scope note：Fault/Crash 与 system diagnostic snapshot 首版不支持。
+- 用户可见名只使用 `Viewer`；`ArkUI dump` 只用于描述数据源、树和 raw Artifact，不作为页面名或导航名。
+- toolbar 显示精确 target + window、最近抓取时间、「重新抓取」和「搜索组件 / ID / 文本」。截图和 dump 树必须来自同一次 capture epoch；任一侧缺失或时代不一致时不得建立可点击映射。
+- 宽屏使用左右双区：左侧「设备截图」；右侧参考 Chrome DevTools Elements 检查器纵向分为「UI 树」和「节点属性」。同一选中组件在截图中用 accent 边界框标记、在树中使用唯一选中行，并立即刷新下方属性。截图或树发起选择都必须更新另外两处。
+- 截图默认显示低对比度组件边界，当前组件使用 2px accent 边界和 `#<componentId> <type>` 标签。重叠 bounds 命中最深的可见节点；父节点可从 breadcrumb 或树中选择，不用多个重叠透明热区争抢指针事件。
+- UI 树是完整节点序列，默认展开到当前节点并自动滚动使其可见；深层缩进不截断节点名，树区域同时支持横向与纵向滚动。搜索只改变树的呈现，不改变 capture 与选中 identity。树遵循 macOS outline keyboard pattern：上下移动，左键折叠或返回父节点，右键展开或进入首个子节点，Enter / Space 选择。
+- 下方节点属性区使用「属性 / 布局 / 无障碍 / Raw dump」分类。结构化字段只作为快速阅读；`Raw dump` 必须保留该节点的全部原始字段，不因 UI 未识别字段而丢失信息。
+- 选中后不强制移动键盘焦点；变化通过稳定的 polite status 播报。截图可点区域与树行都使用原生 button 语义和可见 `focusVisible`，不只依赖颜色表达选中。
+- UI 树默认获得右侧较多高度；树与属性之间使用可拖动的水平分隔条，键盘可用上下方向键微调、Home / End 跳到允许范围两端。调整只改变可视比例，不改变节点选择和滚动身份。
+- 窗口变窄时仍保持右侧「UI 树在上、节点属性在下」的关联结构；无法容纳左右双区时按「设备截图 → 右侧检查器」单列排列。任一宽度下当前节点、搜索、树的双向滚动和 raw 信息都不可被裁掉。
+- Viewer 数据默认本地保存且按敏感 Artifact 处理；导出前仍须预览和确认。Fault/Crash Artifact 与整机诊断快照不得伪装成 Viewer 中的另一类节点。
 
 ### 5.4 Trace
 
@@ -197,19 +204,21 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - 原型必须声明演示数据，不连接设备；任何 simulated、planned、fake 结果不得展示为真实硬件结果。
 - 每次原型变更至少检查：UTF-8/中文；light/dark；900×600 与宽屏；键盘遍历与 modal focus return；Reduce Motion；所有导航页；typed-only 命令面；Job 跨页可见。
 
-### 7.1 v0.5 基线与 v0.6 Flash 评审
+### 7.1 v0.5 基线、v0.6 Flash 与 v0.8 Viewer 评审
 
 - `docs/design/references/v0.5/` 固定保存 1180×760 的简体中文与英文设备详情参考截图；原型通过显式 locale / reference state 生成，不依赖浏览器记忆状态。v0.6 Flash 先在交互原型中评审，确认后再固定同尺寸中英文参考截图并进入 SwiftUI 对齐。
+- v0.8 Viewer 以 `prototype.html?page=dump` 为可点击事实：默认选中 `Toggle #42`，必须可从截图与完整树双向切换节点，且下方属性、布局、无障碍和 raw 内容同步更新；水平分隔条可用指针和键盘调整。固定参考截图只在本轮方向确认后补入，避免把未确认的提案当成回归基线。
 - 参考截图只校验导航层级、宽屏分栏、信息密度、context menu 和文案长度，不是生产 Runtime 截图，更不是硬件验收证据；截图中必须持续标明演示数据。
 - App UI 测试在同一 1180×760 默认窗口和中英文 fixture 下检查：设备详情只有一个主标题、双栏/单栏的几何关系；Flash 默认只显示设备、镜像和主操作，运行态显示阶段与真实 byte-derived 估算，结果态只在 postflight 成功后出现成功文案。测试附加当次窗口截图供人工 diff；系统字体、accent、材质和抗锯齿继续由 macOS 控制，不用逐像素阈值锁死原生渲染。
 
-## 8. v0.6 已决视觉项
+## 8. v0.8 已决视觉项
 
 - 图标：产品使用 SF Symbols；HTML 原型使用单色 inline SVG 近似，禁止 Emoji 作为最终导航图标。
 - 密度：默认紧凑舒适（macOS medium sidebar size）；不额外提供 App 内密度开关，尊重系统设置。
 - Job Inspector：默认折叠；有 running / waiting / humanRequired 时显示摘要但不自动抢焦点。
 - 外观：跟随系统；不默认强制 dark。
 - Accent：跟随用户系统 accent；ArkDeck 不固定 teal 覆盖系统选择。
+- Viewer：使用左侧截图 + 右侧上下检查器；树与属性之间保留紧凑的可拖动结构分隔线，不使用圆角卡片。截图边界、树行与 inspector 用同一 accent selection，但选中同时保留 ID / type 文字线索。
 
 ## 9. 平台设计参考
 

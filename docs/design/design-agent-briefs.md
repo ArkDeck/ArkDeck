@@ -20,7 +20,7 @@
 用 ArkDeck 组件画 **Overview** 页。
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏的设备行由 `device.candidates` 动态产生；`NavItem` × 7（Overview · Flash · Debug · UI Dump · Trace · History · Automation，Overview 为当前页），不画 Settings 导航项。
+左栏的设备行由 `device.candidates` 动态产生；`NavItem` × 7（Overview · Flash · Debug · Viewer · Trace · History · Automation，Overview 为当前页），不画 Settings 导航项。
 内容区自上而下:`StatusStrip` 四格 → 两列 `Card` 网格,四张卡片依次是 HDC 工具链 / 连接与通道保护 / 能力矩阵 / 设备访问诊断。
 底部 `JobInspector` 折叠态常驻。
 
@@ -76,7 +76,7 @@ StatusStrip 四格:
 用 ArkDeck 组件画 **设备授权** 页。
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏设备行来自 `device.candidates`，当前选中 unauthorized candidate；`NavItem` × 7（Overview · Flash · Debug · UI Dump · Trace · History · Automation）。本页是点击未授权设备行进入的,不是导航目的地 —— 七个 `NavItem` 全部非活动。
+左栏设备行来自 `device.candidates`，当前选中 unauthorized candidate；`NavItem` × 7（Overview · Flash · Debug · Viewer · Trace · History · Automation）。本页是点击未授权设备行进入的,不是导航目的地 —— 七个 `NavItem` 全部非活动。
 内容区只有一张 `Card`,宽度上限 640,不铺满 detail:标题 → 三步 onboarding 有序列表 → 状态块(随阶段替换) → 一行按钮。三步就是 spec 说的 解锁 → 设备端信任 → 有界等待。
 底部 `JobInspector` 折叠态常驻。
 
@@ -134,82 +134,52 @@ StatusStrip 四格:
 
 ---
 
-## 5.3 UI Dump
+## 5.3 Viewer
 
 > 贴进 claude.ai/design 项目的新对话。
+>
+> 生产实现交接：[`viewer-ui-implementation-task.md`](viewer-ui-implementation-task.md)。
+> 该 brief 复用 `TASK-AIN-021`，不新建 OpenSpec Task，也不改变本设计稿版本号。
 
-用 ArkDeck 组件画 **UI Dump** 页。
+用 ArkDeck 组件画 **Viewer** 页。页面名、导航名和任务名只使用 `Viewer`；`ArkUI dump` 只用于描述数据源。
 
-**布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev · ready · **当前选中**;unknown-tablet · unauthorized)+ `NavItem` × 7,🌲 UI Dump 为当前页。
-detail 自上而下:`RecoveryBanner`(两条,在页面内容之前、toolbar 之下) → 页标题 `UI Dump` → 两列工作区 → 页尾 scope note。
-两列:左列是一条**单一工作流表单**,四段沿 leading edge 对齐、共享一条纵向轴线 —— Window inventory → Recipe → Debug parameter policy;右列 `Card` 是这条流水线的 Review 端(产物)。原型把它画成了四张平级卡片网格,spec §5.3 明确要求避免「四张孤立卡片」:分组照原型,阅读顺序按 spec 画成一条有方向的流水线。
-底部 `JobInspector` 折叠态常驻。
+**布局** — `WindowFrame`，标题 `ArkDeck — Viewer`。
+左栏：`DeviceRow` × 2（DAYU200 · ready；unknown-tablet · unauthorized）+ `NavItem` × 7，`Viewer` 为当前页。detail 不用卡片 dashboard，而是一个占满可用空间的 DevTools 式双区 inspector：左侧 `ViewerScreenshot`；右侧 `ViewerInspectorStack`，上方 `ComponentTree`、下方 `DumpInspector`。底部 `JobInspector` 折叠态常驻。
 
-产物卡画 **两个状态**:未采集 / 已采集。策略卡另画一张选中「保持开启」的二次确认。
+toolbar:
+- target + window selector：`DAYU200 · w12`
+- 状态：`刚刚采集`
+- button：`重新抓取`
+- search：`搜索组件 / ID / 文本`
 
-**内容** — 逐字使用,不要改写、不要翻译、不要补充:
+**左栏「设备截图」**
+- 显示一张 OpenHarmony 设置页截图，包含「设置 / WLAN / 蓝牙 / 移动网络 / 显示和亮度 / 声音和振动」。
+- `显示组件边界` 默认开启；普通节点使用低对比度 1px accent 边界，当前节点使用 2px accent 边界和 `#42 Toggle` 标签。
+- 截图上每个有 bounds 的节点都可选择。重叠时命中最深的可见节点，父节点通过 breadcrumb 或树选择，不让多层透明热区争抢事件。
 
-`RecoveryBanner` 两条(与 Trace 页共用同一组):
-- `Flash · rk3568-dev · system 分区` + warn chip `outcomeUnknown`。正文:`上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。设备最后处于 updater 模式。` / `Provider 未声明 restartSafe —— 不提供自动续跑,请按 RecoveryGuide 人工确认设备状态。` 动作:`恢复指引` + danger `结束恢复并归档…`
-- `Trace · rk3568-dev` + dim chip `waiting`。正文:`等待设备重启回连(剩余 04:12)。回连后自动继续参数恢复。` 动作:disabled 的 `结束恢复并归档…`,hover 原因 `仍在等待窗口内,归档不可用`
+**右侧上方「UI 树」**
+- 显示完整、可展开、可横向与纵向滚动的树，header 只显示 `ArkUI dump · 28 / 28`。层级很深时保留完整节点名，不用省略号吞掉末端信息；示例至少包含一个 9 层长名称节点，以明确展示横向滚动能力。
+- 树至少展示：`Root #1 → Stage #3 → Column #8 → Navigation #12 / List #21 → ListItem #22 → Row #31 → Text WLAN #38 / Row #40 → Toggle #42`。
+- `Toggle #42` 使用与截图命中框相同的 accent 选中态。选择截图节点时树自动滚动使对应行可见，但不抢键盘焦点。
 
-第一段「窗口清单」,`Card` 的 `action` 是 `刷新` 按钮。`DataTable`,列 = windowId / 名称 / 焦点(第一列 mono):
-- `12` · `com.example.settings / MainAbility` · `●`(**当前选中行**)
-- `8` · `com.ohos.launcher` · (空)
+**右侧下方「节点属性」**
+- 与 UI 树之间使用紧凑的水平拖动分隔条，默认 UI 树约占右侧高度 60%；分隔条支持指针拖动和上下方向键调整。
+- header：`节点属性 / Toggle` + chips `#42 / 可交互 / 可见`。
+- breadcrumb：`Root / Stage / Column / List / Row / Toggle`。
+- tabs：`属性 / 布局 / 无障碍 / Raw dump`，默认选中「属性」。
+- 属性表展示：`id / type / inspectorId / text / bounds / enabled / visible / clickable / focusable / checked / opacity / zIndex / hitTestBehavior`。
+- 下方 disclosure：`布局与渲染 / 无障碍 / 原始 dump`。`Raw dump` 必须可查看该节点的全部原始字段，不因结构化 inspector 未识别字段而丢失信息。
 
-尾注:`来源:hidumper -s WindowManagerService -a -a。解析失败时保留 raw 输出并允许安全手输 windowId。`(命令部分 mono)
+**必须画出的语义**：
 
-第二段「Recipe」,`Card` 的 `action` 是 accent 色 mono 文字 `-w 12 -element -c`,随选中 recipe 与 windowId 实时变化。`RadioGroup`,四个选项(破折号后半段 mono):
-- `elementTree — -w <w> -element -c`(默认选中)
-- `nodeSummary — -w <w> -default`
-- `fullDefaultTree — -w <w> -default -all`
-- `componentDetail — -w <w> -element -lastpage <compId>`
+1. **左右双区是同一个 selection model。** 截图框、树行和下方属性 header 都必须指向 `Toggle #42`；截图或树选择新节点时，另外两处同步更新。
+2. **截图与树必须来自同一 capture epoch。** 不用旧截图去映射新 dump；数据不完整时显示无法建立映射，不猜测 bounds。
+3. **树不是只显示命中附近的摘要。** 它是完整 dump 树，搜索只改变当前显示结果。
+4. **详情不是只列常用字段。** 结构化分组用于快速阅读，完整 raw 始终可达。
+5. **键盘与指针路径等价。** 截图区和树行有原生 button / outline 语义与 `focusVisible`；树支持上下选项、左右折叠展开与父子节点。分隔条使用 `role=separator`，方向键和指针都能调整高度。
+6. **窄屏不拆散树与属性。** 中等宽度继续保留左侧截图 + 右侧上下检查器；更窄时按截图 → 检查器单列排列，检查器内部始终是树在上、属性在下。
 
-只有选中 `componentDetail` 时,组下面多出一行:`compId(安全手输,只接受数字):` + mono `TextField`,宽 100,值 `33`。
-
-第三段「Debug 参数策略」,`RadioGroup`,三项(label + description):
-- `不改变参数` — `— 以设备当前状态采集`(默认选中)
-- `临时开启,结束后恢复` — `— 仅当原值可读且可写回时可选`
-- `保持开启` — `— 需要二次确认,状态栏持续提醒`
-
-左对齐 primary 按钮 `采集`;运行中变成 disabled 的 `采集中…`。
-
-选中「保持开启」后的二次确认,直接接在这一组下面:danger `Callout` + 两个按钮。
-- Callout 正文:`persist.ace.debug.enabled 等参数将持久保留在设备上,可能影响性能与后续测量;设备状态栏将持续显示提醒,且该变更计入审计。`
-- 按钮:`取消` + danger `确认保持开启`
-- 原型这个 sheet 没有勾选门,所以不要为它编 `DangerConfirmDialog` 的 acknowledgement 文案。
-
-右列「产物」`Card`:
-- 未采集:`尚未采集。产物将按 stdout / remote sidecar / merged 派生分行列出并标注来源。`
-- 已采集:`DataTable`,列 = Artifact / 来源 / SHA-256(第一列与第三列 mono):
-  - `stdout.elementtree.txt` · `stdout` · `7d1a…90ff`
-  - `sidecar.arkui.dump` · `remote sidecar` · `e33b…12c0`
-  - `merged.elementtree.json` · `derived(可重建)` · `a1f4…77b3`
-- 已采集尾注:`⚠ Dump 可能包含页面文本/包名/标识符,按敏感数据处理;导出前将提示。raw 永不原地修改。`
-
-页尾固定 scope note:`仅 ArkUI UI Dump(窗口/组件树/组件详情)。Fault/Crash Artifact 与整机诊断快照首版不支持。`
-(原型把这句放在标题下方;spec §5.3 要求固定在页尾。文字相同,按 spec 放页尾。)
-
-`JobInspector` 里这条 Job 的标题:`UI Dump · elementTree · w12 · rk3568-dev`。若画展开态,用 `PhaseTrack`,阶段随策略变:
-- 不改变参数:`Preflight · WindowInventory · Capture · Sidecars · Receive · Validate · Complete`
-- 临时开启,结束后恢复:`Preflight · WindowInventory · SnapshotParam · Capture · Sidecars · Receive · Validate · RestoreParam · Complete`
-- 保持开启:`Preflight · WindowInventory · SnapshotParam · Capture · Sidecars · Receive · Validate · Complete`
-
-**必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
-
-1. **Recipe 只有四个 canonical option,没有第五个「自定义」入口。** 每个选项的 label 里就是那条 hidumper 参数本身,不塞进 tooltip:选 recipe 等于选一条已验证的命令,读者要在按「采集」之前对得上。这一页永远不出现自由命令输入框。
-2. **只有 `componentDetail` 会露出 compId 输入,别的三个 recipe 页面上根本没有这个字段。** 而且它只收数字 —— `安全手输,只接受数字` 是命令注入面上的闸,不是输入便利。四个 recipe 里只有它需要一个设备上的 component ID,这就是它单独有输入框的全部理由。
-3. **三条策略的代价必须贴在它自己那一行。** `仅当原值可读且可写回时可选` 是「临时开启」的前置条件,`需要二次确认,状态栏持续提醒` 是「保持开启」的代价。把它们收进卡片尾注,就等于让人先选完才知道选了什么。
-4. **「不改变参数」是默认选中项,「保持开启」要第二次确认且是 danger 面。** 默认不动设备状态;要动,就得再答一次。
-5. **产物三行不能合并成一行。** stdout / remote sidecar / merged 是三种不同来源,merged 标 `derived(可重建)`;`raw 永不原地修改` —— merged 是并列的第三份产物,不是覆盖前两份的结果。
-6. **阶段名是承诺,不是装饰。** `RestoreParam` 只存在于「临时开启,结束后恢复」的阶段列里;选「保持开启」就没有这一步 —— 因为它本来就不打算恢复。
-7. **页尾那句 scope note 是硬边界,不是路线图。** Fault/Crash Artifact 与整机诊断快照首版不支持,不要画成灰掉的 tab、「即将支持」的占位或带锁图标的入口。
-8. **解析失败不是空状态。** spec 要求解析失败时给 raw 只读视图和校验后的安全手输 ID。如果画这一态,只画一块 mono 只读区 + 手输 windowId 的输入,内容留空 —— 原型只有那句尾注,没有对应的 raw 视图文案,不要编。
-
-**不要做的事**:不要发明第五个 recipe、windowId、bundle 名或 hash;不要把 compId 做成下拉或 picker(原型是手输 + 数字过滤);不要给产物表补 size / sensitivity 列 —— spec 列了这两列但原型没有对应内容,sensitivity 现在只以整句形式活在尾注里;不要画 `AC-DUMP-*` 这类标注 chip;不要把 `RecoveryBanner` 折进页面内容里或做成可关闭的 toast。
-
----
+**不要做的事**：不要给 `Viewer` 增加任何产品前缀或恢复旧名；不要保留旧 Window inventory / Recipe / Debug parameter policy / Review 表单；不要把属性恢复成独立第三栏；不要让下方属性挤掉树的最小可用高度；不要只靠颜色表达选中；不要展示 raw command 输入。
 
 ## 5.4 Trace
 
@@ -219,7 +189,7 @@ detail 自上而下:`RecoveryBanner`(两条,在页面内容之前、toolbar 之�
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
 左栏:`DeviceRow` × 2(rk3568-dev · ready · **当前选中**;unknown-tablet · unauthorized)+ `NavItem` × 7,📈 Trace 为当前页。
-detail 自上而下:`RecoveryBanner`(两条,与 UI Dump 页同一组) → 页标题 `Trace` → 两列。
+detail 自上而下:`RecoveryBanner`(两条,与 Viewer 页共用同一组恢复数据) → 页标题 `Trace` → 两列。
 左列竖排:`Card`「抓取配置」(heading 右侧放 `SegmentedControl size="sm"`:Preset / 自定义 tag) → `Card`「Debug 参数快照(before → desired)」 → 卡片之外一个左对齐 primary 按钮。
 右列一张 `Card`「抓取状态」。
 底部 `JobInspector` 折叠态常驻。
@@ -290,7 +260,7 @@ spec §5.4 还要求不定进度旁显示 elapsed;原型页面上没有,elapsed 
 用 ArkDeck 组件画 **Debug 工作台**页。四个 tab 各画一张:Logs / Apps / Network / Commands。
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(◎ Overview · ⚡ Flash · 🐞 Debug · 🌲 UI Dump · 📈 Trace · 🗂 History · ⚙ Settings,Debug 为当前页)。
+左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(◎ Overview · ⚡ Flash · 🐞 Debug · 🌲 Viewer · 📈 Trace · 🗂 History · ⚙ Settings,Debug 为当前页)。
 内容区自上而下:`RecoveryBanner`(跨页常驻,不是本页新增)→ 页标题 `Debug 工作台` → `Tabs`(四项)→ 当前 tab 的内容,一张 `Card` 装完。
 底部 `JobInspector` 折叠态常驻。本页没有 `StatusStrip`——那是 Overview 的。
 
@@ -545,7 +515,7 @@ Session 表,`DataTable`,列 = Session(mono)/ 状态 / 设备(mono)/ 内容 / 时
 | S-0712-02 | planned `◇ PLANNED` | rk3568-dev | Flash · rk3568-5.0-full(3 分区) | 07-12 15:40 |
 | S-0712-03 | ok `✓ 成功` + simulated `▤ SIMULATED` | SIM-fixture-a3 | Flash · 断连注入场景(reconcile 一致) | 07-12 16:11 |
 | S-0711-04 | warn `⚠ 已中断 · 结果未知` | rk3568-dev | Flash · system 分区(outcomeUnknown) | 07-11 23:47 |
-| S-0711-05 | danger `✕ 失败` | rk3568-dev | UI Dump · elementTree(设备离线) | 07-11 20:15 |
+| S-0711-05 | danger `✕ 失败` | rk3568-dev | Viewer · elementTree(设备离线) | 07-11 20:15 |
 本次会话刚产生的行,Session 号后面跟一枚小标签 `本会话`。筛空时表体写 `无匹配项`。
 
 详情栏标题 `Session 详情`。未选中时:`选择左侧 Session 查看 manifest、参数 before/after、Artifact 与审计详情。planned/simulated 标识在历史与导出中永久保留。`
@@ -560,13 +530,13 @@ Summary,`KeyValueList`(以 `S-0711-04` 为例):
 
 Timeline:原型没有为已结束的会话提供时间轴文案。可以用 `PhaseTrack` 复用 Flash 任务自己声明的九个阶段 —— `Preflight` `EnterUpdater` `Re-identify` `flash boot` `flash system` `Verify` `Reboot` `Postflight` `Complete` —— 并把中断点停在 `flash system`(与审计行的 `flashPartition(system)` 对得上)。这是从任务定义推出来的,不是新编的;除此之外不要造时间戳。
 
-Parameters(只有 Trace / UI Dump 会话有),`DataTable`,列 = 参数(mono)/ before / after / 状态:
+Parameters(只有 Trace / Viewer 会话有),`DataTable`,列 = 参数(mono)/ before / after / 状态:
 - `persist.ace.trace.build.enabled` · `false` · `false` · ok `Chip` `已恢复`
 - `persist.rosen.animationtrace.enabled` · `missing` · `missing` · dim `Chip` `未改变`
 
 Artifacts,小标题 `Artifact`,`DataTable` 列 = 文件(mono)/ role / origin / size / SHA-256(mono)/ privacy / status。所有值来自 `artifact.list`，按会话类型取生产返回行；不得使用下面的旧示例 hash 作为真实值:
 - Trace:`raw.ftrace` · raw / device · `3f9a…b1c7`;`filtered.ftrace` · derived / host · `c822…04de`;`capture.log` · log / host · `910b…77aa`
-- UI Dump:`stdout.elementtree.txt` · raw / stdout · `7d1a…90ff`;`sidecar.arkui.dump` · raw / device · `e33b…12c0`;`merged.elementtree.json` · derived / host · `a1f4…77b3`
+- Viewer:`stdout.elementtree.txt` · raw / stdout · `7d1a…90ff`;`sidecar.arkui.dump` · raw / device · `e33b…12c0`;`merged.elementtree.json` · derived / host · `a1f4…77b3`
 - Flash(execute):`plan.json` · plan / host · `b7c3…e901`;`flash.log` · log / host · `44d0…a2c8`
 - Flash(plan-only):只有 `plan.json` · plan / host · `b7c3…e901`
 空表文案:`无产物(planned 会话仅含 plan artifact)`
@@ -685,7 +655,7 @@ Artifacts,小标题 `Artifact`,`DataTable` 列 = 文件(mono)/ role / origin / s
 <summary>已废止的 v0.3 Automation Preview 候选（仅供追溯，不得用于新设计或实现）</summary>
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(Overview · Flash · Debug · UI Dump · Trace · History · Automation,Automation 为当前页)。Automation 的 label 后面跟一枚小 `Chip tone="dim"` `Preview`——`NavItem` 没有 badge 属性,徽标从 label 传进去。icon 用 `Symbol`(`overview` / `flash` / `debug` / `dump` / `trace` / `history` / `automation`),不用 emoji。
+左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(Overview · Flash · Debug · Viewer · Trace · History · Automation,Automation 为当前页)。Automation 的 label 后面跟一枚小 `Chip tone="dim"` `Preview`——`NavItem` 没有 badge 属性,徽标从 label 传进去。icon 用 `Symbol`(`overview` / `flash` / `debug` / `dump` / `trace` / `history` / `automation`),不用 emoji。
 内容区自上而下:`RecoveryBanner`(§4.2 的 banner,humanRequired 一项,落在页面内容之前、toolbar 之下)→ 页标题 `Automation` + `Chip tone="planned"` → `StatusStrip` 四格 → `Card`「修复目标」内含 `StageTrack` → `Card`「预算」内含 `BudgetMeters` → 两列并排:`Card`「Attempts」(`DataTable`)与 `Card`「Attempt 2 · Evidence」(`KeyValueList` + `OperationList` + warn `Callout`)。
 底部 `JobInspector` 折叠态常驻,`jobs` 为空,摘要读作「没有运行中的任务」。
 spec 给 Automation Attempt 留的是三栏 split view;原型用内容区内的两列实现「清单 + 详情」。照两列画即可,但两列的对应关系要显式:Attempts 表第 2 行是选中行(`selectedId`),右卡标题就是 Attempt 2。

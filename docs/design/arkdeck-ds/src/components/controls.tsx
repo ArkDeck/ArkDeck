@@ -133,7 +133,7 @@ export interface NavItemProps {
 /**
  * Sidebar navigation row.
  *
- * One row per workbench capability (Overview, Flash, Debug, UI Dump, Trace,
+ * One row per workbench capability (Overview, Flash, Debug, Viewer, Trace,
  * History, Settings). The active row is the only accent-colored element in the
  * sidebar.
  */
