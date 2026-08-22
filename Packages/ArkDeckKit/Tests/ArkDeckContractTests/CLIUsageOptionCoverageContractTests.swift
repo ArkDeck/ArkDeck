@@ -112,4 +112,17 @@ final class CLIUsageOptionCoverageContractTests: XCTestCase {
           + "either restore the refusal or document the flag")
     }
   }
+
+  func testUsageMakesHeadlessRealDeviceValidationTheDefault() throws {
+    let main = try source("Sources/ArkDeckCLI/ArkDeckCLIMain.swift")
+
+    XCTAssertTrue(main.contains("Real-device validation defaults to `arkdeck agent run`"))
+    XCTAssertTrue(main.contains("use the App only when the acceptance"))
+    XCTAssertTrue(main.contains("UI acknowledgement is never a"))
+    XCTAssertTrue(main.contains("prerequisite or authority for headless execution"))
+    XCTAssertTrue(
+      main.contains("for headless real-device validation use ")
+        && main.contains("`arkdeck agent run --operation flash.full-restore@1`"),
+      "the retired flash executor must direct operators to the headless product path first")
+  }
 }

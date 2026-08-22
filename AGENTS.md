@@ -135,6 +135,15 @@
 
 ## 执行规则(产品闭环阶段)
 
+- **真机验收默认走 Agent/CLI,不是 App UI**:验证已发布 operation、Runtime、Provider、
+  binding、Job、journal 或 Artifact 时,Agent SHALL 优先直接执行 `arkdeck agent run`
+  (需要人工动作时仅消费并 `agent resume` 对应 `RuntimeHumanAction`),不得要求维护者打开
+  App、点击按钮或代跑 host CLI。只有当前 AC 明确验证 App 交互/呈现时才运行 App/UI
+  入口;该 UI 腿只证明 App surface,不得成为同一 operation 真机准入或
+  `REAL_DEVICE_PASS` 的通用前置。首次设备信任、多候选消歧与物理拔插仍可请求最小
+  physical assistance;UI acknowledgement 永远不是 Runtime authority。若 headless 路径
+  缺失或失败,应报告 `BLOCKED_BY_PRODUCT_DEFECT` 并修复该产品路径,不得静默回退到 UI
+  点击完成验收。
 - **进度唯一指标 = Golden Journey**(`PRODUCT-LOOP.md` §6):每轮工作必须映射到
   GJ-1~GJ-5 之一;状态只能取 `NOT_STARTED`/`IMPLEMENTING`/`BLOCKED_BY_PRODUCT_DEFECT`/
   `REAL_DEVICE_PASS`,文档完成、schema 完成或 fake test 通过不构成 `REAL_DEVICE_PASS`。

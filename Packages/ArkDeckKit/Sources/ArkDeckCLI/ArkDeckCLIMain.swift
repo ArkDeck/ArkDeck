@@ -83,7 +83,10 @@ struct ArkDeckCommandLine {
     case "execute":
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "use the ArkDeck Flash UI or submit flash.full-restore@1 through the typed Job API")
+        message:
+          "the legacy flash executor is retired; for headless real-device validation use "
+          + "`arkdeck agent run --operation flash.full-restore@1` with its typed inputs, "
+          + "or use the ArkDeck Flash UI only when validating the App surface")
     case "continue":
       throw CLIError(
         exitCode: EX_USAGE,
@@ -472,8 +475,11 @@ struct ArkDeckCommandLine {
       passes the admission every other caller passes. `operation describe` publishes an
       operation's typed inputs and an example request.
 
-      Flash execution is available only through the ArkDeck Flash UI or the typed Job API. The
-      historical campaign and standing-authorization records exposed by `flash status` and
+      Real-device validation defaults to `arkdeck agent run`; use the App only when the acceptance
+      criterion is specifically about its UI. Flash execution uses flash.full-restore@1 through
+      that headless Agent/typed Job surface or through the App; UI acknowledgement is never a
+      prerequisite or authority for headless execution. The historical campaign records exposed
+      by `flash status` and
       `flash reconcile` are decode/export-only and cannot admit or dispatch a new operation.
       Caller-provided authorization files, fact/context documents, executables, argv and storage
       roots are rejected.
