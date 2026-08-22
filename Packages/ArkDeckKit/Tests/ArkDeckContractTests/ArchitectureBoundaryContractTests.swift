@@ -507,6 +507,13 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertTrue(
       manualDriver.contains(
         "url.lastPathComponent, identifier: \"flash.image.value\", timeout: max(timeout, 30)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "element(displayingNavigationFallback: fallbackStrings)"))
+    XCTAssertTrue(manualDriver.contains("kAXRowRole as String"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "expected.contains(where: { value == $0 || value.contains($0) })"))
   }
 
   private func relative(_ url: URL) -> String {
