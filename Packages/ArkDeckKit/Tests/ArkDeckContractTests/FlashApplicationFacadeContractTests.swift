@@ -342,8 +342,8 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(presentation.target, target)
     XCTAssertEqual(presentation.profileReference, profile.catalogReference)
     XCTAssertEqual(presentation.archiveSHA256, profile.archiveSHA256)
-    // No fabricated digest before submission (CHG-2026-066): the engine
-    // materializes the executed plan at job.submit.
+    // No fabricated digest in the local catalog builder: production
+    // `preparePlan` attaches the engine's `job.plan` digest before submit.
     XCTAssertNil(presentation.planDigestSHA256)
     XCTAssertEqual(
       presentation.dataImpact,
@@ -374,6 +374,15 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
           status: $0 == .stablePower ? .unknown : .satisfied)
       })
     XCTAssertTrue(ready.blockingRequiredPrerequisites.isEmpty)
+
+    let runtimeReviewed = presentation.withRuntimePlanPreview(
+      planDigestSHA256: String(repeating: "a", count: 64))
+    XCTAssertEqual(
+      runtimeReviewed.planDigestSHA256, String(repeating: "a", count: 64))
+    XCTAssertTrue(runtimeReviewed.runtimeAdmissionPreviewPassed)
+    XCTAssertTrue(
+      runtimeReviewed.blockingRequiredPrerequisites.isEmpty,
+      "Runtime plan-only admission facts supersede stale local prerequisite guesses")
   }
 
   func testExecutePresentationRemainsReviewOnlyUntilRuntimeSubmission() throws {

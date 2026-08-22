@@ -1272,6 +1272,7 @@ public actor RuntimeJobEngine {
     }
     try validateInputs(request.inputs, against: descriptor)
     try validateSupportedPlanInputs(request.inputs, descriptor: descriptor)
+    let reviewedPlanDigest = try Self.reviewedPlanDigest(in: requestData)
 
     // A retry/conflict is decided before capability consumption. Otherwise
     // a conflicting request could consume a different capability and then
@@ -1289,6 +1290,14 @@ public actor RuntimeJobEngine {
       idempotencyKey: request.idempotencyKey, requestHash: fingerprint)
     {
     case .duplicate(let existingJobID):
+      if let reviewedPlanDigest {
+        let existing = try recordForRead(jobID: existingJobID)
+        guard existing.materializedPlanDigest == reviewedPlanDigest else {
+          throw RuntimeJobEngineError.rejected(
+            .conflict,
+            "deduplicated job plan digest differs from the reviewed plan; zero new dispatch")
+        }
+      }
       return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
     case .conflict:
       throw RuntimeJobEngineError.idempotencyConflict(
@@ -1317,6 +1326,13 @@ public actor RuntimeJobEngine {
     let materialized = try await materializeTypedPlanBeforeAuthorization(
       request: request, descriptor: descriptor,
       jobID: Self.authorizationPlanJobID)
+    if let reviewedPlanDigest {
+      guard materialized.planDigest == reviewedPlanDigest else {
+        throw RuntimeJobEngineError.rejected(
+          .conflict,
+          "materialized plan digest changed after review; zero admission and zero dispatch")
+      }
+    }
     let preparedAuthorization = try await preauthorize(
       request: request, descriptor: descriptor, effect: effectiveEffect,
       materialized: materialized)
@@ -1367,6 +1383,14 @@ public actor RuntimeJobEngine {
     try configuration.admissionFaultInjector.check(.beforeAdmission)
     switch try admissionService.admit(record: record, requestHash: fingerprint) {
     case .duplicate(let existingJobID):
+      if let reviewedPlanDigest {
+        let existing = try recordForRead(jobID: existingJobID)
+        guard existing.materializedPlanDigest == reviewedPlanDigest else {
+          throw RuntimeJobEngineError.rejected(
+            .conflict,
+            "concurrent duplicate plan digest differs from the reviewed plan; zero new dispatch")
+        }
+      }
       return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
     case .conflict:
       throw RuntimeJobEngineError.idempotencyConflict(
@@ -7746,6 +7770,33 @@ public actor RuntimeJobEngine {
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {
     SHA256Hex.isLowercaseSHA256(value)
+  }
+
+  /// `reviewedPlanDigest` is a forward-compatible request-envelope
+  /// precondition, not an operation input and never an authority source. The
+  /// typed v2 decoder deliberately ignores unknown minor-version keys, while
+  /// the engine checks this fail-closed constraint against the freshly
+  /// materialized plan before preauthorization or admission. Canonical
+  /// persistence and idempotency continue to use the decoded typed request, so
+  /// the precondition cannot change operation semantics or become durable
+  /// authority.
+  private static func reviewedPlanDigest(in requestData: Data) throws -> String? {
+    let envelope: [String: JSONValue]
+    do {
+      envelope = try JSONDecoder().decode([String: JSONValue].self, from: requestData)
+    } catch {
+      // RuntimeOperationCodec has already proven this is a duplicate-free JSON
+      // object. Keep a defensive error here in case that contract changes.
+      throw RuntimeJobEngineError.rejected(
+        .invalidRequest, "could not read the typed request envelope")
+    }
+    guard let value = envelope["reviewedPlanDigest"] else { return nil }
+    guard case .string(let digest) = value, isLowercaseSHA256(digest) else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidRequest,
+        "reviewedPlanDigest must be a lowercase SHA-256 precondition")
+    }
+    return digest
   }
 
   /// Journal-grade WorkflowStep for the kinds the engine exercises in MU-2.

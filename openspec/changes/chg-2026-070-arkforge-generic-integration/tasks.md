@@ -7,6 +7,9 @@ contract stage 已通过 PR #1449。AOT XPC bridge 与 remote-view file panel �
 已到达 Runtime ready 并完成 canonical/alias plan parity。PR #1457 依赖的可见 row
 文本未出现在原始 AX attributes，现改用既有受校验 external candidate 完成非提交导航；
 同时修复 macOS 26 AppKit remote file panel 暂时接管前台时的精确归属判定后继续 cutover。
+本轮剩余缺陷统一保留在同一 agent branch，以本地 commit 累积；完整非破坏性门禁通过
+前不 push、不按缺陷拆 PR。受保护 main 的 destructive authority 仍是最终一次合入后
+验收边界，而不是每发现一个问题就创建一次中间 PR。
 
 ## TASK-AFG-001 — ArkForge Swift SDK and release bundle
 
@@ -34,8 +37,9 @@ preflight reached `execution: ready` and composed the DAYU200 lane.
 
 ## TASK-AFG-002 — Generic operation and alias cutover
 
-- Status:in-progress（AFG-AC-4..8 已通过、实现 #1449 及 actuator 修复 #1455–
-  #1457 已合入；正在修复 macOS 26 App-owned remote file panel 前台判定）
+- Status:in-progress（AFG-AC-4..8 已通过；同一未 push 分支正在收敛 App-owned file
+  panel、typed `job.plan`、XPC allowlist 与 reviewed plan digest pinning，完成全部
+  非破坏性门禁后只创建一个最终 PR）
 - Platform: macos
 - Hardware required: no for contract stage; yes for final cutover
 - Golden Journey: GJ-4
@@ -94,9 +98,9 @@ from production consumers.
 
 ## TASK-AFG-003 — Real-device cutover
 
-- Status:blocked（等待 TASK-AFG-002 macOS 26 App-owned remote file panel 修复合入；
-  typed Job 队列为空，既有 unknown lineage 已有 Runtime resolution 归属，禁止重放原
-  destructive effect）
+- Status:blocked（等待 TASK-AFG-002 单一最终集成 PR 合入受保护 main；typed Job 队列
+  为空，既有 unknown lineage 已有 Runtime resolution 归属，禁止重放原 destructive
+  effect）
 - Platform: macos
 - Hardware required: yes, DAYU200
 - Golden Journey: GJ-4

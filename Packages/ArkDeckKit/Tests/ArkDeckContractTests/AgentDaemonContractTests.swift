@@ -1964,6 +1964,90 @@ final class AgentDaemonContractTests: XCTestCase {
     return Bundle.main.bundleURL
   }
 
+  func testJobSubmitPinsAnOptionalPlanOnlyDigestBeforeAdmission() async throws {
+    let (handler, _) = try makeStack()
+    let requestJSON = """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-plan-pin-rpc","idempotencyKey":"idem-plan-pin-rpc-01",\
+      "target":{"targetId":"TGT-PLAN-PIN-01","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """
+    let planned = try await request(
+      handler, method: "job.plan", params: ["requestJson": .string(requestJSON)])
+    guard case .object(let planFields)? = planned.result,
+      case .string(let digest)? = planFields["materializedPlanDigest"]
+    else { return XCTFail("plan-only must return the reviewed digest") }
+
+    func requestPinned(to reviewedDigest: String) throws -> String {
+      var envelope = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: Data(requestJSON.utf8)) as? [String: Any])
+      envelope["reviewedPlanDigest"] = reviewedDigest
+      return try XCTUnwrap(
+        String(
+          data: JSONSerialization.data(withJSONObject: envelope, options: [.sortedKeys]),
+          encoding: .utf8))
+    }
+
+    let drifted = try await request(
+      handler, method: "job.submit",
+      params: [
+        "requestJson": .string(
+          try requestPinned(to: String(repeating: "0", count: 64)))
+      ])
+    XCTAssertFalse(drifted.ok)
+    XCTAssertEqual(drifted.error?.code, "rejected")
+    XCTAssertTrue(drifted.error?.message.contains("zero admission and zero dispatch") == true)
+
+    let submitted = try await request(
+      handler, method: "job.submit",
+      params: ["requestJson": .string(try requestPinned(to: digest))])
+    XCTAssertTrue(submitted.ok)
+    guard case .object(let fields)? = submitted.result,
+      case .string(let jobID)? = fields["jobId"],
+      !jobID.isEmpty
+    else { return XCTFail("the matching reviewed digest must admit one job") }
+  }
+
+  func testAppXPCAdmitsTypedPlanAndCarriesPinnedSubmitInRequestEnvelope() throws {
+    let requestJSON = """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-xpc-plan-pin","idempotencyKey":"idem-xpc-plan-pin-01",\
+      "target":{"targetId":"TGT-XPC-PLAN-PIN","expectedBindingRevision":7},\
+      "operation":{"id":"flash.full-restore","version":1},"inputs":{},\
+      "clientContext":{"clientName":"ArkDeckApp.FlashWorkspace"}}
+      """
+    let plan = try ArkDeckAgentXPC.requestFrame(
+      method: "job.plan", params: ["requestJson": .string(requestJSON)])
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(of: plan), .direct(method: "job.plan"))
+
+    func requestPinned(to digest: String) throws -> String {
+      var envelope = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: Data(requestJSON.utf8)) as? [String: Any])
+      envelope["reviewedPlanDigest"] = digest
+      return try XCTUnwrap(
+        String(
+          data: JSONSerialization.data(withJSONObject: envelope, options: [.sortedKeys]),
+          encoding: .utf8))
+    }
+
+    let digest = String(repeating: "a", count: 64)
+    let submit = try ArkDeckAgentXPC.requestFrame(
+      method: "job.submit",
+      params: ["requestJson": .string(try requestPinned(to: digest))])
+    guard case .appSubmit(_, .flash)? = AgentXPCEndpoint.admission(of: submit) else {
+      return XCTFail("the typed Flash submit must carry its reviewed digest through XPC")
+    }
+    for invalid in ["", String(repeating: "A", count: 64), String(repeating: "0", count: 63)] {
+      let frame = try ArkDeckAgentXPC.requestFrame(
+        method: "job.submit",
+        params: ["requestJson": .string(try requestPinned(to: invalid))])
+      guard case .appSubmit(_, .flash)? = AgentXPCEndpoint.admission(of: frame) else {
+        return XCTFail("XPC admits the typed request; Runtime validates the digest")
+      }
+    }
+  }
+
   /// `job.cancel` used to answer every failure with `notFound: unknown job`.
   /// Cancelling persists a decision, so it can fail long after the job was
   /// found — and claiming the job does not exist, while its steps may still be

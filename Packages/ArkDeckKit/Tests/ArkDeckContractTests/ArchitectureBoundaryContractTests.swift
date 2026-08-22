@@ -501,6 +501,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       encoding: .utf8)
     XCTAssertTrue(manualDriver.contains("flash.full-restore"))
     XCTAssertFalse(manualDriver.contains("flash.dayu200"))
+    XCTAssertTrue(manualDriver.contains("\"job.list-page\", \"job.plan\", \"job.status\""))
+    XCTAssertTrue(manualDriver.contains("params.count == 1"))
     XCTAssertFalse(manualDriver.contains("waitForPresence(\"open-panel\""))
     XCTAssertFalse(manualDriver.contains("waitForAbsence(\"open-panel\""))
     XCTAssertTrue(manualDriver.contains("try openGoToFolder(timeout: timeout)"))

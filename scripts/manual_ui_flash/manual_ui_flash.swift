@@ -461,7 +461,7 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
     "artifact.importFlashBundle.abort", "artifact.importFlashBundle.append",
     "artifact.importFlashBundle.begin", "artifact.importFlashBundle.commit",
     "artifact.inspect", "artifact.list", "job.evidence", "job.list",
-    "job.list-page", "job.status", "operation.list", "target.list",
+    "job.list-page", "job.plan", "job.status", "operation.list", "target.list",
   ]
 
   private let socketPath: String
@@ -1620,9 +1620,11 @@ private final class AccessibilityDriver {
     }
 
     let raised = AXUIElementPerformAction(panel, kAXRaiseAction as CFString)
-    guard raised == .success,
-      runningApplication.activate(options: [.activateAllWindows])
-    else {
+    if raised != .success {
+      throw DriverFailure.message(
+        "could not focus the exact ArkDeck system file panel")
+    }
+    guard runningApplication.activate(options: [.activateAllWindows]) else {
       throw DriverFailure.message(
         "could not focus the exact ArkDeck system file panel")
     }

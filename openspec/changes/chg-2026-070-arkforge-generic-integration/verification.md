@@ -2,9 +2,10 @@
 
 > Change:CHG-2026-070-arkforge-generic-integration@r1
 >
-> Status: AFG-AC-1..8 implemented and contract-verified; AFG-AC-9 remains
-> blocked on the TASK-AFG-002 macOS 26 App-owned remote file panel
-> remediation review/merge and the canonical run.
+> Status: AFG-AC-1..8 implemented and contract-verified; the remaining
+> TASK-AFG-002 remediations are accumulating on one unpushed branch and will
+> produce one final integration PR. AFG-AC-9 remains blocked on that merge and
+> the canonical run from protected main.
 
 | AC | Method | Expected result |
 | --- | --- | --- |
@@ -36,7 +37,7 @@
 - AFG-AC-7: Flash application contracts prove new UI requests use only
   `flash.full-restore@1`; typed progress derives phases from catalog step kinds
   without DAYU200 step-id branching.
-- AFG-AC-8: the full ArkDeckKit suite passes 1487 tests with 17 environment-
+- AFG-AC-8: the full ArkDeckKit suite passes 1490 tests with 17 environment-
   gated tests skipped and zero failures. The API baseline consumer builds, and
   `testFlashSingletonPersistedAliasKeepsRecoveryJournalSchema` proves old
   `flash.dayu200@1` records remain decode-only readable/recoverable without
@@ -92,8 +93,19 @@ or prior digest cannot substitute for the maintainer-operated destructive run.
   only while the exact ArkDeck process is alive, its AX tree contains the
   stable requested control plus `OKButton`, and no unrelated application owns
   the foreground.
-- The modified actuator typechecks; the focused architecture-boundary contract
-  passes, and the full ArkDeckKit suite passes 1487 tests with 17
+- The exact new App selected and imported the supplied archive against the
+  protected-main Runtime, then failed closed because the product XPC allowlist
+  did not yet admit typed read-only `job.plan`. No Runtime Job or device
+  dispatch occurred. The same branch now admits only a closed App-owned typed
+  plan request and carries a lowercase reviewed digest on typed submit.
+- Production Flash preparation imports/caches the target-bound Artifact lease,
+  asks Runtime `job.plan` for the authoritative materialized plan, and validates
+  operation, target, binding, provider, effect, authorization, inputs and step
+  facts before presenting its digest. `job.submit` atomically compares that
+  reviewed digest before preauthorization, admission or dispatch.
+- The modified actuator and bridge typecheck; the focused XPC, plan-digest and
+  architecture-boundary contracts pass, the macOS App builds for testing, and
+  the full ArkDeckKit suite passes 1490 tests with 17
   environment-gated skips and zero failures.
 - Typed Runtime pagination reports no current Job. Historical unknown records
   are either superseded or carry an explicit target-alias resolution owner;
@@ -102,3 +114,6 @@ or prior digest cannot substitute for the maintainer-operated destructive run.
 Real-device verification must not be inferred from a mock, scripted process or
 prior catalog digest. Alias execution parity is established from materialized
 plans; only the canonical operation is destructively executed in this change.
+Intermediate defects in this vertical task stay as local commits on the same
+branch; they do not create sibling PRs. The protected-main requirement creates
+one final post-merge hardware checkpoint, not a merge-before-every-fix loop.

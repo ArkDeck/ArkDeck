@@ -156,11 +156,13 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let mappedPartitionCount: Int
-  /// The engine materializes the executed plan at submission and pins its
-  /// digest into the job record and the RuntimeCapability; before submission
-  /// there is honestly no plan digest to show, so this is nil (CHG-2026-066 —
-  /// the review no longer fabricates one).
+  /// Runtime's effect-safe `job.plan` digest for these exact target, binding,
+  /// artifact and typed inputs. Production execute plans remain ineligible
+  /// until this is present; submit pins it again before any admission.
   public let planDigestSHA256: String?
+  /// True only when Runtime's plan-only surface returned zero admission,
+  /// zero dispatch and no provider admission blocker for this exact digest.
+  public let runtimeAdmissionPreviewPassed: Bool
   public let stepSetDigestSHA256: String
   public let steps: [FlashPlanStepPresentation]
   public let dataImpact: [FlashDataImpactPresentation]
@@ -172,7 +174,8 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   /// Unknown is a blocker just like an explicit negative: the one-click UI
   /// removes redundant confirmation ceremony, not the pre-effect fact gate.
   public var blockingRequiredPrerequisites: [FlashPrerequisitePresentation] {
-    prerequisites.filter {
+    if runtimeAdmissionPreviewPassed { return [] }
+    return prerequisites.filter {
       $0.requirement == .required && $0.status != .satisfied
     }
   }
@@ -187,6 +190,7 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     archiveSHA256: String,
     mappedPartitionCount: Int,
     planDigestSHA256: String?,
+    runtimeAdmissionPreviewPassed: Bool = false,
     stepSetDigestSHA256: String,
     steps: [FlashPlanStepPresentation],
     dataImpact: [FlashDataImpactPresentation],
@@ -203,6 +207,7 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     self.archiveSHA256 = archiveSHA256
     self.mappedPartitionCount = mappedPartitionCount
     self.planDigestSHA256 = planDigestSHA256
+    self.runtimeAdmissionPreviewPassed = runtimeAdmissionPreviewPassed
     self.stepSetDigestSHA256 = stepSetDigestSHA256
     self.steps = steps
     self.dataImpact = dataImpact
@@ -225,7 +230,9 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
       runtimeBuildVersion: runtimeBuildVersion,
       archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256,
       mappedPartitionCount: mappedPartitionCount,
-      planDigestSHA256: planDigestSHA256, stepSetDigestSHA256: stepSetDigestSHA256,
+      planDigestSHA256: planDigestSHA256,
+      runtimeAdmissionPreviewPassed: runtimeAdmissionPreviewPassed,
+      stepSetDigestSHA256: stepSetDigestSHA256,
       steps: steps, dataImpact: dataImpact, partitions: partitions,
       writeForbiddenMemberNames: writeForbiddenMemberNames,
       prerequisites: prerequisites.map {
@@ -233,6 +240,22 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
           identifier: $0.identifier, requirement: $0.requirement,
           status: statuses[$0.identifier] ?? .unknown)
       })
+  }
+
+  func withRuntimePlanPreview(
+    planDigestSHA256: String
+  ) -> FlashExactPlanPresentation {
+    FlashExactPlanPresentation(
+      mode: mode, target: target, profileReference: profileReference,
+      imageFileName: imageFileName, runtimeBuildVersion: runtimeBuildVersion,
+      archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256,
+      mappedPartitionCount: mappedPartitionCount,
+      planDigestSHA256: planDigestSHA256,
+      runtimeAdmissionPreviewPassed: true,
+      stepSetDigestSHA256: stepSetDigestSHA256,
+      steps: steps, dataImpact: dataImpact, partitions: partitions,
+      writeForbiddenMemberNames: writeForbiddenMemberNames,
+      prerequisites: prerequisites)
   }
 }
 
@@ -612,7 +635,27 @@ public enum FlashApplicationFacade {
   }
 }
 
+private struct FlashImportedArtifact: Sendable, Equatable {
+  let lease: String
+  let targetID: String
+  let bindingRevision: Int
+  let archiveSHA256: String
+}
+
+private struct FlashImportedArtifactKey: Sendable, Hashable {
+  let targetID: String
+  let bindingRevision: Int
+  let archiveSHA256: String
+  let archiveSizeBytes: Int64
+}
+
+private struct FlashRuntimePlanPreview: Sendable, Equatable {
+  let materializedPlanDigest: String
+}
+
 private actor FlashProductionApplicationProvider: FlashApplicationProviding {
+  private var importedArtifacts: [FlashImportedArtifactKey: FlashImportedArtifact] = [:]
+
   func refreshWorkspace() async -> FlashWorkspacePresentation {
     async let operations = FlashXPCTransport.request(method: "operation.list")
     async let targets = FlashXPCTransport.request(method: "target.list")
@@ -649,15 +692,30 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         "targetId": .string(target.id),
         "profileReference": .string(profileReference),
       ])
+    let observedPlan: FlashExactPlanPresentation
     switch FlashPrerequisiteResponseDecoding.observations(
       response, target: target, profileReference: profileReference)
     {
     case .success(let observations):
-      return .ready(plan.withPrerequisiteObservations(observations))
+      observedPlan = plan.withPrerequisiteObservations(observations)
     case .failure:
       // The exact plan remains reviewable, but every unobserved prerequisite
       // stays unknown. Runtime performs the authoritative probe before write.
-      return local
+      observedPlan = plan
+    }
+
+    do {
+      let artifact = try await importFlashBundle(
+        archiveURL: archiveURL, plan: observedPlan, target: target)
+      let preview = try await runtimePlanPreview(
+        plan: observedPlan, artifact: artifact, target: target)
+      return .ready(
+        observedPlan.withRuntimePlanPreview(
+          planDigestSHA256: preview.materializedPlanDigest))
+    } catch let failure as FlashResponseFailure {
+      return .failed(code: .planMaterializationFailed, detail: failure.message)
+    } catch {
+      return .failed(code: .planMaterializationFailed, detail: String(describing: error))
     }
   }
 
@@ -712,7 +770,10 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     archiveURL: URL,
     plan: FlashExactPlanPresentation
   ) async -> FlashSubmissionResult {
-    guard plan.mode == .execute, let target = plan.target else {
+    guard plan.mode == .execute, let target = plan.target,
+      plan.runtimeAdmissionPreviewPassed,
+      let expectedPlanDigest = plan.planDigestSHA256
+    else {
       return .failed("Only a bound execute plan can be submitted")
     }
     let gainedScope = archiveURL.startAccessingSecurityScopedResource()
@@ -720,90 +781,15 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       if gainedScope { archiveURL.stopAccessingSecurityScopedResource() }
     }
     do {
-      let begin = try await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
-          method: "artifact.importFlashBundle.begin",
-          params: [
-            "targetId": .string(target.id),
-            "name": .string(archiveURL.lastPathComponent),
-            "byteCount": .integer(plan.archiveSizeBytes),
-            "sha256": .string(plan.archiveSHA256),
-          ]))
-      guard let uploadID = begin["uploadId"] as? String,
-        let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
-        maximumChunkBytes > 0
-      else {
-        return .failed("Runtime returned incomplete Flash import facts")
-      }
-      do {
-        let handle = try FileHandle(forReadingFrom: archiveURL)
-        defer { try? handle.close() }
-        var offset = 0
-        while true {
-          guard !Task.isCancelled else { throw CancellationError() }
-          let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
-          if chunk.isEmpty { break }
-          let appended = try await FlashXPCResponseDecoding.resultObject(
-            await FlashXPCTransport.request(
-              method: "artifact.importFlashBundle.append",
-              params: [
-                "uploadId": .string(uploadID),
-                "offset": .integer(Int64(offset)),
-                "base64": .string(chunk.base64EncodedString()),
-              ]))
-          guard let nextOffset = appended["nextOffset"] as? Int,
-            nextOffset == offset + chunk.count
-          else {
-            throw FlashResponseFailure(message: "Runtime Flash import offset drifted")
-          }
-          offset = nextOffset
-        }
-        guard Int64(offset) == plan.archiveSizeBytes else {
-          throw FlashResponseFailure(message: "Selected archive changed while it was imported")
-        }
-      } catch {
-        _ = await FlashXPCTransport.request(
-          method: "artifact.importFlashBundle.abort",
-          params: ["uploadId": .string(uploadID)])
-        throw error
-      }
-
-      let imported = try await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
-          method: "artifact.importFlashBundle.commit",
-          params: ["uploadId": .string(uploadID)]))
-      guard let lease = imported["lease"] as? String,
-        imported["targetId"] as? String == target.id,
-        imported["bindingRevision"] as? Int == target.bindingRevision,
-        imported["sha256"] as? String == plan.archiveSHA256
-      else {
-        return .failed("Runtime import facts no longer match the reviewed target and archive")
-      }
-
-      let nonce = UUID().uuidString.lowercased()
-      let request = try RuntimeOperationRequest(
-        requestID: "flash-ui-\(nonce)",
-        idempotencyKey: "flash-ui-\(nonce)",
-        target: DurableTargetReference(
-          targetID: target.id,
-          expectedBindingRevision: target.bindingRevision),
-        operation: RuntimeOperationReference(id: "flash.full-restore", version: 1),
-        inputs: [
-          "artifactLease": .string(lease),
-          "deviceProfileRef": .string(plan.profileReference),
-          "intent": .string("fullRestore"),
-          "verification": .string("full"),
-        ],
-        requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
-      let encoder = CanonicalJSONEncoders.canonical()
-      let requestData = try encoder.encode(request)
-      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
-        return .failed("Could not encode the typed Flash request")
-      }
+      let artifact = try await importFlashBundle(
+        archiveURL: archiveURL, plan: plan, target: target)
+      let requestJSON = try runtimeRequestJSON(
+        plan: plan, artifact: artifact, target: target,
+        reviewedPlanDigest: expectedPlanDigest)
       let submitted = try await FlashXPCResponseDecoding.resultObject(
         await FlashXPCTransport.request(
-          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
+          method: "job.submit",
+          params: ["requestJson": .string(requestJSON)]))
       guard let jobID = submitted["jobId"] as? String else {
         return .failed("Runtime accepted Flash without returning a Job ID")
       }
@@ -813,6 +799,183 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     } catch {
       return .failed(String(describing: error))
     }
+  }
+
+  private func importFlashBundle(
+    archiveURL: URL,
+    plan: FlashExactPlanPresentation,
+    target: FlashTargetPresentation
+  ) async throws -> FlashImportedArtifact {
+    let key = FlashImportedArtifactKey(
+      targetID: target.id,
+      bindingRevision: target.bindingRevision,
+      archiveSHA256: plan.archiveSHA256,
+      archiveSizeBytes: plan.archiveSizeBytes)
+    if let cached = importedArtifacts[key] { return cached }
+
+    let begin = try await FlashXPCResponseDecoding.resultObject(
+      await FlashXPCTransport.request(
+        method: "artifact.importFlashBundle.begin",
+        params: [
+          "targetId": .string(target.id),
+          "name": .string(archiveURL.lastPathComponent),
+          "byteCount": .integer(plan.archiveSizeBytes),
+          "sha256": .string(plan.archiveSHA256),
+        ]))
+    guard let uploadID = begin["uploadId"] as? String,
+      let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
+      maximumChunkBytes > 0
+    else {
+      throw FlashResponseFailure(message: "Runtime returned incomplete Flash import facts")
+    }
+    do {
+      let handle = try FileHandle(forReadingFrom: archiveURL)
+      defer { try? handle.close() }
+      var offset = 0
+      while true {
+        guard !Task.isCancelled else { throw CancellationError() }
+        let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
+        if chunk.isEmpty { break }
+        let appended = try await FlashXPCResponseDecoding.resultObject(
+          await FlashXPCTransport.request(
+            method: "artifact.importFlashBundle.append",
+            params: [
+              "uploadId": .string(uploadID),
+              "offset": .integer(Int64(offset)),
+              "base64": .string(chunk.base64EncodedString()),
+            ]))
+        guard let nextOffset = appended["nextOffset"] as? Int,
+          nextOffset == offset + chunk.count
+        else {
+          throw FlashResponseFailure(message: "Runtime Flash import offset drifted")
+        }
+        offset = nextOffset
+      }
+      guard Int64(offset) == plan.archiveSizeBytes else {
+        throw FlashResponseFailure(message: "Selected archive changed while it was imported")
+      }
+    } catch {
+      _ = await FlashXPCTransport.request(
+        method: "artifact.importFlashBundle.abort",
+        params: ["uploadId": .string(uploadID)])
+      throw error
+    }
+
+    let result = try await FlashXPCResponseDecoding.resultObject(
+      await FlashXPCTransport.request(
+        method: "artifact.importFlashBundle.commit",
+        params: ["uploadId": .string(uploadID)]))
+    guard let lease = result["lease"] as? String,
+      result["targetId"] as? String == target.id,
+      result["bindingRevision"] as? Int == target.bindingRevision,
+      result["sha256"] as? String == plan.archiveSHA256
+    else {
+      throw FlashResponseFailure(
+        message: "Runtime import facts no longer match the reviewed target and archive")
+    }
+    let imported = FlashImportedArtifact(
+      lease: lease,
+      targetID: target.id,
+      bindingRevision: target.bindingRevision,
+      archiveSHA256: plan.archiveSHA256)
+    importedArtifacts[key] = imported
+    return imported
+  }
+
+  private func runtimeRequestJSON(
+    plan: FlashExactPlanPresentation,
+    artifact: FlashImportedArtifact,
+    target: FlashTargetPresentation,
+    reviewedPlanDigest: String? = nil
+  ) throws -> String {
+    guard artifact.targetID == target.id,
+      artifact.bindingRevision == target.bindingRevision,
+      artifact.archiveSHA256 == plan.archiveSHA256
+    else {
+      throw FlashResponseFailure(message: "Prepared Flash artifact identity drifted")
+    }
+    let nonce = UUID().uuidString.lowercased()
+    let request = try RuntimeOperationRequest(
+      requestID: "flash-ui-\(nonce)",
+      idempotencyKey: "flash-ui-\(nonce)",
+      target: DurableTargetReference(
+        targetID: target.id,
+        expectedBindingRevision: target.bindingRevision),
+      operation: RuntimeOperationReference(id: "flash.full-restore", version: 1),
+      inputs: [
+        "artifactLease": .string(artifact.lease),
+        "deviceProfileRef": .string(plan.profileReference),
+        "intent": .string("fullRestore"),
+        "verification": .string("full"),
+      ],
+      requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
+    let requestData: Data
+    if let reviewedPlanDigest {
+      guard SHA256Hex.isLowercaseSHA256(reviewedPlanDigest) else {
+        throw FlashResponseFailure(message: "Reviewed Runtime plan digest is malformed")
+      }
+      var envelope = try JSONDecoder().decode([String: JSONValue].self, from:
+        CanonicalJSONEncoders.canonical().encode(request))
+      envelope["reviewedPlanDigest"] = .string(reviewedPlanDigest)
+      requestData = try CanonicalJSONEncoders.canonical().encode(envelope)
+    } else {
+      requestData = try CanonicalJSONEncoders.canonical().encode(request)
+    }
+    guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+      throw FlashResponseFailure(message: "Could not encode the typed Flash request")
+    }
+    return requestJSON
+  }
+
+  private func runtimePlanPreview(
+    plan: FlashExactPlanPresentation,
+    artifact: FlashImportedArtifact,
+    target: FlashTargetPresentation
+  ) async throws -> FlashRuntimePlanPreview {
+    let requestJSON = try runtimeRequestJSON(
+      plan: plan, artifact: artifact, target: target)
+    let result = try await FlashXPCResponseDecoding.resultObject(
+      await FlashXPCTransport.request(
+        method: "job.plan", params: ["requestJson": .string(requestJSON)]))
+    if let blocker = result["providerAdmissionBlocker"] as? String, !blocker.isEmpty {
+      throw FlashResponseFailure(message: blocker)
+    }
+    guard result["executionMode"] as? String == "planOnly",
+      result["operationReference"] as? String == ArkForgeFlashOperation.canonicalReference,
+      result["targetID"] as? String == target.id,
+      result["bindingRevision"] as? Int == target.bindingRevision,
+      result["providerID"] as? String == "arkforge",
+      result["effectiveEffect"] as? String == WorkflowEffect.destructive.rawValue,
+      result["authorizationPolicy"] as? String
+        == RuntimeOperationAuthorizationPolicy.runtimeCapability.rawValue,
+      result["jobAdmitted"] as? Bool == false,
+      result["dispatchDisposition"] as? String == "notDispatched",
+      (result["providerAdmissionBlocker"] == nil
+        || result["providerAdmissionBlocker"] is NSNull),
+      let materializedPlanDigest = result["materializedPlanDigest"] as? String,
+      SHA256Hex.isLowercaseSHA256(materializedPlanDigest),
+      let inputs = result["inputs"] as? [String: Any],
+      inputs["artifactLease"] as? String == artifact.lease,
+      inputs["deviceProfileRef"] as? String == plan.profileReference,
+      inputs["intent"] as? String == "fullRestore",
+      inputs["verification"] as? String == "full",
+      let rows = result["steps"] as? [[String: Any]]
+    else {
+      throw FlashResponseFailure(
+        message: "Runtime plan-only facts no longer match the reviewed Flash plan")
+    }
+    let stepIDs = rows.compactMap { row in row["stepID"] as? String }
+    let stepKinds = rows.compactMap { row in row["kind"] as? String }
+    let stepEffects = rows.compactMap { row in row["effect"] as? String }
+    guard stepIDs == plan.steps.map(\.id),
+      stepKinds == plan.steps.map(\.kind),
+      stepEffects == plan.steps.map({ $0.effect.rawValue })
+    else {
+      throw FlashResponseFailure(
+        message: "Runtime plan-only steps no longer match the reviewed Flash plan")
+    }
+    return FlashRuntimePlanPreview(materializedPlanDigest: materializedPlanDigest)
   }
 
   func run(jobID: String) async -> FlashRunResult {
@@ -952,7 +1115,9 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
         identifier: $0,
         status: $0 == .stablePower ? .unknown : .satisfied)
     }
-    return .ready(presentation.withPrerequisiteObservations(observations))
+    return .ready(
+      presentation.withPrerequisiteObservations(observations)
+        .withRuntimePlanPreview(planDigestSHA256: String(repeating: "e", count: 64)))
   }
 
   func submit(
@@ -1343,8 +1508,9 @@ enum FlashPlanPresentationBuilder {
       archiveSizeBytes: profile.archiveSizeBytes,
       archiveSHA256: profile.archiveSHA256,
       mappedPartitionCount: profile.mappedPartitions.count,
-      // The executed plan's digest exists only once the engine materializes
-      // it at submission (job record / capability `exactPlanDigest`).
+      // A catalog-only presentation must not fabricate a Runtime digest.
+      // Production `preparePlan` attaches the exact `job.plan` digest after
+      // Artifact import and before the UI enables submission.
       planDigestSHA256: nil,
       stepSetDigestSHA256: review.stepSetDigestSHA256,
       steps: review.steps,
