@@ -3,7 +3,7 @@
 > Change:CHG-2026-070-arkforge-generic-integration@r1
 >
 > Status: AFG-AC-1..8 implemented and contract-verified; AFG-AC-9 remains
-> blocked on the TASK-AFG-002 macOS 26 sidebar navigation fallback
+> blocked on the TASK-AFG-002 macOS 26 App-owned remote file panel
 > remediation review/merge and the canonical run.
 
 | AC | Method | Expected result |
@@ -73,18 +73,28 @@ or prior digest cannot substitute for the maintainer-operated destructive run.
   It was unsigned and is preflight evidence only, not release acceptance.
 - PR #1455 moved the interpreted Swift XPC bridge to an exact-source,
   owner-private AOT executable; PR #1456 replaced the undocumented remote-view
-  file-panel identifier with stable panel controls and workspace readback.
-- The next protected-main stop-before-submit run reached the App but macOS 26
-  exposed the SwiftUI Flash sidebar destination as a selectable AX row without
-  its stable identifier. Computer-use inspection proved the row was visible,
-  selected normally and opened the exact Flash workspace. The actuator refused
-  before archive selection because its fallback required a byte-exact raw AX
-  label. No Runtime Job or device dispatch occurred and the debug session used
-  zero destructive epochs.
-- The remediation confines localized substring matching to row/button
-  roles already admitted for the exact Flash navigation action; window titles
-  and workspace prose cannot become click targets. The script typechecks and
-  the architecture boundary contract passes.
+  file-panel identifier with stable panel controls and workspace readback;
+  PR #1457 added a role-bounded localized sidebar fallback.
+- Protected-main replay proved the visible macOS 26 sidebar row's computed label
+  is not present in the raw AX attributes available to the actuator. The
+  validated external-candidate extension point therefore owns only the
+  non-submitting Flash navigation click; archive identity, plan facts and the
+  sole submit gesture remain protected-main responsibilities.
+- After that navigation, the actuator opened the exact App's system file panel.
+  Process and AX inspection proved macOS hosts it in
+  `com.apple.appkit.xpc.openAndSavePanelService`: ArkDeck becomes inactive and
+  `frontmostApplication` can be nil while the panel remains inside the exact
+  ArkDeck AX tree. The prior generic frontmost guard refused before selecting
+  an archive. No Runtime Job or device dispatch occurred and the debug session
+  used zero destructive epochs.
+- The remediation keeps ordinary input behind the exact-App frontmost guard.
+  Only file-panel keystrokes and AX press may use the remote-panel path, and
+  only while the exact ArkDeck process is alive, its AX tree contains the
+  stable requested control plus `OKButton`, and no unrelated application owns
+  the foreground.
+- The modified actuator typechecks; the focused architecture-boundary contract
+  passes, and the full ArkDeckKit suite passes 1487 tests with 17
+  environment-gated skips and zero failures.
 - Typed Runtime pagination reports no current Job. Historical unknown records
   are either superseded or carry an explicit target-alias resolution owner;
   none was replayed during this preflight.

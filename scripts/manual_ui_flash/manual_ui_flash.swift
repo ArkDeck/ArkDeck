@@ -1033,6 +1033,9 @@ private final class ManualUIDebugSessionRecorder {
 }
 
 private final class AccessibilityDriver {
+  private static let appKitFilePanelServiceBundleIdentifier =
+    "com.apple.appkit.xpc.openAndSavePanelService"
+
   private let application: AXUIElement
   private let runningApplication: NSRunningApplication
   private let candidate: ManualUIFlashCandidateProgram
@@ -1313,22 +1316,25 @@ private final class AccessibilityDriver {
   }
 
   func openGoToFolder(timeout: TimeInterval) throws {
-    try activateApplication()
+    try waitForExactApplicationOwnedFilePanel(
+      containing: "OKButton", timeout: timeout)
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if element(identifier: "PathTextField") != nil { return }
-      try key(virtualCode: CGKeyCode(kVK_ANSI_G), flags: [.maskCommand, .maskShift])
+      try keyForExactApplicationOwnedFilePanel(
+        virtualCode: CGKeyCode(kVK_ANSI_G), flags: [.maskCommand, .maskShift],
+        containing: "OKButton")
       RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     } while Date() < deadline
     throw DriverFailure.message("file picker did not open the Go to Folder path field")
   }
 
   func commitGoToFolder(timeout: TimeInterval) throws {
-    try activateApplication()
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if element(identifier: "PathTextField") == nil { return }
-      try key(virtualCode: CGKeyCode(kVK_Return))
+      try keyForExactApplicationOwnedFilePanel(
+        virtualCode: CGKeyCode(kVK_Return), containing: "PathTextField")
       RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     } while Date() < deadline
     throw DriverFailure.message("file picker did not accept the Go to Folder path")
@@ -1418,7 +1424,7 @@ private final class AccessibilityDriver {
     try setValue(url.path, identifier: "PathTextField")
     try commitGoToFolder(timeout: timeout)
     try waitForEnabled("OKButton", timeout: timeout)
-    try press("OKButton", timeout: timeout)
+    try pressExactApplicationOwnedFilePanel("OKButton", timeout: timeout)
     // Prove that the owning workspace accepted the pinned file. Merely seeing
     // the filename in the remote panel would be a false positive.
     try waitForValue(
@@ -1591,6 +1597,69 @@ private final class AccessibilityDriver {
     else {
       throw DriverFailure.message(
         "exact ArkDeck process did not become frontmost; no global input was dispatched")
+    }
+  }
+
+  /// macOS 26 hosts NSSavePanel in AppKit's open/save XPC service. While that
+  /// remote panel is active, the owning NSRunningApplication and AX application
+  /// are intentionally not reported as frontmost even though the panel remains
+  /// inside the exact App's accessibility tree. Admit input only while the
+  /// exact App is alive, a stable panel control is present in that exact tree,
+  /// and no unrelated application owns the foreground.
+  private func requireExactApplicationOwnedFilePanel(containing identifier: String) throws {
+    guard !runningApplication.isTerminated,
+      element(identifier: "OKButton") != nil,
+      element(identifier: identifier) != nil
+    else {
+      throw DriverFailure.message(
+        "exact ArkDeck application does not own the expected system file panel")
+    }
+
+    if let frontmost = NSWorkspace.shared.frontmostApplication {
+      guard
+        frontmost.processIdentifier == runningApplication.processIdentifier
+          || frontmost.bundleIdentifier == Self.appKitFilePanelServiceBundleIdentifier
+      else {
+        throw DriverFailure.message(
+          "an unrelated application became frontmost; no file-panel input was dispatched")
+      }
+    }
+  }
+
+  private func waitForExactApplicationOwnedFilePanel(
+    containing identifier: String, timeout: TimeInterval
+  ) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if (try? requireExactApplicationOwnedFilePanel(containing: identifier)) != nil { return }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    throw DriverFailure.message(
+      "exact ArkDeck application did not expose its system file panel before timeout")
+  }
+
+  private func keyForExactApplicationOwnedFilePanel(
+    virtualCode: CGKeyCode, flags: CGEventFlags = [], containing identifier: String
+  ) throws {
+    try requireExactApplicationOwnedFilePanel(containing: identifier)
+    let down = CGEvent(keyboardEventSource: nil, virtualKey: virtualCode, keyDown: true)
+    down?.flags = flags
+    down?.post(tap: .cghidEventTap)
+    let up = CGEvent(keyboardEventSource: nil, virtualKey: virtualCode, keyDown: false)
+    up?.flags = flags
+    up?.post(tap: .cghidEventTap)
+  }
+
+  private func pressExactApplicationOwnedFilePanel(
+    _ identifier: String, timeout: TimeInterval
+  ) throws {
+    try waitForExactApplicationOwnedFilePanel(containing: identifier, timeout: timeout)
+    try requireExactApplicationOwnedFilePanel(containing: identifier)
+    let element = try waitForElement(identifier: identifier, timeout: timeout)
+    let result = AXUIElementPerformAction(element, kAXPressAction as CFString)
+    guard result == .success else {
+      throw DriverFailure.message(
+        "could not press owned file-panel control \(identifier): AX error \(result.rawValue)")
     }
   }
 
