@@ -514,6 +514,26 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertTrue(manualDriver.contains("guard !runningApplication.isTerminated"))
     XCTAssertTrue(
       manualDriver.contains(
+        "let panel = elementAttribute(okButton, kAXWindowAttribute as CFString)"))
+    XCTAssertTrue(manualDriver.contains("isSameExactApplicationWindow(panel, requiredWindow)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "let raised = AXUIElementPerformAction(panel, kAXRaiseAction as CFString)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "runningApplication.activate(options: [.activateAllWindows])"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "elementAttribute(application, kAXFocusedWindowAttribute as CFString)"))
+    XCTAssertTrue(manualDriver.contains("isSameExactApplicationWindow(panel, focusedWindow)"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "lhsPID == runningApplication.processIdentifier"))
+    XCTAssertTrue(
+      manualDriver.contains(
+        "an unrelated application remained frontmost; no file-panel input was dispatched"))
+    XCTAssertTrue(
+      manualDriver.contains(
         "url.lastPathComponent, identifier: \"flash.image.value\", timeout: max(timeout, 30)"))
     XCTAssertTrue(
       manualDriver.contains(
