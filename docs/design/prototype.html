@@ -102,7 +102,7 @@ body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:
 .content{flex:1;display:flex;flex-direction:column;min-width:0}
 .page{flex:1;overflow-y:auto;padding:20px 24px 28px;display:flex;flex-direction:column;gap:20px;scrollbar-gutter:stable}
 .page>*{flex-shrink:0}
-h1{font-size:20px;line-height:1.15;font-weight:650;letter-spacing:-.018em;margin:0;text-wrap:balance}
+.page-lead{display:contents}
 h2{font-size:13px;line-height:1.3;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px;margin:0}
 .card{background:color-mix(in srgb,var(--panel-solid) 92%,transparent);border:1px solid var(--line);border-radius:11px;
   padding:14px 16px;display:flex;flex-direction:column;gap:10px;position:relative;box-shadow:var(--control-shadow)}
@@ -236,7 +236,6 @@ select.inp{cursor:pointer}
 .viewer-page{padding:14px 16px 10px;gap:10px;overflow:hidden}
 .viewer-page>.viewer-workspace{flex:1;min-height:0}
 .viewer-lead{display:flex;align-items:center;gap:12px;min-width:0}
-.viewer-lead h1{white-space:nowrap}
 .viewer-toolbar{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
 .viewer-toolbar .spacer{flex:1;min-width:8px}
 .viewer-toolbar select.inp{flex:0 1 auto;min-width:0}
@@ -376,7 +375,7 @@ select.inp{cursor:pointer}
 .device-section{display:flex;flex-direction:column;gap:12px;min-width:0}
 .device-section h2{padding-bottom:7px;border-bottom:1px solid var(--line)}
 .device-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.flash-shell{width:min(760px,100%);display:flex;flex-direction:column;gap:16px}
+.flash-shell{width:min(920px,100%);display:flex;flex-direction:column;gap:16px}
 .flash-lead{display:flex;flex-direction:column;gap:5px}
 .flash-lead p{margin:0;color:var(--ink2);font-size:13px;text-wrap:pretty}
 .flash-target{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel-solid)}
@@ -789,7 +788,7 @@ function recoveryHTML(){
 /* ---------- Overview ---------- */
 function pOverview(){
   return recoveryHTML()+`
-  <h1>Overview <span class="acin">REQ-UX-002</span></h1>
+  <div class="page-lead" data-page-title="Overview"><span class="acin">REQ-UX-002</span></div>
   <div class="grid2">
     <div class="card" data-acin><span class="ac">AC-UX-002-01</span>
       <h2>HDC 工具链</h2>
@@ -1149,7 +1148,7 @@ function viewerInspectorHTML(node){
 }
 function pViewer(){
   const node=viewerNode(S.viewer.selected),visible=viewerVisibleNodes();
-  return `<div class="viewer-lead" data-acin><span class="ac">VIEWER-LINKED-SELECTION</span><h1>Viewer</h1>
+  return `<div class="viewer-lead" data-page-title="Viewer" data-acin><span class="ac">VIEWER-LINKED-SELECTION</span>
     <div class="viewer-toolbar">
       <select class="inp" aria-label="选择 Viewer 目标与窗口"><option>DAYU200 · w12</option></select>
       <input class="inp" type="search" aria-label="搜索组件、ID 或文本" placeholder="搜索组件 / ID / 文本" value="${esc(S.viewer.query)}" oninput="setViewerQuery(this)">
@@ -1190,7 +1189,7 @@ function traceTitle(){return S.trace.mode==="preset"?PRESETS[S.trace.preset].nam
 function pTrace(){
   const t=S.trace;
   return recoveryHTML()+`
-  <h1>Trace <span class="acin">REQ-TRACE-*</span></h1>
+  <div class="page-lead" data-page-title="Trace"><span class="acin">REQ-TRACE-*</span></div>
   <div class="two">
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">
@@ -1436,7 +1435,7 @@ ${esc(h.out)}</div>`).join("")||'<p class="empty">尚未运行 typed template。
       <p class="hint">不存在自由文本 command / argv / path 字段;PTY 与 raw shell 不属于此界面。</p></div>`;
   }
   return recoveryHTML()+`
-  <h1>Debug 工作台 <span class="acin">REQ-DEBUG-*</span></h1>
+  <div class="page-lead" data-page-title="Debug 工作台"><span class="acin">REQ-DEBUG-*</span></div>
   <div class="tabs" role="tablist" aria-label="Debug 工作台视图">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${tb===k}" class="${tb===k?"on":""}" onclick="S.debugTab='${k}';renderPage()">${l}</button>`).join("")}</div>
   ${body}`;
 }
@@ -1486,7 +1485,7 @@ function pFlash(){
     </div>`;
   }
   return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
-    <div class="flash-lead"><h1>${tx("flashTitle")}</h1><p>${tx("flashSubtitle")}</p></div>
+    <div class="flash-lead" data-page-title="${esc(tx("flashTitle"))}"><p>${tx("flashSubtitle")}</p></div>
     <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
       <span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span></div>
     ${main}
@@ -1613,7 +1612,7 @@ function pHistory(){
   const rows=HIST.filter(h=>(f.st==="all"||h.st===f.st)&&(f.mode==="all"||h.mode===f.mode)&&(f.dev==="all"||h.dev===f.dev));
   const sel=HIST.find(h=>h.id===S.histSel);
   return recoveryHTML()+`
-  <h1>History <span class="acin">REQ-UX-004</span></h1>
+  <div class="page-lead" data-page-title="History"><span class="acin">REQ-UX-004</span></div>
   <div class="card" data-acin style="gap:8px"><span class="ac">AC-UX-004-01</span>
     <div class="filters"><span class="fl">状态</span>
       ${[["all","全部"],["succeeded","成功"],["failed","失败"],["cancelled","已取消"],["planned","planned"],["interrupted","已中断"]]
@@ -1682,7 +1681,7 @@ function pAutomation(){
 function pSettings(){
   const runningJobs=S.jobs.some(j=>j.state==="running");
   return `
-  <h1>Settings</h1>
+  <div class="page-lead" data-page-title="Settings"></div>
   <div class="grid2">
     <div class="card"><h2>HDC 工具</h2>
       <div class="radio">
@@ -1737,9 +1736,8 @@ function renderNav(){
 function renderPage(){
   $("page").classList.toggle("viewer-page",S.nav==="dump");
   $("page").innerHTML=PAGES[S.nav]();
-  const detail=$("page").querySelector("[data-page-title]"),title=$("page").querySelector("h1");
-  if(detail){document.querySelector(".titlebar .t").textContent=detail.dataset.pageTitle;$("page").setAttribute("aria-label",detail.dataset.pageTitle);}
-  else if(title){title.id="pageTitle";$("page").setAttribute("aria-labelledby","pageTitle");document.querySelector(".titlebar .t").textContent="ArkDeck — "+title.childNodes[0].textContent.trim();}
+  const titled=$("page").querySelector("[data-page-title]");
+  if(titled){document.querySelector(".titlebar .t").textContent=titled.dataset.pageTitle;$("page").setAttribute("aria-label",titled.dataset.pageTitle);}
   const ls=$("logstream");if(ls)ls.scrollTop=ls.scrollHeight;
   if(S.nav==="dump")requestAnimationFrame(()=>document.querySelector(`[data-viewer-node="${S.viewer.selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"}));
 }

@@ -342,6 +342,9 @@ for (const name of dsLight.keys()) {
     ac: "AC-annotation overlay — spec §5 says the review tool does not ship",
     acin: "AC-annotation overlay", acmode: "AC-annotation overlay",
     main: "page scaffolding", content: "page scaffolding", page: "page scaffolding",
+    // Carries `data-page-title` for the title bar and nothing else; it is
+    // `display:contents`, so it never becomes a component.
+    "page-lead": "page scaffolding",
     sidebar: "page scaffolding", two: "layout grid", grid2: "layout grid",
     "device-layout": "responsive device-detail layout grid",
     "device-section": "device-detail section grouping",

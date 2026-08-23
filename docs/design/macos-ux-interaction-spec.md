@@ -1,6 +1,6 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.8（design input，非 normative；2026-08-22 完成 Viewer DevTools 式上下检查器对齐）
+> Status：draft v0.8（design input，非 normative；2026-08-22 完成 Viewer DevTools 式上下检查器对齐；2026-08-23 与 SwiftUI 实现对齐一轮视觉词汇，见 §8）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
@@ -50,7 +50,7 @@ v0.8 延续 v0.7 的 `Viewer` 命名与选中联动，将检查器重排为 Chro
 
 字体只用系统字族：UI = SF Pro；代码、路径、hash、Job/Session ID、日志 = SF Mono。推荐角色：window title 13/semibold、page title 20/semibold、section title 13/semibold、body/control 13/regular、secondary 12/regular、monospace 11–12。变化中的时长、bytes、round、PID 使用 tabular numbers。
 
-基础尺寸：toolbar 52；sidebar 232–300（用户可拖动）；导航 row 32；常规 control 28–32；section 内 gap 8–10，section 间 gap 20–24；内容边距 20–24；container radius 10，内部 control radius 6–8，遵守同心圆角。桌面最小 target 24×24，空间允许时使用 32–40；任何扩展 hit area 不得重叠。
+基础尺寸：toolbar 52；sidebar 232–300（用户可拖动）；导航 row 32；常规 control 28–32；section 内 gap 8–10，section 间 gap 20–24；内容边距 20–24；同心圆角自外向内 container 11 → 内嵌 box 9 → control 7（原型 `.card` 一直是 11，本文档此前写 10，两者以 11 为准）。桌面最小 target 24×24，空间允许时使用 32–40；任何扩展 hit area 不得重叠。
 
 ## 3. 窗口骨架与自适应（REQ-UX-001）
 
@@ -219,6 +219,9 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - 外观：跟随系统；不默认强制 dark。
 - Accent：跟随用户系统 accent；ArkDeck 不固定 teal 覆盖系统选择。
 - Viewer：使用左侧截图 + 右侧上下检查器；树与属性之间保留紧凑的可拖动结构分隔线，不使用圆角卡片。截图边界、树行与 inspector 用同一 accent selection，但选中同时保留 ID / type 文字线索。
+- 页面标题只在 toolbar：任何工作区的内容区都不再画与 toolbar 同名的主标题。原型此前每页一个 `<h1>` 且标题栏显示「ArkDeck — 页面名」，两者不重复；SwiftUI 的 `navigationTitle` 只显示裸页面名，内容区再画一遍就成了字面重复，违反 §3 与 §6 的「一个 detail 只有一个可感知主标题」。需要解释的页面改用一行 secondary 说明 + 页面级控件（Debug 的 scope 行即此形态）。原型已同步移除全部 `<h1>`，改由 `data-page-title` 提供标题栏文本。
+- 统一页面测量 920：Flash、设备详情与 Trace 此前各自取 760 / 920 / 1000。在 1180 参考窗口下 detail pane 约 926，920 正好填满而不留死白，在更宽的显示器上仍有界。正文段落另按约 620 收窄，Flash 的「一条平静阅读路径」不靠整页变窄来实现。
+- 容器圆角 11：与 §2 同心圆角一致，外层 container 11、内嵌 box 9、control 7。
 
 ## 9. 平台设计参考
 
