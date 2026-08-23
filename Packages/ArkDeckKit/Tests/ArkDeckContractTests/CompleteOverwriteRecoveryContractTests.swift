@@ -61,20 +61,47 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         imported: false, durationMilliseconds: 7)
     }
 
-    func perform(
-      stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
-      binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
+    func finishArtifactPrewarm(jobID _: String) async {}
+
+    func prepareExecution(
+      jobID: String, artifact: ArkForgeLaneArtifact,
+      binding: ArkForgeLaneDeviceBinding, executionPurpose: String
+    ) async throws -> RuntimeArkForgeLaneExecution {
+      guard prewarms == 1 else {
+        throw RuntimeDispatchFailure.failed(
+          "delegated execution reached prepare before its one admitted prewarm")
+      }
+      if !started {
+        started = true
+        starts += 1
+      }
+      return RuntimeArkForgeLaneExecution(
+        arkDeckJobID: jobID, daemonJobID: receipt.jobID,
+        planID: receipt.planID, planSHA256: String(repeating: "7", count: 64),
+        executionPurpose: executionPurpose,
+        artifactSHA256: artifact.sha256, artifactProfileID: artifact.profileID,
+        targetID: binding.targetID, bindingRevision: binding.bindingRevision,
+        stableIdentitySHA256: binding.stableIdentitySHA256,
+        usbTopology: binding.usbTopology, observationMode: "loader",
+        toolchainSHA256: toolchainSHA256)
+    }
+
+    func performPrepared(
+      stepID _: String, execution _: RuntimeArkForgeLaneExecution,
+      artifact _: ArkForgeLaneArtifact, binding _: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary {
       guard prewarms == 1 else {
         throw RuntimeDispatchFailure.failed(
           "delegated execution reached perform before its one admitted prewarm")
       }
       callOrder.append("perform")
-      if !started {
-        started = true
-        starts += 1
-      }
       return receipt
+    }
+
+    func observeTerminal(
+      execution _: RuntimeArkForgeLaneExecution
+    ) async throws -> ArkForgeFlashSession.Outcome? {
+      .completed(receipts: [receipt])
     }
 
     func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
@@ -106,16 +133,122 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       throw StoreUnavailable()
     }
 
-    func perform(
-      stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
+    func finishArtifactPrewarm(jobID _: String) async {}
+
+    func prepareExecution(
+      jobID _: String, artifact _: ArkForgeLaneArtifact,
       binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
+    ) async throws -> RuntimeArkForgeLaneExecution {
+      performs += 1
+      throw RuntimeDispatchFailure.failed("prepare must not follow a refused prewarm")
+    }
+
+    func performPrepared(
+      stepID _: String, execution _: RuntimeArkForgeLaneExecution,
+      artifact _: ArkForgeLaneArtifact, binding _: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary {
       performs += 1
       throw RuntimeDispatchFailure.failed("perform must not follow a refused prewarm")
     }
 
+    func observeTerminal(
+      execution _: RuntimeArkForgeLaneExecution
+    ) async throws -> ArkForgeFlashSession.Outcome? { nil }
+
     func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? { nil }
     func counts() -> (prewarms: Int, performs: Int) { (prewarms, performs) }
+  }
+
+  /// Two process generations around the receipt-loss window. Generation one
+  /// creates the exact daemon job then loses its terminal; generation two can
+  /// only observe that persisted job and intentionally exposes no in-memory
+  /// completed-receipt cache.
+  private actor RestartingArkForgeLane: RuntimeJobEngine.ArkForgeLane {
+    enum Mode { case loseTerminal, observeCompletion }
+
+    nonisolated let toolchainSHA256: String
+    private let mode: Mode
+    private let stateDirectory: URL?
+    private let receipt: ArkForgeActionReceiptSummary
+    private var prepares = 0
+    private var sawDurableJoinBeforePerform = false
+
+    init(toolchainSHA256: String, mode: Mode, stateDirectory: URL? = nil) {
+      self.toolchainSHA256 = toolchainSHA256
+      self.mode = mode
+      self.stateDirectory = stateDirectory
+      let facts = [
+        ArkForgeKeyValue(key: "const.product.model", value: "DAYU200"),
+        ArkForgeKeyValue(key: "const.ohos.fullname", value: "OpenHarmony-7.0.0.fixture"),
+        ArkForgeKeyValue(key: "usbTopology", value: "42"),
+      ]
+      self.receipt = ArkForgeActionReceiptSummary(
+        jobID: "JOB-RESTART-1", planID: "PLAN-RESTART-1", stepID: "STEP-023",
+        actionID: "", attemptID: "", permitID: "PERMIT-RESTART-23",
+        disposition: "semanticSuccess",
+        evidenceSHA256: ArkForgeManagedControlPort.canonicalFactsDigest(
+          Dictionary(uniqueKeysWithValues: facts.map { ($0.key, $0.value) })),
+        verificationOutcome: "", verificationStrength: "",
+        verifiedRangeStart: 0, verifiedRangeLength: 0,
+        typedSkipReason: "", failureClassification: "", facts: facts)
+    }
+
+    func prewarmArtifact(
+      jobID _: String, artifact: ArkForgeLaneArtifact
+    ) async throws -> ArkForgeLaneArtifactPrewarmReceipt {
+      ArkForgeLaneArtifactPrewarmReceipt(
+        artifactSHA256: artifact.sha256, profileID: artifact.profileID,
+        imported: false, durationMilliseconds: 0)
+    }
+
+    func finishArtifactPrewarm(jobID _: String) async {}
+
+    func prepareExecution(
+      jobID: String, artifact: ArkForgeLaneArtifact,
+      binding: ArkForgeLaneDeviceBinding, executionPurpose: String
+    ) async throws -> RuntimeArkForgeLaneExecution {
+      prepares += 1
+      return RuntimeArkForgeLaneExecution(
+        arkDeckJobID: jobID, daemonJobID: receipt.jobID,
+        planID: receipt.planID, planSHA256: String(repeating: "7", count: 64),
+        executionPurpose: executionPurpose,
+        artifactSHA256: artifact.sha256, artifactProfileID: artifact.profileID,
+        targetID: binding.targetID, bindingRevision: binding.bindingRevision,
+        stableIdentitySHA256: binding.stableIdentitySHA256,
+        usbTopology: binding.usbTopology, observationMode: "loader",
+        toolchainSHA256: toolchainSHA256)
+    }
+
+    func performPrepared(
+      stepID: String, execution: RuntimeArkForgeLaneExecution,
+      artifact _: ArkForgeLaneArtifact, binding _: ArkForgeLaneDeviceBinding
+    ) async throws -> ArkForgeActionReceiptSummary {
+      if let stateDirectory {
+        let directory = stateDirectory.appending(
+          path: "jobs/\(execution.arkDeckJobID)", directoryHint: .isDirectory)
+        let arkForgeState = try ArkForgeRuntimeJobState.load(from: directory)
+        let replay = try DurableJournalRecovery.inspect(
+          url: directory.appending(path: "journal.jsonl"))
+        sawDurableJoinBeforePerform =
+          arkForgeState.execution == execution
+          && replay.outstandingIntents.contains(where: { $0.stepID == stepID })
+      }
+      throw RuntimeDispatchFailure.outcomeUnknown(
+        "fixture lost the controller after the daemon accepted the exact job")
+    }
+
+    func observeTerminal(
+      execution _: RuntimeArkForgeLaneExecution
+    ) async throws -> ArkForgeFlashSession.Outcome? {
+      mode == .observeCompletion ? .completed(receipts: [receipt]) : nil
+    }
+
+    func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
+      nil
+    }
+
+    func prepareCount() -> Int { prepares }
+    func observedDurableJoinBeforePerform() -> Bool { sawDurableJoinBeforePerform }
   }
 
   private struct RecoveryFactsPort: RockchipRuntimeFactsPort {
@@ -629,8 +762,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let laneCalls = await lane.calls()
     XCTAssertEqual(lanePrewarms, 1)
     XCTAssertEqual(
-      laneCalls, ["prewarm", "perform", "perform"],
-      "one prewarm feeds both logical delegated-step projections; the lane starts one plan")
+      laneCalls, ["prewarm", "perform"],
+      "one prewarm and one correlated drive feed both logical delegated-step projections")
     XCTAssertTrue(
       status.timeline.contains("ArkForge artifact prewarm started after durable admission"))
     let prewarmReady = try XCTUnwrap(
@@ -696,6 +829,105 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(epochsAfterReplay, [epoch])
     let dispatchesAfterReplay = await dispatchLog.snapshot()
     XCTAssertEqual(dispatchesAfterReplay.count, dispatchCountAtCrash)
+  }
+
+  func testRestartReconcilesTheExactDaemonTerminalWithoutStartingOrUsingActorCache() async throws {
+    _ = try writeUnknownJob(
+      jobID: "job-original-for-daemon-restart", timestamp: "2026-08-08T00:00:00Z",
+      correlatedUnknownOutcome: false)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let artifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-restart-input", sessionID: "session-restart-input",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
+          stableIdentitySHA256: identity),
+        contents: try recoveryArchive()))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
+    let dispatchLog = DispatchLog()
+    let firstLane = RestartingArkForgeLane(
+      toolchainSHA256: providerSHA256, mode: .loseTerminal,
+      stateDirectory: stateDirectory)
+    let registry = DeviceProviderRegistry(providers: [
+      ArkForgeFlashProviderAdapter(
+        factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
+        availability: .available)
+    ])
+    let firstEngine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: firstLane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
+      providers: registry, dispatcher: ConfirmingDispatcher(log: dispatchLog),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let accepted = try await firstEngine.submit(
+      encoder.encode(try flashRequest(id: "daemon-restart", lease: lease)))
+
+    let unknown = try await firstEngine.run(jobID: accepted.jobID)
+    XCTAssertEqual(unknown.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertTrue(unknown.outcomeUnknown)
+    let firstPrepareCount = await firstLane.prepareCount()
+    XCTAssertEqual(firstPrepareCount, 1)
+    let durableBeforePerform = await firstLane.observedDurableJoinBeforePerform()
+    XCTAssertTrue(
+      durableBeforePerform,
+      "Runtime must persist correlation and step intent before the permit-capable call")
+    let jobDirectory = stateDirectory.appending(
+      path: "jobs/\(accepted.jobID)", directoryHint: .isDirectory)
+    let persistedBeforeRestart = try ArkForgeRuntimeJobState.load(from: jobDirectory)
+    XCTAssertEqual(
+      persistedBeforeRestart.execution?.daemonJobID, "JOB-RESTART-1")
+    XCTAssertNil(persistedBeforeRestart.planCompletionReceipt)
+
+    let recoveredLane = RestartingArkForgeLane(
+      toolchainSHA256: providerSHA256, mode: .observeCompletion)
+    let recoveredEngine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: recoveredLane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
+      providers: registry, dispatcher: ConfirmingDispatcher(log: dispatchLog),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-08-08T01:00:01Z" })
+    _ = try await recoveredEngine.recoverActiveJobs()
+
+    let reconciled = try await recoveredEngine.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(reconciled.state, JobState.resumeAtConfirmedSafeBoundary.rawValue)
+    XCTAssertFalse(reconciled.outcomeUnknown)
+    let recoveredPrepareCount = await recoveredLane.prepareCount()
+    XCTAssertEqual(
+      recoveredPrepareCount, 0,
+      "a fresh process must observe the persisted daemon job, not prepare another")
+    let persistedAfterReconcile = try ArkForgeRuntimeJobState.load(from: jobDirectory)
+    XCTAssertEqual(
+      persistedAfterReconcile.planCompletionReceipt?.jobID, "JOB-RESTART-1")
+
+    let completed = try await recoveredEngine.run(jobID: accepted.jobID)
+    XCTAssertEqual(
+      completed.state, JobState.recovered.rawValue,
+      "timeline: \(completed.timeline.joined(separator: " | "))")
+    let replay = try DurableJournalRecovery.inspect(
+      url: jobDirectory.appending(path: "journal.jsonl"))
+    XCTAssertEqual(
+      replay.events.filter {
+        $0.kind == .stepIntent && $0.stepID == "flash-partitions"
+      }.count, 1)
+    XCTAssertTrue(
+      replay.events.contains {
+        $0.kind == .stepOutcome && $0.stepID == "flash-partitions"
+          && $0.payload["semanticCode"]
+            == .string(RuntimeJobEngine.arkForgePlanCompletionSemanticCode)
+      })
   }
 
   func testUnpreparedCrossModeBindingRejectsBeforeCapabilityAndDispatch() async throws {

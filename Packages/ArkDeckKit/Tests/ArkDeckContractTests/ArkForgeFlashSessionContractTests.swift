@@ -34,6 +34,7 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     /// When set, every control receipt is rejected with this code.
     var controlRejection: (code: String, message: String)?
     var cancelRequests: [String] = []
+    var startRequests: [ArkForgeStartExecutionRequest] = []
 
     init(
       events: [ArkForgeJobEvent],
@@ -46,7 +47,10 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
 
     func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
       -> ArkForgeStartExecutionResponse
-    { ArkForgeStartExecutionResponse(jobID: "JOB-1") }
+    {
+      startRequests.append(body)
+      return ArkForgeStartExecutionResponse(jobID: "JOB-1")
+    }
 
     func submitStepPermit(_ body: ArkForgeSubmitStepPermitRequest, requestID: String) throws
       -> ArkForgeSubmitStepPermitResponse
@@ -169,6 +173,11 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     let daemon = ScriptedDaemon(events: [
       admissionEvent(stepID: "flash-partitions"),
       receiptEvent(stepID: "flash-partitions", disposition: "semanticSuccess"),
+      ArkForgeJobEvent(
+        jobID: "JOB-1", sequence: 3, kind: .outcomeClassified,
+        atEpochMs: 1_000_070, journalRecordSHA256: [], jobState: "succeeded",
+        admission: nil, controlRequest: nil, receipt: nil,
+        facts: [ArkForgeKeyValue(key: "outcome", value: "succeeded")]),
     ])
     let session = ArkForgeFlashSession(
       daemon: daemon, authority: authority(),
@@ -188,6 +197,77 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     }
     XCTAssertEqual(receipts.count, 1)
     XCTAssertEqual(receipts.first?.disposition, "semanticSuccess")
+  }
+
+  func testRunExistingNeverStartsAReplacementJob() async throws {
+    let daemon = ScriptedDaemon(events: [
+      receiptEvent(stepID: "flash-partitions", disposition: "semanticSuccess")
+    ])
+    let session = ArkForgeFlashSession(
+      daemon: daemon, authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    let outcome = try await session.runExisting(jobID: "JOB-1")
+
+    XCTAssertTrue(daemon.startRequests.isEmpty)
+    guard case .completed(let receipts) = outcome else {
+      return XCTFail("expected the correlated job's completion, got \(outcome)")
+    }
+    XCTAssertEqual(receipts.map(\.stepID), ["flash-partitions"])
+  }
+
+  func testPassiveTerminalObservationCannotAnswerOrMutateTheJob() throws {
+    let daemon = ScriptedDaemon(events: [
+      admissionEvent(stepID: "flash-partitions"),
+      receiptEvent(stepID: "flash-partitions", disposition: "semanticSuccess"),
+      ArkForgeJobEvent(
+        jobID: "JOB-1", sequence: 3, kind: .outcomeClassified,
+        atEpochMs: 1_000_070, journalRecordSHA256: [], jobState: "succeeded",
+        admission: nil, controlRequest: nil, receipt: nil,
+        facts: [ArkForgeKeyValue(key: "outcome", value: "succeeded")]),
+    ])
+
+    let outcome = try ArkForgeFlashSession.observeTerminal(daemon: daemon, jobID: "JOB-1")
+
+    guard case .completed(let receipts) = outcome else {
+      return XCTFail("expected passive completion, got \(String(describing: outcome))")
+    }
+    XCTAssertEqual(receipts.map(\.stepID), ["flash-partitions"])
+    XCTAssertTrue(daemon.startRequests.isEmpty)
+    XCTAssertTrue(daemon.permitSubmissions.isEmpty)
+    XCTAssertTrue(daemon.controlSubmissions.isEmpty)
+    XCTAssertTrue(daemon.cancelRequests.isEmpty)
+  }
+
+  func testPassiveObservationConsumesReconciledTerminalAndRestartedReceipt() throws {
+    let daemon = ScriptedDaemon(events: [
+      ArkForgeJobEvent(
+        jobID: "JOB-1", sequence: 1, kind: .outcomeClassified,
+        atEpochMs: 1_000_050, journalRecordSHA256: [], jobState: "outcomeUnknown",
+        admission: nil, controlRequest: nil, receipt: nil,
+        facts: [
+          ArkForgeKeyValue(key: "outcome", value: "outcomeUnknown"),
+          ArkForgeKeyValue(key: "reason", value: "daemon restarted after dispatch"),
+        ]),
+      receiptEvent(stepID: "postflight-readback", disposition: "semanticSuccess"),
+      ArkForgeJobEvent(
+        jobID: "JOB-1", sequence: 3, kind: .outcomeClassified,
+        atEpochMs: 1_000_070, journalRecordSHA256: [], jobState: "succeeded",
+        admission: nil, controlRequest: nil, receipt: nil,
+        facts: [ArkForgeKeyValue(key: "outcome", value: "succeeded")]),
+    ])
+
+    let outcome = try ArkForgeFlashSession.observeTerminal(daemon: daemon, jobID: "JOB-1")
+
+    guard case .completed(let receipts) = outcome else {
+      return XCTFail("the later durable classification must supersede outcomeUnknown")
+    }
+    XCTAssertEqual(receipts.map(\.stepID), ["postflight-readback"])
+    XCTAssertTrue(daemon.startRequests.isEmpty)
+    XCTAssertTrue(daemon.permitSubmissions.isEmpty)
+    XCTAssertTrue(daemon.controlSubmissions.isEmpty)
+    XCTAssertTrue(daemon.cancelRequests.isEmpty)
   }
 
   func testAnEmptyPollBetweenAReceiptAndTheNextAdmissionIsNotCompletion() async throws {
@@ -492,6 +572,49 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     XCTAssertTrue(reason.contains("expired unanswered"), reason)
   }
 
+  func testAConfirmedFailureCannotFallThroughToCompletion() async throws {
+    let classified = ArkForgeJobEvent(
+      jobID: "JOB-1", sequence: 1, kind: .outcomeClassified, atEpochMs: 1_000_050,
+      journalRecordSHA256: [], jobState: "confirmedFailed", admission: nil,
+      controlRequest: nil, receipt: nil,
+      facts: [
+        ArkForgeKeyValue(key: "outcome", value: "confirmedFailed"),
+        ArkForgeKeyValue(key: "reason", value: "postflight readback disproved the target image"),
+      ])
+    let session = ArkForgeFlashSession(
+      daemon: ScriptedDaemon(events: [classified]), authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    let outcome = try await session.run(
+      planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+
+    guard case .confirmedFailed(let reason, _) = outcome else {
+      return XCTFail("expected confirmedFailed, got \(outcome)")
+    }
+    XCTAssertTrue(reason.contains("disproved the target image"), reason)
+  }
+
+  func testAnUnknownTerminalWireValueFailsClosed() async throws {
+    let classified = ArkForgeJobEvent(
+      jobID: "JOB-1", sequence: 1, kind: .outcomeClassified, atEpochMs: 1_000_050,
+      journalRecordSHA256: [], jobState: "succeeded", admission: nil,
+      controlRequest: nil, receipt: nil,
+      facts: [ArkForgeKeyValue(key: "outcome", value: "futureDaemonTerminal")])
+    let session = ArkForgeFlashSession(
+      daemon: ScriptedDaemon(events: [classified]), authority: authority(),
+      performer: StubPerformer(observation: .init(accepted: true, facts: [:], evidenceSHA256: [])),
+      controllerSessionID: "SESSION-1")
+
+    let outcome = try await session.run(
+      planID: "PLAN-1", planSHA256: "abc", executionPurpose: "flash")
+
+    guard case .outcomeUnknown(let reason, _) = outcome else {
+      return XCTFail("an unknown wire value must not complete: \(outcome)")
+    }
+    XCTAssertTrue(reason.contains("futureDaemonTerminal"), reason)
+  }
+
   // MARK: - AFA-AC-10: cancellation is not a drain proof
 
   func testACancelledSafeAnswerIsTheStrongerFormOfDrained() async throws {
@@ -685,11 +808,12 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     controller: any ArkForgePlanSource,
     publicSource: any ArkForgeAssessmentSource,
     counter: StartCounter,
-    campaign: String = "AFA-SEAL"
+    campaign: String = "AFA-SEAL",
+    events: [ArkForgeJobEvent]? = nil
   ) -> ArkForgeLaneHost {
     let daemon = CountingDaemon(
       counter: counter,
-      events: [
+      events: events ?? [
         ArkForgeJobEvent(
           jobID: "JOB-1", sequence: 1, kind: .actionReceipt, atEpochMs: 0,
           journalRecordSHA256: [], jobState: "running", admission: nil,
@@ -956,6 +1080,28 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
   }
 
+  func testPersistedCorrelationContinuesAcrossAFreshLaneHostWithoutStartingAgain() async throws {
+    let source = ScriptedPlanSource.executable()
+    let started = StartCounter()
+    let firstProcess = sealTestHost(
+      controller: source, publicSource: source, counter: started)
+    let recoveredProcess = sealTestHost(
+      controller: source, publicSource: source, counter: started)
+    let artifact = scriptedArtifact()
+
+    let execution = try await firstProcess.prepareExecution(
+      jobID: "ARKDECK-JOB-RESTART", artifact: artifact,
+      binding: sealTestBinding, executionPurpose: "primaryFlash")
+    XCTAssertEqual(started.value, 1)
+
+    let receipt = try await recoveredProcess.performPrepared(
+      stepID: "flash-partitions", execution: execution,
+      artifact: artifact, binding: sealTestBinding)
+
+    XCTAssertEqual(receipt.jobID, execution.daemonJobID)
+    XCTAssertEqual(started.value, 1, "recovery must watch the exact job, never start a replacement")
+  }
+
   func testSupersedingRecoveryPurposeCrossesMaterializationAndStartUnchanged() async throws {
     let started = StartCounter()
     let daemon = CountingDaemon(
@@ -1070,6 +1216,71 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let completion = await host.completedPlanReceipt(jobID: "ARKDECK-JOB-1")
     XCTAssertNil(completion)
     XCTAssertEqual(started.value, 1)
+  }
+
+  func testConfirmedFailedStaysAStickyFailureWithoutACompletionReceipt() async throws {
+    let source = ScriptedPlanSource.executable()
+    let started = StartCounter()
+    let host = sealTestHost(
+      controller: source, publicSource: source, counter: started,
+      events: [
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 1, kind: .outcomeClassified, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "confirmedFailed", admission: nil,
+          controlRequest: nil, receipt: nil,
+          facts: [
+            ArkForgeKeyValue(key: "outcome", value: "confirmedFailed"),
+            ArkForgeKeyValue(key: "reason", value: "postflight mismatch"),
+          ])
+      ])
+
+    for _ in 0..<2 {
+      do {
+        _ = try await host.perform(
+          stepID: "flash-partitions", jobID: "ARKDECK-CONFIRMED-FAILED",
+          artifact: scriptedArtifact(), binding: sealTestBinding)
+        XCTFail("confirmedFailed must not publish a completed delegated step")
+      } catch let failure as RuntimeDispatchFailure {
+        guard case .failed(let reason) = failure else {
+          return XCTFail("unexpected confirmed failure mapping: \(failure)")
+        }
+        XCTAssertTrue(reason.contains("postflight mismatch"), reason)
+      }
+    }
+    let completion = await host.completedPlanReceipt(jobID: "ARKDECK-CONFIRMED-FAILED")
+    XCTAssertNil(completion)
+    XCTAssertEqual(started.value, 1, "the terminal failure must remain sticky")
+  }
+
+  func testUnknownTerminalWireValueStaysUnknownWithoutACompletionReceipt() async throws {
+    let source = ScriptedPlanSource.executable()
+    let started = StartCounter()
+    let host = sealTestHost(
+      controller: source, publicSource: source, counter: started,
+      events: [
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 1, kind: .outcomeClassified, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "succeeded", admission: nil,
+          controlRequest: nil, receipt: nil,
+          facts: [ArkForgeKeyValue(key: "outcome", value: "futureDaemonTerminal")])
+      ])
+
+    for _ in 0..<2 {
+      do {
+        _ = try await host.perform(
+          stepID: "flash-partitions", jobID: "ARKDECK-FUTURE-TERMINAL",
+          artifact: scriptedArtifact(), binding: sealTestBinding)
+        XCTFail("an unknown wire terminal must not publish a completed delegated step")
+      } catch let failure as RuntimeDispatchFailure {
+        guard case .outcomeUnknown(let reason) = failure else {
+          return XCTFail("unexpected future terminal mapping: \(failure)")
+        }
+        XCTAssertTrue(reason.contains("futureDaemonTerminal"), reason)
+      }
+    }
+    let completion = await host.completedPlanReceipt(jobID: "ARKDECK-FUTURE-TERMINAL")
+    XCTAssertNil(completion)
+    XCTAssertEqual(started.value, 1, "the unknown classification must remain sticky")
   }
 
   func testAnAssessmentNeverBecomesAWrite() async throws {
