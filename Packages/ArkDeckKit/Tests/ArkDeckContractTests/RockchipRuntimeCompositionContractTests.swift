@@ -342,10 +342,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   private struct NormalOnlyUSBProbe: RockchipRuntimeUSBProbing {
     let identity: String
+    let topology: String
 
-    init(connectKey: String) {
+    init(connectKey: String, topology: String = "42") {
       identity = SHA256.hash(data: Data(connectKey.utf8))
         .map { String(format: "%02x", $0) }.joined()
+      self.topology = topology
     }
 
     func singleLoader(
@@ -362,7 +364,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       }
       return RockchipRuntimeLoaderIdentity(
         serialDigestSHA256: identity,
-        topology: "42")
+        topology: topology)
     }
   }
 
@@ -980,7 +982,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       sha256: Self.nativeProviderSHA256)
     let probe = RecordingLiveModeProbe(
       observation: RockchipLiveModeObservation(
-        deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion))
+        deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        usbTopology: "44"))
     let port = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore,
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
@@ -996,7 +999,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       nextDigest)
     XCTAssertEqual(
       facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
-      "42")
+      "44",
+      "the exact live HDC identity may move ports without widening its durable alias")
+    XCTAssertEqual(
+      try postFlashStore.loadIfPresent()?.usbTopology, "42",
+      "live route selection must not rewrite the owner-only historical proof")
     let observedConnectKeys = await probe.observedConnectKeys()
     let observedStableIdentities = await probe.observedStableIdentities()
     XCTAssertEqual(observedConnectKeys, [nextHDC])
@@ -1148,10 +1155,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     let hdcObservation = try await FoundationRockchipLiveModeProbe(
       hdcResolver: resolver, runner: connected,
-      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal")
+      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal"),
+      usbProbe: NormalOnlyUSBProbe(connectKey: "device-1", topology: "44")
     ).observe(
       connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     XCTAssertEqual(hdcObservation.deviceMode, "hdc")
+    XCTAssertEqual(hdcObservation.usbTopology, "44")
     XCTAssertEqual(
       hdcObservation.buildFingerprint, "OpenHarmony-7.0.0.35-20260728_180253")
     let hdcCommands = await connected.invocations()
@@ -1191,6 +1200,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       connectKey: "device-1", stableIdentitySHA256: loaderIdentity)
     XCTAssertEqual(loaderObservation.deviceMode, "loader")
     XCTAssertNil(loaderObservation.buildFingerprint)
+    XCTAssertEqual(loaderObservation.usbTopology, "42")
     let loaderCommands = await loaderRunner.invocations()
     XCTAssertEqual(loaderCommands.map(\.arguments), [["list", "targets", "-v"]])
     XCTAssertTrue(loaderCommands.allSatisfy { $0.executable.path == hdc.path })
@@ -1207,6 +1217,23 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           path: "/product/arkforged",
           sha256: Self.nativeProviderSHA256),
       ])
+
+    // Seeing the requested connect key over HDC is enough to name the mode,
+    // but a different IOKit identity must not lend its current USB port to
+    // that target. The facts layer will retain the durable route and the
+    // mutation gate will fail closed if that route is stale.
+    let mismatchedHDCIdentity = ProbeCommandRunner(responses: [
+      .success("device-1\t\tUSB\tConnected\tlocalhost\n"),
+      .success("const.ohos.fullname = OpenHarmony-7.0.0.35-20260728_180253\n"),
+    ])
+    let hdcWithoutAttributedTopology = try await FoundationRockchipLiveModeProbe(
+      hdcResolver: resolver, runner: mismatchedHDCIdentity,
+      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal"),
+      usbProbe: NormalOnlyUSBProbe(connectKey: "another-device", topology: "44")
+    ).observe(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
+    XCTAssertEqual(hdcWithoutAttributedTopology.deviceMode, "hdc")
+    XCTAssertNil(hdcWithoutAttributedTopology.usbTopology)
 
     // A single `ld` observation is not enough to assign a Loader to this
     // target. The IOKit identity must match the durable target identity before
