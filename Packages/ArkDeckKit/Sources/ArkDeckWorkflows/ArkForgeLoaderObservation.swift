@@ -15,6 +15,31 @@ protocol ArkForgeLoaderObserving: Sendable {
     expectedUSBTopology: String?,
     requestID: String
   ) throws -> RockchipRuntimeLoaderIdentity
+
+  /// Confirms ArkForge's independent observation against an IOKit identity
+  /// the caller has just read from the same descriptor. Production uses this
+  /// to avoid immediately enumerating IOKit a second time; test and alternate
+  /// observers retain the original API through the conservative default.
+  func confirmLoader(
+    _ identity: RockchipRuntimeLoaderIdentity,
+    stableIdentitySHA256: String,
+    expectedUSBTopology: String?,
+    requestID: String
+  ) throws -> RockchipRuntimeLoaderIdentity
+}
+
+extension ArkForgeLoaderObserving {
+  func confirmLoader(
+    _: RockchipRuntimeLoaderIdentity,
+    stableIdentitySHA256: String,
+    expectedUSBTopology: String?,
+    requestID: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
+    try observeLoader(
+      stableIdentitySHA256: stableIdentitySHA256,
+      expectedUSBTopology: expectedUSBTopology,
+      requestID: requestID)
+  }
 }
 
 enum ArkForgeLoaderObservationFailure: Error, Sendable, Equatable,
@@ -86,6 +111,19 @@ struct ProductArkForgeLoaderObserver: ArkForgeLoaderObserving {
     } catch {
       throw ArkForgeLoaderObservationFailure.iokit("\(error)")
     }
+    return try confirmLoader(
+      identity,
+      stableIdentitySHA256: stableIdentitySHA256,
+      expectedUSBTopology: expectedUSBTopology,
+      requestID: requestID)
+  }
+
+  func confirmLoader(
+    _ identity: RockchipRuntimeLoaderIdentity,
+    stableIdentitySHA256: String,
+    expectedUSBTopology: String?,
+    requestID: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
     guard identity.serialDigestSHA256 == stableIdentitySHA256 else {
       throw ArkForgeLoaderObservationFailure.identityMismatch
     }

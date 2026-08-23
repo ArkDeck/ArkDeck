@@ -57,14 +57,18 @@ enum RockchipHDCIntegrationProfile {
     "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
   static let reportedVersion = "3.2.0f"
   static let dayu200NormalProductID: UInt16 = 0x5000
+  static let postFlashBuildPropertiesCommand =
+    "param get \(HDCAllowlistedProperty.fullBuildVersion.rawValue); "
+    + "param get \(HDCAllowlistedProperty.productModel.rawValue)"
 
   static func enterLoaderArguments(connectKey: String) -> [String] {
-    // HDC forwards a non-option MODE to `/bin/begetctl reboot`.  DAYU200's
-    // RockUSB flashing personality is `loader`; `-bootloader` selects the
-    // distinct fastboot personality, which RockUSB flashing cannot use. Keep
-    // the reviewed transition typed and shell-free while naming the exact
-    // mode required by the RockUSB Provider.
-    ["-t", connectKey, "target", "boot", "loader"]
+    // DAYU200's board support and measured hardware path use the device-side
+    // reboot command. It reaches RockUSB Loader in about four seconds; HDC's
+    // generic `target boot loader` path takes about seventeen seconds on the
+    // same RK3568 board. Every token after `shell` is fixed here — neither a
+    // request nor a Profile can inject command text — and `-t` preserves the
+    // exact connect-key selection when another HDC target is present.
+    ["-t", connectKey, "shell", "reboot", "loader"]
   }
 }
 
