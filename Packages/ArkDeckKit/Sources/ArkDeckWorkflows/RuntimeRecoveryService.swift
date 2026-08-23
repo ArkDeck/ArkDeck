@@ -666,10 +666,12 @@ struct RuntimeRecoveryService {
           retryability: .runtimeDecisionRequired,
           recovery: .awaitRuntimeReconciliation)
         record.finishedAtUTC = record.finishedAtUTC ?? nowUTC()
-        record.timeline.append(
-          "recovered: ArkForge execution state was process-owned; parked unknown; no redispatch")
+        appendRecoveryTimeline(
+          "recovered: ArkForge execution state was process-owned; parked unknown; no redispatch",
+          to: &record)
       } else {
-        record.timeline.append("recovered: outstanding intents or unknown outcomes; no redispatch")
+        appendRecoveryTimeline(
+          "recovered: outstanding intents or unknown outcomes; no redispatch", to: &record)
       }
     } else {
       // A clean non-terminal cancellation/finalization journal has no resume
@@ -706,9 +708,9 @@ struct RuntimeRecoveryService {
         record.recoveryIntentEventID = nil
         record.recoveryAction = nil
         record.finishedAtUTC = nowUTC()
-        record.timeline.append(
-          "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
-        )
+        appendRecoveryTimeline(
+          "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch",
+          to: &record)
       case .finalizing:
         let establishedRecoveryEpoch: SupersedingRecoveryEpoch?
         if record.admissionEvidence?.completeOverwriteRecovery != nil,
@@ -738,12 +740,13 @@ struct RuntimeRecoveryService {
           record.recoveryIntentEventID = nil
           record.recoveryAction = nil
         }
-        record.timeline.append(
+        appendRecoveryTimeline(
           establishedRecoveryEpoch == nil
             ? "recovered: finalization interrupted before terminal transition; failed without redispatch"
-            : "recovered: durable superseding epoch completed journal-only; no redispatch")
+            : "recovered: durable superseding epoch completed journal-only; no redispatch",
+          to: &record)
       default:
-        record.timeline.append("recovered: journal clean")
+        appendRecoveryTimeline("recovered: journal clean", to: &record)
       }
       if let currentState = inspection.currentState {
         record.state = currentState.rawValue
@@ -766,6 +769,16 @@ struct RuntimeRecoveryService {
     stateDirectory
       .appending(path: "jobs", directoryHint: .isDirectory)
       .appending(path: jobID, directoryHint: .isDirectory)
+  }
+
+  /// A parked Job is replayed on every daemon start. Keep that read-only
+  /// recovery observation visible without growing an identical projection on
+  /// every restart; an intervening timeline event still permits a new marker.
+  private func appendRecoveryTimeline(
+    _ entry: String, to record: inout RuntimeJobRecord
+  ) {
+    guard record.timeline.last != entry else { return }
+    record.timeline.append(entry)
   }
 
   private func appendInitialAdmissionEvents(

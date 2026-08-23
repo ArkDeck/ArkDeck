@@ -1233,6 +1233,23 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let recoveredCapability = try await recoveredStore.inspect(
       capabilityID: automaticCapabilityID)
     XCTAssertEqual(recoveredCapability?.remainingUses, 9_999)
+
+    let recoveryMarker =
+      "recovered: outstanding intents or unknown outcomes; no redispatch"
+    XCTAssertEqual(
+      try XCTUnwrap(recovered.first).timeline.filter { $0 == recoveryMarker }.count, 1)
+
+    // A parked Job remains in the active SQLite index and is replayed by each
+    // fresh daemon. Repeating that read-only recovery must not grow its
+    // persisted timeline when no durable event intervened.
+    let secondRecoveredDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (secondRecoveredEngine, _) = try makeEngine(
+      dispatcher: secondRecoveredDispatcher)
+    let recoveredAgain = try await secondRecoveredEngine.recoverPersistedJobs()
+    XCTAssertEqual(recoveredAgain.map(\.jobID), [first.jobID])
+    XCTAssertEqual(
+      try XCTUnwrap(recoveredAgain.first).timeline.filter { $0 == recoveryMarker }.count, 1)
+    XCTAssertEqual(secondRecoveredDispatcher.dispatchCount, 0)
   }
 
   // MARK: - plan-only answers what a submit would need
