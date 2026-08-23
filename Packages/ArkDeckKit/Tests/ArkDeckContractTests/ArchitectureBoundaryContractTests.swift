@@ -46,6 +46,25 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckStorage": ["ArkDeckCore"],
+    "ArkDeckTraceCore": [],
+    "ArkDeckTraceParser": ["ArkDeckTraceCore"],
+    "ArkDeckTraceStore": ["ArkDeckTraceCore"],
+    "ArkDeckTraceRuntime": [
+      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
+    ],
+    "ArkDeckTraceAnalysis": ["ArkDeckTraceCore"],
+    "ArkDeckTraceRendering": ["ArkDeckTraceCore"],
+    "ArkDeckTraceAppSupport": [
+      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceRuntime",
+      "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
+    ],
+    "ArkDeckTraceSignalShim": [],
+    "ArkDeckTraceCLI": [
+      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
+      "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceSignalShim",
+    ],
+    "ArkDeckTraceCLIResourceFixtures": [],
+    "ArkDeckTraceCLIExecutable": ["ArkDeckTraceCLI"],
     // ArkForgeProtocol and ArkForgeClient are external SDK products owned by
     // ArkForge. This matrix lists only ArkDeck-to-ArkDeck edges.
     "ArkDeckWorkflows": [
@@ -77,6 +96,16 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
     ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
     ("ArkDeckStorage", "Sources/ArkDeckStorage", []),
+    ("ArkDeckTraceCore", "Sources/ArkDeckTraceCore", []),
+    ("ArkDeckTraceParser", "Sources/ArkDeckTraceParser", []),
+    ("ArkDeckTraceStore", "Sources/ArkDeckTraceStore", []),
+    ("ArkDeckTraceRuntime", "Sources/ArkDeckTraceRuntime", []),
+    ("ArkDeckTraceAnalysis", "Sources/ArkDeckTraceAnalysis", []),
+    ("ArkDeckTraceRendering", "Sources/ArkDeckTraceRendering", []),
+    ("ArkDeckTraceAppSupport", "Sources/ArkDeckTraceAppSupport", []),
+    ("ArkDeckTraceCLI", "Sources/ArkDeckTraceCLI", []),
+    ("ArkDeckTraceCLIResourceFixtures", "Sources/ArkDeckTraceCLIResourceFixtures", []),
+    ("ArkDeckTraceCLIExecutable", "Sources/ArkDeckTraceCLIExecutable", []),
     ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
     ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
     ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
@@ -158,10 +187,18 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
         let closing = block[nameRange.upperBound...].firstIndex(of: "\"")
       else { continue }
       let name = String(block[nameRange.upperBound..<closing])
-      if block.contains(".strictMemorySafety()") { declaring.insert(name) }
+      if block.contains(".strictMemorySafety()") || block.contains("traceSwiftSettings") {
+        declaring.insert(name)
+      }
     }
     XCTAssertEqual(
-      declaring, ["ArkDeckCore", "ArkDeckProcess"],
+      declaring,
+      [
+        "ArkDeckCore", "ArkDeckProcess", "ArkDeckTraceCore", "ArkDeckTraceParser",
+        "ArkDeckTraceStore", "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis",
+        "ArkDeckTraceRendering", "ArkDeckTraceAppSupport", "ArkDeckTraceCLI",
+        "ArkDeckTraceCLIResourceFixtures",
+      ],
       "the set of targets declaring .strictMemorySafety() changed; a target that "
         + "drops it stops being checked with no diagnostic of any kind")
   }

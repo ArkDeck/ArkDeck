@@ -1,0 +1,2 @@
+# Preserve byte-pinned upstream license text, including CRLF and intentional whitespace.
+LICENSES/*.txt -text whitespace=-trailing-space,-blank-at-eof

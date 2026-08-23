@@ -58,6 +58,41 @@ struct TraceProgressArtifactsView: View {
           .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
 
+        if model.isPreparingViewer {
+          Label(traceString("trace.viewer.preparing"), systemImage: "hourglass")
+            .font(WorkspaceFont.secondary)
+            .accessibilityIdentifier("trace.viewer.preparing")
+        } else if let failure = model.viewerArtifactFailure {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+            Label(failure, systemImage: "exclamationmark.triangle.fill")
+              .font(WorkspaceFont.secondary)
+              .foregroundStyle(.red)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("trace.viewer.failure")
+            Button(traceString("trace.viewer.tryAgain")) {
+              model.reopenLatestTraceArtifact()
+            }
+            .accessibilityIdentifier("trace.viewer.tryAgain")
+          }
+        } else if let artifactName = model.latestViewerArtifactName {
+          HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+            Label(
+              traceString("trace.viewer.opened"),
+              systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+            Text(artifactName)
+              .font(WorkspaceFont.monospacedValue)
+              .textSelection(.enabled)
+            Spacer(minLength: WorkspaceMetrics.contentGap)
+            Button(traceString("trace.action.openViewer")) {
+              model.showViewer()
+            }
+            .accessibilityIdentifier("trace.viewer.reopenWindow")
+          }
+          .accessibilityElement(children: .contain)
+        }
+
         if !model.runtimeArtifacts.isEmpty {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
             Text(traceString("trace.artifacts.runtimeTitle"))

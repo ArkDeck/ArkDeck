@@ -90,6 +90,7 @@
     "settings.tab.diagnostics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Diagnostics"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"诊断"}}}},
     "settings.tab.general": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"General"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"通用"}}}},
     "settings.tab.storage": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Storage"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"存储"}}}},
+    "settings.tab.trace": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Trace"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"跟踪"}}}},
     "settings.tab.toolchains": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Toolchains"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"工具链"}}}},
     "settings.tab.updates": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Updates"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"更新"}}}},
     "settings.toolchains.choose": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Choose HDC…"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择 HDC…"}}}},

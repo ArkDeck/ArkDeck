@@ -1,6 +1,6 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.9（design input，非 normative；2026-08-23 将 Debug 重构为编译产物替换主链路，并保留日志反馈与既有调试工具，见 §5.5 / §8）
+> Status：draft v0.9（design input，非 normative；2026-08-23 将 Debug 重构为编译产物替换主链路，并保留日志反馈与既有调试工具；2026-08-24 补齐 Trace 原生 Timeline 与 Artifact 验证流，见 §5.5 / §8）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
@@ -18,6 +18,7 @@ v0.9 保留 v0.8 的 Viewer DevTools 式检查器，将 Debug 的默认工作流
 | Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
 | Viewer | `UIDumpWorkspaceView` 仍是窗口、Recipe、参数策略与产物审核表单 | 改为左侧截图 + 右侧上下检查器；UI 树在上、当前节点属性在下，截图区域、树节点与属性选中态双向同步 |
 | Debug | `DebugWorkspaceView` 已有 Logs / Apps / Network / Commands，生产 Catalog 另已发布单个 app-owned `.so` 的校验、备份、原子发布、回滚与 Ability restart，但 App 尚无编译来源浏览与 native deployment surface | 默认进入 Artifacts；管理 SSH、本机目录、SMB、WSL 来源及其根目录，搜索、勾选、预览替换计划，完成替换后显式提供重启与日志验证。未发布的来源浏览、批量、`.abc` 与独立设备重启能力必须显示 unavailable，不用原型状态伪造生产可用性 |
+| Trace | `capture.diagnostics@1` 采集、Artifact 分块校验与 ArkTrace 原生 Timeline 已合并到同一工作区 | 保持采集 / Viewer 双模式；加载、缓存、筛选、选区、搜索、Inspector 与无障碍语义使用同一份 typed 状态 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
 | Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
 | Runtime data | Trace tag / 参数快照、Debug probe、Flash prerequisite / postflight、Artifact metadata 均有生产 facade | 缺失字段显示 unknown / unavailable，不使用 fixture、占位行或默认值补齐 |
@@ -140,6 +141,12 @@ Primary Window
 - Toolbar 或 section header 使用 Preset / Custom segmented control；只显示设备已确认 tag，unsupported tag 禁用并解释。
 - `trace.probe` 返回 target / binding 绑定的 tag 集与全部参数 before 值；Job evidence 返回 after 值。snapshot diff 是 table，不用彩色卡片；missing / unreadable 明确「不可自动恢复」。需重启时在执行前显示影响。
 - 无可靠总量时显示 indeterminate + elapsed，不伪造百分比。完成后 raw / filtered / capture.log 分列，筛选是派生产物操作。
+- 采集与 Viewer 是同一工作区的两种状态，不再打开 ArkTrace 独立 App shell。无文档时显示采集表单与「打开已有 Trace」；已打开文档时显示轨道、搜索、选区与 Inspector，Toolbar 保留返回采集、打开与 reload。
+- 自动进入 Viewer 之前必须从本次 terminal Job 精确选中唯一的 published raw `trace.htrace`，经 sensitive opt-in 的 Artifact API 分块读取，并同时匹配 byte count 与 lowercase SHA-256。任一校验失败不替换当前文档、不写 Recent、不启动 parser。
+- Timeline 使用原生 AppKit/CoreGraphics 画布，包含 CPU slice、thread state、named slice、counter 和 frame lane。滚动 / 捏合、键盘、range/event selection、flag、mark 和 search 都操作真实 event identity，不从像素位置伪造事件。
+- Process filter 与 trace search 分开；隐藏 lane 时保留 view state，搜索命中可显示必要 lane 并滚动到真实事件。Inspector 可停靠在右侧或底部，窄窗只改布局不丢失选择。
+- 加载中只有 hashing、cache lookup 与 indexing 拥有真实 denominator 时才显示百分比；TraceStreamer stdout 无可靠进度时使用 indeterminate。空 timed events、缓存隔离重建、schema 不兼容、取消与 parser identity drift 必须显示不同状态。
+- 所有 toolbar 动作在 Trace menu 有键盘等价入口，完整快捷键目录位于 Help 菜单。Timeline 焦点、选区、搜索结果与状态变化有稳定无障碍语义；不以颜色作为唯一信号，并尊重 Reduce Motion。
 
 ### 5.5 Debug 工作台
 
