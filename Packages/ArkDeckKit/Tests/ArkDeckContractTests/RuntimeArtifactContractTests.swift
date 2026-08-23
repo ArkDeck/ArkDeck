@@ -185,6 +185,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let store = try makeStore()
     let metadata = try await store.publish(request())
     let payload = root.appending(path: "job-1/\(metadata.artifactID)")
+    try chmodOrThrow(payload, 0o600)
     try Data("tampered".utf8).write(to: payload)
     await XCTAssertThrowsErrorAsync(try await store.list(jobID: "job-1"))
 
@@ -236,6 +237,11 @@ final class RuntimeArtifactContractTests: XCTestCase {
       expectedSHA256: digest)
 
     let published = try await store.publishFile(request)
+    let payload = root.appending(path: "\(published.jobID)/\(published.artifactID)")
+    XCTAssertEqual(try permissions(at: payload), 0o400)
+    let afterPublication = await store.verificationMetricsSnapshot()
+    XCTAssertEqual(afterPublication.fullHashPasses, 1)
+    XCTAssertEqual(afterPublication.fullHashBytes, UInt64(bytes.count))
     let repeated = try await store.publishFile(request)
     XCTAssertEqual(repeated, published)
     XCTAssertEqual(published.byteCount, bytes.count)
@@ -247,6 +253,79 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertFalse(lease.contains(source.path))
     let resolved = try await store.resolveLease(lease)
     XCTAssertEqual(try Data(contentsOf: resolved.fileURL), bytes)
+    _ = try await store.resolveLease(lease)
+    _ = try await store.resolveLease(lease)
+    let afterRepeatedResolution = await store.verificationMetricsSnapshot()
+    XCTAssertEqual(
+      afterRepeatedResolution.fullHashPasses, afterPublication.fullHashPasses,
+      "lease creation and repeated resolution must not re-hash an unchanged sealed payload")
+    XCTAssertGreaterThan(
+      afterRepeatedResolution.sealedIdentityHits, afterPublication.sealedIdentityHits)
+  }
+
+  func testSealedPayloadVerificationCacheSurvivesStoreRestart() async throws {
+    let store = try makeStore()
+    let metadata = try await store.publish(request())
+    let lease = try await store.leaseReference(
+      jobID: metadata.jobID, artifactID: metadata.artifactID)
+
+    let reopened = try makeStore()
+    _ = try await reopened.resolveLease(lease)
+    let metrics = await reopened.verificationMetricsSnapshot()
+    XCTAssertEqual(
+      metrics.fullHashPasses, 0,
+      "a durable sealed identity must avoid re-hashing after daemon restart")
+    XCTAssertGreaterThan(metrics.sealedIdentityHits, 0)
+  }
+
+  func testWritableOrReplacedPayloadNeverUsesSealedIdentityCache() async throws {
+    let store = try makeStore()
+    let metadata = try await store.publish(request())
+    let payload = root.appending(path: "job-1/\(metadata.artifactID)")
+    let afterPublication = await store.verificationMetricsSnapshot()
+
+    try chmodOrThrow(payload, 0o600)
+    _ = try await store.list(jobID: "job-1")
+    let afterWritablePayload = await store.verificationMetricsSnapshot()
+    XCTAssertEqual(
+      afterWritablePayload.fullHashPasses, afterPublication.fullHashPasses + 1)
+    XCTAssertEqual(try permissions(at: payload), 0o400)
+
+    let replacement = payload.deletingLastPathComponent()
+      .appending(path: ".replacement-\(UUID().uuidString)")
+    try Data(repeating: 0x5a, count: metadata.byteCount).write(to: replacement)
+    try chmodOrThrow(replacement, 0o400)
+    guard Darwin.rename(replacement.path, payload.path) == 0 else {
+      throw posixError()
+    }
+    await XCTAssertThrowsErrorAsync(try await store.list(jobID: "job-1"))
+    let afterReplacement = await store.verificationMetricsSnapshot()
+    XCTAssertEqual(
+      afterReplacement.fullHashPasses, afterWritablePayload.fullHashPasses + 1,
+      "same-size inode replacement must force a complete digest check")
+  }
+
+  func testCorruptPayloadVerificationCacheFallsBackToHashAndRepairsItself() async throws {
+    let store = try makeStore()
+    let metadata = try await store.publish(request())
+    let lease = try await store.leaseReference(
+      jobID: metadata.jobID, artifactID: metadata.artifactID)
+    let cache = root.appending(path: "job-1/.payload-verification-v1.json")
+    try chmodOrThrow(cache, 0o600)
+    try Data("corrupt-cache".utf8).write(to: cache)
+    try chmodOrThrow(cache, 0o400)
+
+    let reopened = try makeStore()
+    _ = try await reopened.resolveLease(lease)
+    let recoveredMetrics = await reopened.verificationMetricsSnapshot()
+    XCTAssertEqual(recoveredMetrics.fullHashPasses, 1)
+    XCTAssertEqual(try permissions(at: cache), 0o400)
+
+    let repaired = try makeStore()
+    _ = try await repaired.resolveLease(lease)
+    let repairedMetrics = await repaired.verificationMetricsSnapshot()
+    XCTAssertEqual(repairedMetrics.fullHashPasses, 0)
+    XCTAssertGreaterThan(repairedMetrics.sealedIdentityHits, 0)
   }
 
   func testFileBackedPublicationRejectsDigestDriftWithoutPublishing() async throws {
@@ -634,6 +713,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertTrue(verified[0].reference.hasPrefix("arkdeck-artifact://job-1/"))
 
     let bytesURL = root.appending(path: "job-1/\(metadata.artifactID)")
+    try chmodOrThrow(bytesURL, 0o600)
     try Data("tampered".utf8).write(to: bytesURL)
     await XCTAssertThrowsErrorAsync(
       try await store.verifiedEvidenceArtifacts(jobID: "job-1"))
@@ -670,6 +750,20 @@ final class RuntimeArtifactContractTests: XCTestCase {
       carry = Data(haystack.suffix(max(0, needle.count - 1)))
     }
     return false
+  }
+
+  private func permissions(at url: URL) throws -> mode_t {
+    var metadata = stat()
+    guard Darwin.lstat(url.path, &metadata) == 0 else { throw posixError() }
+    return metadata.st_mode & 0o777
+  }
+
+  private func chmodOrThrow(_ url: URL, _ mode: mode_t) throws {
+    guard Darwin.chmod(url.path, mode) == 0 else { throw posixError() }
+  }
+
+  private func posixError() -> POSIXError {
+    POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
   }
 }
 
