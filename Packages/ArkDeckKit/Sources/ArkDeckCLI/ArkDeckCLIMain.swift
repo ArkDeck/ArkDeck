@@ -418,9 +418,11 @@ struct ArkDeckCommandLine {
       [--arkforge-bundle <absolute-ArkForge.bundle|none> [--arkforge-campaign <id>]]
         legacy ArkForge options are rejected with migration guidance: \
       --arkforged --arkforged-sha256 --arkforge-profile
+        arkdeck agentd restart [--maximum-wait-seconds <1...300>] [--json]
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] \
       [--execution-id <id>] [--json]
+        arkdeck agentd verify --job <existing-observe-job-id> [--json]
         arkdeck agentd uninstall [--json]
         arkdeck signing install-sdk-release --sdk <absolute-openharmony-sdk-path> \
       --java <absolute-java-path> --bundle-name <application-bundle-name> \
@@ -460,7 +462,8 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-workspace-patch --target <id> --file <change.patch> [--json]
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
       [--device-profile <dayu200>] [--json]
-        arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
+        arkdeck artifact import-native-library --target <id> \
+      --file <libname.so|ART-id-libname.so> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
         arkdeck agent run --operation <reference> [--target <id>] [--inputs-file <path>] \

@@ -27,6 +27,22 @@ HDC 执行路径。
    arkdeck doctor
    ```
 
+只在当前 Mac 上验证工作树代码时，不需要把开发构建上传公证服务，也不应手工拼装 bundle。
+使用独立的本地构建入口，并显式传入同一 Team 的两份 profile：
+
+```text
+ARKDECK_CLI_PROVISIONING_PROFILE=/absolute/com.arkdeck.cli.provisionprofile \
+ARKDECK_DAEMON_PROVISIONING_PROFILE=/absolute/com.arkdeck.agentd.provisionprofile \
+ARKDECK_LOCAL_HELPER_OUTPUT=/absolute/output-directory \
+Distribution/macOS/build-local-helpers.sh
+```
+
+该脚本固定构建 Debug `arkdeck`/`arkdeck-agentd`，复用发布路径相同的 Info.plist、资源、
+entitlements、Developer ID 和 hardened runtime，逐层执行严格 codesign 校验。它明确使用
+`timestamp=none`，不执行 notarization、staple 或 Gatekeeper distribution assessment，并在输出根
+写入 `LOCAL-DEVELOPMENT-BUILD.txt`；产物只可用于当前 Mac 的 `agentd install/update`、签名预设和
+CLI 真机验证，绝不是发布物。正式发布仍只能运行 `build-helpers.sh`，其公证要求没有本地绕过开关。
+
 `install` 会严格验证 helper bundle 的 Developer ID、Team、bundle ID、hardened runtime、
 embedded provisioning profile 和共享 Keychain entitlement，再哈希 daemon/HDC，把完整 daemon
 bundle 复制到 `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，生成
@@ -46,6 +62,24 @@ arkdeck agentd update
 ```
 
 HDC 路径变化时同时传 `--hdc /new/absolute/path/to/hdc`。
+
+验证 daemon 进程重启与 Runtime 历史持久化时只走 CLI：先用 `agentd verify` 产生一个
+`observe.device@1` Job，随后重启同一份已安装 helper，再按 Job ID 重开其状态、可信证据和
+Artifact 清单：
+
+```text
+arkdeck agentd verify --target <target-id> --json
+arkdeck agentd restart --json
+arkdeck agentd verify --job <observe-job-id> --json
+```
+
+`restart` 不复制 helper、不重写 plist/install receipt，也不删除 Runtime state；它会拒绝 active、
+等待人工或带 cleanup residue 的 current Job。已经 durable 终止的
+`waitingForRecovery + outcomeUnknown` Job 不可能靠重启变成 known，restart 允许并在新 daemon 中逐一
+核对它们仍原样保留，永不 replay。随后以不同进程 PID、相同 catalog digest 和新进程 UDS health
+闭合结果。`verify --job` 仅调用 `health`、`job.status`、`job.evidence` 与 `artifact.list`，不会
+submit/run/cancel/reconcile Job，也不会产生设备 dispatch。若 daemon 不健康、仍有活动或未闭合 Job，
+历史 unknown 集合在重启中漂移，或既有 Job/Artifact 证据不完整，命令 fail closed，不回退到 App/UI。
 
 要启用已合入的 ArkTrace typed analyzer profile，请把已审阅、版本化 ArkTrace
 distribution 的 owner-controlled descriptor 交给同一个安装边界，而不是手工编辑 plist：

@@ -17,6 +17,11 @@ import Foundation
 
 enum RuntimeCLI {
 
+  struct AgentdRestartJobPreflight: Equatable {
+    let blockingJobIDs: [String]
+    let preservedUnknownJobIDs: [String]
+  }
+
   /// Every option `agentd install` and `agentd update` accept.
   ///
   /// One list, exposed, because the failure it prevents already happened: the
@@ -169,7 +174,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing agentd subcommand (install|update|status|verify|uninstall)")
+        message: "missing agentd subcommand (install|update|restart|status|verify|uninstall)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -302,6 +307,76 @@ enum RuntimeCLI {
         beforeBootstrap: beforeBootstrap)
       emit(try encodedJSON(receipt), json: json)
 
+    case "restart":
+      let options = try CLIOptions(rest)
+      try options.validateAllowed(["--maximum-wait-seconds"])
+      let maximumWaitSeconds: Int
+      if let raw = options.value("--maximum-wait-seconds") {
+        guard let parsed = Int(raw), (1...300).contains(parsed) else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "agentd restart --maximum-wait-seconds must be between 1 and 300")
+        }
+        maximumWaitSeconds = parsed
+      } else {
+        maximumWaitSeconds = 30
+      }
+
+      // A restart is maintenance, not a way to interrupt a Runtime Job. It
+      // refuses active/human/cleanup work. A durable waitingForRecovery Job
+      // with an already closed unknown outcome is preserved: daemon restart
+      // cannot make that history known and must never redispatch it.
+      let beforeStatus = try service.status()
+      guard beforeStatus.ready else {
+        throw CLIError(
+          exitCode: 69,
+          message: "LaunchAgent is not ready: "
+            + beforeStatus.diagnostics.joined(separator: "; "))
+      }
+      let beforeClient = AgentClient(socketPath: beforeStatus.socketPath)
+      let beforeHealth = try beforeClient.request(method: "health")
+      let beforeCatalogDigest = try agentdHealthCatalogDigest(beforeHealth)
+      let beforeInstance = try service.daemonInstance()
+      let beforeJobs = try agentdRestartJobPreflight(beforeClient)
+      guard beforeJobs.blockingJobIDs.isEmpty else {
+        throw CLIError(
+          exitCode: 75,
+          message: "agentd restart refused while Runtime Jobs are active or unclosed: "
+            + beforeJobs.blockingJobIDs.joined(separator: ", "))
+      }
+
+      let restart = try service.restart()
+      let after = try waitForRestart(
+        service: service, previousPID: beforeInstance.pid,
+        expectedCatalogDigest: beforeCatalogDigest,
+        maximumWaitSeconds: maximumWaitSeconds)
+      let afterJobs = try agentdRestartJobPreflight(
+        AgentClient(socketPath: after.status.socketPath))
+      guard afterJobs.blockingJobIDs.isEmpty,
+        afterJobs.preservedUnknownJobIDs == beforeJobs.preservedUnknownJobIDs
+      else {
+        throw CLIError(
+          exitCode: 69,
+          message: "Runtime current Job closure changed across daemon restart")
+      }
+      emit(
+        .object([
+          "restart": try encodedJSON(restart),
+          "restartProof": .object([
+            "schemaVersion": .string("arkdeck-launchagent-restart-proof/v1"),
+            "beforeInstance": try encodedJSON(beforeInstance),
+            "afterInstance": try encodedJSON(after.instance),
+            "catalogDigestBefore": .string(beforeCatalogDigest),
+            "catalogDigestAfter": .string(after.catalogDigest),
+            "blockingJobCountBefore": .integer(0),
+            "preservedUnknownJobIds": .array(
+              beforeJobs.preservedUnknownJobIDs.map(JSONValue.string)),
+          ]),
+          "launchAgent": try encodedJSON(after.status),
+          "daemonHealth": after.health,
+        ]),
+        json: json)
+
     case "status":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "agentd status accepts only --json")
@@ -329,7 +404,18 @@ enum RuntimeCLI {
 
     case "verify":
       let options = try CLIOptions(rest)
-      try options.validateAllowed(["--target", "--maximum-wait-seconds", "--execution-id"])
+      try options.validateAllowed([
+        "--target", "--maximum-wait-seconds", "--execution-id", "--job",
+      ])
+      let persistedJobID = options.value("--job")
+      if persistedJobID != nil,
+        options.value("--target") != nil || options.value("--maximum-wait-seconds") != nil
+          || options.value("--execution-id") != nil
+      {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "agentd verify --job cannot be combined with execution options")
+      }
       let maximumWaitSeconds: Int
       if let raw = options.value("--maximum-wait-seconds") {
         guard let parsed = Int(raw), (1...300).contains(parsed) else {
@@ -361,6 +447,28 @@ enum RuntimeCLI {
 
       let verifier = RuntimeHeadlessVerifier(
         client: AgentClient(socketPath: status.socketPath), nowUTC: utcNow)
+      if let persistedJobID {
+        switch try verifier.verifyPersistedObserveDevice(jobID: persistedJobID) {
+        case .verified(let report):
+          emit(
+            .object([
+              "launchAgent": try encodedJSON(status),
+              "runtime": try encodedJSON(report),
+              "runtimeVerified": .bool(true),
+            ]),
+            json: json)
+        case .failed(let reason, let report):
+          emit(
+            .object([
+              "launchAgent": try encodedJSON(status),
+              "runtime": try encodedJSON(report),
+              "runtimeVerified": .bool(false),
+            ]),
+            json: json)
+          throw CLIError(exitCode: 1, message: reason)
+        }
+        return
+      }
       let outcome = try verifier.verifyObserveDevice(
         targetID: options.value("--target"),
         maximumWaitSeconds: maximumWaitSeconds,
@@ -407,6 +515,136 @@ enum RuntimeCLI {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported agentd subcommand")
     }
+  }
+
+  private static func agentdHealthCatalogDigest(_ health: JSONValue) throws -> String {
+    guard case .object(let fields) = health,
+      case .string("ok")? = fields["status"],
+      case .string(let digest)? = fields["catalogDigest"],
+      digest.count == 64,
+      digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+    else {
+      throw CLIError(
+        exitCode: 69, message: "daemon health lacks a valid lowercase catalog digest")
+    }
+    return digest
+  }
+
+  private static func exactInt(_ value: JSONValue?) -> Int? {
+    switch value {
+    case .integer(let raw)?: return Int(exactly: raw)
+    case .unsignedInteger(let raw)?: return Int(exactly: raw)
+    default: return nil
+    }
+  }
+
+  private static func agentdRestartJobPreflight(_ client: AgentClient) throws
+    -> AgentdRestartJobPreflight
+  {
+    let listed = try client.request(
+      method: "job.list-page",
+      params: [
+        "pageSize": .integer(1),
+        "order": .string("newestFirst"),
+        "includeTimeline": .bool(false),
+        "includeCurrent": .bool(true),
+      ])
+    guard case .object(let fields) = listed,
+      case .array(let current)? = fields["currentJobs"]
+    else {
+      throw CLIError(
+        exitCode: 69, message: "daemon did not return its current Runtime Job set")
+    }
+    return try classifyAgentdRestartCurrentJobs(current)
+  }
+
+  static func classifyAgentdRestartCurrentJobs(_ current: [JSONValue]) throws
+    -> AgentdRestartJobPreflight
+  {
+    var blocking: [String] = []
+    var preservedUnknown: [String] = []
+    for value in current {
+      guard case .object(let job) = value,
+        case .string(let jobID)? = job["jobId"],
+        !jobID.isEmpty,
+        case .string(let state)? = job["state"],
+        case .bool(let outcomeUnknown)? = job["outcomeUnknown"],
+        case .bool(let waitingForHuman)? = job["waitingForHuman"],
+        let residue = exactInt(job["outstandingResidueCount"])
+      else {
+        throw CLIError(
+          exitCode: 69, message: "daemon returned a malformed current Runtime Job")
+      }
+      let processClosed: Bool
+      if case .null? = job["processProgress"] {
+        processClosed = true
+      } else {
+        processClosed = false
+      }
+      let hasFinishedAt: Bool
+      if case .string(let finishedAt)? = job["finishedAtUtc"], !finishedAt.isEmpty {
+        hasFinishedAt = true
+      } else {
+        hasFinishedAt = false
+      }
+      if state == "waitingForRecovery", outcomeUnknown, !waitingForHuman,
+        residue == 0, processClosed, hasFinishedAt
+      {
+        preservedUnknown.append(jobID)
+      } else {
+        blocking.append(jobID)
+      }
+    }
+    return AgentdRestartJobPreflight(
+      blockingJobIDs: blocking.sorted(),
+      preservedUnknownJobIDs: preservedUnknown.sorted())
+  }
+
+  private static func waitForRestart(
+    service: LaunchAgentService,
+    previousPID: Int32,
+    expectedCatalogDigest: String,
+    maximumWaitSeconds: Int
+  ) throws -> (
+    status: LaunchAgentStatus, instance: LaunchAgentDaemonInstance,
+    health: JSONValue, catalogDigest: String
+  ) {
+    let deadline = Date().addingTimeInterval(TimeInterval(maximumWaitSeconds))
+    var lastDetail = "replacement daemon has not published readiness"
+    repeat {
+      do {
+        let status = try service.status()
+        guard status.ready else {
+          lastDetail = status.diagnostics.joined(separator: "; ")
+          if Date() < deadline { usleep(100_000) }
+          continue
+        }
+        let instance = try service.daemonInstance()
+        guard instance.pid != previousPID else {
+          lastDetail = "daemon instance PID has not changed"
+          if Date() < deadline { usleep(100_000) }
+          continue
+        }
+        let health = try AgentClient(socketPath: status.socketPath).request(method: "health")
+        let catalogDigest = try agentdHealthCatalogDigest(health)
+        guard catalogDigest == expectedCatalogDigest else {
+          throw CLIError(
+            exitCode: 69,
+            message: "daemon catalog changed across a configuration-preserving restart")
+        }
+        return (status, instance, health, catalogDigest)
+      } catch let error as CLIError {
+        if error.message.contains("catalog changed") { throw error }
+        lastDetail = error.message
+      } catch {
+        lastDetail = "\(error)"
+      }
+      if Date() < deadline { usleep(100_000) }
+    } while Date() < deadline
+    throw CLIError(
+      exitCode: 69,
+      message: "replacement daemon did not become ready within \(maximumWaitSeconds)s: "
+        + lastDetail)
   }
 
   static func refreshSigningAccessIfInstalled() throws {
@@ -1672,16 +1910,7 @@ enum RuntimeCLI {
     path: String
   ) throws -> HAPImportPayload {
     let url = URL(filePath: path).standardizedFileURL
-    let name = url.lastPathComponent
-    guard name.count <= 128,
-      name.range(
-        of: #"^lib[A-Za-z0-9_.-]+\.so$"#,
-        options: .regularExpression) != nil
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "native library file must have a safe lib*.so basename")
-    }
+    let name = try canonicalNativeLibraryImportName(url.lastPathComponent)
     let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
     guard descriptor >= 0 else {
       throw CLIError(
@@ -1740,6 +1969,48 @@ enum RuntimeCLI {
     }
     let digest = SHA256Hex.string(of: contents)
     return HAPImportPayload(name: name, contents: contents, sha256: digest)
+  }
+
+  /// Restores the recorded logical name from an `artifact export` file.
+  ///
+  /// Export deliberately prefixes every file with its collision-resistant
+  /// Artifact ID. Native import deliberately accepts only a `lib*.so`
+  /// logical name. Without this exact bridge, the two published CLI commands
+  /// cannot be composed: a caller must rename Runtime-owned output by hand
+  /// before it can bind the same bytes to a fresh target revision.
+  ///
+  /// Only the exact Artifact ID shape emitted by `RuntimeArtifactStore.export`
+  /// is stripped. Near-matches stay invalid, and the canonical suffix still
+  /// passes the original length and safe-name checks before any bytes are
+  /// opened or uploaded.
+  static func canonicalNativeLibraryImportName(_ basename: String) throws -> String {
+    let exportPrefixLength = 4 + 32 + 1  // `ART-` + lowercase identity + `-`
+    let canonical: String
+    if basename.count > exportPrefixLength {
+      let prefix = String(basename.prefix(exportPrefixLength))
+      if prefix.range(
+        of: #"^ART-[0-9a-f]{32}-$"#,
+        options: .regularExpression) != nil
+      {
+        canonical = String(basename.dropFirst(exportPrefixLength))
+      } else {
+        canonical = basename
+      }
+    } else {
+      canonical = basename
+    }
+    guard canonical.count <= 128,
+      canonical.range(
+        of: #"^lib[A-Za-z0-9_.-]+\.so$"#,
+        options: .regularExpression) != nil
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "native library file must have a safe lib*.so basename or an exact "
+          + "ArkDeck export name ART-<32 lowercase hex>-lib*.so")
+    }
+    return canonical
   }
 
   private static func json2Bool(_ arguments: [String]) -> Bool {

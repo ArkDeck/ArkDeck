@@ -174,6 +174,36 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         releaseScript.contains(requiredStep),
         "release helper pipeline must retain \(requiredStep)")
     }
+
+    let localScript = try String(
+      contentsOf: distribution.appending(path: "build-local-helpers.sh"), encoding: .utf8)
+    for requiredStep in [
+      "security cms -D",
+      "security find-identity -v -p codesigning",
+      "-c debug --product arkdeck",
+      "-c debug --product arkdeck-agentd",
+      "codesign --verify --strict --deep",
+      "--options runtime --timestamp=none",
+      "LOCAL-DEVELOPMENT-BUILD.txt",
+      "-e \"$output_root\" || -L \"$output_root\"",
+      "cp -R \"$workflows_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
+      "cp -R \"$workflows_resource_bundle\" \"$daemon_bundle/Contents/Resources/\"",
+      "cp -R \"$launch_agent_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
+    ] {
+      XCTAssertTrue(
+        localScript.contains(requiredStep),
+        "local helper pipeline must retain \(requiredStep)")
+    }
+    for releaseOnlyStep in [
+      "ARKDECK_NOTARY_KEYCHAIN_PROFILE", "notarytool", "stapler", "spctl",
+    ] {
+      XCTAssertFalse(
+        localScript.contains(releaseOnlyStep),
+        "local helper pipeline must stay separate from release step \(releaseOnlyStep)")
+      XCTAssertTrue(
+        releaseScript.contains(releaseOnlyStep),
+        "release helper pipeline must retain \(releaseOnlyStep)")
+    }
   }
 
   func testProductionInstallerRejectsAnUnsignedHelperBeforeLaunchctl() throws {
@@ -655,6 +685,96 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ])
   }
 
+  func testInstallReenablesPersistentlyDisabledServiceAfterBoundedEIO() throws {
+    runner.requireEnableBeforeBootstrap()
+
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
+
+    XCTAssertEqual(
+      runner.commands,
+      [
+        ["print", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootstrap", "gui/501", paths.plist.path],
+        ["bootstrap", "gui/501", paths.plist.path],
+        ["bootstrap", "gui/501", paths.plist.path],
+        ["enable", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootstrap", "gui/501", paths.plist.path],
+      ])
+  }
+
+  func testRestartPreservesInstalledIdentityConfigurationAndRuntimeState() throws {
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
+    try FileManager.default.createDirectory(
+      at: paths.stateDirectory, withIntermediateDirectories: true)
+    XCTAssertTrue(FileManager.default.createFile(atPath: paths.socket.path, contents: Data()))
+    let stateMarker = paths.stateDirectory.appending(path: "jobs.sqlite")
+    try Data("durable-runtime-history".utf8).write(to: stateMarker)
+    let instance = LaunchAgentDaemonInstance(
+      pid: 4242, socketPath: paths.socket.path,
+      protocolVersion: "1.0.0", startedAtUTC: "2026-08-08T11:59:00Z")
+    try JSONEncoder().encode(instance).write(
+      to: paths.stateDirectory.appending(path: "instance.json"))
+
+    let plistBefore = try Data(contentsOf: paths.plist)
+    let daemonBefore = try Data(contentsOf: paths.installedDaemon)
+    let installReceiptBefore = try Data(contentsOf: paths.receipt)
+    runner.removeAllCommands()
+
+    let restart = try service.restart()
+
+    XCTAssertEqual(restart.schemaVersion, "arkdeck-launchagent-restart/v1")
+    XCTAssertEqual(restart.daemonPath, paths.installedDaemon.path)
+    XCTAssertEqual(restart.daemonSHA256, try digest(paths.installedDaemon))
+    XCTAssertEqual(restart.hdcSHA256, try digest(hdc))
+    XCTAssertEqual(restart.preservedStateDirectory, paths.stateDirectory.path)
+    XCTAssertEqual(try service.daemonInstance(), instance)
+    XCTAssertEqual(try Data(contentsOf: paths.plist), plistBefore)
+    XCTAssertEqual(try Data(contentsOf: paths.installedDaemon), daemonBefore)
+    XCTAssertEqual(try Data(contentsOf: paths.receipt), installReceiptBefore)
+    XCTAssertEqual(try Data(contentsOf: stateMarker), Data("durable-runtime-history".utf8))
+    XCTAssertEqual(
+      runner.commands,
+      [
+        ["print", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootout", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootstrap", "gui/501", paths.plist.path],
+      ])
+  }
+
+  func testRestartPreflightPreservesOnlyClosedUnknownRecoveryJobs() throws {
+    func currentJob(
+      _ id: String, state: String = "waitingForRecovery",
+      outcomeUnknown: Bool = true, waitingForHuman: Bool = false,
+      residue: Int = 0, processProgress: JSONValue = .null,
+      finishedAtUTC: JSONValue = .string("2026-08-09T03:15:26Z")
+    ) -> JSONValue {
+      .object([
+        "jobId": .string(id), "state": .string(state),
+        "outcomeUnknown": .bool(outcomeUnknown),
+        "waitingForHuman": .bool(waitingForHuman),
+        "outstandingResidueCount": .integer(Int64(residue)),
+        "processProgress": processProgress, "finishedAtUtc": finishedAtUTC,
+      ])
+    }
+
+    let classified = try RuntimeCLI.classifyAgentdRestartCurrentJobs([
+      currentJob("job-closed-unknown-b"),
+      currentJob("job-running", state: "running", outcomeUnknown: false),
+      currentJob("job-cleanup", residue: 1),
+      currentJob("job-human", waitingForHuman: true),
+      currentJob("job-open-process", processProgress: .object(["phase": .string("running")])),
+      currentJob("job-no-finish", finishedAtUTC: .null),
+      currentJob("job-closed-unknown-a"),
+    ])
+
+    XCTAssertEqual(
+      classified.preservedUnknownJobIDs,
+      ["job-closed-unknown-a", "job-closed-unknown-b"])
+    XCTAssertEqual(
+      classified.blockingJobIDs,
+      ["job-cleanup", "job-human", "job-no-finish", "job-open-process", "job-running"])
+  }
+
   func testInvalidOrMissingExecutablesFailBeforeLaunchctlAndConfigurationWrites() throws {
     let nonExecutable = root.appending(path: "not-executable")
     try Data("bytes".utf8).write(to: nonExecutable)
@@ -758,6 +878,7 @@ private final class FakeLaunchAgentCommandRunner: LaunchAgentCommandRunning, @un
   private var recordedCommands: [[String]] = []
   private var loaded = false
   private var bootstrapEIOFailuresRemaining = 0
+  private var bootstrapRequiresEnable = false
 
   func run(arguments: [String]) throws -> LaunchAgentCommandResult {
     lock.lock()
@@ -767,6 +888,10 @@ private final class FakeLaunchAgentCommandRunner: LaunchAgentCommandRunning, @un
     case "print":
       return LaunchAgentCommandResult(exitStatus: loaded ? 0 : 113)
     case "bootstrap":
+      if bootstrapRequiresEnable {
+        return LaunchAgentCommandResult(
+          exitStatus: EIO, stderr: Data("Bootstrap failed: 5: Input/output error".utf8))
+      }
       if bootstrapEIOFailuresRemaining > 0 {
         bootstrapEIOFailuresRemaining -= 1
         return LaunchAgentCommandResult(
@@ -776,6 +901,9 @@ private final class FakeLaunchAgentCommandRunner: LaunchAgentCommandRunning, @un
       return LaunchAgentCommandResult(exitStatus: 0)
     case "bootout":
       loaded = false
+      return LaunchAgentCommandResult(exitStatus: 0)
+    case "enable":
+      bootstrapRequiresEnable = false
       return LaunchAgentCommandResult(exitStatus: 0)
     default:
       return LaunchAgentCommandResult(
@@ -798,6 +926,12 @@ private final class FakeLaunchAgentCommandRunner: LaunchAgentCommandRunning, @un
   func failNextBootstrapWithEIO() {
     lock.lock()
     bootstrapEIOFailuresRemaining = 1
+    lock.unlock()
+  }
+
+  func requireEnableBeforeBootstrap() {
+    lock.lock()
+    bootstrapRequiresEnable = true
     lock.unlock()
   }
 }
