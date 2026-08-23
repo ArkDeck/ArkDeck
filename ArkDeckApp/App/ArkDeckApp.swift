@@ -396,6 +396,12 @@ private struct AppShellView: View {
     .onChange(of: deviceList.presentation) { _, observation in
       publishDeviceObservation(observation)
     }
+    // A capture's own bounded reads share the daemon with the device probe.
+    // Measured: one probe is ~54ms of daemon time and the daemon answers one
+    // request at a time, so a tick landing mid-read makes that read wait.
+    .onChange(of: models.uiDumpWorkspace.isCapturing) { _, capturing in
+      deviceList.setLiveObservationPaused(capturing)
+    }
     .task(id: deviceList.startupInformationReady) {
       guard deviceList.startupInformationReady else { return }
       // Yield the main actor once so SwiftUI can commit the complete device

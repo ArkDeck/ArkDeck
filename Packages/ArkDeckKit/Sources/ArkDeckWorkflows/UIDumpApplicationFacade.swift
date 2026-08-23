@@ -702,6 +702,11 @@ public enum UIDumpApplicationFacade {
 }
 
 private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
+  /// Measured on a 446KB screenshot: 64KB chunks cost 21.7ms, 256KB cost
+  /// 7.5ms, 1MB costs 4.8ms, and 4MB costs no less than 1MB. The cost is per
+  /// request (~3ms each), not per byte, so this is the point where fewer
+  /// round trips stops buying anything.
+  private static let artifactChunkBytes: Int64 = 1_024 * 1_024
   private static let maximumSingleArtifactBytes = 32 * 1_024 * 1_024
   private static let maximumCaptureBytes = 64 * 1_024 * 1_024
 
@@ -849,7 +854,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         method: "artifact.read",
         params: [
           "jobId": .string(jobID), "artifactId": .string(artifact.id),
-          "offset": .integer(offset), "maxBytes": .integer(256 * 1_024),
+          "offset": .integer(offset), "maxBytes": .integer(Self.artifactChunkBytes),
           "allowSensitive": .bool(true),
         ])
       let chunk = try artifactChunk(response, artifact: artifact, expectedOffset: offset)

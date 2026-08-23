@@ -77,7 +77,14 @@ final class DeviceListViewModel {
   /// publishes no device event, so a timer is the honest mechanism. It runs
   /// only while the App is active — a backgrounded window has nobody to show
   /// a state change to, and the probe is not free.
-  func startLiveObservation(interval: Duration = .seconds(4)) {
+  ///
+  /// Ten seconds, measured rather than picked: one `device.candidates` costs
+  /// ~54ms of daemon time, and the daemon answers one request at a time, so a
+  /// tick that lands mid-read makes the read wait. At four seconds that
+  /// collision was frequent enough to show up as several-fold jitter in
+  /// unrelated reads; ten keeps an unplug prompt without paying for it
+  /// continuously.
+  func startLiveObservation(interval: Duration = .seconds(10)) {
     guard liveTask == nil else { return }
     liveTask = Task { [weak self] in
       while !Task.isCancelled {
@@ -93,6 +100,17 @@ final class DeviceListViewModel {
   func stopLiveObservation() {
     liveTask?.cancel()
     liveTask = nil
+  }
+
+  /// Suspends polling while a device job is running. The probe and the job's
+  /// own reads compete for the same single-threaded daemon, and a device
+  /// mid-capture is not going anywhere.
+  func setLiveObservationPaused(_ paused: Bool) {
+    if paused {
+      stopLiveObservation()
+    } else {
+      startLiveObservation()
+    }
   }
 
   /// The App's startup task awaits this read as its only startup I/O. Manual
