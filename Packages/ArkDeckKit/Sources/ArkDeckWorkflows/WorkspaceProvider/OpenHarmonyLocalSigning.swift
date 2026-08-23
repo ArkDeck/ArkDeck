@@ -370,6 +370,19 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
 
   package func trustedDaemonApplicationSHA256() throws -> String? {
     let daemonURL = try validatedDaemonURL()
+    // Strict, all-architecture static validation of a signed app bundle costs
+    // about two seconds and blocks in securityd. It was being paid on every
+    // `operation.list`, which made a Viewer refresh cost seconds for an answer
+    // that had not changed. Memoised against the file's own identity: if the
+    // helper on disk is replaced the cache misses and the check runs again,
+    // and a short expiry bounds how long a revocation could go unnoticed.
+    if let cached = RuntimeFileDerivedCaches.daemonIdentity.value(for: daemonURL) { return cached }
+    let fingerprint = try uncachedTrustedDaemonApplicationSHA256(daemonURL)
+    RuntimeFileDerivedCaches.daemonIdentity.store(fingerprint, for: daemonURL)
+    return fingerprint
+  }
+
+  private func uncachedTrustedDaemonApplicationSHA256(_ daemonURL: URL) throws -> String? {
     var staticCode: SecStaticCode?
     let createStatus = SecStaticCodeCreateWithPath(
       daemonURL as CFURL, SecCSFlags(), &staticCode)

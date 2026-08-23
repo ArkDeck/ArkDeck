@@ -29,9 +29,18 @@ public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codabl
 
   package static func hashing(path: String) throws -> WorkspaceExecutableIdentity {
     let canonical = URL(filePath: path).standardizedFileURL.path
-    let bytes = try Data(contentsOf: URL(filePath: canonical))
-    return try WorkspaceExecutableIdentity(
-      path: canonical, sha256: WorkspaceProviderSupport.sha256(bytes))
+    let url = URL(filePath: canonical)
+    // Availability asks this once per published operation, so the same
+    // executable was being read and hashed twenty-five times per
+    // `operation.list`. The digest is a pure function of the bytes; the file
+    // identity behind the memo is the complete invalidation condition.
+    if let cached = RuntimeFileDerivedCaches.executableDigest.value(for: url) {
+      return try WorkspaceExecutableIdentity(path: canonical, sha256: cached)
+    }
+    let bytes = try Data(contentsOf: url)
+    let digest = WorkspaceProviderSupport.sha256(bytes)
+    RuntimeFileDerivedCaches.executableDigest.store(digest, for: url)
+    return try WorkspaceExecutableIdentity(path: canonical, sha256: digest)
   }
 }
 

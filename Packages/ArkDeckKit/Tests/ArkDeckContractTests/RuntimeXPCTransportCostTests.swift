@@ -22,7 +22,7 @@ final class RuntimeXPCTransportCostTests: XCTestCase {
 
   /// Every read the Viewer performs, so the cost of a refresh can be attributed
   /// rather than guessed.
-  private let sweep = ["device.candidates", "target.list"]
+  private let sweep = ["target.list", "operation.list", "job.list", "operation.list"]
 
   func testWhatEachRuntimeReadCosts() async throws {
     guard ProcessInfo.processInfo.environment[Self.environmentKey] == "1" else {
@@ -177,6 +177,69 @@ final class RuntimeXPCTransportCostTests: XCTestCase {
     }
 
     enum ReplicaFailure: Error { case refused }
+  }
+
+  /// What the daemon's own code-identity check costs, and what memoising it
+  /// saves. Measured against the installed helper without replacing it, so
+  /// the saving can be shown before anything is deployed.
+  func testTrustedDaemonIdentityIsExpensiveOnceAndFreeAfterwards() throws {
+    guard ProcessInfo.processInfo.environment[Self.environmentKey] == "1" else {
+      throw XCTSkip("Set \(Self.environmentKey)=1 with an installed helper to measure this")
+    }
+    let store = LoginKeychainSigningSecretStore()
+    RuntimeFileDerivedCaches.daemonIdentity.invalidate()
+
+    let cold = try elapsed { _ = try store.trustedDaemonApplicationSHA256() }
+    var warm: [Double] = []
+    for _ in 0..<8 {
+      warm.append(try elapsed { _ = try store.trustedDaemonApplicationSHA256() })
+    }
+
+    print("[xpc-cost] daemon identity: cold \(round(cold * 100) / 100)ms, warm \(summary(warm))")
+    let evidence = XCTAttachment(
+      string: "cold \(cold)ms\nwarm \(summary(warm))")
+    evidence.name = "daemon-identity-cost"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+
+    // The point of the cache, asserted as a ratio so a busy machine cannot
+    // fail it: a repeat answer must not cost what the first one did.
+    XCTAssertLessThan(
+      median(warm) * 20, cold,
+      "a memoised code-identity answer must be far cheaper than evaluating it again")
+  }
+
+  /// The hash that availability re-derived once per published operation.
+  func testExecutableDigestIsHashedOnceAndMemoisedAfterwards() throws {
+    guard ProcessInfo.processInfo.environment[Self.environmentKey] == "1" else {
+      throw XCTSkip("Set \(Self.environmentKey)=1 to measure the executable digest")
+    }
+    let path = "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc"
+    try XCTSkipUnless(FileManager.default.fileExists(atPath: path), "needs an installed hdc")
+    RuntimeFileDerivedCaches.executableDigest.invalidate()
+
+    let cold = try elapsed { _ = try WorkspaceExecutableIdentity.hashing(path: path) }
+    var warm: [Double] = []
+    for _ in 0..<24 {
+      warm.append(try elapsed { _ = try WorkspaceExecutableIdentity.hashing(path: path) })
+    }
+    print("[xpc-cost] executable digest: cold \(round(cold * 100) / 100)ms, warm \(summary(warm))")
+
+    // Availability asks for this once per operation. Twenty-five operations
+    // used to mean twenty-five hashes of the same unchanged file.
+    XCTAssertLessThan(
+      median(warm) * 20, cold,
+      "a memoised digest must not cost what hashing the file again costs")
+    let evidence = XCTAttachment(string: "cold \(cold)ms\nwarm \(summary(warm))")
+    evidence.name = "executable-digest-cost"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+  }
+
+  private func elapsed(_ body: () throws -> Void) rethrows -> Double {
+    let start = DispatchTime.now().uptimeNanoseconds
+    try body()
+    return Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
   }
 
   func testConnectionPerRequestVersusOneReusedConnection() async throws {
