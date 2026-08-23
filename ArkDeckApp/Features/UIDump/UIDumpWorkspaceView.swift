@@ -55,10 +55,10 @@ struct UIDumpWorkspaceView: View {
   private var toolbar: some View {
     HStack(spacing: 10) {
       Text("Viewer").font(.title2.weight(.semibold))
-      Picker(viewerText("viewer.toolbar.exactTarget"), selection: targetBinding) {
-        Text(viewerText("viewer.toolbar.noTarget")).tag("")
-        ForEach(model.workspace.targets) { target in
-          Text(target.pickerTitle).tag(target.id)
+      Picker(viewerText("viewer.toolbar.device"), selection: targetBinding) {
+        Text(viewerText("viewer.toolbar.noDevice")).tag("")
+        ForEach(model.targets) { target in
+          Text(model.deviceTitle(target)).tag(target.id)
         }
       }
       .frame(maxWidth: 220)
@@ -718,10 +718,36 @@ final class UIDumpWorkspaceViewModel {
   private(set) var isRefreshing = false
   private(set) var isCapturing = false
   private(set) var captureFailure: String?
+  /// The App's shared device observation. Viewer never probes HDC itself; it
+  /// reads this, so an unplug reaches the picker without anyone navigating.
+  private(set) var deviceObservation = DeviceListPresentation.loading
+  private(set) var deviceNames: [String: String] = [:]
   private let provider: any UIDumpApplicationProviding
 
   init(provider: any UIDumpApplicationProviding) { self.provider = provider }
-  var selectedTarget: UIDumpTargetPresentation? { workspace.targets.first { $0.id == selectedTargetID } }
+
+  /// Adoption facts come from the durable target store; only the route is
+  /// live, so the newest observation is re-joined on every read rather than
+  /// frozen into  at refresh time.
+  var targets: [UIDumpTargetPresentation] {
+    UIDumpApplicationFacade.rejoin(targets: workspace.targets, with: deviceObservation)
+  }
+
+  func applyDeviceObservation(_ observation: DeviceListPresentation, names: [String: String]) {
+    deviceObservation = observation
+    deviceNames = names
+  }
+
+  /// What the picker calls a device: the name a person gave it, or the target
+  /// it was adopted as — never a raw connect key, which identifies hardware
+  /// and does not belong on screen.
+  func deviceTitle(_ target: UIDumpTargetPresentation) -> String {
+    let name = deviceNames[target.id] ?? target.id
+    guard let reason = target.connection.failureReason else { return name }
+    return "\(name) · \(reason)"
+  }
+
+  var selectedTarget: UIDumpTargetPresentation? { targets.first { $0.id == selectedTargetID } }
   var selectedNode: ViewerNode? { selectedNodeIdentity.flatMap { capture?.node(identity: $0) } }
   var emptyMessage: String {
     if let failure = workspace.targetLoadFailure { return failure }
@@ -755,11 +781,12 @@ final class UIDumpWorkspaceViewModel {
     guard !isRefreshing else { return }
     isRefreshing = true
     let provider = provider
+    let observation = deviceObservation
     Task { [weak self] in
-      let next = await provider.refreshWorkspace()
+      let next = await provider.refreshWorkspace(deviceObservation: observation)
       guard let self, !Task.isCancelled else { return }
       self.workspace = next
-      self.selectedTargetID = self.preferredTargetID(in: next.targets)
+      self.selectedTargetID = self.preferredTargetID(in: self.targets)
       if self.selectedTarget?.isCaptureReady == false { self.captureFailure = nil }
       self.isRefreshing = false
     }

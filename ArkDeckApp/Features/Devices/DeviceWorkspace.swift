@@ -36,6 +36,7 @@ final class DeviceListViewModel {
   private let displayNamesDefaults: UserDefaults
   private let waitWindow: TimeInterval
   @ObservationIgnored private var waitTask: Task<Void, Never>?
+  @ObservationIgnored private var liveTask: Task<Void, Never>?
   @ObservationIgnored private var refreshGeneration: UInt64 = 0
 
   init(
@@ -62,6 +63,36 @@ final class DeviceListViewModel {
       let current = await provider.refreshCandidates()
       self?.finishRefresh(current, generation: generation)
     }
+  }
+
+  /// The App's one live device observation.
+  ///
+  /// Every workspace used to ask HDC for routing again on the way in, which
+  /// cost a probe per navigation and still showed a device that had been
+  /// unplugged since. One poll here answers all of them, and a device that
+  /// goes away disappears from every surface at once rather than at each
+  /// surface's next visit.
+  ///
+  /// Polling, not subscription: the daemon's door is request/response and
+  /// publishes no device event, so a timer is the honest mechanism. It runs
+  /// only while the App is active — a backgrounded window has nobody to show
+  /// a state change to, and the probe is not free.
+  func startLiveObservation(interval: Duration = .seconds(4)) {
+    guard liveTask == nil else { return }
+    liveTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: interval)
+        guard let self, !Task.isCancelled else { return }
+        // `refresh()` already declines to start while one is in flight, so a
+        // slow probe delays the next tick instead of stacking requests.
+        self.refresh()
+      }
+    }
+  }
+
+  func stopLiveObservation() {
+    liveTask?.cancel()
+    liveTask = nil
   }
 
   /// The App's startup task awaits this read as its only startup I/O. Manual

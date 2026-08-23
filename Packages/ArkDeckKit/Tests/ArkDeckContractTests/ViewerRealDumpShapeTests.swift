@@ -119,6 +119,69 @@ final class ViewerRealDumpShapeTests: XCTestCase {
     XCTAssertEqual(capture.nodes.first?.type, "Unknown")
   }
 
+  // MARK: - The shared device observation drives routing
+
+  private func target(_ id: String) -> UIDumpTargetPresentation {
+    UIDumpTargetPresentation(
+      id: id, bindingRevision: 4, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-07-31T02:43:19Z", connection: .connected)
+  }
+
+  private func candidate(
+    target id: String?, state: String,
+    health: DeviceCandidatePresentation.StateObservationHealth = .current
+  ) -> DeviceCandidatePresentation {
+    DeviceCandidatePresentation(
+      connectKey: "key-\(id ?? "none")", state: state, adoptedTargetID: id,
+      bindingRevision: id == nil ? nil : 4,
+      stateObservedAtUTC: "2026-08-23T00:00:00Z", stateObservationHealth: health)
+  }
+
+  func testATargetTheObservationNoLongerSeesStopsBeingCaptureReady() {
+    // An unplugged device leaves the candidate list. That absence is the
+    // whole signal, and it has to reach the picker without a re-read.
+    let rejoined = UIDumpApplicationFacade.rejoin(
+      targets: [target("TGT-a")],
+      with: DeviceListPresentation(availability: .available, candidates: []))
+    XCTAssertEqual(rejoined.count, 1, "the adopted target itself does not disappear")
+    XCTAssertFalse(rejoined[0].isCaptureReady, "a device that is gone cannot be captured")
+    XCTAssertNotNil(rejoined[0].connection.failureReason, "the picker must be able to say why")
+  }
+
+  func testAStaleObservationIsNotTreatedAsAConnectedRoute() {
+    let rejoined = UIDumpApplicationFacade.rejoin(
+      targets: [target("TGT-a")],
+      with: DeviceListPresentation(
+        availability: .available,
+        candidates: [candidate(target: "TGT-a", state: "Connected", health: .stale)]))
+    XCTAssertFalse(
+      rejoined[0].isCaptureReady,
+      "a stale observation says what was true once, not what is true now")
+  }
+
+  func testAnUnobservedStateNeverDowngradesATarget() {
+    // Not yet measured is not measured-unavailable. Reporting the first poll
+    // as an outage would flap every picker on launch.
+    let rejoined = UIDumpApplicationFacade.rejoin(
+      targets: [target("TGT-a")], with: .loading)
+    XCTAssertTrue(
+      rejoined[0].isCaptureReady,
+      "an observation that has not arrived must not overwrite a known route")
+  }
+
+  func testAConnectedObservationRestoresTheRoute() {
+    let offline = UIDumpTargetPresentation(
+      id: "TGT-a", bindingRevision: 4, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-07-31T02:43:19Z",
+      connection: .unavailable(reason: "HDC reported Offline"))
+    let rejoined = UIDumpApplicationFacade.rejoin(
+      targets: [offline],
+      with: DeviceListPresentation(
+        availability: .available,
+        candidates: [candidate(target: "TGT-a", state: "Connected")]))
+    XCTAssertTrue(rejoined[0].isCaptureReady, "a device that comes back must come back")
+  }
+
   // MARK: - Helpers
 
   private func parse(_ tree: [String: Any]) throws -> ViewerCapture {

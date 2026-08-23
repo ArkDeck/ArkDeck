@@ -390,6 +390,12 @@ private struct AppShellView: View {
       guard deviceList.presentation.availability != .checking else { return }
       refreshVisibleProjection(for: newValue)
     }
+    // The shared device observation feeds every workspace that needs routing,
+    // and keeps feeding it: a device that unplugs leaves the pickers without
+    // anyone navigating. It runs only while the App is active.
+    .onChange(of: deviceList.presentation) { _, observation in
+      publishDeviceObservation(observation)
+    }
     .task(id: deviceList.startupInformationReady) {
       guard deviceList.startupInformationReady else { return }
       // Yield the main actor once so SwiftUI can commit the complete device
@@ -398,8 +404,11 @@ private struct AppShellView: View {
       runtimeHistory.refresh()
       autoUpdate.startup()
       ApplicationIconChoice.applyStoredSelection()
+      publishDeviceObservation(deviceList.presentation)
       refreshVisibleProjection(for: storedSelection)
+      deviceList.startLiveObservation()
     }
+    .onDisappear { deviceList.stopLiveObservation() }
     .alert(
       deviceString("device.rename.title"),
       isPresented: renameDialogIsPresented
@@ -443,6 +452,27 @@ private struct AppShellView: View {
 
   private func openHistory() {
     storedSelection = ShellSelection.navigation(.history).storageValue
+  }
+
+  /// Fans the shared observation out to the workspaces that need routing.
+  /// Under the Viewer fixture the fixture's own device stands in, so a
+  /// launch that fabricates a capture also fabricates the device it came
+  /// from rather than contradicting itself.
+  private func publishDeviceObservation(_ observation: DeviceListPresentation) {
+    let effective = ViewerUIFixture.deviceObservation() ?? observation
+    models.uiDumpWorkspace.applyDeviceObservation(
+      effective, names: deviceDisplayNames(effective))
+  }
+
+  /// Presentation-only names, keyed by the adopted target the workspaces
+  /// address. A connect key identifies hardware and never reaches a picker.
+  private func deviceDisplayNames(_ observation: DeviceListPresentation) -> [String: String] {
+    var names: [String: String] = [:]
+    for candidate in observation.candidates {
+      guard let targetID = candidate.adoptedTargetID else { continue }
+      names[targetID] = deviceList.displayName(for: candidate)
+    }
+    return names
   }
 
   private func refreshVisibleProjection(for storageValue: String) {

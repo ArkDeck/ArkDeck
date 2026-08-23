@@ -632,7 +632,13 @@ public enum ViewerCaptureSubmissionResult: Sendable, Equatable {
 }
 
 public protocol UIDumpApplicationProviding: Sendable {
-  func refreshWorkspace() async -> UIDumpWorkspacePresentation
+  /// The device observation is supplied rather than fetched. HDC routing is
+  /// one fact about the machine, not a fact about Viewer, and every surface
+  /// that re-asked for it paid a probe and still went stale the moment the
+  /// user looked away. The App keeps one live observation and hands it here.
+  func refreshWorkspace(
+    deviceObservation: DeviceListPresentation
+  ) async -> UIDumpWorkspacePresentation
   func recapture(target: UIDumpTargetPresentation) async -> ViewerCaptureSubmissionResult
   func cancel(jobID: String) async -> Bool
 }
@@ -669,6 +675,15 @@ public enum ViewerCaptureRequestBuilder {
 }
 
 public enum UIDumpApplicationFacade {
+  /// Re-joins already-decoded targets against a newer device observation, so a
+  /// workspace can answer an unplug from the App's shared observation without
+  /// re-reading the durable target store.
+  public static func rejoin(
+    targets: [UIDumpTargetPresentation], with observation: DeviceListPresentation
+  ) -> [UIDumpTargetPresentation] {
+    UIDumpWorkspaceResponseDecoding.rejoin(targets: targets, with: observation)
+  }
+
   public static let operationReference = "capture.diagnostics@1"
   private static let descriptor = RuntimeOperationCatalog.descriptor(reference: operationReference)!
 
@@ -690,18 +705,23 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
   private static let maximumSingleArtifactBytes = 32 * 1_024 * 1_024
   private static let maximumCaptureBytes = 64 * 1_024 * 1_024
 
-  func refreshWorkspace() async -> UIDumpWorkspacePresentation {
+  func refreshWorkspace(
+    deviceObservation: DeviceListPresentation
+  ) async -> UIDumpWorkspacePresentation {
     async let operations = UIDumpXPCTransport.request(method: "operation.list")
+    // `target.list` stays: it is a durable store read, not a device probe, and
+    // it carries the adoption facts a candidate does not. What Viewer no
+    // longer does is re-run the HDC probe — admission still requires a fresh
+    // Connected route, but freshness is now a property the shared observation
+    // stamps and this workspace checks, instead of an accident of having just
+    // navigated here.
     async let targets = UIDumpXPCTransport.request(method: "target.list")
-    // Capture admission requires fresh routing facts. The durable target list
-    // alone deliberately cannot prove that a device is still Connected.
-    async let candidates = UIDumpXPCTransport.request(method: "device.candidates")
     async let jobs = UIDumpXPCTransport.request(
       method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
     return UIDumpWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
-      candidateResponse: await candidates,
+      deviceObservation: deviceObservation,
       jobResponse: await jobs)
   }
 
@@ -908,10 +928,10 @@ enum UIDumpWorkspaceResponseDecoding {
   fileprivate static func presentation(
     operationResponse: Result<Data, ViewerTransportFailure>,
     targetResponse: Result<Data, ViewerTransportFailure>,
-    candidateResponse: Result<Data, ViewerTransportFailure>,
+    deviceObservation: DeviceListPresentation,
     jobResponse: Result<Data, ViewerTransportFailure>
   ) -> UIDumpWorkspacePresentation {
-    let targets = decodeTargets(targetResponse, candidateResponse: candidateResponse)
+    let targets = decodeTargets(targetResponse, observation: deviceObservation)
     let jobs = decodeJobs(jobResponse)
     return UIDumpWorkspacePresentation(
       operation: UIDumpApplicationFacade.operationPresentation(
@@ -940,11 +960,11 @@ enum UIDumpWorkspaceResponseDecoding {
 
   private static func decodeTargets(
     _ response: Result<Data, ViewerTransportFailure>,
-    candidateResponse: Result<Data, ViewerTransportFailure>
+    observation: DeviceListPresentation
   ) -> ViewerDecodedList<UIDumpTargetPresentation> {
     do {
       let entries = try resultArray(response.get(), label: "Target list")
-      let routes = targetConnections(candidateResponse)
+      let routes = targetConnections(observation)
       var targets: [UIDumpTargetPresentation] = []
       for entry in entries {
         guard let id = entry["targetId"] as? String,
@@ -970,6 +990,31 @@ enum UIDumpWorkspaceResponseDecoding {
     }
   }
 
+  /// Re-joins already-decoded targets against a newer device observation.
+  ///
+  /// The adoption facts in a target are durable; only the route is live. This
+  /// lets a workspace answer an unplug from the shared observation alone,
+  /// without re-reading the target store to learn something the target store
+  /// does not know.
+  static func rejoin(
+    targets: [UIDumpTargetPresentation], with observation: DeviceListPresentation
+  ) -> [UIDumpTargetPresentation] {
+    // Not yet observed is not observed-unavailable. Overriding during the
+    // first poll would flap every picker to Unavailable and back, and would
+    // report an absence of measurement as a measurement.
+    guard case .available = observation.availability else { return targets }
+    let routes = targetConnections(observation)
+    return targets.map { target in
+      UIDumpTargetPresentation(
+        id: target.id,
+        bindingRevision: target.bindingRevision,
+        toolVersion: target.toolVersion,
+        adoptedAtUTC: target.adoptedAtUTC,
+        connection: routes.connections[target.id] ?? .unavailable(
+          reason: routes.failure ?? "No current HDC route was reported for this target"))
+    }
+  }
+
   static func targetConnection(for candidate: DeviceCandidatePresentation) -> UIDumpTargetConnection {
     guard candidate.isAuthorized else {
       let reason: String
@@ -984,14 +1029,8 @@ enum UIDumpWorkspaceResponseDecoding {
   }
 
   private static func targetConnections(
-    _ response: Result<Data, ViewerTransportFailure>
+    _ presentation: DeviceListPresentation
   ) -> ViewerTargetConnections {
-    switch response {
-    case .failure(let failure):
-      return ViewerTargetConnections(
-        connections: [:], failure: "Could not read current device state: \(failure.message)")
-    case .success(let data):
-      let presentation = DeviceCandidatesResponseDecoding.presentation(data)
       guard case .available = presentation.availability else {
         let reason: String
         if case .unavailable(let value) = presentation.availability { reason = value }
@@ -1011,7 +1050,6 @@ enum UIDumpWorkspaceResponseDecoding {
         connections[targetID] = targetConnection(for: candidate)
       }
       return ViewerTargetConnections(connections: connections, failure: nil)
-    }
   }
 
   private static func decodeJobs(

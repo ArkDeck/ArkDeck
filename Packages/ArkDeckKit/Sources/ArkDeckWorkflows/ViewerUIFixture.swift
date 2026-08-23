@@ -69,6 +69,28 @@ public enum ViewerUIFixture {
       coordinatesAreVerified: true)
   }
 
+  /// The device the fixture claims to have captured.
+  ///
+  /// A fixture that offers a Connected target must also present the device
+  /// that makes it Connected, or the App's shared observation would correctly
+  /// contradict it and the fixture would be describing a device nobody has.
+  public static func deviceObservation(
+    arguments: [String] = CommandLine.arguments
+  ) -> DeviceListPresentation? {
+    guard isSelected(arguments: arguments) else { return nil }
+    return DeviceListPresentation(
+      availability: .available,
+      candidates: [
+        DeviceCandidatePresentation(
+          connectKey: "ui-fixture-connect-key",
+          state: "Connected",
+          adoptedTargetID: "target-ui-fixture",
+          bindingRevision: 1,
+          stateObservedAtUTC: "2026-08-22T00:00:00Z",
+          stateObservationHealth: .current)
+      ])
+  }
+
   public static let screenWidth = 1080
   public static let screenHeight = 1920
 
@@ -271,7 +293,9 @@ public enum ViewerUIFixture {
   private struct Provider: UIDumpApplicationProviding {
     let capture: ViewerCapture
 
-    func refreshWorkspace() async -> UIDumpWorkspacePresentation {
+    func refreshWorkspace(
+      deviceObservation: DeviceListPresentation
+    ) async -> UIDumpWorkspacePresentation {
       UIDumpWorkspacePresentation(
         operation: UIDumpApplicationFacade.operationPresentation(availability: .available),
         targets: [

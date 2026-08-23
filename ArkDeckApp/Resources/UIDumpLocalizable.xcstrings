@@ -630,36 +630,36 @@
         }
       }
     },
-    "viewer.toolbar.exactTarget": {
+    "viewer.toolbar.device": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exact target"
+            "value": "Device"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "精确目标"
+            "value": "设备"
           }
         }
       }
     },
-    "viewer.toolbar.noTarget": {
+    "viewer.toolbar.noDevice": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No target"
+            "value": "No device"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无目标"
+            "value": "无设备"
           }
         }
       }
