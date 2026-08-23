@@ -50,9 +50,13 @@ struct DebugWorkspaceView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      workspaceHeader
-      Divider()
-      tabPicker
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+        workspaceHeader
+        tabPicker
+      }
+      .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+      .padding(.top, WorkspaceMetrics.contentGap)
+      .padding(.bottom, WorkspaceMetrics.tightGap)
       Divider()
       selectedWorkspace
     }
@@ -86,38 +90,36 @@ struct DebugWorkspaceView: View {
 
   private var workspaceHeader: some View {
     ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: 16) {
+      HStack(alignment: .center, spacing: WorkspaceMetrics.blockGap) {
         titleAndScope
-        Spacer(minLength: 12)
+        Spacer(minLength: WorkspaceMetrics.contentGap)
         targetPicker
         operationBadges
       }
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         titleAndScope
-        HStack(spacing: 12) {
+        HStack(spacing: WorkspaceMetrics.contentGap) {
           targetPicker
-          Spacer(minLength: 8)
+          Spacer(minLength: WorkspaceMetrics.tightGap)
           operationBadges
         }
       }
     }
-    .padding(.horizontal, 20)
-    .padding(.vertical, 14)
   }
 
   // The page title lives in the window toolbar; repeating it here would give
   // the detail two perceivable main headings. Only the scope line stays.
   private var titleAndScope: some View {
     Text(DebugL10n.text("debug.scope"))
-      .font(.footnote)
+      .font(WorkspaceFont.secondary)
       .foregroundStyle(.secondary)
       .accessibilityIdentifier("debug.scope")
   }
 
   private var targetPicker: some View {
-    VStack(alignment: .leading, spacing: 3) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       Text(DebugL10n.text("debug.target.label"))
-        .font(.caption)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
       Picker(DebugL10n.text("debug.target.label"), selection: $selectedTargetID) {
         Text(DebugL10n.text("debug.target.none")).tag(String?.none)
@@ -134,11 +136,11 @@ struct DebugWorkspaceView: View {
             localized: LocalizedStringResource.DebugLocalizable.debugTargetBinding(
               Int32(clamping: selectedTarget.bindingRevision), selectedTarget.toolVersion))
         )
-        .font(.caption.monospacedDigit())
+        .font(WorkspaceFont.monospacedDense.monospacedDigit())
         .foregroundStyle(.secondary)
       } else if let failure = model.workspace.targetLoadFailure {
         Text(failure)
-          .font(.caption)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.red)
           .lineLimit(2)
       }
@@ -146,7 +148,7 @@ struct DebugWorkspaceView: View {
   }
 
   private var operationBadges: some View {
-    VStack(alignment: .trailing, spacing: 6) {
+    VStack(alignment: .trailing, spacing: WorkspaceMetrics.tightGap) {
       operationBadge(
         reference: DebugApplicationFacade.captureDiagnosticsReference,
         shortTitle: DebugL10n.text("debug.operation.capture"))
@@ -158,18 +160,19 @@ struct DebugWorkspaceView: View {
 
   private func operationBadge(reference: String, shortTitle: String) -> some View {
     let operation = model.workspace.operation(reference)
-    return HStack(spacing: 6) {
-      Image(systemName: operationStatusSymbol(operation?.availability))
-      Text(shortTitle)
-      Text(reference)
-        .font(.caption.monospaced())
-        .foregroundStyle(.secondary)
+    return WorkspaceChip(
+      text: Text(shortTitle),
+      tone: operationChipTone(operation?.availability),
+      symbol: operationStatusSymbol(operation?.availability))
+      .help(reference)
+  }
+
+  private func operationChipTone(_ availability: DebugRuntimeAvailability?) -> WorkspaceTone {
+    switch availability {
+    case .available: .ok
+    case .checking: .neutral
+    case .unavailable, nil: .warning
     }
-    .font(.caption.weight(.medium))
-    .padding(.horizontal, 9)
-    .padding(.vertical, 5)
-    .background(.quaternary, in: Capsule())
-    .accessibilityElement(children: .combine)
   }
 
   private var tabPicker: some View {
@@ -183,8 +186,6 @@ struct DebugWorkspaceView: View {
     .pickerStyle(.segmented)
     .labelsHidden()
     .frame(maxWidth: 620)
-    .padding(.horizontal, 20)
-    .padding(.vertical, 10)
     .accessibilityIdentifier("debug.tabs")
   }
 
@@ -311,11 +312,11 @@ private struct DebugLogsWorkspace: View {
         .frame(width: geometry.size.width, height: geometry.size.height)
 
         ScrollView {
-          VStack(spacing: 16) {
+          VStack(spacing: WorkspaceMetrics.blockGap) {
             configuration
             liveAndStorage
           }
-          .padding(16)
+          .padding(WorkspaceMetrics.pageInsetHorizontal)
         }
       }
     }
@@ -346,14 +347,14 @@ private struct DebugLogsWorkspace: View {
 
   private var configuration: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         DebugCard(
           title: DebugL10n.text("debug.logs.capture.title"), symbol: "record.circle"
         ) {
-          VStack(alignment: .leading, spacing: 12) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
             LabeledContent(DebugL10n.text("debug.logs.target")) {
               Text(target?.id ?? DebugL10n.text("debug.target.none"))
-                .font(.body.monospaced())
+                .font(WorkspaceFont.monospacedValue)
             }
             Stepper(
               String(
@@ -385,7 +386,7 @@ private struct DebugLogsWorkspace: View {
             Toggle(DebugL10n.text("debug.logs.rawSave"), isOn: $savesRawHiLog)
               .disabled(true)
             Text(DebugL10n.text("debug.logs.filters.note"))
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
             if !invalidFilterNames.isEmpty {
               Label(
@@ -394,7 +395,7 @@ private struct DebugLogsWorkspace: View {
                     invalidFilterNames.joined(separator: ", "))),
                 systemImage: "exclamationmark.circle"
               )
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.red)
             }
           }
@@ -405,7 +406,7 @@ private struct DebugLogsWorkspace: View {
         DebugCard(
           title: DebugL10n.text("debug.logs.request.title"), symbol: "list.bullet.rectangle"
         ) {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
             DebugCodeRow(
               label: "operation", value: DebugApplicationFacade.captureDiagnosticsReference)
             DebugCodeRow(label: "durationSeconds", value: String(durationSeconds))
@@ -433,16 +434,16 @@ private struct DebugLogsWorkspace: View {
               }
               if let jobID = model.activeLogJobID {
                 ProgressView().controlSize(.small)
-                Text(jobID).font(.caption.monospaced()).lineLimit(1)
+                Text(jobID).font(WorkspaceFont.monospacedDense).lineLimit(1)
               }
             }
             if let failure = model.logFailure {
               Label(failure, systemImage: "xmark.octagon")
-                .font(.footnote)
+                .font(WorkspaceFont.secondary)
                 .foregroundStyle(.red)
                 .textSelection(.enabled)
             } else if let terminal = model.logTerminal {
-              VStack(alignment: .leading, spacing: 4) {
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
                 Label(
                   "\(terminal.state) · \(terminal.jobID)",
                   systemImage: terminal.state == "succeeded"
@@ -454,7 +455,7 @@ private struct DebugLogsWorkspace: View {
                     .accessibilityIdentifier("debug.logs.typedFailure")
                 }
               }
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(terminal.state == "succeeded" ? .green : .secondary)
             }
           }
@@ -462,15 +463,15 @@ private struct DebugLogsWorkspace: View {
 
         destructiveActions
       }
-      .padding(16)
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
   }
 
   private var liveAndStorage: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         DebugCard(title: DebugL10n.text("debug.logs.live.title"), symbol: "text.alignleft") {
-          VStack(alignment: .leading, spacing: 10) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
             HStack {
               // Pausing is deliberately a local viewport state; it never
               // cancels or suspends the Runtime Job.
@@ -487,38 +488,45 @@ private struct DebugLogsWorkspace: View {
                 DebugL10n.text("debug.logs.viewport.bounded"),
                 systemImage: "arrow.down.right.and.arrow.up.left"
               )
-              .font(.caption)
+              .font(WorkspaceFont.caption)
               .foregroundStyle(.secondary)
             }
-            ZStack {
-              RoundedRectangle(cornerRadius: 8)
+            ZStack(alignment: .topLeading) {
+              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
                 .fill(Color(nsColor: .textBackgroundColor))
-              VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: "text.page.badge.magnifyingglass")
-                  .font(.title2)
-                  .foregroundStyle(.secondary)
-                Text(DebugL10n.text("debug.logs.live.empty"))
-                  .font(.callout.weight(.medium))
-                Text(DebugL10n.text("debug.logs.live.empty.detail"))
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-                  .multilineTextAlignment(.center)
-                  .frame(maxWidth: 420)
-                if let terminal = model.logTerminal, !terminal.timeline.isEmpty {
-                  Divider()
-                  ForEach(Array(terminal.timeline.suffix(12).enumerated()), id: \.offset) {
-                    _, entry in
-                    Text(entry)
-                      .font(.caption.monospaced())
-                      .textSelection(.enabled)
+              if let terminal = model.logTerminal, !terminal.timeline.isEmpty {
+                ScrollView {
+                  VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap / 2) {
+                    ForEach(Array(terminal.timeline.suffix(12).enumerated()), id: \.offset) {
+                      _, entry in
+                      Text(entry)
+                        .font(WorkspaceFont.monospacedDense)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                   }
+                  .padding(WorkspaceMetrics.contentGap)
                 }
+              } else {
+                VStack(spacing: WorkspaceMetrics.tightGap) {
+                  Image(systemName: "text.page.badge.magnifyingglass")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                  Text(DebugL10n.text("debug.logs.live.empty"))
+                    .font(WorkspaceFont.body.weight(.medium))
+                  Text(DebugL10n.text("debug.logs.live.empty.detail"))
+                    .font(WorkspaceFont.secondary)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(WorkspaceMetrics.pageInsetTop)
               }
-              .padding()
             }
             .frame(minHeight: 250)
             .overlay {
-              RoundedRectangle(cornerRadius: 8)
+              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
                 .stroke(.separator, lineWidth: 1)
             }
             .accessibilityElement(children: .combine)
@@ -527,15 +535,17 @@ private struct DebugLogsWorkspace: View {
         }
 
         DebugCard(title: DebugL10n.text("debug.logs.shards.title"), symbol: "externaldrive") {
-          VStack(alignment: .leading, spacing: 10) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
             HStack {
               Text(DebugL10n.text("debug.logs.shards.sequence"))
               Spacer()
               Text(DebugL10n.text("debug.logs.shards.size"))
+                .frame(width: 72, alignment: .trailing)
               Text(DebugL10n.text("debug.logs.shards.hash"))
                 .frame(width: 100, alignment: .trailing)
+              Color.clear.frame(width: 96, height: 1)
             }
-            .font(.caption.weight(.semibold))
+            .font(WorkspaceFont.label)
             .foregroundStyle(.secondary)
             Divider()
             if runtimeArtifacts.isEmpty {
@@ -550,48 +560,54 @@ private struct DebugLogsWorkspace: View {
             } else {
               ForEach(runtimeArtifacts) { row in
                 let artifact = row.artifact
-                VStack(alignment: .leading, spacing: 5) {
-                  HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                      Text(artifact.name).font(.callout.monospaced())
+                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                  HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+                    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                      Text(artifact.name).font(WorkspaceFont.monospacedValue)
                       Text("\(artifact.status) · \(artifact.privacy)")
-                        .font(.caption)
+                        .font(WorkspaceFont.caption)
                         .foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 12)
+                    Spacer(minLength: WorkspaceMetrics.contentGap)
                     Text(
                       ByteCountFormatter.string(
                         fromByteCount: artifact.byteCount, countStyle: .file)
                     )
-                    .font(.caption.monospacedDigit())
+                    .font(WorkspaceFont.monospacedDense.monospacedDigit())
+                    .frame(width: 72, alignment: .trailing)
                     Text(String(artifact.sha256.prefix(12)))
-                      .font(.caption.monospaced())
+                      .font(WorkspaceFont.monospacedDense)
                       .frame(width: 100, alignment: .trailing)
                       .help(artifact.sha256)
-                    Button(DebugL10n.text("debug.logs.export")) {
-                      pendingExport = row
-                      isExportPreviewPresented = true
-                    }
-                    .disabled(
-                      artifact.status != "published"
-                        || model.exportStatesByArtifactID[artifact.id] == .exporting
-                    )
-                    .accessibilityIdentifier("debug.logs.export.\(artifact.id)")
-                    if model.exportStatesByArtifactID[artifact.id] == .exporting {
-                      ProgressView()
-                        .controlSize(.small)
-                        .accessibilityLabel(DebugL10n.text("debug.logs.exporting"))
-                    }
-                    if case .completed(let url) = model.exportStatesByArtifactID[artifact.id] {
-                      Button(DebugL10n.text("debug.logs.showInFinder")) {
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    HStack(spacing: WorkspaceMetrics.tightGap) {
+                      Button(DebugL10n.text("debug.logs.export")) {
+                        pendingExport = row
+                        isExportPreviewPresented = true
                       }
-                      .accessibilityIdentifier("debug.logs.showInFinder.\(artifact.id)")
+                      .disabled(
+                        artifact.status != "published"
+                          || model.exportStatesByArtifactID[artifact.id] == .exporting
+                      )
+                      .accessibilityIdentifier("debug.logs.export.\(artifact.id)")
+                      if model.exportStatesByArtifactID[artifact.id] == .exporting {
+                        ProgressView()
+                          .controlSize(.small)
+                          .accessibilityLabel(DebugL10n.text("debug.logs.exporting"))
+                      }
+                      if case .completed(let url) = model.exportStatesByArtifactID[artifact.id] {
+                        Button(DebugL10n.text("debug.logs.showInFinder")) {
+                          NSWorkspace.shared.activateFileViewerSelecting([url])
+                        }
+                        .accessibilityIdentifier("debug.logs.showInFinder.\(artifact.id)")
+                      }
                     }
+                    // minWidth, not a hard width: a localized button title must
+                    // not be clipped to keep the column edge.
+                    .frame(minWidth: 96, alignment: .trailing)
                   }
                   if case .failed(let reason) = model.exportStatesByArtifactID[artifact.id] {
                     Label(reason, systemImage: "xmark.octagon")
-                      .font(.caption)
+                      .font(WorkspaceFont.caption)
                       .foregroundStyle(.red)
                       .fixedSize(horizontal: false, vertical: true)
                       .accessibilityIdentifier("debug.logs.exportFailure.\(artifact.id)")
@@ -605,7 +621,7 @@ private struct DebugLogsWorkspace: View {
                 DebugL10n.text("debug.logs.exportBoundary"),
                 systemImage: "checkmark.shield")
             }
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             if let operation {
               Text(
                 String(
@@ -613,7 +629,7 @@ private struct DebugLogsWorkspace: View {
                     ByteCountFormatter.string(
                       fromByteCount: Int64(operation.outputByteBudget), countStyle: .file)))
               )
-              .font(.footnote.monospacedDigit())
+              .font(WorkspaceFont.monospacedDense.monospacedDigit())
               .foregroundStyle(.secondary)
             }
           }
@@ -621,7 +637,7 @@ private struct DebugLogsWorkspace: View {
 
         DebugRecentJobsCard(model: model, jobs: relatedJobs)
       }
-      .padding(16)
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
   }
 
@@ -653,7 +669,7 @@ private struct DebugLogsWorkspace: View {
       title: DebugL10n.text("debug.logs.destructive.title"),
       symbol: "exclamationmark.triangle"
     ) {
-      VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         Text(DebugL10n.text("debug.logs.destructive.scope"))
           .font(.callout)
         // Exactly one destructive buffer action exists in the design
@@ -669,9 +685,16 @@ private struct DebugLogsWorkspace: View {
     }
   }
 
+  /// A bare `TextField` hides its title on macOS, so the capture form rendered
+  /// as five unlabelled boxes whose only clue was a placeholder. `LabeledContent`
+  /// puts each field on the same label/value column as the rows above it.
   private func typedField(_ key: String, text: Binding<String>, prompt: String) -> some View {
-    TextField(DebugL10n.text(key), text: text, prompt: Text(prompt))
-      .textFieldStyle(.roundedBorder)
+    LabeledContent(DebugL10n.text(key)) {
+      TextField(DebugL10n.text(key), text: text, prompt: Text(prompt))
+        .textFieldStyle(.roundedBorder)
+        .labelsHidden()
+        .frame(maxWidth: 180)
+    }
   }
 }
 
@@ -697,13 +720,13 @@ private struct DebugAppsWorkspace: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: 16) {
+          HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
             packageAndIdentity.frame(minWidth: 300, maxWidth: 390)
             lifecycleReview.frame(minWidth: 420, maxWidth: .infinity)
           }
-          VStack(spacing: 16) {
+          VStack(spacing: WorkspaceMetrics.blockGap) {
             packageAndIdentity
             lifecycleReview
           }
@@ -712,8 +735,8 @@ private struct DebugAppsWorkspace: View {
         if !runtimeArtifacts.isEmpty { resultArtifacts }
         DebugRecentJobsCard(model: model, jobs: relatedJobs)
       }
-      .frame(maxWidth: 1_050, alignment: .topLeading)
-      .padding(16)
+      .frame(maxWidth: WorkspaceMetrics.pageMaxWidth, alignment: .topLeading)
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
     .fileImporter(
       isPresented: $isImporterPresented,
@@ -723,13 +746,13 @@ private struct DebugAppsWorkspace: View {
   }
 
   private var packageAndIdentity: some View {
-    VStack(spacing: 16) {
+    VStack(spacing: WorkspaceMetrics.blockGap) {
       DebugAvailabilityCard(operation: operation)
       DebugCard(title: DebugL10n.text("debug.apps.package.title"), symbol: "shippingbox") {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           LabeledContent(DebugL10n.text("debug.apps.target")) {
             Text(target?.id ?? DebugL10n.text("debug.target.none"))
-              .font(.body.monospaced())
+              .font(WorkspaceFont.monospacedValue)
           }
           Button {
             isImporterPresented = true
@@ -737,22 +760,22 @@ private struct DebugAppsWorkspace: View {
             Label(DebugL10n.text("debug.apps.chooseHAP"), systemImage: "doc.badge.plus")
           }
           Text(selectedHAPURL?.lastPathComponent ?? DebugL10n.text("debug.apps.noHAP"))
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .foregroundStyle(selectedHAPURL == nil ? .secondary : .primary)
             .textSelection(.enabled)
           if let selectionError {
             Label(selectionError, systemImage: "xmark.octagon")
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.red)
           }
           Text(DebugL10n.text("debug.apps.localOnly"))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
         }
       }
 
       DebugCard(title: DebugL10n.text("debug.apps.identity.title"), symbol: "tag") {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           TextField(
             DebugL10n.text("debug.apps.bundle"), text: $bundleName,
             prompt: Text("com.example.app"))
@@ -769,12 +792,12 @@ private struct DebugAppsWorkspace: View {
                   invalid)),
               systemImage: "exclamationmark.circle"
             )
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.red)
             .accessibilityIdentifier("debug.apps.identity.invalid")
           }
           Text(DebugL10n.text("debug.apps.identity.note"))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
         }
         .textFieldStyle(.roundedBorder)
@@ -783,11 +806,11 @@ private struct DebugAppsWorkspace: View {
   }
 
   private var lifecycleReview: some View {
-    VStack(spacing: 16) {
+    VStack(spacing: WorkspaceMetrics.blockGap) {
       DebugCard(
         title: DebugL10n.text("debug.apps.lifecycle.title"), symbol: "arrow.triangle.2.circlepath"
       ) {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           Picker(DebugL10n.text("debug.apps.installPolicy"), selection: $installPolicy) {
             Text(DebugL10n.text("debug.apps.install.replace")).tag("installOrReplace")
             Text(DebugL10n.text("debug.apps.install.fresh")).tag("installFresh")
@@ -816,13 +839,13 @@ private struct DebugAppsWorkspace: View {
           )
           .font(.callout.weight(.medium))
           Text(DebugL10n.text("debug.apps.mutationDetail"))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
         }
       }
 
       DebugCard(title: DebugL10n.text("debug.apps.plan.title"), symbol: "list.number") {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           DebugCodeRow(label: "bundleName", value: bundleName.isEmpty ? "—" : bundleName)
           DebugCodeRow(label: "abilityName", value: abilityName.isEmpty ? "—" : abilityName)
           DebugCodeRow(label: "installPolicy", value: installPolicy)
@@ -832,20 +855,20 @@ private struct DebugAppsWorkspace: View {
           Divider()
           if let operation {
             ForEach(operation.steps) { step in
-              HStack(alignment: .firstTextBaseline, spacing: 10) {
+              HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
                 Image(systemName: effectSymbol(step.effect))
                   .frame(width: 18)
                   .foregroundStyle(effectColor(step.effect))
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
                   Text(step.id).font(.callout.monospaced().weight(.medium))
                   Text("\(step.kind) · \(step.effect)")
-                    .font(.caption)
+                    .font(WorkspaceFont.caption)
                     .foregroundStyle(.secondary)
                 }
                 Spacer()
                 if step.isOptional {
                   Text(DebugL10n.text("debug.optional"))
-                    .font(.caption2)
+                    .font(WorkspaceFont.caption)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(.quaternary, in: Capsule())
@@ -862,9 +885,9 @@ private struct DebugAppsWorkspace: View {
                   model.activeHAPJobID == nil
                     ? "debug.apps.importing" : "debug.apps.running")
               )
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               if let jobID = model.activeHAPJobID {
-                Text(jobID).font(.caption.monospaced()).lineLimit(1)
+                Text(jobID).font(WorkspaceFont.monospacedDense).lineLimit(1)
                 Spacer()
                 Button(DebugL10n.text("debug.action.cancel")) { model.cancelHAP() }
                   .disabled(model.isCancellingHAP)
@@ -891,13 +914,13 @@ private struct DebugAppsWorkspace: View {
           }
           if let failure = model.hapFailure {
             Label(failure, systemImage: "xmark.octagon")
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.red)
               .fixedSize(horizontal: false, vertical: true)
               .textSelection(.enabled)
           }
           if let terminal = model.hapTerminal {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
               Label(
                 "\(terminal.state) · \(terminal.jobID)",
                 systemImage: terminal.state == "succeeded"
@@ -909,7 +932,7 @@ private struct DebugAppsWorkspace: View {
                   .accessibilityIdentifier("debug.apps.typedFailure")
               }
             }
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
           }
         }
@@ -919,16 +942,16 @@ private struct DebugAppsWorkspace: View {
 
   private var packageInventory: some View {
     DebugCard(title: DebugL10n.text("debug.apps.inventory.title"), symbol: "tablecells") {
-      VStack(spacing: 12) {
+      VStack(spacing: WorkspaceMetrics.contentGap) {
         HStack {
           Text(DebugL10n.text("debug.apps.inventory.package"))
           Spacer()
           Text(DebugL10n.text("debug.apps.inventory.pid"))
-            .font(.body.monospacedDigit())
+            .frame(width: 72, alignment: .trailing)
           Text(DebugL10n.text("debug.apps.inventory.debuggable"))
             .frame(width: 100, alignment: .trailing)
         }
-        .font(.caption.weight(.semibold))
+        .font(WorkspaceFont.label)
         .foregroundStyle(.secondary)
         Divider()
         if let runtimeProbe, runtimeProbe.targetID == target?.id,
@@ -936,10 +959,16 @@ private struct DebugAppsWorkspace: View {
         {
           ForEach(runtimeProbe.packages, id: \.self) { package in
             HStack {
-              Text(package).font(.callout.monospaced()).textSelection(.enabled)
+              Text(package).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
               Spacer()
-              Text("—").font(.body.monospacedDigit()).foregroundStyle(.secondary)
-              Text("—").frame(width: 100, alignment: .trailing).foregroundStyle(.secondary)
+              Text("—")
+                .font(WorkspaceFont.tabularSecondary)
+                .frame(width: 72, alignment: .trailing)
+                .foregroundStyle(.secondary)
+              Text("—")
+                .font(WorkspaceFont.body)
+                .frame(width: 100, alignment: .trailing)
+                .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
           }
@@ -953,7 +982,7 @@ private struct DebugAppsWorkspace: View {
         }
         if let warnings = runtimeProbe?.warnings, !warnings.isEmpty {
           Text(warnings.joined(separator: " · "))
-            .font(.caption.monospaced())
+            .font(WorkspaceFont.monospacedDense)
             .foregroundStyle(.orange)
             .textSelection(.enabled)
         }
@@ -970,23 +999,23 @@ private struct DebugAppsWorkspace: View {
 
   private var resultArtifacts: some View {
     DebugCard(title: DebugL10n.text("debug.apps.artifacts.title"), symbol: "shippingbox.fill") {
-      VStack(spacing: 8) {
+      VStack(spacing: WorkspaceMetrics.tightGap) {
         ForEach(runtimeArtifacts) { row in
-          HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-              Text(row.artifact.name).font(.callout.monospaced())
+          HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+              Text(row.artifact.name).font(WorkspaceFont.monospacedValue)
               Text("\(row.artifact.status) · \(row.artifact.privacy) · \(row.jobID)")
-                .font(.caption)
+                .font(WorkspaceFont.caption)
                 .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: WorkspaceMetrics.contentGap)
             Text(
               ByteCountFormatter.string(
                 fromByteCount: row.artifact.byteCount, countStyle: .file)
             )
-            .font(.caption.monospacedDigit())
+            .font(WorkspaceFont.monospacedDense.monospacedDigit())
             Text(String(row.artifact.sha256.prefix(12)))
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .help(row.artifact.sha256)
           }
           .accessibilityElement(children: .combine)
@@ -1057,30 +1086,30 @@ private struct DebugNetworkWorkspace: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: 16) {
+          HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
             ruleEditor.frame(minWidth: 320, maxWidth: 410)
             ruleList.frame(minWidth: 420, maxWidth: .infinity)
           }
-          VStack(spacing: 16) {
+          VStack(spacing: WorkspaceMetrics.blockGap) {
             ruleEditor
             ruleList
           }
         }
         protocolAndSafety
       }
-      .frame(maxWidth: 1_050, alignment: .topLeading)
-      .padding(16)
+      .frame(maxWidth: WorkspaceMetrics.pageMaxWidth, alignment: .topLeading)
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
   }
 
   private var ruleEditor: some View {
     DebugCard(title: DebugL10n.text("debug.network.editor.title"), symbol: "plus.circle") {
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         LabeledContent(DebugL10n.text("debug.network.target")) {
           Text(target?.id ?? DebugL10n.text("debug.target.none"))
-            .font(.body.monospaced())
+            .font(WorkspaceFont.monospacedValue)
         }
         Picker(DebugL10n.text("debug.network.direction"), selection: $direction) {
           Text(DebugL10n.text("debug.network.forward")).tag(DebugPortRuleDirection.forward)
@@ -1109,9 +1138,9 @@ private struct DebugNetworkWorkspace: View {
               return true
             }())
         if let jobID = model.activePortRuleJobID {
-          HStack(spacing: 8) {
+          HStack(spacing: WorkspaceMetrics.tightGap) {
             ProgressView().controlSize(.small)
-            Text(jobID).font(.caption.monospaced()).lineLimit(1)
+            Text(jobID).font(WorkspaceFont.monospacedDense).lineLimit(1)
             Spacer()
             Button(DebugL10n.text("debug.action.cancel")) {
               model.cancelPortRuleMutation()
@@ -1122,12 +1151,12 @@ private struct DebugNetworkWorkspace: View {
         }
         if let failure = model.portRuleFailure {
           Label(failure, systemImage: "exclamationmark.triangle")
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
         }
         if let terminal = model.portRuleTerminal {
-          VStack(alignment: .leading, spacing: 4) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Label(
               "\(terminal.state) · \(terminal.jobID)",
               systemImage: terminal.state == "succeeded"
@@ -1139,7 +1168,7 @@ private struct DebugNetworkWorkspace: View {
                 .accessibilityIdentifier("debug.network.typedFailure")
             }
           }
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
         }
       }
@@ -1152,21 +1181,21 @@ private struct DebugNetworkWorkspace: View {
     case .valid:
       Label(DebugL10n.text("debug.network.validation.valid"), systemImage: "checkmark.circle")
         .foregroundStyle(.green)
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
     case .invalid(let failure):
       Label(
         DebugL10n.text("debug.network.validation.\(failure.rawValue)"),
         systemImage: "exclamationmark.circle"
       )
       .foregroundStyle(localPort.isEmpty && remotePort.isEmpty ? Color.secondary : Color.red)
-      .font(.footnote)
+      .font(WorkspaceFont.secondary)
     }
   }
 
   private var ruleList: some View {
     DebugCard(title: DebugL10n.text("debug.network.rules.title"), symbol: "arrow.left.arrow.right")
     {
-      VStack(spacing: 12) {
+      VStack(spacing: WorkspaceMetrics.contentGap) {
         HStack {
           Text(DebugL10n.text("debug.network.rules.direction"))
           Text(DebugL10n.text("debug.network.rules.local"))
@@ -1177,7 +1206,7 @@ private struct DebugNetworkWorkspace: View {
           Text(DebugL10n.text("debug.network.rules.action"))
             .frame(width: 72, alignment: .trailing)
         }
-        .font(.caption.weight(.semibold))
+        .font(WorkspaceFont.label)
         .foregroundStyle(.secondary)
         Divider()
         if let runtimeProbe, runtimeProbe.targetID == target?.id,
@@ -1186,11 +1215,11 @@ private struct DebugNetworkWorkspace: View {
           ForEach(Array(runtimeProbe.portRules.enumerated()), id: \.offset) { _, rule in
             HStack {
               Text(rule.direction.rawValue)
-              Text("tcp:\(rule.localPort)").font(.body.monospacedDigit())
+              Text("tcp:\(rule.localPort)").font(WorkspaceFont.tabularSecondary)
               Spacer()
-              Text("tcp:\(rule.remotePort)").font(.body.monospacedDigit())
+              Text("tcp:\(rule.remotePort)").font(WorkspaceFont.tabularSecondary)
               Text("active")
-                .font(.caption.weight(.medium))
+                .font(WorkspaceFont.label)
                 .foregroundStyle(.green)
                 .frame(width: 90, alignment: .trailing)
               Button(DebugL10n.text("debug.network.delete"), role: .destructive) {
@@ -1224,11 +1253,11 @@ private struct DebugNetworkWorkspace: View {
           !warnings.isEmpty
         {
           Text(warnings.joined(separator: " · "))
-            .font(.caption.monospaced())
+            .font(WorkspaceFont.monospacedDense)
             .foregroundStyle(.orange)
         }
         Label(DebugL10n.text("debug.network.delete.scope"), systemImage: "target")
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
       }
     }
@@ -1236,7 +1265,7 @@ private struct DebugNetworkWorkspace: View {
 
   private var protocolAndSafety: some View {
     DebugCard(title: DebugL10n.text("debug.network.safety.title"), symbol: "checkmark.shield") {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
         Label(DebugL10n.text("debug.network.safety.typed"), systemImage: "number")
         Label(DebugL10n.text("debug.network.safety.noShell"), systemImage: "text.badge.xmark")
         Label(DebugL10n.text("debug.network.safety.binding"), systemImage: "link")
@@ -1267,10 +1296,12 @@ private struct DebugCommandsWorkspace: View {
           DebugL10n.text("debug.commands.calloutTyped"),
           systemImage: "exclamationmark.shield"
         )
-        .font(.callout)
-        .padding(10)
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary, Color.orange)
+        .symbolRenderingMode(.palette)
+        .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+        .padding(.vertical, WorkspaceMetrics.tightGap)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.08))
         .accessibilityIdentifier("debug.commands.typedOnly")
         Divider()
         HSplitView {
@@ -1283,7 +1314,8 @@ private struct DebugCommandsWorkspace: View {
               }
               .buttonStyle(.plain)
               .listRowBackground(
-                selectedTemplateID == template.id ? Color.accentColor.opacity(0.14) : Color.clear)
+                selectedTemplateID == template.id
+                  ? Color(nsColor: .selectedContentBackgroundColor) : Color.clear)
             }
           }
           .frame(minWidth: 240, idealWidth: 280, maxWidth: 330, maxHeight: .infinity)
@@ -1299,16 +1331,16 @@ private struct DebugCommandsWorkspace: View {
 
   private var commandDetail: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         if let template = selectedTemplate {
           DebugCard(title: template.id, symbol: "chevron.left.forwardslash.chevron.right") {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
               DebugCodeRow(label: "catalog", value: "arkdeck-remote-operations@1.0.0")
               DebugCodeRow(label: "actionId", value: template.id)
               DebugCodeRow(label: "effect", value: template.effect)
               LabeledContent(DebugL10n.text("debug.commands.target")) {
                 Text(target?.id ?? DebugL10n.text("debug.target.none"))
-                  .font(.body.monospaced())
+                  .font(WorkspaceFont.monospacedValue)
               }
               Text(DebugL10n.text("debug.commands.noParameters"))
                 .font(.callout)
@@ -1319,7 +1351,7 @@ private struct DebugCommandsWorkspace: View {
           DebugCard(
             title: DebugL10n.text("debug.commands.argv.title"), symbol: "list.bullet.rectangle"
           ) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
               DebugCodeRow(
                 label: DebugL10n.text("debug.commands.executable"),
                 value: model.commandResult.map {
@@ -1333,13 +1365,13 @@ private struct DebugCommandsWorkspace: View {
                 DebugCodeRow(label: "lowering sha256", value: result.loweringSHA256)
               }
               Text(DebugL10n.text("debug.commands.argv.note"))
-                .font(.footnote)
+                .font(WorkspaceFont.secondary)
                 .foregroundStyle(.secondary)
             }
           }
 
           DebugCard(title: DebugL10n.text("debug.commands.result.title"), symbol: "doc.text") {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
               HStack {
                 DebugCodeRow(
                   label: DebugL10n.text("debug.commands.result.exitCode"),
@@ -1352,12 +1384,12 @@ private struct DebugCommandsWorkspace: View {
               Divider()
               LabeledContent(DebugL10n.text("debug.commands.result.stdout")) {
                 Text(model.commandResult?.stdout ?? DebugL10n.text("debug.commands.result.none"))
-                  .font(.body.monospaced())
+                  .font(WorkspaceFont.monospacedValue)
                   .textSelection(.enabled)
               }
               LabeledContent(DebugL10n.text("debug.commands.result.stderr")) {
                 Text(model.commandResult?.stderr ?? DebugL10n.text("debug.commands.result.none"))
-                  .font(.body.monospaced())
+                  .font(WorkspaceFont.monospacedValue)
                   .textSelection(.enabled)
               }
             }
@@ -1372,18 +1404,18 @@ private struct DebugCommandsWorkspace: View {
             .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
             Spacer()
             Label(DebugL10n.text("debug.commands.noPTY"), systemImage: "rectangle.slash")
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
           }
           if model.isRunningCommand { ProgressView().controlSize(.small) }
           if let failure = model.commandFailure {
             Label(failure, systemImage: "xmark.octagon")
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.red)
               .textSelection(.enabled)
           }
           Text(DebugL10n.text("debug.commands.footerNoFreeText"))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("debug.commands.footer")
@@ -1391,8 +1423,8 @@ private struct DebugCommandsWorkspace: View {
           ContentUnavailableView(DebugL10n.text("debug.commands.select"), systemImage: "terminal")
         }
       }
-      .frame(maxWidth: 760, alignment: .topLeading)
-      .padding(16)
+      .frame(maxWidth: WorkspaceMetrics.pageMaxWidth, alignment: .topLeading)
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
   }
 }
@@ -1411,10 +1443,10 @@ private struct DebugCommandTemplateRow: View {
 
   var body: some View {
     Label {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(template.id).font(.body.monospaced())
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Text(template.id).font(WorkspaceFont.monospacedValue)
         Text(template.effect)
-          .font(.caption)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(effectColor)
       }
     } icon: {
@@ -1429,7 +1461,7 @@ private struct DebugAvailabilityCard: View {
 
   var body: some View {
     DebugCard(title: DebugL10n.text("debug.availability.title"), symbol: "checkmark.seal") {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
         if let operation {
           DebugCodeRow(
             label: DebugL10n.text("debug.availability.operation"), value: operation.reference)
@@ -1448,7 +1480,7 @@ private struct DebugAvailabilityCard: View {
             .foregroundStyle(.red)
             ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
               Text(reason)
-                .font(.caption.monospaced())
+                .font(WorkspaceFont.monospacedDense)
                 .textSelection(.enabled)
             }
           }
@@ -1456,7 +1488,7 @@ private struct DebugAvailabilityCard: View {
             LocalizedStringResource.DebugLocalizable.debugAvailabilityEffect(
               operation.minimumEffect)
           )
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
         } else {
           DebugBlockedReason(text: DebugL10n.text("debug.availability.missing"))
@@ -1478,27 +1510,27 @@ private struct DebugRecentJobsCard: View {
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, minHeight: 54, alignment: .center)
       } else {
-        VStack(spacing: 8) {
+        VStack(spacing: WorkspaceMetrics.tightGap) {
           ForEach(jobs.prefix(5)) { job in
-            VStack(alignment: .leading, spacing: 4) {
-              HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+              HStack(spacing: WorkspaceMetrics.contentGap) {
                 Image(systemName: job.needsAttention ? "exclamationmark.triangle" : "circle.fill")
-                  .font(.caption)
+                  .font(WorkspaceFont.caption)
                   .foregroundStyle(job.needsAttention ? .orange : .secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(job.id).font(.callout.monospaced())
+                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                  Text(job.id).font(WorkspaceFont.monospacedValue)
                   Text("\(job.targetID) · \(job.operationReference)")
-                    .font(.caption.monospaced())
+                    .font(WorkspaceFont.monospacedDense)
                     .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text(job.state)
-                  .font(.caption.weight(.medium))
+                  .font(WorkspaceFont.label)
                 if job.isActive {
                   Button {
                     model.cancelOutstandingJob(job)
                   } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: WorkspaceMetrics.rowGap) {
                       if model.isCancellingOutstandingJob(job.id) {
                         ProgressView().controlSize(.mini)
                       }
@@ -1512,13 +1544,13 @@ private struct DebugRecentJobsCard: View {
               }
               if let failure = job.operationFailure {
                 Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
-                  .font(.caption)
+                  .font(WorkspaceFont.caption)
                   .foregroundStyle(.secondary)
                   .lineLimit(3)
                   .accessibilityIdentifier("debug.jobs.typedFailure.\(job.id)")
               } else if let latest = job.timeline.last {
                 Text(latest)
-                  .font(.caption.monospaced())
+                  .font(WorkspaceFont.monospacedDense)
                   .foregroundStyle(.secondary)
                   .lineLimit(2)
               }
@@ -1536,14 +1568,9 @@ private struct DebugCard<Content: View>: View {
   @ViewBuilder let content: Content
 
   var body: some View {
-    GroupBox {
+    WorkspaceTitledCard(Text(title), symbol: symbol) {
       content
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(.top, 4)
-    } label: {
-      Label(title, systemImage: symbol)
-        .font(.headline)
-        .accessibilityAddTraits(.isHeader)
     }
   }
 }
@@ -1555,7 +1582,7 @@ private struct DebugCodeRow: View {
   var body: some View {
     LabeledContent(label) {
       Text(value)
-        .font(.callout.monospaced())
+        .font(WorkspaceFont.monospacedValue)
         .textSelection(.enabled)
         .multilineTextAlignment(.trailing)
     }
@@ -1567,7 +1594,7 @@ private struct DebugBlockedReason: View {
 
   var body: some View {
     Label(text, systemImage: "lock.fill")
-      .font(.footnote)
+      .font(WorkspaceFont.secondary)
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
       .accessibilityElement(children: .combine)

@@ -6,7 +6,7 @@ struct TraceConfigurationView: View {
   var model: TraceWorkspaceViewModel
 
   var body: some View {
-    VStack(spacing: 18) {
+    VStack(spacing: WorkspaceMetrics.blockGap) {
       presetAndTags
       captureBounds
       parameterSnapshots
@@ -15,8 +15,9 @@ struct TraceConfigurationView: View {
   }
 
   private var presetAndTags: some View {
-    GroupBox(traceString("trace.configuration.title")) {
-      VStack(alignment: .leading, spacing: 14) {
+    WorkspaceSection(
+      Text(traceString("trace.configuration.title")),
+      accessory: {
         Picker(traceString("trace.configuration.mode"), selection: modeBinding) {
           Text(traceString("trace.configuration.preset"))
             .tag(TraceConfigurationMode.preset)
@@ -26,14 +27,18 @@ struct TraceConfigurationView: View {
             .accessibilityIdentifier("trace.configuration.mode.custom")
         }
         .pickerStyle(.segmented)
-        .frame(maxWidth: 280)
+        .labelsHidden()
+        .frame(maxWidth: 200)
         .accessibilityIdentifier("trace.configuration.mode")
-
+      }
+    ) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         if model.configurationMode == .preset {
-          VStack(alignment: .leading, spacing: 6) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
             Text(traceString("trace.preset.label"))
-              .font(.subheadline.weight(.semibold))
-            VStack(alignment: .leading, spacing: 6) {
+              .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
               ForEach(
                 TracePresetCatalog.definitions.filter { $0.id != .custom },
                 id: \.id.rawValue
@@ -43,7 +48,7 @@ struct TraceConfigurationView: View {
             }
             .accessibilityIdentifier("trace.preset.picker")
             Text(traceString("trace.preset.logicalNote"))
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
           }
         } else {
@@ -66,7 +71,7 @@ struct TraceConfigurationView: View {
 
         DisclosureGroup(traceString("trace.probe.rawHelp.title")) {
           Text(model.selectedRuntimeProbe?.rawHelp ?? traceString("trace.probe.rawHelp.empty"))
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -74,15 +79,14 @@ struct TraceConfigurationView: View {
         }
         .accessibilityIdentifier("trace.probe.rawHelp")
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
   private var customTags: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       Text(traceString("trace.custom.title"))
-        .font(.subheadline.weight(.semibold))
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
       if model.selectedPreset.logicalTags.isEmpty {
         traceNotice(
           traceString("trace.custom.empty"),
@@ -90,7 +94,7 @@ struct TraceConfigurationView: View {
           color: .secondary,
           identifier: "trace.custom.empty")
       } else {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: WorkspaceMetrics.tightGap)], spacing: WorkspaceMetrics.tightGap) {
           ForEach(model.selectedPreset.logicalTags, id: \.self) { tag in
             customTagToggle(tag)
           }
@@ -98,12 +102,12 @@ struct TraceConfigurationView: View {
         Text(
           LocalizedStringResource.TraceLocalizable.traceCustomCount(model.customTags.count)
         )
-          .font(.footnote.monospacedDigit())
+          .font(WorkspaceFont.monospacedDense.monospacedDigit())
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("trace.custom.count")
       }
       Text(traceString("trace.custom.noFreeText"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
     }
   }
@@ -118,18 +122,21 @@ struct TraceConfigurationView: View {
       model.toggleCustomTag(tag)
     } label: {
       Label(tag, systemImage: selected ? "checkmark.circle.fill" : "circle")
-        .font(.callout.monospaced())
-        .foregroundStyle(selected ? Color.primary : Color.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .font(WorkspaceFont.monospacedValue)
+        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+        .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+        .padding(.vertical, WorkspaceMetrics.tightGap)
+        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
         .background(
-          selected
-            ? AnyShapeStyle(Color.accentColor.opacity(0.14))
-            : AnyShapeStyle(.quaternary.opacity(0.5)),
-          in: Capsule()
+          selected ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(Color.clear),
+          in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
         )
-        .contentShape(Capsule())
+        .overlay {
+          RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+            .stroke(
+              selected ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .help(isLastSelected ? traceString("trace.custom.minimumOne") : "")
@@ -148,28 +155,30 @@ struct TraceConfigurationView: View {
     return Button {
       model.setPreset(preset.id)
     } label: {
-      HStack(alignment: .top, spacing: 10) {
+      HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
         Image(systemName: selected ? "largecircle.fill.circle" : "circle")
           .foregroundStyle(selected ? Color.accentColor : Color.secondary)
           .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
           Text(traceString("trace.preset.\(preset.id.rawValue)"))
-            .font(.callout.weight(.semibold))
+            .font(WorkspaceFont.body.weight(.semibold))
           Text(preset.logicalTags.joined(separator: " "))
-            .font(.caption.monospaced())
+            .font(WorkspaceFont.monospacedDense)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
         Spacer(minLength: 8)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(8)
-      .background(selected ? Color.accentColor.opacity(0.08) : Color.clear)
-      .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(
-            selected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1)
-      }
+      .padding(.horizontal, WorkspaceMetrics.tightGap)
+      .padding(.vertical, WorkspaceMetrics.tightGap)
+      // `.radio` in the prototype is a radio and a label, not a card: six
+      // bordered boxes stacked down a column read as six separate objects and
+      // spend most of the page's height on chrome.
+      .background(
+        selected ? Color.accentColor.opacity(0.10) : Color.clear,
+        in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+      )
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
@@ -180,10 +189,11 @@ struct TraceConfigurationView: View {
   }
 
   private var requestedTagDiff: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       HStack {
         Text(traceString("trace.tags.title"))
-          .font(.subheadline.weight(.semibold))
+          .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
         Spacer(minLength: 12)
         Text(
           String(
@@ -191,14 +201,14 @@ struct TraceConfigurationView: View {
               Int32(clamping: model.requestedTags.count - model.unsupportedRequestedTags.count),
               Int32(clamping: model.requestedTags.count)))
         )
-        .font(.caption.monospacedDigit())
+        .font(WorkspaceFont.monospacedDense.monospacedDigit())
         .foregroundStyle(model.unsupportedRequestedTags.isEmpty ? Color.green : Color.orange)
       }
-      LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+      LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: WorkspaceMetrics.tightGap)], spacing: WorkspaceMetrics.tightGap) {
         ForEach(model.requestedTags, id: \.self) { tag in
           let supported = model.confirmedTags.contains(tag)
           Label(tag, systemImage: supported ? "checkmark.circle.fill" : "xmark.circle.fill")
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .foregroundStyle(supported ? Color.green : Color.red)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -210,18 +220,18 @@ struct TraceConfigurationView: View {
         }
       }
       Text(traceString("trace.tags.verifiedNote"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
 
   private var captureBounds: some View {
-    GroupBox(traceString("trace.bounds.title")) {
-      VStack(alignment: .leading, spacing: 12) {
+    WorkspaceSection(Text(traceString("trace.bounds.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: 24) { boundFields }
-          VStack(alignment: .leading, spacing: 12) { boundFields }
+          HStack(alignment: .top, spacing: WorkspaceMetrics.sectionGap) { boundFields }
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) { boundFields }
         }
 
         Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
@@ -244,17 +254,16 @@ struct TraceConfigurationView: View {
           color: .secondary,
           identifier: "trace.progress.honest")
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
   @ViewBuilder
   private var boundFields: some View {
-    VStack(alignment: .leading, spacing: 5) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       Text(traceString("trace.bounds.duration"))
-        .font(.subheadline.weight(.semibold))
-      HStack(spacing: 6) {
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+      HStack(spacing: WorkspaceMetrics.tightGap) {
         Picker(traceString("trace.bounds.duration"), selection: durationBinding) {
           ForEach(TraceConfigurationView.durationChoicesSeconds, id: \.self) { seconds in
             Text("\(seconds) s").tag(String(seconds))
@@ -265,26 +274,32 @@ struct TraceConfigurationView: View {
         .frame(maxWidth: 200)
         .accessibilityIdentifier("trace.duration")
       }
-      Text(validationMessage(model.durationValidation))
-        .font(.footnote)
-        .foregroundStyle(model.durationIsValid ? Color.secondary : Color.red)
-        .accessibilityIdentifier("trace.duration.validation")
+      Label {
+        Text(validationMessage(model.durationValidation))
+      } icon: {
+        Image(systemName: model.durationIsValid ? "checkmark.circle" : "exclamationmark.triangle")
+      }
+      .labelStyle(.titleAndIcon)
+      .font(WorkspaceFont.secondary)
+      .foregroundStyle(model.durationIsValid ? Color.secondary : Color.red)
+      .accessibilityIdentifier("trace.duration.validation")
     }
 
     // The buffer is a fact the capability probe converges, not a value a
     // person types; the request preview stays read-only so no affordance
     // suggests re-trying a larger buffer against the device.
-    VStack(alignment: .leading, spacing: 5) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       Text(traceString("trace.bounds.buffer"))
-        .font(.subheadline.weight(.semibold))
-      HStack(spacing: 6) {
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+      HStack(spacing: WorkspaceMetrics.tightGap) {
         Text(model.bufferText)
-          .font(.body.monospacedDigit().weight(.semibold))
+          .font(WorkspaceFont.tabularValue.weight(.semibold))
           .accessibilityIdentifier("trace.buffer")
         Text("KB").foregroundStyle(.secondary)
       }
       Text(traceString("trace.bounds.bufferConverged"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("trace.buffer.validation")
@@ -297,28 +312,28 @@ struct TraceConfigurationView: View {
   static let durationChoicesSeconds = [10, 15, 30]
 
   private var parameterSnapshots: some View {
-    GroupBox(traceString("trace.parameters.title")) {
-      VStack(alignment: .leading, spacing: 12) {
+    WorkspaceSection(Text(traceString("trace.parameters.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         Text(traceString("trace.parameters.description"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
 
         Table(parameterRows) {
           TableColumn(traceString("trace.parameters.name")) { row in
-            Text(row.name).font(.caption.monospaced()).textSelection(.enabled)
+            Text(row.name).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
           }
           TableColumn(traceString("trace.parameters.desired")) { row in
-            Text(row.desiredValue).font(.callout.monospaced())
+            Text(row.desiredValue).font(WorkspaceFont.monospacedValue)
           }
           TableColumn(traceString("trace.parameters.before")) { row in
             Text(parameterBeforeValue(row.name))
-              .font(.callout.monospaced())
+              .font(WorkspaceFont.monospacedValue)
               .foregroundStyle(.primary)
           }
           TableColumn(traceString("trace.parameters.after")) { row in
             Text(parameterAfterValue(row.name))
-              .font(.callout.monospaced())
+              .font(WorkspaceFont.monospacedValue)
               .foregroundStyle(.secondary)
           }
           TableColumn(traceString("trace.parameters.restore")) { _ in
@@ -326,21 +341,21 @@ struct TraceConfigurationView: View {
               .foregroundStyle(.secondary)
           }
         }
-        .frame(minHeight: 230)
+        .frame(minHeight: 26 * CGFloat(max(parameterRows.count, 1)) + 28)
         .accessibilityIdentifier("trace.parameters.table")
 
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           parameterModeRow(.unchanged)
           parameterModeRow(.temporaryRestore)
           parameterModeRow(.persistentChange)
         }
 
         Toggle(isOn: persistentConfirmationBinding) {
-          VStack(alignment: .leading, spacing: 2) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(traceString("trace.parameters.persistConfirm"))
               .font(.callout.weight(.semibold))
             Text(traceString("trace.parameters.persistConfirmDetail"))
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
           }
         }
@@ -363,31 +378,29 @@ struct TraceConfigurationView: View {
             identifier: "trace.parameters.snapshotGap")
         }
 
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: WorkspaceMetrics.tightGap) {
           Image(systemName: "arrow.trianglehead.2.clockwise")
             .foregroundStyle(.secondary)
-          VStack(alignment: .leading, spacing: 2) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(traceString("trace.parameters.rebootTitle"))
               .font(.callout.weight(.semibold))
             Text(traceString("trace.parameters.rebootUnchanged"))
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
   private var derivedFiltering: some View {
-    GroupBox(traceString("trace.filter.title")) {
-      VStack(alignment: .leading, spacing: 10) {
+    WorkspaceSection(Text(traceString("trace.filter.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         Toggle(traceString("trace.filter.createFileAsset"), isOn: filterBinding)
           .disabled(!model.workspace.operation.supportsFilteredTraceArtifact)
           .accessibilityIdentifier("trace.filter.createFileAsset")
         Text(traceString("trace.filter.description"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
         traceNotice(
@@ -396,8 +409,6 @@ struct TraceConfigurationView: View {
           color: .green,
           identifier: "trace.filter.rawImmutable")
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
@@ -480,30 +491,30 @@ struct TraceConfigurationView: View {
     return Button {
       model.setParameterMode(mode)
     } label: {
-      HStack(alignment: .top, spacing: 10) {
+      HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
         Image(systemName: selected ? "largecircle.fill.circle" : "circle")
           .foregroundStyle(selected ? Color.accentColor : Color.secondary)
           .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
           Text(traceString("trace.parameters.mode.\(mode.rawValue)"))
             .font(.callout.weight(.semibold))
           Text(traceString("trace.parameters.mode.\(mode.rawValue).detail"))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
         Spacer(minLength: 8)
         if !enabled {
           Text(traceString("trace.value.unavailable"))
-            .font(.caption2.weight(.semibold))
+            .font(WorkspaceFont.label)
             .foregroundStyle(.secondary)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(10)
+      .padding(WorkspaceMetrics.contentGap)
       .background(selected ? Color.accentColor.opacity(0.08) : Color.clear)
       .overlay {
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
           .stroke(selected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1)
       }
       .contentShape(Rectangle())

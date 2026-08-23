@@ -11,11 +11,11 @@ struct FlashPlanDetailsView: View {
   @State private var arePartitionsExpanded = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       Button {
         arePartitionsExpanded.toggle()
       } label: {
-        HStack(spacing: 6) {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
           Image(systemName: arePartitionsExpanded ? "chevron.down" : "chevron.right")
             .imageScale(.small)
             .accessibilityHidden(true)
@@ -25,7 +25,7 @@ struct FlashPlanDetailsView: View {
                 Int32(clamping: plan.partitions.count))),
             systemImage: "externaldrive.badge.checkmark"
           )
-          .font(.subheadline.weight(.semibold))
+          .font(WorkspaceFont.body.weight(.semibold))
         }
         .contentShape(Rectangle())
       }
@@ -33,38 +33,38 @@ struct FlashPlanDetailsView: View {
       .accessibilityIdentifier("flash.plan.partitions.disclosure")
 
       if arePartitionsExpanded {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           ForEach(plan.partitions) { partition in
             partitionRow(partition)
           }
           if !plan.writeForbiddenMemberNames.isEmpty {
             Label(flashText("flash.plan.writeForbidden"), systemImage: "checkmark.shield.fill")
-              .font(.callout.weight(.semibold))
+              .font(WorkspaceFont.body.weight(.semibold))
             Text(plan.writeForbiddenMemberNames.joined(separator: ", "))
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
           }
         }
-        .padding(.top, 8)
+        .padding(.top, WorkspaceMetrics.tightGap)
       }
     }
   }
 
   private func partitionRow(_ partition: FlashPartitionPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 5) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       ViewThatFits(in: .horizontal) {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
           partitionIdentity(partition)
-          Spacer(minLength: 12)
+          Spacer(minLength: WorkspaceMetrics.contentGap)
           Text(partition.imageMemberName)
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
         }
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
           partitionIdentity(partition)
           Text(partition.imageMemberName)
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
         }
       }
       LabeledContent(flashText("flash.plan.imageSize")) {
@@ -73,25 +73,28 @@ struct FlashPlanDetailsView: View {
             fromByteCount: partition.imageSizeBytes,
             countStyle: .file)
         )
-        .monospacedDigit()
+        .font(WorkspaceFont.tabularValue)
       }
       LabeledContent(flashText("flash.plan.imageHash")) {
         Text(partition.imageSHA256)
-          .font(.caption.monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .lineLimit(1)
           .truncationMode(.middle)
           .help(partition.imageSHA256)
           .textSelection(.enabled)
       }
     }
-    .padding(10)
-    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
+    .background(
+      .quaternary.opacity(0.45),
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous))
     .accessibilityIdentifier("flash.plan.partition.\(partition.partitionName)")
   }
 
   private func partitionIdentity(_ partition: FlashPartitionPresentation) -> some View {
     Text("\(partition.writeOrder). \(partition.partitionName)")
-      .font(.callout.monospaced().weight(.semibold))
+      .font(WorkspaceFont.monospacedValue.weight(.semibold))
   }
 
 }
@@ -103,7 +106,7 @@ struct FlashPrerequisitesList: View {
   let prerequisites: [FlashPrerequisitePresentation]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       ForEach(prerequisites) { prerequisite in
         prerequisiteRow(prerequisite)
       }
@@ -113,24 +116,27 @@ struct FlashPrerequisitesList: View {
   }
 
   private func prerequisiteRow(_ prerequisite: FlashPrerequisitePresentation) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 10) {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
       Image(systemName: prerequisiteSymbol(prerequisite.status))
         .foregroundStyle(prerequisiteColor(prerequisite.status))
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(flashText(prerequisiteName(prerequisite.identifier)))
-          .font(.callout.weight(.semibold))
+          .font(WorkspaceFont.body.weight(.semibold))
         Text(flashText(requirementName(prerequisite.requirement)))
-          .font(.footnote)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
       }
-      Spacer(minLength: 8)
+      Spacer(minLength: WorkspaceMetrics.tightGap)
       Text(flashText(statusName(prerequisite.status)))
-        .font(.caption.weight(.semibold))
+        .font(WorkspaceFont.label)
         .foregroundStyle(prerequisiteColor(prerequisite.status))
     }
-    .padding(10)
-    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
+    .background(
+      .quaternary.opacity(0.45),
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous))
   }
 
   private func prerequisiteName(

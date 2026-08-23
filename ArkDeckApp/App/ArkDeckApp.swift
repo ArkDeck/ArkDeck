@@ -325,46 +325,26 @@ private struct AppShellView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      NavigationSplitView {
-        List(selection: selection) {
-          Section("app.navigation.section.device") {
-            navigationRow(.overview)
-            deviceRows
-          }
-          Section("app.navigation.section.workflows") {
-            navigationRow(.flash)
-            navigationRow(.debug)
-            navigationRow(.uiDump)
-            navigationRow(.trace)
-          }
-          Section("app.navigation.section.records") {
-            navigationRow(.history)
-          }
+    // The Job inspector is a sibling of the split view, not a passenger inside
+    // the detail pane (spec §3's window skeleton). Keeping it window-wide in
+    // both states is what stops its left edge from jumping across the sidebar
+    // the moment it is expanded. `VSplitView` only appears once there is a
+    // height worth dragging.
+    Group {
+      if isJobInspectorExpanded {
+        VSplitView {
+          navigationShell
+            .frame(minHeight: 320, maxHeight: .infinity)
+          jobInspector
+            .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
         }
-        .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
-        .navigationTitle("app.shell.title")
-      } detail: {
-        GeometryReader { geometry in
-          jobAwareDetail
-            .frame(
-              width: geometry.size.width, height: geometry.size.height,
-              alignment: .topLeading)
+      } else {
+        VStack(spacing: 0) {
+          navigationShell
+          Divider()
+          jobInspector
+            .frame(height: WorkspaceMetrics.jobInspectorBarHeight)
         }
-        .navigationTitle(detailTitle)
-        .toolbar { UpdateAttentionToolbarContent(model: autoUpdate) }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-      if !isJobInspectorExpanded {
-        Divider()
-        RuntimeHistoryJobInspector(
-          model: runtimeHistory,
-          onOpenHistory: openHistory,
-          isExpanded: $isJobInspectorExpanded
-        )
-        .frame(height: 40)
-        .background(.bar)
       }
     }
     .frame(minWidth: 900, minHeight: 600)
@@ -430,22 +410,43 @@ private struct AppShellView: View {
     }
   }
 
-  @ViewBuilder
-  private var jobAwareDetail: some View {
-    if isJobInspectorExpanded {
-      VSplitView {
-        workspaceWithRecovery
-          .frame(minHeight: 320, maxHeight: .infinity)
-        RuntimeHistoryJobInspector(
-          model: runtimeHistory,
-          onOpenHistory: openHistory,
-          isExpanded: $isJobInspectorExpanded
-        )
-        .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
+  private var jobInspector: some View {
+    RuntimeHistoryJobInspector(
+      model: runtimeHistory,
+      onOpenHistory: openHistory,
+      isExpanded: $isJobInspectorExpanded)
+  }
+
+  private var navigationShell: some View {
+    NavigationSplitView {
+      List(selection: selection) {
+        Section("app.navigation.section.device") {
+          navigationRow(.overview)
+          deviceRows
+        }
+        Section("app.navigation.section.workflows") {
+          navigationRow(.flash)
+          navigationRow(.debug)
+          navigationRow(.uiDump)
+          navigationRow(.trace)
+        }
+        Section("app.navigation.section.records") {
+          navigationRow(.history)
+        }
       }
-    } else {
-      workspaceWithRecovery
+      .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
+      .navigationTitle("app.shell.title")
+    } detail: {
+      GeometryReader { geometry in
+        workspaceWithRecovery
+          .frame(
+            width: geometry.size.width, height: geometry.size.height,
+            alignment: .topLeading)
+      }
+      .navigationTitle(detailTitle)
+      .toolbar { UpdateAttentionToolbarContent(model: autoUpdate) }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private var workspaceWithRecovery: some View {
@@ -523,12 +524,16 @@ private struct AppShellView: View {
     case .unavailable:
       Label {
         Text("app.devices.unavailable")
-          .font(.caption)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
       } icon: {
         Image(systemName: "antenna.radiowaves.left.and.right.slash")
           .foregroundStyle(.secondary)
       }
+      .frame(
+        maxWidth: .infinity, minHeight: WorkspaceMetrics.navigationRowHeight,
+        alignment: .leading
+      )
       .accessibilityIdentifier("app.devices.unavailable")
     case .available:
       ForEach(deviceList.presentation.candidates) { candidate in
@@ -695,7 +700,10 @@ private struct SettingsSceneLoader: View {
       if isPresented {
         SettingsSceneContent(models: models)
       } else {
+        // Match the eventual pane frame (SettingsRootView) so the window does
+        // not open around a spinner and then resize.
         ProgressView()
+          .frame(minWidth: 760, idealWidth: 820, minHeight: 560, idealHeight: 620)
       }
     }
     .task {
@@ -737,40 +745,48 @@ private struct AutoUpdateSettingsView: View {
   let model: AutoUpdateViewModel
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("update.title")
-        .font(.title2)
-      Toggle(
-        "update.automaticChecks",
-        isOn: Binding(
-          get: { model.automaticChecksEnabled },
-          set: { enabled in model.setAutomaticChecksEnabled(enabled) })
-      )
-      .accessibilityIdentifier("update.automaticChecks")
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
       Text("update.privacyDisclosure")
-        .font(.caption)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
-      HStack {
-        Button("update.checkNow", action: model.checkManually)
-          .accessibilityIdentifier("update.checkNow")
-          .disabled(model.isBusy || !model.canCheck)
-        Button("update.download", action: model.download)
-          .accessibilityIdentifier("update.download")
-          .disabled(model.isBusy || !model.canDownload)
-        Button("update.reveal", action: model.reveal)
-          .accessibilityIdentifier("update.reveal")
-          .disabled(model.isBusy || !model.canReveal)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
+      GroupBox("update.title") {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          Toggle(
+            "update.automaticChecks",
+            isOn: Binding(
+              get: { model.automaticChecksEnabled },
+              set: { enabled in model.setAutomaticChecksEnabled(enabled) })
+          )
+          .accessibilityIdentifier("update.automaticChecks")
+          Text(LocalizedStringKey(model.statusKey))
+            .font(WorkspaceFont.body.weight(.semibold))
+            .accessibilityIdentifier("update.status")
+          if let releaseNotesSummary = model.releaseNotesSummary {
+            Text(releaseNotesSummary)
+              .font(WorkspaceFont.secondary)
+              .textSelection(.enabled)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          HStack(spacing: WorkspaceMetrics.tightGap) {
+            Button("update.checkNow", action: model.checkManually)
+              .accessibilityIdentifier("update.checkNow")
+              .disabled(model.isBusy || !model.canCheck)
+            Button("update.download", action: model.download)
+              .accessibilityIdentifier("update.download")
+              .disabled(model.isBusy || !model.canDownload)
+            Button("update.reveal", action: model.reveal)
+              .accessibilityIdentifier("update.reveal")
+              .disabled(model.isBusy || !model.canReveal)
+          }
+          Text("update.manualInstallDisclosure")
+            .font(WorkspaceFont.secondary)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      Text(LocalizedStringKey(model.statusKey))
-        .font(.headline)
-        .accessibilityIdentifier("update.status")
-      if let releaseNotesSummary = model.releaseNotesSummary {
-        Text(releaseNotesSummary)
-          .textSelection(.enabled)
-      }
-      Text("update.manualInstallDisclosure")
-        .font(.caption)
-        .foregroundStyle(.secondary)
     }
   }
 }

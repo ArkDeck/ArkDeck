@@ -53,8 +53,11 @@ struct UIDumpWorkspaceView: View {
   }
 
   private var toolbar: some View {
-    HStack(spacing: 10) {
-      Text("Viewer").font(.title2.weight(.semibold))
+    // The page's name is in the window toolbar. Repeating it here gave the
+    // detail pane two perceivable main headings (spec §3, §6); the prototype
+    // gets away with its own `<h1>` because its title bar reads
+    // "ArkDeck — Viewer" rather than the bare page name this App shows.
+    HStack(spacing: WorkspaceMetrics.contentGap) {
       Picker(viewerText("viewer.toolbar.device"), selection: targetBinding) {
         Text(viewerText("viewer.toolbar.noDevice")).tag("")
         ForEach(model.targets) { target in
@@ -72,7 +75,7 @@ struct UIDumpWorkspaceView: View {
         }
         .frame(maxWidth: 190)
         Text(capture.identity.capturedAtUTC)
-          .font(.caption.monospacedDigit())
+          .font(WorkspaceFont.monospacedDense.monospacedDigit())
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .help(capture.identity.capturedAtUTC)
@@ -129,7 +132,7 @@ struct UIDumpWorkspaceView: View {
         // than to a window-wide toolbar.
         Toggle(viewerText("viewer.pane.showBounds"), isOn: boundsBinding)
           .toggleStyle(.checkbox)
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .accessibilityIdentifier("viewer.showBounds")
       }
       GeometryReader { proxy in
@@ -160,7 +163,7 @@ struct UIDumpWorkspaceView: View {
       }
       if !capture.coordinatesAreVerified {
         Label(viewerText("viewer.screenshot.unverifiedDetail"), systemImage: "exclamationmark.triangle")
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.orange)
           .padding(10)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,7 +193,7 @@ struct UIDumpWorkspaceView: View {
           }
         if selected {
           Text("#\(node.deviceID ?? "—") \(node.type)")
-            .font(.caption2.monospaced())
+            .font(WorkspaceFont.monospacedDense)
             .padding(.horizontal, 4).padding(.vertical, 2)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
             .foregroundStyle(Color.primary)
@@ -328,24 +331,24 @@ struct UIDumpWorkspaceView: View {
         .onTapGesture { model.toggleExpansion(node.identity) }
 
         Image(systemName: Self.symbol(for: node.type))
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .frame(width: 16, height: 16)
           .opacity(selected ? 0.95 : 0.65)
 
         Text(node.type)
-          .font(.system(size: 12))
+          .font(WorkspaceFont.secondary)
           .lineLimit(1)
           .fixedSize()
         if let text = node.text, !text.isEmpty {
           Text(text)
-            .font(.system(size: 12))
+            .font(WorkspaceFont.secondary)
             .opacity(selected ? 0.85 : 0.62)
             .lineLimit(1)
             .fixedSize()
         }
         if let id = node.deviceID {
           Text("#\(id)")
-            .font(.system(size: 11).monospaced())
+            .font(WorkspaceFont.monospacedDense)
             .monospacedDigit()
             .opacity(selected ? 0.85 : 0.55)
             .fixedSize()
@@ -428,8 +431,8 @@ struct UIDumpWorkspaceView: View {
         VStack(alignment: .leading, spacing: 6) {
           HStack(spacing: 8) {
             Image(systemName: Self.symbol(for: node.type))
-              .font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(node.type).font(.system(size: 13, weight: .semibold))
+              .font(WorkspaceFont.caption).foregroundStyle(.secondary)
+            Text(node.type).font(WorkspaceFont.sectionTitle)
             if let id = node.deviceID { statusChip("#\(id)") }
             // Neutral, not green: "visible" and "interactive" are facts about
             // the node, not a health verdict. Semantic green stays reserved
@@ -439,7 +442,7 @@ struct UIDumpWorkspaceView: View {
             Spacer(minLength: 0)
           }
           Text(model.breadcrumb(for: node.identity))
-            .font(.system(size: 11).monospaced())
+            .font(WorkspaceFont.monospacedDense)
             .foregroundStyle(.secondary)
             .lineLimit(1).truncationMode(.head)
             .help(model.breadcrumb(for: node.identity))
@@ -492,7 +495,7 @@ struct UIDumpWorkspaceView: View {
       }
       Spacer(minLength: 0)
     }
-    .font(.system(size: 11).monospaced())
+    .font(WorkspaceFont.monospacedDense)
     .foregroundStyle(.secondary)
     .lineLimit(1)
     .padding(.horizontal, 12)
@@ -519,7 +522,7 @@ struct UIDumpWorkspaceView: View {
 
   private func statusChip(_ text: String) -> some View {
     Text(text)
-      .font(.system(size: 11).monospaced())
+      .font(WorkspaceFont.monospacedDense)
       .foregroundStyle(.secondary)
       .padding(.horizontal, 6).padding(.vertical, 1)
       .overlay(Capsule().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
@@ -568,7 +571,7 @@ struct UIDumpWorkspaceView: View {
       ])
     case .rawDump:
       Text(capture.formattedRawFields(for: node.identity) ?? viewerText("viewer.properties.rawUnavailable"))
-        .font(.system(size: 12).monospaced()).textSelection(.enabled)
+        .font(WorkspaceFont.monospacedValue).textSelection(.enabled)
         .padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("viewer.rawDump")
@@ -578,7 +581,7 @@ struct UIDumpWorkspaceView: View {
   private func keyValueGroup(_ title: String, _ rows: [(String, String)]) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       Text(title)
-        .font(.system(size: 11, weight: .semibold))
+        .font(WorkspaceFont.label)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12).padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -589,10 +592,10 @@ struct UIDumpWorkspaceView: View {
           // A fixed key column. A fluid one let two-character keys claim 40%
           // of the inspector and pushed their values half a pane away.
           Text(name)
-            .font(.system(size: 12)).foregroundStyle(.secondary)
+            .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
             .frame(width: 150, alignment: .leading)
           Text(value)
-            .font(.system(size: 12).monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -606,7 +609,7 @@ struct UIDumpWorkspaceView: View {
     let active = model.inspectorTab == tab
     return Button { model.setInspectorTab(tab) } label: {
       Text(tab.title)
-        .font(.system(size: 12, weight: active ? .semibold : .regular))
+        .font(active ? WorkspaceFont.secondary.weight(.semibold) : WorkspaceFont.secondary)
         .foregroundStyle(active ? Color.accentColor : Color.secondary)
         .padding(.horizontal, 6).padding(.vertical, 6)
         .frame(minHeight: 32)
@@ -640,12 +643,12 @@ struct UIDumpWorkspaceView: View {
       // identifier overwrites every descendant's, which is how the inspector
       // tabs and the separator once became unreachable.
       Text(title)
-        .font(.system(size: 12, weight: .semibold))
+        .font(WorkspaceFont.secondary.weight(.semibold))
         .accessibilityIdentifier(identifier)
       Spacer(minLength: 8)
       if !detail.isEmpty {
         Text(detail)
-          .font(.system(size: 11).monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .monospacedDigit()
           .foregroundStyle(.secondary)
           .lineLimit(1)

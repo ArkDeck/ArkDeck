@@ -132,9 +132,9 @@ struct RuntimeHistoryView: View {
         Image(systemName: "exclamationmark.triangle")
       }
     } description: {
-      VStack(spacing: 8) {
+      VStack(spacing: WorkspaceMetrics.tightGap) {
         Text(reason)
-          .font(.callout.monospaced())
+          .font(WorkspaceFont.monospacedValue)
           .textSelection(.enabled)
           .accessibilityIdentifier("history.unavailable.reason")
         Text(historyLocalized("history.unavailable.guidance"))
@@ -159,12 +159,12 @@ struct RuntimeHistoryView: View {
       }
     } else {
       GeometryReader { workspace in
-        if workspace.size.width >= 860 {
+        if workspace.size.width >= 890 {
           HSplitView {
             filterSidebar
-              .frame(minWidth: 190, idealWidth: 210, maxWidth: 240, maxHeight: .infinity)
+              .frame(minWidth: 200, idealWidth: 230, maxWidth: 280, maxHeight: .infinity)
             jobTable
-              .frame(minWidth: 360, idealWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
+              .frame(minWidth: 360, idealWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
             detail
               .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
           }
@@ -188,41 +188,42 @@ struct RuntimeHistoryView: View {
 
   private var filterSidebar: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         Text(historyLocalized("history.filter.title"))
-          .font(.headline)
+          .font(WorkspaceFont.sectionTitle)
           .accessibilityAddTraits(.isHeader)
         TextField(historyLocalized("history.filter.search"), text: $searchText)
           .textFieldStyle(.roundedBorder)
           .accessibilityIdentifier("history.filter.search")
-        filterPickers
+        Form { filterPickers }
+          .formStyle(.columns)
         filterResultSummary
         Button(historyLocalized("history.filter.reset"), action: resetFilters)
           .accessibilityIdentifier("history.filter.reset")
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(16)
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
-    .background(.quaternary.opacity(0.18))
+    .background(Color(nsColor: .windowBackgroundColor))
   }
 
   private var compactFilters: some View {
     ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: 12) {
+      HStack(alignment: .center, spacing: WorkspaceMetrics.contentGap) {
         TextField(historyLocalized("history.filter.search"), text: $searchText)
           .textFieldStyle(.roundedBorder)
           .frame(minWidth: 180)
-        filterPickers
+        filterPickers.labelsHidden()
         filterResultSummary
       }
-      VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         TextField(historyLocalized("history.filter.search"), text: $searchText)
           .textFieldStyle(.roundedBorder)
-        filterPickers
+        filterPickers.labelsHidden()
         filterResultSummary
       }
     }
-    .padding(12)
+    .padding(WorkspaceMetrics.pageInsetHorizontal)
   }
 
   private var filterPickers: some View {
@@ -240,13 +241,13 @@ struct RuntimeHistoryView: View {
       Picker(historyLocalized("history.filter.session"), selection: $sessionFilter) {
         Text(historyLocalized("history.filter.session.all")).tag(Self.allSessions)
         ForEach(sessions, id: \.self) { session in
-          Text(session).font(.body.monospaced()).tag(session)
+          Text(session).font(WorkspaceFont.monospacedValue).tag(session)
         }
       }
       Picker(historyLocalized("history.filter.device"), selection: $targetFilter) {
         Text(historyLocalized("history.filter.device.all")).tag(Self.allTargets)
         ForEach(targets, id: \.self) { target in
-          Text(target).font(.body.monospaced()).tag(target)
+          Text(target).font(WorkspaceFont.monospacedValue).tag(target)
         }
       }
       Picker(historyLocalized("history.filter.time"), selection: $timeFilter) {
@@ -255,7 +256,6 @@ struct RuntimeHistoryView: View {
         }
       }
     }
-    .labelsHidden()
   }
 
   private var filterResultSummary: some View {
@@ -265,7 +265,7 @@ struct RuntimeHistoryView: View {
           filteredJobs.count,
           presentation.jobs.count))
     )
-    .font(.caption)
+    .font(WorkspaceFont.caption)
     .foregroundStyle(.secondary)
     .monospacedDigit()
     .accessibilityIdentifier("history.filter.resultCount")
@@ -310,59 +310,58 @@ struct RuntimeHistoryView: View {
       } else {
         Table(filteredJobs, selection: $selectedJobID) {
           TableColumn(historyLocalized("history.column.job")) { job in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
               Text(job.id)
-                .font(.body.monospaced())
+                .font(WorkspaceFont.monospacedValue)
                 .lineLimit(1)
                 .truncationMode(.middle)
               if let sessionID = job.sessionID {
                 Text(sessionID)
-                  .font(.caption2.monospaced())
+                  .font(WorkspaceFont.monospacedDense)
                   .foregroundStyle(.secondary)
                   .lineLimit(1)
                   .truncationMode(.middle)
               }
             }
           }
-          .width(min: 110, ideal: 140)
+          .width(min: 130, ideal: 150)
           TableColumn(historyLocalized("history.column.state")) { job in
             historyStateLabel(job)
               .accessibilityIdentifier("history.row.state.\(job.id)")
           }
-          .width(min: 105, ideal: 125)
+          .width(min: 130, ideal: 150)
           TableColumn(historyLocalized("history.column.operation")) { job in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
               Text(displayedOperationReference(job.operationReference))
-                .font(.body.monospaced())
+                .font(WorkspaceFont.monospacedValue)
                 .lineLimit(1)
               if let badge = historyExecutionModeBadge(job.executionMode) {
                 badge
               }
             }
           }
-          .width(min: 160, ideal: 210)
+          .width(min: 160, ideal: 170)
           TableColumn(historyLocalized("history.column.target")) { job in
             Text(job.targetID)
-              .font(.body.monospaced())
+              .font(WorkspaceFont.monospacedValue)
               .lineLimit(1)
               .truncationMode(.middle)
           }
-          .width(min: 120, ideal: 160)
+          .width(min: 120, ideal: 140)
           TableColumn(historyLocalized("history.column.time")) { job in
             Text(formattedDate(historyDate(job)))
-              .font(.callout)
-              .monospacedDigit()
+              .font(WorkspaceFont.tabularValue)
           }
-          .width(min: 120, ideal: 160)
+          .width(min: 120, ideal: 150)
         }
         .accessibilityIdentifier("history.table")
       }
       Divider()
       if presentation.hasOlderJobs || presentation.olderJobsLoadFailure != nil {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           if let failure = presentation.olderJobsLoadFailure {
             Label(failure, systemImage: "exclamationmark.triangle")
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.orange)
               .accessibilityIdentifier("history.loadOlder.failure")
           }
@@ -382,14 +381,15 @@ struct RuntimeHistoryView: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
+        .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+        .padding(.top, WorkspaceMetrics.contentGap)
       }
       Text(historyLocalized("history.readOnlyNote"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("history.readOnlyNote")
-        .padding(12)
+        .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+        .padding(.vertical, WorkspaceMetrics.contentGap)
     }
   }
 
@@ -397,16 +397,18 @@ struct RuntimeHistoryView: View {
   private var detail: some View {
     if let job = selectedJob {
       ScrollView {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
           detailHeader(job)
           summarySection(job)
-          correlationSection(job)
           timelineSection(job)
+          correlationSection(job)
           evidenceSections(job)
           recoverySection(job)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(16)
+        .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+        .padding(.top, WorkspaceMetrics.pageInsetTop)
+        .padding(.bottom, WorkspaceMetrics.pageInsetBottom)
       }
       .accessibilityIdentifier("history.detail")
     } else {
@@ -418,8 +420,8 @@ struct RuntimeHistoryView: View {
   }
 
   private func detailHeader(_ job: RuntimeJobSummaryPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .firstTextBaseline, spacing: 10) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+      HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
         Text(historyLocalized("history.detail.title"))
           .font(.headline)
           .accessibilityAddTraits(.isHeader)
@@ -449,7 +451,7 @@ struct RuntimeHistoryView: View {
           unavailableSection(reason)
         case .available:
           if let correlation = detail.correlation {
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+            Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
               row(
                 "history.detail.job", correlation.jobID,
                 id: "history.correlation.job", monospaced: true)
@@ -472,23 +474,23 @@ struct RuntimeHistoryView: View {
               Text(historyLocalized("history.correlation.noArtifacts"))
                 .foregroundStyle(.secondary)
             } else {
-              VStack(alignment: .leading, spacing: 7) {
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
                 Text(
                   String(
                     localized:
                       LocalizedStringResource.HistoryLocalizable.historyCorrelationArtifactCount(
                         correlation.artifacts.count))
                 )
-                .font(.caption.weight(.semibold))
+                .font(WorkspaceFont.label)
                 ForEach(correlation.artifacts) { artifact in
-                  VStack(alignment: .leading, spacing: 2) {
+                  VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
                     Text("\(artifact.name) · \(artifact.role ?? "—")")
-                      .font(.caption)
+                      .font(WorkspaceFont.caption)
                     Text(artifact.id)
-                      .font(.caption.monospaced())
+                      .font(WorkspaceFont.monospacedDense)
                       .textSelection(.enabled)
                     Text(artifact.sha256)
-                      .font(.caption2.monospaced())
+                      .font(WorkspaceFont.monospacedDense)
                       .lineLimit(1)
                       .truncationMode(.middle)
                       .help(artifact.sha256)
@@ -499,7 +501,7 @@ struct RuntimeHistoryView: View {
               }
             }
             Text(historyLocalized("history.correlation.readOnly"))
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
           }
@@ -510,7 +512,7 @@ struct RuntimeHistoryView: View {
 
   private func summarySection(_ job: RuntimeJobSummaryPresentation) -> some View {
     historySection("history.detail.summary") {
-      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+      Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
         row("history.detail.job", job.id, id: "history.detail.job", monospaced: true)
         row(
           "history.detail.session", job.sessionID ?? historyLocalized("history.value.notReported"),
@@ -530,7 +532,7 @@ struct RuntimeHistoryView: View {
           Text(historyLocalized("history.detail.mode"))
             .foregroundStyle(.secondary)
             .gridColumnAlignment(.trailing)
-          HStack(spacing: 6) {
+          HStack(spacing: WorkspaceMetrics.tightGap) {
             Text(job.executionMode ?? "—")
               .accessibilityIdentifier("history.detail.mode")
             if let badge = historyExecutionModeBadge(job.executionMode) {
@@ -546,7 +548,7 @@ struct RuntimeHistoryView: View {
           "history.detail.finished", formattedUTC(job.finishedAtUTC), id: "history.detail.finished")
       }
       Text(historyLocalized("history.detail.projectionNote"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
       if job.outstandingResidueCount > 0 {
@@ -584,16 +586,16 @@ struct RuntimeHistoryView: View {
   ) -> some View {
     if !timeline.isEmpty {
       historySection("history.detail.timeline") {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           ForEach(Array(timeline.enumerated()), id: \.offset) { index, entry in
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
               Image(
                 systemName: index == timeline.count - 1 ? stateSymbol(job) : "checkmark.circle"
               )
               .foregroundStyle(index == timeline.count - 1 ? stateColor(job) : .secondary)
               .accessibilityHidden(true)
               Text(entry)
-                .font(.callout.monospaced())
+                .font(WorkspaceFont.monospacedValue)
                 .textSelection(.enabled)
             }
           }
@@ -628,7 +630,7 @@ struct RuntimeHistoryView: View {
         unavailableSection(reason)
       case .available:
         if let evidence = detail.evidence {
-          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+          Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
             row(
               "history.evidence.provider", evidence.providerID, id: "history.evidence.provider",
               monospaced: true)
@@ -668,13 +670,13 @@ struct RuntimeHistoryView: View {
           }
           if !evidence.actualStepKinds.isEmpty {
             Text(evidence.actualStepKinds.joined(separator: " · "))
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .textSelection(.enabled)
               .accessibilityIdentifier("history.evidence.steps")
           }
           ForEach(evidence.blockers, id: \.self) { blocker in
             Label(blocker, systemImage: "exclamationmark.triangle")
-              .font(.callout.monospaced())
+              .font(WorkspaceFont.monospacedValue)
               .foregroundStyle(.orange)
           }
         }
@@ -694,7 +696,7 @@ struct RuntimeHistoryView: View {
             traceParameterTable(evidence.traceParameters)
             if evidence.parametersWereReported, !evidence.parameters.isEmpty {
               Text(historyLocalized("history.parameters.typedInputs"))
-                .font(.caption.weight(.semibold))
+                .font(WorkspaceFont.label)
                 .foregroundStyle(.secondary)
               typedParameterGrid(evidence.parameters)
             }
@@ -718,7 +720,7 @@ struct RuntimeHistoryView: View {
     Table(parameters) {
       TableColumn(historyLocalized("history.parameters.column.name")) { parameter in
         Text(parameter.name)
-          .font(.caption.monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .lineLimit(2)
           .help(parameter.name)
           .textSelection(.enabled)
@@ -737,19 +739,22 @@ struct RuntimeHistoryView: View {
       }
       .width(min: 82, ideal: 104)
     }
-    .frame(minHeight: 250, idealHeight: 300)
+    .frame(
+      minHeight: 24 * CGFloat(min(max(parameters.count, 1), 8)) + 28,
+      idealHeight: 24 * CGFloat(min(max(parameters.count, 1), 12)) + 28
+    )
     .accessibilityIdentifier("history.parameters.traceDiff")
   }
 
   private func typedParameterGrid(
     _ parameters: [RuntimeJobParameterPresentation]
   ) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+    Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
       ForEach(parameters) { parameter in
         GridRow(alignment: .firstTextBaseline) {
-          Text(parameter.name).font(.callout.monospaced())
+          Text(parameter.name).font(WorkspaceFont.monospacedValue)
           Text(parameter.value)
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -767,7 +772,7 @@ struct RuntimeHistoryView: View {
     default: displayValue = historyLocalized("history.parameters.state.unknown")
     }
     return Text(displayValue)
-      .font(.caption.monospaced())
+      .font(WorkspaceFont.monospacedDense)
       .lineLimit(2)
       .textSelection(.enabled)
   }
@@ -785,7 +790,7 @@ struct RuntimeHistoryView: View {
         ("history.parameters.comparison.unverified", "questionmark.circle", .orange)
       }
     return Label(historyLocalized(presentation.key), systemImage: presentation.symbol)
-      .font(.caption.weight(.semibold))
+      .font(WorkspaceFont.label)
       .foregroundStyle(presentation.color)
       .fixedSize(horizontal: false, vertical: true)
   }
@@ -810,7 +815,7 @@ struct RuntimeHistoryView: View {
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("history.artifacts.empty")
         } else {
-          VStack(alignment: .leading, spacing: 10) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
             ForEach(detail.artifacts) { artifact in
               artifactRow(artifact, jobID: job.id)
             }
@@ -818,7 +823,7 @@ struct RuntimeHistoryView: View {
           .accessibilityIdentifier("history.artifacts")
         }
         Label(historyLocalized("history.artifacts.exportBoundary"), systemImage: "lock.doc")
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -829,14 +834,14 @@ struct RuntimeHistoryView: View {
     _ artifact: RuntimeArtifactPresentation,
     jobID: String
   ) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       ViewThatFits(in: .horizontal) {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
           Text(artifact.name).font(.callout.monospaced().weight(.semibold))
           Spacer(minLength: 8)
           artifactStatus(artifact)
         }
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
           Text(artifact.name).font(.callout.monospaced().weight(.semibold))
           artifactStatus(artifact)
         }
@@ -845,24 +850,24 @@ struct RuntimeHistoryView: View {
         "\(artifact.role ?? "—") · \(artifact.sourceOperation) · "
           + ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file)
       )
-      .font(.caption)
+      .font(WorkspaceFont.caption)
       .foregroundStyle(.secondary)
       Text(artifact.sha256)
-        .font(.caption.monospaced())
+        .font(WorkspaceFont.monospacedDense)
         .lineLimit(1)
         .truncationMode(.middle)
         .help(artifact.sha256)
         .textSelection(.enabled)
       Text("\(artifact.privacy) · \(artifact.mediaType)")
-        .font(.caption)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
       if let statusDetail = artifact.statusDetail {
         Label(statusDetail, systemImage: "exclamationmark.triangle")
-          .font(.caption.monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.orange)
           .textSelection(.enabled)
       }
-      HStack(spacing: 8) {
+      HStack(spacing: WorkspaceMetrics.tightGap) {
         Button(historyLocalized("history.artifacts.export")) {
           pendingExportArtifact = artifact
           pendingExportJobID = jobID
@@ -887,14 +892,18 @@ struct RuntimeHistoryView: View {
       }
       if case .failed(let reason) = exportStatesByArtifactID[artifact.id] {
         Label(reason, systemImage: "xmark.octagon")
-          .font(.caption)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.red)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("history.artifact.exportFailure.\(artifact.id)")
       }
     }
-    .padding(10)
-    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
+    .background(
+      .quaternary.opacity(0.35),
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+    )
     .accessibilityIdentifier("history.artifact.\(artifact.id)")
   }
 
@@ -927,7 +936,7 @@ struct RuntimeHistoryView: View {
         systemName: artifact.status == "published" ? "checkmark.circle" : "exclamationmark.triangle"
       )
     }
-    .font(.caption.weight(.semibold))
+    .font(WorkspaceFont.label)
     .foregroundStyle(artifact.status == "published" ? .green : .orange)
   }
 
@@ -956,7 +965,7 @@ struct RuntimeHistoryView: View {
           .foregroundStyle(.secondary)
       }
       Text(historyLocalized("history.recovery.readOnly"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -966,25 +975,21 @@ struct RuntimeHistoryView: View {
     _ titleKey: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(historyLocalized(titleKey))
-        .font(.subheadline.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
+    WorkspaceSection(Text(historyLocalized(titleKey))) {
       content()
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func unavailableSection(_ reason: String) -> some View {
     Label {
       Text(reason)
-        .font(.callout.monospaced())
+        .font(WorkspaceFont.monospacedValue)
         .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
     } icon: {
       Image(systemName: "exclamationmark.triangle")
+        .foregroundStyle(.orange)
     }
-    .foregroundStyle(.orange)
   }
 
   private func attention(_ titleKey: String, id: String) -> some View {
@@ -1099,9 +1104,10 @@ struct RuntimeHistoryView: View {
           ? localizedState(job.state) + historyLocalized("history.state.outcomeUnknownSuffix")
           : localizedState(job.state))
     } icon: {
-      Image(systemName: stateSymbol(job)).accessibilityHidden(true)
+      Image(systemName: stateSymbol(job))
+        .foregroundStyle(stateColor(job))
+        .accessibilityHidden(true)
     }
-    .foregroundStyle(stateColor(job))
   }
 
   private func stateSymbol(_ job: RuntimeJobSummaryPresentation) -> String {
@@ -1337,7 +1343,7 @@ func displayedOperationReference(_ reference: String) -> String {
 /// guessing a color semantics for it.
 struct RuntimeExecutionModeBadge: View {
   private let text: String
-  private let color: Color
+  private let tone: WorkspaceTone
   private let dashed: Bool
 
   init?(_ mode: String?) {
@@ -1346,29 +1352,24 @@ struct RuntimeExecutionModeBadge: View {
       return nil
     case JobExecutionMode.planOnly.rawValue:
       text = "PLANNED"
-      color = .purple
+      tone = .planned
       dashed = false
     case "simulated":
       text = "SIMULATED"
-      color = .orange
+      tone = .simulated
       dashed = true
     case let other?:
       text = other.uppercased()
-      color = .secondary
+      tone = .neutral
       dashed = false
     }
   }
 
   var body: some View {
-    Text(text)
-      .font(.caption2.weight(.semibold))
-      .foregroundStyle(color)
-      .padding(.horizontal, 5)
-      .padding(.vertical, 1)
-      .overlay {
-        RoundedRectangle(cornerRadius: 4)
-          .stroke(color, style: StrokeStyle(lineWidth: 1, dash: dashed ? [3, 2] : []))
-      }
+    // The one chip shape in the App. Permanent, outline-only, and never a
+    // filled control the user could mistake for something pressable
+    // (spec §4.4).
+    WorkspaceChip(text: Text(text), tone: tone, isDashed: dashed)
       .accessibilityLabel(text)
   }
 }

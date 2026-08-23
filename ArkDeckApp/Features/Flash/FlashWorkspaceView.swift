@@ -32,28 +32,6 @@ private enum FlashImageArchiveOpenPanel {
   }
 }
 
-private struct FlashWorkspaceSurface<Content: View>: View {
-  @ViewBuilder let content: Content
-
-  init(@ViewBuilder content: () -> Content) {
-    self.content = content()
-  }
-
-  var body: some View {
-    content
-      .padding(18)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        Color(nsColor: .controlBackgroundColor),
-        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-      }
-  }
-}
-
 private enum FlashWorkspaceRunStage: Int, CaseIterable {
   case prepare
   case write
@@ -104,15 +82,14 @@ struct FlashWorkspaceView: View {
   @State private var isDetailsExpanded = false
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        pageLead
-        currentDeviceSurface
-        primarySurface
-        flashDetails
-      }
-      .frame(maxWidth: 760, alignment: .topLeading)
-      .padding(20)
+    WorkspacePage(
+      maximumWidth: WorkspaceMetrics.pageMaxWidth,
+      spacing: WorkspaceMetrics.blockGap
+    ) {
+      pageLead
+      currentDeviceSurface
+      primarySurface
+      flashDetails
     }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
@@ -154,28 +131,25 @@ struct FlashWorkspaceView: View {
     }
   }
 
+  /// The page's name is already in the window toolbar. Repeating it here gave
+  /// the detail pane two main headings, which spec §3 and §6 forbid, so only
+  /// the line that explains the page remains — the same shape Debug uses.
   private var pageLead: some View {
-    VStack(alignment: .leading, spacing: 5) {
-      Text(flashText("flash.workspace.title"))
-        .font(.title2.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityIdentifier("flash.workspace.title")
-      Text(flashText("flash.workspace.subtitle"))
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-    }
+    WorkspaceHeaderBar(
+      summary: Text(flashText("flash.workspace.subtitle")),
+      summaryIdentifier: "flash.workspace.title")
+      .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
   }
 
   private var currentDeviceSurface: some View {
-    FlashWorkspaceSurface {
+    WorkspaceCard {
       ViewThatFits(in: .horizontal) {
-        HStack(spacing: 12) {
+        HStack(spacing: WorkspaceMetrics.contentGap) {
           currentDeviceIdentity
-          Spacer(minLength: 16)
+          Spacer(minLength: WorkspaceMetrics.blockGap)
           readinessLabel
         }
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           currentDeviceIdentity
           readinessLabel
         }
@@ -184,7 +158,7 @@ struct FlashWorkspaceView: View {
   }
 
   private var currentDeviceIdentity: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: WorkspaceMetrics.contentGap) {
       Image(
         systemName: model.selectedTarget == nil
           ? "externaldrive.badge.questionmark" : "externaldrive.fill"
@@ -192,13 +166,13 @@ struct FlashWorkspaceView: View {
       .font(.title3)
       .foregroundStyle(readinessColor)
       .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(
           model.selectedTarget == nil
             ? flashText("flash.workspace.device.none")
             : model.profileReference.uppercased()
         )
-        .font(.callout.weight(.semibold))
+        .font(WorkspaceFont.body.weight(.semibold))
         .lineLimit(1)
         if let target = model.selectedTarget {
           Text(
@@ -206,14 +180,14 @@ struct FlashWorkspaceView: View {
               localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceDeviceDetail(
                 target.id, Int32(clamping: target.bindingRevision)))
           )
-          .font(.caption.monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .truncationMode(.middle)
           .help(target.id)
         } else {
           Text(flashText("flash.target.guidance"))
-            .font(.caption)
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
             .lineLimit(2)
         }
@@ -223,13 +197,13 @@ struct FlashWorkspaceView: View {
   }
 
   private var readinessLabel: some View {
-    VStack(alignment: .trailing, spacing: 2) {
+    VStack(alignment: .trailing, spacing: WorkspaceMetrics.rowGap) {
       Label(flashText(readinessTitleKey), systemImage: readinessSymbol)
-        .font(.callout.weight(.semibold))
+        .font(WorkspaceFont.body.weight(.semibold))
         .foregroundStyle(readinessColor)
         .accessibilityIdentifier("flash.workspace.readiness")
       Text(readinessDetail)
-        .font(.caption)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.trailing)
         .fixedSize(horizontal: false, vertical: true)
@@ -319,16 +293,16 @@ struct FlashWorkspaceView: View {
   }
 
   private var imageAndActionSurface: some View {
-    FlashWorkspaceSurface {
-      VStack(alignment: .leading, spacing: 16) {
+    WorkspaceCard(spacing: WorkspaceMetrics.blockGap) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
         imagePickerRow
 
         if model.isPreparingPlan {
           Divider()
-          HStack(spacing: 10) {
+          HStack(spacing: WorkspaceMetrics.contentGap) {
             ProgressView().controlSize(.small)
             Text(flashText("flash.workspace.image.validating"))
-              .font(.callout)
+              .font(WorkspaceFont.secondary)
           }
           .accessibilityIdentifier("flash.plan.preparing")
         } else if let errorCode = model.planFailureCode {
@@ -339,7 +313,7 @@ struct FlashWorkspaceView: View {
             .accessibilityIdentifier("flash.plan.error")
           if let detail = model.planFailureDetail {
             Text(detail)
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
@@ -357,20 +331,20 @@ struct FlashWorkspaceView: View {
   }
 
   private var imagePickerRow: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: WorkspaceMetrics.keyColumnGap) {
       Image(systemName: model.selectedArchiveURL == nil ? "shippingbox" : "shippingbox.fill")
         .font(.title2)
         .foregroundStyle(
           model.selectedArchiveURL == nil ? Color.secondary : Color.accentColor
         )
-        .frame(width: 34, height: 34)
+        .frame(width: WorkspaceMetrics.navigationRowHeight, height: WorkspaceMetrics.navigationRowHeight)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 3) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(
           model.selectedArchiveURL?.lastPathComponent
             ?? flashText("flash.workspace.image.chooseTitle")
         )
-        .font(.callout.weight(.semibold))
+        .font(WorkspaceFont.body.weight(.semibold))
         .lineLimit(2)
         .truncationMode(.middle)
         .accessibilityIdentifier("flash.image.value")
@@ -378,16 +352,16 @@ struct FlashWorkspaceView: View {
           Text(
             "\(ByteCountFormatter.string(fromByteCount: plan.archiveSizeBytes, countStyle: .file)) · \(plan.runtimeBuildVersion)"
           )
-          .font(.caption)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
         } else {
           Text(flashText("flash.workspace.image.chooseHelp"))
-            .font(.caption)
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
       }
-      Spacer(minLength: 12)
+      Spacer(minLength: WorkspaceMetrics.contentGap)
       if model.selectedArchiveURL == nil {
         Button(flashText("flash.workspace.image.choose")) {
           if let url = FlashImageArchiveOpenPanel.choose() {
@@ -408,13 +382,13 @@ struct FlashWorkspaceView: View {
         .accessibilityIdentifier("flash.image.choose")
       }
     }
-    .padding(16)
+    .padding(WorkspaceMetrics.cardPaddingHorizontal)
     .background(
       Color(nsColor: .windowBackgroundColor).opacity(0.55),
-      in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 10, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
         .stroke(
           Color(nsColor: .separatorColor),
           style: StrokeStyle(
@@ -430,36 +404,40 @@ struct FlashWorkspaceView: View {
         if case .userDataDestroyed = $0 { return true }
         return false
       } ?? .mappedPartitionsOverwritten(count: plan.mappedPartitionCount)
-    return VStack(alignment: .leading, spacing: 12) {
+    return VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       Label(mainImpactText(plan), systemImage: "externaldrive.badge.exclamationmark")
-        .font(.callout.weight(.semibold))
+        .font(WorkspaceFont.sectionTitle)
         .foregroundStyle(.red)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
         .accessibilityIdentifier(dataImpactIdentifier(impact))
       Label(flashText("flash.workspace.action.power"), systemImage: "bolt.fill")
-        .font(.callout)
+        .font(WorkspaceFont.body)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
       Text(flashText("flash.workspace.action.authority"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
 
       if model.canSubmit {
-        HStack {
-          Spacer(minLength: 0)
-          Button {
-            model.submit()
-          } label: {
-            Text(flashText("flash.workspace.action.submit"))
-          }
-          .buttonStyle(.borderedProminent)
-          .tint(.red)
-          .controlSize(.large)
-          .accessibilityIdentifier("flash.execute.submit")
+        // The button stays content-sized and trails the risk lines it follows.
+        Button {
+          model.submit()
+        } label: {
+          Text(flashText("flash.workspace.action.submit"))
         }
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+        .controlSize(.large)
+        .accessibilityIdentifier("flash.execute.submit")
+        .frame(maxWidth: .infinity, alignment: .trailing)
       } else {
+        // The blocker replaces the primary control, so it carries the weight of
+        // the control it stands in for (spec §5.6).
         Label(flashBlockerText(plan), systemImage: "exclamationmark.triangle.fill")
-          .font(.callout.weight(.semibold))
+          .font(WorkspaceFont.sectionTitle)
           .foregroundStyle(.orange)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("flash.execute.prerequisiteBlocker")
@@ -539,13 +517,13 @@ struct FlashWorkspaceView: View {
   private func recoveryBlockerSurface(
     _ job: RuntimeJobSummaryPresentation
   ) -> some View {
-    FlashWorkspaceSurface {
-      VStack(alignment: .leading, spacing: 12) {
+    WorkspaceCard(spacing: WorkspaceMetrics.blockGap) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         Label(
           flashText("flash.runtime.recoveryTitle"),
           systemImage: "exclamationmark.shield.fill"
         )
-        .font(.title3.weight(.semibold))
+        .font(.title2.weight(.semibold))
         .foregroundStyle(.orange)
         .accessibilityIdentifier("flash.runtime.attention")
         Text(
@@ -554,10 +532,10 @@ struct FlashWorkspaceView: View {
               ? "flash.runtime.outcomeUnknownGuidance"
               : "flash.runtime.waitingForHumanGuidance")
         )
-        .font(.callout)
+        .font(WorkspaceFont.secondary)
         .fixedSize(horizontal: false, vertical: true)
         LabeledContent(flashText("flash.runtime.job")) {
-          Text(job.id).font(.callout.monospaced())
+          Text(job.id).font(WorkspaceFont.monospacedValue)
         }
         Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
           .accessibilityIdentifier("flash.runtime.openHistory")
@@ -577,32 +555,32 @@ struct FlashWorkspaceView: View {
   }
 
   private var executionProgressSurface: some View {
-    FlashWorkspaceSurface {
-      VStack(alignment: .leading, spacing: 18) {
-        HStack(alignment: .top, spacing: 12) {
-          VStack(alignment: .leading, spacing: 5) {
+    WorkspaceCard(spacing: WorkspaceMetrics.blockGap) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
+        HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(progressTitle)
-              .font(.title3.weight(.semibold))
+              .font(.title2.weight(.semibold))
               .accessibilityAddTraits(.isHeader)
               .accessibilityIdentifier("flash.workspace.progress")
             Text(flashText("flash.workspace.progress.keepConnected"))
-              .font(.callout)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
           }
-          Spacer(minLength: 12)
+          Spacer(minLength: WorkspaceMetrics.contentGap)
           if let percent = liveProgress.writePercentCompleted {
+            // `.flash-percent` in the prototype: the run's one focal number,
+            // tabular so it does not jitter as the digits change.
             Text("\(percent)%")
-              .font(.title3.monospacedDigit().weight(.semibold))
+              .font(.system(size: 28, weight: .semibold).monospacedDigit())
               .foregroundStyle(Color.accentColor)
               .accessibilityIdentifier("flash.runtime.progress.percent")
           } else {
-            Label(
-              flashText("flash.workspace.progress.running"),
-              systemImage: "arrow.triangle.2.circlepath"
-            )
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.orange)
+            WorkspaceChip(
+              text: Text(flashText("flash.workspace.progress.running")),
+              tone: .warning,
+              symbol: "arrow.triangle.2.circlepath")
           }
         }
 
@@ -619,7 +597,7 @@ struct FlashWorkspaceView: View {
             .accessibilityIdentifier("flash.runtime.progress")
         }
         Text(progressDetail)
-          .font(.footnote)
+          .font(WorkspaceFont.tabularSecondary)
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("flash.runtime.progress.detail")
 
@@ -630,12 +608,21 @@ struct FlashWorkspaceView: View {
             flashText("flash.runtime.criticalWrite"),
             systemImage: "exclamationmark.triangle.fill"
           )
-          .font(.callout.weight(.semibold))
+          .font(WorkspaceFont.body.weight(.semibold))
           .foregroundStyle(.orange)
           .fixedSize(horizontal: false, vertical: true)
-          .padding(12)
+          .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+          .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
           .frame(maxWidth: .infinity, alignment: .leading)
-          .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+          .background(
+            WorkspaceTone.warning.wash,
+            in: RoundedRectangle(
+              cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+          )
+          .overlay {
+            RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+              .stroke(WorkspaceTone.warning.line, lineWidth: 1)
+          }
           .accessibilityIdentifier("flash.runtime.criticalWrite")
         }
 
@@ -646,7 +633,7 @@ struct FlashWorkspaceView: View {
           .disabled(model.isCancelling)
           .accessibilityIdentifier("flash.execute.cancel")
           Text(flashText("flash.action.cancel.help"))
-            .font(.footnote)
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -655,9 +642,9 @@ struct FlashWorkspaceView: View {
   }
 
   private var flashStageTrack: some View {
-    HStack(alignment: .top, spacing: 8) {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
       ForEach(FlashWorkspaceRunStage.allCases, id: \.rawValue) { stage in
-        VStack(spacing: 6) {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
           Image(
             systemName: stage.rawValue < currentRunStage.rawValue
               ? "checkmark.circle.fill"
@@ -665,21 +652,20 @@ struct FlashWorkspaceView: View {
                 ? "circle.inset.filled"
                 : "circle"
           )
+          .imageScale(.small)
           .foregroundStyle(
-            stage.rawValue <= currentRunStage.rawValue
-              ? Color.accentColor
-              : Color.secondary)
+            stage.rawValue < currentRunStage.rawValue
+              ? Color.green
+              : stage == currentRunStage ? Color.accentColor : Color.secondary
+          )
+          .accessibilityHidden(true)
           Text(flashText(stage.titleKey))
-            .font(.caption)
-            .multilineTextAlignment(.center)
+            .font(stage == currentRunStage ? WorkspaceFont.label : WorkspaceFont.caption)
             .foregroundStyle(stage == currentRunStage ? .primary : .secondary)
-            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
+          Spacer(minLength: 0)
         }
-        if stage != .verify {
-          Divider()
-            .frame(maxWidth: 60)
-            .padding(.top, 8)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .accessibilityElement(children: .contain)
@@ -734,29 +720,29 @@ struct FlashWorkspaceView: View {
 
   private var executionResultSurface: some View {
     let succeeded = model.hasVerifiedPostflight
-    return FlashWorkspaceSurface {
-      HStack(alignment: .top, spacing: 15) {
+    return WorkspaceCard(spacing: WorkspaceMetrics.blockGap) {
+      HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
         Image(systemName: succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
           .font(.system(size: 36))
           .foregroundStyle(succeeded ? .green : .orange)
           .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           Text(
             flashText(
               succeeded
                 ? "flash.workspace.result.success"
                 : "flash.workspace.result.stopped")
           )
-          .font(.title3.weight(.semibold))
+          .font(.title2.weight(.semibold))
           .accessibilityAddTraits(.isHeader)
           .accessibilityIdentifier("flash.execute.terminal")
           Text(resultDescription(succeeded: succeeded))
-            .font(.callout)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
           if let submission = model.submission {
             Text(submission.jobID)
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
               .textSelection(.enabled)
               .accessibilityIdentifier("flash.execute.jobId")
@@ -764,7 +750,7 @@ struct FlashWorkspaceView: View {
           if let plan = model.plan, let evidence = model.postflightEvidence {
             flashPostflight(plan: plan, evidence: evidence)
           }
-          HStack(spacing: 10) {
+          HStack(spacing: WorkspaceMetrics.contentGap) {
             Button(flashText("flash.workspace.result.again")) {
               model.resetForAnotherFlash()
             }
@@ -799,14 +785,16 @@ struct FlashWorkspaceView: View {
             isDetailsExpanded ? "flash.workspace.details.hide" : "flash.workspace.details"),
           systemImage: isDetailsExpanded ? "chevron.down" : "chevron.right"
         )
-        .font(.callout.weight(.semibold))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .frame(minHeight: 28, alignment: .leading)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("flash.workspace.details")
 
       if isDetailsExpanded {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
           availabilitySection
           deviceAccessSection
           detailsInputs
@@ -818,52 +806,50 @@ struct FlashWorkspaceView: View {
             plan: model.plan,
             onOpenHistory: onOpenHistory)
         }
-        .padding(.top, 12)
+        .padding(.top, WorkspaceMetrics.blockGap)
       }
     }
   }
 
   private var detailsInputs: some View {
-    GroupBox(flashText("flash.workspace.details.configuration")) {
-      VStack(alignment: .leading, spacing: 14) {
-        Picker(flashText("flash.profile.label"), selection: profileBinding) {
-          ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
-            Text(reference).tag(reference)
-          }
+    WorkspaceSection(
+      Text(flashText("flash.workspace.details.configuration")),
+      spacing: WorkspaceMetrics.blockGap
+    ) {
+      Picker(flashText("flash.profile.label"), selection: profileBinding) {
+        ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
+          Text(reference).tag(reference)
         }
-        .accessibilityIdentifier("flash.profile")
-        .disabled(model.isPreparingPlan || model.isSubmitting)
-        targetContent
-        Divider()
-        Text(flashText("flash.plan.prerequisites"))
-          .font(.subheadline.weight(.semibold))
-          .accessibilityAddTraits(.isHeader)
-        prerequisitesContent
-          .accessibilityIdentifier("flash.plan.prerequisitesSection")
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
+      .accessibilityIdentifier("flash.profile")
+      .disabled(model.isPreparingPlan || model.isSubmitting)
+      targetContent
+      Text(flashText("flash.plan.prerequisites"))
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+        .accessibilityAddTraits(.isHeader)
+      prerequisitesContent
+        .accessibilityIdentifier("flash.plan.prerequisitesSection")
     }
   }
 
   private func exactPlanDetails(_ plan: FlashExactPlanPresentation) -> some View {
-    GroupBox(flashText("flash.plan.title")) {
-      VStack(alignment: .leading, spacing: 12) {
-        Text(
-          String(
-            localized: LocalizedStringResource.FlashLocalizable.flashWorkspacePlanSummary(
-              Int32(clamping: plan.steps.count),
-              flashText(effectKey(highestEffect(in: plan.steps) ?? .hostOnly))))
-        )
-        .font(.callout.weight(.semibold))
-        planStageSummary(plan)
-        Divider()
-        planSummary(plan)
-        Divider()
-        FlashPlanDetailsView(plan: plan)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
+    WorkspaceSection(
+      Text(flashText("flash.plan.title")),
+      spacing: WorkspaceMetrics.contentGap
+    ) {
+      Text(
+        String(
+          localized: LocalizedStringResource.FlashLocalizable.flashWorkspacePlanSummary(
+            Int32(clamping: plan.steps.count),
+            flashText(effectKey(highestEffect(in: plan.steps) ?? .hostOnly))))
+      )
+      .font(WorkspaceFont.body.weight(.semibold))
+      planStageSummary(plan)
+      Divider()
+      planSummary(plan)
+      Divider()
+      FlashPlanDetailsView(plan: plan)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.plan.steps")
@@ -877,7 +863,7 @@ struct FlashWorkspaceView: View {
         Text(flashText("flash.workspace.plan.steps"))
         Text(flashText("flash.workspace.plan.effect"))
       }
-      .font(.caption.weight(.semibold))
+      .font(WorkspaceFont.label)
       .foregroundStyle(.secondary)
       .padding(.bottom, 6)
       Divider().gridCellColumns(3)
@@ -959,8 +945,7 @@ struct FlashWorkspaceView: View {
   }
 
   private var availabilitySection: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      flashSectionHeader(flashText("flash.availability.title"))
+    WorkspaceSection(Text(flashText("flash.availability.title"))) {
       switch model.workspace.availability {
       case .checking:
         Label(flashText("flash.availability.checking"), systemImage: "hourglass")
@@ -975,136 +960,132 @@ struct FlashWorkspaceView: View {
           .accessibilityIdentifier("flash.availability.status")
         ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
           Text(reason)
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
         }
       }
       Text(flashText("flash.availability.scope"))
-        .font(.footnote)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private func flashSectionHeader(_ title: String) -> some View {
-    VStack(alignment: .leading, spacing: 7) {
-      Text(title)
-        .font(.subheadline.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-      Divider()
     }
   }
 
   private var deviceAccessSection: some View {
-    GroupBox(flashText("flash.deviceAccess.title")) {
-      VStack(alignment: .leading, spacing: 10) {
-        switch model.deviceAccess.availability {
-        case .checking:
-          HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
-            Text(flashText("flash.deviceAccess.checking"))
-          }
-        case .unavailable(let reason):
+    WorkspaceSection(Text(flashText("flash.deviceAccess.title"))) {
+      switch model.deviceAccess.availability {
+      case .checking:
+        HStack(spacing: WorkspaceMetrics.tightGap) {
+          ProgressView().controlSize(.small)
+          Text(flashText("flash.deviceAccess.checking"))
+        }
+      case .unavailable(let reason):
+        Label(
+          flashText("flash.deviceAccess.toolUnavailable"),
+          systemImage: "wrench.and.screwdriver.fill"
+        )
+        .foregroundStyle(.orange)
+        Text(reason)
+          .font(WorkspaceFont.monospacedValue)
+          .textSelection(.enabled)
+      case .available:
+        if let advice = model.deviceAccess.advice {
           Label(
-            flashText("flash.deviceAccess.toolUnavailable"),
-            systemImage: "wrench.and.screwdriver.fill"
+            flashText(deviceAccessVerdictKey(advice.verdict)),
+            systemImage: deviceAccessSymbol(advice.verdict)
           )
-          .foregroundStyle(.orange)
-          Text(reason)
-            .font(.callout.monospaced())
-            .textSelection(.enabled)
-        case .available:
-          if let advice = model.deviceAccess.advice {
-            Label(
-              flashText(deviceAccessVerdictKey(advice.verdict)),
-              systemImage: deviceAccessSymbol(advice.verdict)
-            )
-            .foregroundStyle(deviceAccessColor(advice.verdict))
-            .font(.callout.weight(.semibold))
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+          .foregroundStyle(deviceAccessColor(advice.verdict))
+          .font(WorkspaceFont.body.weight(.semibold))
+          Grid(
+            alignment: .leading,
+            horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+            verticalSpacing: WorkspaceMetrics.rowGap
+          ) {
+            GridRow {
+              Text(flashText("flash.deviceAccess.responsibility"))
+                .foregroundStyle(.secondary)
+              Text(flashText(deviceAccessResponsibilityKey(advice.responsibility)))
+            }
+            GridRow {
+              Text(flashText("flash.deviceAccess.nextStep"))
+                .foregroundStyle(.secondary)
+              Text(flashText(deviceAccessRemediationKey(advice.remediation)))
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            if model.deviceAccess.observationCount > 0 {
               GridRow {
-                Text(flashText("flash.deviceAccess.responsibility"))
+                Text(flashText("flash.deviceAccess.observations"))
                   .foregroundStyle(.secondary)
-                Text(flashText(deviceAccessResponsibilityKey(advice.responsibility)))
-              }
-              GridRow {
-                Text(flashText("flash.deviceAccess.nextStep"))
-                  .foregroundStyle(.secondary)
-                Text(flashText(deviceAccessRemediationKey(advice.remediation)))
-                  .fixedSize(horizontal: false, vertical: true)
-              }
-              if model.deviceAccess.observationCount > 0 {
-                GridRow {
-                  Text(flashText("flash.deviceAccess.observations"))
-                    .foregroundStyle(.secondary)
-                  Text(
-                    String(
-                      localized: LocalizedStringResource.FlashLocalizable
-                        .flashDeviceAccessObservationValue(
-                          Int32(clamping: model.deviceAccess.observationCount),
-                          model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", ")))
-                  )
-                }
+                Text(
+                  String(
+                    localized: LocalizedStringResource.FlashLocalizable
+                      .flashDeviceAccessObservationValue(
+                        Int32(clamping: model.deviceAccess.observationCount),
+                        model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", ")))
+                )
               }
             }
           }
         }
-        if model.deviceAccess.advice?.reprobeAvailable == true {
-          Button(flashText("flash.deviceAccess.reprobe")) {
-            model.refreshDeviceAccess()
-          }
-          .disabled(model.isRefreshingDeviceAccess)
-          .accessibilityIdentifier("flash.deviceAccess.reprobe")
+      }
+      if model.deviceAccess.advice?.reprobeAvailable == true {
+        Button(flashText("flash.deviceAccess.reprobe")) {
+          model.refreshDeviceAccess()
         }
-        if model.workspace.bootloaderStatus.disposition == .unbound
-          || model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
-          model.workspace.bootloaderStatus.mode == "loader"
-        {
-          Divider()
-          Label(
-            flashText("flash.bootloader.unbound.title"),
-            systemImage: "externaldrive.badge.questionmark"
-          )
-          .font(.callout.weight(.semibold))
-          .foregroundStyle(.orange)
-          Text(
-            flashText(
-              model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared
-                ? "flash.bootloader.unprepared.detail"
-                : "flash.bootloader.unbound.detail")
-          )
+        .disabled(model.isRefreshingDeviceAccess)
+        .accessibilityIdentifier("flash.deviceAccess.reprobe")
+      }
+      if model.workspace.bootloaderStatus.disposition == .unbound
+        || model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
+        model.workspace.bootloaderStatus.mode == "loader"
+      {
+        Divider()
+        Label(
+          flashText("flash.bootloader.unbound.title"),
+          systemImage: "externaldrive.badge.questionmark"
+        )
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.orange)
+        Text(
+          flashText(
+            model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared
+              ? "flash.bootloader.unprepared.detail"
+              : "flash.bootloader.unbound.detail")
+        )
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      } else if model.workspace.bootloaderStatus.disposition == .exactBoundTarget,
+        model.workspace.bootloaderStatus.mode == "loader"
+      {
+        Label(
+          flashText("flash.bootloader.bound"),
+          systemImage: "checkmark.seal.fill"
+        )
+        .foregroundStyle(.green)
+        .accessibilityIdentifier("flash.bootloader.bound")
+      } else if model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
+        model.workspace.bootloaderStatus.mode == "hdcNormal"
+      {
+        Label(
+          flashText("flash.binding.unprepared.hdc.title"),
+          systemImage: "externaldrive.badge.questionmark"
+        )
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.orange)
+        Text(flashText("flash.binding.unprepared.hdc.detail"))
           .font(.callout)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
-        } else if model.workspace.bootloaderStatus.disposition == .exactBoundTarget,
-          model.workspace.bootloaderStatus.mode == "loader"
-        {
-          Label(
-            flashText("flash.bootloader.bound"),
-            systemImage: "checkmark.seal.fill"
-          )
-          .foregroundStyle(.green)
-          .accessibilityIdentifier("flash.bootloader.bound")
-        } else if model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
-          model.workspace.bootloaderStatus.mode == "hdcNormal"
-        {
-          Label(
-            flashText("flash.binding.unprepared.hdc.title"),
-            systemImage: "externaldrive.badge.questionmark"
-          )
-          .font(.callout.weight(.semibold))
-          .foregroundStyle(.orange)
-          Text(flashText("flash.binding.unprepared.hdc.detail"))
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
+    // The identifier sits on a plain stack now that this is a section rather
+    // than a GroupBox, and an accessibility modifier on a plain container makes
+    // SwiftUI publish it as one leaf element — which hid `flash.bootloader.bound`
+    // inside it. `children: .contain` keeps the section addressable without
+    // swallowing what it contains.
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.deviceAccess")
   }
 
@@ -1157,7 +1138,7 @@ struct FlashWorkspaceView: View {
   }
 
   private var targetContent: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       if model.workspace.targets.isEmpty {
         Label(flashText("flash.target.none"), systemImage: "externaldrive.badge.questionmark")
           .accessibilityIdentifier("flash.target.empty")
@@ -1168,7 +1149,7 @@ struct FlashWorkspaceView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         Text(flashText("flash.target.guidance"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
       } else {
         Picker(flashText("flash.target.label"), selection: targetBinding) {
@@ -1199,16 +1180,16 @@ struct FlashWorkspaceView: View {
   }
 
   private var prerequisitesContent: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       if let plan = model.plan {
         Text(flashText("flash.plan.prerequisitesNote"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
         FlashPrerequisitesList(prerequisites: plan.prerequisites)
       } else {
         Text(flashText("flash.plan.prerequisitesAwaitPlan"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -1304,7 +1285,7 @@ struct FlashWorkspaceView: View {
       color = .red
     }
     return Label(flashText(key), systemImage: symbol)
-      .font(.caption.weight(.semibold))
+      .font(WorkspaceFont.label)
       .foregroundStyle(color)
       .lineLimit(2)
   }
@@ -1313,9 +1294,9 @@ struct FlashWorkspaceView: View {
     plan: FlashExactPlanPresentation,
     evidence: RuntimeJobEvidencePresentation
   ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       Text(flashText("flash.postflight.title"))
-        .font(.subheadline.weight(.semibold))
+        .font(WorkspaceFont.label)
       if let observedFirmware = evidence.observedFirmware {
         postflightRow(
           label: flashText("flash.postflight.build"),
@@ -1338,9 +1319,9 @@ struct FlashWorkspaceView: View {
           identifier: "flash.postflight.binding")
       }
     }
-    .padding(12)
+    .padding(WorkspaceMetrics.contentGap)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.postflight")
   }
@@ -1352,18 +1333,18 @@ struct FlashWorkspaceView: View {
     matches: Bool,
     identifier: String
   ) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
       Image(systemName: matches ? "checkmark.circle.fill" : "xmark.octagon.fill")
         .foregroundStyle(matches ? .green : .red)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(label).font(.callout.weight(.semibold))
         Text(
           String(
             localized: LocalizedStringResource.FlashLocalizable.flashPostflightComparison(
               expected, observed))
         )
-        .font(.caption.monospaced())
+        .font(WorkspaceFont.monospacedDense)
         .textSelection(.enabled)
       }
     }

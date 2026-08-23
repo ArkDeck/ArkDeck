@@ -44,25 +44,24 @@ struct HDCStatusView: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
-        statusStrip
-        LazyVGrid(
-          columns: [
-            GridItem(.adaptive(minimum: 360), spacing: 24, alignment: .topLeading)
-          ],
-          alignment: .leading,
-          spacing: 24
-        ) {
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      statusStrip
+      // Two fixed columns, not an adaptive grid: `.adaptive` derives its column
+      // count from the pane width, so a maximised window laid all four sections
+      // side by side and crushed the capability matrix. `.grid2` in the
+      // prototype is two columns or one, never four.
+      WorkspaceColumns(spacing: WorkspaceMetrics.sectionGap) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
           serverAndToolchainSection
-          deviceAndChannelSection
           capabilitiesSection
+        }
+      } trailing: {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+          deviceAndChannelSection
           needsAttentionSection
         }
-        advancedDiagnosticsSection
       }
-      .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(24)
+      advancedDiagnosticsSection
     }
     // The refresh control renders in the window's unified toolbar but is
     // declared here, so it exists — and `⌘R` is live — only while the Overview
@@ -106,67 +105,123 @@ struct HDCStatusView: View {
 
   // MARK: - Status strip
 
+  /// `.summary-strip` in the prototype: one bordered band whose four cells are
+  /// separated by the same hairline as everything else. The adaptive grid this
+  /// replaces derived its column count from the pane width, so a wide window
+  /// clumped all four cells into the left third; the refresh indicator was an
+  /// overlay that landed on top of the fourth cell every time ⌘R ran.
   private var statusStrip: some View {
-    LazyVGrid(
-      columns: [GridItem(.adaptive(minimum: 168), spacing: 20, alignment: .topLeading)],
-      alignment: .leading,
-      spacing: 12
-    ) {
-      statusItem(
-        titleKey: "overview.status.server",
-        tone: serverHealthTone,
-        value: Text(LocalizedStringKey(serverHealthKey)),
-        id: "overview.status.server.value")
-      statusItem(
-        titleKey: "overview.status.trust",
-        tone: trustTone,
-        value: Text(LocalizedStringKey(trustSummaryKey)),
-        id: "overview.status.trust.value")
-      statusItem(
-        titleKey: "overview.status.channel",
-        tone: channelTone,
-        value: Text(LocalizedStringKey(channelSummaryKey)),
-        id: "overview.status.channel.value")
-      statusItem(
-        titleKey: "overview.status.needsAttention",
-        tone: needsAttentionTone,
-        value: Text(needsAttentionSummary),
-        id: "overview.status.needsAttention.value")
-    }
-    .overlay(alignment: .topTrailing) {
-      if isRefreshInFlight {
-        HStack(spacing: 6) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+      HStack(spacing: WorkspaceMetrics.tightGap) {
+        Spacer(minLength: 0)
+        if isRefreshInFlight {
           ProgressView().controlSize(.small)
           Text("overview.status.refreshing")
-            .font(.caption)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("overview.status.refreshing")
         }
       }
+      .frame(height: 18)
+
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 0) {
+          statusItem(statusStripItems[0])
+          Divider()
+          statusItem(statusStripItems[1])
+          Divider()
+          statusItem(statusStripItems[2])
+          Divider()
+          statusItem(statusStripItems[3])
+        }
+        VStack(spacing: 0) {
+          HStack(spacing: 0) {
+            statusItem(statusStripItems[0])
+            Divider()
+            statusItem(statusStripItems[1])
+          }
+          Divider()
+          HStack(spacing: 0) {
+            statusItem(statusStripItems[2])
+            Divider()
+            statusItem(statusStripItems[3])
+          }
+        }
+      }
+      .fixedSize(horizontal: false, vertical: true)
+      .background(
+        Color(nsColor: .controlBackgroundColor),
+        in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      )
+      .clipShape(
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+          .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+      }
     }
   }
 
-  private func statusItem(
-    titleKey: String,
-    tone: StatusTone,
-    value: Text,
-    id: String
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
+  /// The strip's four slots, declared once so the wide row and the folded
+  /// two-by-two grid cannot drift apart (spec §5.1 fixes both the slots and
+  /// their order).
+  private struct StatusStripItem {
+    let titleKey: String
+    let tone: StatusTone
+    let value: Text
+    let id: String
+  }
+
+  private var statusStripItems: [StatusStripItem] {
+    [
+      StatusStripItem(
+        titleKey: "overview.status.server",
+        tone: serverHealthTone,
+        value: Text(LocalizedStringKey(serverHealthKey)),
+        id: "overview.status.server.value"),
+      StatusStripItem(
+        titleKey: "overview.status.trust",
+        tone: trustTone,
+        value: Text(LocalizedStringKey(trustSummaryKey)),
+        id: "overview.status.trust.value"),
+      StatusStripItem(
+        titleKey: "overview.status.channel",
+        tone: channelTone,
+        value: Text(LocalizedStringKey(channelSummaryKey)),
+        id: "overview.status.channel.value"),
+      StatusStripItem(
+        titleKey: "overview.status.needsAttention",
+        tone: needsAttentionTone,
+        value: Text(needsAttentionSummary),
+        id: "overview.status.needsAttention.value"),
+    ]
+  }
+
+  private func statusItem(_ item: StatusStripItem) -> some View {
+    let titleKey = item.titleKey
+    let tone = item.tone
+    let value = item.value
+    let id = item.id
+    return VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       Text(LocalizedStringKey(titleKey))
-        .font(.caption)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
-      HStack(spacing: 6) {
+      HStack(spacing: WorkspaceMetrics.tightGap) {
         // The symbol is redundant with the adjacent status text on purpose:
         // no status here may be readable by colour alone.
         Image(systemName: tone.symbol)
           .foregroundStyle(tone.color)
           .accessibilityHidden(true)
         value
-          .font(.body)
+          .font(WorkspaceFont.body)
+          .lineLimit(2)
           .accessibilityIdentifier(id)
       }
     }
+    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
+    .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
   }
 
   // MARK: - Sections
@@ -203,10 +258,11 @@ struct HDCStatusView: View {
         field("overview.field.authorization", authorizationText, id: "hdc.authorization")
         field("overview.field.channelProtection", protectionText, id: "hdc.channelProtection")
       }
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
         Text("overview.field.deviceEvents")
-          .font(.subheadline)
+          .font(WorkspaceFont.label)
           .foregroundStyle(.secondary)
+          .accessibilityAddTraits(.isHeader)
         deviceEventList
       }
     }
@@ -221,38 +277,46 @@ struct HDCStatusView: View {
           "overview.field.lifecycleAvailability", lifecycleAvailabilityText,
           id: "hdc.lifecycle.availability")
       }
-      Divider()
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
         Text(capabilityMatrixTitle)
-          .font(.subheadline.weight(.semibold))
+          .font(WorkspaceFont.label)
+          .foregroundStyle(.secondary)
+          .accessibilityAddTraits(.isHeader)
           .accessibilityIdentifier("overview.capabilities.matrixTitle")
         if let failure = capabilityMatrix.failure, capabilityMatrix.items.isEmpty {
           Label(failure, systemImage: "questionmark.circle")
-            .font(.callout)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("overview.capabilities.failure")
         } else if capabilityMatrix.items.isEmpty {
-          HStack(spacing: 8) {
+          HStack(spacing: WorkspaceMetrics.tightGap) {
             ProgressView().controlSize(.small)
             Text("overview.capabilities.loading")
-              .font(.callout)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
           }
         } else {
-          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+          Grid(
+            alignment: .leading,
+            horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+            verticalSpacing: WorkspaceMetrics.tightGap
+          ) {
             GridRow {
               Text("overview.capabilities.column.capability")
               Text("overview.capabilities.column.state")
               Text("overview.capabilities.column.evidence")
             }
-            .font(.caption.weight(.semibold))
+            .font(WorkspaceFont.label)
             .foregroundStyle(.secondary)
             Divider().gridCellColumns(3)
             ForEach(capabilityMatrix.items) { item in
               GridRow(alignment: .firstTextBaseline) {
-                Text(item.name).font(.body.monospaced())
+                // Capability name and its probe evidence are the same class of
+                // value, so they share one mono size instead of 13 next to 10.
+                Text(item.name).font(WorkspaceFont.monospacedValue)
                 Label {
                   Text(LocalizedStringKey(capabilityStateKey(item.state)))
+                    .font(WorkspaceFont.body)
                 } icon: {
                   Image(systemName: capabilityStateSymbol(item.state))
                     .foregroundStyle(capabilityStateColor(item.state))
@@ -260,7 +324,7 @@ struct HDCStatusView: View {
                 }
                 .accessibilityIdentifier("overview.capabilities.\(item.id).state")
                 Text(item.evidence)
-                  .font(.caption.monospaced())
+                  .font(WorkspaceFont.monospacedValue)
                   .foregroundStyle(.secondary)
                   .fixedSize(horizontal: false, vertical: true)
                   .accessibilityIdentifier("overview.capabilities.\(item.id).evidence")
@@ -312,24 +376,24 @@ struct HDCStatusView: View {
     section("overview.section.needsAttention", id: "overview.section.needsAttention") {
       if attentionItems.isEmpty && !recoveryNeedsAttention {
         Text("overview.attention.clear")
-          .font(.callout)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("overview.attention.clear")
       }
       ForEach(attentionItems) { item in
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
           Label {
             Text(LocalizedStringKey(item.titleKey))
           } icon: {
             Image(systemName: item.tone.symbol).foregroundStyle(item.tone.color)
           }
-          .font(.subheadline.weight(.semibold))
+          .font(WorkspaceFont.body.weight(.semibold))
           Text(item.reason)
-            .font(.callout)
+            .font(WorkspaceFont.secondary)
             .accessibilityIdentifier(item.id)
             .fixedSize(horizontal: false, vertical: true)
           Text(LocalizedStringKey(item.nextStepKey))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -339,25 +403,32 @@ struct HDCStatusView: View {
   }
 
   private var advancedDiagnosticsSection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Button {
-        isAdvancedExpanded.toggle()
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: isAdvancedExpanded ? "chevron.down" : "chevron.right")
-            .imageScale(.small)
-            .accessibilityHidden(true)
-          Text("overview.section.advanced")
-            .font(.headline)
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionHeaderGap) {
+        Button {
+          isAdvancedExpanded.toggle()
+        } label: {
+          HStack(spacing: WorkspaceMetrics.tightGap) {
+            Image(systemName: isAdvancedExpanded ? "chevron.down" : "chevron.right")
+              .imageScale(.small)
+              .frame(width: 12)
+              .accessibilityHidden(true)
+            Text("overview.section.advanced")
+              .font(WorkspaceFont.sectionTitle)
+            Spacer(minLength: 0)
+          }
+          .frame(minHeight: 24)
+          .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .keyboardShortcut("d", modifiers: [.command, .shift])
-      .accessibilityIdentifier("overview.advanced.toggle")
-      .accessibilityAddTraits(.isHeader)
-      if isAdvancedExpanded {
+        .buttonStyle(.plain)
+        .keyboardShortcut("d", modifiers: [.command, .shift])
+        .accessibilityIdentifier("overview.advanced.toggle")
+        .accessibilityAddTraits(.isHeader)
+        // The rule belongs to the section, not to the disclosure state: the
+        // last band of the page must not change structure on click.
         Divider()
+      }
+      if isAdvancedExpanded {
         diagnosticsGrid {
           field(
             "overview.field.path", presentation.absolutePath, id: "hdc.toolchain.path",
@@ -390,11 +461,11 @@ struct HDCStatusView: View {
 
   @ViewBuilder
   private var recoveryControls: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       switch presentation.lifecycleRecovery {
       case .unavailable(let reason):
         Text(reason)
-          .font(.callout)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("hdc.lifecycle.recoveryUnavailable")
           .fixedSize(horizontal: false, vertical: true)
@@ -411,7 +482,7 @@ struct HDCStatusView: View {
         } icon: {
           Image(systemName: "checkmark.seal").foregroundStyle(.green)
         }
-        .font(.callout)
+        .font(WorkspaceFont.secondary)
         if let onDispatchConfirmedRecovery {
           Button("overview.recovery.dispatch", action: onDispatchConfirmedRecovery)
             .accessibilityIdentifier("hdc.lifecycle.dispatch")
@@ -424,13 +495,13 @@ struct HDCStatusView: View {
         } icon: {
           Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
         }
-        .font(.callout)
+        .font(WorkspaceFont.secondary)
         recoveryPreviewButton
       }
       Text(
         "Server recovery is host-wide: it requires an impact preview, an exact-generation user confirmation, and a dispatch-time recheck."
       )
-      .font(.footnote)
+      .font(WorkspaceFont.secondary)
       .foregroundStyle(.secondary)
       .accessibilityIdentifier("hdc.lifecycle.previewRequirement")
       .fixedSize(horizontal: false, vertical: true)
@@ -464,21 +535,19 @@ struct HDCStatusView: View {
     id: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(LocalizedStringKey(titleKey))
-        .font(.headline)
-        .accessibilityIdentifier(id)
-        .accessibilityAddTraits(.isHeader)
-      Divider()
+    WorkspaceSection(Text(LocalizedStringKey(titleKey)), identifier: id) {
       content()
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func diagnosticsGrid<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+    Grid(
+      alignment: .leading,
+      horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+      verticalSpacing: WorkspaceMetrics.rowGap
+    ) {
       content()
     }
   }
@@ -516,9 +585,11 @@ struct HDCStatusView: View {
 
     func body(content: Content) -> some View {
       switch style {
-      case .plain: content
-      case .monospaced: content.font(.body.monospaced())
-      case .digits: content.font(.body.monospacedDigit())
+      case .plain: content.font(WorkspaceFont.body)
+      // Paths, hashes and generations are compared character by character, so
+      // they share the one mono size the rest of the App uses (spec §2).
+      case .monospaced: content.font(WorkspaceFont.monospacedValue)
+      case .digits: content.font(WorkspaceFont.tabularValue)
       }
     }
   }
@@ -527,23 +598,34 @@ struct HDCStatusView: View {
   /// value so the exact ordered, redacted history stays a single stable
   /// assistive-technology and automation string.
   private var deviceEventList: some View {
-    VStack(alignment: .leading, spacing: 3) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       if presentation.deviceEvents.isEmpty {
         Text(deviceEventsText)
-          .font(.callout)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
       } else {
-        ForEach(Array(presentation.deviceEvents.enumerated()), id: \.offset) { _, event in
-          HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(event.timestamp)
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(.secondary)
-            Text(event.kind.rawValue)
-              .font(.caption)
-            if let identifier = event.redactedDeviceIdentifier {
-              Text(identifier)
-                .font(.caption.monospaced())
+        // A Grid, not free HStacks: timestamp, kind and identifier are columns
+        // and have to line up down the list.
+        Grid(
+          alignment: .leading,
+          horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+          verticalSpacing: WorkspaceMetrics.rowGap
+        ) {
+          ForEach(Array(presentation.deviceEvents.enumerated()), id: \.offset) { _, event in
+            GridRow(alignment: .firstTextBaseline) {
+              Text(event.timestamp)
+                .font(WorkspaceFont.monospacedDense.monospacedDigit())
                 .foregroundStyle(.secondary)
+              Text(event.kind.rawValue)
+                .font(WorkspaceFont.secondary)
+              // A redacted identifier is one comparable token: elide its middle
+              // rather than wrapping it across three lines of fragments.
+              Text(event.redactedDeviceIdentifier ?? "")
+                .font(WorkspaceFont.monospacedDense)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(event.redactedDeviceIdentifier ?? "")
             }
           }
         }
@@ -785,15 +867,21 @@ private struct HDCRecoveryImpactSheet: View {
   @FocusState private var isCancelFocused: Bool
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
       Text("overview.recovery.sheetTitle")
-        .font(.title3.weight(.semibold))
+        .font(.title2.weight(.semibold))
         .accessibilityAddTraits(.isHeader)
       if let snapshot = presentation.lifecycleImpactPreview {
+        // A subtitle under the sheet's one heading, not a second heading.
         Text("Server recovery impact preview")
-          .font(.headline)
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
           .accessibilityIdentifier("hdc.lifecycle.impactPreview")
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+        Grid(
+          alignment: .leading,
+          horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+          verticalSpacing: WorkspaceMetrics.rowGap
+        ) {
           row("overview.impact.action", snapshot.action.rawValue, id: "hdc.lifecycle.action")
           row("overview.impact.endpoint", snapshot.endpoint.rawValue, id: "hdc.lifecycle.endpoint")
           row(
@@ -821,7 +909,7 @@ private struct HDCRecoveryImpactSheet: View {
         Text(
           "This preview requires an exact-generation user confirmation before recovery can dispatch."
         )
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("hdc.lifecycle.confirmationRequired")
         .fixedSize(horizontal: false, vertical: true)
@@ -842,20 +930,19 @@ private struct HDCRecoveryImpactSheet: View {
         }
       }
     }
-    .padding(24)
+    .padding(WorkspaceMetrics.pageInsetHorizontal)
     .frame(minWidth: 520, maxWidth: 640, alignment: .leading)
     .defaultFocus($isCancelFocused, true)
   }
 
+  /// The same fact row the page behind the sheet uses: secondary label, mono
+  /// value. Job IDs, device coordinators and the generation are all values a
+  /// reader has to compare character by character (spec §2).
   private func row(_ titleKey: String, _ value: String, id: String) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(LocalizedStringKey(titleKey))
-        .foregroundStyle(.secondary)
-        .gridColumnAlignment(.leading)
-      Text(value)
-        .accessibilityIdentifier(id)
-        .fixedSize(horizontal: false, vertical: true)
-    }
+    WorkspaceFactRow(
+      name: Text(LocalizedStringKey(titleKey)),
+      value: Text(value),
+      identifier: id)
   }
 
   private func otherClientText(_ detection: HDCServerOtherClientDetection) -> String {

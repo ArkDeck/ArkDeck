@@ -107,8 +107,7 @@ final class AppShellUITests: XCTestCase {
           "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
           "Provider invocation disclosure",
         ],
-        uiDumpAvailable: "Runtime operation is available",
-        uiDumpUnavailable: "Runtime operation is unavailable",
+        viewerEmptyTitle: "No verified capture",
         traceAvailable: "Diagnostics operation is available",
         traceUnavailable: "Diagnostics operation is unavailable",
         settingsPanes: ["General", "Toolchains", "Storage", "Updates", "Diagnostics"]),
@@ -155,8 +154,7 @@ final class AppShellUITests: XCTestCase {
         debugPanels: [
           "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则", "Provider 调用披露",
         ],
-        uiDumpAvailable: "Runtime 操作可用",
-        uiDumpUnavailable: "Runtime 操作不可用",
+        viewerEmptyTitle: "没有已验证的 capture",
         traceAvailable: "诊断操作可用",
         traceUnavailable: "诊断操作不可用",
         settingsPanes: ["通用", "工具链", "存储", "更新", "诊断"]),
@@ -293,8 +291,7 @@ final class AppShellUITests: XCTestCase {
     let inspectorShow: String
     let inspectorReadOnly: String
     let debugPanels: [String]
-    let uiDumpAvailable: String
-    let uiDumpUnavailable: String
+    let viewerEmptyTitle: String
     let traceAvailable: String
     let traceUnavailable: String
     let settingsPanes: [String]
@@ -519,31 +516,27 @@ final class AppShellUITests: XCTestCase {
         "Debug panel \(tabID) did not render", file: file, line: line)
     }
 
-    // UI Dump presents its canonical recipes, artifact contract and locked
-    // run action even when Runtime has not published the required operation.
+    // Viewer keeps its capture scope, its search field and its explicit
+    // "no verified capture" state visible when Runtime has published nothing.
+    // Both pane titles come from the Viewer's strings catalog, so this also
+    // proves the page is localized rather than rendering hardcoded English.
     select("app.navigation.uiDump", in: app)
-    assertDisplayed(
-      element("uiDump.availability.status", in: app),
-      oneOf: [workspaces.uiDumpAvailable, workspaces.uiDumpUnavailable], timeout: 10)
     XCTAssertTrue(
-      element("uiDump.target.empty", in: app).exists
-        || element("uiDump.target.picker", in: app).exists,
-      "UI Dump must expose either a selected Runtime target or its explicit empty state",
-      file: file, line: line)
+      element("viewer.target", in: app).waitForExistenceFast(timeout: 10),
+      "Viewer must expose its exact-target picker", file: file, line: line)
     XCTAssertTrue(
-      element("uiDump.recipe.fullDefaultTree", in: app).exists,
-      file: file, line: line)
-    // elementTree is the default recipe; the section's live echo proves it by
-    // showing its exact hidumper arguments, in any language.
+      element("viewer.search", in: app).exists,
+      "Viewer must expose its component search field", file: file, line: line)
     XCTAssertTrue(
-      displayedText(for: element("uiDump.recipe.liveArguments", in: app))
-        .contains("-element -c"),
-      "the live argument echo must reflect the default elementTree recipe",
+      element("viewer.recapture", in: app).exists,
+      "Viewer must expose its Recapture action", file: file, line: line)
+    // With no verified capture there are no panes to title, so the empty
+    // state is the surface that must speak — and it must speak the sweep's
+    // language, which is what proves the page reads its strings catalog.
+    XCTAssertTrue(
+      app.staticTexts[workspaces.viewerEmptyTitle].waitForExistenceFast(timeout: 10),
+      "Viewer must name its empty state in the sweep's language",
       file: file, line: line)
-    XCTAssertTrue(element("uiDump.artifacts.table", in: app).exists, file: file, line: line)
-    let uiDumpRun = app.buttons["uiDump.run"]
-    XCTAssertTrue(uiDumpRun.exists, file: file, line: line)
-    XCTAssertFalse(uiDumpRun.isEnabled, file: file, line: line)
     XCTAssertFalse(app.staticTexts["app.unavailable.title"].exists, file: file, line: line)
 
     // Trace likewise keeps the bounded configuration visible and its start
@@ -951,10 +944,9 @@ final class AppShellUITests: XCTestCase {
     }
 
     select("app.navigation.uiDump", in: app, file: file, line: line)
-    assertDisplayed(
-      element("uiDump.availability.status", in: app),
-      oneOf: [workspaces.uiDumpAvailable, workspaces.uiDumpUnavailable],
-      timeout: 10, file: file, line: line)
+    XCTAssertTrue(
+      app.staticTexts[workspaces.viewerEmptyTitle].waitForExistenceFast(timeout: 10),
+      "localized Viewer empty state did not render", file: file, line: line)
     select("app.navigation.trace", in: app, file: file, line: line)
     assertDisplayed(
       element("trace.availability.status", in: app),
