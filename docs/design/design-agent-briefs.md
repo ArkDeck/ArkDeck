@@ -257,99 +257,112 @@ spec §5.4 还要求不定进度旁显示 elapsed;原型页面上没有,elapsed 
 
 > 贴进 claude.ai/design 项目的新对话。
 
-用 ArkDeck 组件画 **Debug 工作台**页。四个 tab 各画一张:Logs / Apps / Network / Commands。
+用 ArkDeck 组件画 **Debug 工作台**页。Debug 的主链路是“编译产物替换后用日志验证”，不是一张日志查看器。至少画：Artifacts 默认态、来源管理 sheet、SSH 密码/密钥与目录/SMB/WSL 条件配置态、替换计划 sheet、替换完成待重启态、重启验证完成态、Logs 采集中态；Apps / Network / Commands 各保留一张。
 
-**布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(◎ Overview · ⚡ Flash · 🐞 Debug · 🌲 Viewer · 📈 Trace · 🗂 History · ⚙ Settings,Debug 为当前页)。
-内容区自上而下:`RecoveryBanner`(跨页常驻,不是本页新增)→ 页标题 `Debug 工作台` → `Tabs`(四项)→ 当前 tab 的内容,一张 `Card` 装完。
-底部 `JobInspector` 折叠态常驻。本页没有 `StatusStrip`——那是 Overview 的。
+**布局** — `WindowFrame`，标题 `ArkDeck — OpenHarmony 设备工作台`。左栏 `DeviceRow` × 2（DAYU200 / 待授权设备）+ `NavItem` × 7（Overview · Flash · Debug · Viewer · Trace · History · Automation，Debug 为当前页），不画 Settings 导航项。内容区自上而下：`RecoveryBanner`（有跨页 recovery 时才出现）→ `Tabs` 五项 → 当前面板。底部 `JobInspector` 折叠态常驻。本页没有 `StatusStrip`。
 
-**内容** — 逐字使用,不要改写、不要翻译、不要补充:
+Tabs 五项，顺序固定：`产物替换` · `获取日志` · `应用` · `网络` · `只读工具`。默认 `产物替换`。Tab 使用 roving focus；左右方向键移动，Home / End 到两端，切换后焦点留在 tab。
 
-Tabs 四项:`Logs` · `Apps` · `Network` · `Commands`。
+### Artifacts / 产物替换默认态
 
-Logs tab,控制行从左到右一行排开(会换行):
-- 主按钮:未采集时 `开始采集`(primary);采集中时 `停止采集`(default)
-- `暂停界面` / 采集暂停后变 `恢复界面`;**未采集时该按钮 disabled**
-- 小字 `level ≥` + `SegmentedControl` size `sm`,三档 `I` `W` `E`,当前 `W`
-- `TextField` mono,占位符 `tag 过滤`,宽约 110
-- `Chip` tone `dim`:`host 轮转: 片 #3 · 11.8MB/64MB · 配额 1GB`
-- 右端(和上面隔开)`Button` variant `danger`:`清空设备 buffer…`
+先画一行无边界 scope：`目标设备` + mono `DAYU200 · TGT-9587… · binding r12` + ok `Chip` `已确认` + `EffectBadge deviceMutation`。
 
-暂停时,控制行下方多一枚 `Chip` tone `warn`:`界面已暂停 · N 行待补`(N 是暂停期间攒下的行数,一直在涨;原型没有固定值,画一个两三位数即可)。
+第一张 `Card` 标题 `编译来源`，说明 `切换 SSH 服务器、本机目录、SMB 共享或 WSL 发行版，再选择该来源登记的编译根目录。`，右上 `管理来源与根目录…`。下面两列：
 
-`LogTail`,`emphasis`,maxHeight 220,格式 `07-13 时间 等级 tag: 正文`:
-```
+- `Select`：label `编译来源`，当前 `远端 · OHOS 编译集群 · 已连接`；其余选项 `本地 · DevEco 输出 · 可用`、`局域网 · Nightly 共享 · 已挂载`、`本机 · WSL Ubuntu · 可用`。控件下显示当前类型和认证摘要，例如 `SSH 远端服务器 · SSH 密钥认证 · 凭据已保存在 Keychain`，绝不显示密码或完整私钥路径。
+- mono `Select`：label `编译根目录`，当前 `rk3568 · Debug — /build/openharmony/out/rk3568/debug`，另一个 `rk3568 · Release — /build/openharmony/out/rk3568/release`。
+
+第二张 `Card` 标题 `搜索编译产物`，说明 `只搜索当前根目录下的 .so / .abc；结果路径是编译来源，不是可编辑的设备目标路径。`。搜索行：可见 label `文件名或相对路径` + mono `TextField` placeholder `例如：libace 或 entry.abc`；`SegmentedControl` 三项 `全部 / .so / .abc`；primary `搜索产物`。
+
+`DataTable` 列 = 选择 / 产物 / 来源相对路径 / 构建信息 / 兼容性，逐字使用四行：
+
+| 选择 | 产物 | 来源相对路径 | 构建信息 | 兼容性 |
+| --- | --- | --- | --- | --- |
+| ☑ | `libace_engine.z.so` · `.so · 6.8 MB` | `arkui/lib64/libace_engine.z.so` | 今天 22:41 | ok `可替换` + `arm64-v8a · ELF64 · Build ID 7f32…c91a` |
+| ☐ | `libfeature_debug.so` · `.so · 1.3 MB` | `product/lib64/libfeature_debug.so` | 今天 22:38 | ok `可替换` + `arm64-v8a · ELF64 · Build ID 11ad…402e` |
+| ☑ | `entry.abc` · `.abc · 842 KB` | `ets/modules.abc/entry.abc` | 今天 22:42 | ok `可替换` + `ABC · API 18 · 编译器指纹匹配` |
+| disabled | `liblegacy32.so` · `.so · 904 KB` | `legacy/lib/liblegacy32.so` | 昨天 18:09 | danger `已阻止` + `armeabi-v7a · 与目标 arm64-v8a 不一致` |
+
+表下 stable live status：`已选择 2 个产物；Runtime 会先校验 ABI / 编译器指纹 / hash，再为每个现有目标创建备份。`，右侧 primary `检查并预览替换`。0 项时按钮 disabled；被阻止行不能选，状态不能只靠红色。
+
+页尾 `Callout warn` 必须保留：`设计边界：当前生产 Catalog 只发布单个 app-owned .so 的校验、备份、替换、回滚和 Ability restart；批量来源浏览、.abc 替换与独立设备重启仍需对应 behavior contract / typed operation 后才能显示 AVAILABLE。`
+
+### 来源与根目录管理 sheet
+
+title `管理编译来源与根目录`，说明 `来源可以是 SSH 服务器、本机目录、SMB 共享或 WSL 发行版；配置只定义受信的编译产物空间，不能在这里输入设备目标路径。`。
+
+四条来源配置：
+
+- 选中态 `远端 · OHOS 编译集群` / `SSH 远端服务器 · 已连接` / mono `builder@build-ohos.internal:22` / `SSH 密钥认证 · 凭据已保存在 Keychain` / `2 个编译根目录` / ok `当前来源` / `编辑` / `删除`。
+- `本地 · DevEco 输出` / `本机目录 · 可用` / mono `~/Workspace/WaterFlow/entry/build/default/intermediates` / `目录安全书签` / `1 个编译根目录` / `切换到此来源` / `编辑` / `删除`。
+- `局域网 · Nightly 共享` / `SMB 共享 · 已挂载` / mono `smb://build-nas/openharmony` / `build-reader · 密码已保存在 Keychain` / `1 个编译根目录` / `切换到此来源` / `编辑` / `删除`。
+- `本机 · WSL Ubuntu` / `WSL 发行版 · 可用` / mono `Ubuntu-24.04` / `通过封闭 WSL 文件适配器访问` / `1 个编译根目录` / `切换到此来源` / `编辑` / `删除`。
+
+下方标题 `当前来源的编译根目录`，右侧 `添加根目录…`；表列名称 / 根目录 / 操作：`rk3568 · Debug` / `/build/openharmony/out/rk3568/debug` / `编辑` `删除`；`rk3568 · Release` / `/build/openharmony/out/rk3568/release` / `编辑` `删除`。footer `完成` / primary `添加来源…`。
+
+添加/编辑来源 sheet 先显示可见 label `配置名称` 与 `来源类型`，类型固定为 `SSH 远端服务器 / 本机目录 / SMB 共享 / WSL 发行版`，再渐进披露：
+
+- SSH：`SSH 主机`、`端口`、`用户名`、`登录方式（密码 / SSH 密钥）`。密码分支只显示 password field；密钥分支显示 `SSH 私钥` 与可选 `密钥口令`。首次连接显示并固定 host-key fingerprint；指纹变化时停止连接。所有 secret 只进入 Keychain，列表、Job、日志和 evidence 不回显。
+- 本机目录：`本机目录` + 系统目录选择器，保存 security-scoped bookmark，不扫描书签以外路径。
+- SMB：`SMB 共享地址`（必须是 `smb://`）、`SMB 账户`、password field；密码只进入 Keychain。
+- WSL：`WSL 发行版`；根目录另用发行版内 Linux 路径登记，不出现 `wsl.exe` 参数、raw command 或 terminal。
+
+隐藏分支必须同时 `hidden` / `inert`，不能进入 tab order。提交错误在字段旁给出修复动作、设置 `aria-invalid` 并聚焦首个错误。删除来源先确认：删除 ArkDeck 配置、根目录书签与 ArkDeck-owned Keychain credential item，但不删除外部 SSH 私钥或来源内文件；删除单个根目录只移除书签。
+
+### 替换计划 sheet
+
+title `检查替换计划`。顶部 warn `Callout`：`ABI / ABC 兼容性校验用于阻止错误产物进入设备；替换前备份用于发布或启动验证失败后的回滚。两道保护都会在首个设备写入前成为硬门。`
+
+`KeyValueList`：
+
+- `目标` → `DAYU200 · TGT-9587… · binding r12`
+- `编译来源` → `远端 · OHOS 编译集群 · rk3568 · Debug`
+- `effect` → `deviceMutation`
+- `回滚策略` → `每项先备份 · 验证失败自动恢复并复验`
+
+`DataTable` 每个选中项一行，列 = 产物 / 主机侧校验 / 发布策略；发布策略逐字写 `staging → 备份当前版本 → 原子替换 → readback`。footer `返回选择` / primary `备份并替换 2 个产物`，不要写 `确定`。
+
+派发后 `JobInspector` 显示 `Debug 产物替换 · 2 项 · DAYU200`，阶段 `Preflight / LeaseArtifacts / VerifyCompatibility / Stage / BackupCurrent / AtomicPublish / Readback / Complete`。没有可信总量，不画百分比。
+
+### 替换完成与重启
+
+替换成功在原位显示带 ok symbol 的状态块：`2 个产物已备份并通过发布 readback`，正文 `新产物尚未通过重启后的加载验证。你可以现在重启，也可以先保留当前运行态。`，按钮 danger `重启设备…` / default `获取日志`。
+
+`重启设备…` 打开 `DangerConfirmDialog`：title `重启设备以加载替换产物`；影响三条 `目标：DAYU200 · binding r12` / `当前前台应用和其他设备会话将中断` / `重启后 Runtime 必须重新绑定，并验证已替换产物与启动状态；失败时恢复备份`；footer `暂不重启` / danger `重启 DAYU200`。不要加 checkbox 或确认短语。重启成功后的状态块：`设备已重连，产物与启动状态匹配`，primary `获取日志并验证`，secondary `再次选择产物`。
+
+### Logs / 获取日志
+
+保留原日志工作区。控制行：`开始采集`（采集中变 `停止采集`）/ `暂停界面`（未采集 disabled）/ `level ≥` + `I W E`（当前 W）/ mono `tag 过滤` / dim `Chip` `host 轮转: 片 #3 · 11.8MB/64MB · 配额 1GB` / danger `清空设备 buffer…`。
+
+`LogTail` 只使用这些行：
+
+```text
 07-13 11:02:11.482 W ArkUI: [list_layout] measure retry, node 88
 07-13 11:02:11.490 W ArkUI: [render] flush delayed 22ms
 07-13 11:02:12.013 E AbilityMS: connect timeout, bundle=com.example.settings
 07-13 11:02:12.400 W ArkUI: [list_layout] measure retry, node 91
 ```
-要更多行只能从这几条里取(同格式,别自己编日志):`W ArkUI: [render] flush delayed 18ms`、`W Multimodal: touch dispatch queue depth 3`、`I RenderService: flush composition, 1 surface dirty`、`I Hiview: cpu usage snapshot written`、`I WindowManager: focus window unchanged (12)`。注意默认筛选是 level ≥ `W`,所以 `I` 行在默认档下**不应该出现**;要画 `I` 行就把分档切到 `I`。
-筛空时正文写 `(当前过滤条件下没有日志)`。
 
-LogTail 下方 hint,两态各一句:
-- 采集中:`采集中:设备端持续拉流,host 侧按 64MB/片轮转,不清设备 buffer。`
-- 未采集:`未在采集。开始/停止只影响 host 侧拉流,绝不清空设备 buffer。`
+采集中 hint：`采集中:设备端持续拉流,host 侧按 64MB/片轮转,不清设备 buffer。`；未采集：`未在采集。开始/停止只影响 host 侧拉流,绝不清空设备 buffer。`。暂停只暂停 viewport，继续显示 `界面已暂停 · N 行待补`。`清空设备 buffer…` 仍走危险 sheet，title `清空设备日志 buffer?`，确认动作 `清空设备 buffer`。
 
-`清空设备 buffer…` 打开 `DangerConfirmDialog`:
-- title `清空设备日志 buffer?`
-- impactTitle `hilog -r 是全局且不可恢复的设备端操作`
-- impact 三条:`会影响其他工具正在进行的采集` / `普通的开始 / 停止采集绝不自动清空` / `该操作计入审计`
-- acknowledgements 一条:`我了解这会清空所有工具可见的设备日志`
-- confirmLabel `清空设备 buffer`,cancel `取消`
-- 确认后日志区只剩一行:`07-13 11:04:00.000 I audit: hilog -r executed (user-confirmed); device-side buffer cleared`
+### 既有辅助 tab
 
-Apps tab,`DataTable`,列 = 包名(mono)/ 版本 / 状态 / 操作:
-- `com.example.settings` · `1.2.0` · `Chip` ok `运行中 · pid 2841` · `停止`
-- `com.demo.gallery` · `0.9.1` · `Chip` dim `未运行` · `启动 Ability` + `Button` danger `卸载…`
-表下 `Button` primary:`安装 HAP…`
+- Apps：保留 `com.example.settings` / `com.demo.gallery` 表，安装 HAP、启动 Ability、停止、卸载；mutation 与 read-only 分组，卸载走危险 sheet。
+- Network：保留 `forward · tcp:9222 → tcp:9222`，创建/删除都提交 typed port-forward；只接受 1024…65535 十进制端口。
+- Commands 改名为 `只读工具`：只用 approved typed template 封闭下拉（已安装包清单 / 读取 ArkUI Debug 参数 / 窗口清单 / 设备运行时长）；lowered argv 是 mono 只读 disclosure，不是输入框。
 
-`安装 HAP…` 开普通 sheet(不是 danger):标题 `安装 HAP`,`KeyValueList`:
-| 文件 | ~/Downloads/todo-demo.hap · 4.2MB |
-| 包名 / 版本 | com.sample.todo · 0.3.0 |
-| 签名 | 证书链完整 · profile 含本设备 + ok `Chip` `✓` |
-hint:`安装是 deviceMutation:进入任务抽屉,按阶段推进,可在安全边界取消。`
-按钮 `取消` / primary `安装到 rk3568-dev`。派发后 `JobInspector` 里出现 `安装 HAP · todo-demo.hap · rk3568-dev`,`PhaseTrack` 五阶段 `Preflight` → `Transfer` → `Install` → `Verify` → `Complete`。
+**必须画出的语义**：
 
-`卸载…` 开 `DangerConfirmDialog`:title `卸载 com.demo.gallery`,impactTitle `影响范围`,impact 三条 `设备:rk3568-dev · serial 150100469…` / `应用本体与其数据将从设备移除(deviceMutation,计入审计)` / `ArkDeck 不保留该应用数据的副本`;ack `我确认卸载 com.demo.gallery 及其数据`;confirmLabel `卸载 com.demo.gallery`。
+1. **Debug 的首要心智是闭环，不是文件管理器。** 编译来源、搜索、替换、重启、日志按阅读顺序前进；来源配置是辅助入口，不能抢成首页主栏。
+2. **预检与备份分开表达。** ABI / compiler fingerprint 阻止不兼容输入，backup 支撑失败 rollback；不能写成“有备份所以 ABI 安全”。
+3. **来源路径与设备目标路径分开。** 用户能管理编译根目录，但永远不能输入设备目标 path；后者只来自 published profile。
+4. **替换完成不等于重启验证成功。** 替换 readback 后才出现独立重启按钮；重启重连与加载验证完成后才显示最终成功。
+5. **日志是反馈腿。** 替换完成态和重启完成态都保留直达 Logs 的动作；切 tab 不停止采集，也不丢选中 target 或运行中 Job。
+6. **当前 production boundary 必须可见。** `.abc`、批量来源浏览和独立设备重启尚未发布，候选稿不能把它们伪装成当前 AVAILABLE。
+7. **tab 与 sheet 可键盘完成。** roving tab、可见 focus、modal focus trap / Escape / focus return 都要成立；动态选择数与任务状态使用稳定 polite live region，日志流不逐行播报。
+8. **认证信息与设备权限正交。** SSH/SMB 连接状态只证明来源可读，不代表设备已接管；密码、私钥与口令不进入 UI 摘要、Job、日志或 Artifact evidence。
 
-Network tab,`DataTable`,列 = 类型 / 本机(mono)/ 设备(mono)/ 操作:
-- `forward` · `tcp:9222` · `tcp:9222` · `删除`
-空表文案 `无转发规则`。表下 `Button` primary `新建转发…`。
-sheet:标题 `新建端口转发`,hint `forward:本机端口 → 设备端口(hdc fport)。`,一行两个 mono `TextField`:`本机 tcp:` `9223` `→ 设备 tcp:` `9223`;按钮 `取消` / primary `添加转发`。
-
-Commands tab:
-- `Callout` tone `warn`:`App 只提交 approved typed template 与 schema-defined inputs。下面的 executable / argv 是 Provider lowering 的只读预览,不是输入框。`
-- `Select` mono,四个选项(封闭集):`已安装包清单` · `读取 ArkUI Debug 参数` · `窗口清单` · `设备运行时长`;旁边 `Button` primary `运行 typed template`
-- `KeyValueList` 三行:`template id` → `device.packageInventory`;`effect` → `EffectBadge` effect `readOnly`;`lowered argv` → `hdc -t 150100469… shell bm dump -a`
-- 未运行时 `尚未运行 typed template。运行后显示 Provider lowering、退出码与耗时。`
-- 运行后每次一段 `LogTail`:
-```
-template device.packageInventory · 已安装包清单
-provider lowering (read-only): hdc -t 150100469… shell bm dump -a
-exit 0 · 812ms
-com.example.settings
-com.demo.gallery
-com.ohos.launcher
-```
-- 页尾 hint:`不存在自由文本 command / argv / path 字段;PTY 与 raw shell 不属于此界面。`
-
-另外三个模板的真实数据(要画第二段回显就从这里取,四个模板 effect 全是 `readOnly`):
-- `device.debugParameterRead` · 读取 ArkUI Debug 参数 · `hdc -t 150100469… shell param get persist.ace.debug.enabled` · 输出 `0` · 104ms
-- `device.windowInventory` · 窗口清单 · `hdc -t 150100469… shell hidumper -s WindowManagerService -a -a` · 输出三行 `WindowName  DisplayId  Pid   WinId  Type` / `settings0   0          2841  12     APP` / `launcher    0          1203  8      LAUNCHER` · 436ms
-- `device.uptime` · 设备运行时长 · `hdc -t 150100469… shell uptime` · 输出 ` 11:02:33 up 2 days,  3:14,  load average: 1.02, 0.88, 0.79` · 96ms
-
-**必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
-
-1. **「暂停界面」暂停的是界面,不是 host 采集。** 暂停态要同时画出三个证据:`界面已暂停 · N 行待补` 这枚 chip(数据还在进来)、主按钮仍是 `停止采集`(采集还在跑)、hint 仍是 `采集中:…` 那句。把它画成「暂停采集」就把整条语义抹掉了。
-2. **「清空设备 buffer」是设备端全局且不可恢复的动作,只能走危险 sheet。** 它与「开始/停止采集」不是同一类东西:后者只动 host 侧拉流。两句 hint 都在强调「绝不清空设备 buffer」,不要因为嫌重复而删掉任何一句。规格要求它待在 destructive actions 菜单里;原型把它放在控制行最右的 danger 按钮上——两种都行,唯独不能让它和 `开始采集` 看起来是同一权重的兄弟按钮。
-3. **Commands 只有 approved typed template。** `Select` 是封闭下拉,不是可输入的 combobox;`lowered argv` 是**只读回显**,画成 `KeyValueList` 的值或 mono 文本,绝不画成带边框的输入框。没有自由文本命令区、没有 `$` 提示符光标、没有 PTY。回显里的 `provider lowering (read-only):` 这行前缀是故意的,留着。
-4. **Apps 把 mutation 与 read-only 分开。** 卸载 = destructive,danger 按钮 + sheet;启动/停止 = deviceMutation,普通按钮就地执行;安装 = deviceMutation,进任务抽屉按阶段推进。三者的视觉重量必须不同。pid 用等宽 tabular numbers,包名 mono。
-5. **Network 只收 typed 端口。** 两个数字字段,非数字被丢弃;界面上不存在任何能贴进 shell 片段的地方。
-6. **切 tab 只换视图。** 目标设备、执行模式、正在跑的任务都不随 tab 变;焦点留在 tab 条上,不被强行搬到面板里。
-
-**不要做的事**:不要画终端窗口、`$` 提示符或任何看起来能敲命令的地方;不要给 Commands 加「高级模式 / 自定义命令」入口;不要发明包名、pid、serial、日志行或模板 id;不要画百分比进度(设备不报可信总量);不要给 chip 配 emoji——`✓ ⚠ ⊘` 这类排版符号可以,走 `Chip` 的 `icon` 位。
+**不要做的事**：不要把主按钮写成 `确定`；不要加入任意 device path、raw command、SSH / WSL 命令或终端；不要在列表、Job、日志或 evidence 中展示密码、私钥完整路径或密钥口令；不要把来源连接成功当成设备授权；不要用备份替代 ABI / ABC compatibility 校验；不要在替换完成前显示重启；不要用同一个绿色成功状态吞并 publish、restart、rebind 和 postflight；不要删除 Logs / Apps / Network / Commands。
 
 ---
 

@@ -1,8 +1,8 @@
 # design-sync notes — ArkDeck
 
-> **Current sync target: design v0.6 (2026-08-12).** The authoritative files are
+> **Current sync target: design v0.9 (2026-08-23).** The authoritative files are
 > `docs/design/macos-ux-interaction-spec.md` and `docs/design/prototype.html`.
-> `docs/design/arkdeck-ds/scripts/check-tokens.mjs` pins `ALIGNED_VERSION = "v0.6"`.
+> `docs/design/arkdeck-ds/scripts/check-tokens.mjs` pins `ALIGNED_VERSION = "v0.9"`.
 > The paragraphs below that mention v0.2/v0.3 describe the historical first-sync
 > incident; they are not the current design version.
 
@@ -35,7 +35,7 @@ each drift kind. It catches seven things:
 
 1. any mapped token whose value differs from the prototype's;
 2. a docs version bump (`ALIGNED_VERSION` in the script pins the current design version —
-   v0.6 as of 2026-08-12 — and must be bumped only after
+   v0.9 as of 2026-08-23 — and must be bumped only after
    re-reading §2 and §1, which is the acknowledgement step that was missing the first time);
 3. a token added to the prototype that this package neither mirrors nor explicitly declines;
 4. a token this package re-themes in dark that the prototype doesn't, or vice versa
@@ -272,8 +272,14 @@ so it fills its own row when used alone and yields when used beside text, and
   materialized write total. All stages without that denominator remain indeterminate;
   100% written still waits for reboot/postflight before success.
 
-- Debug tab values are `logs / apps / net / cmd` — **`net`, not `network`**; only the
-  label is `Network`.
+- Debug tab values are `artifacts / logs / apps / net / cmd` — `artifacts` is the
+  default, and **`net`, not `network`**, remains the internal value for Network.
+  Build-source kinds are `ssh / directory / smb / wsl`; SSH authentication is
+  `password / key`. Hidden connector/auth branches stay inert, and secrets are never
+  copied into visible summaries, Jobs, logs, or Artifact evidence.
+  Artifact-source browsing, `.abc` replacement and a separate device restart are
+  v0.9 design inputs, not current production availability; every composed screen
+  must retain that boundary instead of presenting the proposal as shipped.
 - The History device filter list is *derived* from the session list, so its real
   membership is 全部 / DAYU200 / SIM-fixture-a3 — a simulated fixture sits in the
   same list as a real board. Don't invent device names.
@@ -338,8 +344,9 @@ Flash execution-mode previews with real-execution-only image/progress/result exa
 and removed stale rk3568 / flashd product literals from the preview set. The local
 package build, token/version guard and all preview TSX bundles pass. Any previously
 published remote component sheet remains a historical snapshot until the documented
-resync command is run; when they disagree, this repository's v0.6 spec and prototype
-remain authoritative.
+resync command is run; when they disagree, this repository's current v0.9 spec and
+prototype remain authoritative (the paragraph above records what the v0.6 alignment
+changed historically).
 
 ## Re-sync risks
 
