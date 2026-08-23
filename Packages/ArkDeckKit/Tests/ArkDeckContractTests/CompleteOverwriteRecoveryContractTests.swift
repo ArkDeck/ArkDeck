@@ -30,6 +30,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     private let receipt: ArkForgeActionReceiptSummary
     private var started = false
     private var starts = 0
+    private var prewarms = 0
+    private var callOrder: [String] = []
 
     init(toolchainSHA256: String) {
       self.toolchainSHA256 = toolchainSHA256
@@ -49,10 +51,25 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         typedSkipReason: "", failureClassification: "", facts: facts)
     }
 
+    func prewarmArtifact(
+      jobID _: String, artifact: ArkForgeLaneArtifact
+    ) async throws -> ArkForgeLaneArtifactPrewarmReceipt {
+      prewarms += 1
+      callOrder.append("prewarm")
+      return ArkForgeLaneArtifactPrewarmReceipt(
+        artifactSHA256: artifact.sha256, profileID: artifact.profileID,
+        imported: false, durationMilliseconds: 7)
+    }
+
     func perform(
       stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
       binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
     ) async throws -> ArkForgeActionReceiptSummary {
+      guard prewarms == 1 else {
+        throw RuntimeDispatchFailure.failed(
+          "delegated execution reached perform before its one admitted prewarm")
+      }
+      callOrder.append("perform")
       if !started {
         started = true
         starts += 1
@@ -65,6 +82,40 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     }
 
     func startCount() -> Int { starts }
+    func prewarmCount() -> Int { prewarms }
+    func calls() -> [String] { callOrder }
+  }
+
+  private actor RefusingPrewarmArkForgeLane: RuntimeJobEngine.ArkForgeLane {
+    private struct StoreUnavailable: Error, CustomStringConvertible {
+      var description: String { "fixture ArkForge content store unavailable" }
+    }
+
+    nonisolated let toolchainSHA256: String
+    private var prewarms = 0
+    private var performs = 0
+
+    init(toolchainSHA256: String) {
+      self.toolchainSHA256 = toolchainSHA256
+    }
+
+    func prewarmArtifact(
+      jobID _: String, artifact _: ArkForgeLaneArtifact
+    ) async throws -> ArkForgeLaneArtifactPrewarmReceipt {
+      prewarms += 1
+      throw StoreUnavailable()
+    }
+
+    func perform(
+      stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
+      binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
+    ) async throws -> ArkForgeActionReceiptSummary {
+      performs += 1
+      throw RuntimeDispatchFailure.failed("perform must not follow a refused prewarm")
+    }
+
+    func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? { nil }
+    func counts() -> (prewarms: Int, performs: Int) { (prewarms, performs) }
   }
 
   private struct RecoveryFactsPort: RockchipRuntimeFactsPort {
@@ -146,10 +197,11 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
+    let lane = CompletedArkForgeLane(toolchainSHA256: providerSHA256)
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: stateDirectory,
-        arkForgeLane: CompletedArkForgeLane(toolchainSHA256: providerSHA256),
+        arkForgeLane: lane,
         arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
       providers: DeviceProviderRegistry(providers: [
         ArkForgeFlashProviderAdapter(
@@ -188,6 +240,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let capabilities = try await capabilityStore.list()
     XCTAssertEqual(dispatches, [])
     XCTAssertEqual(capabilities, [])
+    let planOnlyPrewarms = await lane.prewarmCount()
+    XCTAssertEqual(planOnlyPrewarms, 0, "planOnly must not populate ArkForge's store")
   }
 
   func testRecoveryStoreIsAppendOnlyIdempotentAndRejectsConflictingProof() async throws {
@@ -515,6 +569,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
 
     let acceptance = try await engine.submit(encoder.encode(request))
+    let admittedPrewarms = await lane.prewarmCount()
+    XCTAssertEqual(
+      admittedPrewarms, 0,
+      "submit may admit the Job but prewarm starts only when the admitted Job is run")
     let issued = try await capabilityStore.list()
     XCTAssertEqual(issued.count, 1)
     XCTAssertEqual(issued.first?.capability.issuer.kind, .runtimeDefaultPolicy)
@@ -567,6 +625,27 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(dispatches.filter { $0 == "enter-loader-mode" }.count, 0)
     let laneStarts = await lane.startCount()
     XCTAssertEqual(laneStarts, 1)
+    let lanePrewarms = await lane.prewarmCount()
+    let laneCalls = await lane.calls()
+    XCTAssertEqual(lanePrewarms, 1)
+    XCTAssertEqual(
+      laneCalls, ["prewarm", "perform", "perform"],
+      "one prewarm feeds both logical delegated-step projections; the lane starts one plan")
+    XCTAssertTrue(
+      status.timeline.contains("ArkForge artifact prewarm started after durable admission"))
+    let prewarmReady = try XCTUnwrap(
+      status.timeline.first {
+        $0.hasPrefix("ArkForge artifact prewarm ready (store-hit, total 7 ms, consume wait ")
+      })
+    let prewarmStartedIndex = try XCTUnwrap(
+      status.timeline.firstIndex(of: "ArkForge artifact prewarm started after durable admission"))
+    let hostVerificationIndex = try XCTUnwrap(
+      status.timeline.firstIndex(of: "host-step verify-image-bundle"))
+    let prewarmReadyIndex = try XCTUnwrap(status.timeline.firstIndex(of: prewarmReady))
+    XCTAssertLessThan(prewarmStartedIndex, hostVerificationIndex)
+    XCTAssertLessThan(
+      hostVerificationIndex, prewarmReadyIndex,
+      "host-only verification runs inside the archive-prewarm overlap window")
     let epochs = try await RuntimeSupersedingRecoveryStore(
       stateDirectory: stateDirectory
     ).list()
@@ -671,6 +750,63 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let dispatches = await dispatchLog.snapshot()
     XCTAssertTrue(capabilities.isEmpty)
     XCTAssertTrue(dispatches.isEmpty)
+  }
+
+  func testPrewarmFailureIsConfirmedBeforeCapabilityConsumptionOrDeviceDispatch() async throws {
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let artifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-prewarm-failure-input", sessionID: "session-prewarm-failure-input",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
+          stableIdentitySHA256: identity),
+        contents: try recoveryArchive()))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
+    let dispatchLog = DispatchLog()
+    let lane = RefusingPrewarmArkForgeLane(toolchainSHA256: providerSHA256)
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: lane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
+      providers: DeviceProviderRegistry(providers: [
+        ArkForgeFlashProviderAdapter(
+          factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
+          availability: .available)
+      ]),
+      dispatcher: ConfirmingDispatcher(log: dispatchLog),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let request = try flashRequest(id: "prewarm-failure", lease: lease)
+    let acceptance = try await engine.submit(JSONEncoder().encode(request))
+    let capabilitiesBeforeRun = try await capabilityStore.list()
+    let beforeRun = try XCTUnwrap(capabilitiesBeforeRun.only)
+    XCTAssertEqual(beforeRun.consumptionCount, 0)
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, JobState.failed.rawValue)
+    XCTAssertTrue(
+      status.timeline.contains {
+        $0.contains("artifact prewarm failed before capability consumption")
+      })
+    XCTAssertFalse(status.timeline.contains { $0.contains("artifact prewarm ready") })
+    let counts = await lane.counts()
+    XCTAssertEqual(counts.prewarms, 1)
+    XCTAssertEqual(counts.performs, 0)
+    let dispatches = await dispatchLog.snapshot()
+    XCTAssertTrue(dispatches.isEmpty)
+    let capabilitiesAfterRun = try await capabilityStore.list()
+    let afterRun = try XCTUnwrap(capabilitiesAfterRun.only)
+    XCTAssertEqual(afterRun.consumptionCount, 0)
   }
 
   func testSupersededUnknownPresentationIsTruthfulButNoLongerNeedsAttention() throws {
