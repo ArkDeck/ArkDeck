@@ -408,7 +408,7 @@ public enum ViewerCaptureParser {
       throw ViewerCaptureFailure.unreadableTree
     }
     var provisional: [ProvisionalNode] = []
-    try appendNode(root, path: [0], parentPath: nil, into: &provisional)
+    try appendNode(componentRoot(of: root), path: [0], parentPath: nil, into: &provisional)
 
     let identifiers = Dictionary(grouping: provisional.compactMap(\.sourceID), by: { $0 })
       .mapValues(\.count)
@@ -459,6 +459,36 @@ public enum ViewerCaptureParser {
       coordinatesAreVerified: coordinatesAreVerified)
   }
 
+  /// Steps past the dump's document envelope so the tree begins at the real
+  /// root component.
+  ///
+  /// A device dump wraps its component tree in an object whose attributes are
+  /// all empty and which holds exactly one child. That envelope is the
+  /// document, not a component: it has no type, no identifier of any kind, and
+  /// nothing to inspect. Presenting it made the first row of every real
+  /// capture an "Unknown" node with the actual root hidden one level below.
+  ///
+  /// The conditions are deliberately narrow — no type *and* no identifier
+  /// *and* exactly one child. A wrapper that names itself is a component and
+  /// is kept, so this can never swallow a node a device meant to publish.
+  private static func componentRoot(of document: [String: Any]) -> [String: Any] {
+    var current = document
+    // Bounded: a malformed dump must not turn this into an unbounded descent.
+    for _ in 0..<8 {
+      let attributes = current["attributes"] as? [String: Any] ?? current
+      guard string(attributes["type"]) == nil,
+        string(attributes["accessibilityId"]) == nil,
+        string(attributes["id"]) == nil,
+        string(attributes["nodeId"]) == nil,
+        string(attributes["componentId"]) == nil,
+        let children = current["children"] as? [[String: Any]],
+        children.count == 1
+      else { return current }
+      current = children[0]
+    }
+    return current
+  }
+
   private static func appendNode(
     _ object: [String: Any],
     path: [Int],
@@ -476,7 +506,14 @@ public enum ViewerCaptureParser {
       childObjects = []
     }
     let childPaths = childObjects.indices.map { path + [$0] }
-    let sourceID = string(attributes["id"])
+    // `accessibilityId` first. On a real ArkUI dump `id` is the developer's
+    // own `.id()` attribute and is empty on almost every node, while
+    // `accessibilityId` is the framework's per-node identifier and is the
+    // number a person cross-references against the platform's own inspector
+    // output. Reading `id` first meant every node fell back to a synthesized
+    // path identity and the whole tree showed "#—".
+    let sourceID = string(attributes["accessibilityId"])
+      ?? string(attributes["id"])
       ?? string(attributes["nodeId"])
       ?? string(attributes["componentId"])
     let type = string(attributes["type"])
