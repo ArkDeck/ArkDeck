@@ -1,114 +1,890 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "uiDump.action.refreshFacts": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Refresh Runtime facts"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"刷新 Runtime 事实"}}}},
-    "uiDump.action.run": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Run UI Dump (locked)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"运行 UI Dump（已锁定）"}}}},
-    "uiDump.artifacts.derived": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Derived"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"派生"}}}},
-    "uiDump.artifacts.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"stdout, sidecar and merged output remain separate. Pending values are not evidence of a created artifact."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"stdout、sidecar 与合并输出始终分开保存；待生成值不代表已创建产物。"}}}},
-    "uiDump.artifacts.merged.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"merged (pending name)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"合并视图（名称待生成）"}}}},
-    "uiDump.artifacts.merged.origin": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Local derived view"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"本地派生视图"}}}},
-    "uiDump.artifacts.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Name"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"名称"}}}},
-    "uiDump.artifacts.origin": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Origin"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"来源"}}}},
-    "uiDump.artifacts.raw": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Raw"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"原始"}}}},
-    "uiDump.artifacts.role": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Role"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"角色"}}}},
-    "uiDump.artifacts.size": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Size"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"大小"}}}},
-    "uiDump.artifacts.sha256": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"SHA-256"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"SHA-256"}}}},
-    "uiDump.artifacts.privacy": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Privacy"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"敏感级别"}}}},
-    "uiDump.artifacts.status": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Status"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"状态"}}}},
-    "uiDump.artifacts.sensitivityNote": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"⚠ A dump can contain page text, bundle names and identifiers — treat it as sensitive data: it stays local by default, is excluded from the default diagnostics export, and export will prompt first. Raw output is never modified in place."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"⚠ Dump 可能包含页面文本、包名与标识符，按敏感数据处理：默认本地保存、不进入默认诊断导出，导出前将提示。raw 永不原地修改。"}}}},
-    "uiDump.artifacts.sidecar.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"sidecar (pending name)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"sidecar（名称待生成）"}}}},
-    "uiDump.artifacts.sidecar.origin": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Device sidecar"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备 sidecar"}}}},
-    "uiDump.artifacts.stdout.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"stdout (pending name)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"stdout（名称待生成）"}}}},
-    "uiDump.artifacts.stdout.origin": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime stdout"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime stdout"}}}},
-    "uiDump.artifacts.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Expected artifact roles"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"预期产物角色"}}}},
-    "uiDump.availability.available": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime operation is available"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 操作可用"}}}},
-    "uiDump.availability.checking": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Checking Runtime availability"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在检查 Runtime 可用性"}}}},
-    "uiDump.availability.inventory": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Window inventory action"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"窗口清单动作"}}}},
-    "uiDump.availability.recipeGap": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The published operation does not expose recipeId, windowId or componentId. Candidate recipes can be reviewed here, but they cannot be lowered or submitted by this App build."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已发布操作未暴露 recipeId、windowId 或 componentId。本页面可审核候选配方，但当前 App 无法将其 lowering 或提交。"}}}},
-    "uiDump.availability.screenTree": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Whole-screen component tree"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"整屏组件树"}}}},
-    "uiDump.availability.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Production capability"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"生产能力"}}}},
-    "uiDump.availability.unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime operation is unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 操作不可用"}}}},
-    "uiDump.availability.windowRecipes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Window-scoped recipe inputs"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"窗口级配方输入"}}}},
-    "uiDump.blocker.checking": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Wait for current Runtime availability facts."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"等待当前 Runtime 可用性事实。"}}}},
-    "uiDump.blocker.component": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter a valid decimal component ID for Component detail."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请为组件详情输入有效的十进制组件 ID。"}}}},
-    "uiDump.blocker.persistConfirmation": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Confirm the persistent debug-parameter impact."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请确认永久启用调试参数的影响。"}}}},
-    "uiDump.blocker.readOnlyTransport": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"This App build has a read-only Runtime transport and cannot create a Job."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"当前 App 构建只有只读 Runtime 通道，无法创建 Job。"}}}},
-    "uiDump.blocker.recipeInputs": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"capture.diagnostics@1 lacks the accepted window-scoped recipe inputs."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"capture.diagnostics@1 缺少已接受的窗口级配方输入。"}}}},
-    "uiDump.blocker.target": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select an adopted target with a complete binding."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请选择具有完整绑定的已接管目标。"}}}},
-    "uiDump.blocker.unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The production Runtime operation is unavailable."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"生产 Runtime 操作不可用。"}}}},
-    "uiDump.blocker.window": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select an inventory row or enter a valid decimal window ID."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请选择窗口清单行，或输入有效的十进制窗口 ID。"}}}},
-    "uiDump.component.hint": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Decimal digits only; options and command text are rejected."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"只能输入十进制数字；选项和命令文本会被拒绝。"}}}},
-    "uiDump.component.label": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Component ID"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"组件 ID"}}}},
-    "uiDump.component.placeholder": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Required for Component detail"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"组件详情配方必填"}}}},
-    "uiDump.component.valid": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Valid decimal component ID."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"有效的十进制组件 ID。"}}}},
-    "uiDump.inventory.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Select a parsed WindowManagerService row when available. A parse failure must preserve raw output."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可用时请选择 WindowManagerService 解析行；解析失败必须保留原始输出。"}}}},
-    "uiDump.inventory.notLoaded": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No window inventory has been loaded"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"尚未加载窗口清单"}}}},
-    "uiDump.inventory.raw.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Runtime response. This is not an empty device inventory."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有 Runtime 响应；这不代表设备窗口清单为空。"}}}},
-    "uiDump.inventory.raw.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Raw WindowManagerService response"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"WindowManagerService 原始响应"}}}},
-    "uiDump.inventory.refresh": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Refresh inventory"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"刷新窗口清单"}}}},
-    "uiDump.inventory.refreshBlocked": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Inventory refresh is locked because the App exposes no reviewed diagnostics submission path."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"窗口清单刷新已锁定，因为 App 尚无经审查的诊断提交通道。"}}}},
-    "uiDump.inventory.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Window inventory"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"窗口清单"}}}},
-    "uiDump.jobs.readOnly": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Existing diagnostics Jobs are shown read-only. Controls on this page cannot resume, cancel or retry them."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已有诊断 Job 仅供读取；本页面无法恢复、取消或重试。"}}}},
-    "uiDump.jobs.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Related Runtime Jobs"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"相关 Runtime Job"}}}},
-    "uiDump.policy.mutation": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"DEVICE MUTATION"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备变更"}}}},
-    "uiDump.policy.originalUnknown": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The original debug-parameter value is not readable through the current App facade. Temporary enable-and-restore remains unavailable rather than guessing a restore value."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"当前 App facade 无法读取原始调试参数值。临时启用并恢复保持不可用，不会猜测恢复值。"}}}},
-    "uiDump.policy.persist.callout": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"persist.ace.debug.enabled and related parameters will remain on the device, may affect performance and later measurements, keep a persistent reminder in the device status bar, and are recorded in the audit."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"persist.ace.debug.enabled 等参数将持久保留在设备上，可能影响性能与后续测量；设备状态栏将持续显示提醒，且该变更计入审计。"}}}},
-    "uiDump.policy.persist.cancel": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Cancel"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"取消"}}}},
-    "uiDump.policy.persist.confirm": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Confirm keep enabled"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"确认保持开启"}}}},
-    "uiDump.policy.persist.confirmed": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Keep-enabled confirmed; the change stays until explicitly reverted and is audited."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已确认保持开启；该变更在显式回退前持续存在，并计入审计。"}}}},
-    "uiDump.policy.persistentlyEnabled.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Persist the debug setting after capture. This is a device mutation and requires a second confirmation."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"采集后继续保持调试设置；这是设备变更，需要第二次确认。"}}}},
-    "uiDump.policy.persistentlyEnabled.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Keep enabled"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"保持启用"}}}},
-    "uiDump.policy.readOnly": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"UNCHANGED"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"保持不变"}}}},
-    "uiDump.policy.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Choose how the device debug parameter should be treated; unsafe restore guesses are disabled."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"选择设备调试参数处理方式；不安全的恢复猜测已禁用。"}}}},
-    "uiDump.policy.temporaryRestore.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Available only when the original value is readable and writable, so the exact value can be restored."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"仅在原始值可读且可写时可用，以便准确恢复。"}}}},
-    "uiDump.policy.temporaryRestore.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enable temporarily, then restore"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"临时启用后恢复"}}}},
-    "uiDump.policy.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Debug parameter policy"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"调试参数策略"}}}},
-    "uiDump.policy.unchanged.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Do not read or modify the debug parameter. Capture may fail if the device is not already configured."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"不读取或修改调试参数；若设备尚未配置，采集可能失败。"}}}},
-    "uiDump.policy.unchanged.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Leave unchanged"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"保持不变"}}}},
-    "uiDump.recipe.candidate": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"CANDIDATE"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"候选"}}}},
-    "uiDump.recipe.candidateNote": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Argument mappings are accepted candidates, not verified device compatibility claims. Runtime integration must pin them before execution."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"参数映射是已接受候选，不代表已验证设备兼容性；执行前必须由 Runtime 集成固定。"}}}},
-    "uiDump.recipe.componentDetail.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Last-page detail for one validated component ID."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"指定有效组件 ID 的末页详情。"}}}},
-    "uiDump.recipe.componentDetail.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Component detail"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"组件详情"}}}},
-    "uiDump.recipe.elementTree.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Compressed element tree for the selected window."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"所选窗口的压缩元素树。"}}}},
-    "uiDump.recipe.elementTree.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Element tree"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"元素树"}}}},
-    "uiDump.recipe.fullDefaultTree.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Complete default tree for the selected window."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"所选窗口的完整默认树。"}}}},
-    "uiDump.recipe.fullDefaultTree.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Full default tree"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"完整默认树"}}}},
-    "uiDump.recipe.nodeSummary.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Default summary for the selected window."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"所选窗口的默认摘要。"}}}},
-    "uiDump.recipe.nodeSummary.name": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Node summary"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"节点摘要"}}}},
-    "uiDump.recipe.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Choose one canonical recipe. There is no free-form command field."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"只能选择一个规范配方；不提供自由命令输入。"}}}},
-    "uiDump.recipe.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Recipe"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"配方"}}}},
-    "uiDump.review.arguments": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Candidate arguments"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"候选参数"}}}},
-    "uiDump.review.binding": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Binding revision"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"绑定修订号"}}}},
-    "uiDump.review.blockers": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Execution blockers"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"执行阻断项"}}}},
-    "uiDump.review.catalogFloor": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"published operation floor"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已发布操作下限"}}}},
-    "uiDump.review.effect": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Effect"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"效果等级"}}}},
-    "uiDump.review.noDispatch": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Reviewing this form does not create a Runtime Job or contact a device."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"审核此表单不会创建 Runtime Job，也不会连接设备。"}}}},
-    "uiDump.review.policy": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Debug policy"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"调试策略"}}}},
-    "uiDump.review.ready": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"All published execution requirements are satisfied."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"所有已发布执行要求均已满足。"}}}},
-    "uiDump.review.recipe": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Recipe"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"配方"}}}},
-    "uiDump.review.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Verify exact facts, separated outputs and every blocker before a future dispatch."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在未来派发前核对精确事实、分离输出和所有阻断项。"}}}},
-    "uiDump.review.target": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Target"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"目标"}}}},
-    "uiDump.review.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Review"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"审核"}}}},
-    "uiDump.scope.note": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"ArkUI UI Dump only (window / component tree / component detail). Fault/Crash artifacts and whole-device diagnostic snapshots are not supported in the first version."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"仅 ArkUI UI Dump（窗口 / 组件树 / 组件详情）。Fault / Crash Artifact 与整机诊断快照首版不支持。"}}}},
-    "uiDump.target.adopted": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Adopted at"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"接管时间"}}}},
-    "uiDump.target.binding": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Binding revision"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"绑定修订号"}}}},
-    "uiDump.target.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No adopted target with complete binding facts is available."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有具备完整绑定事实的已接管目标。"}}}},
-    "uiDump.target.label": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Exact target"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"精确目标"}}}},
-    "uiDump.target.tool": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Adopted tool version"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"接管时工具版本"}}}},
-    "uiDump.validation.decimal": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Use decimal digits only; spaces, signs, options and separators are rejected."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"只能使用十进制数字；空格、符号、选项和分隔符均会被拒绝。"}}}},
-    "uiDump.validation.missing": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"A value is required."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此项为必填。"}}}},
-    "uiDump.validation.tooLong": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Use no more than 20 decimal digits."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最多输入 20 位十进制数字。"}}}},
-    "uiDump.value.notSelected": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Not selected"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未选择"}}}},
-    "uiDump.value.pending": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Pending"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"待生成"}}}},
-    "uiDump.value.selected": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Selected"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已选择"}}}},
-    "uiDump.value.supported": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Supported"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"支持"}}}},
-    "uiDump.value.unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"不可用"}}}},
-    "uiDump.window.manual.hint": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Safe fallback for a known window ID; decimal digits only."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"用于已知窗口 ID 的安全回退；只能输入十进制数字。"}}}},
-    "uiDump.window.manual.label": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Manual window ID"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"手动窗口 ID"}}}},
-    "uiDump.window.manual.placeholder": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter a decimal window ID"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"输入十进制窗口 ID"}}}},
-    "uiDump.window.manual.valid": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Valid decimal window ID."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"有效的十进制窗口 ID。"}}}},
-    "uiDump.window.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Pin one adopted target and one validated WindowManagerService identifier."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"固定一个已接管目标和一个通过校验的 WindowManagerService 标识符。"}}}},
-    "uiDump.window.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Window inventory"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"窗口清单"}}}}
+    "viewer.action.show": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示%1$@"
+          }
+        }
+      }
+    },
+    "viewer.chip.interactive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interactive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可交互"
+          }
+        }
+      }
+    },
+    "viewer.chip.visible": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可见"
+          }
+        }
+      }
+    },
+    "viewer.empty.explain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recapture creates a typed Runtime Job and shows only verified, same-Job Artifacts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「重新抓取」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。"
+          }
+        }
+      }
+    },
+    "viewer.empty.selectTarget": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select an adopted target with a complete binding, then recapture."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先选择一个绑定完整的已纳管目标，再重新抓取。"
+          }
+        }
+      }
+    },
+    "viewer.empty.targetBlocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ cannot be recaptured: %2$@. Select a Connected target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 无法重新抓取：%2$@。请选择一个「已连接」的目标。"
+          }
+        }
+      }
+    },
+    "viewer.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No verified capture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有已验证的 capture"
+          }
+        }
+      }
+    },
+    "viewer.field.accessibleLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "accessible label"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无障碍名称"
+          }
+        }
+      }
+    },
+    "viewer.field.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "description"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "描述"
+          }
+        }
+      }
+    },
+    "viewer.field.hitTest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hit test"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命中测试"
+          }
+        }
+      }
+    },
+    "viewer.field.screenshotMapping": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "screenshot mapping"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "截图映射"
+          }
+        }
+      }
+    },
+    "viewer.footer.nodes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d nodes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d 个节点"
+          }
+        }
+      }
+    },
+    "viewer.footer.notMeasured": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "not measured"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未测量"
+          }
+        }
+      }
+    },
+    "viewer.group.focus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focus"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "焦点"
+          }
+        }
+      }
+    },
+    "viewer.group.geometry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geometry"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "几何"
+          }
+        }
+      }
+    },
+    "viewer.group.identity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "身份"
+          }
+        }
+      }
+    },
+    "viewer.group.paint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "绘制"
+          }
+        }
+      }
+    },
+    "viewer.group.semantics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantics"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义"
+          }
+        }
+      }
+    },
+    "viewer.group.state": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "viewer.pane.coordinatesUnverified": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coordinates cannot be verified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "坐标系无法证明"
+          }
+        }
+      }
+    },
+    "viewer.pane.screenshot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device screenshot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备截图"
+          }
+        }
+      }
+    },
+    "viewer.pane.showBounds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show component bounds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示组件边界"
+          }
+        }
+      }
+    },
+    "viewer.pane.tree": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UI tree"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UI 树"
+          }
+        }
+      }
+    },
+    "viewer.properties.rawUnavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw fields are unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始字段不可用"
+          }
+        }
+      }
+    },
+    "viewer.properties.selectPrompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a component"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一个组件"
+          }
+        }
+      }
+    },
+    "viewer.screenshot.selectHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the UI tree to select a component with the keyboard."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 UI 树可以通过键盘选择组件。"
+          }
+        }
+      }
+    },
+    "viewer.screenshot.selectLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select component in screenshot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在截图中选择组件"
+          }
+        }
+      }
+    },
+    "viewer.screenshot.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screenshot is unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "截图不可用"
+          }
+        }
+      }
+    },
+    "viewer.screenshot.unverifiedDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tree bounds do not prove this screenshot's coordinate space. Tree and Raw dump remain available, but screenshot selection is disabled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "树的 bounds 无法证明这张截图的坐标系。树和 Raw dump 仍然可读，但截图选择已禁用。"
+          }
+        }
+      }
+    },
+    "viewer.separator.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resize UI tree and node properties"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调整 UI 树和节点属性的高度"
+          }
+        }
+      }
+    },
+    "viewer.separator.value": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UI tree uses %1$d percent of the inspector"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UI 树占检查器高度 %1$d%%"
+          }
+        }
+      }
+    },
+    "viewer.tab.accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accessibility"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无障碍"
+          }
+        }
+      }
+    },
+    "viewer.tab.layout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layout"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "布局"
+          }
+        }
+      }
+    },
+    "viewer.tab.properties": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Properties"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "属性"
+          }
+        }
+      }
+    },
+    "viewer.tab.rawDump": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw dump"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw dump"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.capturing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capturing…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抓取中…"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.currentScreen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前屏幕"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.device": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.noDevice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无设备"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.recapture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recapture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新抓取"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Viewer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新 Viewer"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search component, ID, or text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索组件 / ID / 文本"
+          }
+        }
+      }
+    },
+    "viewer.tree.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Complete UI tree"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整 UI 树"
+          }
+        }
+      }
+    },
+    "viewer.tree.matchCount": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ / %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "viewer.tree.noMatches": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching components. The current selection is unchanged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的组件。当前选中项未改变。"
+          }
+        }
+      }
+    },
+    "viewer.tree.notSelected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not selected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未选中"
+          }
+        }
+      }
+    },
+    "viewer.tree.selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选中"
+          }
+        }
+      }
+    },
+    "viewer.value.available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用"
+          }
+        }
+      }
+    },
+    "viewer.value.no": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "否"
+          }
+        }
+      }
+    },
+    "viewer.value.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "viewer.value.verified": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已验证"
+          }
+        }
+      }
+    },
+    "viewer.value.yes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是"
+          }
+        }
+      }
+    }
   },
   "version": "1.0"
 }

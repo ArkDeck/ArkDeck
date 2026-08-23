@@ -316,24 +316,29 @@ for (const name of dsLight.keys()) {
     "viewer-devtools": "ViewerInspectorStack", "viewer-tree-pane": "ViewerInspectorStack",
     "viewer-splitter": "ViewerInspectorStack",
     "viewer-screen-canvas": "ViewerScreenshot", "viewer-screen": "ViewerScreenshot",
-    "viewer-screen-status": "ViewerScreenshot", "viewer-screen-title": "ViewerScreenshot",
-    "viewer-search": "ViewerScreenshot", "viewer-profile": "ViewerScreenshot",
-    "viewer-avatar": "ViewerScreenshot", "viewer-settings": "ViewerScreenshot",
-    "viewer-setting": "ViewerScreenshot", "viewer-setting-icon": "ViewerScreenshot",
-    "viewer-setting-copy": "ViewerScreenshot", "viewer-switch": "ViewerScreenshot",
     "viewer-hit": "ViewerScreenshot",
     "viewer-tree": "ComponentTree", "viewer-tree-row": "ComponentTree",
     "viewer-tree-id": "ComponentTree", "viewer-chevron": "ComponentTree",
     "viewer-node-icon": "ComponentTree",
     "viewer-inspector": "DumpInspector", "viewer-inspector-head": "DumpInspector",
     "viewer-inspector-title": "DumpInspector", "viewer-breadcrumb": "DumpInspector",
-    "viewer-section-label": "DumpInspector",
+    "viewer-group-title": "DumpInspector",
     "viewer-inspector-body": "DumpInspector", "viewer-kv": "DumpInspector",
     "viewer-disclosure": "DumpInspector", "viewer-raw": "DumpInspector",
   };
 
   /** Never becomes a component. */
   const SCAFFOLDING = {
+    // vs-* 画的是被抓取的那台设备自己的界面（占位截图），不是 ArkDeck 的界面。
+    // 生产 Viewer 这里放的是 screenshot.png，所以它们永远不会变成 DS 组件。
+    "vs-card": "device-screenshot stand-in", "vs-nav": "device-screenshot stand-in",
+    "vs-statusbar": "device-screenshot stand-in", "vs-si": "device-screenshot stand-in",
+    "vs-title": "device-screenshot stand-in", "vs-search": "device-screenshot stand-in",
+    "vs-avatar": "device-screenshot stand-in", "vs-name": "device-screenshot stand-in",
+    "vs-sub": "device-screenshot stand-in", "vs-icon": "device-screenshot stand-in",
+    "vs-label": "device-screenshot stand-in", "vs-value": "device-screenshot stand-in",
+    "vs-switch": "device-screenshot stand-in", "vs-chev": "device-screenshot stand-in",
+    "vs-safe": "device-screenshot stand-in",
     ac: "AC-annotation overlay — spec §5 says the review tool does not ship",
     acin: "AC-annotation overlay", acmode: "AC-annotation overlay",
     main: "page scaffolding", content: "page scaffolding", page: "page scaffolding",

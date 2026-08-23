@@ -9,7 +9,7 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
     let projected = HDCRuntimeDiagnosticsResponseDecoding.overlay(
       presentation: basePresentation(),
       statusResponse: .success(try statusResponse()),
-      candidateResponse: .success(try candidateResponse(states: ["Connected"])))
+      deviceObservation: observation(states: ["Connected"]))
 
     XCTAssertTrue(projected.isRuntimeManaged)
     XCTAssertEqual(projected.absolutePath, "not exposed by Runtime")
@@ -39,7 +39,7 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
       let presentation = HDCRuntimeDiagnosticsResponseDecoding.overlay(
         presentation: basePresentation(),
         statusResponse: .success(try statusResponse()),
-        candidateResponse: .success(try candidateResponse(states: states)))
+        deviceObservation: observation(states: states))
       return presentation.authorization
     }
 
@@ -57,7 +57,7 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
     let unreadable = HDCRuntimeDiagnosticsResponseDecoding.overlay(
       presentation: basePresentation(),
       statusResponse: .success(try statusResponse()),
-      candidateResponse: .failure(.transport("fixture")))
+      deviceObservation: .loading)
     XCTAssertEqual(
       unreadable.authorization,
       .unavailable(reason: "Runtime device authorization could not be read"))
@@ -77,7 +77,7 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
       let projected = HDCRuntimeDiagnosticsResponseDecoding.overlay(
         presentation: base,
         statusResponse: .success(try response(result: status)),
-        candidateResponse: .success(try candidateResponse(states: ["Connected"])))
+        deviceObservation: observation(states: ["Connected"]))
       XCTAssertEqual(projected, base, "mutation \(mutation) must fail closed")
       XCTAssertFalse(projected.isRuntimeManaged)
     }
@@ -90,14 +90,14 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
       workflows.range(of: "private actor HDCProductionApplicationDiagnostics"))
     let refreshStart = try XCTUnwrap(
       workflows.range(
-        of: "func refresh() async",
+        of: "func refresh(deviceObservation: DeviceListPresentation) async",
         range: productionStart.upperBound..<workflows.endIndex))
     let requestStart = try XCTUnwrap(
       workflows.range(
         of: "func requestRecoveryImpactPreview() async",
         range: refreshStart.upperBound..<workflows.endIndex))
     let refresh = String(workflows[refreshStart.lowerBound..<requestStart.lowerBound])
-    let runtimeCheck = try XCTUnwrap(refresh.range(of: "runtimeManagedPresentation()"))
+    let runtimeCheck = try XCTUnwrap(refresh.range(of: "runtimeManagedPresentation("))
     let localBootstrap = try XCTUnwrap(refresh.range(of: "attachSessionIfConfigured()"))
     XCTAssertLessThan(runtimeCheck.lowerBound, localBootstrap.lowerBound)
     XCTAssertTrue(
@@ -153,15 +153,15 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
     ]
   }
 
-  private func candidateResponse(states: [String]) throws -> Data {
-    try response(
-      result: states.enumerated().map { index, state in
-        [
-          "connectKey": "must-not-enter-presentation-\(index)",
-          "state": state,
-          "adoptedTargetId": NSNull(),
-          "bindingRevision": NSNull(),
-        ] as [String: Any]
+  /// The App's shared observation, not a second HDC read. Connect keys still
+  /// carry a marker so a leak into the presentation stays obvious.
+  private func observation(states: [String]) -> DeviceListPresentation {
+    DeviceListPresentation(
+      availability: .available,
+      candidates: states.enumerated().map { index, state in
+        DeviceCandidatePresentation(
+          connectKey: "must-not-enter-presentation-\(index)",
+          state: state, adoptedTargetID: nil, bindingRevision: nil)
       })
   }
 

@@ -36,6 +36,7 @@ final class DeviceListViewModel {
   private let displayNamesDefaults: UserDefaults
   private let waitWindow: TimeInterval
   @ObservationIgnored private var waitTask: Task<Void, Never>?
+  @ObservationIgnored private var liveTask: Task<Void, Never>?
   @ObservationIgnored private var refreshGeneration: UInt64 = 0
 
   init(
@@ -61,6 +62,54 @@ final class DeviceListViewModel {
     Task { [weak self] in
       let current = await provider.refreshCandidates()
       self?.finishRefresh(current, generation: generation)
+    }
+  }
+
+  /// The App's one live device observation.
+  ///
+  /// Every workspace used to ask HDC for routing again on the way in, which
+  /// cost a probe per navigation and still showed a device that had been
+  /// unplugged since. One poll here answers all of them, and a device that
+  /// goes away disappears from every surface at once rather than at each
+  /// surface's next visit.
+  ///
+  /// Polling, not subscription: the daemon's door is request/response and
+  /// publishes no device event, so a timer is the honest mechanism. It runs
+  /// only while the App is active — a backgrounded window has nobody to show
+  /// a state change to, and the probe is not free.
+  ///
+  /// Ten seconds, measured rather than picked: one `device.candidates` costs
+  /// ~54ms of daemon time, and the daemon answers one request at a time, so a
+  /// tick that lands mid-read makes the read wait. At four seconds that
+  /// collision was frequent enough to show up as several-fold jitter in
+  /// unrelated reads; ten keeps an unplug prompt without paying for it
+  /// continuously.
+  func startLiveObservation(interval: Duration = .seconds(10)) {
+    guard liveTask == nil else { return }
+    liveTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: interval)
+        guard let self, !Task.isCancelled else { return }
+        // `refresh()` already declines to start while one is in flight, so a
+        // slow probe delays the next tick instead of stacking requests.
+        self.refresh()
+      }
+    }
+  }
+
+  func stopLiveObservation() {
+    liveTask?.cancel()
+    liveTask = nil
+  }
+
+  /// Suspends polling while a device job is running. The probe and the job's
+  /// own reads compete for the same single-threaded daemon, and a device
+  /// mid-capture is not going anywhere.
+  func setLiveObservationPaused(_ paused: Bool) {
+    if paused {
+      stopLiveObservation()
+    } else {
+      startLiveObservation()
     }
   }
 

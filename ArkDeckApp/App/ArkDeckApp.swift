@@ -97,8 +97,10 @@ private final class ArkDeckAppModelStore {
     provider: OverviewCapabilityApplicationFacade.make())
   @ObservationIgnored lazy var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
+  // A launch without `--ui-test-viewer…` never reaches the fixture, so the
+  // production path stays the XPC facade and nothing else.
   @ObservationIgnored lazy var uiDumpWorkspace = UIDumpWorkspaceViewModel(
-    provider: UIDumpApplicationFacade.make())
+    provider: ViewerUIFixture.provider() ?? UIDumpApplicationFacade.make())
   @ObservationIgnored lazy var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
@@ -388,6 +390,18 @@ private struct AppShellView: View {
       guard deviceList.presentation.availability != .checking else { return }
       refreshVisibleProjection(for: newValue)
     }
+    // The shared device observation feeds every workspace that needs routing,
+    // and keeps feeding it: a device that unplugs leaves the pickers without
+    // anyone navigating. It runs only while the App is active.
+    .onChange(of: deviceList.presentation) { _, observation in
+      publishDeviceObservation(observation)
+    }
+    // A capture's own bounded reads share the daemon with the device probe.
+    // Measured: one probe is ~54ms of daemon time and the daemon answers one
+    // request at a time, so a tick landing mid-read makes that read wait.
+    .onChange(of: models.uiDumpWorkspace.isCapturing) { _, capturing in
+      deviceList.setLiveObservationPaused(capturing)
+    }
     .task(id: deviceList.startupInformationReady) {
       guard deviceList.startupInformationReady else { return }
       // Yield the main actor once so SwiftUI can commit the complete device
@@ -396,8 +410,11 @@ private struct AppShellView: View {
       runtimeHistory.refresh()
       autoUpdate.startup()
       ApplicationIconChoice.applyStoredSelection()
+      publishDeviceObservation(deviceList.presentation)
       refreshVisibleProjection(for: storedSelection)
+      deviceList.startLiveObservation()
     }
+    .onDisappear { deviceList.stopLiveObservation() }
     .alert(
       deviceString("device.rename.title"),
       isPresented: renameDialogIsPresented
@@ -441,6 +458,30 @@ private struct AppShellView: View {
 
   private func openHistory() {
     storedSelection = ShellSelection.navigation(.history).storageValue
+  }
+
+  /// Fans the shared observation out to the workspaces that need routing.
+  /// Under the Viewer fixture the fixture's own device stands in, so a
+  /// launch that fabricates a capture also fabricates the device it came
+  /// from rather than contradicting itself.
+  private func publishDeviceObservation(_ observation: DeviceListPresentation) {
+    let effective = ViewerUIFixture.deviceObservation() ?? observation
+    models.uiDumpWorkspace.applyDeviceObservation(
+      effective, names: deviceDisplayNames(effective))
+    // HDC diagnostics reads the real observation: a fixture Viewer capture
+    // must not make the machine claim a device is authorized.
+    models.hdcDiagnostics.applyDeviceObservation(observation)
+  }
+
+  /// Presentation-only names, keyed by the adopted target the workspaces
+  /// address. A connect key identifies hardware and never reaches a picker.
+  private func deviceDisplayNames(_ observation: DeviceListPresentation) -> [String: String] {
+    var names: [String: String] = [:]
+    for candidate in observation.candidates {
+      guard let targetID = candidate.adoptedTargetID else { continue }
+      names[targetID] = deviceList.displayName(for: candidate)
+    }
+    return names
   }
 
   private func refreshVisibleProjection(for storageValue: String) {
@@ -959,12 +1000,22 @@ private final class HDCStatusViewModel {
     lifecycleDispatchIsProductionComposed = provider.lifecycleDispatchIsProductionComposed
   }
 
+  /// The device observation arrives from the App's shared source rather than
+  /// being probed here. Authorization is the only device fact this surface
+  /// needs, and it is already being observed once for everyone.
+  private(set) var deviceObservation = DeviceListPresentation.loading
+
+  func applyDeviceObservation(_ observation: DeviceListPresentation) {
+    deviceObservation = observation
+  }
+
   func refresh() {
     guard !isRefreshInFlight else { return }
     isRefreshInFlight = true
     let provider = provider
+    let observation = deviceObservation
     Task { [weak self] in
-      let next = await provider.refresh()
+      let next = await provider.refresh(deviceObservation: observation)
       guard let self else { return }
       defer { self.isRefreshInFlight = false }
       guard !Task.isCancelled else { return }

@@ -23,6 +23,7 @@
 		A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AC /* GlobalJobInspectorView.swift */; };
 		A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AE /* JobsLocalizable.xcstrings */; };
 		A100000000000000000000C0 /* UIDumpWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C2 /* UIDumpWorkspaceView.swift */; };
+		A100000000000000000000E2 /* ViewerLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E3 /* ViewerLocalization.swift */; };
 		A100000000000000000000C1 /* UIDumpLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C3 /* UIDumpLocalizable.xcstrings */; };
 		B10000000000000000000001 /* TraceWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* TraceWorkspaceView.swift */; };
 		B10000000000000000000002 /* TraceConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* TraceConfigurationView.swift */; };
@@ -32,6 +33,7 @@
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
+		A100000000000000000000E0 /* ViewerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* ViewerUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
@@ -58,6 +60,7 @@
 		A100000000000000000000AC /* GlobalJobInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalJobInspectorView.swift; sourceTree = "<group>"; };
 		A100000000000000000000AE /* JobsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = JobsLocalizable.xcstrings; sourceTree = "<group>"; };
 		A100000000000000000000C2 /* UIDumpWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIDumpWorkspaceView.swift; sourceTree = "<group>"; };
+		A100000000000000000000E3 /* ViewerLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerLocalization.swift; sourceTree = "<group>"; };
 		A100000000000000000000C3 /* UIDumpLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = UIDumpLocalizable.xcstrings; sourceTree = "<group>"; };
 		B10000000000000000000005 /* TraceWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceWorkspaceView.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* TraceConfigurationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceConfigurationView.swift; sourceTree = "<group>"; };
@@ -67,6 +70,7 @@
 		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
+		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -201,6 +205,7 @@
 			isa = PBXGroup;
 			children = (
 				A100000000000000000000C2 /* UIDumpWorkspaceView.swift */,
+				A100000000000000000000E3 /* ViewerLocalization.swift */,
 			);
 			path = Features/UIDump;
 			sourceTree = "<group>";
@@ -251,6 +256,7 @@
 			children = (
 				A10000000000000000000038 /* AppShellUITests.swift */,
 				A100000000000000000000A1 /* KeyboardInputSourcePin.swift */,
+				A100000000000000000000E1 /* ViewerUITests.swift */,
 			);
 			path = ArkDeckAppUITests/AppShell;
 			sourceTree = "<group>";
@@ -369,6 +375,7 @@
 				A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */,
 				A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */,
 				A100000000000000000000C0 /* UIDumpWorkspaceView.swift in Sources */,
+				A100000000000000000000E2 /* ViewerLocalization.swift in Sources */,
 				A100000000000000000000B0 /* DebugWorkspaceView.swift in Sources */,
 				B10000000000000000000001 /* TraceWorkspaceView.swift in Sources */,
 				B10000000000000000000002 /* TraceConfigurationView.swift in Sources */,
@@ -383,6 +390,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000001F /* AppShellUITests.swift in Sources */,
+				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
 			);

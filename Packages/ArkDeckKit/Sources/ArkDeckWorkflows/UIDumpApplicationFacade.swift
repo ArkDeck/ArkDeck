@@ -212,6 +212,10 @@ public struct ViewerCapture: Sendable, Equatable {
   public let rawDumpDocument: Data?
   public let identity: ViewerCaptureIdentity
   public let coordinatesAreVerified: Bool
+  /// What this capture cost to produce. `nil` for a capture that was not
+  /// measured — a fixture, or a decode in a test — so the UI can say "not
+  /// measured" instead of reporting a fabricated zero.
+  public let metrics: ViewerCaptureMetrics?
   private let nodeIndex: [String: ViewerNode]
 
   public init(
@@ -222,7 +226,8 @@ public struct ViewerCapture: Sendable, Equatable {
     nodes: [ViewerNode],
     rawDumpDocument: Data?,
     identity: ViewerCaptureIdentity,
-    coordinatesAreVerified: Bool
+    coordinatesAreVerified: Bool,
+    metrics: ViewerCaptureMetrics? = nil
   ) {
     self.screenshotData = screenshotData
     self.screenshotWidth = screenshotWidth
@@ -232,6 +237,7 @@ public struct ViewerCapture: Sendable, Equatable {
     self.rawDumpDocument = rawDumpDocument
     self.identity = identity
     self.coordinatesAreVerified = coordinatesAreVerified
+    self.metrics = metrics
     // A capture is immutable. Build its lookup table exactly once so Viewer
     // rendering never turns a large device tree into repeated linear scans.
     var index: [String: ViewerNode] = [:]
@@ -243,6 +249,17 @@ public struct ViewerCapture: Sendable, Equatable {
 
   public func node(identity: String) -> ViewerNode? {
     nodeIndex[identity]
+  }
+
+  /// Returns the same capture with its measured cost attached. Parsing is
+  /// itself one of the measured stages, so the number cannot exist until after
+  /// the capture does.
+  public func withMetrics(_ metrics: ViewerCaptureMetrics) -> ViewerCapture {
+    ViewerCapture(
+      screenshotData: screenshotData, screenshotWidth: screenshotWidth,
+      screenshotHeight: screenshotHeight, roots: roots, nodes: nodes,
+      rawDumpDocument: rawDumpDocument, identity: identity,
+      coordinatesAreVerified: coordinatesAreVerified, metrics: metrics)
   }
 
   public func ancestors(of identity: String) -> [String] {
@@ -391,7 +408,7 @@ public enum ViewerCaptureParser {
       throw ViewerCaptureFailure.unreadableTree
     }
     var provisional: [ProvisionalNode] = []
-    try appendNode(root, path: [0], parentPath: nil, into: &provisional)
+    try appendNode(componentRoot(of: root), path: [0], parentPath: nil, into: &provisional)
 
     let identifiers = Dictionary(grouping: provisional.compactMap(\.sourceID), by: { $0 })
       .mapValues(\.count)
@@ -442,6 +459,36 @@ public enum ViewerCaptureParser {
       coordinatesAreVerified: coordinatesAreVerified)
   }
 
+  /// Steps past the dump's document envelope so the tree begins at the real
+  /// root component.
+  ///
+  /// A device dump wraps its component tree in an object whose attributes are
+  /// all empty and which holds exactly one child. That envelope is the
+  /// document, not a component: it has no type, no identifier of any kind, and
+  /// nothing to inspect. Presenting it made the first row of every real
+  /// capture an "Unknown" node with the actual root hidden one level below.
+  ///
+  /// The conditions are deliberately narrow — no type *and* no identifier
+  /// *and* exactly one child. A wrapper that names itself is a component and
+  /// is kept, so this can never swallow a node a device meant to publish.
+  private static func componentRoot(of document: [String: Any]) -> [String: Any] {
+    var current = document
+    // Bounded: a malformed dump must not turn this into an unbounded descent.
+    for _ in 0..<8 {
+      let attributes = current["attributes"] as? [String: Any] ?? current
+      guard string(attributes["type"]) == nil,
+        string(attributes["accessibilityId"]) == nil,
+        string(attributes["id"]) == nil,
+        string(attributes["nodeId"]) == nil,
+        string(attributes["componentId"]) == nil,
+        let children = current["children"] as? [[String: Any]],
+        children.count == 1
+      else { return current }
+      current = children[0]
+    }
+    return current
+  }
+
   private static func appendNode(
     _ object: [String: Any],
     path: [Int],
@@ -459,7 +506,14 @@ public enum ViewerCaptureParser {
       childObjects = []
     }
     let childPaths = childObjects.indices.map { path + [$0] }
-    let sourceID = string(attributes["id"])
+    // `accessibilityId` first. On a real ArkUI dump `id` is the developer's
+    // own `.id()` attribute and is empty on almost every node, while
+    // `accessibilityId` is the framework's per-node identifier and is the
+    // number a person cross-references against the platform's own inspector
+    // output. Reading `id` first meant every node fell back to a synthesized
+    // path identity and the whole tree showed "#—".
+    let sourceID = string(attributes["accessibilityId"])
+      ?? string(attributes["id"])
       ?? string(attributes["nodeId"])
       ?? string(attributes["componentId"])
     let type = string(attributes["type"])
@@ -578,7 +632,13 @@ public enum ViewerCaptureSubmissionResult: Sendable, Equatable {
 }
 
 public protocol UIDumpApplicationProviding: Sendable {
-  func refreshWorkspace() async -> UIDumpWorkspacePresentation
+  /// The device observation is supplied rather than fetched. HDC routing is
+  /// one fact about the machine, not a fact about Viewer, and every surface
+  /// that re-asked for it paid a probe and still went stale the moment the
+  /// user looked away. The App keeps one live observation and hands it here.
+  func refreshWorkspace(
+    deviceObservation: DeviceListPresentation
+  ) async -> UIDumpWorkspacePresentation
   func recapture(target: UIDumpTargetPresentation) async -> ViewerCaptureSubmissionResult
   func cancel(jobID: String) async -> Bool
 }
@@ -615,6 +675,15 @@ public enum ViewerCaptureRequestBuilder {
 }
 
 public enum UIDumpApplicationFacade {
+  /// Re-joins already-decoded targets against a newer device observation, so a
+  /// workspace can answer an unplug from the App's shared observation without
+  /// re-reading the durable target store.
+  public static func rejoin(
+    targets: [UIDumpTargetPresentation], with observation: DeviceListPresentation
+  ) -> [UIDumpTargetPresentation] {
+    UIDumpWorkspaceResponseDecoding.rejoin(targets: targets, with: observation)
+  }
+
   public static let operationReference = "capture.diagnostics@1"
   private static let descriptor = RuntimeOperationCatalog.descriptor(reference: operationReference)!
 
@@ -633,21 +702,31 @@ public enum UIDumpApplicationFacade {
 }
 
 private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
+  /// Measured on a 446KB screenshot: 64KB chunks cost 21.7ms, 256KB cost
+  /// 7.5ms, 1MB costs 4.8ms, and 4MB costs no less than 1MB. The cost is per
+  /// request (~3ms each), not per byte, so this is the point where fewer
+  /// round trips stops buying anything.
+  private static let artifactChunkBytes: Int64 = 1_024 * 1_024
   private static let maximumSingleArtifactBytes = 32 * 1_024 * 1_024
   private static let maximumCaptureBytes = 64 * 1_024 * 1_024
 
-  func refreshWorkspace() async -> UIDumpWorkspacePresentation {
+  func refreshWorkspace(
+    deviceObservation: DeviceListPresentation
+  ) async -> UIDumpWorkspacePresentation {
     async let operations = UIDumpXPCTransport.request(method: "operation.list")
+    // `target.list` stays: it is a durable store read, not a device probe, and
+    // it carries the adoption facts a candidate does not. What Viewer no
+    // longer does is re-run the HDC probe — admission still requires a fresh
+    // Connected route, but freshness is now a property the shared observation
+    // stamps and this workspace checks, instead of an accident of having just
+    // navigated here.
     async let targets = UIDumpXPCTransport.request(method: "target.list")
-    // Capture admission requires fresh routing facts. The durable target list
-    // alone deliberately cannot prove that a device is still Connected.
-    async let candidates = UIDumpXPCTransport.request(method: "device.candidates")
     async let jobs = UIDumpXPCTransport.request(
       method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
     return UIDumpWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
-      candidateResponse: await candidates,
+      deviceObservation: deviceObservation,
       jobResponse: await jobs)
   }
 
@@ -659,23 +738,30 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed Viewer request")
       }
-      let submitted = try resultObject(
-        await UIDumpXPCTransport.request(
-          method: "job.submit", params: ["requestJson": .string(requestJSON)]),
-        label: "Viewer capture submission")
+      let (submitted, submitMilliseconds) = try await ViewerSignpost.measure("viewer.submit") {
+        try resultObject(
+          await UIDumpXPCTransport.request(
+            method: "job.submit", params: ["requestJson": .string(requestJSON)]),
+          label: "Viewer capture submission")
+      }
       guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
         return .failed("Runtime accepted Viewer capture without returning a Job ID")
       }
-      let terminal = try resultObject(
-        await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
-        label: "Viewer capture")
+      let (terminal, runMilliseconds) = try await ViewerSignpost.measure("viewer.run") {
+        try resultObject(
+          await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
+          label: "Viewer capture")
+      }
       let facts = try terminalFacts(terminal, jobID: jobID, target: target)
       guard facts.state == "succeeded", !facts.outcomeUnknown,
         !facts.waitingForHuman, facts.outstandingResidueCount == 0
       else {
         return .failed("Viewer capture did not produce a safe terminal result (\(facts.state))")
       }
-      return .captured(try await loadCapture(facts: facts, target: target))
+      return .captured(
+        try await loadCapture(
+          facts: facts, target: target,
+          submitMilliseconds: submitMilliseconds, runMilliseconds: runMilliseconds))
     } catch let failure as ViewerTransportFailure {
       return .failed(failure.message)
     } catch let failure as ViewerArtifactFailure {
@@ -697,37 +783,66 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
 
   private func loadCapture(
     facts: ViewerTerminalFacts,
-    target: UIDumpTargetPresentation
+    target: UIDumpTargetPresentation,
+    submitMilliseconds: Double = 0,
+    runMilliseconds: Double = 0
   ) async throws -> ViewerCapture {
-    let entries = try artifactList(
-      await UIDumpXPCTransport.request(
-        method: "artifact.list", params: ["jobId": .string(facts.jobID)]),
-      jobID: facts.jobID)
-    let screenshot = try requiredArtifact(named: "screenshot.png", mediaType: "image/png", entries: entries)
-    let tree = try requiredArtifact(named: "ui-tree.json", mediaType: "application/json", entries: entries)
-    let rawDump = try optionalArtifact(named: "ui-dump.json", mediaType: "application/json", entries: entries)
-    let selected = [screenshot, tree] + (rawDump.map { [$0] } ?? [])
-    let total = selected.reduce(Int64(0)) { $0 + $1.byteCount }
-    guard total <= Int64(Self.maximumCaptureBytes) else {
-      throw ViewerArtifactFailure(message: "Viewer Artifact set exceeds its in-memory safety limit")
+    let (selection, listMilliseconds) = try await ViewerSignpost.measure("viewer.artifactList") {
+      let entries = try artifactList(
+        await UIDumpXPCTransport.request(
+          method: "artifact.list", params: ["jobId": .string(facts.jobID)]),
+        jobID: facts.jobID)
+      let screenshot = try requiredArtifact(
+        named: "screenshot.png", mediaType: "image/png", entries: entries)
+      let tree = try requiredArtifact(
+        named: "ui-tree.json", mediaType: "application/json", entries: entries)
+      let rawDump = try optionalArtifact(
+        named: "ui-dump.json", mediaType: "application/json", entries: entries)
+      let total = ([screenshot, tree] + (rawDump.map { [$0] } ?? []))
+        .reduce(Int64(0)) { $0 + $1.byteCount }
+      guard total <= Int64(Self.maximumCaptureBytes) else {
+        throw ViewerArtifactFailure(
+          message: "Viewer Artifact set exceeds its in-memory safety limit")
+      }
+      return (screenshot: screenshot, tree: tree, rawDump: rawDump)
     }
-    let screenshotData = try await readArtifact(screenshot, jobID: facts.jobID)
-    let treeData = try await readArtifact(tree, jobID: facts.jobID)
-    let rawDumpData: Data?
-    if let rawDump { rawDumpData = try await readArtifact(rawDump, jobID: facts.jobID) }
-    else { rawDumpData = nil }
+    let screenshot = selection.screenshot
+    let tree = selection.tree
+    let rawDump = selection.rawDump
+    let (payload, readMilliseconds) = try await ViewerSignpost.measure("viewer.artifactRead") {
+      let screenshotData = try await readArtifact(screenshot, jobID: facts.jobID)
+      let treeData = try await readArtifact(tree, jobID: facts.jobID)
+      let rawDumpData: Data?
+      if let rawDump { rawDumpData = try await readArtifact(rawDump, jobID: facts.jobID) }
+      else { rawDumpData = nil }
+      return (screenshotData: screenshotData, treeData: treeData, rawDumpData: rawDumpData)
+    }
+    let screenshotData = payload.screenshotData
+    let treeData = payload.treeData
+    let rawDumpData = payload.rawDumpData
     guard let capturedAtUTC = facts.finishedAtUTC, !capturedAtUTC.isEmpty else {
       throw ViewerArtifactFailure(message: "Runtime did not report a terminal Viewer capture time")
     }
-    return try ViewerCaptureParser.parse(
-      screenshotData: screenshotData,
-      treeData: treeData,
-      rawDumpData: rawDumpData,
-      identity: ViewerCaptureIdentity(
-        jobID: facts.jobID,
-        targetID: target.id,
-        bindingRevision: target.bindingRevision,
-        capturedAtUTC: capturedAtUTC))
+    let (capture, parseMilliseconds) = try ViewerSignpost.measureSync("viewer.parse") {
+      try ViewerCaptureParser.parse(
+        screenshotData: screenshotData,
+        treeData: treeData,
+        rawDumpData: rawDumpData,
+        identity: ViewerCaptureIdentity(
+          jobID: facts.jobID,
+          targetID: target.id,
+          bindingRevision: target.bindingRevision,
+          capturedAtUTC: capturedAtUTC))
+    }
+    return capture.withMetrics(
+      ViewerCaptureMetrics(
+        submitMilliseconds: submitMilliseconds,
+        runMilliseconds: runMilliseconds,
+        listMilliseconds: listMilliseconds,
+        readMilliseconds: readMilliseconds,
+        readBytes: screenshotData.count + treeData.count + (rawDumpData?.count ?? 0),
+        parseMilliseconds: parseMilliseconds,
+        nodeCount: capture.nodes.count))
   }
 
   private func readArtifact(_ artifact: ViewerArtifactMetadata, jobID: String) async throws -> Data {
@@ -739,7 +854,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         method: "artifact.read",
         params: [
           "jobId": .string(jobID), "artifactId": .string(artifact.id),
-          "offset": .integer(offset), "maxBytes": .integer(256 * 1_024),
+          "offset": .integer(offset), "maxBytes": .integer(Self.artifactChunkBytes),
           "allowSensitive": .bool(true),
         ])
       let chunk = try artifactChunk(response, artifact: artifact, expectedOffset: offset)
@@ -818,10 +933,10 @@ enum UIDumpWorkspaceResponseDecoding {
   fileprivate static func presentation(
     operationResponse: Result<Data, ViewerTransportFailure>,
     targetResponse: Result<Data, ViewerTransportFailure>,
-    candidateResponse: Result<Data, ViewerTransportFailure>,
+    deviceObservation: DeviceListPresentation,
     jobResponse: Result<Data, ViewerTransportFailure>
   ) -> UIDumpWorkspacePresentation {
-    let targets = decodeTargets(targetResponse, candidateResponse: candidateResponse)
+    let targets = decodeTargets(targetResponse, observation: deviceObservation)
     let jobs = decodeJobs(jobResponse)
     return UIDumpWorkspacePresentation(
       operation: UIDumpApplicationFacade.operationPresentation(
@@ -850,11 +965,11 @@ enum UIDumpWorkspaceResponseDecoding {
 
   private static func decodeTargets(
     _ response: Result<Data, ViewerTransportFailure>,
-    candidateResponse: Result<Data, ViewerTransportFailure>
+    observation: DeviceListPresentation
   ) -> ViewerDecodedList<UIDumpTargetPresentation> {
     do {
       let entries = try resultArray(response.get(), label: "Target list")
-      let routes = targetConnections(candidateResponse)
+      let routes = targetConnections(observation)
       var targets: [UIDumpTargetPresentation] = []
       for entry in entries {
         guard let id = entry["targetId"] as? String,
@@ -880,6 +995,31 @@ enum UIDumpWorkspaceResponseDecoding {
     }
   }
 
+  /// Re-joins already-decoded targets against a newer device observation.
+  ///
+  /// The adoption facts in a target are durable; only the route is live. This
+  /// lets a workspace answer an unplug from the shared observation alone,
+  /// without re-reading the target store to learn something the target store
+  /// does not know.
+  static func rejoin(
+    targets: [UIDumpTargetPresentation], with observation: DeviceListPresentation
+  ) -> [UIDumpTargetPresentation] {
+    // Not yet observed is not observed-unavailable. Overriding during the
+    // first poll would flap every picker to Unavailable and back, and would
+    // report an absence of measurement as a measurement.
+    guard case .available = observation.availability else { return targets }
+    let routes = targetConnections(observation)
+    return targets.map { target in
+      UIDumpTargetPresentation(
+        id: target.id,
+        bindingRevision: target.bindingRevision,
+        toolVersion: target.toolVersion,
+        adoptedAtUTC: target.adoptedAtUTC,
+        connection: routes.connections[target.id] ?? .unavailable(
+          reason: routes.failure ?? "No current HDC route was reported for this target"))
+    }
+  }
+
   static func targetConnection(for candidate: DeviceCandidatePresentation) -> UIDumpTargetConnection {
     guard candidate.isAuthorized else {
       let reason: String
@@ -894,14 +1034,8 @@ enum UIDumpWorkspaceResponseDecoding {
   }
 
   private static func targetConnections(
-    _ response: Result<Data, ViewerTransportFailure>
+    _ presentation: DeviceListPresentation
   ) -> ViewerTargetConnections {
-    switch response {
-    case .failure(let failure):
-      return ViewerTargetConnections(
-        connections: [:], failure: "Could not read current device state: \(failure.message)")
-    case .success(let data):
-      let presentation = DeviceCandidatesResponseDecoding.presentation(data)
       guard case .available = presentation.availability else {
         let reason: String
         if case .unavailable(let value) = presentation.availability { reason = value }
@@ -921,7 +1055,6 @@ enum UIDumpWorkspaceResponseDecoding {
         connections[targetID] = targetConnection(for: candidate)
       }
       return ViewerTargetConnections(connections: connections, failure: nil)
-    }
   }
 
   private static func decodeJobs(

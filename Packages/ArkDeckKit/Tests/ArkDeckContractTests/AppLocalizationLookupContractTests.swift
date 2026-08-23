@@ -35,6 +35,7 @@ final class AppLocalizationLookupContractTests: XCTestCase {
     ("historyLocalized", "HistoryLocalizable"),
     ("settingsText", "SettingsLocalizable"),
     ("deviceString", "Localizable"),
+    ("viewerText", "UIDumpLocalizable"),
   ]
 
   private func repositoryRoot() -> URL {

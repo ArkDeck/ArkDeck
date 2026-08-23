@@ -27,7 +27,10 @@ extension HDCDiagnosticsPresentation {
 /// supervisor, lifecycle executor, or durable-audit primitive.
 public protocol HDCApplicationDiagnosticsProviding: Sendable {
   var lifecycleDispatchIsProductionComposed: Bool { get }
-  func refresh() async -> HDCDiagnosticsPresentation
+  /// The device observation is supplied, not fetched. This surface only needs
+  /// it to say whether any device is currently authorized, which is a fact
+  /// about the machine that the App already observes once for everyone.
+  func refresh(deviceObservation: DeviceListPresentation) async -> HDCDiagnosticsPresentation
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation
@@ -79,6 +82,10 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
   private let provider = HDCApplicationDiagnosticsProvider.shared
   private let host = HDCApplicationDiagnosticsHost.shared
   private var attemptedSessionBootstrap = false
+  /// The newest observation this facade was handed. The recovery overlays run
+  /// from a screen that has just refreshed, so reusing it reports what was
+  /// last actually seen instead of fabricating "could not be read".
+  private var lastDeviceObservation = DeviceListPresentation.loading
   private var sessionDiagnostics: HDCServerDiagnosticsUseCase?
   private var sessionLifecycle: HDCSessionLifecycleUseCase?
   private var registeredToolchain: HDCCandidate?
@@ -93,11 +100,14 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     self.runtimeProjectionEnabled = runtimeProjectionEnabled
   }
 
-  func refresh() async -> HDCDiagnosticsPresentation {
-    if let runtime = await runtimeManagedPresentation() { return runtime }
+  func refresh(deviceObservation: DeviceListPresentation) async -> HDCDiagnosticsPresentation {
+    lastDeviceObservation = deviceObservation
+    if let runtime = await runtimeManagedPresentation(deviceObservation: deviceObservation) {
+      return runtime
+    }
     await attachSessionIfConfigured()
     let base = await provider.refresh()
-    let presentation = await runtimeOverlay(base)
+    let presentation = await runtimeOverlay(base, deviceObservation: deviceObservation)
     guard let deviceObservationSession else { return presentation }
     return presentation.overlayingDeviceEvents(await deviceObservationSession.refresh())
   }
@@ -152,22 +162,28 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     return await runtimeOverlay(withEvents)
   }
 
-  private func runtimeManagedPresentation() async -> HDCDiagnosticsPresentation? {
+  private func runtimeManagedPresentation(
+    deviceObservation: DeviceListPresentation? = nil
+  ) async -> HDCDiagnosticsPresentation? {
     guard runtimeProjectionEnabled else { return nil }
-    let presentation = await runtimeOverlay(.unprobed)
+    let presentation = await runtimeOverlay(.unprobed, deviceObservation: deviceObservation)
     return presentation.isRuntimeManaged ? presentation : nil
   }
 
   private func runtimeOverlay(
-    _ presentation: HDCDiagnosticsPresentation
+    _ presentation: HDCDiagnosticsPresentation,
+    deviceObservation: DeviceListPresentation? = nil
   ) async -> HDCDiagnosticsPresentation {
     guard runtimeProjectionEnabled else { return presentation }
-    async let status = DeviceListXPCReadTransport.request(method: "runtime.hdc-status")
-    async let candidates = DeviceListXPCReadTransport.request(method: "device.candidates")
+    let observation = deviceObservation ?? lastDeviceObservation
+    // Only the managed-server status is asked for here. Whether a device is
+    // authorized is the App's shared observation, and re-probing HDC for it
+    // bought a second answer to a question already being asked once.
+    let status = await DeviceListXPCReadTransport.request(method: "runtime.hdc-status")
     return HDCRuntimeDiagnosticsResponseDecoding.overlay(
       presentation: presentation,
-      statusResponse: await status,
-      candidateResponse: await candidates)
+      statusResponse: status,
+      deviceObservation: observation)
   }
 
   private func attachSessionIfConfigured() async {
@@ -331,7 +347,7 @@ enum HDCRuntimeDiagnosticsResponseDecoding {
   static func overlay(
     presentation: HDCDiagnosticsPresentation,
     statusResponse: Result<Data, DeviceListXPCReadFailure>,
-    candidateResponse: Result<Data, DeviceListXPCReadFailure>
+    deviceObservation: DeviceListPresentation
   ) -> HDCDiagnosticsPresentation {
     guard case .success(let statusData) = statusResponse,
       let status = resultObject(statusData),
@@ -362,7 +378,7 @@ enum HDCRuntimeDiagnosticsResponseDecoding {
       serverHealth: .healthy,
       generation: "Runtime-owned process lifetime",
       ownership: .arkDeckManaged,
-      authorization: authorization(from: candidateResponse),
+      authorization: authorization(from: deviceObservation),
       channelProtection: .unverifiedAssumeUnprotected,
       tcpUnprotectedWarning: nil,
       keyAccessError: nil,
@@ -374,14 +390,12 @@ enum HDCRuntimeDiagnosticsResponseDecoding {
   }
 
   private static func authorization(
-    from response: Result<Data, DeviceListXPCReadFailure>
+    from observation: DeviceListPresentation
   ) -> HDCAuthorizationState {
-    guard case .success(let data) = response,
-      let candidates = resultArray(data)
-    else {
+    guard case .available = observation.availability else {
       return .unavailable(reason: "Runtime device authorization could not be read")
     }
-    let states = candidates.compactMap { $0["state"] as? String }
+    let states = observation.candidates.map(\.state)
     if states.contains("Connected") { return .ready }
     if states.contains("Unauthorized") { return .unauthorizedWaitingForTrust }
     if states.contains("Offline") {
@@ -492,7 +506,7 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
   /// Overview's "nothing needs attention" branch could never be reached.
   private var channelVerified: Bool { activeFaults().contains("--ui-test-hdc-channel-verified") }
 
-  func refresh() async -> HDCDiagnosticsPresentation {
+  func refresh(deviceObservation: DeviceListPresentation) async -> HDCDiagnosticsPresentation {
     refreshCallCount += 1
     let acceptedCall = refreshCallCount
     if delayedRefresh, acceptedCall == 2 {
