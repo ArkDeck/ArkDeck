@@ -1,0 +1,3 @@
+# Xcode writes this when it resolves the package graph. The pins that matter
+# live in Package.swift; this file is per-machine build state.
+project.xcworkspace/
