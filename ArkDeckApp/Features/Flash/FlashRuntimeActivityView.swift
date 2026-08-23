@@ -32,7 +32,7 @@ struct FlashRuntimeActivityView: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       if let job = focusedJob, job.needsAttention {
         recoveryBanner(job)
       }
@@ -41,21 +41,17 @@ struct FlashRuntimeActivityView: View {
         criticalWriteCallout
       }
 
-      GroupBox(flashText("flash.runtime.title")) {
-        VStack(alignment: .leading, spacing: 12) {
-          switch presentation.availability {
-          case .unavailable(let reason):
-            unavailable(reason)
-          case .available:
-            if let job = focusedJob {
-              jobSummary(job)
-            } else {
-              empty
-            }
+      WorkspaceSection(Text(flashText("flash.runtime.title"))) {
+        switch presentation.availability {
+        case .unavailable(let reason):
+          unavailable(reason)
+        case .available:
+          if let job = focusedJob {
+            jobSummary(job)
+          } else {
+            empty
           }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
       }
     }
   }
@@ -65,12 +61,20 @@ struct FlashRuntimeActivityView: View {
       flashText("flash.runtime.criticalWrite"),
       systemImage: "exclamationmark.triangle.fill"
     )
-    .font(.callout.weight(.semibold))
+    .font(WorkspaceFont.body.weight(.semibold))
     .foregroundStyle(.orange)
     .fixedSize(horizontal: false, vertical: true)
-    .padding(14)
+    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .background(
+      WorkspaceTone.warning.wash,
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+        .stroke(WorkspaceTone.warning.line, lineWidth: 1)
+    }
     .accessibilityIdentifier("flash.runtime.criticalWrite")
   }
 
@@ -87,9 +91,9 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func recoveryBanner(_ job: RuntimeJobSummaryPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       Label(flashText("flash.runtime.recoveryTitle"), systemImage: "exclamationmark.shield.fill")
-        .font(.headline)
+        .font(WorkspaceFont.sectionTitle)
         .foregroundStyle(.orange)
       Text(
         flashText(
@@ -99,28 +103,33 @@ struct FlashRuntimeActivityView: View {
       )
       .fixedSize(horizontal: false, vertical: true)
       .accessibilityIdentifier("flash.runtime.recovery.guidance")
-      HStack(alignment: .firstTextBaseline, spacing: 16) {
+      HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.blockGap) {
         LabeledContent(flashText("flash.runtime.job")) {
-          Text(job.id).font(.callout.monospaced())
+          Text(job.id).font(WorkspaceFont.monospacedValue)
         }
         LabeledContent(flashText("flash.runtime.target")) {
-          Text(job.targetID).font(.callout.monospaced())
+          Text(job.targetID).font(WorkspaceFont.monospacedValue)
         }
       }
       Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
         .accessibilityIdentifier("flash.runtime.openHistory")
     }
-    .padding(16)
+    .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.cardPaddingVertical)
     .background(
-      Color.orange.opacity(0.08),
-      in: RoundedRectangle(cornerRadius: 12)
+      WorkspaceTone.warning.wash,
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
     )
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+        .stroke(WorkspaceTone.warning.line, lineWidth: 1)
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.runtime.attention")
   }
 
   private func unavailable(_ reason: String) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       Label(
         flashText("flash.runtime.unavailable"),
         systemImage: "antenna.radiowaves.left.and.right.slash"
@@ -128,32 +137,32 @@ struct FlashRuntimeActivityView: View {
       .foregroundStyle(.orange)
       .accessibilityIdentifier("flash.runtime.unavailable")
       Text(reason)
-        .font(.callout.monospaced())
+        .font(WorkspaceFont.monospacedValue)
         .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
       Text(flashText("flash.runtime.unavailableNote"))
-        .font(.footnote)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
 
   private var empty: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       Label(flashText("flash.runtime.empty"), systemImage: "clock")
-        .font(.callout.weight(.semibold))
+        .font(WorkspaceFont.body.weight(.semibold))
         .accessibilityIdentifier("flash.runtime.empty")
       Text(flashText("flash.runtime.emptyDescription"))
-        .font(.footnote)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
 
   private func jobSummary(_ job: RuntimeJobSummaryPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       ViewThatFits(in: .horizontal) {
-        HStack(spacing: 12) {
+        HStack(spacing: WorkspaceMetrics.contentGap) {
           runtimeState(job)
           if displaysIndeterminateProgress(job.state) {
             ProgressView()
@@ -166,11 +175,11 @@ struct FlashRuntimeActivityView: View {
               localized: LocalizedStringResource.FlashLocalizable.flashRuntimeJobCount(
                 Int32(clamping: flashJobs.count)))
           )
-          .font(.caption)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
         }
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+          HStack(spacing: WorkspaceMetrics.contentGap) {
             runtimeState(job)
             if displaysIndeterminateProgress(job.state) {
               ProgressView()
@@ -183,12 +192,16 @@ struct FlashRuntimeActivityView: View {
               localized: LocalizedStringResource.FlashLocalizable.flashRuntimeJobCount(
                 Int32(clamping: flashJobs.count)))
           )
-          .font(.caption)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
         }
       }
 
-      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+      Grid(
+        alignment: .leading,
+        horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+        verticalSpacing: WorkspaceMetrics.rowGap
+      ) {
         factRow("flash.runtime.job", job.id, identifier: "flash.runtime.jobID")
         factRow("flash.runtime.target", job.targetID, identifier: "flash.runtime.targetID")
       }
@@ -207,9 +220,10 @@ struct FlashRuntimeActivityView: View {
       if !job.timeline.isEmpty {
         Divider()
         Text(flashText("flash.runtime.timeline"))
-          .font(.subheadline.weight(.semibold))
+          .font(WorkspaceFont.label)
+          .foregroundStyle(.secondary)
           .accessibilityAddTraits(.isHeader)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
             timelineRow(entry, index: index, job: job)
           }
@@ -219,13 +233,13 @@ struct FlashRuntimeActivityView: View {
 
       Divider()
       resultSummary(job)
-      HStack(spacing: 12) {
+      HStack(spacing: WorkspaceMetrics.contentGap) {
         if !job.needsAttention {
           Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
             .accessibilityIdentifier("flash.runtime.openHistory")
         }
         Label(flashText("flash.runtime.readOnly"), systemImage: "eye")
-          .font(.footnote)
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -239,7 +253,7 @@ struct FlashRuntimeActivityView: View {
     } icon: {
       Image(systemName: stateSymbol(job))
     }
-    .font(.callout.weight(.semibold))
+    .font(WorkspaceFont.body.weight(.semibold))
     .foregroundStyle(stateColor(job))
   }
 
@@ -263,7 +277,7 @@ struct FlashRuntimeActivityView: View {
     job: RuntimeJobSummaryPresentation
   ) -> some View {
     let isCurrent = index == job.timeline.count - 1
-    return HStack(alignment: .firstTextBaseline, spacing: 8) {
+    return HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
       Image(systemName: isCurrent ? stateSymbol(job) : "checkmark.circle")
         .foregroundStyle(isCurrent ? stateColor(job) : .secondary)
         .accessibilityHidden(true)

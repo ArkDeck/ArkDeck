@@ -48,11 +48,12 @@ struct GlobalJobInspectorView: View {
     VStack(spacing: 0) {
       if isExpanded {
         expandedContent
+          .background(Color(nsColor: .controlBackgroundColor))
         Divider()
       }
       compactBar
+        .background(.bar)
     }
-    .background(.bar)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobInspector")
   }
@@ -66,7 +67,7 @@ struct GlobalJobInspectorView: View {
           jobsText("jobInspector.unavailable.title"),
           systemImage: "antenna.radiowaves.left.and.right.slash")
       } description: {
-        VStack(spacing: 6) {
+        VStack(spacing: WorkspaceMetrics.tightGap) {
           Text(reason).font(.callout.monospaced())
           Text(jobsText("jobInspector.unavailable.guidance"))
         }
@@ -94,10 +95,10 @@ struct GlobalJobInspectorView: View {
 
   private var jobList: some View {
     List(orderedJobs, selection: $selectedJobID) { job in
-      VStack(alignment: .leading, spacing: 5) {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
           stateLabel(job)
-          Spacer(minLength: 8)
+          Spacer(minLength: WorkspaceMetrics.tightGap)
           if job.outstandingResidueCount > 0 {
             Label(
               String(
@@ -105,39 +106,38 @@ struct GlobalJobInspectorView: View {
                   Int32(clamping: job.outstandingResidueCount))),
               systemImage: "externaldrive.badge.exclamationmark"
             )
-            .font(.caption)
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.orange)
-          }
-
-          if isCriticalStepActive(job) {
-            Label(
-              jobsText("jobInspector.criticalWrite"),
-              systemImage: "exclamationmark.triangle.fill"
-            )
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-            .accessibilityIdentifier("jobInspector.criticalWrite")
           }
         }
-        HStack(spacing: 6) {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
           Text(displayedOperationReference(job.operationReference))
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .lineLimit(1)
           if let badge = RuntimeExecutionModeBadge(job.executionMode) {
             badge
           }
         }
         Text(job.targetID)
-          .font(.caption.monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .truncationMode(.middle)
+        // A full-width callout, not a member of the baseline row above: nested
+        // in that HStack it took the row's whole width and pushed the summary
+        // it annotates out of view.
+        if isCriticalStepActive(job) {
+          WorkspaceNotice(
+            tone: .warning,
+            symbol: "exclamationmark.triangle.fill",
+            identifier: "jobInspector.criticalWrite"
+          ) {
+            Text(jobsText("jobInspector.criticalWrite"))
+              .fontWeight(.semibold)
+          }
+        }
       }
-      .padding(.vertical, 3)
+      .padding(.vertical, WorkspaceMetrics.rowGap)
       .tag(job.id)
       .accessibilityIdentifier("jobInspector.row.\(job.id)")
     }
@@ -148,21 +148,25 @@ struct GlobalJobInspectorView: View {
   private var jobDetail: some View {
     if let job = focusedJob {
       ScrollView {
-        VStack(alignment: .leading, spacing: 14) {
-          HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
+          HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
             stateLabel(job)
             if isActive(job) {
               ProgressView()
                 .controlSize(.small)
                 .accessibilityLabel(jobsText("jobInspector.progress"))
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: WorkspaceMetrics.contentGap)
             Text(jobsText("jobInspector.readOnly"))
-              .font(.caption)
+              .font(WorkspaceFont.caption)
               .foregroundStyle(.secondary)
           }
 
-          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+          Grid(
+            alignment: .leading,
+            horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+            verticalSpacing: WorkspaceMetrics.rowGap
+          ) {
             factRow("jobInspector.fact.job", job.id)
             factRow(
               "jobInspector.fact.operation",
@@ -180,7 +184,7 @@ struct GlobalJobInspectorView: View {
           }
 
           if let relation = establishedCurrentEpochRelation(job) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
               Label(
                 jobsText(relation.messageKey),
                 systemImage: "checkmark.shield.fill"
@@ -222,13 +226,28 @@ struct GlobalJobInspectorView: View {
           }
 
           if !job.timeline.isEmpty {
-            Divider()
-            Text(jobsText("jobInspector.timeline"))
-              .font(.subheadline.weight(.semibold))
-              .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: 7) {
-              ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+              Text(jobsText("jobInspector.timeline"))
+                .font(WorkspaceFont.label)
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+              timelineEntries(job)
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
+        .padding(.vertical, WorkspaceMetrics.blockGap)
+      }
+    } else {
+      ContentUnavailableView(jobsText("jobInspector.select"), systemImage: "sidebar.right")
+    }
+  }
+
+  private func timelineEntries(_ job: RuntimeJobSummaryPresentation) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+      ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
+                HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
                   Image(
                     systemName: index == job.timeline.count - 1
                       ? symbol(for: job)
@@ -239,25 +258,17 @@ struct GlobalJobInspectorView: View {
                   )
                   .accessibilityHidden(true)
                   Text(entry)
-                    .font(.callout.monospaced())
+                    .font(WorkspaceFont.monospacedValue)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 }
-              }
-            }
-            .accessibilityIdentifier("jobInspector.timeline.entries")
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(16)
       }
-    } else {
-      ContentUnavailableView(jobsText("jobInspector.select"), systemImage: "sidebar.right")
     }
+    .accessibilityIdentifier("jobInspector.timeline.entries")
   }
 
   private var compactBar: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: WorkspaceMetrics.contentGap) {
       Button {
         isExpanded.toggle()
       } label: {
@@ -273,7 +284,7 @@ struct GlobalJobInspectorView: View {
 
       compactStatus
 
-      Spacer(minLength: 12)
+      Spacer(minLength: WorkspaceMetrics.contentGap)
 
       if isRefreshInFlight {
         ProgressView()
@@ -286,8 +297,8 @@ struct GlobalJobInspectorView: View {
       Button(jobsText("jobInspector.action.openHistory"), action: onOpenHistory)
         .accessibilityIdentifier("jobInspector.openHistory")
     }
-    .padding(.horizontal, 12)
-    .frame(minHeight: 40)
+    .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
+    .frame(minHeight: WorkspaceMetrics.jobInspectorBarHeight)
   }
 
   @ViewBuilder
@@ -301,10 +312,10 @@ struct GlobalJobInspectorView: View {
       .foregroundStyle(.orange)
     case .available:
       if let job = focusedJob {
-        HStack(spacing: 8) {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
           stateLabel(job)
           Text(displayedOperationReference(job.operationReference))
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .lineLimit(1)
           if activeJobCount > 0 {
             Text(
@@ -312,7 +323,7 @@ struct GlobalJobInspectorView: View {
                 localized: LocalizedStringResource.JobsLocalizable.jobInspectorCompactActiveCount(
                   Int32(clamping: activeJobCount)))
             )
-            .font(.caption)
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
           }
           if isActive(job) {
@@ -320,7 +331,7 @@ struct GlobalJobInspectorView: View {
             // spinner alone says "busy"; the timer says "for how long".
             if let started = startedDate(job) {
               Text(started, style: .timer)
-                .font(.caption.monospacedDigit())
+                .font(WorkspaceFont.tabularSecondary)
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(jobsText("jobInspector.elapsed"))
             }
@@ -483,45 +494,47 @@ struct GlobalRecoveryBannerView: View {
   var body: some View {
     let jobs = recoveryJobs
     if !jobs.isEmpty {
-      VStack(spacing: 8) {
+      VStack(spacing: WorkspaceMetrics.tightGap) {
         ForEach(jobs) { job in
           banner(job)
         }
       }
-      .padding(.horizontal, 20)
-      .padding(.top, 12)
+      .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+      .padding(.top, WorkspaceMetrics.pageInsetTop)
     }
   }
 
   private func banner(_ job: RuntimeJobSummaryPresentation) -> some View {
-    HStack(alignment: .top, spacing: 12) {
+    let tone = recoveryTone(job)
+    return HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
       Image(systemName: recoverySymbol(job))
         .font(.title3)
-        .foregroundStyle(recoveryColor(job))
+        .foregroundStyle(tone.color)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(jobsText(recoveryTitle(job)))
-          .font(.headline)
+          .font(WorkspaceFont.sectionTitle)
         Text(jobsText(recoveryGuidance(job)))
-          .font(.callout)
+          .font(WorkspaceFont.secondary)
           .fixedSize(horizontal: false, vertical: true)
         Text("\(job.id) · \(job.targetID)")
-          .font(.caption.monospaced())
+          .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
       }
-      Spacer(minLength: 12)
+      Spacer(minLength: WorkspaceMetrics.contentGap)
       Button(jobsText("jobRecovery.action.openHistory"), action: onOpenHistory)
         .accessibilityIdentifier("jobRecovery.openHistory")
     }
-    .padding(14)
+    .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.cardPaddingVertical)
     .background(
-      recoveryColor(job).opacity(0.08),
-      in: RoundedRectangle(cornerRadius: 10)
+      tone.wash,
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 10)
-        .stroke(recoveryColor(job).opacity(0.35), lineWidth: 1)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+        .stroke(tone.line, lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobRecovery.banner")
@@ -568,9 +581,9 @@ struct GlobalRecoveryBannerView: View {
     }
   }
 
-  private func recoveryColor(_ job: RuntimeJobSummaryPresentation) -> Color {
+  private func recoveryTone(_ job: RuntimeJobSummaryPresentation) -> WorkspaceTone {
     // outcomeUnknown is warn (the system warning tone), not danger: red
     // claims a known failure, and unknown is precisely not that.
-    .orange
+    .warning
   }
 }

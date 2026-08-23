@@ -79,7 +79,6 @@ private struct GeneralSettingsPane: View {
   var body: some View {
     SettingsPaneContainer {
       SettingsPaneHeader(
-        title: settingsText("settings.general.title"),
         subtitle: settingsText("settings.general.subtitle"))
       GroupBox(settingsText("settings.general.appIcon")) {
         ApplicationIconPicker(selection: $applicationIconChoice)
@@ -98,7 +97,7 @@ private struct GeneralSettingsPane: View {
         SettingsLoadingRow()
       }
       GroupBox(settingsText("settings.general.privacy")) {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           SettingsAssuranceRow(
             icon: "lock.shield",
             title: settingsText("settings.general.localFirst"),
@@ -162,12 +161,12 @@ private struct ApplicationIconPicker: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       Text(settingsText("settings.general.appIcon.detail"))
         .font(.callout)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
-      HStack(spacing: 12) {
+      HStack(spacing: WorkspaceMetrics.contentGap) {
         ForEach(ApplicationIconChoice.allCases) { choice in
           option(choice)
         }
@@ -178,15 +177,16 @@ private struct ApplicationIconPicker: View {
 
   private func option(_ choice: ApplicationIconChoice) -> some View {
     let isSelected = choice == selectedChoice
-    let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+    let shape = RoundedRectangle(
+      cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
 
     return Button {
       selection = choice.rawValue
       choice.apply()
     } label: {
-      HStack(spacing: 12) {
+      HStack(spacing: WorkspaceMetrics.contentGap) {
         ApplicationIconPreview(choice: choice)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           Text(choice.title)
             .font(.headline)
           if isSelected {
@@ -200,15 +200,12 @@ private struct ApplicationIconPicker: View {
         }
         Spacer(minLength: 0)
       }
-      .padding(12)
-      .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-      .background(
-        isSelected ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor),
-        in: shape
-      )
+      .padding(WorkspaceMetrics.contentGap)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color(nsColor: .controlBackgroundColor), in: shape)
       .overlay(
-        shape.stroke(
-          isSelected ? Color.accentColor : Color.primary.opacity(0.12),
+        shape.strokeBorder(
+          isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
           lineWidth: isSelected ? 2 : 1)
       )
       .contentShape(shape)
@@ -217,12 +214,9 @@ private struct ApplicationIconPicker: View {
     .focused($focusedChoice, equals: choice)
     .overlay {
       if focusedChoice == choice {
-        shape
-          .stroke(Color.accentColor, lineWidth: 2)
-          .padding(-3)
+        shape.strokeBorder(Color.accentColor, lineWidth: 2)
       }
     }
-    .padding(4)
     .accessibilityLabel(choice.title)
     .accessibilityValue(
       isSelected ? settingsText("settings.general.appIcon.selected") : ""
@@ -246,14 +240,19 @@ private struct ApplicationIconPreview: View {
         Image(systemName: "app.dashed")
           .resizable()
           .scaledToFit()
-          .padding(14)
+          .padding(WorkspaceMetrics.tightGap)
       }
     }
-    .frame(width: 64, height: 64)
-    .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
+    // Concentric: the preview sits inside the option tile (radius 9), so its
+    // own corner is the next step down, not a larger 14.
+    .frame(width: 40, height: 40)
+    .background(
+      Color(nsColor: .windowBackgroundColor),
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+    )
     .overlay(
-      RoundedRectangle(cornerRadius: 14)
-        .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
     )
     .accessibilityHidden(true)
   }
@@ -272,16 +271,15 @@ private struct ToolchainsSettingsPane: View {
   var body: some View {
     SettingsPaneContainer {
       SettingsPaneHeader(
-        title: settingsText("settings.toolchains.title"),
         subtitle: settingsText("settings.toolchains.subtitle"))
       GroupBox(settingsText("settings.toolchains.hdc")) {
-        VStack(alignment: .leading, spacing: 14) {
-          HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          HStack(spacing: WorkspaceMetrics.tightGap) {
             Image(systemName: healthSymbol)
               .foregroundStyle(healthColor)
               .accessibilityHidden(true)
             Text(healthText)
-              .font(.headline)
+              .font(WorkspaceFont.body.weight(.semibold))
             Spacer()
             if isRefreshInFlight {
               ProgressView()
@@ -337,9 +335,11 @@ private struct ToolchainsSettingsPane: View {
                 .foregroundStyle(.orange)
             }
             .font(.callout)
-            .padding(10)
+            .padding(WorkspaceMetrics.contentGap)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
             .accessibilityIdentifier("settings.toolchains.activeJobsCallout")
           } else {
             Text(settingsText("settings.toolchains.futureJobs"))
@@ -373,9 +373,12 @@ private struct ToolchainsSettingsPane: View {
   }
 
   private var healthSymbol: String {
+    // `unavailable` has its own text here but used to fall through to the
+    // unknown glyph, so Settings and Overview disagreed about the same fact.
     switch presentation.serverHealth.rawValue.lowercased() {
     case "healthy": "checkmark.circle.fill"
     case "unhealthy": "exclamationmark.triangle.fill"
+    case "unavailable": "xmark.octagon.fill"
     default: "questionmark.circle"
     }
   }
@@ -392,6 +395,7 @@ private struct ToolchainsSettingsPane: View {
     switch presentation.serverHealth.rawValue.lowercased() {
     case "healthy": .green
     case "unhealthy": .orange
+    case "unavailable": .red
     default: .secondary
     }
   }
@@ -408,24 +412,21 @@ private struct StorageSettingsPane: View {
   var body: some View {
     SettingsPaneContainer {
       SettingsPaneHeader(
-        title: settingsText("settings.storage.title"),
         subtitle: settingsText("settings.storage.subtitle"))
       if let storage = model.presentation?.storage {
         GroupBox(settingsText("settings.storage.location")) {
-          VStack(alignment: .leading, spacing: 12) {
-            LabeledContent(settingsText("settings.storage.root")) {
-              Text(storage.rootPath)
-                .font(.system(.body, design: .monospaced))
-                .textSelection(.enabled)
-                .multilineTextAlignment(.trailing)
-            }
-            LabeledContent(settingsText("settings.storage.rootSource")) {
-              Text(
-                settingsText(
-                  storage.usesCustomRoot
-                    ? "settings.storage.rootSource.custom"
-                    : "settings.storage.rootSource.default"))
-            }
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+            SettingsValueGrid(
+              rows: [
+                .init(settingsText("settings.storage.root"), storage.rootPath),
+                .init(
+                  settingsText("settings.storage.rootSource"),
+                  settingsText(
+                    storage.usesCustomRoot
+                      ? "settings.storage.rootSource.custom"
+                      : "settings.storage.rootSource.default")),
+              ],
+              monospacedValueLabels: [settingsText("settings.storage.root")])
             HStack {
               Button(settingsText("settings.storage.chooseRoot")) {
                 isSelectingRoot = true
@@ -443,8 +444,8 @@ private struct StorageSettingsPane: View {
         }
 
         GroupBox(settingsText("settings.storage.policy")) {
-          VStack(alignment: .leading, spacing: 12) {
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 18, verticalSpacing: 10) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.contentGap) {
               storageField(
                 label: settingsText("settings.storage.quota"),
                 value: $quotaGiB,
@@ -517,7 +518,7 @@ private struct StorageSettingsPane: View {
   ) -> some View {
     GridRow {
       Text(label)
-      HStack(spacing: 8) {
+      HStack(spacing: WorkspaceMetrics.tightGap) {
         TextField(label, text: value)
           .frame(width: 110)
           .textFieldStyle(.roundedBorder)
@@ -529,7 +530,7 @@ private struct StorageSettingsPane: View {
 
   @ViewBuilder
   private func storageUsage(_ storage: SettingsStoragePresentation) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       if let currentBytes = storage.currentBytes {
         ProgressView(
           value: Double(currentBytes),
@@ -616,10 +617,9 @@ private struct DiagnosticsSettingsPane: View {
   var body: some View {
     SettingsPaneContainer {
       SettingsPaneHeader(
-        title: settingsText("settings.diagnostics.title"),
         subtitle: settingsText("settings.diagnostics.subtitle"))
       GroupBox(settingsText("settings.diagnostics.defaultScope")) {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           SettingsAssuranceRow(
             icon: "checkmark.circle",
             title: settingsText("settings.diagnostics.metadata"),
@@ -635,7 +635,7 @@ private struct DiagnosticsSettingsPane: View {
         }
       }
       GroupBox(settingsText("settings.diagnostics.export")) {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           Text(settingsText("settings.diagnostics.previewFirst"))
             .fixedSize(horizontal: false, vertical: true)
           Button(settingsText("settings.diagnostics.chooseAndPreview"), action: chooseDestination)
@@ -650,14 +650,9 @@ private struct DiagnosticsSettingsPane: View {
             let preview = model.diagnosticPreview
           {
             Divider()
-            LabeledContent(settingsText("settings.diagnostics.destination")) {
-              Text(destination.path)
-                .font(.system(.caption, design: .monospaced))
-                .textSelection(.enabled)
-                .multilineTextAlignment(.trailing)
-            }
             SettingsValueGrid(
               rows: [
+                .init(settingsText("settings.diagnostics.destination"), destination.path),
                 .init(
                   settingsText("settings.diagnostics.size"),
                   ByteCountFormatter.string(
@@ -670,13 +665,17 @@ private struct DiagnosticsSettingsPane: View {
                     preview.deviceRawExcluded
                       ? "settings.diagnostics.excluded"
                       : "settings.diagnostics.notExcluded")),
-              ], monospacedValueLabels: [settingsText("settings.diagnostics.scopeHash")])
-            VStack(alignment: .leading, spacing: 5) {
+              ],
+              monospacedValueLabels: [
+                settingsText("settings.diagnostics.destination"),
+                settingsText("settings.diagnostics.scopeHash"),
+              ])
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
               Text(settingsText("settings.diagnostics.entries"))
-                .font(.subheadline.weight(.semibold))
+                .font(WorkspaceFont.label)
               ForEach(preview.includedEntries, id: \.self) { entry in
                 Label(entry, systemImage: "doc")
-                  .font(.system(.caption, design: .monospaced))
+                  .font(.system(.callout, design: .monospaced))
               }
             }
             Label(
@@ -869,27 +868,22 @@ private struct SettingsPaneContainer<Content: View>: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 18) { content }
-        .frame(maxWidth: 720, alignment: .topLeading)
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .top)
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) { content }
+        .padding(WorkspaceMetrics.pageInsetHorizontal)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
   }
 }
 
 private struct SettingsPaneHeader: View {
-  let title: String
   let subtitle: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 5) {
-      Text(title)
-        .font(.title2.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-      Text(subtitle)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-    }
+    Text(subtitle)
+      .font(WorkspaceFont.secondary)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
   }
 }
 
@@ -909,17 +903,26 @@ private struct SettingsValueGrid: View {
   var monospacedValueLabels: Set<String> = []
 
   var body: some View {
-    Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 20, verticalSpacing: 8) {
+    Grid(
+      alignment: .leadingFirstTextBaseline,
+      horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+      verticalSpacing: WorkspaceMetrics.rowGap
+    ) {
       ForEach(rows) { row in
+        let isMonospaced = monospacedValueLabels.contains(row.label)
         GridRow {
           Text(row.label)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
+          // A path or a hash stays on one line with the middle elided and the
+          // complete value one hover (or one selection) away, rather than
+          // wrapping to three lines of unreadable fragments.
           Text(row.value)
-            .font(
-              monospacedValueLabels.contains(row.label)
-                ? .system(.body, design: .monospaced)
-                : .body
-            )
+            .font(isMonospaced ? WorkspaceFont.monospacedValue : WorkspaceFont.body)
+            .monospacedDigit()
+            .lineLimit(isMonospaced ? 1 : nil)
+            .truncationMode(isMonospaced ? .middle : .tail)
+            .help(isMonospaced ? row.value : "")
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -935,12 +938,12 @@ private struct SettingsAssuranceRow: View {
   let detail: String
 
   var body: some View {
-    HStack(alignment: .top, spacing: 10) {
+    HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
       Image(systemName: icon)
         .frame(width: 20)
         .foregroundStyle(.secondary)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(title).font(.headline)
         Text(detail)
           .font(.callout)
@@ -953,7 +956,7 @@ private struct SettingsAssuranceRow: View {
 
 private struct SettingsLoadingRow: View {
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: WorkspaceMetrics.tightGap) {
       ProgressView().controlSize(.small)
       Text(settingsText("settings.common.loading"))
     }
@@ -968,9 +971,11 @@ private struct SettingsErrorBanner: View {
   var body: some View {
     Label(message, systemImage: "exclamationmark.triangle.fill")
       .foregroundStyle(.orange)
-      .padding(12)
+      .padding(WorkspaceMetrics.contentGap)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+      .overlay(
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+          .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
       .accessibilityElement(children: .combine)
   }
 }
@@ -981,9 +986,11 @@ private struct SettingsSuccessBanner: View {
   var body: some View {
     Label(message, systemImage: "checkmark.circle.fill")
       .foregroundStyle(.green)
-      .padding(12)
+      .padding(WorkspaceMetrics.contentGap)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+      .overlay(
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+          .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
       .accessibilityElement(children: .combine)
   }
 }

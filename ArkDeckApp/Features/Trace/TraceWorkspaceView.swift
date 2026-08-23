@@ -6,17 +6,13 @@ struct TraceWorkspaceView: View {
   var model: TraceWorkspaceViewModel
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        availability
-        target
-        relatedDiagnosticsJobs
-        TraceConfigurationView(model: model)
-        TraceProgressArtifactsView(model: model)
-        review
-      }
-      .frame(maxWidth: 1_000, alignment: .topLeading)
-      .padding(20)
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      availability
+      target
+      relatedDiagnosticsJobs
+      TraceConfigurationView(model: model)
+      TraceProgressArtifactsView(model: model)
+      review
     }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
@@ -32,20 +28,20 @@ struct TraceWorkspaceView: View {
   }
 
   private var availability: some View {
-    GroupBox(traceString("trace.availability.title")) {
-      VStack(alignment: .leading, spacing: 10) {
+    WorkspaceSection(Text(traceString("trace.availability.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         HStack(alignment: .firstTextBaseline) {
           availabilityStatus
           Spacer(minLength: 12)
           Text(model.workspace.operation.reference)
-            .font(.callout.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
         }
 
         ViewThatFits(in: .horizontal) {
-          HStack(spacing: 16) { capabilityLabels }
-          VStack(alignment: .leading, spacing: 6) { capabilityLabels }
+          HStack(spacing: WorkspaceMetrics.blockGap) { capabilityLabels }
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) { capabilityLabels }
         }
 
         if !model.hasAdapterCapabilityFacts {
@@ -56,8 +52,6 @@ struct TraceWorkspaceView: View {
             identifier: "trace.availability.probeGap")
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
@@ -72,14 +66,14 @@ struct TraceWorkspaceView: View {
         .foregroundStyle(.green)
         .accessibilityIdentifier("trace.availability.status")
     case .unavailable(let reasons):
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Label(
           traceString("trace.availability.unavailable"), systemImage: "xmark.octagon.fill"
         )
         .foregroundStyle(.red)
         .accessibilityIdentifier("trace.availability.status")
         ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
-          Text(reason).font(.caption.monospaced()).textSelection(.enabled)
+          Text(reason).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
         }
       }
     }
@@ -102,8 +96,8 @@ struct TraceWorkspaceView: View {
   }
 
   private var target: some View {
-    GroupBox(traceString("trace.target.title")) {
-      VStack(alignment: .leading, spacing: 10) {
+    WorkspaceSection(Text(traceString("trace.target.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         if model.workspace.targets.isEmpty {
           traceNotice(
             model.workspace.targetLoadFailure ?? traceString("trace.target.empty"),
@@ -121,7 +115,7 @@ struct TraceWorkspaceView: View {
         }
 
         if let target = model.selectedTarget {
-          Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 5) {
+          Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: 5) {
             traceReviewRow(
               traceString("trace.target.binding"), String(target.bindingRevision),
               monospaced: true)
@@ -134,8 +128,6 @@ struct TraceWorkspaceView: View {
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
@@ -148,10 +140,10 @@ struct TraceWorkspaceView: View {
         color: .orange,
         identifier: "trace.jobs.failure")
     } else if !model.workspace.relatedDiagnosticsJobs.isEmpty {
-      GroupBox(traceString("trace.jobs.title")) {
-        VStack(alignment: .leading, spacing: 8) {
+      WorkspaceSection(Text(traceString("trace.jobs.title"))) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
           ForEach(model.workspace.relatedDiagnosticsJobs.prefix(3)) { job in
-            HStack(spacing: 8) {
+            HStack(spacing: WorkspaceMetrics.tightGap) {
               if job.needsAttention {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
               } else if traceActiveJobStates.contains(job.state) {
@@ -159,32 +151,30 @@ struct TraceWorkspaceView: View {
               } else {
                 Image(systemName: "clock").foregroundStyle(.secondary)
               }
-              VStack(alignment: .leading, spacing: 2) {
-                Text(job.id).font(.callout.monospaced())
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                Text(job.id).font(WorkspaceFont.monospacedValue)
                 Text(traceString("trace.jobs.selectionUnknown"))
-                  .font(.caption)
+                  .font(WorkspaceFont.caption)
                   .foregroundStyle(.secondary)
               }
               Spacer(minLength: 12)
               Text(job.state)
-              Text(job.targetID).font(.caption.monospaced()).foregroundStyle(.secondary)
+              Text(job.targetID).font(WorkspaceFont.monospacedDense).foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
           }
           Text(traceString("trace.jobs.readOnly"))
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
       }
     }
   }
 
   private var review: some View {
-    GroupBox(traceString("trace.review.title")) {
-      VStack(alignment: .leading, spacing: 14) {
-        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
+    WorkspaceSection(Text(traceString("trace.review.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
+        Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.rowGap) {
           traceReviewRow(
             traceString("trace.review.target"),
             model.selectedTarget?.id ?? traceString("trace.value.notSelected"),
@@ -215,7 +205,7 @@ struct TraceWorkspaceView: View {
         Divider()
 
         Text(traceString("trace.review.blockers"))
-          .font(.subheadline.weight(.semibold))
+          .font(WorkspaceFont.label)
         if reviewBlockers.isEmpty {
           Label(traceString("trace.review.ready"), systemImage: "checkmark.shield.fill")
             .font(.callout)
@@ -235,7 +225,7 @@ struct TraceWorkspaceView: View {
               .disabled(model.isCancelling)
               .accessibilityIdentifier("trace.cancel")
             Text(activeJobID)
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
               .lineLimit(1)
               .truncationMode(.middle)
@@ -251,23 +241,27 @@ struct TraceWorkspaceView: View {
         }
         if let failure = model.submissionFailure {
           Label(failure, systemImage: "exclamationmark.triangle.fill")
-            .font(.footnote)
+            .font(WorkspaceFont.secondary)
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("trace.submission.failure")
         } else if let terminal = model.terminalSubmission {
-          Text("\(terminal.state) · \(terminal.jobID)")
-            .font(.footnote.monospaced())
-            .foregroundStyle(terminal.outcomeUnknown ? Color.orange : Color.secondary)
-            .textSelection(.enabled)
+          // An unknown outcome is a state, so it carries a symbol as well as a
+          // colour (spec §2, §4.4).
+          Label {
+            Text("\(terminal.state) · \(terminal.jobID)")
+              .textSelection(.enabled)
+          } icon: {
+            Image(systemName: terminal.outcomeUnknown ? "questionmark.diamond.fill" : "clock")
+          }
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(terminal.outcomeUnknown ? Color.orange : Color.secondary)
         }
         Text(traceString("trace.review.typedDispatch"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .trailing)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
@@ -672,10 +666,18 @@ func traceNotice(
   } icon: {
     Image(systemName: systemImage).foregroundStyle(color)
   }
-  .font(.callout)
-  .padding(10)
+  .font(WorkspaceFont.secondary)
+  .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+  .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
   .frame(maxWidth: .infinity, alignment: .leading)
-  .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+  .background(
+    color.opacity(0.08),
+    in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+  )
+  .overlay {
+    RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      .stroke(color.opacity(0.38), lineWidth: 1)
+  }
   .accessibilityIdentifier(identifier)
 }
 

@@ -269,28 +269,42 @@ struct DeviceSidebarRow: View {
 
   var body: some View {
     Label {
-      VStack(alignment: .leading, spacing: 1) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap / 2) {
         Text(displayName)
-          .font(.body)
+          .font(WorkspaceFont.body)
           .lineLimit(1)
           .truncationMode(.middle)
         // The second line names what was actually observed — firmware and
         // transport from the last succeeded observation — and falls back to
         // the connect key when no observation evidence exists yet.
-        HStack(spacing: 4) {
+        // The state and what was observed are two facts, so a separator sits
+        // between them: "Ready · OpenHarmony 5.0.0.71 · USB", not "Ready
+        // OpenHarmony 5.0.0.71 · USB".
+        HStack(spacing: WorkspaceMetrics.rowGap) {
           Text(stateText)
-            .font(.caption)
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
           if let secondary = observedSummary {
+            Text("·")
+              .font(WorkspaceFont.caption)
+              .foregroundStyle(.tertiary)
+              .accessibilityHidden(true)
+            // Firmware and transport read left to right, so a tail ellipsis
+            // keeps the version legible; middle truncation chewed the digits
+            // that distinguish one build from another.
             Text(secondary)
-              .font(.caption)
+              .font(WorkspaceFont.caption)
               .foregroundStyle(.secondary)
               .lineLimit(1)
-              .truncationMode(.middle)
+              .truncationMode(.tail)
               .accessibilityIdentifier("device.row.observed.\(candidate.connectKey)")
           } else if candidate.isAdopted {
+            Text("·")
+              .font(WorkspaceFont.caption)
+              .foregroundStyle(.tertiary)
+              .accessibilityHidden(true)
             Text(candidate.connectKey)
-              .font(.caption.monospaced())
+              .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
               .lineLimit(1)
               .truncationMode(.middle)
@@ -301,6 +315,8 @@ struct DeviceSidebarRow: View {
       Image(systemName: stateSymbol)
         .foregroundStyle(stateColor)
     }
+    .frame(maxWidth: .infinity, minHeight: WorkspaceMetrics.navigationRowHeight, alignment: .leading)
+    .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityValue(
       startupEvidenceSeconds.map { "startup-seconds:\($0)" } ?? stateText)
@@ -371,30 +387,24 @@ struct DeviceDetailView: View {
   let onOpenOverview: () -> Void
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: 24) {
-            statusAndActionsSection
-              .frame(width: 320, alignment: .topLeading)
-            factsSection
-              .frame(width: 520, alignment: .topLeading)
-          }
-
-          VStack(alignment: .leading, spacing: 24) {
-            statusAndActionsSection
-            factsSection
-          }
-        }
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      // `.device-layout` in the prototype: two proportional columns that grow
+      // with the pane, folding to one when they no longer fit. The fixed
+      // 320 + 520 block left the wide reference pane visibly short.
+      WorkspaceColumns(
+        spacing: WorkspaceMetrics.pageInsetHorizontal,
+        leadingRatio: WorkspaceMetrics.splitLeadingColumnRatio
+      ) {
+        statusAndActionsSection
+      } trailing: {
+        factsSection
       }
-      .frame(maxWidth: 960, alignment: .topLeading)
-      .padding(20)
     }
     .accessibilityIdentifier("device.detail")
   }
 
   private var statusAndActionsSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       deviceSectionHeader(deviceString("device.detail.statusTitle"))
       stateBlock
       if candidate.state == "Unauthorized" {
@@ -403,14 +413,14 @@ struct DeviceDetailView: View {
       }
       actionRow
       Text(deviceString("device.detail.recheckNote"))
-        .font(.footnote)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
       if !candidate.isAdopted, candidate.isAuthorized {
         // Adoption is deliberately not an App action: the transport refuses
         // target.adopt. Say who performs it instead of hiding the step.
         Text(deviceString("device.detail.adoptViaCLI"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("device.detail.adoptViaCLI")
@@ -422,14 +432,14 @@ struct DeviceDetailView: View {
   }
 
   private var factsSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       deviceSectionHeader(deviceString("device.detail.factsTitle"))
       factsGrid
       if candidate.observedFacts != nil {
         // Provenance, not certification: these fields describe what the last
         // succeeded observation recorded, not the device's state this second.
         Text(deviceString("device.fact.observedProvenance"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -440,12 +450,7 @@ struct DeviceDetailView: View {
   }
 
   private func deviceSectionHeader(_ title: String) -> some View {
-    VStack(alignment: .leading, spacing: 7) {
-      Text(title)
-        .font(.subheadline.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-      Divider()
-    }
+    WorkspaceSectionHeader(Text(title))
   }
 
   @ViewBuilder
@@ -495,22 +500,17 @@ struct DeviceDetailView: View {
     case .idle:
       EmptyView()
     case .polling(_, let deadline):
-      Label {
-        HStack(spacing: 6) {
+      WorkspaceNotice(
+        tone: .warning, symbol: "clock", identifier: "device.wait.polling"
+      ) {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
           Text(deviceString("device.wait.polling"))
           Text(timerInterval: Date.now...deadline, countsDown: true)
-            .font(.callout.monospacedDigit().weight(.semibold))
+            .font(WorkspaceFont.tabularSecondary.weight(.semibold))
         }
-      } icon: {
-        ProgressView().controlSize(.small)
       }
-      .font(.callout)
-      .padding(10)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-      .accessibilityIdentifier("device.wait.polling")
     case .timedOut:
-      VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         deviceNotice(
           deviceString("device.wait.timedOut"),
           systemImage: "exclamationmark.triangle.fill",
@@ -534,7 +534,7 @@ struct DeviceDetailView: View {
 
   @ViewBuilder
   private var actionRow: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: WorkspaceMetrics.contentGap) {
       if candidate.state == "Unauthorized" {
         Button(
           {
@@ -559,6 +559,8 @@ struct DeviceDetailView: View {
         ProgressView().controlSize(.small)
       }
     }
+    // Spec §2 puts a regular control at 28–32pt; the default macOS button is 22.
+    .controlSize(.large)
   }
 
   private var isPolling: Bool {
@@ -567,9 +569,11 @@ struct DeviceDetailView: View {
   }
 
   private var trustSteps: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
       Text(deviceString("device.trust.stepsTitle"))
-        .font(.subheadline.weight(.semibold))
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+        .accessibilityAddTraits(.isHeader)
       trustStep(1, "device.trust.step1")
       trustStep(2, "device.trust.step2")
       trustStep(3, "device.trust.step3")
@@ -579,9 +583,9 @@ struct DeviceDetailView: View {
   }
 
   private func trustStep(_ number: Int, _ key: String) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
       Text("\(number).")
-        .font(.callout.monospacedDigit().weight(.semibold))
+        .font(WorkspaceFont.tabularSecondary.weight(.semibold))
         .foregroundStyle(.secondary)
       Text(deviceString(key))
         .fixedSize(horizontal: false, vertical: true)
@@ -589,30 +593,34 @@ struct DeviceDetailView: View {
   }
 
   private var factsGrid: some View {
-    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 5) {
+    Grid(
+      alignment: .leading,
+      horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+      verticalSpacing: WorkspaceMetrics.tightGap
+    ) {
       GridRow(alignment: .firstTextBaseline) {
         Text(deviceString("device.fact.connectKey")).foregroundStyle(.secondary)
         Text(candidate.connectKey)
-          .font(.body.monospaced())
+          .font(WorkspaceFont.monospacedValue)
           .textSelection(.enabled)
       }
       GridRow(alignment: .firstTextBaseline) {
         Text(deviceString("device.fact.state")).foregroundStyle(.secondary)
         Text(candidate.state)
-          .font(.body.monospaced())
+          .font(WorkspaceFont.monospacedValue)
           .accessibilityIdentifier("device.fact.state")
       }
       if let stateObservedAtUTC = candidate.stateObservedAtUTC {
         GridRow(alignment: .firstTextBaseline) {
           Text(deviceString("device.fact.stateObservedAt")).foregroundStyle(.secondary)
-          Text(stateObservedAtUTC).font(.body.monospaced())
+          Text(stateObservedAtUTC).font(WorkspaceFont.monospacedValue)
         }
       }
       if let targetID = candidate.adoptedTargetID {
         GridRow(alignment: .firstTextBaseline) {
           Text(deviceString("device.fact.target")).foregroundStyle(.secondary)
           Text(targetID)
-            .font(.body.monospaced())
+            .font(WorkspaceFont.monospacedValue)
             .textSelection(.enabled)
         }
       }
@@ -620,21 +628,21 @@ struct DeviceDetailView: View {
         GridRow(alignment: .firstTextBaseline) {
           Text(deviceString("device.fact.bindingRevision")).foregroundStyle(.secondary)
           Text(String(revision))
-            .font(.body.monospacedDigit())
+            .font(WorkspaceFont.tabularSecondary)
         }
       }
       if let facts = candidate.observedFacts {
         if let model = facts.model {
           GridRow(alignment: .firstTextBaseline) {
             Text(deviceString("device.fact.model")).foregroundStyle(.secondary)
-            Text(model).font(.body.monospaced()).textSelection(.enabled)
+            Text(model).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
           }
         }
         if let firmware = facts.firmware {
           GridRow(alignment: .firstTextBaseline) {
             Text(deviceString("device.fact.firmware")).foregroundStyle(.secondary)
             Text(firmware)
-              .font(.body.monospaced())
+              .font(WorkspaceFont.monospacedValue)
               .textSelection(.enabled)
               .accessibilityIdentifier("device.fact.firmware")
           }
@@ -642,13 +650,13 @@ struct DeviceDetailView: View {
         if let transport = facts.transport {
           GridRow(alignment: .firstTextBaseline) {
             Text(deviceString("device.fact.transport")).foregroundStyle(.secondary)
-            Text(transport).font(.body.monospaced())
+            Text(transport).font(WorkspaceFont.monospacedValue)
           }
         }
         if let confirmedAt = facts.confirmedAtUTC {
           GridRow(alignment: .firstTextBaseline) {
             Text(deviceString("device.fact.observedAt")).foregroundStyle(.secondary)
-            Text(confirmedAt).font(.body.monospaced())
+            Text(confirmedAt).font(WorkspaceFont.monospacedValue)
           }
         }
       }
@@ -667,10 +675,18 @@ func deviceNotice(
   } icon: {
     Image(systemName: systemImage).foregroundStyle(color)
   }
-  .font(.callout)
-  .padding(10)
+  .font(WorkspaceFont.secondary)
+  .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+  .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
   .frame(maxWidth: .infinity, alignment: .leading)
-  .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+  .background(
+    color.opacity(0.08),
+    in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+  )
+  .overlay {
+    RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      .stroke(color.opacity(0.38), lineWidth: 1)
+  }
   .accessibilityIdentifier(identifier)
 }
 

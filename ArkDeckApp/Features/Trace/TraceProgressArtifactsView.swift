@@ -6,23 +6,23 @@ struct TraceProgressArtifactsView: View {
   var model: TraceWorkspaceViewModel
 
   var body: some View {
-    VStack(spacing: 18) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
       stageModel
       artifactModel
     }
   }
 
   private var stageModel: some View {
-    GroupBox(traceString("trace.progress.title")) {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack(alignment: .top, spacing: 8) {
+    WorkspaceSection(Text(traceString("trace.progress.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+        HStack(alignment: .top, spacing: WorkspaceMetrics.tightGap) {
           Image(systemName: "timeline.selection")
             .foregroundStyle(.secondary)
-          VStack(alignment: .leading, spacing: 2) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(traceString("trace.progress.noActive"))
-              .font(.callout.weight(.semibold))
+              .font(WorkspaceFont.body.weight(.semibold))
             Text(traceString("trace.progress.noActiveDetail"))
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
           }
         }
@@ -36,34 +36,33 @@ struct TraceProgressArtifactsView: View {
           color: .secondary,
           identifier: "trace.progress.honestRule")
 
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: WorkspaceMetrics.tightGap) {
           Image(systemName: "stop.circle").foregroundStyle(.secondary)
-          VStack(alignment: .leading, spacing: 2) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(traceString("trace.progress.cancelTitle"))
-              .font(.callout.weight(.semibold))
+              .font(WorkspaceFont.body.weight(.semibold))
             Text(cancelDetail)
-              .font(.footnote)
+              .font(WorkspaceFont.secondary)
               .foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
   private var artifactModel: some View {
-    GroupBox(traceString("trace.artifacts.title")) {
-      VStack(alignment: .leading, spacing: 12) {
+    WorkspaceSection(Text(traceString("trace.artifacts.title"))) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
         Text(traceString("trace.artifacts.description"))
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
 
         if !model.runtimeArtifacts.isEmpty {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
             Text(traceString("trace.artifacts.runtimeTitle"))
-              .font(.subheadline.weight(.semibold))
+              .font(WorkspaceFont.label)
+              .foregroundStyle(.secondary)
             ForEach(model.runtimeArtifacts) { artifact in
               runtimeArtifactRow(artifact)
             }
@@ -79,14 +78,18 @@ struct TraceProgressArtifactsView: View {
           Divider()
         }
 
-        VStack(alignment: .leading, spacing: 0) {
+        Grid(
+          alignment: .leading,
+          horizontalSpacing: WorkspaceMetrics.keyColumnGap,
+          verticalSpacing: WorkspaceMetrics.contentGap
+        ) {
           artifactRow(
             file: "trace.htrace",
             role: traceString("trace.artifacts.role.raw"),
             detail: traceString("trace.artifacts.rawDetail"),
             state: model.workspace.operation.supportsRawTraceArtifact
               ? .publishedContract : .missingContract)
-          Divider()
+          Divider().gridCellColumns(3)
           artifactRow(
             file: "trace-filtered.htrace",
             role: traceString("trace.artifacts.role.derived"),
@@ -95,14 +98,14 @@ struct TraceProgressArtifactsView: View {
               : traceString("trace.artifacts.filteredDetail"),
             state: model.workspace.operation.supportsFilteredTraceArtifact
               ? .publishedContract : .missingContract)
-          Divider()
+          Divider().gridCellColumns(3)
           artifactRow(
             file: "capture.log",
             role: traceString("trace.artifacts.role.log"),
             detail: traceString("trace.artifacts.logDetail"),
             state: model.workspace.operation.supportsCaptureLogArtifact
               ? .publishedContract : .missingContract)
-          Divider()
+          Divider().gridCellColumns(3)
           artifactRow(
             file: "artifact-index.json + capture-summary.json",
             role: traceString("trace.artifacts.role.manifest"),
@@ -112,7 +115,7 @@ struct TraceProgressArtifactsView: View {
 
         Divider()
 
-        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.rowGap) {
           traceReviewRow(
             traceString("trace.artifacts.receive"),
             traceString("trace.artifacts.partialFirst"))
@@ -127,34 +130,32 @@ struct TraceProgressArtifactsView: View {
             traceString("trace.artifacts.sensitive"))
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
   private func runtimeArtifactRow(_ artifact: RuntimeArtifactPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(alignment: .firstTextBaseline, spacing: 10) {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
         Text(artifact.name)
-          .font(.callout.monospaced().weight(.semibold))
+          .font(WorkspaceFont.monospacedValue.weight(.semibold))
           .textSelection(.enabled)
-        Spacer(minLength: 12)
+        Spacer(minLength: WorkspaceMetrics.contentGap)
         Text(ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file))
-          .font(.caption.monospacedDigit())
+          .font(WorkspaceFont.tabularSecondary)
         Text(artifact.status)
-          .font(.caption.weight(.semibold))
+          .font(WorkspaceFont.label)
       }
       Text(artifact.sha256)
-        .font(.caption.monospaced())
+        .font(WorkspaceFont.monospacedDense)
         .lineLimit(1)
         .truncationMode(.middle)
         .help(artifact.sha256)
         .textSelection(.enabled)
       Text("\(artifact.privacy) · \(artifact.role ?? "—")")
-        .font(.caption)
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
     }
-    .padding(.vertical, 5)
+    .padding(.vertical, WorkspaceMetrics.rowGap)
     .accessibilityElement(children: .combine)
   }
 
@@ -175,26 +176,25 @@ struct TraceProgressArtifactsView: View {
     detail: String,
     state: TraceArtifactContractState
   ) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
+    GridRow(alignment: .firstTextBaseline) {
       Text(file)
-        .font(.caption.monospaced())
+        .font(WorkspaceFont.monospacedValue)
         .textSelection(.enabled)
-        .frame(minWidth: 200, alignment: .leading)
+        .gridColumnAlignment(.leading)
       Text(role)
-        .font(.caption.weight(.semibold))
-        .frame(minWidth: 130, alignment: .leading)
-      VStack(alignment: .leading, spacing: 2) {
+        .font(WorkspaceFont.body)
+        .gridColumnAlignment(.leading)
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Label(state.label, systemImage: state.systemImage)
-          .font(.caption.weight(.semibold))
+          .font(WorkspaceFont.body.weight(.semibold))
           .foregroundStyle(state.color)
         Text(detail)
-          .font(.footnote)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(.vertical, 8)
     .accessibilityElement(children: .combine)
   }
 }
