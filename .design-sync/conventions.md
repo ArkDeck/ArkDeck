@@ -1,10 +1,10 @@
-## Building with ArkDeck — design v0.6
+## Building with ArkDeck — design v0.9
 
-> Current design: **draft v0.6, 2026-08-12**. Authority order for design work is
+> Current design: **draft v0.9, 2026-08-23**. Authority order for design work is
 > `docs/design/macos-ux-interaction-spec.md` → `docs/design/prototype.html` →
 > `docs/design/arkdeck-ds` → `.design-sync/previews`. If a preview conflicts with
-> the spec or prototype, the preview is stale. v0.6 replaces the v0.4 Flash layout
-> and the first-sync v0.3 preview assumptions.
+> the spec or prototype, the preview is stale. v0.9 keeps the v0.6 Flash and v0.8
+> Viewer decisions, and makes artifact replacement the primary Debug workflow.
 
 ArkDeck is a **macOS desktop workbench for OpenHarmony devices** — flashing firmware,
 capturing traces, dumping UI trees, reading logs. Screens are dense, factual, and
@@ -96,6 +96,17 @@ anything you hardcode will drift the first time they do.
   action; after submission the same region becomes progress, then the verified result.
   Target binding, image SHA, prerequisites and exact-plan summary live under the native
   `刷机详情` disclosure instead of becoming a wall of cards.
+- **Debug has one bounded feedback loop:** explicit device → SSH / local directory / SMB /
+  WSL build source → registered build root → searched and selected artifacts →
+  compatibility preflight → backup and atomic publish → explicit restart → Logs. SSH
+  supports password or private-key authentication; SSH/SMB secrets stay in Keychain and
+  never appear in lists, Jobs, logs or evidence. Source roots are user-managed; device
+  destination paths are never editable. ABI/ABC validation prevents an invalid
+  replacement, while backup enables rollback — never collapse those into one promise.
+- **Keep the production boundary visible in Debug.** The current Catalog publishes a
+  single app-owned `.so` deployment with restartAbility in its typed plan. Batch source
+  browsing, `.abc` deployment, and a separate device restart are v0.9 design inputs and
+  remain unavailable until their own closed operations and Provider readbacks ship.
 
 ### Where to read more
 

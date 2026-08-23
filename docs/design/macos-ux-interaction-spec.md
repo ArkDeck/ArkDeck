@@ -1,22 +1,23 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.8（design input，非 normative；2026-08-22 完成 Viewer DevTools 式上下检查器对齐；2026-08-23 与 SwiftUI 实现对齐一轮视觉词汇，见 §8）
+> Status：draft v0.9（design input，非 normative；2026-08-23 将 Debug 重构为编译产物替换主链路，并保留日志反馈与既有调试工具，见 §5.5 / §8）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v0.8 目标与当前实现边界
+## 0. v0.9 目标与当前实现边界
 
-v0.8 延续 v0.7 的 `Viewer` 命名与选中联动，将检查器重排为 Chrome DevTools 式结构：左侧设备截图；右侧上方为可展开、可双向滚动的完整 UI 树，下方为当前节点属性。树与属性共享垂直空间并可拖动分隔条调整比例，以容纳很深的组件层级。数据源仍是 ArkUI dump，但用户可见的功能名始终为 `Viewer`。
+v0.9 保留 v0.8 的 Viewer DevTools 式检查器，将 Debug 的默认工作流改为「绑定 SSH、本机目录、SMB 或 WSL 编译来源 → 选择编译根目录 → 搜索并勾选 `.so` / `.abc` → 兼容性预检 → 备份并原子替换 → 显式重启 → 获取日志验证」。日志不是被移除的旧功能，而是替换后的反馈腿；Apps / Network / Commands 继续作为辅助调试工具，不再定义 Debug 首页的首要心智。
 
 当前代码与目标设计的边界必须如实呈现：
 
-| Surface | 当前实现 | v0.8 设计方向 |
+| Surface | 当前实现 | v0.9 设计方向 |
 | --- | --- | --- |
 | App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / Viewer / Trace / History / Automation 均有实际工作区 | 保留原生 split view；导航及页面用户可见名统一为 `Viewer`；统一 toolbar、全局 Job inspector 与窗口自适应 |
 | Device detail | 未授权设备有接管引导；已接管设备能显示真实 binding / observation facts，并有原生右键重命名和重新检测 | 删除重复内容标题；宽屏拆分状态操作与事实；名称只是 App 展示别名，重新检测只刷新候选事实 |
 | Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
 | Viewer | `UIDumpWorkspaceView` 仍是窗口、Recipe、参数策略与产物审核表单 | 改为左侧截图 + 右侧上下检查器；UI 树在上、当前节点属性在下，截图区域、树节点与属性选中态双向同步 |
+| Debug | `DebugWorkspaceView` 已有 Logs / Apps / Network / Commands，生产 Catalog 另已发布单个 app-owned `.so` 的校验、备份、原子发布、回滚与 Ability restart，但 App 尚无编译来源浏览与 native deployment surface | 默认进入 Artifacts；管理 SSH、本机目录、SMB、WSL 来源及其根目录，搜索、勾选、预览替换计划，完成替换后显式提供重启与日志验证。未发布的来源浏览、批量、`.abc` 与独立设备重启能力必须显示 unavailable，不用原型状态伪造生产可用性 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
 | Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
 | Runtime data | Trace tag / 参数快照、Debug probe、Flash prerequisite / postflight、Artifact metadata 均有生产 facade | 缺失字段显示 unknown / unavailable，不使用 fixture、占位行或默认值补齐 |
@@ -142,11 +143,19 @@ Primary Window
 
 ### 5.5 Debug 工作台
 
-- 四个 tab：Logs / Apps / Network / Commands。Tab 遵循 macOS keyboard pattern；tab 内容改变时焦点不被强制移动。
-- Logs：bounded live viewport、等级/tag/filter、host shard 状态；「暂停界面」不停止 host capture。「清空设备 buffer」位于 destructive actions menu，走危险 sheet。
-- Apps：HAP import、install/start/stop/uninstall；mutation 与 read-only action 分组，package/PID 使用 tabular numbers。
-- Network：`port-forward.create@1` / `port-forward.remove@1` 产生真实 Runtime Job，端口只接受 1024…65535 的十进制字段；失败后以 exact inverse + readback 补偿，不接受 shell fragment。
-- Commands：只能选择 daemon 实现的 closed read-only template。执行结果可显示已脱敏 connect key 的 executable / argument disclosure 与 lowering SHA；这些值从不作为请求字段，没有任意文本命令输入，也不模拟 PTY。
+- 五个 tab：Artifacts / Logs / Apps / Network / Commands，Artifacts 为默认项。Tab 使用 roving focus 与左右方向键、Home / End；切换只替换工作区内容，不把焦点强制移到内容区。
+- Artifacts 的固定阅读顺序为：显式 target / binding → 编译来源 → 编译根目录 → 搜索与结果 → 已选摘要 → 替换计划 → 替换结果 → 重启 → Logs。页面不把最近选中的 sidebar 设备暗中当成 target，也不让服务器配置同时承担设备 scope。
+- 编译来源固定为四种封闭 connector：SSH 远端服务器、本机目录、SMB 共享、WSL 发行版。用户可切换、添加、编辑、删除来源配置；每个来源可独立添加、编辑、删除多个编译根目录。根目录始终在所选 connector 的命名空间内解释，绝不是设备目标路径。
+- SSH 配置展示 host、1…65535 端口、用户名与「密码 / SSH 密钥」登录方式。密码、私钥安全书签和可选密钥口令进入 Keychain / 系统安全存储，列表、Job、日志和 Artifact evidence 只显示认证方式与凭据是否就绪，绝不回显 secret 或完整私钥路径。首次连接必须展示并固定 SSH host-key fingerprint；已固定指纹变化时 fail closed，不能静默接受新指纹。SSH connector 只允许 bounded browse/read/import，不提供 raw command、任意远端执行或终端。
+- 本机目录通过系统目录选择器建立安全书签；SMB 使用 `smb://server/share`、账户和 Keychain 密码；WSL 选择发行版，并使用发行版内 Linux 路径作为根目录。SMB / WSL 同样只经封闭文件 connector 读取，不把 mount、`wsl.exe` 或 shell fragment 暴露为 UI 输入。删除来源会移除 ArkDeck 配置、目录书签和 ArkDeck 保存的 Keychain credential item，但不会删除外部 SSH 私钥、服务器/共享/WSL 内文件或任何设备数据；只删除某个根目录则仅移除该书签。
+- 搜索只在当前服务器的当前根目录内运行，支持文件名 / 相对路径与 `.so` / `.abc` 类型筛选。结果表以 checkbox 多选，至少展示名称、类型、来源相对路径、size、mtime 与兼容性事实；不可识别、ABI 不一致、签名/Build ID 缺失、ABC 编译器/API 指纹不匹配的行显示原因并禁用选择，不能只用红色表达。
+- 「检查并预览替换」先展示 target / binding、来源、每项 host-side validation、effect、备份与发布策略。确认按钮使用完整动作名「备份并替换 N 个产物」，不用 `确定`。source path 只用于导入 Artifact lease；device path 必须由 published operation/profile materialize，App 不提交任意目标路径。
+- ABI / ELF class / machine / Build ID / code-sign / hash 或 ABC compatibility 的**预检**负责在首个设备写入前阻止不兼容产物；每个现有目标的 immutable **备份**负责原子发布、启动或 readback 失败后的 rollback。界面必须分别表达这两层，不能把「有备份」写成「ABI 一定兼容」，也不能在 backup 未确认时进入 publish。
+- 替换进入全局 Job Inspector，阶段至少区分 Preflight、Artifact lease、compatibility verification、staging、backup、atomic publish 与 readback。取消遵循实际 safe boundary；publish outcome unknown 时不重放，转入 Runtime recovery。只有全部选中项的 backup 与 publish readback confirmed，页面才显示「替换完成」。
+- 替换成功后在原位显示独立「重启目标…」操作，并同时提供「获取日志」。重启页必须明确重启的是 Ability、进程还是整台设备及其影响；整机重启走危险 sheet，展示精确 target / binding、将中断的会话和重连后验证。点击只是 UX acknowledgement，不是 Runtime authority；没有已发布 closed restart operation 或 fresh facts 时显示 unavailable，不能用 raw HDC reboot 兜底。
+- 重启完成后主操作变为「获取日志并验证」，切到保留的 Logs 工作区。Logs 继续提供 bounded live viewport、等级/tag/filter、host shard 状态；「暂停界面」不停止 host capture。「清空设备 buffer」位于 destructive actions menu，走危险 sheet。日志是 Debug 反馈 Artifact，与替换输入分开保存，不因切 tab 丢失采集状态。
+- Apps：HAP import、install/start/stop/uninstall；mutation 与 read-only action 分组，package/PID 使用 tabular numbers。Network：`port-forward.create@1` / `port-forward.remove@1` 产生真实 Runtime Job，端口只接受 1024…65535 的十进制字段；失败后以 exact inverse + readback 补偿，不接受 shell fragment。Commands：只能选择 daemon 实现的 closed read-only template，显示 Provider lowering 的只读 disclosure，没有任意文本命令输入或 PTY。
+- Production availability 必须如实：当前 Catalog 只覆盖单个 app-owned `.so` 的 `deploy.native-library.app-owned@1`，且 restartAbility 位于同一 typed plan 内；批量来源浏览、`.abc` deployment 与独立 device restart 仍是 v0.9 设计输入。它们只有在对应 behavior delta、Catalog operation、Provider lowering 与 recovery/readback 全部发布后才能从 unavailable 变为可操作。原型可演示目标交互，但必须持续标明其不代表生产可用性。
 
 ### 5.6 Flash
 
@@ -204,14 +213,15 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - 原型必须声明演示数据，不连接设备；任何 simulated、planned、fake 结果不得展示为真实硬件结果。
 - 每次原型变更至少检查：UTF-8/中文；light/dark；900×600 与宽屏；键盘遍历与 modal focus return；Reduce Motion；所有导航页；typed-only 命令面；Job 跨页可见。
 
-### 7.1 v0.5 基线、v0.6 Flash 与 v0.8 Viewer 评审
+### 7.1 v0.5 基线、v0.6 Flash、v0.8 Viewer 与 v0.9 Debug 评审
 
 - `docs/design/references/v0.5/` 固定保存 1180×760 的简体中文与英文设备详情参考截图；原型通过显式 locale / reference state 生成，不依赖浏览器记忆状态。v0.6 Flash 先在交互原型中评审，确认后再固定同尺寸中英文参考截图并进入 SwiftUI 对齐。
 - v0.8 Viewer 以 `prototype.html?page=dump` 为可点击事实：默认选中 `Toggle #42`，必须可从截图与完整树双向切换节点，且下方属性、布局、无障碍和 raw 内容同步更新；水平分隔条可用指针和键盘调整。固定参考截图只在本轮方向确认后补入，避免把未确认的提案当成回归基线。
+- v0.9 Debug 以 `prototype.html?page=debug` 为可点击事实：默认进入 Artifacts，可切换 SSH / 本机目录 / SMB / WSL 来源与根目录、按名称/类型搜索、勾选兼容产物、阻止 ABI 不匹配行、预览「校验 / 备份 / 原子替换 / readback」计划，并在替换完成后看到独立重启与 Logs 反馈入口。来源和根目录的 add/edit/delete sheet 必须走查 SSH 密码/密钥分支、SMB 凭据分支、WSL 发行版分支及字段级错误聚焦；重启影响 sheet、tab 方向键与 modal focus return 同属本轮范围。原型底部的 production-boundary callout 不得删除。
 - 参考截图只校验导航层级、宽屏分栏、信息密度、context menu 和文案长度，不是生产 Runtime 截图，更不是硬件验收证据；截图中必须持续标明演示数据。
 - App UI 测试在同一 1180×760 默认窗口和中英文 fixture 下检查：设备详情只有一个主标题、双栏/单栏的几何关系；Flash 默认只显示设备、镜像和主操作，运行态显示阶段与真实 byte-derived 估算，结果态只在 postflight 成功后出现成功文案。测试附加当次窗口截图供人工 diff；系统字体、accent、材质和抗锯齿继续由 macOS 控制，不用逐像素阈值锁死原生渲染。
 
-## 8. v0.8 已决视觉项
+## 8. v0.9 已决视觉项
 
 - 图标：产品使用 SF Symbols；HTML 原型使用单色 inline SVG 近似，禁止 Emoji 作为最终导航图标。
 - 密度：默认紧凑舒适（macOS medium sidebar size）；不额外提供 App 内密度开关，尊重系统设置。
@@ -219,6 +229,7 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - 外观：跟随系统；不默认强制 dark。
 - Accent：跟随用户系统 accent；ArkDeck 不固定 teal 覆盖系统选择。
 - Viewer：使用左侧截图 + 右侧上下检查器；树与属性之间保留紧凑的可拖动结构分隔线，不使用圆角卡片。截图边界、树行与 inspector 用同一 accent selection，但选中同时保留 ID / type 文字线索。
+- Debug：Artifacts 是首个且默认 tab；编译来源配置和搜索结果各自成组，避免把来源管理、文件勾选与设备执行混成一张表。来源编辑器先选 SSH / 本机目录 / SMB / WSL，再渐进披露对应连接字段；SSH 再选密码或密钥，隐藏分支不进入 tab order。替换后的重启与日志反馈原位出现，不另开 dashboard；兼容性阻止、备份确认、替换 readback、重启后验证使用不同文案和状态，不用一个绿色「成功」吞并全部阶段。
 - 页面标题只在 toolbar：任何工作区的内容区都不再画与 toolbar 同名的主标题。原型此前每页一个 `<h1>` 且标题栏显示「ArkDeck — 页面名」，两者不重复；SwiftUI 的 `navigationTitle` 只显示裸页面名，内容区再画一遍就成了字面重复，违反 §3 与 §6 的「一个 detail 只有一个可感知主标题」。需要解释的页面改用一行 secondary 说明 + 页面级控件（Debug 的 scope 行即此形态）。原型已同步移除全部 `<h1>`，改由 `data-page-title` 提供标题栏文本。
 - 统一页面测量 920：Flash、设备详情与 Trace 此前各自取 760 / 920 / 1000。在 1180 参考窗口下 detail pane 约 926，920 正好填满而不留死白，在更宽的显示器上仍有界。正文段落另按约 620 收窄，Flash 的「一条平静阅读路径」不靠整页变窄来实现。
 - 容器圆角 11：与 §2 同心圆角一致，外层 container 11、内嵌 box 9、control 7。

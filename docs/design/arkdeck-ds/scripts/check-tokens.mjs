@@ -28,7 +28,7 @@ function srcFiles(dir) {
 // Bump ONLY after re-reading the docs and confirming this package still
 // expresses them. This is the deliberate acknowledgement step: a docs version
 // bump is exactly the event that silently invalidated the library once.
-const ALIGNED_VERSION = "v0.8";
+const ALIGNED_VERSION = "v0.9";
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const designDir = join(pkgRoot, "..");
@@ -370,6 +370,17 @@ for (const name of dsLight.keys()) {
     "flash-result-copy": "Flash terminal result text layout",
     "flash-details": "native disclosure for secondary Flash facts",
     "flash-detail-grid": "Flash fact layout inside disclosure",
+    "debug-shell": "Debug page layout",
+    "debug-scope": "Debug target and binding summary row",
+    "debug-source": "Debug source and build-root layout",
+    "debug-field": "form-field layout around existing native controls",
+    "debug-search": "Debug artifact search control layout",
+    "debug-selection": "Debug selection summary and action row",
+    "debug-result": "Debug deployment/restart result layout",
+    "debug-manager-list": "Debug server-manager list layout",
+    "debug-manager-row": "Debug server-manager row layout",
+    "debug-manager-actions": "Debug server-manager action layout",
+    "debug-row-disabled": "disabled artifact-result state utility",
     sec: "sidebar section heading",
     hint: "text utility", note: "text utility", empty: "empty-state text utility",
     mono: "type utility", livetag: "inline marker in a History row",
