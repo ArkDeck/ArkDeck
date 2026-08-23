@@ -41,6 +41,16 @@
 | AFA-AC-9 crash 不重放 | 写入中途 SIGKILL `arkforged`，重启 | 该 permit 被判为 outcomeUnknown 并拒绝再次派发；journal 可复原；不产生第二个 StepIntent | 真机 run 记录 + journal |
 | AFA-AC-10 取消不伪造 drain proof | `wlx` 进行中请求取消 | 得到 `CANCEL_NOT_SAFE` 的**拒绝**，job 继续跑到该 step 的回执；**不得**产生 `.unconfirmed` 的取消回执，也不得声称 `.drained`——那个进程组已不属于 ArkDeck（design 6.3.1） | 契约测试 + 真机 run 记录 |
 
+### Controller restart durability addendum（2026-08-23）
+
+| 场景 | 必须结果 | 自动化证据 |
+|---|---|---|
+| `startExecution` 已返回、permit-capable call 尚未进入 | job-owned ArkForge sidecar 中的 correlation 与 ArkDeck step intent 均已 durable；否则调用不可进入 | `testRestartReconcilesTheExactDaemonTerminalWithoutStartingOrUsingActorCache` 在 `performPrepared` 入口读取 sidecar + journal |
+| ArkDeck 进程丢失 daemon terminal | 新进程观察 correlation 中的 exact daemon job；`prepareExecution/startExecution` 次数为 0 | 同上，fresh lane host + `prepareCount == 0` |
+| terminal receipt 已有、lane actor cache 丢失 | receipt 先持久化，再补原 intent 的 typed outcome；后续 catalog projection 只读 durable receipt | 同上，最终 complete-overwrite typed outcomes 全部成立 |
+| 恢复观察 | 不 start、不签 permit、不提交 control receipt、不 cancel | `testPassiveTerminalObservationCannotAnswerOrMutateTheJob` |
+| ArkDeck 与 arkforged 都重启 | daemon 从 `SemanticReceiptRecorded` 重放原 canonical receipt/cursor 后报告 immutable terminal；controller 消费完整 poll，后来的 `succeeded`/`confirmedFailed` 覆盖较早 `outcomeUnknown`，且不产生任何 mutation call | ArkForge `a_job_dispatches_every_step_and_reaches_a_verdict_on_each`（reopen receipt/digest/facts）；ArkDeck `testPassiveObservationConsumesReconciledTerminalAndRestartedReceipt` |
+
 ## 不在本次验收内
 
 - 多设备并发（本环境单板）

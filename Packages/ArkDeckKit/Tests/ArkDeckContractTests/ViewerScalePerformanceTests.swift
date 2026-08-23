@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 
@@ -8,11 +9,13 @@ import XCTest
 /// These assert on the *shape* of the cost curve, not on wall-clock budgets.
 /// A budget like "20k nodes in under 200 ms" passes on an idle machine and
 /// fails under load without anything having regressed — this repository has
-/// already paid for that lesson once. Growth ratios are load-normalised: both
-/// halves of the ratio run on the same busy machine, so only an algorithmic
-/// change can move them.
+/// already paid for that lesson once. Growth ratios use the current test
+/// thread's CPU time, so another SwiftPM worker preempting this process cannot
+/// turn scheduling delay into apparent algorithmic work. Each sample is a
+/// paired large/small ratio, execution order alternates, and the median rejects
+/// an isolated thermal or cache miss.
 ///
-/// Absolute timings are recorded too, but as reported context rather than as
+/// CPU timings are recorded too, but as reported context rather than as
 /// pass/fail gates.
 final class ViewerScalePerformanceTests: XCTestCase {
   /// 4× the nodes may cost noticeably more than 4× the time — allocation and
@@ -156,37 +159,73 @@ final class ViewerScalePerformanceTests: XCTestCase {
     Set(capture.nodes.filter { !$0.children.isEmpty }.map(\.identity))
   }
 
-  /// Runs both sizes interleaved and returns `large / small` on the best run
-  /// of each. Interleaving keeps a thermal or scheduling excursion from
-  /// landing on only one side of the ratio; taking the minimum discards the
-  /// samples that were preempted rather than slow.
+  /// Returns the median paired `large / small` CPU-time ratio. Wall-clock
+  /// time is deliberately excluded: CI runs eight test processes at once, so
+  /// either half can be descheduled independently. Alternating order removes
+  /// a systematic warm-cache or thermal advantage from either size.
   private func growth(
-    small: () -> Void, large: () -> Void, rounds: Int = 5,
+    small: () -> Void, large: () -> Void, rounds: Int = 7,
     file: StaticString = #filePath, line: UInt = #line
   ) -> Double {
     small()
     large()  // warm both paths before any sample counts
-    var smallBest = Double.infinity
-    var largeBest = Double.infinity
-    for _ in 0..<rounds {
-      smallBest = Swift.min(smallBest, elapsed(small))
-      largeBest = Swift.min(largeBest, elapsed(large))
-    }
-    guard smallBest > 0 else {
-      XCTFail("the small case was too fast to time", file: file, line: line)
+    guard rounds > 0 else {
+      XCTFail("at least one growth sample is required", file: file, line: line)
       return 0
     }
-    let ratio = largeBest / smallBest
+
+    var samples: [(small: Double, large: Double)] = []
+    samples.reserveCapacity(rounds)
+    for round in 0..<rounds {
+      let smallTime: Double
+      let largeTime: Double
+      if round.isMultiple(of: 2) {
+        smallTime = elapsedThreadCPU(small)
+        largeTime = elapsedThreadCPU(large)
+      } else {
+        largeTime = elapsedThreadCPU(large)
+        smallTime = elapsedThreadCPU(small)
+      }
+      guard smallTime > 0, largeTime > 0 else {
+        XCTFail("a case was too fast to measure in thread CPU time", file: file, line: line)
+        return 0
+      }
+      samples.append((small: smallTime, large: largeTime))
+    }
+
+    let smallMedian = median(samples.map(\.small))
+    let largeMedian = median(samples.map(\.large))
+    let ratio = median(samples.map { $0.large / $0.small })
     print(
-      "[viewer-scale] small=\(String(format: "%.3f", smallBest * 1000))ms "
-        + "large=\(String(format: "%.3f", largeBest * 1000))ms "
-        + "ratio=\(String(format: "%.2f", ratio))×")
+      "[viewer-scale] smallCPU=\(String(format: "%.3f", smallMedian * 1000))ms "
+        + "largeCPU=\(String(format: "%.3f", largeMedian * 1000))ms "
+        + "pairedMedianRatio=\(String(format: "%.2f", ratio))×")
     return ratio
   }
 
-  private func elapsed(_ body: () -> Void) -> Double {
-    let start = DispatchTime.now().uptimeNanoseconds
+  private func median(_ values: [Double]) -> Double {
+    precondition(!values.isEmpty)
+    let sorted = values.sorted()
+    let middle = sorted.count / 2
+    if sorted.count.isMultiple(of: 2) {
+      return (sorted[middle - 1] + sorted[middle]) / 2
+    }
+    return sorted[middle]
+  }
+
+  private func elapsedThreadCPU(_ body: () -> Void) -> Double {
+    var start = timespec()
+    guard clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start) == 0 else {
+      XCTFail("CLOCK_THREAD_CPUTIME_ID is unavailable")
+      return 0
+    }
     body()
-    return Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+    var end = timespec()
+    guard clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end) == 0 else {
+      XCTFail("CLOCK_THREAD_CPUTIME_ID is unavailable")
+      return 0
+    }
+    return Double(end.tv_sec - start.tv_sec)
+      + Double(end.tv_nsec - start.tv_nsec) / 1_000_000_000
   }
 }

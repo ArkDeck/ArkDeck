@@ -59,6 +59,9 @@ package actor ArkForgeFlashSession {
   /// What a finished job amounts to, in the vocabulary the engine journals.
   package enum Outcome: Sendable, Equatable {
     case completed(receipts: [ArkForgeActionReceiptSummary])
+    /// The daemon reached a conclusive failure. Unlike `outcomeUnknown`, this
+    /// may close the original attempt, but it is never a completion receipt.
+    case confirmedFailed(reason: String, receipts: [ArkForgeActionReceiptSummary])
     /// Cancelled with proof nothing external happened. Equivalent to the
     /// engine's `.drained`: the tool was never spawned, which is a stronger
     /// statement than "the process group was torn down".
@@ -145,10 +148,20 @@ package actor ArkForgeFlashSession {
         planID: planID, planSHA256: planSHA256, executionPurpose: executionPurpose,
         controllerSessionID: controllerSessionID),
       requestID: "start-\(planID)")
+    return try await runExisting(jobID: started.jobID)
+  }
+
+  /// Drives a daemon job that was started earlier and whose exact identity was
+  /// durably correlated with the ArkDeck job before any permit was signed.
+  ///
+  /// This is the restart-safe path: it deliberately does not call
+  /// `startExecution`, so recovering the controller process cannot create a
+  /// replacement destructive attempt.
+  package func runExisting(jobID daemonJobID: String) async throws -> Outcome {
     // The daemon names the job, and every admission it sends will carry that
     // name. Taken here, from the reply, rather than assumed from ArkDeck's own
     // job ID — which belongs to a different namespace and matched nothing.
-    await authority.adoptDaemonJob(started.jobID)
+    await authority.adoptDaemonJob(daemonJobID)
 
     var terminal: Outcome?
     // The journal sequence already answered. `events_from` is exclusive, so
@@ -175,9 +188,10 @@ package actor ArkForgeFlashSession {
       var sawEvent = false
 
       try daemon.watchJob(
-        ArkForgeWatchJobRequest(jobID: started.jobID, fromSequence: cursor),
-        requestID: "watch-\(started.jobID)-\(cursor)"
+        ArkForgeWatchJobRequest(jobID: daemonJobID, fromSequence: cursor),
+        requestID: "watch-\(daemonJobID)-\(cursor)"
       ) { event in
+        guard event.jobID == daemonJobID else { return terminal == nil }
         // The cursor is exclusive, so anything at or below it was answered on an
         // earlier poll. Guarding here is what keeps a re-poll from counting the
         // same receipt twice.
@@ -195,33 +209,7 @@ package actor ArkForgeFlashSession {
             awaitingReceipts.remove(receipt.stepID)
           }
         case .outcomeClassified:
-          // The daemon's own classification is authoritative for the job's end.
-          // It keys that fact `outcome`, not `disposition`; reading the wrong
-          // key meant this never saw a terminal answer at all.
-          switch event.facts.first(where: { $0.key == "outcome" })?.value ?? "" {
-          case "outcomeUnknown", "recoveryAssessable":
-            // The daemon publishes why beside the classification — a `reason`
-            // fact for control refusals and expiries, or the dispatch facts
-            // (tool exit, duration, output tail) for a write that did not
-            // confirm. Without them the operator gets "unknown" while the one
-            // line naming the cause sits in a CBOR journal on the other side
-            // of the boundary.
-            let why =
-              event.facts.first(where: { $0.key == "reason" })?.value
-              ?? event.facts
-              .filter { $0.key != "outcome" }
-              .map { "\($0.key)=\($0.value)" }
-              .joined(separator: " ")
-            terminal = .outcomeUnknown(
-              reason: why.isEmpty
-                ? "the daemon classified this job's outcome as unknown"
-                : "the daemon classified this job's outcome as unknown: \(why)",
-              receipts: self.receipts)
-          case "cancelledSafe":
-            terminal = .cancelledSafe(receipts: self.receipts)
-          default:
-            terminal = .completed(receipts: self.receipts)
-          }
+          terminal = Self.terminalOutcome(from: event, receipts: self.receipts)
         default:
           break
         }
@@ -234,14 +222,14 @@ package actor ArkForgeFlashSession {
       for admission in admissions {
         // A signed permit is what makes a receipt due. If one already arrived in
         // the same poll as the admission, nothing is owed.
-        if try await answer(admission, jobID: started.jobID),
+        if try await answer(admission, jobID: daemonJobID),
           !receipts.contains(where: { $0.stepID == admission.stepID })
         {
           awaitingReceipts.insert(admission.stepID)
         }
       }
       for control in controls {
-        try await answer(control, jobID: started.jobID)
+        try await answer(control, jobID: daemonJobID)
       }
 
       if terminal != nil { break }
@@ -270,7 +258,79 @@ package actor ArkForgeFlashSession {
       }
     }
 
-    return terminal ?? .completed(receipts: receipts)
+    return terminal
+      ?? .outcomeUnknown(
+        reason: "arkforged session ended without an authoritative terminal classification",
+        receipts: receipts)
+  }
+
+  /// Reads the already-journaled terminal state of one exact daemon job.
+  ///
+  /// Recovery must be observational: this method never starts a job, signs a
+  /// permit, performs a control action, or cancels anything. It consumes the
+  /// complete finite poll because `outcomeUnknown` is reconcilable: a later
+  /// durable `succeeded`/`confirmedFailed` classification supersedes that
+  /// earlier observation. `nil` means no classification exists at all.
+  package static func observeTerminal(
+    daemon: any Daemon, jobID: String
+  ) throws -> Outcome? {
+    var observedReceipts: [ArkForgeActionReceiptSummary] = []
+    var terminal: Outcome?
+    try daemon.watchJob(
+      ArkForgeWatchJobRequest(jobID: jobID, fromSequence: 0),
+      requestID: "observe-terminal-\(jobID)"
+    ) { event in
+      guard event.jobID == jobID else { return true }
+      switch event.kind {
+      case .actionReceipt:
+        if let receipt = event.receipt { observedReceipts.append(receipt) }
+      case .outcomeClassified:
+        terminal = terminalOutcome(from: event, receipts: observedReceipts)
+      default:
+        break
+      }
+      return true
+    }
+    return terminal
+  }
+
+  /// Strict wire-to-domain terminal mapping shared by active execution and
+  /// passive restart recovery. Only the exact `succeeded` value completes.
+  private static func terminalOutcome(
+    from event: ArkForgeJobEvent, receipts: [ArkForgeActionReceiptSummary]
+  ) -> Outcome {
+    let classifiedOutcome =
+      event.facts.first(where: { $0.key == "outcome" })?.value ?? ""
+    let detail =
+      event.facts.first(where: { $0.key == "reason" })?.value
+      ?? event.facts
+      .filter { $0.key != "outcome" }
+      .map { "\($0.key)=\($0.value)" }
+      .joined(separator: " ")
+    switch classifiedOutcome {
+    case "succeeded":
+      return .completed(receipts: receipts)
+    case "confirmedFailed":
+      return .confirmedFailed(
+        reason: detail.isEmpty
+          ? "the daemon classified this job as confirmedFailed"
+          : "the daemon classified this job as confirmedFailed: \(detail)",
+        receipts: receipts)
+    case "outcomeUnknown", "recoveryAssessable":
+      return .outcomeUnknown(
+        reason: detail.isEmpty
+          ? "the daemon classified this job's outcome as \(classifiedOutcome)"
+          : "the daemon classified this job's outcome as \(classifiedOutcome): \(detail)",
+        receipts: receipts)
+    case "cancelledSafe":
+      return .cancelledSafe(receipts: receipts)
+    default:
+      return .outcomeUnknown(
+        reason: classifiedOutcome.isEmpty
+          ? "arkforged emitted outcomeClassified without an outcome fact"
+          : "arkforged emitted unsupported terminal outcome \(classifiedOutcome)",
+        receipts: receipts)
+    }
   }
 
   /// How long to wait before polling again when the daemon has nothing queued.

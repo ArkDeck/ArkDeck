@@ -212,6 +212,10 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     let receipt: ArkForgeLaneArtifactPrewarmReceipt
   }
   private var prewarmedArtifactByJob: [String: PrewarmedArtifact] = [:]
+  /// Process-local acceleration only. Runtime persists the same value before
+  /// a permit can be signed; a fresh host accepts that durable correlation via
+  /// `performPrepared` instead of relying on this cache.
+  private var executionByJob: [String: RuntimeArkForgeLaneExecution] = [:]
 
   package init(
     connection: Connection,
@@ -358,12 +362,23 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     prewarmedArtifactByJob.removeValue(forKey: jobID)
   }
 
-  /// Runs the ArkForge job on first use for this ArkDeck job, then serves each
-  /// delegated step from what that run published.
-  package func perform(
-    stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
+  /// Materializes and creates the daemon job, but does not drive it far enough
+  /// to sign a permit or touch the device.
+  ///
+  /// Runtime durably stores the returned correlation before writing its own
+  /// step intent and before calling `performPrepared`. If this process dies
+  /// between the daemon reply and that durable store, the only possible leak
+  /// is an orphan job waiting for a permit; it cannot have an external effect.
+  package func prepareExecution(
+    jobID: String, artifact: ArkForgeLaneArtifact,
     binding: ArkForgeLaneDeviceBinding, executionPurpose: String = "primaryFlash"
-  ) async throws -> ArkForgeActionReceiptSummary {
+  ) async throws -> RuntimeArkForgeLaneExecution {
+    if let existing = executionByJob[jobID] {
+      try validate(
+        existing, jobID: jobID, artifact: artifact, binding: binding,
+        executionPurpose: executionPurpose)
+      return existing
+    }
     if let sealedPurpose = executionPurposeByJob[jobID], sealedPurpose != executionPurpose {
       throw LaneError.planNotExecutable(
         availability: "unusable",
@@ -373,16 +388,9 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     if let terminalFailure = terminalFailureByJob[jobID] {
       throw terminalFailure
     }
-    if completedJobs.contains(jobID) {
-      guard let cached = projectedReceipt(jobID: jobID, stepID: stepID) else {
-        throw LaneError.noReceiptForStep(stepID)
-      }
-      // A second lane-covered step is an explicit projection of the already
-      // completed daemon plan. It must not materialize and run the lane again.
-      return cached
-    }
-    // No cache yet: this is the first delegated step of this job, so it is the
-    // one that materializes the plan and runs the ArkForge job.
+    // No cache yet: this is the one materialization and start for this
+    // process. A recovered process receives the durable value directly in
+    // `performPrepared` and does not call this method again.
     let client: any ArkForgeFlashSession.Daemon
     let materialized: (plan: ArkForgeExecutablePlan, observedMode: String)
     do {
@@ -423,20 +431,105 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
         reason: "arkforged returned a plan digest that is not 32 hex-encoded bytes",
         unknowns: ["planSHA256": plan.planSHA256])
     }
-    let authority = makeAuthority(jobID, plan.planID, planDigest, binding)
-    await authority.recordMaterializedObservationMode(materialized.observedMode)
+    _ = planDigest
+    let started: ArkForgeStartExecutionResponse
+    do {
+      started = try client.startExecution(
+        ArkForgeStartExecutionRequest(
+          planID: plan.planID, planSHA256: plan.planSHA256,
+          executionPurpose: plan.executionPurpose,
+          controllerSessionID: connection.controllerSessionID),
+        requestID: "start-\(plan.planID)-\(jobID)")
+    } catch {
+      // No permit can exist yet. The daemon may have accepted the request
+      // before transport failed, but even that orphan remains effect-free.
+      let failure = RuntimeDispatchFailure.confirmedNotExecuted(
+        "arkforged startExecution did not return a durable job identity; no permit was signed "
+          + "and the device was not touched: \(error)")
+      terminalFailureByJob[jobID] = failure
+      throw failure
+    }
+    guard !started.jobID.isEmpty else {
+      let failure = RuntimeDispatchFailure.confirmedNotExecuted(
+        "arkforged startExecution returned no job identity; no permit was signed and the device "
+          + "was not touched")
+      terminalFailureByJob[jobID] = failure
+      throw failure
+    }
+    let execution = RuntimeArkForgeLaneExecution(
+      arkDeckJobID: jobID, daemonJobID: started.jobID,
+      planID: plan.planID, planSHA256: plan.planSHA256.lowercased(),
+      executionPurpose: plan.executionPurpose,
+      artifactSHA256: artifact.sha256.lowercased(), artifactProfileID: artifact.profileID,
+      targetID: binding.targetID, bindingRevision: binding.bindingRevision,
+      stableIdentitySHA256: binding.stableIdentitySHA256.lowercased(),
+      usbTopology: binding.usbTopology, observationMode: materialized.observedMode,
+      toolchainSHA256: toolchainSHA256)
+    executionByJob[jobID] = execution
+    return execution
+  }
+
+  /// Drives the exact job returned by `prepareExecution`; never starts a
+  /// replacement. This is the only path that may cause permits to be signed.
+  package func performPrepared(
+    stepID: String, execution: RuntimeArkForgeLaneExecution,
+    artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding
+  ) async throws -> ArkForgeActionReceiptSummary {
+    try validate(
+      execution, jobID: execution.arkDeckJobID, artifact: artifact, binding: binding,
+      executionPurpose: execution.executionPurpose)
+    let jobID = execution.arkDeckJobID
+    if let terminalFailure = terminalFailureByJob[jobID] { throw terminalFailure }
+    if completedJobs.contains(jobID) {
+      guard let cached = projectedReceipt(jobID: jobID, stepID: stepID) else {
+        throw LaneError.noReceiptForStep(stepID)
+      }
+      return cached
+    }
+    executionByJob[jobID] = execution
+    executionPurposeByJob[jobID] = execution.executionPurpose
+
+    guard let planDigest = Self.digestBytes(execution.planSHA256) else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable", reason: "persisted ArkForge plan digest is malformed",
+        unknowns: ["planSHA256": execution.planSHA256])
+    }
+    let client: any ArkForgeFlashSession.Daemon
+    do {
+      client = try makeClient(connection.socketPath)
+    } catch {
+      let failure = RuntimeDispatchFailure.outcomeUnknown(
+        "cannot reconnect to correlated arkforged job \(execution.daemonJobID): \(error)")
+      terminalFailureByJob[jobID] = failure
+      throw failure
+    }
+    let authority = makeAuthority(jobID, execution.planID, planDigest, binding)
+    await authority.recordMaterializedObservationMode(execution.observationMode)
     let session = ArkForgeFlashSession(
       daemon: client, authority: authority,
       performer: makePerformer(binding, jobID),
       controllerSessionID: connection.controllerSessionID)
 
-    let outcome = try await session.run(
-      planID: plan.planID, planSHA256: plan.planSHA256,
-      executionPurpose: plan.executionPurpose)
+    let outcome: ArkForgeFlashSession.Outcome
+    do {
+      outcome = try await session.runExisting(jobID: execution.daemonJobID)
+    } catch {
+      let failure = RuntimeDispatchFailure.outcomeUnknown(
+        "lost control of correlated arkforged job \(execution.daemonJobID): \(error)")
+      terminalFailureByJob[jobID] = failure
+      throw failure
+    }
     let published: [ArkForgeActionReceiptSummary]
     switch outcome {
     case .completed(let receipts):
       published = receipts
+    case .confirmedFailed(let reason, let receipts):
+      published = receipts
+      receiptsByJob[jobID] = Dictionary(
+        published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
+      let failure = RuntimeDispatchFailure.failed(reason)
+      terminalFailureByJob[jobID] = failure
+      throw failure
     case .cancelledSafe(let receipts):
       published = receipts
       receiptsByJob[jobID] = Dictionary(
@@ -481,6 +574,85 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       throw LaneError.noReceiptForStep(stepID)
     }
     return receipt
+  }
+
+  /// Backward-compatible convenience for direct lane tests and callers that
+  /// do not own a durable Runtime record. Production Runtime uses the split
+  /// prepare/perform path above.
+  package func perform(
+    stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
+    binding: ArkForgeLaneDeviceBinding, executionPurpose: String = "primaryFlash"
+  ) async throws -> ArkForgeActionReceiptSummary {
+    let execution = try await prepareExecution(
+      jobID: jobID, artifact: artifact, binding: binding,
+      executionPurpose: executionPurpose)
+    return try await performPrepared(
+      stepID: stepID, execution: execution, artifact: artifact, binding: binding)
+  }
+
+  /// Passively reads an already-correlated daemon job's durable terminal.
+  package func observeTerminal(
+    execution: RuntimeArkForgeLaneExecution
+  ) throws -> ArkForgeFlashSession.Outcome? {
+    try validateCorrelationIdentity(execution)
+    let client = try makeClient(connection.socketPath)
+    return try ArkForgeFlashSession.observeTerminal(
+      daemon: client, jobID: execution.daemonJobID)
+  }
+
+  private func validate(
+    _ execution: RuntimeArkForgeLaneExecution, jobID: String,
+    artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding,
+    executionPurpose: String
+  ) throws {
+    try validateCorrelationIdentity(execution)
+    var mismatches: [String: String] = [:]
+    if execution.arkDeckJobID != jobID { mismatches["arkDeckJobID"] = execution.arkDeckJobID }
+    if execution.executionPurpose != executionPurpose {
+      mismatches["executionPurpose"] = execution.executionPurpose
+    }
+    if execution.artifactSHA256 != artifact.sha256.lowercased() {
+      mismatches["artifactSHA256"] = execution.artifactSHA256
+    }
+    if execution.artifactProfileID != artifact.profileID {
+      mismatches["artifactProfileID"] = execution.artifactProfileID
+    }
+    if execution.targetID != binding.targetID { mismatches["targetID"] = execution.targetID }
+    if execution.bindingRevision != binding.bindingRevision {
+      mismatches["bindingRevision"] = String(execution.bindingRevision)
+    }
+    if execution.stableIdentitySHA256 != binding.stableIdentitySHA256.lowercased() {
+      mismatches["stableIdentitySHA256"] = execution.stableIdentitySHA256
+    }
+    if execution.usbTopology != binding.usbTopology {
+      mismatches["usbTopology"] = execution.usbTopology
+    }
+    guard mismatches.isEmpty else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "persisted ArkForge execution correlation does not match this Runtime attempt",
+        unknowns: mismatches)
+    }
+  }
+
+  private func validateCorrelationIdentity(
+    _ execution: RuntimeArkForgeLaneExecution
+  ) throws {
+    guard !execution.arkDeckJobID.isEmpty, !execution.daemonJobID.isEmpty,
+      !execution.planID.isEmpty, Self.digestBytes(execution.planSHA256) != nil,
+      Self.digestBytes(execution.artifactSHA256) != nil,
+      Self.digestBytes(execution.stableIdentitySHA256) != nil,
+      !execution.observationMode.isEmpty
+    else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable", reason: "persisted ArkForge execution correlation is malformed",
+        unknowns: ["correlation": "missing identity or digest"])
+    }
+    guard execution.toolchainSHA256 == toolchainSHA256 else {
+      throw LaneError.toolchainMismatch(
+        "persisted ArkForge execution is bound to toolchain \(execution.toolchainSHA256), "
+          + "but this lane is \(toolchainSHA256)")
+    }
   }
 
   /// Puts this job's plan in the daemon's store and returns how the daemon
@@ -809,6 +981,7 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     completedJobs.remove(jobID)
     terminalFailureByJob[jobID] = nil
     executionPurposeByJob[jobID] = nil
+    executionByJob[jobID] = nil
   }
 
   /// Checks the daemon is ready and bound to the toolchain this authority

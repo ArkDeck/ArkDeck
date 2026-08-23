@@ -808,7 +808,7 @@ public actor RuntimeJobEngine {
     ///
     /// This may mutate only ArkForge's content-addressed host store. It has no
     /// device binding or authority and therefore cannot materialize or start a
-    /// device execution. `perform` still owns those boundaries.
+    /// device execution. `prepareExecution` still owns those boundaries.
     func prewarmArtifact(
       jobID: String, artifact: ArkForgeLaneArtifact
     ) async throws -> ArkForgeLaneArtifactPrewarmReceipt
@@ -818,28 +818,34 @@ public actor RuntimeJobEngine {
     /// for its normal content-addressed reuse.
     func finishArtifactPrewarm(jobID: String) async
 
-    /// Performs one delegated step and returns the daemon's semantic receipt.
+    /// Materializes and creates the daemon job, but does not watch it or sign
+    /// a permit. Runtime durably records the returned join before calling
+    /// `performPrepared`; a crash in this window may orphan a no-effect daemon
+    /// job, but can never lose correlation to an external effect.
+    func prepareExecution(
+      jobID: String, artifact: ArkForgeLaneArtifact,
+      binding: ArkForgeLaneDeviceBinding, executionPurpose: String
+    ) async throws -> RuntimeArkForgeLaneExecution
+
+    /// Performs one already-correlated delegated step and returns the daemon's semantic receipt.
     ///
     /// Throwing here is a dispatch failure like any other. What must never
     /// happen is returning a receipt the daemon did not publish — the receipt
     /// is the evidence, and inventing one would make a write look confirmed.
     ///
-    /// # Why no plan identity is passed
-    ///
-    /// It used to take `planID` and `planSHA256` from the job record — facts
-    /// about the plan **ArkDeck** materialized through its own Rockchip lane.
-    /// `arkforged` resolves plans from its **own** content store, so those
-    /// named nothing it had and every delegated step would have died at
-    /// `PLAN_NOT_STARTABLE` (AD-026, measured 2026-08-17 against a live
-    /// daemon).
-    ///
-    /// The lane now materializes through the daemon and uses the identity the
-    /// daemon returns. What it needs for that is the *inputs* — the artifact
-    /// and the device — rather than a conclusion this side reached alone.
-    func perform(
-      stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
-      binding: ArkForgeLaneDeviceBinding, executionPurpose: String
+    /// The plan identity is carried by `execution`: it came from ArkForge's
+    /// own materialization and daemon job reply, not from ArkDeck's separate
+    /// provider plan. Runtime has already persisted and revalidated that join.
+    func performPrepared(
+      stepID: String, execution: RuntimeArkForgeLaneExecution,
+      artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary
+
+    /// Passively reads an existing daemon job. It never answers admissions,
+    /// submits control receipts or creates a replacement job.
+    func observeTerminal(
+      execution: RuntimeArkForgeLaneExecution
+    ) async throws -> ArkForgeFlashSession.Outcome?
 
     /// The terminal receipt of this job's *completed* lane run, if it ran.
     ///
@@ -932,6 +938,10 @@ public actor RuntimeJobEngine {
     var record: RuntimeJobRecord
     var journal: FileDurableJournal
     var nextSequence: Int
+    /// ArkForge-only sidecar loaded from the owning job directory. Keeping
+    /// this out of the generic Runtime snapshot preserves the integration
+    /// boundary while retaining correlation-before-intent ordering.
+    var arkForgeState: ArkForgeRuntimeJobState = .init()
     /// Confirmed provider steps reconstructed from the durable journal.
     /// A clean restart resumes after these exact actions instead of
     /// rebuilding progress from the current catalog.
@@ -1008,7 +1018,7 @@ public actor RuntimeJobEngine {
   /// durable Runtime intents and outcomes, sourced from the completed plan's
   /// terminal semantic receipt, before an epoch can be established.
   package static let arkForgePlanCompletionSteps: Set<String> = [
-    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+    "verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
   ]
 
   /// The `processKind` those steps carry in a materialized plan.
@@ -1740,9 +1750,10 @@ public actor RuntimeJobEngine {
   private func beginArkForgeArtifactPrewarmIfNeeded(
     jobID: String, descriptor: CatalogOperationDescriptor
   ) async throws -> ArkForgeArtifactPrewarmTask? {
-    guard descriptor.steps.contains(where: {
-      Self.arkForgeDispatchedSteps.contains($0.stepID)
-    }), let lane = configuration.arkForgeLane,
+    guard
+      descriptor.steps.contains(where: {
+        Self.arkForgeDispatchedSteps.contains($0.stepID)
+      }), let lane = configuration.arkForgeLane,
       let profileID = configuration.arkForgeDeviceProfileID,
       !profileID.isEmpty
     else { return nil }
@@ -2160,6 +2171,24 @@ public actor RuntimeJobEngine {
               + "total \(prewarm.durationMilliseconds) ms, consume wait "
               + "\(consumeWaitMilliseconds) ms)")
           arkForgePrewarmConfirmed = true
+        }
+        // The daemon executes both delegated catalog steps as one plan. Once
+        // its canonical terminal receipt is durable, every later obligation
+        // is a projection of that proof — including after the lane actor was
+        // recreated. Calling `performPrepared` here would ask a fresh actor to
+        // drive an already-terminal job and used to start/lose a second path.
+        if step.stepID != "flash-partitions",
+          jobs[jobID]?.arkForgeState.planCompletionReceipt != nil,
+          let lane = configuration.arkForgeLane
+        {
+          try await journalArkForgePlanCompletion(
+            jobID: jobID, step: step, descriptor: descriptor, lane: lane)
+          completedStepIDs.insert(step.stepID)
+          if var runtime = jobs[jobID] {
+            runtime.completedStepIDs = completedStepIDs
+            jobs[jobID] = runtime
+          }
+          continue
         }
         if step.effect >= .deviceMutation {
           // The capability is consumed before the write, exactly as on the
@@ -3036,36 +3065,51 @@ public actor RuntimeJobEngine {
           + "identifies the board by that port path and will not guess one. Nothing was "
           + "dispatched and the device was not touched")
     }
-    let receipt = try await lane.perform(
-      stepID: step.stepID, jobID: jobID,
-      artifact: ArkForgeLaneArtifact(
-        fileURL: resolved.fileURL, sha256: resolved.sha256, profileID: profileID),
-      binding: ArkForgeLaneDeviceBinding(
-        connectKey: connectKey, stableIdentitySHA256: identity,
-        targetID: runtime.record.request.target.targetID,
-        bindingRevision: runtime.record.request.target.expectedBindingRevision ?? 1,
-        usbTopology: topology),
-      executionPurpose: runtime.record.admissionEvidence?.completeOverwriteRecovery == nil
-        ? "primaryFlash" : "supersedingRecovery")
-    // `ArkForgeLaneHost.perform` runs the whole daemon plan on first use and
-    // returns its terminal managed-control receipt. Validate that typed
-    // receipt before reducing it to Runtime's journal vocabulary; otherwise a
-    // bare disposition string could be mistaken for complete-overwrite proof.
-    try Self.validateArkForgePlanCompletionReceipt(receipt, jobID: jobID)
+    let laneArtifact = ArkForgeLaneArtifact(
+      fileURL: resolved.fileURL, sha256: resolved.sha256, profileID: profileID)
+    let laneBinding = ArkForgeLaneDeviceBinding(
+      connectKey: connectKey, stableIdentitySHA256: identity,
+      targetID: runtime.record.request.target.targetID,
+      bindingRevision: runtime.record.request.target.expectedBindingRevision ?? 1,
+      usbTopology: topology)
+    let executionPurpose =
+      runtime.record.admissionEvidence?.completeOverwriteRecovery == nil
+      ? "primaryFlash" : "supersedingRecovery"
 
-    // The daemon's disposition is journalled as it stands. `outcomeUnknown` is
-    // not a failure to retry — it is a job that needs reconciling, and turning
-    // it into a retry is the one thing this whole change refuses to do.
-    let (result, certainty): (String, JournalOutcomeCertainty) = {
-      switch receipt.disposition {
-      case "semanticSuccess": return ("succeeded", .confirmed)
-      case "confirmedNoEffect": return ("failed", .confirmed)
-      case "outcomeUnknown": return ("failed", .outcomeUnknown)
-      default: return ("failed", .outcomeUnknown)
+    // `startExecution` cannot touch the device. Its returned identity is the
+    // first durable half of the cross-process join and must land before the
+    // ArkDeck intent that authorizes `performPrepared` to sign a permit.
+    let execution: RuntimeArkForgeLaneExecution
+    if let persisted = runtime.arkForgeState.execution {
+      execution = persisted
+    } else {
+      execution = try await lane.prepareExecution(
+        jobID: jobID, artifact: laneArtifact, binding: laneBinding,
+        executionPurpose: executionPurpose)
+      guard var refreshed = jobs[jobID] else {
+        throw RuntimeJobEngineError.jobNotFound(jobID)
       }
-    }()
+      try Self.validateArkForgeLaneExecution(
+        execution, jobID: jobID, artifact: laneArtifact, binding: laneBinding,
+        executionPurpose: executionPurpose, toolchainSHA256: lane.toolchainSHA256)
+      refreshed.arkForgeState.execution = execution
+      try persistArkForgeRuntimeJobState(refreshed.arkForgeState, jobID: jobID)
+      jobs[jobID] = refreshed
+    }
+    try Self.validateArkForgeLaneExecution(
+      execution, jobID: jobID, artifact: laneArtifact, binding: laneBinding,
+      executionPurpose: executionPurpose, toolchainSHA256: lane.toolchainSHA256)
+
     guard var current = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    if cancellationRequests.contains(jobID)
+      || current.record.state == JobState.cancelRequested.rawValue
+    {
+      try completeCancellationAtSafeBoundary(
+        jobID: jobID, baseline: current, step: nil, intentEventID: nil,
+        reason: "client-cancel before ArkForge permit admission")
+      throw RuntimeHostDispatchCancellation()
     }
     let workflowStep = try Self.journalStep(
       for: step, jobID: jobID, inputs: current.record.request.inputs,
@@ -3089,36 +3133,101 @@ public actor RuntimeJobEngine {
           ? (current.record.request.target.expectedBindingRevision ?? 1) : nil,
         schemaVersion: Self.journalSchemaVersion(of: current.record)))
     current.nextSequence += 1
-    // Where this step stopped, so a restart knows. What it deliberately does
-    // *not* carry is a `recoveryAction`: there is no ArkDeck action to persist,
-    // and inventing one would be a record claiming this process could redo the
-    // write. The authoritative record for a delegated step is the permit in
-    // arkforged's durable ledger, keyed by the same (job, step, attempt) this
-    // intent names — so recovery asks the daemon what became of it rather than
-    // reconstructing an intent from a catalog.
     current.record.recoveryStepID = step.stepID
     current.record.recoveryIntentEventID = intentEventID
+    current.record.timeline.append(
+      "intent \(step.stepID) correlated daemon-job=\(execution.daemonJobID)")
     try persistRuntimeRecord(current.record)
+    jobs[jobID] = current
+
+    let receipt: ArkForgeActionReceiptSummary
+    do {
+      receipt = try await lane.performPrepared(
+        stepID: step.stepID, execution: execution,
+        artifact: laneArtifact, binding: laneBinding)
+    } catch let failure as RuntimeDispatchFailure {
+      var failed = jobs[jobID] ?? current
+      switch failure {
+      case .outcomeUnknown:
+        // Preserve the one outstanding intent. Reconciliation observes the
+        // exact daemon job or reads the device; it never creates a new job or
+        // signs this capability again.
+        failed.record.timeline.append(
+          "outcomeUnknown \(step.stepID); correlated daemon job retained")
+        failed.record.recoveryStepID = step.stepID
+        failed.record.recoveryIntentEventID = intentEventID
+        try persistRuntimeRecord(failed.record)
+        jobs[jobID] = failed
+        throw failure
+      case .confirmedNotExecuted, .confirmedNotExecutedWithDiagnostic, .failed:
+        let confirmedNotExecuted: Bool
+        switch failure {
+        case .confirmedNotExecuted, .confirmedNotExecutedWithDiagnostic:
+          confirmedNotExecuted = true
+        default:
+          confirmedNotExecuted = false
+        }
+        try failed.journal.appendAndSynchronize(
+          JournalEvent.stepOutcome(
+            eventID: "outcome-\(step.stepID)", sequence: failed.nextSequence,
+            sessionID: failed.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+            stepID: step.stepID, attempt: 1,
+            correlatesToIntentEventID: intentEventID,
+            result: "failed", outcomeCertainty: .confirmed,
+            semanticCode: confirmedNotExecuted
+              ? Self.confirmedNotExecutedSemanticCode : nil,
+            schemaVersion: Self.journalSchemaVersion(of: failed.record)))
+        failed.nextSequence += 1
+        failed.record.recoveryStepID = nil
+        failed.record.recoveryIntentEventID = nil
+        try persistRuntimeRecord(failed.record)
+        jobs[jobID] = failed
+        throw failure
+      }
+    } catch {
+      var unknown = jobs[jobID] ?? current
+      unknown.record.timeline.append(
+        "outcomeUnknown \(step.stepID); correlated daemon observation failed: \(error)")
+      try persistRuntimeRecord(unknown.record)
+      jobs[jobID] = unknown
+      throw RuntimeDispatchFailure.outcomeUnknown(
+        "lost the terminal state of correlated arkforged job \(execution.daemonJobID): \(error)")
+    }
+
+    // Persist the exact typed terminal receipt before the ArkDeck outcome.
+    // A crash can leave a completed receipt beside an outstanding intent; the
+    // passive recovery path can close that pair. The inverse (success without
+    // durable evidence) is impossible.
+    let durableReceipt = RuntimeArkForgePlanCompletionReceipt(receipt)
+    do {
+      try Self.validateArkForgePlanCompletionReceipt(
+        durableReceipt, jobID: jobID, execution: execution)
+    } catch {
+      var unknown = jobs[jobID] ?? current
+      unknown.record.timeline.append(
+        "outcomeUnknown \(step.stepID); daemon terminal receipt failed canonical validation")
+      try persistRuntimeRecord(unknown.record)
+      jobs[jobID] = unknown
+      throw RuntimeDispatchFailure.outcomeUnknown("\(error)")
+    }
+    current = jobs[jobID] ?? current
+    current.arkForgeState.planCompletionReceipt = durableReceipt
+    try persistArkForgeRuntimeJobState(current.arkForgeState, jobID: jobID)
     try current.journal.appendAndSynchronize(
       JournalEvent.stepOutcome(
         eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
         sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
         stepID: step.stepID, attempt: 1,
         correlatesToIntentEventID: intentEventID,
-        result: result, outcomeCertainty: certainty,
-        semanticCode: certainty == .confirmed
-          ? Self.arkForgePlanCompletionSemanticCode : nil,
-        summary: certainty == .confirmed
-          ? Self.arkForgePlanCompletionSummary(receipt) : nil,
+        result: "succeeded", outcomeCertainty: .confirmed,
+        semanticCode: Self.arkForgePlanCompletionSemanticCode,
+        summary: Self.arkForgePlanCompletionSummary(durableReceipt),
         schemaVersion: Self.journalSchemaVersion(of: current.record)))
     current.nextSequence += 1
+    current.record.recoveryStepID = nil
+    current.record.recoveryIntentEventID = nil
+    try persistRuntimeRecord(current.record)
     jobs[jobID] = current
-
-    if certainty == .outcomeUnknown {
-      throw RuntimeDispatchFailure.failed(
-        "\(step.stepID) returned \(receipt.disposition) from arkforged; the job needs "
-          + "reconciliation and this permit must not be signed again")
-    }
   }
 
   /// Closes one ArkDeck catalog step from the already-completed ArkForge plan.
@@ -3135,11 +3244,13 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.internalFailure(
         "\(step.stepID) is not an ArkForge plan-completion projection")
     }
-    guard let receipt = await lane.completedPlanReceipt(jobID: jobID) else {
+    guard let receipt = await arkForgePlanCompletionReceipt(jobID: jobID, lane: lane) else {
       throw RuntimeDispatchFailure.failed(
         "\(step.stepID) cannot be confirmed: ArkForge has no completed-plan receipt for \(jobID)")
     }
-    try Self.validateArkForgePlanCompletionReceipt(receipt, jobID: jobID)
+    try Self.validateArkForgePlanCompletionReceipt(
+      receipt, jobID: jobID,
+      execution: jobs[jobID]?.arkForgeState.execution)
     guard var current = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
     }
@@ -3194,11 +3305,17 @@ public actor RuntimeJobEngine {
   /// write receipt, a typed skip, or an arbitrary success string from being
   /// repurposed as plan-completion evidence.
   private static func validateArkForgePlanCompletionReceipt(
-    _ receipt: ArkForgeActionReceiptSummary, jobID: String
+    _ receipt: RuntimeArkForgePlanCompletionReceipt, jobID: String,
+    execution: RuntimeArkForgeLaneExecution? = nil
   ) throws {
     let facts = Dictionary(
       receipt.facts.map { ($0.key, $0.value) },
       uniquingKeysWith: { first, _ in first })
+    let matchesExecution =
+      execution.map { correlated in
+        receipt.jobID == correlated.daemonJobID && receipt.planID == correlated.planID
+          && facts["usbTopology"] == correlated.usbTopology
+      } ?? true
     guard facts.count == receipt.facts.count,
       receipt.jobID.hasPrefix("JOB-"), receipt.planID.hasPrefix("PLAN-"),
       receipt.stepID.hasPrefix("STEP-"), !receipt.permitID.isEmpty,
@@ -3208,20 +3325,55 @@ public actor RuntimeJobEngine {
         == ArkForgeManagedControlPort.canonicalFactsDigest(facts),
       facts["const.product.model"]?.isEmpty == false,
       facts["const.ohos.fullname"]?.isEmpty == false,
-      facts["usbTopology"]?.isEmpty == false
+      facts["usbTopology"]?.isEmpty == false,
+      matchesExecution
     else {
-      throw RuntimeDispatchFailure.failed(
+      throw RuntimeDispatchFailure.outcomeUnknown(
         "ArkForge returned no canonical completed-plan postflight receipt for \(jobID)")
     }
   }
 
   private static func arkForgePlanCompletionSummary(
-    _ receipt: ArkForgeActionReceiptSummary
+    _ receipt: RuntimeArkForgePlanCompletionReceipt
   ) -> String {
     let evidence = receipt.evidenceSHA256.map { String(format: "%02x", $0) }.joined()
     return
       "arkforge-plan=\(receipt.planID); daemon-job=\(receipt.jobID); "
       + "terminal-step=\(receipt.stepID); evidence-sha256=\(evidence)"
+  }
+
+  private func arkForgePlanCompletionReceipt(
+    jobID: String, lane: any ArkForgeLane
+  ) async -> RuntimeArkForgePlanCompletionReceipt? {
+    if let durable = jobs[jobID]?.arkForgeState.planCompletionReceipt {
+      return durable
+    }
+    guard let live = await lane.completedPlanReceipt(jobID: jobID) else { return nil }
+    return RuntimeArkForgePlanCompletionReceipt(live)
+  }
+
+  private static func validateArkForgeLaneExecution(
+    _ execution: RuntimeArkForgeLaneExecution, jobID: String,
+    artifact: ArkForgeLaneArtifact, binding: ArkForgeLaneDeviceBinding,
+    executionPurpose: String, toolchainSHA256: String
+  ) throws {
+    guard execution.arkDeckJobID == jobID,
+      !execution.daemonJobID.isEmpty, !execution.planID.isEmpty,
+      isLowercaseSHA256(execution.planSHA256),
+      execution.executionPurpose == executionPurpose,
+      execution.artifactSHA256 == artifact.sha256.lowercased(),
+      execution.artifactProfileID == artifact.profileID,
+      execution.targetID == binding.targetID,
+      execution.bindingRevision == binding.bindingRevision,
+      execution.stableIdentitySHA256 == binding.stableIdentitySHA256.lowercased(),
+      execution.usbTopology == binding.usbTopology,
+      !execution.observationMode.isEmpty,
+      execution.toolchainSHA256 == toolchainSHA256.lowercased()
+    else {
+      throw RuntimeDispatchFailure.confirmedNotExecuted(
+        "persisted ArkForge execution correlation does not match the admitted Runtime attempt; "
+          + "no permit was signed by this call")
+    }
   }
 
   private func dispatchWithWAL(
@@ -3791,13 +3943,15 @@ public actor RuntimeJobEngine {
     step: CatalogStepDescriptor,
     lane: any ArkForgeLane
   ) async throws {
-    guard let receipt = await lane.completedPlanReceipt(jobID: jobID) else {
+    guard let receipt = await arkForgePlanCompletionReceipt(jobID: jobID, lane: lane) else {
       // No lane run has happened for this job, so nothing verified anything:
       // the required product cannot be built from facts nobody produced.
       throw RuntimeDispatchFailure.failed(
         "\(step.stepID) was delegated but the lane holds no completed-plan receipt for \(jobID)")
     }
-    try Self.validateArkForgePlanCompletionReceipt(receipt, jobID: jobID)
+    try Self.validateArkForgePlanCompletionReceipt(
+      receipt, jobID: jobID,
+      execution: jobs[jobID]?.arkForgeState.execution)
     let facts = Dictionary(
       receipt.facts.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
     if var runtime = jobs[jobID] {
@@ -3836,8 +3990,9 @@ public actor RuntimeJobEngine {
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: runtime.record.operationReference)
     else { return }
-    guard let mapping = RuntimeArtifactService.artifacts(
-      reference: descriptor.reference, stepID: step.stepID)
+    guard
+      let mapping = RuntimeArtifactService.artifacts(
+        reference: descriptor.reference, stepID: step.stepID)
     else {
       return  // this step owns no declared product
     }
@@ -4705,11 +4860,14 @@ public actor RuntimeJobEngine {
     for persisted in persistedJobs {
       if jobs[persisted.jobID] != nil { continue }
       let replayed = try await recoveryService.replay(persisted)
+      let arkForgeState = try ArkForgeRuntimeJobState.load(
+        from: jobDirectory(for: persisted.jobID))
       try persistRuntimeRecord(replayed.record)
       recovered.append(status(of: replayed.record))
       jobs[persisted.jobID] = JobRuntime(
         record: replayed.record, journal: replayed.journal,
         nextSequence: replayed.nextSequence,
+        arkForgeState: arkForgeState,
         completedStepIDs: replayed.completedStepIDs)
       if replayed.record.outcomeUnknown {
         try await recordCapabilityOutcome(
@@ -5030,6 +5188,14 @@ public actor RuntimeJobEngine {
       if ArkForgeFlashOperation.containsDurableRecordReference(
         runtime.record.operationReference)
       {
+        if let execution = runtime.arkForgeState.execution,
+          let lane = configuration.arkForgeLane,
+          let settled = try await reconcileLaneAgainstDaemonTerminal(
+            runtime: &runtime, inspection: inspection, execution: execution,
+            lane: lane, provider: provider)
+        {
+          return settled
+        }
         return try await reconcileLaneFlashAgainstDevice(
           runtime: &runtime, inspection: inspection, provider: provider)
       }
@@ -5221,7 +5387,9 @@ public actor RuntimeJobEngine {
     recoveryAttemptID: String,
     outcome: ProviderReconcileOutcome,
     bindingRevision: Int?,
-    provider: any DeviceProvider
+    provider: any DeviceProvider,
+    successSemanticCode: String? = nil,
+    successSummary: String? = nil
   ) async throws -> RuntimeJobStatus {
     let jobID = runtime.record.jobID
     let hasDurableResolution = inspection.events.contains { event in
@@ -5250,6 +5418,8 @@ public actor RuntimeJobEngine {
             correlatesToIntentEventID: intentEventID,
             result: "succeeded",
             outcomeCertainty: .confirmed,
+            semanticCode: successSemanticCode,
+            summary: successSummary,
             schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
         runtime.nextSequence += 1
       }
@@ -5333,15 +5503,21 @@ public actor RuntimeJobEngine {
     case .confirmedCompleted:
       runtime.completedStepIDs.insert(stepID)
       runtime.record.outcomeUnknown = false
+      runtime.record.operationFailure = nil
       runtime.record.recoveryStepID = nil
       runtime.record.recoveryIntentEventID = nil
       runtime.record.recoveryAction = nil
+      runtime.record.finishedAtUTC = nil
       runtime.record.timeline.append("reconciled: confirmed completed \(stepID)")
     case .confirmedNotExecuted:
       try transition(
         &runtime, from: .finalizing, to: .failed,
         reason: "reconciliation confirmed \(stepID) did not complete")
       runtime.record.outcomeUnknown = false
+      runtime.record.operationFailure = RuntimeOperationFailure(
+        code: .executionConfirmedNotPerformed, category: .externalTool,
+        retryability: .runtimeDecisionRequired,
+        recovery: .submitNewTypedRequestAfterRuntimeProof)
       runtime.record.recoveryStepID = nil
       runtime.record.recoveryIntentEventID = nil
       runtime.record.recoveryAction = nil
@@ -5368,6 +5544,153 @@ public actor RuntimeJobEngine {
       break
     }
     return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+  }
+
+  /// First recovery source for a delegated job: the exact daemon job Runtime
+  /// durably correlated before any permit could be signed.
+  ///
+  /// This path is passive. It accepts either the already-persisted canonical
+  /// receipt (the crash window between receipt persistence and step outcome)
+  /// or a terminal event observed from that exact daemon job. It never starts
+  /// execution or answers an admission. Inconclusive/failed daemon terminals
+  /// fall through to the independent read-only device reconciliation below.
+  private func reconcileLaneAgainstDaemonTerminal(
+    runtime: inout JobRuntime,
+    inspection initialInspection: JournalReplay,
+    execution: RuntimeArkForgeLaneExecution,
+    lane: any ArkForgeLane,
+    provider: any DeviceProvider
+  ) async throws -> RuntimeJobStatus? {
+    let jobID = runtime.record.jobID
+    guard let stepID = runtime.record.recoveryStepID,
+      let intentEventID = runtime.record.recoveryIntentEventID,
+      initialInspection.unknownOutcomes.isEmpty,
+      initialInspection.outstandingIntents.contains(where: {
+        $0.eventID == intentEventID && $0.stepID == stepID
+      })
+    else {
+      return nil
+    }
+
+    var durableReceipt = runtime.arkForgeState.planCompletionReceipt
+    var cancelledSafe = false
+    if durableReceipt == nil {
+      do {
+        switch try await lane.observeTerminal(execution: execution) {
+        case .completed(let receipts):
+          durableReceipt = receipts.last.map(RuntimeArkForgePlanCompletionReceipt.init)
+        case .cancelledSafe:
+          cancelledSafe = true
+        case .confirmedFailed(let reason, _):
+          runtime.record.timeline.append(
+            "correlated arkforged terminal is confirmedFailed; device readback required: \(reason)")
+        case .outcomeUnknown(let reason, _):
+          runtime.record.timeline.append(
+            "correlated arkforged terminal remains unknown: \(reason)")
+        case nil:
+          runtime.record.timeline.append(
+            "correlated arkforged job \(execution.daemonJobID) has no terminal yet")
+        }
+      } catch {
+        runtime.record.timeline.append(
+          "could not observe correlated arkforged job \(execution.daemonJobID): \(error)")
+      }
+    }
+
+    if let durableReceipt {
+      do {
+        try Self.validateArkForgePlanCompletionReceipt(
+          durableReceipt, jobID: jobID, execution: execution)
+      } catch {
+        runtime.record.timeline.append(
+          "correlated arkforged completion receipt is non-canonical; device readback required")
+        try persistRuntimeRecord(runtime.record)
+        jobs[jobID] = runtime
+        return nil
+      }
+      // Receipt before outcome: preserve the same crash invariant as live
+      // dispatch. Re-entering this method after a crash simply reuses it.
+      runtime.arkForgeState.planCompletionReceipt = durableReceipt
+      try persistArkForgeRuntimeJobState(runtime.arkForgeState, jobID: jobID)
+    } else if !cancelledSafe {
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
+      return nil
+    }
+
+    var inspection = initialInspection
+    let journalURL = jobDirectory(for: jobID).appending(path: "journal.jsonl")
+    if inspection.currentState == .waitingForRecovery {
+      try transition(
+        &runtime, from: .waitingForRecovery, to: .reconciling,
+        reason: "begin passive correlated ArkForge reconciliation")
+      inspection = try DurableJournalRecovery.inspect(url: journalURL)
+    }
+    guard inspection.currentState == .reconciling else { return nil }
+
+    let unfinishedAttemptID: String? = {
+      var completed = Set<String>()
+      for event in inspection.events where event.kind == .reconcileOutcome {
+        if case .string(let attempt)? = event.payload["recoveryAttemptId"] {
+          completed.insert(attempt)
+        }
+      }
+      for event in inspection.events.reversed() where event.kind == .reconcileStarted {
+        if case .string(let attempt)? = event.payload["recoveryAttemptId"],
+          !completed.contains(attempt)
+        {
+          return attempt
+        }
+      }
+      return nil
+    }()
+    let recoveryAttemptID: String
+    if let unfinishedAttemptID {
+      recoveryAttemptID = unfinishedAttemptID
+    } else {
+      recoveryAttemptID = "arkforge-terminal-recovery-\(jobID)-\(runtime.nextSequence)"
+      try runtime.journal.appendAndSynchronize(
+        JournalEvent.reconcileStarted(
+          eventID: "reconcile-start-\(runtime.nextSequence)",
+          sequence: runtime.nextSequence,
+          sessionID: runtime.record.sessionID,
+          jobID: jobID,
+          timestamp: nowUTC(),
+          recoveryAttemptID: recoveryAttemptID,
+          sourceState: .waitingForRecovery,
+          lastDurableSequence: inspection.lastDurableSequence ?? 0,
+          trigger: "manual",
+          schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+      runtime.nextSequence += 1
+      runtime.record.timeline.append(
+        "reconcile observed exact daemon job \(execution.daemonJobID)")
+      jobs[jobID] = runtime
+      inspection = try DurableJournalRecovery.inspect(url: journalURL)
+    }
+
+    if cancelledSafe {
+      return try await finishReconcile(
+        runtime: &runtime, inspection: inspection,
+        intentEventID: intentEventID, stepID: stepID,
+        recoveryAttemptID: recoveryAttemptID,
+        outcome: .confirmedNotExecuted,
+        bindingRevision: runtime.record.materializedBindingRevision,
+        provider: provider)
+    }
+    guard let receipt = runtime.arkForgeState.planCompletionReceipt else { return nil }
+    return try await finishReconcile(
+      runtime: &runtime, inspection: inspection,
+      intentEventID: intentEventID, stepID: stepID,
+      recoveryAttemptID: recoveryAttemptID,
+      outcome: .confirmedCompleted(summary: [
+        "source": "correlatedArkForgeTerminal",
+        "daemonJobID": execution.daemonJobID,
+        "planID": execution.planID,
+      ]),
+      bindingRevision: runtime.record.materializedBindingRevision,
+      provider: provider,
+      successSemanticCode: Self.arkForgePlanCompletionSemanticCode,
+      successSummary: Self.arkForgePlanCompletionSummary(receipt))
   }
 
   /// Reconciles an unknown ArkForge-lane flash against the device itself.
@@ -5942,8 +6265,9 @@ public actor RuntimeJobEngine {
       else { return nil }
       lease = value
     case let reference where ArkForgeFlashOperation.contains(reference):
-      guard let value = ArkForgeFlashRequest.artifactLeaseID(
-        submittedReference: reference, inputs: runtime.record.request.inputs)
+      guard
+        let value = ArkForgeFlashRequest.artifactLeaseID(
+          submittedReference: reference, inputs: runtime.record.request.inputs)
       else { return nil }
       lease = value
     case "workspace.apply-patch@1":
@@ -6101,7 +6425,8 @@ public actor RuntimeJobEngine {
       leaseInputName = "libraryArtifactLease"
       artifactLabel = "native library"
     case let reference where ArkForgeFlashOperation.contains(reference):
-      leaseInputName = reference == ArkForgeFlashOperation.canonicalReference
+      leaseInputName =
+        reference == ArkForgeFlashOperation.canonicalReference
         ? "artifactLease" : "imageBundleLease"
       artifactLabel = "flash bundle"
     case "workspace.apply-patch@1":
@@ -7642,6 +7967,12 @@ public actor RuntimeJobEngine {
     try admissionService.persist(record, at: nowUTC())
   }
 
+  private func persistArkForgeRuntimeJobState(
+    _ state: ArkForgeRuntimeJobState, jobID: String
+  ) throws {
+    try state.persist(into: jobDirectory(for: jobID))
+  }
+
   /// Terminal jobs have no further dispatch or recovery path.  Their durable
   /// record and SQLite row remain queryable, so retaining a FileDurableJournal
   /// and detailed runtime projection in the daemon only makes memory grow with
@@ -8645,10 +8976,9 @@ public actor RuntimeJobEngine {
 }
 
 extension RuntimeJobEngine.ArkForgeLane {
-  /// Compatibility default for lanes whose `perform` implementation already
-  /// owns preparation. Production `ArkForgeLaneHost` overrides this to do the
-  /// actual early import; scripted lanes remain valid without pretending they
-  /// imported bytes they do not model.
+  /// Compatibility default for scripted lanes that do not model host-store
+  /// preparation. Production `ArkForgeLaneHost` overrides this to perform the
+  /// actual early import before execution preparation.
   package func prewarmArtifact(
     jobID _: String, artifact: ArkForgeLaneArtifact
   ) async throws -> ArkForgeLaneArtifactPrewarmReceipt {
@@ -8692,7 +9022,8 @@ extension RuntimeJobEngine: WorkspaceReferenceLedgerReading {
   public func referenceFacts(
     prepareRuntimeOwnerID: String, derivedProjectRef: String
   ) async throws -> WorkspaceReferenceLedgerFacts {
-    let prepareJobID = prepareRuntimeOwnerID.hasPrefix("runtime-")
+    let prepareJobID =
+      prepareRuntimeOwnerID.hasPrefix("runtime-")
       ? String(prepareRuntimeOwnerID.dropFirst("runtime-".count))
       : prepareRuntimeOwnerID
     let all = try admissionService.allJobs()

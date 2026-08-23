@@ -31,12 +31,27 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       self.toolchainSHA256 = toolchainSHA256
     }
 
-    func perform(
-      stepID: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
+    func prepareExecution(
+      jobID _: String, artifact _: ArkForgeLaneArtifact,
       binding _: ArkForgeLaneDeviceBinding, executionPurpose _: String
+    ) async throws -> RuntimeArkForgeLaneExecution {
+      throw RuntimeDispatchFailure.failed(
+        "planOnly must never prepare delegated ArkForge execution")
+    }
+
+    func performPrepared(
+      stepID: String, execution _: RuntimeArkForgeLaneExecution,
+      artifact _: ArkForgeLaneArtifact, binding _: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary {
       throw RuntimeDispatchFailure.failed(
         "planOnly must never execute delegated ArkForge step \(stepID)")
+    }
+
+    func observeTerminal(
+      execution _: RuntimeArkForgeLaneExecution
+    ) async throws -> ArkForgeFlashSession.Outcome? {
+      throw RuntimeDispatchFailure.failed(
+        "planOnly must never observe delegated ArkForge execution")
     }
 
     func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
@@ -250,7 +265,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       partitionTable
       ?? ("CMDLINE:mtdparts=rk29xxnand:"
         + profile.mappedPartitions.enumerated()
-          .map { "0x1@0x\(String(($0.offset + 1) * 0x2000, radix: 16))(\($0.element.partitionName))" }
+        .map { "0x1@0x\(String(($0.offset + 1) * 0x2000, radix: 16))(\($0.element.partitionName))" }
         .joined(separator: ",")
         + ","
         + profile.membershiplessPartitionsWriteForbidden.map { "0x1@0x1(\($0))" }

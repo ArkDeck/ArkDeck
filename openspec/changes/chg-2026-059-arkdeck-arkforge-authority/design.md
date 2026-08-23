@@ -271,12 +271,28 @@ daemon 收到含这些 key 的回执会拒绝。ArkDeck 侧需要对应的 secre
 
 现在：`RuntimeJobEngine` → `arkforged`：
 
-1. `materializePlan`（已有的只读 API）拿到 public plan 与 plan digest；
-2. `startExecution{plan_id, plan_sha256}` 开一个 job；
-3. `watchJob` 订阅事件；
-4. 对每个 `STEP_ADMISSION_REQUESTED`：跑现有的授权判定 → 签 permit → `submitStepPermit`；
-5. 对每个 `MANAGED_CONTROL_REQUESTED`：跑映射表里的 provider action → `submitReceipt`；
-6. 对每个 `ACTION_RECEIPT`：记 journal、驱动 UI。
+1. `materializePlan`（已有的只读 API）拿到 ArkForge plan 与 plan digest；
+2. `startExecution{plan_id, plan_sha256}` 开一个**尚不能产生外部效果**的 daemon job；
+3. 把 `(ArkDeck job, daemon job, plan/digest, artifact, target binding, purpose,
+   toolchain)` correlation 原子写入 job-owned
+   `arkforge-runtime-state.json` sidecar；
+4. 写入 ArkDeck 对应 step intent；只有第 3、4 步都 durable 后才进入 `watchJob`；
+5. 对每个 `STEP_ADMISSION_REQUESTED`：跑现有的授权判定 → 签 permit → `submitStepPermit`；
+6. 对每个 `MANAGED_CONTROL_REQUESTED`：跑映射表里的 provider action → `submitReceipt`；
+7. 对每个 `ACTION_RECEIPT`：先把 canonical terminal receipt 写入同一个
+   job-owned ArkForge sidecar，再写 correlated step outcome、驱动 UI。
+
+arkforged 在发布第 7 步事件之前，已经把 canonical receipt body、semantic digest
+和该事件的 cursor 一起写入 `SemanticReceiptRecorded`。因此 ArkDeck 与 arkforged
+都重启时，新 daemon 能以同一个 cursor 重放同一张 receipt；ArkDeck 仍须按 durable
+correlation 重验 job/plan/step/postflight，不能只信 terminal 字符串。
+
+这里的顺序是 crash contract，不是缓存优化。`ArkForgeLaneHost` 的 actor cache
+不构成 durable authority；进程重启后只能用记录里的 daemon job id 调
+`watchJob`，不得为同一次 ArkDeck attempt 再调 `startExecution`。如果进程恰好死在
+第 2、3 步之间，daemon 最多留下一个没有 permit、不能触碰设备的 orphan job。
+如果死在 terminal receipt 与 step outcome 之间，reconcile 用已落盘 receipt 关闭原
+intent，不重签 permit，也不创建新 intent。
 
 ### 5.3 postflight 期望值的来源（这条最容易做错）
 
@@ -308,11 +324,20 @@ ArkDeck 侧要处理的形态：
 
 | daemon 重启后 | ArkDeck 该做什么 |
 |---|---|
-| 该 permit 已消费并有回执 | 拿原回执，不要重签 |
+| 该 permit 已消费并有回执 | 只接受 canonical body、关联 ID 与 digest 全部复验通过的原回执；不要重签 |
 | 该 permit 消费中断、无回执 | outcome unknown。**不要**签第二张 permit |
 | 该 permit 已签发但 daemon 没落 intent | 可以重传**同一个** permitID；不能签新的 |
 
 第二行是最容易做错的：一个「重试一下」的按钮会在这里造成第二次写入。
+
+ArkDeck 自身崩溃遵循同一规则：恢复先读 durable correlation，再被动观察那个精确
+daemon job。只有 exact `succeeded` 且 canonical terminal receipt 通过 job/plan/
+postflight digest 校验，才可补写原 intent 的成功 outcome；`cancelledSafe` 可补写
+confirmed-not-executed；缺失、未来 terminal 值、`confirmedFailed` 或
+`outcomeUnknown` 都不能据此重放，必要时转入独立的只读设备 reconcile。
+被动观察必须消费完整的有限 poll：同一条 durable 历史里，先前的
+`outcomeUnknown` 可以被随后 read-only reconcile 产生的 `succeeded` 或
+`confirmedFailed` 覆盖；在第一个 unknown 处提前返回会漏掉真正终态和重放 receipt。
 
 ### 6.2 掉电
 
