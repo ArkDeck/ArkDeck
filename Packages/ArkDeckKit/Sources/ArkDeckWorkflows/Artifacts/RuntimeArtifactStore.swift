@@ -190,6 +190,91 @@ public struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
   }
 }
 
+/// Process-local counters for the Artifact payload verification path. They are
+/// deliberately not durable evidence: their only job is to make a regression
+/// from identity checks back to repeated full-file hashing measurable in
+/// contract tests and host profiling.
+package struct RuntimeArtifactVerificationMetrics: Sendable, Equatable {
+  package let fullHashPasses: Int
+  package let fullHashBytes: UInt64
+  package let fullHashDurationNanoseconds: UInt64
+  package let sealedIdentityHits: Int
+}
+
+/// The exact inode facts established after a complete payload hash. A cache
+/// hit is useful only while the file remains a private, read-only regular file
+/// with this identity; chmod, replacement and content writes all change one of
+/// these fields and force a new full hash.
+private struct ArtifactPayloadFingerprint: Codable, Equatable {
+  let device: UInt64
+  let inode: UInt64
+  let byteCount: Int64
+  let owner: UInt32
+  let mode: UInt32
+  let linkCount: UInt64
+  let modifiedSeconds: Int64
+  let modifiedNanoseconds: Int64
+  let changedSeconds: Int64
+  let changedNanoseconds: Int64
+  let createdSeconds: Int64
+  let createdNanoseconds: Int64
+
+  init(_ value: stat) {
+    device = UInt64(value.st_dev)
+    inode = UInt64(value.st_ino)
+    byteCount = Int64(value.st_size)
+    owner = UInt32(value.st_uid)
+    mode = UInt32(value.st_mode)
+    linkCount = UInt64(value.st_nlink)
+    modifiedSeconds = Int64(value.st_mtimespec.tv_sec)
+    modifiedNanoseconds = Int64(value.st_mtimespec.tv_nsec)
+    changedSeconds = Int64(value.st_ctimespec.tv_sec)
+    changedNanoseconds = Int64(value.st_ctimespec.tv_nsec)
+    createdSeconds = Int64(value.st_birthtimespec.tv_sec)
+    createdNanoseconds = Int64(value.st_birthtimespec.tv_nsec)
+  }
+
+  var isPrivateSealedRegularFile: Bool {
+    mode & UInt32(S_IFMT) == UInt32(S_IFREG)
+      && mode & 0o777 == 0o400
+      && owner == UInt32(geteuid())
+      && linkCount == 1
+  }
+}
+
+private struct ArtifactPayloadVerificationRecord: Codable, Equatable {
+  let artifactID: String
+  let sha256: String
+  let byteCount: Int
+  let fingerprint: ArtifactPayloadFingerprint
+
+  init(metadata: RuntimeArtifactMetadata, fingerprint: ArtifactPayloadFingerprint) {
+    artifactID = metadata.artifactID
+    sha256 = metadata.sha256
+    byteCount = metadata.byteCount
+    self.fingerprint = fingerprint
+  }
+
+  func matches(
+    metadata: RuntimeArtifactMetadata,
+    fingerprint current: ArtifactPayloadFingerprint
+  ) -> Bool {
+    artifactID == metadata.artifactID
+      && sha256 == metadata.sha256
+      && byteCount == metadata.byteCount
+      && fingerprint == current
+      && current.byteCount == Int64(metadata.byteCount)
+      && current.isPrivateSealedRegularFile
+  }
+}
+
+private struct ArtifactPayloadVerificationDocument: Codable {
+  static let schemaVersion = "arkdeck-artifact-payload-verification/1"
+  let schemaVersion: String
+  let records: [ArtifactPayloadVerificationRecord]
+  let recordsSHA256: String
+}
+
 private struct ArtifactIndexDocument: Codable, Equatable {
   static let currentSchemaVersion = "1.0.0"
   var schemaVersion: String
@@ -496,6 +581,8 @@ public struct CleanupDebtRecord: Sendable, Equatable, Codable {
 
 public actor RuntimeArtifactStore {
   private static let maximumReadBytes = 4 * 1024 * 1024
+  private static let payloadVerificationCacheName = ".payload-verification-v1.json"
+  private static let maximumPayloadVerificationCacheBytes = 4 * 1024 * 1024
 
   private let rootURL: URL
   private let quota: ArtifactQuota
@@ -509,6 +596,9 @@ public actor RuntimeArtifactStore {
   /// almost a minute. The cache is process-local (so restart always rebuilds
   /// from durable truth) and GC invalidates it before changing indexes.
   private var cachedIndexedBytes: Int?
+  private var payloadVerificationsByJob: [String: [String: ArtifactPayloadVerificationRecord]]
+  private var loadedPayloadVerificationJobs: Set<String>
+  private var payloadVerificationMetrics: RuntimeArtifactVerificationMetrics
 
   public init(
     rootURL: URL,
@@ -523,6 +613,11 @@ public actor RuntimeArtifactStore {
     self.retentionPolicy = retentionPolicy
     self.nowUTC = nowUTC
     self.cachedIndexedBytes = nil
+    self.payloadVerificationsByJob = [:]
+    self.loadedPayloadVerificationJobs = []
+    self.payloadVerificationMetrics = RuntimeArtifactVerificationMetrics(
+      fullHashPasses: 0, fullHashBytes: 0,
+      fullHashDurationNanoseconds: 0, sealedIdentityHits: 0)
     do {
       try FileManager.default.createDirectory(
         at: rootURL, withIntermediateDirectories: true,
@@ -531,6 +626,10 @@ public actor RuntimeArtifactStore {
     } catch {
       throw RuntimeArtifactError.ioFailure("cannot create artifact root: \(error)")
     }
+  }
+
+  package func verificationMetricsSnapshot() -> RuntimeArtifactVerificationMetrics {
+    payloadVerificationMetrics
   }
 
   // MARK: - Publication
@@ -629,6 +728,7 @@ public actor RuntimeArtifactStore {
     // reaches the filesystem path.
     if !destinationExists {
       try atomicWrite(payload, to: destination, directory: jobDirectory)
+      _ = try validateStoredPayload(metadata, at: destination)
     }
     try upsert(metadata, jobID: request.jobID)
     cachedIndexedBytes = used + metadata.byteCount
@@ -721,10 +821,11 @@ public actor RuntimeArtifactStore {
           requestedBytes: request.expectedByteCount,
           remainingBytes: max(0, quota.totalBytes - used))
       }
-      try copyFileDescriptor(
+      let fingerprint = try copyFileDescriptor(
         sourceFD, sourceBefore: sourceBefore, expectedSHA256: digest,
         expectedByteCount: request.expectedByteCount,
         destination: destination, directory: jobDirectory)
+      rememberPayloadVerification(metadata, fingerprint: fingerprint)
     }
     try upsert(metadata, jobID: request.jobID)
     cachedIndexedBytes = used + metadata.byteCount
@@ -776,19 +877,19 @@ public actor RuntimeArtifactStore {
       if !temporaryPublished { _ = Darwin.unlink(temporary.path) }
     }
 
+    let streamStarted = DispatchTime.now().uptimeNanoseconds
     let streamed = try streamRedactedText(
       sourceFD: sourceFD, sourceBefore: sourceBefore, destinationFD: temporaryFD,
       sourcePath: request.sourceFileURL.path)
-    guard Darwin.fsync(temporaryFD) == 0 else {
+    recordFullPayloadHash(
+      byteCount: streamed.byteCount,
+      durationNanoseconds: DispatchTime.now().uptimeNanoseconds - streamStarted)
+    guard Darwin.fchmod(temporaryFD, 0o400) == 0,
+      Darwin.fsync(temporaryFD) == 0
+    else {
       throw RuntimeArtifactError.ioFailure(
-        "cannot synchronize redacted Artifact staging file (errno \(errno))")
+        "cannot seal redacted Artifact staging file (errno \(errno))")
     }
-    guard Darwin.close(temporaryFD) == 0 else {
-      temporaryIsOpen = false
-      throw RuntimeArtifactError.ioFailure(
-        "cannot close redacted Artifact staging file (errno \(errno))")
-    }
-    temporaryIsOpen = false
 
     let identityInput = Data(
       "\(request.jobID)\u{0}\(request.name)\u{0}\(streamed.sha256)".utf8)
@@ -829,6 +930,7 @@ public actor RuntimeArtifactStore {
 
     let destination = jobDirectory.appending(path: metadata.artifactID)
     let used = try totalBytesUsed()
+    var publishedFingerprint: ArtifactPayloadFingerprint?
     if FileManager.default.fileExists(atPath: destination.path) {
       _ = try validateStoredPayload(metadata, at: destination)
     } else {
@@ -845,12 +947,34 @@ public actor RuntimeArtifactStore {
           "cannot remove redacted Artifact staging link (errno \(errno))")
       }
       temporaryPublished = true
+      var published = stat()
+      guard fstat(temporaryFD, &published) == 0 else {
+        throw RuntimeArtifactError.ioFailure(
+          "cannot inspect published redacted Artifact (errno \(errno))")
+      }
+      let fingerprint = ArtifactPayloadFingerprint(published)
+      guard fingerprint.byteCount == Int64(streamed.byteCount),
+        fingerprint.isPrivateSealedRegularFile
+      else {
+        throw RuntimeArtifactError.ioFailure(
+          "published redacted Artifact is not a sealed private regular file")
+      }
+      publishedFingerprint = fingerprint
       let directoryFD = Darwin.open(
         jobDirectory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
       if directoryFD >= 0 {
         _ = Darwin.fsync(directoryFD)
         Darwin.close(directoryFD)
       }
+    }
+    guard Darwin.close(temporaryFD) == 0 else {
+      temporaryIsOpen = false
+      throw RuntimeArtifactError.ioFailure(
+        "cannot close redacted Artifact staging file (errno \(errno))")
+    }
+    temporaryIsOpen = false
+    if let publishedFingerprint {
+      rememberPayloadVerification(metadata, fingerprint: publishedFingerprint)
     }
     try upsert(metadata, jobID: request.jobID)
     cachedIndexedBytes = used + metadata.byteCount
@@ -1118,6 +1242,8 @@ public actor RuntimeArtifactStore {
             do {
               try FileManager.default.removeItem(
                 at: entry.appending(path: metadata.artifactID))
+              forgetPayloadVerification(
+                jobID: jobID, artifactID: metadata.artifactID)
             } catch {
               throw RuntimeArtifactError.ioFailure(
                 "cannot collect \(metadata.artifactID): \(error)")
@@ -1220,6 +1346,189 @@ public actor RuntimeArtifactStore {
   }
 
   // MARK: - Internals
+
+  private func cachedPayloadVerification(
+    jobID: String, artifactID: String
+  ) -> ArtifactPayloadVerificationRecord? {
+    loadPayloadVerificationsIfNeeded(jobID: jobID)
+    return payloadVerificationsByJob[jobID]?[artifactID]
+  }
+
+  private func rememberPayloadVerification(
+    _ metadata: RuntimeArtifactMetadata,
+    fingerprint: ArtifactPayloadFingerprint
+  ) {
+    guard fingerprint.isPrivateSealedRegularFile else { return }
+    loadPayloadVerificationsIfNeeded(jobID: metadata.jobID)
+    var records = payloadVerificationsByJob[metadata.jobID] ?? [:]
+    records[metadata.artifactID] = ArtifactPayloadVerificationRecord(
+      metadata: metadata, fingerprint: fingerprint)
+    payloadVerificationsByJob[metadata.jobID] = records
+    // The cache is an optimization. A read-only or full volume may still
+    // resolve safely by hashing the payload again on the next access.
+    try? persistPayloadVerifications(jobID: metadata.jobID, records: records)
+  }
+
+  private func forgetPayloadVerification(jobID: String, artifactID: String) {
+    loadPayloadVerificationsIfNeeded(jobID: jobID)
+    guard var records = payloadVerificationsByJob[jobID] else { return }
+    records.removeValue(forKey: artifactID)
+    payloadVerificationsByJob[jobID] = records
+    try? persistPayloadVerifications(jobID: jobID, records: records)
+  }
+
+  private func loadPayloadVerificationsIfNeeded(jobID: String) {
+    guard loadedPayloadVerificationJobs.insert(jobID).inserted else { return }
+    let loaded = (try? loadPayloadVerifications(jobID: jobID)) ?? []
+    payloadVerificationsByJob[jobID] = Dictionary(
+      uniqueKeysWithValues: loaded.map { ($0.artifactID, $0) })
+  }
+
+  private func loadPayloadVerifications(
+    jobID: String
+  ) throws -> [ArtifactPayloadVerificationRecord] {
+    let url = try directory(for: jobID).appending(
+      path: Self.payloadVerificationCacheName)
+    var pathMetadata = stat()
+    guard lstat(url.path, &pathMetadata) == 0 else {
+      if errno == ENOENT { return [] }
+      throw RuntimeArtifactError.ioFailure(
+        "cannot inspect Artifact verification cache (errno \(errno))")
+    }
+    let pathFingerprint = ArtifactPayloadFingerprint(pathMetadata)
+    guard pathFingerprint.isPrivateSealedRegularFile,
+      pathFingerprint.byteCount > 0,
+      pathFingerprint.byteCount <= Int64(Self.maximumPayloadVerificationCacheBytes)
+    else { return [] }
+
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else { return [] }
+    defer { Darwin.close(descriptor) }
+    var openedMetadata = stat()
+    guard fstat(descriptor, &openedMetadata) == 0,
+      ArtifactPayloadFingerprint(openedMetadata) == pathFingerprint
+    else { return [] }
+    let data = try Self.readAll(
+      from: descriptor, maximumBytes: Self.maximumPayloadVerificationCacheBytes,
+      label: "Artifact verification cache")
+    let document = try JSONDecoder().decode(
+      ArtifactPayloadVerificationDocument.self, from: data)
+    guard document.schemaVersion == ArtifactPayloadVerificationDocument.schemaVersion,
+      document.recordsSHA256 == (try Self.payloadVerificationRecordsDigest(document.records))
+    else { return [] }
+    var identities = Set<String>()
+    guard document.records.allSatisfy({ record in
+      Self.isSafeArtifactID(record.artifactID)
+        && record.sha256.range(
+          of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
+        && record.byteCount >= 0
+        && record.fingerprint.isPrivateSealedRegularFile
+        && identities.insert(record.artifactID).inserted
+    }) else { return [] }
+    return document.records
+  }
+
+  private func persistPayloadVerifications(
+    jobID: String,
+    records: [String: ArtifactPayloadVerificationRecord]
+  ) throws {
+    let ordered = records.values.sorted { $0.artifactID < $1.artifactID }
+    let document = ArtifactPayloadVerificationDocument(
+      schemaVersion: ArtifactPayloadVerificationDocument.schemaVersion,
+      records: ordered,
+      recordsSHA256: try Self.payloadVerificationRecordsDigest(ordered))
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    let data = try encoder.encode(document)
+    guard data.count <= Self.maximumPayloadVerificationCacheBytes else {
+      throw RuntimeArtifactError.ioFailure("Artifact verification cache exceeded its bound")
+    }
+    let jobDirectory = try directory(for: jobID)
+    let target = jobDirectory.appending(path: Self.payloadVerificationCacheName)
+    let temporary = jobDirectory.appending(
+      path: ".tmp-payload-verification-\(UUID().uuidString.prefix(12).lowercased())")
+    let descriptor = Darwin.open(
+      temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard descriptor >= 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot create Artifact verification cache (errno \(errno))")
+    }
+    var isOpen = true
+    defer {
+      if isOpen { Darwin.close(descriptor) }
+      _ = Darwin.unlink(temporary.path)
+    }
+    try Self.writeAll(data, to: descriptor, label: "Artifact verification cache")
+    guard Darwin.fchmod(descriptor, 0o400) == 0,
+      Darwin.fsync(descriptor) == 0
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot seal Artifact verification cache (errno \(errno))")
+    }
+    guard Darwin.close(descriptor) == 0 else {
+      isOpen = false
+      throw RuntimeArtifactError.ioFailure(
+        "cannot close Artifact verification cache (errno \(errno))")
+    }
+    isOpen = false
+    guard Darwin.rename(temporary.path, target.path) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot publish Artifact verification cache (errno \(errno))")
+    }
+    let directoryDescriptor = Darwin.open(
+      jobDirectory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    if directoryDescriptor >= 0 {
+      _ = Darwin.fsync(directoryDescriptor)
+      Darwin.close(directoryDescriptor)
+    }
+  }
+
+  private static func payloadVerificationRecordsDigest(
+    _ records: [ArtifactPayloadVerificationRecord]
+  ) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return SHA256Hex.string(of: try encoder.encode(records))
+  }
+
+  private static func readAll(
+    from descriptor: Int32, maximumBytes: Int, label: String
+  ) throws -> Data {
+    guard Darwin.lseek(descriptor, 0, SEEK_SET) == 0 else {
+      throw RuntimeArtifactError.ioFailure("cannot rewind \(label) (errno \(errno))")
+    }
+    var result = Data()
+    var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw RuntimeArtifactError.ioFailure("cannot read \(label) (errno \(errno))")
+      }
+      if count == 0 { return result }
+      guard result.count <= maximumBytes - count else {
+        throw RuntimeArtifactError.ioFailure("\(label) exceeded its byte bound")
+      }
+      result.append(contentsOf: buffer[0..<count])
+    }
+  }
+
+  private func recordFullPayloadHash(byteCount: Int, durationNanoseconds: UInt64) {
+    payloadVerificationMetrics = RuntimeArtifactVerificationMetrics(
+      fullHashPasses: payloadVerificationMetrics.fullHashPasses + 1,
+      fullHashBytes: payloadVerificationMetrics.fullHashBytes + UInt64(max(0, byteCount)),
+      fullHashDurationNanoseconds:
+        payloadVerificationMetrics.fullHashDurationNanoseconds + durationNanoseconds,
+      sealedIdentityHits: payloadVerificationMetrics.sealedIdentityHits)
+  }
+
+  private func recordSealedPayloadIdentityHit() {
+    payloadVerificationMetrics = RuntimeArtifactVerificationMetrics(
+      fullHashPasses: payloadVerificationMetrics.fullHashPasses,
+      fullHashBytes: payloadVerificationMetrics.fullHashBytes,
+      fullHashDurationNanoseconds: payloadVerificationMetrics.fullHashDurationNanoseconds,
+      sealedIdentityHits: payloadVerificationMetrics.sealedIdentityHits + 1)
+  }
 
   private func directory(for jobID: String) throws -> URL {
     // jobID comes from the engine (a UUID-derived identifier), never from
@@ -1383,7 +1692,7 @@ public actor RuntimeArtifactStore {
     expectedByteCount: Int,
     destination: URL,
     directory: URL
-  ) throws {
+  ) throws -> ArtifactPayloadFingerprint {
     guard Darwin.lseek(sourceFD, 0, SEEK_SET) == 0 else {
       throw RuntimeArtifactError.ioFailure(
         "cannot rewind file-backed Artifact source (errno \(errno))")
@@ -1406,6 +1715,7 @@ public actor RuntimeArtifactStore {
     var hasher = SHA256()
     var copied = 0
     var buffer = [UInt8](repeating: 0, count: 1 << 20)
+    let hashStarted = DispatchTime.now().uptimeNanoseconds
     while true {
       let count = Darwin.read(sourceFD, &buffer, buffer.count)
       if count < 0, errno == EINTR { continue }
@@ -1433,6 +1743,9 @@ public actor RuntimeArtifactStore {
     var sourceAfter = stat()
     let copiedDigest =
       SHA256Hex.hexString(hasher.finalize())
+    recordFullPayloadHash(
+      byteCount: copied,
+      durationNanoseconds: DispatchTime.now().uptimeNanoseconds - hashStarted)
     guard copied == expectedByteCount,
       copiedDigest == expectedSHA256,
       fstat(sourceFD, &sourceAfter) == 0,
@@ -1441,12 +1754,12 @@ public actor RuntimeArtifactStore {
       throw RuntimeArtifactError.ioFailure(
         "file-backed Artifact source changed while being published")
     }
-    guard fsync(destinationFD) == 0 else {
+    guard Darwin.fchmod(destinationFD, 0o400) == 0,
+      fsync(destinationFD) == 0
+    else {
       throw RuntimeArtifactError.ioFailure(
-        "cannot synchronize file-backed Artifact destination (errno \(errno))")
+        "cannot seal file-backed Artifact destination (errno \(errno))")
     }
-    Darwin.close(destinationFD)
-    destinationIsOpen = false
     guard Darwin.link(temporary.path, destination.path) == 0 else {
       throw RuntimeArtifactError.ioFailure(
         "cannot publish file-backed Artifact without overwrite (errno \(errno))")
@@ -1455,12 +1768,27 @@ public actor RuntimeArtifactStore {
       throw RuntimeArtifactError.ioFailure(
         "cannot remove file-backed Artifact staging link (errno \(errno))")
     }
+    var published = stat()
+    guard fstat(destinationFD, &published) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot inspect published file-backed Artifact (errno \(errno))")
+    }
+    let fingerprint = ArtifactPayloadFingerprint(published)
+    guard fingerprint.byteCount == Int64(expectedByteCount),
+      fingerprint.isPrivateSealedRegularFile
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "published file-backed Artifact is not a sealed private regular file")
+    }
+    Darwin.close(destinationFD)
+    destinationIsOpen = false
     let directoryFD = Darwin.open(
       directory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
     if directoryFD >= 0 {
       _ = Darwin.fsync(directoryFD)
       Darwin.close(directoryFD)
     }
+    return fingerprint
   }
 
   private struct StreamedTextArtifact {
@@ -1543,22 +1871,57 @@ public actor RuntimeArtifactStore {
   private func validateStoredPayload(
     _ metadata: RuntimeArtifactMetadata, at url: URL
   ) throws -> URL {
-    do {
-      try Self.requireRegularFileWithoutSymlink(url, label: "artifact payload")
-      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-      guard let size = attributes[.size] as? NSNumber,
-        size.intValue == metadata.byteCount
-      else {
-        throw RuntimeArtifactError.indexCorrupted("artifact payload size drifted")
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RuntimeArtifactError.indexCorrupted(
+        "artifact payload is missing, linked or unreadable (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    var before = stat()
+    guard fstat(descriptor, &before) == 0,
+      before.st_mode & S_IFMT == S_IFREG,
+      before.st_size == Int64(metadata.byteCount)
+    else {
+      throw RuntimeArtifactError.indexCorrupted(
+        "artifact payload type or size drifted")
+    }
+    let beforeFingerprint = ArtifactPayloadFingerprint(before)
+    if let cached = cachedPayloadVerification(
+      jobID: metadata.jobID, artifactID: metadata.artifactID),
+      cached.matches(metadata: metadata, fingerprint: beforeFingerprint)
+    {
+      recordSealedPayloadIdentityHit()
+      return url
+    }
+
+    let started = DispatchTime.now().uptimeNanoseconds
+    let (digest, hashedBytes) = try Self.sha256Hex(ofDescriptor: descriptor)
+    let duration = DispatchTime.now().uptimeNanoseconds - started
+    recordFullPayloadHash(byteCount: hashedBytes, durationNanoseconds: duration)
+    var after = stat()
+    guard fstat(descriptor, &after) == 0,
+      Self.sameFileIdentityAndContent(before, after),
+      hashedBytes == metadata.byteCount,
+      digest == metadata.sha256
+    else {
+      throw RuntimeArtifactError.indexCorrupted("artifact payload digest or identity drifted")
+    }
+
+    // Older stores published payloads as owner-writable files. They remain
+    // readable, but cannot become cacheable until a complete hash has just
+    // established their bytes and this exact descriptor is sealed. Failure to
+    // chmod is an availability fallback, not permission to trust metadata: the
+    // payload is accepted from this full hash and will be hashed again later.
+    if ArtifactPayloadFingerprint(after).isPrivateSealedRegularFile
+      || Darwin.fchmod(descriptor, 0o400) == 0
+    {
+      var sealed = stat()
+      if fstat(descriptor, &sealed) == 0 {
+        let fingerprint = ArtifactPayloadFingerprint(sealed)
+        if fingerprint.isPrivateSealedRegularFile {
+          rememberPayloadVerification(metadata, fingerprint: fingerprint)
+        }
       }
-      let digest = try Self.sha256Hex(of: url)
-      guard digest == metadata.sha256 else {
-        throw RuntimeArtifactError.indexCorrupted("artifact payload digest drifted")
-      }
-    } catch let error as RuntimeArtifactError {
-      throw error
-    } catch {
-      throw RuntimeArtifactError.ioFailure("cannot inspect artifact payload: \(error)")
     }
     return url
   }
@@ -1608,14 +1971,26 @@ public actor RuntimeArtifactStore {
       options: .regularExpression) != nil
   }
 
-  private static func sha256Hex(of url: URL) throws -> String {
-    let handle = try FileHandle(forReadingFrom: url)
-    defer { try? handle.close() }
-    var hasher = SHA256()
-    while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-      hasher.update(data: chunk)
+  private static func sha256Hex(ofDescriptor descriptor: Int32) throws -> (String, Int) {
+    guard Darwin.lseek(descriptor, 0, SEEK_SET) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot rewind artifact payload (errno \(errno))")
     }
-    return SHA256Hex.hexString(hasher.finalize())
+    var hasher = SHA256()
+    var byteCount = 0
+    var buffer = [UInt8](repeating: 0, count: 1 << 20)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw RuntimeArtifactError.ioFailure(
+          "cannot hash artifact payload (errno \(errno))")
+      }
+      if count == 0 { break }
+      byteCount += count
+      hasher.update(data: Data(buffer[0..<count]))
+    }
+    return (SHA256Hex.hexString(hasher.finalize()), byteCount)
   }
 
   private static func sameFileIdentityAndContent(_ lhs: stat, _ rhs: stat) -> Bool {

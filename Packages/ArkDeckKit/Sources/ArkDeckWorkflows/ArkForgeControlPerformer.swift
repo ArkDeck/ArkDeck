@@ -26,6 +26,30 @@ package struct ArkForgeLaneArtifact: Sendable, Equatable {
   }
 }
 
+/// What the lane learned while making an admitted Job's archive ready.
+///
+/// This is deliberately smaller than a materialized plan. Prewarming may put
+/// immutable bytes in ArkForge's content store and ask it to inspect those
+/// bytes, but it has no device binding, no authority and no permit, so it
+/// cannot create or start an execution. The engine checks the digest and
+/// profile again before it consumes the destructive capability.
+package struct ArkForgeLaneArtifactPrewarmReceipt: Sendable, Equatable {
+  package let artifactSHA256: String
+  package let profileID: String
+  package let imported: Bool
+  package let durationMilliseconds: UInt64
+
+  package init(
+    artifactSHA256: String, profileID: String, imported: Bool,
+    durationMilliseconds: UInt64
+  ) {
+    self.artifactSHA256 = artifactSHA256
+    self.profileID = profileID
+    self.imported = imported
+    self.durationMilliseconds = durationMilliseconds
+  }
+}
+
 /// The device a delegated step was admitted against, carried from the engine
 /// to the lane.
 ///

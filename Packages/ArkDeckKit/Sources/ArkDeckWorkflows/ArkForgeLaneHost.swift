@@ -1,6 +1,7 @@
 import ArkDeckCore
 import ArkForgeClient
 import ArkForgeProtocol
+import Dispatch
 import Foundation
 
 /// The lane the engine dispatches a delegated step through.
@@ -199,6 +200,18 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// Purpose is part of the immutable ArkForge plan identity. One ArkDeck job
   /// may not switch from primary execution to recovery after materialization.
   private var executionPurposeByJob: [String: String] = [:]
+  /// Host-store preparation started by Runtime after durable admission.
+  ///
+  /// Only digest/profile identity is retained. The engine resolves and
+  /// revalidates the sealed file again at the consume point; retaining a file
+  /// descriptor here would blur that boundary, while retaining the URL would
+  /// make spelling differences look like byte drift.
+  private struct PrewarmedArtifact: Sendable {
+    let artifactSHA256: String
+    let profileID: String
+    let receipt: ArkForgeLaneArtifactPrewarmReceipt
+  }
+  private var prewarmedArtifactByJob: [String: PrewarmedArtifact] = [:]
 
   package init(
     connection: Connection,
@@ -297,6 +310,52 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       }
     }
     return high == nil ? out : nil
+  }
+
+  /// Imports and inspects immutable archive bytes while Runtime continues its
+  /// admitted Job's host-only work.
+  ///
+  /// There is intentionally no device argument here. With no device binding,
+  /// authority or permit this method cannot materialize or start an
+  /// execution; it can only populate ArkForge's content-addressed host store.
+  package func prewarmArtifact(
+    jobID: String, artifact: ArkForgeLaneArtifact
+  ) async throws -> ArkForgeLaneArtifactPrewarmReceipt {
+    if let prepared = prewarmedArtifactByJob[jobID] {
+      guard prepared.artifactSHA256 == artifact.sha256,
+        prepared.profileID == artifact.profileID
+      else {
+        throw LaneError.planNotExecutable(
+          availability: "unusable",
+          reason: "ArkDeck job \(jobID) changed artifact identity after lane prewarm",
+          unknowns: [
+            "prewarmedArtifactSHA256": prepared.artifactSHA256,
+            "requestedArtifactSHA256": artifact.sha256,
+          ])
+      }
+      return prepared.receipt
+    }
+
+    let started = DispatchTime.now().uptimeNanoseconds
+    let controller = try makeMaterializer(connection.socketPath)
+    let imported = try ensureArtifactStored(
+      controller: controller, artifact: artifact,
+      requestStem: "prewarm-\(jobID)")
+    let finished = DispatchTime.now().uptimeNanoseconds
+    let receipt = ArkForgeLaneArtifactPrewarmReceipt(
+      artifactSHA256: artifact.sha256, profileID: artifact.profileID,
+      imported: imported,
+      durationMilliseconds: (finished &- started) / 1_000_000)
+    prewarmedArtifactByJob[jobID] = PrewarmedArtifact(
+      artifactSHA256: artifact.sha256, profileID: artifact.profileID,
+      receipt: receipt)
+    return receipt
+  }
+
+  /// Drops only transient per-Job bookkeeping. The daemon's immutable store
+  /// remains content-addressed and is intentionally not altered here.
+  package func finishArtifactPrewarm(jobID: String) async {
+    prewarmedArtifactByJob.removeValue(forKey: jobID)
   }
 
   /// Runs the ArkForge job on first use for this ArkDeck job, then serves each
@@ -440,15 +499,26 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   ) async throws -> (plan: ArkForgeExecutablePlan, observedMode: String) {
     let controller = try makeMaterializer(connection.socketPath)
 
-    if (try? controller.inspectArtifact(
-      artifactID: artifact.sha256, requestID: "inspect-\(jobID)"))
-      == nil
-    {
-      _ = try controller.importArtifact(
-        contentsOf: artifact.fileURL, expectedSHA256: artifact.sha256,
-        requestID: "import-\(jobID)")
-      _ = try controller.inspectArtifact(
-        artifactID: artifact.sha256, requestID: "inspect-after-import-\(jobID)")
+    if let prepared = prewarmedArtifactByJob[jobID] {
+      guard prepared.artifactSHA256 == artifact.sha256,
+        prepared.profileID == artifact.profileID
+      else {
+        throw LaneError.planNotExecutable(
+          availability: "unusable",
+          reason: "ArkDeck job \(jobID) changed artifact identity after lane prewarm",
+          unknowns: [
+            "prewarmedArtifactSHA256": prepared.artifactSHA256,
+            "requestedArtifactSHA256": artifact.sha256,
+          ])
+      }
+      // The public assessment below independently inspects this digest. If
+      // the daemon restarted or lost its store after prewarm, that call fails
+      // closed before `startExecution`; repeating the 731 MB controller import
+      // here would only erase the overlap we created.
+      prewarmedArtifactByJob.removeValue(forKey: jobID)
+    } else {
+      _ = try ensureArtifactStored(
+        controller: controller, artifact: artifact, requestStem: jobID)
     }
 
     let publicSource = try makeAssessmentSource(connection.publicSocketPath)
@@ -460,6 +530,30 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       bindingID: binding.targetID,
       bindingRevision: UInt64(max(1, binding.bindingRevision)),
       executionPurpose: executionPurpose, requestStem: jobID)
+  }
+
+  /// Ensures the daemon has inspected this exact content digest.
+  ///
+  /// `true` means bytes crossed the client connection; `false` is the fast
+  /// content-store hit. The post-import inspection is mandatory because plan
+  /// materialization consumes the manifest, not merely the stored archive.
+  private func ensureArtifactStored(
+    controller: any ArkForgePlanSource, artifact: ArkForgeLaneArtifact,
+    requestStem: String
+  ) throws -> Bool {
+    if (try? controller.inspectArtifact(
+      artifactID: artifact.sha256, requestID: "inspect-\(requestStem)"))
+      != nil
+    {
+      return false
+    }
+    _ = try controller.importArtifact(
+      contentsOf: artifact.fileURL, expectedSHA256: artifact.sha256,
+      requestID: "import-\(requestStem)")
+    _ = try controller.inspectArtifact(
+      artifactID: artifact.sha256,
+      requestID: "inspect-after-import-\(requestStem)")
+    return true
   }
 
   /// Builds an executable controller plan only after two non-executable

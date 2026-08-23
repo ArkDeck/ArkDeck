@@ -807,6 +807,49 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     XCTAssertEqual(counter.value, 1)
   }
 
+  func testPrewarmImportsAndInspectsOnceBeforePerformReusesTheStoredArtifact() async throws {
+    let source = MissingArtifactPlanSource()
+    let counter = StartCounter()
+    let host = sealTestHost(
+      controller: source, publicSource: source, counter: counter)
+    let artifact = scriptedArtifact()
+
+    let first = try await host.prewarmArtifact(
+      jobID: "JOB-PREWARM", artifact: artifact)
+    let repeated = try await host.prewarmArtifact(
+      jobID: "JOB-PREWARM", artifact: artifact)
+
+    XCTAssertEqual(first, repeated, "one admitted Job gets one store preparation")
+    XCTAssertTrue(first.imported)
+    XCTAssertEqual(first.artifactSHA256, artifact.sha256)
+    XCTAssertEqual(first.profileID, artifact.profileID)
+    XCTAssertEqual(source.importRequestIDs, ["import-prewarm-JOB-PREWARM"])
+    XCTAssertEqual(
+      source.inspectRequestIDs,
+      [
+        "inspect-prewarm-JOB-PREWARM",
+        "inspect-after-import-prewarm-JOB-PREWARM",
+      ])
+
+    _ = try await host.perform(
+      stepID: "flash-partitions", jobID: "JOB-PREWARM",
+      artifact: artifact, binding: sealTestBinding)
+
+    XCTAssertEqual(source.importRequestIDs, ["import-prewarm-JOB-PREWARM"])
+    XCTAssertEqual(
+      source.inspectRequestIDs,
+      [
+        "inspect-prewarm-JOB-PREWARM",
+        "inspect-after-import-prewarm-JOB-PREWARM",
+        "public-inspect-JOB-PREWARM",
+      ],
+      "perform must use the prepared controller result and retain the independent public inspect")
+    XCTAssertFalse(
+      source.inspectRequestIDs.contains("inspect-JOB-PREWARM"),
+      "perform must not repeat the controller store probe after successful prewarm")
+    XCTAssertEqual(counter.value, 1)
+  }
+
   func testInvalidPublicMechanicsKeyRefusesBeforeControllerMaterializeOrStart() async throws {
     let recorder = MaterializeRequestRecorder()
     let controller = ScriptedPlanSource.executable(requestRecorder: recorder)
@@ -1204,6 +1247,60 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
   }
 
   // MARK: - doubles
+
+  private final class MissingArtifactPlanSource: ArkForgePlanSource, @unchecked Sendable {
+    private struct ArtifactMissing: Error {}
+
+    private let lock = NSLock()
+    private let base = ScriptedPlanSource.executable()
+    private var stored = false
+    private var recordedImportRequestIDs: [String] = []
+    private var recordedInspectRequestIDs: [String] = []
+
+    func importArtifact(
+      contentsOf url: URL, expectedSHA256: String, requestID: String
+    ) throws -> ArkForgeImportArtifactResponse {
+      lock.lock()
+      recordedImportRequestIDs.append(requestID)
+      stored = true
+      lock.unlock()
+      return try base.importArtifact(
+        contentsOf: url, expectedSHA256: expectedSHA256, requestID: requestID)
+    }
+
+    func inspectArtifact(artifactID: String, requestID: String) throws
+      -> ArkForgeInspectArtifactResponse
+    {
+      lock.lock()
+      recordedInspectRequestIDs.append(requestID)
+      let available = stored
+      lock.unlock()
+      guard available else { throw ArtifactMissing() }
+      return try base.inspectArtifact(artifactID: artifactID, requestID: requestID)
+    }
+
+    func discoverDevices(requestID: String) throws -> [ArkForgeDeviceObservation] {
+      try base.discoverDevices(requestID: requestID)
+    }
+
+    func materializePlan(
+      _ body: ArkForgeMaterializePlanRequest, requestID: String
+    ) throws -> ArkForgeMaterializePlanResponse {
+      try base.materializePlan(body, requestID: requestID)
+    }
+
+    var importRequestIDs: [String] {
+      lock.lock()
+      defer { lock.unlock() }
+      return recordedImportRequestIDs
+    }
+
+    var inspectRequestIDs: [String] {
+      lock.lock()
+      defer { lock.unlock() }
+      return recordedInspectRequestIDs
+    }
+  }
 
   /// Counted under a lock rather than in an actor.
   ///

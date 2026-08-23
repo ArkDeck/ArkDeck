@@ -213,6 +213,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           ? "[Empty]\n"
           : "\(connectedTarget)\t\tUSB\tConnected\tlocalhost\n"
       case let value
+      where value.count == 4 && value[2] == "shell"
+        && value[3] == RockchipHDCIntegrationProfile.postFlashBuildPropertiesCommand:
+        stdout =
+          "const.ohos.fullname = \(buildVersion)\n"
+          + "const.product.model = \(productModel)\n"
+      case let value
       where value.suffix(4)
         == ["shell", "param", "get", HDCAllowlistedProperty.productModel.rawValue]:
         stdout = "const.product.model = \(productModel)\n"
@@ -336,10 +342,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   private struct NormalOnlyUSBProbe: RockchipRuntimeUSBProbing {
     let identity: String
+    let topology: String
 
-    init(connectKey: String) {
+    init(connectKey: String, topology: String = "42") {
       identity = SHA256.hash(data: Data(connectKey.utf8))
         .map { String(format: "%02x", $0) }.joined()
+      self.topology = topology
     }
 
     func singleLoader(
@@ -356,7 +364,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       }
       return RockchipRuntimeLoaderIdentity(
         serialDigestSHA256: identity,
-        topology: "42")
+        topology: topology)
     }
   }
 
@@ -369,6 +377,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     init(identity: String) {
       self.identity = identity
+    }
+
+    var loaderReadCount: Int {
+      lock.lock()
+      defer { lock.unlock() }
+      return loaderReads
     }
 
     func singleLoader(
@@ -536,6 +550,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       action: verify, descriptor: hostDescriptor(verifyPlan),
       providerExecutable: component, actionDirectory: root)
     XCTAssertEqual(verified.summary["verification"], "exact-published-profile-and-bound-hdc")
+    XCTAssertEqual(
+      verified.subprocesses.count, 1,
+      "the fresh IOKit revalidation should reuse the reconnect and read both properties once")
 
     let binding = try XCTUnwrap(store.loadIfPresent())
     XCTAssertEqual(binding.targetID, "TGT-HOST")
@@ -548,10 +565,18 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(binding.buildVersion, RockchipFlashProfile.dayu200.runtimeBuildVersion)
     XCTAssertEqual(binding.jobID, "job-host")
     let invocations = await log.snapshot()
-    XCTAssertTrue(
-      invocations.contains {
-        $0.arguments.starts(with: ["-t", nextConnectKey, "shell", "param", "get"])
-      })
+    XCTAssertEqual(
+      invocations.filter { $0.arguments == ["list", "targets", "-v"] }.count, 1,
+      "postflight verification must not repeat the reconnect target-list round trip")
+    XCTAssertEqual(
+      invocations.filter {
+        $0.arguments == [
+          "-t", nextConnectKey, "shell",
+          RockchipHDCIntegrationProfile.postFlashBuildPropertiesCommand,
+        ]
+      }.count,
+      1,
+      "model and build must be read by one fixed HDC shell command")
     XCTAssertFalse(
       invocations.contains {
         $0.arguments.starts(with: ["-t", previousConnectKey])
@@ -957,7 +982,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       sha256: Self.nativeProviderSHA256)
     let probe = RecordingLiveModeProbe(
       observation: RockchipLiveModeObservation(
-        deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion))
+        deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        usbTopology: "44"))
     let port = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore,
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
@@ -973,7 +999,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       nextDigest)
     XCTAssertEqual(
       facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
-      "42")
+      "44",
+      "the exact live HDC identity may move ports without widening its durable alias")
+    XCTAssertEqual(
+      try postFlashStore.loadIfPresent()?.usbTopology, "42",
+      "live route selection must not rewrite the owner-only historical proof")
     let observedConnectKeys = await probe.observedConnectKeys()
     let observedStableIdentities = await probe.observedStableIdentities()
     XCTAssertEqual(observedConnectKeys, [nextHDC])
@@ -1125,10 +1155,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     let hdcObservation = try await FoundationRockchipLiveModeProbe(
       hdcResolver: resolver, runner: connected,
-      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal")
+      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal"),
+      usbProbe: NormalOnlyUSBProbe(connectKey: "device-1", topology: "44")
     ).observe(
       connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     XCTAssertEqual(hdcObservation.deviceMode, "hdc")
+    XCTAssertEqual(hdcObservation.usbTopology, "44")
     XCTAssertEqual(
       hdcObservation.buildFingerprint, "OpenHarmony-7.0.0.35-20260728_180253")
     let hdcCommands = await connected.invocations()
@@ -1168,6 +1200,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       connectKey: "device-1", stableIdentitySHA256: loaderIdentity)
     XCTAssertEqual(loaderObservation.deviceMode, "loader")
     XCTAssertNil(loaderObservation.buildFingerprint)
+    XCTAssertEqual(loaderObservation.usbTopology, "42")
     let loaderCommands = await loaderRunner.invocations()
     XCTAssertEqual(loaderCommands.map(\.arguments), [["list", "targets", "-v"]])
     XCTAssertTrue(loaderCommands.allSatisfy { $0.executable.path == hdc.path })
@@ -1184,6 +1217,23 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           path: "/product/arkforged",
           sha256: Self.nativeProviderSHA256),
       ])
+
+    // Seeing the requested connect key over HDC is enough to name the mode,
+    // but a different IOKit identity must not lend its current USB port to
+    // that target. The facts layer will retain the durable route and the
+    // mutation gate will fail closed if that route is stale.
+    let mismatchedHDCIdentity = ProbeCommandRunner(responses: [
+      .success("device-1\t\tUSB\tConnected\tlocalhost\n"),
+      .success("const.ohos.fullname = OpenHarmony-7.0.0.35-20260728_180253\n"),
+    ])
+    let hdcWithoutAttributedTopology = try await FoundationRockchipLiveModeProbe(
+      hdcResolver: resolver, runner: mismatchedHDCIdentity,
+      loaderObserver: RefusingArkForgeLoaderObserver(reason: "fixture is HDC-normal"),
+      usbProbe: NormalOnlyUSBProbe(connectKey: "another-device", topology: "44")
+    ).observe(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
+    XCTAssertEqual(hdcWithoutAttributedTopology.deviceMode, "hdc")
+    XCTAssertNil(hdcWithoutAttributedTopology.usbTopology)
 
     // A single `ld` observation is not enough to assign a Loader to this
     // target. The IOKit identity must match the durable target identity before
@@ -1563,7 +1613,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let invocations = await runner.invocations()
     XCTAssertEqual(
       invocations.map(\.arguments),
-      [["-t", "device-1", "target", "boot", "loader"]])
+      [["-t", "device-1", "shell", "reboot", "loader"]])
   }
 
   func testEnterLoaderAlreadyInExactLoaderSkipsHDCAndRecordsReadback() async throws {
@@ -1599,6 +1649,59 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let invocations = await runner.invocations()
     XCTAssertTrue(invocations.isEmpty)
     XCTAssertEqual(result.subprocesses.count, 0)
+  }
+
+  func testManagedControlLoaderReceiptsReuseOneExactTransitionObservation() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let connectKey = "device-1"
+    let runner = ProbeCommandRunner(responses: [.success("")])
+    let usbProbe = LoaderAfterInitialProbe(identity: identity)
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner,
+      usbProbe: usbProbe,
+      loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
+    let component = ResolvedExecutable(
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
+
+    func execute(
+      _ action: RockchipProviderAction, index: Int
+    ) async throws -> RockchipRuntimeActionExecutionResult {
+      let plan = try rockchipPlan(
+        action: action,
+        stepID: "enter-loader-mode-mc-deadbeefcafe-a\(index)",
+        toolSHA256: component.sha256)
+      return try await executor.execute(
+        action: action, descriptor: hostDescriptor(plan),
+        providerExecutable: component, actionDirectory: root)
+    }
+
+    let entered = try await execute(.enterLoader(connectKey: connectKey), index: 1)
+    let disconnected = try await execute(
+      .waitForHDCDisconnect(connectKey: connectKey), index: 2)
+    let appeared = try await execute(
+      .waitForLoader(stableIdentitySHA256: identity), index: 3)
+    let rebound = try await execute(
+      .rebindLoader(stableIdentitySHA256: identity), index: 4)
+
+    XCTAssertEqual(entered.summary["transition"], "normal-to-loader")
+    XCTAssertEqual(disconnected.summary["hdcState"], "disconnected")
+    XCTAssertEqual(appeared.summary["loaderIdentitySha256"], identity)
+    XCTAssertEqual(rebound.summary["loaderIdentitySha256"], identity)
+    XCTAssertEqual(
+      usbProbe.loaderReadCount, 2,
+      "one pre-command miss and one post-command exact readback must cover the receipt chain")
+    let invocations = await runner.invocations()
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [["-t", connectKey, "shell", "reboot", "loader"]],
+      "the logical disconnect/wait/rebind receipts must not spawn extra HDC commands")
   }
 
   func testEnterLoaderKeepsTimedOutHDCUnknownWithoutExactLoader() async throws {
@@ -1675,7 +1778,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(
       invocations.map(\.arguments),
       [
-        ["-t", connectKey, "target", "boot", "loader"]
+        ["-t", connectKey, "shell", "reboot", "loader"]
       ])
   }
 

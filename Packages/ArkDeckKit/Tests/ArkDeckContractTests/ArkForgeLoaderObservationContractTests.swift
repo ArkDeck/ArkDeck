@@ -6,6 +6,37 @@ import XCTest
 @testable import ArkForgeProtocol
 
 final class ArkForgeLoaderObservationContractTests: XCTestCase {
+  private final class CountingUSBProbe: @unchecked Sendable, RockchipRuntimeUSBProbing {
+    private let lock = NSLock()
+    private var reads = 0
+    let identity: RockchipRuntimeLoaderIdentity
+
+    init(identity: RockchipRuntimeLoaderIdentity) {
+      self.identity = identity
+    }
+
+    var loaderReads: Int {
+      lock.lock()
+      defer { lock.unlock() }
+      return reads
+    }
+
+    func singleLoader(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      lock.lock()
+      reads += 1
+      lock.unlock()
+      return identity
+    }
+
+    func singleHDCNormal(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw ProbeFailure.absent
+    }
+  }
+
   private struct USBProbe: RockchipRuntimeUSBProbing {
     let loader: Result<RockchipRuntimeLoaderIdentity, ProbeFailure>
 
@@ -74,6 +105,32 @@ final class ArkForgeLoaderObservationContractTests: XCTestCase {
 
     XCTAssertEqual(observed.serialDigestSHA256, identity)
     XCTAssertEqual(observed.topology, topology)
+  }
+
+  func testFreshIOKitIdentityCanBeConfirmedWithoutImmediateSecondEnumeration() throws {
+    let exact = RockchipRuntimeLoaderIdentity(
+      serialDigestSHA256: identity, topology: topology)
+    let probe = CountingUSBProbe(identity: exact)
+    let discovered = observation()
+    let observer = ProductArkForgeLoaderObserver(
+      usbProbe: probe,
+      discover: { _ in [discovered] })
+
+    let confirmed = try observer.confirmLoader(
+      exact,
+      stableIdentitySHA256: identity,
+      expectedUSBTopology: topology,
+      requestID: "REQ-preobserved-iokit")
+
+    XCTAssertEqual(confirmed, exact)
+    XCTAssertEqual(
+      probe.loaderReads, 0,
+      "the caller's same-descriptor IOKit read must not be repeated")
+    _ = try observer.observeLoader(
+      stableIdentitySHA256: identity,
+      expectedUSBTopology: topology,
+      requestID: "REQ-full-observation")
+    XCTAssertEqual(probe.loaderReads, 1)
   }
 
   func testIOKitAloneIsInsufficient() {

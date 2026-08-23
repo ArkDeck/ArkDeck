@@ -11,6 +11,7 @@
 // nothing here is an admission gate — see `RockchipLiveModeProbing` for that
 // boundary.
 
+import ArkDeckCore
 import ArkDeckOpenHarmony
 import Foundation
 
@@ -24,10 +25,18 @@ package struct RockchipLiveModeObservation: Sendable, Equatable {
   /// build at all, so the RockUSB modes leave this `nil` rather than carrying
   /// an inferred or stale value.
   package let buildFingerprint: String?
+  /// Fresh IOKit location of the exact HDC/Loader identity observed above.
+  /// It is intentionally ephemeral: moving a cable does not rewrite durable
+  /// target identity, but the next ArkForge materialization must address the
+  /// port the already-bound device occupies now rather than an old port.
+  package let usbTopology: String?
 
-  package init(deviceMode: String, buildFingerprint: String?) {
+  package init(
+    deviceMode: String, buildFingerprint: String?, usbTopology: String? = nil
+  ) {
     self.deviceMode = deviceMode
     self.buildFingerprint = buildFingerprint
+    self.usbTopology = usbTopology
   }
 }
 
@@ -65,6 +74,7 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   private let hdcResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
   private let loaderObserver: any ArkForgeLoaderObserving
+  private let usbProbe: (any RockchipRuntimeUSBProbing)?
 
   /// HDC reads use the daemon's product-owned state directory. Loader mode is
   /// observed separately through ArkForge's public read-only socket and IOKit.
@@ -78,17 +88,20 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
         workingDirectory: stateDirectory),
       loaderObserver: ProductArkForgeLoaderObserver(
         runtimeDirectory: stateDirectory.appending(
-          path: "arkforge", directoryHint: .isDirectory)))
+          path: "arkforge", directoryHint: .isDirectory)),
+      usbProbe: ProductRockchipRuntimeUSBProbe())
   }
 
   init(
     hdcResolver: any RuntimeExecutableResolving,
     runner: any RockchipRuntimeCommandRunning,
-    loaderObserver: any ArkForgeLoaderObserving
+    loaderObserver: any ArkForgeLoaderObserving,
+    usbProbe: (any RockchipRuntimeUSBProbing)? = nil
   ) {
     self.hdcResolver = hdcResolver
     self.runner = runner
     self.loaderObserver = loaderObserver
+    self.usbProbe = usbProbe
   }
 
   package func observe(
@@ -99,11 +112,20 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
     // personality is absent, RockUSB must independently match the target's
     // stable IOKit identity and ArkForge topology before it may name the mode.
     if try await isConnectedOverHDC(connectKey: connectKey) {
+      let hdcIdentitySHA256 = SHA256Hex.string(of: Data(connectKey.utf8))
+      let currentTopology: String?
+      if let usbProbe {
+        currentTopology = try? usbProbe.singleHDCNormal(
+          stableIdentitySHA256: hdcIdentitySHA256).topology
+      } else {
+        currentTopology = nil
+      }
       return RockchipLiveModeObservation(
         deviceMode: "hdc",
         // The mode was observed even when the build readback fails; that is
         // recorded as a known mode with an unknown build, never as a guess.
-        buildFingerprint: try? await buildFingerprint(connectKey: connectKey))
+        buildFingerprint: try? await buildFingerprint(connectKey: connectKey),
+        usbTopology: currentTopology)
     }
     return try await observeRockUSBMode(
       stableIdentitySHA256: stableIdentitySHA256)
@@ -170,8 +192,9 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   private func observeRockUSBMode(
     stableIdentitySHA256: String
   ) async throws -> RockchipLiveModeObservation {
+    let loader: RockchipRuntimeLoaderIdentity
     do {
-      _ = try loaderObserver.observeLoader(
+      loader = try loaderObserver.observeLoader(
         stableIdentitySHA256: stableIdentitySHA256,
         expectedUSBTopology: nil,
         requestID: "live-mode-\(UUID().uuidString.lowercased())")
@@ -180,7 +203,8 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
         "ArkForge dual-source Loader observation failed: \(error)")
     }
     return RockchipLiveModeObservation(
-      deviceMode: "loader", buildFingerprint: nil)
+      deviceMode: "loader", buildFingerprint: nil,
+      usbTopology: loader.topology)
   }
 
   private func resolve(

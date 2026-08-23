@@ -14,6 +14,7 @@ import ArkDeckStorage
 import ArkForgeClient
 import ArkForgeProtocol
 import CryptoKit
+import Dispatch
 import Foundation
 
 public enum RuntimeJobEngineError: Error, Equatable, Sendable {
@@ -802,6 +803,21 @@ public actor RuntimeJobEngine {
     /// StepPermit before any lane call or external effect.
     var toolchainSHA256: String { get }
 
+    /// Makes immutable archive bytes available to the daemon after Runtime
+    /// admission, while the engine is still doing host-only work.
+    ///
+    /// This may mutate only ArkForge's content-addressed host store. It has no
+    /// device binding or authority and therefore cannot materialize or start a
+    /// device execution. `perform` still owns those boundaries.
+    func prewarmArtifact(
+      jobID: String, artifact: ArkForgeLaneArtifact
+    ) async throws -> ArkForgeLaneArtifactPrewarmReceipt
+
+    /// Releases only the lane's per-Job preparation bookkeeping. Immutable
+    /// content already admitted to ArkForge's content store remains available
+    /// for its normal content-addressed reuse.
+    func finishArtifactPrewarm(jobID: String) async
+
     /// Performs one delegated step and returns the daemon's semantic receipt.
     ///
     /// Throwing here is a dispatch failure like any other. What must never
@@ -833,6 +849,10 @@ public actor RuntimeJobEngine {
     /// completed plan and neither may satisfy a recovery verification step.
     func completedPlanReceipt(jobID: String) async -> ArkForgeActionReceiptSummary?
   }
+
+  private typealias ArkForgeArtifactPrewarmTask = Task<
+    ArkForgeLaneArtifactPrewarmReceipt, Error
+  >
 
   public struct Configuration: Sendable {
     package struct TestHooks: Sendable {
@@ -1495,18 +1515,9 @@ public actor RuntimeJobEngine {
         descriptor: descriptor, inputs: runtime.record.request.inputs) >= .deviceMutation
     let targetID = runtime.record.request.target.targetID
     do {
-      if isMutation {
-        let capturedJobID = jobID
-        try await mutationLane.withMutationLane(deviceID: targetID, requestID: capturedJobID) {
-          [weak self] in
-          guard let self else { throw RuntimeJobEngineError.internalFailure("engine gone") }
-          try await self.executeStepsWithTraceEvidence(
-            jobID: capturedJobID, descriptor: descriptor, provider: provider)
-        }
-      } else {
-        try await executeStepsWithTraceEvidence(
-          jobID: jobID, descriptor: descriptor, provider: provider)
-      }
+      try await executeAdmittedSteps(
+        jobID: jobID, descriptor: descriptor, provider: provider,
+        isMutation: isMutation, targetID: targetID)
     } catch is RuntimeHostDispatchCancellation {
       let current = jobs[jobID] ?? runtime
       cancellationRequests.remove(jobID)
@@ -1672,6 +1683,93 @@ public actor RuntimeJobEngine {
       current.record, recoveryEpochID: establishedRecoveryEpochID, provider: provider)
   }
 
+  /// Runs the admitted step loop with a prewarm task whose lifetime cannot
+  /// escape the Job run.
+  ///
+  /// Cancellation is cooperative, while ArkForge's synchronous import is
+  /// bounded by its materialization timeout. Joining the task on every exit
+  /// means a host-step failure or an early cancellation cannot leave a hidden
+  /// archive upload running after Runtime has made the Job terminal.
+  private func executeAdmittedSteps(
+    jobID: String, descriptor: CatalogOperationDescriptor,
+    provider: any DeviceProvider, isMutation: Bool, targetID: String
+  ) async throws {
+    // Admission and the running transition are durable before this helper is
+    // called. Starting the host-store import here lets it overlap mutation-
+    // lane contention and the operation's host-only verification steps, while
+    // planOnly never reaches this path. The first delegated write awaits the
+    // result before capability consumption.
+    let arkForgeArtifactPrewarm = try await beginArkForgeArtifactPrewarmIfNeeded(
+      jobID: jobID, descriptor: descriptor)
+    do {
+      if isMutation {
+        try await mutationLane.withMutationLane(deviceID: targetID, requestID: jobID) {
+          [weak self] in
+          guard let self else { throw RuntimeJobEngineError.internalFailure("engine gone") }
+          try await self.executeStepsWithTraceEvidence(
+            jobID: jobID, descriptor: descriptor, provider: provider,
+            arkForgeArtifactPrewarm: arkForgeArtifactPrewarm)
+        }
+      } else {
+        try await executeStepsWithTraceEvidence(
+          jobID: jobID, descriptor: descriptor, provider: provider,
+          arkForgeArtifactPrewarm: arkForgeArtifactPrewarm)
+      }
+    } catch {
+      arkForgeArtifactPrewarm?.cancel()
+      if let arkForgeArtifactPrewarm {
+        _ = try? await arkForgeArtifactPrewarm.value
+      }
+      await configuration.arkForgeLane?.finishArtifactPrewarm(jobID: jobID)
+      throw error
+    }
+    arkForgeArtifactPrewarm?.cancel()
+    if let arkForgeArtifactPrewarm {
+      _ = try? await arkForgeArtifactPrewarm.value
+    }
+    await configuration.arkForgeLane?.finishArtifactPrewarm(jobID: jobID)
+  }
+
+  /// Starts the only host-side mutation allowed before a delegated flash: an
+  /// idempotent put/inspect in ArkForge's content-addressed archive store.
+  ///
+  /// This is called only from `run`, after the admitted record and running
+  /// transition are durable. `planOnly` and `submit` cannot reach it. The
+  /// returned task is joined by the admitted execution scope on every exit
+  /// and awaited immediately before the destructive capability is consumed.
+  private func beginArkForgeArtifactPrewarmIfNeeded(
+    jobID: String, descriptor: CatalogOperationDescriptor
+  ) async throws -> ArkForgeArtifactPrewarmTask? {
+    guard descriptor.steps.contains(where: {
+      Self.arkForgeDispatchedSteps.contains($0.stepID)
+    }), let lane = configuration.arkForgeLane,
+      let profileID = configuration.arkForgeDeviceProfileID,
+      !profileID.isEmpty
+    else { return nil }
+
+    let resolved: ProviderResolvedInputArtifact
+    do {
+      guard let artifact = try await resolvedInputArtifact(jobID: jobID) else {
+        throw RuntimeDispatchFailure.confirmedNotExecuted(
+          "admitted ArkForge flash Job has no resolved input Artifact; nothing was dispatched "
+            + "and the device was not touched")
+      }
+      resolved = artifact
+    } catch {
+      throw RuntimeDispatchFailure.confirmedNotExecuted(
+        "input Artifact lease became unreadable before ArkForge prewarm; nothing was "
+          + "dispatched and the device was not touched: \(error)")
+    }
+    let artifact = ArkForgeLaneArtifact(
+      fileURL: resolved.fileURL, sha256: resolved.sha256, profileID: profileID)
+    appendTimeline(
+      jobID: jobID,
+      entry: "ArkForge artifact prewarm started after durable admission")
+    return Task {
+      try await lane.prewarmArtifact(jobID: jobID, artifact: artifact)
+    }
+  }
+
   /// A selected trace leg is bracketed by two Runtime-owned read snapshots.
   /// Both reads run inside the same target mutation lane as the trace itself;
   /// no other ArkDeck mutation can slip between `before`, the capture, and
@@ -1679,13 +1777,16 @@ public actor RuntimeJobEngine {
   private func executeStepsWithTraceEvidence(
     jobID: String,
     descriptor: CatalogOperationDescriptor,
-    provider: any DeviceProvider
+    provider: any DeviceProvider,
+    arkForgeArtifactPrewarm: ArkForgeArtifactPrewarmTask?
   ) async throws {
     guard descriptor.reference == "capture.diagnostics@1",
       case .array(let requestedTagValues)? = jobs[jobID]?.record.request.inputs["traceCategories"],
       !requestedTagValues.isEmpty
     else {
-      try await executeSteps(jobID: jobID, descriptor: descriptor, provider: provider)
+      try await executeSteps(
+        jobID: jobID, descriptor: descriptor, provider: provider,
+        arkForgeArtifactPrewarm: arkForgeArtifactPrewarm)
       return
     }
     guard let traceRuntimeProbe else {
@@ -1720,7 +1821,9 @@ public actor RuntimeJobEngine {
     }
 
     do {
-      try await executeSteps(jobID: jobID, descriptor: descriptor, provider: provider)
+      try await executeSteps(
+        jobID: jobID, descriptor: descriptor, provider: provider,
+        arkForgeArtifactPrewarm: arkForgeArtifactPrewarm)
     } catch {
       let executionFailure = error
       do {
@@ -1800,9 +1903,11 @@ public actor RuntimeJobEngine {
   private func executeSteps(
     jobID: String,
     descriptor: CatalogOperationDescriptor,
-    provider: any DeviceProvider
+    provider: any DeviceProvider,
+    arkForgeArtifactPrewarm: ArkForgeArtifactPrewarmTask?
   ) async throws {
     var completedStepIDs = jobs[jobID]?.completedStepIDs ?? []
+    var arkForgePrewarmConfirmed = false
     let flashArtifactLeaseID = Self.flashArtifactLeaseID(
       in: jobs[jobID]?.record.request.inputs)
     for step in descriptor.steps {
@@ -2027,6 +2132,35 @@ public actor RuntimeJobEngine {
       // action it deliberately no longer has would only produce the removal's
       // error message in a place that cannot act on it.
       if Self.arkForgeDispatchedSteps.contains(step.stepID) {
+        if !arkForgePrewarmConfirmed, let arkForgeArtifactPrewarm {
+          let prewarm: ArkForgeLaneArtifactPrewarmReceipt
+          let consumeWaitStarted = DispatchTime.now().uptimeNanoseconds
+          do {
+            prewarm = try await arkForgeArtifactPrewarm.value
+          } catch {
+            throw RuntimeDispatchFailure.confirmedNotExecuted(
+              "arkforged artifact prewarm failed before capability consumption; nothing was "
+                + "dispatched and the device was not touched: \(error)")
+          }
+          guard let profileID = configuration.arkForgeDeviceProfileID,
+            let currentArtifact = resolvedArtifact,
+            prewarm.artifactSHA256 == currentArtifact.sha256,
+            prewarm.profileID == profileID
+          else {
+            throw RuntimeDispatchFailure.confirmedNotExecuted(
+              "arkforged artifact prewarm identity drifted before capability consumption; "
+                + "nothing was dispatched and the device was not touched")
+          }
+          let consumeWaitMilliseconds =
+            (DispatchTime.now().uptimeNanoseconds &- consumeWaitStarted) / 1_000_000
+          appendTimeline(
+            jobID: jobID,
+            entry:
+              "ArkForge artifact prewarm ready (\(prewarm.imported ? "imported" : "store-hit"), "
+              + "total \(prewarm.durationMilliseconds) ms, consume wait "
+              + "\(consumeWaitMilliseconds) ms)")
+          arkForgePrewarmConfirmed = true
+        }
         if step.effect >= .deviceMutation {
           // The capability is consumed before the write, exactly as on the
           // local path. Delegating the mechanics does not delegate admission.
@@ -8508,6 +8642,22 @@ public actor RuntimeJobEngine {
     ).runtimeBuildVersion
   }
 
+}
+
+extension RuntimeJobEngine.ArkForgeLane {
+  /// Compatibility default for lanes whose `perform` implementation already
+  /// owns preparation. Production `ArkForgeLaneHost` overrides this to do the
+  /// actual early import; scripted lanes remain valid without pretending they
+  /// imported bytes they do not model.
+  package func prewarmArtifact(
+    jobID _: String, artifact: ArkForgeLaneArtifact
+  ) async throws -> ArkForgeLaneArtifactPrewarmReceipt {
+    ArkForgeLaneArtifactPrewarmReceipt(
+      artifactSHA256: artifact.sha256, profileID: artifact.profileID,
+      imported: false, durationMilliseconds: 0)
+  }
+
+  package func finishArtifactPrewarm(jobID _: String) async {}
 }
 
 /// What the runtime's own durable ledger can say about the jobs referencing

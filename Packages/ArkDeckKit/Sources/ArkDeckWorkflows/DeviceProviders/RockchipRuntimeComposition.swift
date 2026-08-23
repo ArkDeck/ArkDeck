@@ -135,6 +135,22 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
     let live = await liveFacts(
       connectKey: executionConnectKey,
       stableIdentitySHA256: target.stablePhysicalIdentitySHA256)
+    // The durable post-flash alias owns the HDC identity, not a forever port.
+    // A DAYU200 cable move keeps the exact connect key/identity but changes
+    // IOKit's locationID. When the read-only live probe correlates both
+    // surfaces to that same trusted alias, use its current topology for this
+    // materialization only. No target, binding or alias record is rewritten.
+    // If either observation is absent or disagrees, retain the durable value
+    // and let ArkForge's exact topology selection fail closed before dispatch.
+    if live.deviceMode == "hdc",
+      let topology = live.usbTopology,
+      !topology.isEmpty,
+      topology.utf8.allSatisfy({ (48...57).contains($0) }),
+      let aliasIdentity = serverFacts[Self.hdcAliasIdentityServerFactKey],
+      SHA256Hex.string(of: Data(executionConnectKey.utf8)) == aliasIdentity
+    {
+      serverFacts[Self.hdcAliasTopologyServerFactKey] = topology
+    }
     // A revision-1 adoption can itself be the exact HDC-normal personality:
     // it has no adjacent lineage edge yet, but its owner binding still pins
     // the live serial and topology.  Use it only after a fresh HDC-mode probe.
@@ -184,16 +200,19 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   private func liveFacts(
     connectKey: String?,
     stableIdentitySHA256: String
-  ) async -> (deviceMode: String, buildFingerprint: String?, profileID: String) {
+  ) async -> (
+    deviceMode: String, buildFingerprint: String?, profileID: String,
+    usbTopology: String?
+  ) {
     guard let prober, let connectKey else {
-      return ("unknown", nil, "unknown")
+      return ("unknown", nil, "unknown", nil)
     }
     guard
       let observation = try? await prober.observe(
         connectKey: connectKey,
         stableIdentitySHA256: stableIdentitySHA256)
     else {
-      return ("absent", nil, "unknown")
+      return ("absent", nil, "unknown", nil)
     }
     // The flash profile is never inferred from a device model or a mode: only
     // an exact published firmware fingerprint names one. Anything else stays
@@ -204,7 +223,9 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
         RockchipFlashProfile.dayu200.firmwareVersion == fingerprint
           ? RockchipFlashProfile.dayu200.catalogReference : nil
       } ?? "unknown"
-    return (observation.deviceMode, observation.buildFingerprint, profileID)
+    return (
+      observation.deviceMode, observation.buildFingerprint, profileID,
+      observation.usbTopology)
   }
 }
 

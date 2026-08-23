@@ -231,6 +231,82 @@ struct RockchipRuntimeHDCIdentity: Sendable, Equatable {
   let topology: String
 }
 
+/// Short-lived observations shared only between adjacent logical receipts of
+/// one managed-control sequence. The receipt store still records every typed
+/// action separately; this cache merely prevents those actions from asking the
+/// same physical USB/HDC question again after a stronger postcondition has
+/// already answered it.
+private actor RockchipRuntimeObservationReuseCache {
+  struct LoaderKey: Hashable, Sendable {
+    let jobID: String
+    let targetID: String
+    let bindingRevision: Int
+    let stableIdentitySHA256: String
+    let controlAttempt: String
+  }
+
+  struct BoundHDCKey: Hashable, Sendable {
+    let jobID: String
+    let targetID: String
+    let bindingRevision: Int
+    let stableIdentitySHA256: String
+    let previousIdentitySHA256: String
+    let usbTopology: String
+  }
+
+  private struct LoaderRecord: Sendable {
+    let identity: RockchipRuntimeLoaderIdentity
+    let recordedAtNanoseconds: UInt64
+  }
+
+  private struct BoundHDCRecord: Sendable {
+    let identity: RockchipRuntimeHDCIdentity
+    let recordedAtNanoseconds: UInt64
+  }
+
+  private static let maximumAgeNanoseconds: UInt64 = 120 * 1_000_000_000
+  private var loaders: [LoaderKey: LoaderRecord] = [:]
+  private var boundHDC: [BoundHDCKey: BoundHDCRecord] = [:]
+
+  func rememberLoader(_ identity: RockchipRuntimeLoaderIdentity, for key: LoaderKey) {
+    purgeExpired()
+    loaders[key] = LoaderRecord(
+      identity: identity,
+      recordedAtNanoseconds: DispatchTime.now().uptimeNanoseconds)
+  }
+
+  func loader(for key: LoaderKey, consume: Bool) -> RockchipRuntimeLoaderIdentity? {
+    purgeExpired()
+    guard let record = loaders[key] else { return nil }
+    if consume { loaders.removeValue(forKey: key) }
+    return record.identity
+  }
+
+  func rememberBoundHDC(_ identity: RockchipRuntimeHDCIdentity, for key: BoundHDCKey) {
+    purgeExpired()
+    boundHDC[key] = BoundHDCRecord(
+      identity: identity,
+      recordedAtNanoseconds: DispatchTime.now().uptimeNanoseconds)
+  }
+
+  func takeBoundHDC(for key: BoundHDCKey) -> RockchipRuntimeHDCIdentity? {
+    purgeExpired()
+    return boundHDC.removeValue(forKey: key)?.identity
+  }
+
+  private func purgeExpired() {
+    let now = DispatchTime.now().uptimeNanoseconds
+    loaders = loaders.filter {
+      now >= $0.value.recordedAtNanoseconds
+        && now - $0.value.recordedAtNanoseconds <= Self.maximumAgeNanoseconds
+    }
+    boundHDC = boundHDC.filter {
+      now >= $0.value.recordedAtNanoseconds
+        && now - $0.value.recordedAtNanoseconds <= Self.maximumAgeNanoseconds
+    }
+  }
+}
+
 protocol RockchipRuntimeUSBProbing: Sendable {
   func singleLoader(
     stableIdentitySHA256: String
@@ -296,6 +372,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private let enterLoaderReadbackTimeoutSeconds: Int
   private let postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore?
   private let nowUTC: @Sendable () -> String
+  private let observationReuseCache: RockchipRuntimeObservationReuseCache
 
   /// `runner` has no default on purpose. The production runner cannot be
   /// constructed without a product-owned working directory, and this executor
@@ -319,6 +396,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
     self.postFlashHDCBindingStore = postFlashHDCBindingStore
     self.nowUTC = nowUTC
+    self.observationReuseCache = RockchipRuntimeObservationReuseCache()
   }
 
   func unavailableReason() -> String? {
@@ -362,10 +440,12 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       if let loader = try? exactLoaderIdentity(
         stableIdentitySHA256: descriptor.expectedIdentitySHA256
       ) {
-        let confirmed = try observeLoader(
+        let confirmed = try confirmLoader(
+          loader,
           stableIdentitySHA256: descriptor.expectedIdentitySHA256,
           expectedUSBTopology: loader.topology,
           requestID: "\(descriptor.jobID)-\(descriptor.stepID)-already-loader")
+        await rememberLoaderObservation(confirmed, descriptor: descriptor, actionIndex: 1)
         return result(
           summary: [
             "transition": "already-loader",
@@ -411,6 +491,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           timeoutSeconds: enterLoaderReadbackTimeoutSeconds,
           pollIntervalMilliseconds: 1_000,
           requestID: "\(descriptor.jobID)-\(descriptor.stepID)-post-transition")
+        await rememberLoaderObservation(loader, descriptor: descriptor, actionIndex: 1)
         let receipts = hdcReceipt.map { [$0] } ?? []
         return result(
           summary: [
@@ -456,6 +537,18 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         receipts: [])
 
     case .waitForHDCDisconnect(let connectKey):
+      if let loader = await reusedLoaderObservation(
+        descriptor: descriptor, actionIndex: 2, consume: false)
+      {
+        return result(
+          summary: [
+            "hdcState": "disconnected",
+            "transitionEvidence": "exact-bound-loader-readback",
+            "loaderIdentitySha256": loader.serialDigestSHA256,
+            "usbTopology": loader.topology,
+          ],
+          receipts: [])
+      }
       let receipts = try await waitForHDC(
         connectKey: connectKey, expectedConnected: false,
         timeoutSeconds: 15,
@@ -464,11 +557,24 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         summary: ["hdcState": "disconnected"], receipts: receipts)
 
     case .waitForLoader(let stableIdentitySHA256):
+      if let identity = await reusedLoaderObservation(
+        descriptor: descriptor, actionIndex: 3, consume: false),
+        identity.serialDigestSHA256 == stableIdentitySHA256
+      {
+        return result(
+          summary: [
+            "loaderIdentitySha256": identity.serialDigestSHA256,
+            "usbTopology": identity.topology,
+            "observationReuse": "enter-loader-postcondition",
+          ],
+          receipts: [])
+      }
       let identity = try await waitForLoader(
         stableIdentitySHA256: stableIdentitySHA256,
         timeoutSeconds: 45,
         pollIntervalMilliseconds: 1_000,
         requestID: "\(descriptor.jobID)-\(descriptor.stepID)-wait-loader")
+      await rememberLoaderObservation(identity, descriptor: descriptor, actionIndex: 3)
       return result(
         summary: [
           "loaderIdentitySha256": identity.serialDigestSHA256,
@@ -477,9 +583,23 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         receipts: [])
 
     case .rebindLoader(let stableIdentitySHA256):
+      if let identity = await reusedLoaderObservation(
+        descriptor: descriptor, actionIndex: 4, consume: true),
+        identity.serialDigestSHA256 == stableIdentitySHA256
+      {
+        return result(
+          summary: [
+            "loaderIdentitySha256": identity.serialDigestSHA256,
+            "usbTopology": identity.topology,
+            "bindingRevision": String(descriptor.bindingRevision),
+            "observationReuse": "exact-bound-loader-readback",
+          ],
+          receipts: [])
+      }
       let identity = try exactLoaderIdentity(
         stableIdentitySHA256: stableIdentitySHA256)
-      let confirmed = try observeLoader(
+      let confirmed = try confirmLoader(
+        identity,
         stableIdentitySHA256: stableIdentitySHA256,
         expectedUSBTopology: identity.topology,
         requestID: "\(descriptor.jobID)-\(descriptor.stepID)-rebind-loader")
@@ -518,6 +638,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         expectation: expectation,
         timeoutSeconds: 600,
         commandTimeoutSeconds: 15)
+      await observationReuseCache.rememberBoundHDC(
+        identity,
+        for: Self.boundHDCReuseKey(
+          descriptor: descriptor, expectation: expectation))
       return result(
         summary: [
           "hdcState": "connected",
@@ -549,31 +673,39 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       // runs — including two where a larger budget was put on the reconnect
       // action this plan never dispatches). Ten minutes bounds a hung boot
       // without calling this board's real first boot missing.
-      let (identity, observationReceipts) = try await waitForBoundHDC(
-        expectation: expectation,
-        timeoutSeconds: 600,
-        commandTimeoutSeconds: 15)
+      let reuseKey = Self.boundHDCReuseKey(
+        descriptor: descriptor, expectation: expectation)
+      let cachedIdentity = await observationReuseCache.takeBoundHDC(for: reuseKey)
+      let identity: RockchipRuntimeHDCIdentity
+      let observationReceipts: [ProviderSubprocessReceipt]
+      if let cachedIdentity,
+        let revalidated = try? revalidateBoundHDC(
+          cachedIdentity, expectation: expectation)
+      {
+        identity = revalidated
+        observationReceipts = []
+      } else {
+        (identity, observationReceipts) = try await waitForBoundHDC(
+          expectation: expectation,
+          timeoutSeconds: 600,
+          commandTimeoutSeconds: 15)
+      }
       let hdc = try resolveHDC()
-      let modelReceipt = try await run(
+      let propertiesReceipt = try await run(
         executable: hdc,
         arguments: [
-          "-t", identity.connectKey, "shell", "param", "get",
-          HDCAllowlistedProperty.productModel.rawValue,
+          "-t", identity.connectKey, "shell",
+          RockchipHDCIntegrationProfile.postFlashBuildPropertiesCommand,
         ],
         timeoutSeconds: 15,
         budget: 64 * 1024)
-      let versionReceipt = try await run(
-        executable: hdc,
-        arguments: [
-          "-t", identity.connectKey, "shell", "param", "get",
-          HDCAllowlistedProperty.fullBuildVersion.rawValue,
-        ],
-        timeoutSeconds: 15,
-        budget: 64 * 1024)
-      let model = try property(
-        modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)
-      let version = try property(
-        versionReceipt, key: HDCAllowlistedProperty.fullBuildVersion.rawValue)
+      let propertyKeys = [
+        HDCAllowlistedProperty.fullBuildVersion.rawValue,
+        HDCAllowlistedProperty.productModel.rawValue,
+      ]
+      let properties = try properties(propertiesReceipt, orderedKeys: propertyKeys)
+      let version = properties[HDCAllowlistedProperty.fullBuildVersion.rawValue] ?? ""
+      let model = properties[HDCAllowlistedProperty.productModel.rawValue] ?? ""
       guard model == expectedProductModel else {
         throw RuntimeDispatchFailure.failed(
           "post-flash model readback does not match the published profile")
@@ -609,7 +741,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "usbTopology": identity.topology,
           "verification": "exact-published-profile-and-bound-hdc",
         ],
-        receipts: observationReceipts + [modelReceipt, versionReceipt])
+        receipts: observationReceipts + [propertiesReceipt])
 
     case .capturePostFlashDiagnostics(let connectKey, let request):
       let hdc = try resolveHDC()
@@ -850,6 +982,99 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     return try usbProbe.singleHDCNormal(stableIdentitySHA256: identity)
   }
 
+  /// Rechecks a just-observed post-flash route through IOKit before reusing
+  /// it for the targeted property query. This removes a second slow HDC target
+  /// list without turning a historical connect key into current evidence.
+  private func revalidateBoundHDC(
+    _ cached: RockchipRuntimeHDCIdentity,
+    expectation: RockchipHDCReconnectExpectation
+  ) throws -> RockchipRuntimeHDCIdentity {
+    let previousDigest = SHA256Hex.string(of: Data(expectation.previousConnectKey.utf8))
+    guard previousDigest == expectation.previousIdentitySHA256 else {
+      throw RuntimeDispatchFailure.failed(
+        "post-flash HDC binding expectation is malformed")
+    }
+    let byTopology = try? usbProbe.singleHDCNormal(usbTopology: cached.topology)
+    let byIdentity =
+      byTopology != nil
+      ? nil
+      : (try? usbProbe.singleHDCNormal(
+        stableIdentitySHA256: cached.serialDigestSHA256))
+        .flatMap { try? usbProbe.singleHDCNormal(usbTopology: $0.topology) }
+    guard let observed = byTopology ?? byIdentity,
+      observed == cached,
+      observed.serialDigestSHA256
+        == SHA256Hex.string(of: Data(observed.connectKey.utf8)),
+      observed.topology == expectation.usbTopology
+        || observed.serialDigestSHA256 == expectation.previousIdentitySHA256
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "cached post-flash HDC route did not pass a fresh exact IOKit readback")
+    }
+    return observed
+  }
+
+  private func rememberLoaderObservation(
+    _ identity: RockchipRuntimeLoaderIdentity,
+    descriptor: HostManagedProcessDescriptor,
+    actionIndex: Int
+  ) async {
+    guard let key = Self.loaderReuseKey(
+      descriptor: descriptor, actionIndex: actionIndex)
+    else { return }
+    await observationReuseCache.rememberLoader(identity, for: key)
+  }
+
+  private func reusedLoaderObservation(
+    descriptor: HostManagedProcessDescriptor,
+    actionIndex: Int,
+    consume: Bool
+  ) async -> RockchipRuntimeLoaderIdentity? {
+    guard let key = Self.loaderReuseKey(
+      descriptor: descriptor, actionIndex: actionIndex)
+    else { return nil }
+    return await observationReuseCache.loader(for: key, consume: consume)
+  }
+
+  /// Accepts only the step-id shape emitted by `ArkForgeControlPerformer`.
+  /// A similarly named plan action or a later control request therefore cannot
+  /// inherit an observation just because its job and target happen to match.
+  private static func loaderReuseKey(
+    descriptor: HostManagedProcessDescriptor,
+    actionIndex: Int
+  ) -> RockchipRuntimeObservationReuseCache.LoaderKey? {
+    let suffix = "-a\(actionIndex)"
+    guard descriptor.stepID.hasSuffix(suffix) else { return nil }
+    let controlAttempt = String(descriptor.stepID.dropLast(suffix.count))
+    guard let marker = controlAttempt.range(of: "-mc-", options: .backwards) else {
+      return nil
+    }
+    let step = controlAttempt[..<marker.lowerBound]
+    let requestDigest = controlAttempt[marker.upperBound...]
+    guard !step.isEmpty, requestDigest.count == 12,
+      requestDigest.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+    else { return nil }
+    return RockchipRuntimeObservationReuseCache.LoaderKey(
+      jobID: descriptor.jobID,
+      targetID: descriptor.targetID,
+      bindingRevision: descriptor.bindingRevision,
+      stableIdentitySHA256: descriptor.expectedIdentitySHA256,
+      controlAttempt: controlAttempt)
+  }
+
+  private static func boundHDCReuseKey(
+    descriptor: HostManagedProcessDescriptor,
+    expectation: RockchipHDCReconnectExpectation
+  ) -> RockchipRuntimeObservationReuseCache.BoundHDCKey {
+    RockchipRuntimeObservationReuseCache.BoundHDCKey(
+      jobID: descriptor.jobID,
+      targetID: descriptor.targetID,
+      bindingRevision: descriptor.bindingRevision,
+      stableIdentitySHA256: descriptor.expectedIdentitySHA256,
+      previousIdentitySHA256: expectation.previousIdentitySHA256,
+      usbTopology: expectation.usbTopology)
+  }
+
   private func waitForLoader(
     stableIdentitySHA256: String,
     timeoutSeconds: Int,
@@ -860,7 +1085,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     while ContinuousClock.now < deadline {
       if let identity = try? exactLoaderIdentity(
         stableIdentitySHA256: stableIdentitySHA256),
-        let confirmed = try? observeLoader(
+        let confirmed = try? confirmLoader(
+          identity,
           stableIdentitySHA256: stableIdentitySHA256,
           expectedUSBTopology: identity.topology,
           requestID: requestID)
@@ -892,13 +1118,15 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     }
   }
 
-  private func observeLoader(
+  private func confirmLoader(
+    _ identity: RockchipRuntimeLoaderIdentity,
     stableIdentitySHA256: String,
     expectedUSBTopology: String?,
     requestID: String
   ) throws -> RockchipRuntimeLoaderIdentity {
     do {
-      return try loaderObserver.observeLoader(
+      return try loaderObserver.confirmLoader(
+        identity,
         stableIdentitySHA256: stableIdentitySHA256,
         expectedUSBTopology: expectedUSBTopology,
         requestID: requestID)
@@ -908,21 +1136,40 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     }
   }
 
-  private func property(
+  private func properties(
     _ receipt: ProviderSubprocessReceipt,
-    key: String
-  ) throws -> String {
+    orderedKeys: [String]
+  ) throws -> [String: String] {
     guard let text = String(data: receipt.stdout, encoding: .utf8) else {
       throw RuntimeDispatchFailure.failed(
-        "post-flash property \(key) is not UTF-8")
+        "post-flash property readback is not UTF-8")
     }
-    let value = HDCObservationProviderAdapter.propertyValue(
-      fromParamGetOutput: text, requestedKey: key)
-    guard !value.isEmpty, value.count <= 400 else {
+    let lines = text.split(whereSeparator: { $0.isNewline }).map {
+      String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    guard lines.count == orderedKeys.count else {
       throw RuntimeDispatchFailure.failed(
-        "post-flash property \(key) is empty or oversized")
+        "post-flash property readback did not return exactly \(orderedKeys.count) values")
     }
-    return value
+    var result: [String: String] = [:]
+    for (key, line) in zip(orderedKeys, lines) {
+      // An echoed property name must match this fixed command's order. Bare
+      // values remain supported, including values that themselves contain an
+      // equals sign, just as the single-property parser supported them.
+      let echoedKnownKey = orderedKeys.first { line.hasPrefix($0) }
+      guard echoedKnownKey == nil || echoedKnownKey == key else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash property readback order or key drifted")
+      }
+      let value = HDCObservationProviderAdapter.propertyValue(
+        fromParamGetOutput: line, requestedKey: key)
+      guard !value.isEmpty, value.count <= 400 else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash property \(key) is empty or oversized")
+      }
+      result[key] = value
+    }
+    return result
   }
 
   private func resolveHDC() throws -> ResolvedExecutable {
