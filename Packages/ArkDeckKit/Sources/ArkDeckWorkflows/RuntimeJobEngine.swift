@@ -3955,6 +3955,7 @@ public actor RuntimeJobEngine {
     let facts = Dictionary(
       receipt.facts.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
     if var runtime = jobs[jobID] {
+      let confirmedAtUTC = nowUTC()
       runtime.record.evidenceObservation = RuntimeEvidenceObservation(
         targetID: runtime.record.request.target.targetID,
         bindingRevision: runtime.record.request.target.expectedBindingRevision,
@@ -3962,13 +3963,17 @@ public actor RuntimeJobEngine {
           ?? runtime.record.materializedStableTargetIdentitySHA256,
         model: facts["const.product.model"],
         firmware: facts["const.ohos.fullname"],
-        transport: "hdc",
+        // A completed ArkForge receipt is accepted above only when it carries
+        // a verified USB topology. `hdc` names the postflight tool, not the
+        // physical transport, and is outside the hardware-evidence contract.
+        transport: "usb",
         providerID: runtime.record.providerID,
-        toolVersion: "",
-        toolSHA256: "",
-        confirmedAtUTC: nowUTC(),
-        confirmationMethod: "arkforge-lane-postflight",
+        toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
+        toolSHA256: lane.toolchainSHA256,
+        confirmedAtUTC: confirmedAtUTC,
+        confirmationMethod: "machineReadback",
         preflightSteps: [])
+      runtime.record.firstEvidenceStepAtUTC = confirmedAtUTC
       try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
     }

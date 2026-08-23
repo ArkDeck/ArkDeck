@@ -209,6 +209,66 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertTrue(report.artifactInventory.allSatisfy { $0.jobID == report.receipt.jobID })
   }
 
+  func testHeadlessVerifierReopensPersistedJobAndArtifactsAfterDaemonRestartWithoutDispatch()
+    throws
+  {
+    let firstClient = try startDaemon()
+    let firstVerifier = RuntimeHeadlessVerifier(
+      client: firstClient, nowUTC: { "2026-07-29T00:00:00Z" })
+    let firstOutcome = try firstVerifier.verifyObserveDevice(
+      maximumWaitSeconds: 30, executionID: "headless-reopen-contract-001")
+    guard case .verified(let firstReport) = firstOutcome,
+      let jobID = firstReport.receipt.jobID
+    else {
+      return XCTFail("the initial observation must produce a persisted Job")
+    }
+    guard case .array(let jobsBeforeRestart) = try firstClient.request(method: "job.list") else {
+      return XCTFail("job.list must answer before restart")
+    }
+    let originalArtifacts = firstReport.artifactInventory
+
+    server?.stop()
+    server = nil
+
+    final class MethodLog: @unchecked Sendable {
+      private let lock = NSLock()
+      private var methods: [String] = []
+      func append(_ method: String) { lock.withLock { methods.append(method) } }
+      func snapshot() -> [String] { lock.withLock { methods } }
+    }
+    let methodLog = MethodLog()
+    let reopenedClient = try startDaemon(observer: { methodLog.append($0) })
+    let reopenedVerifier = RuntimeHeadlessVerifier(
+      client: reopenedClient, nowUTC: { "2026-07-29T00:00:01Z" })
+
+    let reopened = try reopenedVerifier.verifyPersistedObserveDevice(jobID: jobID)
+    guard case .verified(let report) = reopened else {
+      return XCTFail("the restarted daemon must reopen durable proof: \(reopened)")
+    }
+
+    XCTAssertEqual(report.schemaVersion, "arkdeck-headless-runtime-reopen/v1")
+    XCTAssertEqual(report.classification, "persistedRuntimeReceipt")
+    XCTAssertTrue(report.runtimeVerified, "\(report.blockers)")
+    XCTAssertTrue(report.checks.udsHealthVerified)
+    XCTAssertTrue(report.checks.terminalStatusVerified)
+    XCTAssertTrue(report.checks.trustedEvidenceVerified)
+    XCTAssertTrue(report.checks.artifactsVerified)
+    XCTAssertTrue(report.checks.runtimePostflightVerified)
+    XCTAssertEqual(report.status.jobID, jobID)
+    XCTAssertEqual(report.trustedFacts.jobID, jobID)
+    XCTAssertEqual(report.artifactInventory, originalArtifacts)
+    XCTAssertEqual(
+      methodLog.snapshot(), ["health", "job.status", "job.evidence", "artifact.list"],
+      "reopening must remain a four-read proof with no submit, run, cancel or device dispatch")
+
+    guard case .array(let jobsAfterRestart) = try reopenedClient.request(method: "job.list") else {
+      return XCTFail("job.list must answer after restart")
+    }
+    XCTAssertEqual(
+      jobsAfterRestart.count, jobsBeforeRestart.count,
+      "read-only reopening must not create a second Runtime Job")
+  }
+
   func testDaemonPreservesHistoricalCampaignCorrelationForDecodeOnlyExport() throws {
     let digest = String(repeating: "a", count: 64)
     let currentCorrelation = RuntimeCampaignEvidenceCorrelation(

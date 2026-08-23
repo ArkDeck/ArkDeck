@@ -299,6 +299,33 @@ public struct LaunchAgentStatus: Codable, Sendable, Equatable {
   public let ready: Bool
 }
 
+/// The daemon-owned process identity written before its UDS starts accepting
+/// requests. The LaunchAgent client reads this only to prove that a restart
+/// produced a distinct process; it is never an authority for device work.
+public struct LaunchAgentDaemonInstance: Codable, Sendable, Equatable {
+  public let pid: Int32
+  public let socketPath: String
+  public let protocolVersion: String
+  public let startedAtUTC: String
+}
+
+/// Receipt for a configuration-preserving LaunchAgent restart.
+///
+/// Restart never copies a helper, rewrites the plist/install receipt or
+/// touches Runtime state. The CLI separately proves the replacement process
+/// is reachable and speaks the same catalog before reporting success.
+public struct LaunchAgentRestartReceipt: Codable, Sendable, Equatable {
+  public let schemaVersion: String
+  public let restartedAtUTC: String
+  public let launchDomain: String
+  public let plistPath: String
+  public let daemonPath: String
+  public let daemonSHA256: String
+  public let hdcSHA256: String
+  public let preservedStateDirectory: String
+  public let preservedLogDirectory: String
+}
+
 public struct LaunchAgentRemoval: Codable, Sendable, Equatable {
   public let removedPlist: Bool
   public let removedDaemon: Bool
@@ -606,6 +633,58 @@ public final class LaunchAgentService: @unchecked Sendable {
       standardErrorPath: paths.standardError.path,
       diagnostics: diagnostics,
       ready: installed && loaded && socketPresent && diagnostics.isEmpty)
+  }
+
+  /// Reads the daemon process identity from the Runtime-owned state directory.
+  /// A stale document is possible after a crash, so callers must pair this
+  /// value with a successful UDS health request before trusting liveness.
+  public func daemonInstance() throws -> LaunchAgentDaemonInstance {
+    let instanceURL = paths.stateDirectory.appending(path: "instance.json")
+    let instance: LaunchAgentDaemonInstance
+    do {
+      instance = try JSONDecoder().decode(
+        LaunchAgentDaemonInstance.self, from: Data(contentsOf: instanceURL))
+    } catch {
+      throw LaunchAgentServiceError.configuration(
+        "daemon instance document is unavailable or invalid: \(error)")
+    }
+    guard instance.pid > 0,
+      instance.socketPath == paths.socket.path,
+      !instance.protocolVersion.isEmpty,
+      !instance.startedAtUTC.isEmpty
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "daemon instance document does not match the managed LaunchAgent")
+    }
+    return instance
+  }
+
+  /// Restarts the already healthy managed service without changing any
+  /// installed bytes or Runtime state. The CLI owns the zero-current-Job
+  /// preflight and post-bootstrap UDS/PID/catalog proof around this narrow
+  /// launchd lifecycle operation.
+  public func restart() throws -> LaunchAgentRestartReceipt {
+    let before = try status()
+    guard before.ready,
+      let daemonPath = before.daemonPath,
+      let daemonSHA256 = before.daemonSHA256,
+      let hdcSHA256 = before.hdcSHA256
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "restart requires a ready, identity-checked LaunchAgent: "
+          + before.diagnostics.joined(separator: "; "))
+    }
+    try requireSuccess(
+      runner.run(arguments: ["bootout", launchDomain + "/" + ArkDeckLaunchAgent.label]),
+      operation: "bootout")
+    try bootstrap()
+    return LaunchAgentRestartReceipt(
+      schemaVersion: "arkdeck-launchagent-restart/v1",
+      restartedAtUTC: nowUTC(), launchDomain: launchDomain,
+      plistPath: paths.plist.path, daemonPath: daemonPath,
+      daemonSHA256: daemonSHA256, hdcSHA256: hdcSHA256,
+      preservedStateDirectory: paths.stateDirectory.path,
+      preservedLogDirectory: paths.logDirectory.path)
   }
 
   /// Returns the descriptor selected by the last successful installation,
@@ -1178,18 +1257,28 @@ public final class LaunchAgentService: @unchecked Sendable {
 
   /// `bootout` can report success before launchd has finished unregistering
   /// the old service. An immediate `bootstrap` then transiently exits with
-  /// EIO. Retry only that exact launchctl status, for a bounded two seconds;
-  /// every other configuration or permission failure remains fail-closed on
-  /// its first response.
+  /// EIO. A persistently disabled user service reports the same status, so an
+  /// explicit install/update repairs that state once after three consecutive
+  /// EIO responses. Retry only that exact launchctl status, for a bounded two
+  /// seconds; every other configuration or permission failure remains
+  /// fail-closed on its first response.
   private func bootstrap() throws {
     let arguments = ["bootstrap", launchDomain, paths.plist.path]
     let maximumAttempts = 20
+    let enableAfterAttempt = 3
+    var enableAttempted = false
     for attempt in 1...maximumAttempts {
       let result = try runner.run(arguments: arguments)
       if result.exitStatus == 0 { return }
       guard result.exitStatus == EIO, attempt < maximumAttempts else {
         try requireSuccess(result, operation: "bootstrap")
         return
+      }
+      if attempt == enableAfterAttempt, !enableAttempted {
+        try requireSuccess(
+          runner.run(arguments: ["enable", launchDomain + "/" + ArkDeckLaunchAgent.label]),
+          operation: "enable")
+        enableAttempted = true
       }
       usleep(100_000)
     }
