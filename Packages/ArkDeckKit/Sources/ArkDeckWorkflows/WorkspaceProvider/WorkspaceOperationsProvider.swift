@@ -813,13 +813,19 @@ package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
       throw RuntimeDispatchFailure.failed(
         "workspace resolver cannot serve provider \(providerID)")
     }
-    for identity in allowed {
-      _ = try validated(identity)
-    }
-    guard let first = allowed.sorted(by: { $0.path < $1.path }).first else {
+    let ordered = allowed.sorted(by: { $0.path < $1.path })
+    guard let selected = ordered.first else {
       throw RuntimeDispatchFailure.failed("workspace profile has no executable presets")
     }
-    return try validated(first)
+    // The whole profile is still checked, not only the identity returned. The
+    // selected one is checked in that same pass instead of a second time, and
+    // the pass runs in path order so a profile with two drifted entries names
+    // the same one every time.
+    let resolved = try validated(selected)
+    for identity in ordered.dropFirst() {
+      _ = try validated(identity)
+    }
+    return resolved
   }
 
   package func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
@@ -833,9 +839,18 @@ package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
     return try validated(invocation.executable)
   }
 
+  /// Re-derives the executable's digest and refuses if it moved.
+  ///
+  /// Availability asks this once per published operation, and a ProjectProfile
+  /// names real toolchain binaries, so answering one read-only `operation.list`
+  /// was reading and hashing gigabytes. Going through the shared memo keeps the
+  /// refusal: the digest is a pure function of the bytes, and the memo
+  /// re-derives whenever the file's own identity moves, so a replaced
+  /// executable is still caught here. The executor checks again atomically at
+  /// spawn either way.
   private func validated(_ identity: WorkspaceExecutableIdentity) throws -> ResolvedExecutable {
-    let bytes = try Data(contentsOf: URL(filePath: identity.path))
-    guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
+    let measured = try WorkspaceExecutableIdentity.hashing(path: identity.path).sha256
+    guard measured == identity.sha256 else {
       throw RuntimeDispatchFailure.failed(
         "workspace executable identity drifted: \(identity.path)")
     }
@@ -992,8 +1007,13 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     }
     do {
       for identity in profile.executableIdentities {
-        let bytes = try Data(contentsOf: URL(filePath: identity.path))
-        guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
+        // Asked once per published operation, against real toolchain
+        // binaries, so re-reading and re-hashing them here cost far more than
+        // the answer is worth. The memo re-derives whenever a file's own
+        // identity moves, so drift is still refused; a file that cannot be
+        // read still throws into the catch below.
+        let measured = try WorkspaceExecutableIdentity.hashing(path: identity.path).sha256
+        guard measured == identity.sha256 else {
           return .unavailable(
             code: .toolIdentityDrift, reason: "workspace.toolIdentityDrift")
         }

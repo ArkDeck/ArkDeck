@@ -105,4 +105,23 @@ final class FileDerivedCacheTests: XCTestCase {
     cache.invalidate()
     XCTAssertNil(cache.value(for: file))
   }
+
+  /// The workspace resolver's drift refusal reads its digest through the
+  /// process-wide memo rather than re-hashing. That is only safe while
+  /// replacing an executable still produces a different digest — otherwise
+  /// availability would keep vouching for bytes that are gone.
+  func testHashingAnExecutableReDerivesAfterItIsReplaced() throws {
+    let executable = directory.appending(path: "tool")
+    try Data("first".utf8).write(to: executable)
+    let before = try WorkspaceExecutableIdentity.hashing(path: executable.path).sha256
+
+    try Data("second-and-longer".utf8).write(to: executable)
+    let after = try WorkspaceExecutableIdentity.hashing(path: executable.path).sha256
+
+    XCTAssertNotEqual(
+      before, after, "a replaced executable must not keep its old digest")
+    XCTAssertEqual(
+      try WorkspaceExecutableIdentity.hashing(path: executable.path).sha256, after,
+      "the second read of unchanged bytes must agree with the first")
+  }
 }
