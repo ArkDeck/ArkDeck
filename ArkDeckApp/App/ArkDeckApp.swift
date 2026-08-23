@@ -462,6 +462,9 @@ private struct AppShellView: View {
     let effective = ViewerUIFixture.deviceObservation() ?? observation
     models.uiDumpWorkspace.applyDeviceObservation(
       effective, names: deviceDisplayNames(effective))
+    // HDC diagnostics reads the real observation: a fixture Viewer capture
+    // must not make the machine claim a device is authorized.
+    models.hdcDiagnostics.applyDeviceObservation(observation)
   }
 
   /// Presentation-only names, keyed by the adopted target the workspaces
@@ -991,12 +994,22 @@ private final class HDCStatusViewModel {
     lifecycleDispatchIsProductionComposed = provider.lifecycleDispatchIsProductionComposed
   }
 
+  /// The device observation arrives from the App's shared source rather than
+  /// being probed here. Authorization is the only device fact this surface
+  /// needs, and it is already being observed once for everyone.
+  private(set) var deviceObservation = DeviceListPresentation.loading
+
+  func applyDeviceObservation(_ observation: DeviceListPresentation) {
+    deviceObservation = observation
+  }
+
   func refresh() {
     guard !isRefreshInFlight else { return }
     isRefreshInFlight = true
     let provider = provider
+    let observation = deviceObservation
     Task { [weak self] in
-      let next = await provider.refresh()
+      let next = await provider.refresh(deviceObservation: observation)
       guard let self else { return }
       defer { self.isRefreshInFlight = false }
       guard !Task.isCancelled else { return }

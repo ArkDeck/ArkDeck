@@ -428,8 +428,8 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
     let fixture = HDCApplicationDiagnosticsFacade.make(arguments: [
       "ArkDeck", "--ui-test-hdc-diagnostics",
     ])
-    let firstFixturePresentation = await fixture.refresh()
-    let secondFixturePresentation = await fixture.refresh()
+    let firstFixturePresentation = await fixture.refresh(deviceObservation: .loading)
+    let secondFixturePresentation = await fixture.refresh(deviceObservation: .loading)
 
     XCTAssertFalse(fixture.lifecycleDispatchIsProductionComposed)
     XCTAssertEqual(
@@ -568,9 +568,9 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
         "ArkDeck", "--ui-test-hdc-diagnostics", "--ui-test-hdc-refresh-delay",
       ],
       delayedRefreshWait: { await delay.wait() })
-    let first = await fixture.refresh()
-    let second = await fixture.refresh()
-    let third = await fixture.refresh()
+    let first = await fixture.refresh(deviceObservation: .loading)
+    let second = await fixture.refresh(deviceObservation: .loading)
+    let third = await fixture.refresh(deviceObservation: .loading)
 
     XCTAssertEqual(first.deviceEvents.map(\.kind), [.appeared])
     XCTAssertEqual(second.deviceEvents.map(\.kind), [.appeared, .disappeared])
@@ -604,14 +604,14 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
     XCTAssertEqual(
       occurrences(of: "hdcDiagnostics.isRefreshInFlight", in: overviewWiring),
       1)
-    XCTAssertEqual(occurrences(of: "let next = await provider.refresh()", in: model), 1)
+    XCTAssertEqual(occurrences(of: "let next = await provider.refresh(deviceObservation: observation)", in: model), 1)
 
     let guardIndex = try XCTUnwrap(
       model.range(of: "guard !isRefreshInFlight else { return }")?.lowerBound)
     let admitIndex = try XCTUnwrap(model.range(of: "isRefreshInFlight = true")?.lowerBound)
     let taskIndex = try XCTUnwrap(model.range(of: "Task { [weak self] in")?.lowerBound)
     let providerIndex = try XCTUnwrap(
-      model.range(of: "let next = await provider.refresh()")?.lowerBound)
+      model.range(of: "let next = await provider.refresh(deviceObservation: observation)")?.lowerBound)
     let releaseIndex = try XCTUnwrap(
       model.range(of: "defer { self.isRefreshInFlight = false }")?.lowerBound)
     XCTAssertLessThan(guardIndex, admitIndex)
