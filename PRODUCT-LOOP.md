@@ -985,67 +985,19 @@ verify
 
 ---
 
-## 19. 每轮执行后的强制汇报格式
+## 19. 每轮执行后的简洁汇报格式
 
-每轮完成后只能使用以下格式汇报。
+每轮完成后只汇报以下两部分。不得固定展示 Golden Journey 全表、治理循环检查、
+重复任务检查或其他无变化状态。
 
-### 本轮产品结果
+### 本轮修改
 
-- 修复的问题:
-- 修改的生产执行路径:
-- 减少的人工步骤:
-- 新增或改进的真实设备能力:
-- 是否执行真实设备验证:
-- 验证设备:
-- 验证结果:
+简要列出本轮实际完成的修改和必要验证。没有修改时明确写「无」。
 
-### Golden Journey 进度
+### 下一轮建议
 
-| Golden Journey | 执行前 | 执行后 | 当前唯一阻塞 |
-|---|---|---|---|
-| GJ-1 Device Observe |  |  |  |
-| GJ-2 HAP Debug |  |  |  |
-| GJ-3 Native Debug |  |  |  |
-| GJ-4 Flash Recovery |  |  |  |
-| GJ-5 Bounded AI Debug Loop |  |  |  |
-
-### 治理循环检查
-
-本轮是否新增:
-
-- OpenSpec Change:否/是
-- Proposal:否/是
-- Readiness-only Task:否/是
-- Acceptance Framework:否/是
-- Evidence Schema:否/是
-- Verification-only Task:否/是
-- Archive-only Task:否/是
-
-如果任意一项为「是」,必须说明:
-
-1. 对应的真实安全风险是什么;
-2. 为什么不能直接通过 Runtime 代码修复;
-3. 它推进了哪个 Golden Journey;
-4. 为什么不会产生后续 readiness、verification、archive 连锁任务。
-
-无法回答以上四项时,撤销该治理工作。
-
-### 重复任务检查
-
-- 是否搜索了已有 Task、PR 和实现:
-- 是否发现语义重复:
-- 已合并或替代的旧任务:
-- 本轮新建产品任务数量:
-
-### 下一步
-
-只允许给出:
-
-```text
-当前阻塞最高优先级 Golden Journey 的一个产品缺陷
-```
-
-禁止重新输出完整项目规划。
+只列与当前请求直接相关的下一步建议;默认给出一个,确有并列依赖时最多三个。
+不得重新输出完整项目规划或无关状态。
 
 ---
 
