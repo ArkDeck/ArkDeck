@@ -130,6 +130,9 @@ Trace 页面保留现有 target、preset/tag、duration/buffer、probe、参数�
 7. 加载、取消、失败、空 timed events、截断与 cache needs-attention 均使用明确状态，
    不以颜色作为唯一信号，不伪造进度百分比；
 8. 尊重 VoiceOver、键盘焦点、focus-visible 与 Reduce Motion。
+9. duration 支持直接输入与秒/分钟展示单位；秒快捷项为 `15/30/45/60`，分钟快捷项为
+   `1/2/3`，提交边界始终规范化为 published `durationSeconds`；Target 区域可显示 Runtime
+   已接管的 `hdc v<version>` 事实，但不得为此新增 Viewer-owned HDC probe。
 
 ArkTrace 的独立 `WindowGroup`、App Settings 和直接 Capture window 不复制；这些能力必须融入
 ArkDeck 既有 shell、全局 Job Inspector、Settings 与 Trace workspace。

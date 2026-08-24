@@ -23,7 +23,10 @@ Trace 缓存设置位于标准 macOS Settings 窗口。
 
 1. 打开 **Trace** 工作区，选择 Runtime 返回的精确 target 与 binding。
 2. 刷新 probe，只选择该 target 当前确认支持的 tags。
-3. 在已发布的 operation 边界内选择 duration 和 buffer。
+3. 在已发布的 operation 边界内输入 duration：可以按秒或分钟输入；秒提供
+   `15s`、`30s`、`45s`、`60s` 快捷项，分钟提供 `1 min`、`2 min`、`3 min`
+   快捷项。界面最终只向 Runtime 提交规范化的 `durationSeconds`。buffer 继续使用
+   probe 收敛出的只读值。
 4. 开始采集。没有可靠总量时只显示 indeterminate 与 elapsed time。
 5. ArkDeck 等待 terminal Job，精确选中唯一的 published raw `trace.htrace`，以
    sensitive opt-in 读取，校验 offset、EOF、byte count 和 SHA-256。
@@ -31,6 +34,9 @@ Trace 缓存设置位于标准 macOS Settings 窗口。
 
 全局 Job Inspector 才是阶段、取消策略、cleanup debt 与 terminal state 的权威。
 Viewer 报错不能证明设备端清理已成功。
+
+Target 区域显示 Runtime 已接管的 HDC 工具版本，例如 `hdc v3.2.0f`。该值来自
+target/binding 事实，不会由 Trace Viewer 另行执行 HDC 探测。
 
 ## 无头真机采集
 

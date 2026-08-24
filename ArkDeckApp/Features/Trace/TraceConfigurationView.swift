@@ -264,16 +264,44 @@ struct TraceConfigurationView: View {
         .font(WorkspaceFont.label)
         .foregroundStyle(.secondary)
       HStack(spacing: WorkspaceMetrics.tightGap) {
-        Picker(traceString("trace.bounds.duration"), selection: durationBinding) {
-          ForEach(TraceConfigurationView.durationChoicesSeconds, id: \.self) { seconds in
-            Text("\(seconds) s").tag(String(seconds))
+        TextField(traceString("trace.bounds.duration"), text: durationBinding)
+          .textFieldStyle(.roundedBorder)
+          .multilineTextAlignment(.trailing)
+          .font(WorkspaceFont.tabularValue)
+          .frame(minWidth: 64, idealWidth: 72, maxWidth: 88)
+          .accessibilityIdentifier("trace.duration.input")
+          .accessibilityLabel(traceString("trace.bounds.duration"))
+
+        Picker(traceString("trace.duration.unit"), selection: durationUnitBinding) {
+          ForEach(model.availableDurationUnits) { unit in
+            Text(durationUnitTitle(unit)).tag(unit)
           }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(maxWidth: 200)
-        .accessibilityIdentifier("trace.duration")
+        .frame(maxWidth: 210)
+        .accessibilityIdentifier("trace.duration.unit")
+        .accessibilityLabel(traceString("trace.duration.unit"))
       }
+
+      Text(traceString("trace.duration.quick"))
+        .font(WorkspaceFont.caption)
+        .foregroundStyle(.secondary)
+
+      LazyVGrid(
+        columns: [
+          GridItem(
+            .adaptive(minimum: 56),
+            spacing: WorkspaceMetrics.tightGap)
+        ],
+        spacing: WorkspaceMetrics.tightGap
+      ) {
+        ForEach(model.durationUnit.quickValues, id: \.self) { value in
+          quickDurationToggle(value)
+        }
+      }
+      .accessibilityIdentifier("trace.duration.quick")
+
       Label {
         Text(validationMessage(model.durationValidation))
       } icon: {
@@ -305,11 +333,6 @@ struct TraceConfigurationView: View {
         .accessibilityIdentifier("trace.buffer.validation")
     }
   }
-
-  /// The three closed duration steps the design vocabulary offers. A step
-  /// outside the catalog range still fails validation below, so a narrowed
-  /// range cannot be bypassed by the segmented control.
-  static let durationChoicesSeconds = [10, 15, 30]
 
   private var parameterSnapshots: some View {
     WorkspaceSection(Text(traceString("trace.parameters.title"))) {
@@ -468,6 +491,48 @@ struct TraceConfigurationView: View {
     Binding(
       get: { model.durationText },
       set: { model.setDurationText($0) })
+  }
+
+  private var durationUnitBinding: Binding<TraceDurationInputUnit> {
+    Binding(
+      get: { model.durationUnit },
+      set: { model.setDurationUnit($0) })
+  }
+
+  private func quickDurationToggle(_ value: Int) -> some View {
+    Toggle(
+      isOn: Binding(
+        get: { model.durationText == String(value) },
+        set: { selected in
+          if selected { model.selectQuickDuration(value) }
+        }
+      )
+    ) {
+      Text(quickDurationTitle(value))
+        .monospacedDigit()
+        .frame(maxWidth: .infinity)
+    }
+    .toggleStyle(.button)
+    .frame(minHeight: 24)
+    .disabled(!model.quickDurationIsAvailable(value))
+    .help(quickDurationAccessibilityLabel(value))
+    .accessibilityLabel(quickDurationAccessibilityLabel(value))
+    .accessibilityIdentifier("trace.duration.quick.\(model.durationUnit.rawValue).\(value)")
+  }
+
+  private func durationUnitTitle(_ unit: TraceDurationInputUnit) -> String {
+    switch unit {
+    case .seconds: traceString("trace.duration.seconds")
+    case .minutes: traceString("trace.duration.minutes")
+    }
+  }
+
+  private func quickDurationTitle(_ value: Int) -> String {
+    "\(value)\(model.durationUnit == .seconds ? "s" : " min")"
+  }
+
+  private func quickDurationAccessibilityLabel(_ value: Int) -> String {
+    "\(value) \(durationUnitTitle(model.durationUnit))"
   }
 
   private var persistentConfirmationBinding: Binding<Bool> {
