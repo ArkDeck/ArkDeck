@@ -1,9 +1,11 @@
 import ArkDeckWorkflows
+import ArkDeckTraceAppSupport
 import Observation
 import SwiftUI
 
 struct TraceWorkspaceView: View {
   var model: TraceWorkspaceViewModel
+  @Environment(\.openWindow) private var openWindow
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
@@ -15,6 +17,14 @@ struct TraceWorkspaceView: View {
       review
     }
     .toolbar {
+      ToolbarItem {
+        Button {
+          openWindow(id: ArkDeckWindow.traceViewer)
+        } label: {
+          Label(traceString("trace.action.openViewer"), systemImage: "timeline.selection")
+        }
+        .accessibilityIdentifier("trace.openViewer")
+      }
       ToolbarItem(placement: .primaryAction) {
         Button {
           model.refresh()
@@ -24,6 +34,10 @@ struct TraceWorkspaceView: View {
         .accessibilityIdentifier("trace.refresh")
         .disabled(model.isRefreshing)
       }
+    }
+    .onChange(of: model.viewerOpenRequestID) { oldValue, newValue in
+      guard newValue != oldValue else { return }
+      openWindow(id: ArkDeckWindow.traceViewer)
     }
   }
 
@@ -344,16 +358,23 @@ final class TraceWorkspaceViewModel {
   private(set) var submissionFailure: String?
   private(set) var isSubmitting = false
   private(set) var isCancelling = false
+  private(set) var isPreparingViewer = false
+  private(set) var viewerArtifactFailure: String?
+  private(set) var latestViewerArtifactName: String?
+  private(set) var viewerOpenRequestID: UInt64 = 0
 
   private let provider: any TraceApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
+  let documentController: TraceDocumentController
 
   init(
     provider: any TraceApplicationProviding,
-    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil
+    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil,
+    documentController: TraceDocumentController = TraceDocumentController()
   ) {
     self.provider = provider
     self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
+    self.documentController = documentController
   }
 
   var selectedTarget: TraceTargetPresentation? {
@@ -573,6 +594,7 @@ final class TraceWorkspaceViewModel {
     activeJobID = nil
     terminalSubmission = nil
     submissionFailure = nil
+    viewerArtifactFailure = nil
     let provider = provider
     let tags = requestedTags
     Task { [weak self] in
@@ -598,7 +620,11 @@ final class TraceWorkspaceViewModel {
         self.activeJobID = nil
         self.isSubmitting = false
         switch result {
-        case .completed(let terminal): self.terminalSubmission = terminal
+        case .completed(let terminal):
+          self.terminalSubmission = terminal
+          if terminal.state == "succeeded", !terminal.outcomeUnknown {
+            await self.openPublishedTrace(jobID: terminal.jobID)
+          }
         case .failed(let failure): self.submissionFailure = failure
         }
         self.refresh()
@@ -620,11 +646,114 @@ final class TraceWorkspaceViewModel {
     }
   }
 
+  func reopenLatestTraceArtifact() {
+    guard let terminalSubmission,
+      terminalSubmission.state == "succeeded",
+      !terminalSubmission.outcomeUnknown,
+      !isPreparingViewer
+    else { return }
+    Task { [weak self] in
+      await self?.openPublishedTrace(jobID: terminalSubmission.jobID)
+    }
+  }
+
+  func showViewer() {
+    viewerOpenRequestID &+= 1
+  }
+
+  private func openPublishedTrace(jobID: String) async {
+    guard !isPreparingViewer else { return }
+    isPreparingViewer = true
+    viewerArtifactFailure = nil
+    defer { isPreparingViewer = false }
+
+    let detail = await detailProvider.loadJobDetail(
+      jobID: jobID,
+      operationReference: TraceApplicationFacade.operationReference)
+    guard case .available = detail.artifactAvailability else {
+      viewerArtifactFailure = traceString("trace.viewer.artifactListUnavailable")
+      return
+    }
+    artifactsByJobID[jobID] = detail.artifacts
+    guard let artifact = TracePublishedArtifactPolicy.selectRawTrace(
+      from: detail.artifacts
+    ) else {
+      viewerArtifactFailure = traceString("trace.viewer.artifactInvalid")
+      return
+    }
+
+    let destination: URL
+    do {
+      destination = try Self.traceInboxURL(sha256: artifact.sha256)
+    } catch {
+      viewerArtifactFailure = traceString("trace.viewer.stagingUnavailable")
+      return
+    }
+    switch await detailProvider.exportArtifact(
+      jobID: jobID,
+      artifact: artifact,
+      destinationURL: destination,
+      allowSensitive: true)
+    {
+    case .completed(let url):
+      latestViewerArtifactName = artifact.name
+      documentController.open(url)
+      viewerOpenRequestID &+= 1
+    case .failed:
+      viewerArtifactFailure = traceString("trace.viewer.readFailed")
+    }
+  }
+
+  private static func traceInboxURL(sha256: String) throws -> URL {
+    guard sha256.utf8.count == 64,
+      sha256.utf8.allSatisfy({ byte in
+        (byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9"))
+          || (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "f"))
+      }),
+      let cache = FileManager.default.urls(
+        for: .cachesDirectory,
+        in: .userDomainMask
+      ).first
+    else { throw TraceViewerInboxError.unavailable }
+    let root = cache
+      .appending(path: "ArkDeck", directoryHint: .isDirectory)
+      .appending(path: "TraceInbox", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: root,
+      withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let rootValues = try root.resourceValues(forKeys: [
+      .isDirectoryKey, .isSymbolicLinkKey,
+    ])
+    guard rootValues.isDirectory == true, rootValues.isSymbolicLink != true else {
+      throw TraceViewerInboxError.unavailable
+    }
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o700],
+      ofItemAtPath: root.path)
+    let destination = root
+      .resolvingSymlinksInPath()
+      .appending(path: "\(sha256).htrace", directoryHint: .notDirectory)
+    if FileManager.default.fileExists(atPath: destination.path) {
+      let values = try destination.resourceValues(forKeys: [
+        .isRegularFileKey, .isSymbolicLinkKey,
+      ])
+      guard values.isRegularFile == true, values.isSymbolicLink != true else {
+        throw TraceViewerInboxError.unavailable
+      }
+    }
+    return destination
+  }
+
   private func resetTargetScopedReview() {
     customTags = configurationMode == .custom ? Set(selectedPreset.logicalTags) : []
     parameterMode = .unchanged
     persistentChangeConfirmed = false
   }
+}
+
+private enum TraceViewerInboxError: Error {
+  case unavailable
 }
 
 enum TraceConfigurationMode: String, CaseIterable, Hashable {

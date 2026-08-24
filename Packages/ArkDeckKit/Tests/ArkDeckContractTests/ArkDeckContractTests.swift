@@ -100,13 +100,16 @@ final class ArkDeckContractTests: XCTestCase {
     }
   }
 
-  func testAppTargetImportsOnlyCoreAndWorkflowsFromArkDeckKit() throws {
-    let allowed = Set(["ArkDeckCore", "ArkDeckWorkflows"])
+  func testAppTargetImportsOnlyApprovedCompositionModulesFromArkDeckKit() throws {
+    let allowed = Set([
+      "ArkDeckCore", "ArkDeckWorkflows", "ArkDeckTraceCore", "ArkDeckTraceAnalysis",
+      "ArkDeckTraceRendering", "ArkDeckTraceAppSupport",
+    ])
     for (file, modules) in try importsByFile(under: repoRoot.appending(path: "ArkDeckApp")) {
       for module in modules where module.hasPrefix("ArkDeck") {
         XCTAssertTrue(
           allowed.contains(module),
-          "app shell imports \(module), which is outside the Core/Workflows boundary (\(file))"
+          "app shell imports \(module), which is outside the approved composition boundary (\(file))"
         )
       }
     }

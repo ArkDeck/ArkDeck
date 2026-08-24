@@ -197,6 +197,36 @@ public enum TraceJobRunResult: Sendable, Equatable {
   case failed(String)
 }
 
+/// Fail-closed policy for handing one Runtime Artifact to the local Trace
+/// parser. Selection is intentionally exact and unique: a second plausible
+/// row is ambiguity, not a tie to resolve with ordering or timestamps.
+public enum TracePublishedArtifactPolicy {
+  public static func selectRawTrace(
+    from artifacts: [RuntimeArtifactPresentation],
+    operationReference: String = TraceApplicationFacade.operationReference
+  ) -> RuntimeArtifactPresentation? {
+    let candidates = artifacts.filter { artifact in
+      artifact.name == "trace.htrace"
+        && artifact.role == "raw"
+        && artifact.mediaType == "application/octet-stream"
+        && artifact.privacy == "sensitive"
+        && artifact.status == "published"
+        && artifact.sourceOperation == operationReference
+        && artifact.byteCount > 0
+        && isSHA256(artifact.sha256)
+    }
+    guard candidates.count == 1 else { return nil }
+    return candidates[0]
+  }
+
+  private static func isSHA256(_ value: String) -> Bool {
+    value.utf8.count == 64 && value.utf8.allSatisfy { byte in
+      (byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9"))
+        || (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "f"))
+    }
+  }
+}
+
 public enum TraceNumericInputValidator {
   public static func validate(
     _ value: String,

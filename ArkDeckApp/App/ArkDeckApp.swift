@@ -1,4 +1,5 @@
 import AppKit
+import ArkDeckTraceAppSupport
 import ArkDeckWorkflows
 import Observation
 import SwiftUI
@@ -90,6 +91,7 @@ private final class ArkDeckAppModelStore {
   let autoUpdate: AutoUpdateViewModel
   let runtimeHistory: RuntimeHistoryViewModel
   let deviceList: DeviceListViewModel
+  var requestedNavigation: ArkDeckNavigationItem?
 
   @ObservationIgnored lazy var hdcDiagnostics = HDCStatusViewModel(
     provider: HDCApplicationDiagnosticsFacade.make())
@@ -103,8 +105,10 @@ private final class ArkDeckAppModelStore {
     provider: ViewerUIFixture.provider() ?? UIDumpApplicationFacade.make())
   @ObservationIgnored lazy var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
+  @ObservationIgnored lazy var traceDocument = TraceDocumentController()
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
-    provider: TraceApplicationFacade.make())
+    provider: TraceApplicationFacade.make(),
+    documentController: traceDocument)
   @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
 
@@ -125,20 +129,105 @@ private final class ArkDeckAppModelStore {
     // publication; the provider actor owns the Runtime/XPC wait.
     deviceList.refreshForStartup()
   }
+
+  func requestTraceWorkspace() {
+    requestedNavigation = .trace
+  }
+
+  func consumeRequestedNavigation() -> ArkDeckNavigationItem? {
+    defer { requestedNavigation = nil }
+    return requestedNavigation
+  }
 }
 
 @main
 struct ArkDeckApp: App {
   @State private var models = ArkDeckAppModelStore()
+  @Environment(\.openWindow) private var openWindow
 
   var body: some Scene {
-    WindowGroup {
+    WindowGroup(id: ArkDeckWindow.main) {
       AppShellView(models: models)
+        .onOpenURL(perform: openTrace)
     }
     .defaultSize(width: 1180, height: 760)
+    .commands {
+      CommandMenu("Trace") {
+        Button("Capture Trace…") {
+          models.requestTraceWorkspace()
+          openWindow(id: ArkDeckWindow.main)
+        }
+        .keyboardShortcut("n")
+        Button("Open Trace…", action: presentTraceOpenPanel)
+          .keyboardShortcut("o", modifiers: [.command, .shift])
+        Button("Reload Trace") { models.traceDocument.reload() }
+          .keyboardShortcut("r", modifiers: [.command, .shift])
+          .disabled(models.traceDocument.sourceURL == nil)
+        Divider()
+        Button("Filter Trace Processes") { models.traceDocument.focusProcessFilter() }
+          .keyboardShortcut("f")
+          .disabled(models.traceDocument.trackGroups.isEmpty)
+        Button("Search Trace Events") { models.traceDocument.focusTraceSearch() }
+          .keyboardShortcut("f", modifiers: [.command, .shift])
+          .disabled(models.traceDocument.metadata == nil)
+      }
+      CommandGroup(replacing: .help) {
+        Button("Trace Keyboard Shortcuts") {
+          openWindow(id: ArkDeckWindow.traceShortcuts)
+        }
+      }
+    }
+    Window("Trace Viewer", id: ArkDeckWindow.traceViewer) {
+      TraceViewerSceneView(models: models)
+    }
+    .defaultSize(width: 1_280, height: 800)
+    Window("Trace Keyboard Shortcuts", id: ArkDeckWindow.traceShortcuts) {
+      ShortcutHelpView()
+    }
+    .defaultSize(width: 520, height: 620)
     Settings {
       SettingsSceneLoader(models: models)
     }
+  }
+
+  @MainActor
+  private func presentTraceOpenPanel() {
+    let panel = NSOpenPanel()
+    panel.title = "Open Trace"
+    panel.prompt = "Open"
+    panel.canChooseFiles = true
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    panel.allowedContentTypes = ArkTraceAppDistribution.supportedTraceContentTypes
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    openTrace(url)
+  }
+
+  @MainActor
+  private func openTrace(_ url: URL) {
+    guard url.isFileURL else { return }
+    models.traceDocument.open(url)
+    openWindow(id: ArkDeckWindow.traceViewer)
+  }
+}
+
+enum ArkDeckWindow {
+  static let main = "arkdeck.window.main"
+  static let traceViewer = "arkdeck.window.traceViewer"
+  static let traceShortcuts = "arkdeck.window.traceShortcuts"
+}
+
+private struct TraceViewerSceneView: View {
+  let models: ArkDeckAppModelStore
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    TraceViewerRootView(
+      controller: models.traceDocument,
+      openCapture: {
+        models.requestTraceWorkspace()
+        openWindow(id: ArkDeckWindow.main)
+      })
   }
 }
 
@@ -349,7 +438,14 @@ private struct AppShellView: View {
     }
     .frame(minWidth: 900, minHeight: 600)
     .onAppear {
+      applyRequestedNavigation(models.consumeRequestedNavigation())
       AppStartupPerformance.firstWindowAppeared()
+    }
+    .onChange(of: models.requestedNavigation) { _, request in
+      applyRequestedNavigation(request)
+      if request != nil {
+        _ = models.consumeRequestedNavigation()
+      }
     }
     // Leaving the device whose trust window is being waited on ends that wait
     // without a verdict: an abandoned window must not later claim it closed.
@@ -415,6 +511,11 @@ private struct AppShellView: View {
       model: runtimeHistory,
       onOpenHistory: openHistory,
       isExpanded: $isJobInspectorExpanded)
+  }
+
+  private func applyRequestedNavigation(_ request: ArkDeckNavigationItem?) {
+    guard let request else { return }
+    storedSelection = ShellSelection.navigation(request).storageValue
   }
 
   private var navigationShell: some View {
@@ -718,12 +819,14 @@ private struct SettingsSceneContent: View {
   let hdcDiagnostics: HDCStatusViewModel
   let runtimeHistory: RuntimeHistoryViewModel
   let autoUpdate: AutoUpdateViewModel
+  let traceDocument: TraceDocumentController
 
   init(models: ArkDeckAppModelStore) {
     model = models.settingsWorkspace
     hdcDiagnostics = models.hdcDiagnostics
     runtimeHistory = models.runtimeHistory
     autoUpdate = models.autoUpdate
+    traceDocument = models.traceDocument
   }
 
   var body: some View {
@@ -733,6 +836,7 @@ private struct SettingsSceneContent: View {
       isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
       hdcConfigurationError: hdcDiagnostics.configurationError,
       hasActiveRuntimeJobs: runtimeHistory.hasActiveJobs,
+      traceController: traceDocument,
       onHDCRefresh: { hdcDiagnostics.refresh() },
       onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
     ) {

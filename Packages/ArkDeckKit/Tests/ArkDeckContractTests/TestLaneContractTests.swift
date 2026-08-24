@@ -111,4 +111,46 @@ final class TestLaneContractTests: XCTestCase {
         "the gate must ask for the full suite, not a lane")
     }
   }
+
+  /// The full gate still covers the Viewer scale tests, but those wall-clock
+  /// ratios must not compete with the process-heavy parallel suite. Doing so
+  /// made a linear implementation intermittently look quadratic under load.
+  func testFullGateRunsViewerScaleBenchmarksSeriallyWithoutDroppingThem() throws {
+    let script = try runner()
+    guard let fullStart = script.range(of: "  full)"),
+      let defaultStart = script.range(
+        of: "  *)", range: fullStart.upperBound..<script.endIndex)
+    else {
+      return XCTFail("the full lane arm could not be isolated")
+    }
+    let full = String(script[fullStart.lowerBound..<defaultStart.lowerBound])
+    XCTAssertTrue(
+      full.contains("--skip ViewerScalePerformanceTests"),
+      "the parallel batch must exclude wall-clock microbenchmarks")
+    XCTAssertTrue(
+      full.contains(
+        "--skip ProcessExecutorContractTests/"
+          + "testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume"),
+      "the scheduler-sensitive pre-SIGCONT race must not compete with the parallel batch")
+    XCTAssertTrue(
+      full.contains(
+        "lane_filter='ProcessExecutorContractTests/"
+          + "testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume'"),
+      "the same full gate must add the skipped process identity race back")
+    XCTAssertTrue(
+      full.contains("run_lane full-process-identity-race \"$swiftpm\" test --filter \"$lane_filter\""),
+      "the process identity race must run through the measured lane runner")
+    XCTAssertTrue(
+      full.contains("lane_filter='ViewerScalePerformanceTests'"),
+      "the same full gate must add every skipped Viewer scale test back")
+    XCTAssertTrue(
+      full.contains("run_lane full-viewer-scale \"$swiftpm\" test --filter \"$lane_filter\""),
+      "Viewer scale tests must run through the measured lane runner")
+    let serialInvocation = try XCTUnwrap(
+      full.range(of: "run_lane full-viewer-scale"),
+      "the Viewer scale invocation is missing")
+    XCTAssertFalse(
+      full[serialInvocation.lowerBound...].contains("--parallel"),
+      "Viewer scale microbenchmarks must run serially")
+  }
 }

@@ -41,6 +41,32 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       .invalid(.outsideRange(1...600)))
   }
 
+  func testViewerArtifactPolicyRequiresOneExactPublishedRawTrace() {
+    let valid = artifact()
+    XCTAssertEqual(
+      TracePublishedArtifactPolicy.selectRawTrace(from: [valid]),
+      valid)
+    XCTAssertNil(
+      TracePublishedArtifactPolicy.selectRawTrace(from: [valid, valid]),
+      "two plausible rows are ambiguous and must fail closed")
+
+    let invalid: [RuntimeArtifactPresentation] = [
+      artifact(name: "trace-filtered.htrace"),
+      artifact(role: "derived"),
+      artifact(mediaType: "application/json"),
+      artifact(byteCount: 0),
+      artifact(sha256: String(repeating: "A", count: 64)),
+      artifact(privacy: "public"),
+      artifact(status: "pending"),
+      artifact(sourceOperation: "capture.diagnostics@2"),
+    ]
+    for candidate in invalid {
+      XCTAssertNil(
+        TracePublishedArtifactPolicy.selectRawTrace(from: [candidate]),
+        "invalid field set must never enter the parser: \(candidate)")
+    }
+  }
+
   func testWorkspaceDecoderPreservesBindingAndLabelsDiagnosticsJobsHonestly() throws {
     let presentation = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
@@ -167,6 +193,13 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(configuration.contains("TraceDebugParameterCatalog.definitions"))
     XCTAssertFalse(workspace.contains("job.submit"))
     XCTAssertFalse(configuration.contains("shell"))
+    XCTAssertTrue(
+      workspace.contains(
+        "if terminal.state == \"succeeded\", !terminal.outcomeUnknown"))
+    XCTAssertTrue(workspace.contains("TracePublishedArtifactPolicy.selectRawTrace("))
+    XCTAssertTrue(workspace.contains("allowSensitive: true"))
+    XCTAssertTrue(workspace.contains("case .completed(let url):"))
+    XCTAssertTrue(workspace.contains("documentController.open(url)"))
   }
 
   func testRuntimeProbeDecoderPinsTargetBindingAdapterTagsAndAllParameters() throws {
@@ -286,6 +319,23 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
 
   private func response(_ result: [[String: Any]]) throws -> Data {
     try JSONSerialization.data(withJSONObject: ["id": "test", "ok": true, "result": result])
+  }
+
+  private func artifact(
+    name: String = "trace.htrace",
+    role: String? = "raw",
+    mediaType: String = "application/octet-stream",
+    byteCount: Int64 = 4_096,
+    sha256: String = String(repeating: "a", count: 64),
+    privacy: String = "sensitive",
+    status: String = "published",
+    sourceOperation: String = "capture.diagnostics@1"
+  ) -> RuntimeArtifactPresentation {
+    RuntimeArtifactPresentation(
+      id: "artifact-1", name: name, role: role, mediaType: mediaType,
+      byteCount: byteCount, sha256: sha256, privacy: privacy,
+      status: status, statusDetail: nil, sourceOperation: sourceOperation,
+      createdAtUTC: "2026-08-24T00:00:00Z", redactionApplied: false)
   }
 
   private func source(_ relativePath: String) throws -> String {

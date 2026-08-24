@@ -1,0 +1,3 @@
+# The reviewed, SHA-locked TraceStreamer executable is intentionally tracked.
+# Stable test mirrors and clean release checkouts must contain the exact parser
+# named by manifest.json without rebuilding it from the network.

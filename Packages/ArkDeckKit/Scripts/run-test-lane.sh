@@ -96,7 +96,17 @@ case "$lane" in
     run_lane focus "$swiftpm" test --parallel --num-workers "$workers" --filter "$2"
     ;;
   full)
-    run_lane full "$swiftpm" test --parallel --num-workers "$workers"
+    # Wall-clock growth ratios are meaningful only when their two samples are
+    # not competing with unrelated subprocess-heavy tests. Keep the merge gate
+    # complete, but run its microbenchmarks serially after the parallel suite.
+    lane_filter='<whole suite except serialized timing tests>'
+    run_lane full-parallel "$swiftpm" test --parallel --num-workers "$workers" \
+      --skip ViewerScalePerformanceTests \
+      --skip ProcessExecutorContractTests/testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume
+    lane_filter='ProcessExecutorContractTests/testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume'
+    run_lane full-process-identity-race "$swiftpm" test --filter "$lane_filter"
+    lane_filter='ViewerScalePerformanceTests'
+    run_lane full-viewer-scale "$swiftpm" test --filter "$lane_filter"
     ;;
   *)
     echo "usage: sh Packages/ArkDeckKit/Scripts/run-test-lane.sh {fast|medium|provider|storage|slow|full|focus <test-filter>}" >&2
