@@ -89,7 +89,9 @@ struct UIDumpWorkspaceView: View {
       Button { model.recapture() } label: {
         Label(
           model.isCapturing
-            ? viewerText("viewer.toolbar.capturing") : viewerText("viewer.toolbar.recapture"),
+            ? viewerText("viewer.toolbar.capturing")
+            : viewerText(
+              model.capture == nil ? "viewer.toolbar.capture" : "viewer.toolbar.recapture"),
           systemImage: "camera.viewfinder")
       }
       .buttonStyle(.borderedProminent)
