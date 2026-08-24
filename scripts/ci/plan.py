@@ -30,13 +30,7 @@ APP_PACKAGE_TARGET_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/",
     "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/",
     "Packages/ArkDeckKit/Sources/ArkDeckStorage/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceCore/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceParser/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceStore/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceRuntime/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceAnalysis/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceRendering/",
-    "Packages/ArkDeckKit/Sources/ArkDeckTraceAppSupport/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/",
 )
 WORKFLOWS_COMPOSITION_PREFIX = (
     "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/"

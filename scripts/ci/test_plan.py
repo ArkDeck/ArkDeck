@@ -47,13 +47,7 @@ class PathClassificationTests(unittest.TestCase):
             "ArkDeckOpenHarmony",
             "ArkDeckWorkflows",
             "ArkDeckStorage",
-            "ArkDeckTraceCore",
-            "ArkDeckTraceParser",
-            "ArkDeckTraceStore",
-            "ArkDeckTraceRuntime",
-            "ArkDeckTraceAnalysis",
-            "ArkDeckTraceRendering",
-            "ArkDeckTraceAppSupport",
+            "ArkDeckTraceAdapter",
         ):
             with self.subTest(target=target):
                 self.assert_lanes(
@@ -67,7 +61,7 @@ class PathClassificationTests(unittest.TestCase):
             "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLI.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckAgentClient/Client.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/Daemon.swift",
-            "Packages/ArkDeckKit/Sources/ArkDeckTraceCLI/CLI.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/Composition.swift",
             "Packages/ArkDeckKit/LaunchAgents/LaunchAgent.swift",
         ):
