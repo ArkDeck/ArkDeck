@@ -11,8 +11,10 @@ name: Swift CI
 #
 # ArkDeckKit keeps its full test suite as the merge gate.  SwiftPM's stable
 # mirrored workspace makes a restored cache genuinely incremental across
-# ephemeral checkout paths.  The App lane compiles the app and UI-test bundle
-# with build-for-testing, but never launches a simulator or device.  Cache
+# ephemeral checkout paths. The Xcode lane uses the same stable-mirror model,
+# so a fresh checkout keeps the source identities recorded in DerivedData. The
+# App lane compiles the app and UI-test bundle with build-for-testing, but never
+# launches a simulator or device. Cache
 # restores prefer an exact input hash, then fall back to the newest protected-
 # main cache for the same runner and toolchain; the build systems remain
 # responsible for invalidating stale outputs after a partial restore.
@@ -179,6 +181,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Xcode stable-workspace contract tests
+        run: python3 scripts/ci/test_run_xcodebuild.py
+
       - name: Configure read-only ArkForge package access
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
@@ -190,27 +195,15 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-
-            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
+            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
+            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
 
       - name: Build ArkDeck app and UI-test bundle
         env:
           ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode
-          CLANG_MODULE_CACHE_PATH: ${{ runner.temp }}/arkdeck-xcode/ModuleCache
-          SWIFTPM_MODULECACHE_OVERRIDE: ${{ runner.temp }}/arkdeck-xcode/ModuleCache
-        run: >-
-          xcodebuild
-          -project ArkDeck.xcodeproj
-          -scheme ArkDeck
-          -configuration Debug
-          -destination 'platform=macOS,arch=arm64'
-          -derivedDataPath "$ARKDECK_XCODE_CACHE_ROOT/DerivedData"
-          -clonedSourcePackagesDirPath "$ARKDECK_XCODE_CACHE_ROOT/SourcePackages"
-          -packageCachePath "$ARKDECK_XCODE_CACHE_ROOT/PackageCache"
-          CODE_SIGNING_ALLOWED=NO
-          build-for-testing
+        run: sh scripts/ci/run-xcodebuild.sh
 
       - name: Remove ArkForge package credential
         if: always()
@@ -225,7 +218,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
 
   # Stable required-check name.  A job-level skip is a successful no-op;
   # workflow-level paths filters are intentionally absent because GitHub can
