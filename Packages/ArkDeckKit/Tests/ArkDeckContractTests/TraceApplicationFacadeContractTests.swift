@@ -154,6 +154,65 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(presentation.relatedDiagnosticsJobs.first?.traceLegSelectionKnown, false)
   }
 
+  func testTraceTargetsJoinSharedDeviceIdentityFacts() {
+    let target = TraceTargetPresentation(
+      id: "target-a",
+      bindingRevision: 9,
+      toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-06T08:00:00Z")
+    let observation = DeviceListPresentation(
+      availability: .available,
+      candidates: [
+        DeviceCandidatePresentation(
+          connectKey: "5SM0125725000252",
+          state: "Connected",
+          adoptedTargetID: "target-a",
+          bindingRevision: 9,
+          observedFacts: DeviceObservedFactsPresentation(
+            model: "HUAWEI Mate 80 Pro",
+            firmware: "OpenHarmony-7.0.0.39",
+            transport: "usb",
+            confirmedAtUTC: "2026-08-24T03:00:00Z"))
+      ])
+
+    let joined = TraceApplicationFacade.rejoin(targets: [target], with: observation)
+
+    XCTAssertEqual(joined.first?.deviceName, "HUAWEI Mate 80 Pro")
+    XCTAssertEqual(joined.first?.systemVersion, "OpenHarmony-7.0.0.39")
+    XCTAssertEqual(joined.first?.connectKey, "5SM0125725000252")
+    XCTAssertEqual(joined.first?.transport, "usb")
+    XCTAssertEqual(
+      joined.first?.connectionSummary,
+      "OpenHarmony-7.0.0.39 · 5SM0…00252 · USB")
+    XCTAssertEqual(
+      joined.first?.accessibleConnectionSummary,
+      "OpenHarmony-7.0.0.39, 5SM0125725000252, USB")
+  }
+
+  func testTraceDeviceJoinRequiresTheCurrentBindingAndOneRoute() {
+    let target = TraceTargetPresentation(
+      id: "target-a", bindingRevision: 9, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-06T08:00:00Z")
+    let candidates = [
+      DeviceCandidatePresentation(
+        connectKey: "old-route", state: "Connected",
+        adoptedTargetID: "target-a", bindingRevision: 8),
+      DeviceCandidatePresentation(
+        connectKey: "new-route-a", state: "Connected",
+        adoptedTargetID: "target-a", bindingRevision: 9),
+      DeviceCandidatePresentation(
+        connectKey: "new-route-b", state: "Connected",
+        adoptedTargetID: "target-a", bindingRevision: 9),
+    ]
+
+    XCTAssertEqual(
+      TraceApplicationFacade.rejoin(
+        targets: [target],
+        with: DeviceListPresentation(availability: .available, candidates: candidates)),
+      [target],
+      "ambiguous current routes must not be presented as one physical device")
+  }
+
   func testMalformedMatchingFactsFailClosed() throws {
     let presentation = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
@@ -227,6 +286,10 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(configuration.contains("ForEach(model.durationUnit.quickValues"))
     XCTAssertTrue(configuration.contains(".toggleStyle(.button)"))
     XCTAssertTrue(workspace.contains("hdcVersionLabel(target.toolVersion)"))
+    XCTAssertTrue(app.contains("models.traceWorkspace.applyDeviceObservation("))
+    XCTAssertTrue(workspace.contains("TraceApplicationFacade.rejoin("))
+    XCTAssertTrue(workspace.contains("model.deviceTitle(target)"))
+    XCTAssertTrue(workspace.contains("target.connectionSummary"))
     XCTAssertFalse(workspace.contains("job.submit"))
     XCTAssertFalse(configuration.contains("shell"))
     XCTAssertTrue(

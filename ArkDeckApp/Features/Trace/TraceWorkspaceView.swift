@@ -1,5 +1,6 @@
 import ArkDeckWorkflows
 import ArkDeckTraceAppSupport
+import Foundation
 import Observation
 import SwiftUI
 
@@ -112,7 +113,7 @@ struct TraceWorkspaceView: View {
   private var target: some View {
     WorkspaceSection(Text(traceString("trace.target.title"))) {
       VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        if model.workspace.targets.isEmpty {
+        if model.targets.isEmpty {
           traceNotice(
             model.workspace.targetLoadFailure ?? traceString("trace.target.empty"),
             systemImage: "externaldrive.badge.questionmark",
@@ -120,8 +121,16 @@ struct TraceWorkspaceView: View {
             identifier: "trace.target.empty")
         } else {
           Picker(traceString("trace.target.label"), selection: targetBinding) {
-            ForEach(model.workspace.targets) { target in
-              Text(target.id).tag(target.id)
+            ForEach(model.targets) { target in
+              VStack(alignment: .leading, spacing: 2) {
+                Text(model.deviceTitle(target))
+                if let summary = target.connectionSummary {
+                  Text(summary)
+                    .font(WorkspaceFont.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              .tag(target.id)
             }
           }
           .frame(maxWidth: 460, alignment: .leading)
@@ -129,6 +138,13 @@ struct TraceWorkspaceView: View {
         }
 
         if let target = model.selectedTarget {
+          if let summary = target.connectionSummary {
+            Text(summary)
+              .font(WorkspaceFont.caption)
+              .foregroundStyle(.secondary)
+              .accessibilityLabel(target.accessibleConnectionSummary ?? summary)
+              .accessibilityIdentifier("trace.target.deviceSummary")
+          }
           Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: 5) {
             traceReviewRow(
               traceString("trace.target.binding"), String(target.bindingRevision),
@@ -350,6 +366,8 @@ struct TraceWorkspaceView: View {
 final class TraceWorkspaceViewModel {
   private(set) var workspace = TraceWorkspacePresentation.loading
   private(set) var selectedTargetID = ""
+  private(set) var deviceObservation = DeviceListPresentation.loading
+  private(set) var deviceNames: [String: String] = [:]
   private(set) var configurationMode = TraceConfigurationMode.preset
   private(set) var selectedPresetID = TracePresetID.arkuiDeep
   private(set) var customTags: Set<String> = []
@@ -387,8 +405,30 @@ final class TraceWorkspaceViewModel {
     self.documentController = documentController
   }
 
+  var targets: [TraceTargetPresentation] {
+    TraceApplicationFacade.rejoin(targets: workspace.targets, with: deviceObservation)
+  }
+
   var selectedTarget: TraceTargetPresentation? {
-    workspace.targets.first { $0.id == selectedTargetID }
+    targets.first { $0.id == selectedTargetID }
+  }
+
+  func applyDeviceObservation(
+    _ observation: DeviceListPresentation,
+    names: [String: String]
+  ) {
+    deviceObservation = observation
+    deviceNames = names
+  }
+
+  func deviceTitle(_ target: TraceTargetPresentation) -> String {
+    if let name = deviceNames[target.id], name != target.id { return name }
+    if let name = target.deviceName,
+      !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      return name
+    }
+    return target.id
   }
 
   var runtimeArtifacts: [RuntimeArtifactPresentation] {
