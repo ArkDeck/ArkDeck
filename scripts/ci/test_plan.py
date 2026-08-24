@@ -39,17 +39,48 @@ class PathClassificationTests(unittest.TestCase):
             app=False,
         )
 
-    def test_package_sources_run_both_composition_lanes(self):
-        self.assert_lanes(
-            ["Packages/ArkDeckKit/Sources/ArkDeckCore/ArkDeckCore.swift"],
-            swift=True,
-            app=True,
-        )
+    def test_app_package_target_sources_run_both_composition_lanes(self):
+        for target in (
+            "ArkDeckCore",
+            "ArkDeckProcess",
+            "ArkDeckRuntime",
+            "ArkDeckOpenHarmony",
+            "ArkDeckWorkflows",
+            "ArkDeckStorage",
+            "ArkDeckTraceCore",
+            "ArkDeckTraceParser",
+            "ArkDeckTraceStore",
+            "ArkDeckTraceRuntime",
+            "ArkDeckTraceAnalysis",
+            "ArkDeckTraceRendering",
+            "ArkDeckTraceAppSupport",
+        ):
+            with self.subTest(target=target):
+                self.assert_lanes(
+                    [f"Packages/ArkDeckKit/Sources/{target}/Example.swift"],
+                    swift=True,
+                    app=True,
+                )
+
+    def test_non_app_package_targets_skip_redundant_xcode_lane(self):
+        for path in (
+            "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLI.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckAgentClient/Client.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/Daemon.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckTraceCLI/CLI.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/Composition.swift",
+            "Packages/ArkDeckKit/LaunchAgents/LaunchAgent.swift",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=True, app=False)
 
     def test_package_manifest_runs_both_composition_lanes(self):
-        self.assert_lanes(
-            ["Packages/ArkDeckKit/Package.swift"], swift=True, app=True
-        )
+        for path in (
+            "Packages/ArkDeckKit/Package.swift",
+            "Packages/ArkDeckKit/Package.resolved",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=True, app=True)
 
     def test_app_and_ui_tests_run_only_xcode_lane(self):
         self.assert_lanes(
@@ -246,8 +277,8 @@ class CommandSelectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             commands = PLAN.local_commands(pathlib.Path(directory), self.plan(swift=False, app=True))
         flattened = "\n".join(" ".join(command) for command in commands)
-        self.assertIn("xcodebuild", flattened)
-        self.assertIn("build-for-testing", flattened)
+        self.assertIn("scripts/ci/test_run_xcodebuild.py", flattened)
+        self.assertIn("sh scripts/ci/run-xcodebuild.sh", flattened)
 
 
 if __name__ == "__main__":

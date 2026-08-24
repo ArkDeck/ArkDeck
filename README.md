@@ -106,8 +106,8 @@ Build and test the Swift package:
 ```bash
 git clone https://github.com/ArkDeck/ArkDeck.git
 cd ArkDeck
-swift build --package-path Packages/ArkDeckKit
-swift test --package-path Packages/ArkDeckKit --parallel
+sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build
+sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel
 ```
 
 Repository contributors can run the same path-aware plan used by GitHub CI.
@@ -125,9 +125,19 @@ python3 scripts/ci/plan.py \
   --run-local
 ```
 
-ArkDeckKit tests use a stable cache outside individual worktrees. App and UI
-test changes compile the Xcode scheme with `build-for-testing`; this does not
-launch a simulator or claim device acceptance.
+ArkDeckKit and Xcode builds use checksum-synchronized source mirrors at stable
+paths outside individual worktrees. Identical files retain their cache identity
+when switching worktrees; only changed targets/files are recompiled. To run the
+App/UI-test build directly:
+
+```bash
+sh scripts/ci/run-xcodebuild.sh
+```
+
+The CI classifier sends only the Package targets linked by the desktop app to
+the Xcode lane; CLI, Agent, LaunchAgent, fixture, and Package-test-only changes
+stay on the Swift lane. App and UI-test changes use `build-for-testing`; this
+does not launch a simulator or claim device acceptance.
 
 For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. This is enough for app development and host-side tests. Installing the background runtime is a separate signed-helper flow; flashing a DAYU200 also requires the signed `arkforged` daemon from the sibling [ArkForge repository](https://github.com/ArkDeck/ArkForge) — the flash path is native RockUSB inside that daemon, with no vendor flashing tool on the product path.
 

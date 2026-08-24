@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import hashlib
 import json
 import os
 import pathlib
@@ -24,6 +23,24 @@ ZERO_OID = "0" * 40
 DEFAULT_BRANCH = "main"
 SWIFT_WORKFLOW = ".github/workflows/swift-ci.yml"
 PLANNER_PREFIX = "scripts/ci/"
+APP_PACKAGE_TARGET_PREFIXES = (
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/",
+    "Packages/ArkDeckKit/Sources/ArkDeckProcess/",
+    "Packages/ArkDeckKit/Sources/ArkDeckRuntime/",
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceCore/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceParser/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceStore/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceRuntime/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceAnalysis/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceRendering/",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceAppSupport/",
+)
+WORKFLOWS_COMPOSITION_PREFIX = (
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/"
+)
 
 
 class PlanError(RuntimeError):
@@ -76,16 +93,20 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         if path.startswith("Packages/ArkDeckKit/") or path.startswith("Package."):
             swift = True
 
-        # The desktop app links ArkDeckKit production targets.  Package tests
-        # and test fixtures do not affect that composition root, while sources,
-        # resources, launch-agent inputs and the manifest do.
+        # The desktop app links a precise subset of ArkDeckKit production
+        # targets. Package tests, CLIs, agent processes, launch-agent inputs,
+        # fixtures, and AgentComposition do not affect that graph. Keeping
+        # those changes on the Swift lane avoids a redundant app rebuild.
+        package_source_affects_app = any(
+            path.startswith(prefix) for prefix in APP_PACKAGE_TARGET_PREFIXES
+        ) and not path.startswith(WORKFLOWS_COMPOSITION_PREFIX)
         if (
             path.startswith("ArkDeckApp/")
             or path.startswith("ArkDeckAppUITests/")
             or path.startswith("ArkDeck.xcodeproj/")
-            or path.startswith("Packages/ArkDeckKit/Sources/")
-            or path.startswith("Packages/ArkDeckKit/LaunchAgents/")
+            or package_source_affects_app
             or path == "Packages/ArkDeckKit/Package.swift"
+            or path == "Packages/ArkDeckKit/Package.resolved"
             or path.startswith("Package.")
         ):
             app = True
@@ -382,42 +403,11 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
             ]
         )
     if plan.lanes.app:
-        path_digest = hashlib.sha256(os.fsencode(repo_root.resolve())).hexdigest()[:16]
-        cache_root = pathlib.Path(
-            os.environ.get(
-                "ARKDECK_XCODE_CACHE_ROOT",
-                os.fspath(
-                    pathlib.Path.home()
-                    / "Library"
-                    / "Caches"
-                    / "com.arkdeck.ArkDeck"
-                    / "Xcode"
-                    / path_digest
-                ),
-            )
-        )
-        if not cache_root.is_absolute():
-            raise PlanError("ARKDECK_XCODE_CACHE_ROOT must be absolute")
-        commands.append(
-            (
-                "xcodebuild",
-                "-project",
-                "ArkDeck.xcodeproj",
-                "-scheme",
-                "ArkDeck",
-                "-configuration",
-                "Debug",
-                "-destination",
-                "platform=macOS,arch=arm64",
-                "-derivedDataPath",
-                os.fspath(cache_root / "DerivedData"),
-                "-clonedSourcePackagesDirPath",
-                os.fspath(cache_root / "SourcePackages"),
-                "-packageCachePath",
-                os.fspath(cache_root / "PackageCache"),
-                "CODE_SIGNING_ALLOWED=NO",
-                "build-for-testing",
-            )
+        commands.extend(
+            [
+                (python, "scripts/ci/test_run_xcodebuild.py"),
+                ("sh", "scripts/ci/run-xcodebuild.sh"),
+            ]
         )
     return tuple(commands)
 
@@ -425,13 +415,7 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
 def run_local(repo_root: pathlib.Path, plan: CIPlan) -> None:
     for command in local_commands(repo_root, plan):
         print("+ " + " ".join(command), flush=True)
-        environment = os.environ.copy()
-        if command[0] == "xcodebuild":
-            derived_index = command.index("-derivedDataPath") + 1
-            module_cache = pathlib.Path(command[derived_index]).parent / "ModuleCache"
-            environment["CLANG_MODULE_CACHE_PATH"] = os.fspath(module_cache)
-            environment["SWIFTPM_MODULECACHE_OVERRIDE"] = os.fspath(module_cache)
-        subprocess.run(command, cwd=repo_root, env=environment, check=True)
+        subprocess.run(command, cwd=repo_root, env=os.environ.copy(), check=True)
 
 
 def _parse_arguments(argv: Sequence[str]) -> argparse.Namespace:

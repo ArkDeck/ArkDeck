@@ -382,20 +382,13 @@ def validate_automatic_check_contract(
         "    if: needs.plan.outputs.app == 'true'\n",
         "    runs-on: macos-26\n",
         "ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode",
-        "CLANG_MODULE_CACHE_PATH: ${{ runner.temp }}/arkdeck-xcode/ModuleCache",
-        "SWIFTPM_MODULECACHE_OVERRIDE: ${{ runner.temp }}/arkdeck-xcode/ModuleCache",
+        "python3 scripts/ci/test_run_xcodebuild.py",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         "          restore-keys: |\n"
-        "            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
-        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-\n"
-        "            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
-        "-project ArkDeck.xcodeproj",
-        "-scheme ArkDeck",
-        "-derivedDataPath",
-        "-clonedSourcePackagesDirPath",
-        "-packageCachePath",
-        "CODE_SIGNING_ALLOWED=NO",
-        "build-for-testing",
+        "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
+        "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+        "sh scripts/ci/run-xcodebuild.sh",
         "        if: >-\n"
         "          success() &&\n"
         "          github.ref == 'refs/heads/main' &&\n"
@@ -659,7 +652,10 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "missing app build",
                 agent,
                 sdd,
-                swift.replace("          build-for-testing\n", "          build\n"),
+                swift.replace(
+                    "        run: sh scripts/ci/run-xcodebuild.sh\n",
+                    "        run: true # app build missing\n",
+                ),
             ),
             (
                 "missing stable aggregator",
@@ -696,7 +692,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+                    "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
                     "",
                 ),
             ),
