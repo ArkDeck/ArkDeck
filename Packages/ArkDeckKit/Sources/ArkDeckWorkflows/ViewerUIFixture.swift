@@ -216,7 +216,7 @@ public enum ViewerUIFixture {
         "focusable": row.interactive, "zIndex": row.level,
         // A dump the parser has never seen must survive into Raw dump intact.
         // Keeping one here means the fixture proves that, not just asserts it.
-        "fixtureUnknownField": "preserved",
+        "fixtureUnknownField": "preserved", "fixtureOwnerID": row.id,
       ]
       if let text = row.text { raw["text"] = text }
       if let inspectorID = row.inspectorID { raw["inspectorId"] = inspectorID }

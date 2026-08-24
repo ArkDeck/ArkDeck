@@ -392,10 +392,11 @@ public enum TraceApplicationFacade {
         bindingRevision: target.bindingRevision,
         toolVersion: target.toolVersion,
         adoptedAtUTC: target.adoptedAtUTC,
-        deviceName: candidate.observedFacts?.model,
-        systemVersion: candidate.observedFacts?.firmware,
+        deviceName: candidate.deviceInformation?.name ?? candidate.observedFacts?.model,
+        systemVersion: candidate.deviceInformation?.systemVersion
+          ?? candidate.observedFacts?.firmware,
         connectKey: candidate.connectKey,
-        transport: candidate.observedFacts?.transport)
+        transport: candidate.deviceInformation?.transport ?? candidate.observedFacts?.transport)
     }
   }
 

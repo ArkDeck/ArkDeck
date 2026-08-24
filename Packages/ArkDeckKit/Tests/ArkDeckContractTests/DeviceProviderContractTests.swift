@@ -619,15 +619,21 @@ final class DeviceProviderContractTests: XCTestCase {
   }
 
   func testEvidencePropertyReadsUseExactDescriptorBoundTarget() throws {
+    let name = try hdc.lower(
+      action: .hdc(.queryProperty(.productName)), context: context)
     let model = try hdc.lower(
       action: .hdc(.queryProperty(.productModel)), context: context)
     let firmware = try hdc.lower(
       action: .hdc(.queryProperty(.fullBuildVersion)), context: context)
-    guard case .process(_, let modelArgv, _) = model.kind,
+    guard case .process(_, let nameArgv, _) = name.kind,
+      case .process(_, let modelArgv, _) = model.kind,
       case .process(_, let firmwareArgv, _) = firmware.kind
     else {
       return XCTFail("property reads must lower to descriptor-bound process plans")
     }
+    XCTAssertEqual(
+      nameArgv,
+      ["-t", "150100424a544e4600", "shell", "param", "get", "const.product.name"])
     XCTAssertEqual(
       modelArgv,
       ["-t", "150100424a544e4600", "shell", "param", "get", "const.product.model"])

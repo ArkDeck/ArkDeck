@@ -147,10 +147,10 @@ final class DeviceListViewModel {
     isRefreshing = false
     guard !Task.isCancelled else { return }
 
-    // Runtime publishes a timestamped HDC observation and the latest verified
-    // model / firmware / transport in one projection. One main-actor
-    // assignment makes the complete row visible without a second XPC request
-    // or render pass.
+    // Runtime publishes a timestamped HDC observation, direct device
+    // information and the latest verified historical facts in one projection.
+    // One main-actor assignment makes the complete row visible without a
+    // second XPC request or render pass.
     presentation = current
     if isStartup {
       AppStartupPerformance.deviceCandidatesPublished()
@@ -174,7 +174,10 @@ final class DeviceListViewModel {
     if let name = customDisplayNames["candidate:\(candidate.connectKey)"] {
       return name
     }
-    return candidate.adoptedTargetID ?? candidate.connectKey
+    return candidate.deviceInformation?.name
+      ?? candidate.observedFacts?.model
+      ?? candidate.adoptedTargetID
+      ?? candidate.connectKey
   }
 
   func canUseDisplayName(_ rawName: String) -> Bool {
@@ -274,9 +277,10 @@ struct DeviceSidebarRow: View {
           .font(WorkspaceFont.body)
           .lineLimit(1)
           .truncationMode(.middle)
-        // The second line names what was actually observed — firmware and
-        // transport from the last succeeded observation — and falls back to
-        // the connect key when no observation evidence exists yet.
+        // The second line names what was actually observed — current HDC
+        // device information first, then the latest succeeded Operation
+        // observation — and falls back to the connect key only when neither
+        // source can describe the device.
         // The state and what was observed are two facts, so a separator sits
         // between them: "Ready · OpenHarmony 5.0.0.71 · USB", not "Ready
         // OpenHarmony 5.0.0.71 · USB".
@@ -330,8 +334,10 @@ struct DeviceSidebarRow: View {
   }
 
   private var observedSummary: String? {
-    guard let facts = candidate.observedFacts else { return nil }
-    let parts = [facts.firmware, facts.transport].compactMap { $0 }
+    let parts = [
+      candidate.deviceInformation?.systemVersion ?? candidate.observedFacts?.firmware,
+      candidate.deviceInformation?.transport ?? candidate.observedFacts?.transport,
+    ].compactMap { $0 }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
@@ -435,7 +441,12 @@ struct DeviceDetailView: View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       deviceSectionHeader(deviceString("device.detail.factsTitle"))
       factsGrid
-      if candidate.observedFacts != nil {
+      if candidate.deviceInformation != nil {
+        Text(deviceString("device.fact.liveProvenance"))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      } else if candidate.observedFacts != nil {
         // Provenance, not certification: these fields describe what the last
         // succeeded observation recorded, not the device's state this second.
         Text(deviceString("device.fact.observedProvenance"))
@@ -631,33 +642,37 @@ struct DeviceDetailView: View {
             .font(WorkspaceFont.tabularSecondary)
         }
       }
-      if let facts = candidate.observedFacts {
-        if let model = facts.model {
-          GridRow(alignment: .firstTextBaseline) {
-            Text(deviceString("device.fact.model")).foregroundStyle(.secondary)
-            Text(model).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
-          }
+      if let model = candidate.deviceInformation?.name ?? candidate.observedFacts?.model {
+        GridRow(alignment: .firstTextBaseline) {
+          Text(deviceString("device.fact.model")).foregroundStyle(.secondary)
+          Text(model).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
         }
-        if let firmware = facts.firmware {
-          GridRow(alignment: .firstTextBaseline) {
-            Text(deviceString("device.fact.firmware")).foregroundStyle(.secondary)
-            Text(firmware)
-              .font(WorkspaceFont.monospacedValue)
-              .textSelection(.enabled)
-              .accessibilityIdentifier("device.fact.firmware")
-          }
+      }
+      if let firmware =
+        candidate.deviceInformation?.systemVersion ?? candidate.observedFacts?.firmware
+      {
+        GridRow(alignment: .firstTextBaseline) {
+          Text(deviceString("device.fact.firmware")).foregroundStyle(.secondary)
+          Text(firmware)
+            .font(WorkspaceFont.monospacedValue)
+            .textSelection(.enabled)
+            .accessibilityIdentifier("device.fact.firmware")
         }
-        if let transport = facts.transport {
-          GridRow(alignment: .firstTextBaseline) {
-            Text(deviceString("device.fact.transport")).foregroundStyle(.secondary)
-            Text(transport).font(WorkspaceFont.monospacedValue)
-          }
+      }
+      if let transport =
+        candidate.deviceInformation?.transport ?? candidate.observedFacts?.transport
+      {
+        GridRow(alignment: .firstTextBaseline) {
+          Text(deviceString("device.fact.transport")).foregroundStyle(.secondary)
+          Text(transport).font(WorkspaceFont.monospacedValue)
         }
-        if let confirmedAt = facts.confirmedAtUTC {
-          GridRow(alignment: .firstTextBaseline) {
-            Text(deviceString("device.fact.observedAt")).foregroundStyle(.secondary)
-            Text(confirmedAt).font(WorkspaceFont.monospacedValue)
-          }
+      }
+      if candidate.deviceInformation == nil,
+        let confirmedAt = candidate.observedFacts?.confirmedAtUTC
+      {
+        GridRow(alignment: .firstTextBaseline) {
+          Text(deviceString("device.fact.observedAt")).foregroundStyle(.secondary)
+          Text(confirmedAt).font(WorkspaceFont.monospacedValue)
         }
       }
     }

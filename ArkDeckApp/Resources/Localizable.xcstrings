@@ -438,13 +438,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Observed firmware"
+            "value": "System version"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "观测固件"
+            "value": "系统版本"
           }
         }
       }
@@ -454,13 +454,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Observed model"
+            "value": "Device name / model"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "观测机型"
+            "value": "设备名称 / 机型"
           }
         }
       }
@@ -477,6 +477,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "确认时间"
+          }
+        }
+      }
+    },
+    "device.fact.liveProvenance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device information was read directly over HDC. Unavailable fields use the latest successful observe.device@1 result. This does not change target binding."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备信息由 HDC 直接读取；无法读取的字段使用最近一次成功的 observe.device@1 结果。此读取不会更改目标绑定。"
           }
         }
       }
@@ -550,13 +566,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Observed transport"
+            "value": "Transport"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "观测传输"
+            "value": "传输方式"
           }
         }
       }

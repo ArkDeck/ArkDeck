@@ -1771,6 +1771,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
         async let observationRead = try? engine.latestSucceededDeviceObservations()
         let (candidateSnapshot, observedFacts) = try await (candidateRead, observationRead)
         let observations = observedFacts ?? [:]
+        let deviceInformation =
+          candidateSnapshot.health == .current
+          ? await bootstrap.deviceInformationForPresentation(
+            candidates: candidateSnapshot.candidates)
+          : [:]
         var projected: [(candidate: BootstrapCandidate, target: RuntimeTargetRecord?)] = []
         for candidate in candidateSnapshot.candidates {
           let target = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
@@ -1797,6 +1802,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
           result: .array(
             projected.map { row in
               let observation = row.target.flatMap { observations[$0.targetID] }
+              let information = deviceInformation[row.candidate.connectKey]
               return .object([
                 "connectKey": .string(row.candidate.connectKey),
                 "state": .string(row.candidate.state),
@@ -1805,6 +1811,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
                 "adoptedTargetId": row.target.map { .string($0.targetID) } ?? .null,
                 "bindingRevision": row.target.map {
                   .integer(Int64($0.bindingRevision))
+                } ?? .null,
+                "deviceInformation": information.map {
+                  .object([
+                    "name": $0.name.map(JSONValue.string) ?? .null,
+                    "systemVersion": $0.systemVersion.map(JSONValue.string) ?? .null,
+                    "transport": .string($0.transport),
+                    "observedAtUtc": .string(candidateSnapshot.observedAtUTC),
+                  ])
                 } ?? .null,
                 "observedFacts": observation.map {
                   .object([

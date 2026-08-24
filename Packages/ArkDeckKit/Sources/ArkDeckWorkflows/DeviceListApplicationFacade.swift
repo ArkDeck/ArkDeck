@@ -31,10 +31,31 @@ public struct DeviceObservedFactsPresentation: Sendable, Equatable {
   }
 }
 
+/// Display-only information read directly from the currently connected HDC
+/// candidate. Unlike `observedFacts`, this is not durable Operation evidence
+/// and never supplies or changes target identity.
+public struct DeviceInformationPresentation: Sendable, Equatable {
+  public let name: String?
+  public let systemVersion: String?
+  public let transport: String?
+  public let observedAtUTC: String?
+
+  public init(
+    name: String?, systemVersion: String?, transport: String?, observedAtUTC: String?
+  ) {
+    self.name = name
+    self.systemVersion = systemVersion
+    self.transport = transport
+    self.observedAtUTC = observedAtUTC
+  }
+}
+
 /// One HDC device candidate with its raw reported state, joined against the
 /// durable target store when it is already adopted. `state` is the tool's own
 /// vocabulary (`Connected` / `Unauthorized` / `Offline`), shown rather than
 /// reinterpreted; the two derived flags mirror `BootstrapCandidate` exactly.
+/// `deviceInformation` is a best-effort live, read-only decoration and does
+/// not certify identity or adoption.
 /// `observedFacts` is nil when no succeeded observation evidence exists for
 /// the adopted target — absence renders as absence, never as a placeholder.
 public struct DeviceCandidatePresentation: Sendable, Equatable, Identifiable {
@@ -49,10 +70,12 @@ public struct DeviceCandidatePresentation: Sendable, Equatable, Identifiable {
   public let stateObservationHealth: StateObservationHealth
   public let adoptedTargetID: String?
   public let bindingRevision: Int?
+  public let deviceInformation: DeviceInformationPresentation?
   public let observedFacts: DeviceObservedFactsPresentation?
 
   public init(
     connectKey: String, state: String, adoptedTargetID: String?, bindingRevision: Int?,
+    deviceInformation: DeviceInformationPresentation? = nil,
     observedFacts: DeviceObservedFactsPresentation? = nil,
     stateObservedAtUTC: String? = nil,
     stateObservationHealth: StateObservationHealth = .current
@@ -63,6 +86,7 @@ public struct DeviceCandidatePresentation: Sendable, Equatable, Identifiable {
     self.stateObservationHealth = stateObservationHealth
     self.adoptedTargetID = adoptedTargetID
     self.bindingRevision = bindingRevision
+    self.deviceInformation = deviceInformation
     self.observedFacts = observedFacts
   }
 
@@ -245,6 +269,19 @@ enum DeviceCandidatesResponseDecoding {
           candidates: [])
       }
       let targetID = row["adoptedTargetId"] as? String
+      let deviceInformation: DeviceInformationPresentation?
+      if let information = row["deviceInformation"] as? [String: Any] {
+        let facts = DeviceInformationPresentation(
+          name: information["name"] as? String,
+          systemVersion: information["systemVersion"] as? String,
+          transport: information["transport"] as? String,
+          observedAtUTC: information["observedAtUtc"] as? String)
+        deviceInformation =
+          facts.name != nil || facts.systemVersion != nil || facts.transport != nil
+          ? facts : nil
+      } else {
+        deviceInformation = nil
+      }
       let observedFacts: DeviceObservedFactsPresentation?
       if let targetID,
         let observed = row["observedFacts"] as? [String: Any],
@@ -267,6 +304,7 @@ enum DeviceCandidatesResponseDecoding {
           state: state,
           adoptedTargetID: targetID,
           bindingRevision: (row["bindingRevision"] as? NSNumber)?.intValue,
+          deviceInformation: deviceInformation,
           observedFacts: observedFacts,
           stateObservedAtUTC: row["stateObservedAtUtc"] as? String,
           stateObservationHealth: DeviceCandidatePresentation.StateObservationHealth(
@@ -320,6 +358,11 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
           state: "Connected",
           adoptedTargetID: "target-fixture-dayu200",
           bindingRevision: 3,
+          deviceInformation: DeviceInformationPresentation(
+            name: "DAYU200",
+            systemVersion: "OpenHarmony 5.0.0.71",
+            transport: "USB",
+            observedAtUTC: "2026-08-07T00:00:00Z"),
           observedFacts: DeviceObservedFactsPresentation(
             model: "DAYU200",
             firmware: "OpenHarmony 5.0.0.71",
