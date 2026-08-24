@@ -105,18 +105,36 @@ final class ViewerRealDumpShapeTests: XCTestCase {
     XCTAssertEqual(capture.nodes.first?.type, "Stack")
   }
 
-  func testATypelessEnvelopeWithSiblingsIsKept() throws {
-    // Two children means the envelope carries structure of its own.
+  func testATypelessDocumentWithWindowSiblingsPublishesEachWindowAsARoot() throws {
+    // A real merged dump has both the focused application and SceneBoard's
+    // status-bar window under one typeless display document.
     let tree: [String: Any] = [
       "attributes": ["type": "", "bounds": "[0,0][720,1280]"],
       "children": [
-        ["attributes": ["type": "root", "accessibilityId": "6"], "children": []],
-        ["attributes": ["type": "root", "accessibilityId": "7"], "children": []],
+        [
+          "attributes": [
+            "type": "root", "accessibilityId": "6", "bounds": "[0,64][720,1280]",
+            "focused": "true",
+          ],
+          "children": [],
+        ],
+        [
+          "attributes": [
+            "type": "WindowScene", "accessibilityId": "7", "bounds": "[0,0][720,96]",
+          ],
+          "children": [],
+        ],
       ],
     ]
     let capture = try parse(tree)
-    XCTAssertEqual(capture.nodes.count, 3)
-    XCTAssertEqual(capture.nodes.first?.type, "Unknown")
+    XCTAssertEqual(capture.nodes.count, 2)
+    XCTAssertEqual(capture.roots, ["device:6", "device:7"])
+    XCTAssertEqual(capture.nodes.map(\.depth), [0, 0])
+    XCTAssertFalse(capture.nodes.contains { $0.type == "Unknown" })
+    XCTAssertEqual(capture.primaryRootIdentity, "device:6")
+    XCTAssertTrue(
+      capture.coordinatesAreVerified,
+      "the discarded display envelope, not either partial window, proves screenshot coordinates")
   }
 
   // MARK: - The shared device observation drives routing

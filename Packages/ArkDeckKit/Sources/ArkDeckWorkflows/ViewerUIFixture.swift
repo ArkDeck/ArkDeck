@@ -233,6 +233,9 @@ public enum ViewerUIFixture {
         enabled: true,
         clickable: row.interactive,
         focusable: row.interactive,
+        focused: nil,
+        clipsChildren: false,
+        hitTestBehavior: nil,
         zIndex: Double(row.level),
         depth: row.level - 1,
         rawFields: (try? JSONSerialization.data(withJSONObject: raw, options: [.sortedKeys]))

@@ -43,7 +43,7 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     let capture = try ViewerCaptureParser.parse(
       screenshotData: png(width: 720, height: 1280),
       treeData: Data("""
-      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true},"children":[]}]}
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","hitTestBehavior":"HitTestMode.Transparent","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true},"children":[]}]}
       """.utf8),
       rawDumpData: Data(#"{"windows":[{"id":"w1"}]}"#.utf8),
       identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
@@ -52,6 +52,7 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     let toggle = try XCTUnwrap(capture.nodes.first { $0.deviceID == "42" })
     XCTAssertEqual(toggle.identity, "device:42")
     XCTAssertEqual(toggle.parentIdentity, "device:1")
+    XCTAssertEqual(capture.node(identity: "device:1")?.hitTestBehavior, "HitTestMode.Transparent")
     XCTAssertTrue(try XCTUnwrap(capture.formattedRawFields(for: "device:1")).contains("unknown"))
     XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID, "42")
   }
@@ -68,6 +69,89 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     XCTAssertFalse(capture.coordinatesAreVerified)
     XCTAssertEqual(capture.nodes.map(\.identity), ["path:0", "path:0.0"])
     XCTAssertNil(ViewerHitTesting.node(in: capture, x: 1, y: 1))
+  }
+
+  func testScreenshotMappingClipsProviderBoundsToTheCapturedDisplay() throws {
+    let raw = try XCTUnwrap(ViewerBounds(x: -40, y: 1200, width: 800, height: 160))
+    let visible = try XCTUnwrap(
+      ViewerScreenshotMapping.visibleBounds(
+        raw, screenshotWidth: 720, screenshotHeight: 1280))
+
+    XCTAssertEqual(visible, ViewerBounds(x: 0, y: 1200, width: 720, height: 80))
+  }
+
+  func testScreenshotMappingAccumulatesClippingAncestorsForDrawingAndHitTesting() throws {
+    let parent = viewerNode(
+      identity: "parent", parent: nil, children: ["child"], type: "List",
+      bounds: ViewerBounds(x: 0, y: 0, width: 100, height: 100), clipsChildren: true)
+    let child = viewerNode(
+      identity: "child", parent: "parent", children: [], type: "ListItem",
+      bounds: ViewerBounds(x: 80, y: 80, width: 100, height: 100))
+    let capture = ViewerCapture(
+      screenshotData: png(width: 200, height: 200), screenshotWidth: 200, screenshotHeight: 200,
+      roots: ["parent"], nodes: [parent, child], rawDumpDocument: nil,
+      identity: ViewerCaptureIdentity(
+        jobID: "job-clipping", targetID: "target-a", bindingRevision: 1,
+        capturedAtUTC: "2026-08-22T00:00:00Z"),
+      coordinatesAreVerified: true)
+
+    XCTAssertEqual(
+      ViewerScreenshotMapping.visibleBounds(of: child, in: capture),
+      ViewerBounds(x: 80, y: 80, width: 20, height: 20))
+    XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 90, y: 90)?.identity, "child")
+    XCTAssertNil(
+      ViewerHitTesting.node(in: capture, x: 120, y: 120),
+      "a child clipped out by the list cannot remain a screenshot hit target")
+  }
+
+  func testHitTestingSelectsFloatingNavigationAboveDeeperContent() {
+    let full = ViewerBounds(x: 0, y: 0, width: 200, height: 200)
+    let navigation = ViewerBounds(x: 10, y: 150, width: 180, height: 40)
+    let root = viewerNode(
+      identity: "root", parent: nil, children: ["content", "tabbar", "overlay"],
+      bounds: full)
+    let content = viewerNode(
+      identity: "content", parent: "root", children: ["poster"], type: "List",
+      bounds: full, zIndex: 0, depth: 1)
+    let poster = viewerNode(
+      identity: "poster", parent: "content", children: [], type: "Image",
+      bounds: full, depth: 2)
+    let tabbar = viewerNode(
+      identity: "tabbar", parent: "root", children: ["item"], type: "TabBar",
+      bounds: navigation, hitTestBehavior: "HitTestMode.Transparent", zIndex: 3, depth: 1)
+    let item = viewerNode(
+      identity: "item", parent: "tabbar", children: ["icon"], type: "Column",
+      bounds: navigation, depth: 2)
+    let icon = viewerNode(
+      identity: "icon", parent: "item", children: [], type: "SymbolGlyph",
+      bounds: ViewerBounds(x: 140, y: 155, width: 40, height: 30), depth: 3)
+    let overlay = viewerNode(
+      identity: "overlay", parent: "root", children: [], type: "Column",
+      bounds: full, hitTestBehavior: "HitTestMode.Transparent", zIndex: 88, depth: 1)
+    let capture = ViewerCapture(
+      screenshotData: png(width: 200, height: 200), screenshotWidth: 200, screenshotHeight: 200,
+      roots: ["root"], nodes: [root, content, poster, tabbar, item, icon, overlay],
+      rawDumpDocument: nil,
+      identity: ViewerCaptureIdentity(
+        jobID: "job-floating-navigation", targetID: "target-a", bindingRevision: 1,
+        capturedAtUTC: "2026-08-24T00:00:00Z"),
+      coordinatesAreVerified: true)
+
+    XCTAssertEqual(
+      ViewerHitTesting.node(in: capture, rootIdentity: "root", x: 160, y: 170)?.identity,
+      "icon",
+      "the foreground TabBar branch must win over a much deeper poster branch")
+  }
+
+  func testDeepTreeIndentAlwaysReservesReadableLabelWidth() {
+    let viewport = 760.0
+    let indent = ViewerTreeLayoutPolicy.leadingIndent(depth: 50, viewportWidth: viewport)
+
+    XCTAssertEqual(indent, 456, accuracy: 0.001)
+    XCTAssertGreaterThanOrEqual(
+      viewport - indent, 300,
+      "a real fifty-level dump must not place the selected row's label outside the pane")
+    XCTAssertEqual(ViewerTreeLayoutPolicy.leadingIndent(depth: 2, viewportWidth: viewport), 34)
   }
 
   func testVisibleTreeProjectionIsLinearAndCycleSafe() {
@@ -145,7 +229,12 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     parent: String?,
     children: [String],
     type: String = "Page",
-    text: String? = nil
+    text: String? = nil,
+    bounds: ViewerBounds? = nil,
+    clipsChildren: Bool = false,
+    hitTestBehavior: String? = nil,
+    zIndex: Double? = nil,
+    depth: Int = 0
   ) -> ViewerNode {
     ViewerNode(
       identity: identity,
@@ -155,13 +244,16 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       type: type,
       text: text,
       inspectorID: nil,
-      bounds: nil,
+      bounds: bounds,
       visible: true,
       enabled: nil,
       clickable: nil,
       focusable: nil,
-      zIndex: nil,
-      depth: 0,
+      focused: nil,
+      clipsChildren: clipsChildren,
+      hitTestBehavior: hitTestBehavior,
+      zIndex: zIndex,
+      depth: depth,
       rawFields: Data("{}".utf8))
   }
 

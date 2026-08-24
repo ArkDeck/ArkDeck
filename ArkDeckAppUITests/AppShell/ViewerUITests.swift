@@ -108,6 +108,23 @@ final class ViewerUITests: XCTestCase {
     attach(app, name: "viewer-keyboard")
   }
 
+  func testSelectingADeepWideRowKeepsItsLeadingContentInTheTreeViewport() {
+    let app = launchCapturedViewer(extra: ["--ui-test-viewer-stress-367"])
+    let row = revealNode("367", in: app)
+    row.click()
+    clearSearch(in: app)
+
+    XCTAssertTrue(row.waitForExistence(timeout: 5))
+    let treeTitle = app.staticTexts["viewer.pane.tree"]
+    XCTAssertTrue(treeTitle.exists)
+    XCTAssertGreaterThanOrEqual(
+      row.frame.minX, treeTitle.frame.minX - 8,
+      "selection reveal must scroll vertically without pushing row labels left of the tree")
+    XCTAssertTrue(row.isHittable, "the selected row must remain visible, not just present in AX")
+    XCTAssertFalse(row.label.isEmpty, "the selected row must keep visible semantic content")
+    attach(app, name: "viewer-deep-row-leading-edge")
+  }
+
   // MARK: - Search (Viewer-06)
 
   func testSearchFiltersAndAnEmptyResultKeepsTheSelection() {
