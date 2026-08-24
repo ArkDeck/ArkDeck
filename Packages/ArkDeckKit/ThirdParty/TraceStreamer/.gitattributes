@@ -1,2 +1,4 @@
 # Preserve byte-pinned upstream license text, including CRLF and intentional whitespace.
 LICENSES/*.txt -text whitespace=-trailing-space,-blank-at-eof
+# Local patches preserve upstream context bytes, including intentional whitespace.
+patches/*.patch -text whitespace=-trailing-space,-blank-at-eof

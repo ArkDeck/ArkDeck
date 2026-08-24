@@ -12,7 +12,7 @@
 | Upstream revision | `447a0a49a7b3b914d6e9bd00648ba5a340f6fbf6` |
 | TraceStreamer version | `4.3.7` |
 | Binary architecture | Mach-O `arm64` |
-| Unsigned binary SHA-256 | `e0167fbb13bf666dd589c7b27d697683bec2762ec66cefc935139e6da49ecbbf` |
+| Unsigned binary SHA-256 | `0665e04e4abf2c2b60e173f6c666cb91844557c85d45386a03962e56804fa55a` |
 | Source lock | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/source-lock.json` |
 | Runtime manifest | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
 
@@ -83,7 +83,9 @@ Packages/ArkDeckKit/Scripts/verify_trace_streamer_lock.sh
 ```
 
 构建脚本只在安全的 package-owned `.build/trace-streamer-workspaces/` 中拉取 exact
-revision，先验证下载字节再解包，并对 local patch fail closed。默认产物是：
+revision，先验证下载字节再解包，并对两个 local patch fail closed。除 Apple clang
+兼容补丁外，`proto-reader-sparse-validity.patch` 以紧凑存在位图替代 protobuf 消息对稀疏
+`DataArea[max_field_id + 1]` 的全量清零，保持字段访问及重复字段语义不变。默认产物是：
 
 ```text
 Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer
@@ -139,7 +141,7 @@ SmartPerf Host *application code* 转写的源码。它保留 upstream hash / st
 ## 7. Re-pin 流程
 
 1. 审阅 upstream 与 required table / CLI / plugin 差异；
-2. 更新 `source-lock.json` 和必要的独立 local patch；
+2. 更新 `source-lock.json` 和必要的独立 local patches；
 3. 在两个 fresh workspace 运行构建，只有二进制 byte-identical 才能更新 manifest；
 4. 更新 version / SHA / recipe 证据和本文档的身份表；
 5. 运行 lock verification、parser integration tests、全量 `ArkDeckTrace*` 测试与 App build；
