@@ -179,6 +179,80 @@ public struct ViewerBounds: Sendable, Equatable {
   public func contains(x pointX: Double, y pointY: Double) -> Bool {
     pointX >= x && pointY >= y && pointX <= x + width && pointY <= y + height
   }
+
+  public func intersection(_ other: ViewerBounds) -> ViewerBounds? {
+    let left = max(x, other.x)
+    let top = max(y, other.y)
+    let right = min(x + width, other.x + other.width)
+    let bottom = min(y + height, other.y + other.height)
+    guard right > left, bottom > top else { return nil }
+    return ViewerBounds(x: left, y: top, width: right - left, height: bottom - top)
+  }
+}
+
+/// Maps provider geometry into the pixels the screenshot can actually show.
+/// Dumps may publish a partially off-screen window or node. Letting that raw
+/// rectangle drive SwiftUI's frame makes the outline escape the image and
+/// makes its accessibility hit area disagree with the visible screenshot.
+public enum ViewerScreenshotMapping {
+  public static func visibleBounds(
+    _ bounds: ViewerBounds?, screenshotWidth: Int, screenshotHeight: Int
+  ) -> ViewerBounds? {
+    guard screenshotWidth > 0, screenshotHeight > 0, let bounds,
+      let viewport = ViewerBounds(
+        x: 0, y: 0, width: Double(screenshotWidth), height: Double(screenshotHeight))
+    else { return nil }
+    return bounds.intersection(viewport)
+  }
+
+  /// Returns the pixels of one node that are actually visible in the capture.
+  /// ArkUI publishes a node's bounds separately from the `clip` flags on its
+  /// ancestors. A list item can therefore have valid screen coordinates and
+  /// still be partly outside the list or swiper viewport. Screenshot outlines
+  /// and pointer hit testing must use the same accumulated clipping rectangle.
+  public static func visibleBounds(
+    of node: ViewerNode,
+    in capture: ViewerCapture
+  ) -> ViewerBounds? {
+    guard capture.coordinatesAreVerified,
+      var visible = visibleBounds(
+      node.bounds,
+      screenshotWidth: capture.screenshotWidth,
+      screenshotHeight: capture.screenshotHeight)
+    else { return nil }
+
+    var cursor = node.parentIdentity
+    var visited: Set<String> = []
+    while let identity = cursor,
+      visited.insert(identity).inserted,
+      let ancestor = capture.node(identity: identity)
+    {
+      if ancestor.clipsChildren {
+        guard let ancestorBounds = visibleBounds(
+          ancestor.bounds,
+          screenshotWidth: capture.screenshotWidth,
+          screenshotHeight: capture.screenshotHeight),
+          let clipped = visible.intersection(ancestorBounds)
+        else { return nil }
+        visible = clipped
+      }
+      cursor = ancestor.parentIdentity
+    }
+    return visible
+  }
+}
+
+/// Keeps deep outline rows readable at the scroll view's leading position.
+/// The tree still grows horizontally for long labels, but depth alone cannot
+/// consume the whole viewport and leave only the selected background visible.
+public enum ViewerTreeLayoutPolicy {
+  public static func leadingIndent(depth: Int, viewportWidth: Double) -> Double {
+    guard viewportWidth.isFinite, viewportWidth > 0 else { return 6 }
+    let rawIndent = 6 + Double(max(0, depth)) * 14
+    let minimumContentWidth = max(180, viewportWidth * 0.4)
+    let maximumIndent = max(6, viewportWidth - minimumContentWidth)
+    return min(rawIndent, maximumIndent)
+  }
 }
 
 /// `identity` is private to one immutable capture. `deviceID` is only the
@@ -196,11 +270,26 @@ public struct ViewerNode: Sendable, Equatable, Identifiable {
   public let enabled: Bool?
   public let clickable: Bool?
   public let focusable: Bool?
+  public let focused: Bool?
+  public let clipsChildren: Bool
+  public let hitTestBehavior: String?
   public let zIndex: Double?
   public let depth: Int
   public let rawFields: Data
 
   public var id: String { identity }
+
+  /// `None` and `Transparent` nodes remain inspectable from the tree, but a
+  /// coordinate click must pass through them just as it does on the device.
+  /// Otherwise a full-screen transparent overlay can make every component
+  /// behind it impossible to select from the screenshot.
+  public var acceptsPointerHit: Bool {
+    guard let behavior = hitTestBehavior?.lowercased() else { return true }
+    return behavior != "none"
+      && behavior != "transparent"
+      && behavior != "hittestmode.none"
+      && behavior != "hittestmode.transparent"
+  }
 }
 
 public struct ViewerCapture: Sendable, Equatable {
@@ -249,6 +338,13 @@ public struct ViewerCapture: Sendable, Equatable {
 
   public func node(identity: String) -> ViewerNode? {
     nodeIndex[identity]
+  }
+
+  /// Prefer the foreground window fact from the Artifact. Provider order is
+  /// retained only when no unique focused root is available.
+  public var primaryRootIdentity: String? {
+    let focusedRoots = roots.filter { nodeIndex[$0]?.focused == true }
+    return focusedRoots.count == 1 ? focusedRoots[0] : roots.first
   }
 
   /// Returns the same capture with its measured cost attached. Parsing is
@@ -388,6 +484,9 @@ public enum ViewerCaptureParser {
     let enabled: Bool?
     let clickable: Bool?
     let focusable: Bool?
+    let focused: Bool?
+    let clipsChildren: Bool
+    let hitTestBehavior: String?
     let zIndex: Double?
     let rawFields: Data
   }
@@ -407,8 +506,11 @@ public enum ViewerCaptureParser {
     guard let root = try? JSONSerialization.jsonObject(with: treeData) as? [String: Any] else {
       throw ViewerCaptureFailure.unreadableTree
     }
+    let document = componentRoots(of: root)
     var provisional: [ProvisionalNode] = []
-    try appendNode(componentRoot(of: root), path: [0], parentPath: nil, into: &provisional)
+    for (index, component) in document.roots.enumerated() {
+      try appendNode(component, path: [index], parentPath: nil, into: &provisional)
+    }
 
     let identifiers = Dictionary(grouping: provisional.compactMap(\.sourceID), by: { $0 })
       .mapValues(\.count)
@@ -436,6 +538,9 @@ public enum ViewerCaptureParser {
         enabled: item.enabled,
         clickable: item.clickable,
         focusable: item.focusable,
+        focused: item.focused,
+        clipsChildren: item.clipsChildren,
+        hitTestBehavior: item.hitTestBehavior,
         zIndex: item.zIndex,
         depth: max(0, item.path.count - 1),
         rawFields: item.rawFields)
@@ -443,7 +548,10 @@ public enum ViewerCaptureParser {
     guard !nodes.isEmpty else { throw ViewerCaptureFailure.invalidTree }
     let roots = nodes.filter { $0.parentIdentity == nil }.map(\.identity)
     guard !roots.isEmpty else { throw ViewerCaptureFailure.invalidTree }
-    let coordinatesAreVerified = nodes.contains { node in
+    let coordinatesAreVerified = document.bounds.map { bounds in
+      bounds.x == 0 && bounds.y == 0
+        && Int(bounds.width) == screenshot.width && Int(bounds.height) == screenshot.height
+    } ?? nodes.contains { node in
       guard node.parentIdentity == nil, let bounds = node.bounds else { return false }
       return bounds.x == 0 && bounds.y == 0
         && Int(bounds.width) == screenshot.width && Int(bounds.height) == screenshot.height
@@ -459,20 +567,25 @@ public enum ViewerCaptureParser {
       coordinatesAreVerified: coordinatesAreVerified)
   }
 
-  /// Steps past the dump's document envelope so the tree begins at the real
-  /// root component.
+  /// Steps past the dump's document envelope so the tree begins at its real
+  /// root components.
   ///
   /// A device dump wraps its component tree in an object whose attributes are
-  /// all empty and which holds exactly one child. That envelope is the
-  /// document, not a component: it has no type, no identifier of any kind, and
-  /// nothing to inspect. Presenting it made the first row of every real
-  /// capture an "Unknown" node with the actual root hidden one level below.
+  /// all empty. The envelope is the display document, not a component: it has
+  /// no type or identifier and nothing to inspect. It may hold several window
+  /// roots (for example the focused app plus SceneBoard's status bar), so child
+  /// count is not evidence that the envelope is a component. Presenting that
+  /// case made a real capture start at `Unknown` and hid every useful row one
+  /// level below it.
   ///
-  /// The conditions are deliberately narrow — no type *and* no identifier
-  /// *and* exactly one child. A wrapper that names itself is a component and
-  /// is kept, so this can never swallow a node a device meant to publish.
-  private static func componentRoot(of document: [String: Any]) -> [String: Any] {
+  /// A wrapper that names itself is still a component and is kept. The full
+  /// display bounds from the discarded document remain the coordinate-space
+  /// proof; window roots need not each cover the status/navigation bars.
+  private static func componentRoots(
+    of document: [String: Any]
+  ) -> (roots: [[String: Any]], bounds: ViewerBounds?) {
     var current = document
+    var documentBounds: ViewerBounds?
     // Bounded: a malformed dump must not turn this into an unbounded descent.
     for _ in 0..<8 {
       let attributes = current["attributes"] as? [String: Any] ?? current
@@ -482,11 +595,13 @@ public enum ViewerCaptureParser {
         string(attributes["nodeId"]) == nil,
         string(attributes["componentId"]) == nil,
         let children = current["children"] as? [[String: Any]],
-        children.count == 1
-      else { return current }
+        !children.isEmpty
+      else { return ([current], documentBounds) }
+      documentBounds = documentBounds ?? bounds(attributes["bounds"] ?? current["bounds"])
+      if children.count > 1 { return (children, documentBounds) }
       current = children[0]
     }
-    return current
+    return ([current], documentBounds)
   }
 
   private static func appendNode(
@@ -534,6 +649,9 @@ public enum ViewerCaptureParser {
         enabled: bool(attributes["enabled"]),
         clickable: bool(attributes["clickable"]),
         focusable: bool(attributes["focusable"]),
+        focused: bool(attributes["focused"]),
+        clipsChildren: bool(attributes["clip"]) ?? false,
+        hitTestBehavior: string(attributes["hitTestBehavior"]),
         zIndex: number(attributes["zIndex"] ?? attributes["zOrder"]),
         rawFields: rawFields))
     for (index, child) in childObjects.enumerated() {
@@ -606,23 +724,82 @@ public enum ViewerCaptureParser {
 }
 
 public enum ViewerHitTesting {
-  /// Runtime tree order is a stable final tie-breaker. This avoids guessing a
-  /// window-manager z-order when the Artifact does not publish one.
+  /// Chooses the frontmost painted branch, then its deepest node. Depth alone
+  /// is insufficient: a floating TabBar is normally shallower than the list
+  /// and image nodes it overlays. At the first divergent siblings, zIndex and
+  /// provider child order establish which whole branch is in front.
   public static func node(
     in capture: ViewerCapture,
+    rootIdentity: String? = nil,
     x: Double,
     y: Double
   ) -> ViewerNode? {
     guard capture.coordinatesAreVerified else { return nil }
-    return capture.nodes.enumerated()
-      .filter { _, node in node.visible && (node.bounds?.contains(x: x, y: y) ?? false) }
-      .max { lhs, rhs in
-        let left = lhs.element
-        let right = rhs.element
-        if left.depth != right.depth { return left.depth < right.depth }
-        if left.zIndex != right.zIndex { return (left.zIndex ?? 0) < (right.zIndex ?? 0) }
-        return lhs.offset < rhs.offset
-      }?.element
+    let candidates = capture.subtreeNodes(rootIdentity: rootIdentity)
+    var stableOrder: [String: Int] = [:]
+    for (offset, candidate) in candidates.enumerated()
+      where stableOrder[candidate.identity] == nil
+    {
+      stableOrder[candidate.identity] = offset
+    }
+    return candidates
+      .filter { node in
+        node.visible && node.acceptsPointerHit
+          && (ViewerScreenshotMapping.visibleBounds(of: node, in: capture)?
+            .contains(x: x, y: y) ?? false)
+      }
+      .max {
+        isPaintedBehind(
+          $0, $1, in: capture, stableOrder: stableOrder)
+      }
+  }
+
+  private static func isPaintedBehind(
+    _ left: ViewerNode,
+    _ right: ViewerNode,
+    in capture: ViewerCapture,
+    stableOrder: [String: Int]
+  ) -> Bool {
+    let leftPath = capture.ancestors(of: left.identity) + [left.identity]
+    let rightPath = capture.ancestors(of: right.identity) + [right.identity]
+    let sharedCount = min(leftPath.count, rightPath.count)
+    var divergence = 0
+    while divergence < sharedCount,
+      leftPath[divergence] == rightPath[divergence]
+    {
+      divergence += 1
+    }
+
+    if divergence < sharedCount,
+      let leftBranch = capture.node(identity: leftPath[divergence]),
+      let rightBranch = capture.node(identity: rightPath[divergence])
+    {
+      let leftZ = finiteZ(leftBranch.zIndex)
+      let rightZ = finiteZ(rightBranch.zIndex)
+      if leftZ != rightZ { return leftZ < rightZ }
+
+      if divergence > 0,
+        let parent = capture.node(identity: leftPath[divergence - 1]),
+        let leftIndex = parent.children.firstIndex(of: leftBranch.identity),
+        let rightIndex = parent.children.firstIndex(of: rightBranch.identity),
+        leftIndex != rightIndex
+      {
+        return leftIndex < rightIndex
+      }
+
+      return (stableOrder[leftBranch.identity] ?? 0)
+        < (stableOrder[rightBranch.identity] ?? 0)
+    }
+
+    // One candidate is an ancestor of the other within the same painted
+    // branch. The descendant is the more specific component at that point.
+    if leftPath.count != rightPath.count { return leftPath.count < rightPath.count }
+    return (stableOrder[left.identity] ?? 0) < (stableOrder[right.identity] ?? 0)
+  }
+
+  private static func finiteZ(_ value: Double?) -> Double {
+    guard let value, value.isFinite else { return 0 }
+    return value
   }
 }
 

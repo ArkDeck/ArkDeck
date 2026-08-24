@@ -178,7 +178,8 @@ struct UIDumpWorkspaceView: View {
     in capture: ViewerCapture,
     content: CGSize
   ) -> some View {
-    if let bounds = node.bounds {
+    if let bounds = ViewerScreenshotMapping.visibleBounds(of: node, in: capture)
+    {
       let selected = node.identity == model.selectedNodeIdentity
       let outlined = model.showBounds || selected
       ZStack(alignment: .topTrailing) {
@@ -186,7 +187,7 @@ struct UIDumpWorkspaceView: View {
           .fill(selected ? Color.accentColor.opacity(0.10) : .clear)
           .overlay {
             if outlined {
-              Rectangle().stroke(
+              Rectangle().strokeBorder(
                 selected ? Color.accentColor : Color.accentColor.opacity(0.35),
                 lineWidth: selected ? 2 : 1)
             }
@@ -203,6 +204,10 @@ struct UIDumpWorkspaceView: View {
       .frame(
         width: max(1, content.width * bounds.width / Double(capture.screenshotWidth)),
         height: max(1, content.height * bounds.height / Double(capture.screenshotHeight)))
+      // Node labels are annotations, not geometry. A long type name must not
+      // visually widen a narrow node or escape the screenshot and masquerade
+      // as part of its selected bounds.
+      .clipped()
       .position(
         x: content.width * (bounds.x + bounds.width / 2) / Double(capture.screenshotWidth),
         y: content.height * (bounds.y + bounds.height / 2) / Double(capture.screenshotHeight))
@@ -284,9 +289,11 @@ struct UIDumpWorkspaceView: View {
             // Reduce Motion users get the same reveal without the slide, and a
             // selection change never becomes a large moving surface.
             if reduceMotion {
-              reader.scrollTo(identity, anchor: .center)
+              reader.scrollTo(identity, anchor: UnitPoint(x: 0, y: 0.5))
             } else {
-              withAnimation(.easeOut(duration: 0.15)) { reader.scrollTo(identity, anchor: .center) }
+              withAnimation(.easeOut(duration: 0.15)) {
+                reader.scrollTo(identity, anchor: UnitPoint(x: 0, y: 0.5))
+              }
             }
           }
         }
@@ -354,7 +361,15 @@ struct UIDumpWorkspaceView: View {
             .fixedSize()
         }
       }
-      .padding(.leading, 6 + CGFloat(node.depth) * 14)
+      // Real merged dumps can exceed fifty levels. Preserve indentation while
+      // reserving enough of the current viewport for the node's actual label;
+      // otherwise auto-reveal shows a blue selection band with every glyph
+      // beyond the right edge.
+      .padding(
+        .leading,
+        CGFloat(
+          ViewerTreeLayoutPolicy.leadingIndent(
+            depth: node.depth, viewportWidth: Double(viewportWidth))))
       .padding(.trailing, 8)
       .frame(minHeight: 26, alignment: .leading)
       // The floor keeps the selection capsule spanning the visible pane; the
@@ -546,15 +561,16 @@ struct UIDumpWorkspaceView: View {
         ("visible", state(node.visible)),
         ("clickable", state(node.clickable)),
         ("focusable", state(node.focusable)),
+        ("focused", state(node.focused)),
       ])
     case .layout:
       keyValueGroup(viewerText("viewer.group.geometry"), [
         ("bounds", boundsText(node.bounds)),
         (viewerText("viewer.field.screenshotMapping"),
-         capture.coordinatesAreVerified
+         ViewerScreenshotMapping.visibleBounds(of: node, in: capture) != nil
            ? viewerText("viewer.value.verified") : viewerText("viewer.value.unavailable")),
         (viewerText("viewer.field.hitTest"),
-         node.bounds != nil && capture.coordinatesAreVerified
+         ViewerScreenshotMapping.visibleBounds(of: node, in: capture) != nil
            ? viewerText("viewer.value.available") : viewerText("viewer.value.unavailable")),
       ])
       keyValueGroup(viewerText("viewer.group.paint"), [
@@ -568,6 +584,7 @@ struct UIDumpWorkspaceView: View {
       keyValueGroup(viewerText("viewer.group.focus"), [
         ("visible", state(node.visible)),
         ("focusable", state(node.focusable)),
+        ("focused", state(node.focused)),
       ])
     case .rawDump:
       Text(capture.formattedRawFields(for: node.identity) ?? viewerText("viewer.properties.rawUnavailable"))
@@ -815,7 +832,7 @@ final class UIDumpWorkspaceViewModel {
       switch result {
       case .captured(let next):
         self.capture = next
-        self.selectedRootIdentity = next.roots.first ?? ""
+        self.selectedRootIdentity = next.primaryRootIdentity ?? ""
         // A previous screen's query must not leave a fresh capture looking
         // empty or hide the row selected from the screenshot.
         self.searchQuery = ""
@@ -843,7 +860,10 @@ final class UIDumpWorkspaceViewModel {
     guard renderedSize.width > 0, renderedSize.height > 0 else { return }
     let screenshotX = Double(location.x / renderedSize.width) * Double(capture.screenshotWidth)
     let screenshotY = Double(location.y / renderedSize.height) * Double(capture.screenshotHeight)
-    guard let node = ViewerHitTesting.node(in: capture, x: screenshotX, y: screenshotY) else {
+    guard let node = ViewerHitTesting.node(
+      in: capture, rootIdentity: selectedRootIdentity,
+      x: screenshotX, y: screenshotY)
+    else {
       return
     }
     select(node.identity)
