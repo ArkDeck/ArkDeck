@@ -573,6 +573,10 @@ private struct AppShellView: View {
     // HDC diagnostics reads the real observation: a fixture Viewer capture
     // must not make the machine claim a device is authorized.
     models.hdcDiagnostics.applyDeviceObservation(observation)
+    if case .navigation(.trace) = shellSelection {
+      models.traceWorkspace.applyDeviceObservation(
+        observation, names: deviceDisplayNames(observation))
+    }
   }
 
   /// Presentation-only names, keyed by the adopted target the workspaces
@@ -602,6 +606,8 @@ private struct AppShellView: View {
     case .navigation(.uiDump):
       models.uiDumpWorkspace.refresh()
     case .navigation(.trace):
+      models.traceWorkspace.applyDeviceObservation(
+        deviceList.presentation, names: deviceDisplayNames(deviceList.presentation))
       models.traceWorkspace.refresh()
     }
   }

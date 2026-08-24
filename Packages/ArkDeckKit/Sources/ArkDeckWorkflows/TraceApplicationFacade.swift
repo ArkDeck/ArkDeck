@@ -79,12 +79,58 @@ public struct TraceTargetPresentation: Sendable, Equatable, Identifiable {
   public let bindingRevision: Int
   public let toolVersion: String
   public let adoptedAtUTC: String
+  public let deviceName: String?
+  public let systemVersion: String?
+  public let connectKey: String?
+  public let transport: String?
 
-  public init(id: String, bindingRevision: Int, toolVersion: String, adoptedAtUTC: String) {
+  public init(
+    id: String,
+    bindingRevision: Int,
+    toolVersion: String,
+    adoptedAtUTC: String,
+    deviceName: String? = nil,
+    systemVersion: String? = nil,
+    connectKey: String? = nil,
+    transport: String? = nil
+  ) {
     self.id = id
     self.bindingRevision = bindingRevision
     self.toolVersion = toolVersion
     self.adoptedAtUTC = adoptedAtUTC
+    self.deviceName = deviceName
+    self.systemVersion = systemVersion
+    self.connectKey = connectKey
+    self.transport = transport
+  }
+
+  public var connectionSummary: String? {
+    let values = [
+      Self.nonempty(systemVersion),
+      Self.nonempty(connectKey).map(Self.abbreviatedIdentifier),
+      Self.nonempty(transport)?.uppercased(),
+    ].compactMap { $0 }
+    return values.isEmpty ? nil : values.joined(separator: " · ")
+  }
+
+  public var accessibleConnectionSummary: String? {
+    let values = [
+      Self.nonempty(systemVersion),
+      Self.nonempty(connectKey),
+      Self.nonempty(transport)?.uppercased(),
+    ].compactMap { $0 }
+    return values.isEmpty ? nil : values.joined(separator: ", ")
+  }
+
+  private static func nonempty(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private static func abbreviatedIdentifier(_ value: String) -> String {
+    guard value.count > 10 else { return value }
+    return "\(value.prefix(4))…\(value.suffix(5))"
   }
 }
 
@@ -324,6 +370,33 @@ public enum TraceApplicationFacade {
 
   public static func make() -> any TraceApplicationProviding {
     TraceProductionApplicationProvider()
+  }
+
+  /// Joins durable Runtime target facts with ArkDeck's one current device
+  /// observation. The App never probes HDC from the Trace workspace: model,
+  /// firmware, route identifier and transport all come from the same shared
+  /// projection used by the Devices and UI Dump surfaces.
+  public static func rejoin(
+    targets: [TraceTargetPresentation],
+    with observation: DeviceListPresentation
+  ) -> [TraceTargetPresentation] {
+    guard case .available = observation.availability else { return targets }
+    let candidates = Dictionary(grouping: observation.candidates) { $0.adoptedTargetID }
+    return targets.map { target in
+      let matches = candidates[target.id, default: []].filter {
+        $0.bindingRevision == target.bindingRevision
+      }
+      guard matches.count == 1, let candidate = matches.first else { return target }
+      return TraceTargetPresentation(
+        id: target.id,
+        bindingRevision: target.bindingRevision,
+        toolVersion: target.toolVersion,
+        adoptedAtUTC: target.adoptedAtUTC,
+        deviceName: candidate.observedFacts?.model,
+        systemVersion: candidate.observedFacts?.firmware,
+        connectKey: candidate.connectKey,
+        transport: candidate.observedFacts?.transport)
+    }
   }
 
   static func operationPresentation(
