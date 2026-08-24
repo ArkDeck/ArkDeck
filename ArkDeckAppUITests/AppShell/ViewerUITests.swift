@@ -39,6 +39,23 @@ final class ViewerUITests: XCTestCase {
     attach(app, name: "viewer-empty-state")
   }
 
+  func testCaptureActionDistinguishesFirstCaptureFromRecapture() {
+    let app = launchViewer(extra: ["-AppleLanguages", "(zh-Hans)"])
+    let capture = app.buttons["viewer.recapture"]
+    XCTAssertTrue(capture.waitForExistence(timeout: 10), "Viewer must offer its capture action")
+    XCTAssertEqual(capture.label, "抓取视图")
+    XCTAssertTrue(
+      app.staticTexts[
+        "「抓取视图」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。"
+      ].exists)
+
+    capture.click()
+    XCTAssertTrue(
+      app.buttons["viewer.tree.node.1"].waitForExistence(timeout: 15),
+      "the fixture capture must render before the action changes to Recapture")
+    XCTAssertEqual(capture.label, "重新抓取")
+  }
+
   func testFixtureCaptureRendersScreenshotTreeAndProperties() {
     let app = launchCapturedViewer()
     // Assert on real controls, not on the layout containers that carry the

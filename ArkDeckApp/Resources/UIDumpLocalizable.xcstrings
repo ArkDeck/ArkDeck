@@ -58,13 +58,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Recapture creates a typed Runtime Job and shows only verified, same-Job Artifacts."
+            "value": "Capture View creates a typed Runtime Job and shows only verified, same-Job Artifacts."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "「重新抓取」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。"
+            "value": "「抓取视图」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。"
           }
         }
       }
@@ -75,13 +75,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Select an adopted target with a complete binding, then recapture."
+            "value": "Select an adopted target with a complete binding, then capture the view."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "先选择一个绑定完整的已纳管目标，再重新抓取。"
+            "value": "先选择一个绑定完整的已纳管目标，再抓取视图。"
           }
         }
       }
@@ -92,13 +92,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ cannot be recaptured: %2$@. Select a Connected target."
+            "value": "%1$@ cannot capture a view: %2$@. Select a Connected target."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ 无法重新抓取：%2$@。请选择一个「已连接」的目标。"
+            "value": "%1$@ 无法抓取视图：%2$@。请选择一个「已连接」的目标。"
           }
         }
       }
@@ -609,6 +609,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "抓取中…"
+          }
+        }
+      }
+    },
+    "viewer.toolbar.capture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture View"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抓取视图"
           }
         }
       }
