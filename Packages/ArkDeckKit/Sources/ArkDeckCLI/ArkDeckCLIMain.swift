@@ -422,7 +422,7 @@ struct ArkDeckCommandLine {
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] \
       [--execution-id <id>] [--json]
-        arkdeck agentd verify --job <existing-observe-job-id> [--json]
+        arkdeck agentd verify --job <existing-profiled-job-id> [--json]
         arkdeck agentd uninstall [--json]
         arkdeck signing install-sdk-release --sdk <absolute-openharmony-sdk-path> \
       --java <absolute-java-path> --bundle-name <application-bundle-name> \

@@ -241,7 +241,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     let reopenedVerifier = RuntimeHeadlessVerifier(
       client: reopenedClient, nowUTC: { "2026-07-29T00:00:01Z" })
 
-    let reopened = try reopenedVerifier.verifyPersistedObserveDevice(jobID: jobID)
+    let reopened = try reopenedVerifier.verifyPersistedJob(jobID: jobID)
     guard case .verified(let report) = reopened else {
       return XCTFail("the restarted daemon must reopen durable proof: \(reopened)")
     }
@@ -267,6 +267,107 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(
       jobsAfterRestart.count, jobsBeforeRestart.count,
       "read-only reopening must not create a second Runtime Job")
+  }
+
+  func testHeadlessVerifierReopensPersistedFullRestoreWithExactDestructiveProof() throws {
+    let jobID = "job-flash-reopen-contract-001"
+    let targetID = "TGT-FLASH-REOPEN-001"
+    let catalogDigest = String(repeating: "b", count: 64)
+    let identity = String(repeating: "c", count: 64)
+    let toolDigest = String(repeating: "d", count: 64)
+    let artifactRows: [(String, String, Int, String)] = [
+      ("ART-flash-report", "flash-report.json", 1_863, String(repeating: "1", count: 64)),
+      (
+        "ART-post-flash-facts", "post-flash-facts.json", 947,
+        String(repeating: "2", count: 64)
+      ),
+      (
+        "ART-post-flash-hilog", "post-flash-hilog.txt", 600_760,
+        String(repeating: "3", count: 64)
+      ),
+    ]
+    let inventory = artifactRows.map { artifactID, name, byteCount, sha256 in
+      RuntimeHeadlessArtifact(
+        artifactID: artifactID, jobID: jobID, name: name,
+        byteCount: byteCount, sha256: sha256, status: "published",
+        sourceOperation: "flash.full-restore@1", targetID: targetID,
+        bindingRevision: 4, stableIdentitySHA256: identity)
+    }
+    let evidenceArtifacts = inventory.map { artifact in
+      RuntimeHardwareEvidenceArtifact(
+        reference: "arkdeck-artifact://\(jobID)/\(artifact.artifactID)",
+        sha256: artifact.sha256, jobID: jobID, targetID: targetID,
+        bindingRevision: 4, stableIdentitySHA256: identity,
+        providerID: "arkforge", byteCount: artifact.byteCount,
+        bytesVerified: true)
+    }
+    let authority = RuntimeHardwareEvidenceAuthority(
+      kind: .runtimeCapability,
+      reference: "CAP-RT-POLICY-FLASH-REOPEN-G1",
+      admittedAtUTC: "2026-08-24T00:00:01Z",
+      validUntilUTC: "2026-08-24T04:00:00Z",
+      consumptionFingerprintSHA256: String(repeating: "4", count: 64),
+      reservationID: "agent-execution-flash-reopen-contract-001",
+      useOrdinal: 1,
+      stepSetDigest: String(repeating: "5", count: 64),
+      artifactDigest: String(repeating: "6", count: 64),
+      planDigest: String(repeating: "7", count: 64),
+      targetBindingDigest: String(repeating: "8", count: 64))
+    let observation = RuntimeHardwareEvidenceObservation(
+      targetID: targetID, bindingRevision: 4,
+      stableIdentitySHA256: identity, model: "ohos",
+      firmware: "OpenHarmony-7.0.0.37", transport: .usb,
+      providerID: "arkforge", toolVersion: "arkforged native RockUSB",
+      toolSHA256: toolDigest, confirmedAtUTC: "2026-08-24T00:02:00Z",
+      confirmationMethod: "machineReadback", preflightSteps: [])
+    let status = RuntimeHeadlessPersistedJobStatus(
+      jobID: jobID, operationReference: "flash.full-restore@1",
+      targetID: targetID, state: "succeeded", waitingForHuman: false,
+      outcomeUnknown: false, outstandingResidueCount: 0,
+      executionMode: "execute", actualEffect: "destructive",
+      startedAtUTC: "2026-08-24T00:00:00Z",
+      finishedAtUTC: "2026-08-24T00:03:00Z")
+    func trustedFacts(stepKinds: [String]) -> RuntimeHardwareEvidenceTrustedFacts {
+      RuntimeHardwareEvidenceTrustedFacts(
+        jobID: jobID, operationReference: "flash.full-restore@1",
+        catalogDigest: catalogDigest, targetID: targetID,
+        bindingRevision: 4, providerID: "arkforge",
+        actualEffect: .destructive, authority: authority,
+        observation: observation, actualStepKinds: stepKinds,
+        executionMode: "execute", terminalState: "succeeded",
+        outcomeUnknown: false, startedAtUTC: "2026-08-24T00:00:00Z",
+        firstEvidenceStepAtUTC: "2026-08-24T00:02:00Z",
+        finishedAtUTC: "2026-08-24T00:03:00Z",
+        recoveryEpoch: nil, artifacts: evidenceArtifacts, blockers: [])
+    }
+    let verifier = RuntimeHeadlessVerifier(
+      client: AgentClient(socketPath: "/not-used-by-pure-report"),
+      nowUTC: { "2026-08-24T00:04:00Z" })
+    let requiredKinds = [
+      "flashPartition", "verifyRemoteState", "rebootDevice",
+      "waitForReconnect", "probeDevice", "captureRemoteStdout",
+    ]
+
+    let report = verifier.reopenReport(
+      daemonCatalogDigest: catalogDigest, status: status,
+      trustedFacts: trustedFacts(stepKinds: requiredKinds),
+      inventory: inventory, additionalBlockers: [])
+
+    XCTAssertTrue(report.runtimeVerified, "\(report.blockers)")
+    XCTAssertTrue(report.checks.terminalStatusVerified)
+    XCTAssertTrue(report.checks.trustedEvidenceVerified)
+    XCTAssertTrue(report.checks.artifactsVerified)
+    XCTAssertTrue(report.checks.runtimePostflightVerified)
+
+    let missingWriteProof = verifier.reopenReport(
+      daemonCatalogDigest: catalogDigest, status: status,
+      trustedFacts: trustedFacts(stepKinds: ["captureRemoteStdout"]),
+      inventory: inventory, additionalBlockers: [])
+    XCTAssertFalse(missingWriteProof.runtimeVerified)
+    XCTAssertFalse(missingWriteProof.checks.runtimePostflightVerified)
+    XCTAssertTrue(
+      missingWriteProof.blockers.contains(
+        "runtimePostflight:typed steps, evidence or Artifact closure is incomplete"))
   }
 
   func testDaemonPreservesHistoricalCampaignCorrelationForDecodeOnlyExport() throws {

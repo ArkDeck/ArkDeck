@@ -448,7 +448,7 @@ enum RuntimeCLI {
       let verifier = RuntimeHeadlessVerifier(
         client: AgentClient(socketPath: status.socketPath), nowUTC: utcNow)
       if let persistedJobID {
-        switch try verifier.verifyPersistedObserveDevice(jobID: persistedJobID) {
+        switch try verifier.verifyPersistedJob(jobID: persistedJobID) {
         case .verified(let report):
           emit(
             .object([

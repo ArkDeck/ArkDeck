@@ -729,6 +729,12 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(observation.toolSHA256, providerSHA256)
     XCTAssertEqual(observation.confirmationMethod, "machineReadback")
     XCTAssertEqual(evidence.firstEvidenceStepAtUTC, observation.confirmedAtUTC)
+    XCTAssertTrue(
+      Set(evidence.actualStepKinds).isSuperset(of: [
+        "flashPartition", "verifyRemoteState", "rebootDevice", "waitForReconnect",
+        "probeDevice",
+      ]),
+      "persisted Flash evidence must project every confirmed mandatory WAL step kind")
     XCTAssertEqual(try Data(contentsOf: old.recordURL), originalRecord)
     XCTAssertEqual(try Data(contentsOf: old.journalURL), originalJournal)
     let recoveryDirectory =
