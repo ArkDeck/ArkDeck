@@ -4450,6 +4450,7 @@ public actor RuntimeJobEngine {
           path:
             "rockchip-runtime", directoryHint: .isDirectory)
       ).flashPostflightObservation(for: record)
+    let actualStepKinds = try durableActualStepKinds(for: record)
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
       operationReference: record.operationReference,
@@ -4460,7 +4461,7 @@ public actor RuntimeJobEngine {
       actualEffect: record.actualEffect,
       authority: record.admissionEvidence,
       observation: observation,
-      actualStepKinds: record.actualStepKinds ?? [],
+      actualStepKinds: actualStepKinds,
       executionMode: "execute",
       terminalState: record.outcomeUnknown ? "outcomeUnknown" : record.state,
       outcomeUnknown: record.outcomeUnknown,
@@ -4471,6 +4472,51 @@ public actor RuntimeJobEngine {
       traceProbeBefore: record.traceProbeBefore,
       traceProbeAfter: record.traceProbeAfter,
       inputs: record.request.inputs)
+  }
+
+  /// ArkForge owns one native plan while ArkDeck retains one confirmed WAL
+  /// pair for every published Flash obligation that the terminal daemon
+  /// receipt closes. Older records therefore contain only the separately
+  /// dispatched diagnostics kind in `actualStepKinds`, even though their
+  /// journal durably proves the destructive write and required postflight.
+  ///
+  /// Reopening evidence must project those already-confirmed journal steps;
+  /// it must never mutate the record or ask the provider to run again. Scope
+  /// this compatibility projection to the reviewed ArkForge operation so an
+  /// unrelated historical Job cannot acquire step claims from catalog text.
+  private func durableActualStepKinds(for record: RuntimeJobRecord) throws -> [String] {
+    let storedKinds = record.actualStepKinds ?? []
+    guard ArkForgeFlashOperation.contains(record.operationReference) else {
+      return storedKinds
+    }
+    guard let descriptor = RuntimeOperationCatalog.descriptor(
+      reference: record.operationReference)
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "persisted Flash operation \(record.operationReference) is unavailable")
+    }
+    let replay = try DurableJournalRecovery.inspect(
+      url: jobDirectory(for: record.jobID).appending(path: "journal.jsonl"))
+    guard replay.outstandingIntents.isEmpty, replay.unknownOutcomes.isEmpty else {
+      throw RuntimeJobEngineError.internalFailure(
+        "persisted Flash journal is not closed for \(record.jobID)")
+    }
+    let confirmedStepIDs = Self.confirmedSucceededStepIDs(in: replay)
+    let provenKinds = Set(storedKinds).union(
+      descriptor.steps.compactMap { step in
+        confirmedStepIDs.contains(step.stepID) ? step.kind.rawValue : nil
+      })
+
+    var ordered: [String] = []
+    for step in descriptor.steps where provenKinds.contains(step.kind.rawValue) {
+      if !ordered.contains(step.kind.rawValue) {
+        ordered.append(step.kind.rawValue)
+      }
+    }
+    for kind in storedKinds where !ordered.contains(kind) {
+      ordered.append(kind)
+    }
+    return ordered
   }
 
   /// Artifact names omitted by the exact materialized request, including

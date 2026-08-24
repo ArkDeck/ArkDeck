@@ -58,7 +58,7 @@ package enum RuntimeHeadlessVerificationOutcome: Sendable, Equatable {
   case failed(reason: String, report: RuntimeHeadlessVerificationReport)
 }
 
-/// Durable status projected by `job.status` when a completed observation is
+/// Durable status projected by `job.status` when a completed Runtime Job is
 /// reopened after the daemon process has changed. This carries Runtime facts,
 /// not a reconstructed claim about which caller originally submitted it.
 package struct RuntimeHeadlessPersistedJobStatus: Codable, Sendable, Equatable {
@@ -97,7 +97,7 @@ package struct RuntimeHeadlessReopenChecks: Codable, Sendable, Equatable {
   package let runtimePostflightVerified: Bool
 }
 
-/// Read-only closure proof for one persisted observation Job. Unlike a fresh
+/// Read-only closure proof for one persisted Runtime Job. Unlike a fresh
 /// verification receipt, this report never invents an executor identity: it
 /// joins only daemon-owned status, evidence and immutable Artifact metadata.
 package struct RuntimeHeadlessReopenReport: Codable, Sendable, Equatable {
@@ -124,12 +124,32 @@ package enum RuntimeHeadlessReopenOutcome: Sendable, Equatable {
 /// This type owns no provider, process, argv or capability-administration
 /// surface. Device dispatch remains exclusively inside `arkdeck-agentd`.
 package struct RuntimeHeadlessVerifier: Sendable {
+  private struct PersistedOperationProfile: Sendable {
+    let effect: RuntimeHardwareEvidenceEffectLevel
+    let authority: RuntimeHardwareEvidenceAuthorityKind
+    let requiredArtifactNames: Set<String>
+    let allowedArtifactNames: Set<String>
+    let requiredStepKinds: Set<String>
+  }
+
   private static let operationReference = "observe.device@1"
   private static let requiredArtifactNames: Set<String> = [
     "binding-snapshot.json", "device-facts.json", "tool-facts.json",
   ]
   private static let requiredStepKinds: Set<String> = [
     "probeDevice", "probeHDCServer", "probeHostTool", "runApprovedRemoteRead",
+  ]
+  private static let flashRequiredArtifactNames: Set<String> = [
+    "flash-report.json", "post-flash-facts.json",
+  ]
+  private static let flashAllowedArtifactNames = flashRequiredArtifactNames.union([
+    "post-flash-hilog.txt"
+  ])
+  /// These mandatory kinds are projected only from confirmed Flash WAL
+  /// outcomes. The optional diagnostics kind may be absent for `basic`.
+  private static let flashRequiredStepKinds: Set<String> = [
+    "flashPartition", "verifyRemoteState", "rebootDevice", "waitForReconnect",
+    "probeDevice",
   ]
 
   private let client: AgentClient
@@ -186,10 +206,13 @@ package struct RuntimeHeadlessVerifier: Sendable {
     }
   }
 
-  /// Reopens a completed `observe.device@1` through durable Runtime APIs only.
+  /// Reopens a completed, explicitly profiled Runtime operation through
+  /// durable APIs only. Today the supported profiles are `observe.device@1`
+  /// and the published ArkForge full-restore references.
+  ///
   /// It never submits, runs, cancels or reconciles a Job, so invoking it after
   /// a LaunchAgent restart proves persistence without causing device work.
-  package func verifyPersistedObserveDevice(
+  package func verifyPersistedJob(
     jobID: String
   ) throws -> RuntimeHeadlessReopenOutcome {
     guard Self.validIdentifier(jobID) else {
@@ -321,7 +344,7 @@ package struct RuntimeHeadlessVerifier: Sendable {
       stableIdentitySHA256: stableIdentitySHA256)
   }
 
-  private func reopenReport(
+  package func reopenReport(
     daemonCatalogDigest: String,
     status: RuntimeHeadlessPersistedJobStatus,
     trustedFacts: RuntimeHardwareEvidenceTrustedFacts,
@@ -329,6 +352,12 @@ package struct RuntimeHeadlessVerifier: Sendable {
     additionalBlockers: [String]
   ) -> RuntimeHeadlessReopenReport {
     var blockers = trustedFacts.blockers + additionalBlockers
+    let profile = Self.persistedProfile(for: status.operationReference)
+    if profile == nil {
+      blockers.append(
+        "operation:persisted verification has no published profile for "
+          + status.operationReference)
+    }
 
     let udsHealthVerified =
       Self.validSHA256(daemonCatalogDigest)
@@ -337,9 +366,15 @@ package struct RuntimeHeadlessVerifier: Sendable {
       blockers.append("udsHealth:catalog digest is missing or drifted")
     }
 
+    let startedAt = status.startedAtUTC.flatMap(ISO8601Timestamps.parse)
+    let finishedAt = status.finishedAtUTC.flatMap(ISO8601Timestamps.parse)
+    let terminalTimesVerified: Bool = {
+      guard let startedAt, let finishedAt else { return false }
+      return startedAt <= finishedAt
+    }()
     let terminalStatusVerified =
-      status.jobID == trustedFacts.jobID
-      && status.operationReference == Self.operationReference
+      profile != nil
+      && status.jobID == trustedFacts.jobID
       && status.operationReference == trustedFacts.operationReference
       && status.targetID == trustedFacts.targetID
       && status.state == "succeeded"
@@ -350,10 +385,10 @@ package struct RuntimeHeadlessVerifier: Sendable {
       && status.outstandingResidueCount == 0
       && status.executionMode == "execute"
       && status.executionMode == trustedFacts.executionMode
-      && status.actualEffect == "readOnly"
-      && status.startedAtUTC?.isEmpty == false
+      && status.actualEffect == profile?.effect.rawValue
+      && trustedFacts.actualEffect == profile?.effect
+      && terminalTimesVerified
       && status.startedAtUTC == trustedFacts.startedAtUTC
-      && status.finishedAtUTC?.isEmpty == false
       && status.finishedAtUTC == trustedFacts.finishedAtUTC
       && (trustedFacts.bindingRevision ?? 0) >= 1
     if !terminalStatusVerified {
@@ -361,9 +396,24 @@ package struct RuntimeHeadlessVerifier: Sendable {
     }
 
     let observation = trustedFacts.observation
+    let confirmedAt = observation?.confirmedAtUTC.flatMap(ISO8601Timestamps.parse)
+    let firstEvidenceAt = trustedFacts.firstEvidenceStepAtUTC.flatMap(
+      ISO8601Timestamps.parse)
+    let evidenceTimesVerified: Bool = {
+      guard let startedAt, let confirmedAt, let firstEvidenceAt, let finishedAt else {
+        return false
+      }
+      return startedAt <= confirmedAt
+        && confirmedAt <= firstEvidenceAt
+        && firstEvidenceAt <= finishedAt
+    }()
+    let authorityVerified = Self.persistedAuthorityVerified(
+      trustedFacts.authority, expected: profile?.authority,
+      finishedAt: finishedAt)
     let trustedEvidenceVerified =
-      trustedFacts.actualEffect == .readOnly
-      && trustedFacts.authority?.kind == .defaultReadOnlyPolicy
+      profile != nil
+      && trustedFacts.actualEffect == profile?.effect
+      && authorityVerified
       && trustedFacts.providerID == observation?.providerID
       && trustedFacts.targetID == observation?.targetID
       && trustedFacts.bindingRevision == observation?.bindingRevision
@@ -373,7 +423,7 @@ package struct RuntimeHeadlessVerifier: Sendable {
       && observation?.transport != nil
       && !(observation?.toolVersion.isEmpty ?? true)
       && Self.validSHA256(observation?.toolSHA256 ?? "")
-      && observation?.confirmedAtUTC?.isEmpty == false
+      && evidenceTimesVerified
       && observation?.confirmationMethod == "machineReadback"
     if !trustedEvidenceVerified {
       blockers.append("trustedEvidence:daemon-owned target/tool observation is incomplete")
@@ -384,8 +434,11 @@ package struct RuntimeHeadlessVerifier: Sendable {
     let evidenceReferences = Set(trustedFacts.artifacts.map(\.reference))
     let observedIdentity = observation?.stableIdentitySHA256
     let artifactsVerified =
-      !inventory.isEmpty
-      && requiredNames == Self.requiredArtifactNames
+      profile != nil
+      && !inventory.isEmpty
+      && requiredNames.isSuperset(of: profile?.requiredArtifactNames ?? [])
+      && requiredNames.isSubset(of: profile?.allowedArtifactNames ?? [])
+      && requiredNames.count == inventory.count
       && inventory.count == trustedFacts.artifacts.count
       && inventoryIDs.count == inventory.count
       && evidenceReferences.count == trustedFacts.artifacts.count
@@ -397,7 +450,7 @@ package struct RuntimeHeadlessVerifier: Sendable {
           return false
         }
         return artifact.status == "published"
-          && artifact.sourceOperation == Self.operationReference
+          && artifact.sourceOperation == trustedFacts.operationReference
           && artifact.jobID == trustedFacts.jobID
           && artifact.targetID == trustedFacts.targetID
           && artifact.bindingRevision == trustedFacts.bindingRevision
@@ -420,7 +473,11 @@ package struct RuntimeHeadlessVerifier: Sendable {
       terminalStatusVerified
       && trustedEvidenceVerified
       && artifactsVerified
-      && Set(trustedFacts.actualStepKinds).isSuperset(of: Self.requiredStepKinds)
+      && !trustedFacts.actualStepKinds.isEmpty
+      && Set(trustedFacts.actualStepKinds).count == trustedFacts.actualStepKinds.count
+      && !trustedFacts.actualStepKinds.contains(where: \.isEmpty)
+      && Set(trustedFacts.actualStepKinds).isSuperset(
+        of: profile?.requiredStepKinds ?? [])
     if !runtimePostflightVerified {
       blockers.append("runtimePostflight:typed steps, evidence or Artifact closure is incomplete")
     }
@@ -438,6 +495,61 @@ package struct RuntimeHeadlessVerifier: Sendable {
         artifactsVerified: artifactsVerified,
         runtimePostflightVerified: runtimePostflightVerified),
       blockers: blockers, runtimeVerified: blockers.isEmpty)
+  }
+
+  private static func persistedProfile(
+    for operationReference: String
+  ) -> PersistedOperationProfile? {
+    if operationReference == Self.operationReference {
+      return PersistedOperationProfile(
+        effect: .readOnly, authority: .defaultReadOnlyPolicy,
+        requiredArtifactNames: Self.requiredArtifactNames,
+        allowedArtifactNames: Self.requiredArtifactNames,
+        requiredStepKinds: Self.requiredStepKinds)
+    }
+    if ArkForgeFlashOperation.contains(operationReference) {
+      return PersistedOperationProfile(
+        effect: .destructive, authority: .runtimeCapability,
+        requiredArtifactNames: Self.flashRequiredArtifactNames,
+        allowedArtifactNames: Self.flashAllowedArtifactNames,
+        requiredStepKinds: Self.flashRequiredStepKinds)
+    }
+    return nil
+  }
+
+  private static func persistedAuthorityVerified(
+    _ authority: RuntimeHardwareEvidenceAuthority?,
+    expected: RuntimeHardwareEvidenceAuthorityKind?,
+    finishedAt: Date?
+  ) -> Bool {
+    guard let authority, let expected, authority.kind == expected,
+      let finishedAt,
+      let admittedAt = ISO8601Timestamps.parse(authority.admittedAtUTC),
+      admittedAt <= finishedAt
+    else {
+      return false
+    }
+    switch expected {
+    case .defaultReadOnlyPolicy:
+      return authority.reference == "default-read-only-policy"
+    case .runtimeCapability:
+      guard Self.validIdentifier(authority.reference),
+        Self.validSHA256(authority.consumptionFingerprintSHA256 ?? ""),
+        authority.reservationID?.isEmpty == false,
+        (authority.useOrdinal ?? 0) >= 1,
+        Self.validSHA256(authority.planDigest ?? ""),
+        Self.validSHA256(authority.stepSetDigest ?? ""),
+        Self.validSHA256(authority.targetBindingDigest ?? ""),
+        Self.validSHA256(authority.artifactDigest ?? ""),
+        let validUntil = authority.validUntilUTC.flatMap(ISO8601Timestamps.parse),
+        validUntil >= finishedAt
+      else {
+        return false
+      }
+      return true
+    case .standingAuthorization, .evolutionCampaignConfirmation:
+      return false
+    }
   }
 
   private func report(

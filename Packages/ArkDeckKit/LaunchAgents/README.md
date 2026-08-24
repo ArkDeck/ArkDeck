@@ -70,15 +70,17 @@ Artifact 清单：
 ```text
 arkdeck agentd verify --target <target-id> --json
 arkdeck agentd restart --json
-arkdeck agentd verify --job <observe-job-id> --json
+arkdeck agentd verify --job <observe-or-full-restore-job-id> --json
 ```
 
 `restart` 不复制 helper、不重写 plist/install receipt，也不删除 Runtime state；它会拒绝 active、
 等待人工或带 cleanup residue 的 current Job。已经 durable 终止的
 `waitingForRecovery + outcomeUnknown` Job 不可能靠重启变成 known，restart 允许并在新 daemon 中逐一
 核对它们仍原样保留，永不 replay。随后以不同进程 PID、相同 catalog digest 和新进程 UDS health
-闭合结果。`verify --job` 仅调用 `health`、`job.status`、`job.evidence` 与 `artifact.list`，不会
-submit/run/cancel/reconcile Job，也不会产生设备 dispatch。若 daemon 不健康、仍有活动或未闭合 Job，
+闭合结果。`verify --job` 对 `observe.device@1` 和已发布的 ArkForge full-restore operation 使用
+各自固定的 effect、authority、必需 Step 与 Artifact profile；它仅调用 `health`、`job.status`、
+`job.evidence` 与 `artifact.list`，不会 submit/run/cancel/reconcile Job，也不会产生设备 dispatch。
+若 daemon 不健康、仍有活动或未闭合 Job，
 历史 unknown 集合在重启中漂移，或既有 Job/Artifact 证据不完整，命令 fail closed，不回退到 App/UI。
 
 要启用已合入的 ArkTrace typed analyzer profile，请把已审阅、版本化 ArkTrace
