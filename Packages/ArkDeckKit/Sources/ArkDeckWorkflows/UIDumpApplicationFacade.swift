@@ -246,12 +246,25 @@ public enum ViewerScreenshotMapping {
 /// The tree still grows horizontally for long labels, but depth alone cannot
 /// consume the whole viewport and leave only the selected background visible.
 public enum ViewerTreeLayoutPolicy {
-  public static func leadingIndent(depth: Int, viewportWidth: Double) -> Double {
+  public static func leadingIndent(
+    depth: Int,
+    maximumDepth: Int,
+    viewportWidth: Double
+  ) -> Double {
     guard viewportWidth.isFinite, viewportWidth > 0 else { return 6 }
-    let rawIndent = 6 + Double(max(0, depth)) * 14
+    let baseIndent = 6.0
+    let normalizedDepth = max(0, depth)
+    let normalizedMaximumDepth = max(normalizedDepth, maximumDepth, 1)
     let minimumContentWidth = max(180, viewportWidth * 0.4)
     let maximumIndent = max(6, viewportWidth - minimumContentWidth)
-    return min(rawIndent, maximumIndent)
+    // Fit ordinary trees with a comfortable 18 pt step. For a fifty-level
+    // real dump, reduce every step evenly instead of clamping the deepest
+    // rows onto one leading edge. Extremely deep provider data keeps an 8 pt
+    // step and uses the tree's horizontal scroll rather than losing hierarchy.
+    let availableIndent = max(0, maximumIndent - baseIndent)
+    let adaptiveStep = availableIndent / Double(normalizedMaximumDepth)
+    let step = max(8, min(18, adaptiveStep))
+    return baseIndent + Double(normalizedDepth) * step
   }
 }
 

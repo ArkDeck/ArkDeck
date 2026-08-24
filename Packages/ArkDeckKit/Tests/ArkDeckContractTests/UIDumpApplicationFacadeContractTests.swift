@@ -143,15 +143,24 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       "the foreground TabBar branch must win over a much deeper poster branch")
   }
 
-  func testDeepTreeIndentAlwaysReservesReadableLabelWidth() {
+  func testDeepTreeIndentPreservesEveryLevelWithoutLosingReadableWidth() {
     let viewport = 760.0
-    let indent = ViewerTreeLayoutPolicy.leadingIndent(depth: 50, viewportWidth: viewport)
+    let indent = ViewerTreeLayoutPolicy.leadingIndent(
+      depth: 50, maximumDepth: 50, viewportWidth: viewport)
+    let previous = ViewerTreeLayoutPolicy.leadingIndent(
+      depth: 49, maximumDepth: 50, viewportWidth: viewport)
 
     XCTAssertEqual(indent, 456, accuracy: 0.001)
     XCTAssertGreaterThanOrEqual(
+      indent - previous, 8,
+      "deep siblings must retain a perceivable hierarchy instead of sharing a clamped edge")
+    XCTAssertGreaterThanOrEqual(
       viewport - indent, 300,
       "a real fifty-level dump must not place the selected row's label outside the pane")
-    XCTAssertEqual(ViewerTreeLayoutPolicy.leadingIndent(depth: 2, viewportWidth: viewport), 34)
+    XCTAssertEqual(
+      ViewerTreeLayoutPolicy.leadingIndent(
+        depth: 2, maximumDepth: 8, viewportWidth: viewport),
+      42)
   }
 
   func testVisibleTreeProjectionIsLinearAndCycleSafe() {

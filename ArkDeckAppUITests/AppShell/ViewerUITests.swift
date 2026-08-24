@@ -56,22 +56,53 @@ final class ViewerUITests: XCTestCase {
 
   // MARK: - Screenshot nodes in the accessibility tree (Viewer-05 / §6.5)
 
-  func testScreenshotNodesStayReachableWhenBoundsAreHidden() {
+  func testScreenshotNodesStayReachableWithBoundsHiddenByDefault() {
     let app = launchCapturedViewer()
     let region = app.descendants(matching: .any)["viewer.screenshot.node.42"]
     XCTAssertTrue(
       region.waitForExistence(timeout: 10),
       "every node with verified bounds must be addressable in the screenshot")
 
-    // Drawing bounds is a visual preference. Turning it off must not remove a
-    // node from assistive technology, which addresses elements by name.
+    // Drawing every bound is opt-in. The default keeps a real 300+ node dump
+    // readable while assistive technology can still address every component.
     let toggle = app.checkBoxes["viewer.showBounds"]
     XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-    toggle.click()
     XCTAssertTrue(
       app.descendants(matching: .any)["viewer.screenshot.node.42"].exists,
       "hiding bounds must not hide the node from assistive technology")
     attach(app, name: "viewer-bounds-hidden")
+
+    // The preference remains interactive in both directions.
+    toggle.click()
+    toggle.click()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["viewer.screenshot.node.42"].exists,
+      "hiding bounds must not hide the node from assistive technology")
+  }
+
+  func testSelectingAnImageKeepsTheScreenshotRangeOnThatImage() {
+    let app = launchCapturedViewer()
+    revealNode("32", in: app).click()
+    clearSearch(in: app)
+
+    let screenshot = app.descendants(matching: .any)["viewer.screenshot.hitTest"]
+    let image = app.descendants(matching: .any)["viewer.screenshot.node.32"]
+    XCTAssertTrue(screenshot.waitForExistence(timeout: 5))
+    XCTAssertTrue(image.waitForExistence(timeout: 5))
+
+    // Fixture #32 is [86, 614, 64, 64] in a 1080 x 1920 capture. Its AX
+    // rectangle is the same rectangle Viewer paints, so this catches labels,
+    // clipping, or scale math accidentally widening the selected range.
+    let expected = CGRect(
+      x: screenshot.frame.minX + screenshot.frame.width * 86 / 1080,
+      y: screenshot.frame.minY + screenshot.frame.height * 614 / 1920,
+      width: screenshot.frame.width * 64 / 1080,
+      height: screenshot.frame.height * 64 / 1920)
+    XCTAssertEqual(image.frame.minX, expected.minX, accuracy: 3)
+    XCTAssertEqual(image.frame.minY, expected.minY, accuracy: 3)
+    XCTAssertEqual(image.frame.width, expected.width, accuracy: 3)
+    XCTAssertEqual(image.frame.height, expected.height, accuracy: 3)
+    attach(app, name: "viewer-image-selection-range")
   }
 
   // MARK: - Linked selection
@@ -123,6 +154,17 @@ final class ViewerUITests: XCTestCase {
     XCTAssertTrue(row.isHittable, "the selected row must remain visible, not just present in AX")
     XCTAssertFalse(row.label.isEmpty, "the selected row must keep visible semantic content")
     attach(app, name: "viewer-deep-row-leading-edge")
+  }
+
+  func testFreshCaptureStartsAsAnOutlineInsteadOfAnExpandedFlatList() {
+    let app = launchCapturedViewer()
+    XCTAssertTrue(app.buttons["viewer.tree.node.1"].exists)
+    XCTAssertTrue(app.buttons["viewer.tree.node.3"].exists)
+    XCTAssertFalse(
+      app.buttons["viewer.tree.node.8"].exists,
+      "a fresh capture should show root and first level, not expand the entire component dump")
+
+    attach(app, name: "viewer-collapsed-outline")
   }
 
   // MARK: - Search (Viewer-06)
@@ -182,6 +224,34 @@ final class ViewerUITests: XCTestCase {
       rendered.contains("fixtureUnknownField"),
       "a field the parser does not model must survive into Raw dump")
     attach(app, name: "viewer-raw-dump")
+  }
+
+  func testInspectorVocabularyStaysEnglish() {
+    let app = launchCapturedViewer()
+    revealNode("42", in: app).click()
+
+    let tabs = [
+      ("properties", "Show Properties"),
+      ("layout", "Show Layout"),
+      ("accessibility", "Show Accessibility"),
+      ("rawDump", "Show Raw dump"),
+    ]
+    for (identifier, label) in tabs {
+      let button = app.buttons["viewer.inspector.tab.\(identifier)"]
+      XCTAssertTrue(
+        button.waitForExistence(timeout: 5),
+        "the inspector tab must remain reachable: \(identifier)")
+      XCTAssertEqual(button.label, label)
+    }
+    XCTAssertTrue(
+      app.staticTexts["Identity"].waitForExistence(timeout: 5),
+      "the inspector must use the English debugging vocabulary: Identity")
+    for translated in ["属性", "布局", "无障碍", "身份"] {
+      XCTAssertFalse(
+        app.staticTexts[translated].exists,
+        "the inspector must not mix translated labels with English dump fields")
+    }
+    attach(app, name: "viewer-english-inspector")
   }
 
   // MARK: - Real hardware

@@ -152,9 +152,13 @@ struct UIDumpWorkspaceView: View {
                   screenshotRegion(node, in: capture, content: content)
                 }
                 screenshotHitTest(capture, content: content)
+                screenshotSelectionAnnotation(capture, content: content)
               }
             }
             .frame(width: content.width, height: content.height)
+            // Selection annotations may sit just outside a small component,
+            // but they still belong to the screenshot and never escape it.
+            .clipped()
           } else {
             ContentUnavailableView(viewerText("viewer.screenshot.unavailable"), systemImage: "photo")
           }
@@ -182,36 +186,25 @@ struct UIDumpWorkspaceView: View {
     {
       let selected = node.identity == model.selectedNodeIdentity
       let outlined = model.showBounds || selected
-      ZStack(alignment: .topTrailing) {
-        Rectangle()
-          .fill(selected ? Color.accentColor.opacity(0.10) : .clear)
-          .overlay {
-            if outlined {
-              Rectangle().strokeBorder(
-                selected ? Color.accentColor : Color.accentColor.opacity(0.35),
-                lineWidth: selected ? 2 : 1)
-            }
+      Rectangle()
+        .fill(selected ? Color.accentColor.opacity(0.10) : .clear)
+        .overlay {
+          if outlined {
+            Rectangle().strokeBorder(
+              selected ? Color.accentColor : Color.accentColor.opacity(0.35),
+              lineWidth: selected ? 2 : 1)
           }
-        if selected {
-          Text("#\(node.deviceID ?? "—") \(node.type)")
-            .font(WorkspaceFont.monospacedDense)
-            .padding(.horizontal, 4).padding(.vertical, 2)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
-            .foregroundStyle(Color.primary)
-            .fixedSize()
         }
-      }
       .frame(
         width: max(1, content.width * bounds.width / Double(capture.screenshotWidth)),
         height: max(1, content.height * bounds.height / Double(capture.screenshotHeight)))
-      // Node labels are annotations, not geometry. A long type name must not
-      // visually widen a narrow node or escape the screenshot and masquerade
-      // as part of its selected bounds.
-      .clipped()
       .position(
         x: content.width * (bounds.x + bounds.width / 2) / Double(capture.screenshotWidth),
         y: content.height * (bounds.y + bounds.height / 2) / Double(capture.screenshotHeight))
-      .zIndex(Double(node.depth) + (node.zIndex ?? 0))
+      // The selected component is the inspection result, so its outline must
+      // remain above deeper transparent descendants and optional all-bounds
+      // guides. This changes presentation only, never hit-test ordering.
+      .zIndex(selected ? 1_000_000 : Double(node.depth) + (node.zIndex ?? 0))
       // Pointer selection stays with the single coordinate target below, which
       // resolves the deepest node under the point. Real dumps stack several
       // full-screen containers, so turning these into click targets lets the
@@ -229,6 +222,41 @@ struct UIDumpWorkspaceView: View {
       .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
       .accessibilityAction { model.select(node.identity) }
       .accessibilityIdentifier("viewer.screenshot.node.\(node.identity)")
+    }
+  }
+
+  /// The label is a sibling of the measured region, not its overlay. AppKit
+  /// otherwise unions the label and rectangle into one accessibility frame,
+  /// making a small image appear to have a much larger selected range.
+  @ViewBuilder
+  private func screenshotSelectionAnnotation(_ capture: ViewerCapture, content: CGSize) -> some View {
+    if let identity = model.selectedNodeIdentity,
+      let node = capture.node(identity: identity),
+      let bounds = ViewerScreenshotMapping.visibleBounds(of: node, in: capture)
+    {
+      Rectangle()
+        .fill(.clear)
+        .frame(
+          width: max(1, content.width * bounds.width / Double(capture.screenshotWidth)),
+          height: max(1, content.height * bounds.height / Double(capture.screenshotHeight)))
+        .overlay(
+          alignment: bounds.x + bounds.width / 2 > Double(capture.screenshotWidth) / 2
+            ? .topTrailing : .topLeading
+        ) {
+          Text("#\(node.deviceID ?? "—") \(node.type)")
+            .font(WorkspaceFont.monospacedDense)
+            .padding(.horizontal, 4).padding(.vertical, 2)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
+            .foregroundStyle(Color.primary)
+            .fixedSize()
+            .offset(y: bounds.y < 64 ? 3 : -22)
+        }
+        .position(
+          x: content.width * (bounds.x + bounds.width / 2) / Double(capture.screenshotWidth),
+          y: content.height * (bounds.y + bounds.height / 2) / Double(capture.screenshotHeight))
+        .zIndex(1_000_001)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
   }
 
@@ -260,6 +288,8 @@ struct UIDumpWorkspaceView: View {
 
   private func tree(_ capture: ViewerCapture) -> some View {
     let rows = model.visibleNodes
+    let minimumDepth = rows.map(\.depth).min() ?? 0
+    let maximumDepth = rows.map(\.depth).max() ?? minimumDepth
     return VStack(spacing: 0) {
       paneHeader(
         viewerText("viewer.pane.tree"),
@@ -274,7 +304,11 @@ struct UIDumpWorkspaceView: View {
           ScrollView([.horizontal, .vertical]) {
             LazyVStack(alignment: .leading, spacing: 1) {
               ForEach(rows) { node in
-                treeRow(node, viewportWidth: proxy.size.width)
+                treeRow(
+                  node,
+                  visualDepth: max(0, node.depth - minimumDepth),
+                  maximumVisualDepth: max(0, maximumDepth - minimumDepth),
+                  viewportWidth: proxy.size.width)
                   .id(node.identity)
               }
               if rows.isEmpty {
@@ -319,7 +353,12 @@ struct UIDumpWorkspaceView: View {
   /// needs two competing controls. `#id` trails the label inline: a deep tree
   /// scrolls horizontally, so there is no fixed right edge to align a column
   /// to, and the node's own name must never be truncated to make one.
-  private func treeRow(_ node: ViewerNode, viewportWidth: CGFloat) -> some View {
+  private func treeRow(
+    _ node: ViewerNode,
+    visualDepth: Int,
+    maximumVisualDepth: Int,
+    viewportWidth: CGFloat
+  ) -> some View {
     let selected = node.identity == model.selectedNodeIdentity
     let expanded = model.expandedNodeIdentities.contains(node.identity)
     return Button { model.select(node.identity) } label: {
@@ -369,7 +408,9 @@ struct UIDumpWorkspaceView: View {
         .leading,
         CGFloat(
           ViewerTreeLayoutPolicy.leadingIndent(
-            depth: node.depth, viewportWidth: Double(viewportWidth))))
+            depth: visualDepth,
+            maximumDepth: maximumVisualDepth,
+            viewportWidth: Double(viewportWidth))))
       .padding(.trailing, 8)
       .frame(minHeight: 26, alignment: .leading)
       // The floor keeps the selection capsule spanning the visible pane; the
@@ -452,8 +493,8 @@ struct UIDumpWorkspaceView: View {
             // Neutral, not green: "visible" and "interactive" are facts about
             // the node, not a health verdict. Semantic green stays reserved
             // for outcomes that are actually good news.
-            if node.clickable == true { statusChip(viewerText("viewer.chip.interactive")) }
-            if node.visible { statusChip(viewerText("viewer.chip.visible")) }
+            if node.clickable == true { statusChip(ViewerInspectorCopy.interactive) }
+            if node.visible { statusChip(ViewerInspectorCopy.visible) }
             Spacer(minLength: 0)
           }
           Text(model.breadcrumb(for: node.identity))
@@ -480,7 +521,7 @@ struct UIDumpWorkspaceView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
       } else {
-        ContentUnavailableView(viewerText("viewer.properties.selectPrompt"), systemImage: "cursorarrow.click")
+        ContentUnavailableView(ViewerInspectorCopy.selectPrompt, systemImage: "cursorarrow.click")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
@@ -536,7 +577,7 @@ struct UIDumpWorkspaceView: View {
   }
 
   private func statusChip(_ text: String) -> some View {
-    Text(text)
+    Text(verbatim: text)
       .font(WorkspaceFont.monospacedDense)
       .foregroundStyle(.secondary)
       .padding(.horizontal, 6).padding(.vertical, 1)
@@ -550,13 +591,13 @@ struct UIDumpWorkspaceView: View {
   private func inspectorContent(_ node: ViewerNode, capture: ViewerCapture) -> some View {
     switch model.inspectorTab {
     case .properties:
-      keyValueGroup(viewerText("viewer.group.identity"), [
-        ("id", node.deviceID ?? viewerText("viewer.value.unavailable")),
+      keyValueGroup(ViewerInspectorCopy.identity, [
+        ("id", node.deviceID ?? ViewerInspectorCopy.unavailable),
         ("type", node.type),
-        ("inspectorId", node.inspectorID ?? viewerText("viewer.value.unavailable")),
-        ("text", node.text ?? viewerText("viewer.value.unavailable")),
+        ("inspectorId", node.inspectorID ?? ViewerInspectorCopy.unavailable),
+        ("text", node.text ?? ViewerInspectorCopy.unavailable),
       ])
-      keyValueGroup(viewerText("viewer.group.state"), [
+      keyValueGroup(ViewerInspectorCopy.state, [
         ("enabled", state(node.enabled)),
         ("visible", state(node.visible)),
         ("clickable", state(node.clickable)),
@@ -564,30 +605,31 @@ struct UIDumpWorkspaceView: View {
         ("focused", state(node.focused)),
       ])
     case .layout:
-      keyValueGroup(viewerText("viewer.group.geometry"), [
+      keyValueGroup(ViewerInspectorCopy.geometry, [
         ("bounds", boundsText(node.bounds)),
-        (viewerText("viewer.field.screenshotMapping"),
+        (ViewerInspectorCopy.screenshotMapping,
          ViewerScreenshotMapping.visibleBounds(of: node, in: capture) != nil
-           ? viewerText("viewer.value.verified") : viewerText("viewer.value.unavailable")),
-        (viewerText("viewer.field.hitTest"),
+           ? ViewerInspectorCopy.verified : ViewerInspectorCopy.unavailable),
+        (ViewerInspectorCopy.hitTest,
          ViewerScreenshotMapping.visibleBounds(of: node, in: capture) != nil
-           ? viewerText("viewer.value.available") : viewerText("viewer.value.unavailable")),
+           ? ViewerInspectorCopy.available : ViewerInspectorCopy.unavailable),
       ])
-      keyValueGroup(viewerText("viewer.group.paint"), [
-        ("zIndex", node.zIndex.map { String($0) } ?? viewerText("viewer.value.unavailable")),
+      keyValueGroup(ViewerInspectorCopy.paint, [
+        ("zIndex", node.zIndex.map { String($0) } ?? ViewerInspectorCopy.unavailable),
       ])
     case .accessibility:
-      keyValueGroup(viewerText("viewer.group.semantics"), [
-        (viewerText("viewer.field.accessibleLabel"), node.text ?? viewerText("viewer.value.unavailable")),
-        (viewerText("viewer.field.description"), node.inspectorID ?? viewerText("viewer.value.unavailable")),
+      keyValueGroup(ViewerInspectorCopy.semantics, [
+        (ViewerInspectorCopy.accessibleLabel, node.text ?? ViewerInspectorCopy.unavailable),
+        (ViewerInspectorCopy.description, node.inspectorID ?? ViewerInspectorCopy.unavailable),
       ])
-      keyValueGroup(viewerText("viewer.group.focus"), [
+      keyValueGroup(ViewerInspectorCopy.focus, [
         ("visible", state(node.visible)),
         ("focusable", state(node.focusable)),
         ("focused", state(node.focused)),
       ])
     case .rawDump:
-      Text(capture.formattedRawFields(for: node.identity) ?? viewerText("viewer.properties.rawUnavailable"))
+      Text(verbatim:
+        capture.formattedRawFields(for: node.identity) ?? ViewerInspectorCopy.rawUnavailable)
         .font(WorkspaceFont.monospacedValue).textSelection(.enabled)
         .padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -597,7 +639,7 @@ struct UIDumpWorkspaceView: View {
 
   private func keyValueGroup(_ title: String, _ rows: [(String, String)]) -> some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text(title)
+      Text(verbatim: title)
         .font(WorkspaceFont.label)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12).padding(.vertical, 6)
@@ -608,10 +650,10 @@ struct UIDumpWorkspaceView: View {
         HStack(alignment: .top, spacing: 0) {
           // A fixed key column. A fluid one let two-character keys claim 40%
           // of the inspector and pushed their values half a pane away.
-          Text(name)
+          Text(verbatim: name)
             .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
             .frame(width: 150, alignment: .leading)
-          Text(value)
+          Text(verbatim: value)
             .font(WorkspaceFont.monospacedValue)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -625,7 +667,7 @@ struct UIDumpWorkspaceView: View {
   private func inspectorTabButton(_ tab: ViewerInspectorTab) -> some View {
     let active = model.inspectorTab == tab
     return Button { model.setInspectorTab(tab) } label: {
-      Text(tab.title)
+      Text(verbatim: tab.title)
         .font(active ? WorkspaceFont.secondary.weight(.semibold) : WorkspaceFont.secondary)
         .foregroundStyle(active ? Color.accentColor : Color.secondary)
         .padding(.horizontal, 6).padding(.vertical, 6)
@@ -641,8 +683,7 @@ struct UIDumpWorkspaceView: View {
     // Before the padding, not after: a later modifier would attach the
     // identifier to the padding container and leave the button itself
     // anonymous in the accessibility tree.
-    .accessibilityLabel(
-      String(localized: LocalizedStringResource.UIDumpLocalizable.viewerActionShow(tab.title)))
+    .accessibilityLabel(ViewerInspectorCopy.show(tab.title))
     .accessibilityAddTraits(active ? [.isSelected] : [])
     .padding(.trailing, 8)
     .accessibilityIdentifier("viewer.inspector.tab.\(tab.id)")
@@ -688,11 +729,11 @@ struct UIDumpWorkspaceView: View {
     return CGSize(width: max(1, width), height: max(1, width / aspect))
   }
   private func state(_ value: Bool?) -> String {
-    value.map { $0 ? viewerText("viewer.value.yes") : viewerText("viewer.value.no") }
-      ?? viewerText("viewer.value.unavailable")
+    value.map { $0 ? ViewerInspectorCopy.yes : ViewerInspectorCopy.no }
+      ?? ViewerInspectorCopy.unavailable
   }
   private func boundsText(_ value: ViewerBounds?) -> String {
-    guard let value else { return viewerText("viewer.value.unavailable") }
+    guard let value else { return ViewerInspectorCopy.unavailable }
     return "x \(value.x), y \(value.y), \(value.width) × \(value.height)"
   }
   private var targetBinding: Binding<String> {
@@ -714,12 +755,43 @@ enum ViewerInspectorTab: String {
   var id: String { rawValue }
   var title: String {
     switch self {
-    case .properties: viewerText("viewer.tab.properties")
-    case .layout: viewerText("viewer.tab.layout")
-    case .accessibility: viewerText("viewer.tab.accessibility")
-    case .rawDump: viewerText("viewer.tab.rawDump")
+    case .properties: ViewerInspectorCopy.properties
+    case .layout: ViewerInspectorCopy.layout
+    case .accessibility: ViewerInspectorCopy.accessibility
+    case .rawDump: ViewerInspectorCopy.rawDump
     }
   }
+}
+
+/// Inspector vocabulary deliberately stays in English. These labels describe
+/// provider fields and debugging concepts beside an English Raw dump; changing
+/// them with the App locale makes the same concept wear two names in one pane.
+private enum ViewerInspectorCopy {
+  static let properties = "Properties"
+  static let layout = "Layout"
+  static let accessibility = "Accessibility"
+  static let rawDump = "Raw dump"
+  static let identity = "Identity"
+  static let state = "State"
+  static let geometry = "Geometry"
+  static let paint = "Paint"
+  static let semantics = "Semantics"
+  static let focus = "Focus"
+  static let interactive = "Interactive"
+  static let visible = "Visible"
+  static let screenshotMapping = "screenshot mapping"
+  static let hitTest = "hit test"
+  static let accessibleLabel = "accessible label"
+  static let description = "description"
+  static let available = "Available"
+  static let unavailable = "Unavailable"
+  static let verified = "Verified"
+  static let yes = "Yes"
+  static let no = "No"
+  static let selectPrompt = "Select a component"
+  static let rawUnavailable = "Raw fields are unavailable"
+
+  static func show(_ title: String) -> String { "Show \(title)" }
 }
 
 @MainActor
@@ -732,7 +804,7 @@ final class UIDumpWorkspaceViewModel {
   private(set) var selectedRootIdentity = ""
   private(set) var expandedNodeIdentities: Set<String> = []
   private(set) var searchQuery = ""
-  private(set) var showBounds = true
+  private(set) var showBounds = false
   private(set) var inspectorTreePercent: Double = 60
   private(set) var inspectorTab: ViewerInspectorTab = .properties
   private(set) var isRefreshing = false
@@ -832,12 +904,14 @@ final class UIDumpWorkspaceViewModel {
       switch result {
       case .captured(let next):
         self.capture = next
-        self.selectedRootIdentity = next.primaryRootIdentity ?? ""
+        let root = next.primaryRootIdentity ?? ""
+        self.selectedRootIdentity = root
         // A previous screen's query must not leave a fresh capture looking
         // empty or hide the row selected from the screenshot.
         self.searchQuery = ""
-        self.expandedNodeIdentities = Set(next.nodes.filter { !$0.children.isEmpty }.map(\.identity))
-        self.select(next.nodes.first?.identity ?? "")
+        self.expandedNodeIdentities = next.node(identity: root)?.children.isEmpty == false
+          ? [root] : []
+        self.select(root)
       case .failed(let reason): self.captureFailure = reason
       }
       self.refresh()
@@ -847,7 +921,12 @@ final class UIDumpWorkspaceViewModel {
     selectedTargetID = value
     captureFailure = nil
   }
-  func setRoot(_ value: String) { selectedRootIdentity = value }
+  func setRoot(_ value: String) {
+    guard let capture, let root = capture.node(identity: value) else { return }
+    selectedRootIdentity = root.identity
+    expandedNodeIdentities = root.children.isEmpty ? [] : [root.identity]
+    select(root.identity)
+  }
   func setSearchQuery(_ value: String) { searchQuery = value }
   func setShowBounds(_ value: Bool) { showBounds = value }
   func setInspectorTab(_ value: ViewerInspectorTab) { inspectorTab = value }
