@@ -11,10 +11,10 @@
   },
   "parser": {
     "reportedVersion": "4.3.7",
-    "binarySHA256": "e0167fbb13bf666dd589c7b27d697683bec2762ec66cefc935139e6da49ecbbf",
+    "binarySHA256": "0665e04e4abf2c2b60e173f6c666cb91844557c85d45386a03962e56804fa55a",
     "architecture": "arm64",
     "adapterVersion": "1",
-    "buildRecipeVersion": "e71c02d139868e4a350740824435d8cd81d0ed840414b12aca3cec9d4e87103e"
+    "buildRecipeVersion": "04518c8ad8ae87ece7bc435e39de5e384a7aa52970b38902bd16722fbb23bb9f"
   },
   "schemaAdapterVersion": "2",
   "schemaFingerprint": "cb34d8b668c21d9a5f50949338e0f4777fcd113f1ecfac4446afcb6ddf25bfc3",

@@ -101,6 +101,10 @@ public final class TimelineNSView: NSView {
     public var onSelectFlag: (@MainActor (TimelineFlagHit) -> Void)?
     public var onAnnotationCommand: (@MainActor (TimelineAnnotationCommand) -> Void)?
     public var onViewportIntent: (@MainActor (TimelineViewportIntent) -> Void)?
+    /// Reports the AppKit clip view in canvas coordinates. The host uses it
+    /// only to decide which vertical lanes need repository data; scrolling
+    /// itself remains native and immediate.
+    public var onVisibleRegionChange: (@MainActor (Double, Double) -> Void)?
     public var onZoomSelection: (@MainActor () -> Void)?
     public var onResetViewport: (@MainActor () -> Void)?
     /// Trace-relative bounds used to suppress accessibility actions whose
@@ -147,6 +151,8 @@ public final class TimelineNSView: NSView {
     static let rangeDragSlop: CGFloat = 3
 
     private var previousSnapshot: TimelineSnapshot?
+    private var lastReportedVisibleRegion: (offset: Double, height: Double)?
+    private var visibleRegionReportScheduled = false
     private(set) var dragMode: DragMode?
     private var dragInitialSelection: TraceTimeRange?
     /// Where a `.newRange` press landed, and whether the pointer has since
@@ -355,6 +361,7 @@ public final class TimelineNSView: NSView {
 
     public override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        reportVisibleRegionIfNeeded()
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.setFillColor(NSColor.windowBackgroundColor.cgColor)
         context.fill(bounds)
@@ -366,6 +373,29 @@ public final class TimelineNSView: NSView {
         if snapshot?.isLoading == true {
             context.setFillColor(NSColor.controlAccentColor.withAlphaComponent(0.06).cgColor)
             context.fill(bounds)
+        }
+    }
+
+    private func reportVisibleRegionIfNeeded() {
+        let region = (
+            offset: max(0, Double(visibleRect.minY)),
+            height: Double(visibleRect.height)
+        )
+        guard region.height > 0 else { return }
+        if let previous = lastReportedVisibleRegion,
+            abs(previous.offset - region.offset) < 1,
+            abs(previous.height - region.height) < 1
+        {
+            return
+        }
+        lastReportedVisibleRegion = region
+        guard !visibleRegionReportScheduled else { return }
+        visibleRegionReportScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.visibleRegionReportScheduled = false
+            guard let latest = self.lastReportedVisibleRegion else { return }
+            self.onVisibleRegionChange?(latest.offset, latest.height)
         }
     }
 
@@ -1982,6 +2012,7 @@ public struct TimelineView: NSViewRepresentable {
     public let onSelectFlag: @MainActor (TimelineFlagHit) -> Void
     public let onAnnotationCommand: @MainActor (TimelineAnnotationCommand) -> Void
     public let onViewportIntent: @MainActor (TimelineViewportIntent) -> Void
+    public let onVisibleRegionChange: @MainActor (Double, Double) -> Void
     public let onZoomSelection: @MainActor () -> Void
     public let onResetViewport: @MainActor () -> Void
     public let interactionBounds: TraceTimeRange?
@@ -2007,6 +2038,8 @@ public struct TimelineView: NSViewRepresentable {
         onAnnotationCommand: @escaping @MainActor (TimelineAnnotationCommand) -> Void
             = { _ in },
         onViewportIntent: @escaping @MainActor (TimelineViewportIntent) -> Void = { _ in },
+        onVisibleRegionChange: @escaping @MainActor (Double, Double) -> Void
+            = { _, _ in },
         onZoomSelection: @escaping @MainActor () -> Void = {},
         onResetViewport: @escaping @MainActor () -> Void = {}
     ) {
@@ -2027,6 +2060,7 @@ public struct TimelineView: NSViewRepresentable {
         self.onSelectFlag = onSelectFlag
         self.onAnnotationCommand = onAnnotationCommand
         self.onViewportIntent = onViewportIntent
+        self.onVisibleRegionChange = onVisibleRegionChange
         self.onZoomSelection = onZoomSelection
         self.onResetViewport = onResetViewport
     }
@@ -2048,6 +2082,7 @@ public struct TimelineView: NSViewRepresentable {
         view.onSelectFlag = onSelectFlag
         view.onAnnotationCommand = onAnnotationCommand
         view.onViewportIntent = onViewportIntent
+        view.onVisibleRegionChange = onVisibleRegionChange
         view.onZoomSelection = onZoomSelection
         view.onResetViewport = onResetViewport
         view.interactionBounds = interactionBounds
@@ -2074,6 +2109,7 @@ public struct TimelineView: NSViewRepresentable {
         view.onSelectFlag = onSelectFlag
         view.onAnnotationCommand = onAnnotationCommand
         view.onViewportIntent = onViewportIntent
+        view.onVisibleRegionChange = onVisibleRegionChange
         view.onZoomSelection = onZoomSelection
         view.onResetViewport = onResetViewport
         view.interactionBounds = interactionBounds
