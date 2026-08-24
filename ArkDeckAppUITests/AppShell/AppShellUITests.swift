@@ -547,7 +547,8 @@ final class AppShellUITests: XCTestCase {
       traceAvailability,
       oneOf: [workspaces.traceAvailable, workspaces.traceUnavailable], timeout: 10)
     for identifier in [
-      "trace.configuration.mode", "trace.preset.picker", "trace.duration", "trace.buffer",
+      "trace.configuration.mode", "trace.preset.picker", "trace.duration.input",
+      "trace.duration.unit", "trace.duration.quick", "trace.buffer",
     ] {
       XCTAssertTrue(
         element(identifier, in: app).exists, "\(identifier) missing",

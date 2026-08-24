@@ -167,6 +167,69 @@ public enum TraceNumericInputValidation: Sendable, Equatable {
   case invalid(TraceNumericInputFailure)
 }
 
+/// App-facing entry units for the duration field. Runtime requests remain
+/// canonical seconds so the presentation choice cannot change the published
+/// `capture.diagnostics@1` input contract.
+public enum TraceDurationInputUnit: String, CaseIterable, Sendable, Identifiable {
+  case seconds
+  case minutes
+
+  public var id: Self { self }
+
+  public var quickValues: [Int] {
+    switch self {
+    case .seconds: [15, 30, 45, 60]
+    case .minutes: [1, 2, 3]
+    }
+  }
+
+  public func inputRange(
+    forDurationSecondsRange secondsRange: ClosedRange<Int>
+  ) -> ClosedRange<Int>? {
+    switch self {
+    case .seconds:
+      return secondsRange
+    case .minutes:
+      guard secondsRange.lowerBound > 0 else { return nil }
+      let lower = secondsRange.lowerBound / 60
+        + (secondsRange.lowerBound.isMultiple(of: 60) ? 0 : 1)
+      let upper = secondsRange.upperBound / 60
+      guard lower <= upper else { return nil }
+      return lower...upper
+    }
+  }
+
+  public func durationSeconds(
+    for inputValue: Int,
+    allowedRange secondsRange: ClosedRange<Int>
+  ) -> Int? {
+    guard inputRange(forDurationSecondsRange: secondsRange)?.contains(inputValue) == true else {
+      return nil
+    }
+    let multiplier = self == .seconds ? 1 : 60
+    let (seconds, overflow) = inputValue.multipliedReportingOverflow(by: multiplier)
+    guard !overflow, secondsRange.contains(seconds) else { return nil }
+    return seconds
+  }
+
+  /// Unit changes preserve the current duration where possible. Minutes round
+  /// up, so changing presentation units never silently shortens a capture.
+  public func inputValue(
+    forDurationSeconds seconds: Int,
+    allowedRange secondsRange: ClosedRange<Int>
+  ) -> Int? {
+    guard let range = inputRange(forDurationSecondsRange: secondsRange) else { return nil }
+    let boundedSeconds = min(secondsRange.upperBound, max(secondsRange.lowerBound, seconds))
+    let value = switch self {
+    case .seconds: boundedSeconds
+    case .minutes:
+      boundedSeconds / 60 + (boundedSeconds.isMultiple(of: 60) ? 0 : 1)
+    }
+    guard range.contains(value) else { return nil }
+    return value
+  }
+}
+
 public struct TraceJobAcceptancePresentation: Sendable, Equatable {
   public let jobID: String
 

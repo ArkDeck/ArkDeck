@@ -25,7 +25,10 @@ window.
 
 1. Open the **Trace** workspace and select an exact Runtime target and binding.
 2. Refresh the probe. Select only tags reported as supported for that target.
-3. Choose a duration and buffer within the published operation bounds.
+3. Enter a duration within the published operation bounds. Seconds provide `15s`, `30s`, `45s`,
+   and `60s` shortcuts; minutes provide `1 min`, `2 min`, and `3 min`. The UI still submits only
+   canonical `durationSeconds` to Runtime. The buffer remains the read-only value converged by the
+   probe.
 4. Start capture. Unknown total work is shown as indeterminate with elapsed time.
 5. ArkDeck waits for a terminal Job, selects one exact published raw `trace.htrace`, reads it with
    sensitive access enabled, and verifies offset, EOF, byte count, and SHA-256.
@@ -34,6 +37,9 @@ window.
 
 The global Job inspector remains the authority for stages, cancellation policy, cleanup debt, and
 terminal state. A Viewer error is not evidence that device cleanup succeeded.
+
+The target section shows the Runtime-adopted HDC tool version, for example `hdc v3.2.0f`. This is
+a target/binding fact; the Trace Viewer does not run another HDC probe.
 
 ## Headless real-device capture
 

@@ -41,6 +41,37 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       .invalid(.outsideRange(1...600)))
   }
 
+  func testDurationUnitsKeepRuntimeRequestsInCanonicalSeconds() {
+    XCTAssertEqual(TraceDurationInputUnit.seconds.quickValues, [15, 30, 45, 60])
+    XCTAssertEqual(TraceDurationInputUnit.minutes.quickValues, [1, 2, 3])
+    XCTAssertEqual(
+      TraceDurationInputUnit.seconds.inputRange(forDurationSecondsRange: 1...600),
+      1...600)
+    XCTAssertEqual(
+      TraceDurationInputUnit.minutes.inputRange(forDurationSecondsRange: 1...600),
+      1...10)
+    XCTAssertNil(
+      TraceDurationInputUnit.minutes.inputRange(forDurationSecondsRange: 1...30))
+    XCTAssertEqual(
+      TraceDurationInputUnit.seconds.durationSeconds(for: 45, allowedRange: 1...600),
+      45)
+    XCTAssertEqual(
+      TraceDurationInputUnit.minutes.durationSeconds(for: 3, allowedRange: 1...600),
+      180)
+    XCTAssertNil(
+      TraceDurationInputUnit.minutes.durationSeconds(for: 11, allowedRange: 1...600))
+    XCTAssertEqual(
+      TraceDurationInputUnit.minutes.inputValue(
+        forDurationSeconds: 61,
+        allowedRange: 1...600),
+      2)
+    XCTAssertNil(
+      TraceDurationInputUnit.minutes.inputValue(
+        forDurationSeconds: 100,
+        allowedRange: 1...100),
+      "unit changes must not round beyond the published maximum or shorten silently")
+  }
+
   func testViewerArtifactPolicyRequiresOneExactPublishedRawTrace() {
     let valid = artifact()
     XCTAssertEqual(
@@ -191,6 +222,11 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(workspace.contains("model.cancel()"))
     XCTAssertTrue(configuration.contains("TracePresetCatalog.definitions"))
     XCTAssertTrue(configuration.contains("TraceDebugParameterCatalog.definitions"))
+    XCTAssertTrue(configuration.contains("TextField(traceString(\"trace.bounds.duration\")"))
+    XCTAssertTrue(configuration.contains("selection: durationUnitBinding"))
+    XCTAssertTrue(configuration.contains("ForEach(model.durationUnit.quickValues"))
+    XCTAssertTrue(configuration.contains(".toggleStyle(.button)"))
+    XCTAssertTrue(workspace.contains("hdcVersionLabel(target.toolVersion)"))
     XCTAssertFalse(workspace.contains("job.submit"))
     XCTAssertFalse(configuration.contains("shell"))
     XCTAssertTrue(

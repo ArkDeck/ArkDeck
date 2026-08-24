@@ -134,7 +134,7 @@ struct TraceWorkspaceView: View {
               traceString("trace.target.binding"), String(target.bindingRevision),
               monospaced: true)
             traceReviewRow(
-              traceString("trace.target.tool"), target.toolVersion,
+              traceString("trace.target.tool"), hdcVersionLabel(target.toolVersion),
               monospaced: true)
             traceReviewRow(
               traceString("trace.target.adopted"), target.adoptedAtUTC,
@@ -201,7 +201,7 @@ struct TraceWorkspaceView: View {
               ? traceString("trace.value.none") : model.requestedTags.joined(separator: ", "),
             monospaced: true)
           traceReviewRow(
-            traceString("trace.review.duration"), "\(model.durationText) s",
+            traceString("trace.review.duration"), model.durationDisplayText,
             monospaced: true)
           traceReviewRow(
             traceString("trace.review.buffer"), "\(model.bufferText) KB",
@@ -286,10 +286,19 @@ struct TraceWorkspaceView: View {
     let resource =
       model.parameterMode == .unchanged
       ? LocalizedStringResource.TraceLocalizable.traceActionStartNamed(
-        model.configurationTitle, model.durationText)
+        model.configurationTitle, model.durationDisplayText)
       : LocalizedStringResource.TraceLocalizable.traceActionApplyAndStartNamed(
-        model.configurationTitle, model.durationText)
+        model.configurationTitle, model.durationDisplayText)
     return String(localized: resource)
+  }
+
+  private func hdcVersionLabel(_ version: String) -> String {
+    let value = version.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !value.isEmpty else { return "hdc" }
+    if value.lowercased().hasPrefix("hdc ") { return value }
+    if value.first?.lowercased() == "v" { return "hdc \(value)" }
+    if value.first?.isNumber == true, value.contains(".") { return "hdc v\(value)" }
+    return "hdc \(value)"
   }
 
   private var reviewBlockers: [String] {
@@ -345,6 +354,7 @@ final class TraceWorkspaceViewModel {
   private(set) var selectedPresetID = TracePresetID.arkuiDeep
   private(set) var customTags: Set<String> = []
   private(set) var durationText = "15"
+  private(set) var durationUnit = TraceDurationInputUnit.seconds
   private(set) var bufferText = "8192"
   private(set) var parameterMode = TraceParameterUISelection.unchanged
   private(set) var persistentChangeConfirmed = false
@@ -448,12 +458,33 @@ final class TraceWorkspaceViewModel {
     workspace.operation.durationSecondsRange ?? 1...600
   }
 
+  var availableDurationUnits: [TraceDurationInputUnit] {
+    TraceDurationInputUnit.allCases.filter {
+      $0.inputRange(forDurationSecondsRange: durationRange) != nil
+    }
+  }
+
+  var durationInputRange: ClosedRange<Int> {
+    durationUnit.inputRange(forDurationSecondsRange: durationRange) ?? durationRange
+  }
+
   var bufferRange: ClosedRange<Int> {
     workspace.operation.traceBufferKBRange ?? 1_024...65_536
   }
 
   var durationValidation: TraceNumericInputValidation {
-    TraceNumericInputValidator.validate(durationText, range: durationRange)
+    let input = TraceNumericInputValidator.validate(durationText, range: durationInputRange)
+    guard case .valid(let inputValue) = input else { return input }
+    guard
+      let seconds = durationUnit.durationSeconds(
+        for: inputValue,
+        allowedRange: durationRange)
+    else { return .invalid(.outsideRange(durationInputRange)) }
+    return .valid(seconds)
+  }
+
+  var durationDisplayText: String {
+    "\(durationText) \(durationUnit == .seconds ? "s" : "min")"
   }
 
   var bufferValidation: TraceNumericInputValidation {
@@ -557,6 +588,34 @@ final class TraceWorkspaceViewModel {
 
   func setDurationText(_ value: String) {
     durationText = value
+  }
+
+  func setDurationUnit(_ unit: TraceDurationInputUnit) {
+    guard unit != durationUnit,
+      unit.inputRange(forDurationSecondsRange: durationRange) != nil
+    else { return }
+    let currentSeconds: Int
+    if case .valid(let seconds) = durationValidation {
+      currentSeconds = seconds
+    } else {
+      currentSeconds = min(durationRange.upperBound, max(durationRange.lowerBound, 15))
+    }
+    guard
+      let value = unit.inputValue(
+      forDurationSeconds: currentSeconds,
+      allowedRange: durationRange)
+    else { return }
+    durationUnit = unit
+    durationText = String(value)
+  }
+
+  func selectQuickDuration(_ value: Int) {
+    guard durationUnit.quickValues.contains(value), quickDurationIsAvailable(value) else { return }
+    durationText = String(value)
+  }
+
+  func quickDurationIsAvailable(_ value: Int) -> Bool {
+    durationUnit.durationSeconds(for: value, allowedRange: durationRange) != nil
   }
 
   func setParameterMode(_ mode: TraceParameterUISelection) {
