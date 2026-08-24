@@ -1,5 +1,5 @@
 import AppKit
-import ArkDeckTraceAppSupport
+import ArkTraceAppSupport
 import ArkDeckWorkflows
 import Observation
 import SwiftUI

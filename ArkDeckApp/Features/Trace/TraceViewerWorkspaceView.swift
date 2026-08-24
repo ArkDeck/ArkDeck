@@ -1,8 +1,9 @@
 import AppKit
-import ArkDeckTraceAnalysis
-import ArkDeckTraceAppSupport
-import ArkDeckTraceCore
-import ArkDeckTraceRendering
+import ArkDeckTraceAdapter
+import ArkTraceAnalysis
+import ArkTraceAppSupport
+import ArkTraceCore
+import ArkTraceRendering
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -309,7 +310,7 @@ struct TraceViewerRootView: View {
         panel.allowsMultipleSelection = false
         // SPEC 2.3: the extension is only a picker/Finder hint; the parser and
         // schema validation decide whether a file is actually supported.
-        panel.allowedContentTypes = ArkTraceAppDistribution.supportedTraceContentTypes
+        panel.allowedContentTypes = ArkDeckTraceConfiguration.supportedTraceContentTypes
         if panel.runModal() == .OK, let url = panel.url { controller.open(url) }
     }
 }

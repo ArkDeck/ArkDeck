@@ -1,3 +1,9 @@
-# Xcode writes this when it resolves the package graph. The pins that matter
-# live in Package.swift; this file is per-machine build state.
-project.xcworkspace/
+# Keep Xcode's machine-local workspace state out of source control, but commit
+# the shared package lock so the App and command-line package resolve the same
+# reviewed ArkForge and ArkTrace revisions.
+project.xcworkspace/*
+!project.xcworkspace/xcshareddata/
+project.xcworkspace/xcshareddata/*
+!project.xcworkspace/xcshareddata/swiftpm/
+project.xcworkspace/xcshareddata/swiftpm/*
+!project.xcworkspace/xcshareddata/swiftpm/Package.resolved

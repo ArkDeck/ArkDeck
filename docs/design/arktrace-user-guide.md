@@ -101,11 +101,12 @@ arkdeck artifact export \
 
 ## 使用开发者 CLI 解析
 
-构建迁入后的 helper，并读取 SwiftPM 实际输出目录：
+从 ArkDeck 锁定的 ArkTrace revision 构建 helper，并读取 SwiftPM 实际输出目录：
 
 ```bash
-swift build --package-path Packages/ArkDeckKit --product arktrace
-swift build --package-path Packages/ArkDeckKit --show-bin-path
+git -C <ArkTrace-checkout> checkout 91a21d1d419c5fec8c56c8b7b742002325045861
+swift build --package-path <ArkTrace-checkout> --product arktrace
+swift build --package-path <ArkTrace-checkout> --show-bin-path
 ```
 
 使用 SwiftPM 裸产物时，必须显式传入锁定 parser 的绝对路径：
@@ -126,7 +127,7 @@ swift build --package-path Packages/ArkDeckKit --show-bin-path
 包括 `--timeout-ms`、`--max-rows`、`--max-events` 和 `--max-output-bytes`；`--no-cache`
 使用 session-owned 临时数据库。
 
-SwiftPM 裸可执行文件是开发产物，不是完整发布：它故意不携带 reviewed license 与
+ArkTrace SwiftPM 裸可执行文件是开发产物，不是完整发布：它故意不携带 reviewed license 与
 self-test 资源布局，因此 `licenses` 和 `doctor --self-test` 会 fail closed。App 携带自己固定的
 parser 与许可文本，不使用 `PATH`。
 

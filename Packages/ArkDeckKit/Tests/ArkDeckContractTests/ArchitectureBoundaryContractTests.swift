@@ -46,25 +46,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckStorage": ["ArkDeckCore"],
-    "ArkDeckTraceCore": [],
-    "ArkDeckTraceParser": ["ArkDeckTraceCore"],
-    "ArkDeckTraceStore": ["ArkDeckTraceCore"],
-    "ArkDeckTraceRuntime": [
-      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
-    ],
-    "ArkDeckTraceAnalysis": ["ArkDeckTraceCore"],
-    "ArkDeckTraceRendering": ["ArkDeckTraceCore"],
-    "ArkDeckTraceAppSupport": [
-      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceRuntime",
-      "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
-    ],
-    "ArkDeckTraceSignalShim": [],
-    "ArkDeckTraceCLI": [
-      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
-      "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceSignalShim",
-    ],
-    "ArkDeckTraceCLIResourceFixtures": [],
-    "ArkDeckTraceCLIExecutable": ["ArkDeckTraceCLI"],
+    "ArkDeckTraceAdapter": [],
     // ArkForgeProtocol and ArkForgeClient are external SDK products owned by
     // ArkForge. This matrix lists only ArkDeck-to-ArkDeck edges.
     "ArkDeckWorkflows": [
@@ -96,16 +78,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
     ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
     ("ArkDeckStorage", "Sources/ArkDeckStorage", []),
-    ("ArkDeckTraceCore", "Sources/ArkDeckTraceCore", []),
-    ("ArkDeckTraceParser", "Sources/ArkDeckTraceParser", []),
-    ("ArkDeckTraceStore", "Sources/ArkDeckTraceStore", []),
-    ("ArkDeckTraceRuntime", "Sources/ArkDeckTraceRuntime", []),
-    ("ArkDeckTraceAnalysis", "Sources/ArkDeckTraceAnalysis", []),
-    ("ArkDeckTraceRendering", "Sources/ArkDeckTraceRendering", []),
-    ("ArkDeckTraceAppSupport", "Sources/ArkDeckTraceAppSupport", []),
-    ("ArkDeckTraceCLI", "Sources/ArkDeckTraceCLI", []),
-    ("ArkDeckTraceCLIResourceFixtures", "Sources/ArkDeckTraceCLIResourceFixtures", []),
-    ("ArkDeckTraceCLIExecutable", "Sources/ArkDeckTraceCLIExecutable", []),
+    ("ArkDeckTraceAdapter", "Sources/ArkDeckTraceAdapter", []),
     ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
     ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
     ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
@@ -160,6 +133,68 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       "ArkDeck must not keep a second copy of ArkForge's wire codec")
   }
 
+  func testArkTraceEngineIsPinnedAndNeverCopiedIntoArkDeckKit() throws {
+    let revision = "91a21d1d419c5fec8c56c8b7b742002325045861"
+    let manifest = try String(
+      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
+    XCTAssertTrue(manifest.contains("https://github.com/ArkDeck/ArkTrace.git"))
+    XCTAssertTrue(manifest.contains("revision: \"\(revision)\""))
+
+    let forbiddenCopies = [
+      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
+      "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
+      "ArkDeckTraceAppSupport", "ArkDeckTraceCLI", "ArkDeckTraceCLIExecutable",
+      "ArkDeckTraceCLIResourceFixtures", "ArkDeckTraceSignalShim",
+    ]
+    for directory in forbiddenCopies {
+      let copyRoot = packageRoot().appending(path: "Sources/\(directory)")
+      let firstEntry = FileManager.default.enumerator(
+        at: copyRoot,
+        includingPropertiesForKeys: nil
+      )?.nextObject()
+      XCTAssertNil(
+        firstEntry,
+        "\(directory) is a forbidden ArkTrace source copy; use the pinned package")
+    }
+
+    let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
+    let project = try String(
+      contentsOf: repoRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
+    XCTAssertTrue(project.contains("XCRemoteSwiftPackageReference \"ArkTrace\""))
+    XCTAssertTrue(project.contains("revision = \(revision);"))
+
+    let resolved = try String(
+      contentsOf: packageRoot().appending(path: "Package.resolved"), encoding: .utf8)
+    XCTAssertTrue(resolved.contains("\"identity\" : \"arktrace\""))
+    XCTAssertTrue(resolved.contains("\"revision\" : \"\(revision)\""))
+
+    let xcodeResolved = try String(
+      contentsOf: repoRoot.appending(
+        path: "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"),
+      encoding: .utf8)
+    XCTAssertTrue(xcodeResolved.contains("\"identity\" : \"arktrace\""))
+    XCTAssertTrue(xcodeResolved.contains("\"revision\" : \"\(revision)\""))
+
+    let recipe = "a2e47752e1353d627b442e607eed513564aa66a94c54f2660042383a0f6f3b20"
+    let parserManifest = try String(
+      contentsOf: packageRoot().appending(
+        path: "ThirdParty/TraceStreamer/macx/manifest.json"),
+      encoding: .utf8)
+    XCTAssertTrue(parserManifest.contains("\"buildRecipeVersion\": \"\(recipe)\""))
+    for removedPath in [
+      "Scripts/build_trace_streamer.sh",
+      "Scripts/verify_trace_streamer_lock.sh",
+      "ThirdParty/TraceStreamer/source-lock.json",
+      "ThirdParty/TraceStreamer/patches",
+    ] {
+      XCTAssertFalse(
+        FileManager.default.fileExists(
+          atPath: packageRoot().appending(path: removedPath).path),
+        "ArkTrace build source belongs only in the pinned dependency: \(removedPath)")
+    }
+  }
+
   /// The exact set of targets that claim strict memory safety.
   ///
   /// This setting is a claim that a target's unsafe surface has been read and
@@ -194,10 +229,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertEqual(
       declaring,
       [
-        "ArkDeckCore", "ArkDeckProcess", "ArkDeckTraceCore", "ArkDeckTraceParser",
-        "ArkDeckTraceStore", "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis",
-        "ArkDeckTraceRendering", "ArkDeckTraceAppSupport", "ArkDeckTraceCLI",
-        "ArkDeckTraceCLIResourceFixtures",
+        "ArkDeckCore", "ArkDeckProcess",
       ],
       "the set of targets declaring .strictMemorySafety() changed; a target that "
         + "drops it stops being checked with no diagnostic of any kind")

@@ -707,26 +707,44 @@ final class AutoUpdateContractTests: XCTestCase {
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
     let arkForgeRevision = "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"
+    let arkTraceRevision = "91a21d1d419c5fec8c56c8b7b742002325045861"
     XCTAssertEqual(
-      package.components(separatedBy: ".package(").count - 1, 1,
-      "ArkForge is the package's only remote source dependency")
+      package.components(separatedBy: ".package(").count - 1, 2,
+      "ArkForge and ArkTrace are the package's only remote source dependencies")
     XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkForge.git"))
     XCTAssertTrue(package.contains("revision: \"\(arkForgeRevision)\""))
+    XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkTrace.git"))
+    XCTAssertTrue(package.contains("revision: \"\(arkTraceRevision)\""))
     let packageResolution =
       try JSONSerialization.jsonObject(
         with: Data(
           contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.resolved")))
       as? [String: Any]
     let pins = try XCTUnwrap(packageResolution?["pins"] as? [[String: Any]])
-    XCTAssertEqual(pins.count, 1)
-    let pin = try XCTUnwrap(pins.first)
-    XCTAssertEqual(pin["identity"] as? String, "arkforge")
-    XCTAssertEqual(pin["location"] as? String, "https://github.com/ArkDeck/ArkForge.git")
-    XCTAssertEqual((pin["state"] as? [String: Any])?["revision"] as? String, arkForgeRevision)
+    XCTAssertEqual(pins.count, 2)
+    let pinsByIdentity = Dictionary(
+      uniqueKeysWithValues: try pins.map { pin in
+        (try XCTUnwrap(pin["identity"] as? String), pin)
+      })
+    let arkForgePin = try XCTUnwrap(pinsByIdentity["arkforge"])
+    XCTAssertEqual(
+      arkForgePin["location"] as? String,
+      "https://github.com/ArkDeck/ArkForge.git")
+    XCTAssertEqual(
+      (arkForgePin["state"] as? [String: Any])?["revision"] as? String,
+      arkForgeRevision)
+    let arkTracePin = try XCTUnwrap(pinsByIdentity["arktrace"])
+    XCTAssertEqual(
+      arkTracePin["location"] as? String,
+      "https://github.com/ArkDeck/ArkTrace.git")
+    XCTAssertEqual(
+      (arkTracePin["state"] as? [String: Any])?["revision"] as? String,
+      arkTraceRevision)
     let project = try String(
       contentsOf: repository.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
-    XCTAssertFalse(project.contains("XCRemoteSwiftPackageReference"))
+    XCTAssertTrue(project.contains("XCRemoteSwiftPackageReference \"ArkTrace\""))
+    XCTAssertTrue(project.contains("revision = \(arkTraceRevision);"))
     let marketingVersions = project.split(separator: "\n").compactMap { line -> String? in
       guard line.contains("MARKETING_VERSION =") else { return nil }
       return line.split(separator: "=", maxSplits: 1)[1]

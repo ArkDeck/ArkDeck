@@ -1,9 +1,9 @@
-# ArkTrace 全量迁移规格（TASK-AIN-021）
+# ArkTrace 单一源码依赖规格（TASK-AIN-021）
 
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness 或批准载体。
 > 归属：复用 protected `main` 已存在的 `TASK-AIN-021`。
-> 目标：把 ArkTrace 的采集后解析、查询、分析、缓存与原生 Timeline 能力迁入 ArkDeck，
-> 并以 ArkDeck 已发布的 typed Runtime/Artifact 边界完成真机闭环。
+> 目标：ArkTrace 唯一拥有采集后解析、查询、分析、缓存、CLI 与原生 Timeline 源码；
+> ArkDeck 以固定 revision 消费，并通过产品配置与 typed Runtime/Artifact 适配完成闭环。
 > 验收状态：`REAL_DEVICE_PASS`（2026-08-24），证据见
 > [`arktrace-real-device-verification-2026-08-24.md`](./arktrace-real-device-verification-2026-08-24.md)。
 > 配套文档：[`arktrace-user-guide.md`](./arktrace-user-guide.md)、
@@ -36,14 +36,14 @@ executable path、capability 或 trusted facts。
 |---|---|---|---|
 | HDC 设备发现与采集 | `capture.diagnostics@1`、HDC Provider、Trace facade | 复用并替代 ArkTrace App-only HDC executor | 继续显式绑定 target/revision，真机产出非空且校验通过的 `trace.htrace` |
 | App responsiveness / CPU / system presets | Trace App workspace + probe-supported tags | 映射到 ArkDeck preset/tag 模型，不引入第二套设备命令 | preset 只提交 probe 已确认且 Catalog 边界内的 tags |
-| TraceStreamer identity/progress/process parser | `ArkDeckTraceParser` | 迁入 ArkDeckKit | exact binary/manifest 校验、bounded stdout/stderr、取消与错误契约全保留 |
-| SQLite schema adapter/repository | `ArkDeckTraceStore` | 迁入 ArkDeckKit | 原始 trace 不可变；数据库只作为可重建的本地派生数据 |
-| content-addressed cache/session | `ArkDeckTraceRuntime` | 迁入 ArkDeckKit | cache hit、损坏恢复、no-cache session、并发与清理契约全保留 |
-| typed trace domain/query | `ArkDeckTraceCore` | 迁入 ArkDeckKit | 时间、identity、capability、query bounds 与错误模型全保留 |
-| summary/context/deep analysis | `ArkDeckTraceAnalysis` + 既有 analyzer operations | 迁入实现并保持公开 operation 不变 | `analyzer.summarize-trace@1` / `analyzer.analyze-trace@1` machine bytes 兼容 |
-| Agent CLI JSON contract | `ArkDeckTraceCLI` / ArkDeck-owned `arktrace` helper | 迁入 ArkDeckKit | JSON contract 1.0、exit status、deadline、row/event/output budgets 兼容 |
-| Timeline geometry/palette/AppKit renderer | `ArkDeckTraceRendering` | 迁入 ArkDeckKit | CPU/thread state/slice/counter/frame lanes、zoom/pan/selection/search/flags/marks 可用 |
-| document controller/recent/view state | `ArkDeckTraceAppSupport` | 迁入 ArkDeckKit | 打开、reload、取消、cache/view state 与错误恢复可测试 |
+| TraceStreamer identity/progress/process parser | `ArkTraceParser` | 固定 ArkTrace revision | exact binary/manifest 校验、bounded stdout/stderr、取消与错误契约全保留 |
+| SQLite schema adapter/repository | `ArkTraceStore` | 固定 ArkTrace revision | 原始 trace 不可变；数据库只作为可重建的本地派生数据 |
+| content-addressed cache/session | `ArkTraceRuntime` | 固定 ArkTrace revision | cache hit、损坏恢复、no-cache session、并发与清理契约全保留 |
+| typed trace domain/query | `ArkTraceCore` | 固定 ArkTrace revision | 时间、identity、capability、query bounds 与错误模型全保留 |
+| summary/context/deep analysis | `ArkTraceAnalysis` + 既有 analyzer operations | 依赖共享实现并保持公开 operation 不变 | `analyzer.summarize-trace@1` / `analyzer.analyze-trace@1` machine bytes 兼容 |
+| Agent CLI JSON contract | ArkTrace-owned `arktrace` distribution | descriptor-bound 外部工具 | JSON contract 1.0、exit status、deadline、row/event/output budgets 兼容 |
+| Timeline geometry/palette/AppKit renderer | `ArkTraceRendering` | 固定 ArkTrace revision | CPU/thread state/slice/counter/frame lanes、zoom/pan/selection/search/flags/marks 可用 |
+| document controller/recent/view state | `ArkTraceAppSupport` | 固定 ArkTrace revision + ArkDeck config | 打开、reload、取消、cache/view state 与错误恢复可测试 |
 | ArkTrace standalone window chrome | `ArkDeckApp/Features/Trace` | 按 ArkDeck 工作区重组 | 不复制第二套 App shell、Settings 或设备控制面 |
 | ArkTrace direct capture module | 不迁入生产依赖图 | 由 ArkDeck Runtime capture 替代 | CLI/analyzer/viewer 不获得直接 HDC route |
 
@@ -51,32 +51,30 @@ executable path、capability 或 trusted facts。
 边界的源文件。被 ArkDeck typed capture 替代的 ArkTrace direct-HDC 实现必须留在迁移矩阵中，
 不能悄悄丢失，也不能作为第二条生产路径进入 App。
 
-## 3. ArkDeckKit 模块边界
+## 3. 依赖与产品边界
 
-新增模块均位于 `Packages/ArkDeckKit`，并进入架构矩阵与结构测试：
+共享模块只存在于 ArkTrace；ArkDeckKit 只保留产品配置适配器：
 
 ```text
-ArkDeckTraceCore
-├─ ArkDeckTraceParser → TraceCore
-├─ ArkDeckTraceStore → TraceCore + SQLite3
-├─ ArkDeckTraceAnalysis → TraceCore
-├─ ArkDeckTraceRendering → TraceCore + AppKit/CoreGraphics/SwiftUI
-└─ ArkDeckTraceRuntime → TraceCore + TraceParser + TraceStore
-      └─ ArkDeckTraceAppSupport
-           → TraceCore + TraceParser + TraceRuntime + TraceAnalysis + TraceRendering
+ArkDeckApp
+├─ ArkDeckWorkflows → Runtime / Artifact / analyzer descriptor
+├─ ArkDeckTraceAdapter → ArkDeck bundle/cache/recent/signpost/parser policy
+└─ pinned ArkTrace revision
+   ├─ ArkTraceCore / Parser / Store / Runtime / Analysis
+   └─ ArkTraceRendering / AppSupport
 
-ArkDeckTraceCLI
-  → TraceCore + TraceParser + TraceStore + TraceRuntime + TraceAnalysis
+ArkDeck daemon → descriptor-bound ArkTrace-owned CLI distribution
 ```
 
-- Trace 模块不 import `ArkDeckWorkflows`、`ArkDeckOpenHarmony`、`ArkDeckAgentClient` 或
+- ArkTrace 模块不 import `ArkDeckWorkflows`、`ArkDeckOpenHarmony`、`ArkDeckAgentClient` 或
   `ArkDeckAgentDaemon`；解析能力因此不会反向获得设备权限。
 - `ArkDeckWorkflows` 继续拥有 Runtime Job、Artifact 和 analyzer provider；它不依赖 AppKit
   renderer。
 - ArkDeck App 是组合根，可以同时依赖 `ArkDeckWorkflows` 与 Trace AppSupport/Rendering。
 - 现有公开 Catalog operation、provider 名、effect、binding 与 authorization 不改变。
-- 迁入代码保留 ArkTrace machine identity，以兼容已经发布的 analyzer envelope；Swift
-  module 名使用 `ArkDeckTrace*`，体现其 ArkDeckKit 所有权。
+- `Package.swift`、`Package.resolved` 与 Xcode 工程锁定同一 ArkTrace commit SHA。
+- ArkDeck 不得出现 `ArkDeckTraceCore/Parser/Store/Runtime/Analysis/Rendering/AppSupport/CLI`
+  源码目录；架构测试对 revision 与禁止副本同时 fail closed。
 
 ## 4. Artifact 到 Viewer 的可信边界
 
@@ -105,7 +103,7 @@ App 只通过 Agent XPC 的 `artifact.list` / `artifact.read` 读取，不访问
 
 ### 4.3 解析与缓存
 
-- parser 只从 ArkDeck App bundle 或 ArkDeck-owned reviewed CLI distribution 的固定位置解析，
+- parser 只从 ArkDeck App bundle 或 ArkTrace-owned reviewed CLI distribution 的固定位置解析，
   不搜索 `PATH`，不接受请求传入 executable/manifest；
 - App 只原位执行 `Contents/MacOS/trace_streamer` 的已签名嵌套代码；CLI 使用私有 immutable
   helper snapshot。两者都在执行前后验证 exact identity，且输入/输出仍在私有 staging；
@@ -139,7 +137,7 @@ ArkDeck 既有 shell、全局 Job Inspector、Settings 与 Trace workspace。
 
 ## 6. CLI 与 analyzer 兼容
 
-迁入的 ArkDeck-owned `arktrace` helper 保持以下机器契约：
+ArkTrace-owned `arktrace` distribution 保持以下机器契约：
 
 - commands：`doctor`、`inspect`、`summary`、`processes`、`threads`、`query`、`context`、
   `analyze`、`licenses`；
@@ -150,7 +148,7 @@ ArkDeck 既有 shell、全局 Job Inspector、Settings 与 Trace workspace。
 - 既有 ArkDeck analyzer validators 接受的 exact envelope、tool/parser/request/source lineage
   保持 byte-compatible。
 
-生产 daemon 仍通过 descriptor-bound child process 隔离 analyzer。迁入源码不构成让 daemon
+生产 daemon 仍通过 descriptor-bound child process 隔离 analyzer。SwiftPM 依赖不构成让 daemon
 改为进程内解析的授权，也不允许降低现有签名、manifest、doctor、lease 和 exact-output 校验。
 
 ## 7. 规格与实现差异处理
@@ -159,16 +157,16 @@ ArkDeck 既有 shell、全局 Job Inspector、Settings 与 Trace workspace。
   Timeline 与同页闭环，不修改 accepted Core requirement 或 Acceptance Scenario。
 - 历史 `docs/PLAN.md` 中“首版不实现完整 Timeline”是早期范围记录；维护者本次明确要求
   全量迁移 ArkTrace，当前产品闭环以本规格与实际实现为准，不重启治理 change。
-- CHG-2026-058/060 的 published operation 与安全边界继续有效；从 ArkTrace 仓库构建的
-  外部分发在迁移期保持兼容，最终由同源码、同 machine contract 的 ArkDeck-owned 分发替代。
+- CHG-2026-058/060 的 published operation 与安全边界继续有效；ArkTrace 仓库拥有 CLI
+  分发与 machine contract，ArkDeck 只选择受审 descriptor，不再维护第二份 CLI 源码。
 
 ## 8. 测试与验收
 
 ### 8.1 模块回归
 
-- 迁移 ArkTrace Core/Parser/Store/Runtime/Analysis/Rendering/AppSupport/CLI 的全部适用测试；
+- ArkTrace 运行 Core/Parser/Store/Runtime/Analysis/Rendering/AppSupport/CLI 全量测试与外部 API 基线；
 - 测试 fixture、golden machine JSON、TraceStreamer identity 与 query/analysis budgets 不降级；
-- 架构测试钉死新增 target 的允许 import、strict memory safety 与零设备权限。
+- ArkDeck 架构测试钉死 exact revision、唯一 Adapter target、禁止源码副本与零设备权限。
 
 ### 8.2 App/Artifact 回归
 
@@ -186,7 +184,7 @@ ArkDeck 既有 shell、全局 Job Inspector、Settings 与 Trace workspace。
 2. `arkdeck agent run` 执行当前 Catalog digest 的 `capture.diagnostics@1`；
 3. Job terminal succeeded、`outcomeUnknown=false`、cleanup 无未结 residue；
 4. `trace.htrace` published、非空、size/SHA-256 可复核；
-5. ArkDeck-owned parser 成功生成数据库并识别有效 trace range；
+5. pinned ArkTrace parser 成功生成数据库并识别有效 trace range；
 6. summary 至少报告 CPU scheduling、thread state 或 named slice 中设备实际包含的能力；
 7. 同一 Artifact 可由 ArkDeck App Viewer 打开；
 8. 记录脱敏 target、Catalog digest、job/artifact IDs、bytes/hash、parser identity 与结果。
@@ -284,7 +282,7 @@ SHALL 是不同状态；交互 SHALL 支持 VoiceOver、可见焦点并尊重 Re
 
 ### REQ-ATM-006 CLI 机器契约兼容
 
-ArkDeck-owned `arktrace` SHALL 保留 commands、Machine JSON 1.0 envelope、typed error、
+ArkTrace-owned `arktrace` SHALL 保留 commands、Machine JSON 1.0 envelope、typed error、
 stable exit status、deterministic ordering 和 timeout/row/event/output byte 硬预算。它 SHALL NOT
 提供 raw SQL、任意表列、shell 或网络能力。
 
@@ -297,7 +295,7 @@ stable exit status、deterministic ordering 和 timeout/row/event/output byte �
 
 ### REQ-ATM-007 发布资源闭包
 
-ArkDeck App SHALL 同时携带 exact parser、manifest、迁入代码的 MIT License、
+ArkDeck App SHALL 同时携带 exact parser、manifest、ArkTrace dependency 的 MIT License、
 third-party notices 与 inventory 要求的 18 份 license text。Xcode build phase SHALL 声明
 exact sandbox input list；任一文件缺失或漂移时 build/distribution validation SHALL fail closed。
 仓库 manifest SHALL 锁定 unsigned canonical source helper；bundle manifest SHALL 锁定
@@ -314,7 +312,7 @@ CodeSignOnCopy 后的 helper bytes，并由 nested-code / outer-App 签名验证
 ### REQ-ATM-008 当前 digest 真机闭环
 
 迁移只有在当前 Catalog digest 上通过 `arkdeck agent run` 完成精确设备采集、
-Artifact 发布 / 校验 / 导出，再由迁入 ArkDeckKit 的 parser/summary 识别有效
+Artifact 发布 / 校验 / 导出，再由固定 ArkTrace revision 的 parser/summary 识别有效
 Trace range 时 MAY 标记完成。
 
 #### AC-ATM-008-01 Fixture 不代替真机
@@ -328,18 +326,20 @@ Trace range 时 MAY 标记完成。
 
 | 产物 | 仓库 / App 位置 |
 |---|---|
-| Swift targets | `Packages/ArkDeckKit/Sources/ArkDeckTrace*` |
-| CLI product | SwiftPM product `arktrace` / target `ArkDeckTraceCLIExecutable` |
-| parser source lock | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/source-lock.json` |
-| parser manifest | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
+| Shared Swift targets | ArkTrace commit `91a21d1d419c5fec8c56c8b7b742002325045861` |
+| ArkDeck adapter | `Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter` |
+| CLI product | ArkTrace-owned `arktrace` distribution，ArkDeck 只消费 descriptor |
+| parser source lock / build scripts | pinned ArkTrace revision |
+| ArkDeck packaging snapshot | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/` |
 | App parser | `ArkDeck.app/Contents/MacOS/trace_streamer` |
 | App manifest | `ArkDeck.app/Contents/Resources/TraceStreamer/manifest.json` |
 | App licenses | `ArkDeck.app/Contents/Resources/ArkTrace/` |
 | Trace cache | `~/Library/Caches/ArkDeck/Trace/traces/` |
 | App document types | `.htrace`、`.ftrace`、`.systrace`、`.trace` |
 
-Xcode 负责 App 组合与发布资源；SwiftPM 负责 Trace libraries、CLI 和测试。
-该拆分不允许 App 另造 parser 或 CLI 另造 Trace 语义。
+Xcode 负责 ArkDeck App 组合与发布资源；ArkTrace SwiftPM package 负责共享 libraries、CLI
+和共享测试。ArkDeck SwiftPM 只负责产品配置与跨仓库契约。该拆分不允许 App 另造 parser、
+CLI 另造 Trace 语义或以 subtree/复制脚本恢复第二份源码。
 
 ## 12. 验收记录要求
 

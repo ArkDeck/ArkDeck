@@ -102,8 +102,7 @@ final class ArkDeckContractTests: XCTestCase {
 
   func testAppTargetImportsOnlyApprovedCompositionModulesFromArkDeckKit() throws {
     let allowed = Set([
-      "ArkDeckCore", "ArkDeckWorkflows", "ArkDeckTraceCore", "ArkDeckTraceAnalysis",
-      "ArkDeckTraceRendering", "ArkDeckTraceAppSupport",
+      "ArkDeckCore", "ArkDeckWorkflows", "ArkDeckTraceAdapter",
     ])
     for (file, modules) in try importsByFile(under: repoRoot.appending(path: "ArkDeckApp")) {
       for module in modules where module.hasPrefix("ArkDeck") {
