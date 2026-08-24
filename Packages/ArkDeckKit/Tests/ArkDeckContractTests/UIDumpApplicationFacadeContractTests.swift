@@ -43,7 +43,7 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     let capture = try ViewerCaptureParser.parse(
       screenshotData: png(width: 720, height: 1280),
       treeData: Data("""
-      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","hitTestBehavior":"HitTestMode.Transparent","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true},"children":[]}]}
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","hitTestBehavior":"HitTestMode.Transparent","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true,"childOnly":"not-root"},"children":[]}]}
       """.utf8),
       rawDumpData: Data(#"{"windows":[{"id":"w1"}]}"#.utf8),
       identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
@@ -53,7 +53,15 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(toggle.identity, "device:42")
     XCTAssertEqual(toggle.parentIdentity, "device:1")
     XCTAssertEqual(capture.node(identity: "device:1")?.hitTestBehavior, "HitTestMode.Transparent")
-    XCTAssertTrue(try XCTUnwrap(capture.formattedRawFields(for: "device:1")).contains("unknown"))
+    let rootRawFields = try XCTUnwrap(capture.formattedRawFields(for: "device:1"))
+    XCTAssertTrue(rootRawFields.contains("unknown"))
+    XCTAssertFalse(
+      rootRawFields.contains("children"),
+      "Raw dump must contain only the selected component, never its descendant tree")
+    XCTAssertFalse(rootRawFields.contains("childOnly"))
+    XCTAssertTrue(
+      try XCTUnwrap(capture.formattedRawFields(for: "device:42")).contains("childOnly"),
+      "provider-specific fields owned by the selected component must remain available")
     XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID, "42")
   }
 
@@ -192,7 +200,30 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       capture.visibleTreeNodes(rootIdentity: nil, query: "wi-fi", expandedNodeIdentities: [])
         .map(\.identity),
       ["root", "section", "target"])
+    XCTAssertEqual(
+      capture.searchMatches(rootIdentity: nil, query: "wi-fi").map(\.identity),
+      ["target"],
+      "the result counter must exclude ancestors shown only as tree context")
     XCTAssertEqual(capture.subtreeNodes(rootIdentity: "section").map(\.identity), ["section", "target"])
+  }
+
+  func testViewerSourceKeepsTreeTwoAxisScrollableAndCentersEveryReveal() throws {
+    let source = try String(
+      contentsOf: repository.appending(
+        path: "ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift"),
+      encoding: .utf8)
+
+    XCTAssertTrue(source.contains("ScrollView([.horizontal, .vertical])"))
+    XCTAssertTrue(source.contains(".scrollIndicators(.visible, axes: [.horizontal, .vertical])"))
+    XCTAssertTrue(source.contains(".scrollPosition($treeScrollPosition)"))
+    XCTAssertTrue(source.contains("position.scrollTo(id: identity, anchor: .center)"))
+    XCTAssertTrue(source.contains("treeScrollPosition.scrollTo(y: verticalOffset)"))
+    XCTAssertTrue(source.contains("viewer.search.matchCount"))
+    XCTAssertTrue(source.contains("viewer.search.previous"))
+    XCTAssertTrue(source.contains("viewer.search.next"))
+    XCTAssertFalse(
+      source.contains("static let unavailable = \"Unavailable\""),
+      "missing optional fields must be omitted instead of rendered as Unavailable")
   }
 
   func testParserRetainsOpaqueOptionalRawDumpWithoutRejectingVerifiedTree() throws {

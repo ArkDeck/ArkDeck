@@ -156,21 +156,25 @@ final class ViewerUITests: XCTestCase {
     attach(app, name: "viewer-keyboard")
   }
 
-  func testSelectingADeepWideRowKeepsItsLeadingContentInTheTreeViewport() {
+  func testSelectingADeepWideRowCentersItInBothTreeAxes() {
     let app = launchCapturedViewer(extra: ["--ui-test-viewer-stress-367"])
     let row = revealNode("367", in: app)
-    row.click()
     clearSearch(in: app)
+    XCTAssertTrue(row.waitForExistence(timeout: 5))
+    row.click()
 
     XCTAssertTrue(row.waitForExistence(timeout: 5))
-    let treeTitle = app.staticTexts["viewer.pane.tree"]
-    XCTAssertTrue(treeTitle.exists)
-    XCTAssertGreaterThanOrEqual(
-      row.frame.minX, treeTitle.frame.minX - 8,
-      "selection reveal must scroll vertically without pushing row labels left of the tree")
+    let treeScroll = app.descendants(matching: .any)["viewer.tree.scroll"]
+    XCTAssertTrue(treeScroll.waitForExistence(timeout: 5))
+    XCTAssertEqual(
+      row.frame.midX, treeScroll.frame.midX, accuracy: 32,
+      "selection reveal must center a wide component horizontally")
+    XCTAssertEqual(
+      row.frame.midY, treeScroll.frame.midY, accuracy: 32,
+      "selection reveal must center a deep component vertically")
     XCTAssertTrue(row.isHittable, "the selected row must remain visible, not just present in AX")
     XCTAssertFalse(row.label.isEmpty, "the selected row must keep visible semantic content")
-    attach(app, name: "viewer-deep-row-leading-edge")
+    attach(app, name: "viewer-deep-row-centered")
   }
 
   func testFreshCaptureStartsAsAnOutlineInsteadOfAnExpandedFlatList() {
@@ -204,6 +208,35 @@ final class ViewerUITests: XCTestCase {
     attach(app, name: "viewer-search-empty")
   }
 
+  func testSearchSelectsFirstMatchAndNavigatesEveryResult() {
+    let app = launchCapturedViewer()
+    let search = searchField(in: app)
+    XCTAssertTrue(search.waitForExistence(timeout: 5))
+    search.click()
+    search.typeText("ListItem")
+
+    let count = app.staticTexts["viewer.search.matchCount"]
+    XCTAssertTrue(count.waitForExistence(timeout: 5))
+    assertDisplayedValue(count, equals: "1 / 8")
+    XCTAssertTrue(
+      app.staticTexts["#22"].waitForExistence(timeout: 5),
+      "the first exact search hit must become the inspected component")
+
+    let next = app.buttons["viewer.search.next"]
+    let previous = app.buttons["viewer.search.previous"]
+    XCTAssertTrue(next.exists && next.isEnabled)
+    XCTAssertTrue(previous.exists && previous.isEnabled)
+    next.click()
+    assertDisplayedValue(count, equals: "2 / 8")
+    XCTAssertTrue(
+      app.staticTexts["#50"].waitForExistence(timeout: 5),
+      "Next must move selection to the following exact hit")
+    previous.click()
+    assertDisplayedValue(count, equals: "1 / 8")
+    XCTAssertTrue(app.staticTexts["#22"].exists)
+    attach(app, name: "viewer-search-navigation")
+  }
+
   // MARK: - Separator (Viewer-07)
 
   func testSeparatorKeyboardResizeKeepsTheSelection() {
@@ -226,7 +259,7 @@ final class ViewerUITests: XCTestCase {
 
   func testRawDumpKeepsFieldsTheParserDoesNotModel() {
     let app = launchCapturedViewer()
-    revealNode("42", in: app).click()
+    revealNode("40", in: app).click()
 
     for tab in ["properties", "layout", "accessibility", "rawDump"] {
       let button = app.buttons["viewer.inspector.tab.\(tab)"]
@@ -240,7 +273,22 @@ final class ViewerUITests: XCTestCase {
     XCTAssertTrue(
       rendered.contains("fixtureUnknownField"),
       "a field the parser does not model must survive into Raw dump")
+    XCTAssertTrue(rendered.contains("\"fixtureOwnerID\" : 40"))
+    XCTAssertFalse(
+      rendered.contains("\"fixtureOwnerID\" : 42"),
+      "Raw dump must not include the selected component's descendants")
     attach(app, name: "viewer-raw-dump")
+  }
+
+  func testPropertiesOmitUnavailableFields() {
+    let app = launchCapturedViewer()
+    revealNode("32", in: app).click()
+    clearSearch(in: app)
+
+    XCTAssertFalse(
+      app.staticTexts["Unavailable"].exists,
+      "optional dump fields that are absent must not render placeholder rows")
+    attach(app, name: "viewer-properties-no-unavailable")
   }
 
   func testInspectorVocabularyStaysEnglish() {
@@ -413,6 +461,22 @@ final class ViewerUITests: XCTestCase {
     search.click()
     app.typeKey("a", modifierFlags: .command)
     app.typeKey(.delete, modifierFlags: [])
+  }
+
+  private func assertDisplayedValue(
+    _ element: XCUIElement,
+    equals expected: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let values = [element.label, element.value as? String]
+      .compactMap { $0 }
+      .filter { !$0.isEmpty }
+    XCTAssertTrue(
+      values.contains(expected),
+      "expected \(expected), got \(values)",
+      file: file,
+      line: line)
   }
 
   /// Screenshots are the only way a reviewer can check the rendered result

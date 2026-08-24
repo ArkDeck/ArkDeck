@@ -652,6 +652,7 @@ final class DeviceBootstrapContractTests: XCTestCase {
     // case would break this test at compile time (new case) or at runtime.
     let actions: [BootstrapObservationAction] = [
       .observeTool, .observeServer, .listCandidates, .observeDevice(connectKey: "AAA"),
+      .queryDeviceName, .queryDeviceSystemVersion,
     ]
     for action in actions {
       XCTAssertLessThanOrEqual(

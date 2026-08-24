@@ -19,6 +19,8 @@ package enum BootstrapObservationAction: Sendable, Equatable {
   case observeServer
   case listCandidates
   case observeDevice(connectKey: String)
+  case queryDeviceName
+  case queryDeviceSystemVersion
 
   var providerAction: TypedProviderAction {
     switch self {
@@ -26,6 +28,8 @@ package enum BootstrapObservationAction: Sendable, Equatable {
     case .observeServer: return .hdc(.observeServer)
     case .listCandidates: return .hdc(.listDeviceCandidates)
     case .observeDevice(let connectKey): return .hdc(.observeDevice(connectKey: connectKey))
+    case .queryDeviceName: return .hdc(.queryProperty(.productName))
+    case .queryDeviceSystemVersion: return .hdc(.queryProperty(.fullBuildVersion))
     }
   }
 }
@@ -77,6 +81,22 @@ public struct BootstrapCandidateSnapshot: Sendable, Equatable {
     self.candidates = candidates
     self.observedAtUTC = observedAtUTC
     self.health = health
+  }
+}
+
+/// Best-effort presentation facts read directly from one currently connected
+/// HDC candidate. These values never participate in target identity or
+/// binding: the connect key still comes from the candidate snapshot and the
+/// bootstrap machine's stable-identity path remains unchanged.
+public struct BootstrapDeviceInformation: Sendable, Equatable {
+  public let name: String?
+  public let systemVersion: String?
+  public let transport: String
+
+  public init(name: String?, systemVersion: String?, transport: String) {
+    self.name = name
+    self.systemVersion = systemVersion
+    self.transport = transport
   }
 }
 
@@ -939,8 +959,20 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 public protocol BootstrapObservationPort: Sendable {
   func observeToolVersion() async throws -> String
   func listCandidates() async throws -> [BootstrapCandidate]
+  /// Reads display-only facts through the same exact candidate route. A
+  /// composition without this optional enrichment still supports bootstrap.
+  func observeDeviceInformation(connectKey: String) async throws
+    -> BootstrapDeviceInformation?
   /// Returns the device's stable-identity source attributes (serial et al).
   func observeDeviceIdentity(connectKey: String) async throws -> [String: String]
+}
+
+public extension BootstrapObservationPort {
+  func observeDeviceInformation(connectKey: String) async throws
+    -> BootstrapDeviceInformation?
+  {
+    nil
+  }
 }
 
 // MARK: - The machine
@@ -1009,6 +1041,38 @@ public actor DeviceBootstrapMachine {
     -> BootstrapCandidateSnapshot
   {
     try await refreshCandidateSnapshot()
+  }
+
+  /// Enriches only current, authorized candidates with best-effort display
+  /// information. Property failures omit decoration without hiding the
+  /// primary candidate row, and unauthorized/offline routes are never asked
+  /// to answer a device command.
+  public func deviceInformationForPresentation(
+    candidates: [BootstrapCandidate]
+  ) async -> [String: BootstrapDeviceInformation] {
+    let observation = observation
+    return await withTaskGroup(
+      of: (String, BootstrapDeviceInformation)?.self,
+      returning: [String: BootstrapDeviceInformation].self
+    ) { group in
+      for candidate in candidates where candidate.isAuthorized {
+        group.addTask {
+          guard
+            let information = try? await observation.observeDeviceInformation(
+              connectKey: candidate.connectKey)
+          else { return nil }
+          return (candidate.connectKey, information)
+        }
+      }
+
+      var informationByConnectKey: [String: BootstrapDeviceInformation] = [:]
+      for await result in group {
+        if let (connectKey, information) = result {
+          informationByConnectKey[connectKey] = information
+        }
+      }
+      return informationByConnectKey
+    }
   }
 
   /// HDC has no public device-event stream. Keep its official read-only

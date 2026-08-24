@@ -168,10 +168,15 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
           state: "Connected",
           adoptedTargetID: "target-a",
           bindingRevision: 9,
+          deviceInformation: DeviceInformationPresentation(
+            name: "HUAWEI Mate 80 Pro",
+            systemVersion: "OpenHarmony-7.0.0.39",
+            transport: "USB",
+            observedAtUTC: "2026-08-24T03:01:00Z"),
           observedFacts: DeviceObservedFactsPresentation(
-            model: "HUAWEI Mate 80 Pro",
-            firmware: "OpenHarmony-7.0.0.39",
-            transport: "usb",
+            model: "stale model",
+            firmware: "stale version",
+            transport: "network",
             confirmedAtUTC: "2026-08-24T03:00:00Z"))
       ])
 
@@ -180,7 +185,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(joined.first?.deviceName, "HUAWEI Mate 80 Pro")
     XCTAssertEqual(joined.first?.systemVersion, "OpenHarmony-7.0.0.39")
     XCTAssertEqual(joined.first?.connectKey, "5SM0125725000252")
-    XCTAssertEqual(joined.first?.transport, "usb")
+    XCTAssertEqual(joined.first?.transport, "USB")
     XCTAssertEqual(
       joined.first?.connectionSummary,
       "OpenHarmony-7.0.0.39 · 5SM0…00252 · USB")

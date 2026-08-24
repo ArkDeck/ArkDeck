@@ -28,8 +28,14 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
   private struct ScriptedCandidates: BootstrapObservationPort {
     let candidates: [BootstrapCandidate]
+    var deviceInformationByConnectKey: [String: BootstrapDeviceInformation] = [:]
     func observeToolVersion() async throws -> String { "3.2.0f" }
     func listCandidates() async throws -> [BootstrapCandidate] { candidates }
+    func observeDeviceInformation(connectKey: String) async throws
+      -> BootstrapDeviceInformation?
+    {
+      deviceInformationByConnectKey[connectKey]
+    }
     func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
       ["serial": connectKey]
     }
@@ -37,6 +43,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
   private func makeHandler(
     candidates: [BootstrapCandidate],
+    deviceInformationByConnectKey: [String: BootstrapDeviceInformation] = [:],
     bootstrapConfigured: Bool = true
   ) throws -> (RuntimeControlPlaneHandler, RuntimeTargetStore) {
     let capabilityStore = try RuntimeCapabilityStore(
@@ -54,7 +61,9 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let bootstrap =
       bootstrapConfigured
       ? DeviceBootstrapMachine(
-        observation: ScriptedCandidates(candidates: candidates),
+        observation: ScriptedCandidates(
+          candidates: candidates,
+          deviceInformationByConnectKey: deviceInformationByConnectKey),
         targetStore: targetStore,
         nowUTC: { "2026-08-07T00:00:00Z" })
       : nil
@@ -93,8 +102,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
     XCTAssertFalse(presentation.candidates.isEmpty, "No connected device candidate was published")
     XCTAssertTrue(
-      presentation.candidates.contains { $0.observedFacts != nil },
-      "The connected-device row did not receive its historical model / firmware / transport")
+      presentation.candidates.contains { $0.deviceInformation != nil },
+      "The connected-device row did not receive direct HDC device information")
     XCTAssertLessThanOrEqual(
       elapsed, .milliseconds(1_250),
       "complete device information exceeded its 1.25-second share of the cold-start budget")
@@ -158,6 +167,53 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertEqual(try XCTUnwrap(adoptedRow)["adoptedTargetId"], .string(adoptedID))
     XCTAssertEqual(try XCTUnwrap(adoptedRow)["bindingRevision"], .integer(1))
     XCTAssertEqual(try XCTUnwrap(unauthorizedRow)["adoptedTargetId"], .null)
+  }
+
+  func testConnectedCandidatesPublishDirectDeviceInformationWithoutAdoption() async throws {
+    let connected = "5SM0125725000252"
+    let unauthorized = "7f2c091a445e21"
+    let (handler, targetStore) = try makeHandler(
+      candidates: [
+        BootstrapCandidate(connectKey: connected, state: "Connected"),
+        BootstrapCandidate(connectKey: unauthorized, state: "Unauthorized"),
+      ],
+      deviceInformationByConnectKey: [
+        connected: BootstrapDeviceInformation(
+          name: "HUAWEI Mate 80 Pro",
+          systemVersion: "OpenHarmony-7.0.0.39",
+          transport: "USB"),
+        unauthorized: BootstrapDeviceInformation(
+          name: "must-not-be-read", systemVersion: nil, transport: "USB"),
+      ])
+
+    let response = await handler.handleFrame(frame("device.candidates"))
+    guard case .array(let rows)? = response.result else {
+      return XCTFail("device.candidates must return an array")
+    }
+    let connectedRow = try XCTUnwrap(rows.compactMap { value -> [String: JSONValue]? in
+      guard case .object(let row) = value, row["connectKey"] == .string(connected) else {
+        return nil
+      }
+      return row
+    }.first)
+    guard case .object(let information)? = connectedRow["deviceInformation"] else {
+      return XCTFail("Connected candidates must carry direct device information")
+    }
+    XCTAssertEqual(information["name"], .string("HUAWEI Mate 80 Pro"))
+    XCTAssertEqual(information["systemVersion"], .string("OpenHarmony-7.0.0.39"))
+    XCTAssertEqual(information["transport"], .string("USB"))
+    XCTAssertEqual(connectedRow["adoptedTargetId"], .null)
+
+    let unauthorizedRow = try XCTUnwrap(rows.compactMap { value -> [String: JSONValue]? in
+      guard case .object(let row) = value, row["connectKey"] == .string(unauthorized) else {
+        return nil
+      }
+      return row
+    }.first)
+    XCTAssertEqual(
+      unauthorizedRow["deviceInformation"], .null,
+      "Unauthorized candidates must not receive device-scoped property commands")
+    XCTAssertEqual(try targetStore.list().count, 0, "device information reads never adopt")
   }
 
   func testResolvedAliasCandidateCollapsesIntoTheCanonicalTarget() async throws {
@@ -257,7 +313,9 @@ final class DeviceCandidatesContractTests: XCTestCase {
       Data(
         #"""
         {"id":"t","ok":true,"result":[
-          {"connectKey":"abc","state":"Connected","adoptedTargetId":"t-1","bindingRevision":3},
+          {"connectKey":"abc","state":"Connected","adoptedTargetId":"t-1","bindingRevision":3,
+           "deviceInformation":{"name":"Phone","systemVersion":"OpenHarmony-7.0.0.39",
+           "transport":"USB","observedAtUtc":"2026-08-24T00:00:00Z"}},
           {"connectKey":"def","state":"Unauthorized","adoptedTargetId":null,"bindingRevision":null}
         ]}
         """#.utf8))
@@ -265,6 +323,10 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertEqual(full.candidates.count, 2)
     XCTAssertEqual(full.candidates[0].adoptedTargetID, "t-1")
     XCTAssertEqual(full.candidates[0].bindingRevision, 3)
+    XCTAssertEqual(full.candidates[0].deviceInformation?.name, "Phone")
+    XCTAssertEqual(
+      full.candidates[0].deviceInformation?.systemVersion, "OpenHarmony-7.0.0.39")
+    XCTAssertEqual(full.candidates[0].deviceInformation?.transport, "USB")
     XCTAssertTrue(full.candidates[0].isAdopted)
     XCTAssertTrue(full.candidates[1].needsPhysicalTrust)
     XCTAssertNil(full.candidates[1].adoptedTargetID)
@@ -494,6 +556,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(deviceSource.contains("AppStartupPerformance.beginDeviceDiscovery()"))
     XCTAssertTrue(deviceSource.contains("AppStartupPerformance.deviceCandidatesPublished()"))
     XCTAssertTrue(deviceSource.contains("AppStartupPerformance.deviceInformationReady()"))
+    XCTAssertTrue(deviceSource.contains("candidate.deviceInformation?.name"))
 
     let demandStart = try XCTUnwrap(
       source.range(
@@ -600,6 +663,16 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(projection.contains("async let candidateRead"))
     XCTAssertTrue(projection.contains("async let observationRead"))
     XCTAssertTrue(projection.contains("latestSucceededDeviceObservations()"))
+    XCTAssertTrue(projection.contains("deviceInformationForPresentation"))
+    XCTAssertTrue(projection.contains("\"deviceInformation\""))
     XCTAssertTrue(projection.contains("\"observedFacts\""))
+
+    let composition = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(composition.contains("property(.productName, connectKey: connectKey)"))
+    XCTAssertTrue(composition.contains("property(.fullBuildVersion, connectKey: connectKey)"))
+    XCTAssertTrue(composition.contains("connectKey: connectKey"))
   }
 }

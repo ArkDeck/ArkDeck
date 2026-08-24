@@ -403,13 +403,8 @@ public struct ViewerCapture: Sendable, Equatable {
 
     var included: Set<String> = []
     if !normalizedQuery.isEmpty {
-      let matches = Set(nodes.compactMap { node -> String? in
-        let searchable = [node.type, node.text, node.deviceID, node.inspectorID]
-          .compactMap { $0 }
-          .joined(separator: " ")
-          .lowercased()
-        return searchable.contains(normalizedQuery) ? node.identity : nil
-      })
+      let matches = Set(
+        searchMatches(rootIdentity: rootIdentity, query: normalizedQuery).map(\.identity))
       guard !matches.isEmpty else { return [] }
       included = matches
       for match in matches {
@@ -441,6 +436,21 @@ public struct ViewerCapture: Sendable, Equatable {
     return rows
   }
 
+  /// Exact search hits in stable provider/tree order. Ancestors are excluded:
+  /// they remain visible in the filtered outline only as navigation context
+  /// and must not inflate the result counter or become Next/Previous targets.
+  public func searchMatches(rootIdentity: String?, query: String) -> [ViewerNode] {
+    let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !normalizedQuery.isEmpty else { return [] }
+    return subtreeNodes(rootIdentity: rootIdentity).filter { node in
+      [node.type, node.text, node.deviceID, node.inspectorID]
+        .compactMap { $0 }
+        .joined(separator: " ")
+        .lowercased()
+        .contains(normalizedQuery)
+    }
+  }
+
   /// The screenshot overlay only needs the selected root's subtree. This
   /// avoids computing every node's ancestor chain during each redraw.
   public func subtreeNodes(rootIdentity: String?) -> [ViewerNode] {
@@ -456,10 +466,18 @@ public struct ViewerCapture: Sendable, Equatable {
 
   public func formattedRawFields(for identity: String) -> String? {
     guard let data = node(identity: identity)?.rawFields,
-      let object = try? JSONSerialization.jsonObject(with: data),
-      JSONSerialization.isValidJSONObject(object),
+      let object = try? JSONSerialization.jsonObject(with: data)
+    else { return nil }
+    let selectedComponent: Any
+    if var fields = object as? [String: Any] {
+      fields.removeValue(forKey: "children")
+      selectedComponent = fields
+    } else {
+      selectedComponent = object
+    }
+    guard JSONSerialization.isValidJSONObject(selectedComponent),
       let formatted = try? JSONSerialization.data(
-        withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+        withJSONObject: selectedComponent, options: [.prettyPrinted, .sortedKeys])
     else { return nil }
     return String(data: formatted, encoding: .utf8)
   }
@@ -624,7 +642,15 @@ public enum ViewerCaptureParser {
     into items: inout [ProvisionalNode]
   ) throws {
     let attributes = object["attributes"] as? [String: Any] ?? object
-    guard let rawFields = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    // Retain every field owned by this component, including provider-specific
+    // fields Viewer does not model, but never duplicate its descendant tree in
+    // Raw dump. Besides being the wrong inspection scope, serializing every
+    // subtree once per node makes a large capture grow quadratically in memory.
+    var componentFields = object
+    componentFields.removeValue(forKey: "children")
+    guard
+      let rawFields = try? JSONSerialization.data(
+        withJSONObject: componentFields, options: [.sortedKeys])
     else { throw ViewerCaptureFailure.invalidTree }
     let childObjects: [[String: Any]]
     if let children = object["children"] {

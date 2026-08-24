@@ -6,9 +6,13 @@ import SwiftUI
 /// A Job-bound inspection surface. It deliberately has no command, argv,
 /// remote-path, Recipe, or parameter-policy input.
 struct UIDumpWorkspaceView: View {
+  private static let treeRowHeight: CGFloat = 26
+  private static let treeRowSpacing: CGFloat = 1
+  private static let treeVerticalPadding: CGFloat = 6
+
   var model: UIDumpWorkspaceViewModel
   @FocusState private var separatorFocused: Bool
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var treeScrollPosition = ScrollPosition()
 
   var body: some View {
     GeometryReader { geometry in
@@ -82,10 +86,29 @@ struct UIDumpWorkspaceView: View {
       }
 
       Spacer(minLength: 8)
-      TextField(viewerText("viewer.toolbar.search"), text: queryBinding)
-        .textFieldStyle(.roundedBorder)
-        .frame(maxWidth: 250)
-        .accessibilityIdentifier("viewer.search")
+      HStack(spacing: 4) {
+        TextField(viewerText("viewer.toolbar.search"), text: queryBinding)
+          .textFieldStyle(.roundedBorder)
+          .frame(minWidth: 150, maxWidth: 250)
+          .accessibilityIdentifier("viewer.search")
+        if model.hasSearchQuery {
+          Text(model.searchMatchSummary)
+            .font(WorkspaceFont.monospacedDense.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 34)
+            .accessibilityLabel(viewerText("viewer.search.matchCount"))
+            .accessibilityValue(model.searchMatchSummary)
+            .accessibilityIdentifier("viewer.search.matchCount")
+          searchNavigationButton(
+            direction: .previous,
+            systemImage: "chevron.up",
+            label: viewerText("viewer.search.previous"))
+          searchNavigationButton(
+            direction: .next,
+            systemImage: "chevron.down",
+            label: viewerText("viewer.search.next"))
+        }
+      }
       Button { model.recapture() } label: {
         Label(
           model.isCapturing
@@ -302,36 +325,37 @@ struct UIDumpWorkspaceView: View {
       // a floor. Asking for `maxWidth: .infinity` here made every row claim the
       // scroll content width in turn and cascaded the tree diagonally.
       GeometryReader { proxy in
-        ScrollViewReader { reader in
-          ScrollView([.horizontal, .vertical]) {
-            LazyVStack(alignment: .leading, spacing: 1) {
-              ForEach(rows) { node in
-                treeRow(
-                  node,
-                  visualDepth: max(0, node.depth - minimumDepth),
-                  maximumVisualDepth: max(0, maximumDepth - minimumDepth),
-                  viewportWidth: proxy.size.width)
-                  .id(node.identity)
-              }
-              if rows.isEmpty {
-                Text(viewerText("viewer.tree.noMatches"))
-                  .foregroundStyle(.secondary).padding(12)
-              }
+        ScrollView([.horizontal, .vertical]) {
+          LazyVStack(alignment: .leading, spacing: Self.treeRowSpacing) {
+            ForEach(rows) { node in
+              treeRow(
+                node,
+                visualDepth: max(0, node.depth - minimumDepth),
+                maximumVisualDepth: max(0, maximumDepth - minimumDepth),
+                viewportWidth: proxy.size.width)
+                .id(node.identity)
             }
-            .padding(.vertical, 6)
-          }
-          .onChange(of: model.selectedNodeIdentity) { _, identity in
-            guard let identity else { return }
-            // Reduce Motion users get the same reveal without the slide, and a
-            // selection change never becomes a large moving surface.
-            if reduceMotion {
-              reader.scrollTo(identity, anchor: UnitPoint(x: 0, y: 0.5))
-            } else {
-              withAnimation(.easeOut(duration: 0.15)) {
-                reader.scrollTo(identity, anchor: UnitPoint(x: 0, y: 0.5))
-              }
+            if rows.isEmpty {
+              Text(viewerText("viewer.tree.noMatches"))
+                .foregroundStyle(.secondary).padding(12)
             }
+            Color.clear
+              .frame(height: max(0, proxy.size.height / 2))
+              .id("viewer.tree.trailingSpacer")
+              .accessibilityHidden(true)
           }
+          .scrollTargetLayout()
+          .padding(.vertical, Self.treeVerticalPadding)
+        }
+        .scrollPosition($treeScrollPosition)
+        .scrollIndicators(.visible, axes: [.horizontal, .vertical])
+        .accessibilityIdentifier("viewer.tree.scroll")
+        .onAppear { revealTreeSelection(viewportHeight: proxy.size.height) }
+        .onChange(of: model.selectionRevealGeneration) { _, _ in
+          // Selection and search navigation are high-frequency inspection
+          // actions. Reveal immediately so rapid result changes never queue
+          // or fight an in-flight scrolling animation.
+          revealTreeSelection(viewportHeight: proxy.size.height)
         }
       }
       // The outline keyboard model lives on the scrolling row set, not on each
@@ -345,6 +369,32 @@ struct UIDumpWorkspaceView: View {
       .onKeyPress(.home) { model.moveSelectionToEdge(first: true); return .handled }
       .onKeyPress(.end) { model.moveSelectionToEdge(first: false); return .handled }
       .accessibilityLabel(viewerText("viewer.tree.label"))
+    }
+  }
+
+  private func revealTreeSelection(viewportHeight: CGFloat) {
+    guard let identity = model.selectedNodeIdentity else { return }
+    // A filtered search may already have targeted this identity before the
+    // full outline is restored. Publish a fresh position request so selecting
+    // the same component again re-resolves its new coordinates instead of
+    // treating the unchanged id as a no-op.
+    var position = ScrollPosition()
+    position.scrollTo(id: identity, anchor: .center)
+    treeScrollPosition = position
+    guard
+      let rowIndex = model.visibleNodes.firstIndex(where: { $0.identity == identity })
+    else { return }
+    let rowCenter = Self.treeVerticalPadding
+      + CGFloat(rowIndex) * (Self.treeRowHeight + Self.treeRowSpacing)
+      + Self.treeRowHeight / 2
+    let verticalOffset = max(0, rowCenter - viewportHeight / 2)
+    Task { @MainActor in
+      // The id request resolves the row's variable horizontal geometry. Apply
+      // the deterministic row offset on the next transaction; `scrollTo(y:)`
+      // preserves that horizontal position while avoiding the macOS combined-
+      // axis bug that otherwise leaves the row at the lower edge.
+      await Task.yield()
+      treeScrollPosition.scrollTo(y: verticalOffset)
     }
   }
 
@@ -414,7 +464,7 @@ struct UIDumpWorkspaceView: View {
             maximumDepth: maximumVisualDepth,
             viewportWidth: Double(viewportWidth))))
       .padding(.trailing, 8)
-      .frame(minHeight: 26, alignment: .leading)
+      .frame(minHeight: Self.treeRowHeight, alignment: .leading)
       // The floor keeps the selection capsule spanning the visible pane; the
       // content decides the real width so nothing is truncated or wrapped.
       .frame(minWidth: max(0, viewportWidth - 12), alignment: .leading)
@@ -594,10 +644,10 @@ struct UIDumpWorkspaceView: View {
     switch model.inspectorTab {
     case .properties:
       keyValueGroup(ViewerInspectorCopy.identity, [
-        ("id", node.deviceID ?? ViewerInspectorCopy.unavailable),
+        ("id", node.deviceID),
         ("type", node.type),
-        ("inspectorId", node.inspectorID ?? ViewerInspectorCopy.unavailable),
-        ("text", node.text ?? ViewerInspectorCopy.unavailable),
+        ("inspectorId", node.inspectorID),
+        ("text", node.text),
       ])
       keyValueGroup(ViewerInspectorCopy.state, [
         ("enabled", state(node.enabled)),
@@ -611,18 +661,18 @@ struct UIDumpWorkspaceView: View {
         ("bounds", boundsText(node.bounds)),
         (ViewerInspectorCopy.screenshotMapping,
          ViewerScreenshotMapping.visibleBounds(of: node, in: capture) != nil
-           ? ViewerInspectorCopy.verified : ViewerInspectorCopy.unavailable),
+           ? ViewerInspectorCopy.verified : nil),
         (ViewerInspectorCopy.hitTest,
          ViewerScreenshotMapping.visibleBounds(of: node, in: capture) != nil
-           ? ViewerInspectorCopy.available : ViewerInspectorCopy.unavailable),
+           ? ViewerInspectorCopy.available : nil),
       ])
       keyValueGroup(ViewerInspectorCopy.paint, [
-        ("zIndex", node.zIndex.map { String($0) } ?? ViewerInspectorCopy.unavailable),
+        ("zIndex", node.zIndex.map { String($0) }),
       ])
     case .accessibility:
       keyValueGroup(ViewerInspectorCopy.semantics, [
-        (ViewerInspectorCopy.accessibleLabel, node.text ?? ViewerInspectorCopy.unavailable),
-        (ViewerInspectorCopy.description, node.inspectorID ?? ViewerInspectorCopy.unavailable),
+        (ViewerInspectorCopy.accessibleLabel, node.text),
+        (ViewerInspectorCopy.description, node.inspectorID),
       ])
       keyValueGroup(ViewerInspectorCopy.focus, [
         ("visible", state(node.visible)),
@@ -639,31 +689,65 @@ struct UIDumpWorkspaceView: View {
     }
   }
 
-  private func keyValueGroup(_ title: String, _ rows: [(String, String)]) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Text(verbatim: title)
-        .font(WorkspaceFont.label)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 12).padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.bar)
-      Divider()
-      ForEach(rows, id: \.0) { name, value in
-        HStack(alignment: .top, spacing: 0) {
-          // A fixed key column. A fluid one let two-character keys claim 40%
-          // of the inspector and pushed their values half a pane away.
-          Text(verbatim: name)
-            .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
-            .frame(width: 150, alignment: .leading)
-          Text(verbatim: value)
-            .font(WorkspaceFont.monospacedValue)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 12).padding(.vertical, 6)
+  @ViewBuilder
+  private func keyValueGroup(_ title: String, _ rows: [(String, String?)]) -> some View {
+    let availableRows = rows.compactMap { row -> (String, String)? in
+      guard let value = row.1, !value.isEmpty else { return nil }
+      return (row.0, value)
+    }
+    if !availableRows.isEmpty {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(verbatim: title)
+          .font(WorkspaceFont.label)
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(.bar)
         Divider()
+        ForEach(availableRows, id: \.0) { name, value in
+          HStack(alignment: .top, spacing: 0) {
+            // A fixed key column. A fluid one let two-character keys claim 40%
+            // of the inspector and pushed their values half a pane away.
+            Text(verbatim: name)
+              .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+              .frame(width: 150, alignment: .leading)
+            Text(verbatim: value)
+              .font(WorkspaceFont.monospacedValue)
+              .textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          Divider()
+        }
       }
     }
+  }
+
+  private enum SearchNavigationDirection: String {
+    case previous, next
+  }
+
+  private func searchNavigationButton(
+    direction: SearchNavigationDirection,
+    systemImage: String,
+    label: String
+  ) -> some View {
+    Button {
+      switch direction {
+      case .previous: model.selectPreviousSearchMatch()
+      case .next: model.selectNextSearchMatch()
+      }
+    } label: {
+      Image(systemName: systemImage)
+        .font(.system(size: 10, weight: .semibold))
+        .frame(width: 24, height: 24)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.borderless)
+    .disabled(!model.canNavigateSearchMatches)
+    .help(label)
+    .accessibilityLabel(label)
+    .accessibilityIdentifier("viewer.search.\(direction.rawValue)")
   }
 
   private func inspectorTabButton(_ tab: ViewerInspectorTab) -> some View {
@@ -730,12 +814,11 @@ struct UIDumpWorkspaceView: View {
     let width = min(container.width - 24, (container.height - 24) * aspect)
     return CGSize(width: max(1, width), height: max(1, width / aspect))
   }
-  private func state(_ value: Bool?) -> String {
+  private func state(_ value: Bool?) -> String? {
     value.map { $0 ? ViewerInspectorCopy.yes : ViewerInspectorCopy.no }
-      ?? ViewerInspectorCopy.unavailable
   }
-  private func boundsText(_ value: ViewerBounds?) -> String {
-    guard let value else { return ViewerInspectorCopy.unavailable }
+  private func boundsText(_ value: ViewerBounds?) -> String? {
+    guard let value else { return nil }
     return "x \(value.x), y \(value.y), \(value.width) × \(value.height)"
   }
   private var targetBinding: Binding<String> {
@@ -786,7 +869,6 @@ private enum ViewerInspectorCopy {
   static let accessibleLabel = "accessible label"
   static let description = "description"
   static let available = "Available"
-  static let unavailable = "Unavailable"
   static let verified = "Verified"
   static let yes = "Yes"
   static let no = "No"
@@ -806,6 +888,9 @@ final class UIDumpWorkspaceViewModel {
   private(set) var selectedRootIdentity = ""
   private(set) var expandedNodeIdentities: Set<String> = []
   private(set) var searchQuery = ""
+  private(set) var searchMatchIdentities: [String] = []
+  private(set) var selectedSearchMatchIndex: Int?
+  private(set) var selectionRevealGeneration = 0
   private(set) var showBounds = false
   private(set) var inspectorTreePercent: Double = 60
   private(set) var inspectorTab: ViewerInspectorTab = .properties
@@ -843,6 +928,14 @@ final class UIDumpWorkspaceViewModel {
 
   var selectedTarget: UIDumpTargetPresentation? { targets.first { $0.id == selectedTargetID } }
   var selectedNode: ViewerNode? { selectedNodeIdentity.flatMap { capture?.node(identity: $0) } }
+  var hasSearchQuery: Bool {
+    !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+  var searchMatchSummary: String {
+    guard let selectedSearchMatchIndex, !searchMatchIdentities.isEmpty else { return "0 / 0" }
+    return "\(selectedSearchMatchIndex + 1) / \(searchMatchIdentities.count)"
+  }
+  var canNavigateSearchMatches: Bool { searchMatchIdentities.count > 1 }
   var emptyMessage: String {
     if let failure = workspace.targetLoadFailure { return failure }
     if selectedTarget == nil { return viewerText("viewer.empty.selectTarget") }
@@ -911,6 +1004,8 @@ final class UIDumpWorkspaceViewModel {
         // A previous screen's query must not leave a fresh capture looking
         // empty or hide the row selected from the screenshot.
         self.searchQuery = ""
+        self.searchMatchIdentities = []
+        self.selectedSearchMatchIndex = nil
         self.expandedNodeIdentities = next.node(identity: root)?.children.isEmpty == false
           ? [root] : []
         self.select(root)
@@ -927,9 +1022,16 @@ final class UIDumpWorkspaceViewModel {
     guard let capture, let root = capture.node(identity: value) else { return }
     selectedRootIdentity = root.identity
     expandedNodeIdentities = root.children.isEmpty ? [] : [root.identity]
-    select(root.identity)
+    if hasSearchQuery {
+      updateSearchMatches(selectFirst: true)
+    } else {
+      select(root.identity)
+    }
   }
-  func setSearchQuery(_ value: String) { searchQuery = value }
+  func setSearchQuery(_ value: String) {
+    searchQuery = value
+    updateSearchMatches(selectFirst: true)
+  }
   func setShowBounds(_ value: Bool) { showBounds = value }
   func setInspectorTab(_ value: ViewerInspectorTab) { inspectorTab = value }
   func toggleExpansion(_ identity: String) { if !expandedNodeIdentities.insert(identity).inserted { expandedNodeIdentities.remove(identity) } }
@@ -953,6 +1055,43 @@ final class UIDumpWorkspaceViewModel {
     guard let capture, let node = capture.node(identity: identity) else { return }
     selectedNodeIdentity = node.identity
     expandedNodeIdentities.formUnion(capture.ancestors(of: node.identity))
+    if let index = searchMatchIdentities.firstIndex(of: node.identity) {
+      selectedSearchMatchIndex = index
+    }
+    // A repeated click is still a reveal request. The row may have been moved
+    // away from center manually even though its identity did not change.
+    selectionRevealGeneration &+= 1
+  }
+
+  private func updateSearchMatches(selectFirst: Bool) {
+    guard let capture, hasSearchQuery else {
+      searchMatchIdentities = []
+      selectedSearchMatchIndex = nil
+      return
+    }
+    searchMatchIdentities = capture.searchMatches(
+      rootIdentity: selectedRootIdentity,
+      query: searchQuery
+    ).map(\.identity)
+    guard !searchMatchIdentities.isEmpty else {
+      selectedSearchMatchIndex = nil
+      return
+    }
+    if selectFirst || selectedSearchMatchIndex == nil {
+      selectedSearchMatchIndex = 0
+      select(searchMatchIdentities[0])
+    }
+  }
+
+  func selectPreviousSearchMatch() { moveSearchMatch(by: -1) }
+  func selectNextSearchMatch() { moveSearchMatch(by: 1) }
+
+  private func moveSearchMatch(by offset: Int) {
+    guard !searchMatchIdentities.isEmpty else { return }
+    let current = selectedSearchMatchIndex ?? 0
+    let next = (current + offset + searchMatchIdentities.count) % searchMatchIdentities.count
+    selectedSearchMatchIndex = next
+    select(searchMatchIdentities[next])
   }
   // MARK: - macOS outline keyboard model
   //
