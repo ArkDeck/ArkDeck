@@ -104,11 +104,12 @@ duplicate candidate, `outcomeUnknown`, or unresolved cleanup residue as a failed
 
 ## Parse from the developer CLI
 
-Build the migrated helper and resolve its actual SwiftPM output directory:
+Build the helper from ArkDeck's pinned ArkTrace revision and resolve its SwiftPM output directory:
 
 ```bash
-swift build --package-path Packages/ArkDeckKit --product arktrace
-swift build --package-path Packages/ArkDeckKit --show-bin-path
+git -C <ArkTrace-checkout> checkout 91a21d1d419c5fec8c56c8b7b742002325045861
+swift build --package-path <ArkTrace-checkout> --product arktrace
+swift build --package-path <ArkTrace-checkout> --show-bin-path
 ```
 
 Pass the pinned parser by absolute path when using a bare SwiftPM executable:
@@ -129,7 +130,7 @@ Available commands are `doctor`, `licenses`, `inspect`, `summary`, `processes`, 
 `--timeout-ms`, `--max-rows`, `--max-events`, and `--max-output-bytes`; `--no-cache` creates a
 session-owned ephemeral database.
 
-A bare SwiftPM executable is a developer artifact, not a complete distribution: it intentionally
+The bare ArkTrace SwiftPM executable is a developer artifact, not a complete distribution: it intentionally
 lacks the reviewed license and self-test resource layout, so `licenses` and `doctor --self-test`
 fail closed. The App carries its own fixed parser and licenses and does not use `PATH`.
 

@@ -1,6 +1,7 @@
 import AppKit
-import ArkDeckTraceAppSupport
+import ArkDeckTraceAdapter
 import ArkDeckWorkflows
+import ArkTraceAppSupport
 import Observation
 import SwiftUI
 import os
@@ -105,7 +106,8 @@ private final class ArkDeckAppModelStore {
     provider: ViewerUIFixture.provider() ?? UIDumpApplicationFacade.make())
   @ObservationIgnored lazy var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
-  @ObservationIgnored lazy var traceDocument = TraceDocumentController()
+  @ObservationIgnored lazy var traceDocument = TraceDocumentController(
+    configuration: ArkDeckTraceConfiguration.make())
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
     provider: TraceApplicationFacade.make(),
     documentController: traceDocument)
@@ -198,7 +200,7 @@ struct ArkDeckApp: App {
     panel.canChooseFiles = true
     panel.canChooseDirectories = false
     panel.allowsMultipleSelection = false
-    panel.allowedContentTypes = ArkTraceAppDistribution.supportedTraceContentTypes
+    panel.allowedContentTypes = ArkDeckTraceConfiguration.supportedTraceContentTypes
     guard panel.runModal() == .OK, let url = panel.url else { return }
     openTrace(url)
   }

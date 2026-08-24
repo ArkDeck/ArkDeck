@@ -31,11 +31,12 @@
 		B10000000000000000000004 /* TraceLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* TraceLocalizable.xcstrings */; };
 		C20000000000000000000001 /* TraceViewerWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000011 /* TraceViewerWorkspaceView.swift */; };
 		C20000000000000000000002 /* TraceViewerLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000012 /* TraceViewerLocalizable.xcstrings */; };
-		C20000000000000000000003 /* ArkDeckTraceAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000091 /* ArkDeckTraceAppSupport */; };
-		C20000000000000000000004 /* ArkDeckTraceAnalysis in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000092 /* ArkDeckTraceAnalysis */; };
-		C20000000000000000000005 /* ArkDeckTraceCore in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000093 /* ArkDeckTraceCore */; };
-		C20000000000000000000006 /* ArkDeckTraceRendering in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000094 /* ArkDeckTraceRendering */; };
+		C20000000000000000000003 /* ArkTraceAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000091 /* ArkTraceAppSupport */; };
+		C20000000000000000000004 /* ArkTraceAnalysis in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000092 /* ArkTraceAnalysis */; };
+		C20000000000000000000005 /* ArkTraceCore in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000093 /* ArkTraceCore */; };
+		C20000000000000000000006 /* ArkTraceRendering in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000094 /* ArkTraceRendering */; };
 		C20000000000000000000007 /* trace_streamer in Embed Trace Streamer Helper */ = {isa = PBXBuildFile; fileRef = C20000000000000000000013 /* trace_streamer */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		C20000000000000000000008 /* ArkDeckTraceAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = C20000000000000000000095 /* ArkDeckTraceAdapter */; };
 		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
@@ -109,10 +110,11 @@
 			files = (
 				A10000000000000000000012 /* ArkDeckCore in Frameworks */,
 				A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */,
-				C20000000000000000000003 /* ArkDeckTraceAppSupport in Frameworks */,
-				C20000000000000000000004 /* ArkDeckTraceAnalysis in Frameworks */,
-				C20000000000000000000005 /* ArkDeckTraceCore in Frameworks */,
-				C20000000000000000000006 /* ArkDeckTraceRendering in Frameworks */,
+				C20000000000000000000003 /* ArkTraceAppSupport in Frameworks */,
+				C20000000000000000000004 /* ArkTraceAnalysis in Frameworks */,
+				C20000000000000000000005 /* ArkTraceCore in Frameworks */,
+				C20000000000000000000006 /* ArkTraceRendering in Frameworks */,
+				C20000000000000000000008 /* ArkDeckTraceAdapter in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -335,10 +337,11 @@
 			packageProductDependencies = (
 				A10000000000000000000091 /* ArkDeckCore */,
 				A10000000000000000000093 /* ArkDeckWorkflows */,
-				C20000000000000000000091 /* ArkDeckTraceAppSupport */,
-				C20000000000000000000092 /* ArkDeckTraceAnalysis */,
-				C20000000000000000000093 /* ArkDeckTraceCore */,
-				C20000000000000000000094 /* ArkDeckTraceRendering */,
+				C20000000000000000000091 /* ArkTraceAppSupport */,
+				C20000000000000000000092 /* ArkTraceAnalysis */,
+				C20000000000000000000093 /* ArkTraceCore */,
+				C20000000000000000000094 /* ArkTraceRendering */,
+				C20000000000000000000095 /* ArkDeckTraceAdapter */,
 			);
 			productName = ArkDeck;
 			productReference = A10000000000000000000022 /* ArkDeck.app */;
@@ -388,6 +391,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */,
+				C20000000000000000000090 /* XCRemoteSwiftPackageReference "ArkTrace" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000033 /* Products */;
@@ -418,7 +422,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nsource_binary=\"${SRCROOT}/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer\"\nhelper_entitlements=\"${SRCROOT}/ArkDeckApp/TraceStreamerHelper.entitlements\"\nprepared_directory=\"${BUILT_PRODUCTS_DIR}/TraceStreamerPrepared\"\nprepared_binary=\"${prepared_directory}/trace_streamer\"\nif [ ! -x \"${source_binary}\" ]; then\n  echo \"error: pinned trace_streamer is missing; run Packages/ArkDeckKit/Scripts/build_trace_streamer.sh\" >&2\n  exit 1\nfi\n/bin/mkdir -p \"${prepared_directory}\"\n/bin/cp -f \"${source_binary}\" \"${prepared_binary}\"\n/bin/chmod 755 \"${prepared_binary}\"\n/usr/bin/codesign --force --sign - --identifier com.arkdeck.desktop.trace-streamer --options runtime --entitlements \"${helper_entitlements}\" \"${prepared_binary}\"\n";
+			shellScript = "set -eu\nsource_binary=\"${SRCROOT}/Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer\"\nhelper_entitlements=\"${SRCROOT}/ArkDeckApp/TraceStreamerHelper.entitlements\"\nprepared_directory=\"${BUILT_PRODUCTS_DIR}/TraceStreamerPrepared\"\nprepared_binary=\"${prepared_directory}/trace_streamer\"\nif [ ! -x \"${source_binary}\" ]; then\n  echo \"error: pinned trace_streamer packaging artifact is missing; restore it from the pinned ArkTrace revision\" >&2\n  exit 1\nfi\n/bin/mkdir -p \"${prepared_directory}\"\n/bin/cp -f \"${source_binary}\" \"${prepared_binary}\"\n/bin/chmod 755 \"${prepared_binary}\"\n/usr/bin/codesign --force --sign - --identifier com.arkdeck.desktop.trace-streamer --options runtime --entitlements \"${helper_entitlements}\" \"${prepared_binary}\"\n";
 		};
 		C20000000000000000000030 /* Copy Pinned Trace Runtime Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -701,6 +705,17 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		C20000000000000000000090 /* XCRemoteSwiftPackageReference "ArkTrace" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ArkDeck/ArkTrace.git";
+			requirement = {
+				kind = revision;
+				revision = 91a21d1d419c5fec8c56c8b7b742002325045861;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCLocalSwiftPackageReference section */
 		A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */ = {
 			isa = XCLocalSwiftPackageReference;
@@ -719,25 +734,30 @@
 			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
 			productName = ArkDeckWorkflows;
 		};
-		C20000000000000000000091 /* ArkDeckTraceAppSupport */ = {
+		C20000000000000000000091 /* ArkTraceAppSupport */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
-			productName = ArkDeckTraceAppSupport;
+			package = C20000000000000000000090 /* XCRemoteSwiftPackageReference "ArkTrace" */;
+			productName = ArkTraceAppSupport;
 		};
-		C20000000000000000000092 /* ArkDeckTraceAnalysis */ = {
+		C20000000000000000000092 /* ArkTraceAnalysis */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
-			productName = ArkDeckTraceAnalysis;
+			package = C20000000000000000000090 /* XCRemoteSwiftPackageReference "ArkTrace" */;
+			productName = ArkTraceAnalysis;
 		};
-		C20000000000000000000093 /* ArkDeckTraceCore */ = {
+		C20000000000000000000093 /* ArkTraceCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
-			productName = ArkDeckTraceCore;
+			package = C20000000000000000000090 /* XCRemoteSwiftPackageReference "ArkTrace" */;
+			productName = ArkTraceCore;
 		};
-		C20000000000000000000094 /* ArkDeckTraceRendering */ = {
+		C20000000000000000000094 /* ArkTraceRendering */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C20000000000000000000090 /* XCRemoteSwiftPackageReference "ArkTrace" */;
+			productName = ArkTraceRendering;
+		};
+		C20000000000000000000095 /* ArkDeckTraceAdapter */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
-			productName = ArkDeckTraceRendering;
+			productName = ArkDeckTraceAdapter;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

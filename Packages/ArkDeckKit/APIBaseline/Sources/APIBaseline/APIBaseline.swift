@@ -16,8 +16,16 @@ import ArkDeckOpenHarmony
 import ArkDeckProcess
 import ArkDeckRuntime
 import ArkDeckStorage
+import ArkDeckTraceAdapter
 import ArkDeckWorkflows
 import Foundation
+
+private enum TraceAdapterSurface {
+  static let bundleIdentifier = ArkDeckTraceConfiguration.bundleIdentifier
+  static let recentDocumentsKey = ArkDeckTraceConfiguration.recentDocumentsKey
+  static let supportedTraceExtensions = ArkDeckTraceConfiguration.supportedTraceExtensions
+  static let make = ArkDeckTraceConfiguration.make(bundleURL:cachesDirectory:)
+}
 
 // MARK: - ArkDeckProcess: execution results carry their semantics
 

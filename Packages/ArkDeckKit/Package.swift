@@ -2,11 +2,6 @@
 
 import PackageDescription
 
-// ArkTrace's parser/store/process boundary was audited with Swift strict
-// memory safety before it moved into ArkDeckKit. Keep that claim explicit on
-// every migrated target instead of silently weakening it during the move.
-let traceSwiftSettings: [SwiftSetting] = [.strictMemorySafety()]
-
 let package = Package(
   name: "ArkDeckKit",
   platforms: [.macOS(.v26)],
@@ -17,15 +12,7 @@ let package = Package(
     .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
-    .library(name: "ArkDeckTraceCore", targets: ["ArkDeckTraceCore"]),
-    .library(name: "ArkDeckTraceParser", targets: ["ArkDeckTraceParser"]),
-    .library(name: "ArkDeckTraceStore", targets: ["ArkDeckTraceStore"]),
-    .library(name: "ArkDeckTraceRuntime", targets: ["ArkDeckTraceRuntime"]),
-    .library(name: "ArkDeckTraceAnalysis", targets: ["ArkDeckTraceAnalysis"]),
-    .library(name: "ArkDeckTraceRendering", targets: ["ArkDeckTraceRendering"]),
-    .library(name: "ArkDeckTraceAppSupport", targets: ["ArkDeckTraceAppSupport"]),
-    .library(name: "ArkDeckTraceCLI", targets: ["ArkDeckTraceCLI"]),
-    .executable(name: "arktrace", targets: ["ArkDeckTraceCLIExecutable"]),
+    .library(name: "ArkDeckTraceAdapter", targets: ["ArkDeckTraceAdapter"]),
     .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
     .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
@@ -41,7 +28,10 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/ArkDeck/ArkForge.git",
-      revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92")
+      revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"),
+    .package(
+      url: "https://github.com/ArkDeck/ArkTrace.git",
+      revision: "91a21d1d419c5fec8c56c8b7b742002325045861"),
   ],
   targets: [
     .target(
@@ -89,67 +79,13 @@ let package = Package(
       dependencies: ["ArkDeckCore"],
       linkerSettings: [.linkedLibrary("sqlite3")]
     ),
-    // Host-only Trace engine. Device capture remains owned by
-    // capture.diagnostics@1 and ArkDeckWorkflows; none of these targets gains
-    // an HDC, Runtime capability or Agent transport dependency.
+    // ArkTrace owns every shared engine source. ArkDeck keeps only its fixed
+    // product profile and app-bundle adapter in this target.
     .target(
-      name: "ArkDeckTraceCore",
-      swiftSettings: traceSwiftSettings),
-    .target(
-      name: "ArkDeckTraceParser",
-      dependencies: ["ArkDeckTraceCore"],
-      swiftSettings: traceSwiftSettings),
-    .target(
-      name: "ArkDeckTraceStore",
-      dependencies: ["ArkDeckTraceCore"],
-      swiftSettings: traceSwiftSettings,
-      linkerSettings: [.linkedLibrary("sqlite3")]),
-    .target(
-      name: "ArkDeckTraceRuntime",
-      dependencies: ["ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore"],
-      swiftSettings: traceSwiftSettings),
-    .target(
-      name: "ArkDeckTraceAnalysis",
-      dependencies: ["ArkDeckTraceCore"],
-      swiftSettings: traceSwiftSettings),
-    .target(
-      name: "ArkDeckTraceRendering",
-      dependencies: ["ArkDeckTraceCore"],
-      swiftSettings: traceSwiftSettings),
-    .target(
-      name: "ArkDeckTraceAppSupport",
+      name: "ArkDeckTraceAdapter",
       dependencies: [
-        "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceRuntime",
-        "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
-      ],
-      swiftSettings: traceSwiftSettings),
-    .target(
-      name: "ArkDeckTraceSignalShim",
-      publicHeadersPath: "include"),
-    .target(
-      name: "ArkDeckTraceCLI",
-      dependencies: [
-        "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
-        "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceSignalShim",
-      ],
-      swiftSettings: traceSwiftSettings),
-    // Test-only resource bundle. Keeping these bytes out of the production
-    // CLI graph prevents Bundle.module from leaking a build-machine path into
-    // the shipped helper.
-    .target(
-      name: "ArkDeckTraceCLIResourceFixtures",
-      resources: [
-        .copy("../../Fixtures/traces/zlib.htrace"),
-        .copy("../../Resources/ArkTraceCLIResources/LICENSE"),
-        .copy("../../THIRD_PARTY_NOTICES.md"),
-        .copy("../../ThirdParty/TraceStreamer/license-inventory.json"),
-        .copy("../../ThirdParty/TraceStreamer/LICENSES"),
-      ],
-      swiftSettings: traceSwiftSettings),
-    .executableTarget(
-      name: "ArkDeckTraceCLIExecutable",
-      dependencies: ["ArkDeckTraceCLI"],
-      swiftSettings: traceSwiftSettings),
+        .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
+      ]),
     .executableTarget(
       name: "ArkDeckCLI",
       dependencies: [
@@ -215,33 +151,11 @@ let package = Package(
       path: "Tests/ArkDeckFakeHapSignerFixture"
     ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
-    .testTarget(name: "ArkDeckTraceCoreTests", dependencies: ["ArkDeckTraceCore"]),
     .testTarget(
-      name: "ArkDeckTraceParserTests",
-      dependencies: ["ArkDeckTraceCore", "ArkDeckTraceParser"]),
-    .testTarget(
-      name: "ArkDeckTraceStoreTests",
-      dependencies: ["ArkDeckTraceStore", "ArkDeckTraceCLI"]),
-    .testTarget(name: "ArkDeckTraceAnalysisTests", dependencies: ["ArkDeckTraceAnalysis"]),
-    .testTarget(name: "ArkDeckTraceRenderingTests", dependencies: ["ArkDeckTraceRendering"]),
-    .testTarget(
-      name: "ArkDeckTraceAppSupportTests",
+      name: "ArkDeckTraceAdapterTests",
       dependencies: [
-        "ArkDeckTraceAppSupport", "ArkDeckTraceCore", "ArkDeckTraceParser",
-        "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
-      ]),
-    .testTarget(
-      name: "ArkDeckTraceCLITests",
-      dependencies: [
-        "ArkDeckTraceCLI", "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
-        "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceCLIResourceFixtures",
-      ],
-      resources: [.copy("Fixtures")]),
-    .testTarget(
-      name: "ArkDeckTraceIntegrationTests",
-      dependencies: [
-        "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
-        "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
+        "ArkDeckTraceAdapter",
+        .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
       ]),
     .testTarget(
       name: "ArkDeckContractTests",

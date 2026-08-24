@@ -1,5 +1,6 @@
 import ArkDeckWorkflows
-import ArkDeckTraceAppSupport
+import ArkDeckTraceAdapter
+import ArkTraceAppSupport
 import Foundation
 import Observation
 import SwiftUI
@@ -398,7 +399,8 @@ final class TraceWorkspaceViewModel {
   init(
     provider: any TraceApplicationProviding,
     detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil,
-    documentController: TraceDocumentController = TraceDocumentController()
+    documentController: TraceDocumentController = TraceDocumentController(
+      configuration: ArkDeckTraceConfiguration.make())
   ) {
     self.provider = provider
     self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()

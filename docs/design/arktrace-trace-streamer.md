@@ -1,7 +1,7 @@
 # ArkDeck TraceStreamer 依赖、构建与发布规格
 
 > Status：current（2026-08-24）
-> Scope：ArkDeckKit 迁入的 Trace parser、App helper 与 `arktrace` 开发产物。
+> Scope：ArkTrace-owned parser/CLI、ArkDeck App helper 与产品打包快照。
 > 行为规格：[`arktrace-migration-spec.md`](./arktrace-migration-spec.md)。
 
 ## 1. 锁定身份
@@ -13,10 +13,10 @@
 | TraceStreamer version | `4.3.7` |
 | Binary architecture | Mach-O `arm64` |
 | Unsigned binary SHA-256 | `0665e04e4abf2c2b60e173f6c666cb91844557c85d45386a03962e56804fa55a` |
-| Source lock | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/source-lock.json` |
-| Runtime manifest | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
+| Source lock | ArkTrace `91a21d1d419c5fec8c56c8b7b742002325045861` 的 `ThirdParty/TraceStreamer/source-lock.json` |
+| ArkDeck packaging manifest | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
 
-`source-lock.json` 同时锁定 13 个源依赖和 GN/Ninja 两个构建工具的 URL、
+ArkTrace 的 `source-lock.json` 同时锁定 13 个源依赖和 GN/Ninja 两个构建工具的 URL、
 byte count 与 SHA-256。`manifest.json` 是运行时许可：二进制、upstream revision、
 third-party revisions、插件集和 build recipe 必须同时相等。文档中的表格不是第二个
 信任根；代码以 manifest 和实际字节为准。
@@ -69,32 +69,30 @@ plugin。保守的 source-closure inventory 仍保留 build-only / disabled 依�
 - `Packages/ArkDeckKit/THIRD_PARTY_NOTICES.md`；
 - `Packages/ArkDeckKit/ThirdParty/TraceStreamer/license-inventory.json`；
 - `Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES/` 下 18 份 exact license / notice 文本；
-- `Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE` 中迁入 ArkTrace 代码的 MIT 许可。
+- `Packages/ArkDeckKit/Resources/ArkTraceCLIResources/LICENSE` 中 ArkTrace dependency 的 MIT 许可。
 
-## 4. 本地构建
+## 4. 构建所有权与打包快照
 
-支持环境是 Apple silicon macOS、Apple clang、Swift 6，并需要 `git`、`jq`、`curl`、
-`shasum`、`tar`、`patch`、`perl`、`lipo` 和 `otool`。锁定的 x86 GN/Ninja 归档需要
-Rosetta 2，但最终 parser 是原生 arm64。
+ArkDeck 不保留 TraceStreamer 构建脚本、source lock 或 patch 副本。构建与可复现性验证只在
+固定 ArkTrace revision 中执行：
 
 ```bash
-Packages/ArkDeckKit/Scripts/build_trace_streamer.sh
-Packages/ArkDeckKit/Scripts/verify_trace_streamer_lock.sh
+git -C <ArkTrace-checkout> checkout 91a21d1d419c5fec8c56c8b7b742002325045861
+<ArkTrace-checkout>/scripts/verify_trace_streamer_lock.sh
+<ArkTrace-checkout>/scripts/build_trace_streamer.sh
 ```
 
-构建脚本只在安全的 package-owned `.build/trace-streamer-workspaces/` 中拉取 exact
-revision，先验证下载字节再解包，并对两个 local patch fail closed。除 Apple clang
-兼容补丁外，`proto-reader-sparse-validity.patch` 以紧凑存在位图替代 protobuf 消息对稀疏
-`DataArea[max_field_id + 1]` 的全量清零，保持字段访问及重复字段语义不变。默认产物是：
+ArkDeck `macx/` 目录只是 App 构建输入，不是第二个构建信任根。只有在升级 pinned ArkTrace
+revision 的同一审阅中，才可把 ArkTrace 已验证的 exact binary/manifest 更新到：
 
 ```text
 Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer
 Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json
 ```
 
-上游 `mac_depend.sh` 不得执行。它在现代 macOS 会尝试把 dyld shared cache 里的
-libc++ 改写为不存在的相对路径。锁定脚本只接受已审阅的 post-link tail
-failure，然后用可执行性、version、architecture 和 Mach-O load commands 证明产物。
+两者的 binary SHA、build recipe、upstream revision 必须与该 ArkTrace revision 完全一致；
+ArkDeck 架构门禁会锁定 revision 与 recipe。App 后续签名只改变 bundle manifest 的
+`binarySHA256`，不得改变 source identity 字段。
 
 ## 5. App 发布布局
 
@@ -130,21 +128,20 @@ bundle manifest 锁定签名后的运行时 bytes。两者不应相等，也不�
 同时检查 canonical source lock、helper designated identifier、hardened-runtime flag、两项
 inherit entitlements、bundle manifest SHA 与外层 App 的 deep/strict codesign。
 
-## 6. SmartPerf palette 移植
+## 6. SmartPerf palette 所有权
 
-`Packages/ArkDeckKit/Sources/ArkDeckTraceRendering/TimelineColorPalette.swift` 是唯一份从
-SmartPerf Host *application code* 转写的源码。它保留 upstream hash / state 分配语义，
-颜色使用 ArkDeck 已验证的可辨识 palette。行为对齐由
-`ArkDeckTraceRenderingTests/TimelinePaletteTests.swift` 的 parity vectors 锁定，Apache-2.0 文本
-与 parser 同车发布。
+`Sources/ArkTraceRendering/TimelineColorPalette.swift` 只存在于 pinned ArkTrace package。
+它保留 upstream hash / state 分配语义，行为对齐由 ArkTrace
+`TimelinePaletteTests.swift` 的 parity vectors 锁定。ArkDeck 只链接该 product，并随 App
+发布对应 Apache-2.0 文本。
 
 ## 7. Re-pin 流程
 
 1. 审阅 upstream 与 required table / CLI / plugin 差异；
-2. 更新 `source-lock.json` 和必要的独立 local patches；
+2. 在 ArkTrace 更新 `source-lock.json` 和必要的独立 local patches；
 3. 在两个 fresh workspace 运行构建，只有二进制 byte-identical 才能更新 manifest；
 4. 更新 version / SHA / recipe 证据和本文档的身份表；
-5. 运行 lock verification、parser integration tests、全量 `ArkDeckTrace*` 测试与 App build；
+5. 运行 ArkTrace lock/API/full tests、ArkDeck dependency contract tests 与 App build；
 6. 用真实 Trace 复核 required schema、range、capabilities、cache key 失效和 Viewer 打开。
 
 不得用浮动 tip、仅 version string、仅签名或 CI 下载成功代替 exact bytes 审查。
@@ -153,7 +150,7 @@ SmartPerf Host *application code* 转写的源码。它保留 upstream hash / st
 
 | 现象 | 安全解释 / 处理 |
 |---|---|
-| App build 提示 helper 缺失 | 运行 §4 构建脚本；不从 `PATH` 复制另一份 binary |
+| App build 提示 helper 缺失 | 从 pinned ArkTrace revision 恢复 §4 exact packaging artifact；不从 `PATH` 复制 |
 | lock verification 报 recipe drift | 脚本 / lock / patch 改变后必须真实重建并审阅 manifest，不手改绕过 |
 | parser 退出 0 但 DB 不可用 | 按失败处理；检查 sidecar 有界摘要、schema / range / quick check |
 | bare `arktrace licenses` 失败 | SwiftPM 裸产物不是完整发布；许可命令要求 reviewed resource layout |
