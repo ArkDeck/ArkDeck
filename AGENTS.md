@@ -147,7 +147,8 @@
 - **进度唯一指标 = Golden Journey**(`PRODUCT-LOOP.md` §6):每轮工作必须映射到
   GJ-1~GJ-5 之一;状态只能取 `NOT_STARTED`/`IMPLEMENTING`/`BLOCKED_BY_PRODUCT_DEFECT`/
   `REAL_DEVICE_PASS`,文档完成、schema 完成或 fake test 通过不构成 `REAL_DEVICE_PASS`。
-  每轮结束按 §19 汇报格式汇报。
+  每轮结束按 §19 只汇报「本轮修改」与「下一轮建议」;不得固定展开 Golden Journey
+  全表、治理循环检查、重复任务检查或其他无变化状态。
 - **一个问题 = 一个垂直产品任务 = 一个 PR**(§4):根因说明 + 产品代码修复 + 必要测试 +
   真实设备验证(适用时)+ 最小必要文档更新 + 完成结论同车交付;PR 标题与描述必须如实
   覆盖其全部内容。**不再创建 readiness-only、status-only、done-only、verified-only、
