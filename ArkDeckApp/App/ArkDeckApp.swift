@@ -306,6 +306,11 @@ private enum ShellSelection: Hashable {
 private struct OverviewWorkspaceView: View {
   let hdcDiagnostics: HDCStatusViewModel
   let overviewCapabilities: OverviewCapabilityViewModel
+  let deviceList: DeviceListViewModel
+  let runtimeHistory: RuntimeHistoryViewModel
+  let onOpenWorkspace: (ArkDeckNavigationItem) -> Void
+
+  @State private var resumingRun: RuntimeJobSummaryPresentation?
 
   var body: some View {
     HDCStatusView(
@@ -314,14 +319,77 @@ private struct OverviewWorkspaceView: View {
       onRefresh: {
         hdcDiagnostics.refresh()
         overviewCapabilities.refresh()
+        runtimeHistory.refresh()
       },
       isRefreshInFlight: hdcDiagnostics.isRefreshInFlight
-        || overviewCapabilities.isRefreshInFlight,
+        || overviewCapabilities.isRefreshInFlight
+        || runtimeHistory.isRefreshInFlight,
       onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
       onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
       onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
       onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
-      configurationError: hdcDiagnostics.configurationError)
+      configurationError: hdcDiagnostics.configurationError,
+      header: AnyView(record))
+      .sheet(item: $resumingRun) { run in
+        OverviewResumeSheet(
+          run: run,
+          detail: runtimeHistory.detailsByJobID[run.id],
+          isLoadingDetail: runtimeHistory.loadingDetailJobIDs.contains(run.id),
+          currentTargetID: overviewCapabilities.presentation.targetID,
+          currentBindingRevision: overviewCapabilities.presentation.bindingRevision,
+          onOpenWorkspace: { openWorkspace(continuing: run) },
+          onCancel: { resumingRun = nil })
+      }
+      .onChange(of: runtimeHistory.presentation, initial: true) { _, presentation in
+        readEvidenceForVisibleRuns(presentation)
+      }
+  }
+
+  private var record: some View {
+    OverviewRecordView(
+      devices: deviceList.presentation,
+      capabilities: overviewCapabilities.presentation,
+      history: runtimeHistory.presentation,
+      detailsByJobID: runtimeHistory.detailsByJobID,
+      onOpen: { onOpenWorkspace(Self.navigation(for: $0)) },
+      onOpenHistory: { onOpenWorkspace(.history) },
+      onOpenJob: { _ in onOpenWorkspace(.history) },
+      onResume: { resumingRun = $0 })
+  }
+
+  /// Whether a run may be offered as repeatable depends on facts that live in
+  /// its evidence, so the page reads the evidence for the runs it is actually
+  /// showing. The read is bounded by the record's own truncation, never by the
+  /// whole archive, and each Job is read once.
+  private func readEvidenceForVisibleRuns(_ presentation: RuntimeHistoryPresentation) {
+    let visible = OverviewRunRecordProjection.threads(from: presentation.jobs)
+      .flatMap(\.runs)
+    for run in visible where runtimeHistory.detailsByJobID[run.id] == nil {
+      runtimeHistory.loadDetail(jobID: run.id, operationReference: run.operationReference)
+    }
+  }
+
+  /// Opens the workspace that submitted this run. When the reported inputs do
+  /// not identify one, the sheet stays put rather than prefilling a different
+  /// request in whichever workspace looked closest.
+  private func openWorkspace(continuing run: RuntimeJobSummaryPresentation) {
+    let parameters = runtimeHistory.detailsByJobID[run.id]?.evidence?.parameters ?? []
+    guard
+      let kind = OverviewActionProjection.workspaceKind(
+        forOperation: run.operationReference, parameters: parameters)
+    else { return }
+    resumingRun = nil
+    onOpenWorkspace(Self.navigation(for: kind))
+  }
+
+  private static func navigation(for kind: OverviewAction.Kind) -> ArkDeckNavigationItem {
+    switch kind {
+    case .uiDump: .uiDump
+    case .trace: .trace
+    case .debugHAP: .debug
+    case .flash: .flash
+    case .toolkit: .toolkit
+    }
   }
 }
 
@@ -609,6 +677,9 @@ private struct AppShellView: View {
     case .navigation(.overview):
       models.hdcDiagnostics.refresh()
       models.overviewCapabilities.refresh()
+      // The record is the page's main content now, so it refreshes with the
+      // page rather than only when History is opened.
+      runtimeHistory.refresh()
     case .navigation(.history):
       runtimeHistory.refresh()
     case .navigation(.flash):
@@ -730,7 +801,12 @@ private struct AppShellView: View {
     case .overview:
       OverviewWorkspaceView(
         hdcDiagnostics: models.hdcDiagnostics,
-        overviewCapabilities: models.overviewCapabilities)
+        overviewCapabilities: models.overviewCapabilities,
+        deviceList: models.deviceList,
+        runtimeHistory: runtimeHistory,
+        onOpenWorkspace: { item in
+          storedSelection = ShellSelection.navigation(item).storageValue
+        })
     case .history:
       RuntimeHistoryView(
         presentation: runtimeHistory.presentation,
