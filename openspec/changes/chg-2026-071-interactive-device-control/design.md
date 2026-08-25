@@ -36,12 +36,11 @@ evidence preflight 与 lane 获取）。会话存续期间：
 - 会话结束（显式退出 / TTL / 预算耗尽 / 漂移 / 断连）时结清 ledger 并
   `recordOutcome`；恢复语义沿用现有 journal replay——恢复只结算，不派发。
 
-**需要维护者裁决的一处 durability 取舍**：input intent 的 journal 追加
-若沿用每条 F_FULLFSYNC×2 + 目录 fsync，成本由 IDC-AC-1 的 Spike 实测；
-若实测超出延迟预算，备选是会话内 group-commit（有界丢失窗口：崩溃时
-最后一组未 fsync 的输入 intent 可能丢失记录——丢的是「审计行」，不是
-「未记账的副作用」，因为丢失窗口内的 dispatch 同样未发生）。两个选项都
-保持 intent-before-effect 的相对顺序；选择权在维护者，Spike 数据先行。
+**durability 取舍——已裁决（2026-08-25，维护者）：保持全量。** Spike 实测
+journal durable append 为 3.6–5.3 ms/条（`evidence/runs/TASK-IDC-001/`），
+每输入 intent+outcome 两条 ≈ 8 ms，在延迟预算内可负担；group-commit 的
+有界丢失窗口不换取任何必要收益，不采用。每条输入 intent 沿用与现有 Job
+step 相同的 F_FULLFSYNC 全量落盘语义。
 
 ## 3. 输入 operations 与 lowering
 

@@ -16,8 +16,9 @@ T02/T03 不进入实现。
   40 MB/三类目 <70 s 回卷的容量数据）、时钟桥 spread 9.7 ms + /proc/uptime 与
   ftrace boot 相差 42.5 h 的时基陷阱 ⇒ Marker 走设备侧 trace_marker、hilog 覆盖在
   采集负载下塌缩到 core 85 s ⇒ 会话需扩容或周期 drain、journal append 3.6–5.3 ms/条
-  ⇒ design.md §2 建议保持全量 durability。开放项：AC-4 的 app 层 HAP 对拍视维护者
-  对方法偏差的裁决）
+  ⇒ design.md §2 建议保持全量 durability。**开放项已裁决（2026-08-25，维护者）：
+  durability 保持全量（design.md §2 已更新）；AC-4 的 shell 级等价物被接受为方法，
+  app 层 HAP 对拍不补做。本任务无剩余开放项**）
 - Golden Journey:GJ-2（测量不改行为；结论决定后续形状）
 - Platform:macos + DAYU200（OpenHarmony 5.0.0.71）
 - Acceptance:IDC-AC-1..4（见 verification.md）
@@ -39,11 +40,25 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-002 — 交互式输入 + Toolkit 真机操作（垂直交付）
 
-- Status:blocked（等 proposal merge 与 TASK-IDC-001 的 Spike 结论）
+- Status:in-progress（2026-08-25 开工。Spike 已定形状：per-invocation 不达标，设备侧
+  常驻注入（`uitest start-daemon`）是达标路径，其落地前 App 输入面按 verification
+  预案走「截图上点选 → 显式确认发送」形态。交付分阶段 PR：① typed input
+  operations + Provider lowering + 契约测试 + 真机单发验证；② Interactive Control
+  Session 会话机械；③ Toolkit App 面与常驻注入升级）
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6
 - Acceptance:IDC-AC-5、IDC-AC-6（输入侧）、IDC-AC-8
+- Allowed paths:
+  - `Catalog/operations/**`
+  - `Catalog/generated/**`
+  - `Packages/ArkDeckKit/Sources/**`
+  - `Packages/ArkDeckKit/Tests/**`
+  - `ArkDeckApp/**`
+  - `ArkDeckAppUITests/**`
+  - `ArkDeck.xcodeproj/**`
+  - 本 change `tasks.md`（仅本任务段的状态/pins/evidence 引用）
+  - 本 change `evidence/runs/TASK-IDC-002/**`
 - 交付内容：
   1. Catalog：`input.tap@1` / `input.long-press@1` / `input.swipe@1`
      （codegen + digest 更新）；`snapshot_display` JPEG 腿。
@@ -60,12 +75,25 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-003 — 环形诊断采集 + Diagnostics Session reader（垂直交付）
 
-- Status:blocked（等 proposal merge 与 TASK-IDC-001 的 Spike 结论；与 T02 可并行实现、共享会话机械）
+- Status:ready（proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
+  Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
+  trace_marker 且必须加落笔回读、回溯窗口与类目集联动预算且 dump 后立即重臂、
+  hilog 按会话时长扩容或周期 drain、core drain 按 bytes + 宽容解码处理）
 - Golden Journey:GJ-2 + GJ-5
 - Platform:macos
 - Requirements:proposal「目标」1/3；design.md §4；
   `diagnostic-mode-design.md` v1.3 §4.4/§12 阶段 1–2
 - Acceptance:IDC-AC-6（截图侧）、IDC-AC-7
+- Allowed paths:
+  - `Catalog/operations/**`
+  - `Catalog/generated/**`
+  - `Packages/ArkDeckKit/Sources/**`
+  - `Packages/ArkDeckKit/Tests/**`
+  - `ArkDeckApp/**`
+  - `ArkDeckAppUITests/**`
+  - `ArkDeck.xcodeproj/**`
+  - 本 change `tasks.md`（仅本任务段的状态/pins/evidence 引用）
+  - 本 change `evidence/runs/TASK-IDC-003/**`
 - 交付内容：
   1. capture.diagnostics@1 additive inputs（`ringBuffered`、markers 通道）
      与三段 ring lowering；`markers.json` Artifact；finalize 阶段的自动
