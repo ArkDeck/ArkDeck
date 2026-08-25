@@ -11,22 +11,22 @@ struct TraceWorkspaceView: View {
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
-      availability
-      target
-      relatedDiagnosticsJobs
-      TraceConfigurationView(model: model)
+      WorkspaceHeaderBar(
+        summary: Text(traceString("trace.workspace.summary")),
+        summaryIdentifier: "trace.workspace.summary")
+
+      WorkspaceSection(
+        Text(traceString("trace.capture.title")),
+        identifier: "trace.capture.section",
+        accessory: { availabilityStatus }
+      ) {
+        TraceConfigurationView(model: model)
+        captureFooter
+      }
+
       TraceProgressArtifactsView(model: model)
-      review
     }
     .toolbar {
-      ToolbarItem {
-        Button {
-          openWindow(id: ArkDeckWindow.traceViewer)
-        } label: {
-          Label(traceString("trace.action.openViewer"), systemImage: "timeline.selection")
-        }
-        .accessibilityIdentifier("trace.openViewer")
-      }
       ToolbarItem(placement: .primaryAction) {
         Button {
           model.refresh()
@@ -43,345 +43,127 @@ struct TraceWorkspaceView: View {
     }
   }
 
-  private var availability: some View {
-    WorkspaceSection(Text(traceString("trace.availability.title"))) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        HStack(alignment: .firstTextBaseline) {
-          availabilityStatus
-          Spacer(minLength: 12)
-          Text(model.workspace.operation.reference)
-            .font(WorkspaceFont.monospacedValue)
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
-        }
-
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: WorkspaceMetrics.blockGap) { capabilityLabels }
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) { capabilityLabels }
-        }
-
-        if !model.hasAdapterCapabilityFacts {
-          traceNotice(
-            traceString("trace.availability.probeGap"),
-            systemImage: "waveform.badge.exclamationmark",
-            color: .orange,
-            identifier: "trace.availability.probeGap")
-        }
-      }
-    }
-  }
-
   @ViewBuilder
   private var availabilityStatus: some View {
-    switch model.workspace.operation.availability {
-    case .checking:
+    if model.isRefreshing || model.workspace.operation.availability == .checking {
       Label(traceString("trace.availability.checking"), systemImage: "hourglass")
+        .foregroundStyle(.secondary)
         .accessibilityIdentifier("trace.availability.status")
-    case .available:
+    } else if model.captureBlockers.isEmpty {
       Label(traceString("trace.availability.available"), systemImage: "checkmark.circle.fill")
         .foregroundStyle(.green)
         .accessibilityIdentifier("trace.availability.status")
-    case .unavailable(let reasons):
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-        Label(
-          traceString("trace.availability.unavailable"), systemImage: "xmark.octagon.fill"
-        )
+    } else {
+      Label(traceString("trace.availability.unavailable"), systemImage: "xmark.circle.fill")
         .foregroundStyle(.red)
         .accessibilityIdentifier("trace.availability.status")
-        ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
-          Text(reason).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+    }
+  }
+
+  private var captureFooter: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      Divider()
+
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .center, spacing: WorkspaceMetrics.blockGap) {
+          captureStatus
+          Spacer(minLength: WorkspaceMetrics.contentGap)
+          captureAction
+        }
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          captureStatus
+          captureAction.frame(maxWidth: .infinity, alignment: .trailing)
         }
       }
     }
   }
 
   @ViewBuilder
-  private var capabilityLabels: some View {
-    traceCapability(
-      traceString("trace.availability.categories"),
-      supported: model.workspace.operation.supportsTypedTraceCategories)
-    traceCapability(
-      traceString("trace.availability.raw"),
-      supported: model.workspace.operation.supportsRawTraceArtifact)
-    traceCapability(
-      traceString("trace.availability.adapter"),
-      supported: model.hasAdapterCapabilityFacts)
-    traceCapability(
-      traceString("trace.availability.parameters"),
-      supported: model.hasParameterSnapshotFacts)
-  }
-
-  private var target: some View {
-    WorkspaceSection(Text(traceString("trace.target.title"))) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        if model.targets.isEmpty {
-          traceNotice(
-            model.workspace.targetLoadFailure ?? traceString("trace.target.empty"),
-            systemImage: "externaldrive.badge.questionmark",
-            color: .secondary,
-            identifier: "trace.target.empty")
-        } else {
-          Picker(traceString("trace.target.label"), selection: targetBinding) {
-            ForEach(model.targets) { target in
-              VStack(alignment: .leading, spacing: 2) {
-                Text(model.deviceTitle(target))
-                if let summary = target.connectionSummary {
-                  Text(summary)
-                    .font(WorkspaceFont.caption)
-                    .foregroundStyle(.secondary)
-                }
-              }
-              .tag(target.id)
-            }
-          }
-          .frame(maxWidth: 460, alignment: .leading)
-          .accessibilityIdentifier("trace.target.picker")
-        }
-
-        if let target = model.selectedTarget {
-          if let summary = target.connectionSummary {
-            Text(summary)
-              .font(WorkspaceFont.caption)
-              .foregroundStyle(.secondary)
-              .accessibilityLabel(target.accessibleConnectionSummary ?? summary)
-              .accessibilityIdentifier("trace.target.deviceSummary")
-          }
-          Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: 5) {
-            traceReviewRow(
-              traceString("trace.target.binding"), String(target.bindingRevision),
-              monospaced: true)
-            traceReviewRow(
-              traceString("trace.target.tool"), hdcVersionLabel(target.toolVersion),
-              monospaced: true)
-            traceReviewRow(
-              traceString("trace.target.adopted"), target.adoptedAtUTC,
-              monospaced: true)
-          }
-        }
+  private var captureStatus: some View {
+    if model.isSubmitting {
+      HStack(spacing: WorkspaceMetrics.tightGap) {
+        ProgressView().controlSize(.small)
+        Text(traceString("trace.action.running"))
       }
-    }
-  }
-
-  @ViewBuilder
-  private var relatedDiagnosticsJobs: some View {
-    if let failure = model.workspace.jobLoadFailure {
-      traceNotice(
-        failure,
-        systemImage: "exclamationmark.triangle",
-        color: .orange,
-        identifier: "trace.jobs.failure")
-    } else if !model.workspace.relatedDiagnosticsJobs.isEmpty {
-      WorkspaceSection(Text(traceString("trace.jobs.title"))) {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-          ForEach(model.workspace.relatedDiagnosticsJobs.prefix(3)) { job in
-            HStack(spacing: WorkspaceMetrics.tightGap) {
-              if job.needsAttention {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-              } else if traceActiveJobStates.contains(job.state) {
-                ProgressView().controlSize(.small)
-              } else {
-                Image(systemName: "clock").foregroundStyle(.secondary)
-              }
-              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                Text(job.id).font(WorkspaceFont.monospacedValue)
-                Text(traceString("trace.jobs.selectionUnknown"))
-                  .font(WorkspaceFont.caption)
-                  .foregroundStyle(.secondary)
-              }
-              Spacer(minLength: 12)
-              Text(job.state)
-              Text(job.targetID).font(WorkspaceFont.monospacedDense).foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-          }
-          Text(traceString("trace.jobs.readOnly"))
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-        }
-      }
-    }
-  }
-
-  private var review: some View {
-    WorkspaceSection(Text(traceString("trace.review.title"))) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-        Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.rowGap) {
-          traceReviewRow(
-            traceString("trace.review.target"),
-            model.selectedTarget?.id ?? traceString("trace.value.notSelected"),
-            monospaced: model.selectedTarget != nil)
-          traceReviewRow(
-            traceString("trace.review.preset"), model.configurationTitle)
-          traceReviewRow(
-            traceString("trace.review.tags"),
-            model.requestedTags.isEmpty
-              ? traceString("trace.value.none") : model.requestedTags.joined(separator: ", "),
-            monospaced: true)
-          traceReviewRow(
-            traceString("trace.review.duration"), model.durationDisplayText,
-            monospaced: true)
-          traceReviewRow(
-            traceString("trace.review.buffer"), "\(model.bufferText) KB",
-            monospaced: true)
-          traceReviewRow(
-            traceString("trace.review.effect"), "deviceMutation",
-            monospaced: true)
-          traceReviewRow(
-            traceString("trace.review.cancellation"),
-            model.workspace.operation.traceStepCancellation
-              ?? traceString("trace.value.unavailable"),
-            monospaced: true)
-        }
-
-        Divider()
-
-        Text(traceString("trace.review.blockers"))
-          .font(WorkspaceFont.label)
-        if reviewBlockers.isEmpty {
-          Label(traceString("trace.review.ready"), systemImage: "checkmark.shield.fill")
-            .font(.callout)
-            .foregroundStyle(.green)
-        } else {
-          ForEach(Array(reviewBlockers.enumerated()), id: \.offset) { _, blocker in
-            Label(blocker, systemImage: "xmark.circle")
-              .font(.callout)
-              .foregroundStyle(.red)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-
-        HStack {
-          if let activeJobID = model.activeJobID {
-            Button(traceString("trace.action.cancel")) { model.cancel() }
-              .disabled(model.isCancelling)
-              .accessibilityIdentifier("trace.cancel")
-            Text(activeJobID)
-              .font(WorkspaceFont.monospacedDense)
-              .foregroundStyle(.secondary)
-              .lineLimit(1)
-              .truncationMode(.middle)
-          }
-          Spacer()
-          Button(model.isSubmitting ? traceString("trace.action.running") : startActionTitle) {
-            model.submit()
-          }
-          .buttonStyle(.borderedProminent)
-          .accessibilityIdentifier("trace.start")
-          .disabled(!reviewBlockers.isEmpty || model.isSubmitting)
-          .help(reviewBlockers.joined(separator: "\n"))
-        }
-        if let failure = model.submissionFailure {
-          Label(failure, systemImage: "exclamationmark.triangle.fill")
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("trace.submission.failure")
-        } else if let terminal = model.terminalSubmission {
-          // An unknown outcome is a state, so it carries a symbol as well as a
-          // colour (spec §2, §4.4).
-          Label {
-            Text("\(terminal.state) · \(terminal.jobID)")
-              .textSelection(.enabled)
-          } icon: {
-            Image(systemName: terminal.outcomeUnknown ? "questionmark.diamond.fill" : "clock")
-          }
-          .font(WorkspaceFont.monospacedDense)
-          .foregroundStyle(terminal.outcomeUnknown ? Color.orange : Color.secondary)
-        }
-        Text(traceString("trace.review.typedDispatch"))
-          .font(WorkspaceFont.secondary)
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("trace.capture.status")
+    } else if let failure = model.submissionFailure {
+      Label(failure, systemImage: "exclamationmark.triangle.fill")
+        .foregroundStyle(.red)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("trace.submission.failure")
+    } else if let terminal = model.terminalSubmission {
+      if terminal.outcomeUnknown {
+        Label(
+          traceString("trace.capture.outcomeUnknown"),
+          systemImage: "questionmark.diamond.fill")
+          .foregroundStyle(.orange)
+          .accessibilityIdentifier("trace.capture.status")
+      } else if terminal.state == "succeeded" {
+        Label(traceString("trace.capture.finished"), systemImage: "checkmark.circle.fill")
+          .foregroundStyle(.green)
+          .accessibilityIdentifier("trace.capture.status")
+      } else {
+        Label(traceString("trace.capture.notCompleted"), systemImage: "xmark.circle")
           .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .trailing)
+          .accessibilityIdentifier("trace.capture.status")
       }
+    } else if let blocker = model.captureBlockers.first {
+      Label(blocker, systemImage: "exclamationmark.circle")
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .help(model.captureBlockerDetails.joined(separator: "\n"))
+        .accessibilityIdentifier("trace.capture.status")
+    } else {
+      Label(traceString("trace.capture.localOnly"), systemImage: "lock")
+        .foregroundStyle(.secondary)
+        .accessibilityIdentifier("trace.capture.status")
     }
   }
 
-  /// The button admits what it would do: a run that mutates parameters says
-  /// so before capturing, and the configuration name and duration ride along
-  /// so the reader can match them against the left column before acting.
-  private var startActionTitle: String {
-    let resource =
-      model.parameterMode == .unchanged
-      ? LocalizedStringResource.TraceLocalizable.traceActionStartNamed(
-        model.configurationTitle, model.durationDisplayText)
-      : LocalizedStringResource.TraceLocalizable.traceActionApplyAndStartNamed(
-        model.configurationTitle, model.durationDisplayText)
-    return String(localized: resource)
-  }
-
-  private func hdcVersionLabel(_ version: String) -> String {
-    let value = version.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !value.isEmpty else { return "hdc" }
-    if value.lowercased().hasPrefix("hdc ") { return value }
-    if value.first?.lowercased() == "v" { return "hdc \(value)" }
-    if value.first?.isNumber == true, value.contains(".") { return "hdc v\(value)" }
-    return "hdc \(value)"
-  }
-
-  private var reviewBlockers: [String] {
-    var values: [String] = []
-    switch model.workspace.operation.availability {
-    case .checking:
-      values.append(traceString("trace.blocker.checking"))
-    case .unavailable(let reasons):
-      values.append(traceString("trace.blocker.operation"))
-      values.append(contentsOf: reasons)
-    case .available:
-      break
+  @ViewBuilder
+  private var captureAction: some View {
+    if let activeJobID = model.activeJobID {
+      HStack(spacing: WorkspaceMetrics.contentGap) {
+        Text(activeJobID)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        Button(traceString("trace.action.cancel"), role: .cancel) {
+          model.cancel()
+        }
+        .keyboardShortcut(.cancelAction)
+        .disabled(model.isCancelling)
+        .accessibilityIdentifier("trace.cancel")
+      }
+    } else {
+      Button(traceString("trace.action.start")) {
+        model.submit()
+      }
+      .buttonStyle(.borderedProminent)
+      .keyboardShortcut(.defaultAction)
+      .disabled(model.isSubmitting)
+      .help(model.captureBlockerDetails.joined(separator: "\n"))
+      .accessibilityHint(model.captureBlockers.first ?? "")
+      .accessibilityIdentifier("trace.start")
     }
-    if model.selectedTarget == nil {
-      values.append(traceString("trace.blocker.target"))
-    }
-    if !model.durationIsValid {
-      values.append(traceString("trace.blocker.duration"))
-    }
-    if !model.bufferIsValid {
-      values.append(traceString("trace.blocker.buffer"))
-    }
-    if !model.hasAdapterCapabilityFacts {
-      values.append(traceString("trace.blocker.adapter"))
-    }
-    // Two distinct failures share this list: an empty request (a capture
-    // always carries at least one tag) and a non-empty one whose members no
-    // probe has classified yet. Neither implies the other.
-    if model.requestedTags.isEmpty {
-      values.append(traceString("trace.blocker.noTags"))
-    } else if !model.unsupportedRequestedTags.isEmpty {
-      values.append(traceString("trace.blocker.tags"))
-    }
-    if !model.hasParameterSnapshotFacts {
-      values.append(traceString("trace.blocker.parameters"))
-    }
-    return values
-  }
-
-  private var targetBinding: Binding<String> {
-    Binding(
-      get: { model.selectedTargetID },
-      set: { model.setTargetID($0) })
   }
 }
 
 @MainActor
 @Observable
 final class TraceWorkspaceViewModel {
+  private static let defaultBufferKB = 8_192
+
   private(set) var workspace = TraceWorkspacePresentation.loading
   private(set) var selectedTargetID = ""
   private(set) var deviceObservation = DeviceListPresentation.loading
   private(set) var deviceNames: [String: String] = [:]
-  private(set) var configurationMode = TraceConfigurationMode.preset
   private(set) var selectedPresetID = TracePresetID.arkuiDeep
-  private(set) var customTags: Set<String> = []
   private(set) var durationText = "15"
   private(set) var durationUnit = TraceDurationInputUnit.seconds
-  private(set) var bufferText = "8192"
-  private(set) var parameterMode = TraceParameterUISelection.unchanged
-  private(set) var persistentChangeConfirmed = false
-  private(set) var filtersCreateFileAsset = false
   private(set) var isRefreshing = false
-  private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
-  private(set) var artifactFailuresByJobID: [String: String] = [:]
-  private(set) var evidenceByJobID: [String: RuntimeJobEvidencePresentation] = [:]
   private(set) var activeJobID: String?
   private(set) var terminalSubmission: TraceJobTerminalPresentation?
   private(set) var submissionFailure: String?
@@ -415,6 +197,129 @@ final class TraceWorkspaceViewModel {
     targets.first { $0.id == selectedTargetID }
   }
 
+  var capturePresets: [TracePresetDefinition] {
+    TracePresetCatalog.definitions.filter { $0.id != .custom }
+  }
+
+  var selectedPreset: TracePresetDefinition {
+    TracePresetCatalog.definition(for: selectedPresetID)
+  }
+
+  var requestedTags: [String] {
+    selectedPreset.logicalTags
+  }
+
+  var selectedRuntimeProbe: TraceRuntimeProbeSnapshot? {
+    guard let probe = workspace.runtimeProbe,
+      probe.targetID == selectedTargetID,
+      probe.bindingRevision == selectedTarget?.bindingRevision
+    else { return nil }
+    return probe
+  }
+
+  var hasAdapterCapabilityFacts: Bool {
+    selectedRuntimeProbe?.adapterDisposition == "captureEligible"
+  }
+
+  var hasParameterSnapshotFacts: Bool {
+    selectedRuntimeProbe?.parameters.count == TraceDebugParameterCatalog.definitions.count
+  }
+
+  var confirmedTags: [String] {
+    selectedRuntimeProbe?.supportedTags ?? []
+  }
+
+  var unsupportedRequestedTags: [String] {
+    requestedTags.filter { !confirmedTags.contains($0) }
+  }
+
+  var durationRange: ClosedRange<Int> {
+    workspace.operation.durationSecondsRange ?? 1...600
+  }
+
+  var availableDurationUnits: [TraceDurationInputUnit] {
+    TraceDurationInputUnit.allCases.filter {
+      $0.inputRange(forDurationSecondsRange: durationRange) != nil
+    }
+  }
+
+  var durationInputRange: ClosedRange<Int> {
+    durationUnit.inputRange(forDurationSecondsRange: durationRange) ?? durationRange
+  }
+
+  var durationValidation: TraceNumericInputValidation {
+    let input = TraceNumericInputValidator.validate(durationText, range: durationInputRange)
+    guard case .valid(let inputValue) = input else { return input }
+    guard
+      let seconds = durationUnit.durationSeconds(
+        for: inputValue,
+        allowedRange: durationRange)
+    else { return .invalid(.outsideRange(durationInputRange)) }
+    return .valid(seconds)
+  }
+
+  var durationIsValid: Bool {
+    if case .valid = durationValidation { return true }
+    return false
+  }
+
+  var captureBufferKB: Int? {
+    let range = workspace.operation.traceBufferKBRange ?? 1_024...65_536
+    guard range.contains(Self.defaultBufferKB) else { return nil }
+    return Self.defaultBufferKB
+  }
+
+  var captureBlockers: [String] {
+    var blockers: [String] = []
+    switch workspace.operation.availability {
+    case .checking:
+      blockers.append(traceString("trace.blocker.checking"))
+    case .unavailable(let reasons):
+      blockers.append(traceString("trace.blocker.operation"))
+      blockers.append(contentsOf: reasons)
+    case .available:
+      break
+    }
+    if selectedTarget == nil {
+      blockers.append(traceString("trace.blocker.target"))
+    }
+    if !durationIsValid {
+      blockers.append(traceString("trace.blocker.duration"))
+    }
+    if captureBufferKB == nil {
+      blockers.append(traceString("trace.blocker.buffer"))
+    }
+    if selectedRuntimeProbe == nil {
+      blockers.append(traceString("trace.blocker.capability"))
+    } else if !hasAdapterCapabilityFacts {
+      blockers.append(traceString("trace.blocker.adapterUnsupported"))
+    } else {
+      if !hasParameterSnapshotFacts {
+        blockers.append(traceString("trace.blocker.capability"))
+      }
+      if requestedTags.isEmpty {
+        blockers.append(traceString("trace.blocker.noTags"))
+      } else if !unsupportedRequestedTags.isEmpty {
+        blockers.append(traceString("trace.blocker.tags"))
+      }
+    }
+    return blockers
+  }
+
+  var captureBlockerDetails: [String] {
+    var details = captureBlockers
+    if let probeFailure = workspace.probeFailure,
+      !probeFailure.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      details.append(probeFailure)
+    }
+    return details
+  }
+
+  var canStartCapture: Bool {
+    !isSubmitting && captureBlockers.isEmpty
+  }
+
   func applyDeviceObservation(
     _ observation: DeviceListPresentation,
     names: [String: String]
@@ -433,161 +338,46 @@ final class TraceWorkspaceViewModel {
     return target.id
   }
 
-  var runtimeArtifacts: [RuntimeArtifactPresentation] {
-    workspace.relatedDiagnosticsJobs
-      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
-      .flatMap { artifactsByJobID[$0.id] ?? [] }
-  }
-
-  var runtimeArtifactFailures: [String] {
-    workspace.relatedDiagnosticsJobs
-      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
-      .compactMap { artifactFailuresByJobID[$0.id] }
-  }
-
-  var latestTraceEvidence: RuntimeJobEvidencePresentation? {
-    workspace.relatedDiagnosticsJobs
-      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
-      .compactMap { evidenceByJobID[$0.id] }
-      .first { !$0.traceParameters.isEmpty }
-  }
-
-  func traceParameterEvidence(name: String) -> RuntimeTraceParameterPresentation? {
-    latestTraceEvidence?.traceParameters.first { $0.name == name }
-  }
-
-  var selectedPreset: TracePresetDefinition {
-    TracePresetCatalog.definition(for: selectedPresetID)
-  }
-
-  var hasAdapterCapabilityFacts: Bool {
-    selectedRuntimeProbe?.adapterDisposition == "captureEligible"
-  }
-
-  var hasParameterSnapshotFacts: Bool {
-    selectedRuntimeProbe?.parameters.count == TraceDebugParameterCatalog.definitions.count
-  }
-
-  var confirmedTags: [String] { selectedRuntimeProbe?.supportedTags ?? [] }
-
-  var unsupportedRequestedTags: [String] {
-    requestedTags.filter { !confirmedTags.contains($0) }
-  }
-
-  func parameterObservation(name: String) -> TraceRuntimeParameterObservation? {
-    selectedRuntimeProbe?.parameters.first { $0.name == name }
-  }
-
-  var selectedRuntimeProbe: TraceRuntimeProbeSnapshot? {
-    guard let probe = workspace.runtimeProbe,
-      probe.targetID == selectedTargetID,
-      probe.bindingRevision == selectedTarget?.bindingRevision
-    else { return nil }
-    return probe
-  }
-
-  var requestedTags: [String] {
-    configurationMode == .preset ? selectedPreset.logicalTags : customTags.sorted()
-  }
-
-  var configurationTitle: String {
-    configurationMode == .preset
-      ? traceString("trace.preset.\(selectedPresetID.rawValue)")
-      : traceString("trace.configuration.custom")
-  }
-
-  var durationRange: ClosedRange<Int> {
-    workspace.operation.durationSecondsRange ?? 1...600
-  }
-
-  var availableDurationUnits: [TraceDurationInputUnit] {
-    TraceDurationInputUnit.allCases.filter {
-      $0.inputRange(forDurationSecondsRange: durationRange) != nil
-    }
-  }
-
-  var durationInputRange: ClosedRange<Int> {
-    durationUnit.inputRange(forDurationSecondsRange: durationRange) ?? durationRange
-  }
-
-  var bufferRange: ClosedRange<Int> {
-    workspace.operation.traceBufferKBRange ?? 1_024...65_536
-  }
-
-  var durationValidation: TraceNumericInputValidation {
-    let input = TraceNumericInputValidator.validate(durationText, range: durationInputRange)
-    guard case .valid(let inputValue) = input else { return input }
-    guard
-      let seconds = durationUnit.durationSeconds(
-        for: inputValue,
-        allowedRange: durationRange)
-    else { return .invalid(.outsideRange(durationInputRange)) }
-    return .valid(seconds)
-  }
-
-  var durationDisplayText: String {
-    "\(durationText) \(durationUnit == .seconds ? "s" : "min")"
-  }
-
-  var bufferValidation: TraceNumericInputValidation {
-    TraceNumericInputValidator.validate(bufferText, range: bufferRange)
-  }
-
-  var durationIsValid: Bool {
-    if case .valid = durationValidation { return true }
-    return false
-  }
-
-  var bufferIsValid: Bool {
-    if case .valid = bufferValidation { return true }
-    return false
-  }
-
-  var canUseTemporaryRestore: Bool { false }
-  var canUsePersistentChange: Bool { false }
-
   func refresh() {
     guard !isRefreshing else { return }
     isRefreshing = true
     let provider = provider
-    let detailProvider = detailProvider
-    let targetID = selectedTargetID
+    let requestedTargetID = selectedTargetID
     Task { [weak self] in
       let next = await provider.refreshWorkspace(
-        targetID: targetID.isEmpty ? nil : targetID)
+        targetID: requestedTargetID.isEmpty ? nil : requestedTargetID)
       guard let self else { return }
-      defer { self.isRefreshing = false }
-      guard !Task.isCancelled else { return }
-      let previousTarget = self.selectedTarget
-      let nextTargetID =
-        next.targets.contains(where: { $0.id == self.selectedTargetID })
-        ? self.selectedTargetID
-        : next.targets.first?.id ?? ""
-      self.workspace = next
-      self.selectedTargetID = nextTargetID
-      var artifacts: [String: [RuntimeArtifactPresentation]] = [:]
-      var failures: [String: String] = [:]
-      var evidence: [String: RuntimeJobEvidencePresentation] = [:]
-      for job in next.relatedDiagnosticsJobs.prefix(3) {
-        let detail = await detailProvider.loadJobDetail(
-          jobID: job.id,
-          operationReference: TraceApplicationFacade.operationReference)
-        switch detail.artifactAvailability {
-        case .available:
-          artifacts[job.id] = detail.artifacts
-        case .unavailable(let reason):
-          failures[job.id] = reason
-        }
-        if let jobEvidence = detail.evidence, !jobEvidence.traceParameters.isEmpty {
-          evidence[job.id] = jobEvidence
-        }
+      guard !Task.isCancelled else {
+        self.isRefreshing = false
+        return
       }
-      guard !Task.isCancelled else { return }
-      self.artifactsByJobID = artifacts
-      self.artifactFailuresByJobID = failures
-      self.evidenceByJobID = evidence
-      if previousTarget != self.selectedTarget {
-        self.resetTargetScopedReview()
+      let selectionAtCompletion = self.selectedTargetID
+      let resolvedTargetID: String
+      if !selectionAtCompletion.isEmpty,
+        next.targets.contains(where: { $0.id == selectionAtCompletion })
+      {
+        resolvedTargetID = selectionAtCompletion
+      } else if let connectedTargetID = self.preferredConnectedTargetID(in: next.targets) {
+        resolvedTargetID = connectedTargetID
+      } else if let probedTargetID = next.runtimeProbe?.targetID,
+        next.targets.contains(where: { $0.id == probedTargetID })
+      {
+        resolvedTargetID = probedTargetID
+      } else {
+        resolvedTargetID = next.targets.first?.id ?? ""
+      }
+      self.workspace = next
+      self.selectedTargetID = resolvedTargetID
+      self.isRefreshing = false
+
+      // A picker change may arrive while the previous target's probe is in
+      // flight. Never apply those capability facts to the new selection;
+      // immediately request the exact target/binding instead.
+      let selectionChangedDuringRefresh = resolvedTargetID != requestedTargetID
+      if selectionChangedDuringRefresh,
+        next.runtimeProbe?.targetID != resolvedTargetID
+      {
+        self.refresh()
       }
     }
   }
@@ -595,41 +385,19 @@ final class TraceWorkspaceViewModel {
   func setTargetID(_ targetID: String) {
     guard selectedTargetID != targetID else { return }
     selectedTargetID = targetID
-    resetTargetScopedReview()
+    submissionFailure = nil
     refresh()
   }
 
-  /// Custom is another entry to the same request, not a second run mode: it
-  /// starts from the current preset's tag set instead of an empty selection.
-  func setConfigurationMode(_ mode: TraceConfigurationMode) {
-    configurationMode = mode
-    if mode == .custom { customTags = Set(selectedPreset.logicalTags) }
-  }
-
-  /// A capture always carries at least one tag, so the last member of the
-  /// custom selection cannot be toggled off. Tags outside the preset's
-  /// logical family have no probe-backed vocabulary and are rejected.
-  func toggleCustomTag(_ tag: String) {
-    guard configurationMode == .custom, selectedPreset.logicalTags.contains(tag) else { return }
-    if customTags.contains(tag) {
-      guard customTags.count > 1 else { return }
-      customTags.remove(tag)
-    } else {
-      customTags.insert(tag)
-    }
-  }
-
   func setPreset(_ preset: TracePresetID) {
-    guard preset != .custom else {
-      setConfigurationMode(.custom)
-      return
-    }
+    guard preset != .custom else { return }
     selectedPresetID = preset
-    configurationMode = .preset
+    submissionFailure = nil
   }
 
   func setDurationText(_ value: String) {
     durationText = value
+    submissionFailure = nil
   }
 
   func setDurationUnit(_ unit: TraceDurationInputUnit) {
@@ -644,52 +412,49 @@ final class TraceWorkspaceViewModel {
     }
     guard
       let value = unit.inputValue(
-      forDurationSeconds: currentSeconds,
-      allowedRange: durationRange)
+        forDurationSeconds: currentSeconds,
+        allowedRange: durationRange)
     else { return }
     durationUnit = unit
     durationText = String(value)
+    submissionFailure = nil
   }
 
   func selectQuickDuration(_ value: Int) {
     guard durationUnit.quickValues.contains(value), quickDurationIsAvailable(value) else { return }
     durationText = String(value)
+    submissionFailure = nil
   }
 
   func quickDurationIsAvailable(_ value: Int) -> Bool {
     durationUnit.durationSeconds(for: value, allowedRange: durationRange) != nil
   }
 
-  func setParameterMode(_ mode: TraceParameterUISelection) {
-    guard
-      mode == .unchanged
-        || (mode == .temporaryRestore && canUseTemporaryRestore)
-        || (mode == .persistentChange && canUsePersistentChange)
-    else { return }
-    parameterMode = mode
-    persistentChangeConfirmed = false
-  }
-
-  func setPersistentChangeConfirmed(_ confirmed: Bool) {
-    guard parameterMode == .persistentChange, canUsePersistentChange else { return }
-    persistentChangeConfirmed = confirmed
-  }
-
-  func setFiltersCreateFileAsset(_ filters: Bool) {
-    guard workspace.operation.supportsFilteredTraceArtifact else {
-      filtersCreateFileAsset = false
-      return
-    }
-    filtersCreateFileAsset = filters
+  private func preferredConnectedTargetID(
+    in targets: [TraceTargetPresentation]
+  ) -> String? {
+    guard case .available = deviceObservation.availability else { return nil }
+    return deviceObservation.candidates.first { candidate in
+      guard candidate.isAuthorized,
+        let targetID = candidate.adoptedTargetID,
+        let bindingRevision = candidate.bindingRevision
+      else { return false }
+      return targets.contains {
+        $0.id == targetID && $0.bindingRevision == bindingRevision
+      }
+    }?.adoptedTargetID
   }
 
   func submit() {
-    guard !isSubmitting, let target = selectedTarget,
+    guard !isSubmitting else { return }
+    guard canStartCapture else {
+      submissionFailure = captureBlockers.first
+      return
+    }
+    guard
+      let target = selectedTarget,
       case .valid(let durationSeconds) = durationValidation,
-      case .valid(let bufferKB) = bufferValidation,
-      hasAdapterCapabilityFacts, hasParameterSnapshotFacts,
-      !requestedTags.isEmpty, unsupportedRequestedTags.isEmpty,
-      parameterMode == .unchanged
+      let bufferKB = captureBufferKB
     else { return }
     isSubmitting = true
     activeJobID = nil
@@ -726,7 +491,8 @@ final class TraceWorkspaceViewModel {
           if terminal.state == "succeeded", !terminal.outcomeUnknown {
             await self.openPublishedTrace(jobID: terminal.jobID)
           }
-        case .failed(let failure): self.submissionFailure = failure
+        case .failed(let failure):
+          self.submissionFailure = failure
         }
         self.refresh()
       }
@@ -775,10 +541,7 @@ final class TraceWorkspaceViewModel {
       viewerArtifactFailure = traceString("trace.viewer.artifactListUnavailable")
       return
     }
-    artifactsByJobID[jobID] = detail.artifacts
-    guard let artifact = TracePublishedArtifactPolicy.selectRawTrace(
-      from: detail.artifacts
-    ) else {
+    guard let artifact = TracePublishedArtifactPolicy.selectRawTrace(from: detail.artifacts) else {
       viewerArtifactFailure = traceString("trace.viewer.artifactInvalid")
       return
     }
@@ -811,10 +574,7 @@ final class TraceWorkspaceViewModel {
         (byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9"))
           || (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "f"))
       }),
-      let cache = FileManager.default.urls(
-        for: .cachesDirectory,
-        in: .userDomainMask
-      ).first
+      let cache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
     else { throw TraceViewerInboxError.unavailable }
     let root = cache
       .appending(path: "ArkDeck", directoryHint: .isDirectory)
@@ -823,9 +583,7 @@ final class TraceWorkspaceViewModel {
       at: root,
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    let rootValues = try root.resourceValues(forKeys: [
-      .isDirectoryKey, .isSymbolicLinkKey,
-    ])
+    let rootValues = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
     guard rootValues.isDirectory == true, rootValues.isSymbolicLink != true else {
       throw TraceViewerInboxError.unavailable
     }
@@ -836,20 +594,12 @@ final class TraceWorkspaceViewModel {
       .resolvingSymlinksInPath()
       .appending(path: "\(sha256).htrace", directoryHint: .notDirectory)
     if FileManager.default.fileExists(atPath: destination.path) {
-      let values = try destination.resourceValues(forKeys: [
-        .isRegularFileKey, .isSymbolicLinkKey,
-      ])
+      let values = try destination.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
       guard values.isRegularFile == true, values.isSymbolicLink != true else {
         throw TraceViewerInboxError.unavailable
       }
     }
     return destination
-  }
-
-  private func resetTargetScopedReview() {
-    customTags = configurationMode == .custom ? Set(selectedPreset.logicalTags) : []
-    parameterMode = .unchanged
-    persistentChangeConfirmed = false
   }
 }
 
@@ -857,32 +607,8 @@ private enum TraceViewerInboxError: Error {
   case unavailable
 }
 
-enum TraceConfigurationMode: String, CaseIterable, Hashable {
-  case preset
-  case custom
-}
-
-enum TraceParameterUISelection: String, CaseIterable, Hashable {
-  case unchanged
-  case temporaryRestore
-  case persistentChange
-}
-
-let traceActiveJobStates: Set<String> = [
-  "queued", "planning", "preflight", "running", "finalizing", "waitingForDevice",
-  "awaitingRebindConfirmation", "cancellingAtSafeBoundary", "reconciling",
-]
-
 func traceString(_ key: String) -> String {
   String(localized: String.LocalizationValue(key), table: "TraceLocalizable")
-}
-
-func traceCapability(_ title: String, supported: Bool) -> some View {
-  Label(title, systemImage: supported ? "checkmark.circle.fill" : "xmark.circle.fill")
-    .font(.callout)
-    .foregroundStyle(supported ? Color.green : Color.secondary)
-    .accessibilityValue(
-      supported ? traceString("trace.value.supported") : traceString("trace.value.unavailable"))
 }
 
 func traceNotice(
@@ -909,21 +635,4 @@ func traceNotice(
       .stroke(color.opacity(0.38), lineWidth: 1)
   }
   .accessibilityIdentifier(identifier)
-}
-
-func traceReviewRow(
-  _ label: String,
-  _ value: String,
-  monospaced: Bool = false
-) -> some View {
-  GridRow(alignment: .firstTextBaseline) {
-    Text(label)
-      .foregroundStyle(.secondary)
-      .gridColumnAlignment(.trailing)
-    Text(value)
-      .font(monospaced ? .body.monospaced() : .body)
-      .textSelection(.enabled)
-      .fixedSize(horizontal: false, vertical: true)
-      .gridColumnAlignment(.leading)
-  }
 }

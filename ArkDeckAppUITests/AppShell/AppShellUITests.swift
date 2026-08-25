@@ -108,8 +108,8 @@ final class AppShellUITests: XCTestCase {
           "Provider invocation disclosure",
         ],
         viewerEmptyTitle: "No verified capture",
-        traceAvailable: "Diagnostics operation is available",
-        traceUnavailable: "Diagnostics operation is unavailable",
+        traceAvailable: "Ready",
+        traceUnavailable: "Unavailable",
         settingsPanes: ["General", "Toolchains", "Storage", "Updates", "Diagnostics"]),
       history: History(
         readOnlyNote:
@@ -155,8 +155,8 @@ final class AppShellUITests: XCTestCase {
           "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则", "Provider 调用披露",
         ],
         viewerEmptyTitle: "没有已验证的 capture",
-        traceAvailable: "诊断操作可用",
-        traceUnavailable: "诊断操作不可用",
+        traceAvailable: "可以抓取",
+        traceUnavailable: "暂时无法抓取",
         settingsPanes: ["通用", "工具链", "存储", "更新", "诊断"]),
       history: History(
         readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
@@ -539,16 +539,16 @@ final class AppShellUITests: XCTestCase {
       file: file, line: line)
     XCTAssertFalse(app.staticTexts["app.unavailable.title"].exists, file: file, line: line)
 
-    // Trace likewise keeps the bounded configuration visible and its start
-    // action locked while production capability facts are unavailable.
+    // Trace keeps only the ArkTrace-style capture inputs and viewer entry in
+    // the primary workspace. Runtime capability facts still lock the action.
     select("app.navigation.trace", in: app)
     let traceAvailability = element("trace.availability.status", in: app)
     assertDisplayed(
       traceAvailability,
       oneOf: [workspaces.traceAvailable, workspaces.traceUnavailable], timeout: 10)
     for identifier in [
-      "trace.configuration.mode", "trace.preset.picker", "trace.duration.input",
-      "trace.duration.unit", "trace.duration.quick", "trace.buffer",
+      "trace.profile.picker", "trace.duration.input", "trace.duration.unit",
+      "trace.duration.quick", "trace.openViewer",
     ] {
       XCTAssertTrue(
         element(identifier, in: app).exists, "\(identifier) missing",
@@ -561,25 +561,20 @@ final class AppShellUITests: XCTestCase {
       file: file, line: line)
     let traceStart = app.buttons["trace.start"]
     XCTAssertTrue(traceStart.exists, file: file, line: line)
-    if traceHasEmptyTarget
-      || displayedValues(for: traceAvailability).contains(workspaces.traceUnavailable)
-    {
-      XCTAssertFalse(traceStart.isEnabled, file: file, line: line)
-    }
-    XCTAssertFalse(app.staticTexts["app.unavailable.title"].exists, file: file, line: line)
-
-    // Custom is another entry to the same request: it arrives carrying the
-    // current preset's tag family instead of an empty selection, and the
-    // members render as individually toggleable chips with a count.
-    element("trace.configuration.mode.custom", in: app).click()
     XCTAssertTrue(
-      element("trace.custom.count", in: app).waitForExistenceFast(timeout: 5),
-      "custom mode must arrive with the preset's tags selected",
+      traceStart.isEnabled,
+      "Start capture must remain actionable so validation is visible instead of hidden in a disabled control",
       file: file, line: line)
-    XCTAssertTrue(
-      element("trace.custom.tag.ace", in: app).exists,
-      "preset members must be visible as toggles", file: file, line: line)
-    element("trace.configuration.mode.preset", in: app).click()
+    XCTAssertFalse(app.staticTexts["app.unavailable.title"].exists, file: file, line: line)
+    for removedControl in [
+      "trace.configuration.mode", "trace.buffer", "trace.parameters.table",
+      "trace.filter.createFileAsset",
+    ] {
+      XCTAssertFalse(
+        element(removedControl, in: app).exists,
+        "advanced Trace control \(removedControl) must stay out of the simplified workspace",
+        file: file, line: line)
+    }
 
     // History renders real Runtime facts and offers no way to submit.
     select("app.navigation.history", in: app)
