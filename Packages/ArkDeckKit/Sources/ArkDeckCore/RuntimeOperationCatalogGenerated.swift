@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "9f99789a536394b34b798951a0d5a1a59f8f860c23ac5b328e17b697d7bedafe"
+  public static let catalogDigest = "2690dbfdb47889e6e367e33c16492f193b64300f311b6387df501b73d2381c4d"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -425,7 +425,10 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
+        CatalogFieldDescriptor(name: "displayHeight", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Height in device pixels of the frame the gesture was computed from. See displayWidth."),
         CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "displayWidth", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Width in device pixels of the frame the gesture was computed from. Supplied together with displayHeight it bounds the coordinates host-side before dispatch, and it joins the authorized subject so a rotation or resolution change cannot reuse the session's authorization."),
+        CatalogFieldDescriptor(name: "screenEpochUtc", type: .string, isRequired: false, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$", maxLength: 32, summary: "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on."),
         CatalogFieldDescriptor(name: "x", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the long-press, anchored at the pointer-down position after content-rect mapping; never a raw host coordinate."),
         CatalogFieldDescriptor(name: "y", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the long-press, anchored at the pointer-down position.")
       ],
@@ -459,10 +462,13 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
+        CatalogFieldDescriptor(name: "displayHeight", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Height in device pixels of the frame the gesture was computed from. See displayWidth."),
         CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "displayWidth", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Width in device pixels of the frame the gesture was computed from. Supplied together with displayHeight it bounds the coordinates host-side before dispatch, and it joins the authorized subject so a rotation or resolution change cannot reuse the session's authorization."),
         CatalogFieldDescriptor(name: "durationMs", type: .integer, isRequired: true, minimum: 80, maximum: 2000, summary: "The caller's real pointer-down-to-up hold time. The device command takes a velocity in px/s, so the provider derives it from this duration and records the conversion in the verified summary; the duration itself is never invented."),
         CatalogFieldDescriptor(name: "fromX", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the pointer-down position after content-rect mapping; never a raw host coordinate."),
         CatalogFieldDescriptor(name: "fromY", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the pointer-down position."),
+        CatalogFieldDescriptor(name: "screenEpochUtc", type: .string, isRequired: false, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$", maxLength: 32, summary: "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on."),
         CatalogFieldDescriptor(name: "toX", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the pointer-up position."),
         CatalogFieldDescriptor(name: "toY", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the pointer-up position.")
       ],
@@ -496,7 +502,10 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
+        CatalogFieldDescriptor(name: "displayHeight", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Height in device pixels of the frame the gesture was computed from. See displayWidth."),
         CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "displayWidth", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Width in device pixels of the frame the gesture was computed from. Supplied together with displayHeight it bounds the coordinates host-side before dispatch, and it joins the authorized subject so a rotation or resolution change cannot reuse the session's authorization."),
+        CatalogFieldDescriptor(name: "screenEpochUtc", type: .string, isRequired: false, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$", maxLength: 32, summary: "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on."),
         CatalogFieldDescriptor(name: "x", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the tap. The caller anchors this at the pointer-down position after content-rect mapping; it is never a raw host coordinate."),
         CatalogFieldDescriptor(name: "y", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the tap, anchored at the pointer-down position.")
       ],

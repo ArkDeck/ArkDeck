@@ -309,7 +309,10 @@ package enum WorkflowStepRegistry {
     case .injectPointerInput:
       deviceMutation(
         required: ["gesture", "pointerX", "pointerY"],
-        optional: ["pointerToX", "pointerToY", "durationMs", "displayId"],
+        optional: [
+          "pointerToX", "pointerToY", "durationMs", "displayId",
+          "displayWidth", "displayHeight",
+        ],
         profileExposable: true)
     case .clearLogBuffer:
       deviceMutation(required: ["bufferId", "confirmationId"])
@@ -893,6 +896,8 @@ private enum WorkflowStepValidator {
         try reader.optionalIntegerOrNull("durationMs", minimum: 80, maximum: 2000)
       }
       try reader.optionalIntegerOrNull("displayId", minimum: 0, maximum: 64)
+      try reader.optionalIntegerOrNull("displayWidth", minimum: 1, maximum: 32767)
+      try reader.optionalIntegerOrNull("displayHeight", minimum: 1, maximum: 32767)
     case .clearLogBuffer:
       try reader.identifier("bufferId")
       try reader.identifier("confirmationId")

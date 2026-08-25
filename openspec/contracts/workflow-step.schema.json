@@ -1084,6 +1084,16 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 64
+        },
+        "displayWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32767
+        },
+        "displayHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32767
         }
       }
     },

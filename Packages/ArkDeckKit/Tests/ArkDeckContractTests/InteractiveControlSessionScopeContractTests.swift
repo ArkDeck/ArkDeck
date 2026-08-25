@@ -115,6 +115,77 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
     XCTAssertEqual(subject.planDigest, String(repeating: "e", count: 64))
   }
 
+  func testARotationOrResolutionChangeIsADifferentAuthorizedSubject() throws {
+    let tap = try descriptor("input.tap@1")
+    let portrait = fingerprint(
+      tap,
+      inputs: [
+        "x": .integer(640), "y": .integer(1500),
+        "displayWidth": .integer(1280), "displayHeight": .integer(2832),
+      ], planDigest: String(repeating: "a", count: 64))
+    let landscape = fingerprint(
+      tap,
+      inputs: [
+        "x": .integer(640), "y": .integer(1500),
+        "displayWidth": .integer(2832), "displayHeight": .integer(1280),
+      ], planDigest: String(repeating: "a", count: 64))
+    XCTAssertNotEqual(
+      portrait, landscape,
+      "a mapping computed against the old frame must not reuse the session envelope")
+
+    // Same frame, different coordinates, still one subject: the frame is the
+    // authorized thing, the position inside it is not.
+    let elsewhereInPortrait = fingerprint(
+      tap,
+      inputs: [
+        "x": .integer(10), "y": .integer(20),
+        "displayWidth": .integer(1280), "displayHeight": .integer(2832),
+      ], planDigest: String(repeating: "z", count: 64))
+    XCTAssertEqual(portrait, elsewhereInPortrait)
+  }
+
+  func testAStaleFrameIsRefusedBeforeAnythingIsDispatched() throws {
+    let spec = try HDCPointerInputSpec(
+      gesture: .tap, x: 10, y: 10, screenEpochUTC: "2026-08-25T00:00:00Z")
+    XCTAssertEqual(spec.frameAgeMs(atUTC: "2026-08-25T00:00:00.400Z"), 400)
+    XCTAssertEqual(spec.frameAgeMs(atUTC: "2026-08-25T00:00:03Z"), 3_000)
+    XCTAssertGreaterThan(
+      try XCTUnwrap(spec.frameAgeMs(atUTC: "2026-08-25T00:00:03Z")),
+      HDCPointerInputSpec.frameFreshnessBudgetMs)
+
+    // A caller that claimed no epoch gets no freshness verdict invented for it.
+    let withoutEpoch = try HDCPointerInputSpec(gesture: .tap, x: 10, y: 10)
+    XCTAssertNil(withoutEpoch.frameAgeMs(atUTC: "2026-08-25T00:00:03Z"))
+  }
+
+  func testCoordinatesMustFitTheFrameTheyWereMappedAgainst() {
+    XCTAssertThrowsError(
+      try HDCPointerInputSpec(
+        gesture: .tap, x: 1300, y: 10, displayWidth: 1280, displayHeight: 2832),
+      "a coordinate outside the declared frame must be refused host-side")
+    XCTAssertThrowsError(
+      try HDCPointerInputSpec(
+        gesture: .swipe, x: 10, y: 10, toX: 10, toY: 3000, durationMs: 300,
+        displayWidth: 1280, displayHeight: 2832),
+      "a swipe endpoint outside the declared frame must be refused too")
+    XCTAssertThrowsError(
+      try HDCPointerInputSpec(gesture: .tap, x: 10, y: 10, displayWidth: 1280),
+      "half a display fact bounds one axis and silently trusts the other")
+    XCTAssertNoThrow(
+      try HDCPointerInputSpec(
+        gesture: .tap, x: 1279, y: 2831, displayWidth: 1280, displayHeight: 2832))
+  }
+
+  func testFrameFactsSurviveExactActionPersistence() throws {
+    let action = TypedProviderAction.hdc(
+      .injectPointerInput(
+        try HDCPointerInputSpec(
+          gesture: .swipe, x: 640, y: 2000, toX: 640, toY: 1000, durationMs: 500,
+          displayWidth: 1280, displayHeight: 2832,
+          screenEpochUTC: "2026-08-25T00:00:00Z")))
+    XCTAssertEqual(try PersistedTypedProviderAction(action).materialize(), action)
+  }
+
   func testTheSessionEnvelopeIsBoundedInTimeAndUses() {
     XCTAssertEqual(
       RuntimeJobEngine.sessionScopedInputLifetime, 60 * 60,

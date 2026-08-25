@@ -4,8 +4,15 @@
   "version": 1,
   "title": "Inject one tap at exact device coordinates",
   "provider": "hdc",
-  "effect": { "minimum": "deviceMutation", "permitted": ["deviceMutation"] },
-  "authorization": { "deviceMutation": "standingCapability" },
+  "effect": {
+    "minimum": "deviceMutation",
+    "permitted": [
+      "deviceMutation"
+    ]
+  },
+  "authorization": {
+    "deviceMutation": "standingCapability"
+  },
   "binding": "confirmedDevice",
   "concurrencyKey": "device-exclusive",
   "inputs": {
@@ -30,6 +37,27 @@
         "minimum": 0,
         "maximum": 64,
         "description": "Target display for multi-display devices. Omitted lowers to the device's default display."
+      },
+      "displayWidth": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 32767,
+        "description": "Width in device pixels of the frame the gesture was computed from. Supplied together with displayHeight it bounds the coordinates host-side before dispatch, and it joins the authorized subject so a rotation or resolution change cannot reuse the session's authorization."
+      },
+      "displayHeight": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 32767,
+        "description": "Height in device pixels of the frame the gesture was computed from. See displayWidth."
+      },
+      "screenEpochUtc": {
+        "type": "string",
+        "required": false,
+        "maxLength": 32,
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+        "description": "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on."
       }
     }
   },
@@ -88,8 +116,14 @@
   ],
   "timeoutSeconds": 60,
   "outputByteBudget": 1048576,
-  "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
+  "retry": {
+    "preflightAttempts": 2,
+    "mutationAttempts": 1
+  },
   "unknownOutcome": "reconcileRequired",
   "artifacts": [],
-  "profiles": ["openharmony-standard@1", "dayu200"]
+  "profiles": [
+    "openharmony-standard@1",
+    "dayu200"
+  ]
 }

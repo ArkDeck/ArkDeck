@@ -173,7 +173,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case .removePortForward:
       return .hdc(.removePortForward(try portForwardSpec(inputs)))
     case .injectPointerInput:
-      return .hdc(.injectPointerInput(try pointerInputSpec(operation, inputs)))
+      return .hdc(.injectPointerInput(try pointerInputSpec(operation, inputs, context)))
     case .runApprovedRemoteRead:
       if descriptorIsDebugHAP(operation), step.actionReference?.actionID == "packageInfo" {
         return try debugHAPAction(for: step, inputs: inputs, context: context)
@@ -267,7 +267,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   /// operation's typed inputs, already schema-bounded by admission.
   private func pointerInputSpec(
     _ operation: CatalogOperationDescriptor,
-    _ inputs: [String: JSONValue]
+    _ inputs: [String: JSONValue],
+    _ context: ProviderExecutionContext
   ) throws -> HDCPointerInputSpec {
     let gesture: HDCPointerGesture
     switch operation.reference {
@@ -292,18 +293,46 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return integer
     }
+    func optionalString(_ key: String) throws -> String? {
+      guard let raw = inputs[key] else { return nil }
+      guard case .string(let value) = raw else {
+        throw DeviceProviderError.unsupportedAction("\(key) must be a string")
+      }
+      return value
+    }
+    let spec: HDCPointerInputSpec
     if gesture == .swipe {
-      return try HDCPointerInputSpec(
+      spec = try HDCPointerInputSpec(
         gesture: gesture,
         x: try requiredCoordinate("fromX"), y: try requiredCoordinate("fromY"),
         toX: try requiredCoordinate("toX"), toY: try requiredCoordinate("toY"),
         durationMs: try requiredCoordinate("durationMs"),
-        displayID: try optionalInteger("displayId"))
+        displayID: try optionalInteger("displayId"),
+        displayWidth: try optionalInteger("displayWidth"),
+        displayHeight: try optionalInteger("displayHeight"),
+        screenEpochUTC: try optionalString("screenEpochUtc"))
+    } else {
+      spec = try HDCPointerInputSpec(
+        gesture: gesture,
+        x: try requiredCoordinate("x"), y: try requiredCoordinate("y"),
+        displayID: try optionalInteger("displayId"),
+        displayWidth: try optionalInteger("displayWidth"),
+        displayHeight: try optionalInteger("displayHeight"),
+        screenEpochUTC: try optionalString("screenEpochUtc"))
     }
-    return try HDCPointerInputSpec(
-      gesture: gesture,
-      x: try requiredCoordinate("x"), y: try requiredCoordinate("y"),
-      displayID: try optionalInteger("displayId"))
+    // Dispatch time, not submit time: an input that sat behind the device lane
+    // is discarded here rather than landing late on a screen that has moved
+    // on. Refusing before the action exists means nothing was dispatched, so
+    // the outcome is a clean refusal rather than an unknown.
+    if let age = spec.frameAgeMs(atUTC: context.nowUTC),
+      age > HDCPointerInputSpec.frameFreshnessBudgetMs
+    {
+      throw DeviceProviderError.unsupportedAction(
+        "inputExpired: the frame this gesture was mapped against is \(age) ms old, "
+          + "beyond the \(HDCPointerInputSpec.frameFreshnessBudgetMs) ms freshness bound; "
+          + "refresh the screen and send a new gesture")
+    }
+    return spec
   }
 
   private func portForwardSpec(
