@@ -120,7 +120,17 @@ T02/T03 不进入实现。
   `uinput` 未注入即需 ~279 ms、真实 tap ~427 ms（spawn），通道去掉的是 spawn 不是这只二进制。
   400 ms 以上唯一还剩的杠杆是更便宜的注入载体，不属本 change。证据
   `evidence/runs/TASK-IDC-002/data/gesture-tail-attribution.json`。
-  未验：App 自身路径（本轮全走 CLI））
+  ⑨ App 自身路径已验：用 App 实际持有的那个 provider（`ToolkitDeviceControlFacade.make()`）
+  经同一条 XPC 传输打真机，40/40 全部 confirmed，p50 519 / p95 592 / p99 721 ms。
+  `job.submit` 单独一次往返（含建连接与准入）只要 p50 18 ms，故传输不是成本所在，余下
+  ~500 ms 全在 `job.run`（身份复核 + 注入）。
+  更正一条既有记载：先前写「App 持长连接、不付 CLI 那笔」——两处都错，App 每次请求新建
+  `NSXPCConnection` 用完即作废，且两条路径实测只差约 25 ms（App 519 vs CLI 544）。
+  这一趟同时验到 facade 自身的工作面（逐手势 typed inputs、提交、运行、从时间线读判据），
+  不只是延迟。证据 `evidence/runs/TASK-IDC-002/data/app-path-verification.json`。
+  **门槛结论收口**：App 路径 p50 519 ms vs 400 ms，差 ~119 ms，且差额既不在传输（18 ms）
+  也不在 Runtime——真实 tap 的 `uinput` 在设备上 spawn ~427 ms / 通道 ~350 ms，且未注入
+  即需 ~279 ms。设备之上已无杠杆，只有更便宜的注入载体能收口，不属本 change）
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6

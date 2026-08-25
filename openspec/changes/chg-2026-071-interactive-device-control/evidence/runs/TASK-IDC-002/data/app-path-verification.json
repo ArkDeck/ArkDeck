@@ -1,0 +1,59 @@
+{
+  "measurement": "app-path-verification",
+  "question": "What does a gesture cost on the path the App actually takes?",
+  "measuredAtUTC": "2026-08-25T14:30:00Z",
+  "method": [
+    "The provider the Toolkit workspace holds - ToolkitDeviceControlFacade.make() -",
+    "driven directly against the live daemon over the same XPC transport, with the",
+    "SwiftUI layer left out. Every request is built by the same facade the App uses,",
+    "so this is the App's path minus its rendering.",
+    "Device: the same DAYU200 board, target TGT-958780b2ffb7 binding r4, Settings in",
+    "the foreground."
+  ],
+  "result": {
+    "gestures": 40,
+    "confirmed": 40,
+    "p50Ms": 519,
+    "p95Ms": 592,
+    "p99Ms": 721,
+    "maxMs": 721,
+    "minMs": 490
+  },
+  "decomposition": {
+    "jobSubmitRoundTripP50Ms": 18,
+    "note": [
+      "`job.submit` is a whole XPC round trip including the connection the App opens",
+      "for it, plus admission. At 18ms the transport is not where a gesture's time",
+      "goes: the remaining ~500ms is `job.run`, which is the identity check and the",
+      "injection."
+    ]
+  },
+  "comparedToTheCLI": {
+    "appP50Ms": 519,
+    "cliP50Ms": 544,
+    "reading": [
+      "The two paths are within noise of each other. Earlier evidence in this change",
+      "said the App 'holds a live connection and does not pay' the CLI's per-invocation",
+      "cost. That was wrong twice over: the App opens a fresh NSXPCConnection for every",
+      "request and invalidates it afterwards, and the difference between the paths is",
+      "~25ms rather than the ~150ms that claim implied."
+    ]
+  },
+  "whatThisAlsoVerifies": [
+    "All forty gestures came back confirmed, so the facade's own work - building the",
+    "typed inputs per gesture kind, submitting, running, and reading a verdict out of",
+    "the returned timeline - is exercised end to end against real hardware, not only",
+    "the latency."
+  ],
+  "gateStatus": {
+    "gateMs": 400,
+    "measuredP50Ms": 519,
+    "verdict": "not met, by ~119ms at p50 on the App's own path",
+    "whereTheGapIs": [
+      "Not the transport (18ms) and not the Runtime. A real `uinput` tap costs the",
+      "device ~427ms spawned and ~350ms over the channel; `uinput` costs ~279ms before",
+      "it injects anything at all. The gap is the injection carrier, and no change",
+      "above the device can close it."
+    ]
+  }
+}
