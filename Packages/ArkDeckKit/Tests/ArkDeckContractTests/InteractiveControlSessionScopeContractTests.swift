@@ -146,7 +146,8 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
 
   func testAStaleFrameIsRefusedBeforeAnythingIsDispatched() throws {
     let spec = try HDCPointerInputSpec(
-      gesture: .tap, x: 10, y: 10, screenEpochUTC: "2026-08-25T00:00:00Z")
+      gesture: .tap, x: 10, y: 10, displayWidth: 1280, displayHeight: 2832,
+      screenEpochUTC: "2026-08-25T00:00:00Z")
     XCTAssertEqual(spec.frameAgeMs(atUTC: "2026-08-25T00:00:00.400Z"), 400)
     XCTAssertEqual(spec.frameAgeMs(atUTC: "2026-08-25T00:00:03Z"), 3_000)
     XCTAssertGreaterThan(
@@ -154,7 +155,8 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
       HDCPointerInputSpec.frameFreshnessBudgetMs)
 
     // A caller that claimed no epoch gets no freshness verdict invented for it.
-    let withoutEpoch = try HDCPointerInputSpec(gesture: .tap, x: 10, y: 10)
+    let withoutEpoch = try HDCPointerInputSpec(
+      gesture: .tap, x: 10, y: 10, displayWidth: 1280, displayHeight: 2832)
     XCTAssertNil(withoutEpoch.frameAgeMs(atUTC: "2026-08-25T00:00:03Z"))
   }
 
@@ -165,12 +167,13 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
       "a coordinate outside the declared frame must be refused host-side")
     XCTAssertThrowsError(
       try HDCPointerInputSpec(
-        gesture: .swipe, x: 10, y: 10, toX: 10, toY: 3000, durationMs: 300,
-        displayWidth: 1280, displayHeight: 2832),
+        gesture: .swipe, x: 10, y: 10, displayWidth: 1280, displayHeight: 2832,
+        toX: 10, toY: 3000, durationMs: 300),
       "a swipe endpoint outside the declared frame must be refused too")
     XCTAssertThrowsError(
-      try HDCPointerInputSpec(gesture: .tap, x: 10, y: 10, displayWidth: 1280),
-      "half a display fact bounds one axis and silently trusts the other")
+      try HDCPointerInputSpec(
+        gesture: .tap, x: 10, y: 10, displayWidth: 0, displayHeight: 2832),
+      "a frame with no extent bounds nothing")
     XCTAssertNoThrow(
       try HDCPointerInputSpec(
         gesture: .tap, x: 1279, y: 2831, displayWidth: 1280, displayHeight: 2832))
@@ -180,8 +183,8 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
     let action = TypedProviderAction.hdc(
       .injectPointerInput(
         try HDCPointerInputSpec(
-          gesture: .swipe, x: 640, y: 2000, toX: 640, toY: 1000, durationMs: 500,
-          displayWidth: 1280, displayHeight: 2832,
+          gesture: .swipe, x: 640, y: 2000, displayWidth: 1280, displayHeight: 2832,
+          toX: 640, toY: 1000, durationMs: 500,
           screenEpochUTC: "2026-08-25T00:00:00Z")))
     XCTAssertEqual(try PersistedTypedProviderAction(action).materialize(), action)
   }

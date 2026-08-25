@@ -498,15 +498,26 @@ public enum HDCPointerGesture: String, Sendable, Equatable {
 
 /// One primary pointer gesture at exact device coordinates. Coordinates
 /// arrive already content-rect mapped and clamped by the caller; this type
-/// holds the closed bounds. `uitest uiInput swipe` takes a velocity in px/s
-/// (200...40000, default 600), not a duration, so the caller's real hold
-/// duration is converted at lowering time and the conversion stays visible
-/// in the verified summary (measured 2026-08-25, OpenHarmony-7.0.0.39).
+/// holds the closed bounds.
+///
+/// Lowered to `uinput -T`, which was measured against `uitest uiInput` under
+/// identical device load on 2026-08-25 (OpenHarmony-7.0.0.39, interleaved so
+/// neither surface could take credit for a quiet moment): p50 272 / p95 328 ms
+/// against p50 400 / p95 423 ms. Two consequences shape this type. The device
+/// command takes a hold duration directly, so the caller's real press time
+/// passes through unchanged instead of being converted to a velocity. And it
+/// does not validate coordinates against the live panel — it accepts an
+/// off-screen point and only suggests checking — so the frame the gesture was
+/// mapped against is required here, and bounding the coordinates inside it is
+/// the guard rather than a second opinion.
 public struct HDCPointerInputSpec: Sendable, Equatable {
   public static let coordinateRange = 0...32767
   public static let durationRangeMs = 80...2000
   public static let displayRange = 0...64
-  public static let velocityRange = 200...40000
+  /// The device command needs an explicit hold interval for a long press. A
+  /// caller that reports its real press time has it used verbatim; this is
+  /// only the bounded stand-in for one that does not.
+  public static let defaultLongPressMs = 800
 
   /// How stale the frame a gesture was computed from may be when the runtime
   /// is about to inject it. An input that waited behind a queue is discarded
@@ -521,11 +532,11 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
   public let toY: Int?
   public let durationMs: Int?
   public let displayID: Int?
-  /// The frame the gesture was mapped against. Present as a pair or not at
-  /// all: half a display fact would bound one axis and silently trust the
-  /// other.
-  public let displayWidth: Int?
-  public let displayHeight: Int?
+  /// The frame the gesture was mapped against. Required, because the device
+  /// command will inject a coordinate it never checked: a gesture the runtime
+  /// cannot bound is refused rather than sent.
+  public let displayWidth: Int
+  public let displayHeight: Int
   /// Capture time of that frame, when the caller supplied one.
   public let screenEpochUTC: String?
 
@@ -533,12 +544,12 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
     gesture: HDCPointerGesture,
     x: Int,
     y: Int,
+    displayWidth: Int,
+    displayHeight: Int,
     toX: Int? = nil,
     toY: Int? = nil,
     durationMs: Int? = nil,
     displayID: Int? = nil,
-    displayWidth: Int? = nil,
-    displayHeight: Int? = nil,
     screenEpochUTC: String? = nil
   ) throws {
     for (value, field) in [(x, "pointerX"), (y, "pointerY")] {
@@ -546,7 +557,8 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
         throw HDCE0RequestError.outOfBounds(field: field, detail: "0...32767")
       }
     }
-    if gesture == .swipe {
+    switch gesture {
+    case .swipe:
       guard let toX, let toY, let durationMs else {
         throw HDCE0RequestError.outOfBounds(
           field: "pointerToX/pointerToY/durationMs", detail: "required for a swipe")
@@ -559,10 +571,20 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
       guard Self.durationRangeMs.contains(durationMs) else {
         throw HDCE0RequestError.outOfBounds(field: "durationMs", detail: "80...2000")
       }
-    } else {
+    case .longPress:
+      guard toX == nil, toY == nil else {
+        throw HDCE0RequestError.outOfBounds(
+          field: "pointerToX/pointerToY", detail: "only a swipe travels")
+      }
+      if let durationMs {
+        guard Self.durationRangeMs.contains(durationMs) else {
+          throw HDCE0RequestError.outOfBounds(field: "durationMs", detail: "80...2000")
+        }
+      }
+    case .tap:
       guard toX == nil, toY == nil, durationMs == nil else {
         throw HDCE0RequestError.outOfBounds(
-          field: "pointerToX/pointerToY/durationMs", detail: "only a swipe carries these")
+          field: "pointerToX/pointerToY/durationMs", detail: "a tap carries none of these")
       }
     }
     if let displayID {
@@ -570,29 +592,22 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
         throw HDCE0RequestError.outOfBounds(field: "displayId", detail: "0...64")
       }
     }
-    switch (displayWidth, displayHeight) {
-    case (nil, nil):
-      break
-    case (let width?, let height?):
-      guard width > 0, height > 0 else {
-        throw HDCE0RequestError.outOfBounds(
-          field: "displayWidth/displayHeight", detail: "positive device pixels")
-      }
-      // Every point the gesture names has to fit the frame it was mapped
-      // against. The device performs its own check against the live panel
-      // (measured: an off-screen coordinate is refused at exit 0), so this is
-      // the host-side half of the same guard — it catches a mapping computed
-      // against a stale or wrongly-sized frame before anything is dispatched.
-      for (px, py, label) in [(x, y, "pointer"), (toX ?? x, toY ?? y, "pointerTo")] {
-        guard px < width, py < height else {
-          throw HDCE0RequestError.outOfBounds(
-            field: label, detail: "inside the declared \(width)x\(height) frame")
-        }
-      }
-    default:
+    guard displayWidth > 0, displayHeight > 0 else {
       throw HDCE0RequestError.outOfBounds(
-        field: "displayWidth/displayHeight",
-        detail: "both or neither; one axis alone bounds nothing")
+        field: "displayWidth/displayHeight", detail: "positive device pixels")
+    }
+    // Every point the gesture names has to fit the frame it was mapped
+    // against. `uinput` will inject a coordinate it never checked — measured:
+    // an off-screen point returns success and only suggests checking — so
+    // this is not a second opinion behind a device-side guard. It is the
+    // guard, and a mapping computed against a stale or wrongly-sized frame
+    // stops here rather than landing somewhere nobody aimed at.
+    for (px, py, label) in [(x, y, "pointer"), (toX ?? x, toY ?? y, "pointerTo")] {
+      guard px < displayWidth, py < displayHeight else {
+        throw HDCE0RequestError.outOfBounds(
+          field: label,
+          detail: "inside the declared \(displayWidth)x\(displayHeight) frame")
+      }
     }
     self.gesture = gesture
     self.x = x
@@ -620,12 +635,14 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
 
   /// px/s for `uiInput swipe`, derived from the caller's real hold duration
   /// and clamped into the device command's closed range.
-  public var swipeVelocity: Int? {
-    guard gesture == .swipe, let toX, let toY, let durationMs else { return nil }
-    let dx = Double(toX - x)
-    let dy = Double(toY - y)
-    let distance = (dx * dx + dy * dy).squareRoot()
-    let velocity = Int((distance / (Double(durationMs) / 1000.0)).rounded())
-    return min(Self.velocityRange.upperBound, max(Self.velocityRange.lowerBound, velocity))
+  /// The hold interval the device command is given. A swipe carries the
+  /// caller's real press-to-release time; a long press uses the caller's when
+  /// it reported one and the bounded default otherwise; a tap has none.
+  public var loweredHoldMs: Int? {
+    switch gesture {
+    case .tap: return nil
+    case .swipe: return durationMs
+    case .longPress: return durationMs ?? Self.defaultLongPressMs
+    }
   }
 }

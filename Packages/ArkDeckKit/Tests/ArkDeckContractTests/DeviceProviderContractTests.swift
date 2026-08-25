@@ -865,7 +865,10 @@ final class DeviceProviderContractTests: XCTestCase {
       .hdc(.uninstallPackage(bundle)),
       .hdc(.createPortForward(port)),
       .hdc(.removePortForward(port)),
-      .hdc(.injectPointerInput(try HDCPointerInputSpec(gesture: .tap, x: 1, y: 2))),
+      .hdc(
+        .injectPointerInput(
+          try HDCPointerInputSpec(
+            gesture: .tap, x: 1, y: 2, displayWidth: 1280, displayHeight: 2832))),
       .hdc(.readPackagePresence(bundle)),
       .hdc(.readProcessPresence(bundle)),
       .hdc(.readOwnedPathPresence(ownedPath)),
@@ -990,21 +993,25 @@ final class DeviceProviderContractTests: XCTestCase {
   }
 
   func testPointerInputArgvIsTargetBoundAndPositional() throws {
-    let tap = try HDCPointerInputSpec(gesture: .tap, x: 640, y: 1500)
-    let long = try HDCPointerInputSpec(gesture: .longPress, x: 12, y: 0, displayID: 2)
-    // 1000 px in 500 ms is exactly 2000 px/s — the conversion the swipe
-    // command needs, derived from the caller's real hold duration.
+    let tap = try HDCPointerInputSpec(
+      gesture: .tap, x: 640, y: 1500, displayWidth: 1280, displayHeight: 2832)
+    let long = try HDCPointerInputSpec(
+      gesture: .longPress, x: 12, y: 0, displayWidth: 1280, displayHeight: 2832,
+      displayID: 2)
+    // The caller's real 500 ms press-to-release time reaches the device
+    // command unchanged: nothing is converted into a velocity and back.
     let swipe = try HDCPointerInputSpec(
-      gesture: .swipe, x: 100, y: 200, toX: 100, toY: 1200, durationMs: 500)
+      gesture: .swipe, x: 100, y: 200, displayWidth: 1280, displayHeight: 2832,
+      toX: 100, toY: 1200, durationMs: 500)
     let cases: [(HDCPointerInputSpec, [String])] = [
-      (tap, ["shell", "uitest", "uiInput", "click", "640", "1500"]),
-      (long, ["shell", "uitest", "uiInput", "longClick", "12", "0", "2"]),
+      (tap, ["shell", "uinput", "-T", "-c", "640", "1500"]),
       (
-        swipe,
-        // The device command takes only the derived px/s velocity; the
-        // caller's duration never appears in argv.
-        ["shell", "uitest", "uiInput", "swipe", "100", "200", "100", "1200", "2000"]
+        long,
+        // The display selector precedes the device option, and a long press is
+        // press, hold, release at the same point.
+        ["shell", "uinput", "-D", "2", "-T", "-d", "12", "0", "-i", "800", "-u", "12", "0"]
       ),
+      (swipe, ["shell", "uinput", "-T", "-m", "100", "200", "100", "1200", "500"]),
     ]
     for (spec, expectedTail) in cases {
       let plan = try hdc.lower(action: .hdc(.injectPointerInput(spec)), context: context)
@@ -1016,83 +1023,132 @@ final class DeviceProviderContractTests: XCTestCase {
     }
   }
 
-  func testPointerSwipeVelocityStaysInTheDeviceCommandRange() throws {
-    // A slow 10 px nudge held 2000 ms is 5 px/s; the device command's floor
-    // is 200. A full-height fling in 80 ms exceeds the 40000 ceiling.
-    let slow = try HDCPointerInputSpec(
-      gesture: .swipe, x: 0, y: 0, toX: 10, toY: 0, durationMs: 2000)
-    XCTAssertEqual(slow.swipeVelocity, 200)
-    let fast = try HDCPointerInputSpec(
-      gesture: .swipe, x: 0, y: 0, toX: 32767, toY: 0, durationMs: 80)
-    XCTAssertEqual(fast.swipeVelocity, 40000)
+  func testALongPressUsesTheCallersOwnHoldWhenItReportedOne() throws {
+    let reported = try HDCPointerInputSpec(
+      gesture: .longPress, x: 5, y: 6, displayWidth: 1280, displayHeight: 2832,
+      durationMs: 1_500)
+    XCTAssertEqual(reported.loweredHoldMs, 1_500)
+    let plan = try hdc.lower(action: .hdc(.injectPointerInput(reported)), context: context)
+    guard case .process(_, let argv, _) = plan.kind else {
+      return XCTFail("a long press must lower to one process invocation")
+    }
+    XCTAssertEqual(
+      argv,
+      [
+        "-t", "150100424a544e4600", "shell", "uinput", "-T", "-d", "5", "6", "-i",
+        "1500", "-u", "5", "6",
+      ])
   }
 
-  func testPointerInputVerdictWhitelistsTheSuccessLine() throws {
+  func testPointerInputVerdictComesFromTheInjectorsAcknowledgement() throws {
     let tap = TypedProviderAction.hdc(
-      .injectPointerInput(try HDCPointerInputSpec(gesture: .tap, x: 640, y: 1500)))
-    // "No Error" contains the substring "error": the success line must be
-    // whitelisted before the failure vocabulary is scanned.
+      .injectPointerInput(
+        try HDCPointerInputSpec(
+          gesture: .tap, x: 640, y: 1500, displayWidth: 1280, displayHeight: 2832)))
+    // Verbatim device output (OpenHarmony-7.0.0.39, 2026-08-25). The closing
+    // line is printed on every accepted run, so it carries no verdict.
+    let acceptedTap =
+      "   click coordinate: (640, 1500)\nclick interval time: 100ms\n"
+      + "If the command does not work as expected, check whether the specified "
+      + "coordinates exceed the screen boundary\n"
     guard
       case .verified(let summary) = try hdc.verify(
-        receipt: pointerReceipt("No Error\n"), action: tap, context: context)
-    else { return XCTFail("the uiInput success line must verify") }
+        receipt: pointerReceipt(acceptedTap), action: tap, context: context)
+    else { return XCTFail("an acknowledged tap must verify") }
     XCTAssertEqual(summary["gesture"], "tap")
-    XCTAssertEqual(summary["x"], "640")
-    XCTAssertEqual(summary["y"], "1500")
+    XCTAssertEqual(
+      summary["frame"], "1280x2832",
+      "the frame the gesture was bounded against belongs in the evidence")
 
+    // `hdc shell` reports its own success, not the remote command's: it
+    // returns 0 even for a command that exits 42. A verdict that trusted the
+    // exit status would call this rejection a success.
     guard
-      case .failed(let rejectedCode, let rejectedDetail) = try hdc.verify(
-        receipt: pointerReceipt(
-          "please confirm that the coordinate values are correct\n"),
-        action: tap, context: context)
-    else { return XCTFail("uiInput's rejection text must fail even at exit 0") }
-    XCTAssertEqual(rejectedCode, "pointerInputRejected")
-    XCTAssertTrue(rejectedDetail.contains("coordinate values"))
-
-    guard
-      case .unknown = try hdc.verify(
-        receipt: pointerReceipt("something new this build prints\n"),
+      case .failed(let code, let detail) = try hdc.verify(
+        receipt: pointerReceipt("parameter error, unable to run\n", exit: 0),
         action: tap, context: context)
     else {
-      return XCTFail("unrecognized uiInput output must stay unknown, not pass")
+      return XCTFail("a rejection must fail even though hdc reports exit 0")
+    }
+    XCTAssertEqual(code, "pointerInputRejected")
+    XCTAssertTrue(detail.contains("parameter error"))
+
+    // Silence, or an acknowledgement for some other gesture, leaves the
+    // outcome unknown rather than assumed either way.
+    guard
+      case .unknown = try hdc.verify(
+        receipt: pointerReceipt(""), action: tap, context: context)
+    else { return XCTFail("an unacknowledged gesture must stay unknown") }
+    guard
+      case .unknown = try hdc.verify(
+        receipt: pointerReceipt("startX:100, startY:200, endX:100, endY:1200\n"),
+        action: tap, context: context)
+    else {
+      return XCTFail("another gesture's acknowledgement must not verify this one")
     }
 
+    let long = TypedProviderAction.hdc(
+      .injectPointerInput(
+        try HDCPointerInputSpec(
+          gesture: .longPress, x: 12, y: 700, displayWidth: 1280, displayHeight: 2832)))
     guard
-      case .failed(let exitCode, _) = try hdc.verify(
-        receipt: pointerReceipt("", exit: 7), action: tap, context: context)
-    else { return XCTFail("a nonzero exit must fail") }
-    XCTAssertEqual(exitCode, "pointerInputFailed")
+      case .unknown = try hdc.verify(
+        receipt: pointerReceipt("touch down 12 700\n"), action: long, context: context)
+    else {
+      return XCTFail("a press with no release acknowledged is not a completed long press")
+    }
+    guard
+      case .verified(let longSummary) = try hdc.verify(
+        receipt: pointerReceipt("touch down 12 700\ntouch up 12 700\n"),
+        action: long, context: context)
+    else { return XCTFail("press and release together must verify") }
+    XCTAssertEqual(
+      longSummary["loweredHoldMs"], "800",
+      "a caller that reported no hold time gets the runtime's bounded default")
 
     let swipe = TypedProviderAction.hdc(
       .injectPointerInput(
         try HDCPointerInputSpec(
-          gesture: .swipe, x: 100, y: 200, toX: 100, toY: 1200, durationMs: 500)))
+          gesture: .swipe, x: 100, y: 200, displayWidth: 1280, displayHeight: 2832,
+          toX: 100, toY: 1200, durationMs: 500)))
     guard
       case .verified(let swipeSummary) = try hdc.verify(
-        receipt: pointerReceipt("No Error\n"), action: swipe, context: context)
-    else { return XCTFail("a successful swipe must verify") }
-    XCTAssertEqual(swipeSummary["durationMs"], "500")
+        receipt: pointerReceipt(
+          "startX:100, startY:200, endX:100, endY:1200\nfingerCount:1\n"
+            + "keepTimeMs:0\nsmoothTimeMs:500\n"),
+        action: swipe, context: context)
+    else { return XCTFail("an acknowledged swipe must verify") }
     XCTAssertEqual(
-      swipeSummary["loweredVelocity"], "2000",
-      "the duration-to-velocity conversion must stay visible in the summary")
+      swipeSummary["loweredHoldMs"], "500",
+      "the caller's real hold time must reach the device unchanged")
   }
 
   func testPointerInputSpecHoldsClosedBounds() {
-    XCTAssertThrowsError(try HDCPointerInputSpec(gesture: .tap, x: -1, y: 0))
-    XCTAssertThrowsError(try HDCPointerInputSpec(gesture: .tap, x: 0, y: 32768))
     XCTAssertThrowsError(
-      try HDCPointerInputSpec(gesture: .swipe, x: 0, y: 0, toX: 10, toY: 10),
+      try HDCPointerInputSpec(
+        gesture: .tap, x: -1, y: 0, displayWidth: 1280, displayHeight: 2832))
+    XCTAssertThrowsError(
+      try HDCPointerInputSpec(
+        gesture: .swipe, x: 0, y: 0, displayWidth: 1280, displayHeight: 2832,
+        toX: 10, toY: 10),
       "a swipe without its real hold duration must be rejected")
     XCTAssertThrowsError(
-      try HDCPointerInputSpec(gesture: .tap, x: 0, y: 0, durationMs: 300),
-      "a tap carrying swipe-only fields must be rejected, not silently ignored")
+      try HDCPointerInputSpec(
+        gesture: .tap, x: 0, y: 0, displayWidth: 1280, displayHeight: 2832,
+        durationMs: 300),
+      "a tap carrying a hold time must be rejected, not silently ignored")
     XCTAssertThrowsError(
       try HDCPointerInputSpec(
-        gesture: .swipe, x: 0, y: 0, toX: 10, toY: 10, durationMs: 79))
+        gesture: .swipe, x: 0, y: 0, displayWidth: 1280, displayHeight: 2832,
+        toX: 10, toY: 10, durationMs: 79))
     XCTAssertThrowsError(
       try HDCPointerInputSpec(
-        gesture: .swipe, x: 0, y: 0, toX: 10, toY: 10, durationMs: 2001))
-    XCTAssertThrowsError(try HDCPointerInputSpec(gesture: .tap, x: 0, y: 0, displayID: 65))
+        gesture: .tap, x: 0, y: 0, displayWidth: 1280, displayHeight: 2832,
+        displayID: 65))
+    XCTAssertThrowsError(
+      try HDCPointerInputSpec(
+        gesture: .tap, x: 1300, y: 10, displayWidth: 1280, displayHeight: 2832),
+      "the frame bound is the only guard once uinput injects unchecked")
   }
 
   func testPointerGestureIsTheOperationIdentityNotAnInput() throws {
@@ -1107,7 +1163,10 @@ final class DeviceProviderContractTests: XCTestCase {
 
     let tapAction = try hdc.action(
       for: inject, operation: tapDescriptor,
-      inputs: ["x": .integer(640), "y": .integer(1500)], context: context)
+      inputs: [
+        "x": .integer(640), "y": .integer(1500),
+        "displayWidth": .integer(1280), "displayHeight": .integer(2832),
+      ], context: context)
     guard case .hdc(.injectPointerInput(let tapSpec)) = tapAction else {
       return XCTFail("input.tap@1 must map to a pointer-input action")
     }
@@ -1115,7 +1174,10 @@ final class DeviceProviderContractTests: XCTestCase {
 
     let longAction = try hdc.action(
       for: inject, operation: longDescriptor,
-      inputs: ["x": .integer(1), "y": .integer(2)], context: context)
+      inputs: [
+        "x": .integer(1), "y": .integer(2),
+        "displayWidth": .integer(1280), "displayHeight": .integer(2832),
+      ], context: context)
     guard case .hdc(.injectPointerInput(let longSpec)) = longAction else {
       return XCTFail("input.long-press@1 must map to a pointer-input action")
     }
@@ -1126,30 +1188,40 @@ final class DeviceProviderContractTests: XCTestCase {
       inputs: [
         "fromX": .integer(100), "fromY": .integer(200),
         "toX": .integer(100), "toY": .integer(1200), "durationMs": .integer(500),
+        "displayWidth": .integer(1280), "displayHeight": .integer(2832),
       ], context: context)
     guard case .hdc(.injectPointerInput(let swipeSpec)) = swipeAction else {
       return XCTFail("input.swipe@1 must map to a pointer-input action")
     }
     XCTAssertEqual(swipeSpec.gesture, .swipe)
-    XCTAssertEqual(swipeSpec.swipeVelocity, 2000)
+    XCTAssertEqual(swipeSpec.durationMs, 500)
 
     XCTAssertThrowsError(
       try hdc.action(
-        for: inject, operation: tapDescriptor, inputs: ["x": .integer(1)],
-        context: context),
+        for: inject, operation: tapDescriptor,
+        inputs: [
+          "x": .integer(1), "displayWidth": .integer(1280),
+          "displayHeight": .integer(2832),
+        ], context: context),
       "a missing coordinate must fail before any device dispatch")
   }
 
   func testPointerInputSurvivesExactActionPersistence() throws {
     let actions: [TypedProviderAction] = [
-      .hdc(.injectPointerInput(try HDCPointerInputSpec(gesture: .tap, x: 640, y: 1500))),
-      .hdc(
-        .injectPointerInput(
-          try HDCPointerInputSpec(gesture: .longPress, x: 12, y: 0, displayID: 2))),
       .hdc(
         .injectPointerInput(
           try HDCPointerInputSpec(
-            gesture: .swipe, x: 100, y: 200, toX: 100, toY: 1200, durationMs: 500))),
+            gesture: .tap, x: 640, y: 1500, displayWidth: 1280, displayHeight: 2832))),
+      .hdc(
+        .injectPointerInput(
+          try HDCPointerInputSpec(
+            gesture: .longPress, x: 12, y: 0, displayWidth: 1280, displayHeight: 2832,
+            displayID: 2))),
+      .hdc(
+        .injectPointerInput(
+          try HDCPointerInputSpec(
+            gesture: .swipe, x: 100, y: 200, displayWidth: 1280, displayHeight: 2832,
+            toX: 100, toY: 1200, durationMs: 500))),
     ]
     for action in actions {
       XCTAssertEqual(
