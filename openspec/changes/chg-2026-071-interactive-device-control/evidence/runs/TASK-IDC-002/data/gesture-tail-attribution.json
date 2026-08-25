@@ -1,0 +1,80 @@
+{
+  "measurement": "gesture-tail-attribution",
+  "question": "Where does the p95 tail live, and how big is it really?",
+  "measuredAtUTC": "2026-08-25T14:00:00Z",
+  "headline": [
+    "The tail was measured on a daemon carrying the idle-close defect, and it does",
+    "not reproduce on the build that fixes it. On the current build, 100 consecutive",
+    "gestures ran with zero failures at p50 544ms, p95 569ms, p99 590ms, max 709ms,",
+    "flat across the whole run.",
+    "So the honest number is p95 569ms, not the 3887ms recorded in",
+    "end-to-end-real-device.json. That file's tail figures describe the previous build."
+  ],
+  "everyRunTaken": [
+    { "build": "pre-#1513", "shape": "20 unpaced", "p50": 644, "p95": 3887, "max": 3887, "failures": 0 },
+    { "build": "pre-#1513", "shape": "24 unpaced", "p50": 2000, "p95": null, "max": 11820, "failures": 2 },
+    { "build": "pre-#1513", "shape": "30 paced 700ms, probed", "p50": 2767, "p95": 7141, "max": 18834, "failures": 2 },
+    { "build": "#1513", "shape": "30 paced 700ms, probed", "p50": 558, "p95": 573, "max": 582, "failures": 0 },
+    { "build": "#1513", "shape": "30 paced 700ms", "p50": 553, "p95": 569, "max": 585, "failures": 0 },
+    { "build": "#1513", "shape": "30 unpaced", "p50": 548, "p95": 562, "max": 569, "failures": 0 },
+    { "build": "#1513", "shape": "40 interleaved with direct injection", "p50": 693, "p95": 2618, "max": 2708, "failures": 0 },
+    { "build": "#1513", "shape": "25 unpaced, sampled", "p50": 578, "p95": 765, "max": 1525, "failures": 0 },
+    { "build": "#1513", "shape": "25 unpaced, fsync probe alongside", "p50": 555, "p95": 581, "max": 581, "failures": 0 },
+    { "build": "#1513", "shape": "100 unpaced", "p50": 544, "p95": 569, "max": 709, "failures": 0 }
+  ],
+  "whereTheTimeGoes": {
+    "note": "device legs measured spawned, at rest, immediately after the 100-gesture run",
+    "uinputRealTapP50Ms": 427,
+    "uinputNoOpP50Ms": 279,
+    "listTargetsP50Ms": 19,
+    "reading": [
+      "A real tap costs the device ~427ms spawned and ~150ms more than a no-op, so",
+      "the same tap over the channel is roughly 350ms. Against a 544ms gesture that",
+      "leaves ~110ms for the identity check, the Runtime, XPC and the CLI together.",
+      "The injection itself is now the dominant term, and it is close to the whole",
+      "400ms budget on its own. Nothing above the device can bring the total under",
+      "the gate; only a cheaper injection can."
+    ]
+  },
+  "ruledOutByMeasurement": [
+    "Capability store size: an engine run against an empty store and against the",
+    "maintainer's real 1.4 MB / 333-record document measured p50 87ms and 85ms.",
+    "Checkpointing: a whole-document write at 1.4 MB costs 17ms warm, 185ms cold.",
+    "Executable identity hashing: SHA-256 over the 6 MB hdc binary is 2.1ms.",
+    "F_FULLFSYNC: p50 3.0ms / p95 3.9ms at rest, and p50 3.0ms / p95 4.2ms sampled",
+    "throughout a gesture loop - no stall, 0 of 518 samples over 20ms.",
+    "Accumulated daemon state (1462 job directories, 1388 artifact directories) did",
+    "not prevent the 100-gesture run from being flat."
+  ],
+  "leadingHypothesisForTheOldTail": [
+    "The only functional difference between the two builds is that a channel now gets",
+    "recycled instead of living forever. On the old build the channel that served",
+    "those batches had been open for tens of minutes across captures and idle spells.",
+    "A long-lived `hdc shell` degrading would produce what was seen: progressive",
+    "slowdown within a batch, recovery afterwards, and occasional target-list",
+    "dropouts. This is not proven - confirming it means holding one channel open for",
+    "twenty minutes and then bursting, which was not run."
+  ],
+  "methodNote": [
+    "The first attribution experiment ran its three shapes sequentially rather than",
+    "interleaved, and concluded the tail was device-side. Interleaving reversed that",
+    "conclusion: the Runtime added p50 249ms and p95 1883ms over direct injection in",
+    "the one run where a tail appeared on the current build.",
+    "Sequential phases are not a controlled comparison when the device's own state",
+    "changes as the phases run - which it does, because every phase taps into a live",
+    "UI. Interleaving is what makes the two shapes comparable, and it is the practice",
+    "used everywhere else in this change."
+  ],
+  "gateStatus": {
+    "gateMs": 400,
+    "measuredP50Ms": 544,
+    "measuredP95Ms": 569,
+    "verdict": "not met, by ~145ms at p50 rather than by seconds",
+    "whatWouldClose it": [
+      "The remaining gap is the injection itself. `uinput` costs ~279ms before it",
+      "injects anything and ~427ms for a real tap, spawned; the channel removes the",
+      "spawn but not the binary. A cheaper injection carrier is the only lever left",
+      "above 400ms, and finding one is not part of this change."
+    ]
+  }
+}
