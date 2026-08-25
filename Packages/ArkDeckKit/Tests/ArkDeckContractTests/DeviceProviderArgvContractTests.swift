@@ -50,6 +50,44 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertEqual(timeout, 30)
   }
 
+  func testComponentDetailLowersWindowAndComponentAsOneValidatedArgument() throws {
+    let request = try HDCUIDumpRequest(
+      scope: .componentDetail, windowID: "60", componentID: "841")
+    let plan = try provider.lower(
+      action: .hdc(.captureUIDump(request)), context: context)
+    guard case .process(_, let arguments, let timeout) = plan.kind else {
+      return XCTFail("expected a process plan")
+    }
+    XCTAssertEqual(
+      arguments,
+      [
+        "-t", connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a",
+        "-w 60 -element -lastpage 841",
+      ])
+    XCTAssertEqual(timeout, 30)
+  }
+
+  func testComponentDetailStepRequiresTypedIdentifiers() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let step = try XCTUnwrap(
+      descriptor.steps.first { $0.stepID == "capture-advanced-ui-dump" })
+    let action = try provider.action(
+      for: step, operation: descriptor,
+      inputs: ["windowId": .string("60"), "componentId": .string("841")],
+      context: context)
+    XCTAssertEqual(
+      action,
+      .hdc(
+        .captureUIDump(
+          try HDCUIDumpRequest(
+            scope: .componentDetail, windowID: "60", componentID: "841"))))
+    XCTAssertThrowsError(
+      try provider.action(
+        for: step, operation: descriptor, inputs: ["windowId": .string("60")],
+        context: context))
+  }
+
   /// The lowering invents no trace category. `ohos` used to stand in as the
   /// default and the 2026-07-31 device window found it absent from `hitrace
   /// --list_categories` on OH 3.2 — a default that could only produce a

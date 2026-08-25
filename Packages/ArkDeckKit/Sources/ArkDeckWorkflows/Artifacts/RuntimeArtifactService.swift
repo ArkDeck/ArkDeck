@@ -210,6 +210,7 @@ enum RuntimeArtifactService {
       "observe-application-liveness": ["application-liveness.json"],
       "capture-hilog": ["hilog.txt"],
       "capture-ui-dump": ["ui-dump.json"],
+      "capture-advanced-ui-dump": ["advanced-dump.txt"],
       "receive-trace-artifact": ["trace.htrace"],
       "receive-ui-tree": ["ui-tree.json"],
       "receive-screenshot": ["screenshot.png"],
@@ -464,7 +465,7 @@ enum RuntimeArtifactService {
       var output = receipt.stdout
       output.append(receipt.stderr)
       return output
-    case "hilog.txt", "ui-dump.json", "debug-hilog.txt", "post-flash-hilog.txt",
+    case "hilog.txt", "ui-dump.json", "advanced-dump.txt", "debug-hilog.txt", "post-flash-hilog.txt",
       "crash-index.txt", "crash-log.txt":
       // These products are the bounded bytes received from the provider.
       return receipt.stdout

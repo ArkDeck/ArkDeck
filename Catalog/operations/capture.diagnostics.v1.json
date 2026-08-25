@@ -80,6 +80,24 @@
         "type": "boolean", "required": false, "default": true,
         "description": "Capture the accessibility/window dump. Read-only: unlike the trace, screenshot and component-tree legs this does not raise the effective effect."
       },
+      "advancedDump": {
+        "type": "boolean", "required": false, "default": false,
+        "description": "Capture ArkUI componentDetail output for one selected component. Requires the typed windowId and componentId inputs; absent or false leaves the plan unchanged."
+      },
+      "windowId": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[0-9]{1,20}$",
+        "maxLength": 20,
+        "description": "Validated ArkUI host window identifier used only by the componentDetail recipe."
+      },
+      "componentId": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[0-9]{1,20}$",
+        "maxLength": 20,
+        "description": "Validated ArkUI accessibility/component identifier used only by the componentDetail recipe."
+      },
       "crashLogs": {
         "type": "boolean",
         "required": false,
@@ -214,6 +232,20 @@
       "binding": "confirmedDevice",
       "optional": true,
       "compensation": "none"
+    },
+    {
+      "stepID": "capture-advanced-ui-dump",
+      "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "componentDetail"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Selected only by advancedDump. Provider lowering requires validated windowId and componentId and publishes the bounded componentDetail stdout as a separate Artifact."
     },
     {
       "stepID": "capture-crash-index",
@@ -357,6 +389,7 @@
   "artifacts": [
     { "name": "hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "ui-dump.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
+    { "name": "advanced-dump.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "ui-tree.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "screenshot.png", "role": "raw", "mediaType": "image/png", "privacy": "sensitive", "required": false },
     { "name": "crash-index.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },

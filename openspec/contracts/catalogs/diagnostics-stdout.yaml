@@ -27,6 +27,18 @@ actions:
     required_inputs: [byteBudget]
     limits:
       byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
+  - id: componentDetail
+    step_kind: captureRemoteStdout
+    output_mode: stdout
+    required_inputs: [windowId, componentId, byteBudget]
+    limits:
+      windowId:
+        { type: string, maximum_length: 20,
+          token_pattern: "^[0-9]{1,20}$" }
+      componentId:
+        { type: string, maximum_length: 20,
+          token_pattern: "^[0-9]{1,20}$" }
+      byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
 
   # Faultlogger is the device's own crash ledger. Both invocations are
   # reads - measured 2026-07-31: `ls` before and after is identical - so

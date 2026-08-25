@@ -103,24 +103,47 @@ public struct HDCHilogCaptureRequest: Sendable, Equatable {
 }
 
 public struct HDCUIDumpRequest: Sendable, Equatable {
-  /// Kept as an enum with one case on purpose: the wire form stays stable
-  /// and the type keeps saying that a UI dump has a scope. `componentTree`
-  /// is gone from it because that scope is not a stdout capture at all —
-  /// it is the `captureComponentTree` file action (CHG-2026-053 r2). No
-  /// persisted journal can name it: its lowering refused from the day it
-  /// was introduced, so nothing was ever dispatched under it.
+  /// `componentTree` is deliberately absent because `uitest dumpLayout` is a
+  /// device-file action. `componentDetail`, by contrast, is ArkUI's bounded
+  /// stdout recipe for one selected component and therefore belongs here.
   public enum Scope: String, CaseIterable, Sendable {
     case windowList
+    case componentDetail
   }
 
   public let scope: Scope
+  public let windowID: String?
+  public let componentID: String?
   package let byteBudget: Int
 
-  public init(scope: Scope = .windowList, byteBudget: Int = 8 * 1024 * 1024) throws {
+  public init(
+    scope: Scope = .windowList,
+    windowID: String? = nil,
+    componentID: String? = nil,
+    byteBudget: Int = 8 * 1024 * 1024
+  ) throws {
     guard (1024...(64 * 1024 * 1024)).contains(byteBudget) else {
       throw HDCE0RequestError.outOfBounds(field: "byteBudget", detail: "1024...64MiB")
     }
+    let identifierPattern = #"^[0-9]{1,20}$"#
+    switch scope {
+    case .windowList:
+      guard windowID == nil, componentID == nil else {
+        throw HDCE0RequestError.malformed(
+          field: "scope", detail: "windowList does not accept component identifiers")
+      }
+    case .componentDetail:
+      guard let windowID, let componentID,
+        windowID.range(of: identifierPattern, options: .regularExpression) != nil,
+        componentID.range(of: identifierPattern, options: .regularExpression) != nil
+      else {
+        throw HDCE0RequestError.malformed(
+          field: "componentDetail", detail: "windowID and componentID must be decimal identifiers")
+      }
+    }
     self.scope = scope
+    self.windowID = windowID
+    self.componentID = componentID
     self.byteBudget = byteBudget
   }
 }

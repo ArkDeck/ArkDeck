@@ -8510,6 +8510,18 @@ public actor RuntimeJobEngine {
         ]
       case "componentTree", "windowInventory", "crashIndex":
         parameters = ["byteBudget": .integer(8 * 1024 * 1024)]
+      case "componentDetail":
+        guard case .string(let windowID)? = inputs["windowId"],
+          case .string(let componentID)? = inputs["componentId"]
+        else {
+          throw RuntimeJobEngineError.internalFailure(
+            "component detail step selected without windowId and componentId")
+        }
+        parameters = [
+          "windowId": .string(windowID),
+          "componentId": .string(componentID),
+          "byteBudget": .integer(8 * 1024 * 1024),
+        ]
       case "crashLog":
         guard case .string(let name)? = inputs["crashLogName"] else {
           throw RuntimeJobEngineError.internalFailure(

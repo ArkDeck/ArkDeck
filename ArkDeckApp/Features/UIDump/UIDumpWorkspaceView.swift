@@ -559,18 +559,33 @@ struct UIDumpWorkspaceView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.bar)
         Divider()
-        HStack(spacing: 0) {
-          inspectorTabButton(.properties)
-          inspectorTabButton(.layout)
-          inspectorTabButton(.accessibility)
-          inspectorTabButton(.rawDump)
-          Spacer(minLength: 0)
+        ScrollView(.horizontal) {
+          HStack(spacing: 0) {
+            inspectorTabButton(.properties)
+            inspectorTabButton(.layout)
+            inspectorTabButton(.accessibility)
+            inspectorTabButton(.rawDump)
+            inspectorTabButton(.advancedDump)
+            Spacer(minLength: 0)
+          }
         }
+        .scrollIndicators(.hidden)
         .padding(.horizontal, 6)
         Divider()
-        ScrollView {
-          inspectorContent(node, capture: capture)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        if model.inspectorTab == .advancedDump {
+          AdvancedDumpInspectorView(
+            nodeIdentity: node.identity,
+            dumpNodeIdentity: model.advancedDumpNodeIdentity,
+            fields: model.advancedDumpFields,
+            failure: model.advancedDumpFailure,
+            isLoading: model.isLoadingAdvancedDump,
+            retry: { model.retryAdvancedDump() })
+            .id(node.identity)
+        } else {
+          ScrollView {
+            inspectorContent(node, capture: capture)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
         }
       } else {
         ContentUnavailableView(ViewerInspectorCopy.selectPrompt, systemImage: "cursorarrow.click")
@@ -686,6 +701,8 @@ struct UIDumpWorkspaceView: View {
         .padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("viewer.rawDump")
+    case .advancedDump:
+      EmptyView()
     }
   }
 
@@ -835,8 +852,271 @@ struct UIDumpWorkspaceView: View {
   }
 }
 
+/// Search state lives in this leaf view so a keystroke never invalidates the
+/// screenshot, outline tree, or the rest of the Viewer workspace. The result
+/// list is lazy because a real componentDetail response commonly has hundreds
+/// of fields and eagerly rebuilding every selectable value made deletion lag.
+private struct AdvancedDumpInspectorView: View {
+  let nodeIdentity: String
+  let dumpNodeIdentity: String?
+  let fields: [ViewerDumpField]
+  let failure: String?
+  let isLoading: Bool
+  let retry: @MainActor () -> Void
+
+  @State private var searchQuery = ""
+  @State private var searchFocusRequestID: UInt64 = 0
+
+  var body: some View {
+    let trimmedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    let hasQuery = !trimmedQuery.isEmpty
+    let matches = matchingFields(query: trimmedQuery)
+
+    VStack(alignment: .leading, spacing: 0) {
+      searchBar(matchCount: matches.count, hasQuery: hasQuery)
+      Divider()
+      ScrollView {
+        content(matches: matches, hasQuery: hasQuery)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+  }
+
+  private func searchBar(matchCount: Int, hasQuery: Bool) -> some View {
+    HStack(spacing: 8) {
+      Button { searchFocusRequestID &+= 1 } label: {
+        Image(systemName: "magnifyingglass")
+          .frame(width: 24, height: 24)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.borderless)
+      .keyboardShortcut("f", modifiers: [.command])
+      .disabled(fields.isEmpty)
+      .help(ViewerInspectorCopy.advancedSearchShortcut)
+      .accessibilityLabel(ViewerInspectorCopy.advancedSearch)
+      .accessibilityIdentifier("viewer.advancedDump.search.focus")
+
+      ViewerSearchTextField(
+        text: $searchQuery,
+        placeholder: ViewerInspectorCopy.advancedSearchPlaceholder,
+        accessibilityLabel: ViewerInspectorCopy.advancedSearch,
+        focusRequestID: searchFocusRequestID,
+        onCancel: { searchQuery = "" })
+        .frame(minWidth: 180, maxWidth: 360)
+        .frame(height: 22)
+        .disabled(fields.isEmpty)
+        .accessibilityIdentifier("viewer.advancedDump.search")
+
+      Spacer(minLength: 0)
+
+      if hasQuery {
+        let summary = "\(matchCount) / \(fields.count)"
+        Text(summary)
+          .font(WorkspaceFont.monospacedDense.monospacedDigit())
+          .foregroundStyle(.secondary)
+          .accessibilityLabel(ViewerInspectorCopy.advancedSearchResults)
+          .accessibilityValue(summary)
+          .accessibilityIdentifier("viewer.advancedDump.search.matchCount")
+
+        Button { searchQuery = "" } label: {
+          Image(systemName: "xmark.circle.fill")
+            .foregroundStyle(.secondary)
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .help(ViewerInspectorCopy.advancedSearchClear)
+        .accessibilityLabel(ViewerInspectorCopy.advancedSearchClear)
+        .accessibilityIdentifier("viewer.advancedDump.search.clear")
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 7)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.bar)
+  }
+
+  @ViewBuilder
+  private func content(matches: [IndexedField], hasQuery: Bool) -> some View {
+    if isLoading, dumpNodeIdentity == nodeIdentity {
+      HStack(spacing: 8) {
+        ProgressView().controlSize(.small)
+        Text(verbatim: ViewerInspectorCopy.advancedLoading)
+          .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+      }
+      .padding(.horizontal, 12).padding(.vertical, 10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityIdentifier("viewer.advancedDump.loading")
+    } else if dumpNodeIdentity == nodeIdentity, !fields.isEmpty {
+      if matches.isEmpty, hasQuery {
+        noResults
+      } else {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(matches) { match in
+            AdvancedDumpFieldRow(field: match.field)
+              .equatable()
+            Divider()
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        Text(verbatim: failure ?? ViewerInspectorCopy.advancedUnavailable)
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(failure == nil ? Color.secondary : Color.red)
+          .fixedSize(horizontal: false, vertical: true)
+        if failure != nil {
+          Button(ViewerInspectorCopy.retry) { retry() }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityIdentifier("viewer.advancedDump.retry")
+        }
+      }
+      .padding(.horizontal, 12).padding(.vertical, 10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityIdentifier("viewer.advancedDump")
+    }
+  }
+
+  private var noResults: some View {
+    VStack(spacing: 8) {
+      Image(systemName: "magnifyingglass")
+        .font(.title2)
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+      Text(verbatim: ViewerInspectorCopy.advancedSearchNoResults)
+        .font(WorkspaceFont.secondary.weight(.semibold))
+        .accessibilityLabel(
+          "\(ViewerInspectorCopy.advancedSearchNoResults): \(searchQuery)")
+        .accessibilityIdentifier("viewer.advancedDump.search.noResults")
+      Text(verbatim: searchQuery)
+        .font(WorkspaceFont.monospacedDense)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+      Button(ViewerInspectorCopy.advancedSearchClear) { searchQuery = "" }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .accessibilityIdentifier("viewer.advancedDump.search.noResults.clear")
+    }
+    .padding(.horizontal, 12).padding(.vertical, 24)
+    .frame(maxWidth: .infinity, alignment: .center)
+  }
+
+  private func matchingFields(query: String) -> [IndexedField] {
+    let indexedFields = fields.enumerated().map { IndexedField(id: $0.offset, field: $0.element) }
+    guard !query.isEmpty else { return indexedFields }
+    return indexedFields.filter { match in
+      match.field.key.localizedCaseInsensitiveContains(query)
+        || match.field.value.localizedCaseInsensitiveContains(query)
+    }
+  }
+
+  private struct IndexedField: Identifiable {
+    let id: Int
+    let field: ViewerDumpField
+  }
+}
+
+private struct AdvancedDumpFieldRow: View, Equatable {
+  let field: ViewerDumpField
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 0) {
+      Text(verbatim: field.key)
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .help(field.key)
+        .frame(width: 134, alignment: .leading)
+      Text(verbatim: ":")
+        .font(WorkspaceFont.monospacedValue)
+        .foregroundStyle(.secondary)
+        .frame(width: 16, alignment: .leading)
+      Text(verbatim: field.value)
+        .font(WorkspaceFont.monospacedValue)
+        .textSelection(.enabled)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .padding(.horizontal, 12).padding(.vertical, 6)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(field.key) : \(field.value)")
+    .accessibilityIdentifier("viewer.advancedDump.field.\(field.key)")
+  }
+}
+
+/// Native search field whose explicit focus request also works when it comes
+/// from a keyboard shortcut. SwiftUI focus can be handed back to the previous
+/// responder after a menu key equivalent; AppKit's first responder request is
+/// the durable source of truth for the caret.
+private struct ViewerSearchTextField: NSViewRepresentable {
+  @Binding var text: String
+  let placeholder: String
+  let accessibilityLabel: String
+  let focusRequestID: UInt64
+  let onCancel: @MainActor () -> Void
+
+  func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+  func makeNSView(context: Context) -> NSTextField {
+    let field = NSTextField(string: text)
+    field.placeholderString = placeholder
+    field.setAccessibilityLabel(accessibilityLabel)
+    field.isBezeled = true
+    field.bezelStyle = .roundedBezel
+    field.focusRingType = .default
+    field.isEditable = true
+    field.isSelectable = true
+    field.usesSingleLineMode = true
+    field.cell?.wraps = false
+    field.cell?.isScrollable = true
+    field.delegate = context.coordinator
+    field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    return field
+  }
+
+  func updateNSView(_ field: NSTextField, context: Context) {
+    context.coordinator.parent = self
+    if field.stringValue != text { field.stringValue = text }
+    context.coordinator.focusIfAsked(field, id: focusRequestID)
+  }
+
+  final class Coordinator: NSObject, NSTextFieldDelegate {
+    var parent: ViewerSearchTextField
+    private var lastFocusRequestID: UInt64?
+
+    init(_ parent: ViewerSearchTextField) { self.parent = parent }
+
+    func controlTextDidChange(_ notification: Notification) {
+      guard let field = notification.object as? NSTextField else { return }
+      parent.text = field.stringValue
+    }
+
+    func control(
+      _ control: NSControl, textView: NSTextView, doCommandBy selector: Selector
+    ) -> Bool {
+      guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+      parent.onCancel()
+      unsafe control.window?.makeFirstResponder(nil)
+      return true
+    }
+
+    func focusIfAsked(_ field: NSTextField, id: UInt64) {
+      guard id != 0, lastFocusRequestID != id else { return }
+      lastFocusRequestID = id
+      DispatchQueue.main.async { [weak field] in
+        guard let field, let window = unsafe field.window else { return }
+        window.makeFirstResponder(field)
+      }
+    }
+  }
+}
+
 enum ViewerInspectorTab: String {
-  case properties, layout, accessibility, rawDump
+  case properties, layout, accessibility, rawDump, advancedDump
   var id: String { rawValue }
   var title: String {
     switch self {
@@ -844,6 +1124,7 @@ enum ViewerInspectorTab: String {
     case .layout: ViewerInspectorCopy.layout
     case .accessibility: ViewerInspectorCopy.accessibility
     case .rawDump: ViewerInspectorCopy.rawDump
+    case .advancedDump: ViewerInspectorCopy.advancedDump
     }
   }
 }
@@ -856,6 +1137,7 @@ private enum ViewerInspectorCopy {
   static let layout = "Layout"
   static let accessibility = "Accessibility"
   static let rawDump = "Raw dump"
+  static let advancedDump = "Advanced Dump"
   static let identity = "Identity"
   static let state = "State"
   static let geometry = "Geometry"
@@ -874,6 +1156,17 @@ private enum ViewerInspectorCopy {
   static let no = "No"
   static let selectPrompt = "Select a component"
   static let rawUnavailable = "Raw fields are unavailable"
+  static let advancedUnavailable = "Select this tab to capture componentDetail fields"
+  static let advancedLoading = "Capturing componentDetail…"
+  static let advancedIdentifiersUnavailable =
+    "This component has no numeric hostWindowId/componentId pair in the current capture"
+  static let retry = "Retry"
+  static let advancedSearch = "Search Advanced Dump"
+  static let advancedSearchPlaceholder = "Search fields or values"
+  static let advancedSearchShortcut = "Search Advanced Dump (⌘F)"
+  static let advancedSearchResults = "Advanced Dump search results"
+  static let advancedSearchClear = "Clear search"
+  static let advancedSearchNoResults = "No matching fields or values"
 
   static func show(_ title: String) -> String { "Show \(title)" }
 }
@@ -897,6 +1190,11 @@ final class UIDumpWorkspaceViewModel {
   private(set) var isRefreshing = false
   private(set) var isCapturing = false
   private(set) var captureFailure: String?
+  private(set) var advancedDumpNodeIdentity: String?
+  private(set) var advancedDumpFields: [ViewerDumpField] = []
+  private(set) var advancedDumpFailure: String?
+  private(set) var isLoadingAdvancedDump = false
+  private var advancedDumpGeneration = 0
   /// The App's shared device observation. Viewer never probes HDC itself; it
   /// reads this, so an unplug reaches the picker without anyone navigating.
   private(set) var deviceObservation = DeviceListPresentation.loading
@@ -998,6 +1296,7 @@ final class UIDumpWorkspaceViewModel {
       self.isCapturing = false
       switch result {
       case .captured(let next):
+        self.resetAdvancedDump()
         self.capture = next
         let root = next.primaryRootIdentity ?? ""
         self.selectedRootIdentity = root
@@ -1017,6 +1316,7 @@ final class UIDumpWorkspaceViewModel {
   func setTargetID(_ value: String) {
     selectedTargetID = value
     captureFailure = nil
+    resetAdvancedDump()
   }
   func setRoot(_ value: String) {
     guard let capture, let root = capture.node(identity: value) else { return }
@@ -1033,7 +1333,10 @@ final class UIDumpWorkspaceViewModel {
     updateSearchMatches(selectFirst: true)
   }
   func setShowBounds(_ value: Bool) { showBounds = value }
-  func setInspectorTab(_ value: ViewerInspectorTab) { inspectorTab = value }
+  func setInspectorTab(_ value: ViewerInspectorTab) {
+    inspectorTab = value
+    if value == .advancedDump { loadAdvancedDumpIfNeeded() }
+  }
   func toggleExpansion(_ identity: String) { if !expandedNodeIdentities.insert(identity).inserted { expandedNodeIdentities.remove(identity) } }
   func adjustInspectorTree(by delta: Double) { setInspectorTree(percent: inspectorTreePercent - delta / 8) }
   /// Resizing is presentation only. It must never touch `selectedNodeIdentity`,
@@ -1053,6 +1356,7 @@ final class UIDumpWorkspaceViewModel {
   }
   func select(_ identity: String) {
     guard let capture, let node = capture.node(identity: identity) else { return }
+    if selectedNodeIdentity != node.identity { resetAdvancedDump() }
     selectedNodeIdentity = node.identity
     expandedNodeIdentities.formUnion(capture.ancestors(of: node.identity))
     if let index = searchMatchIdentities.firstIndex(of: node.identity) {
@@ -1061,6 +1365,55 @@ final class UIDumpWorkspaceViewModel {
     // A repeated click is still a reveal request. The row may have been moved
     // away from center manually even though its identity did not change.
     selectionRevealGeneration &+= 1
+    if inspectorTab == .advancedDump { loadAdvancedDumpIfNeeded() }
+  }
+
+  func retryAdvancedDump() {
+    resetAdvancedDump()
+    loadAdvancedDumpIfNeeded()
+  }
+
+  private func resetAdvancedDump() {
+    advancedDumpGeneration &+= 1
+    advancedDumpNodeIdentity = nil
+    advancedDumpFields = []
+    advancedDumpFailure = nil
+    isLoadingAdvancedDump = false
+  }
+
+  private func loadAdvancedDumpIfNeeded() {
+    guard inspectorTab == .advancedDump, !isLoadingAdvancedDump,
+      let capture, let nodeIdentity = selectedNodeIdentity,
+      advancedDumpNodeIdentity != nodeIdentity,
+      let target = selectedTarget,
+      capture.identity.targetID == target.id,
+      capture.identity.bindingRevision == target.bindingRevision
+    else { return }
+    guard let selection = capture.advancedDumpSelection(for: nodeIdentity) else {
+      advancedDumpNodeIdentity = nodeIdentity
+      advancedDumpFailure = ViewerInspectorCopy.advancedIdentifiersUnavailable
+      return
+    }
+    advancedDumpNodeIdentity = nodeIdentity
+    advancedDumpFields = []
+    advancedDumpFailure = nil
+    isLoadingAdvancedDump = true
+    let generation = advancedDumpGeneration
+    let provider = provider
+    let captureJobID = capture.identity.jobID
+    Task { [weak self] in
+      let result = await provider.advancedDump(target: target, selection: selection)
+      guard let self, !Task.isCancelled,
+        self.capture?.identity.jobID == captureJobID,
+        self.selectedNodeIdentity == nodeIdentity,
+        self.advancedDumpGeneration == generation
+      else { return }
+      self.isLoadingAdvancedDump = false
+      switch result {
+      case .captured(let fields): self.advancedDumpFields = fields
+      case .failed(let reason): self.advancedDumpFailure = reason
+      }
+    }
   }
 
   private func updateSearchMatches(selectFirst: Bool) {

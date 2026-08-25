@@ -214,6 +214,7 @@ public enum ViewerUIFixture {
         "id": row.id, "type": row.type, "bounds": [row.x, row.y, row.width, row.height],
         "enabled": true, "visible": true, "clickable": row.interactive,
         "focusable": row.interactive, "zIndex": row.level,
+        "hostWindowId": "60",
         // A dump the parser has never seen must survive into Raw dump intact.
         // Keeping one here means the fixture proves that, not just asserts it.
         "fixtureUnknownField": "preserved", "fixtureOwnerID": row.id,
@@ -314,6 +315,23 @@ public enum ViewerUIFixture {
 
     func recapture(target: UIDumpTargetPresentation) async -> ViewerCaptureSubmissionResult {
       .captured(capture)
+    }
+
+    func advancedDump(
+      target: UIDumpTargetPresentation,
+      selection: ViewerAdvancedDumpSelection
+    ) async -> ViewerAdvancedDumpSubmissionResult {
+      var fields = [
+        ViewerDumpField(key: "componentId", value: selection.componentID),
+        ViewerDumpField(key: "hostWindowId", value: selection.windowID),
+        ViewerDumpField(key: "source", value: "componentDetail"),
+      ]
+      fields.append(contentsOf: (0..<253).map { index in
+        ViewerDumpField(
+          key: "fixtureField\(index.formatted(.number.precision(.integerLength(3))))",
+          value: "fixtureValue\(index)")
+      })
+      return .captured(fields)
     }
 
     func cancel(jobID: String) async -> Bool { false }
