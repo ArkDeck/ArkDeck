@@ -2901,6 +2901,23 @@
           }
         }
       }
+    },
+    "app.navigation.toolkit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toolkit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toolkit"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

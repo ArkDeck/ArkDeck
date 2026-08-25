@@ -113,6 +113,8 @@ private final class ArkDeckAppModelStore {
     documentController: traceDocument)
   @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
+  @ObservationIgnored lazy var toolkitWorkspace = ToolkitWorkspaceViewModel(
+    provider: ToolkitDeviceControlFacade.make())
 
   init() {
     AppStartupPerformance.beginStartup()
@@ -241,6 +243,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   case debug
   case uiDump
   case trace
+  case toolkit
   case history
 
   var id: String { rawValue }
@@ -252,6 +255,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "app.navigation.debug"
     case .uiDump: "app.navigation.uiDump"
     case .trace: "app.navigation.trace"
+    case .toolkit: "app.navigation.toolkit"
     case .history: "app.navigation.history"
     }
   }
@@ -263,6 +267,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "ladybug"
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
+    case .toolkit: "hand.tap"
     case .history: "clock.arrow.circlepath"
     }
   }
@@ -480,6 +485,9 @@ private struct AppShellView: View {
     .onChange(of: models.uiDumpWorkspace.isCapturing) { _, capturing in
       deviceList.setLiveObservationPaused(capturing)
     }
+    .onChange(of: models.toolkitWorkspace.isCapturing) { _, capturing in
+      deviceList.setLiveObservationPaused(capturing)
+    }
     .task(id: deviceList.startupInformationReady) {
       guard deviceList.startupInformationReady else { return }
       // Yield the main actor once so SwiftUI can commit the complete device
@@ -532,6 +540,7 @@ private struct AppShellView: View {
           navigationRow(.debug)
           navigationRow(.uiDump)
           navigationRow(.trace)
+          navigationRow(.toolkit)
         }
         Section("app.navigation.section.records") {
           navigationRow(.history)
@@ -579,6 +588,7 @@ private struct AppShellView: View {
       models.traceWorkspace.applyDeviceObservation(
         observation, names: deviceDisplayNames(observation))
     }
+    models.toolkitWorkspace.publish(deviceObservation: observation)
   }
 
   /// Presentation-only names, keyed by the adopted target the workspaces
@@ -611,6 +621,10 @@ private struct AppShellView: View {
       models.traceWorkspace.applyDeviceObservation(
         deviceList.presentation, names: deviceDisplayNames(deviceList.presentation))
       models.traceWorkspace.refresh()
+    case .navigation(.toolkit):
+      // Only routing. Toolkit shows a still the person asked for, so arriving
+      // on the tab must not quietly photograph the device.
+      models.toolkitWorkspace.publish(deviceObservation: deviceList.presentation)
     }
   }
 
@@ -744,6 +758,8 @@ private struct AppShellView: View {
       UIDumpWorkspaceView(model: models.uiDumpWorkspace)
     case .trace:
       TraceWorkspaceView(model: models.traceWorkspace)
+    case .toolkit:
+      ToolkitWorkspaceView(model: models.toolkitWorkspace)
     }
   }
 
