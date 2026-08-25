@@ -84,8 +84,23 @@ T02/T03 不进入实现。
   `evidence/runs/TASK-IDC-002/data/persistent-shell-channel.json`。
   顺带记一条硬事实：本次会话中设备连接键自行变过（5SM… → 150100424a…），症状是
   `Not match target founded`，误导了约一小时；这也正面支持「每次手势重读身份」。
-  当前分量估算 p50 ≈ 362 ms（Runtime 107 + 身份 32 + 注入 223），门槛 400 ms;
-  p95 端到端未验——生产 daemon 仍是不含这三个操作的旧构建，更新需要维护者签名身份）
+  ⑦ 端到端真机验证已跑（daemon 按 #1512 重建并用维护者自己的 Developer ID 重签安装，
+  旧 bundle 备份在 Helpers/.backup-20260825T205319/）。三种手势全部走通；会话沿用、
+  追加台账、持久通道三者均在真机上确认（沿用后设备步骤只剩身份+注入；ledger 出现且
+  1.3 MB 文档不再被整写；ps 里有 daemon 名下的常驻 `hdc … shell`）。
+  **门槛未达**：经 CLI 的 p50 644 ms（其中 CLI 启动+XPC 往返约 75 ms/次，`--wait` 付两次），
+  但 p95 3887 ms——持续点击下同一手势在 636–11820 ms 之间漂。事后立即量设备腿：
+  `list targets -v` p50 40 ms 无缺行、`uinput` spawn p50 313 ms、loadavg 2.10（板子基线），
+  故长尾在设备与链路侧而非 Runtime，但它是横在分量与门槛之间的东西，尚未刻画。
+  两次「失败」不是缺陷：`targetConfirmationMismatch: saw 0`，设备瞬时掉出目标列表，
+  两次都失败在注入之前且 outcomeUnknown=false——正是 #1510 保留的每手势身份复核在挡，
+  前导里最便宜的那一步抓住了真实瞬态。
+  **发现并修掉一个真缺陷**：通道的 120 s 空闲关闭只在下一次派发时清扫，也就是在「没有
+  下一次」这个它本该覆盖的情形下永不触发——真机上最后一次手势后 11 分钟仍开着。已改为
+  按定时器清扫并在每次使用时重新计时，附反向验证测试。证据
+  `evidence/runs/TASK-IDC-002/data/end-to-end-real-device.json`。
+  未验：App 自身路径（本轮全走 CLI）；修复后的空闲关闭在真机上的表现（带修复的 daemon
+  尚未安装））
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6

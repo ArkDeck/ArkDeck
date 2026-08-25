@@ -1,0 +1,96 @@
+{
+  "measurement": "end-to-end-real-device",
+  "question": "With every stage merged and installed, what does a gesture actually cost, and what breaks?",
+  "measuredAtUTC": "2026-08-25T13:15:00Z",
+  "setup": {
+    "device": "DAYU200 development board, 720x1280, display powered on",
+    "connectKey": "<redacted-connect-key> (changed during this session; see persistent-shell-channel.json)",
+    "target": "TGT-958780b2ffb7 binding r4",
+    "foregroundApp": "com.ohos.settings (a neutral screen, set by the maintainer)",
+    "daemon": [
+      "The installed helper was rebuilt from main at #1512 and re-signed with the",
+      "maintainer's own Developer ID (8AQTYW5FKR), same identifier, hardened runtime",
+      "and entitlements as the build it replaced. Previous bundle kept under",
+      "Helpers/.backup-20260825T205319/."
+    ],
+    "clientPath": "the arkdeck CLI, which spawns a process and opens an XPC connection per invocation - measured at 54-106ms for a no-op round trip, and paid twice by `job submit --wait`. The App holds a live connection and does not pay it."
+  },
+  "verifiedOnHardware": {
+    "allThreeGestures": {
+      "input.tap@1": "succeeded",
+      "input.long-press@1": "succeeded",
+      "input.swipe@1": "succeeded"
+    },
+    "sessionCarriedEvidence": [
+      "First gesture of a session ran all three preamble steps.",
+      "Every later gesture ran only ['confirm-evidence-target', 'inject-pointer-input'],",
+      "with the journal recording `read-evidence-model carried from session readback at ...`",
+      "and the same for firmware. #1510 confirmed live."
+    ],
+    "capabilityUseLedger": [
+      "`runtime-capabilities.ledger` appeared on first use and grew 1.3k -> 7.1k while",
+      "the 1.3 MB document was left untouched. #1511 confirmed live - and the document",
+      "being 1.3 MB is what the old shape rewrote twice per gesture."
+    ],
+    "persistentChannel": [
+      "`ps` showed a long-lived `hdc -t <key> shell` whose parent is the daemon.",
+      "#1512 confirmed live."
+    ]
+  },
+  "latency": {
+    "throughTheCLI": {
+      "firstGestureOfASession": 971,
+      "steadyStateBatch": { "n": 8, "range": [551, 576] },
+      "twentyGestureBatch": { "n": 20, "ok": 20, "p50": 644, "p95": 3887, "min": 565, "max": 3887 }
+    },
+    "components": {
+      "cliStartupAndXPCRoundTrip": 75,
+      "identityReconfirmation": 40,
+      "injectionOverChannel": 223,
+      "runtimeOwnCost": 107
+    },
+    "reading": [
+      "p50 through the CLI is 644ms. Subtracting the CLI's own startup and XPC round",
+      "trips brings the App's path lower, but the App path was not measured and no",
+      "figure is claimed for it.",
+      "p95 is the honest problem: under sustained tapping the same gesture ranged from",
+      "636ms to 11820ms. The 400ms gate is not met end to end."
+    ]
+  },
+  "theTail": [
+    "A 24-gesture batch degraded progressively (1.0s -> 11.8s) and then recovered.",
+    "Measured at rest immediately after: `hdc list targets -v` p50 40ms with no missing",
+    "rows, `uinput` p50 313ms spawned, device loadavg 2.10 (this board's baseline).",
+    "So the tail is the device and its link under sustained gesture load, not the",
+    "Runtime - but it is real, and it is what stands between these components and the",
+    "gate. Characterising it is not done."
+  ],
+  "twoFailuresWhichWereNotDefects": {
+    "jobs": ["job-9b216336a05cc994a422e2f5458648f8", "job-437f7fe394fac6ab1dc26b5135ef419c"],
+    "reason": "targetConfirmationMismatch: expected exactly one matching target row, saw 0",
+    "reading": [
+      "The device dropped off the hdc target list momentarily under load. Both jobs",
+      "failed at `confirm-evidence-target`, before anything was injected, with",
+      "outcomeUnknown false.",
+      "This is the per-gesture identity re-confirmation kept in #1510 doing exactly what",
+      "it is for: it refused to inject into a target it could not confirm. The cheapest",
+      "step in the preamble is the one that caught a real transient."
+    ]
+  },
+  "defectFoundAndFixed": {
+    "claim": "an open channel closes after 120s without a gesture",
+    "observed": "still open 11 minutes after the last gesture",
+    "cause": [
+      "The idle sweep ran only from `dispatch`, so it could only close a channel when",
+      "another gesture arrived - which is precisely not the case it exists for. The",
+      "claim was false as implemented, in the commit message and in this evidence set."
+    ],
+    "fix": "the sweep is armed on a timer and re-armed on every use, so it measures from the last gesture",
+    "test": "testAnIdleChannelClosesWithoutWaitingForAnotherGesture; with the arming removed it fails"
+  },
+  "notVerified": [
+    "The App's own path. Everything here went through the CLI.",
+    "The channel's idle close on hardware after the fix - the daemon carrying the fix",
+    "has not been installed yet."
+  ]
+}
