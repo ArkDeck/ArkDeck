@@ -40,11 +40,16 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-002 — 交互式输入 + Toolkit 真机操作（垂直交付）
 
-- Status:in-progress（2026-08-25 开工。Spike 已定形状：per-invocation 不达标，设备侧
-  常驻注入（`uitest start-daemon`）是达标路径，其落地前 App 输入面按 verification
-  预案走「截图上点选 → 显式确认发送」形态。交付分阶段 PR：① typed input
-  operations + Provider lowering + 契约测试 + 真机单发验证；② Interactive Control
-  Session 会话机械；③ Toolkit App 面与常驻注入升级）
+- Status:in-progress（2026-08-25。已交付 ① typed input operations + Provider lowering
+  + 契约测试 + 真机单发验证（#1498）；②a 会话 scope 授权 + TTL/预算（#1500）；
+  ②b 帧 epoch 与超时作废 + display facts 漂移 fail-closed + 帧内坐标界（#1502）。
+  **Spike 的达标路径结论已被 T02 实测推翻并取代**：`uitest start-daemon` 对 uiInput
+  延迟零影响（CLI 不是它的客户端），瓶颈是 uitest 二进制启动本身（不注入也要 301 ms）；
+  既证达标载体是 `uinput -T`（p95 333 ms < 400 ms 门槛），代价是失去设备侧坐标校验，
+  使 ②b 的 host 侧帧内界从纵深防御变为唯一防线。证据
+  `evidence/runs/TASK-IDC-002/data/injection-path-comparison.json`。
+  剩余 ③：Toolkit App 面 + 会话 open/close 与 XPC 方法面 + uinput lowering 切换；
+  在其落地前 App 输入面按 verification 预案走「截图上点选 → 显式确认发送」）
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6
