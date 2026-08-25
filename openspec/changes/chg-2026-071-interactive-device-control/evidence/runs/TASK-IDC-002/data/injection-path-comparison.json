@@ -1,0 +1,30 @@
+{
+ "date": "2026-08-25",
+ "device": "5SM0125725000252 / TGT-1a62a0dbedd6 (OpenHarmony-7.0.0.39, 1280x2832)",
+ "method": "one long-lived `hdc shell` over a PTY, sentinel-terminated round trips; the transport floor is measured in the same session",
+ "question": "TASK-IDC-001 concluded that a device-side resident injector (uitest start-daemon) was the path to the 400 ms p95 gate. This run tests that conclusion.",
+ "latency_ms": {
+  "shell_builtin_echo": {"p50": 12.4, "note": "transport floor of the persistent channel"},
+  "param_get": {"p50": 63.6, "note": "a trivial native OHOS binary: process start with no framework"},
+  "uinput_help_only": {"p50": 174.2, "note": "uinput startup with no injection"},
+  "uinput_touch_click": {"p50": 275.8, "p95": 332.9},
+  "uitest_help_only": {"p50": 301.1, "note": "uitest startup with no injection at all"},
+  "uitest_uiInput_click_no_daemon": {"p50": 325.5, "p95": 413.1},
+  "uitest_uiInput_click_with_resident_daemon": {"p50": 334.0, "p95": 424.4},
+  "snapshot_display_jpeg": {"p50": 473.9, "p95": 551.0}
+ },
+ "findings": [
+  "The resident daemon does not help. `uitest start-daemon` runs and stays resident (verified: pid parented to init), but uiInput latency with it (p50 334 / p95 424) is indistinguishable from without it (p50 326 / p95 413). The CLI is not a client of that daemon.",
+  "The cost is process startup, not injection. `uitest help`, which injects nothing, already costs p50 301 ms; the injection itself is therefore only ~34 ms. TASK-IDC-001's assumed remedy addressed a service connection that was never the bottleneck.",
+  "`uinput -T` is the faster closed surface: p95 332.9 ms, under the 400 ms gate, against uitest's 413.1 ms over it. Its own startup is 174 ms, so its injection costs ~100 ms.",
+  "uinput injection is real. A `uinput -T -m` swipe on the lock screen unlocked the device (this device has no passcode), so the events traverse the system input pipeline rather than being reported as accepted.",
+  "The two surfaces differ in what they refuse. uitest fail-closes on an off-panel coordinate (`Please confirm that the coordinate values are correct.`). uinput does not: it returns rc=0 with the hedge `If the command does not work as expected, check whether the specified coordinates exceed the screen boundary`, and only malformed arguments fail (rc=255).",
+  "uinput exposes a wider surface than the closed set needs (mouse, keyboard, touchpad, multi-finger, text) - a reason to keep lowering to an explicitly enumerated subset rather than passing anything through."
+ ],
+ "consequences": [
+  "The gate is reachable inside the existing command surface, but only through uinput and only over a persistent channel; neither surface can meet it if a gesture pays a fresh Job's admission.",
+  "Choosing uinput moves the host-side frame bounds check from defence-in-depth to load-bearing: with uinput there is no device-side coordinate validation behind it.",
+  "Both surfaces remain startup-dominated. A genuinely low-latency path needs a resident process that keeps an injector loaded and accepts gestures over a channel; that is a device-side helper to be built, not a command to be called, and it stays out of the current scope."
+ ],
+ "device_state": "the uitest daemon started for the comparison was killed; no uitest/uinput process remains; /data/local/tmp holds no probe files; the screen was returned to the off/locked state it was found in"
+}
