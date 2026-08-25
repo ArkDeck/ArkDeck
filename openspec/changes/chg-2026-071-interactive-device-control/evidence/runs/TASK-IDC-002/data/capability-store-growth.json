@@ -1,0 +1,16 @@
+{
+ "date": "2026-08-25",
+ "measured_on": "the live production capability store (~/Library/Application Support/ArkDeck/Agentd/capabilities/runtime-capabilities.json)",
+ "observations": {
+  "records": 318,
+  "document_bytes": 1286105,
+  "bytes_per_record_mean": 4044,
+  "storage_shape": "one JSON document holding every record; every issue and every consume rewrites the whole document atomically under flock with fsync"
+ },
+ "code_facts": [
+  "RuntimeJobEngine.authorizationScopeFingerprint includes `inputs=<canonical JSON>` and `planDigest`, so two taps at different coordinates hash to different capability IDs.",
+  "automaticRuntimeCapability mints a record per distinct scope fingerprint; consumeCapabilityBeforeMutation rewrites the document again."
+ ],
+ "consequence": "Under a per-input-Job shape, every pointer coordinate a user touches adds a permanent ~4 KB record and forces two full-document rewrites. The rewrite cost grows with the store, so an interactive session degrades quadratically and the store never shrinks. This is a storage argument for session-scoped capability that stands independently of the latency argument in TASK-IDC-001.",
+ "product_constraint": "The published input operations must not be exposed through an App input surface before the session scope exists; today they are catalog-level primitives for typed callers, not an interactive control plane."
+}

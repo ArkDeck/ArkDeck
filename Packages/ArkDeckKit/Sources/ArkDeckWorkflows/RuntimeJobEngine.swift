@@ -6888,14 +6888,17 @@ public actor RuntimeJobEngine {
     if let identity = materialized.stableTargetIdentitySHA256,
       let bindingRevision = materialized.bindingRevision
     {
+      let subject = Self.sessionScopedAuthorizationSubject(
+        descriptor: descriptor, inputs: request.inputs,
+        planDigest: materialized.planDigest)
       return RuntimeCapabilityAuthorizationQuery(
         operationID: descriptor.id,
         operationVersion: descriptor.version,
         effect: effect,
         targetStableIdentitySHA256: identity,
         targetBindingRevision: bindingRevision,
-        planDigest: materialized.planDigest,
-        inputs: request.inputs,
+        planDigest: subject.planDigest,
+        inputs: subject.inputs,
         artifactFacts: materialized.artifactFacts)
     }
 
@@ -7112,9 +7115,10 @@ public actor RuntimeJobEngine {
     recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
   ) async throws -> RuntimeCapabilityReference {
     let issuedAtUTC = nowUTC()
+    let sessionScoped = Self.sessionScopedInputOperations.contains(descriptor.reference)
     guard
       let expiresAtUTC = Self.automaticCapabilityExpiry(
-        issuedAtUTC: issuedAtUTC, effect: query.effect)
+        issuedAtUTC: issuedAtUTC, effect: query.effect, sessionScoped: sessionScoped)
     else {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
@@ -7291,7 +7295,8 @@ public actor RuntimeJobEngine {
           exactArtifactFacts: query.effect == .destructive ? query.artifactFacts : nil,
           issuedAtUTC: issuedAtUTC,
           expiresAtUTC: expiresAtUTC,
-          maximumUses: pinsExactPlan ? 1 : 10_000,
+          maximumUses: pinsExactPlan
+            ? 1 : (sessionScoped ? Self.sessionScopedInputMaximumUses : 10_000),
           issuer: RuntimeCapabilityIssuer(
             kind: .runtimeDefaultPolicy,
             reference:
@@ -7516,14 +7521,17 @@ public actor RuntimeJobEngine {
         )
       }
       deviceLineage = (stableIdentity, bindingRevision)
+      let subject = Self.sessionScopedAuthorizationSubject(
+        descriptor: descriptor, inputs: runtime.record.request.inputs,
+        planDigest: planDigest)
       query = RuntimeCapabilityAuthorizationQuery(
         operationID: descriptor.id,
         operationVersion: descriptor.version,
         effect: effect,
         targetStableIdentitySHA256: stableIdentity,
         targetBindingRevision: bindingRevision,
-        planDigest: planDigest,
-        inputs: runtime.record.request.inputs,
+        planDigest: subject.planDigest,
+        inputs: subject.inputs,
         artifactFacts: artifactFacts)
     } else {
       guard let provider = providers.provider(id: descriptor.provider.rawValue),
@@ -8216,6 +8224,43 @@ public actor RuntimeJobEngine {
     return constraints
   }
 
+  /// Operations whose authorized subject is the control session, not the one
+  /// gesture. The scope fingerprint hashes both `inputs` and the materialized
+  /// plan digest, and both change with every pointer coordinate, so scoping a
+  /// gesture individually mints one permanent capability record per screen
+  /// position. Measured on the production store 2026-08-25: 318 records in a
+  /// single 1.29 MB document that is rewritten whole on every issue and every
+  /// consume, so an interactive session would degrade quadratically and never
+  /// reclaim the records (chg-2026-071 evidence
+  /// `TASK-IDC-002/data/capability-store-growth.json`).
+  ///
+  /// Reducing the subject to target + binding + gesture kind bounds the record
+  /// count at three per bound device. It does not weaken what the runtime can
+  /// prove about an individual input: every gesture still materializes its own
+  /// plan, writes its own durable intent before dispatch, and records its own
+  /// outcome, so intent-before-effect and the no-replay rule are untouched.
+  static let sessionScopedInputOperations: Set<String> = [
+    "input.tap@1", "input.long-press@1", "input.swipe@1",
+  ]
+
+  /// The projection has to be applied identically where a capability is issued
+  /// and where it is consumed, or the consume would look up an ID the issue
+  /// never wrote. One helper serves both call sites for exactly that reason.
+  static func sessionScopedAuthorizationSubject(
+    descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
+    planDigest: String?
+  ) -> (inputs: [String: JSONValue], planDigest: String?) {
+    guard sessionScopedInputOperations.contains(descriptor.reference) else {
+      return (inputs, planDigest)
+    }
+    // The display a gesture lands on stays part of the authorized subject; the
+    // coordinates inside that display do not.
+    var reduced: [String: JSONValue] = [:]
+    if let display = inputs["displayId"] { reduced["displayId"] = display }
+    return (reduced, nil)
+  }
+
   private static func authorizationScopeFingerprint(
     of query: RuntimeCapabilityAuthorizationQuery
   ) -> String {
@@ -8257,12 +8302,26 @@ public actor RuntimeJobEngine {
     return RuntimeJobRecord.sha256Hex(Data(lines.joined(separator: "\n").utf8))
   }
 
+  /// A control session's envelope is short by design: it authorizes gestures a
+  /// person is sending right now, so it expires on the order of one sitting
+  /// rather than inheriting the thirty-day standing lifetime that suits a
+  /// repeatable, exactly-scoped mutation.
+  static let sessionScopedInputLifetime: TimeInterval = 60 * 60
+  /// The session budget. Every gesture consumes one use, so this bounds how
+  /// much a single unattended envelope can do before a fresh authorization is
+  /// required — the "budget" half of the session envelope.
+  static let sessionScopedInputMaximumUses = 2_000
+
   private static func automaticCapabilityExpiry(
     issuedAtUTC: String,
-    effect: WorkflowEffect
+    effect: WorkflowEffect,
+    sessionScoped: Bool = false
   ) -> String? {
     guard let issued = ISO8601Timestamps.parse(issuedAtUTC) else { return nil }
-    let lifetime: TimeInterval = effect == .destructive ? 4 * 60 * 60 : 30 * 24 * 60 * 60
+    let lifetime: TimeInterval =
+      sessionScoped
+      ? sessionScopedInputLifetime
+      : (effect == .destructive ? 4 * 60 * 60 : 30 * 24 * 60 * 60)
     return ISO8601Timestamps.string(from: issued.addingTimeInterval(lifetime))
   }
 
