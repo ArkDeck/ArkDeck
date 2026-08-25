@@ -22,6 +22,27 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(request.inputs["redactionProfile"], .string("standard"))
   }
 
+  func testAdvancedDumpRequestPinsOnlyTypedComponentDetailInputs() throws {
+    let target = UIDumpTargetPresentation(
+      id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-22T00:00:00Z")
+    let request = try ViewerCaptureRequestBuilder.advancedDumpRequest(
+      target: target,
+      selection: ViewerAdvancedDumpSelection(windowID: "60", componentID: "841"),
+      nonce: "advanced")
+
+    XCTAssertEqual(request.operation.reference, "capture.diagnostics@1")
+    XCTAssertEqual(request.target.targetID, "target-a")
+    XCTAssertEqual(request.target.expectedBindingRevision, 7)
+    XCTAssertEqual(request.inputs["advancedDump"], .bool(true))
+    XCTAssertEqual(request.inputs["windowId"], .string("60"))
+    XCTAssertEqual(request.inputs["componentId"], .string("841"))
+    XCTAssertEqual(request.inputs["captureHilog"], .bool(false))
+    XCTAssertEqual(request.inputs["uiDump"], .bool(false))
+    XCTAssertEqual(request.inputs["uiScreenshot"], .bool(false))
+    XCTAssertEqual(request.inputs["uiComponentTree"], .bool(false))
+  }
+
   func testViewerOnlyTreatsFreshConnectedCandidateAsCaptureReady() {
     let connected = DeviceCandidatePresentation(
       connectKey: "usb-a", state: "Connected", adoptedTargetID: "target-a", bindingRevision: 7)
@@ -43,7 +64,7 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     let capture = try ViewerCaptureParser.parse(
       screenshotData: png(width: 720, height: 1280),
       treeData: Data("""
-      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","hitTestBehavior":"HitTestMode.Transparent","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true,"childOnly":"not-root"},"children":[]}]}
+      {"attributes":{"id":"1","type":"Page","bounds":"[0,0][720,1280]","hostWindowId":"60","hitTestBehavior":"HitTestMode.Transparent","unknown":"kept"},"children":[{"attributes":{"id":"42","type":"Toggle","text":"Wi-Fi","bounds":"[40,80][220,136]","clickable":true,"childOnly":"not-root"},"children":[]}]}
       """.utf8),
       rawDumpData: Data(#"{"windows":[{"id":"w1"}]}"#.utf8),
       identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
@@ -62,7 +83,35 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(
       try XCTUnwrap(capture.formattedRawFields(for: "device:42")).contains("childOnly"),
       "provider-specific fields owned by the selected component must remain available")
+    XCTAssertEqual(
+      capture.advancedDumpSelection(for: "device:42"),
+      ViewerAdvancedDumpSelection(windowID: "60", componentID: "42"),
+      "Advanced Dump must use the selected component and its enclosing window, not raw fields")
     XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID, "42")
+  }
+
+  func testAdvancedDumpParserUsesCapturedKeyColonValueText() throws {
+    let fields = try ViewerAdvancedDumpParser.parse(Data("""
+      WaterFlow dump:
+        accessibilityId : 841
+        layoutConstraint: { minWidth: 0, maxWidth: 1280 }
+        scrollable : true
+      """.utf8))
+
+    XCTAssertEqual(fields[0], ViewerDumpField(key: "WaterFlow dump", value: ""))
+    XCTAssertEqual(fields[1], ViewerDumpField(key: "accessibilityId", value: "841"))
+    XCTAssertEqual(
+      fields[2],
+      ViewerDumpField(key: "layoutConstraint", value: "{ minWidth: 0, maxWidth: 1280 }"))
+    XCTAssertEqual(fields[3], ViewerDumpField(key: "scrollable", value: "true"))
+  }
+
+  func testAdvancedDumpParserRejectsSidecarNoticeInsteadOfFallingBackToRawFields() {
+    XCTAssertThrowsError(
+      try ViewerAdvancedDumpParser.parse(
+        Data("Dump saved to /data/app/example/files/arkui-comp.dump\n".utf8))) { error in
+      XCTAssertEqual(error as? ViewerCaptureFailure, .advancedDumpRequiresSidecar)
+    }
   }
 
   func testParserFallsBackToStablePathForDuplicateDeviceIDsAndDisablesUnprovenCoordinates() throws {

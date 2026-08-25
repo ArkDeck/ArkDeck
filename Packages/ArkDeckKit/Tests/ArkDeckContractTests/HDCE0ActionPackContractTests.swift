@@ -120,9 +120,15 @@ final class HDCE0ActionPackContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HDCTraceCaptureRequest(durationSeconds: 5, categories: ["ohos"], bufferKB: 100))
     XCTAssertThrowsError(try HDCUIDumpRequest(byteBudget: 10))
-    // r2: the default is the only scope a stdout UI dump can honestly have.
     XCTAssertEqual(try HDCUIDumpRequest().scope, .windowList)
-    XCTAssertEqual(HDCUIDumpRequest.Scope.allCases, [.windowList])
+    XCTAssertEqual(HDCUIDumpRequest.Scope.allCases, [.windowList, .componentDetail])
+    XCTAssertNoThrow(
+      try HDCUIDumpRequest(
+        scope: .componentDetail, windowID: "60", componentID: "841"))
+    XCTAssertThrowsError(
+      try HDCUIDumpRequest(
+        scope: .componentDetail, windowID: "60; reboot", componentID: "841"))
+    XCTAssertThrowsError(try HDCUIDumpRequest(scope: .componentDetail))
   }
 
   func testPropertyQueriesAreAllowlisted() {

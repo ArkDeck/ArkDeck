@@ -580,12 +580,13 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "byteBudget": .integer(Int64(request.byteBudget)),
         ])
     case .hdc(.captureUIDump(let request)):
-      self.init(
-        kind: "hdc.captureUIDump",
-        arguments: [
-          "scope": .string(request.scope.rawValue),
-          "byteBudget": .integer(Int64(request.byteBudget)),
-        ])
+      var arguments: [String: JSONValue] = [
+        "scope": .string(request.scope.rawValue),
+        "byteBudget": .integer(Int64(request.byteBudget)),
+      ]
+      optional(request.windowID, into: &arguments, key: "windowId")
+      optional(request.componentID, into: &arguments, key: "componentId")
+      self.init(kind: "hdc.captureUIDump", arguments: arguments)
     case .hdc(.captureCrashIndex(let byteBudget)):
       self.init(
         kind: "hdc.captureCrashIndex",
@@ -1126,7 +1127,10 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .hdc(
         .captureUIDump(
           try HDCUIDumpRequest(
-            scope: scope, byteBudget: integer("byteBudget"))))
+            scope: scope,
+            windowID: try optionalString("windowId"),
+            componentID: try optionalString("componentId"),
+            byteBudget: integer("byteBudget"))))
     case "hdc.captureCrashIndex":
       return .hdc(.captureCrashIndex(byteBudget: try integer("byteBudget")))
     case "hdc.captureCrashLog":

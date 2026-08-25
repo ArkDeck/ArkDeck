@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "ca6c879f921a569a0268292caa4d69aadae52afdedee88f7174e71fdfb91d5ac"
+  public static let catalogDigest = "d701d69cb070bca31de1838888f3ca2d9c3aeff614cf38543a6ce735777119e2"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -146,8 +146,10 @@ extension RuntimeOperationCatalog {
       concurrencyKey: .deviceExclusive,
       inputs: [
         CatalogFieldDescriptor(name: "abilityName", type: .string, isRequired: false, pattern: "^[a-zA-Z][a-zA-Z0-9_.]*$", maxLength: 200, summary: "Optional ability identity carried into the liveness artifact; never lowered as caller-supplied argv."),
+        CatalogFieldDescriptor(name: "advancedDump", type: .boolean, isRequired: false, summary: "Capture ArkUI componentDetail output for one selected component. Requires the typed windowId and componentId inputs; absent or false leaves the plan unchanged.", defaultValue: .bool(false)),
         CatalogFieldDescriptor(name: "bundleName", type: .string, isRequired: false, pattern: "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$", maxLength: 200, summary: "Optional typed application identity. When present, the same bounded job publishes an application-specific process readback."),
         CatalogFieldDescriptor(name: "captureHilog", type: .boolean, isRequired: false, summary: "Capture the bounded HiLog artifact. Set false for a typed UI snapshot that needs the component tree and PNG but not diagnostic logs.", defaultValue: .bool(true)),
+        CatalogFieldDescriptor(name: "componentId", type: .string, isRequired: false, pattern: "^[0-9]{1,20}$", maxLength: 20, summary: "Validated ArkUI accessibility/component identifier used only by the componentDetail recipe."),
         CatalogFieldDescriptor(name: "crashLogName", type: .string, isRequired: false, pattern: "^[a-z]+-[A-Za-z0-9._-]{1,180}$", maxLength: 200, summary: "One Faultlogger entry to fetch, named exactly as the index lists it. An entry name, never a path."),
         CatalogFieldDescriptor(name: "crashLogs", type: .boolean, isRequired: false, summary: "Capture the device's Faultlogger index. Read-only: unlike the trace, tree and screenshot legs this does not raise the effective effect.", defaultValue: .bool(false)),
         CatalogFieldDescriptor(name: "durationSeconds", type: .integer, isRequired: true, minimum: 1, maximum: 600, summary: "Bounded HiLog capture window."),
@@ -160,7 +162,8 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: false, maxLength: 64, maxItems: 24, summary: "Trace categories; presence selects the remote-file trace leg and escalates the effective effect to deviceMutation."),
         CatalogFieldDescriptor(name: "uiComponentTree", type: .boolean, isRequired: false, summary: "Capture the on-screen component tree. Presence selects the file-producing dumpLayout leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.", defaultValue: .bool(false)),
         CatalogFieldDescriptor(name: "uiDump", type: .boolean, isRequired: false, summary: "Capture the accessibility/window dump. Read-only: unlike the trace, screenshot and component-tree legs this does not raise the effective effect.", defaultValue: .bool(true)),
-        CatalogFieldDescriptor(name: "uiScreenshot", type: .boolean, isRequired: false, summary: "Capture a PNG screenshot of the display. Presence selects the file-producing snapshot_display leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.", defaultValue: .bool(false))
+        CatalogFieldDescriptor(name: "uiScreenshot", type: .boolean, isRequired: false, summary: "Capture a PNG screenshot of the display. Presence selects the file-producing snapshot_display leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.", defaultValue: .bool(false)),
+        CatalogFieldDescriptor(name: "windowId", type: .string, isRequired: false, pattern: "^[0-9]{1,20}$", maxLength: 20, summary: "Validated ArkUI host window identifier used only by the componentDetail recipe.")
       ],
       outputs: [
         CatalogFieldDescriptor(name: "applicationLiveness", type: .artifactReference, isRequired: false),
@@ -176,6 +179,7 @@ extension RuntimeOperationCatalog {
         CatalogStepDescriptor(stepID: "observe-application-liveness", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none),
         CatalogStepDescriptor(stepID: "capture-hilog", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")),
         CatalogStepDescriptor(stepID: "capture-ui-dump", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "windowInventory")),
+        CatalogStepDescriptor(stepID: "capture-advanced-ui-dump", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "componentDetail")),
         CatalogStepDescriptor(stepID: "capture-crash-index", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "crashIndex")),
         CatalogStepDescriptor(stepID: "capture-crash-log", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "crashLog")),
         CatalogStepDescriptor(stepID: "capture-ui-tree", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
@@ -196,6 +200,7 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "ui-dump.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "advanced-dump.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "ui-tree.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "screenshot.png", role: .raw, mediaType: "image/png", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "crash-index.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),

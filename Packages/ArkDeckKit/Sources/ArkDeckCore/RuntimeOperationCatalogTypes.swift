@@ -412,6 +412,9 @@ package enum CatalogOperationEffectResolver {
     case "capture-ui-dump":
       if case .bool(let enabled)? = value("uiDump", descriptor, inputs) { return enabled }
       return true
+    case "capture-advanced-ui-dump":
+      if case .bool(let enabled)? = value("advancedDump", descriptor, inputs) { return enabled }
+      return false
     case "capture-crash-index":
       if case .bool(let enabled)? = value("crashLogs", descriptor, inputs) { return enabled }
       return false

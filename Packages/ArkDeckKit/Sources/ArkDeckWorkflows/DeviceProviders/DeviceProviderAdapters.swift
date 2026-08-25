@@ -408,6 +408,17 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     switch actionID {
     case "windowInventory":
       return .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .windowList)))
+    case "componentDetail":
+      guard case .string(let windowID)? = inputs["windowId"],
+        case .string(let componentID)? = inputs["componentId"]
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "componentDetail requires typed windowId and componentId inputs")
+      }
+      return .hdc(
+        .captureUIDump(
+          try HDCUIDumpRequest(
+            scope: .componentDetail, windowID: windowID, componentID: componentID)))
     case "crashIndex":
       return .hdc(.captureCrashIndex(byteBudget: 8 * 1024 * 1024))
     case "crashLog":
@@ -816,6 +827,22 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
             executableSHA256: "resolved-at-dispatch",
             argumentSummary: try deviceArguments(
               ["shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"],
+              context: context),
+            timeoutSeconds: 30))
+      case .componentDetail:
+        guard let windowID = request.windowID, let componentID = request.componentID else {
+          throw DeviceProviderError.unsupportedAction(
+            "componentDetail request lost its validated identifiers")
+        }
+        return TypedProcessPlan(
+          action: action,
+          kind: .process(
+            executableSHA256: "resolved-at-dispatch",
+            argumentSummary: try deviceArguments(
+              [
+                "shell", "hidumper", "-s", "WindowManagerService", "-a",
+                "-w \(windowID) -element -lastpage \(componentID)",
+              ],
               context: context),
             timeoutSeconds: 30))
       }

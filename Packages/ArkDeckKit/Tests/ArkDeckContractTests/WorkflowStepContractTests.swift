@@ -51,6 +51,26 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
           actionID: "windowInventory",
           parameters: ["byteBudget": .integer(67_108_864)])
       ),
+      (
+        "component-detail-min",
+        diagnosticsArguments(
+          actionID: "componentDetail",
+          parameters: [
+            "byteBudget": .integer(1024),
+            "windowId": .string("0"),
+            "componentId": .string("0"),
+          ])
+      ),
+      (
+        "component-detail-max",
+        diagnosticsArguments(
+          actionID: "componentDetail",
+          parameters: [
+            "byteBudget": .integer(67_108_864),
+            "windowId": .string(String(repeating: "9", count: 20)),
+            "componentId": .string(String(repeating: "8", count: 20)),
+          ])
+      ),
     ]
 
     for (id, arguments) in vectors {
@@ -158,6 +178,25 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
           parameters: ["byteBudget": .integer(67_108_865)])
       ),
       (
+        "component-detail-missing-id",
+        diagnosticsArguments(
+          actionID: "componentDetail",
+          parameters: [
+            "byteBudget": .integer(1024),
+            "windowId": .string("60"),
+          ])
+      ),
+      (
+        "component-detail-injected-id",
+        diagnosticsArguments(
+          actionID: "componentDetail",
+          parameters: [
+            "byteBudget": .integer(1024),
+            "windowId": .string("60"),
+            "componentId": .string("841;reboot"),
+          ])
+      ),
+      (
         "caller-remote-path",
         diagnosticsArguments(
           actionID: "boundedHilog",
@@ -203,6 +242,7 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
       [
         "boundedHilog": "#/$defs/diagnosticsHilogParameters",
         "componentTree": "#/$defs/diagnosticsComponentTreeParameters",
+        "componentDetail": "#/$defs/diagnosticsComponentDetailParameters",
         "windowInventory": "#/$defs/diagnosticsComponentTreeParameters",
         "crashIndex": "#/$defs/diagnosticsComponentTreeParameters",
         "crashLog": "#/$defs/diagnosticsCrashLogParameters",

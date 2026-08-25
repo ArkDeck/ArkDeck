@@ -261,7 +261,7 @@ final class ViewerUITests: XCTestCase {
     let app = launchCapturedViewer()
     revealNode("40", in: app).click()
 
-    for tab in ["properties", "layout", "accessibility", "rawDump"] {
+    for tab in ["properties", "layout", "accessibility", "rawDump", "advancedDump"] {
       let button = app.buttons["viewer.inspector.tab.\(tab)"]
       XCTAssertTrue(button.waitForExistence(timeout: 5), "\(tab) tab must be reachable")
       button.click()
@@ -278,6 +278,94 @@ final class ViewerUITests: XCTestCase {
       rendered.contains("\"fixtureOwnerID\" : 42"),
       "Raw dump must not include the selected component's descendants")
     attach(app, name: "viewer-raw-dump")
+  }
+
+  func testAdvancedDumpUsesKeyColonValueRowsForTheSelectedComponent() {
+    let app = launchCapturedViewer()
+    revealNode("40", in: app).click()
+
+    let tab = app.buttons["viewer.inspector.tab.advancedDump"]
+    XCTAssertTrue(tab.waitForExistence(timeout: 5), "Advanced Dump tab must be reachable")
+    tab.click()
+
+    let advanced = app.descendants(matching: .any)[
+      "viewer.advancedDump.field.componentId"]
+    XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced Dump must render")
+    XCTAssertEqual(advanced.label, "componentId : 40")
+
+    let owner = app.descendants(matching: .any)["viewer.advancedDump.field.hostWindowId"]
+    XCTAssertEqual(owner.label, "hostWindowId : 60")
+    attach(app, name: "viewer-advanced-dump")
+  }
+
+  func testAdvancedDumpSearchMatchesFieldsAndValuesAndSupportsCommandF() {
+    let app = launchCapturedViewer()
+    revealNode("40", in: app).click()
+
+    let tab = app.buttons["viewer.inspector.tab.advancedDump"]
+    XCTAssertTrue(tab.waitForExistence(timeout: 5))
+    tab.click()
+
+    let component = app.descendants(matching: .any)[
+      "viewer.advancedDump.field.componentId"]
+    let owner = app.descendants(matching: .any)[
+      "viewer.advancedDump.field.hostWindowId"]
+    let source = app.descendants(matching: .any)[
+      "viewer.advancedDump.field.source"]
+    let lastFixtureField = app.descendants(matching: .any)[
+      "viewer.advancedDump.field.fixtureField252"]
+    let firstFixtureField = app.descendants(matching: .any)[
+      "viewer.advancedDump.field.fixtureField000"]
+    XCTAssertTrue(component.waitForExistence(timeout: 5))
+
+    let search = app.textFields["viewer.advancedDump.search"]
+    XCTAssertTrue(search.waitForExistence(timeout: 5), "Advanced Dump must expose field search")
+    app.typeKey("f", modifierFlags: .command)
+    app.typeText("COMPONENTID")
+
+    XCTAssertTrue(component.waitForExistence(timeout: 5), "field names must match case-insensitively")
+    XCTAssertTrue(owner.waitForNonExistenceFast(timeout: 5))
+    let count = app.staticTexts["viewer.advancedDump.search.matchCount"]
+    XCTAssertTrue(count.waitForExistence(timeout: 5))
+    assertDisplayedValue(count, equals: "1 / 256")
+
+    app.typeKey("a", modifierFlags: .command)
+    let inputStartedAt = Date()
+    app.typeText("fixtureField252")
+    XCTAssertLessThan(
+      Date().timeIntervalSince(inputStartedAt), 2,
+      "typing a field query must not block on rebuilding hundreds of rows")
+    XCTAssertTrue(lastFixtureField.waitForExistence(timeout: 5))
+    assertDisplayedValue(count, equals: "1 / 256")
+
+    // Deleting a narrow query expands the result set back to hundreds of
+    // rows. This is the path that regressed when the list was eager and the
+    // search query lived in the workspace-wide observable model.
+    let deletionStartedAt = Date()
+    for _ in 0..<3 {
+      app.typeKey(XCUIKeyboardKey.delete, modifierFlags: [])
+    }
+    XCTAssertLessThan(
+      Date().timeIntervalSince(deletionStartedAt), 2,
+      "deleting into a broad query must not eagerly rebuild every result row")
+    XCTAssertTrue(firstFixtureField.waitForExistence(timeout: 5))
+    assertDisplayedValue(count, equals: "253 / 256")
+
+    app.typeKey("a", modifierFlags: .command)
+    app.typeText("componentdetail")
+    XCTAssertTrue(source.waitForExistence(timeout: 5), "field values must be searchable")
+    XCTAssertTrue(component.waitForNonExistenceFast(timeout: 5))
+
+    app.typeKey("a", modifierFlags: .command)
+    app.typeText("no-such-field-or-value")
+    XCTAssertTrue(
+      app.staticTexts["viewer.advancedDump.search.noResults"].waitForExistence(timeout: 5),
+      "a zero-match query must show an explicit empty result")
+
+    app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+    XCTAssertTrue(component.waitForExistence(timeout: 5), "Escape must clear the local filter")
+    XCTAssertTrue(owner.exists && source.exists)
+    attach(app, name: "viewer-advanced-dump-search")
   }
 
   func testPropertiesOmitUnavailableFields() {
@@ -300,6 +388,7 @@ final class ViewerUITests: XCTestCase {
       ("layout", "Show Layout"),
       ("accessibility", "Show Accessibility"),
       ("rawDump", "Show Raw dump"),
+      ("advancedDump", "Show Advanced Dump"),
     ]
     for (identifier, label) in tabs {
       let button = app.buttons["viewer.inspector.tab.\(identifier)"]

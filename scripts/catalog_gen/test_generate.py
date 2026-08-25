@@ -257,6 +257,9 @@ class RealCatalogTests(unittest.TestCase):
                 "capture.diagnostics@1/capture-ui-dump": (
                     "arkdeck-diagnostics", "windowInventory"
                 ),
+                "capture.diagnostics@1/capture-advanced-ui-dump": (
+                    "arkdeck-diagnostics", "componentDetail"
+                ),
                 "capture.diagnostics@1/capture-crash-index": (
                     "arkdeck-diagnostics", "crashIndex"
                 ),
@@ -720,6 +723,13 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'catalogID: "arkdeck-diagnostics", actionID: "componentTree")'
             ),
             0,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "componentDetail")'
+            ),
+            1,
         )
         self.assertEqual(
             swift.count(

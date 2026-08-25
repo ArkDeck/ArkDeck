@@ -767,11 +767,14 @@ private enum WorkflowStepValidator {
         let action = try reader.enumeration(
           "actionId",
           allowed: [
-            "boundedHilog", "componentTree", "crashIndex", "crashLog", "windowInventory",
+            "boundedHilog", "componentTree", "componentDetail", "crashIndex", "crashLog",
+            "windowInventory",
           ])
         let parameters = try reader.validatedOptions("parameters")
         if action == "boundedHilog" {
           try reader.diagnosticsHilogParameters(parameters, key: "parameters")
+        } else if action == "componentDetail" {
+          try reader.diagnosticsComponentDetailParameters(parameters, key: "parameters")
         } else if action == "crashLog" {
           try reader.diagnosticsCrashLogParameters(parameters, key: "parameters")
         } else {
@@ -1315,6 +1318,28 @@ private enum WorkflowStepValidator {
       try exactOptionKeys(options, key: key, required: ["byteBudget"])
       try optionInteger(
         options, key: key, name: "byteBudget", minimum: 1024, maximum: 67_108_864)
+    }
+
+    /// The selected component recipe accepts only the two numeric ArkUI
+    /// identifiers materialized by Viewer plus the bounded stdout budget.
+    /// Keeping this validation in the Core step validator makes the generated
+    /// contract and the daemon's pre-authorization plan check fail closed in
+    /// exactly the same way.
+    func diagnosticsComponentDetailParameters(
+      _ options: [String: JSONValue],
+      key: String
+    ) throws {
+      try exactOptionKeys(
+        options, key: key, required: ["byteBudget", "windowId", "componentId"])
+      try optionInteger(
+        options, key: key, name: "byteBudget", minimum: 1024, maximum: 67_108_864)
+      for name in ["windowId", "componentId"] {
+        guard case .string(let identifier)? = options[name],
+          identifier.range(of: #"^[0-9]{1,20}$"#, options: .regularExpression) != nil
+        else {
+          throw invalid("\(key).\(name)", "1...20 decimal digits")
+        }
+      }
     }
 
     /// The crash-log fetch carries the entry name as a typed parameter.

@@ -305,6 +305,86 @@ public struct ViewerNode: Sendable, Equatable, Identifiable {
   }
 }
 
+/// One selected-component field prepared for the Viewer's key/value inspector.
+///
+/// The device owns both strings. Keeping this projection separate from
+/// `ViewerNode` means an unknown provider field remains inspectable without
+/// turning it into a field ArkDeck claims to understand.
+public struct ViewerDumpField: Sendable, Equatable {
+  public let key: String
+  public let value: String
+
+  public init(key: String, value: String) {
+    self.key = key
+    self.value = value
+  }
+}
+
+/// The two ArkUI identifiers accepted by the published `componentDetail`
+/// recipe. Both values originate in one immutable ui-tree Artifact; no App
+/// surface can supply argv or a remote path.
+public struct ViewerAdvancedDumpSelection: Sendable, Equatable {
+  public let windowID: String
+  public let componentID: String
+
+  public init(windowID: String, componentID: String) {
+    self.windowID = windowID
+    self.componentID = componentID
+  }
+}
+
+public enum ViewerAdvancedDumpSubmissionResult: Sendable, Equatable {
+  case captured([ViewerDumpField])
+  case failed(String)
+}
+
+public enum ViewerAdvancedDumpParser {
+  public static func parse(_ data: Data) throws -> [ViewerDumpField] {
+    guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else {
+      throw ViewerCaptureFailure.invalidAdvancedDump
+    }
+    if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+      let fields = object.keys.sorted().compactMap { key -> ViewerDumpField? in
+        guard let value = fieldValue(object[key]) else { return nil }
+        return ViewerDumpField(key: key, value: value)
+      }
+      if !fields.isEmpty { return fields }
+    }
+
+    var fields: [ViewerDumpField] = []
+    for rawLine in text.split(whereSeparator: \Character.isNewline) {
+      let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+      guard let separator = line.firstIndex(of: ":") else { continue }
+      let rawKey = line[..<separator].trimmingCharacters(in: .whitespacesAndNewlines)
+      let key = rawKey.trimmingCharacters(
+        in: CharacterSet(charactersIn: "|`+-=>[]{} "))
+      let value = line[line.index(after: separator)...]
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !key.isEmpty else { continue }
+      fields.append(ViewerDumpField(key: key, value: value))
+    }
+    guard !fields.isEmpty else {
+      let normalized = text.lowercased()
+      if normalized.contains("arkui-comp.dump") || normalized.contains("arkui.dump") {
+        throw ViewerCaptureFailure.advancedDumpRequiresSidecar
+      }
+      throw ViewerCaptureFailure.invalidAdvancedDump
+    }
+    return fields
+  }
+
+  private static func fieldValue(_ value: Any?) -> String? {
+    guard let value, !(value is NSNull) else { return "null" }
+    if let value = value as? String { return value }
+    if let value = value as? NSNumber { return value.stringValue }
+    guard JSONSerialization.isValidJSONObject(value),
+      let data = try? JSONSerialization.data(
+        withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
+    else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+}
+
 public struct ViewerCapture: Sendable, Equatable {
   public let screenshotData: Data
   public let screenshotWidth: Int
@@ -481,6 +561,44 @@ public struct ViewerCapture: Sendable, Equatable {
     else { return nil }
     return String(data: formatted, encoding: .utf8)
   }
+
+  /// Resolves the selected component id and its nearest enclosing host window
+  /// from the immutable tree. Some provider revisions repeat hostWindowId on
+  /// every node while others publish it only on the window root, so ancestry
+  /// is the bounded and truthful fallback.
+  public func advancedDumpSelection(for identity: String) -> ViewerAdvancedDumpSelection? {
+    guard let selected = node(identity: identity),
+      let componentID = Self.decimalIdentifier(selected.deviceID)
+    else { return nil }
+    var cursor: String? = selected.identity
+    var visited: Set<String> = []
+    while let value = cursor, visited.insert(value).inserted, let candidate = node(identity: value) {
+      if let windowID = Self.hostWindowID(in: candidate.rawFields) {
+        return ViewerAdvancedDumpSelection(windowID: windowID, componentID: componentID)
+      }
+      cursor = candidate.parentIdentity
+    }
+    return nil
+  }
+
+  private static func hostWindowID(in data: Data) -> String? {
+    guard let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return nil
+    }
+    let fields = document["attributes"] as? [String: Any] ?? document
+    if let value = fields["hostWindowId"] as? String { return decimalIdentifier(value) }
+    if let value = fields["hostWindowId"] as? NSNumber {
+      return decimalIdentifier(value.stringValue)
+    }
+    return nil
+  }
+
+  private static func decimalIdentifier(_ value: String?) -> String? {
+    guard let value, !value.isEmpty, value.count <= 20,
+      value.allSatisfy({ $0.isASCII && $0.isNumber })
+    else { return nil }
+    return value
+  }
 }
 
 public enum ViewerCaptureFailure: Error, Sendable, Equatable {
@@ -488,6 +606,8 @@ public enum ViewerCaptureFailure: Error, Sendable, Equatable {
   case invalidTree
   case invalidRawDump
   case invalidPNG
+  case invalidAdvancedDump
+  case advancedDumpRequiresSidecar
 
   public var message: String {
     switch self {
@@ -495,6 +615,9 @@ public enum ViewerCaptureFailure: Error, Sendable, Equatable {
     case .invalidTree: "The UI tree Artifact does not contain a valid node tree"
     case .invalidRawDump: "The UI dump Artifact is not readable JSON"
     case .invalidPNG: "The screenshot Artifact is not a valid PNG"
+    case .invalidAdvancedDump: "ArkUI returned no readable key : value fields for this component"
+    case .advancedDumpRequiresSidecar:
+      "ArkUI moved this Advanced Dump to a remote sidecar; retrieval is not safely available for this device build"
     }
   }
 }
@@ -856,6 +979,10 @@ public protocol UIDumpApplicationProviding: Sendable {
     deviceObservation: DeviceListPresentation
   ) async -> UIDumpWorkspacePresentation
   func recapture(target: UIDumpTargetPresentation) async -> ViewerCaptureSubmissionResult
+  func advancedDump(
+    target: UIDumpTargetPresentation,
+    selection: ViewerAdvancedDumpSelection
+  ) async -> ViewerAdvancedDumpSubmissionResult
   func cancel(jobID: String) async -> Bool
 }
 
@@ -883,6 +1010,34 @@ public enum ViewerCaptureRequestBuilder {
         "crashLogs": .bool(false),
         "uiScreenshot": .bool(true),
         "uiComponentTree": .bool(true),
+        "redactionProfile": .string("standard"),
+      ],
+      requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugLogsWorkspace))
+  }
+
+  public static func advancedDumpRequest(
+    target: UIDumpTargetPresentation,
+    selection: ViewerAdvancedDumpSelection,
+    nonce: String
+  ) throws -> RuntimeOperationRequest {
+    try RuntimeOperationRequest(
+      requestID: "viewer-advanced-dump-\(nonce)",
+      idempotencyKey: "viewer-advanced-dump-\(nonce)",
+      target: DurableTargetReference(
+        targetID: target.id, expectedBindingRevision: target.bindingRevision),
+      operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
+      inputs: [
+        "durationSeconds": .integer(Int64(durationSeconds)),
+        "captureHilog": .bool(false),
+        "hilogFilters": .array([]),
+        "uiDump": .bool(false),
+        "advancedDump": .bool(true),
+        "windowId": .string(selection.windowID),
+        "componentId": .string(selection.componentID),
+        "crashLogs": .bool(false),
+        "uiScreenshot": .bool(false),
+        "uiComponentTree": .bool(false),
         "redactionProfile": .string("standard"),
       ],
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
@@ -986,6 +1141,52 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       return .failed(failure.message)
     } catch {
       return .failed("Viewer capture failed: \(error)")
+    }
+  }
+
+  func advancedDump(
+    target: UIDumpTargetPresentation,
+    selection: ViewerAdvancedDumpSelection
+  ) async -> ViewerAdvancedDumpSubmissionResult {
+    do {
+      let nonce = UUID().uuidString.lowercased()
+      let request = try ViewerCaptureRequestBuilder.advancedDumpRequest(
+        target: target, selection: selection, nonce: nonce)
+      let requestData = try CanonicalJSONEncoders.canonical().encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed Advanced Dump request")
+      }
+      let submitted = try resultObject(
+        await UIDumpXPCTransport.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]),
+        label: "Advanced Dump submission")
+      guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
+        return .failed("Runtime accepted Advanced Dump without returning a Job ID")
+      }
+      let terminal = try resultObject(
+        await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
+        label: "Advanced Dump")
+      let facts = try terminalFacts(terminal, jobID: jobID, target: target)
+      guard facts.state == "succeeded", !facts.outcomeUnknown,
+        !facts.waitingForHuman, facts.outstandingResidueCount == 0
+      else {
+        return .failed("Advanced Dump did not produce a safe terminal result (\(facts.state))")
+      }
+      let entries = try artifactList(
+        await UIDumpXPCTransport.request(
+          method: "artifact.list", params: ["jobId": .string(jobID)]),
+        jobID: jobID)
+      let artifact = try requiredArtifact(
+        named: "advanced-dump.txt", mediaType: "text/plain", entries: entries)
+      return .captured(try ViewerAdvancedDumpParser.parse(await readArtifact(artifact, jobID: jobID)))
+    } catch let failure as ViewerTransportFailure {
+      return .failed(failure.message)
+    } catch let failure as ViewerArtifactFailure {
+      return .failed(failure.message)
+    } catch let failure as ViewerCaptureFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed("Advanced Dump failed: \(error)")
     }
   }
 
