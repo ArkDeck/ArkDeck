@@ -52,6 +52,8 @@ T02/T03 不进入实现。
 - Allowed paths:
   - `Catalog/operations/**`
   - `Catalog/generated/**`
+  - `openspec/contracts/workflow-step-registry.yaml`（仅新增 `injectPointerInput` 一行：
+    proposal 已批准的三个 input operation 的封闭 step 载体；不改既有行）
   - `Packages/ArkDeckKit/Sources/**`
   - `Packages/ArkDeckKit/Tests/**`
   - `ArkDeckApp/**`
@@ -87,6 +89,8 @@ T02/T03 不进入实现。
 - Allowed paths:
   - `Catalog/operations/**`
   - `Catalog/generated/**`
+  - `openspec/contracts/workflow-step-registry.yaml`（仅当环形采集需要新封闭 step kind
+    时新增对应行；不改既有行）
   - `Packages/ArkDeckKit/Sources/**`
   - `Packages/ArkDeckKit/Tests/**`
   - `ArkDeckApp/**`
