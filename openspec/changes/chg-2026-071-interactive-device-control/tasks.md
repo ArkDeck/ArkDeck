@@ -172,7 +172,20 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-003 — 环形诊断采集 + Diagnostics Session reader（垂直交付）
 
-- Status:ready（proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
+- Status:in-progress（2026-08-25。① 环形 trace lowering 已交付：`ringBuffered` additive
+  typed input + `--trace_begin / --trace_dump / --trace_finish_nodump` 三段 lowering +
+  覆盖锚点（arm 后立刻写设备侧 trace_marker 并回读）。**载体选择与 Spike 建议不同并给出
+  理由**：`--dump_bgsrv` 写到服务自选路径，provider 无法拥有该路径，而本 operation 其余
+  文件腿都绑定 provider 自铸的临时路径、清理也只碰自己创建的路径；`--trace_dump -o` 收下
+  owned path，机械不动。两者能力都在真机验过，这是路径归属之争不是能力之争。
+  **一处措辞已就地更正**：先前写「环形自带回溯、快照携带其已持有的内容」——实测两次分别
+  是锚点前 25.64 s 与 0.06 s，取决于缓冲区原本存着什么，故回溯深度不是 arm 的属性；catalog、
+  lowering、测试三处的说法均已改为「快照携带自 arm 起的内容，实际回溯深度由锚点判定」。
+  另实证：`--overwrite` 语义与其名相反（复证 Spike）、dump 后采集继续无需重新 begin、
+  重定向作为独立 argv 元素不生效（故 marker 写入用单行、锚点限定为字母数字）。
+  证据 `evidence/runs/TASK-IDC-003/data/ring-lowering-facts.json`。
+  剩余 ②markers.json 与自动 Marker、③会话内截图子意图、④App Diagnostics tab、⑤真机走查。
+  原 ready 依据：proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
   Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
   trace_marker 且必须加落笔回读、回溯窗口与类目集联动预算且 dump 后立即重臂、
   hilog 按会话时长扩容或周期 drain、core drain 按 bytes + 宽容解码处理）

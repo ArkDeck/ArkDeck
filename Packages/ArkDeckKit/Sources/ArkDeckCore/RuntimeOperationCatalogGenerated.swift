@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "d701d69cb070bca31de1838888f3ca2d9c3aeff614cf38543a6ce735777119e2"
+  public static let catalogDigest = "32fc370a3dee29f8bd13a4d78bc8e24434e54c33c55b3b0903d1d211d4be7fbc"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -157,6 +157,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "hilogFilters", type: .stringArray, isRequired: false, maxLength: 200, maxItems: 16, summary: "Typed HiLog filter expressions; no shell fragments."),
         CatalogFieldDescriptor(name: "processName", type: .string, isRequired: false, pattern: "^[a-zA-Z][a-zA-Z0-9_.:]*$", maxLength: 200, summary: "Optional process identity. Defaults to bundleName and is lowered only by the HDC provider."),
         CatalogFieldDescriptor(name: "redactionProfile", type: .string, isRequired: false, enumValues: ["standard"], summary: "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists.", defaultValue: .string("standard")),
+        CatalogFieldDescriptor(name: "ringBuffered", type: .boolean, isRequired: false, summary: "Arm the trace ring, let the window pass, then snapshot it, instead of blocking for the window with `-t N`. The snapshot carries everything since the arm, bounded by the buffer, so the decision to keep a trace can be made after the thing worth keeping rather than before it. Only consulted when traceCategories selects the trace leg.", defaultValue: .bool(false)),
         CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912, summary: "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product.", defaultValue: .integer(134217728)),
         CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536, summary: "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise.", defaultValue: .integer(8192)),
         CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: false, maxLength: 64, maxItems: 24, summary: "Trace categories; presence selects the remote-file trace leg and escalates the effective effect to deviceMutation."),
