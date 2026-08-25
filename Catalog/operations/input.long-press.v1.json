@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "input.long-press",
+  "version": 1,
+  "title": "Inject one long-press at exact device coordinates",
+  "provider": "hdc",
+  "effect": {
+    "minimum": "deviceMutation",
+    "permitted": [
+      "deviceMutation"
+    ]
+  },
+  "authorization": {
+    "deviceMutation": "standingCapability"
+  },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "x": {
+        "type": "integer",
+        "required": true,
+        "minimum": 0,
+        "maximum": 32767,
+        "description": "Device-pixel X of the long-press, anchored at the pointer-down position after content-rect mapping; never a raw host coordinate."
+      },
+      "y": {
+        "type": "integer",
+        "required": true,
+        "minimum": 0,
+        "maximum": 32767,
+        "description": "Device-pixel Y of the long-press, anchored at the pointer-down position."
+      },
+      "displayId": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0,
+        "maximum": 64,
+        "description": "Target display for multi-display devices. Omitted lowers to the device's default display."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {}
+  },
+  "steps": [
+    {
+      "stepID": "confirm-evidence-target",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-model",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "deviceModel"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-firmware",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "firmwareBuild"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "inject-pointer-input",
+      "kind": "injectPointerInput",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 60,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 2,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [],
+  "profiles": [
+    "openharmony-standard@1",
+    "dayu200"
+  ]
+}

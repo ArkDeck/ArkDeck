@@ -537,6 +537,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         throw RuntimeDispatchFailure.failed("unexpected provider")
       }
       switch action {
+      case .injectPointerInput:
+        note("injectPointerInput")
+        return receipt("No Error\n")
       case .observeTool:
         note("observeTool")
         return receipt("Ver: 3.2.0f\n")

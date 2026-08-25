@@ -2783,6 +2783,7 @@ public actor RuntimeJobEngine {
   static let evidenceEligibleOperations: Set<String> = [
     "observe.device@1", "capture.diagnostics@1", "debug.hap@1",
     "port-forward.create@1", "port-forward.remove@1",
+    "input.tap@1", "input.long-press@1", "input.swipe@1",
   ]
 
   static func requiresEvidencePreflight(_ descriptor: CatalogOperationDescriptor) -> Bool {
@@ -8622,6 +8623,25 @@ public actor RuntimeJobEngine {
         "hostEndpoint": .string("tcp:\(spec.localPort)"),
         "deviceEndpoint": .string("tcp:\(spec.remotePort)"),
       ]
+    case .injectPointerInput:
+      guard case .hdc(.injectPointerInput(let spec))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed pointer-input action")
+      }
+      var pointer: [String: JSONValue] = [
+        "gesture": .string(spec.gesture.rawValue),
+        "pointerX": .integer(Int64(spec.x)),
+        "pointerY": .integer(Int64(spec.y)),
+      ]
+      if let toX = spec.toX { pointer["pointerToX"] = .integer(Int64(toX)) }
+      if let toY = spec.toY { pointer["pointerToY"] = .integer(Int64(toY)) }
+      if let durationMs = spec.durationMs {
+        pointer["durationMs"] = .integer(Int64(durationMs))
+      }
+      if let displayID = spec.displayID {
+        pointer["displayId"] = .integer(Int64(displayID))
+      }
+      arguments = pointer
     case .removePortForward:
       guard case .hdc(.removePortForward(let spec))? = action else {
         throw RuntimeJobEngineError.internalFailure(

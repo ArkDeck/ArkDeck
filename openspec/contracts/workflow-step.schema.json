@@ -35,6 +35,7 @@
         "stopApplication",
         "createPortForward",
         "removePortForward",
+        "injectPointerInput",
         "clearLogBuffer",
         "resizeLogBuffer",
         "startDeviceLogPersist",
@@ -1038,6 +1039,54 @@
         }
       }
     },
+    "pointerInputArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gesture",
+        "pointerX",
+        "pointerY"
+      ],
+      "properties": {
+        "gesture": {
+          "enum": [
+            "tap",
+            "longPress",
+            "swipe"
+          ]
+        },
+        "pointerX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "pointerY": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "pointerToX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "pointerToY": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 80,
+          "maximum": 2000
+        },
+        "displayId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        }
+      }
+    },
     "removePortForwardArguments": {
       "type": "object",
       "additionalProperties": false,
@@ -1484,6 +1533,7 @@
                   "stopApplication",
                   "createPortForward",
                   "removePortForward",
+                  "injectPointerInput",
                   "clearLogBuffer",
                   "resizeLogBuffer",
                   "startDeviceLogPersist",
@@ -1599,6 +1649,7 @@
                   "stopApplication",
                   "createPortForward",
                   "removePortForward",
+                  "injectPointerInput",
                   "clearLogBuffer",
                   "resizeLogBuffer",
                   "startDeviceLogPersist",
@@ -2089,6 +2140,25 @@
             "properties": {
               "arguments": {
                 "$ref": "#/$defs/portForwardArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "injectPointerInput"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/pointerInputArguments"
               }
             }
           }
