@@ -56,7 +56,22 @@ T02/T03 不进入实现。
   258 ms。沿用过的观察记 `machineReadbackSessionCarried` 与逐片 `carriedFromUTC`，
   这同时是 fail-closed：硬件证据契约只认 `machineReadback`，沿用过的观察因此无法被
   投影成任何硬件证据。证据 `evidence/runs/TASK-IDC-002/data/session-carried-evidence.json`。
-  剩余：持久派发通道（每次 spawn ~93 ms vs 持久通道 ~10 ms，不属本 change））
+  ⑤ capability 使用台账改追加式。开工持久通道前先量了 Runtime 自身开销（设备侧全部
+  零成本假件）：p50 245 ms / p95 392 ms，几乎吃满 400 ms 门槛，即传输不是瓶颈。根因：
+  session capability 是一条记录（如设计），但其 `consumptions` 每次手势加一条、整份
+  文档在每次 consume 与每次 outcome 时被整写——「取一次 use 的代价随该 capability 已
+  取过多少次而涨」，恰好在会话作用域本要让它恒定的地方变成二次。实测单次 use 从 use
+  50 的 36 ms 涨到 use 450 的 441 ms（一次授权即超出整个手势预算）。改法：文档降为
+  checkpoint，每次 use 追加进 durable ledger 并 fsync，读 = checkpoint + 重放；每 128
+  个事件整写一次以给重放封顶；解析后的文档按文件身份缓存，另一写者改过即失效。全量
+  durability 保持不变（每张收据都留，仅换了写在哪里），维护者裁决未被动。改后单次 use
+  在 600 次内平直 11→16 ms，Runtime 每手势 245→107 ms（p95 392→141 ms）。断尾丢弃、
+  重放预留 fail closed、篡改 ledger fail closed 均有测试，反向验证 3 条测试 5 处断言会红。
+  两条既有测试原本用手改文档构造崩溃窗口，已就地移植到 ledger（更贴近真实崩溃）。证据
+  `evidence/runs/TASK-IDC-002/data/capability-use-ledger.json`。
+  剩余：持久派发通道。实测 uinput 腿 242→177 ms（省 66 ms），PTY 上 sentinel 协议可取回
+  设备侧退出码（当前 spawn 形态取不到，判据只能读 stdout）；远端消失时通道不假报成功。
+  合入本刀后 p50 381 ms 已进门槛、p95 未进，持久通道是把「刚好进」变成「宽裕」的那一步）
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6
