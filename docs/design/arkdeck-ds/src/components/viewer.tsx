@@ -24,16 +24,17 @@ export interface ViewerRegion {
 }
 
 export interface ViewerWorkspaceProps {
-  title?: ReactNode;
   toolbar?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
 }
 
-/** Full-height Viewer shell: screenshot beside a stacked tree and inspector. */
+/**
+ * Full-height Viewer shell: in-page controls above screenshot + inspector.
+ * The window toolbar owns the single page title, matching the SwiftUI App.
+ */
 export function ViewerWorkspace({
-  title = "Viewer",
   toolbar,
   footer,
   children,
@@ -41,10 +42,11 @@ export function ViewerWorkspace({
 }: ViewerWorkspaceProps) {
   return (
     <section className={["ad-viewer", className].filter(Boolean).join(" ")}>
-      <header className="ad-viewer__lead">
-        <h1>{title}</h1>
-        {toolbar && <div className="ad-viewer__toolbar">{toolbar}</div>}
-      </header>
+      {toolbar && (
+        <header className="ad-viewer__lead" aria-label="Viewer controls">
+          <div className="ad-viewer__toolbar">{toolbar}</div>
+        </header>
+      )}
       <div className="ad-viewer__workspace">{children}</div>
       {footer && <footer className="ad-viewer__footer">{footer}</footer>}
     </section>
@@ -164,7 +166,7 @@ export function ViewerScreenshot({
   alt,
   regions,
   selectedId,
-  showBounds = true,
+  showBounds = false,
   onSelect,
   className,
 }: ViewerScreenshotProps) {

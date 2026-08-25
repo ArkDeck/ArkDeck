@@ -126,4 +126,39 @@ final class AppLocalizationLookupContractTests: XCTestCase {
       test would otherwise notice: \(unresolved.sorted().joined(separator: "; "))
       """)
   }
+
+  func testSidebarProductNamesStayConsistentAcrossLocales() throws {
+    let catalogURL = repositoryRoot()
+      .appending(path: "ArkDeckApp/Resources/Localizable.xcstrings")
+    let data = try Data(contentsOf: catalogURL)
+    let catalog = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let strings = try XCTUnwrap(catalog["strings"] as? [String: Any])
+
+    let expectedNames = [
+      "app.navigation.overview": "Overview",
+      "app.navigation.flash": "Flash",
+      "app.navigation.debug": "Debug",
+      "app.navigation.uiDump": "Viewer",
+      "app.navigation.trace": "Trace",
+      "app.navigation.history": "History",
+    ]
+
+    for (key, expectedName) in expectedNames {
+      let entry = try XCTUnwrap(strings[key] as? [String: Any], "missing \(key)")
+      let localizations = try XCTUnwrap(
+        entry["localizations"] as? [String: Any], "missing localizations for \(key)")
+      for locale in ["en", "zh-Hans"] {
+        let localization = try XCTUnwrap(
+          localizations[locale] as? [String: Any], "missing \(locale) for \(key)")
+        let stringUnit = try XCTUnwrap(
+          localization["stringUnit"] as? [String: Any],
+          "missing string unit for \(key) in \(locale)")
+        XCTAssertEqual(
+          stringUnit["value"] as? String,
+          expectedName,
+          "\(key) must use the product name in \(locale)")
+      }
+    }
+  }
 }

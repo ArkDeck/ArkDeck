@@ -60,7 +60,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "调试"
+            "value": "Debug"
           }
         }
       }
@@ -76,7 +76,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "刷机"
+            "value": "Flash"
           }
         }
       }
@@ -92,7 +92,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "历史"
+            "value": "History"
           }
         }
       }
@@ -108,7 +108,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "概览"
+            "value": "Overview"
           }
         }
       }
@@ -172,7 +172,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "追踪"
+            "value": "Trace"
           }
         }
       }

@@ -143,18 +143,33 @@ StatusStrip 四格:
 
 用 ArkDeck 组件画 **Viewer** 页。页面名、导航名和任务名只使用 `Viewer`；`ArkUI dump` 只用于描述数据源。
 
-**布局** — `WindowFrame`，标题 `ArkDeck — Viewer`。
-左栏：`DeviceRow` × 2（DAYU200 · ready；unknown-tablet · unauthorized）+ `NavItem` × 7，`Viewer` 为当前页。detail 不用卡片 dashboard，而是一个占满可用空间的 DevTools 式双区 inspector：左侧 `ViewerScreenshot`；右侧 `ViewerInspectorStack`，上方 `ComponentTree`、下方 `DumpInspector`。底部 `JobInspector` 折叠态常驻。
+**事实源顺序** — 当前 SwiftUI `UIDumpWorkspaceView` 是产品表面的事实源；本 brief、
+`prototype.html?page=dump` 和设计系统组件只镜像它。设计更新不得先行发明新的 Viewer
+步骤、控件或默认状态。窗口工具栏只显示一个 `Viewer` 主标题，内容区不要再重复 `<h1>`。
 
-toolbar:
-- target + window selector：`DAYU200 · w12`
-- 状态：`刚刚采集`
-- button：`重新抓取`
-- search：`搜索组件 / ID / 文本`
+**布局** — `WindowFrame`，标题 `ArkDeck — Viewer`。左栏：`DeviceRow` × 2
+（DAYU200 · ready；unknown-tablet · unauthorized）+ `NavItem` × 7，`Viewer` 为当前页。
+detail 默认不是 inspector，而是生产实现的空态；完成一次抓取后才切换为占满可用空间的
+DevTools 式双区 inspector：左侧 `ViewerScreenshot`；右侧 `ViewerInspectorStack`，上方
+`ComponentTree`、下方 `DumpInspector`。底部 `JobInspector` 折叠态常驻。
+
+**默认空态**（`prototype.html?page=dump`）:
+
+- toolbar：设备选择器、`搜索组件 / ID / 文本`、primary `抓取视图`；没有 current root、
+  capture 时间和搜索匹配导航；
+- 中央标题：`没有已验证的 capture`；
+- 说明：`「抓取视图」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。`。
+
+**已抓取态**（`prototype.html?page=dump&viewerState=captured`）:
+
+- toolbar：设备选择器、当前 screen/root、ISO capture 时间、搜索框；输入搜索词后显示
+  `匹配数 / 总节点数` 与上一项/下一项；primary 按钮改为 `重新抓取`；
+- 内容变为截图 + 树/属性双区 inspector；
+- 底部为一次抓取的生产指标摘要：`nodes · submit · run · list · read · parse · Σ`。
 
 **左栏「设备截图」**
 - 显示一张 OpenHarmony 设置页截图，包含「设置 / WLAN / 蓝牙 / 移动网络 / 显示和亮度 / 声音和振动」。
-- `显示组件边界` 默认开启；普通节点使用低对比度 1px accent 边界，当前节点使用 2px accent 边界和 `#42 Toggle` 标签。
+- `显示组件边界` 默认关闭；关闭时当前节点仍使用 2px accent 边界和 `#42 Toggle` 标签，开启后才为其他节点增加低对比度 1px accent 边界。
 - 截图上每个有 bounds 的节点都可选择。重叠时命中最深的可见节点，父节点通过 breadcrumb 或树选择，不让多层透明热区争抢事件。
 
 **右侧上方「UI 树」**
@@ -178,8 +193,9 @@ toolbar:
 4. **详情不是只列常用字段。** 结构化分组用于快速阅读，完整 raw 始终可达。
 5. **键盘与指针路径等价。** 截图区和树行有原生 button / outline 语义与 `focusVisible`；树支持上下选项、左右折叠展开与父子节点。分隔条使用 `role=separator`，方向键和指针都能调整高度。
 6. **窄屏不拆散树与属性。** 中等宽度继续保留左侧截图 + 右侧上下检查器；更窄时按截图 → 检查器单列排列，检查器内部始终是树在上、属性在下。
+7. **空态是首屏，不是异常态。** 没有经过验证的 capture 时不画演示截图或 fixture 树；用户先选择设备并抓取，验证完成后才原子切换到 inspector。
 
-**不要做的事**：不要给 `Viewer` 增加任何产品前缀或恢复旧名；不要保留旧 Window inventory / Recipe / Debug parameter policy / Review 表单；不要把属性恢复成独立第三栏；不要让下方属性挤掉树的最小可用高度；不要只靠颜色表达选中；不要展示 raw command 输入。
+**不要做的事**：不要给 `Viewer` 增加任何产品前缀或恢复旧名；不要在内容区重复窗口标题；不要让默认页面直接落入演示 capture；不要保留旧 Window inventory / Recipe / Debug parameter policy / Review 表单；不要把属性恢复成独立第三栏；不要让下方属性挤掉树的最小可用高度；不要只靠颜色表达选中；不要展示 raw command 输入。
 
 ## 5.4 Trace
 
@@ -187,69 +203,59 @@ toolbar:
 
 用 ArkDeck 组件画 **Trace** 页。
 
-**布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev · ready · **当前选中**;unknown-tablet · unauthorized)+ `NavItem` × 7,📈 Trace 为当前页。
-detail 自上而下:`RecoveryBanner`(两条,与 Viewer 页共用同一组恢复数据) → 页标题 `Trace` → 两列。
-左列竖排:`Card`「抓取配置」(heading 右侧放 `SegmentedControl size="sm"`:Preset / 自定义 tag) → `Card`「Debug 参数快照(before → desired)」 → 卡片之外一个左对齐 primary 按钮。
-右列一张 `Card`「抓取状态」。
-底部 `JobInspector` 折叠态常驻。
+**事实源顺序** — 当前 SwiftUI `TraceWorkspaceView`、`TraceConfigurationView` 与
+`TraceProgressArtifactsView` 是产品表面的事实源；本 brief 和
+`prototype.html?page=trace` 只镜像它。Trace 页只承担两件事：抓取 Trace、打开 Trace
+查看器。窗口工具栏只显示一个 `Trace` 主标题，内容区不要重复标题。
 
-配置卡画 **两态**:Preset(表)与 自定义 tag(`TagPicker`)。状态卡画 **三态**:未抓取 / 抓取中 / 完成。
+**布局** — `WindowFrame`，标题 `ArkDeck — Trace`。左栏：已接管设备 + `NavItem` × 7，
+`Trace` 为当前页。detail 是一个纵向、单阅读顺序页面，不使用两列 dashboard，也不放
+`RecoveryBanner`、参数快照卡或 Artifact 状态卡。底部全局 `JobInspector` 仍由 App shell
+负责，不复制进 Trace 内容。
 
-**内容** — 逐字使用,不要改写、不要翻译、不要补充:
+detail 从上到下固定为：
 
-`SegmentedControl`:`Preset` / `自定义 tag`
+1. 摘要：`从已接管的 OpenHarmony 设备抓取 Trace，然后在内置查看器中分析。`
+2. `抓取 Trace` section，标题右侧显示 `检查中`、`可以抓取` 或 `暂时无法抓取`；
+3. `查看 Trace` section，提供独立 Trace Viewer 窗口入口。
 
-Preset 态,`DataTable`,列 = (选中标记) / Preset / tags(第三列 mono):
-- `ArkUI 深度` · `ace app ability graphic ohos sched freq sync`(**默认选中**,行首 `●`)
-- `附件兼容 / 全景` · `ace app ability graphic ohos sched freq sync binder disk workq`
-- `渲染 / 动画` · `graphic ace app sched freq sync`
+**抓取 Trace**:
 
-选中「附件兼容 / 全景」时,配置卡底部多一条 warn `Callout`:`附件兼容 preset 的 buffer 327680 超出该设备建议值,已按能力探测收敛到 307200。`
+- `设备`：单选 Picker；下方显示截短的设备 connection summary，完整值通过 help /
+  accessibility 暴露；
+- `抓取场景`：单选 Picker，生产列表为 `应用响应`、`渲染与动画`、`CPU 调度`、
+  `I/O`、`系统概览`；下方显示当前场景对应的生产说明；
+- `时长`：72pt 数字输入 + `秒 / 分钟` segmented control；秒快捷值固定为
+  `15s / 30s / 45s / 60s`，分钟快捷值固定为 `1 min / 2 min / 3 min`；
+- section footer 左侧只显示当前事实：正在提交、失败、terminal outcome、首个 blocker，
+  或 `Trace 只保存在这台 Mac，并会在完成后自动打开。`；
+- footer 右侧未运行时为 primary `开始抓取`；存在 active Job 时显示 job ID 和 `取消抓取`。
+  按钮是否可用与 blocker / validation 同步，不靠样式假装可执行。
 
-自定义 tag 态:
-- 提示句:`仅设备已确认支持的 tag 可选(能力探测 tag×11);未确认的 tag 禁用并标注原因,不猜测。`
-- `TagPicker`,**可选 11 个**:`ace` `app` `ability` `graphic` `ohos` `sched` `freq` `sync` `binder` `disk` `workq`(前 8 个点亮)
-- **禁用 2 个,仍然可见**:`distributeddata` `mmc`,虚线边框,hover 原因 `设备未报告支持该 tag`
-- 计数句:`已选 8 个 tag。`
+**查看 Trace**:
 
-配置卡底部一行(两态都有):
-- `duration` + `SegmentedControl size="sm"`:`10s` `15s` `30s`,默认 `15s`
-- `buffer 307200`(数字加粗)
-- dim `Chip`:`工具:hitrace(设备已确认)`
+- 默认说明：`在查看器中打开本地 Trace，或继续查看最近的 Trace。`；
+- trailing 按钮：`打开 Trace 查看器`；
+- 正在准备、读取失败、最近 Artifact 三种状态原位替换说明；失败态可 `再试一次`；
+- 查看器通过单独的 ArkDeck window 打开，不把时间轴内嵌回 Trace 抓取页。
 
-「Debug 参数快照(before → desired)」`Card`,`DataTable`,列 = 参数 / before / desired / 恢复(前三列 mono):
-- `persist.ace.trace.build.enabled` · `false` · `true` · ok `Chip` `可恢复`
-- `persist.rosen.animationtrace.enabled` · `missing` · `1` · warn `Chip` `不可自动回滚`
+**必须画出的语义**:
 
-尾注:`missing/unreadable 原值不承诺自动恢复:只允许「不改变」或显式确认的持久变更。本组合需要设备重启,预计断开 → 回连同一设备。`
+1. **页内只有抓取与查看。** 能力探测、typed Job、Artifact 验证和 viewer preparation
+   仍在 facade / Runtime 后面完成，不把内部实现细节扩写成配置 dashboard。
+2. **不可用也保留动作位置。** 页头状态与 footer blocker 清楚说明原因；`开始抓取` 按
+   生产逻辑禁用，不用一个看似可点、实际无响应的按钮。
+3. **时长控件和生产边界一致。** 设计稿只使用秒/分钟及当前快捷值；输入非法时在控件下方
+   显示 validation，不发明新档位。
+4. **Viewer 是单独窗口。** 打开本地或最近 Trace 后进入共享查看器，抓取页本身不承担
+   Artifact 表、timeline 或 hash 检查器。
+5. **状态来自生产 facade。** 未知或缺失事实显示 unavailable / blocker，不用 fixture
+   补成成功态。
 
-主按钮,primary,左对齐,在卡片之外:`应用参数并开始抓取(ArkUI 深度 · 15s)`;抓取中变成 disabled 的 `抓取中…`。括号里的名字与秒数跟随左列选择;自定义 tag 态下写作 `自定义(8 tags)`。
-
-右列「抓取状态」`Card`:
-- 未抓取:`未在抓取。完成后产物:*.raw.ftrace(不可变)/ *.filtered.ftrace(派生)/ capture.log / manifest.json。`(四个文件名 mono)
-- 抓取中:warn `Chip`(脉冲)`抓取中` + `IndeterminateBar`,下面一句:`设备端无可靠字节总量,不显示百分比——只显示阶段(见底部任务抽屉)与不定进度。`(`不显示百分比` 加粗)
-- 完成:`DataTable`,列 = Artifact / 角色 / SHA-256(第一列与第三列 mono):
-  - `arkui-deep.raw.ftrace` · `raw(不可变)` · `3f9a…b1c7`
-  - `arkui-deep.filtered.ftrace` · `derived(可重建)` · `c822…04de`
-  - `capture.log` · `log` · `910b…77aa`
-  - `manifest.json` · `manifest` · `e0a1…88f2`
-  - 尾注:`✓ 参数已按快照恢复;raw hash 已写入 manifest。`
-
-`JobInspector` 里这条 Job 的标题:`Trace · ArkUI 深度 15s · rk3568-dev`。若画展开态,用 `PhaseTrack`,阶段逐字如下:`Preflight · SnapshotParams · Configure · Reboot · WaitReconnect · Capturing · Receiving · Validating · Restore · Complete`,安全边界落在 `WaitReconnect`。
-spec §5.4 还要求不定进度旁显示 elapsed;原型页面上没有,elapsed 归 `JobInspector`。别在右列编一个计时器。
-
-**必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
-
-1. **只有设备已确认的 tag 可选;未确认的那两个保持可见、禁用、并给出原因。** `distributeddata` 与 `mmc` 不在「未选」里,而在「未确认」里 —— 把它们藏起来会让人以为这台设备没有该 tag,而真正发生的是 ArkDeck 没能确认它。全选也只到 11。这个区别就是这个控件存在的理由。
-2. **参数 snapshot 是一张 diff 表,不是彩色卡片。** `missing` 那一行的「恢复」列必须是 warn chip `不可自动回滚`,与上一行的 ok chip `可恢复` 视觉可分。`missing`/`unreadable` 意思是 ArkDeck **读不到原值**,不是「原值是空」—— 读不到就没法承诺还原,所以只允许「不改变」或显式确认的持久变更。
-3. **需要重启的影响写在执行之前。** `本组合需要设备重启,预计断开 → 回连同一设备。` 主按钮自己也要承认它先改参数再抓:`应用参数并开始抓取(…)`,不是「开始」。
-4. **抓取中是 indeterminate,而且要说明为什么。** 不要 0–100 进度条、不要 ETA、不要编字节数或帧数。`设备端无可靠字节总量` 这句留在页面上 —— 它是设计承诺,不是可以省掉的解释。
-5. **完成后四行分列,角色不同。** raw 标 `不可变`,filtered 标 `derived(可重建)`,`capture.log` 与 `manifest.json` 各占一行。筛选是在派生产物上做的操作,永远不回写 raw;`raw hash 已写入 manifest` 是这条不变量的凭据。
-6. **buffer 收敛是已经发生的事实,不是待你确认的选项。** `327680 → 307200` 用 warn callout 陈述结果,旁边不给「仍按 327680 试一次」的按钮或撤销链接。
-7. **Preset 与自定义是同一件事的两个入口,不是两种运行模式。** 切到自定义时带着当前 preset 的 tag 集合进来;至少保留一个 tag —— 已选数为 1 时最后那个取消不掉,抓取始终带一个 tag。
-
-**不要做的事**:不要发明 tag、preset、参数名、时长档位或 hash;不要给 tag 面板加全选/反选(原型没有,加了就会让人以为能选到那两个禁用项);不要把禁用 tag 收进「更多」或折叠区;不要把 `IndeterminateBar` 换成 spinner + 百分比;不要画 `AC-TRACE(param)` 这类标注 chip;不要把 `RecoveryBanner` 折进页面内容里 —— 那条 `Trace · rk3568-dev · waiting` 说的正是这台设备现在的处境。
+**不要做的事**：不要恢复 `Preset / 自定义 tag` 切换、TagPicker、Debug 参数快照、
+before → desired diff、`应用参数并开始抓取(…)`、raw / filtered Artifact 卡、两列 dashboard、
+假百分比或页面内嵌 timeline；不要在内容区重复 `Trace` 主标题；不要发明 tag、参数、
+时长档位、文件名或 hash。
 
 ---
 

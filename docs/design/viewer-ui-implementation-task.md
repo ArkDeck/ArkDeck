@@ -4,6 +4,11 @@
 >
 > 归属：复用 protected `main` 已存在的 `TASK-AIN-021`。本文件不改变该 Task
 > 的状态、Acceptance、Allowed paths，也不修改设计稿版本号。
+>
+> 2026-08-25 状态：本实现任务已闭合。本文件第 3 节以后保留为历史实现与验收上下文，
+> 不是当前产品差距清单。当前 SwiftUI 实现及其本地化、accessibility identifiers 是产品
+> 表面的事实源；可交互原型、交互规范、brief 和设计系统组件必须与它同车同步，不得反向
+> 要求实现恢复旧稿。
 
 ## 1. 交付目标
 
@@ -21,17 +26,20 @@
 App/facade 投影和必要测试，不发布新 operation/provider/profile，也不改变 Runtime
 admission 或设备命令 lowering。
 
-## 2. 实现前必须阅读的事实源
+## 2. 当前事实源与设计镜像
 
-- 可交互设计稿：[`prototype.html?page=dump`](prototype.html?page=dump)
+- 当前 App 入口（产品表面事实源）：
+  `ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`
+- 当前本地化与 accessibility identifiers（用户可见文案和同步锚点）：
+  `ArkDeckApp/Resources/UIDumpLocalizable.xcstrings`
+- 可交互设计镜像：[`prototype.html?page=dump`](prototype.html?page=dump)，已抓取态使用
+  [`prototype.html?page=dump&viewerState=captured`](prototype.html?page=dump&viewerState=captured)
 - 交互规范：[`macos-ux-interaction-spec.md` §5.3](macos-ux-interaction-spec.md#53-viewer)
 - 设计交接 brief：[`design-agent-briefs.md` §5.3](design-agent-briefs.md#53-viewer)
 - 设计系统实现：
   [`viewer.tsx`](arkdeck-ds/src/components/viewer.tsx) 中的
   `ViewerWorkspace`、`ViewerScreenshot`、`ViewerInspectorStack`、
   `ComponentTree` 与 `DumpInspector`
-- 当前 App 入口：
-  `ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`
 - 当前生产 facade：
   `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift`
 - 当前发布 Operation：
@@ -39,10 +47,11 @@ admission 或设备命令 lowering。
 - 可复用 Artifact 读取实现：
   `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
 
-视觉稿描述交互目标，Catalog、contracts、Runtime 返回事实和仓库安全不变量决定生产行为。
-两者不一致时不得在 App 中伪造能力。
+SwiftUI 与本地化描述当前产品表面，视觉稿镜像它；Catalog、contracts、Runtime 返回事实和
+仓库安全不变量决定生产行为。两者不一致时先把设计镜像同步到实现，不得在 App 中伪造能力，
+也不得在视觉稿中保留已经移除的路径。
 
-## 3. 当前实现差距
+## 3. 历史实现差距（已关闭）
 
 当前 `UIDumpApplicationFacade` 只读取 `operation.list`、`target.list` 和最近的 `job.list`；
 当前 `UIDumpWorkspaceView` 仍展示四种历史 Recipe、候选参数和 disabled run action。它没有：
@@ -156,16 +165,18 @@ ViewerSelection(nodeIdentity)
 
 - 侧栏和页面标题只显示 `Viewer`；内部 Swift 类型是否由 `UIDump*` 重命名可由实现者按
   diff 风险决定，但所有用户可见字符串和 accessibility label 必须统一；
-- toolbar：精确 target、当前 capture 内 window/root、最近成功抓取时间、`重新抓取`、
-  `搜索组件 / ID / 文本`；
+- 无 capture 时 toolbar 只显示 target、`搜索组件 / ID / 文本` 与 `抓取视图`；默认内容区
+  显示“没有已验证的 capture”空态；
+- capture 验证完成后 toolbar 才增加当前 root、ISO 抓取时间、搜索匹配数与上一项/下一项，
+  动作改为 `重新抓取`；
 - 删除旧 Window inventory / Recipe / Debug parameter policy / Review 表单；
 - 不提供 `全部 / 可交互` segmented control；搜索是唯一树过滤入口；
 - 底部全局 Job Inspector 继续存在，抓取中的进度和 terminal timeline 来自 Runtime facts。
 
 ### 6.2 左侧截图
 
-- 默认显示低对比度 1 px 节点边界；可通过“显示组件边界”切换；
-- 当前节点使用 2 px accent 边界和 `#<id> <type>` 文本标签；
+- `显示组件边界` 默认关闭；开启后显示低对比度 1 px 普通节点边界；
+- 无论 toggle 是否开启，当前节点都使用 2 px accent 边界和 `#<id> <type>` 文本标签；
 - 只有具有已验证 bounds 的节点可点击；重叠命中选择指针位置下最深的 visible 节点，深度
   相同时使用稳定的绘制/z-order 规则；父节点从树或 breadcrumb 选择；
 - 截图缩放必须使用 aspect-fit 后的真实 content rect 映射，letterbox 区域不响应命中；

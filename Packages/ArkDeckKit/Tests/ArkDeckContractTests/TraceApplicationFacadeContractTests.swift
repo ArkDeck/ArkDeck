@@ -281,20 +281,30 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       workspace.contains(
         "String.LocalizationValue(key), table: \"TraceLocalizable\""))
     XCTAssertTrue(workspace.contains("model.submit()"))
-    XCTAssertTrue(workspace.contains("traceActionStartNamed("))
-    XCTAssertTrue(workspace.contains("traceActionApplyAndStartNamed("))
+    XCTAssertTrue(workspace.contains("traceString(\"trace.action.start\")"))
     XCTAssertTrue(workspace.contains("model.cancel()"))
-    XCTAssertTrue(configuration.contains("TracePresetCatalog.definitions"))
-    XCTAssertTrue(configuration.contains("TraceDebugParameterCatalog.definitions"))
+    XCTAssertTrue(configuration.contains("model.capturePresets"))
     XCTAssertTrue(configuration.contains("TextField(traceString(\"trace.bounds.duration\")"))
     XCTAssertTrue(configuration.contains("selection: durationUnitBinding"))
     XCTAssertTrue(configuration.contains("ForEach(model.durationUnit.quickValues"))
     XCTAssertTrue(configuration.contains(".toggleStyle(.button)"))
-    XCTAssertTrue(workspace.contains("hdcVersionLabel(target.toolVersion)"))
+    XCTAssertFalse(configuration.contains("configurationMode"))
+    XCTAssertFalse(configuration.contains("customTags"))
+    XCTAssertFalse(configuration.contains("TraceDebugParameterCatalog.definitions"))
+    XCTAssertFalse(configuration.contains("trace.buffer"))
+    XCTAssertFalse(configuration.contains("trace.parameters"))
+    XCTAssertFalse(configuration.contains("trace.filter"))
     XCTAssertTrue(app.contains("models.traceWorkspace.applyDeviceObservation("))
     XCTAssertTrue(workspace.contains("TraceApplicationFacade.rejoin("))
-    XCTAssertTrue(workspace.contains("model.deviceTitle(target)"))
-    XCTAssertTrue(workspace.contains("target.connectionSummary"))
+    XCTAssertTrue(configuration.contains("model.deviceTitle(target)"))
+    XCTAssertTrue(configuration.contains("target.connectionSummary"))
+    XCTAssertTrue(workspace.contains("trace.blocker.adapterUnsupported"))
+    XCTAssertTrue(workspace.contains(".disabled(model.isSubmitting)"))
+    XCTAssertTrue(workspace.contains("submissionFailure = captureBlockers.first"))
+    XCTAssertTrue(workspace.contains("selectionChangedDuringRefresh"))
+    XCTAssertTrue(workspace.contains("next.runtimeProbe?.targetID != resolvedTargetID"))
+    XCTAssertTrue(workspace.contains("preferredConnectedTargetID"))
+    XCTAssertTrue(workspace.contains("candidate.isAuthorized"))
     XCTAssertFalse(workspace.contains("job.submit"))
     XCTAssertFalse(configuration.contains("shell"))
     XCTAssertTrue(
@@ -363,15 +373,9 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     let object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     let strings = try XCTUnwrap(object["strings"] as? [String: Any])
-    let requiredKeys =
-      TracePresetCatalog.definitions.filter { $0.id != .custom }.map {
-        "trace.preset.\($0.id.rawValue)"
-      }
-      + [
-        "trace.parameters.mode.unchanged",
-        "trace.parameters.mode.temporaryRestore",
-        "trace.parameters.mode.persistentChange",
-      ]
+    let requiredKeys = TracePresetCatalog.definitions.filter { $0.id != .custom }.map {
+      "trace.preset.\($0.id.rawValue)"
+    }
 
     let featureRoot = repository.appending(path: "ArkDeckApp/Features/Trace")
     let sources = try FileManager.default.contentsOfDirectory(
@@ -392,14 +396,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
         }
       })
     referencedKeys.formUnion(requiredKeys)
-    referencedKeys.formUnion(
-      requiredKeys.filter { $0.hasPrefix("trace.parameters.mode.") }.map { "\($0).detail" })
     let generatedSymbolConsumers = [
-      "trace.action.applyAndStartNamed": "traceActionApplyAndStartNamed(",
-      "trace.action.startNamed": "traceActionStartNamed(",
-      "trace.custom.count": "traceCustomCount(",
-      "trace.progress.cancelDetail": "traceProgressCancelDetail(",
-      "trace.tags.verifiedCount": "traceTagsVerifiedCount(",
       "trace.validation.range": "traceValidationRange(",
     ]
     referencedKeys.formUnion(
