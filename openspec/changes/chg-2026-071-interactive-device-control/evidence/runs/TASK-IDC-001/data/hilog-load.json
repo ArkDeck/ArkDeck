@@ -1,0 +1,35 @@
+{
+ "before": [
+  {
+   "type": "app",
+   "lines": 3327,
+   "bytes": 518547,
+   "first_ts": "08-25 12:17:16.183",
+   "last_ts": "08-25 12:21:29.658"
+  },
+  {
+   "type": "core",
+   "lines": 3404,
+   "bytes": 768453,
+   "first_ts": "08-25 12:19:14.570",
+   "last_ts": "08-25 12:21:31.788"
+  }
+ ],
+ "note": "before/after the perturb workload; per-type spans show how interactive load shrinks retro coverage",
+ "after": [
+  {
+   "type": "app",
+   "lines": 2613,
+   "bytes": 510127,
+   "first_ts": "08-25 12:19:10.197",
+   "last_ts": "08-25 12:28:20.662"
+  },
+  {
+   "type": "core",
+   "lines": 3862,
+   "bytes": 739732,
+   "first_ts": "08-25 12:26:57.336",
+   "last_ts": "08-25 12:28:22.695"
+  }
+ ]
+}

@@ -1,6 +1,7 @@
 # TASK-IDC-001 — 真机 Spike 测量束 · run r1
 
-> Date：2026-08-25
+> Date：2026-08-25（同日两段：锁屏段 + 解锁监督窗口补测段；后者覆盖滚动扰动与
+> hilog 负载收缩，见 §2b/§6）
 > Device：connect key `5SM0125725000252` · target `TGT-1a62a0dbedd6`（binding r1，2026-08-22 接管）·
 > `const.product.model=ohos` · `const.ohos.fullname=OpenHarmony-7.0.0.39` · root shell ·
 > 显示 1280×2832（**与仓内旧实测 720×1280 不同**，7.0 固件/面板配置已变）· 全程锁屏（充电，100%）
@@ -52,9 +53,32 @@
 - **JPEG p95 922 ms ≤ 1.5 s ✓ PASS；PNG p95 1230 ms ≤ 2.5 s ✓ PASS**。JPEG/PNG 体积比
   ~1:9.2（87 KB vs 806 KB），支撑「JPEG 预览腿 + PNG 证据腿」的双腿设计。
 - 静态锁屏下连续 8 次 JPEG 捕获 464–559 ms，稳定（`snapseries.json`）。
-- **残留（AC-2 部分未测）**：滚动负载下单次截图注入的渲染停顿（vsync 计）需要解锁的
-  交互界面；锁屏近乎静态帧，无法构造滚动负载。伴随 graphic trace 已留存
-  （`snapseries.json` 记录 SHA），补测只差一个解锁设备窗口。
+
+### 2b. 滚动负载下的截图/录屏扰动（解锁监督窗口补测）— 已量化
+
+方法：前台内容瀑布流 app（图片密集、真实渲染负载），fling-only 不点击；帧锚点
+`H:RSMainThread::DoComposition`；三阶段各自独立 graphic-only trace 会话
+（20 MB 缓冲防回卷）；每次截图由设备侧 trace_marker 括出精确窗口；驱动为持久
+`hdc shell`（PTY）。数据：`perturb.json`。
+
+| 阶段 | 帧间隔 median | p95 | p99 | 截图窗口内最大帧隙 |
+|---|---:|---:|---:|---:|
+| 基线滚动（6 fling） | 8.37 ms | 16.74 ms | 50.30 ms | — |
+| 滚动 + 每 fling 一张 JPEG | 8.38 ms | 16.78 ms | 29.96 ms | **29.96 ms**（3 窗口） |
+| 滚动 + 连拍 ~1.4 张/s（v1 宿主合成录屏负载） | 8.37 ms | 16.73 ms | 41.57 ms | **83.94 ms**（6 窗口） |
+
+- 面板实测 **120 Hz**（median 8.37 ms）。三阶段 median/p95 完全一致：**截图对滚动
+  帧率的稳态影响 ≈ 0**；p99/max 受 fling 收尾的相位性长间隔影响，三阶段等同存在
+  （janks 计数同为 8），不构成阶段间差异。
+- **单张事后截图**：窗口内最大帧隙 29.96 ms ≈ 3.6 vsync @120 Hz——超出"≤1 vsync"
+  理想门槛 ⇒ 按 AC-2 预案，**Timeline 上的截图 instrumentation 痕迹确认为 T03
+  必做项**（设计 §4.4 已含）；除此之外扰动可接受。
+- **连拍（录屏负载）**：个别窗口出现 ~84 ms（~10 vsync）可感知 hitch——Toolkit
+  「录屏可能影响设备性能」提示自此有量化依据；宿主合成录屏期间的 jank 判读必须
+  结合 instrumentation 痕迹排除自伤。
+- 设备侧截图窗口自测时长 443.9–462.2 ms（marker 括号，与 §2 的 host 端计时相符）。
+- 标记完整性：穿插阶段 6 对 marker 落 3 对、连拍 12 对落 6 对（PTY 驱动下部分
+  marker echo 未落笔，成因未深究）；已落窗口的度量不受影响，窗口计数如实记录。
 
 ## 3. 环形缓冲（IDC-AC-3）— PASS
 
@@ -69,6 +93,11 @@
   文件名内嵌 boot 时戳）。**对会话形态这是比 begin/dump 更好的载体**（服务持有、按需
   快照、raw 可直接喂 TraceStreamer）；T03 的 lowering 建议优先评估 bgsrv。
 - 本次 spike 产生的设备端文件已逐一删除（bgsrv dump 亦然）；`/data/local/tmp` 零残留。
+- **容量数据点**：graphic+ace+ohos 三类目在滚动+截图负载下，40 MB 环形缓冲 **<70 秒
+  即回卷**（首轮合并实验的 78 MB 文本 dump 只剩尾部 17/42 个 marker，留档
+  perturb-wrapped）；graphic 单类目下 20 MB 覆盖 24 s 仅用约半仓（38 MB 文本）。
+  ⇒ T03 的「回溯 ≥10 s」在默认 18 MB 下对全类目**不宽裕**，回溯窗口与类目集必须
+  联动预算，且 dump 后应立即重臂避免长会话丢头。
 
 ## 4. 时钟（IDC-AC-4）
 
@@ -104,9 +133,16 @@
 ## 6. hilog（覆盖与格式）
 
 - 缓冲：app 512 K / core 512 K / init 64 K / only_prerelease 512 K（`hilog -g`）。
-- 空闲负载实测：`hilog -x` 一次 drain 8 464 行 / 跨度 **08-23 02:56 → 08-25 11:40
-  （≈ 2.3 天）**——轻负载下回溯窗口极深；重日志负载下的覆盖收缩未测（需负载源，
-  见 §7）。时间戳格式 `MM-DD HH:MM:SS.mmm`（realtime，无年份），与 §4 桥接结论衔接。
+- 空闲（锁屏）实测：`hilog -x` 一次 drain 8 464 行 / 跨度 **≈ 2.3 天**。
+- **交互负载实测（`hilog-load.json`，按 type 分测）**：解锁 + 前台内容 app 时，
+  app 缓冲回溯 **4.2 分钟**、core **2.3 分钟**；跑完扰动工作负载（fling + 截图 +
+  trace 采集）后，app **9.2 分钟**、core 仅 **85 秒**。⇒ 回溯窗口随负载从"天"塌缩到
+  "分钟/秒"级，且**诊断采集自身就是冲刷源**（反馈效应）。T03 对超过 ~1 分钟的会话
+  不得依赖 hilog 天然回溯：需在 arm 时按会话时长扩容（`hilog -G`，结束恢复原值）
+  或会话中周期性 drain 落盘，二者取一并写进 lowering 契约。
+- 时间戳格式 `MM-DD HH:MM:SS.mmm`（realtime，无年份），与 §4 桥接结论衔接。
+  另：core 类目 drain 含非 UTF-8 字节（实测 0xd2），宿主侧解析必须按
+  bytes + 宽容解码处理，不能假设合法 UTF-8。
 
 ## 7. 偏差与残留
 
@@ -114,12 +150,16 @@
    等价物（trace_marker+date 桥 + uiInput 跨通道事件）完成了时钟层判定。App 层打点
    延迟（hilog 写→戳抖动、应用内 trace 点）未覆盖——若维护者要求 app 层数字，需按
    原案构建测试 HAP（工程量：构建+签名+安装）。
-2. **AC-2 残留**：滚动负载下的截图扰动（vsync 停顿）与录屏并发扰动，需**解锁设备
-   的监督窗口**（人工解锁 + 允许在前台界面注入滑动）。
-3. hilog 重负载覆盖收缩未测（无设备侧日志泛洪源；测试 HAP 可兼做此负载源）。
+2. ~~AC-2 滚动扰动~~ **已于解锁监督窗口补测**（§2b：单张截图窗口内最大帧隙
+   29.96 ms、连拍 83.94 ms，稳态 median/p95 零影响）。
+3. ~~hilog 重负载覆盖~~ **已补测**（§6：真实交互负载 + 采集自身负载下 core 塌缩到
+   85 秒；未用合成泛洪源，极限泛洪可由测试 HAP 兼做，非阻塞）。
 4. `uitest start-daemon` 存在性已证，**协议与延迟未接**——T02 实现项，不在本 spike
    下结论。
-5. 本 spike 在生产 daemon 留下 ~16 个真实 Job（observe.device ~10 + capture.diagnostics 6；
+5. 扰动实验的 trace_marker 落笔率不足（穿插 3/6、连拍 6/12 对成对命中），成因未
+   深究；不影响已落窗口的度量结论，但 **T03 实现 Marker lowering 时必须加落笔
+   回读确认**，不能假设 echo 即落笔。
+6. 本 spike 在生产 daemon 留下 ~16 个真实 Job（observe.device ~10 + capture.diagnostics 6；
    首轮 CLI 侧拒绝的提交不落库）与对应 artifact（History 可见，操作名即自解释）；
    40 次 trace probe 按其契约不产生 Job/journal/artifact。设备端零残留文件。
 
@@ -128,7 +168,7 @@
 | AC | 判定 |
 |---|---|
 | IDC-AC-1 | 方法完成；**per-invocation 不达标为定论**，T02 形状必须含设备侧常驻注入（`uitest start-daemon` 为既证载体），落地前 Toolkit 输入走显式确认预案 |
-| IDC-AC-2 | 延迟 **PASS**（JPEG 922 ms ≤ 1.5 s；PNG 1230 ms ≤ 2.5 s）；扰动腿残留（解锁窗口） |
+| IDC-AC-2 | **PASS（全项完成）**：延迟 JPEG 922 ms ≤ 1.5 s、PNG 1230 ms ≤ 2.5 s；扰动已量化（§2b）——单张截图窗口内最大帧隙 29.96 ms（>1 vsync ⇒ 按预案 Timeline instrumentation 痕迹确认为 T03 必做）、连拍 83.94 ms、稳态 median/p95 零影响 |
 | IDC-AC-3 | **PASS**（16.4 s ≥ 10 s；clock/环形语义/bgsrv 均实证）|
 | IDC-AC-4 | 时钟层 **PASS**（桥 spread 9.7 ms ≤ 30 ms）；host 映射改道 trace_marker 机制（±20 ms 门槛被机制替代性满足）；app 层残留 |
 
