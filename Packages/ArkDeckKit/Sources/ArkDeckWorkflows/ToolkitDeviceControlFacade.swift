@@ -165,8 +165,8 @@ public enum ToolkitDeviceControlFacade {
         "redactionProfile": .string("standard"),
       ],
       requestedOutputs: [.rawArtifacts, .hardwareEvidence],
-      clientContext: RuntimeClientContext(
-        clientName: ArkDeckAgentClientName.toolkitDeviceControl))
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.toolkitDeviceControl, targetID: target.id))
   }
 
   /// Every gesture is its own request with its own idempotency key. Two taps
@@ -185,8 +185,8 @@ public enum ToolkitDeviceControlFacade {
       operation: RuntimeOperationReference(id: gesture.gesture.operationID, version: 1),
       inputs: gesture.typedInputs,
       requestedOutputs: [.hardwareEvidence],
-      clientContext: RuntimeClientContext(
-        clientName: ArkDeckAgentClientName.toolkitDeviceControl))
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.toolkitDeviceControl, targetID: target.id))
   }
 
   public static func make() -> any ToolkitDeviceControlProviding {

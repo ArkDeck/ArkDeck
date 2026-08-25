@@ -2125,6 +2125,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "processProgress": encodeProcessProgress(status.processProgress),
       "executionMode": status.executionMode.map(JSONValue.string) ?? .null,
       "sessionId": status.sessionID.map(JSONValue.string) ?? .null,
+      "threadId": status.threadID.map(JSONValue.string) ?? .null,
       "actualEffect": status.actualEffect.map(JSONValue.string) ?? .null,
       "createdAtUtc": status.createdAtUTC.map(JSONValue.string) ?? .null,
       "startedAtUtc": status.startedAtUTC.map(JSONValue.string) ?? .null,

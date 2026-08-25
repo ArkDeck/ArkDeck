@@ -505,7 +505,8 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
           "redactionProfile": .string("standard"),
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.traceWorkspace))
+        clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.traceWorkspace, targetID: target.id))
       let encoder = CanonicalJSONEncoders.canonical()
       let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {

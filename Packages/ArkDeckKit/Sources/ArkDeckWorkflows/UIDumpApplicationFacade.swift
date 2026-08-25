@@ -1013,7 +1013,8 @@ public enum ViewerCaptureRequestBuilder {
         "redactionProfile": .string("standard"),
       ],
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugLogsWorkspace))
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
   }
 
   public static func advancedDumpRequest(
@@ -1041,7 +1042,8 @@ public enum ViewerCaptureRequestBuilder {
         "redactionProfile": .string("standard"),
       ],
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugLogsWorkspace))
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
   }
 }
 
