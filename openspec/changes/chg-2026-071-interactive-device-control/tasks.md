@@ -69,9 +69,23 @@ T02/T03 不进入实现。
   重放预留 fail closed、篡改 ledger fail closed 均有测试，反向验证 3 条测试 5 处断言会红。
   两条既有测试原本用手改文档构造崩溃窗口，已就地移植到 ledger（更贴近真实崩溃）。证据
   `evidence/runs/TASK-IDC-002/data/capability-use-ledger.json`。
-  剩余：持久派发通道。实测 uinput 腿 242→177 ms（省 66 ms），PTY 上 sentinel 协议可取回
-  设备侧退出码（当前 spawn 形态取不到，判据只能读 stdout）；远端消失时通道不假报成功。
-  合入本刀后 p50 381 ms 已进门槛、p95 未进，持久通道是把「刚好进」变成「宽裕」的那一步）
+  ⑥ 持久派发通道已落地。平台事实两条：`hdc shell` 在管道上直接拒绝（`Not support stdio
+  TTY mode` 后吞掉一切写入），必须走 PTY；且在设备 shell 起来之前写入会被丢弃，所以开场
+  要先等远端出声、再用一条成帧的空命令自证（实测 open 59 ms）。命令用「前后各一个标记」
+  成帧而非只加结尾哨兵——提示符形状不可预测且设备侧还会回显命令行，两端界定才不必去认
+  提示符。交错实测 `uinput`：通道 p50 223 ms vs spawn p50 334 ms，省 111 ms。
+  只路由 pointer injection，且只认 `hdc -t <key> shell <裸 token>`；换个动作、进程序列、
+  host landing、或任何 shell 会重新解读的 token 一律留在 spawn 路径（加引号会让两种派发
+  形态跑出不同命令，比不用通道更糟）。开不出通道只损失延迟不损失操作（未写出，回落
+  spawn）；**已写出而无答复 = outcomeUnknown 且绝不重发**（回落会打出第二次手势）。
+  通道能取回设备侧退出码（127/42/0，spawn 形态一律 0），但本刀仍按 spawn 形态报 0——
+  否则同一手势的判据会取决于它走了哪条路；启用它必须两条路径同时改，不属本刀。
+  通道 120 s 无手势即关闭（它是设备上一个常驻 shell）。证据
+  `evidence/runs/TASK-IDC-002/data/persistent-shell-channel.json`。
+  顺带记一条硬事实：本次会话中设备连接键自行变过（5SM… → 150100424a…），症状是
+  `Not match target founded`，误导了约一小时；这也正面支持「每次手势重读身份」。
+  当前分量估算 p50 ≈ 362 ms（Runtime 107 + 身份 32 + 注入 223），门槛 400 ms;
+  p95 端到端未验——生产 daemon 仍是不含这三个操作的旧构建，更新需要维护者签名身份）
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6

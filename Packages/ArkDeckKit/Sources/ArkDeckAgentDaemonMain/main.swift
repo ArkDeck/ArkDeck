@@ -343,7 +343,14 @@ Task.detached {
           Darwin.exit(70)
         })
       hdcExecutableResolver = resolver
-      hdcDispatcher = DescriptorBoundProcessDispatcher.hdc(resolver: resolver)
+      // Pointer injection is the one operation with an interaction budget, and
+      // it is a single device command, so a spawned client costs a process
+      // launch on top of the round trip that does the work. It is routed over
+      // a shell that is already open; everything else keeps the spawning path
+      // it has, including pointer injection whenever a channel cannot serve it.
+      hdcDispatcher = PointerInputChannelDispatcher(
+        fallback: DescriptorBoundProcessDispatcher.hdc(resolver: resolver),
+        resolver: resolver)
       traceRuntimeProbe = FoundationTraceRuntimeProbe(
         targetStore: targetStore, hdcResolver: resolver,
         workingDirectory: resolvedStateDirectory)

@@ -1,0 +1,82 @@
+{
+  "measurement": "persistent-shell-channel",
+  "question": "Can a gesture's one device command avoid paying for a process launch, and what does that cost in safety?",
+  "measuredAtUTC": "2026-08-25T12:10:00Z",
+  "platformFacts": [
+    {
+      "fact": "`hdc shell` refuses to run over a plain pipe",
+      "observed": "prints `[W] Not support stdio TTY mode`, offers a `# ` prompt, then discards everything written to it and answers nothing",
+      "consequence": "a persistent channel has to be a terminal; there is no pipe-based option"
+    },
+    {
+      "fact": "`hdc shell` discards input written before the device shell is up",
+      "observed": "a command written immediately after spawn produced no bytes at all within 10s; waiting for the shell's first output first, then writing, answers in ~60ms",
+      "consequence": "opening waits for the far end to speak before the first write, and then proves itself with one framed no-op"
+    },
+    {
+      "fact": "the device-side exit status IS recoverable over a channel",
+      "observed": "framed commands answered 0 for a successful read, 127 for a command that does not exist, 42 for an explicit failure",
+      "consequence": "a spawned `hdc shell` reports 0 for all three, which is why verdicts on that path are inferred from output text"
+    },
+    {
+      "fact": "the device's connect key changed during this session",
+      "observed": "5SM0125725000252 stopped resolving; `list targets -v` reported 150100424a544434520325874bbf4900 for the same physically-attached device",
+      "consequence": "this cost an hour of misdiagnosis - the symptom was `Not match target founded`, which reads like a launch-path problem. It is also direct support for re-confirming identity on every gesture rather than once per session."
+    }
+  ],
+  "latency": {
+    "note": "interleaved within one loop so host load and device drift land on both",
+    "command": "hdc -t <key> shell uinput",
+    "overChannelP50Ms": 223,
+    "overChannelP95Ms": 228,
+    "spawnedP50Ms": 334,
+    "spawnedP95Ms": 336,
+    "savedP50Ms": 111,
+    "channelOpenMs": 59
+  },
+  "framing": [
+    "The command is bracketed, not merely terminated: `echo <nonce>B; <cmd>; echo <nonce>:$?`.",
+    "What precedes a command's output is not predictable - the shell prints a prompt whose",
+    "shape is its own business, and the device's shell also echoes the line it was given -",
+    "so the output is delimited at both ends rather than by recognising prompts, which would",
+    "mean keeping a list of prompt shapes and being wrong about the first one missing from it.",
+    "Both markers also appear inside the echo; they are told apart by what follows them",
+    "(`;` and `:$?` in the echo, a newline and the status digits in the real output)."
+  ],
+  "safetyProperties": [
+    "Only pointer injection is routed, and only as `hdc -t <key> shell <bare tokens>`. Another",
+    "action, a process sequence, a host landing, or an argument the shell would not read back",
+    "unchanged all stay on the spawning path: quoting instead would let the two dispatch shapes",
+    "run different commands, which is worse than not using the channel.",
+    "A channel that cannot open costs latency, never the operation - nothing was written, so",
+    "the gesture still goes out the ordinary way.",
+    "A command written whose answer never arrives is an unknown outcome and is never dispatched",
+    "again. Falling back there would inject a second gesture.",
+    "Anything unexpected closes the channel rather than resynchronising a stream whose position",
+    "is no longer trustworthy.",
+    "The channel reports exit status 0, as the spawning path does. The device status is now",
+    "recoverable, but using it would make a gesture's verdict depend on which path it happened",
+    "to take. Adopting it has to land on both paths at once, and is not part of this change.",
+    "The executable's identity is verified when the channel opens, exactly as a spawned dispatch",
+    "verifies it; every later command rides that one verified process.",
+    "An open channel is a shell running on the device, so it is closed after 120s without a",
+    "gesture rather than held for as long as the daemon lives."
+  ],
+  "provenInTests": {
+    "PersistentDeviceShellChannelContractTests": "7 tests over the host's /bin/sh: status recovery, framing across commands, refusal of tokens needing quotes, timeout as unknown rather than failed, a dead channel refusing rather than guessing, truncation without losing the status, and an executable whose identity does not match",
+    "PointerInputChannelRoutingContractTests": "8 tests: what may and may not ride the channel, fallback when it cannot open, and that a written-but-unanswered gesture is never sent again",
+    "negativeControl": "with the unknown-outcome path changed to fall back, testAGestureThatWasWrittenButNeverAnsweredIsNeverSentAgain fails"
+  },
+  "budgetAfterThisChange": {
+    "runtimeP50Ms": 107,
+    "identityReconfirmationMs": 32,
+    "injectionOverChannelP50Ms": 223,
+    "totalP50Ms": 362,
+    "gateMs": 400,
+    "reading": [
+      "p50 sits inside the gate with room; p95 is not established end to end, because the",
+      "production daemon still runs a build without these operations and updating it needs the",
+      "maintainer's signing identity. Every figure here is a component measurement."
+    ]
+  }
+}
