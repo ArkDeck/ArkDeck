@@ -27,6 +27,12 @@ private struct HDCNativeFileIdentity: Equatable {
 }
 
 package struct HDCObservationProviderAdapter: DeviceProvider {
+  /// The kernel's own marker sink and the ring it lands in. Both paths exist
+  /// on the device under test; `/sys/kernel/tracing` is the one the platform
+  /// keeps current, and the debug alias is left alone rather than probed for.
+  static let traceMarkerPath = "/sys/kernel/tracing/trace_marker"
+  static let traceRingPath = "/sys/kernel/tracing/trace"
+
   /// The HDC provider's stable identity for a target, derived from the HDC
   /// connect key — the address the provider actually verifies against a live
   /// target row. This is the single source for both the daemon's facts port
@@ -223,7 +229,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .hdc(
         .captureTrace(
-          try traceRequest(from: inputs),
+          try traceRequest(from: inputs, jobID: context.jobID, stepID: "capture-trace"),
           into: try mintStableOwnedRemotePath(
             jobID: context.jobID, stepID: "capture-trace")))
     case .receiveFile:
@@ -463,7 +469,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     }
   }
 
-  private func traceRequest(from inputs: [String: JSONValue]) throws -> HDCTraceCaptureRequest {
+  private func traceRequest(
+    from inputs: [String: JSONValue], jobID: String, stepID: String
+  ) throws -> HDCTraceCaptureRequest {
     // No invented default. The 2026-07-31 device window found `ohos` — the
     // value that used to stand in here — absent from `hitrace
     // --list_categories` on OH 3.2 (DAYU200), so the fallback could only ever
@@ -485,8 +493,16 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     if case .integer(let requested)? = inputs["traceBufferKB"] {
       buffer = max(1024, min(Int(requested), 65536))
     }
+    var ringBuffered = false
+    if case .bool(let requested)? = inputs["ringBuffered"] { ringBuffered = requested }
     return try HDCTraceCaptureRequest(
-      durationSeconds: duration, categories: categories, bufferKB: buffer)
+      durationSeconds: duration, categories: categories, bufferKB: buffer,
+      ringBuffered: ringBuffered,
+      // A ring snapshot without an anchor cannot say how far back it reaches,
+      // so the anchor is not optional in practice - it is derived here rather
+      // than asked of the caller.
+      coverageAnchor: ringBuffered
+        ? HDCTraceCaptureRequest.anchor(sessionID: jobID, stepID: stepID) : nil)
   }
 
   private func applicationLivenessAction(
@@ -846,6 +862,76 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
               context: context),
             timeoutSeconds: 30))
       }
+    case .captureTrace(let request, let path) where request.ringBuffered:
+      // Arm, let the window pass, snapshot, stop. What this buys is when the
+      // decision to keep a trace can be made: `-t N` has to be started before
+      // the interesting thing and reports only its own window, while an armed
+      // ring can be snapshotted after it and carries everything since the arm.
+      //
+      // `--overwrite` is deliberately absent. Its name reads like the ring
+      // behaviour and its meaning is the opposite: with it the *newest*
+      // traces are discarded, and the default is what drops the oldest. A
+      // lowering written from the flag name would silently keep the first N
+      // seconds of a session and throw away the part worth capturing.
+      var ring: [TypedProcessInvocation] = [
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "hitrace", "--trace_begin", "-b", String(request.bufferKB)]
+              + request.categories,
+            context: context),
+          timeoutSeconds: 30)
+      ]
+      if let anchor = request.coverageAnchor {
+        // Written into the ring and read straight back out of it. The write
+        // alone would only say the command ran; the readback is what says the
+        // ring is live and holding it, and the anchor's later presence in the
+        // dump is what proves how far back the snapshot reaches — a check that
+        // needs no trace decoder, only a string search.
+        //
+        // Both are one quoted line rather than argv elements: passing the
+        // redirect as its own element does not redirect on this path
+        // (measured — the text came back on stdout and the file was never
+        // written). The anchor is bounded to letters and digits, so there is
+        // nothing in the line for a shell to reinterpret.
+        ring.append(
+          TypedProcessInvocation(
+            arguments: try deviceArguments(
+              ["shell", "echo \(anchor) > \(Self.traceMarkerPath)"], context: context),
+            timeoutSeconds: 15))
+        ring.append(
+          TypedProcessInvocation(
+            arguments: try deviceArguments(
+              ["shell", "grep -c \(anchor) \(Self.traceRingPath)"], context: context),
+            timeoutSeconds: 15))
+      }
+      ring.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "sleep", String(request.durationSeconds)], context: context),
+          timeoutSeconds: request.durationSeconds + 30))
+      ring.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "hitrace", "--trace_dump", "-o", path.remotePath], context: context),
+          timeoutSeconds: 120,
+          continueAfterNonZero: true))
+      // Stopping without a second dump: the snapshot above is the product,
+      // and `--trace_finish` would write another copy nobody asked for.
+      ring.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "hitrace", "--trace_finish_nodump"], context: context),
+          timeoutSeconds: 30,
+          continueAfterNonZero: true))
+      ring.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "ls", "-l", path.remotePath], context: context),
+          timeoutSeconds: 15))
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch", invocations: ring))
     case .captureTrace(let request, let path):
       // hitrace's own exit status is the hdc client's, not the remote
       // command's, so the capture is judged by the file it was supposed to

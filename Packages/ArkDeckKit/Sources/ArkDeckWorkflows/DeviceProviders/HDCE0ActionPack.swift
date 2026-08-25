@@ -155,11 +155,37 @@ public struct HDCTraceCaptureRequest: Sendable, Equatable {
   public let durationSeconds: Int
   public let categories: [String]
   public let bufferKB: Int
+  /// Arm the ring, then snapshot it - instead of asking `hitrace -t N` to
+  /// block for a window and hand back only what happened inside it.
+  ///
+  /// What this buys is when the decision to keep a trace can be made. `-t N`
+  /// has to be started before the interesting thing and reports only its own
+  /// window; an armed ring can be snapshotted after it, and the snapshot
+  /// carries everything since the arm, bounded by the buffer.
+  ///
+  /// How far back a given snapshot actually reaches is not a property of
+  /// arming: measured on the device, one dump reached 25.6s before its marker
+  /// and another 0.06s, depending on what the kernel buffer already held. The
+  /// coverage anchor below is what makes the real reach of each capture a
+  /// fact rather than an assumption.
+  public let ringBuffered: Bool
+  /// Written into the device's own `trace_marker` when the ring is armed, and
+  /// read back before the window starts. Its presence in the dump is what
+  /// proves the snapshot reaches back at least as far as the arm - an
+  /// assertion that needs no trace decoder, only a string search.
+  public let coverageAnchor: String?
+
+  package static func anchor(sessionID: String, stepID: String) -> String {
+    let allowed = (sessionID + stepID).filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+    return "ARKDECKANCHOR" + String(allowed.suffix(40))
+  }
 
   public init(
     durationSeconds: Int,
     categories: [String],
-    bufferKB: Int = 8192
+    bufferKB: Int = 8192,
+    ringBuffered: Bool = false,
+    coverageAnchor: String? = nil
   ) throws {
     guard (1...Self.maximumDurationSeconds).contains(durationSeconds) else {
       throw HDCE0RequestError.outOfBounds(
@@ -180,9 +206,21 @@ public struct HDCTraceCaptureRequest: Sendable, Equatable {
     guard (1024...65536).contains(bufferKB) else {
       throw HDCE0RequestError.outOfBounds(field: "bufferKB", detail: "1024...65536")
     }
+    if let coverageAnchor {
+      // The anchor is echoed into a shell line, so it carries nothing a shell
+      // would reinterpret, and it has to be findable in a binary dump.
+      guard ringBuffered, (14...64).contains(coverageAnchor.count),
+        coverageAnchor.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })
+      else {
+        throw HDCE0RequestError.malformed(
+          field: "coverageAnchor", detail: "a ring-only bounded identifier")
+      }
+    }
     self.durationSeconds = durationSeconds
     self.categories = categories
     self.bufferKB = bufferKB
+    self.ringBuffered = ringBuffered
+    self.coverageAnchor = coverageAnchor
   }
 }
 

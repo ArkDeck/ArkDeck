@@ -1,0 +1,72 @@
+{
+  "measurement": "ring-lowering-facts",
+  "question": "Which hitrace surface carries a ring capture, and what does a snapshot actually prove?",
+  "measuredAtUTC": "2026-08-25T14:30:00Z",
+  "device": "DAYU200 development board, OpenHarmony, kernel 6.6.101",
+  "carrierChoice": {
+    "candidates": ["--trace_begin/--trace_dump/--trace_finish_nodump", "--start_bgsrv/--dump_bgsrv/--stop_bgsrv"],
+    "chosen": "--trace_begin/--trace_dump/--trace_finish_nodump",
+    "why": [
+      "The Spike recommended evaluating bgsrv first, for its raw format and because a",
+      "service holds it. Evaluated: `--dump_bgsrv` writes to a path the service picks",
+      "(/data/log/hitrace/trace_<wall>@<boot>-<n>.sys), which the provider cannot own.",
+      "Every other file leg in this operation is bound to a provider-minted temp path",
+      "for exactly the reasons the step notes give, and cleanup would otherwise reach",
+      "into a service directory rather than a path ArkDeck created.",
+      "`--trace_dump -o <path>` takes the owned path and fits that machinery unchanged.",
+      "Both were confirmed working on the device; this is a path-ownership decision,",
+      "not a capability one."
+    ]
+  },
+  "measuredFacts": [
+    {
+      "fact": "`--overwrite` means the opposite of what its name suggests",
+      "detail": "with it the newest traces are discarded; the default discards the oldest, which is the ring behaviour wanted. The lowering therefore never passes it, and a test pins that.",
+      "note": "already recorded by the T01 Spike; re-confirmed here from the device's own help text"
+    },
+    {
+      "fact": "`--trace_dump` writes ftrace text; `--dump_bgsrv` writes a binary .sys",
+      "detail": "the text dump carries parseable timestamps, so a capture's real reach can be measured without a decoder"
+    },
+    {
+      "fact": "capture continues after a dump",
+      "detail": "a second marker written after the first dump appeared in a second dump, with no second --trace_begin: 809 lines against the first dump's ~200"
+    },
+    {
+      "fact": "a redirect passed as its own argv element does not redirect",
+      "detail": "`shell echo X > /path` as separate elements left the file unwritten and the text on stdout; the same line quoted wrote the file. The marker write is therefore one line, and the anchor is bounded to letters and digits so nothing in it can be reinterpreted."
+    },
+    {
+      "fact": "trace_marker accepts a write and the ring holds it",
+      "detail": "written to /sys/kernel/tracing/trace_marker, read straight back with grep -c against /sys/kernel/tracing/trace, and present in the dump afterwards - in the text dump and in the binary one alike"
+    }
+  ],
+  "howFarBackASnapshotReaches": {
+    "observations": [
+      { "armToMarkerSeconds": 12, "windowBeforeMarkerSeconds": 25.64, "note": "the kernel buffer already held events from before the arm" },
+      { "armToMarkerSeconds": 0, "windowBeforeMarkerSeconds": 0.06, "note": "the buffer had been drained by a preceding --trace_finish_nodump" }
+    ],
+    "reading": [
+      "Retrospective reach is not a property of arming. It depends on what the buffer",
+      "already held, which is why the lowering writes a coverage anchor immediately",
+      "after arming and reads it back: the anchor's presence in a dump is what makes",
+      "that capture's real reach a fact rather than an assumption, and it needs no",
+      "trace decoder to check - only a string search.",
+      "An earlier draft of this change described the ring as 'carrying what it already",
+      "held'. That is what the first observation looked like, and the second shows it",
+      "is not something to rely on. The wording was corrected in the catalog, the",
+      "lowering and the tests rather than left to read as a guarantee."
+    ]
+  },
+  "loweredSequenceRunOnTheDevice": [
+    "hitrace --trace_begin -b 20480 ohos graphic      -> OpenRecording done",
+    "echo <anchor> > /sys/kernel/tracing/trace_marker -> written",
+    "grep -c <anchor> /sys/kernel/tracing/trace       -> 1",
+    "sleep <window>",
+    "hitrace --trace_dump -o <owned path>             -> trace read done",
+    "hitrace --trace_finish_nodump                    -> end capture trace",
+    "ls -l <owned path>                               -> 7039 bytes",
+    "anchor found in the received dump: yes; 63 events spanning 5.35s"
+  ],
+  "deviceLeftClean": "every file this run wrote under /data/local/tmp and /data/log/hitrace was removed, and the trace service was stopped"
+}
