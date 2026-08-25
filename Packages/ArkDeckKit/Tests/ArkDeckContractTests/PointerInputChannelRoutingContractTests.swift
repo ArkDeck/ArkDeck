@@ -183,6 +183,29 @@ final class PointerInputChannelRoutingContractTests: XCTestCase {
     await routing.closeAllChannels()
   }
 
+  /// An open channel is a shell running on the device, so it has to close on
+  /// its own. Sweeping only when the next gesture arrives closes nothing in
+  /// the case that matters - the one where no next gesture comes. Measured on
+  /// the device before this was armed: still open 11 minutes after the last
+  /// gesture, under a 120s timeout.
+  func testAnIdleChannelClosesWithoutWaitingForAnotherGesture() async throws {
+    let routing = PointerInputChannelDispatcher(
+      fallback: RecordingDispatcher(), resolver: Resolver(path: shellStub.path()),
+      childEnvironment: [:], idleTimeout: 0.5)
+    _ = try await routing.dispatch(
+      try plan(argv: ["-t", "KEY", "shell", "echo", "open"]))
+    let heldAfterUse = await routing.holdsChannel(connectKey: "KEY")
+    XCTAssertTrue(heldAfterUse, "the channel is held while gestures are arriving")
+
+    // Nothing else is dispatched: the close has to come from the channel's own
+    // idle timer.
+    try await Task.sleep(nanoseconds: 2_000_000_000)
+    let heldWhenIdle = await routing.holdsChannel(connectKey: "KEY")
+    XCTAssertFalse(
+      heldWhenIdle, "an idle channel must not outlive its timeout on the device")
+    await routing.closeAllChannels()
+  }
+
   /// The channel reports the status the spawning path reports. `hdc shell`
   /// cannot carry the device's own status back, so a channel that surfaced it
   /// would make a gesture's verdict depend on which path it happened to take.

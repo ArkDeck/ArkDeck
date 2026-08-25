@@ -20,7 +20,7 @@ import Foundation
 package actor PointerInputChannelDispatcher: RuntimeProcessDispatching {
   /// A channel left open is a shell left running on the device. It is closed
   /// once gestures stop, rather than held for as long as the daemon lives.
-  package static let idleTimeout: TimeInterval = 120
+  package static let defaultIdleTimeout: TimeInterval = 120
 
   private struct OpenChannel {
     let channel: PersistentDeviceShellChannel
@@ -30,19 +30,28 @@ package actor PointerInputChannelDispatcher: RuntimeProcessDispatching {
   private let fallback: any RuntimeProcessDispatching
   private let resolver: any RuntimeExecutableResolving
   private let childEnvironment: [String: String]
+  private let idleTimeout: TimeInterval
   private let now: @Sendable () -> Date
   private var channels: [String: OpenChannel] = [:]
+  /// Closing an idle channel cannot wait for the next gesture: the case that
+  /// matters is precisely the one where no next gesture comes. Sweeping only
+  /// on dispatch left the device holding a shell for as long as the daemon
+  /// ran — measured on the device, still open 11 minutes after the last
+  /// gesture under a 120s timeout.
+  private var sweep: Task<Void, Never>?
 
   package init(
     fallback: any RuntimeProcessDispatching,
     resolver: any RuntimeExecutableResolving,
     childEnvironment: [String: String] = HDCServerEndpointSelector
       .inheritedPortChildEnvironment(),
+    idleTimeout: TimeInterval = PointerInputChannelDispatcher.defaultIdleTimeout,
     now: @escaping @Sendable () -> Date = { Date() }
   ) {
     self.fallback = fallback
     self.resolver = resolver
     self.childEnvironment = childEnvironment
+    self.idleTimeout = idleTimeout
     self.now = now
   }
 
@@ -76,6 +85,7 @@ package actor PointerInputChannelDispatcher: RuntimeProcessDispatching {
         routed.command, timeout: routed.timeoutSeconds,
         outputByteBudget: plan.outputByteBudget ?? 1_048_576)
       channels[routed.connectKey]?.lastUsed = now()
+      scheduleSweep()
       // The exit status is reported as the spawning path reports it, which is
       // always 0 because `hdc shell` cannot carry the device's status back.
       // The channel *can* recover it, but a verdict that depended on which
@@ -146,8 +156,20 @@ package actor PointerInputChannelDispatcher: RuntimeProcessDispatching {
     return channel
   }
 
+  /// Arms the next sweep. Re-armed on every use, so the timer always measures
+  /// from the last gesture rather than from the first.
+  private func scheduleSweep() {
+    sweep?.cancel()
+    let delay = idleTimeout
+    sweep = Task { [weak self] in
+      try? await Task.sleep(nanoseconds: UInt64(max(delay, 0) * 1_000_000_000))
+      guard !Task.isCancelled else { return }
+      await self?.expireIdleChannels()
+    }
+  }
+
   private func expireIdleChannels() {
-    let cutoff = now().addingTimeInterval(-Self.idleTimeout)
+    let cutoff = now().addingTimeInterval(-idleTimeout)
     for (key, open) in channels where open.lastUsed < cutoff || !open.channel.isAlive {
       open.channel.close()
       channels[key] = nil
@@ -160,7 +182,15 @@ package actor PointerInputChannelDispatcher: RuntimeProcessDispatching {
   }
 
   package func closeAllChannels() {
+    sweep?.cancel()
+    sweep = nil
     for (_, open) in channels { open.channel.close() }
     channels.removeAll()
+  }
+
+  /// Whether a channel is currently held for this device. Lets a test observe
+  /// the idle close without reaching into the actor's storage.
+  package func holdsChannel(connectKey: String) -> Bool {
+    channels[connectKey]?.channel.isAlive == true
   }
 }
