@@ -169,7 +169,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
           adoptedTargetID: "target-a",
           bindingRevision: 9,
           deviceInformation: DeviceInformationPresentation(
-            name: "HUAWEI Mate 80 Pro",
+            name: "OpenHarmony Reference Device",
             systemVersion: "OpenHarmony-7.0.0.39",
             transport: "USB",
             observedAtUTC: "2026-08-24T03:01:00Z"),
@@ -182,7 +182,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
 
     let joined = TraceApplicationFacade.rejoin(targets: [target], with: observation)
 
-    XCTAssertEqual(joined.first?.deviceName, "HUAWEI Mate 80 Pro")
+    XCTAssertEqual(joined.first?.deviceName, "OpenHarmony Reference Device")
     XCTAssertEqual(joined.first?.systemVersion, "OpenHarmony-7.0.0.39")
     XCTAssertEqual(joined.first?.connectKey, "5SM0125725000252")
     XCTAssertEqual(joined.first?.transport, "USB")

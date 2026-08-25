@@ -148,9 +148,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
           stdout: Data(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".utf8),
           stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
-      case (_, .hdc(.queryProperty(.productModel))):
+      case (_, .hdc(.queryProperty(.productName))):
         return ProviderProcessReceipt(
-          exitStatus: 0, stdout: Data("DAYU200\n".utf8), stderr: Data(),
+          exitStatus: 0, stdout: Data("OpenHarmony Reference Device\n".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01)
       case (_, .hdc(.queryProperty(.fullBuildVersion))):
         return ProviderProcessReceipt(
@@ -516,7 +516,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(evidence.authority?.kind, .defaultReadOnlyPolicy)
     XCTAssertEqual(evidence.authority?.reference, "default-read-only-policy")
     XCTAssertEqual(evidence.observation?.bindingRevision, 7)
-    XCTAssertEqual(evidence.observation?.model, "DAYU200")
+    XCTAssertEqual(evidence.observation?.model, "OpenHarmony Reference Device")
     XCTAssertEqual(evidence.observation?.firmware, "OpenHarmony-4.1-release")
     XCTAssertTrue(evidence.actualStepKinds.contains("probeDevice"))
     XCTAssertNotNil(evidence.startedAtUTC)

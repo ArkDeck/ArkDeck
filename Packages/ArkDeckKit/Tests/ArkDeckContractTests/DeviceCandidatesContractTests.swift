@@ -179,7 +179,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
       ],
       deviceInformationByConnectKey: [
         connected: BootstrapDeviceInformation(
-          name: "HUAWEI Mate 80 Pro",
+          name: "OpenHarmony Reference Device",
           systemVersion: "OpenHarmony-7.0.0.39",
           transport: "USB"),
         unauthorized: BootstrapDeviceInformation(
@@ -199,7 +199,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     guard case .object(let information)? = connectedRow["deviceInformation"] else {
       return XCTFail("Connected candidates must carry direct device information")
     }
-    XCTAssertEqual(information["name"], .string("HUAWEI Mate 80 Pro"))
+    XCTAssertEqual(information["name"], .string("OpenHarmony Reference Device"))
     XCTAssertEqual(information["systemVersion"], .string("OpenHarmony-7.0.0.39"))
     XCTAssertEqual(information["transport"], .string("USB"))
     XCTAssertEqual(connectedRow["adoptedTargetId"], .null)
