@@ -9,11 +9,15 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-001 — Spike：真机测量束（决定架构，不产出产品面）
 
-- Status:in-progress（2026-08-25 主体测量收官，见 `evidence/runs/TASK-IDC-001/run.md`：
-  三档输入延迟 + 持久通道分解、截图双格式、hitrace 环形与 bgsrv 实证 PASS、时钟桥
-  spread 9.7 ms、journal append 3.6–5.3 ms/条 ⇒ design.md §2 建议保持全量 durability。
-  两条残留腿等待解锁设备的监督窗口：滚动负载下的截图/录屏扰动、hilog 重负载覆盖；
-  app 层 ground-truth HAP 视维护者对 AC-4 方法偏差的裁决决定是否补做）
+- Status:done（2026-08-25 测量收官，见 `evidence/runs/TASK-IDC-001/run.md`：三档输入
+  延迟 + 持久通道分解（裸 click p95 396 ms 吃满门槛 ⇒ T02 必须做设备侧常驻注入）、
+  截图双格式 PASS、滚动扰动已量化（单张窗口内最大帧隙 30 ms、连拍 84 ms、稳态零
+  影响 ⇒ instrumentation 痕迹为 T03 必做）、hitrace 环形与 bgsrv 实证 PASS（含
+  40 MB/三类目 <70 s 回卷的容量数据）、时钟桥 spread 9.7 ms + /proc/uptime 与
+  ftrace boot 相差 42.5 h 的时基陷阱 ⇒ Marker 走设备侧 trace_marker、hilog 覆盖在
+  采集负载下塌缩到 core 85 s ⇒ 会话需扩容或周期 drain、journal append 3.6–5.3 ms/条
+  ⇒ design.md §2 建议保持全量 durability。开放项：AC-4 的 app 层 HAP 对拍视维护者
+  对方法偏差的裁决）
 - Golden Journey:GJ-2（测量不改行为；结论决定后续形状）
 - Platform:macos + DAYU200（OpenHarmony 5.0.0.71）
 - Acceptance:IDC-AC-1..4（见 verification.md）

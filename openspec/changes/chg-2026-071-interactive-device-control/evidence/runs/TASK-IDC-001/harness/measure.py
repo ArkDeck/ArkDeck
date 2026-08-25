@@ -12,6 +12,7 @@ Subcommands: latency | hash | ring | clocks | hilog | snapseries
 
 import hashlib
 import json
+import os
 import re
 import statistics
 import subprocess
@@ -387,6 +388,223 @@ def measure_daemon():
     save("daemon-tiers.json", out)
 
 
+class DeviceShell:
+    """Long-lived `hdc shell` over a PTY (root). Sentinel split by quoting so the
+    PTY input echo can never satisfy the wait (see persistent_shell.py)."""
+
+    def __init__(self):
+        import pty as _pty
+
+        self.master, slave = _pty.openpty()
+        self.proc = subprocess.Popen(
+            [HDC, "-t", KEY, "shell"], stdin=slave, stdout=slave, stderr=slave, close_fds=True
+        )
+        os.close(slave)
+        self.buf = b""
+        time.sleep(1.2)
+        self._drain(0.5)
+
+    def _drain(self, seconds):
+        import select as _select
+
+        end = time.time() + seconds
+        while time.time() < end:
+            ready, _, _ = _select.select([self.master], [], [], 0.1)
+            if ready:
+                try:
+                    self.buf += os.read(self.master, 8192)
+                except OSError:
+                    return
+
+    def run(self, cmd, marker, deadline=20):
+        import select as _select
+
+        self.buf = b""
+        os.write(self.master, (cmd + ' && echo D_"' + marker + '"\r\n').encode())
+        end = time.time() + deadline
+        while time.time() < end:
+            ready, _, _ = _select.select([self.master], [], [], 0.05)
+            if ready:
+                try:
+                    self.buf += os.read(self.master, 8192)
+                except OSError:
+                    break
+                if ("D_" + marker).encode() in self.buf:
+                    return True
+        return False
+
+    def close(self):
+        try:
+            os.write(self.master, b"exit\r\n")
+            time.sleep(0.3)
+        finally:
+            self.proc.terminate()
+
+
+MARK = "echo {} > /sys/kernel/tracing/trace_marker"
+FRAME_EVENT = "H:RSMainThread::DoComposition"
+
+
+def parse_phase_trace(local):
+    frames, marks = [], {}
+    with open(local, errors="replace") as fh:
+        for line in fh:
+            if FRAME_EVENT in line and "B|" in line:
+                m = TS_RE.search(line)
+                if m:
+                    frames.append(float(m.group(1)))
+            elif "tracing_mark_write: " in line:
+                name = line.rsplit("tracing_mark_write: ", 1)[1].strip()
+                m = TS_RE.search(line)
+                if m and len(name) <= 10 and ("_b" in name or "_e" in name):
+                    marks[name] = float(m.group(1))
+    return frames, marks
+
+
+def phase_stats(frames, begin, end, windows=()):
+    xs = [t for t in frames if begin <= t <= end]
+    iv = [(b - a) * 1000 for a, b in zip(xs, xs[1:]) if (b - a) < 1.0]
+    if not iv:
+        return {"frames": len(xs)}
+    s = sorted(iv)
+    med = s[len(s) // 2]
+    stats = {
+        "frames": len(xs),
+        "interval_median_ms": round(med, 2),
+        "p95_ms": round(s[int(len(s) * 0.95)], 2),
+        "p99_ms": round(s[min(len(s) - 1, int(len(s) * 0.99))], 2),
+        "max_ms": round(s[-1], 2),
+        "janks_gt_2p5x_median": sum(1 for x in iv if x > 2.5 * med),
+        "note": "idle stretches between flings count as long intervals in every phase alike",
+    }
+    if windows:
+        inside = []
+        for wb, we in windows:
+            seg = [t for t in xs if wb - 0.05 <= t <= we + 0.05]
+            inside += [(b - a) * 1000 for a, b in zip(seg, seg[1:])]
+        if inside:
+            stats["max_ms_inside_snapshot_windows"] = round(max(inside), 2)
+            stats["snapshot_window_count"] = len(windows)
+    return stats
+
+
+def run_traced_phase(tag, body):
+    """One graphic-only trace session per phase, so the ring can never wrap over
+    the phase's own markers (the combined 3-category run filled 40 MB in <70 s
+    and evicted phases A/B — kept as perturb-wrapped evidence)."""
+    shell("hitrace --trace_begin --trace_clock boot -b 20480 graphic")
+    sh = DeviceShell()
+    t0 = time.time()
+    try:
+        sh.run(MARK.format("p_b"), "m0")
+        body(sh)
+        sh.run(MARK.format("p_e"), "m1")
+    finally:
+        sh.close()
+    wall = round(time.time() - t0, 1)
+    remote = f"/data/local/tmp/idc-{tag}.txt"
+    shell(f"hitrace --trace_dump -o {remote}", timeout=240)
+    shell("hitrace --trace_finish_nodump")
+    local = SCRATCH / f"{tag}.txt"
+    run(["file", "recv", remote, str(local)], timeout=300)
+    shell(f"rm -f {remote}")
+    frames, marks = parse_phase_trace(local)
+    return {
+        "wall_s": wall,
+        "frames": frames,
+        "marks": marks,
+        "bytes": local.stat().st_size,
+        "sha256": hashlib.sha256(local.read_bytes()).hexdigest(),
+    }
+
+
+def measure_perturb():
+    """Three separately-traced phases on the foreground app (fling-only, no taps):
+    baseline scroll, scroll with one bracketed JPEG snapshot per fling, scroll
+    with back-to-back snapshots (the v1 host-synth recording load)."""
+    fling = lambda sh, i: sh.run(
+        f"uitest uiInput dircFling {2 if i % 2 == 0 else 3}", f"f{time.monotonic_ns() % 100000}"
+    )
+
+    def body_baseline(sh):
+        for i in range(6):
+            fling(sh, i)
+            sh.run("sleep 2", f"sa{i}", deadline=8)
+
+    def body_snap(sh):
+        for i in range(6):
+            fling(sh, i)
+            sh.run("sleep 0.6", f"sb{i}", deadline=8)
+            sh.run(MARK.format(f"s{i}_b"), f"mbb{i}")
+            sh.run("snapshot_display -t jpeg -f /data/local/tmp/idc-p.jpeg", f"sn{i}", deadline=15)
+            sh.run(MARK.format(f"s{i}_e"), f"mbe{i}")
+            sh.run("sleep 0.8", f"sc{i}", deadline=8)
+        sh.run("rm -f /data/local/tmp/idc-p.jpeg", "rmp")
+
+    def body_loop(sh):
+        for i in range(6):
+            fling(sh, i)
+            for j in range(2):
+                sh.run(MARK.format(f"l{i}{j}_b"), f"mlb{i}{j}")
+                sh.run("snapshot_display -t jpeg -f /data/local/tmp/idc-p.jpeg", f"ln{i}{j}", deadline=15)
+                sh.run(MARK.format(f"l{i}{j}_e"), f"mle{i}{j}")
+        sh.run("rm -f /data/local/tmp/idc-p.jpeg", "rmp2")
+
+    out = {"frame_event": FRAME_EVENT, "driver": "persistent hdc shell (PTY), one trace session per phase"}
+    a = run_traced_phase("pa", body_baseline)
+    out["baseline"] = phase_stats(a["frames"], a["marks"].get("p_b", 0), a["marks"].get("p_e", 1e12))
+    out["baseline"] |= {"wall_s": a["wall_s"], "trace_bytes": a["bytes"], "trace_sha256": a["sha256"]}
+
+    b = run_traced_phase("pb", body_snap)
+    wins = [
+        (b["marks"][f"s{i}_b"], b["marks"][f"s{i}_e"])
+        for i in range(6)
+        if f"s{i}_b" in b["marks"] and f"s{i}_e" in b["marks"]
+    ]
+    out["snap_interleaved"] = phase_stats(b["frames"], b["marks"].get("p_b", 0), b["marks"].get("p_e", 1e12), wins)
+    out["snap_interleaved"] |= {"wall_s": b["wall_s"], "trace_bytes": b["bytes"], "trace_sha256": b["sha256"]}
+    out["snapshot_device_side_ms"] = [round((e - s) * 1000, 1) for s, e in wins]
+
+    c = run_traced_phase("pc", body_loop)
+    wins = [
+        (c["marks"][f"l{i}{j}_b"], c["marks"][f"l{i}{j}_e"])
+        for i in range(6)
+        for j in range(2)
+        if f"l{i}{j}_b" in c["marks"] and f"l{i}{j}_e" in c["marks"]
+    ]
+    out["snap_loop_recording_load"] = phase_stats(c["frames"], c["marks"].get("p_b", 0), c["marks"].get("p_e", 1e12), wins)
+    out["snap_loop_recording_load"] |= {"wall_s": c["wall_s"], "trace_bytes": c["bytes"], "trace_sha256": c["sha256"]}
+    save("perturb.json", out)
+    print(json.dumps(out, indent=1))
+
+
+def hilog_span(logtype):
+    p = subprocess.run(
+        [HDC, "-t", KEY, "shell", "hilog", "-x", "-t", logtype], capture_output=True, timeout=120
+    )
+    lines = p.stdout.decode("utf-8", errors="replace").splitlines()
+    ts_re = re.compile(r"^(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})")
+    first = next((m.group(1) for line in lines if (m := ts_re.match(line))), None)
+    last = next((m.group(1) for line in reversed(lines) if (m := ts_re.match(line))), None)
+    return {"type": logtype, "lines": len(lines), "bytes": len(p.stdout), "first_ts": first, "last_ts": last}
+
+
+def measure_hilogload():
+    out = {"before": [hilog_span("app"), hilog_span("core")]}
+    out["note"] = "before/after the perturb workload; per-type spans show how interactive load shrinks retro coverage"
+    save("hilog-load.json", out)
+    print("before:", out["before"])
+    print("now run `perturb`, then `hilogload-after`")
+
+
+def measure_hilogload_after():
+    path = DATA / "hilog-load.json"
+    out = json.loads(path.read_text())
+    out["after"] = [hilog_span("app"), hilog_span("core")]
+    save("hilog-load.json", out)
+    print("after:", out["after"])
+
+
 if __name__ == "__main__":
     sub = sys.argv[1] if len(sys.argv) > 1 else ""
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 50
@@ -398,4 +616,7 @@ if __name__ == "__main__":
         "hilog": measure_hilog,
         "snapseries": measure_snapseries,
         "daemon": measure_daemon,
+        "perturb": measure_perturb,
+        "hilogload": measure_hilogload,
+        "hilogload-after": measure_hilogload_after,
     }.get(sub, lambda: sys.exit(__doc__))()
