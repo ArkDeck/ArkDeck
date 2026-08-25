@@ -72,6 +72,9 @@ T02/T03 不进入实现。
   - `ArkDeck.xcodeproj/**`
   - 本 change `tasks.md`（仅本任务段的状态/pins/evidence 引用）
   - 本 change `evidence/runs/TASK-IDC-002/**`
+  - 本 change `evidence/runs/TASK-IDC-001/run.md`（仅在本任务的测量推翻 spike 的某条
+    结论时，就地标注被取代并指向取代它的测量。留在证据文件里未标注的过时结论，会被
+    下一个打开它的人读成现行结论）
 - 交付内容：
   1. Catalog：`input.tap@1` / `input.long-press@1` / `input.swipe@1`
      （codegen + digest 更新）；`snapshot_display` JPEG 腿。
