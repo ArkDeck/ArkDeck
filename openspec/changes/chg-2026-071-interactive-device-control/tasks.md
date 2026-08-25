@@ -54,6 +54,9 @@ T02/T03 不进入实现。
   - `Catalog/generated/**`
   - `openspec/contracts/workflow-step-registry.yaml`（仅新增 `injectPointerInput` 一行：
     proposal 已批准的三个 input operation 的封闭 step 载体；不改既有行）
+  - `openspec/contracts/workflow-step.schema.json`（仅新增 `injectPointerInput` 的
+    kind 枚举项与其封闭 arguments 对象映射；不改既有 kind 的任何条目——registry 与
+    schema 由契约测试对偶锁定，二者必须同车）
   - `Packages/ArkDeckKit/Sources/**`
   - `Packages/ArkDeckKit/Tests/**`
   - `ArkDeckApp/**`
@@ -91,6 +94,8 @@ T02/T03 不进入实现。
   - `Catalog/generated/**`
   - `openspec/contracts/workflow-step-registry.yaml`（仅当环形采集需要新封闭 step kind
     时新增对应行；不改既有行）
+  - `openspec/contracts/workflow-step.schema.json`（同上：仅当新增 kind 时补其枚举项
+    与 arguments 映射；不改既有条目）
   - `Packages/ArkDeckKit/Sources/**`
   - `Packages/ArkDeckKit/Tests/**`
   - `ArkDeckApp/**`
