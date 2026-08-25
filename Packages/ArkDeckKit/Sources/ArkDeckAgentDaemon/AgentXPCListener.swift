@@ -62,6 +62,8 @@ enum AgentXPCAppJobKind: String, Sendable, Equatable {
   case debugLogs
   case debugHAP
   case debugPorts
+  case toolkitScreenshot
+  case toolkitInput
 }
 
 actor AgentXPCAppJobGate {
@@ -236,6 +238,17 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       (ArkDeckAgentClientName.debugNetworkWorkspace, "port-forward.remove"):
       guard case .integer(1)? = operation["version"] else { return nil }
       return .debugPorts
+    case (ArkDeckAgentClientName.toolkitDeviceControl, "capture.diagnostics"):
+      guard case .integer(1)? = operation["version"] else { return nil }
+      return .toolkitScreenshot
+    // The three gestures are separate operations but one admitted kind: they
+    // are the same act from the workspace's side, and the runtime already
+    // distinguishes them where it matters, in the plan and the capability.
+    case (ArkDeckAgentClientName.toolkitDeviceControl, "input.tap"),
+      (ArkDeckAgentClientName.toolkitDeviceControl, "input.long-press"),
+      (ArkDeckAgentClientName.toolkitDeviceControl, "input.swipe"):
+      guard case .integer(1)? = operation["version"] else { return nil }
+      return .toolkitInput
     default:
       return nil
     }

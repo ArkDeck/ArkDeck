@@ -1290,7 +1290,8 @@ final class AppShellUITests: XCTestCase {
     // native keyboard selection instead of synthesizing an off-window click.
     let items = [
       "app.navigation.overview", "app.navigation.flash", "app.navigation.debug",
-      "app.navigation.uiDump", "app.navigation.trace", "app.navigation.history",
+      "app.navigation.uiDump", "app.navigation.trace", "app.navigation.toolkit",
+      "app.navigation.history",
     ]
     guard let index = items.firstIndex(of: identifier) else {
       XCTFail("unknown sidebar item \(identifier)", file: file, line: line)
