@@ -1,0 +1,34 @@
+{
+ "date": "2026-08-25",
+ "device": "5SM0125725000252 / TGT-1a62a0dbedd6 (OpenHarmony-7.0.0.39, 1280x2832, awake)",
+ "method": "an isolated daemon built from this branch, on its own state directory and socket. The production LaunchAgent was stopped for the run so exactly one hdc server owned the device, and was restored to its original build and configuration afterwards.",
+ "why_this_run_existed": "Every unit-level contract test for these operations was green, yet none of them submitted one. The two defects below were both invisible until a gesture was actually run.",
+ "defects_found": [
+  {
+   "defect": "the three input operations were never listed in the hdc provider's runtimeAvailability",
+   "symptom": "operation describe returned unavailable / operation_not_supported; submit was refused before reaching the device",
+   "why_tests_missed_it": "lowering, verdict, persistence and session-scope tests all exercise the functions directly and never ask the provider whether the operation can be run at all",
+   "fix": "the three references join the available list, plus a contract test that walks every hdc operation in the catalog and requires the provider to answer available for each"
+  },
+  {
+   "defect": "the session scope conflated which capability record a gesture lands on with which plan a use authorized",
+   "symptom": "every submission was denied authorizationRequired / planDigestRequired: the consume path requires a materialized plan digest unconditionally, and the session subject had dropped it",
+   "impact": "as merged, the session scope made all three operations impossible to execute",
+   "fix": "the digest is excluded from the scope fingerprint (which is what bounds the record count) and kept in the query (which is what the consume record needs)"
+  }
+ ],
+ "end_to_end_results": [
+  {"operation": "input.tap@1", "inputs": "x 640 y 1400, frame 1280x2832", "state": "succeeded", "outcomeUnknown": false, "outstandingResidue": 0, "wall_ms": 1584, "verified_summary_keys": ["frame", "gesture", "x", "y"]},
+  {"operation": "input.long-press@1", "inputs": "x 300 y 1200, durationMs 900", "state": "succeeded", "outcomeUnknown": false, "outstandingResidue": 0, "wall_ms": 1748, "verified_summary_keys": ["durationMs", "frame", "gesture", "loweredHoldMs", "x", "y"]},
+  {"operation": "input.swipe@1", "inputs": "(640,2200) -> (640,1200), durationMs 500", "state": "succeeded", "outcomeUnknown": false, "outstandingResidue": 0, "wall_ms": 1139, "verified_summary_keys": ["durationMs", "frame", "gesture", "loweredHoldMs", "toX", "toY", "x", "y"]},
+  {"operation": "input.tap@1", "inputs": "x 900 y 800 (a different coordinate)", "state": "succeeded", "outcomeUnknown": false, "outstandingResidue": 0, "wall_ms": 731}
+ ],
+ "session_scope_proved_on_a_real_store": {
+  "records": 4,
+  "document_bytes": 11256,
+  "detail": "two taps at different coordinates shared one capability record (uses: 2); long-press and swipe hold one record each; the fourth is the empty record left by the rejected attempt before the fix. This is the bounded shape the session scope exists to produce - three records per bound device rather than one per screen position.",
+  "maximumUses": 2000
+ },
+ "latency_note": "A gesture submitted as a whole Job costs 0.7-1.7 s, well above the 400 ms interactive gate. That is the Job's admission and evidence preamble, not the injection: the same uinput command measured p95 328 ms over a persistent channel. It is the reason an App input surface needs the session path rather than one Job per gesture, and it is measured here rather than assumed.",
+ "host_state": "the production LaunchAgent was restored and verified: ready, its original 25-operation build, both adopted targets intact at their original binding revisions, its own hdc server back on 8710"
+}

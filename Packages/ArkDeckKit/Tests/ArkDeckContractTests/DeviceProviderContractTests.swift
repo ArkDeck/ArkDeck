@@ -1151,6 +1151,28 @@ final class DeviceProviderContractTests: XCTestCase {
       "the frame bound is the only guard once uinput injects unchecked")
   }
 
+  /// Publishing an operation in the catalog does not make it runnable: the
+  /// provider answers availability separately, and a reference missing from
+  /// that answer is reported `operation_not_supported` at describe time and
+  /// refused at submit. The gap is invisible to every other test here —
+  /// lowering, verdict and persistence all pass while the operation cannot be
+  /// run at all — so the two lists are compared directly. Found exactly that
+  /// way on a real device, 2026-08-25.
+  func testEveryHDCCatalogOperationAnswersAvailability() throws {
+    let hdcOperations = RuntimeOperationCatalog.operations
+      .filter { $0.provider == .hdc }
+      .map(\.reference)
+    XCTAssertFalse(hdcOperations.isEmpty)
+    for reference in hdcOperations {
+      let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
+      guard case .available = hdc.runtimeAvailability(for: descriptor) else {
+        return XCTFail(
+          "\(reference) is published for the hdc provider but the provider does not "
+            + "report it available, so it can never be submitted")
+      }
+    }
+  }
+
   func testPointerGestureIsTheOperationIdentityNotAnInput() throws {
     let tapDescriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "input.tap@1"))
