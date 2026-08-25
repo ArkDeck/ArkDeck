@@ -300,24 +300,25 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return value
     }
+    let frameWidth = try requiredCoordinate("displayWidth")
+    let frameHeight = try requiredCoordinate("displayHeight")
     let spec: HDCPointerInputSpec
     if gesture == .swipe {
       spec = try HDCPointerInputSpec(
         gesture: gesture,
         x: try requiredCoordinate("fromX"), y: try requiredCoordinate("fromY"),
+        displayWidth: frameWidth, displayHeight: frameHeight,
         toX: try requiredCoordinate("toX"), toY: try requiredCoordinate("toY"),
         durationMs: try requiredCoordinate("durationMs"),
         displayID: try optionalInteger("displayId"),
-        displayWidth: try optionalInteger("displayWidth"),
-        displayHeight: try optionalInteger("displayHeight"),
         screenEpochUTC: try optionalString("screenEpochUtc"))
     } else {
       spec = try HDCPointerInputSpec(
         gesture: gesture,
         x: try requiredCoordinate("x"), y: try requiredCoordinate("y"),
+        displayWidth: frameWidth, displayHeight: frameHeight,
+        durationMs: try optionalInteger("durationMs"),
         displayID: try optionalInteger("displayId"),
-        displayWidth: try optionalInteger("displayWidth"),
-        displayHeight: try optionalInteger("displayHeight"),
         screenEpochUTC: try optionalString("screenEpochUtc"))
     }
     // Dispatch time, not submit time: an input that sat behind the device lane
@@ -1083,32 +1084,41 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
               timeoutSeconds: 30),
           ]))
     case .injectPointerInput(let spec):
-      // `uitest uiInput` argv is positional; swipe carries a velocity derived
-      // from the caller's real hold duration (px/s, closed range), never the
-      // duration itself — the device command has no duration parameter.
-      var uiInput: [String]
+      // `uinput -T` argv is positional. The display selector, when present,
+      // has to precede the device option; the touch commands follow it.
+      var uinput: [String] = []
+      if let displayID = spec.displayID { uinput += ["-D", String(displayID)] }
+      uinput.append("-T")
       switch spec.gesture {
       case .tap:
-        uiInput = ["click", String(spec.x), String(spec.y)]
+        uinput += ["-c", String(spec.x), String(spec.y)]
       case .longPress:
-        uiInput = ["longClick", String(spec.x), String(spec.y)]
+        // No single long-press command exists: press, hold for the interval,
+        // release at the same point.
+        let hold = spec.loweredHoldMs ?? HDCPointerInputSpec.defaultLongPressMs
+        uinput += [
+          "-d", String(spec.x), String(spec.y),
+          "-i", String(hold),
+          "-u", String(spec.x), String(spec.y),
+        ]
       case .swipe:
-        guard let toX = spec.toX, let toY = spec.toY, let velocity = spec.swipeVelocity
-        else {
+        guard let toX = spec.toX, let toY = spec.toY, let duration = spec.durationMs else {
           throw DeviceProviderError.unsupportedAction("a swipe needs an end point and duration")
         }
-        uiInput = [
-          "swipe", String(spec.x), String(spec.y), String(toX), String(toY),
-          String(velocity),
+        // The smooth-move time is a duration in milliseconds, so the caller's
+        // real press-to-release time travels unchanged: nothing is converted
+        // into a velocity and back.
+        uinput += [
+          "-m", String(spec.x), String(spec.y), String(toX), String(toY),
+          String(duration),
         ]
       }
-      if let displayID = spec.displayID { uiInput.append(String(displayID)) }
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            ["shell", "uitest", "uiInput"] + uiInput, context: context),
+            ["shell", "uinput"] + uinput, context: context),
           timeoutSeconds: 30))
     case .createPortForward(let spec):
       let verb = spec.direction == .forward ? "fport" : "rport"
@@ -2283,39 +2293,54 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["localPort": String(spec.localPort)])
     case .injectPointerInput(let spec):
-      // uiInput exits 0 even when it rejects the input; the verdict comes from
-      // its stdout. "No Error" is the success line and must be whitelisted
-      // before scanning, because it contains the substring "error"
-      // (DEVICE-COMMAND-FACTS §7, real-device 2026-08-25).
-      guard receipt.exitStatus == 0 else {
-        return .failed(
-          code: "pointerInputFailed", detail: "uiInput exited \(receipt.exitStatus)")
-      }
+      // `uinput` reports differently from the surface it replaced. A malformed
+      // invocation exits non-zero with `parameter error, unable to run`. An
+      // accepted one exits 0 and prints a standing hint about checking whether
+      // the coordinates exceed the screen — it prints that on every run,
+      // including ones that land, so it carries no verdict and must not be
+      // scanned as a failure. Measured 2026-08-25 on OpenHarmony-7.0.0.39.
       guard let text = String(data: receipt.stdout, encoding: .utf8) else {
-        return .unknown(reason: "uiInput stdout is not UTF-8; the gesture outcome is unknown")
+        return .unknown(reason: "uinput stdout is not UTF-8; the gesture outcome is unknown")
       }
       let lowered = text.lowercased()
-      let scanned = lowered.replacingOccurrences(of: "no error", with: "")
-      let failureMarks = ["illegal", "fail", "error", "incorrect", "please confirm"]
-      if let mark = failureMarks.first(where: { scanned.contains($0) }) {
-        let firstLine = text.split(separator: "\n").first.map(String.init) ?? mark
+      if lowered.contains("parameter error") {
         return .failed(
           code: "pointerInputRejected",
-          detail: firstLine.trimmingCharacters(in: .whitespaces))
+          detail: text.split(separator: "\n").first.map(String.init)?
+            .trimmingCharacters(in: .whitespaces) ?? "parameter error")
       }
-      guard lowered.contains("no error") else {
+      // The verdict cannot rest on the exit status: `hdc shell` reports its own
+      // success, not the remote command's, and returns 0 even for a command
+      // that exits 42 or does not exist (measured 2026-08-25). What uinput does
+      // give us is an echo of the gesture it accepted, one shape per gesture,
+      // so the acknowledgement is what is required — and its absence leaves the
+      // outcome unknown rather than assumed.
+      let acknowledgement: [String]
+      switch spec.gesture {
+      case .tap: acknowledgement = ["click coordinate"]
+      case .longPress: acknowledgement = ["touch down", "touch up"]
+      case .swipe: acknowledgement = ["startx:", "endx:"]
+      }
+      guard acknowledgement.allSatisfy({ lowered.contains($0) }) else {
         return .unknown(
-          reason: "uiInput printed neither the success line nor a recognized failure")
+          reason:
+            "uinput did not acknowledge the \(spec.gesture.rawValue) it was given; "
+            + "the gesture may or may not have been injected")
       }
+      // What this verdict claims is exactly what the device told us: the
+      // injector accepted the gesture. It is not a claim that anything on
+      // screen reacted to it — nothing here observes that, and an input
+      // result must never be read as a UI outcome.
       var summary = [
         "gesture": spec.gesture.rawValue,
         "x": String(spec.x),
         "y": String(spec.y),
+        "frame": "\(spec.displayWidth)x\(spec.displayHeight)",
       ]
       if let toX = spec.toX { summary["toX"] = String(toX) }
       if let toY = spec.toY { summary["toY"] = String(toY) }
       if let durationMs = spec.durationMs { summary["durationMs"] = String(durationMs) }
-      if let velocity = spec.swipeVelocity { summary["loweredVelocity"] = String(velocity) }
+      if let hold = spec.loweredHoldMs { summary["loweredHoldMs"] = String(hold) }
       if let displayID = spec.displayID { summary["displayId"] = String(displayID) }
       return .verified(summary: summary)
     case .readPackagePresence(let bundle):

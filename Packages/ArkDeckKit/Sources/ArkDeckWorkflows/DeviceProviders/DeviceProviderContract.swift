@@ -696,10 +696,8 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       if let displayID = spec.displayID {
         arguments["displayId"] = .integer(Int64(displayID))
       }
-      if let width = spec.displayWidth { arguments["displayWidth"] = .integer(Int64(width)) }
-      if let height = spec.displayHeight {
-        arguments["displayHeight"] = .integer(Int64(height))
-      }
+      arguments["displayWidth"] = .integer(Int64(spec.displayWidth))
+      arguments["displayHeight"] = .integer(Int64(spec.displayHeight))
       if let epoch = spec.screenEpochUTC { arguments["screenEpochUtc"] = .string(epoch) }
       self.init(kind: "hdc.injectPointerInput", arguments: arguments)
     case .hdc(.createPortForward(let spec)):
@@ -1209,11 +1207,10 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           try HDCPointerInputSpec(
             gesture: gesture,
             x: integer("pointerX"), y: integer("pointerY"),
+            displayWidth: integer("displayWidth"), displayHeight: integer("displayHeight"),
             toX: optionalInteger("pointerToX"), toY: optionalInteger("pointerToY"),
             durationMs: optionalInteger("durationMs"),
             displayID: optionalInteger("displayId"),
-            displayWidth: optionalInteger("displayWidth"),
-            displayHeight: optionalInteger("displayHeight"),
             screenEpochUTC: optionalString("screenEpochUtc"))))
     case "hdc.createPortForward":
       return .hdc(

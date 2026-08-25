@@ -1,0 +1,33 @@
+{
+ "date": "2026-08-25",
+ "device": "5SM0125725000252 / TGT-1a62a0dbedd6 (OpenHarmony-7.0.0.39, 1280x2832, awake)",
+ "subject": "the uinput lowering the provider now emits, verified as argv on the device",
+ "interleaved_latency_ms": {
+  "note": "uinput and uitest alternated within one persistent shell under identical device load, so neither surface could take credit for a quiet moment",
+  "uinput_tap": {"n": 18, "p50": 272.0, "p95": 327.8},
+  "uitest_tap": {"n": 18, "p50": 399.6, "p95": 423.4},
+  "verdict": "uinput passes the 400 ms p95 gate; uitest does not"
+ },
+ "gesture_forms": [
+  {"gesture": "tap", "argv": "shell uinput -T -c 640 1500", "stdout_head": "   click coordinate: (640, 1500)", "accepted": true},
+  {"gesture": "longPress", "argv": "shell uinput -T -d 12 700 -i 800 -u 12 700", "stdout_head": "touch down 12 700 / touch up 12 700", "accepted": true},
+  {"gesture": "swipe", "argv": "shell uinput -T -m 100 2200 100 1200 500", "stdout_head": "startX:100, startY:2200, endX:100, endY:1200", "accepted": true, "note": "the trailing value is a duration in ms, so the caller's real hold time passes through unconverted"},
+  {"gesture": "tap", "argv": "shell uinput -D 0 -T -c 640 1500", "accepted": true, "note": "the display selector must precede the device option"},
+  {"gesture": "malformed", "argv": "shell uinput -T -c abc", "stdout_head": "parameter error, unable to run", "accepted": false}
+ ],
+ "critical_finding": {
+  "claim": "`hdc shell` does not propagate the device-side exit status",
+  "evidence": ["`uinput -T -c abc` reports device_rc=255 when captured inside the shell, while the hdc client exits 0", "`hdc shell 'exit 42'` exits 0", "`hdc shell no_such_binary_xyz` exits 0"],
+  "consequence": "A verdict resting on the receipt's exit status would call a rejected gesture a success. The uinput verdict therefore derives entirely from stdout: `parameter error` fails, the gesture's own acknowledgement line verifies, and anything else stays unknown rather than assumed. This also explains why the repository's file legs are judged by a paired `ls -l` readback rather than by exit status."
+ },
+ "functional_proof": [
+  "A uinput swipe on the lock screen unlocked the device (no passcode), so the events traverse the system input pipeline rather than merely being reported as accepted.",
+  "Injected input is silently ignored while the device is asleep: with PowerManagerService reporting SLEEP, repeated swipes changed nothing; the same command worked immediately after waking. A control surface has to show the device's power state rather than reporting such inputs as sent."
+ ],
+ "acknowledgement_lines_are_per_gesture": {
+  "tap": "click coordinate",
+  "longPress": "touch down + touch up",
+  "swipe": "startX: + endX:",
+  "note": "requiring the gesture's own acknowledgement means another gesture's echo cannot verify this one"
+ }
+}

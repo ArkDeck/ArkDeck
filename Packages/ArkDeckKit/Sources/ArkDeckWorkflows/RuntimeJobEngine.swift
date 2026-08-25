@@ -8709,10 +8709,8 @@ public actor RuntimeJobEngine {
       // The frame the gesture was mapped against belongs in the durable
       // intent: a later reader has to be able to tell what the coordinates
       // meant, not just what they were.
-      if let width = spec.displayWidth { pointer["displayWidth"] = .integer(Int64(width)) }
-      if let height = spec.displayHeight {
-        pointer["displayHeight"] = .integer(Int64(height))
-      }
+      pointer["displayWidth"] = .integer(Int64(spec.displayWidth))
+      pointer["displayHeight"] = .integer(Int64(spec.displayHeight))
       arguments = pointer
     case .removePortForward:
       guard case .hdc(.removePortForward(let spec))? = action else {

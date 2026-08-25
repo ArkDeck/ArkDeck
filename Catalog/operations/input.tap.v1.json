@@ -40,17 +40,17 @@
       },
       "displayWidth": {
         "type": "integer",
-        "required": false,
+        "required": true,
         "minimum": 1,
         "maximum": 32767,
-        "description": "Width in device pixels of the frame the gesture was computed from. Supplied together with displayHeight it bounds the coordinates host-side before dispatch, and it joins the authorized subject so a rotation or resolution change cannot reuse the session's authorization."
+        "description": "Width in device pixels of the frame the gesture was computed from. Required: the device-side injector does not validate coordinates against the live panel, so a gesture the runtime cannot bound host-side is refused rather than injected. It also joins the authorized subject, so a rotation or resolution change cannot reuse the session's authorization."
       },
       "displayHeight": {
         "type": "integer",
-        "required": false,
+        "required": true,
         "minimum": 1,
         "maximum": 32767,
-        "description": "Height in device pixels of the frame the gesture was computed from. See displayWidth."
+        "description": "Height in device pixels of the frame the gesture was computed from. Required for the same reason as displayWidth."
       },
       "screenEpochUtc": {
         "type": "string",
