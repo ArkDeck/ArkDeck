@@ -443,8 +443,9 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(receipt.terminalState, "succeeded")
     XCTAssertTrue(receipt.evidenceBlockers.isEmpty, "\(receipt.evidenceBlockers)")
     XCTAssertEqual(
-      receipt.artifacts.count, 5,
-      "HiLog, UI dump, capture log, index and summary are evidence; unselected Trace is not")
+      receipt.artifacts.count, 6,
+      "HiLog, UI dump, capture log, markers, index and summary are evidence; "
+        + "unselected Trace is not")
     XCTAssertTrue(receipt.artifacts.allSatisfy(\.bytesVerified))
     XCTAssertFalse(
       receipt.artifacts.contains { $0.reference.contains("ART-MISSING-") },

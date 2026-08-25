@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "32fc370a3dee29f8bd13a4d78bc8e24434e54c33c55b3b0903d1d211d4be7fbc"
+  public static let catalogDigest = "2e2ad8aa38cf8c621bc1358f9ef678480c4f49f8a3913f6a9eb7311b6e2d6965"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -155,6 +155,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "durationSeconds", type: .integer, isRequired: true, minimum: 1, maximum: 600, summary: "Bounded HiLog capture window."),
         CatalogFieldDescriptor(name: "expectedDeployedArtifactDigest", type: .string, isRequired: false, pattern: "^[0-9a-f]{64}$", maxLength: 64, summary: "Caller-supplied expected digest of the deployment whose liveness is being sampled. Recorded with the observation so a later reader can tell which build was live; it is not trusted as a fact about the device."),
         CatalogFieldDescriptor(name: "hilogFilters", type: .stringArray, isRequired: false, maxLength: 200, maxItems: 16, summary: "Typed HiLog filter expressions; no shell fragments."),
+        CatalogFieldDescriptor(name: "markers", type: .stringArray, isRequired: false, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?Z(#[A-Za-z0-9 ._-]{1,64})?$", maxLength: 96, maxItems: 200, summary: "Host-side marks collected during the captured window, each an RFC 3339 instant with an optional `#label`. They reach no device: a mark is an annotation on host time, and the capture only carries it into `markers.json` so a reader can line it up with what the device recorded."),
         CatalogFieldDescriptor(name: "processName", type: .string, isRequired: false, pattern: "^[a-zA-Z][a-zA-Z0-9_.:]*$", maxLength: 200, summary: "Optional process identity. Defaults to bundleName and is lowered only by the HDC provider."),
         CatalogFieldDescriptor(name: "redactionProfile", type: .string, isRequired: false, enumValues: ["standard"], summary: "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists.", defaultValue: .string("standard")),
         CatalogFieldDescriptor(name: "ringBuffered", type: .boolean, isRequired: false, summary: "Arm the trace ring, let the window pass, then snapshot it, instead of blocking for the window with `-t N`. The snapshot carries everything since the arm, bounded by the buffer, so the decision to keep a trace can be made after the thing worth keeping rather than before it. Only consulted when traceCategories selects the trace leg.", defaultValue: .bool(false)),
@@ -209,6 +210,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "application-liveness.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "trace.htrace", role: .raw, mediaType: "application/octet-stream", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "markers.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],

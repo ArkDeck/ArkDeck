@@ -240,7 +240,9 @@ enum RuntimeArtifactService {
 
   /// Products synthesized at finalization rather than by one typed step.
   static let finalizeArtifacts: [String: [String]] = [
-    "capture.diagnostics@1": ["capture.log", "artifact-index.json", "capture-summary.json"],
+    "capture.diagnostics@1": [
+      "capture.log", "markers.json", "artifact-index.json", "capture-summary.json",
+    ],
     ArkForgeFlashOperation.canonicalReference: ["flash-report.json"],
   ]
 
@@ -271,6 +273,98 @@ enum RuntimeArtifactService {
     return artifactMapping[key]
   }
 
+  /// The marks on a capture's timeline, and what the runtime could and could
+  /// not derive for itself.
+  ///
+  /// A manual mark is an annotation on host time that reached no device. An
+  /// automatic one is derived here from facts the run already established -
+  /// not from re-reading the artifacts, which this composer holds only the
+  /// metadata of. What that rules out is stated in the document rather than
+  /// left to be inferred from an empty list: a reader who finds no frame
+  /// marker should learn that nothing looked, not conclude that nothing
+  /// happened.
+  static func markersDocument(
+    record: RuntimeJobRecord, recorded: [RuntimeArtifactMetadata]
+  ) throws -> Data {
+    var marks: [JSONValue] = []
+
+    if case .array(let requested)? = record.request.inputs["markers"] {
+      for case .string(let raw) in requested {
+        let parts = raw.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+        var mark: [String: JSONValue] = [
+          "kind": .string("manual"),
+          "atHostUTC": .string(String(parts[0])),
+        ]
+        if parts.count == 2, !parts[1].isEmpty { mark["label"] = .string(String(parts[1])) }
+        marks.append(.object(mark))
+      }
+    }
+
+    // A crash log that arrived with bytes in it is a fact about this window,
+    // and the run already knows it without opening the file.
+    if let crash = recorded.first(where: { $0.name == "crash-log.txt" }),
+      crash.status.isPublished, crash.byteCount > 0
+    {
+      marks.append(
+        .object([
+          "kind": .string("auto"),
+          "trigger": .string("crashLogCaptured"),
+          "evidenceArtifact": .string(crash.name),
+          "evidenceByteCount": .integer(Int64(crash.byteCount)),
+        ]))
+    }
+    for entry in record.timeline where entry.hasPrefix("failed ") {
+      marks.append(
+        .object([
+          "kind": .string("auto"),
+          "trigger": .string("stepFailed"),
+          "detail": .string(entry),
+        ]))
+    }
+
+    var document: [String: JSONValue] = [
+      "documentType": .string("arkdeck-diagnostic-markers"),
+      "schemaVersion": .string("1.0.0"),
+      "jobId": .string(record.jobID),
+      "markers": .array(marks),
+      // Absence of a marker kind must not read as absence of the thing.
+      "notDerived": .array([
+        .object([
+          "kind": .string("frameDeadline"),
+          "reason": .string(
+            "deriving it means reading the trace, and finalization holds artifact metadata "
+              + "rather than artifact bytes"),
+        ]),
+        .object([
+          "kind": .string("logKeyword"),
+          "reason": .string(
+            "deriving it means reading the captured log, which finalization does not open"),
+        ]),
+      ]),
+    ]
+
+    // The ring's coverage anchor, when this capture armed one. The document
+    // records what to look for and where; it does not claim the search
+    // succeeded, because the runtime never opened the trace.
+    if case .bool(true)? = record.request.inputs["ringBuffered"] {
+      let anchor = HDCTraceCaptureRequest.anchor(
+        sessionID: record.jobID, stepID: "capture-trace")
+      let trace = recorded.first { $0.name == "trace.htrace" }
+      document["coverage"] = .object([
+        "anchor": .string(anchor),
+        "writtenIntoTheDeviceRingAt": .string("capture-trace"),
+        "checkAgainst": .string("trace.htrace"),
+        "traceStatus": .string(trace?.status.isPublished == true ? "published" : "absent"),
+        "how": .string(
+          "the anchor's presence in the trace is what says how far back this snapshot "
+            + "reaches; a string search settles it, no decoder needed"),
+      ])
+    }
+
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
+    return try encoder.encode(JSONValue.object(document))
+  }
+
   static func finalArtifactContents(
     name: String,
     descriptor: CatalogOperationDescriptor,
@@ -281,6 +375,9 @@ enum RuntimeArtifactService {
   ) throws -> Data {
     if descriptor.reference == "capture.diagnostics@1", name == "capture.log" {
       return Data((record.timeline.joined(separator: "\n") + "\n").utf8)
+    }
+    if descriptor.reference == "capture.diagnostics@1", name == "markers.json" {
+      return try markersDocument(record: record, recorded: recorded)
     }
     var perArtifact: [String: JSONValue] = [:]
     for declaration in descriptor.artifacts

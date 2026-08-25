@@ -184,7 +184,19 @@ T02/T03 不进入实现。
   另实证：`--overwrite` 语义与其名相反（复证 Spike）、dump 后采集继续无需重新 begin、
   重定向作为独立 argv 元素不生效（故 marker 写入用单行、锚点限定为字母数字）。
   证据 `evidence/runs/TASK-IDC-003/data/ring-lowering-facts.json`。
-  剩余 ②markers.json 与自动 Marker、③会话内截图子意图、④App Diagnostics tab、⑤真机走查。
+  ② markers.json 与自动 Marker 已交付：`markers` additive typed input（每条是
+  RFC 3339 时刻 + 可选 `#label`，走 catalog pattern 校验）+ finalize 合成的
+  `markers.json`。手动 Marker 是 host 时间上的标注、不碰设备；自动 Marker v1 由
+  **本次运行已确立的事实**反推（crash-log 带字节 → crashLogCaptured；时间线里的
+  step 失败 → stepFailed），不重开制品。
+  **未反推的种类写进文档本身**（frameDeadline / logKeyword 及其原因）——finalize 手上
+  只有制品元数据不是字节，读者看不到 frame marker 时必须能分辨「没有去看」和「没有发生」。
+  ring 采集另记 coverage：锚点值 + 该拿哪个制品去查 + 查法（字符串搜索即可），
+  但**不声称查过**，因为 finalize 从未打开 trace。
+  顺带修一个静默陷阱：数组字段声明的 `pattern` 此前只对标量分支生效，对数组元素不生效
+  ——catalog 说值受约束而 runtime 什么都收。已改为逐元素强制（现存无任何数组字段声明
+  pattern，故不影响任何调用方），反向验证：去掉强制后畸形 marker 测试即红。
+  剩余 ③会话内截图子意图、④App Diagnostics tab、⑤真机走查。
   原 ready 依据：proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
   Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
   trace_marker 且必须加落笔回读、回溯窗口与类目集联动预算且 dump 后立即重臂、
