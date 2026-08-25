@@ -1,0 +1,30 @@
+{
+ "host_device": {
+  "n": 60,
+  "rtt": {
+   "n": 60,
+   "p50_ms": 104.0,
+   "p95_ms": 110.8,
+   "min_ms": 76.9,
+   "max_ms": 114.8,
+   "mean_ms": 102.7
+  },
+  "offset_jitter_ms": {
+   "p95_abs_dev_ms": 7.0,
+   "spread_ms": 17.3
+  },
+  "note": "offset = host wall midpoint - device boottime; spread bounds calibration error (USB)"
+ },
+ "bridge": {
+  "markers_found": 30,
+  "pairs": 30,
+  "realtime_minus_boot": {
+   "median_s": 1787424970.314084,
+   "spread_ms": 9.74
+  },
+  "trace_bytes": 121347,
+  "trace_sha256": "acbdc6831203d4391fd565032fc48bbca68c033f17aaac802952eb836dda38d9",
+  "device_uptime_at_dump": 51229.04,
+  "note": "spread bounds (marker-write .. date) skew + ftrace stamping jitter on-device"
+ }
+}

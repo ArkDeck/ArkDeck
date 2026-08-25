@@ -1,0 +1,21 @@
+{
+ "binary": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+ "bytes": 6016944,
+ "sha256_only": {
+  "n": 10,
+  "p50_ms": 2.2,
+  "p95_ms": 2.3,
+  "min_ms": 2.1,
+  "max_ms": 2.3,
+  "mean_ms": 2.2
+ },
+ "read_plus_sha256": {
+  "n": 10,
+  "p50_ms": 2.2,
+  "p95_ms": 2.7,
+  "min_ms": 2.1,
+  "max_ms": 2.7,
+  "mean_ms": 2.2
+ },
+ "note": "per-spawn cost the production dispatcher pays today (no cache on the hdc path)"
+}

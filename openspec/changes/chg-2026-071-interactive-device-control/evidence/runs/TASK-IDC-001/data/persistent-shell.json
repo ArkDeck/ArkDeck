@@ -1,0 +1,17 @@
+{
+ "persistent_shell_echo": {
+  "n": 20,
+  "p50_ms": 10.0,
+  "p95_ms": 12.6,
+  "min_ms": 6.3,
+  "max_ms": 12.6
+ },
+ "persistent_shell_uiinput_click": {
+  "n": 15,
+  "p50_ms": 316.2,
+  "p95_ms": 406.2,
+  "min_ms": 305.1,
+  "max_ms": 406.2
+ },
+ "note": "one long-lived `hdc -t K shell` over a PTY; sentinel token split by quoting so the PTY input echo cannot match; round trip = command completion"
+}

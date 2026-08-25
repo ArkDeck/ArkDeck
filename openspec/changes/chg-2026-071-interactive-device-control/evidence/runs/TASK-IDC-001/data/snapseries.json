@@ -1,0 +1,55 @@
+{
+ "snapshots": [
+  {
+   "i": 0,
+   "device_uptime_before": 51234.73,
+   "cmd_ms": 559.1,
+   "rc": 0
+  },
+  {
+   "i": 1,
+   "device_uptime_before": 51236.52,
+   "cmd_ms": 463.7,
+   "rc": 0
+  },
+  {
+   "i": 2,
+   "device_uptime_before": 51238.21,
+   "cmd_ms": 542.2,
+   "rc": 0
+  },
+  {
+   "i": 3,
+   "device_uptime_before": 51239.98,
+   "cmd_ms": 500.7,
+   "rc": 0
+  },
+  {
+   "i": 4,
+   "device_uptime_before": 51241.71,
+   "cmd_ms": 535.8,
+   "rc": 0
+  },
+  {
+   "i": 5,
+   "device_uptime_before": 51243.49,
+   "cmd_ms": 520.4,
+   "rc": 0
+  },
+  {
+   "i": 6,
+   "device_uptime_before": 51245.25,
+   "cmd_ms": 517.4,
+   "rc": 0
+  },
+  {
+   "i": 7,
+   "device_uptime_before": 51247.02,
+   "cmd_ms": 527.4,
+   "rc": 0
+  }
+ ],
+ "trace_bytes": 1549399,
+ "trace_sha256": "cfae14c14b11ee61891ebfbc0a41f3595b23e87712ad4edf01b323fe63463fdd",
+ "note": "lock screen is mostly static; scroll-load perturbation needs an unlocked supervised window and is recorded as a residual in run.md"
+}
