@@ -962,6 +962,69 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertNotNil(steps.last?.carriedFromUTC)
   }
 
+  /// A pattern declared on an array field used to apply to nothing: only the
+  /// scalar branch read it. So a catalog could say the values are constrained
+  /// while the runtime admitted anything - and marks land in a published
+  /// artifact, which is the wrong place to discover that.
+  func testAMarkOutsideItsCatalogPatternIsRefusedBeforeTheCaptureRuns() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init())
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    for bad in [
+      "not-a-time", "2026-08-25T10:00:00Z#label with \"quotes\"",
+      "2026-08-25T10:00:00", "2026-08-25T10:00:00Z#" + String(repeating: "x", count: 65),
+    ] {
+      do {
+        _ = try await engine.submit(
+          try markedCaptureRequest(markers: [bad], key: "idem-bad-\(abs(bad.hashValue))"))
+        XCTFail("\(bad) must not reach a published artifact")
+      } catch let error as RuntimeJobEngineError {
+        guard case .rejected(let code, _) = error, code == .invalidInput else {
+          return XCTFail("expected invalidInput, got \(error)")
+        }
+      }
+    }
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.isEmpty,
+      "a refused mark must not have started a capture")
+  }
+
+  func testAWellFormedMarkIsAdmittedAndPublished() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init())
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      try markedCaptureRequest(
+        markers: ["2026-07-29T00:00:03Z#stutter", "2026-07-29T00:00:07.500Z"],
+        key: "idem-marked-ok"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    let document = try await publishedJSON(
+      named: "markers.json", jobID: acceptance.jobID, artifacts: artifacts)
+    let marks = try XCTUnwrap(document["markers"] as? [[String: Any]])
+    XCTAssertEqual(marks.count, 2)
+    XCTAssertEqual(marks[0]["label"] as? String, "stutter")
+    XCTAssertNotNil(document["notDerived"], "the document says what nothing looked for")
+  }
+
+  /// Built through JSONSerialization rather than interpolated, so a mark
+  /// carrying a quote is properly encoded and reaches the pattern check
+  /// instead of breaking the envelope on the way there.
+  private func markedCaptureRequest(markers: [String], key: String) throws -> Data {
+    let request: [String: Any] = [
+      "documentType": "runtime-operation-request",
+      "schemaVersion": "2.0.0",
+      "requestId": "req-marked",
+      "idempotencyKey": key,
+      "target": ["targetId": "TGT-1", "expectedBindingRevision": 7],
+      "operation": ["id": "capture.diagnostics", "version": 1],
+      "inputs": [
+        "durationSeconds": 1, "captureHilog": false, "uiDump": false,
+        "crashLogs": false, "uiScreenshot": false, "uiComponentTree": false,
+        "markers": markers,
+      ],
+    ]
+    return try JSONSerialization.data(withJSONObject: request, options: [.sortedKeys])
+  }
+
   private func publishedJSON(
     named name: String,
     jobID: String,

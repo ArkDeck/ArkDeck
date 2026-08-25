@@ -7918,6 +7918,18 @@ public actor RuntimeJobEngine {
               .invalidInput, "input \(key) contains an item exceeding maxLength \(maximum)")
           }
         }
+        // A pattern declared on an array field used to apply to nothing: only
+        // the scalar branch read it. That is a trap for whoever declares one,
+        // because the catalog says the values are constrained and the runtime
+        // admits anything. It constrains each item, which is the only reading
+        // a per-item `maxLength` on the same field already had.
+        if let pattern = field.pattern {
+          for case .string(let item) in values
+          where item.range(of: pattern, options: .regularExpression) == nil {
+            throw RuntimeJobEngineError.rejected(
+              .invalidInput, "input \(key) contains an item outside its catalog pattern")
+          }
+        }
       case .integer(let raw):
         try validateInteger(raw, field: field)
       case .unsignedInteger(let raw):
