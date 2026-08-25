@@ -24,6 +24,8 @@ Toolkit 不替代 Debug、Viewer、Trace 或 Diagnostics。Diagnostics 默认不
 
 Toolkit 是一组小型、单一目的、可独立退出的设备工具，不是 raw HDC 控制台：
 
+Sidebar 使用带提手与分隔仓的 outline 工具箱图标，表达“多个工具的容器”；不使用单独扳手，避免把 Toolkit 误读成一个维修操作。图标沿用全局 `currentColor`、统一描边和选中态规则，内部「真机操作」继续使用设备图标表达当前工具。
+
 ```text
 Toolkit
 └── 真机操作
