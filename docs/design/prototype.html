@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArkDeck 交互原型 v0.9</title>
+<title>ArkDeck 交互原型 v1.2</title>
 <style>
 :root{
   color-scheme:light dark;
@@ -54,6 +54,7 @@ button,input,select{font:inherit}
 button{color:inherit}
 .note{max-width:1240px;width:100%;color:var(--ink2);font-size:12px;text-wrap:pretty}
 .note b{color:var(--ink)}
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 .window{width:min(1180px,100%);height:min(760px,calc(100vh - 96px));min-height:600px;background:var(--panel);
   border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
 body.reference{padding:0;gap:0;justify-content:flex-start;min-width:1180px;min-height:760px}
@@ -397,6 +398,229 @@ select.inp{cursor:pointer}
   .viewer-pane{min-height:460px;border-inline-end:0;border-bottom:1px solid var(--line)}
   .viewer-devtools{min-height:640px}
 }
+
+/* ---------- Diagnostic Session ----------
+   Trace event 是会话内的主选择身份；画面和日志是共享时间光标的投影，不是三个并排文件查看器。 */
+.diagnostic-page{padding:10px 12px;gap:10px;overflow:hidden}
+.diagnostic-page>.diag-shell{flex:1;min-height:0}
+.diag-shell{width:100%;display:flex;flex-direction:column;gap:10px;min-height:0}
+.diag-toolbar{display:flex;align-items:center;gap:8px;min-height:34px;flex-wrap:wrap}
+.diag-toolbar .spacer{flex:1;min-width:10px}
+.diag-target{display:inline-flex;align-items:center;gap:7px;min-width:0;color:var(--ink2);font-size:11.5px}
+.diag-target b{color:var(--ink);font-weight:600}
+.diag-align{min-height:27px;display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--warn);
+  border-radius:999px;background:transparent;color:var(--warn);font-size:11px;font-weight:600;cursor:pointer}
+.diag-align:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.diag-overview{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(420px,1.2fr);gap:1px;min-height:0;flex:0 1 285px;
+  overflow:hidden;border:1px solid var(--line);border-radius:11px;background:var(--line);box-shadow:var(--control-shadow)}
+.diag-frame-pane,.diag-context-pane{min-width:0;min-height:0;background:var(--panel-solid);display:flex;flex-direction:column}
+.diag-pane-head{min-height:36px;padding:7px 11px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.diag-pane-head .trailing{margin-inline-start:auto;color:var(--ink2);font-size:11px;font-variant-numeric:tabular-nums}
+.diag-frame-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(132px,.62fr) minmax(132px,.38fr);gap:12px;
+  padding:10px 12px;align-items:center;overflow:auto}
+.diag-device-stage{height:100%;min-height:190px;display:grid;place-items:center;background:color-mix(in srgb,var(--ground) 82%,var(--panel-solid));
+  border-radius:9px;overflow:hidden}
+.diag-device-frame{height:min(220px,100%);aspect-ratio:9/16;border-radius:15px;background:#f4f5f7;color:#202124;
+  box-shadow:0 0 0 1px oklch(0 0 0 / .1),0 8px 24px rgba(0,0,0,.14);padding:9px 7px 8px;display:flex;flex-direction:column;
+  gap:6px;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;position:relative;overflow:hidden}
+@media (prefers-color-scheme:dark){.diag-device-frame{box-shadow:0 0 0 1px oklch(1 0 0 / .1),0 8px 24px rgba(0,0,0,.32)}}
+:root[data-theme="dark"] .diag-device-frame{box-shadow:0 0 0 1px oklch(1 0 0 / .1),0 8px 24px rgba(0,0,0,.32)}
+:root[data-theme="light"] .diag-device-frame{box-shadow:0 0 0 1px oklch(0 0 0 / .1),0 8px 24px rgba(0,0,0,.14)}
+.diag-device-status{display:flex;justify-content:space-between;font-size:5.8px;font-weight:650;padding:0 3px;color:#34363a}
+.diag-device-title{font-size:10px;font-weight:700;padding:2px 4px}
+.diag-device-search{height:18px;border-radius:6px;background:#e7e9ed;color:#858991;font-size:6.5px;display:flex;align-items:center;padding:0 7px}
+.diag-device-card{border-radius:7px;background:#fff;padding:7px;display:flex;align-items:center;gap:6px;box-shadow:0 .5px 2px rgba(0,0,0,.08)}
+.diag-device-card i{width:17px;height:17px;border-radius:50%;background:linear-gradient(145deg,#ced5df,#9caabd);flex:none}
+.diag-device-card span{font-size:6.5px;font-weight:650}.diag-device-card small{display:block;color:#858991;font-size:5px;font-weight:500}
+.diag-device-row{height:29px;border-radius:7px;background:#fff;padding:0 7px;display:flex;align-items:center;gap:7px;font-size:6.5px;font-weight:600;
+  box-shadow:0 .5px 2px rgba(0,0,0,.06);position:relative}
+.diag-device-row .glyph{width:14px;height:14px;border-radius:4px;background:#3478f6;color:#fff;display:grid;place-items:center;font-size:7px}
+.diag-device-row .value{margin-inline-start:auto;color:#777b82;font-size:5.5px;font-weight:500}
+.diag-device-switch{width:19px;height:11px;border-radius:999px;background:#3478f6;padding:1.5px;display:flex;justify-content:flex-end}
+.diag-device-switch::after{content:"";height:8px;aspect-ratio:1;border-radius:50%;background:white;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.diag-touch{position:absolute;inset:92px 5px auto;height:31px;border:1.5px solid #ff9f0a;border-radius:7px;background:rgba(255,159,10,.09)}
+.diag-touch::after{content:"main thread stall";position:absolute;inset-block-start:-9px;inset-inline-end:2px;padding:0 3px;border-radius:3px;
+  background:#ff9f0a;color:#fff;font:4.8px/8px var(--mono)}
+.diag-frame-meta{display:flex;flex-direction:column;gap:8px;min-width:0}
+.diag-frame-meta b{font-size:12px}.diag-frame-meta p{margin:0;color:var(--ink2);font-size:11.5px;line-height:1.45}
+.diag-frame-time{font:10.5px/1.5 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.diag-context-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.diag-context-block{padding:9px 11px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)}
+.diag-context-block:last-child{border-bottom:0}
+.diag-event-summary{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(180px,1.3fr);gap:4px 14px;margin:0;font-size:11.5px}
+.diag-event-summary dt,.diag-event-summary dd{margin:0}.diag-event-summary dt{color:var(--ink2)}.diag-event-summary dd{font-family:var(--mono);min-width:0;overflow-wrap:anywhere}
+.diag-log-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.diag-log-controls .label{font-size:11px;color:var(--ink2)}
+.diag-log-list{display:flex;flex-direction:column;gap:2px;min-height:0}
+.diag-log-row{width:100%;display:grid;grid-template-columns:58px 19px 72px minmax(0,1fr);gap:7px;align-items:start;min-height:25px;
+  border:0;border-radius:6px;background:transparent;color:var(--ink);padding:4px 6px;text-align:start;cursor:pointer;font:10.8px/1.45 var(--mono)}
+.diag-log-row:hover{background:var(--selection)}.diag-log-row.on{background:var(--accent-weak);box-shadow:inset 2px 0 0 var(--accent)}
+.diag-log-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.diag-log-row .delta{color:var(--ink2);font-variant-numeric:tabular-nums}.diag-log-row .level{font-weight:700}.diag-log-row .level.error{color:var(--danger)}
+.diag-log-row .level.warn{color:var(--warn)}.diag-log-row .tagname{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diag-timeline{flex:1;min-height:245px;border:1px solid var(--line);border-radius:11px;background:var(--panel-solid);overflow:hidden;
+  display:flex;flex-direction:column;box-shadow:var(--control-shadow)}
+.diag-timeline-head{min-height:37px;padding:6px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.diag-time{font:11.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.diag-timeline-scroll{overflow:auto;min-height:0;flex:1;scrollbar-gutter:stable}
+.diag-track{min-width:760px;display:grid;grid-template-columns:96px minmax(660px,1fr);min-height:35px;border-bottom:1px solid var(--line)}
+.diag-track:last-child{border-bottom:0}
+.diag-track-label{position:sticky;inset-inline-start:0;z-index:5;padding:8px 10px;background:var(--panel2);border-inline-end:1px solid var(--line);
+  color:var(--ink2);font-size:10.5px;font-weight:600;white-space:nowrap}
+.diag-track-body{position:relative;min-width:660px;background-image:linear-gradient(to right,var(--line) 1px,transparent 1px);background-size:12.5% 100%}
+.diag-ruler{min-height:28px}.diag-ruler .diag-track-body{font:9.5px var(--mono);color:var(--ink2);font-variant-numeric:tabular-nums}
+.diag-ruler-tick{position:absolute;inset-block-start:6px;transform:translateX(-50%)}
+.diag-cursor{position:absolute;z-index:4;inset-block:0;width:1px;background:var(--accent);pointer-events:none}
+.diag-cursor::before{content:"";position:absolute;inset-block-start:0;inset-inline-start:-4px;border-inline:4px solid transparent;border-block-start:6px solid var(--accent)}
+.diag-range{position:absolute;z-index:0;inset-block:0;background:var(--accent-weak);border-inline:1px solid color-mix(in srgb,var(--accent) 55%,transparent);pointer-events:none}
+.diag-scrubber{position:absolute;z-index:6;inset:0;width:100%;height:100%;margin:0;opacity:.001;cursor:ew-resize}
+.diag-scrubber:focus-visible{opacity:1;height:4px;inset-block-start:0;accent-color:var(--accent);outline:2px solid var(--accent);outline-offset:2px}
+.diag-thumb{position:absolute;inset-block:4px;width:42px;height:27px;transform:translateX(-50%);border:1px solid var(--line);border-radius:5px;
+  background:linear-gradient(155deg,#f6f7f9 0 32%,#d7e6ff 32% 48%,#fff 48%);box-shadow:0 1px 3px rgba(0,0,0,.12);cursor:pointer;padding:0}
+.diag-thumb:hover,.diag-thumb.on{border-color:var(--accent)}.diag-thumb.on{box-shadow:0 0 0 2px var(--accent-weak)}
+.diag-thumb:focus-visible,.diag-event:focus-visible,.diag-log-dot:focus-visible,.diag-marker:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.diag-event{position:absolute;inset-block:7px;height:21px;border:0;border-radius:4px;background:color-mix(in srgb,var(--accent) 22%,var(--panel-solid));
+  color:var(--accent);font:9.5px var(--mono);text-align:start;padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.diag-event.alt{background:color-mix(in srgb,var(--planned) 18%,var(--panel-solid));color:var(--planned)}
+.diag-event.on{background:var(--accent-fill);color:var(--accent-ink)}
+.diag-log-dot{position:absolute;inset-block-start:12px;width:9px;height:9px;transform:translateX(-50%);border:0;border-radius:50%;background:var(--warn);padding:0;cursor:pointer}
+.diag-log-dot.error{background:var(--danger)}.diag-log-dot.on{box-shadow:0 0 0 3px var(--accent-weak),0 0 0 1px var(--accent)}
+.diag-marker{position:absolute;inset-block:6px;width:12px;height:22px;transform:translateX(-50%);border:0;background:transparent;color:var(--accent);padding:0;cursor:pointer}
+.diag-marker::before{content:"";display:block;width:0;height:0;border-block:5px solid transparent;border-inline-start:8px solid currentColor}
+.diag-marker::after{content:"";position:absolute;inset-block-start:4px;inset-inline-start:1px;width:1px;height:18px;background:currentColor}
+.diag-gap{position:absolute;inset-block:0;background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--warn) 20%,transparent) 5px 9px);
+  border-inline:1px dashed var(--warn);pointer-events:none}
+.diag-boundary{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--warn);border-radius:9px;color:var(--warn);font-size:11.5px}
+.diag-boundary svg{flex:none;margin-top:1px}
+.diag-capture{width:min(920px,100%);display:flex;flex-direction:column;gap:16px}
+.diag-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.diag-preset{min-height:112px;padding:13px 14px;border:1px solid var(--line);border-radius:11px;background:var(--panel-solid);color:var(--ink);
+  text-align:start;display:flex;flex-direction:column;gap:5px;cursor:pointer;box-shadow:var(--control-shadow)}
+.diag-preset:hover{border-color:var(--accent)}.diag-preset.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
+.diag-preset:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.diag-preset b{font-size:13px}.diag-preset p{margin:0;color:var(--ink2);font-size:12px}
+.diag-preset .meta{margin-top:auto;font:10.5px var(--mono);color:var(--ink2)}
+.diag-channel-list{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px}
+.diag-channel{min-height:58px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel-solid);display:flex;flex-direction:column;gap:3px}
+.diag-channel b{font-size:11.5px}.diag-channel span{font-size:10.5px;color:var(--ink2)}
+.diag-recording{width:min(760px,100%);margin:auto;display:flex;flex-direction:column;gap:18px;padding:24px;border:1px solid var(--line);border-radius:13px;
+  background:var(--panel-solid);box-shadow:var(--control-shadow)}
+.diag-recording-status{display:flex;align-items:flex-start;gap:12px}.diag-recording-status .dot{margin-top:6px;box-shadow:0 0 0 5px var(--danger-weak)}
+.diag-recording-status h2{font-size:17px}.diag-recording-status p{margin:3px 0 0;color:var(--ink2);font-size:12.5px}
+.diag-recording-time{font:650 34px/1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.diag-recording-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.diag-marker-list{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:var(--ink2);font-size:11.5px}
+
+@media (prefers-reduced-motion:no-preference){
+  .diag-preset,.diag-thumb,.diag-event,.diag-log-row,.diag-align{
+    transition-property:background-color,border-color,color,box-shadow,transform;transition-duration:120ms;transition-timing-function:cubic-bezier(.2,0,0,1)}
+  .diag-preset:active,.diag-align:active{transform:scale(.96)}
+}
+@media(max-width:980px){
+  .diag-overview{grid-template-columns:minmax(220px,.72fr) minmax(360px,1.28fr)}
+  .diag-frame-body{grid-template-columns:minmax(120px,.55fr) minmax(120px,.45fr)}
+  .diag-channel-list{grid-template-columns:repeat(2,minmax(140px,1fr))}
+}
+@media(max-width:760px){
+  .diagnostic-page{overflow-y:auto;padding:12px}.diagnostic-page>.diag-shell{flex:none}
+  .diag-overview{grid-template-columns:1fr;flex:none}.diag-frame-pane{min-height:360px}.diag-context-pane{min-height:360px}
+  .diag-timeline{min-height:330px}.diag-preset-grid,.diag-channel-list{grid-template-columns:1fr}
+  .diag-toolbar .spacer{display:none}.diag-target{width:100%}.diag-recording{padding:18px}
+}
+@media(max-height:700px){
+  .diagnostic-page{overflow-y:auto}.diagnostic-page>.diag-shell{flex:none}
+  .diag-overview{flex:0 0 285px}.diag-timeline{flex:none;height:245px}
+}
+
+/* ---------- Toolkit · Device Control ---------- */
+.tools-page{padding:12px;gap:12px;background:color-mix(in srgb,var(--ground) 70%,var(--panel-solid));overflow:auto}
+.tools-shell{width:100%;min-height:100%;display:grid;grid-template-columns:172px minmax(0,1fr);gap:12px}
+.tools-rail{align-self:start;position:sticky;inset-block-start:0;display:flex;flex-direction:column;gap:8px;padding:10px;
+  border:1px solid var(--line);border-radius:11px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
+.tools-rail-title{padding:2px 4px 6px;color:var(--ink2);font-size:11px;font-weight:600}
+.tool-nav-item{width:100%;min-height:44px;display:flex;align-items:center;gap:9px;padding:7px 8px;border:0;border-radius:8px;
+  background:transparent;color:var(--ink);text-align:start;cursor:pointer}
+.tool-nav-item:hover,.tool-nav-item.on{background:var(--selection)}
+.tool-nav-item.on{box-shadow:inset 2px 0 0 var(--accent)}
+.tool-nav-item .symbol{color:var(--accent)}
+.tool-nav-copy{display:flex;flex-direction:column;gap:1px;min-width:0}.tool-nav-copy b{font-size:12px}.tool-nav-copy span{font-size:10px;color:var(--ink2)}
+.tool-placeholder{margin:4px;padding:10px 6px 2px;border-top:1px solid var(--line);color:var(--ink2);font-size:10.5px;line-height:1.45}
+.device-tool{min-width:0;display:flex;flex-direction:column;gap:12px}
+.tool-toolbar{min-height:46px;display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;
+  background:var(--panel-solid);box-shadow:var(--control-shadow);flex-wrap:wrap}
+.tool-target{display:flex;align-items:center;gap:8px;min-width:0}.tool-target-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
+.tool-target-copy b{font-size:12px}.tool-target-copy span{font:10px/1.35 var(--mono);color:var(--ink2);white-space:nowrap}
+.tool-toolbar-actions{margin-inline-start:auto;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.tool-recording{display:inline-flex;align-items:center;gap:6px;color:var(--danger);font:600 11px var(--mono);font-variant-numeric:tabular-nums}
+.tool-recording .dot{background:var(--danger);box-shadow:0 0 0 3px var(--danger-weak)}
+.recording-result{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid color-mix(in srgb,var(--ok) 52%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--panel-solid) 92%,var(--ok) 8%);box-shadow:var(--control-shadow)}
+.recording-result.receiving{border-color:var(--line);background:var(--panel-solid)}
+.recording-result-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ok);background:color-mix(in srgb,var(--panel-solid) 82%,var(--ok) 18%)}
+.recording-result.receiving .recording-result-icon{color:var(--accent);background:var(--accent-weak)}
+.recording-result-copy{min-width:0}.recording-result-copy b{display:block;font-size:12px}.recording-result-copy>span{display:block;margin-top:2px;color:var(--ink2);font-size:10.5px}
+.recording-path{margin-top:4px;font:10px/1.4 var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.recording-result-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.device-control-grid{display:grid;grid-template-columns:minmax(320px,1.15fr) minmax(280px,.85fr);gap:12px;align-items:start}
+.device-preview-pane,.device-inspector{min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
+.device-preview-pane{display:flex;flex-direction:column;overflow:hidden}
+.device-pane-head{min-height:42px;display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.device-pane-head .spacer{flex:1}.device-pane-head .seg button{min-height:28px}
+.device-stage{min-height:436px;display:grid;place-items:center;padding:16px;background:color-mix(in srgb,var(--ground) 84%,var(--panel-solid));overflow:auto}
+.device-screen{width:min(246px,72%);aspect-ratio:9/16;position:relative;overflow:hidden;padding:0;border:0;border-radius:24px;
+  background:#f4f5f7;color:#202124;box-shadow:0 0 0 1px oklch(0 0 0 / .1),0 14px 38px rgba(0,0,0,.18);cursor:default;text-align:start;touch-action:none}
+.device-screen:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.device-screen-content{position:absolute;inset:0;padding:16px 11px 12px;display:flex;flex-direction:column;gap:9px;pointer-events:none}
+.device-screen-status{display:flex;justify-content:space-between;font-size:8px;font-weight:650;padding:0 4px;color:#34363a}
+.device-screen-title{font-size:15px;font-weight:720;padding:5px 4px 2px}
+.device-screen-search{height:29px;border-radius:8px;background:#e6e8ec;color:#858991;font-size:9px;display:flex;align-items:center;padding:0 10px}
+.device-screen-card{min-height:54px;border-radius:10px;background:white;padding:10px;display:flex;align-items:center;gap:9px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.device-screen-card i{width:28px;height:28px;border-radius:50%;background:linear-gradient(145deg,#ced5df,#9caabd);flex:none}
+.device-screen-card b{font-size:10px}.device-screen-card span{display:block;color:#858991;font-size:7px;margin-top:2px}
+.device-screen-row{height:42px;border-radius:10px;background:white;padding:0 10px;display:flex;align-items:center;gap:9px;font-size:9.5px;font-weight:620;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.device-screen-row .glyph{width:22px;height:22px;border-radius:6px;background:#3478f6;color:white;display:grid;place-items:center;font-size:10px}
+.device-screen-row .value{margin-inline-start:auto;color:#777b82;font-size:8px;font-weight:500}
+.device-screen-switch{width:31px;height:18px;border-radius:999px;background:#3478f6;padding:2px;display:flex;justify-content:flex-end}
+.device-screen-switch::after{content:"";height:14px;aspect-ratio:1;border-radius:50%;background:white;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.device-touch-feedback{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:2px solid #ff9f0a;border-radius:50%;
+  background:rgba(255,159,10,.14);box-shadow:0 0 0 5px rgba(255,159,10,.08);pointer-events:none}
+.device-swipe-feedback{position:absolute;height:3px;transform-origin:0 50%;background:#ff9f0a;border-radius:999px;pointer-events:none}
+.device-swipe-feedback::after{content:"";position:absolute;inset-inline-end:-2px;inset-block-start:-4px;border-block:5px solid transparent;border-inline-start:8px solid #ff9f0a}
+.device-drag-preview{position:absolute;height:3px;transform-origin:0 50%;background:#006edb;border-radius:999px;pointer-events:none;box-shadow:0 0 0 3px rgba(0,110,219,.12)}
+.device-drag-preview::before,.device-drag-preview::after{content:"";position:absolute;width:9px;height:9px;margin-top:-3px;border-radius:50%;background:#006edb}
+.device-drag-preview::before{inset-inline-start:-2px}.device-drag-preview::after{inset-inline-end:-2px}
+.device-keyboard-cursor{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border:2px solid #006edb;border-radius:50%;pointer-events:none;display:none}
+.device-keyboard-cursor::before,.device-keyboard-cursor::after{content:"";position:absolute;background:#006edb}
+.device-keyboard-cursor::before{width:2px;height:26px;inset-inline-start:7px;inset-block-start:-5px}.device-keyboard-cursor::after{height:2px;width:26px;inset-inline-start:-5px;inset-block-start:7px}
+.device-screen:focus-visible .device-keyboard-cursor{display:block}
+.device-preview-meta{min-height:48px;display:flex;align-items:center;gap:9px;padding:8px 10px;border-top:1px solid var(--line);color:var(--ink2);font-size:10.5px;flex-wrap:wrap}
+.device-preview-meta .mono{color:var(--ink)}
+.device-inspector{display:flex;flex-direction:column;overflow:hidden}
+.tool-section{display:flex;flex-direction:column;gap:9px;padding:12px;border-bottom:1px solid var(--line)}.tool-section:last-child{border-bottom:0}
+.tool-section-head{display:flex;align-items:center;gap:8px}.tool-section-head .spacer{flex:1}.tool-section-head p{margin:0;color:var(--ink2);font-size:10.5px}
+.gesture-guide{display:flex;flex-direction:column;gap:8px}
+.gesture-guide-row{display:grid;grid-template-columns:28px minmax(0,1fr);gap:9px;align-items:start;padding:9px;border-radius:9px;background:var(--panel2)}
+.gesture-guide-row>.symbol{width:18px;height:18px;margin:2px 0 0 4px;color:var(--accent)}
+.gesture-guide-copy b{display:block;font-size:11.5px}.gesture-guide-copy span{display:block;margin-top:2px;color:var(--ink2);font-size:10.5px;line-height:1.45}
+.tool-event-list{display:flex;flex-direction:column;gap:2px;max-height:172px;overflow:auto}
+.tool-event-row{display:grid;grid-template-columns:60px 18px minmax(0,1fr);gap:7px;padding:6px 5px;border-radius:6px;font-size:10.5px;align-items:start}
+.tool-event-row:hover{background:var(--selection)}.tool-event-row time{font-family:var(--mono);color:var(--ink2)}
+.tool-event-icon{color:var(--accent);display:flex;padding-top:1px}.tool-event-copy b{display:block;font-size:10.5px}.tool-event-copy span{display:block;color:var(--ink2);font:9.5px/1.45 var(--mono);overflow-wrap:anywhere}
+.performance-note,.tools-boundary{display:flex;align-items:flex-start;gap:8px;padding:9px 10px;border-radius:9px;font-size:11px;line-height:1.45}
+.performance-note{background:var(--panel2);color:var(--ink2)}.performance-note b{color:var(--ink)}
+.tools-boundary{border:1px solid var(--warn);color:var(--warn)}
+.performance-note .symbol,.tools-boundary .symbol{margin-top:1px;flex:none}
+@media (prefers-reduced-motion:no-preference){
+  .tool-nav-item,.device-screen,.tool-event-row{transition-property:background-color,box-shadow,transform;transition-duration:120ms;transition-timing-function:cubic-bezier(.2,0,0,1)}
+  .tool-nav-item:active{transform:scale(.96)}
+}
+@media(max-width:1050px){
+  .tools-shell{grid-template-columns:1fr}.tools-rail{position:static;flex-direction:row;align-items:center}.tools-rail-title{display:none}
+  .tool-nav-item{width:auto;min-width:160px}.tool-placeholder{margin:0 0 0 auto;padding:4px 6px;border-top:0;border-inline-start:1px solid var(--line);max-width:240px}
+}
+@media(max-width:980px){.device-control-grid{grid-template-columns:1fr}.device-stage{min-height:420px}}
+@media(max-width:760px){
+  .tools-page{padding:10px}.tools-rail{align-items:stretch;flex-direction:column}.tool-placeholder{margin:0;padding:8px 4px 2px;border-inline-start:0;border-top:1px solid var(--line);max-width:none}
+  .tool-nav-item{width:100%}.tool-toolbar-actions{margin-inline-start:0;width:100%}.recording-result{grid-template-columns:34px minmax(0,1fr)}.recording-result-actions{grid-column:1/-1;justify-content:flex-start}
+}
 .device-layout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(420px,1.18fr);gap:24px;max-width:920px}
 .device-section{display:flex;flex-direction:column;gap:12px;min-width:0}
 .device-section h2{padding-bottom:7px;border-bottom:1px solid var(--line)}
@@ -480,6 +704,15 @@ select.inp{cursor:pointer}
     <symbol id="i-debug" viewBox="0 0 20 20"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></symbol>
     <symbol id="i-dump" viewBox="0 0 20 20"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></symbol>
     <symbol id="i-trace" viewBox="0 0 20 20"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></symbol>
+    <symbol id="i-diagnostics" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="12" rx="2"/><path d="M4.5 10h2l1.5-3 2.2 6 1.7-4 1.1 1.5h2.5M7 17.5h6"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 20 20"><path d="M12.1 3.2a4.1 4.1 0 0 0-4.7 5.4l-4.9 4.9a2.1 2.1 0 0 0 3 3l4.9-4.9a4.1 4.1 0 0 0 5.4-4.7l-2.5 2.5-2.7-.7-.7-2.7z"/></symbol>
+    <symbol id="i-device-control" viewBox="0 0 20 20"><rect x="5" y="2.5" width="10" height="15" rx="2"/><path d="M8.2 14.8h3.6M16.5 6.5l1.5-1.5m-1.5 5h2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 20 20"><path d="M3 6.5h3l1.3-2h5.4l1.3 2h3v9H3z"/><circle cx="10" cy="11" r="3"/></symbol>
+    <symbol id="i-record" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="3" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-download" viewBox="0 0 20 20"><path d="M10 2.5v10M6.5 9.5 10 13l3.5-3.5M3 15.5h14"/></symbol>
+    <symbol id="i-pointer" viewBox="0 0 20 20"><path d="m5 2 9.5 8.2-4.2.7 2.4 4.4-2.5 1.4-2.4-4.4L5 15z"/></symbol>
+    <symbol id="i-swipe" viewBox="0 0 20 20"><path d="M4 14h8a4 4 0 0 0 0-8H7"/><path d="m9 3-3 3 3 3"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 20 20"><rect x="2.5" y="4.5" width="15" height="11" rx="2"/><path d="M5 8h.01M8 8h.01M11 8h.01M14 8h.01M5 11h.01M8 11h.01M11 11h.01M14 11h.01M6 13.5h8"/></symbol>
     <symbol id="i-history" viewBox="0 0 20 20"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></symbol>
     <symbol id="i-automation" viewBox="0 0 20 20"><path d="m10 2 .9 3.1L14 6l-3.1.9L10 10l-.9-3.1L6 6l3.1-.9zM15.5 10l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7zM5 11l.6 2 2 .6-2 .6-.6 2-.6-2-2-.6 2-.6z"/></symbol>
     <symbol id="i-settings" viewBox="0 0 20 20"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7" fill="var(--panel-solid)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel-solid)"/><circle cx="7" cy="15" r="1.7" fill="var(--panel-solid)"/></symbol>
@@ -505,7 +738,7 @@ select.inp{cursor:pointer}
   </defs>
 </svg>
 
-<p class="note"><b>ArkDeck macOS 交互原型 v0.9</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v0.9）同版本。Debug 以“选择 SSH / 本机目录 / SMB / WSL 编译来源 → 搜索并勾选产物 → 校验、备份并替换 → 显式重启 → 获取日志”为主链路；Viewer 保留 DevTools 式双区检查器。工具栏可切换语言、外观与 AC 标注。所有数据均为演示数据，不连接设备，也不构成真实硬件验收。</p>
+<p class="note"><b>ArkDeck macOS 交互原型 v1.2</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v1.2）同版本。新增独立 Toolkit 工具集，第一个工具“真机操作”默认按需截图，可显式录屏、低帧率预览、点击与滑动；录屏停止后自动拉取到 Mac 并展示本地位置。Diagnostics 默认不持续录屏。工具栏可切换语言、外观与 AC 标注。所有数据均为演示数据，不连接设备，也不代表相关 device operation 已 production available。</p>
 
 <div class="window" id="win" aria-label="ArkDeck 设计原型窗口">
   <div class="titlebar" role="toolbar" aria-label="窗口工具栏">
@@ -556,6 +789,7 @@ select.inp{cursor:pointer}
 </div>
 <div id="modalHost"></div>
 <div id="deviceMenu" class="context-menu" role="menu" hidden></div>
+<p class="visually-hidden" id="toolActionStatus" role="status" aria-live="polite" aria-atomic="true"></p>
 
 <script>
 "use strict";
@@ -571,6 +805,18 @@ const S = {
   viewer:{selected:42, showBounds:true, query:"", tab:"attributes", capturedAt:"刚刚采集", treeSize:60, expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
   trace:{running:false, done:false, mode:"preset", preset:0, dur:15,
          tags:new Set(["ace","app","ability","graphic","ohos","sched","freq","sync"])},
+  diagnostics:{view:PARAMS.get("diagnostics") === "capture" ? "capture" : "session", running:false, finishing:false,
+         preset:0, dur:60, cursor:13.242, rangeStart:null, selectedEvent:"render-42", selectedLog:"log-3", logWindow:100,
+         elapsed:13, markers:[{time:13.242,label:"问题出现"}], timer:null, job:null,
+         includeVideo:false, markerScreenshot:true,
+         tags:new Set(["ace","app","ability","graphic","ohos","sched","freq","sync"])},
+  tools:{tool:"device-control",preview:"snapshot",showTouches:true,recording:false,recordPhase:"idle",recordSeconds:0,timer:null,receiveTimer:null,lastRecording:null,
+         screenshotAt:"11:26:42.184",pointerStart:null,pointerNow:null,pointerStartedAt:0,pointerId:null,keyboardCursor:{x:540,y:960},lastInput:{kind:"click",x:540,y:958},
+         events:[
+           {time:"11:26:42",kind:"capture",text:"已获取截图",detail:"screen-112642.png · 428 KB"},
+           {time:"11:26:38",kind:"input",text:"点击",detail:"(540, 958) · confirmed"},
+           {time:"11:26:31",kind:"input",text:"向上滑动",detail:"(540, 1420) → (540, 520) · 320 ms"}
+         ]},
   lg:{on:false, paused:false, pend:0, shard:11.8, piece:3, lvl:"W", tag:"", timer:null, ms:12400,
       lines:[
         {t:"11:02:11.482",lv:"W",tag:"ArkUI",m:"[list_layout] measure retry, node 88"},
@@ -598,7 +844,7 @@ const DEVICES=[
   {id:"tab01", name:"Unknown tablet", tp:"USB", state:"unauthorized", build:"—", key:"connect key 已脱敏"}
 ];
 const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug","debug","Debug"],
-  ["dump","dump","Viewer"],["trace","trace","Trace"],["history","history","History"],
+  ["dump","dump","Viewer"],["trace","trace","Trace"],["diagnostics","diagnostics","Diagnostics"],["tools","tools","Toolkit"],["history","history","History"],
   ["automation","automation","Automation"]];
 const HIST=[
   {id:"S-0713-06", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
@@ -1209,14 +1455,14 @@ function pViewer(){
 /* ---------- Trace ---------- */
 const TRACE_TAGS_OK=["ace","app","ability","graphic","ohos","sched","freq","sync","binder","disk","workq"];
 const TRACE_TAGS_NO=["distributeddata","mmc"];
-const PRESETS=[
+const TRACE_PRESETS=[
   {name:"ArkUI 深度", tags:["ace","app","ability","graphic","ohos","sched","freq","sync"]},
   {name:"附件兼容 / 全景", tags:TRACE_TAGS_OK, warnBuf:true},
   {name:"渲染 / 动画", tags:["graphic","ace","app","sched","freq","sync"]}
 ];
-function pickPreset(i){S.trace.preset=i;S.trace.tags=new Set(PRESETS[i].tags);renderPage();}
-function toggleTag(t){const g=S.trace.tags;if(g.has(t)){if(g.size>1)g.delete(t);}else g.add(t);renderPage();}
-function traceTitle(){return S.trace.mode==="preset"?PRESETS[S.trace.preset].name:"自定义("+S.trace.tags.size+" tags)";}
+function pickTracePreset(i){S.trace.preset=i;S.trace.tags=new Set(TRACE_PRESETS[i].tags);renderPage();}
+function toggleTraceTag(t){const g=S.trace.tags;if(g.has(t)){if(g.size>1)g.delete(t);}else g.add(t);renderPage();}
+function traceTitle(){return S.trace.mode==="preset"?TRACE_PRESETS[S.trace.preset].name:"自定义("+S.trace.tags.size+" tags)";}
 function pTrace(){
   const t=S.trace;
   return recoveryHTML()+`
@@ -1226,19 +1472,19 @@ function pTrace(){
       <div class="card">
         <h2>抓取配置
           <span class="seg mini" style="margin-left:auto">
-            <button class="${t.mode==="preset"?"on":""}" onclick="S.trace.mode='preset';pickPreset(S.trace.preset)">Preset</button>
+            <button class="${t.mode==="preset"?"on":""}" onclick="S.trace.mode='preset';pickTracePreset(S.trace.preset)">Preset</button>
             <button class="${t.mode==="custom"?"on":""}" onclick="S.trace.mode='custom';renderPage()">自定义 tag</button>
           </span></h2>
         ${t.mode==="preset"?`
         <div class="tablewrap"><table>
           <tr><th></th><th>Preset</th><th>tags</th></tr>
-          ${PRESETS.map((p,i)=>`<tr class="${t.preset===i?"sel-row":""}" style="cursor:pointer" onclick="pickPreset(${i})">
+          ${TRACE_PRESETS.map((p,i)=>`<tr class="${t.preset===i?"sel-row":""}" style="cursor:pointer" onclick="pickTracePreset(${i})">
             <td>${t.preset===i?"●":""}</td><td>${p.name}</td><td class="mono">${p.tags.join(" ")}</td></tr>`).join("")}
         </table></div>`
         :`
         <p class="hint">仅设备已确认支持的 tag 可选(能力探测 tag×11);未确认的 tag 禁用并标注原因,不猜测。</p>
         <div class="tagpick">
-          ${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleTag('${x}')">${x}</button>`).join("")}
+          ${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleTraceTag('${x}')">${x}</button>`).join("")}
           ${TRACE_TAGS_NO.map(x=>`<button disabled title="设备未报告支持该 tag">${x}</button>`).join("")}
         </div>
         <p class="hint">已选 ${t.tags.size} 个 tag。</p>`}
@@ -1249,7 +1495,7 @@ function pTrace(){
           <span>buffer <b>307200</b></span>
           <span class="chip dim">工具:hitrace(设备已确认)</span>
         </div>
-        ${t.mode==="preset"&&PRESETS[t.preset].warnBuf?`<div class="warnbox" data-acin>⚠ 附件兼容 preset 的 buffer 327680 超出该设备建议值,已按能力探测收敛到 307200。<span class="ac">buffer 资源警告</span></div>`:""}
+        ${t.mode==="preset"&&TRACE_PRESETS[t.preset].warnBuf?`<div class="warnbox" data-acin>⚠ 附件兼容 preset 的 buffer 327680 超出该设备建议值,已按能力探测收敛到 307200。<span class="ac">buffer 资源警告</span></div>`:""}
       </div>
       <div class="card" data-acin><span class="ac">参数 diff · AC-TRACE(param)</span>
         <h2>Debug 参数快照(before → desired)</h2>
@@ -1287,6 +1533,338 @@ function startTrace(){
     phaseIdx:0,safeBoundary:5,tick:600,log:["→ Preflight"],pages:["trace"],
     onDone:st=>{S.trace.running=false;S.trace.done=(st==="succeeded");renderPageIf(["trace"]);}}));
   renderPage();
+}
+
+/* ---------- Diagnostics ---------- */
+const DIAG_PRESETS=[
+  {name:"低干扰诊断",duration:60,description:"默认不持续录屏，适合卡顿、闪退和偶现问题。",channels:"Trace · HiLog · Marker 截图",tags:["ace","app","ability","graphic","ohos","sched","freq","sync"]},
+  {name:"图形诊断",duration:30,description:"增加 frame/display、window/layer/input 事实；录屏仍需显式开启。",channels:"低干扰诊断 + 图形 Track",tags:["graphic","ace","app","sched","freq","sync"]}
+];
+const DIAG_START=10,DIAG_END=18;
+const DIAG_FRAMES=[
+  {time:10.000,index:596},{time:11.500,index:686},{time:13.233,index:790},{time:14.750,index:881},{time:16.033,index:958},{time:17.500,index:1046}
+];
+const DIAG_EVENTS=[
+  {id:"input-17",start:10.620,duration:.410,name:"DispatchTouchEvent",thread:"InputManager · 781",category:"input"},
+  {id:"layout-31",start:11.520,duration:.930,name:"ListLayout::Measure",thread:"com.example.settings · 2841",category:"ace"},
+  {id:"render-42",start:13.242,duration:.084,name:"RenderFrame #790",thread:"RenderThread · 2860",category:"graphic"},
+  {id:"ffrt-61",start:14.160,duration:.670,name:"FlushLayoutTask",thread:"ffrt_worker · 2891",category:"sched"},
+  {id:"render-77",start:16.280,duration:.310,name:"RenderFrame #973",thread:"RenderThread · 2860",category:"graphic"}
+];
+const DIAG_LOGS=[
+  {id:"log-0",time:12.982,level:"I",tag:"Input",message:"touch up id=17 target=wifi_switch"},
+  {id:"log-1",time:13.118,level:"W",tag:"ArkUI",message:"[list_layout] measure retry, node 88"},
+  {id:"log-2",time:13.227,level:"W",tag:"ArkUI",message:"[render] flush delayed 22ms"},
+  {id:"log-3",time:13.242,level:"E",tag:"Frame",message:"deadline missed, frame=790 delta=34ms"},
+  {id:"log-4",time:13.278,level:"W",tag:"Rosen",message:"transaction applied after expected vsync"},
+  {id:"log-5",time:13.401,level:"I",tag:"AbilityMS",message:"foreground ability remains responsive"},
+  {id:"log-6",time:14.208,level:"W",tag:"ArkUI",message:"layout task exceeded 16ms budget"},
+  {id:"log-7",time:16.331,level:"I",tag:"Frame",message:"frame pacing recovered"}
+];
+function chooseDiagPreset(i){
+  const p=DIAG_PRESETS[i]||DIAG_PRESETS[0];S.diagnostics.preset=i;S.diagnostics.dur=p.duration;S.diagnostics.tags=new Set(p.tags);renderPage();
+}
+function toggleDiagTag(t){const g=S.diagnostics.tags;if(g.has(t)){if(g.size>1)g.delete(t);}else g.add(t);renderPage();}
+function diagnosticTitle(){return DIAG_PRESETS[S.diagnostics.preset]?.name||DIAG_PRESETS[0].name;}
+function diagPercent(time){return Math.max(0,Math.min(100,(time-DIAG_START)/(DIAG_END-DIAG_START)*100));}
+function diagTime(time){return "00:"+Number(time).toFixed(3).padStart(6,"0");}
+function diagDelta(delta){const ms=Math.round(delta*1000);return (ms>0?"+":"")+ms+" ms";}
+function diagDuration(seconds){return Math.round(seconds*1000)+" ms";}
+function diagFrameAt(time){
+  if(time>=15.45&&time<16.0)return null;
+  let frame=DIAG_FRAMES[0];for(const candidate of DIAG_FRAMES){if(candidate.time<=time)frame=candidate;else break;}return frame;
+}
+function diagEvent(){return DIAG_EVENTS.find(e=>e.id===S.diagnostics.selectedEvent)||null;}
+function nearestDiagLogID(time){
+  return DIAG_LOGS.slice().sort((a,b)=>Math.abs(a.time-time)-Math.abs(b.time-time))[0]?.id||null;
+}
+function setDiagCursor(time,eventID=null,logID=null,refocus=false){
+  S.diagnostics.cursor=Math.max(DIAG_START,Math.min(DIAG_END,Number(time)||DIAG_START));
+  S.diagnostics.rangeStart=null;S.diagnostics.selectedEvent=eventID;S.diagnostics.selectedLog=logID||nearestDiagLogID(S.diagnostics.cursor);renderPage();
+  if(refocus)requestAnimationFrame(()=>document.querySelector(".diag-scrubber")?.focus());
+}
+function diagSliderKey(event){
+  const anchor=event.shiftKey?(S.diagnostics.rangeStart??S.diagnostics.cursor):null;let next=S.diagnostics.cursor;
+  if(event.key==="ArrowLeft")next-=1/60;else if(event.key==="ArrowRight")next+=1/60;
+  else if(event.key==="PageUp")next+=.1;else if(event.key==="PageDown")next-=.1;
+  else if(event.key==="Home")next=DIAG_START;else if(event.key==="End")next=DIAG_END;else return;
+  event.preventDefault();S.diagnostics.rangeStart=anchor;S.diagnostics.cursor=Math.max(DIAG_START,Math.min(DIAG_END,next));
+  S.diagnostics.selectedEvent=null;S.diagnostics.selectedLog=nearestDiagLogID(S.diagnostics.cursor);renderPage();requestAnimationFrame(()=>document.querySelector(".diag-scrubber")?.focus());
+}
+function setDiagLogWindow(ms){S.diagnostics.logWindow=ms;renderPage();requestAnimationFrame(()=>document.querySelector(`[data-log-window="${ms}"]`)?.focus());}
+function showDiagAlignment(){
+  modal(`<div class="modal" style="max-width:720px"><h3>时间对齐 · 已校准 ±12 ms</h3>
+    <p class="hint">每个来源只在自己的 calibration segment 内参与联动。误差是上界，不是装饰性的健康分。</p>
+    <div class="tablewrap"><table><tr><th>来源</th><th>时间域</th><th>映射</th><th>适用区间</th></tr>
+      <tr><td>Trace</td><td class="mono">device monotonic</td><td><span class="chip ok">同一时钟</span></td><td class="mono">00:10.000–00:18.000</td></tr>
+      <tr><td>Screen</td><td class="mono">video PTS</td><td><span class="chip warn">已校准 ±12 ms</span></td><td class="mono">00:10.000–00:15.450<br>00:16.000–00:18.000</td></tr>
+      <tr><td>HiLog</td><td class="mono">device realtime</td><td><span class="chip warn">已校准 ±8 ms</span></td><td class="mono">00:10.014–00:17.984</td></tr>
+    </table></div>
+    <div class="warnbox">${icon("warning",true)} 录屏在 00:15.450–00:16.000 断流。光标位于该区间时，当前画面显示缺口，不沿用上一帧。</div>
+    <div class="mfoot"><button class="btn pri" onclick="closeModal()">完成</button></div></div>`);
+}
+function diagDeviceFrameHTML(frame){
+  if(!frame)return `<div class="diag-device-stage"><div class="empty"><b>这一时刻没有可证明对应的画面</b><br>录屏在 00:15.450–00:16.000 断流。</div></div>`;
+  const stalled=S.diagnostics.cursor>=13.2&&S.diagnostics.cursor<13.65;
+  return `<div class="diag-device-stage"><div class="diag-device-frame" role="img" aria-label="设置应用在 ${diagTime(frame.time)} 的录屏帧">
+    <div class="diag-device-status"><span>11:02</span><span>5G  ▰</span></div><div class="diag-device-title">设置</div>
+    <div class="diag-device-search">搜索设置项</div>
+    <div class="diag-device-card"><i></i><span>小艺<small>华为账号、云空间与服务</small></span></div>
+    <div class="diag-device-row"><span class="glyph">W</span><span>WLAN</span><span class="value">已连接</span><span class="diag-device-switch"></span></div>
+    <div class="diag-device-row"><span class="glyph" style="background:#4f79db">B</span><span>蓝牙</span><span class="value">已开启</span></div>
+    <div class="diag-device-row"><span class="glyph" style="background:#34a853">M</span><span>移动网络</span></div>
+    ${stalled?'<div class="diag-touch" aria-hidden="true"></div>':""}
+  </div></div>`;
+}
+function diagFramePaneHTML(){
+  const frame=diagFrameAt(S.diagnostics.cursor),delta=frame?frame.time-S.diagnostics.cursor:0;
+  return `<section class="diag-frame-pane" aria-labelledby="diagFrameTitle">
+    <div class="diag-pane-head"><h2 id="diagFrameTitle">当前画面</h2><span class="trailing">Screen track</span></div>
+    <div class="diag-frame-body">${diagDeviceFrameHTML(frame)}
+      <div class="diag-frame-meta">${frame?`<b>Frame #${frame.index}</b><div class="diag-frame-time">${diagTime(frame.time)} · 画面 ${diagDelta(delta)}</div>
+        <span class="chip warn">已校准 ±12 ms</span><p>按视频 PTS 解码；画面时间不等同于 Trace event start。</p>`
+        :`<b>录屏缺口</b><span class="chip warn">无法关联画面</span><p>Trace 与日志仍可查看，但这里不会保留上一帧制造连续假象。</p>`}</div>
+    </div></section>`;
+}
+function diagEventHTML(){
+  const event=diagEvent();
+  if(!event)return `<div class="diag-context-block"><h2>当前时间点</h2><p class="hint">当前光标来自画面、日志或 Timeline slider，没有选中 Trace event。</p>
+    <div class="diag-time">${diagTime(S.diagnostics.cursor)}</div></div>`;
+  return `<div class="diag-context-block"><h2>选中事件</h2><dl class="diag-event-summary">
+    <dt>Event</dt><dd>${esc(event.name)}</dd><dt>Process / thread</dt><dd>${esc(event.thread)}</dd>
+    <dt>Start / duration</dt><dd>${diagTime(event.start)} / ${diagDuration(event.duration)}</dd><dt>Category</dt><dd>${esc(event.category)}</dd>
+  </dl></div>`;
+}
+function diagLogsHTML(){
+  const radius=S.diagnostics.logWindow/1000,rows=DIAG_LOGS.filter(l=>Math.abs(l.time-S.diagnostics.cursor)<=radius+.0001);
+  return `<div class="diag-context-block" style="flex:1"><div class="diag-log-controls"><h2>邻近日志</h2><span class="label">窗口</span>
+    <span class="seg mini">${[20,100,500].map(ms=>`<button data-log-window="${ms}" class="${S.diagnostics.logWindow===ms?"on":""}" onclick="setDiagLogWindow(${ms})">±${ms} ms</button>`).join("")}</span></div>
+    <div class="diag-log-list" aria-label="当前时间附近的 HiLog">${rows.length?rows.map(l=>`<button class="diag-log-row ${l.id===S.diagnostics.selectedLog?"on":""}" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="${esc(l.level+" "+l.tag+" "+l.message)}">
+      <span class="delta">${diagDelta(l.time-S.diagnostics.cursor)}</span><span class="level ${l.level==="E"?"error":l.level==="W"?"warn":""}">${l.level}</span><span class="tagname">${esc(l.tag)}</span><span>${esc(l.message)}</span></button>`).join("")
+      :'<p class="empty">当前时间窗内没有日志。可扩大窗口或选择其他时间。</p>'}</div></div>`;
+}
+function diagContextPaneHTML(){
+  return `<section class="diag-context-pane" aria-label="当前时间上下文"><div class="diag-pane-head"><h2>当前时间上下文</h2><span class="trailing diag-time">${diagTime(S.diagnostics.cursor)}</span></div>
+    <div class="diag-context-scroll">${diagEventHTML()}${diagLogsHTML()}</div></section>`;
+}
+function diagTimelineHTML(){
+  const cursor=diagPercent(S.diagnostics.cursor),frame=diagFrameAt(S.diagnostics.cursor);
+  const ticks=[10,11,12,13,14,15,16,17,18].map(t=>`<span class="diag-ruler-tick" style="left:${diagPercent(t)}%">00:${t}</span>`).join("");
+  const cursorLine=`<span class="diag-cursor" style="left:${cursor}%" aria-hidden="true"></span>`;
+  const range=S.diagnostics.rangeStart==null?"":`<span class="diag-range" style="left:${Math.min(cursor,diagPercent(S.diagnostics.rangeStart))}%;width:${Math.abs(cursor-diagPercent(S.diagnostics.rangeStart))}%" aria-hidden="true"></span>`;
+  const screen=DIAG_FRAMES.map(f=>`<button class="diag-thumb ${frame?.index===f.index?"on":""}" style="left:${diagPercent(f.time)}%" onclick="setDiagCursor(${f.time})" aria-label="选择录屏 Frame ${f.index}，${diagTime(f.time)}"></button>`).join("");
+  const events=DIAG_EVENTS.map((e,i)=>`<button class="diag-event ${i%2?"alt":""} ${S.diagnostics.selectedEvent===e.id?"on":""}" style="left:${diagPercent(e.start)}%;width:${Math.max(2,e.duration/(DIAG_END-DIAG_START)*100)}%" onclick="setDiagCursor(${e.start},'${e.id}')" aria-label="选择 Trace event ${esc(e.name)}，${diagTime(e.start)}">${esc(e.name)}</button>`).join("");
+  const logs=DIAG_LOGS.map(l=>`<button class="diag-log-dot ${l.level==="E"?"error":""} ${S.diagnostics.selectedLog===l.id?"on":""}" style="left:${diagPercent(l.time)}%" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="选择 ${l.level} 日志，${diagTime(l.time)}，${esc(l.message)}"></button>`).join("");
+  const markers=S.diagnostics.markers.map((m,i)=>`<button class="diag-marker" style="left:${diagPercent(m.time)}%" onclick="setDiagCursor(${m.time})" aria-label="选择 Marker ${i+1}，${esc(m.label)}，${diagTime(m.time)}"></button>`).join("");
+  const gap=`<span class="diag-gap" style="left:${diagPercent(15.45)}%;width:${diagPercent(16)-diagPercent(15.45)}%" title="录屏断流"></span>`;
+  const body=(content,extra="")=>`<div class="diag-track-body">${range}${cursorLine}${content}${extra}</div>`;
+  return `<section class="diag-timeline" aria-labelledby="diagTimelineTitle"><div class="diag-timeline-head"><h2 id="diagTimelineTitle">Trace 时间轴</h2>
+    <span class="diag-time">${diagTime(S.diagnostics.cursor)}</span><span class="chip dim">8.000 s 窗口</span><span style="flex:1"></span><span class="hint">← → 移动 · ⌘+/− 缩放</span></div>
+    <div class="diag-timeline-scroll">
+      <div class="diag-track diag-ruler"><div class="diag-track-label">Session time</div>${body(ticks,`<input class="diag-scrubber" type="range" min="${DIAG_START}" max="${DIAG_END}" step="0.001" value="${S.diagnostics.cursor}" aria-label="诊断时间光标，当前 ${diagTime(S.diagnostics.cursor)}" onkeydown="diagSliderKey(event)" oninput="setDiagCursor(this.value,null,null,true)">`)}</div>
+      <div class="diag-track"><div class="diag-track-label">Marker</div>${body(markers)}</div>
+      <div class="diag-track"><div class="diag-track-label">Screen</div>${body(screen,gap)}</div>
+      <div class="diag-track"><div class="diag-track-label">Frame / Display</div>${body(`<button class="diag-event on" style="left:${diagPercent(13.2)}%;width:3.3%" onclick="setDiagCursor(13.242,'render-42')">missed frame · 34 ms</button><button class="diag-event" style="left:${diagPercent(16.28)}%;width:2.2%" onclick="setDiagCursor(16.28,'render-77')">recovered</button>`)}</div>
+      <div class="diag-track"><div class="diag-track-label">CPU / Thread</div>${body(events)}</div>
+      <div class="diag-track"><div class="diag-track-label">HiLog</div>${body(logs)}</div>
+    </div></section>`;
+}
+function pDiagnosticSession(){
+  return `<div class="diag-shell" data-page-title="Diagnostics · Session" data-acin><span class="ac">DIAGNOSTIC-LINKED-TIME</span>
+    <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='capture';renderPage()">新建诊断</button>
+      <select class="inp" aria-label="选择 Diagnostic Session"><option>今天 11:02 · 低干扰诊断 · 含录屏 · Ready</option><option>今天 09:41 · 图形诊断 · 无录屏 · Partial</option></select>
+      <span class="diag-target"><span class="dot ok"></span><b>DAYU200</b><span class="mono">TGT-9587… · binding r3</span></span><span class="spacer"></span>
+      <button class="diag-align" onclick="showDiagAlignment()">${icon("warning",true)} 已校准 ±12 ms</button>
+      <button class="btn" onclick="doneBtn(this,'已准备导出预览')">导出…</button></div>
+    <div class="diag-overview">${diagFramePaneHTML()}${diagContextPaneHTML()}</div>
+    ${diagTimelineHTML()}
+    <div class="diag-boundary">${icon("warning",true)} <span><b>目标设计 · 演示数据。</b> 当前示例来自一次显式开启录屏的 Session；新建诊断默认不持续录屏。当前发布的 <span class="mono">capture.diagnostics@1</span> 只有单张 screenshot、Trace 和 HiLog，屏幕视频与 clock calibration 尚未 production available。</span></div>
+  </div>`;
+}
+function pDiagnosticCapture(){
+  const t=S.diagnostics,p=DIAG_PRESETS[t.preset];
+  return `<div class="diag-capture" data-page-title="Diagnostics · 新建诊断">
+    <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='session';renderPage()">返回 Session</button><span class="hint">DAYU200 · TGT-9587… · binding r3</span></div>
+    <section><h2>选择诊断方式</h2><p class="hint">开始后，等所有必需通道就绪，再到设备上复现问题。</p></section>
+    <div class="diag-preset-grid">
+      ${DIAG_PRESETS.map((item,i)=>`<button class="diag-preset ${t.preset===i?"on":""}" onclick="chooseDiagPreset(${i})" aria-pressed="${t.preset===i}"><b>${item.name}</b><p>${item.description}</p><span class="meta">${item.duration}s · ${item.channels}</span></button>`).join("")}
+    </div>
+    <section class="card"><h2>采集通道 <span class="chip dim" style="margin-left:auto">上限 ${p.duration} 秒</span></h2><div class="diag-channel-list">
+      <div class="diag-channel"><b>✓ Trace</b><span>required · device monotonic</span></div>
+      <div class="diag-channel"><b>✓ HiLog</b><span>required · bounded</span></div>
+      <div class="diag-channel"><b>✓ Marker 截图</b><span>仅标记问题时按需抓取</span></div>
+      <label class="diag-channel"><b><input type="checkbox" ${t.includeVideo?"checked":""} onchange="S.diagnostics.includeVideo=this.checked;renderPage()"> 屏幕录制</b><span>${t.includeVideo?"已开启 · 可能影响性能":"optional · 默认关闭"}</span></label>
+    </div>
+    <details class="flash-details"><summary>高级设置</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+      <div><span class="hint">Trace categories</span><div class="tagpick">${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleDiagTag('${x}')">${x}</button>`).join("")}${TRACE_TAGS_NO.map(x=>`<button disabled title="设备未报告支持该 tag">${x}</button>`).join("")}</div></div>
+      <p class="hint">HiLog filter：warning+ · Artifact byte budget：128 MB · redaction：standard。这里只组合 typed inputs，不暴露 raw argv 或设备路径。</p>
+    </div></details></section>
+    <div class="diag-boundary">${icon("warning",true)} <span>Diagnostics 默认只在 Marker 时按需截图。持续录屏必须显式开启，并固定展示性能影响；当前 Provider 未发布完整能力时必须显示 unavailable，不能从 App 执行 raw HDC 兜底。</span></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn pri" onclick="startDiagnostic()">开始诊断</button><span class="hint">预计上限 128 MB · 全部 Artifact 默认保存在本地</span></div>
+  </div>`;
+}
+function formatDiagElapsed(seconds){return String(Math.floor(seconds/60)).padStart(2,"0")+":"+String(seconds%60).padStart(2,"0");}
+function pDiagnosticRecording(){
+  const t=S.diagnostics;
+  return `<div class="diag-shell" data-page-title="Diagnostics · 正在诊断"><div class="diag-recording">
+    <div class="diag-recording-status"><span class="dot" style="background:var(--danger)"></span><div><h2>采集已开始，现在开始复现</h2><p>在问题出现时选择“标记并截图”。采集将在 ${t.dur} 秒后自动结束。</p></div></div>
+    <div class="diag-recording-time" aria-label="已采集 ${formatDiagElapsed(t.elapsed)}">${formatDiagElapsed(t.elapsed)}</div>
+    <div class="diag-channel-list"><div class="diag-channel"><b>● Trace</b><span>recording · 同一时钟</span></div><div class="diag-channel"><b>● HiLog</b><span>recording · bounded</span></div><div class="diag-channel"><b>● Marker 截图</b><span>${t.markers.length} 张按需截图</span></div><div class="diag-channel"><b>${t.includeVideo?"●":"○"} 屏幕录制</b><span>${t.includeVideo?"recording · 可能影响性能":"off · 无持续取帧"}</span></div></div>
+    <div class="diag-recording-actions"><button class="btn pri" onclick="addDiagMarker()">标记并截图 <span class="mono">⌘M</span></button><button class="btn" onclick="stopDiagnostic()">停止并生成结果</button><span class="hint" role="status" aria-live="polite" id="diagCaptureStatus">${t.markers.length?`最近标记：${diagTime(t.markers[t.markers.length-1].time)} · 截图已保存`:"尚未添加 Marker"}</span></div>
+    <div class="diag-marker-list">${t.markers.map((m,i)=>`<span class="chip dim">Marker ${i+1} · ${diagTime(m.time)} · ${esc(m.label)}</span>`).join("")}</div>
+    <div class="diag-boundary">${icon("warning",true)} <span>目标设计演示：Runtime authority、精确 target、Artifact budget 与安全边界不会由这个按钮创建或放宽。</span></div>
+  </div></div>`;
+}
+function pDiagnosticFinalizing(){
+  return `<div class="diag-shell" data-page-title="Diagnostics · 正在生成结果"><div class="diag-recording">
+    <div class="diag-recording-status"><span class="ibar" style="display:block;min-width:120px;margin-top:8px"></span><div><h2>正在生成诊断结果</h2><p>正在接收、校验并建立时间索引。没有可靠总量，因此不显示百分比。</p></div></div>
+    <div class="phases"><span class="ph done">停止采集</span><span class="ph run">校验 Artifact</span><span class="ph">校准时钟</span><span class="ph">建立索引</span></div>
+  </div></div>`;
+}
+function pDiagnostics(){
+  if(S.diagnostics.view==="capture")return pDiagnosticCapture();
+  if(S.diagnostics.view==="recording")return pDiagnosticRecording();
+  if(S.diagnostics.view==="finalizing")return pDiagnosticFinalizing();
+  return pDiagnosticSession();
+}
+function startDiagnostic(){
+  if(S.diagnostics.running)return;clearInterval(S.diagnostics.timer);S.diagnostics.running=true;S.diagnostics.finishing=false;S.diagnostics.elapsed=0;S.diagnostics.markers=[];S.diagnostics.view="recording";
+  const j={id:"J"+(S.jobSeq++),title:"诊断采集 · "+diagnosticTitle()+" · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
+    phases:["Preflight","Arming","Recording","Finalizing"],phaseIdx:2,safeBoundary:2,log:["→ Preflight","→ Arming","required channels ready",S.diagnostics.includeVideo?"→ Recording · screen video enabled":"→ Recording · continuous screen video off"],pages:["diagnostics"],cancelled:false};
+  S.jobs.push(j);S.diagnostics.job=j;renderDrawer();renderPage();
+  S.diagnostics.timer=setInterval(()=>{if(!S.diagnostics.running)return;if(j.cancelled){stopDiagnostic("cancelled");return;}S.diagnostics.elapsed++;
+    if(S.diagnostics.elapsed>=S.diagnostics.dur){stopDiagnostic("succeeded");return;}renderPageIf(["diagnostics"]);},1000);
+}
+function addDiagMarker(){
+  if(!S.diagnostics.running)return;const time=DIAG_START+Math.min(7.8,S.diagnostics.elapsed/Math.max(1,S.diagnostics.dur)*8);
+  S.diagnostics.markers.push({time,label:"问题出现"});S.diagnostics.job?.log.push("Marker "+S.diagnostics.markers.length+" + screenshot @ "+diagTime(time));renderDrawer();renderPage();
+}
+function stopDiagnostic(result="succeeded"){
+  if(!S.diagnostics.running||S.diagnostics.finishing)return;clearInterval(S.diagnostics.timer);S.diagnostics.finishing=true;S.diagnostics.view="finalizing";
+  const j=S.diagnostics.job;if(j){j.phaseIdx=3;j.log.push("→ Finalizing");}renderDrawer();renderPage();
+  setTimeout(()=>{S.diagnostics.running=false;S.diagnostics.finishing=false;S.diagnostics.view="session";const firstMarker=S.diagnostics.markers[0]?.time;
+    S.diagnostics.cursor=firstMarker||13.242;S.diagnostics.rangeStart=null;S.diagnostics.selectedEvent=firstMarker?null:"render-42";S.diagnostics.selectedLog=nearestDiagLogID(S.diagnostics.cursor);
+    if(j){j.state=result;j.log.push(result==="cancelled"?"已在安全边界停止；现有 Artifact 以 Partial 打开。":"完成：Artifact 已校验，时间索引已建立（演示）。");histFromJob(j);}
+    renderDrawer();renderPage();},900);
+}
+
+/* ---------- Toolkit · Device Control ---------- */
+function toolTime(){return new Date().toLocaleTimeString("zh-CN",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});}
+function toolRecordTime(){const s=S.tools.recordSeconds;return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+function toolPushEvent(kind,text,detail){S.tools.events.unshift({time:toolTime(),kind,text,detail});S.tools.events=S.tools.events.slice(0,12);const status=$("toolActionStatus");if(status)status.textContent=text+"，"+detail;}
+function captureToolScreenshot(){
+  S.tools.screenshotAt=toolTime()+"."+String(Math.floor(Math.random()*1000)).padStart(3,"0");
+  toolPushEvent("capture","已获取截图","screen-"+S.tools.screenshotAt.replaceAll(":","").replace(".","-")+".png · 431 KB");renderPage();
+}
+function toggleToolPreview(){
+  S.tools.preview=S.tools.preview==="snapshot"?"live":"snapshot";
+  toolPushEvent("preview",S.tools.preview==="live"?"已开启低帧率预览":"已停止持续预览",S.tools.preview==="live"?"5 fps · 仅用于操作反馈":"恢复按需截图");renderPage();
+}
+function startToolRecording(){
+  if(S.tools.recording||S.tools.recordPhase==="receiving")return;clearInterval(S.tools.timer);clearTimeout(S.tools.receiveTimer);S.tools.recording=true;S.tools.recordPhase="recording";S.tools.recordSeconds=0;
+  const j={id:"J"+(S.jobSeq++),title:"真机录屏 · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
+    phases:["Preflight","Recording","Receiving","Validating"],phaseIdx:1,safeBoundary:1,log:["→ Preflight","→ Recording · 720p · 15 fps"],pages:["tools"],cancelled:false};
+  S.tools.recordJob=j;S.jobs.push(j);toolPushEvent("record","已开始录屏","720p · 15 fps · 最长 60 秒");renderDrawer();renderPage();
+  S.tools.timer=setInterval(()=>{if(!S.tools.recording)return;if(j.cancelled){stopToolRecording("cancelled");return;}S.tools.recordSeconds++;
+    if(S.tools.recordSeconds>=60){stopToolRecording("succeeded");return;}renderPageIf(["tools"]);},1000);
+}
+function stopToolRecording(result="succeeded"){
+  if(!S.tools.recording)return;clearInterval(S.tools.timer);S.tools.recording=false;
+  S.tools.recordPhase="receiving";const j=S.tools.recordJob;if(j){j.phaseIdx=2;j.log.push("→ Receiving · 正在从设备拉取视频");}
+  toolPushEvent("record","已停止录制，正在拉取视频",`设备 → Mac · ${toolRecordTime()}`);renderDrawer();renderPage();
+  S.tools.receiveTimer=setTimeout(()=>finalizeToolRecording(j?.cancelled?"cancelled":result),900);
+}
+function finalizeToolRecording(result="succeeded"){
+  const j=S.tools.recordJob,partial=result!=="succeeded",name=partial?"screen-recording-partial.mp4":"screen-recording.mp4",size=Math.max(1.2,S.tools.recordSeconds*.85).toFixed(1)+" MB";
+  S.tools.recordPhase="ready";S.tools.lastRecording={name,duration:toolRecordTime(),size,hash:"9d7a…e241",path:`~/Library/Application Support/ArkDeck/Artifacts/${j?.id||"CTRL-001"}/${name}`,partial};
+  if(j){j.phaseIdx=3;j.state=result;j.log.push("→ Validating · byte count / SHA-256 / MP4 container",partial?"部分视频已拉取；remote cleanup debt 保留":"完成：本地 Artifact 已校验并原子发布；设备临时文件可清理");histFromJob(j);}
+  toolPushEvent("record",partial?"部分录屏已拉取到 Mac":"录屏已保存到 Mac",`${name} · ${size} · SHA-256 9d7a…e241`);renderDrawer();renderPage();
+}
+function toolRevealRecording(el){doneBtn(el,"已在 Finder 中显示（演示）");const status=$("toolActionStatus");if(status)status.textContent="已在 Finder 中显示录屏（演示）";}
+function toolSaveRecordingAsModal(){
+  const r=S.tools.lastRecording;if(!r)return;modal(`<div class="modal"><h3>另存为录屏</h3><p class="hint">产品中这里使用 macOS 保存面板导出副本；ArkDeck managed raw Artifact 保持不变。</p><div class="kv"><dt>文件名</dt><dd>${esc(r.name)}</dd><dt>默认位置</dt><dd>下载</dd><dt>来源</dt><dd>${esc(r.path)}</dd></div><div class="mfoot"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" onclick="closeModal();document.getElementById('toolActionStatus').textContent='已保存录屏副本（演示）'">保存副本（演示）</button></div></div>`);
+}
+function toolPoint(event){
+  const r=event.currentTarget.getBoundingClientRect();
+  return{x:Math.max(0,Math.min(1080,Math.round((event.clientX-r.left)/r.width*1080))),y:Math.max(0,Math.min(1920,Math.round((event.clientY-r.top)/r.height*1920)))};
+}
+function sendToolClick(x,y){x=Math.round(Number(x));y=Math.round(Number(y));S.tools.lastInput={kind:"click",x,y};toolPushEvent("input","点击",`(${x}, ${y}) · confirmed`);renderPage();}
+function sendToolSwipe(x1,y1,x2,y2,duration=320){
+  [x1,y1,x2,y2,duration]=[x1,y1,x2,y2,duration].map(Number);S.tools.lastInput={kind:"swipe",x1,y1,x2,y2,duration};
+  toolPushEvent("input","滑动",`(${x1}, ${y1}) → (${x2}, ${y2}) · ${duration} ms`);renderPage();
+}
+function updateToolDragPreview(a,b){
+  const el=$("toolDragPreview");if(!el)return;const x1=a.x/10.8,y1=a.y/19.2,x2=b.x/10.8,y2=b.y/19.2,dx=x2-x1,dy=y2-y1;
+  el.hidden=false;el.style.left=x1+"%";el.style.top=y1+"%";el.style.width=Math.hypot(dx,dy)+"%";el.style.transform=`rotate(${Math.atan2(dy,dx)*180/Math.PI}deg)`;
+}
+function clearToolPointer(){S.tools.pointerStart=null;S.tools.pointerNow=null;S.tools.pointerStartedAt=0;S.tools.pointerId=null;const el=$("toolDragPreview");if(el)el.hidden=true;}
+function handleToolPointerDown(event){
+  if(event.button!==0)return;const p=toolPoint(event);S.tools.pointerStart={...p,clientX:event.clientX,clientY:event.clientY};S.tools.pointerNow=p;S.tools.pointerStartedAt=performance.now();S.tools.pointerId=event.pointerId;
+  event.currentTarget.focus({preventScroll:true});event.currentTarget.setPointerCapture?.(event.pointerId);event.preventDefault();updateToolDragPreview(p,p);
+}
+function handleToolPointerMove(event){if(!S.tools.pointerStart||event.pointerId!==S.tools.pointerId)return;S.tools.pointerNow=toolPoint(event);updateToolDragPreview(S.tools.pointerStart,S.tools.pointerNow);}
+function handleToolPointerUp(event){
+  if(!S.tools.pointerStart||event.pointerId!==S.tools.pointerId)return;const a=S.tools.pointerStart,b=toolPoint(event),distance=Math.hypot(event.clientX-a.clientX,event.clientY-a.clientY),duration=Math.max(80,Math.min(2000,Math.round(performance.now()-S.tools.pointerStartedAt)));
+  event.currentTarget.releasePointerCapture?.(event.pointerId);clearToolPointer();distance<6?sendToolClick(b.x,b.y):sendToolSwipe(a.x,a.y,b.x,b.y,duration);
+}
+function handleToolPointerCancel(event){if(event.pointerId!==S.tools.pointerId)return;clearToolPointer();}
+function positionToolKeyboardCursor(){const el=$("toolKeyboardCursor"),p=S.tools.keyboardCursor;if(el){el.style.left=p.x/10.8+"%";el.style.top=p.y/19.2+"%";}}
+function handleToolCanvasKey(event){
+  const p=S.tools.keyboardCursor;if(event.key==="Enter"||event.key===" "){event.preventDefault();sendToolClick(p.x,p.y);requestAnimationFrame(()=>document.querySelector(".device-screen")?.focus());return;}
+  const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];if(!delta)return;event.preventDefault();const step=event.shiftKey?280:54,next={x:Math.max(0,Math.min(1080,p.x+delta[0]*step)),y:Math.max(0,Math.min(1920,p.y+delta[1]*step))};S.tools.keyboardCursor=next;
+  if(event.shiftKey){sendToolSwipe(p.x,p.y,next.x,next.y,280);requestAnimationFrame(()=>document.querySelector(".device-screen")?.focus());}else positionToolKeyboardCursor();
+}
+function toolInputFeedback(){
+  const i=S.tools.lastInput;if(!i)return"";
+  if(i.kind==="click")return `<span class="device-touch-feedback" style="left:${i.x/10.8}%;top:${i.y/19.2}%" aria-hidden="true"></span>`;
+  const x1=i.x1/10.8,y1=i.y1/19.2,x2=i.x2/10.8,y2=i.y2/19.2,dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)*180/Math.PI;
+  return `<span class="device-swipe-feedback" style="left:${x1}%;top:${y1}%;width:${len}%;transform:rotate(${angle}deg)" aria-hidden="true"></span>`;
+}
+function toolDeviceScreenHTML(){
+  const p=S.tools.keyboardCursor;
+  return `<button class="device-screen" aria-label="设备操作画面：单击发送点击，按住拖动发送滑动；键盘方向键移动指针，Enter 点击，Shift 加方向键滑动" onkeydown="handleToolCanvasKey(event)" onpointerdown="handleToolPointerDown(event)" onpointermove="handleToolPointerMove(event)" onpointerup="handleToolPointerUp(event)" onpointercancel="handleToolPointerCancel(event)">
+    <span class="device-screen-content" aria-hidden="true"><span class="device-screen-status"><span>11:26</span><span>5G&nbsp;&nbsp;▰</span></span><span class="device-screen-title">设置</span>
+      <span class="device-screen-search">搜索设置项</span><span class="device-screen-card"><i></i><span><b>小艺</b><span>华为账号、云空间与服务</span></span></span>
+      <span class="device-screen-row"><span class="glyph">W</span><span>WLAN</span><span class="value">已连接</span><span class="device-screen-switch"></span></span>
+      <span class="device-screen-row"><span class="glyph" style="background:#4f79db">B</span><span>蓝牙</span><span class="value">已开启</span></span>
+      <span class="device-screen-row"><span class="glyph" style="background:#34a853">M</span><span>移动网络</span></span>
+    </span>${S.tools.showTouches?toolInputFeedback():""}<span class="device-drag-preview" id="toolDragPreview" hidden aria-hidden="true"></span><span class="device-keyboard-cursor" id="toolKeyboardCursor" style="left:${p.x/10.8}%;top:${p.y/19.2}%" aria-hidden="true"></span></button>`;
+}
+function toolEventRows(){return S.tools.events.map(e=>`<div class="tool-event-row"><time>${esc(e.time)}</time><span class="tool-event-icon">${icon(e.kind==="capture"?"camera":e.kind==="record"?"record":e.kind==="preview"?"eye":"pointer",true)}</span><span class="tool-event-copy"><b>${esc(e.text)}</b><span>${esc(e.detail)}</span></span></div>`).join("");}
+function toolRecordingResultHTML(){
+  const t=S.tools;if(t.recordPhase==="receiving")return `<div class="recording-result receiving" role="status"><span class="recording-result-icon">${icon("download",true)}</span><span class="recording-result-copy"><b>正在拉取视频到 Mac</b><span>设备端录制已停止，正在接收并校验本地文件。</span><span class="recording-path">Receiving · byte count / SHA-256 / MP4 container</span></span></div>`;
+  const r=t.lastRecording;if(!r)return"";return `<div class="recording-result" role="status"><span class="recording-result-icon" aria-hidden="true">✓</span><span class="recording-result-copy"><b>${r.partial?"部分录屏已拉取到 Mac":"录屏已保存到 Mac"}</b><span>${esc(r.name)} · ${esc(r.duration)} · ${esc(r.size)} · SHA-256 ${esc(r.hash)}</span><span class="recording-path" title="${esc(r.path)}">${esc(r.path)}</span></span><span class="recording-result-actions"><button class="btn" onclick="toolRevealRecording(this)">在 Finder 中显示</button><button class="btn" onclick="toolSaveRecordingAsModal()">另存为…</button></span></div>`;
+}
+function pTools(){
+  const t=S.tools,live=t.preview==="live",receiving=t.recordPhase==="receiving";
+  return `<div class="tools-shell" data-page-title="Toolkit · 真机操作" data-acin><span class="ac">TOOLKIT-DEVICE-CONTROL</span>
+    <aside class="tools-rail" aria-label="工具列表"><div class="tools-rail-title">工具</div>
+      <button class="tool-nav-item on" aria-current="page"><svg class="symbol"><use href="#i-device-control"></use></svg><span class="tool-nav-copy"><b>真机操作</b><span>画面与输入</span></span></button>
+      <div class="tool-placeholder">后续工具只在对应 typed operation 发布后出现，不提供 raw shell。</div>
+    </aside>
+    <div class="device-tool"><div class="tool-toolbar">
+      <div class="tool-target"><span class="dot ok"></span><span class="tool-target-copy"><b>DAYU200 · USB</b><span>TGT-9587… · binding r3 · 1080×1920 · portrait</span></span></div>
+      <div class="tool-toolbar-actions">${t.recording?`<span class="tool-recording" aria-label="正在录屏，已录制 ${toolRecordTime()}"><span class="dot"></span> REC ${toolRecordTime()}</span>`:""}
+        <button class="btn" onclick="captureToolScreenshot()">${icon("camera",true)} 获取截图</button>
+        <button class="btn ${live?"danger":""}" onclick="toggleToolPreview()">${icon("eye",true)} ${live?"停止持续预览":"开启低帧率预览"}</button>
+        <button class="btn ${t.recording?"danger":"pri"}" onclick="${t.recording?"stopToolRecording()":"startToolRecording()"}" ${receiving?"disabled":""}>${icon(receiving?"download":"record",true)} ${receiving?"正在拉取视频…":t.recording?"停止录制":"开始录屏"}</button>
+      </div></div>
+      ${toolRecordingResultHTML()}
+      <div class="device-control-grid">
+        <section class="device-preview-pane" aria-labelledby="devicePreviewTitle"><div class="device-pane-head"><h2 id="devicePreviewTitle">设备画面</h2><span class="spacer"></span><span class="chip dim">单击 · 拖动</span></div>
+          <div class="device-stage">${toolDeviceScreenHTML()}</div>
+          <div class="device-preview-meta"><span class="chip ${live?"warn":"ok"}">${live?"● 低帧率预览 · 5 fps":"✓ 按需截图 · 无持续取帧"}</span><span class="mono">${esc(t.screenshotAt)}</span><span>显示触点 ${t.showTouches?"开":"关"}</span></div>
+        </section>
+        <aside class="device-inspector" aria-label="真机操作控制与历史">
+          <section class="tool-section"><div class="tool-section-head"><h2>操作方式</h2><span class="spacer"></span><p>直接转换系统鼠标事件</p></div>
+            <div class="gesture-guide"><div class="gesture-guide-row">${icon("pointer",true)}<span class="gesture-guide-copy"><b>单击设备画面</b><span>pointer down / up 转换为一次点击，无需输入坐标。</span></span></div><div class="gesture-guide-row">${icon("swipe",true)}<span class="gesture-guide-copy"><b>按住并拖动</b><span>拖动方向和实际按住时长转换为一次滑动，松开后才发送。</span></span></div><div class="gesture-guide-row">${icon("keyboard",true)}<span class="gesture-guide-copy"><b>键盘操作</b><span>方向键移动虚拟指针，Enter 点击，Shift + 方向键滑动。</span></span></div></div>
+          </section>
+          <section class="tool-section"><div class="tool-section-head"><h2>操作记录</h2><span class="spacer"></span><p>最近 ${t.events.length} 项</p></div><div class="tool-event-list">${toolEventRows()}</div></section>
+          <section class="tool-section"><div class="performance-note">${icon("warning",true)} <span><b>默认不持续取帧。</b> 低帧率预览和录屏都可能改变设备负载；录屏开始后预览不会自动开启。</span></div></section>
+        </aside>
+      </div>
+      <div class="tools-boundary">${icon("warning",true)} <span><b>目标设计 · 演示数据。</b> 截图、录屏、点击和滑动必须分别由已发布 typed operation materialize；每次输入绑定当前 target、binding、分辨率与方向，结果未知时不自动重放。当前原型不会向设备发送操作。</span></div>
+    </div></div>`;
 }
 
 /* ---------- Debug ---------- */
@@ -1961,7 +2539,7 @@ function pHistory(){
 
 /* ---------- Automation / bounded AI loop ---------- */
 function pAutomation(){
-  return recoveryHTML()+`
+  return recoveryHTML()+`<div class="page-lead" data-page-title="Automation"></div>
   <div class="two">
     <div class="card">
       <h2>Runtime tasks</h2>
@@ -2040,7 +2618,7 @@ function diagModal(){
 }
 
 /* ---------- render ---------- */
-const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pViewer,trace:pTrace,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
+const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pViewer,trace:pTrace,diagnostics:pDiagnostics,tools:pTools,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
 function renderDevs(){
   $("devlist").innerHTML=DEVICES.map(d=>`
     <button class="dev ${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"on":""}" onclick="pickDevice('${d.id}')" oncontextmenu="openDeviceMenu(event,'${d.id}')" aria-current="${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"page":"false"}">
@@ -2054,6 +2632,8 @@ function renderNav(){
 }
 function renderPage(){
   $("page").classList.toggle("viewer-page",S.nav==="dump");
+  $("page").classList.toggle("diagnostic-page",S.nav==="diagnostics"&&S.diagnostics.view!=="capture");
+  $("page").classList.toggle("tools-page",S.nav==="tools");
   $("page").innerHTML=PAGES[S.nav]();
   const titled=$("page").querySelector("[data-page-title]");
   if(titled){document.querySelector(".titlebar .t").textContent=titled.dataset.pageTitle;$("page").setAttribute("aria-label",titled.dataset.pageTitle);}
