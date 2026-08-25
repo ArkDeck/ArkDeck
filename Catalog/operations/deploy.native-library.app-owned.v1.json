@@ -46,8 +46,8 @@
         "type": "string",
         "required": false,
         "enum": ["hashOnly", "hashAndProcess", "hashProcessAndMaps"],
-        "default": "hashAndProcess",
-        "description": "How much of the deployment is proven after publication. `hashOnly` compares the published bytes, `hashAndProcess` also requires the process to be live, `hashProcessAndMaps` additionally requires the library to appear in the process's loaded maps."
+        "default": "hashProcessAndMaps",
+        "description": "How much of the deployment is proven after publication. `hashOnly` compares the published bytes, `hashAndProcess` also requires the process to be live, and the default `hashProcessAndMaps` additionally requires the library to appear in the process's loaded maps."
       },
       "rollbackPolicy": {
         "type": "string",

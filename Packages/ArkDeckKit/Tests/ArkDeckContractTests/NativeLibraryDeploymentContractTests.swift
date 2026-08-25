@@ -475,6 +475,11 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(
         reference: "deploy.native-library.app-owned@1"))
+    let verificationInput = try XCTUnwrap(
+      descriptor.inputs.first { $0.name == "verificationProfile" })
+    XCTAssertEqual(
+      verificationInput.defaultValue, .string("hashProcessAndMaps"),
+      "the published default must prove loader maps even when the caller omits the field")
     let provider = HDCObservationProviderAdapter(
       factsPort: FactsPort(),
       appOwnedNativeLibraryAvailability: .available)
@@ -854,19 +859,17 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       XCTAssertEqual(summary["loaderVerified"], "notObserved", profile)
     }
 
-    // And the shape a caller who names no profile gets: the runtime's own
-    // fallback, which is one of the weak ones. It must be labelled the same
-    // way — this is the run that reaches a device when nobody chose.
+    // A caller that names no profile gets the GJ-3 default. It must read and
+    // prove loaded maps rather than silently falling back to process liveness.
     let defaulted = try deployment(profile: nil)
-    XCTAssertEqual(try mapsReads(defaulted), 0)
-    guard case .verified(let defaultedSummary) = try verdict(defaulted, mapsObserved: false)
+    XCTAssertEqual(defaulted.verificationProfile, .hashProcessAndMaps)
+    XCTAssertEqual(try mapsReads(defaulted), 1)
+    guard case .verified(let defaultedSummary) = try verdict(defaulted, mapsObserved: true)
     else {
-      return XCTFail("the defaulted profile still verifies what it did read")
+      return XCTFail("the defaulted profile must prove the loaded library")
     }
-    XCTAssertEqual(defaultedSummary["loaderVerified"], "notObserved")
-    XCTAssertNotEqual(
-      defaultedSummary["loaderVerified"], strongSummary["loaderVerified"],
-      "a run that never read the loader must not be recorded like one that did")
+    XCTAssertEqual(defaultedSummary["loaderVerified"], "true")
+    XCTAssertEqual(defaultedSummary["loaderVerified"], strongSummary["loaderVerified"])
   }
 
   func testPersistedNativeActionReusesExactClosedLegacyPaths() throws {

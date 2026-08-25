@@ -47,8 +47,9 @@ final class AppShellUITests: XCTestCase {
     let deviceRow = app.descendants(matching: .any).matching(
       NSPredicate(
         format: "identifier BEGINSWITH %@ AND NOT identifier BEGINSWITH %@",
-        "device.row.", "device.row.observed."))
-      .firstMatch
+        "device.row.", "device.row.observed.")
+    )
+    .firstMatch
     let appeared = deviceRow.waitForExistence(timeout: 10)
     XCTAssertTrue(appeared, "The connected-device row never appeared")
     let evidenceText = try XCTUnwrap(deviceRow.value as? String)
@@ -104,13 +105,15 @@ final class AppShellUITests: XCTestCase {
         inspectorShow: "Show job inspector",
         inspectorReadOnly: "Read-only Runtime facts",
         debugPanels: [
-          "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
+          "Build Artifact", "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
           "Provider invocation disclosure",
         ],
         viewerEmptyTitle: "No verified capture",
         traceAvailable: "Ready",
         traceUnavailable: "Unavailable",
-        settingsPanes: ["General", "Toolchains", "Storage", "Updates", "Diagnostics"]),
+        settingsPanes: [
+          "General", "Toolchains", "Servers", "Storage", "Updates", "Diagnostics",
+        ]),
       history: History(
         readOnlyNote:
           "This workspace reads Runtime state. It cannot submit, cancel, or retry anything.",
@@ -152,12 +155,13 @@ final class AppShellUITests: XCTestCase {
         inspectorShow: "展开 Job 检查器",
         inspectorReadOnly: "只读 Runtime 事实",
         debugPanels: [
-          "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则", "Provider 调用披露",
+          "编译产物", "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则",
+          "Provider 调用披露",
         ],
         viewerEmptyTitle: "没有已验证的 capture",
         traceAvailable: "可以抓取",
         traceUnavailable: "暂时无法抓取",
-        settingsPanes: ["通用", "工具链", "存储", "更新", "诊断"]),
+        settingsPanes: ["通用", "工具链", "服务器", "存储", "更新", "诊断"]),
       history: History(
         readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
         outcomeUnknown: "结果未知——此 Job 对设备的影响从未被确认。",
@@ -216,6 +220,37 @@ final class AppShellUITests: XCTestCase {
     let restoredWaveform = element("settings.general.appIcon.waveform", in: reopened)
     restoredWaveform.click()
     XCTAssertEqual(restoredWaveform.value as? String, "Selected")
+  }
+
+  func testRemoteBuildSourceSettingsSurfaceIsReachableAndFailClosed() {
+    let app = launch(arguments: ["-AppleLanguages", "(en)"])
+    openSettings(in: app)
+
+    let servers = app.buttons["Servers"]
+    XCTAssertTrue(servers.waitForExistenceFast(timeout: 10))
+    servers.click()
+    XCTAssertTrue(app.buttons["settings.remoteSources.add"].waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(app.buttons["settings.remoteSources.refresh"].exists)
+
+    app.buttons["settings.remoteSources.add"].click()
+    XCTAssertTrue(
+      element("settings.remoteSources.field.host", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(element("settings.remoteSources.field.root", in: app).exists)
+    let authentication = element("settings.remoteSources.field.authentication", in: app)
+    XCTAssertTrue(authentication.exists)
+    authentication.click()
+    let privateKey = app.menuItems["OpenSSH private key"]
+    XCTAssertTrue(privateKey.waitForExistenceFast(timeout: 5))
+    privateKey.click()
+    XCTAssertTrue(
+      app.staticTexts["System default (id_rsa → id_ed25519)"].waitForExistenceFast(timeout: 5),
+      "private-key authentication should not require selecting a replacement key")
+    XCTAssertTrue(app.buttons["settings.remoteSources.choosePrivateKey"].exists)
+    XCTAssertTrue(app.buttons["settings.remoteSources.testConnection"].exists)
+    XCTAssertFalse(
+      app.buttons["settings.remoteSources.save"].isEnabled,
+      "an unverified server must not be saved")
+    app.buttons["settings.remoteSources.cancel"].click()
   }
 
   func testDeviceContextMenuRenamesAndRefreshesDeviceState() {
@@ -484,7 +519,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(element("flash.runtime.result", in: app), equals: flash.runtimeResult)
     XCTAssertFalse(app.buttons["flash.execute.submit"].exists, file: file, line: line)
 
-    // Debug is a complete native workspace with four distinct panels. The
+    // Debug is a complete native workspace with five distinct panels. The
     // production App read channel has no target in this fixture, so every
     // mutation stays disabled while its exact form remains inspectable.
     // The page title lives in the window toolbar; the content area carries
@@ -497,16 +532,11 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(app.buttons["debug.refresh"].exists, file: file, line: line)
     let debugTabs = element("debug.tabs", in: app)
     XCTAssertTrue(debugTabs.exists, file: file, line: line)
-    let debugStart = app.buttons["debug.logs.start"]
-    XCTAssertTrue(debugStart.exists, file: file, line: line)
-    XCTAssertFalse(debugStart.isEnabled, file: file, line: line)
-    // Pausing is a viewport action that exists only while a capture runs; in
-    // this read-only build nothing captures, so the button stays disabled.
-    let pauseViewport = app.buttons["debug.logs.pauseViewport"]
-    XCTAssertTrue(pauseViewport.exists, file: file, line: line)
-    XCTAssertFalse(pauseViewport.isEnabled, file: file, line: line)
-    XCTAssertEqual(workspaces.debugPanels.count, 4, file: file, line: line)
-    let debugTabIDs = ["logs", "apps", "network", "commands"]
+    let artifactPreview = app.buttons["debug.artifacts.preview"]
+    XCTAssertTrue(artifactPreview.exists, file: file, line: line)
+    XCTAssertFalse(artifactPreview.isEnabled, file: file, line: line)
+    XCTAssertEqual(workspaces.debugPanels.count, 5, file: file, line: line)
+    let debugTabIDs = ["artifacts", "logs", "apps", "network", "commands"]
     for (tabID, panelTitle) in zip(debugTabIDs, workspaces.debugPanels) {
       let tab = element("debug.tab.\(tabID)", in: app)
       XCTAssertTrue(tab.waitForExistenceFast(timeout: 5), file: file, line: line)
@@ -515,6 +545,27 @@ final class AppShellUITests: XCTestCase {
         app.staticTexts[panelTitle].waitForExistenceFast(timeout: 5),
         "Debug panel \(tabID) did not render", file: file, line: line)
     }
+    let artifactsTab = element("debug.tab.artifacts", in: app)
+    let logsTab = element("debug.tab.logs", in: app)
+    let commandsTab = element("debug.tab.commands", in: app)
+    artifactsTab.click()
+    artifactsTab.typeKey(.end, modifierFlags: [])
+    XCTAssertTrue(commandsTab.isSelected, file: file, line: line)
+    commandsTab.typeKey(.home, modifierFlags: [])
+    XCTAssertTrue(artifactsTab.isSelected, file: file, line: line)
+    artifactsTab.typeKey(.rightArrow, modifierFlags: [])
+    XCTAssertTrue(logsTab.isSelected, file: file, line: line)
+    logsTab.typeKey(.leftArrow, modifierFlags: [])
+    XCTAssertTrue(artifactsTab.isSelected, file: file, line: line)
+    clickCorrectingNavigationSplitAXOffset(element("debug.tab.logs", in: app), in: app)
+    let debugStart = app.buttons["debug.logs.start"]
+    XCTAssertTrue(debugStart.exists, file: file, line: line)
+    XCTAssertFalse(debugStart.isEnabled, file: file, line: line)
+    // Pausing is a viewport action that exists only while a capture runs; in
+    // this read-only build nothing captures, so the button stays disabled.
+    let pauseViewport = app.buttons["debug.logs.pauseViewport"]
+    XCTAssertTrue(pauseViewport.exists, file: file, line: line)
+    XCTAssertFalse(pauseViewport.isEnabled, file: file, line: line)
 
     // Viewer keeps its capture scope, its search field and its explicit
     // "no verified capture" state visible when Runtime has published nothing.
@@ -791,7 +842,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
 
     // The Settings scene is its own window, so it comes after every sidebar
-    // interaction. Both languages verify the five panes and the safe controls;
+    // interaction. Both languages verify the six product panes and the safe controls;
     // the update state machine asserts English status strings, so English
     // carries that walk.
     openSettings(in: app)
@@ -806,6 +857,22 @@ final class AppShellUITests: XCTestCase {
       file: file, line: line)
     XCTAssertTrue(app.buttons["settings.toolchains.refresh"].exists, file: file, line: line)
     app.buttons[workspaces.settingsPanes[2]].click()
+    XCTAssertTrue(
+      app.buttons["settings.remoteSources.add"].waitForExistenceFast(timeout: 10),
+      file: file, line: line)
+    XCTAssertTrue(app.buttons["settings.remoteSources.refresh"].exists, file: file, line: line)
+    app.buttons["settings.remoteSources.add"].click()
+    XCTAssertTrue(
+      element("settings.remoteSources.field.host", in: app).waitForExistenceFast(timeout: 10),
+      file: file, line: line)
+    XCTAssertTrue(
+      element("settings.remoteSources.field.root", in: app).exists,
+      file: file, line: line)
+    XCTAssertFalse(
+      app.buttons["settings.remoteSources.save"].isEnabled,
+      "an unverified server must not be saved", file: file, line: line)
+    app.buttons["settings.remoteSources.cancel"].click()
+    app.buttons[workspaces.settingsPanes[3]].click()
     for identifier in [
       "settings.storage.chooseRoot", "settings.storage.quota", "settings.storage.margin",
       "settings.storage.retention", "settings.storage.save",
@@ -814,12 +881,12 @@ final class AppShellUITests: XCTestCase {
         element(identifier, in: app).waitForExistenceFast(timeout: 10),
         "\(identifier) missing", file: file, line: line)
     }
-    app.buttons[workspaces.settingsPanes[4]].click()
+    app.buttons[workspaces.settingsPanes[5]].click()
     XCTAssertTrue(
       app.buttons["settings.diagnostics.preview"].waitForExistenceFast(timeout: 10),
       file: file, line: line)
     XCTAssertFalse(app.buttons["settings.diagnostics.export"].exists, file: file, line: line)
-    app.buttons[workspaces.settingsPanes[3]].click()
+    app.buttons[workspaces.settingsPanes[4]].click()
     XCTAssertTrue(
       app.staticTexts["update.status"].waitForExistenceFast(timeout: 10),
       "the Updates pane must render its status", file: file, line: line)
@@ -929,7 +996,7 @@ final class AppShellUITests: XCTestCase {
 
     select("app.navigation.debug", in: app, file: file, line: line)
     for (tabID, panelTitle) in zip(
-      ["logs", "apps", "network", "commands"], workspaces.debugPanels
+      ["artifacts", "logs", "apps", "network", "commands"], workspaces.debugPanels
     ) {
       let tab = element("debug.tab.\(tabID)", in: app)
       XCTAssertTrue(tab.waitForExistenceFast(timeout: 5), file: file, line: line)

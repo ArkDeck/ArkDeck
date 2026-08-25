@@ -688,19 +688,26 @@ final class AutoUpdateContractTests: XCTestCase {
       ])
     XCTAssertTrue(entitlements.values.allSatisfy { $0 })
 
-    // The App holds exactly one non-boolean entitlement. The App Sandbox
-    // classifies AF_UNIX connect() as its own operation, so the daemon's Unix
-    // socket is unreachable from this container under every file entitlement
-    // (measured); a mach-lookup exception naming a launchd-vended service is
-    // the only transport that works. It is pinned to that one service, so
-    // granting a second one cannot pass as a value edit, and the whole set
-    // stays closed so a new privilege cannot arrive unnoticed.
+    // Every non-boolean entitlement is value-pinned. The App Sandbox classifies
+    // AF_UNIX connect() as its own operation, so the daemon's Unix socket is
+    // unreachable from this container under every file entitlement (measured);
+    // a mach-lookup exception naming a launchd-vended service is the only
+    // transport that works. The SSH exception is intentionally file-exact and
+    // read-only: it cannot enumerate ~/.ssh or read config, known_hosts, agent
+    // sockets, public keys, or other identity names.
     let machLookupKey = "com.apple.security.temporary-exception.mach-lookup.global-name"
     XCTAssertEqual(
       entitlementPlist[machLookupKey] as? [String], ["com.arkdeck.agentd"],
       "the mach-lookup exception must name exactly the daemon's read-only XPC door")
+    let systemSSHIdentityKey =
+      "com.apple.security.temporary-exception.files.home-relative-path.read-only"
     XCTAssertEqual(
-      Set(entitlementPlist.keys), Set(entitlements.keys).union([machLookupKey]),
+      entitlementPlist[systemSSHIdentityKey] as? [String],
+      ["/.ssh/id_rsa", "/.ssh/id_ed25519"],
+      "system-default SSH access must remain read-only and identity-file exact")
+    XCTAssertEqual(
+      Set(entitlementPlist.keys),
+      Set(entitlements.keys).union([machLookupKey, systemSSHIdentityKey]),
       "the App's entitlement set is closed; adding one is a privilege decision")
 
     let package = try String(
@@ -709,23 +716,78 @@ final class AutoUpdateContractTests: XCTestCase {
     let arkForgeRevision = "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"
     let arkTraceRevision = "91a21d1d419c5fec8c56c8b7b742002325045861"
     XCTAssertEqual(
-      package.components(separatedBy: ".package(").count - 1, 2,
-      "ArkForge and ArkTrace are the package's only remote source dependencies")
+      package.components(separatedBy: ".package(").count - 1, 7,
+      "the package's direct remote-source dependency set is closed")
     XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkForge.git"))
     XCTAssertTrue(package.contains("revision: \"\(arkForgeRevision)\""))
     XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkTrace.git"))
     XCTAssertTrue(package.contains("revision: \"\(arkTraceRevision)\""))
+    for dependency in [
+      ("https://github.com/orlandos-nl/Citadel.git", "0.12.1"),
+      ("https://github.com/Wellz26/swift-nio-ssh.git", "0.3.4"),
+      ("https://github.com/apple/swift-nio.git", "2.101.3"),
+      ("https://github.com/apple/swift-crypto.git", "3.15.1"),
+      ("https://github.com/apple/swift-log.git", "1.15.0"),
+    ] {
+      XCTAssertTrue(package.contains(dependency.0))
+      XCTAssertTrue(package.contains("exact: \"\(dependency.1)\""))
+    }
     let packageResolution =
       try JSONSerialization.jsonObject(
         with: Data(
           contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.resolved")))
       as? [String: Any]
     let pins = try XCTUnwrap(packageResolution?["pins"] as? [[String: Any]])
-    XCTAssertEqual(pins.count, 2)
+    let expectedPins: [String: (location: String, revision: String, version: String?)] = [
+      "arkforge": (
+        "https://github.com/ArkDeck/ArkForge.git",
+        arkForgeRevision, nil),
+      "arktrace": (
+        "https://github.com/ArkDeck/ArkTrace.git",
+        arkTraceRevision, nil),
+      "bigint": (
+        "https://github.com/attaswift/BigInt.git",
+        "e07e00fa1fd435143a2dcf8b7eec9a7710b2fdfe", "5.7.0"),
+      "citadel": (
+        "https://github.com/orlandos-nl/Citadel.git",
+        "ae8562f895de06ccb86fdb1cbb65fd99c8976e12", "0.12.1"),
+      "swift-asn1": (
+        "https://github.com/apple/swift-asn1.git",
+        "a9a5efd40eaf558a2bcd48d64b1d1646be686008", "1.7.1"),
+      "swift-atomics": (
+        "https://github.com/apple/swift-atomics.git",
+        "0442cb5a3f98ab802acb777929fdb446bda11a34", "1.3.1"),
+      "swift-collections": (
+        "https://github.com/apple/swift-collections.git",
+        "a0cb0954ecb21e4e31b0070e6ed5674e8556685a", "1.6.0"),
+      "swift-crypto": (
+        "https://github.com/apple/swift-crypto.git",
+        "95ba0316a9b733e92bb6b071255ff46263bbe7dc", "3.15.1"),
+      "swift-log": (
+        "https://github.com/apple/swift-log.git",
+        "3ffafb9722d5d918c614feb496c8789a3b59d222", "1.15.0"),
+      "swift-nio": (
+        "https://github.com/apple/swift-nio.git",
+        "0b18836bd8b0162e7e17a995a3fbee20ed8f3b2b", "2.101.3"),
+      "swift-nio-ssh": (
+        "https://github.com/Wellz26/swift-nio-ssh.git",
+        "b93961a2988607a756cbc21a811f406f27aa9ab6", "0.3.4"),
+      "swift-system": (
+        "https://github.com/apple/swift-system.git",
+        "869129b7bf4ecc57b97d0193ad29690ca2134750", "1.8.1"),
+    ]
     let pinsByIdentity = Dictionary(
       uniqueKeysWithValues: try pins.map { pin in
         (try XCTUnwrap(pin["identity"] as? String), pin)
       })
+    XCTAssertEqual(Set(pinsByIdentity.keys), Set(expectedPins.keys))
+    for (identity, expected) in expectedPins {
+      let pin = try XCTUnwrap(pinsByIdentity[identity])
+      XCTAssertEqual(pin["location"] as? String, expected.location, identity)
+      let state = try XCTUnwrap(pin["state"] as? [String: Any])
+      XCTAssertEqual(state["revision"] as? String, expected.revision, identity)
+      XCTAssertEqual(state["version"] as? String, expected.version, identity)
+    }
     let arkForgePin = try XCTUnwrap(pinsByIdentity["arkforge"])
     XCTAssertEqual(
       arkForgePin["location"] as? String,

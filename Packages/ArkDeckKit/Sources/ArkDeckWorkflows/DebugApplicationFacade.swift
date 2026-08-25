@@ -1,9 +1,10 @@
 // App-facing Debug workspace over Runtime's closed typed XPC door.
 //
 // Executable work is limited to published Debug operations: bounded
-// diagnostics, one target-bound HAP lifecycle, typed port rules and four
-// read-only templates. There is no executable, argv, endpoint or authority
-// input: the daemon owns lowering and the App receives a disclosure.
+// diagnostics, one target-bound HAP lifecycle, one app-owned native-library
+// deployment, typed port rules and four read-only templates. There is no
+// executable, argv, device path or authority input: the daemon owns lowering
+// and the App receives a disclosure.
 
 import ArkDeckCore
 import ArkDeckRuntime
@@ -233,6 +234,115 @@ public enum DebugLogJobSubmissionResult: Sendable, Equatable {
   case failed(String)
 }
 
+public struct DebugNativeLibraryPlanStepPresentation: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let kind: String
+  public let effect: String
+
+  public init(id: String, kind: String, effect: String) {
+    self.id = id
+    self.kind = kind
+    self.effect = effect
+  }
+}
+
+/// A Runtime-materialized, target-bound plan for one app-owned .so. The
+/// request bytes stay package-private so the App can only submit the exact
+/// reviewed plan; it cannot rewrite the lease, target or operation.
+public struct DebugNativeLibraryPreparation: Sendable, Equatable, Identifiable {
+  public let operationReference: String
+  public let targetID: String
+  public let bindingRevision: Int
+  public let libraryName: String
+  public let byteCount: Int
+  public let sha256: String
+  public let abi: String
+  public let elfClassBits: Int
+  public let machine: Int
+  public let buildID: String
+  public let targetBundle: String
+  public let verificationProfile: String
+  public let rollbackPolicy: String
+  public let planDigest: String
+  public let steps: [DebugNativeLibraryPlanStepPresentation]
+  let requestJSON: String
+
+  public var id: String { planDigest }
+}
+
+public enum DebugNativeLibraryPreparationResult: Sendable, Equatable {
+  case prepared(DebugNativeLibraryPreparation)
+  case failed(String)
+}
+
+private struct DebugNativeLibraryLocalArtifact: Sendable {
+  let name: String
+  let contents: Data
+  let sha256: String
+  let abi: String
+  let elfClassBits: Int
+  let machine: Int
+  let buildID: String
+}
+
+private enum DebugNativeLibraryLocalArtifactError: Error, CustomStringConvertible {
+  case invalidName
+  case invalidSize
+  case notRegularFile
+  case changedWhileReading
+  case invalidELF(String)
+
+  var description: String {
+    switch self {
+    case .invalidName:
+      "Choose a file named lib<name>.so using only letters, numbers, dot, underscore or hyphen"
+    case .invalidSize:
+      "Choose a native library between 64 bytes and 64 MiB"
+    case .notRegularFile:
+      "Choose a readable regular .so file"
+    case .changedWhileReading:
+      "The selected library changed while ArkDeck read it. Choose the file again"
+    case .invalidELF(let detail):
+      "The selected library did not pass signed OpenHarmony ELF validation: \(detail)"
+    }
+  }
+}
+
+private enum DebugNativeLibraryLocalArtifactInspector {
+  static func inspect(_ url: URL) throws -> DebugNativeLibraryLocalArtifact {
+    let name = url.lastPathComponent
+    guard DebugTypedValueValidator.isValidNativeLibraryLogicalName(name) else {
+      throw DebugNativeLibraryLocalArtifactError.invalidName
+    }
+    let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+    guard values.isRegularFile == true, let fileSize = values.fileSize else {
+      throw DebugNativeLibraryLocalArtifactError.notRegularFile
+    }
+    guard (64...NativeLibraryArtifactValidator.maximumBytes).contains(fileSize) else {
+      throw DebugNativeLibraryLocalArtifactError.invalidSize
+    }
+    let contents = try Data(contentsOf: url, options: [.mappedIfSafe])
+    guard contents.count == fileSize else {
+      throw DebugNativeLibraryLocalArtifactError.changedWhileReading
+    }
+    let facts: HDCNativeLibraryArtifactFacts
+    do {
+      facts = try NativeLibraryArtifactValidator.validate(
+        contents, requireOpenHarmonyCodeSignature: true)
+    } catch {
+      throw DebugNativeLibraryLocalArtifactError.invalidELF(String(describing: error))
+    }
+    return DebugNativeLibraryLocalArtifact(
+      name: name,
+      contents: contents,
+      sha256: SHA256Hex.string(of: contents),
+      abi: facts.abi.rawValue,
+      elfClassBits: facts.elfClassBits,
+      machine: Int(facts.machine),
+      buildID: facts.buildID)
+  }
+}
+
 struct DebugHAPLocalArtifact: Sendable, Equatable {
   let name: String
   let byteCount: Int64
@@ -406,6 +516,13 @@ public enum DebugTypedValueValidator {
         of: #"^[a-zA-Z][a-zA-Z0-9_.]*$"#,
         options: .regularExpression) != nil
   }
+
+  public static func isValidNativeLibraryLogicalName(_ value: String) -> Bool {
+    value.count <= 128
+      && value.range(
+        of: #"^lib[A-Za-z0-9_.-]+\.so$"#,
+        options: .regularExpression) != nil
+  }
 }
 
 public protocol DebugApplicationProviding: Sendable {
@@ -425,6 +542,26 @@ public protocol DebugApplicationProviding: Sendable {
     postRunAbilityState: String,
     captureDiagnostics: Bool,
     diagnosticsDurationSeconds: Int
+  ) async -> DebugLogJobSubmissionResult
+  func prepareNativeLibrary(
+    target: DebugTargetPresentation,
+    fileURL: URL,
+    targetBundle: String,
+    libraryLogicalName: String,
+    verificationProfile: String,
+    rollbackPolicy: String
+  ) async -> DebugNativeLibraryPreparationResult
+  func prepareRemoteNativeLibrary(
+    target: DebugTargetPresentation,
+    sourceID: UUID,
+    relativePath: String,
+    targetBundle: String,
+    libraryLogicalName: String,
+    verificationProfile: String,
+    rollbackPolicy: String
+  ) async -> DebugNativeLibraryPreparationResult
+  func submitNativeLibrary(
+    preparation: DebugNativeLibraryPreparation
   ) async -> DebugLogJobSubmissionResult
   func run(jobID: String) async -> DebugLogJobRunResult
   func cancel(jobID: String) async -> Bool
@@ -483,8 +620,52 @@ enum DebugHAPRequestBuilder {
   }
 }
 
+enum DebugNativeLibraryRequestBuilder {
+  static func request(
+    target: DebugTargetPresentation,
+    lease: String,
+    targetBundle: String,
+    libraryLogicalName: String,
+    expectedABI: String,
+    verificationProfile: String,
+    rollbackPolicy: String,
+    nonce: String = UUID().uuidString.lowercased()
+  ) throws -> RuntimeOperationRequest {
+    guard !lease.isEmpty,
+      DebugTypedValueValidator.isValidBundleName(targetBundle),
+      DebugTypedValueValidator.isValidNativeLibraryLogicalName(libraryLogicalName),
+      HDCNativeLibraryABI(rawValue: expectedABI) != nil,
+      ["hashOnly", "hashAndProcess", "hashProcessAndMaps"].contains(verificationProfile),
+      ["autoRollback", "retainBackup"].contains(rollbackPolicy)
+    else {
+      throw DebugXPCReadFailure.transport(
+        "Native-library request is outside the published bounds")
+    }
+    return try RuntimeOperationRequest(
+      requestID: "debug-native-ui-\(nonce)",
+      idempotencyKey: "debug-native-ui-\(nonce)",
+      target: DurableTargetReference(
+        targetID: target.id, expectedBindingRevision: target.bindingRevision),
+      operation: RuntimeOperationReference(
+        id: "deploy.native-library.app-owned", version: 1),
+      inputs: [
+        "libraryArtifactLease": .string(lease),
+        "targetBundle": .string(targetBundle),
+        "libraryLogicalName": .string(libraryLogicalName),
+        "expectedABI": .string(expectedABI),
+        "restartProfile": .string("restartAbility"),
+        "verificationProfile": .string(verificationProfile),
+        "rollbackPolicy": .string(rollbackPolicy),
+      ],
+      requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+      clientContext: RuntimeClientContext(
+        clientName: ArkDeckAgentClientName.debugArtifactsWorkspace))
+  }
+}
+
 public enum DebugApplicationFacade {
   public static let debugHAPReference = "debug.hap@1"
+  public static let nativeLibraryReference = "deploy.native-library.app-owned@1"
   public static let captureDiagnosticsReference = "capture.diagnostics@1"
   public static let createPortForwardReference = "port-forward.create@1"
   public static let removePortForwardReference = "port-forward.remove@1"
@@ -492,6 +673,7 @@ public enum DebugApplicationFacade {
   static let descriptors: [CatalogOperationDescriptor] = [
     RuntimeOperationCatalog.descriptor(reference: captureDiagnosticsReference),
     RuntimeOperationCatalog.descriptor(reference: debugHAPReference),
+    RuntimeOperationCatalog.descriptor(reference: nativeLibraryReference),
     RuntimeOperationCatalog.descriptor(reference: createPortForwardReference),
     RuntimeOperationCatalog.descriptor(reference: removePortForwardReference),
   ].compactMap { $0 }
@@ -566,6 +748,14 @@ public enum DebugApplicationFacade {
 }
 
 private actor DebugProductionApplicationProvider: DebugApplicationProviding {
+  private let remoteBuildSources: any RemoteBuildSourceProviding
+
+  init(
+    remoteBuildSources: any RemoteBuildSourceProviding = RemoteBuildSourceApplicationFacade.make()
+  ) {
+    self.remoteBuildSources = remoteBuildSources
+  }
+
   func refreshWorkspace(targetID: String?) async -> DebugWorkspacePresentation {
     async let operations = DebugXPCReadTransport.request(method: "operation.list")
     async let targets = DebugXPCReadTransport.request(method: "target.list")
@@ -761,6 +951,274 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     }
   }
 
+  func prepareNativeLibrary(
+    target: DebugTargetPresentation,
+    fileURL: URL,
+    targetBundle: String,
+    libraryLogicalName: String,
+    verificationProfile: String,
+    rollbackPolicy: String
+  ) async -> DebugNativeLibraryPreparationResult {
+    guard DebugTypedValueValidator.isValidBundleName(targetBundle),
+      DebugTypedValueValidator.isValidNativeLibraryLogicalName(libraryLogicalName),
+      ["hashOnly", "hashAndProcess", "hashProcessAndMaps"].contains(verificationProfile),
+      ["autoRollback", "retainBackup"].contains(rollbackPolicy)
+    else {
+      return .failed("Complete the bundle, library name and published verification settings")
+    }
+
+    let gainedScope = fileURL.startAccessingSecurityScopedResource()
+    defer {
+      if gainedScope { fileURL.stopAccessingSecurityScopedResource() }
+    }
+    var uploadID: String?
+    do {
+      let local = try await Task.detached(priority: .userInitiated) {
+        try DebugNativeLibraryLocalArtifactInspector.inspect(fileURL)
+      }.value
+
+      let begin = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "artifact.importNativeLibrary.begin",
+          params: [
+            "targetId": .string(target.id),
+            "name": .string(local.name),
+            "byteCount": .integer(Int64(local.contents.count)),
+            "sha256": .string(local.sha256),
+          ]))
+      guard let startedUploadID = begin["uploadId"] as? String else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime returned no native-library upload identity")
+      }
+      uploadID = startedUploadID
+      guard let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
+        maximumChunkBytes > 0,
+        maximumChunkBytes <= 512 * 1_024,
+        begin["targetId"] as? String == target.id,
+        begin["bindingRevision"] as? Int == target.bindingRevision
+      else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime returned incomplete native-library import facts")
+      }
+
+      var offset = 0
+      while offset < local.contents.count {
+        guard !Task.isCancelled else { throw CancellationError() }
+        let end = min(local.contents.count, offset + maximumChunkBytes)
+        let chunk = local.contents.subdata(in: offset..<end)
+        let appended = try DebugRuntimeResponseDecoding.resultObject(
+          await DebugXPCReadTransport.request(
+            method: "artifact.importNativeLibrary.append",
+            params: [
+              "uploadId": .string(startedUploadID),
+              "offset": .integer(Int64(offset)),
+              "base64": .string(chunk.base64EncodedString()),
+            ]))
+        guard appended["nextOffset"] as? Int == end else {
+          throw DebugXPCReadFailure.transport(
+            "Runtime native-library import offset drifted")
+        }
+        offset = end
+      }
+
+      let imported = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "artifact.importNativeLibrary.commit",
+          params: ["uploadId": .string(startedUploadID)]))
+      uploadID = nil
+      guard let lease = imported["lease"] as? String,
+        imported["targetId"] as? String == target.id,
+        imported["bindingRevision"] as? Int == target.bindingRevision,
+        imported["name"] as? String == local.name,
+        imported["byteCount"] as? Int == local.contents.count,
+        imported["sha256"] as? String == local.sha256,
+        imported["abi"] as? String == local.abi,
+        imported["elfClassBits"] as? Int == local.elfClassBits,
+        imported["machine"] as? Int == local.machine,
+        imported["buildId"] as? String == local.buildID
+      else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime import facts no longer match the selected target and library")
+      }
+
+      let request = try DebugNativeLibraryRequestBuilder.request(
+        target: target,
+        lease: lease,
+        targetBundle: targetBundle,
+        libraryLogicalName: libraryLogicalName,
+        // ABI is an observed property of the signed ELF, not a user-authored
+        // compatibility claim. Runtime validates the same value again against
+        // the immutable lease bytes during plan materialization.
+        expectedABI: local.abi,
+        verificationProfile: verificationProfile,
+        rollbackPolicy: rollbackPolicy)
+      let encoder = CanonicalJSONEncoders.canonical()
+      let requestData = try encoder.encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        throw DebugXPCReadFailure.transport(
+          "Could not encode the typed native-library request")
+      }
+
+      let result = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.plan", params: ["requestJson": .string(requestJSON)]))
+      if let blocker = result["providerAdmissionBlocker"] as? String, !blocker.isEmpty {
+        throw DebugXPCReadFailure.transport(blocker)
+      }
+      guard
+        let descriptor = RuntimeOperationCatalog.descriptor(
+          reference: DebugApplicationFacade.nativeLibraryReference),
+        result["executionMode"] as? String == "planOnly",
+        result["operationReference"] as? String
+          == DebugApplicationFacade.nativeLibraryReference,
+        result["targetID"] as? String == target.id,
+        result["bindingRevision"] as? Int == target.bindingRevision,
+        result["providerID"] as? String == CatalogProvider.hdc.rawValue,
+        result["effectiveEffect"] as? String == WorkflowEffect.deviceMutation.rawValue,
+        result["jobAdmitted"] as? Bool == false,
+        result["dispatchDisposition"] as? String == "notDispatched",
+        result["providerAdmissionBlocker"] == nil
+          || result["providerAdmissionBlocker"] is NSNull,
+        let planDigest = result["materializedPlanDigest"] as? String,
+        SHA256Hex.isLowercaseSHA256(planDigest),
+        let inputs = result["inputs"] as? [String: Any],
+        inputs["libraryArtifactLease"] as? String == lease,
+        inputs["targetBundle"] as? String == targetBundle,
+        inputs["libraryLogicalName"] as? String == libraryLogicalName,
+        inputs["expectedABI"] as? String == local.abi,
+        inputs["restartProfile"] as? String == "restartAbility",
+        inputs["verificationProfile"] as? String == verificationProfile,
+        inputs["rollbackPolicy"] as? String == rollbackPolicy,
+        let rows = result["steps"] as? [[String: Any]]
+      else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime plan facts no longer match the selected target and library")
+      }
+      let steps = try rows.map { row in
+        guard let id = row["stepID"] as? String,
+          let kind = row["kind"] as? String,
+          let effect = row["effect"] as? String
+        else {
+          throw DebugXPCReadFailure.transport(
+            "Runtime returned an incomplete native-library plan step")
+        }
+        return DebugNativeLibraryPlanStepPresentation(id: id, kind: kind, effect: effect)
+      }
+      let expectedSteps = descriptor.steps.map {
+        DebugNativeLibraryPlanStepPresentation(
+          id: $0.stepID, kind: $0.kind.rawValue, effect: $0.effect.rawValue)
+      }
+      guard steps == expectedSteps else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime plan steps no longer match the published native-library operation")
+      }
+
+      var reviewedEnvelope = try JSONDecoder().decode(
+        [String: JSONValue].self, from: requestData)
+      reviewedEnvelope["reviewedPlanDigest"] = .string(planDigest)
+      let reviewedData = try encoder.encode(reviewedEnvelope)
+      guard let reviewedJSON = String(data: reviewedData, encoding: .utf8) else {
+        throw DebugXPCReadFailure.transport(
+          "Could not pin the reviewed native-library plan")
+      }
+      return .prepared(
+        DebugNativeLibraryPreparation(
+          operationReference: descriptor.reference,
+          targetID: target.id,
+          bindingRevision: target.bindingRevision,
+          libraryName: libraryLogicalName,
+          byteCount: local.contents.count,
+          sha256: local.sha256,
+          abi: local.abi,
+          elfClassBits: local.elfClassBits,
+          machine: local.machine,
+          buildID: local.buildID,
+          targetBundle: targetBundle,
+          verificationProfile: verificationProfile,
+          rollbackPolicy: rollbackPolicy,
+          planDigest: planDigest,
+          steps: steps,
+          requestJSON: reviewedJSON))
+    } catch let failure as DebugXPCReadFailure {
+      if let uploadID {
+        _ = await DebugXPCReadTransport.request(
+          method: "artifact.importNativeLibrary.abort",
+          params: ["uploadId": .string(uploadID)])
+      }
+      return .failed(failure.message)
+    } catch {
+      if let uploadID {
+        _ = await DebugXPCReadTransport.request(
+          method: "artifact.importNativeLibrary.abort",
+          params: ["uploadId": .string(uploadID)])
+      }
+      return .failed(String(describing: error))
+    }
+  }
+
+  func prepareRemoteNativeLibrary(
+    target: DebugTargetPresentation,
+    sourceID: UUID,
+    relativePath: String,
+    targetBundle: String,
+    libraryLogicalName: String,
+    verificationProfile: String,
+    rollbackPolicy: String
+  ) async -> DebugNativeLibraryPreparationResult {
+    let temporaryRoot = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-remote-native-\(UUID().uuidString)", directoryHint: .isDirectory)
+    do {
+      let artifact = try await remoteBuildSources.fetchNativeLibrary(
+        sourceID: sourceID, relativePath: relativePath)
+      guard artifact.byteCount == artifact.contents.count,
+        artifact.sha256 == SHA256Hex.string(of: artifact.contents)
+      else {
+        return .failed("Remote Artifact bytes no longer match the inspected SSH source")
+      }
+      try FileManager.default.createDirectory(
+        at: temporaryRoot, withIntermediateDirectories: false)
+      let fileURL = temporaryRoot.appending(path: artifact.fileName)
+      try artifact.contents.write(to: fileURL, options: [.atomic])
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+      defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+      return await prepareNativeLibrary(
+        target: target,
+        fileURL: fileURL,
+        targetBundle: targetBundle,
+        libraryLogicalName: libraryLogicalName,
+        verificationProfile: verificationProfile,
+        rollbackPolicy: rollbackPolicy)
+    } catch {
+      try? FileManager.default.removeItem(at: temporaryRoot)
+      return .failed(error.localizedDescription)
+    }
+  }
+
+  func submitNativeLibrary(
+    preparation: DebugNativeLibraryPreparation
+  ) async -> DebugLogJobSubmissionResult {
+    guard preparation.operationReference == DebugApplicationFacade.nativeLibraryReference,
+      SHA256Hex.isLowercaseSHA256(preparation.planDigest),
+      !preparation.requestJSON.isEmpty
+    else { return .failed("The reviewed native-library plan is incomplete") }
+    do {
+      let result = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.submit",
+          params: ["requestJson": .string(preparation.requestJSON)]))
+      guard let jobID = result["jobId"] as? String, !jobID.isEmpty else {
+        return .failed(
+          "Runtime accepted native-library deployment without returning a Job ID")
+      }
+      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
   func run(jobID: String) async -> DebugLogJobRunResult {
     do {
       let result = try DebugRuntimeResponseDecoding.resultObject(
@@ -948,6 +1406,7 @@ enum DebugWorkspaceResponseDecoding {
           guard
             operation == DebugApplicationFacade.debugHAPReference
               || operation == DebugApplicationFacade.captureDiagnosticsReference
+              || operation == DebugApplicationFacade.nativeLibraryReference
               || operation == DebugApplicationFacade.createPortForwardReference
               || operation == DebugApplicationFacade.removePortForwardReference
           else { continue }
@@ -1110,7 +1569,8 @@ enum DebugRuntimeResponseDecoding {
           let direction = DebugRuntimePortDirection(rawValue: directionText),
           let localPort = row["localPort"] as? Int,
           let remotePort = row["remotePort"] as? Int,
-          (1...65_535).contains(localPort), (1...65_535).contains(remotePort)
+          (1_024...65_535).contains(localPort),
+          (1_024...65_535).contains(remotePort)
         else { return .failure(.transport("Runtime returned malformed port rules")) }
         rules.append(
           DebugRuntimePortRule(

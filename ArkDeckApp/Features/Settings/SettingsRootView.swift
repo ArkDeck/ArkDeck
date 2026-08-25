@@ -55,6 +55,10 @@ struct SettingsRootView<UpdatesContent: View>: View {
       .tabItem {
         Label(settingsText("settings.tab.toolchains"), systemImage: "wrench.and.screwdriver")
       }
+      RemoteBuildSourcesSettingsPane(model: model)
+        .tabItem {
+          Label(settingsText("settings.tab.remoteSources"), systemImage: "server.rack")
+        }
       StorageSettingsPane(model: model)
         .tabItem {
           Label(settingsText("settings.tab.storage"), systemImage: "externaldrive")
@@ -75,7 +79,10 @@ struct SettingsRootView<UpdatesContent: View>: View {
         }
     }
     .frame(minWidth: 760, idealWidth: 820, minHeight: 560, idealHeight: 620)
-    .task { model.refresh() }
+    .task {
+      model.refresh()
+      model.refreshRemoteSources()
+    }
   }
 }
 
@@ -117,6 +124,398 @@ private struct GeneralSettingsPane: View {
         }
       }
     }
+  }
+}
+
+private struct RemoteBuildSourcesSettingsPane: View {
+  var model: SettingsWorkspaceViewModel
+  @State private var editorSource: RemoteBuildSourcePresentation?
+  @State private var isEditorPresented = false
+  @State private var pendingRemoval: RemoteBuildSourcePresentation?
+
+  var body: some View {
+    SettingsPaneContainer {
+      SettingsPaneHeader(subtitle: settingsText("settings.remoteSources.subtitle"))
+      GroupBox(settingsText("settings.remoteSources.title")) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          if model.remoteSources.isEmpty && model.isRemoteSourcesBusy {
+            SettingsLoadingRow()
+          } else if model.remoteSources.isEmpty {
+            ContentUnavailableView(
+              settingsText("settings.remoteSources.empty.title"),
+              systemImage: "server.rack",
+              description: Text(settingsText("settings.remoteSources.empty.detail")))
+            .frame(maxWidth: .infinity, minHeight: 180)
+          } else {
+            ForEach(model.remoteSources) { source in
+              RemoteBuildSourceSettingsRow(
+                source: source,
+                onEdit: {
+                  editorSource = source
+                  isEditorPresented = true
+                },
+                onRemove: { pendingRemoval = source })
+              if source.id != model.remoteSources.last?.id { Divider() }
+            }
+          }
+          HStack {
+            Button {
+              editorSource = nil
+              isEditorPresented = true
+            } label: {
+              Label(settingsText("settings.remoteSources.add"), systemImage: "plus")
+            }
+            .accessibilityIdentifier("settings.remoteSources.add")
+            Button(settingsText("settings.remoteSources.refresh")) {
+              model.refreshRemoteSources()
+            }
+            .accessibilityIdentifier("settings.remoteSources.refresh")
+            .disabled(model.isRemoteSourcesBusy)
+            Spacer()
+            if model.isRemoteSourcesBusy { ProgressView().controlSize(.small) }
+          }
+        }
+        .padding(WorkspaceMetrics.contentGap)
+      }
+      GroupBox(settingsText("settings.remoteSources.security.title")) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          SettingsAssuranceRow(
+            icon: "key.horizontal",
+            title: settingsText("settings.remoteSources.security.keychain"),
+            detail: settingsText("settings.remoteSources.security.keychain.detail"))
+          SettingsAssuranceRow(
+            icon: "checkmark.shield",
+            title: settingsText("settings.remoteSources.security.hostKey"),
+            detail: settingsText("settings.remoteSources.security.hostKey.detail"))
+          SettingsAssuranceRow(
+            icon: "lock.doc",
+            title: settingsText("settings.remoteSources.security.readOnly"),
+            detail: settingsText("settings.remoteSources.security.readOnly.detail"))
+        }
+        .padding(WorkspaceMetrics.contentGap)
+      }
+      if let error = model.remoteSourceError {
+        SettingsErrorBanner(message: error)
+      }
+    }
+    .sheet(isPresented: $isEditorPresented, onDismiss: model.clearRemoteSourceProbe) {
+      RemoteBuildSourceEditor(model: model, source: editorSource)
+    }
+    .confirmationDialog(
+      settingsText("settings.remoteSources.remove.title"),
+      isPresented: Binding(
+        get: { pendingRemoval != nil },
+        set: { if !$0 { pendingRemoval = nil } }),
+      titleVisibility: .visible
+    ) {
+      if let source = pendingRemoval {
+        Button(settingsText("settings.remoteSources.remove"), role: .destructive) {
+          pendingRemoval = nil
+          Task { await model.removeRemoteSource(source.id) }
+        }
+      }
+      Button(settingsText("settings.common.cancel"), role: .cancel) {
+        pendingRemoval = nil
+      }
+    } message: {
+      Text(settingsText("settings.remoteSources.remove.detail"))
+    }
+  }
+}
+
+private struct RemoteBuildSourceSettingsRow: View {
+  let source: RemoteBuildSourcePresentation
+  let onEdit: () -> Void
+  let onRemove: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+      Image(systemName: source.credentialStored ? "server.rack" : "exclamationmark.triangle")
+        .font(.title3)
+        .foregroundStyle(source.credentialStored ? Color.secondary : Color.orange)
+        .frame(width: 28)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
+          Text(source.name).font(.headline)
+          if source.credentialStored {
+            Label(
+              settingsText(
+                source.usesSystemDefaultCredential
+                  ? "settings.remoteSources.credentialSystemDefault"
+                  : "settings.remoteSources.credentialStored"),
+              systemImage: source.usesSystemDefaultCredential ? "person.badge.key" : "key.fill")
+              .font(WorkspaceFont.caption)
+              .foregroundStyle(.green)
+          }
+        }
+        Text(source.endpoint)
+          .font(WorkspaceFont.monospacedValue)
+          .textSelection(.enabled)
+        Text(source.rootPath)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .help(source.rootPath)
+        Text(source.hostKeyFingerprint)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+      }
+      Spacer(minLength: WorkspaceMetrics.contentGap)
+      Button(settingsText("settings.remoteSources.edit"), action: onEdit)
+      Button(role: .destructive, action: onRemove) {
+        Image(systemName: "trash")
+      }
+      .accessibilityLabel(settingsText("settings.remoteSources.remove"))
+    }
+    .accessibilityElement(children: .contain)
+  }
+}
+
+private struct RemoteBuildSourceEditor: View {
+  @Environment(\.dismiss) private var dismiss
+  var model: SettingsWorkspaceViewModel
+  let source: RemoteBuildSourcePresentation?
+
+  @State private var name: String
+  @State private var host: String
+  @State private var port: String
+  @State private var username: String
+  @State private var rootPath: String
+  @State private var authentication: RemoteBuildSourceAuthentication
+  @State private var password = ""
+  @State private var privateKeyData: Data?
+  @State private var privateKeyName: String?
+  @State private var passphrase = ""
+  @State private var usesSystemDefaultKey: Bool
+  @State private var isKeyImporterPresented = false
+  @State private var importerError: String?
+
+  init(model: SettingsWorkspaceViewModel, source: RemoteBuildSourcePresentation?) {
+    self.model = model
+    self.source = source
+    _name = State(initialValue: source?.name ?? "")
+    _host = State(initialValue: source?.host ?? "")
+    _port = State(initialValue: String(source?.port ?? 22))
+    _username = State(initialValue: source?.username ?? "")
+    _rootPath = State(initialValue: source?.rootPath ?? "")
+    _authentication = State(initialValue: source?.authentication ?? .password)
+    _usesSystemDefaultKey = State(
+      initialValue: source == nil || source?.usesSystemDefaultCredential == true)
+  }
+
+  private var credentialInput: RemoteBuildSourceCredentialInput? {
+    switch authentication {
+    case .password:
+      password.isEmpty ? nil : .password(password)
+    case .privateKey:
+      if let privateKeyData {
+        .privateKey(privateKeyData, passphrase: passphrase.isEmpty ? nil : passphrase)
+      } else if usesSystemDefaultKey {
+        .systemDefault(passphrase: passphrase.isEmpty ? nil : passphrase)
+      } else {
+        nil
+      }
+    }
+  }
+
+  private var privateKeyStatus: String {
+    if let privateKeyName { return privateKeyName }
+    if usesSystemDefaultKey {
+      return settingsText("settings.remoteSources.systemDefaultIdentity")
+    }
+    return settingsText("settings.remoteSources.noPrivateKey")
+  }
+
+  private var draft: RemoteBuildSourceDraft {
+    RemoteBuildSourceDraft(
+      id: source?.id, name: name, host: host, port: Int(port) ?? 0,
+      username: username, rootPath: rootPath, authentication: authentication)
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Text(
+            source == nil
+              ? settingsText("settings.remoteSources.editor.addTitle")
+              : settingsText("settings.remoteSources.editor.editTitle")
+          )
+          .font(.title2.weight(.semibold))
+          .accessibilityAddTraits(.isHeader)
+          Text(settingsText("settings.remoteSources.editor.detail"))
+            .font(WorkspaceFont.secondary)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+      }
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
+      Divider()
+      Form {
+        Section(settingsText("settings.remoteSources.editor.server")) {
+          TextField(settingsText("settings.remoteSources.field.name"), text: $name)
+            .accessibilityIdentifier("settings.remoteSources.field.name")
+          TextField(settingsText("settings.remoteSources.field.host"), text: $host)
+            .accessibilityIdentifier("settings.remoteSources.field.host")
+          TextField(settingsText("settings.remoteSources.field.port"), text: $port)
+            .accessibilityIdentifier("settings.remoteSources.field.port")
+          TextField(settingsText("settings.remoteSources.field.username"), text: $username)
+            .accessibilityIdentifier("settings.remoteSources.field.username")
+          TextField(settingsText("settings.remoteSources.field.root"), text: $rootPath)
+            .accessibilityIdentifier("settings.remoteSources.field.root")
+        }
+        Section(settingsText("settings.remoteSources.editor.credential")) {
+          Picker(settingsText("settings.remoteSources.field.authentication"), selection: $authentication) {
+            Text(settingsText("settings.remoteSources.auth.password"))
+              .tag(RemoteBuildSourceAuthentication.password)
+            Text(settingsText("settings.remoteSources.auth.privateKey"))
+              .tag(RemoteBuildSourceAuthentication.privateKey)
+          }
+          .accessibilityIdentifier("settings.remoteSources.field.authentication")
+          if authentication == .password {
+            SecureField(
+              source == nil
+                ? settingsText("settings.remoteSources.field.password")
+                : settingsText("settings.remoteSources.field.passwordOptional"),
+              text: $password)
+              .accessibilityIdentifier("settings.remoteSources.field.password")
+          } else {
+            HStack {
+              Button {
+                isKeyImporterPresented = true
+              } label: {
+                Label(
+                  settingsText("settings.remoteSources.choosePrivateKey"),
+                  systemImage: "doc.badge.plus")
+              }
+              .accessibilityIdentifier("settings.remoteSources.choosePrivateKey")
+              if !usesSystemDefaultKey {
+                Button(settingsText("settings.remoteSources.useSystemDefault")) {
+                  privateKeyData = nil
+                  privateKeyName = nil
+                  usesSystemDefaultKey = true
+                  importerError = nil
+                  model.clearRemoteSourceProbe()
+                }
+                .accessibilityIdentifier("settings.remoteSources.useSystemDefault")
+              }
+              Text(privateKeyStatus)
+                .font(WorkspaceFont.secondary)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+            Text(settingsText("settings.remoteSources.systemDefaultHint"))
+              .font(WorkspaceFont.secondary)
+              .foregroundStyle(.secondary)
+            SecureField(settingsText("settings.remoteSources.field.passphrase"), text: $passphrase)
+              .accessibilityIdentifier("settings.remoteSources.field.passphrase")
+          }
+          if let importerError { SettingsErrorBanner(message: importerError) }
+          if source != nil && credentialInput == nil {
+            Label(
+              settingsText("settings.remoteSources.usingStoredCredential"),
+              systemImage: "key.fill")
+            .font(WorkspaceFont.secondary)
+            .foregroundStyle(.secondary)
+          }
+        }
+        Section(settingsText("settings.remoteSources.editor.verify")) {
+          Button {
+            Task { _ = await model.probeRemoteSource(draft: draft, credential: credentialInput) }
+          } label: {
+            Label(
+              settingsText("settings.remoteSources.testConnection"),
+              systemImage: "network.badge.shield.half.filled")
+          }
+          .accessibilityIdentifier("settings.remoteSources.testConnection")
+          .disabled(model.isRemoteSourcesBusy)
+          if model.isRemoteSourcesBusy {
+            HStack { ProgressView().controlSize(.small); Text(settingsText("settings.remoteSources.testing")) }
+          }
+          if let probe = model.remoteSourceProbe {
+            WorkspaceNotice(tone: .ok, symbol: "checkmark.shield") {
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                Text(settingsText("settings.remoteSources.verified"))
+                  .fontWeight(.semibold)
+                Text(probe.endpoint).font(WorkspaceFont.monospacedValue)
+                Text(probe.canonicalRootPath).font(WorkspaceFont.monospacedDense)
+                Text(probe.hostKeyFingerprint).font(WorkspaceFont.monospacedDense)
+                if probe.requiresNewHostTrust {
+                  Text(settingsText("settings.remoteSources.trustOnSave"))
+                    .font(WorkspaceFont.secondary)
+                    .foregroundStyle(.secondary)
+                }
+              }
+            }
+          }
+          if let error = model.remoteSourceError { SettingsErrorBanner(message: error) }
+        }
+      }
+      .formStyle(.grouped)
+      Divider()
+      HStack {
+        Button(settingsText("settings.common.cancel")) { dismiss() }
+          .accessibilityIdentifier("settings.remoteSources.cancel")
+        Spacer()
+        Button(settingsText("settings.remoteSources.save")) {
+          guard let probe = model.remoteSourceProbe else { return }
+          Task {
+            if await model.saveRemoteSource(probe) { dismiss() }
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("settings.remoteSources.save")
+        .disabled(model.remoteSourceProbe == nil || model.isRemoteSourcesBusy)
+      }
+      .padding(WorkspaceMetrics.pageInsetHorizontal)
+    }
+    .frame(width: 680, height: 660)
+    .fileImporter(
+      isPresented: $isKeyImporterPresented,
+      allowedContentTypes: [.data],
+      allowsMultipleSelection: false
+    ) { result in
+      switch result {
+      case .success(let urls):
+        guard let url = urls.first else {
+          importerError = settingsText("settings.remoteSources.privateKeyReadFailed")
+          return
+        }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        if let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
+          let size = values.fileSize, size > 0, size <= 256 * 1_024,
+          let data = try? Data(contentsOf: url), !data.isEmpty
+        {
+          privateKeyData = data
+          privateKeyName = url.lastPathComponent
+          usesSystemDefaultKey = false
+          importerError = nil
+          model.clearRemoteSourceProbe()
+        } else {
+          importerError = settingsText("settings.remoteSources.privateKeyInvalid")
+        }
+      case .failure:
+        importerError = settingsText("settings.remoteSources.privateKeyReadFailed")
+        model.clearRemoteSourceProbe()
+      }
+    }
+    .onChange(of: name) { _, _ in model.clearRemoteSourceProbe() }
+    .onChange(of: host) { _, _ in model.clearRemoteSourceProbe() }
+    .onChange(of: port) { _, _ in model.clearRemoteSourceProbe() }
+    .onChange(of: username) { _, _ in model.clearRemoteSourceProbe() }
+    .onChange(of: rootPath) { _, _ in model.clearRemoteSourceProbe() }
+    .onChange(of: authentication) { _, value in
+      if value == .privateKey && source?.authentication != .privateKey {
+        usesSystemDefaultKey = true
+      }
+      model.clearRemoteSourceProbe()
+    }
+    .onChange(of: password) { _, _ in model.clearRemoteSourceProbe() }
+    .onChange(of: passphrase) { _, _ in model.clearRemoteSourceProbe() }
   }
 }
 
@@ -752,11 +1151,89 @@ final class SettingsWorkspaceViewModel {
   private(set) var diagnosticDestination: URL?
   private(set) var exportedDiagnosticURL: URL?
   private(set) var diagnosticsMessage: String?
+  private(set) var remoteSources: [RemoteBuildSourcePresentation] = []
+  private(set) var isRemoteSourcesBusy = false
+  private(set) var remoteSourceError: String?
+  private(set) var remoteSourceProbe: RemoteBuildSourceProbe?
 
   private let provider: any SettingsApplicationProviding
+  private let remoteSourceProvider: any RemoteBuildSourceProviding
 
-  init(provider: any SettingsApplicationProviding) {
+  init(
+    provider: any SettingsApplicationProviding,
+    remoteSourceProvider: any RemoteBuildSourceProviding = RemoteBuildSourceApplicationFacade.make()
+  ) {
     self.provider = provider
+    self.remoteSourceProvider = remoteSourceProvider
+  }
+
+  func refreshRemoteSources() {
+    guard !isRemoteSourcesBusy else { return }
+    isRemoteSourcesBusy = true
+    remoteSourceError = nil
+    let provider = remoteSourceProvider
+    Task { [weak self] in
+      do {
+        self?.remoteSources = try await provider.listSources()
+      } catch {
+        self?.remoteSourceError = error.localizedDescription
+      }
+      self?.isRemoteSourcesBusy = false
+    }
+  }
+
+  func clearRemoteSourceProbe() {
+    remoteSourceProbe = nil
+    remoteSourceError = nil
+  }
+
+  func probeRemoteSource(
+    draft: RemoteBuildSourceDraft,
+    credential: RemoteBuildSourceCredentialInput?
+  ) async -> RemoteBuildSourceProbe? {
+    guard !isRemoteSourcesBusy else { return nil }
+    isRemoteSourcesBusy = true
+    remoteSourceProbe = nil
+    remoteSourceError = nil
+    defer { isRemoteSourcesBusy = false }
+    do {
+      let probe = try await remoteSourceProvider.probe(
+        draft: draft, credential: credential)
+      remoteSourceProbe = probe
+      return probe
+    } catch {
+      remoteSourceError = error.localizedDescription
+      return nil
+    }
+  }
+
+  func saveRemoteSource(_ probe: RemoteBuildSourceProbe) async -> Bool {
+    guard !isRemoteSourcesBusy else { return false }
+    isRemoteSourcesBusy = true
+    remoteSourceError = nil
+    defer { isRemoteSourcesBusy = false }
+    do {
+      _ = try await remoteSourceProvider.save(probe: probe)
+      remoteSources = try await remoteSourceProvider.listSources()
+      remoteSourceProbe = nil
+      return true
+    } catch {
+      remoteSourceError = error.localizedDescription
+      return false
+    }
+  }
+
+  func removeRemoteSource(_ sourceID: UUID) async {
+    guard !isRemoteSourcesBusy else { return }
+    isRemoteSourcesBusy = true
+    remoteSourceError = nil
+    defer { isRemoteSourcesBusy = false }
+    do {
+      try await remoteSourceProvider.remove(sourceID: sourceID)
+      remoteSources = try await remoteSourceProvider.listSources()
+    } catch {
+      remoteSourceError = error.localizedDescription
+    }
   }
 
   func refresh() {

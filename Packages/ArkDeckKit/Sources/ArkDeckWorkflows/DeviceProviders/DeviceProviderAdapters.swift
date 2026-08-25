@@ -672,7 +672,11 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     if case .string(let value)? = inputs["verificationProfile"] {
       verificationValue = value
     } else {
-      verificationValue = HDCNativeVerificationProfile.hashAndProcess.rawValue
+      // GJ-3 requires proof that the restarted process actually mapped the
+      // published library. Keep direct provider materialization at least as
+      // strong as the Catalog default even when a caller bypasses schema
+      // default insertion in a focused test or recovery path.
+      verificationValue = HDCNativeVerificationProfile.hashProcessAndMaps.rawValue
     }
     let rollbackValue: String
     if case .string(let value)? = inputs["rollbackPolicy"] {

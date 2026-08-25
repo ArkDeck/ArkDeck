@@ -60,6 +60,7 @@ enum AgentXPCAppJobKind: String, Sendable, Equatable {
   case flash
   case trace
   case debugLogs
+  case debugNativeLibrary
   case debugHAP
   case debugPorts
   case toolkitScreenshot
@@ -162,6 +163,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableHAPImportMethods.contains(request.method)
+      || ArkDeckAgentXPC.forwardableNativeLibraryImportMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableRockchipBindingMethods.contains(request.method)
     {
       return .direct(method: request.method)
@@ -231,6 +233,12 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
     case (ArkDeckAgentClientName.debugLogsWorkspace, "capture.diagnostics"):
       guard case .integer(1)? = operation["version"] else { return nil }
       return .debugLogs
+    case (
+      ArkDeckAgentClientName.debugArtifactsWorkspace,
+      "deploy.native-library.app-owned"
+    ):
+      guard case .integer(1)? = operation["version"] else { return nil }
+      return .debugNativeLibrary
     case (ArkDeckAgentClientName.debugAppsWorkspace, "debug.hap"):
       guard case .integer(1)? = operation["version"] else { return nil }
       return .debugHAP

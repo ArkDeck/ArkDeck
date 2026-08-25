@@ -311,7 +311,7 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
       let ports = line.split(whereSeparator: \Character.isWhitespace).compactMap { token -> Int? in
         let value = String(token)
         guard value.hasPrefix("tcp:"), let port = Int(value.dropFirst(4)),
-          (1...65_535).contains(port)
+          (1_024...65_535).contains(port)
         else { return nil }
         return port
       }

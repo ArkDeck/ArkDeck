@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "2e2ad8aa38cf8c621bc1358f9ef678480c4f49f8a3913f6a9eb7311b6e2d6965"
+  public static let catalogDigest = "436999a0a0062bf0375fa351f0d5fd590c0b0d5e8b6a123cebc3572e1070f5d3"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -288,7 +288,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "restartProfile", type: .string, isRequired: false, enumValues: ["restartAbility"], summary: "How the application is restarted so it loads the new library. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `restartAbility`. Other restart modes are not published until they have complete restart/readback plans.", defaultValue: .string("restartAbility")),
         CatalogFieldDescriptor(name: "rollbackPolicy", type: .string, isRequired: false, enumValues: ["autoRollback", "retainBackup"], summary: "What happens to the previous library when verification fails. `autoRollback` restores it; `retainBackup` leaves the new one in place and keeps the backup for a later decision.", defaultValue: .string("autoRollback")),
         CatalogFieldDescriptor(name: "targetBundle", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$", maxLength: 200, summary: "Remote destination is derived from this bundle's app-owned profile directory; callers cannot submit a remote path."),
-        CatalogFieldDescriptor(name: "verificationProfile", type: .string, isRequired: false, enumValues: ["hashOnly", "hashAndProcess", "hashProcessAndMaps"], summary: "How much of the deployment is proven after publication. `hashOnly` compares the published bytes, `hashAndProcess` also requires the process to be live, `hashProcessAndMaps` additionally requires the library to appear in the process's loaded maps.", defaultValue: .string("hashAndProcess"))
+        CatalogFieldDescriptor(name: "verificationProfile", type: .string, isRequired: false, enumValues: ["hashOnly", "hashAndProcess", "hashProcessAndMaps"], summary: "How much of the deployment is proven after publication. `hashOnly` compares the published bytes, `hashAndProcess` also requires the process to be live, and the default `hashProcessAndMaps` additionally requires the library to appear in the process's loaded maps.", defaultValue: .string("hashProcessAndMaps"))
       ],
       outputs: [
         CatalogFieldDescriptor(name: "publishReport", type: .artifactReference, isRequired: true),

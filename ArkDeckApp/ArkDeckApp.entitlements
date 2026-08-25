@@ -14,6 +14,15 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- "Use system default" is intentionally narrower than OpenSSH itself:
+	     ArkDeck can read only the two software-key formats supported by its
+	     typed SSH client. It cannot enumerate ~/.ssh or access config,
+	     known_hosts, agent sockets, public keys, or any other home path. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>/.ssh/id_rsa</string>
+		<string>/.ssh/id_ed25519</string>
+	</array>
 	<!-- The daemon's Unix socket is unreachable from this container: the App
 	     Sandbox classifies AF_UNIX connect() as its own operation, so neither
 	     network.client nor any file entitlement reaches it (measured against a

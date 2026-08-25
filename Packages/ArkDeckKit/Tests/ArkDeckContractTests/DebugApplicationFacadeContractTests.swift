@@ -18,6 +18,10 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
             "reference": "debug.hap@1", "availability": "unavailable",
             "reasons": ["capability_missing"],
           ],
+          [
+            "reference": "deploy.native-library.app-owned@1",
+            "availability": "available", "reasons": [],
+          ],
         ])),
       targetResponse: .success(
         try response([
@@ -51,6 +55,9 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(
       presentation.operation("debug.hap@1")?.availability,
       .unavailable(reasons: ["capability_missing"]))
+    XCTAssertEqual(
+      presentation.operation("deploy.native-library.app-owned@1")?.availability,
+      .available)
   }
 
   func testEveryKnownNonterminalJobStateIsActiveIncludingPreflight() {
@@ -172,12 +179,20 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       .valid(DebugValidatedPortRule(direction: .forward, localPort: 8080, remotePort: 9229)))
     XCTAssertEqual(
       DebugPortRuleValidator.validate(
+        direction: .forward, localPortText: "1024", remotePortText: "65535"),
+      .valid(DebugValidatedPortRule(direction: .forward, localPort: 1024, remotePort: 65535)))
+    XCTAssertEqual(
+      DebugPortRuleValidator.validate(
         direction: .forward, localPortText: "8080;reboot", remotePortText: "9229"),
       .invalid(.localPortNotNumeric))
     XCTAssertEqual(
       DebugPortRuleValidator.validate(
-        direction: .reverse, localPortText: "0", remotePortText: "9229"),
+        direction: .reverse, localPortText: "1023", remotePortText: "9229"),
       .invalid(.localPortOutOfRange))
+    XCTAssertEqual(
+      DebugPortRuleValidator.validate(
+        direction: .reverse, localPortText: "8080", remotePortText: "1023"),
+      .invalid(.remotePortOutOfRange))
     XCTAssertEqual(
       DebugPortRuleValidator.validate(
         direction: .reverse, localPortText: "8080", remotePortText: "65536"),
@@ -291,10 +306,13 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
     XCTAssertEqual(
-      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 7)
+      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 10)
     XCTAssertTrue(protocolBody.contains("func refreshWorkspace(targetID:"))
     XCTAssertTrue(protocolBody.contains("func submitLogs("))
     XCTAssertTrue(protocolBody.contains("func submitHAP("))
+    XCTAssertTrue(protocolBody.contains("func prepareNativeLibrary("))
+    XCTAssertTrue(protocolBody.contains("func prepareRemoteNativeLibrary("))
+    XCTAssertTrue(protocolBody.contains("func submitNativeLibrary("))
     XCTAssertTrue(protocolBody.contains("func run(jobID:"))
     XCTAssertTrue(protocolBody.contains("func cancel(jobID:"))
     XCTAssertTrue(protocolBody.contains("func submitPortRule("))
@@ -310,8 +328,11 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       "operation.list", "target.list", "job.list", "debug.probe", "debug.template.run",
       "job.submit", "job.run", "job.cancel",
       "port-forward.create", "port-forward.remove",
+      "deploy.native-library.app-owned",
       "artifact.importHap.begin", "artifact.importHap.append",
       "artifact.importHap.commit", "artifact.importHap.abort",
+      "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.append",
+      "artifact.importNativeLibrary.commit", "artifact.importNativeLibrary.abort",
     ] {
       XCTAssertTrue(source.contains("\"\(exposed)\""))
     }
@@ -337,6 +358,110 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertFalse(localization.contains("debug.blocked.hapImport"))
   }
 
+  func testNativeLibraryRequestPinsPublishedOperationTargetAndClosedInputs() throws {
+    let target = DebugTargetPresentation(
+      id: "target-dayu200-a", bindingRevision: 9, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-06T12:00:00Z")
+    let request = try DebugNativeLibraryRequestBuilder.request(
+      target: target,
+      lease: "LEASE-SO-1",
+      targetBundle: "com.example.app",
+      libraryLogicalName: "libfeature_debug.so",
+      expectedABI: "arm64-v8a",
+      verificationProfile: "hashAndProcess",
+      rollbackPolicy: "autoRollback",
+      nonce: "contract")
+    let data = try CanonicalJSONEncoders.canonical().encode(request)
+    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let operation = try XCTUnwrap(object["operation"] as? [String: Any])
+    let targetObject = try XCTUnwrap(object["target"] as? [String: Any])
+    let inputs = try XCTUnwrap(object["inputs"] as? [String: Any])
+    let context = try XCTUnwrap(object["clientContext"] as? [String: Any])
+
+    XCTAssertEqual(operation["id"] as? String, "deploy.native-library.app-owned")
+    XCTAssertEqual(operation["version"] as? Int, 1)
+    XCTAssertEqual(targetObject["targetId"] as? String, target.id)
+    XCTAssertEqual(targetObject["expectedBindingRevision"] as? Int, 9)
+    XCTAssertEqual(inputs["libraryArtifactLease"] as? String, "LEASE-SO-1")
+    XCTAssertEqual(inputs["targetBundle"] as? String, "com.example.app")
+    XCTAssertEqual(inputs["libraryLogicalName"] as? String, "libfeature_debug.so")
+    XCTAssertEqual(inputs["expectedABI"] as? String, "arm64-v8a")
+    XCTAssertEqual(inputs["restartProfile"] as? String, "restartAbility")
+    XCTAssertEqual(inputs["verificationProfile"] as? String, "hashAndProcess")
+    XCTAssertEqual(inputs["rollbackPolicy"] as? String, "autoRollback")
+    XCTAssertEqual(
+      context["clientName"] as? String,
+      ArkDeckAgentClientName.debugArtifactsWorkspace)
+    XCTAssertThrowsError(
+      try DebugNativeLibraryRequestBuilder.request(
+        target: target,
+        lease: "LEASE-SO-1",
+        targetBundle: "com.example.app",
+        libraryLogicalName: "../libfeature_debug.so",
+        expectedABI: "arm64-v8a",
+        verificationProfile: "hashAndProcess",
+        rollbackPolicy: "autoRollback"))
+  }
+
+  func testArtifactsWorkspaceUsesThePublishedNativeLibraryPath() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/DebugLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    XCTAssertTrue(view.contains("case artifacts"))
+    XCTAssertTrue(view.contains(".onKeyPress(.leftArrow)"))
+    XCTAssertTrue(view.contains(".onKeyPress(.rightArrow)"))
+    XCTAssertTrue(view.contains(".onKeyPress(.home)"))
+    XCTAssertTrue(view.contains(".onKeyPress(.end)"))
+    XCTAssertTrue(view.contains("@FocusState private var focusedTab: DebugWorkspaceTab?"))
+    XCTAssertTrue(view.contains(".focusable()"))
+    XCTAssertTrue(view.contains(".focused($focusedTab, equals: tab)"))
+    XCTAssertTrue(view.contains(".onChange(of: target?.bindingRevision)"))
+    XCTAssertTrue(view.contains("private func relatedJobs(for operationReference: String)"))
+    XCTAssertTrue(view.contains("job.targetID == $0.id"))
+    XCTAssertTrue(view.contains("DebugArtifactsWorkspace("))
+    XCTAssertTrue(view.contains("model.prepareNativeLibrary("))
+    XCTAssertTrue(view.contains("model.prepareRemoteNativeLibrary("))
+    XCTAssertTrue(view.contains("RemoteBuildSourceApplicationFacade.make()"))
+    XCTAssertTrue(view.contains("DebugRemoteBuildBrowserSheet"))
+    XCTAssertTrue(view.contains("SettingsLink"))
+    XCTAssertTrue(view.contains("model.submitNativeLibrary(preparation)"))
+    XCTAssertTrue(view.contains("model.nativeLibraryFeedbackMatches("))
+    XCTAssertTrue(view.contains("private let verificationProfile = \"hashProcessAndMaps\""))
+    XCTAssertTrue(view.contains("private let rollbackPolicy = \"autoRollback\""))
+    XCTAssertFalse(view.contains("@State private var expectedABI"))
+    XCTAssertFalse(view.contains(".tag(\"arm64-v8a\")"))
+    XCTAssertTrue(localization.contains("Read from the signed ELF during validation"))
+    XCTAssertFalse(view.contains(".tag(\"hashOnly\")"))
+    XCTAssertFalse(view.contains(".tag(\"hashAndProcess\")"))
+    XCTAssertFalse(view.contains(".tag(\"retainBackup\")"))
+    XCTAssertTrue(view.contains("DebugNativeLibraryAnnouncementBridge"))
+    XCTAssertTrue(view.contains("notification: .announcementRequested"))
+    XCTAssertTrue(view.contains("model.logFeedbackMatches(target: target)"))
+    XCTAssertTrue(view.contains("model.hapFeedbackMatches(target: target)"))
+    XCTAssertTrue(view.contains("model.portRuleFeedbackMatches(target: target)"))
+    XCTAssertTrue(view.contains("model.commandFeedbackMatches(target: target"))
+    XCTAssertTrue(view.contains("runtimeProbe.bindingRevision == target.bindingRevision"))
+    XCTAssertTrue(view.contains("result.bindingRevision == target.bindingRevision"))
+    XCTAssertTrue(view.contains("fileURL: selectedLibraryURL"))
+    XCTAssertTrue(
+      view.contains("bindingRevision: target.bindingRevision"))
+    XCTAssertTrue(view.contains("DebugApplicationFacade.nativeLibraryReference"))
+    XCTAssertFalse(view.contains("TextField(\"device path\""))
+    XCTAssertTrue(localization.contains("debug.artifacts.productionBoundary"))
+    XCTAssertTrue(localization.contains("standalone device restart remain unavailable"))
+    XCTAssertTrue(localization.contains("Back up, replace, restart, and verify"))
+    XCTAssertTrue(localization.contains("automatically restores and re-verifies"))
+    XCTAssertTrue(localization.contains("Only decimal TCP ports from 1024 through 65535"))
+    XCTAssertTrue(localization.contains("只读工具"))
+    XCTAssertTrue(localization.contains("获取日志"))
+  }
+
   func testDebugProbeAndCommandResponsesStayBoundToTargetAndClosedTemplate() throws {
     let target = DebugTargetPresentation(
       id: "target-dayu200-a", bindingRevision: 9, toolVersion: "3.2.0f",
@@ -356,6 +481,20 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(
       try snapshot.get().portRules,
       [DebugRuntimePortRule(direction: .forward, localPort: 8080, remotePort: 9229)])
+
+    let privilegedSnapshot = DebugRuntimeResponseDecoding.snapshot(
+      .success(
+        try objectResponse([
+          "targetId": target.id,
+          "bindingRevision": target.bindingRevision,
+          "packages": [],
+          "portRules": [
+            ["direction": "forward", "localPort": 80, "remotePort": 9229]
+          ],
+          "warnings": [],
+        ])),
+      target: target)
+    XCTAssertThrowsError(try privilegedSnapshot.get())
 
     let command = DebugRuntimeResponseDecoding.command(
       .success(
@@ -387,8 +526,14 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       ["com.example.app", "com.ohos.launcher"])
     XCTAssertEqual(
       FoundationDebugRuntimeProbe.portRules(
-        Data("target tcp:8080 tcp:9229\ngarbage\n".utf8), direction: .forward),
-      [DebugRuntimePortRule(direction: .forward, localPort: 8080, remotePort: 9229)])
+        Data(
+          "target tcp:80 tcp:9229\ntarget tcp:1024 tcp:65535\ntarget tcp:8080 tcp:9229\ngarbage\n"
+            .utf8),
+        direction: .forward),
+      [
+        DebugRuntimePortRule(direction: .forward, localPort: 1024, remotePort: 65535),
+        DebugRuntimePortRule(direction: .forward, localPort: 8080, remotePort: 9229),
+      ])
   }
 
   func testReadOnlyHDCProbeRejectsExitZeroFailureMarkersBeforeProjection() {

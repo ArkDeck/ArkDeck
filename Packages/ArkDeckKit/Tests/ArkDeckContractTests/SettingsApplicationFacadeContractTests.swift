@@ -28,7 +28,7 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(manifest.contains(Data("\"deviceRawExcluded\":true".utf8)))
   }
 
-  func testSettingsSceneHasFiveNamedLocalizedPartitions() throws {
+  func testSettingsSceneHasNamedLocalizedPartitionsIncludingRemoteBuildSources() throws {
     let repository = repositoryRoot()
     let app = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
@@ -50,6 +50,7 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     for key in [
       "settings.tab.general",
       "settings.tab.toolchains",
+      "settings.tab.remoteSources",
       "settings.tab.storage",
       "settings.tab.updates",
       "settings.tab.diagnostics",
