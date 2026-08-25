@@ -489,3 +489,88 @@ public struct HDCPortForwardSpec: Sendable, Equatable {
     self.remotePort = remotePort
   }
 }
+
+public enum HDCPointerGesture: String, Sendable, Equatable {
+  case tap
+  case longPress
+  case swipe
+}
+
+/// One primary pointer gesture at exact device coordinates. Coordinates
+/// arrive already content-rect mapped and clamped by the caller; this type
+/// holds the closed bounds. `uitest uiInput swipe` takes a velocity in px/s
+/// (200...40000, default 600), not a duration, so the caller's real hold
+/// duration is converted at lowering time and the conversion stays visible
+/// in the verified summary (measured 2026-08-25, OpenHarmony-7.0.0.39).
+public struct HDCPointerInputSpec: Sendable, Equatable {
+  public static let coordinateRange = 0...32767
+  public static let durationRangeMs = 80...2000
+  public static let displayRange = 0...64
+  public static let velocityRange = 200...40000
+
+  public let gesture: HDCPointerGesture
+  public let x: Int
+  public let y: Int
+  public let toX: Int?
+  public let toY: Int?
+  public let durationMs: Int?
+  public let displayID: Int?
+
+  public init(
+    gesture: HDCPointerGesture,
+    x: Int,
+    y: Int,
+    toX: Int? = nil,
+    toY: Int? = nil,
+    durationMs: Int? = nil,
+    displayID: Int? = nil
+  ) throws {
+    for (value, field) in [(x, "pointerX"), (y, "pointerY")] {
+      guard Self.coordinateRange.contains(value) else {
+        throw HDCE0RequestError.outOfBounds(field: field, detail: "0...32767")
+      }
+    }
+    if gesture == .swipe {
+      guard let toX, let toY, let durationMs else {
+        throw HDCE0RequestError.outOfBounds(
+          field: "pointerToX/pointerToY/durationMs", detail: "required for a swipe")
+      }
+      for (value, field) in [(toX, "pointerToX"), (toY, "pointerToY")] {
+        guard Self.coordinateRange.contains(value) else {
+          throw HDCE0RequestError.outOfBounds(field: field, detail: "0...32767")
+        }
+      }
+      guard Self.durationRangeMs.contains(durationMs) else {
+        throw HDCE0RequestError.outOfBounds(field: "durationMs", detail: "80...2000")
+      }
+    } else {
+      guard toX == nil, toY == nil, durationMs == nil else {
+        throw HDCE0RequestError.outOfBounds(
+          field: "pointerToX/pointerToY/durationMs", detail: "only a swipe carries these")
+      }
+    }
+    if let displayID {
+      guard Self.displayRange.contains(displayID) else {
+        throw HDCE0RequestError.outOfBounds(field: "displayId", detail: "0...64")
+      }
+    }
+    self.gesture = gesture
+    self.x = x
+    self.y = y
+    self.toX = toX
+    self.toY = toY
+    self.durationMs = durationMs
+    self.displayID = displayID
+  }
+
+  /// px/s for `uiInput swipe`, derived from the caller's real hold duration
+  /// and clamped into the device command's closed range.
+  public var swipeVelocity: Int? {
+    guard gesture == .swipe, let toX, let toY, let durationMs else { return nil }
+    let dx = Double(toX - x)
+    let dy = Double(toY - y)
+    let distance = (dx * dx + dy * dy).squareRoot()
+    let velocity = Int((distance / (Double(durationMs) / 1000.0)).rounded())
+    return min(Self.velocityRange.upperBound, max(Self.velocityRange.lowerBound, velocity))
+  }
+}

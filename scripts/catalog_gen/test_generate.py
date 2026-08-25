@@ -52,6 +52,9 @@ class RealCatalogTests(unittest.TestCase):
                 "deploy.native-library.app-owned@1",
                 "flash.dayu200",
                 "flash.full-restore@1",
+                "input.long-press@1",
+                "input.swipe@1",
+                "input.tap@1",
                 "observe.device@1",
                 "port-forward.create@1",
                 "port-forward.remove@1",
@@ -723,14 +726,14 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
             ),
-            5,
+            8,
         )
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
             ),
-            5,
+            8,
         )
         self.assertEqual(
             swift.count(

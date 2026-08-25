@@ -1,0 +1,21 @@
+{
+ "date": "2026-08-25",
+ "device": "5SM0125725000252 / TGT-1a62a0dbedd6 (OpenHarmony-7.0.0.39, 1280x2832, unlocked)",
+ "method": "the exact argv the provider lowers, sent through the existing shared hdc server (one extra client, no second server, no USB contention)",
+ "results": [
+  {"gesture": "tap", "argv": "shell uitest uiInput click 640 1450", "rc": 0, "stdout": "No Error", "verdict": "verified"},
+  {"gesture": "longPress", "argv": "shell uitest uiInput longClick 640 1450", "rc": 0, "stdout": "No Error", "verdict": "verified"},
+  {"gesture": "swipe", "argv": "shell uitest uiInput swipe 640 2000 640 1000 2000", "rc": 0, "stdout": "No Error", "verdict": "verified", "note": "2000 px/s is the provider's conversion of a real 1000 px / 500 ms hold"},
+  {"gesture": "swipe", "argv": "shell uitest uiInput swipe 640 2400 640 400 40000", "rc": 0, "stdout": "No Error", "verdict": "verified", "note": "velocity ceiling accepted with in-screen coordinates"},
+  {"gesture": "swipe", "argv": "shell uitest uiInput swipe 640 2400 640 1400 200", "rc": 0, "stdout": "No Error", "verdict": "verified", "note": "velocity floor accepted"},
+  {"gesture": "swipe", "argv": "shell uitest uiInput swipe 0 0 32767 0 2000", "rc": 0, "stdout": "Please confirm that the coordinate values are correct.", "verdict": "failed(pointerInputRejected)", "note": "off-screen X: uitest validates against the real panel size and rejects at exit 0 — the exact case the verdict's failure vocabulary must catch"}
+ ],
+ "findings": [
+  "uiInput exits 0 for both success and rejection; stdout is the only verdict source, confirming the whitelist-then-scan design.",
+  "The device accepted every gesture form the closed set lowers, including both ends of the velocity range.",
+  "Coordinate bounds are enforced by the device against the live panel size, not by the 0...32767 type bound alone: the provider's clamp is necessary but not sufficient, and the reject path is real.",
+  "An injected tap opened a content detail view (screenshot evidence), proving the gesture reaches the system input pipeline rather than only satisfying uitest.",
+  "keyEvent Back exists in the same uiInput surface and restored the app — a candidate for the future system-key extension, not part of this closed set."
+ ],
+ "device_state": "no residue in /data/local/tmp; device returned to its pre-probe screen via keyEvent Back"
+}

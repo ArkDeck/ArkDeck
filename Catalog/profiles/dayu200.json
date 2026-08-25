@@ -29,6 +29,9 @@
     "flash.dayu200",
     "flash.full-restore@1",
     "port-forward.create@1",
-    "port-forward.remove@1"
+    "port-forward.remove@1",
+    "input.tap@1",
+    "input.long-press@1",
+    "input.swipe@1"
   ]
 }

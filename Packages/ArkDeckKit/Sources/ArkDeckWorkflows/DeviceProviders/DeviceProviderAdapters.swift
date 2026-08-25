@@ -172,6 +172,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       return .hdc(.createPortForward(try portForwardSpec(inputs)))
     case .removePortForward:
       return .hdc(.removePortForward(try portForwardSpec(inputs)))
+    case .injectPointerInput:
+      return .hdc(.injectPointerInput(try pointerInputSpec(operation, inputs)))
     case .runApprovedRemoteRead:
       if descriptorIsDebugHAP(operation), step.actionReference?.actionID == "packageInfo" {
         return try debugHAPAction(for: step, inputs: inputs, context: context)
@@ -258,6 +260,50 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
 
   private func descriptorIsDebugHAP(_ operation: CatalogOperationDescriptor) -> Bool {
     operation.id == "debug.hap"
+  }
+
+  /// The gesture is the operation's identity, never an input: `input.tap@1`
+  /// can only ever inject a tap. Coordinates and the swipe duration are the
+  /// operation's typed inputs, already schema-bounded by admission.
+  private func pointerInputSpec(
+    _ operation: CatalogOperationDescriptor,
+    _ inputs: [String: JSONValue]
+  ) throws -> HDCPointerInputSpec {
+    let gesture: HDCPointerGesture
+    switch operation.reference {
+    case "input.tap@1": gesture = .tap
+    case "input.long-press@1": gesture = .longPress
+    case "input.swipe@1": gesture = .swipe
+    default:
+      throw DeviceProviderError.unsupportedAction(
+        "\(operation.reference) has no registered pointer gesture")
+    }
+    func requiredCoordinate(_ key: String) throws -> Int {
+      guard case .integer(let value)? = inputs[key], let coordinate = Int(exactly: value)
+      else {
+        throw DeviceProviderError.unsupportedAction("\(key) is required for a pointer input")
+      }
+      return coordinate
+    }
+    func optionalInteger(_ key: String) throws -> Int? {
+      guard let raw = inputs[key] else { return nil }
+      guard case .integer(let value) = raw, let integer = Int(exactly: value) else {
+        throw DeviceProviderError.unsupportedAction("\(key) must be an integer")
+      }
+      return integer
+    }
+    if gesture == .swipe {
+      return try HDCPointerInputSpec(
+        gesture: gesture,
+        x: try requiredCoordinate("fromX"), y: try requiredCoordinate("fromY"),
+        toX: try requiredCoordinate("toX"), toY: try requiredCoordinate("toY"),
+        durationMs: try requiredCoordinate("durationMs"),
+        displayID: try optionalInteger("displayId"))
+    }
+    return try HDCPointerInputSpec(
+      gesture: gesture,
+      x: try requiredCoordinate("x"), y: try requiredCoordinate("y"),
+      displayID: try optionalInteger("displayId"))
   }
 
   private func portForwardSpec(
@@ -1007,6 +1053,34 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
                 ["shell", "bm", "dump", "-n", bundle.bundleName], context: context),
               timeoutSeconds: 30),
           ]))
+    case .injectPointerInput(let spec):
+      // `uitest uiInput` argv is positional; swipe carries a velocity derived
+      // from the caller's real hold duration (px/s, closed range), never the
+      // duration itself — the device command has no duration parameter.
+      var uiInput: [String]
+      switch spec.gesture {
+      case .tap:
+        uiInput = ["click", String(spec.x), String(spec.y)]
+      case .longPress:
+        uiInput = ["longClick", String(spec.x), String(spec.y)]
+      case .swipe:
+        guard let toX = spec.toX, let toY = spec.toY, let velocity = spec.swipeVelocity
+        else {
+          throw DeviceProviderError.unsupportedAction("a swipe needs an end point and duration")
+        }
+        uiInput = [
+          "swipe", String(spec.x), String(spec.y), String(toX), String(toY),
+          String(velocity),
+        ]
+      }
+      if let displayID = spec.displayID { uiInput.append(String(displayID)) }
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "uitest", "uiInput"] + uiInput, context: context),
+          timeoutSeconds: 30))
     case .createPortForward(let spec):
       let verb = spec.direction == .forward ? "fport" : "rport"
       return TypedProcessPlan(
@@ -2179,6 +2253,42 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         return .failed(code: "portForwardFailed", detail: "tcp:\(spec.localPort)")
       }
       return .verified(summary: ["localPort": String(spec.localPort)])
+    case .injectPointerInput(let spec):
+      // uiInput exits 0 even when it rejects the input; the verdict comes from
+      // its stdout. "No Error" is the success line and must be whitelisted
+      // before scanning, because it contains the substring "error"
+      // (DEVICE-COMMAND-FACTS §7, real-device 2026-08-25).
+      guard receipt.exitStatus == 0 else {
+        return .failed(
+          code: "pointerInputFailed", detail: "uiInput exited \(receipt.exitStatus)")
+      }
+      guard let text = String(data: receipt.stdout, encoding: .utf8) else {
+        return .unknown(reason: "uiInput stdout is not UTF-8; the gesture outcome is unknown")
+      }
+      let lowered = text.lowercased()
+      let scanned = lowered.replacingOccurrences(of: "no error", with: "")
+      let failureMarks = ["illegal", "fail", "error", "incorrect", "please confirm"]
+      if let mark = failureMarks.first(where: { scanned.contains($0) }) {
+        let firstLine = text.split(separator: "\n").first.map(String.init) ?? mark
+        return .failed(
+          code: "pointerInputRejected",
+          detail: firstLine.trimmingCharacters(in: .whitespaces))
+      }
+      guard lowered.contains("no error") else {
+        return .unknown(
+          reason: "uiInput printed neither the success line nor a recognized failure")
+      }
+      var summary = [
+        "gesture": spec.gesture.rawValue,
+        "x": String(spec.x),
+        "y": String(spec.y),
+      ]
+      if let toX = spec.toX { summary["toX"] = String(toX) }
+      if let toY = spec.toY { summary["toY"] = String(toY) }
+      if let durationMs = spec.durationMs { summary["durationMs"] = String(durationMs) }
+      if let velocity = spec.swipeVelocity { summary["loweredVelocity"] = String(velocity) }
+      if let displayID = spec.displayID { summary["displayId"] = String(displayID) }
+      return .verified(summary: summary)
     case .readPackagePresence(let bundle):
       guard
         let present = Self.packagePresence(
@@ -3010,6 +3120,12 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       // reconcile pass that has none must stay unknown rather than guess.
       return .stillUnknown(
         reason: "device mutation needs a readback pass before it can be concluded")
+    case .hdc(.injectPointerInput):
+      // An injected gesture leaves no device-observable state to read back.
+      // The outcome stays unknown permanently and the intent is never
+      // replayed; the caller surfaces it as an unknown input result.
+      return .stillUnknown(
+        reason: "an injected pointer gesture has no observable readback")
     case .hdc(.inspectNativeLibrary):
       return .confirmedNotExecuted
     default:

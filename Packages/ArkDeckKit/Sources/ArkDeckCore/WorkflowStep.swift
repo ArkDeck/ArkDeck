@@ -130,6 +130,10 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   case stopApplication
   case createPortForward
   case removePortForward
+  /// One primary pointer gesture (tap, long-press or swipe) injected at
+  /// device coordinates. There is no observable readback for an injected
+  /// gesture, so an unknown outcome stays unknown and is never replayed.
+  case injectPointerInput
   case clearLogBuffer
   case resizeLogBuffer
   case startDeviceLogPersist
@@ -302,6 +306,11 @@ package enum WorkflowStepRegistry {
         required: ["forwardId", "hostEndpoint", "deviceEndpoint"], profileExposable: true)
     case .removePortForward:
       deviceMutation(required: ["forwardId"], profileExposable: true)
+    case .injectPointerInput:
+      deviceMutation(
+        required: ["gesture", "pointerX", "pointerY"],
+        optional: ["pointerToX", "pointerToY", "durationMs", "displayId"],
+        profileExposable: true)
     case .clearLogBuffer:
       deviceMutation(required: ["bufferId", "confirmationId"])
     case .resizeLogBuffer:
@@ -870,6 +879,20 @@ private enum WorkflowStepValidator {
       _ = try reader.string("deviceEndpoint", minimumLength: 1, maximumLength: 255)
     case .removePortForward:
       try reader.identifier("forwardId")
+    case .injectPointerInput:
+      let gesture = try reader.enumeration("gesture", allowed: ["tap", "longPress", "swipe"])
+      try reader.integer("pointerX", minimum: 0, maximum: 32767)
+      try reader.integer("pointerY", minimum: 0, maximum: 32767)
+      if gesture == "swipe" {
+        try reader.integer("pointerToX", minimum: 0, maximum: 32767)
+        try reader.integer("pointerToY", minimum: 0, maximum: 32767)
+        try reader.integer("durationMs", minimum: 80, maximum: 2000)
+      } else {
+        try reader.optionalIntegerOrNull("pointerToX", minimum: 0, maximum: 32767)
+        try reader.optionalIntegerOrNull("pointerToY", minimum: 0, maximum: 32767)
+        try reader.optionalIntegerOrNull("durationMs", minimum: 80, maximum: 2000)
+      }
+      try reader.optionalIntegerOrNull("displayId", minimum: 0, maximum: 64)
     case .clearLogBuffer:
       try reader.identifier("bufferId")
       try reader.identifier("confirmationId")

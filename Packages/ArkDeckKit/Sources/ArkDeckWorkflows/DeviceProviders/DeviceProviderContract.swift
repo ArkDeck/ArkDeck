@@ -64,6 +64,10 @@ public enum HDCProviderAction: Sendable, Equatable {
   case uninstallPackage(HDCBundleReference)
   case createPortForward(HDCPortForwardSpec)
   case removePortForward(HDCPortForwardSpec)
+  // One primary pointer gesture at exact device coordinates. An injected
+  // gesture has no observable readback: an unknown outcome stays unknown
+  // and is never replayed.
+  case injectPointerInput(HDCPointerInputSpec)
   // App-owned native-library deployment. The deployment value carries a
   // provider-derived namespace and host-verified ELF facts, never a caller
   // path. Every mutation has a dedicated typed inspection used both in the
@@ -420,7 +424,8 @@ public enum TypedProviderAction: Sendable, Equatable {
       .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet),
       .hdc(.cleanupStagedPackageSet),
       .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
-      .hdc(.removePortForward), .hdc(.sendNativeLibraryToStaging),
+      .hdc(.removePortForward), .hdc(.injectPointerInput),
+      .hdc(.sendNativeLibraryToStaging),
       .hdc(.backupNativeLibrary), .hdc(.publishNativeLibrary),
       .hdc(.stopNativeTarget), .hdc(.startNativeTarget),
       .hdc(.cleanupNativeLibrary), .hdc(.rollbackNativeLibrary):
@@ -677,6 +682,21 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "hdc.uninstallPackage",
         arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.injectPointerInput(let spec)):
+      var arguments: [String: JSONValue] = [
+        "gesture": .string(spec.gesture.rawValue),
+        "pointerX": .integer(Int64(spec.x)),
+        "pointerY": .integer(Int64(spec.y)),
+      ]
+      if let toX = spec.toX { arguments["pointerToX"] = .integer(Int64(toX)) }
+      if let toY = spec.toY { arguments["pointerToY"] = .integer(Int64(toY)) }
+      if let durationMs = spec.durationMs {
+        arguments["durationMs"] = .integer(Int64(durationMs))
+      }
+      if let displayID = spec.displayID {
+        arguments["displayId"] = .integer(Int64(displayID))
+      }
+      self.init(kind: "hdc.injectPointerInput", arguments: arguments)
     case .hdc(.createPortForward(let spec)):
       self.init(
         kind: "hdc.createPortForward",
@@ -1175,6 +1195,18 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .hdc(.stopAbility(try ability()))
     case "hdc.uninstallPackage":
       return .hdc(.uninstallPackage(try bundle()))
+    case "hdc.injectPointerInput":
+      guard let gesture = HDCPointerGesture(rawValue: try string("gesture")) else {
+        throw DeviceProviderError.unsupportedAction("persisted pointer gesture is invalid")
+      }
+      return .hdc(
+        .injectPointerInput(
+          try HDCPointerInputSpec(
+            gesture: gesture,
+            x: integer("pointerX"), y: integer("pointerY"),
+            toX: optionalInteger("pointerToX"), toY: optionalInteger("pointerToY"),
+            durationMs: optionalInteger("durationMs"),
+            displayID: optionalInteger("displayId"))))
     case "hdc.createPortForward":
       return .hdc(
         .createPortForward(

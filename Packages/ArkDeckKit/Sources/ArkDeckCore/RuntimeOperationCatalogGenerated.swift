@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "be7b73616a7b1786f66408056b3a0d4daf811be46368344c2c3da7e3b88715c7"
+  public static let catalogDigest = "9f99789a536394b34b798951a0d5a1a59f8f860c23ac5b328e17b697d7bedafe"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -412,6 +412,111 @@ extension RuntimeOperationCatalog {
         profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200", coveredEffects: ["partition:uboot", "partition:resource", "partition:boot_linux", "partition:ramdisk", "partition:system", "partition:vendor", "partition:updater", "partition:chip_ckm", "partition:userdata"])],
         overwriteStepID: "flash-partitions",
         verificationStepIDs: ["verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build"])
+    ),
+    CatalogOperationDescriptor(
+      id: "input.long-press",
+      version: 1,
+      title: "Inject one long-press at exact device coordinates",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "x", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the long-press, anchored at the pointer-down position after content-rect mapping; never a raw host coordinate."),
+        CatalogFieldDescriptor(name: "y", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the long-press, anchored at the pointer-down position.")
+      ],
+      outputs: [
+        
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "inject-pointer-input", kind: .injectPointerInput, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 2,
+      artifacts: [
+        
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
+    ),
+    CatalogOperationDescriptor(
+      id: "input.swipe",
+      version: 1,
+      title: "Inject one swipe between exact device coordinates",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "durationMs", type: .integer, isRequired: true, minimum: 80, maximum: 2000, summary: "The caller's real pointer-down-to-up hold time. The device command takes a velocity in px/s, so the provider derives it from this duration and records the conversion in the verified summary; the duration itself is never invented."),
+        CatalogFieldDescriptor(name: "fromX", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the pointer-down position after content-rect mapping; never a raw host coordinate."),
+        CatalogFieldDescriptor(name: "fromY", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the pointer-down position."),
+        CatalogFieldDescriptor(name: "toX", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the pointer-up position."),
+        CatalogFieldDescriptor(name: "toY", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the pointer-up position.")
+      ],
+      outputs: [
+        
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "inject-pointer-input", kind: .injectPointerInput, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 2,
+      artifacts: [
+        
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
+    ),
+    CatalogOperationDescriptor(
+      id: "input.tap",
+      version: 1,
+      title: "Inject one tap at exact device coordinates",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "x", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel X of the tap. The caller anchors this at the pointer-down position after content-rect mapping; it is never a raw host coordinate."),
+        CatalogFieldDescriptor(name: "y", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the tap, anchored at the pointer-down position.")
+      ],
+      outputs: [
+        
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "inject-pointer-input", kind: .injectPointerInput, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 2,
+      artifacts: [
+        
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "observe.device",

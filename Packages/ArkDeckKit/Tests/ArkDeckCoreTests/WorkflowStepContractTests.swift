@@ -647,6 +647,10 @@ final class WorkflowStepContractTests: XCTestCase {
     )
 
     switch kind {
+    case .injectPointerInput:
+      arguments["gesture"] = .string("tap")
+      arguments["pointerX"] = .integer(640)
+      arguments["pointerY"] = .integer(1500)
     case .mutateHDCServerLifecycle:
       arguments["action"] = .string("startManaged")
       arguments["expectedGeneration"] = .null

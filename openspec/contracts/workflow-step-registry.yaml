@@ -42,6 +42,7 @@ steps:
   - { kind: stopApplication, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
   - { kind: createPortForward, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
   - { kind: removePortForward, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: injectPointerInput, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
   - { kind: clearLogBuffer, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
   - { kind: resizeLogBuffer, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
   - { kind: startDeviceLogPersist, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
