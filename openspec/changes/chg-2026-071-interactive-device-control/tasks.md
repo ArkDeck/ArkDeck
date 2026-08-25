@@ -52,6 +52,9 @@ T02/T03 不进入实现。
 - Allowed paths:
   - `Catalog/**`（operation 的双向声明横跨 operations/profiles/generated 三个子目录，
     一次 op 新增必须同车；schema/ 仅在 operation schema 变化时触碰，本任务不改）
+  - `scripts/catalog_gen/test_generate.py`（codegen 的自测把已发布 operation 清单与
+    每类 actionRef 出现次数硬编码为期望值；新增 operation 必须同车更新这些计数，
+    否则 SDD guard 红。仅改期望数据，不改生成器逻辑）
   - `openspec/contracts/workflow-step-registry.yaml`（仅新增 `injectPointerInput` 一行：
     proposal 已批准的三个 input operation 的封闭 step 载体；不改既有行）
   - `openspec/contracts/workflow-step.schema.json`（仅新增 `injectPointerInput` 的
@@ -92,6 +95,9 @@ T02/T03 不进入实现。
 - Allowed paths:
   - `Catalog/**`（operation 的双向声明横跨 operations/profiles/generated 三个子目录，
     一次 op 新增必须同车；schema/ 仅在 operation schema 变化时触碰，本任务不改）
+  - `scripts/catalog_gen/test_generate.py`（codegen 的自测把已发布 operation 清单与
+    每类 actionRef 出现次数硬编码为期望值；新增 operation 必须同车更新这些计数，
+    否则 SDD guard 红。仅改期望数据，不改生成器逻辑）
   - `openspec/contracts/workflow-step-registry.yaml`（仅当环形采集需要新封闭 step kind
     时新增对应行；不改既有行）
   - `openspec/contracts/workflow-step.schema.json`（同上：仅当新增 kind 时补其枚举项
