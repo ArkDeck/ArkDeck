@@ -1,0 +1,93 @@
+{
+  "measurement": "capability-use-ledger",
+  "question": "Where does a gesture's time actually go once the evidence preamble is carried?",
+  "measuredAtUTC": "2026-08-25T11:40:00Z",
+  "howThisWasFound": [
+    "The plan was a persistent dispatch channel. Before building it, the Runtime's",
+    "own per-gesture cost was measured with the device answered by a zero-cost fake.",
+    "It came back at p50 245ms / p95 392ms - nearly the whole 400ms interaction",
+    "budget, before any device work at all. So the transport was not the bottleneck",
+    "and the channel would have optimised the smaller half."
+  ],
+  "rootCause": [
+    "A session-scoped capability is one record, as intended - but its `consumptions`",
+    "array grows by one entry per gesture, and the whole store document is encoded",
+    "and rewritten atomically on each consume and again on each outcome.",
+    "So the cost of taking one use grew with how many uses that capability had",
+    "already taken: quadratic over a session, in the exact place the session scope",
+    "was introduced to make constant."
+  ],
+  "storeCostPerUse": {
+    "note": "one consume + one recordOutcome, measured directly against the store",
+    "before": {
+      "uses0to99": 35.8, "uses100to199": 79.3, "uses200to299": 145.8,
+      "uses300to399": 332.3, "uses400to499": 441.1, "uses500to599": 209.5,
+      "documentBytesAfter600Uses": 846241,
+      "finding": "past roughly use 400 a single authorization exceeds the whole 400ms gesture budget on its own"
+    },
+    "after": {
+      "uses0to99": 11.3, "uses100to199": 12.1, "uses200to299": 13.0,
+      "uses300to399": 13.0, "uses400to499": 13.5, "uses500to599": 15.6,
+      "documentBytes": 819074, "ledgerBytes": 23445,
+      "finding": "flat in session length"
+    }
+  },
+  "runtimePerGesture": {
+    "note": "engine submit + run, device answered by a zero-cost fake",
+    "before": { "p50Ms": 245, "p95Ms": 392, "submitP50GrewFrom": 71, "submitP50GrewTo": 197 },
+    "after": {
+      "p50Ms": 107, "p95Ms": 141,
+      "byWindow": { "0-39": 96, "40-79": 105, "80-119": 107, "120-159": 110, "160-199": 118 },
+      "residualSlope": "96->118ms over 200 gestures, from checkpoint amortisation over a growing document; bounded, not quadratic"
+    }
+  },
+  "design": [
+    "The document is a checkpoint; each use is appended to a durable ledger and",
+    "fsynced. Load = checkpoint + replay of the events appended since. The document",
+    "is written out whole every 128 events, which is what bounds replay.",
+    "The parsed document is cached in memory and reused only while both files are",
+    "byte-for-byte the ones it was built from, so another writer's change is never",
+    "hidden behind a warm cache."
+  ],
+  "safetyProperties": [
+    "A final line without its newline is a torn append: the use never became durable,",
+    "so the tail is dropped rather than half-read into an authorization.",
+    "A reservation appearing twice in replay fails closed as storeCorrupted rather",
+    "than spending the use twice - the window a crash between a checkpoint and its",
+    "ledger reset would otherwise open.",
+    "Replayed state is validated as a whole, exactly as a checkpoint is, so a",
+    "tampered receipt digest in the ledger fails closed the same way it did in the",
+    "document.",
+    "Full durability is preserved: every receipt is still kept, per the maintainer's",
+    "earlier ruling. Only where it is written changed."
+  ],
+  "provenInTests": {
+    "testTakingAUseDoesNotRewriteTheWholeStore": "twenty uses leave the document byte-identical",
+    "testAReopenedStoreSeesEveryAppendedUse": "a fresh store on the same directory sees exactly what the writer saw",
+    "testATornFinalAppendIsDiscardedNotGuessed": "a half-written final line does not become a use",
+    "testAReplayedReservationFailsClosed": "a duplicated consume event is refused, not double-spent",
+    "testTheLedgerIsBoundedByPeriodicCheckpoints": "past the threshold the ledger resets and no use is lost",
+    "testAnotherWritersUseIsNeverServedFromMemory": "a warm cache never hides another writer's use",
+    "negativeControl": "with appends forced back to whole-document rewrites, 5 assertions across 3 of these fail"
+  },
+  "portedFixtures": [
+    "Two existing tests recreated durability windows by hand-editing the document.",
+    "The window now lives in the ledger, so they were ported to it - which models the",
+    "real crash (an append that never landed) more directly than editing a document.",
+    "RuntimeJobEngineContractTests.testTerminalLineageRepairsWithoutRedispatchForReconcileAndNextSubmit",
+    "and RuntimeCapabilityStoreContractTests.testTamperedLineageDigestFailsClosed."
+  ],
+  "budgetAfterThisChange": {
+    "runtimeP50Ms": 107,
+    "deviceFacingP50Ms": 274,
+    "deviceFacingBreakdown": "identity re-confirmation 32ms + uinput leg ~242ms",
+    "totalP50Ms": 381,
+    "gateMs": 400,
+    "reading": [
+      "p50 now sits just inside the gate; p95 does not.",
+      "The persistent dispatch channel measures 66ms on the uinput leg (242 -> 177ms)",
+      "and is what turns 'just inside' into comfortable. It is the next step, and it",
+      "is now worth its hazards - which it was not while the Runtime spent 245ms."
+    ]
+  }
+}

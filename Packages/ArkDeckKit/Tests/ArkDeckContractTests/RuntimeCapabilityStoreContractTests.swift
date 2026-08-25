@@ -137,6 +137,135 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       workspaceFileScopesDigest: String(repeating: "e", count: 64))
   }
 
+  // MARK: - Appended use lineage
+
+  private var documentURL: URL { directoryURL.appending(path: "runtime-capabilities.json") }
+  private var ledgerURL: URL { directoryURL.appending(path: "runtime-capabilities.ledger") }
+
+  private func takeUse(
+    _ store: RuntimeCapabilityStore, _ n: Int, settle: Bool = true
+  ) async throws {
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-\(n)", jobID: "job-\(n)",
+      query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    guard settle else { return }
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-\(n)", jobID: "job-\(n)",
+      outcome: .confirmed, terminalState: "succeeded", atUTC: "2026-07-15T00:00:30Z")
+  }
+
+  /// Taking a use used to rewrite the whole store, so the cost of a use grew
+  /// with how many that capability had already taken: measured 36 ms at use
+  /// 50 and 441 ms at use 450 — one authorization alone past the whole
+  /// interaction budget. What makes the cost flat is that the document is not
+  /// touched per use, which is what this asserts, in bytes rather than in
+  /// milliseconds so it says the same thing on a loaded machine.
+  func testTakingAUseDoesNotRewriteTheWholeStore() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 50))
+    let afterInstall = try Data(contentsOf: documentURL)
+    for n in 0..<20 { try await takeUse(store, n) }
+    XCTAssertEqual(
+      try Data(contentsOf: documentURL), afterInstall,
+      "twenty uses must not rewrite the document even once")
+    XCTAssertGreaterThan(
+      (try? Data(contentsOf: ledgerURL).count) ?? 0, 0,
+      "the uses have to be durable somewhere: they are appended")
+  }
+
+  /// The appended events are the record, not a cache of it: a fresh store on
+  /// the same directory must see exactly what the writing one saw.
+  func testAReopenedStoreSeesEveryAppendedUse() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 50))
+    for n in 0..<5 { try await takeUse(store, n) }
+    try await takeUse(store, 99, settle: false)
+    let written = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+
+    let reopened = try await makeStore().inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(reopened, written)
+    XCTAssertEqual(reopened?.remainingUses, 44)
+    XCTAssertEqual(reopened?.lineage.count, 6)
+    XCTAssertEqual(reopened?.lineage.last?.outcome, .pending)
+  }
+
+  /// A final line without its newline is an append that never completed. The
+  /// use it describes never became durable, so it never happened - the tail
+  /// is dropped rather than half-read into an authorization.
+  func testATornFinalAppendIsDiscardedNotGuessed() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 50))
+    for n in 0..<3 { try await takeUse(store, n) }
+    let intact = try Data(contentsOf: ledgerURL)
+    let lastLine = try XCTUnwrap(
+      intact.split(separator: 0x0A, omittingEmptySubsequences: true).last)
+    var torn = intact
+    torn.append(Data(lastLine.prefix(lastLine.count / 2)))
+    try torn.write(to: ledgerURL, options: .atomic)
+
+    let reopened = try await makeStore().inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(reopened?.lineage.count, 3, "the torn tail must not become a fourth use")
+    XCTAssertEqual(reopened?.remainingUses, 47)
+  }
+
+  /// Two records of one reservation cannot both be true. Replay refuses the
+  /// pair rather than spending the use twice - the case a crash between a
+  /// checkpoint and its ledger reset would otherwise produce.
+  func testAReplayedReservationFailsClosed() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 50))
+    try await takeUse(store, 0, settle: false)
+    let ledger = try Data(contentsOf: ledgerURL)
+    var doubled = ledger
+    doubled.append(ledger)
+    try doubled.write(to: ledgerURL, options: .atomic)
+
+    do {
+      _ = try await makeStore().list()
+      XCTFail("a reservation recorded twice must fail closed")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .storeCorrupted = error else {
+        return XCTFail("expected storeCorrupted, got \(error)")
+      }
+    }
+  }
+
+  /// Replay stays bounded: past the checkpoint threshold the store is written
+  /// out whole and the ledger starts empty again.
+  func testTheLedgerIsBoundedByPeriodicCheckpoints() async throws {
+    let store = try makeStore()
+    let uses = RuntimeCapabilityStore.checkpointEveryEvents + 4
+    try await store.install(try e1Capability(maximumUses: uses + 10))
+    // Each use is settled: a pending use forbids the next mutation, so an
+    // unsettled run would be testing the lineage gate, not the checkpoint.
+    for n in 0..<uses { try await takeUse(store, n) }
+    XCTAssertLessThan(
+      (try? Data(contentsOf: ledgerURL).count) ?? .max,
+      RuntimeCapabilityStore.checkpointEveryEvents * 200,
+      "the ledger must be reset by a checkpoint rather than grow without bound")
+    let reopened = try await makeStore().inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(reopened?.lineage.count, uses, "a checkpoint must not lose a use")
+    XCTAssertEqual(reopened?.remainingUses, 10)
+  }
+
+  /// The parsed document is kept in memory between calls, so it must never be
+  /// served once another writer has moved the files on. Two stores on one
+  /// directory is the shape that catches it.
+  func testAnotherWritersUseIsNeverServedFromMemory() async throws {
+    let first = try makeStore()
+    try await first.install(try e1Capability(maximumUses: 50))
+    _ = try await first.list()  // the cache is now warm
+
+    let second = try makeStore()
+    try await takeUse(second, 0)
+
+    let seenByFirst = try await first.inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(
+      seenByFirst?.remainingUses, 49,
+      "a use taken by another writer must be seen, not hidden by a warm cache")
+    XCTAssertEqual(seenByFirst?.lineage.count, 1)
+  }
+
   func testInstallListInspectRoundTrip() async throws {
     let store = try makeStore()
     let capability = try e1Capability()
@@ -817,12 +946,25 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
         capabilityID: "CAP-RT-STORE-001", reservationID: "res-tamper",
         jobID: "job-tamper", query: query(), nowUTC: "2026-07-15T00:00:00Z")
     }
-    let documentURL = directoryURL.appending(path: "runtime-capabilities.json")
-    let original = try String(contentsOf: documentURL, encoding: .utf8)
+    // A use is recorded by appending it, so the receipt digest lives in the
+    // ledger rather than the document. The protection has to live wherever
+    // the lineage does: this finds the digest instead of assuming which file
+    // holds it, so moving the lineage again cannot quietly retire the test.
+    let candidates = [
+      directoryURL.appending(path: "runtime-capabilities.ledger"),
+      directoryURL.appending(path: "runtime-capabilities.json"),
+    ]
+    let target = try XCTUnwrap(
+      candidates.first {
+        ((try? String(contentsOf: $0, encoding: .utf8)) ?? "").contains("receiptSHA256")
+      }, "fixture assumption: some durable file carries the receipt digest")
+    let original = try String(contentsOf: target, encoding: .utf8)
     let corrupted = original.replacingOccurrences(
+      of: "\"receiptSHA256\":\"", with: "\"receiptSHA256\":\"0"
+    ).replacingOccurrences(
       of: "\"receiptSHA256\" : \"", with: "\"receiptSHA256\" : \"0")
     XCTAssertNotEqual(corrupted, original, "fixture assumption: receipt digest is present")
-    try corrupted.write(to: documentURL, atomically: true, encoding: .utf8)
+    try corrupted.write(to: target, atomically: true, encoding: .utf8)
     do {
       _ = try await makeStore().list()
       XCTFail("tampered lineage must fail closed")

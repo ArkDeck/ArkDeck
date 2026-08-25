@@ -1461,11 +1461,16 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let parked = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(parked.state, JobState.waitingForRecovery.rawValue)
     XCTAssertTrue(parked.outcomeUnknown)
-    let capabilityURL =
+    let capabilityDirectory =
       stateDirectory
       .appending(path: "capabilities", directoryHint: .isDirectory)
-      .appending(path: "runtime-capabilities.json")
+    let capabilityURL = capabilityDirectory.appending(path: "runtime-capabilities.json")
+    // A use is recorded by appending it, so the durable state of a capability
+    // is the document *and* the events appended since. Capturing only one of
+    // them would recreate a window that cannot happen.
+    let ledgerURL = capabilityDirectory.appending(path: "runtime-capabilities.ledger")
     let parkedCapabilityBytes = try Data(contentsOf: capabilityURL)
+    let parkedLedgerBytes = (try? Data(contentsOf: ledgerURL)) ?? Data()
 
     let firstReconcile = try await engine.reconcile(jobID: acceptance.jobID)
     XCTAssertEqual(firstReconcile.state, JobState.failed.rawValue)
@@ -1480,6 +1485,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // are durable, while the independently durable capability store still has
     // only its earlier outcomeUnknown node.
     try parkedCapabilityBytes.write(to: capabilityURL, options: .atomic)
+    try parkedLedgerBytes.write(to: ledgerURL, options: .atomic)
     let rolledBackLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
     XCTAssertEqual(
       rolledBackLineage?.lineage.first?.outcomeHistory.map(\.outcome),
@@ -1498,18 +1504,19 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
     // Recreate the production ENOSPC/process-loss window more exactly: the
     // capability use was consumed, but no outcome append became durable.
-    var pendingDocument = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: parkedCapabilityBytes) as? [String: Any])
-    var pendingRecords = try XCTUnwrap(
-      pendingDocument["records"] as? [[String: Any]])
-    var pendingConsumptions = try XCTUnwrap(
-      pendingRecords.first?["consumptions"] as? [[String: Any]])
-    pendingConsumptions[0]["outcomes"] = []
-    pendingRecords[0]["consumptions"] = pendingConsumptions
-    pendingDocument["records"] = pendingRecords
-    let pendingCapabilityBytes = try JSONSerialization.data(
-      withJSONObject: pendingDocument, options: [.sortedKeys])
-    try pendingCapabilityBytes.write(to: capabilityURL, options: .atomic)
+    // With uses appended rather than rewritten, that window is exactly a
+    // ledger whose consume event is durable and whose outcome append never
+    // landed - which is what dropping the outcome events leaves behind.
+    try parkedCapabilityBytes.write(to: capabilityURL, options: .atomic)
+    let consumeOnlyLedger =
+      parkedLedgerBytes
+      .split(separator: 0x0A, omittingEmptySubsequences: true)
+      .filter { !String(decoding: $0, as: UTF8.self).contains("\"kind\":\"outcome\"") }
+      .reduce(into: Data()) { $0.append(Data($1)); $0.append(0x0A) }
+    XCTAssertLessThan(
+      consumeOnlyLedger.count, parkedLedgerBytes.count,
+      "fixture assumption: the parked ledger carries at least one outcome append")
+    try consumeOnlyLedger.write(to: ledgerURL, options: .atomic)
     let pendingLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
     XCTAssertEqual(pendingLineage?.lineage.first?.outcome, .pending)
 
