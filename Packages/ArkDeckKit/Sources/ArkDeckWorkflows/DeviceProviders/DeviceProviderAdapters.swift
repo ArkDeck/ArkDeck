@@ -125,7 +125,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   ) -> ProviderOperationAvailability {
     switch operation.reference {
     case "observe.device@1", "capture.diagnostics@1", "debug.hap@1",
-      "port-forward.create@1", "port-forward.remove@1":
+      "port-forward.create@1", "port-forward.remove@1",
+      "input.tap@1", "input.long-press@1", "input.swipe@1":
       return .available
     case "deploy.native-library.app-owned@1":
       return appOwnedNativeLibraryAvailability

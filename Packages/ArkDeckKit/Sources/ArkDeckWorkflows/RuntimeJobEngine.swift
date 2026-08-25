@@ -6888,17 +6888,20 @@ public actor RuntimeJobEngine {
     if let identity = materialized.stableTargetIdentitySHA256,
       let bindingRevision = materialized.bindingRevision
     {
-      let subject = Self.sessionScopedAuthorizationSubject(
-        descriptor: descriptor, inputs: request.inputs,
-        planDigest: materialized.planDigest)
       return RuntimeCapabilityAuthorizationQuery(
         operationID: descriptor.id,
         operationVersion: descriptor.version,
         effect: effect,
         targetStableIdentitySHA256: identity,
         targetBindingRevision: bindingRevision,
-        planDigest: subject.planDigest,
-        inputs: subject.inputs,
+        // The digest travels even for a session-scoped subject: the consume
+        // record has to say which exact plan each individual use authorized.
+        // What the session scope drops is the digest's influence on *which*
+        // capability record the gesture lands on, and that is decided in the
+        // scope fingerprint, not here.
+        planDigest: materialized.planDigest,
+        inputs: Self.sessionScopedAuthorizationSubject(
+          descriptor: descriptor, inputs: request.inputs),
         artifactFacts: materialized.artifactFacts)
     }
 
@@ -7521,17 +7524,15 @@ public actor RuntimeJobEngine {
         )
       }
       deviceLineage = (stableIdentity, bindingRevision)
-      let subject = Self.sessionScopedAuthorizationSubject(
-        descriptor: descriptor, inputs: runtime.record.request.inputs,
-        planDigest: planDigest)
       query = RuntimeCapabilityAuthorizationQuery(
         operationID: descriptor.id,
         operationVersion: descriptor.version,
         effect: effect,
         targetStableIdentitySHA256: stableIdentity,
         targetBindingRevision: bindingRevision,
-        planDigest: subject.planDigest,
-        inputs: subject.inputs,
+        planDigest: planDigest,
+        inputs: Self.sessionScopedAuthorizationSubject(
+          descriptor: descriptor, inputs: runtime.record.request.inputs),
         artifactFacts: artifactFacts)
     } else {
       guard let provider = providers.provider(id: descriptor.provider.rawValue),
@@ -8248,11 +8249,10 @@ public actor RuntimeJobEngine {
   /// never wrote. One helper serves both call sites for exactly that reason.
   static func sessionScopedAuthorizationSubject(
     descriptor: CatalogOperationDescriptor,
-    inputs: [String: JSONValue],
-    planDigest: String?
-  ) -> (inputs: [String: JSONValue], planDigest: String?) {
+    inputs: [String: JSONValue]
+  ) -> [String: JSONValue] {
     guard sessionScopedInputOperations.contains(descriptor.reference) else {
-      return (inputs, planDigest)
+      return inputs
     }
     // The frame a gesture was mapped against stays part of the authorized
     // subject; the coordinates inside that frame do not. A rotation or a
@@ -8264,7 +8264,7 @@ public actor RuntimeJobEngine {
     for key in ["displayId", "displayWidth", "displayHeight"] {
       if let value = inputs[key] { reduced[key] = value }
     }
-    return (reduced, nil)
+    return reduced
   }
 
   private static func authorizationScopeFingerprint(
@@ -8275,7 +8275,13 @@ public actor RuntimeJobEngine {
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
-      "planDigest=\(query.planDigest ?? "-")",
+      // A session-scoped gesture must not land on a different capability
+      // record for every coordinate, and the materialized plan digest moves
+      // with each one. Excluding it here is what bounds the record count; the
+      // digest itself still reaches the consume record through the query.
+      "planDigest="
+        + (sessionScopedInputOperations.contains(query.operationReference)
+          ? "session-scoped" : (query.planDigest ?? "-")),
     ]
     let encoder = CanonicalJSONEncoders.canonical()
     guard

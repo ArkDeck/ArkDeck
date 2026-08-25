@@ -17,19 +17,24 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
     try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
   }
 
+  /// The identity that decides which capability record a gesture lands on:
+  /// the reduced inputs, plus the plan digest only where the scope still
+  /// carries it. A session-scoped operation drops the digest here while the
+  /// query keeps it, because the consume record must still say which exact
+  /// plan each individual use authorized.
   private func fingerprint(
     _ descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
     planDigest: String
   ) -> String {
-    let subject = RuntimeJobEngine.sessionScopedAuthorizationSubject(
-      descriptor: descriptor, inputs: inputs, planDigest: planDigest)
-    // The identity that decides which capability record a job lands on.
+    let reduced = RuntimeJobEngine.sessionScopedAuthorizationSubject(
+      descriptor: descriptor, inputs: inputs)
+    let scoped = RuntimeJobEngine.sessionScopedInputOperations.contains(descriptor.reference)
     let encoder = CanonicalJSONEncoders.canonical()
-    let encoded = (try? encoder.encode(subject.inputs)).flatMap {
+    let encoded = (try? encoder.encode(reduced)).flatMap {
       String(data: $0, encoding: .utf8)
     }
-    return "\(descriptor.reference)|\(subject.planDigest ?? "-")|\(encoded ?? "?")"
+    return "\(descriptor.reference)|\(scoped ? "session-scoped" : planDigest)|\(encoded ?? "?")"
   }
 
   func testEveryPointerCoordinateSharesOneAuthorizationSubject() throws {
@@ -82,19 +87,16 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
     let inputs: [String: JSONValue] = [
       "fromX": .integer(640), "fromY": .integer(2000),
       "toX": .integer(640), "toY": .integer(1000), "durationMs": .integer(500),
+      "displayWidth": .integer(1280), "displayHeight": .integer(2832),
     ]
     let atIssue = RuntimeJobEngine.sessionScopedAuthorizationSubject(
-      descriptor: swipe, inputs: inputs, planDigest: String(repeating: "d", count: 64))
+      descriptor: swipe, inputs: inputs)
     let atConsume = RuntimeJobEngine.sessionScopedAuthorizationSubject(
-      descriptor: swipe, inputs: inputs, planDigest: String(repeating: "d", count: 64))
-    XCTAssertEqual(atIssue.inputs, atConsume.inputs)
-    XCTAssertEqual(atIssue.planDigest, atConsume.planDigest)
-    XCTAssertNil(
-      atIssue.planDigest,
-      "the plan digest moves with the coordinates, so it cannot pin the session subject")
-    XCTAssertTrue(
-      atIssue.inputs.isEmpty,
-      "no coordinate or duration may survive into the authorized subject")
+      descriptor: swipe, inputs: inputs)
+    XCTAssertEqual(atIssue, atConsume)
+    XCTAssertEqual(
+      atIssue, ["displayWidth": .integer(1280), "displayHeight": .integer(2832)],
+      "the frame survives into the subject; no coordinate or duration does")
   }
 
   func testOnlyThePublishedInputOperationsAreSessionScoped() throws {
@@ -109,10 +111,8 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
       "remotePort": .integer(3456),
     ]
     let subject = RuntimeJobEngine.sessionScopedAuthorizationSubject(
-      descriptor: portForward, inputs: inputs,
-      planDigest: String(repeating: "e", count: 64))
-    XCTAssertEqual(subject.inputs, inputs)
-    XCTAssertEqual(subject.planDigest, String(repeating: "e", count: 64))
+      descriptor: portForward, inputs: inputs)
+    XCTAssertEqual(subject, inputs)
   }
 
   func testARotationOrResolutionChangeIsADifferentAuthorizedSubject() throws {
