@@ -110,6 +110,9 @@ T02/T03 不进入实现。
     时新增对应行；不改既有行）
   - `openspec/contracts/workflow-step.schema.json`（同上：仅当新增 kind 时补其枚举项
     与 arguments 映射；不改既有条目）
+  - `openspec/contracts/catalogs/diagnostics-stdout.yaml`（仅为新增的
+    `componentDetail` stdout action 登记 exact action ID、typed parameters 与 bounds；
+    不改既有 action）
   - `Packages/ArkDeckKit/Sources/**`
   - `Packages/ArkDeckKit/Tests/**`
   - `ArkDeckApp/**`
