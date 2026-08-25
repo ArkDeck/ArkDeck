@@ -48,8 +48,15 @@ T02/T03 不进入实现。
   既证达标载体是 `uinput -T`（p95 333 ms < 400 ms 门槛），代价是失去设备侧坐标校验，
   使 ②b 的 host 侧帧内界从纵深防御变为唯一防线。证据
   `evidence/runs/TASK-IDC-002/data/injection-path-comparison.json`。
-  剩余 ③：Toolkit App 面 + 会话 open/close 与 XPC 方法面 + uinput lowering 切换；
-  在其落地前 App 输入面按 verification 预案走「截图上点选 → 显式确认发送」）
+  ③ Toolkit App 面 + XPC facade + uinput lowering 已交付（#1507/#1509）。
+  ④ 会话内轻量派发：前导的三步里只有身份确认是防错设备的那一步，且它由 host 侧
+  hdc server 应答（p50 35 ms），型号与固件各是一次设备往返（各 p50 150 ms）。会话
+  沿用后两者、每次手势仍重读身份 —— 二者都改不了而连接不断（改任一都要重启或重刷，
+  两者都会断连），身份复核就是沿用成立的依据。实测前导 292 → 32 ms，每次手势省
+  258 ms。沿用过的观察记 `machineReadbackSessionCarried` 与逐片 `carriedFromUTC`，
+  这同时是 fail-closed：硬件证据契约只认 `machineReadback`，沿用过的观察因此无法被
+  投影成任何硬件证据。证据 `evidence/runs/TASK-IDC-002/data/session-carried-evidence.json`。
+  剩余：持久派发通道（每次 spawn ~93 ms vs 持久通道 ~10 ms，不属本 change））
 - Golden Journey:GJ-2
 - Platform:macos
 - Requirements:proposal「目标」2/3/4/5；design.md §2/§3/§5/§6

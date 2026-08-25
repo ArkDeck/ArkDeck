@@ -405,11 +405,21 @@ public struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
   public let stepID: String
   package let stepKind: String
   package let outcomeAtUTC: String
+  /// When set, this fragment was not read from the device for this job: it
+  /// was carried from the session's own earlier readback, taken at this
+  /// time. Nil means the device answered it during this job. The two are
+  /// never merged into one word, because a fact read four minutes ago and a
+  /// fact read just now are different claims.
+  public var carriedFromUTC: String?
 
-  public init(stepID: String, stepKind: String, outcomeAtUTC: String) {
+  public init(
+    stepID: String, stepKind: String, outcomeAtUTC: String,
+    carriedFromUTC: String? = nil
+  ) {
     self.stepID = stepID
     self.stepKind = stepKind
     self.outcomeAtUTC = outcomeAtUTC
+    self.carriedFromUTC = carriedFromUTC
   }
 }
 
@@ -2051,6 +2061,15 @@ public actor RuntimeJobEngine {
         }
         try await recordSkippedOptionalStep(
           jobID: jobID, step: step, descriptor: descriptor, reason: reason)
+        continue
+      }
+      // A session-scoped gesture asks the device who it is every time, but it
+      // does not re-ask what model and firmware it runs: those cost a device
+      // round trip each and cannot have changed under an identity that just
+      // re-confirmed. This is the difference between a gesture that answers
+      // in a moment and one that does not, and the identity check above is
+      // what keeps it honest.
+      if ingestCarriedEvidenceFragment(jobID: jobID, step: step, descriptor: descriptor) {
         continue
       }
       let resolvedArtifact: ProviderResolvedInputArtifact?
@@ -3897,19 +3916,9 @@ public actor RuntimeJobEngine {
     runtime.record.timeline.append("evidence-preflight \(step.stepID)")
 
     if accumulator.isComplete {
-      runtime.record.evidenceObservation = RuntimeEvidenceObservation(
-        targetID: accumulator.targetID,
-        bindingRevision: accumulator.bindingRevision,
-        stableIdentitySHA256: accumulator.stableIdentitySHA256,
-        model: accumulator.model,
-        firmware: accumulator.firmware,
-        transport: accumulator.transport,
-        providerID: accumulator.providerID,
-        toolVersion: accumulator.toolVersion,
-        toolSHA256: accumulator.toolSHA256,
-        confirmedAtUTC: accumulator.confirmedAtUTC,
-        confirmationMethod: "machineReadback",
-        preflightSteps: accumulator.steps)
+      rememberCarriableEvidence(
+        accumulator: accumulator, descriptor: descriptor, outcomeAtUTC: outcomeAtUTC)
+      runtime.record.evidenceObservation = Self.evidenceObservation(from: accumulator)
       // observe.device publishes its evidence-bearing products from the
       // final preflight outcome itself; the other operations set this at
       // their first post-preflight device step.
@@ -8243,6 +8252,144 @@ public actor RuntimeJobEngine {
   static let sessionScopedInputOperations: Set<String> = [
     "input.tap@1", "input.long-press@1", "input.swipe@1",
   ]
+
+  /// The two preflight fragments a session may carry rather than re-read.
+  /// `confirm-evidence-target` is deliberately absent: it is the step that
+  /// re-reads the device identity, it costs a host-side query rather than a
+  /// device round trip, and it is what makes carrying the other two sound.
+  static let sessionCarriableEvidenceStepIDs: Set<String> = [
+    "read-evidence-model", "read-evidence-firmware",
+  ]
+
+  /// Model and firmware, remembered from the readback that did reach the
+  /// device, together with the identity they were read under.
+  ///
+  /// Neither property can change on a device that stays continuously
+  /// connected: changing either requires a reboot or a reflash, which drops
+  /// the connection. A gesture that re-confirms the same identity is
+  /// therefore looking at the same device in the same state that answered
+  /// these questions. If the identity differs, or the record has aged past
+  /// the session lifetime, it is discarded and the device is asked again.
+  struct CarriedDeviceEvidence: Sendable, Equatable {
+    let stableIdentitySHA256: String
+    let model: String
+    let firmware: String
+    let readAtUTC: String
+  }
+
+  /// Keyed by device, not by operation: a tap, a long press and a swipe in
+  /// one session are the same person working on the same device, and the
+  /// facts they would each re-read are identical.
+  var carriedDeviceEvidence: [String: CarriedDeviceEvidence] = [:]
+
+  static func carriedEvidenceKey(stableIdentitySHA256: String, bindingRevision: Int) -> String {
+    "\(stableIdentitySHA256)\n\(bindingRevision)"
+  }
+
+  /// The one place a complete accumulator becomes an exported observation, so
+  /// a fresh preflight and a session-carried one cannot drift into describing
+  /// themselves differently.
+  static func evidenceObservation(
+    from accumulator: RuntimeEvidencePreflightAccumulator
+  ) -> RuntimeEvidenceObservation {
+    let carried = accumulator.steps.contains { $0.carriedFromUTC != nil }
+    return RuntimeEvidenceObservation(
+      targetID: accumulator.targetID,
+      bindingRevision: accumulator.bindingRevision,
+      stableIdentitySHA256: accumulator.stableIdentitySHA256,
+      model: accumulator.model,
+      firmware: accumulator.firmware,
+      transport: accumulator.transport,
+      providerID: accumulator.providerID,
+      toolVersion: accumulator.toolVersion,
+      toolSHA256: accumulator.toolSHA256,
+      confirmedAtUTC: accumulator.confirmedAtUTC,
+      // A carried observation is not the same claim as a wholly fresh one and
+      // does not get the same word. The hardware-evidence contract admits
+      // only `machineReadback`, so naming this honestly is also what stops a
+      // carried observation being projected as hardware evidence.
+      confirmationMethod: carried ? "machineReadbackSessionCarried" : "machineReadback",
+      preflightSteps: accumulator.steps)
+  }
+
+  /// Remembers a wholly fresh session-scoped readback so a later gesture may
+  /// carry it. A run that already carried anything is not remembered again:
+  /// the record must always trace back to a readback that reached the device.
+  private func rememberCarriableEvidence(
+    accumulator: RuntimeEvidencePreflightAccumulator,
+    descriptor: CatalogOperationDescriptor,
+    outcomeAtUTC: String
+  ) {
+    guard Self.sessionScopedInputOperations.contains(descriptor.reference),
+      !accumulator.steps.contains(where: { $0.carriedFromUTC != nil }),
+      let model = accumulator.model, let firmware = accumulator.firmware
+    else { return }
+    carriedDeviceEvidence[
+      Self.carriedEvidenceKey(
+        stableIdentitySHA256: accumulator.stableIdentitySHA256,
+        bindingRevision: accumulator.bindingRevision)
+    ] = CarriedDeviceEvidence(
+      stableIdentitySHA256: accumulator.stableIdentitySHA256,
+      model: model, firmware: firmware,
+      readAtUTC: accumulator.confirmedAtUTC ?? outcomeAtUTC)
+  }
+
+  /// Answers one carriable preflight fragment from the session's own earlier
+  /// readback instead of the device, saving a device round trip per gesture.
+  /// Returns false whenever anything is missing or mismatched, and the step
+  /// then runs against the device exactly as before.
+  private func ingestCarriedEvidenceFragment(
+    jobID: String, step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor
+  ) -> Bool {
+    guard Self.sessionScopedInputOperations.contains(descriptor.reference),
+      Self.sessionCarriableEvidenceStepIDs.contains(step.stepID),
+      var runtime = jobs[jobID],
+      var accumulator = runtime.record.evidencePreflight,
+      // Nothing is carried into a job that has not re-read the identity for
+      // itself. That readback is the entire reason carrying is sound, and it
+      // has already thrown if the device answered with a different identity.
+      accumulator.steps.contains(where: { $0.stepID == "confirm-evidence-target" }),
+      let carried = carriedDeviceEvidence[
+        Self.carriedEvidenceKey(
+          stableIdentitySHA256: accumulator.stableIdentitySHA256,
+          bindingRevision: accumulator.bindingRevision)],
+      carried.stableIdentitySHA256 == accumulator.stableIdentitySHA256
+    else { return false }
+    let now = nowUTC()
+    // Carried facts never outlive the session envelope that authorized the
+    // gestures carrying them.
+    guard let readAt = ISO8601Timestamps.parse(carried.readAtUTC),
+      let current = ISO8601Timestamps.parse(now),
+      case let age = current.timeIntervalSince(readAt),
+      age >= 0, age < Self.sessionScopedInputLifetime
+    else { return false }
+    let expectedStepIDs = [
+      "confirm-evidence-target", "read-evidence-model", "read-evidence-firmware",
+    ]
+    guard accumulator.steps.count < expectedStepIDs.count,
+      expectedStepIDs[accumulator.steps.count] == step.stepID
+    else { return false }
+    if step.stepID == "read-evidence-model" {
+      accumulator.model = carried.model
+    } else {
+      accumulator.firmware = carried.firmware
+      accumulator.confirmedAtUTC = now
+    }
+    accumulator.steps.append(
+      RuntimeEvidencePreflightStep(
+        stepID: step.stepID, stepKind: step.kind.rawValue,
+        outcomeAtUTC: now, carriedFromUTC: carried.readAtUTC))
+    runtime.record.evidencePreflight = accumulator
+    runtime.record.timeline.append(
+      "evidence-preflight \(step.stepID) carried from session readback at \(carried.readAtUTC)")
+    if accumulator.isComplete {
+      runtime.record.evidenceObservation = Self.evidenceObservation(from: accumulator)
+      runtime.record.timeline.append("evidence-preflight complete")
+    }
+    jobs[jobID] = runtime
+    return true
+  }
 
   /// The projection has to be applied identically where a capability is issued
   /// and where it is consumed, or the consume would look up an ID the issue

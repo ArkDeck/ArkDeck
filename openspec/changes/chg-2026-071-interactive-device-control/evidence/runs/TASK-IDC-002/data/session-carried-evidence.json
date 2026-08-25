@@ -1,0 +1,95 @@
+{
+  "measurement": "session-carried-evidence",
+  "question": "What does a gesture's evidence preamble cost, and which part of it may a session carry?",
+  "measuredAtUTC": "2026-08-25T09:44:00Z",
+  "device": {
+    "connectKey": "<redacted-connect-key>",
+    "model": "HUAWEI Mate 60 Pro class device under test",
+    "note": "same device and hdc build as injection-path-comparison.json"
+  },
+  "method": [
+    "Each preamble step dispatched as its own hdc client invocation, matching the",
+    "descriptor-bound dispatcher's one-process-per-step shape in production.",
+    "Shapes A and B interleaved within one loop (12 iterations each) so host load",
+    "and device thermal drift land on both rather than on whichever ran second.",
+    "Injection is deliberately excluded: it is byte-identical in both shapes, so",
+    "including it would only add a shared constant to both sides of the comparison."
+  ],
+  "perStepCost": {
+    "confirm-evidence-target": {
+      "command": "hdc -t <key> list targets -v",
+      "p50Ms": 35,
+      "p95Ms": 38,
+      "answeredBy": "host-side hdc server",
+      "reachesDevice": false
+    },
+    "read-evidence-model": {
+      "command": "hdc -t <key> shell param get const.product.model",
+      "p50Ms": 151,
+      "p95Ms": 155,
+      "answeredBy": "device",
+      "reachesDevice": true
+    },
+    "read-evidence-firmware": {
+      "command": "hdc -t <key> shell param get const.ohos.fullname",
+      "p50Ms": 150,
+      "p95Ms": 155,
+      "answeredBy": "device",
+      "reachesDevice": true
+    }
+  },
+  "shapes": {
+    "before": {
+      "steps": ["confirm-evidence-target", "read-evidence-model", "read-evidence-firmware"],
+      "p50Ms": 292,
+      "p95Ms": 302,
+      "minMs": 264
+    },
+    "after": {
+      "steps": ["confirm-evidence-target"],
+      "p50Ms": 32,
+      "p95Ms": 79,
+      "minMs": 26
+    }
+  },
+  "savedPerGestureMsP50": 258,
+  "finding": [
+    "The preamble's cost is almost entirely the two property readbacks, because",
+    "each is a device round trip. The identity query — the step that actually",
+    "prevents acting on the wrong device — is answered by the host-side hdc server",
+    "and costs an eighth of what the other two cost together.",
+    "So the expensive part of the preamble is not the part that guards against the",
+    "hazard the preamble exists for."
+  ],
+  "ruling": [
+    "A session carries `read-evidence-model` and `read-evidence-firmware`, and never",
+    "carries `confirm-evidence-target`. Every gesture re-reads the identity.",
+    "Neither property can change on a device that stays continuously connected:",
+    "changing either requires a reboot or a reflash, and both drop the connection.",
+    "A gesture that re-confirms the same identity is therefore looking at the same",
+    "device in the same state that answered those questions. If the identity differs,",
+    "or the record has aged past the session lifetime (3600s), the carried facts are",
+    "discarded and the device is asked again."
+  ],
+  "honesty": [
+    "A carried observation reports `confirmationMethod: machineReadbackSessionCarried`",
+    "and each carried fragment records `carriedFromUTC`, the time it was actually read.",
+    "This is also the fail-closed mechanism: the hardware-evidence contract admits only",
+    "`machineReadback`, so a carried observation cannot be projected as hardware evidence",
+    "for anything, and no separate gate has to remember to exclude it."
+  ],
+  "provenInTests": {
+    "DiagnosticsAndHAPContractTests.testASessionCarriesThePropertyReadbacksButNeverTheIdentityCheck":
+      "two gestures through the engine dispatch [observeDevice, evidenceModel, evidenceFirmware, injectPointerInput, observeDevice, injectPointerInput]",
+    "DiagnosticsAndHAPContractTests.testACarriedObservationStatesThatItWasCarried":
+      "the second gesture still exports a complete observation, named as carried",
+    "negativeControl":
+      "with the carry path disabled both tests fail, the first with the second gesture re-reading evidenceModel and evidenceFirmware"
+  },
+  "remainingGap": [
+    "This removes the preamble's device round trips, not the per-spawn transport cost.",
+    "Measured earlier: ~93ms per hdc client spawn versus ~10ms over a persistent",
+    "channel. A persistent dispatch channel is the next lever and is not part of",
+    "this change."
+  ]
+}
