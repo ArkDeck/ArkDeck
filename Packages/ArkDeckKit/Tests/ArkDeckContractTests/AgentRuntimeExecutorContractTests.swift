@@ -65,8 +65,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
           "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
             + "AAA\t\tUSB\tConnected\tlocalhost\n"
             + "BBB\t\tUSB\tConnected\tlocalhost\n")
-      case .queryProperty(.productModel):
-        return receipt("DAYU200\n")
+      case .queryProperty(.productName):
+        return receipt("OpenHarmony Reference Device\n")
       case .queryProperty(.fullBuildVersion):
         return receipt("OpenHarmony-4.1-release\n")
       case .observeStorage:

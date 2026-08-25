@@ -3870,7 +3870,7 @@ public actor RuntimeJobEngine {
           "evidenceIncomplete: target confirmation summary is incomplete or mismatched")
       }
       accumulator.transport = transport
-    case ("read-evidence-model", .hdc(.queryProperty(.productModel))):
+    case ("read-evidence-model", .hdc(.queryProperty(.productName))):
       guard let value = summary["value"], !value.isEmpty else {
         throw RuntimeDispatchFailure.failed(
           "evidenceIncomplete: model readback is empty")

@@ -118,6 +118,11 @@ final class DeviceProviderContractTests: XCTestCase {
     } else {
       XCTFail("probeDevice must map to observeDevice")
     }
+    let model = observe.steps.first { $0.stepID == "read-evidence-model" }!
+    XCTAssertEqual(
+      try hdc.action(for: model, operation: observe, inputs: [:]),
+      .hdc(.queryProperty(.productName)),
+      "the published deviceModel read must use the branded HDC product name, not generic ohos")
     // T13 (CHG-2026-049) implemented the mutation family, so the failure
     // mode moved rather than disappeared: an install without its declared
     // inputs is still refused, never guessed at.

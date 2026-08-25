@@ -48,9 +48,9 @@ if let invocationLog = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_INV
 let mode: FixtureMode
 let fixtureConnectKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 if endpointBoundArguments
-  == ["-t", fixtureConnectKey, "shell", "param", "get", "const.product.model"]
+  == ["-t", fixtureConnectKey, "shell", "param", "get", "const.product.name"]
 {
-  FileHandle.standardOutput.write(Data("DAYU200\n".utf8))
+  FileHandle.standardOutput.write(Data("OpenHarmony Reference Device\n".utf8))
   exit(0)
 } else if endpointBoundArguments
   == ["-t", fixtureConnectKey, "shell", "param", "get", "const.ohos.fullname"]

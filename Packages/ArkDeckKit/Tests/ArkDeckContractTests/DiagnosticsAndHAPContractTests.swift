@@ -761,7 +761,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           exitStatus: 0, stdout: Data(), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.02,
           subprocesses: [sub("uninstall bundle successfully"), sub(dump)])
-      case .queryProperty(.productModel):
+      case .queryProperty(.productName):
         note("evidenceModel")
         return receipt(script.modelValue)
       case .queryProperty(.fullBuildVersion):

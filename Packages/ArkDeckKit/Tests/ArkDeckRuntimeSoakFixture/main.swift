@@ -145,9 +145,9 @@ private actor SimulatedHDCDispatcher: RuntimeProcessDispatching {
         exitStatus: 0,
         stdout: Data("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".utf8),
         stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
-    case .hdc(.queryProperty(.productModel)):
+    case .hdc(.queryProperty(.productName)):
       return ProviderProcessReceipt(
-        exitStatus: 0, stdout: Data("DAYU200\n".utf8), stderr: Data(),
+        exitStatus: 0, stdout: Data("OpenHarmony Reference Device\n".utf8), stderr: Data(),
         stdoutTruncated: false, durationSeconds: 0.01)
     case .hdc(.queryProperty(.fullBuildVersion)):
       return ProviderProcessReceipt(

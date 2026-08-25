@@ -296,7 +296,11 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     }
     switch reference.actionID {
     case "deviceModel":
-      return .hdc(.queryProperty(.productModel))
+      // `const.product.model` may expose only a generic platform/build value.
+      // The user-facing product label comes from `const.product.name`; keep
+      // the published action ID for durable compatibility while reading that
+      // property.
+      return .hdc(.queryProperty(.productName))
     case "firmwareBuild":
       return .hdc(.queryProperty(.fullBuildVersion))
     case "packageInfo":
