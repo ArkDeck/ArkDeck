@@ -33,6 +33,13 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
   public let timeline: [String]
   public let executionMode: String?
   public let sessionID: String?
+  /// The run-grouping thread the submitting workspace filed this Job under.
+  /// Display and audit only — History groups consecutive work on one device
+  /// into one line by it, and nothing decides anything by it. Nil for Jobs
+  /// submitted before workspaces declared a thread, and for callers that
+  /// declare none; History must show those as ungrouped rather than inventing
+  /// a line for them.
+  public let threadID: String?
   public let actualEffect: String?
   public let createdAtUTC: String?
   public let startedAtUTC: String?
@@ -46,6 +53,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     id: String, operationReference: String, targetID: String, state: String,
     waitingForHuman: Bool, outcomeUnknown: Bool, outstandingResidueCount: Int,
     timeline: [String], executionMode: String? = nil, sessionID: String? = nil,
+    threadID: String? = nil,
     actualEffect: String? = nil,
     createdAtUTC: String? = nil, startedAtUTC: String? = nil, finishedAtUTC: String? = nil,
     supersededByRecoveryEpochID: String? = nil, recoveryEpochID: String? = nil,
@@ -61,6 +69,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     self.timeline = timeline
     self.executionMode = executionMode
     self.sessionID = sessionID
+    self.threadID = threadID
     self.actualEffect = actualEffect
     self.createdAtUTC = createdAtUTC
     self.startedAtUTC = startedAtUTC
@@ -666,6 +675,7 @@ enum RuntimeHistoryResponseDecoding {
           timeline: entry["timeline"] as? [String] ?? [],
           executionMode: entry["executionMode"] as? String,
           sessionID: entry["sessionId"] as? String,
+          threadID: entry["threadId"] as? String,
           actualEffect: entry["actualEffect"] as? String,
           createdAtUTC: entry["createdAtUtc"] as? String,
           startedAtUTC: entry["startedAtUtc"] as? String,

@@ -909,7 +909,8 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         "verification": .string("full"),
       ],
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.flashWorkspace, targetID: target.id))
     let requestData: Data
     if let reviewedPlanDigest {
       guard SHA256Hex.isLowercaseSHA256(reviewedPlanDigest) else {

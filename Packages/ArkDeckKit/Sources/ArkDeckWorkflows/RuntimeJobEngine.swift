@@ -204,6 +204,11 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   /// and leaves room for a future persisted simulated mode without guessing.
   public let executionMode: String?
   public let sessionID: String?
+  /// The run-grouping thread the submitting workspace filed this Job under,
+  /// projected out of the request's non-authoritative client provenance.
+  /// Display and audit only: History groups by it, nothing decides by it.
+  /// Distinct from `sessionID`, which is this Job's own storage identity.
+  public let threadID: String?
   public let actualEffect: String?
   public let createdAtUTC: String?
   public let startedAtUTC: String?
@@ -231,6 +236,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     processProgress: RuntimeJobProcessProgress? = nil,
     executionMode: String? = nil,
     sessionID: String? = nil,
+    threadID: String? = nil,
     actualEffect: String? = nil,
     createdAtUTC: String? = nil,
     startedAtUTC: String? = nil,
@@ -251,6 +257,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     self.processProgress = processProgress
     self.executionMode = executionMode
     self.sessionID = sessionID
+    self.threadID = threadID
     self.actualEffect = actualEffect
     self.createdAtUTC = createdAtUTC
     self.startedAtUTC = startedAtUTC
@@ -8120,6 +8127,7 @@ public actor RuntimeJobEngine {
       processProgress: liveProcessProgress(for: record.jobID),
       executionMode: "execute",
       sessionID: record.sessionID,
+      threadID: record.request.clientContext?.threadID,
       actualEffect: record.actualEffect,
       createdAtUTC: record.createdAtUTC,
       startedAtUTC: record.startedAtUTC,

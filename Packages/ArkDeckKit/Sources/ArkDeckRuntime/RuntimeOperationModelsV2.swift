@@ -157,14 +157,42 @@ public struct RuntimeCapabilityReference: Equatable, Sendable, Codable {
 }
 
 public struct RuntimeClientContext: Equatable, Sendable, Codable {
+  /// Reserved provenance key naming the run-grouping thread a caller filed
+  /// this request under, so History can show consecutive work on one device
+  /// as one line instead of N unrelated rows.
+  ///
+  /// It lives in provenance precisely because provenance grants nothing: this
+  /// is a display and audit label, and no admission decision, capability,
+  /// materialized plan, storage layout or audit identity may read it. In
+  /// particular it is NOT `RuntimeJobRecord.sessionID`, which is one Job's
+  /// own durable storage identity and its session directory name.
+  public static let threadProvenanceKey = "arkdeck.threadId"
+
   public let clientName: String?
   /// Display/audit annotations only. The runtime never derives authority,
   /// scope or identity from provenance entries.
   public let provenance: [String: String]?
 
+  /// The run-grouping thread this request declared, when it declared one.
+  public var threadID: String? { provenance?[Self.threadProvenanceKey] }
+
   public init(clientName: String? = nil, provenance: [String: String]? = nil) {
     self.clientName = clientName
     self.provenance = provenance
+  }
+
+  /// Files the request under a run-grouping thread. Any other provenance the
+  /// caller supplies is preserved; a caller cannot smuggle a second thread in
+  /// through `provenance` because the reserved key is written last.
+  public init(
+    clientName: String?,
+    threadID: String,
+    provenance: [String: String] = [:]
+  ) {
+    var entries = provenance
+    entries[Self.threadProvenanceKey] = threadID
+    self.clientName = clientName
+    self.provenance = entries
   }
 
   func validate() throws {
@@ -187,6 +215,22 @@ public struct RuntimeClientContext: Equatable, Sendable, Codable {
             code: .invalidRequest,
             path: "$.clientContext.provenance.\(key)",
             message: "malformed provenance entry")
+        }
+      }
+      // The thread label is free-form to the runtime but not unbounded: a
+      // decoded request naming a malformed thread is refused here rather than
+      // reaching History as an un-renderable grouping key.
+      if let thread = provenance[Self.threadProvenanceKey] {
+        guard
+          thread.range(
+            of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"#,
+            options: .regularExpression
+          ) == thread.startIndex..<thread.endIndex
+        else {
+          throw RuntimeOperationRequestRejection(
+            code: .invalidRequest,
+            path: "$.clientContext.provenance.\(Self.threadProvenanceKey)",
+            message: "thread id must be 1..64 characters of [A-Za-z0-9._-]")
         }
       }
     }

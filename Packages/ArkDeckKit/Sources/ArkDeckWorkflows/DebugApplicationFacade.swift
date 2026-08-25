@@ -478,7 +478,8 @@ enum DebugHAPRequestBuilder {
         "portForwardProfile": .string("none"),
       ],
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugAppsWorkspace))
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.debugAppsWorkspace, targetID: target.id))
   }
 }
 
@@ -620,7 +621,8 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
           "redactionProfile": .string("standard"),
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugLogsWorkspace))
+        clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
       let encoder = CanonicalJSONEncoders.canonical()
       let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
@@ -804,8 +806,8 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
           "remotePort": .integer(Int64(rule.remotePort)),
         ],
         requestedOutputs: [.derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(
-          clientName: ArkDeckAgentClientName.debugNetworkWorkspace))
+        clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.debugNetworkWorkspace, targetID: target.id))
       let encoder = CanonicalJSONEncoders.canonical()
       let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
