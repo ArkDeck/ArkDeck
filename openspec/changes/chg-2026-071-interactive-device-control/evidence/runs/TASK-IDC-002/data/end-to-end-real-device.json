@@ -40,8 +40,21 @@
   "latency": {
     "throughTheCLI": {
       "firstGestureOfASession": 971,
-      "steadyStateBatch": { "n": 8, "range": [551, 576] },
-      "twentyGestureBatch": { "n": 20, "ok": 20, "p50": 644, "p95": 3887, "min": 565, "max": 3887 }
+      "steadyStateBatch": {
+        "n": 8,
+        "range": [
+          551,
+          576
+        ]
+      },
+      "twentyGestureBatch": {
+        "n": 20,
+        "ok": 20,
+        "p50": 644,
+        "p95": 3887,
+        "min": 565,
+        "max": 3887
+      }
     },
     "components": {
       "cliStartupAndXPCRoundTrip": 75,
@@ -66,7 +79,10 @@
     "gate. Characterising it is not done."
   ],
   "twoFailuresWhichWereNotDefects": {
-    "jobs": ["job-9b216336a05cc994a422e2f5458648f8", "job-437f7fe394fac6ab1dc26b5135ef419c"],
+    "jobs": [
+      "job-9b216336a05cc994a422e2f5458648f8",
+      "job-437f7fe394fac6ab1dc26b5135ef419c"
+    ],
     "reason": "targetConfirmationMismatch: expected exactly one matching target row, saw 0",
     "reading": [
       "The device dropped off the hdc target list momentarily under load. Both jobs",
@@ -86,11 +102,20 @@
       "claim was false as implemented, in the commit message and in this evidence set."
     ],
     "fix": "the sweep is armed on a timer and re-armed on every use, so it measures from the last gesture",
-    "test": "testAnIdleChannelClosesWithoutWaitingForAnotherGesture; with the arming removed it fails"
+    "test": "testAnIdleChannelClosesWithoutWaitingForAnotherGesture; with the arming removed it fails",
+    "verifiedOnHardwareAfterTheFix": {
+      "daemon": "rebuilt from main at #1513 and re-signed with the maintainer's Developer ID; previous bundle kept under Helpers/.backup-20260825T213042/",
+      "staleChannelFromTheOldDaemon": "gone once the daemon restarted",
+      "opened": "one gesture opened a channel owned by the daemon (pid parented to it)",
+      "closedAfterIdleSeconds": "between 105 and 120, sampled every 15s with nothing dispatched; the channel's own elapsed time read 2:01 at the last sample before it disappeared",
+      "timeoutSeconds": 120,
+      "reopened": "the next gesture opened a fresh channel; five gestures then ran at 520-653ms with only ['confirm-evidence-target', 'inject-pointer-input'] reaching the device"
+    }
   },
   "notVerified": [
     "The App's own path. Everything here went through the CLI.",
-    "The channel's idle close on hardware after the fix - the daemon carrying the fix",
-    "has not been installed yet."
+    "The p95 tail under sustained gesture load, which is what stands between the",
+    "component measurements and the 400ms gate. It is device-and-link side, not",
+    "Runtime, and it is not characterised."
   ]
 }
