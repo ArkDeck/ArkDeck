@@ -28,7 +28,11 @@ function srcFiles(dir) {
 // Bump ONLY after re-reading the docs and confirming this package still
 // expresses them. This is the deliberate acknowledgement step: a docs version
 // bump is exactly the event that silently invalidated the library once.
-const ALIGNED_VERSION = "v1.2";
+// v1.3 (2026-08-25) re-read: the revision is behavioral (Diagnostics marker
+// retro-capture, Toolkit input semantics) — §1 direction, the §2 token table
+// and the prototype's `:root` palette are byte-identical to v1.2; the five
+// new prototype classes are classified below.
+const ALIGNED_VERSION = "v1.3";
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const designDir = join(pkgRoot, "..");
@@ -456,6 +460,7 @@ for (const name of dsLight.keys()) {
     "device-screen-row": "device-screenshot stand-in",
     "device-screen-switch": "device-screenshot stand-in",
     "device-preview-meta": "Device Control preview metadata layout",
+    "device-frame-age": "Device Control preview frame-age typography",
     "tool-section": "Device Control inspector section grouping",
     "tool-section-head": "Device Control inspector heading layout",
     "gesture-guide": "Device Control gesture-guide layout",
@@ -497,6 +502,9 @@ for (const name of dsLight.keys()) {
     "diag-event": "DiagnosticTraceEvent",
     "diag-log-dot": "DiagnosticLogMarker",
     "diag-marker": "DiagnosticMarker",
+    "diag-shot": "DiagnosticScreenshotPoint",
+    "diag-track-flat": "DiagnosticUnalignedTrackNotice",
+    "diag-partial": "PartialSessionBanner",
     "diag-boundary": "ProductionBoundaryCallout",
     "diag-preset": "DiagnosticPresetPicker",
     "diag-channel": "DiagnosticChannelStatus",
@@ -505,6 +513,7 @@ for (const name of dsLight.keys()) {
     "device-touch-feedback": "DeviceTouchFeedback",
     "device-swipe-feedback": "DeviceSwipeFeedback",
     "device-drag-preview": "DeviceDragPreview",
+    "device-stale-overlay": "DeviceStaleInputGuard",
     "device-keyboard-cursor": "DeviceKeyboardCursor",
     "gesture-guide-row": "DeviceGestureGuideRow",
     "tool-event-row": "DeviceControlEventRow",
