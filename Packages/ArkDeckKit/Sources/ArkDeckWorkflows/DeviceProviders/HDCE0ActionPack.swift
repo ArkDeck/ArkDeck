@@ -508,6 +508,12 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
   public static let displayRange = 0...64
   public static let velocityRange = 200...40000
 
+  /// How stale the frame a gesture was computed from may be when the runtime
+  /// is about to inject it. An input that waited behind a queue is discarded
+  /// rather than landing late on a screen that has moved on; the bound is a
+  /// runtime constant, never a caller-supplied budget.
+  public static let frameFreshnessBudgetMs = 1_000
+
   public let gesture: HDCPointerGesture
   public let x: Int
   public let y: Int
@@ -515,6 +521,13 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
   public let toY: Int?
   public let durationMs: Int?
   public let displayID: Int?
+  /// The frame the gesture was mapped against. Present as a pair or not at
+  /// all: half a display fact would bound one axis and silently trust the
+  /// other.
+  public let displayWidth: Int?
+  public let displayHeight: Int?
+  /// Capture time of that frame, when the caller supplied one.
+  public let screenEpochUTC: String?
 
   public init(
     gesture: HDCPointerGesture,
@@ -523,7 +536,10 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
     toX: Int? = nil,
     toY: Int? = nil,
     durationMs: Int? = nil,
-    displayID: Int? = nil
+    displayID: Int? = nil,
+    displayWidth: Int? = nil,
+    displayHeight: Int? = nil,
+    screenEpochUTC: String? = nil
   ) throws {
     for (value, field) in [(x, "pointerX"), (y, "pointerY")] {
       guard Self.coordinateRange.contains(value) else {
@@ -554,6 +570,30 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
         throw HDCE0RequestError.outOfBounds(field: "displayId", detail: "0...64")
       }
     }
+    switch (displayWidth, displayHeight) {
+    case (nil, nil):
+      break
+    case (let width?, let height?):
+      guard width > 0, height > 0 else {
+        throw HDCE0RequestError.outOfBounds(
+          field: "displayWidth/displayHeight", detail: "positive device pixels")
+      }
+      // Every point the gesture names has to fit the frame it was mapped
+      // against. The device performs its own check against the live panel
+      // (measured: an off-screen coordinate is refused at exit 0), so this is
+      // the host-side half of the same guard — it catches a mapping computed
+      // against a stale or wrongly-sized frame before anything is dispatched.
+      for (px, py, label) in [(x, y, "pointer"), (toX ?? x, toY ?? y, "pointerTo")] {
+        guard px < width, py < height else {
+          throw HDCE0RequestError.outOfBounds(
+            field: label, detail: "inside the declared \(width)x\(height) frame")
+        }
+      }
+    default:
+      throw HDCE0RequestError.outOfBounds(
+        field: "displayWidth/displayHeight",
+        detail: "both or neither; one axis alone bounds nothing")
+    }
     self.gesture = gesture
     self.x = x
     self.y = y
@@ -561,6 +601,21 @@ public struct HDCPointerInputSpec: Sendable, Equatable {
     self.toY = toY
     self.durationMs = durationMs
     self.displayID = displayID
+    self.displayWidth = displayWidth
+    self.displayHeight = displayHeight
+    self.screenEpochUTC = screenEpochUTC
+  }
+
+  /// Whether the frame this gesture was computed from is still fresh enough to
+  /// act on. A caller that supplied no epoch gets no freshness claim and no
+  /// refusal: the guard reports on what it was given, and never invents a
+  /// verdict from an absent fact.
+  public func frameAgeMs(atUTC nowUTC: String) -> Int? {
+    guard let screenEpochUTC,
+      let captured = ISO8601Timestamps.parse(screenEpochUTC),
+      let now = ISO8601Timestamps.parse(nowUTC)
+    else { return nil }
+    return Int((now.timeIntervalSince(captured) * 1000).rounded())
   }
 
   /// px/s for `uiInput swipe`, derived from the caller's real hold duration

@@ -8254,10 +8254,16 @@ public actor RuntimeJobEngine {
     guard sessionScopedInputOperations.contains(descriptor.reference) else {
       return (inputs, planDigest)
     }
-    // The display a gesture lands on stays part of the authorized subject; the
-    // coordinates inside that display do not.
+    // The frame a gesture was mapped against stays part of the authorized
+    // subject; the coordinates inside that frame do not. A rotation or a
+    // resolution change therefore produces a different subject, so a mapping
+    // computed against the old frame cannot reuse this session's
+    // authorization — drift fails closed by construction rather than by a
+    // check someone has to remember to run.
     var reduced: [String: JSONValue] = [:]
-    if let display = inputs["displayId"] { reduced["displayId"] = display }
+    for key in ["displayId", "displayWidth", "displayHeight"] {
+      if let value = inputs[key] { reduced[key] = value }
+    }
     return (reduced, nil)
   }
 
@@ -8699,6 +8705,13 @@ public actor RuntimeJobEngine {
       }
       if let displayID = spec.displayID {
         pointer["displayId"] = .integer(Int64(displayID))
+      }
+      // The frame the gesture was mapped against belongs in the durable
+      // intent: a later reader has to be able to tell what the coordinates
+      // meant, not just what they were.
+      if let width = spec.displayWidth { pointer["displayWidth"] = .integer(Int64(width)) }
+      if let height = spec.displayHeight {
+        pointer["displayHeight"] = .integer(Int64(height))
       }
       arguments = pointer
     case .removePortForward:
