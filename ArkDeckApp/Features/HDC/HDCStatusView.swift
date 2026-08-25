@@ -16,6 +16,10 @@ struct HDCStatusView: View {
   let onDispatchConfirmedRecovery: (() -> Void)?
   let onSelectUserConfiguredExecutable: ((URL) -> Void)?
   let configurationError: String?
+  /// Content rendered above the diagnostics, inside the same scrolling page.
+  /// The Overview's record lives here rather than in a second scroll view, so
+  /// one workspace keeps one scroll position and one toolbar.
+  let header: AnyView?
   @State private var isSelectingExecutable = false
   @State private var importerError: String?
   @State private var isAdvancedExpanded = false
@@ -30,7 +34,8 @@ struct HDCStatusView: View {
     onConfirmRecoveryImpactPreview: (() -> Void)? = nil,
     onDispatchConfirmedRecovery: (() -> Void)? = nil,
     onSelectUserConfiguredExecutable: ((URL) -> Void)? = nil,
-    configurationError: String? = nil
+    configurationError: String? = nil,
+    header: AnyView? = nil
   ) {
     self.presentation = presentation
     self.capabilityMatrix = capabilityMatrix
@@ -41,10 +46,12 @@ struct HDCStatusView: View {
     self.onDispatchConfirmedRecovery = onDispatchConfirmedRecovery
     self.onSelectUserConfiguredExecutable = onSelectUserConfiguredExecutable
     self.configurationError = configurationError
+    self.header = header
   }
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      if let header { header }
       statusStrip
       // Two fixed columns, not an adaptive grid: `.adaptive` derives its column
       // count from the pane width, so a maximised window laid all four sections

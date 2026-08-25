@@ -15,6 +15,8 @@
 		A100000000000000000000B6 /* DebugLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B3 /* DebugLocalizable.xcstrings */; };
 		A10000000000000000000012 /* ArkDeckCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000091 /* ArkDeckCore */; };
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
+		A100000000000000000000E6 /* OverviewRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E4 /* OverviewRecordView.swift */; };
+		A100000000000000000000E7 /* OverviewResumeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* OverviewResumeSheet.swift */; };
 		D10000000000000000000001 /* DeviceWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* DeviceWorkspace.swift */; };
 		A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* RuntimeHistoryView.swift */; };
 		A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* FlashWorkspaceView.swift */; };
@@ -49,6 +51,7 @@
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
+		A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E9 /* OverviewRecordUITests.swift */; };
 		E10000000000000000000001 /* WorkspaceChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* WorkspaceChrome.swift */; };
 		F20000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -63,7 +66,10 @@
 		A10000000000000000000022 /* ArkDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArkDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000023 /* ArkDeckApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArkDeckApp.entitlements; sourceTree = "<group>"; };
 		A10000000000000000000024 /* HDCStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDCStatusView.swift; sourceTree = "<group>"; };
+		A100000000000000000000E4 /* OverviewRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewRecordView.swift; sourceTree = "<group>"; };
+		A100000000000000000000E5 /* OverviewResumeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewResumeSheet.swift; sourceTree = "<group>"; };
 		A10000000000000000000025 /* HDCStatusUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDCStatusUITests.swift; sourceTree = "<group>"; };
+		A100000000000000000000E9 /* OverviewRecordUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewRecordUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000026 /* ArkDeckHDCUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArkDeckHDCUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D10000000000000000000002 /* DeviceWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWorkspace.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* RuntimeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeHistoryView.swift; sourceTree = "<group>"; };
@@ -141,6 +147,7 @@
 			children = (
 				A10000000000000000000031 /* ArkDeckApp */,
 				A10000000000000000000036 /* HDC UI Tests */,
+				A100000000000000000000EB /* Overview UI Tests */,
 				A1000000000000000000003A /* App Shell UI Tests */,
 				A10000000000000000000033 /* Products */,
 			);
@@ -153,6 +160,7 @@
 				E10000000000000000000003 /* Design System */,
 				A10000000000000000000034 /* Resources */,
 				A10000000000000000000035 /* Features */,
+				A100000000000000000000E8 /* Overview Feature */,
 				A10000000000000000000039 /* Shared Features */,
 				A1000000000000000000003F /* History Feature */,
 				A100000000000000000000A2 /* Flash Feature */,
@@ -229,12 +237,29 @@
 			path = Features/HDC;
 			sourceTree = "<group>";
 		};
+		A100000000000000000000E8 /* Overview Feature */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000000000000E4 /* OverviewRecordView.swift */,
+				A100000000000000000000E5 /* OverviewResumeSheet.swift */,
+			);
+			path = Features/Overview;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000036 /* HDC UI Tests */ = {
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000025 /* HDCStatusUITests.swift */,
 			);
 			path = ArkDeckAppUITests/HDC;
+			sourceTree = "<group>";
+		};
+		A100000000000000000000EB /* Overview UI Tests */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000000000000E9 /* OverviewRecordUITests.swift */,
+			);
+			path = ArkDeckAppUITests/Overview;
 			sourceTree = "<group>";
 		};
 		A1000000000000000000003F /* History Feature */ = {
@@ -496,6 +521,8 @@
 				E10000000000000000000001 /* WorkspaceChrome.swift in Sources */,
 				A10000000000000000000010 /* ArkDeckApp.swift in Sources */,
 				A10000000000000000000013 /* HDCStatusView.swift in Sources */,
+				A100000000000000000000E6 /* OverviewRecordView.swift in Sources */,
+				A100000000000000000000E7 /* OverviewResumeSheet.swift in Sources */,
 				D10000000000000000000001 /* DeviceWorkspace.swift in Sources */,
 				A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */,
 				A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */,
@@ -525,6 +552,7 @@
 				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
+				A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

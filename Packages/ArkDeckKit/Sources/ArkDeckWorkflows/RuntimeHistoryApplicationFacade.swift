@@ -1253,6 +1253,9 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           timeline: ["queued", "running", "succeeded"],
           executionMode: "execute",
           sessionID: "session-job-fixture-0001",
+          // One fixture run carries a thread and one does not, so the Overview
+          // fixture exercises both a grouped line and an ungrouped run.
+          threadID: "t-fixture0001",
           actualEffect: "readOnly",
           createdAtUTC: "2026-08-06T07:00:00Z",
           startedAtUTC: "2026-08-06T07:00:01Z",
