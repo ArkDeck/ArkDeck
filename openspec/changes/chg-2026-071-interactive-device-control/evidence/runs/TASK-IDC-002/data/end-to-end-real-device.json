@@ -13,7 +13,7 @@
       "and entitlements as the build it replaced. Previous bundle kept under",
       "Helpers/.backup-20260825T205319/."
     ],
-    "clientPath": "the arkdeck CLI, which spawns a process and opens an XPC connection per invocation - measured at 54-106ms for a no-op round trip, and paid twice by `job submit --wait`. The App holds a live connection and does not pay it."
+    "clientPath": "the arkdeck CLI, which spawns a process and opens a socket per invocation. CORRECTED: this file previously said the App holds a live connection and does not pay that cost. The App opens a fresh NSXPCConnection per request and invalidates it afterwards, and the two paths measure within ~25ms of each other. See app-path-verification.json."
   },
   "verifiedOnHardware": {
     "allThreeGestures": {
