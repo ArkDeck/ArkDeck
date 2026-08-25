@@ -71,6 +71,7 @@
     ]
   },
   "theTail": [
+    "SUPERSEDED - see supersededBy. Kept for the record, not as a current conclusion.",
     "A 24-gesture batch degraded progressively (1.0s -> 11.8s) and then recovered.",
     "Measured at rest immediately after: `hdc list targets -v` p50 40ms with no missing",
     "rows, `uinput` p50 313ms spawned, device loadavg 2.10 (this board's baseline).",
@@ -117,5 +118,17 @@
     "The p95 tail under sustained gesture load, which is what stands between the",
     "component measurements and the 400ms gate. It is device-and-link side, not",
     "Runtime, and it is not characterised."
-  ]
+  ],
+  "supersededBy": {
+    "file": "gesture-tail-attribution.json",
+    "what": [
+      "The tail figures in this file (p95 3887ms, and the 7141/18834ms runs) were",
+      "measured on the daemon carrying the idle-close defect. They do not reproduce on",
+      "the build that fixes it: 100 consecutive gestures ran at p50 544ms, p95 569ms,",
+      "max 709ms, zero failures.",
+      "The reading in `theTail` - that the tail is device-and-link side rather than",
+      "Runtime - was drawn from phases run sequentially rather than interleaved, and",
+      "did not survive interleaving. Do not carry it forward."
+    ]
+  }
 }
