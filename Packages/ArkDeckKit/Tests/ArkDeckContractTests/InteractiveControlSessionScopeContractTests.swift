@@ -198,4 +198,119 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
       RuntimeJobEngine.sessionScopedInputMaximumUses, 10_000,
       "the session budget must be tighter than the standing default it replaces")
   }
+
+  // MARK: - Session-carried evidence (stage 4)
+
+  /// The two property readbacks cost a device round trip each (measured:
+  /// ~150 ms apiece against DAYU200, versus 35 ms for the identity query
+  /// that is a host-side call). Carrying them within a session is what
+  /// brings a gesture inside its budget - but only the two, and only under a
+  /// freshly re-confirmed identity.
+  private func accumulator(
+    identity: String = String(repeating: "1", count: 64),
+    bindingRevision: Int = 7,
+    model: String? = "HW-DAYU200",
+    firmware: String? = "OpenHarmony-5.0",
+    steps: [RuntimeEvidencePreflightStep]
+  ) -> RuntimeEvidencePreflightAccumulator {
+    RuntimeEvidencePreflightAccumulator(
+      targetID: "target-a", bindingRevision: bindingRevision,
+      stableIdentitySHA256: identity, providerID: "hdc",
+      toolVersion: "1.0", toolSHA256: String(repeating: "b", count: 64),
+      transport: "usb", confirmedAtUTC: "2026-08-25T10:00:00Z",
+      model: model, firmware: firmware, steps: steps)
+  }
+
+  private func step(
+    _ id: String, carriedFrom: String? = nil
+  ) -> RuntimeEvidencePreflightStep {
+    RuntimeEvidencePreflightStep(
+      stepID: id, stepKind: id == "confirm-evidence-target" ? "probeDevice" : "runApprovedRemoteRead",
+      outcomeAtUTC: "2026-08-25T10:00:00Z", carriedFromUTC: carriedFrom)
+  }
+
+  private var allThreeFresh: [RuntimeEvidencePreflightStep] {
+    ["confirm-evidence-target", "read-evidence-model", "read-evidence-firmware"].map { step($0) }
+  }
+
+  private var identityFreshRestCarried: [RuntimeEvidencePreflightStep] {
+    [
+      step("confirm-evidence-target"),
+      step("read-evidence-model", carriedFrom: "2026-08-25T09:55:00Z"),
+      step("read-evidence-firmware", carriedFrom: "2026-08-25T09:55:00Z"),
+    ]
+  }
+
+  /// The step that re-reads the device identity is the reason carrying the
+  /// others is sound. It is never itself carried, and it is cheap enough
+  /// that it need not be.
+  func testTheIdentityConfirmationIsNeverCarried() {
+    XCTAssertFalse(
+      RuntimeJobEngine.sessionCarriableEvidenceStepIDs.contains("confirm-evidence-target"),
+      "carrying the identity check would remove the only per-gesture wrong-device guard")
+    XCTAssertEqual(
+      RuntimeJobEngine.sessionCarriableEvidenceStepIDs,
+      ["read-evidence-model", "read-evidence-firmware"],
+      "only the two property readbacks may be answered from session memory")
+  }
+
+  /// A fact carried from four minutes ago and a fact read just now are
+  /// different claims, and the observation says which it is.
+  func testACarriedObservationIsNotNamedAFreshOne() {
+    let fresh = RuntimeJobEngine.evidenceObservation(
+      from: accumulator(steps: allThreeFresh))
+    XCTAssertEqual(fresh.confirmationMethod, "machineReadback")
+    let carried = RuntimeJobEngine.evidenceObservation(
+      from: accumulator(steps: identityFreshRestCarried))
+    XCTAssertEqual(carried.confirmationMethod, "machineReadbackSessionCarried")
+  }
+
+  /// Fail-closed by construction: the hardware-evidence contract admits only
+  /// `machineReadback`, so a session-carried observation cannot be projected
+  /// as hardware evidence for anything, and no separate gate has to remember
+  /// to exclude it.
+  func testACarriedObservationCannotBeProjectedAsHardwareEvidence() {
+    let carried = RuntimeJobEngine.evidenceObservation(
+      from: accumulator(steps: identityFreshRestCarried))
+    XCTAssertNotEqual(
+      carried.confirmationMethod, "machineReadback",
+      "a carried readback must not satisfy the machineReadback hardware-evidence gate")
+    XCTAssertNotEqual(carried.confirmationMethod, "humanVisual")
+  }
+
+  /// Which device answered is part of what is remembered: another device, or
+  /// the same device on a new binding, gets asked again.
+  func testCarriedFactsAreScopedToOneDeviceAndOneBinding() {
+    let a = RuntimeJobEngine.carriedEvidenceKey(
+      stableIdentitySHA256: String(repeating: "1", count: 64), bindingRevision: 7)
+    let otherDevice = RuntimeJobEngine.carriedEvidenceKey(
+      stableIdentitySHA256: String(repeating: "2", count: 64), bindingRevision: 7)
+    let otherBinding = RuntimeJobEngine.carriedEvidenceKey(
+      stableIdentitySHA256: String(repeating: "1", count: 64), bindingRevision: 8)
+    XCTAssertNotEqual(a, otherDevice)
+    XCTAssertNotEqual(a, otherBinding)
+  }
+
+  /// Carrying shortens the work, never the requirement: an observation is
+  /// still assembled only from all three correlated fragments, in order.
+  func testCarryingDoesNotRelaxWhatACompletePreflightMeans() {
+    let missingFirmware = accumulator(
+      firmware: nil,
+      steps: [step("confirm-evidence-target"), step("read-evidence-model", carriedFrom: "x")])
+    XCTAssertFalse(missingFirmware.isComplete)
+    XCTAssertTrue(accumulator(steps: identityFreshRestCarried).isComplete)
+    let outOfOrder = accumulator(
+      steps: [
+        step("confirm-evidence-target"),
+        step("read-evidence-firmware", carriedFrom: "x"),
+        step("read-evidence-model", carriedFrom: "x"),
+      ])
+    XCTAssertFalse(outOfOrder.isComplete, "a carried fragment still may not arrive out of order")
+  }
+
+  /// The carried facts live no longer than the envelope that authorized the
+  /// gestures carrying them.
+  func testCarriedFactsExpireWithTheSessionEnvelope() {
+    XCTAssertEqual(RuntimeJobEngine.sessionScopedInputLifetime, 60 * 60)
+  }
 }

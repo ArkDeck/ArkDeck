@@ -499,6 +499,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var screenshotPayload: Data? =
         Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         + Data("fake-png-body".utf8)
+      /// What `uinput` prints for an injected tap.
+      var pointerAck = "click coordinate is (640, 1500)\n"
       /// Bytes the simulated `file recv` leaves for the component tree leg.
       var uiTreePayload: Data? = Data(
         #"{"attributes":{"text":"hello"},"children":[]}"#.utf8)
@@ -539,7 +541,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       switch action {
       case .injectPointerInput:
         note("injectPointerInput")
-        return receipt("No Error\n")
+        // uinput's own acknowledgement shape. The verdict is read from
+        // stdout because `hdc shell` does not carry the device-side exit
+        // status back (measured), so a fake that answered only an exit code
+        // would be testing something the real channel cannot do.
+        return receipt(script.pointerAck)
       case .observeTool:
         note("observeTool")
         return receipt("Ver: 3.2.0f\n")
@@ -874,6 +880,86 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "inputs": { \(trace) \(tree) \(shot) \(crash) \(crashName) \(budget) \(redaction) \(bundle) \(ability) \(process) \(digest) "durationSeconds": 5 }
       }
       """.utf8)
+  }
+
+  private func tapRequest(key: String) -> Data {
+    Data(
+      """
+      {
+        "documentType": "runtime-operation-request",
+        "schemaVersion": "2.0.0",
+        "requestId": "req-tap",
+        "idempotencyKey": "\(key)",
+        "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
+        "operation": { "id": "input.tap", "version": 1 },
+        "inputs": {
+          "x": 640, "y": 1500,
+          "displayWidth": 1260, "displayHeight": 2720
+        }
+      }
+      """.utf8)
+  }
+
+  /// What a session actually saves, measured at the only place that settles
+  /// it: the actions that reached the device.
+  ///
+  /// Against DAYU200 the identity query costs ~35 ms because it is answered
+  /// by the host-side `hdc` server, while each property readback is a device
+  /// round trip at ~150 ms. A gesture that re-read all three could not come
+  /// in under the interaction budget; one that re-reads only the identity
+  /// can. So the session carries the two properties and keeps the identity
+  /// check, and this is the test that says so in dispatched actions rather
+  /// than in a comment.
+  func testASessionCarriesThePropertyReadbacksButNeverTheIdentityCheck() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init())
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+
+    let first = try await engine.submit(tapRequest(key: "idem-tap-01"))
+    let firstStatus = try await engine.run(jobID: first.jobID)
+    XCTAssertEqual(
+      firstStatus.state, "succeeded", firstStatus.timeline.joined(separator: " | "))
+
+    let second = try await engine.submit(tapRequest(key: "idem-tap-02"))
+    let secondStatus = try await engine.run(jobID: second.jobID)
+    XCTAssertEqual(
+      secondStatus.state, "succeeded", secondStatus.timeline.joined(separator: " | "))
+
+    XCTAssertEqual(
+      dispatcher.dispatchedActions,
+      [
+        "observeDevice", "evidenceModel", "evidenceFirmware", "injectPointerInput",
+        "observeDevice", "injectPointerInput",
+      ],
+      "the first gesture reads every fragment; the second re-confirms the identity "
+        + "and carries the two properties that cannot have changed under it")
+  }
+
+  /// The saving never buys a weaker claim: the second gesture still exports a
+  /// complete observation, and that observation says which fragments were
+  /// carried and when they were actually read.
+  func testACarriedObservationStatesThatItWasCarried() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init())
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    let first = try await engine.submit(tapRequest(key: "idem-tap-11"))
+    _ = try await engine.run(jobID: first.jobID)
+    let second = try await engine.submit(tapRequest(key: "idem-tap-12"))
+    _ = try await engine.run(jobID: second.jobID)
+
+    let evidence = try await engine.evidenceSnapshot(jobID: second.jobID)
+    let observation = try XCTUnwrap(evidence.observation)
+    XCTAssertEqual(observation.model, "DAYU200")
+    XCTAssertEqual(observation.firmware, "OpenHarmony-4.1-release")
+    XCTAssertEqual(
+      observation.confirmationMethod, "machineReadbackSessionCarried",
+      "a carried observation must not present itself as a wholly fresh readback")
+    let steps = observation.preflightSteps
+    XCTAssertEqual(
+      steps.map(\.stepID),
+      ["confirm-evidence-target", "read-evidence-model", "read-evidence-firmware"])
+    XCTAssertNil(
+      steps.first?.carriedFromUTC, "the identity is always read for the job that uses it")
+    XCTAssertNotNil(steps.dropFirst().first?.carriedFromUTC)
+    XCTAssertNotNil(steps.last?.carriedFromUTC)
   }
 
   private func publishedJSON(
