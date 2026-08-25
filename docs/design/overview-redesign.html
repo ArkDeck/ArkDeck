@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArkDeck Overview 重设计候选稿</title>
+<style>
+
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-fill); }
+
+.ad-root {
+  --ground: #f5f5f7;
+  --panel: #ffffff;
+  --panel2: rgba(242, 242, 247, 0.82);
+  --ink: #1d1d1f;
+  --ink2: #6e6e73;
+  --line: rgba(60, 60, 67, 0.18);
+  --accent: #006edb;
+  --accent-fill: #0065ca;
+  --accent-ink: #ffffff;
+  --accent-weak: rgba(0, 110, 219, 0.12);
+  --ok: #1f7a35;
+  --warn: #8a4b00;
+  --danger: #c10014;
+  --danger-weak: rgba(193, 0, 20, 0.08);
+  --planned: #7047b7;
+  --chrome: rgba(246, 246, 248, 0.82);
+  --cshadow: 0 1px 1px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  width: 1180px;
+  height: 760px;
+  background: var(--ground);
+  color: var(--ink);
+  font: 13px/1.5 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  .ad-root:not([data-theme="light"]) {
+  --ground: #1c1c1e;
+  --panel: #2c2c2e;
+  --panel2: rgba(44, 44, 46, 0.78);
+  --ink: #f5f5f7;
+  --ink2: #aeaeb2;
+  --line: rgba(235, 235, 245, 0.16);
+  --accent: #58a6ff;
+  --accent-fill: #0065ca;
+  --accent-weak: rgba(88, 166, 255, 0.18);
+  --ok: #4cd964;
+  --warn: #ffb340;
+  --danger: #ff6961;
+  --danger-weak: rgba(255, 105, 97, 0.12);
+  --planned: #c3a6ff;
+  --chrome: rgba(36, 36, 38, 0.82);
+  --cshadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+  }
+}
+.ad-root[data-theme="dark"] {
+  --ground: #1c1c1e;
+  --panel: #2c2c2e;
+  --panel2: rgba(44, 44, 46, 0.78);
+  --ink: #f5f5f7;
+  --ink2: #aeaeb2;
+  --line: rgba(235, 235, 245, 0.16);
+  --accent: #58a6ff;
+  --accent-fill: #0065ca;
+  --accent-weak: rgba(88, 166, 255, 0.18);
+  --ok: #4cd964;
+  --warn: #ffb340;
+  --danger: #ff6961;
+  --danger-weak: rgba(255, 105, 97, 0.12);
+  --planned: #c3a6ff;
+  --chrome: rgba(36, 36, 38, 0.82);
+  --cshadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+}
+
+.sym { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; fill: none; flex: none; }
+.sym-sm { width: 13px; height: 13px; stroke-width: 1.8; }
+.mono { font-family: var(--mono); font-size: 11.5px; }
+
+/* ---- window shell (prototype.html geometry) ---- */
+.win { width: 1180px; height: 760px; display: flex; flex-direction: column; background: var(--panel); overflow: hidden; position: relative; }
+.tb {
+  height: 52px; flex: none; display: grid; grid-template-columns: minmax(210px, 1fr) auto minmax(210px, 1fr);
+  align-items: center; gap: 10px; padding: 0 12px; background: var(--chrome); border-bottom: 1px solid var(--line);
+}
+.tb-lead, .tb-trail { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tb-trail { justify-content: flex-end; }
+.lights { display: flex; gap: 7px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.lights i:nth-child(1) { background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.tb-title { text-align: center; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.tbtn {
+  min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 11px; font-family: var(--ui); border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 78%, transparent); color: var(--ink2);
+  border-radius: 7px; padding: 0 9px; cursor: pointer; box-shadow: var(--cshadow);
+}
+.tbtn-i { width: 28px; padding: 0; }
+
+.main { flex: 1; display: flex; min-height: 0; }
+.side {
+  width: 250px; flex: none; background: var(--panel2); border-right: 1px solid var(--line);
+  padding: 12px 10px; display: flex; flex-direction: column; gap: 18px;
+}
+.side-h { font-size: 11px; font-weight: 600; color: var(--ink2); padding: 0 9px 5px; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav button {
+  min-height: 32px; display: flex; align-items: center; gap: 9px; padding: 5px 9px; border-radius: 8px;
+  border: none; background: none; color: var(--ink); font-size: 13px; font-family: var(--ui); cursor: pointer;
+  text-align: start; width: 100%;
+}
+.nav button .ic { width: 18px; display: flex; align-items: center; justify-content: center; flex: none; color: var(--ink2); }
+.nav button.on { background: var(--accent-weak); font-weight: 600; }
+.nav button.on .ic { color: var(--accent); }
+.dev {
+  width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 8px; min-height: 42px;
+  border-radius: 8px; border: 1px solid transparent; background: none; text-align: start;
+  color: var(--ink); font-family: var(--ui); cursor: pointer;
+}
+.dev.on { background: var(--accent-weak); border-color: var(--accent); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot-ok { background: var(--ok); }
+.dot-warn { background: var(--warn); }
+.dot-off { background: var(--ink2); }
+.dn { flex: 1; min-width: 0; }
+.dn b { display: block; font-size: 13px; }
+.dn span { font-size: 11px; color: var(--ink2); }
+.tag { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--ink2); flex: none; }
+.addlink {
+  min-height: 28px; font-size: 12px; color: var(--accent); padding: 3px 8px; cursor: pointer; background: none;
+  border: none; text-align: start; display: flex; align-items: center; gap: 7px; font-family: var(--ui);
+}
+
+.content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.page { flex: 1; overflow: hidden; padding: 20px 24px 28px; display: flex; flex-direction: column; gap: 20px; background: var(--ground); }
+.drawer { flex: none; border-top: 1px solid var(--line); background: var(--chrome); }
+.dbar { min-height: 36px; display: flex; align-items: center; gap: 10px; padding: 7px 16px; font-size: 12.5px; color: var(--ink); }
+.dst { color: var(--ink2); flex: 1; }
+
+/* ---- content vocabulary (styles.css) ---- */
+h2 { font-size: 13px; line-height: 1.3; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
+.hint { font-size: 12px; color: var(--ink2); margin: 0; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px; box-shadow: var(--cshadow);
+}
+.card-h { display: flex; align-items: center; gap: 8px; }
+.card-h .sp { margin-inline-start: auto; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; border-radius: 999px;
+  padding: 2px 8px; border: 1px solid; white-space: nowrap; font-family: var(--ui);
+}
+.chip-ok { color: var(--ok); border-color: var(--ok); }
+.chip-warn { color: var(--warn); border-color: var(--warn); }
+.chip-danger { color: var(--danger); border-color: var(--danger); }
+.chip-dim { color: var(--ink2); border-color: var(--line); }
+.chip-accent { color: var(--accent); border-color: var(--accent); }
+.eff {
+  display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em;
+  border-radius: 4px; padding: 1px 6px; border: 1px solid; font-family: var(--mono);
+}
+.eff-read { color: var(--ok); border-color: var(--ok); }
+.eff-mut { color: var(--warn); border-color: var(--warn); }
+.eff-destr { color: var(--danger); border-color: var(--danger); }
+.btn {
+  min-height: 29px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 7px;
+  padding: 4px 12px; font-size: 13px; font-family: var(--ui); cursor: pointer; box-shadow: var(--cshadow);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.btn-pri { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+.btn-sm { min-height: 25px; padding: 2px 10px; font-size: 12px; }
+.btn-off { opacity: 0.45; cursor: not-allowed; }
+.kv { display: grid; grid-template-columns: 132px 1fr; gap: 3px 14px; font-size: 12.5px; margin: 0; }
+.kv dt { color: var(--ink2); }
+.kv dd { margin: 0; font-family: var(--mono); font-size: 11.5px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { font-size: 11px; color: var(--ink2); text-align: start; font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.warnbox {
+  border: 1px solid var(--warn); color: var(--warn); border-radius: 9px; padding: 9px 12px; font-size: 12.5px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.label { font-size: 12px; font-weight: 600; color: var(--ink2); }
+.sep { height: 1px; background: var(--line); }
+.disclosure {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink2);
+  padding: 4px 2px; cursor: pointer;
+}
+.rowline { display: flex; align-items: center; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+
+.strip {
+  display: grid; grid-template-columns: minmax(180px, 1.6fr) repeat(3, minmax(100px, 0.7fr));
+  gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px;
+  overflow: hidden; box-shadow: var(--cshadow); flex: none;
+}
+.scell { background: var(--panel); padding: 10px 13px; min-width: 0; }
+.scell small { display: block; color: var(--ink2); font-size: 10.5px; margin-bottom: 3px; }
+.scell b { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.cols-ab { display: grid; grid-template-columns: 1.18fr 1fr; gap: 20px; align-items: start; }
+.colstack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.secblk { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.state { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.t-ok { color: var(--ok); }
+.t-warn { color: var(--warn); }
+.t-danger { color: var(--danger); }
+.t-dim { color: var(--ink2); }
+.t-accent { color: var(--accent); }
+
+/* A — action rows */
+.list { display: flex; flex-direction: column; }
+.act { display: flex; align-items: flex-start; gap: 11px; padding: 7px 0; border-top: 1px solid var(--line); }
+.act:first-of-type { border-top: none; padding-top: 2px; }
+.act .ai { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  background: var(--accent-weak); color: var(--accent); flex: none; margin-top: 1px; }
+.act .ai-off { background: color-mix(in srgb, var(--ink2) 12%, transparent); color: var(--ink2); }
+.act .ab { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.act .an { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.act .ae { font-size: 11.5px; color: var(--ink2); font-family: var(--mono); }
+.act .ax { font-size: 11.5px; color: var(--ink2); }
+.act.off .an { color: var(--ink2); font-weight: 500; }
+
+/* run rows */
+.run { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.run:first-of-type { border-top: none; padding-top: 2px; }
+.run .rn { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.run .rt { font-weight: 600; }
+.run .rs { font-size: 11.5px; color: var(--ink2); font-family: var(--mono); }
+.run .rw { font-size: 11.5px; color: var(--ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* B — device header */
+.devhead { display: flex; flex-direction: column; gap: 12px; }
+.devtitle { display: flex; align-items: center; gap: 10px; }
+.devtitle h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.factgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 20px; }
+.fact { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fact small { font-size: 11px; color: var(--ink2); }
+.fact span { font-family: var(--mono); font-size: 11.5px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column;
+  gap: 5px; background: var(--panel); min-width: 0; box-shadow: var(--cshadow); }
+.tile b { font-size: 12.5px; }
+.tile .te { font-size: 11px; color: var(--ink2); font-family: var(--mono); }
+
+/* C — thin bar */
+.thin { display: flex; align-items: center; gap: 0; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--panel); padding: 0; box-shadow: var(--cshadow); flex: none; }
+.thin > div { padding: 7px 14px; font-size: 12px; display: flex; align-items: center; gap: 7px; border-inline-start: 1px solid var(--line); }
+.thin > div:first-child { border-inline-start: none; }
+.thin .sp { margin-inline-start: auto; color: var(--ink2); }
+
+/* D — checklist */
+.step { display: flex; gap: 11px; align-items: flex-start; padding: 7px 0; border-top: 1px solid var(--line); }
+.step:first-of-type { border-top: none; padding-top: 2px; }
+.step .sm { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; margin-top: 1px; }
+.step .sm-done { background: var(--ok); color: #fff; }
+.step .sm-now { border: 1.5px dashed var(--warn); color: var(--warn); }
+.step .sm-wait { border: 1.5px solid var(--line); color: var(--ink2); }
+.step .sb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.step .sn { font-size: 13px; font-weight: 600; }
+.step .sd { font-size: 11.5px; color: var(--ink2); }
+.code { font-family: var(--mono); font-size: 11.5px; background: var(--ground); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 9px; display: flex; align-items: center; gap: 8px; }
+.entries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.entry { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--panel);
+  display: flex; flex-direction: column; gap: 7px; box-shadow: var(--cshadow); }
+.entry b { font-size: 13px; }
+.entry p { margin: 0; font-size: 11.5px; color: var(--ink2); }
+
+/* 细化稿：会话与运行记录 */
+.tiles5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 11px; }
+.tile5 {
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--panel);
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; box-shadow: var(--cshadow);
+}
+.tile5 b { font-size: 12.5px; line-height: 1.3; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tile5 .tl2 { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.tile5 .te { font-size: 10.5px; color: var(--ink2); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sess { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--cshadow); }
+.sess-warn { border-color: var(--warn); }
+.sess-h {
+  display: flex; align-items: center; gap: 9px; padding: 4px 14px; font-size: 12.5px;
+  border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--ground) 55%, var(--panel));
+  border-radius: 10px 10px 0 0;
+}
+.sess-h b { font-family: var(--mono); font-size: 11.5px; }
+.sess-h .sm2 { color: var(--ink2); font-size: 11.5px; }
+.sess-note {
+  padding: 6px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink2);
+  display: flex; gap: 12px; align-items: center;
+}
+.jrow {
+  display: grid; grid-template-columns: 16px 74px minmax(0, 1.4fr) 84px 74px minmax(0, 1.2fr) auto;
+  gap: 10px; align-items: center; padding: 4px 14px; border-top: 1px solid var(--line); font-size: 12.5px;
+}
+.jrow:first-of-type { border-top: none; }
+.jrow .jid { font-family: var(--mono); font-size: 11px; color: var(--ink2); }
+.jrow .op { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jrow .tm { font-family: var(--mono); font-size: 11px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.jrow .out { font-size: 11.5px; color: var(--ink2); min-width: 0; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.jrow .acts { display: flex; gap: 6px; justify-content: flex-end; align-items: center; min-height: 25px; }
+.rulehint { font-size: 11.5px; color: var(--ink2); }
+
+/* 「再来一次」确认面 */
+.sheet-bg {
+  position: absolute; top: 52px; left: 0; right: 0; bottom: 0; z-index: 9; background: rgba(15, 18, 22, 0.4);
+  display: flex; align-items: flex-start; justify-content: center; padding: 24px 20px 20px;
+}
+.sheet {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 13px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 24px 64px rgba(0, 0, 0, 0.3);
+  width: 580px; padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 13px;
+}
+.sheet h3 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 9px; }
+.sheet .kv { grid-template-columns: 116px 1fr; }
+.sheet .kv dd { display: flex; align-items: center; gap: 7px; font-family: var(--ui); font-size: 12.5px; }
+.sheet .kv dd .mono { font-family: var(--mono); font-size: 11.5px; }
+.sfoot { display: flex; justify-content: flex-end; gap: 10px; }
+.explain { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.explain > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.explain b { font-size: 12.5px; }
+.explain p { margin: 0; font-size: 11.5px; color: var(--ink2); }
+
+
+html { color-scheme: light dark; }
+body {
+  margin: 0; padding: 28px 20px 48px; display: flex; flex-direction: column; gap: 14px;
+  align-items: center; background: #e9e9ed;
+  font: 13px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+  color: #1d1d1f;
+}
+@media (prefers-color-scheme: dark) {
+  body { background: #151517; color: #f5f5f7; }
+}
+.doc { max-width: 1180px; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.doc h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.doc p { margin: 0; font-size: 12.5px; opacity: 0.75; }
+.doc code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+.board { max-width: 1180px; width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 22px; }
+.board h2 { font-size: 15px; margin: 0; }
+.board > p { margin: 0; font-size: 12.5px; opacity: 0.7; max-width: 860px; }
+.board .ad-root {
+  border: 1px solid rgba(60, 60, 67, 0.24); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 18px 52px rgba(0, 0, 0, 0.14);
+}
+@media (prefers-color-scheme: dark) {
+  .board .ad-root { border-color: rgba(235, 235, 245, 0.2); }
+}
+.board .win { border-radius: 12px; }
+
+</style>
+</head>
+<body>
+<div class="doc">
+<h1>ArkDeck Overview 重设计候选稿（记录优先）</h1>
+<p>设计输入，非 normative。规格正本是 <code>docs/design/macos-ux-interaction-spec.md</code> §5.1 与
+<code>openspec/specs/desktop-ux-observability/spec.md</code>；两者与本稿不一致时以规格为准，行为级缺口走 behavior delta。
+说明与取舍见 <code>docs/design/overview-redesign.md</code>。</p>
+<p>页面数据全部是演示数据（沿用 <code>prototype.html</code> 的 DAYU200 / S-07xx 那套），不连接设备，
+不代表任何真机事实，也不表示相关 operation 已 production available。颜色与间距取自
+<code>docs/design/arkdeck-ds/src/tokens.css</code>，窗口几何取自 <code>prototype.html</code>。
+随系统外观切换浅色 / 深色。</p>
+</div>
+<section class="board">
+<h2>日常态</h2>
+<p>自上而下：设备条 → 开始新的一次（动作卡，带效果分级）→ 最近的工作（按会话）→ 工具链一行。需要处理的会话钉在记录最上面并加 warn 边框，不另开横幅——记录是唯一的一处。</p>
+<div class="ad-root">
+<div class="win">
+
+  <div class="tb">
+    <div class="tb-lead">
+      <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+      <button type="button" class="tbtn tbtn-i" aria-label="显示或隐藏边栏"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2"/><path d="M7 3v14"/></svg></button>
+    </div>
+    <div class="tb-title">ArkDeck — OpenHarmony 设备工作台</div>
+    <div class="tb-trail">
+      <button type="button" class="tbtn">刷新 ⌘R</button>
+      <button type="button" class="tbtn tbtn-i" aria-label="设置"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7" fill="var(--panel)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel)"/><circle cx="7" cy="15" r="1.7" fill="var(--panel)"/></svg></button>
+      <button type="button" class="tbtn"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8"/></svg><span>任务</span></button>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="side">
+      <div>
+        <div class="side-h">设备</div>
+        <nav class="nav"><button type="button" class="on"><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="3" width="5.5" height="5.5" rx="1"/><rect x="3" y="11.5" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1"/></svg></span><span>Overview</span></button></nav>
+        <button type="button" class="dev"><span class="dot dot-ok"></span><span class="dn"><b>DAYU200</b><span>已授权 · rk3568</span></span><span class="tag">USB</span></button><button type="button" class="dev"><span class="dot dot-warn"></span><span class="dn"><b>待授权设备</b><span>需要信任</span></span><span class="tag">USB</span></button>
+        <button type="button" class="addlink"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M3 10h14"/></svg><span>添加 TCP / UART 目标…</span></button>
+      </div>
+      <div>
+        <div class="side-h">工作流</div>
+        <nav class="nav"><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></svg></span><span>Flash</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></svg></span><span>Debug</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></svg></span><span>Viewer</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg></span><span>Trace</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.4 10.6V4.4a1.4 1.4 0 0 1 2.8 0v4.2m0-.6a1.4 1.4 0 0 1 2.8 0v1m0-.4a1.4 1.4 0 0 1 2.8 0v3.9a4.6 4.6 0 0 1-4.6 4.6h-1.2a3.8 3.8 0 0 1-3-1.5l-2.6-3.4a1.5 1.5 0 0 1 2.3-1.9z"/></svg></span><span>Toolkit</span></button></nav>
+      </div>
+      <div>
+        <div class="side-h">记录</div>
+        <nav class="nav"><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg></span><span>History</span></button></nav>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="page">
+
+<div class="thin">
+  <div><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><rect x="5.5" y="2.5" width="9" height="15" rx="1.8"/><path d="M8.6 15.2h2.8"/></svg><b>DAYU200</b><span class="mono">TGT-958780b2ffb7 · binding 4</span></div>
+  <div><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>已授权 · 已接管</span></span></div>
+  <div class="mono">rk3568 · 5.0.0.71 · USB</div>
+  <div class="sp">刚刚刷新</div>
+</div>
+
+
+<section class="secblk">
+  <h2>开始新的一次</h2>
+  <div class="tiles5">
+    
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></svg><span>抓 UI Dump</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span></span>
+      <span class="te">capture.diagnostics@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg><span>抓 Trace</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span></span>
+      <span class="te">hitrace · tags × 11</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></svg><span>调试 HAP</span></b>
+      <span class="tl2"><span class="state t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M8.1 8.1a2 2 0 1 1 2.5 1.9c-.5.2-.6.5-.6 1v.5M10 14.5h.01"/></svg><span>未探测</span></span><span class="eff eff-mut">mutation</span></span>
+      <span class="te">debug.hap@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></svg><span>刷机</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span><span class="eff eff-destr">destructive</span></span>
+      <span class="te">flash.dayu200@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.4 10.6V4.4a1.4 1.4 0 0 1 2.8 0v4.2m0-.6a1.4 1.4 0 0 1 2.8 0v1m0-.4a1.4 1.4 0 0 1 2.8 0v3.9a4.6 4.6 0 0 1-4.6 4.6h-1.2a3.8 3.8 0 0 1-3-1.5l-2.6-3.4a1.5 1.5 0 0 1 2.3-1.9z"/></svg><span>真机操作</span></b>
+      <span class="tl2"><span class="state t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M8.1 8.1a2 2 0 1 1 2.5 1.9c-.5.2-.6.5-.6 1v.5M10 14.5h.01"/></svg><span>未探测</span></span><span class="eff eff-mut">mutation</span></span>
+      <span class="te">input.tap@1</span>
+    </div>
+  </div>
+</section>
+
+<section class="secblk">
+  <div class="rowline"><h2>最近的工作</h2><span class="sp"></span><a href="#">全部记录 ›</a></div>
+  
+<div class="sess sess-warn">
+  <div class="sess-h">
+    <svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg><b>SESS-71a4e0</b>
+    <span class="sm2">flash.dayu200@1 · DAYU200 · binding 4 · 1 次运行 · 07-11 23:47</span>
+    <span class="sp"></span>
+    <span class="chip chip-warn">需要你处理</span>
+  </div>
+  
+  <div class="jrow">
+    <span class="t-warn"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></svg></span>
+    <span class="jid">S-0711-04</span>
+    <span class="op">刷机 · flash-partitions</span>
+    <span class="eff eff-destr">destructive</span>
+    <span class="tm">07-11 23:47</span>
+    <span class="out">interrupted · 外部效果未知</span>
+    <span class="acts"><span class="rulehint">不可重放</span></span>
+  </div><div class="sess-note"><span class="grow">中断落在写入窗口内，台账无法判定分区是否已被改写。ArkDeck 永不重放未知的 destructive 请求——确认设备实际状态后按恢复流程处理。</span><button type="button" class="btn btn-sm">打开恢复流程</button></div>
+</div>
+
+  
+<div class="sess">
+  <div class="sess-h">
+    <svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg><b>SESS-2f9c4b</b>
+    <span class="sm2">capture.diagnostics@1 · DAYU200 · binding 4 · 4 次运行 · 07-11 20:15 → 07-13 10:21</span>
+    <span class="sp"></span>
+    <button type="button" class="btn btn-sm">继续这条会话</button>
+  </div>
+  
+  <div class="jrow">
+    <span class="t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg></span>
+    <span class="jid">S-0711-05</span>
+    <span class="op">UI Dump</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-11 20:15</span>
+    <span class="out">ui-dump.json · +1</span>
+    <span class="acts"><button type="button" class="btn btn-sm">打开 Viewer</button><button type="button" class="btn btn-sm">再来一次</button></span>
+  </div>
+  <div class="jrow">
+    <span class="t-danger"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2"/></svg></span>
+    <span class="jid">S-0712-01</span>
+    <span class="op">Trace · ArkUI 深度 15s</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-12 14:02</span>
+    <span class="out">failed · 设备离线</span>
+    <span class="acts"><button type="button" class="btn btn-sm">再来一次</button></span>
+  </div>
+  <div class="jrow">
+    <span class="t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg></span>
+    <span class="jid">S-0712-03</span>
+    <span class="op">Trace · ArkUI 深度 15s</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-12 14:06</span>
+    <span class="out">trace.htrace · 12.4 MB</span>
+    <span class="acts"><button type="button" class="btn btn-sm">打开查看器</button><button type="button" class="btn btn-sm">再来一次</button></span>
+  </div>
+  <div class="jrow">
+    <span class="t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M6.8 10h6.4"/></svg></span>
+    <span class="jid">S-0713-06</span>
+    <span class="op">Trace · 渲染 / 动画 30s</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-13 10:21</span>
+    <span class="out"><span class="chip chip-dim">未上报 typed inputs</span></span>
+    <span class="acts"><button type="button" class="btn btn-sm btn-off">再来一次</button></span>
+  </div>
+</div>
+
+  <p class="rulehint">readOnly 可直接再来一次（参数预填，提交仍在工作区发生）；mutation / destructive 每次重走授权闸；效果未知的 destructive 永不重放。</p>
+</section>
+
+<div class="disclosure"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5 12.5 10 8 14.5"/></svg><span class="grow">HDC 正常 · client / server / daemon 3.1.0e · 归属 external · 通道加密未验证</span><a href="#">查看完整诊断 ›</a></div>
+
+</div>
+      <div class="drawer">
+        <div class="dbar"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5 12.5 10 8 14.5"/></svg><b>任务</b><span class="dst">没有运行中的任务</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div></section>
+<section class="board">
+<h2>「再来一次」确认面</h2>
+<p>核对来源运行、目标与 binding、效果分级与 catalog digest，再逐项对照 typed inputs。此稿故意画成 digest 已变化的情形。底部是「在工作区打开并预填」而不是「立即执行」。</p>
+<div class="ad-root">
+<div class="win">
+
+<div class="sheet-bg">
+  <div class="sheet">
+    <h3><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg><span>再抓一次 · capture.diagnostics@1</span></h3>
+    <p class="hint" style="margin:0">将以同一条会话 SESS-2f9c4b 提交一次新的运行。ArkDeck 不代你提交——确认后在 Trace 工作区预填参数，由你按下开始。</p>
+
+    <dl class="kv">
+      <dt>来源运行</dt><dd><span class="mono">S-0712-03</span><span class="mono">07-12 14:06</span><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>succeeded</span></span></dd>
+      <dt>目标</dt><dd><span class="mono">TGT-958780b2ffb7 · binding 4</span><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>与来源一致</span></span></dd>
+      <dt>效果</dt><dd><span class="eff eff-read">readOnly</span><span class="hint">不改变设备状态，无需 capability</span></dd>
+      <dt>Catalog digest</dt><dd><span class="mono">7d31… → 9a02…</span><span class="state t-warn"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></svg><span>已变化</span></span></dd>
+    </dl>
+
+    <div class="warnbox" style="padding: 8px 11px">
+      <svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></svg>
+      <span class="grow">Catalog digest 与来源运行不同：参数照旧预填，但这不是同一次运行的重复。产物可比较，结论不可直接沿用。</span>
+    </div>
+
+    <div>
+      <div class="label" style="margin-bottom:5px">参数 · 来自来源运行上报的 typed inputs</div>
+      <table>
+        <tr><th>名称</th><th>来源运行</th><th>本次预填</th></tr>
+        <tr><td class="mono">durationSeconds</td><td class="mono">15</td><td class="mono">15</td></tr>
+        <tr><td class="mono">traceTags</td><td class="mono">ark · ui · graphic</td><td class="mono">ark · ui · graphic</td></tr>
+        <tr><td class="mono">targetId</td><td class="mono">TGT-958780b2ffb7</td><td class="mono">TGT-958780b2ffb7</td></tr>
+      </table>
+    </div>
+    <p class="rulehint" style="margin:0">来源运行未上报 typed inputs 时不出现这一面：ArkDeck 不会凭默认值假装是「同样的参数」。</p>
+
+    <div class="sfoot">
+      <button type="button" class="btn">取消</button>
+      <button type="button" class="btn btn-pri">在 Trace 工作区打开并预填</button>
+    </div>
+  </div>
+</div>
+
+  <div class="tb">
+    <div class="tb-lead">
+      <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+      <button type="button" class="tbtn tbtn-i" aria-label="显示或隐藏边栏"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2"/><path d="M7 3v14"/></svg></button>
+    </div>
+    <div class="tb-title">ArkDeck — OpenHarmony 设备工作台</div>
+    <div class="tb-trail">
+      <button type="button" class="tbtn">刷新 ⌘R</button>
+      <button type="button" class="tbtn tbtn-i" aria-label="设置"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7" fill="var(--panel)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel)"/><circle cx="7" cy="15" r="1.7" fill="var(--panel)"/></svg></button>
+      <button type="button" class="tbtn"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8"/></svg><span>任务</span></button>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="side">
+      <div>
+        <div class="side-h">设备</div>
+        <nav class="nav"><button type="button" class="on"><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="3" width="5.5" height="5.5" rx="1"/><rect x="3" y="11.5" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1"/></svg></span><span>Overview</span></button></nav>
+        <button type="button" class="dev"><span class="dot dot-ok"></span><span class="dn"><b>DAYU200</b><span>已授权 · rk3568</span></span><span class="tag">USB</span></button><button type="button" class="dev"><span class="dot dot-warn"></span><span class="dn"><b>待授权设备</b><span>需要信任</span></span><span class="tag">USB</span></button>
+        <button type="button" class="addlink"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M3 10h14"/></svg><span>添加 TCP / UART 目标…</span></button>
+      </div>
+      <div>
+        <div class="side-h">工作流</div>
+        <nav class="nav"><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></svg></span><span>Flash</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></svg></span><span>Debug</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></svg></span><span>Viewer</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg></span><span>Trace</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.4 10.6V4.4a1.4 1.4 0 0 1 2.8 0v4.2m0-.6a1.4 1.4 0 0 1 2.8 0v1m0-.4a1.4 1.4 0 0 1 2.8 0v3.9a4.6 4.6 0 0 1-4.6 4.6h-1.2a3.8 3.8 0 0 1-3-1.5l-2.6-3.4a1.5 1.5 0 0 1 2.3-1.9z"/></svg></span><span>Toolkit</span></button></nav>
+      </div>
+      <div>
+        <div class="side-h">记录</div>
+        <nav class="nav"><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg></span><span>History</span></button></nav>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="page">
+
+<div class="thin">
+  <div><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><rect x="5.5" y="2.5" width="9" height="15" rx="1.8"/><path d="M8.6 15.2h2.8"/></svg><b>DAYU200</b><span class="mono">TGT-958780b2ffb7 · binding 4</span></div>
+  <div><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>已授权 · 已接管</span></span></div>
+  <div class="mono">rk3568 · 5.0.0.71 · USB</div>
+  <div class="sp">刚刚刷新</div>
+</div>
+
+
+<section class="secblk">
+  <h2>开始新的一次</h2>
+  <div class="tiles5">
+    
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></svg><span>抓 UI Dump</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span></span>
+      <span class="te">capture.diagnostics@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg><span>抓 Trace</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span></span>
+      <span class="te">hitrace · tags × 11</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></svg><span>调试 HAP</span></b>
+      <span class="tl2"><span class="state t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M8.1 8.1a2 2 0 1 1 2.5 1.9c-.5.2-.6.5-.6 1v.5M10 14.5h.01"/></svg><span>未探测</span></span><span class="eff eff-mut">mutation</span></span>
+      <span class="te">debug.hap@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></svg><span>刷机</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span><span class="eff eff-destr">destructive</span></span>
+      <span class="te">flash.dayu200@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.4 10.6V4.4a1.4 1.4 0 0 1 2.8 0v4.2m0-.6a1.4 1.4 0 0 1 2.8 0v1m0-.4a1.4 1.4 0 0 1 2.8 0v3.9a4.6 4.6 0 0 1-4.6 4.6h-1.2a3.8 3.8 0 0 1-3-1.5l-2.6-3.4a1.5 1.5 0 0 1 2.3-1.9z"/></svg><span>真机操作</span></b>
+      <span class="tl2"><span class="state t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M8.1 8.1a2 2 0 1 1 2.5 1.9c-.5.2-.6.5-.6 1v.5M10 14.5h.01"/></svg><span>未探测</span></span><span class="eff eff-mut">mutation</span></span>
+      <span class="te">input.tap@1</span>
+    </div>
+  </div>
+</section>
+
+<section class="secblk">
+  <div class="rowline"><h2>最近的工作</h2><span class="sp"></span><a href="#">全部记录 ›</a></div>
+  
+<div class="sess sess-warn">
+  <div class="sess-h">
+    <svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg><b>SESS-71a4e0</b>
+    <span class="sm2">flash.dayu200@1 · DAYU200 · binding 4 · 1 次运行 · 07-11 23:47</span>
+    <span class="sp"></span>
+    <span class="chip chip-warn">需要你处理</span>
+  </div>
+  
+  <div class="jrow">
+    <span class="t-warn"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></svg></span>
+    <span class="jid">S-0711-04</span>
+    <span class="op">刷机 · flash-partitions</span>
+    <span class="eff eff-destr">destructive</span>
+    <span class="tm">07-11 23:47</span>
+    <span class="out">interrupted · 外部效果未知</span>
+    <span class="acts"><span class="rulehint">不可重放</span></span>
+  </div><div class="sess-note"><span class="grow">中断落在写入窗口内，台账无法判定分区是否已被改写。ArkDeck 永不重放未知的 destructive 请求——确认设备实际状态后按恢复流程处理。</span><button type="button" class="btn btn-sm">打开恢复流程</button></div>
+</div>
+
+  
+<div class="sess">
+  <div class="sess-h">
+    <svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg><b>SESS-2f9c4b</b>
+    <span class="sm2">capture.diagnostics@1 · DAYU200 · binding 4 · 4 次运行 · 07-11 20:15 → 07-13 10:21</span>
+    <span class="sp"></span>
+    <button type="button" class="btn btn-sm">继续这条会话</button>
+  </div>
+  
+  <div class="jrow">
+    <span class="t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg></span>
+    <span class="jid">S-0711-05</span>
+    <span class="op">UI Dump</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-11 20:15</span>
+    <span class="out">ui-dump.json · +1</span>
+    <span class="acts"><button type="button" class="btn btn-sm">打开 Viewer</button><button type="button" class="btn btn-sm">再来一次</button></span>
+  </div>
+  <div class="jrow">
+    <span class="t-danger"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2"/></svg></span>
+    <span class="jid">S-0712-01</span>
+    <span class="op">Trace · ArkUI 深度 15s</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-12 14:02</span>
+    <span class="out">failed · 设备离线</span>
+    <span class="acts"><button type="button" class="btn btn-sm">再来一次</button></span>
+  </div>
+  <div class="jrow">
+    <span class="t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg></span>
+    <span class="jid">S-0712-03</span>
+    <span class="op">Trace · ArkUI 深度 15s</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-12 14:06</span>
+    <span class="out">trace.htrace · 12.4 MB</span>
+    <span class="acts"><button type="button" class="btn btn-sm">打开查看器</button><button type="button" class="btn btn-sm">再来一次</button></span>
+  </div>
+  <div class="jrow">
+    <span class="t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M6.8 10h6.4"/></svg></span>
+    <span class="jid">S-0713-06</span>
+    <span class="op">Trace · 渲染 / 动画 30s</span>
+    <span class="eff eff-read">readOnly</span>
+    <span class="tm">07-13 10:21</span>
+    <span class="out"><span class="chip chip-dim">未上报 typed inputs</span></span>
+    <span class="acts"><button type="button" class="btn btn-sm btn-off">再来一次</button></span>
+  </div>
+</div>
+
+  <p class="rulehint">readOnly 可直接再来一次（参数预填，提交仍在工作区发生）；mutation / destructive 每次重走授权闸；效果未知的 destructive 永不重放。</p>
+</section>
+
+<div class="disclosure"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5 12.5 10 8 14.5"/></svg><span class="grow">HDC 正常 · client / server / daemon 3.1.0e · 归属 external · 通道加密未验证</span><a href="#">查看完整诊断 ›</a></div>
+
+</div>
+      <div class="drawer">
+        <div class="dbar"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5 12.5 10 8 14.5"/></svg><b>任务</b><span class="dst">没有运行中的任务</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div></section>
+<section class="board">
+<h2>还没有记录</h2>
+<p>记录型页面必须定义空态。这里不摆演示行，只说清记录里将会有什么。</p>
+<div class="ad-root">
+<div class="win">
+
+  <div class="tb">
+    <div class="tb-lead">
+      <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+      <button type="button" class="tbtn tbtn-i" aria-label="显示或隐藏边栏"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2"/><path d="M7 3v14"/></svg></button>
+    </div>
+    <div class="tb-title">ArkDeck — OpenHarmony 设备工作台</div>
+    <div class="tb-trail">
+      <button type="button" class="tbtn">刷新 ⌘R</button>
+      <button type="button" class="tbtn tbtn-i" aria-label="设置"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7" fill="var(--panel)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel)"/><circle cx="7" cy="15" r="1.7" fill="var(--panel)"/></svg></button>
+      <button type="button" class="tbtn"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8"/></svg><span>任务</span></button>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="side">
+      <div>
+        <div class="side-h">设备</div>
+        <nav class="nav"><button type="button" class="on"><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="3" width="5.5" height="5.5" rx="1"/><rect x="3" y="11.5" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1"/></svg></span><span>Overview</span></button></nav>
+        <button type="button" class="dev"><span class="dot dot-ok"></span><span class="dn"><b>DAYU200</b><span>已授权 · rk3568</span></span><span class="tag">USB</span></button><button type="button" class="dev"><span class="dot dot-warn"></span><span class="dn"><b>待授权设备</b><span>需要信任</span></span><span class="tag">USB</span></button>
+        <button type="button" class="addlink"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M3 10h14"/></svg><span>添加 TCP / UART 目标…</span></button>
+      </div>
+      <div>
+        <div class="side-h">工作流</div>
+        <nav class="nav"><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></svg></span><span>Flash</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></svg></span><span>Debug</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></svg></span><span>Viewer</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg></span><span>Trace</span></button><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.4 10.6V4.4a1.4 1.4 0 0 1 2.8 0v4.2m0-.6a1.4 1.4 0 0 1 2.8 0v1m0-.4a1.4 1.4 0 0 1 2.8 0v3.9a4.6 4.6 0 0 1-4.6 4.6h-1.2a3.8 3.8 0 0 1-3-1.5l-2.6-3.4a1.5 1.5 0 0 1 2.3-1.9z"/></svg></span><span>Toolkit</span></button></nav>
+      </div>
+      <div>
+        <div class="side-h">记录</div>
+        <nav class="nav"><button type="button" class=""><span class="ic"><svg class="sym" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg></span><span>History</span></button></nav>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="page">
+
+<div class="thin">
+  <div><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><rect x="5.5" y="2.5" width="9" height="15" rx="1.8"/><path d="M8.6 15.2h2.8"/></svg><b>DAYU200</b><span class="mono">TGT-958780b2ffb7 · binding 4</span></div>
+  <div><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>已授权 · 已接管</span></span></div>
+  <div class="mono">rk3568 · 5.0.0.71 · USB</div>
+  <div class="sp">刚刚刷新</div>
+</div>
+
+
+<section class="secblk">
+  <h2>开始新的一次</h2>
+  <div class="tiles5">
+    
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></svg><span>抓 UI Dump</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span></span>
+      <span class="te">capture.diagnostics@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></svg><span>抓 Trace</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span></span>
+      <span class="te">hitrace · tags × 11</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></svg><span>调试 HAP</span></b>
+      <span class="tl2"><span class="state t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M8.1 8.1a2 2 0 1 1 2.5 1.9c-.5.2-.6.5-.6 1v.5M10 14.5h.01"/></svg><span>未探测</span></span><span class="eff eff-mut">mutation</span></span>
+      <span class="te">debug.hap@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></svg><span>刷机</span></b>
+      <span class="tl2"><span class="state t-ok"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10.5 8 15l8.5-9.5"/></svg><span>可用</span></span><span class="eff eff-destr">destructive</span></span>
+      <span class="te">flash.dayu200@1</span>
+    </div>
+    <div class="tile5">
+      <b><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.4 10.6V4.4a1.4 1.4 0 0 1 2.8 0v4.2m0-.6a1.4 1.4 0 0 1 2.8 0v1m0-.4a1.4 1.4 0 0 1 2.8 0v3.9a4.6 4.6 0 0 1-4.6 4.6h-1.2a3.8 3.8 0 0 1-3-1.5l-2.6-3.4a1.5 1.5 0 0 1 2.3-1.9z"/></svg><span>真机操作</span></b>
+      <span class="tl2"><span class="state t-dim"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M8.1 8.1a2 2 0 1 1 2.5 1.9c-.5.2-.6.5-.6 1v.5M10 14.5h.01"/></svg><span>未探测</span></span><span class="eff eff-mut">mutation</span></span>
+      <span class="te">input.tap@1</span>
+    </div>
+  </div>
+</section>
+
+<section class="secblk">
+  <div class="rowline"><h2>最近的工作</h2><span class="sp"></span><a href="#">全部记录 ›</a></div>
+  <div class="card">
+    <div class="rowline" style="gap:10px"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></svg><b style="font-size:13px">还没有任何运行记录</b></div>
+    <p class="hint" style="margin:0">从上面开一次运行。记录不是事后补的日志，而是每次提交时由 Runtime 落账的事实：</p>
+    <div class="explain">
+      <div>
+        <b>每次运行</b>
+        <p>操作与版本 · 精确目标与 binding revision · 上报的 typed inputs · 实际执行的步骤 · 终态与失败分类。</p>
+      </div>
+      <div>
+        <b>每件产物</b>
+        <p>名称 · 角色 · 字节数 · SHA-256 · 隐私级别 · 来源运行；导出前仍需确认。</p>
+      </div>
+      <div>
+        <b>每条会话</b>
+        <p>把同一条调试线上的运行串起来，之后可以从其中任意一次接着做。</p>
+      </div>
+    </div>
+    <p class="rulehint" style="margin:0">这里不会显示演示记录。没跑过就是没跑过。</p>
+  </div>
+</section>
+
+<div class="disclosure"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5 12.5 10 8 14.5"/></svg><span class="grow">HDC 正常 · client / server / daemon 3.1.0e · 归属 external · 通道加密未验证</span><a href="#">查看完整诊断 ›</a></div>
+
+</div>
+      <div class="drawer">
+        <div class="dbar"><svg class="sym sym-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5 12.5 10 8 14.5"/></svg><b>任务</b><span class="dst">没有运行中的任务</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div></section>
+</body>
+</html>
