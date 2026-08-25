@@ -12,9 +12,21 @@ idempotency 静默去重。空载假 dispatcher 已 0.98 s；真实链路只会�
 交互输入的体验门槛是 p95 ≤ 400 ms、pending 反馈 ≤ 100 ms——两者相差
 一个数量级，不是优化能弥合的，是形状问题。
 
+**第二条独立理由——capability 存储按坐标增长（2026-08-25 在生产 store 实测）**：
+`authorizationScopeFingerprint` 把 `inputs` 的 canonical JSON 纳入指纹，因此**两次
+不同坐标的 tap 属于两个不同 capability**。而 store 是单个 JSON 文档（实测 318 条
+记录 / 1.29 MB / 每条约 4 KB），签发与消费各整文件原子重写一次。于是 per-input-Job
+形状下，用户每点一个新位置就永久增加一条记录并触发两次全量重写，重写成本随 store
+增长——一次交互会话的开销是二次的，且记录永不回收。这条与延迟无关，单独就否掉了
+per-input-Job。证据：`evidence/runs/TASK-IDC-002/data/capability-store-growth.json`。
+
+**由此产生的产品约束**：stage-1 发布的三个 input operation 是给 typed caller 的
+目录级原语；**在会话 scope 落地前，不得把它们接到 App 的交互输入面**，否则第一个
+真实用户就会把 capability store 撑成上述形状。
+
 被拒绝的方案：
 
-- **A. 每输入一个完整 Job**：如上，拒绝。
+- **A. 每输入一个完整 Job**：如上（延迟 + 存储两条独立理由），拒绝。
 - **B. 走 `DebugRuntimeProbe` 形状**：probe 是 readOnly-by-construction
   （不落 journal、不消耗 capability、无 mutation lane），把 mutation 塞进
   probe 面会绕开统一安全内核——PRODUCT-LOOP §12 明令禁止的形态，拒绝。
