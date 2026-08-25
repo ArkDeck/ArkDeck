@@ -1,0 +1,31 @@
+{
+ "target": "TGT-1a62a0dbedd6",
+ "daemon": "production com.arkdeck.agentd (catalog be7b7361…, matches HEAD)",
+ "tier2_trace_probe": {
+  "n": 20,
+  "p50_ms": 438.7,
+  "p95_ms": 459.7,
+  "min_ms": 400.8,
+  "max_ms": 459.7,
+  "mean_ms": 433.7,
+  "failures": 0
+ },
+ "tier3_observe_device_full_job": {
+  "n": 8,
+  "p50_ms": 578.3,
+  "p95_ms": 619.1,
+  "min_ms": 550.1,
+  "max_ms": 619.1,
+  "mean_ms": 577.1,
+  "failures": 0
+ },
+ "tier3_screenshot_mutating_full_job": {
+  "n": 6,
+  "p50_ms": 3339.5,
+  "p95_ms": 3677.8,
+  "min_ms": 3263.8,
+  "max_ms": 3677.8,
+  "mean_ms": 3379.5,
+  "failures": 0
+ }
+}

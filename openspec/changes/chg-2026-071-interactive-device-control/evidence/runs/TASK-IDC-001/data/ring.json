@@ -1,0 +1,42 @@
+{
+ "categories": "sched freq graphic ace app ohos",
+ "clock": "boot (explicit)",
+ "begin": {
+  "ms": 246.3,
+  "rc": 0,
+  "stdout_tail": " hitrace enter, running_state is RECORDING_LONG_BEGIN\n2026/08/25 11:40:02 args: tags:sched,freq,graphic,ace,app,ohos bufferSize:18432 clockType:boot overwrite:1\n2026/08/25 11:40:02 OpenRecording done."
+ },
+ "dump1": {
+  "ms": 333.7,
+  "rc": 0,
+  "device_uptime_at_dump": 51194.23
+ },
+ "dump2": {
+  "ms": 397.9,
+  "rc": 0,
+  "device_uptime_at_dump": 51209.67
+ },
+ "finish_nodump": {
+  "ms": 468.0,
+  "rc": 0,
+  "stdout_tail": "2026/08/25 11:40:34 hitrace enter, running_state is RECORDING_LONG_FINISH_NODUMP\n2026/08/25 11:40:34 end capture trace."
+ },
+ "ring1_span": {
+  "bytes": 11537441,
+  "sha256": "d542d218e31946039a59834e6894860a99c29d350c8a311979031b24bb90b356",
+  "timestamped_lines": 80119,
+  "first_ts": 204232.102719,
+  "last_ts": 204248.506932,
+  "coverage_back_from_dump_s": -153037.87,
+  "lag_last_to_dump_s": -153054.28
+ },
+ "ring2_span": {
+  "bytes": 16840428,
+  "sha256": "cf52e28b94742b2653870ff7eeb0729a596b428cac26064478da610cfaab8679",
+  "timestamped_lines": 109537,
+  "first_ts": 204232.102719,
+  "last_ts": 204264.018025,
+  "coverage_back_from_dump_s": -153022.43,
+  "lag_last_to_dump_s": -153054.35
+ }
+}

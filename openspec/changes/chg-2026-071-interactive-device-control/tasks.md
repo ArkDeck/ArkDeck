@@ -9,7 +9,11 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-001 — Spike：真机测量束（决定架构，不产出产品面）
 
-- Status:blocked（proposal 未 merge 前不开工；merge 后即转 ready）
+- Status:in-progress（2026-08-25 主体测量收官，见 `evidence/runs/TASK-IDC-001/run.md`：
+  三档输入延迟 + 持久通道分解、截图双格式、hitrace 环形与 bgsrv 实证 PASS、时钟桥
+  spread 9.7 ms、journal append 3.6–5.3 ms/条 ⇒ design.md §2 建议保持全量 durability。
+  两条残留腿等待解锁设备的监督窗口：滚动负载下的截图/录屏扰动、hilog 重负载覆盖；
+  app 层 ground-truth HAP 视维护者对 AC-4 方法偏差的裁决决定是否补做）
 - Golden Journey:GJ-2（测量不改行为；结论决定后续形状）
 - Platform:macos + DAYU200（OpenHarmony 5.0.0.71）
 - Acceptance:IDC-AC-1..4（见 verification.md）

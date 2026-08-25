@@ -1,0 +1,9 @@
+{
+ "drain_ms": 3383.1,
+ "bytes": 1128093,
+ "lines": 8464,
+ "first_ts": "08-23 02:56:20.928",
+ "last_ts": "08-25 11:40:54.351",
+ "buffers": "app 512K / core 512K / init 64K / only_prerelease 512K (hilog -g)",
+ "note": "coverage span under idle lock-screen load; content not stored (sensitive)"
+}
