@@ -172,6 +172,31 @@ final class AgentXPCTransportContractTests: XCTestCase {
             clientName: ArkDeckAgentClientName.debugNetworkWorkspace)),
         .appSubmit(requestID: "contract-submit", kind: .debugPorts))
     }
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "capture.diagnostics",
+          operationVersion: 1,
+          clientName: ArkDeckAgentClientName.toolkitDeviceControl)),
+      .appSubmit(requestID: "contract-submit", kind: .toolkitScreenshot))
+    for operationID in ["input.tap", "input.long-press", "input.swipe"] {
+      XCTAssertEqual(
+        AgentXPCEndpoint.admission(
+          of: try submitFrame(
+            operationID: operationID,
+            operationVersion: 1,
+            clientName: ArkDeckAgentClientName.toolkitDeviceControl)),
+        .appSubmit(requestID: "contract-submit", kind: .toolkitInput))
+      // A gesture is admitted for the Toolkit client and no other: the pair
+      // is the subject, so the same operation from another workspace's client
+      // is not an App submission at all.
+      XCTAssertNil(
+        AgentXPCEndpoint.admission(
+          of: try submitFrame(
+            operationID: operationID,
+            operationVersion: 1,
+            clientName: ArkDeckAgentClientName.debugNetworkWorkspace)))
+    }
     XCTAssertNil(
       AgentXPCEndpoint.admission(
         of: try submitFrame(operationVersion: 1)),

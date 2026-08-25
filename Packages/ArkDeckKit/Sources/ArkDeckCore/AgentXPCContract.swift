@@ -41,6 +41,11 @@ package enum ArkDeckAgentClientName {
   package static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
   package static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
   package static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
+  /// Toolkit's device-control workspace. It is named apart from the Viewer's
+  /// client even though both capture a screenshot, because the daemon decides
+  /// what an App may submit from the pair of client name and operation: a
+  /// client that may also inject a gesture must be a distinct subject.
+  package static let toolkitDeviceControl = "ArkDeckApp.Toolkit.DeviceControl"
 }
 
 /// The global Mach service name the daemon vends and the App looks up. It is
