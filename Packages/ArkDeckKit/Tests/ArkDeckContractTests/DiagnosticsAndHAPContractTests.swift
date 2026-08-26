@@ -1025,6 +1025,56 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     return try JSONSerialization.data(withJSONObject: request, options: [.sortedKeys])
   }
 
+  /// Carrying is a session's privilege, not the device's. A capture that asks
+  /// for more than a screenshot is not a session sub-intent, so it reads its
+  /// own model and firmware however many sessions have run before it.
+  ///
+  /// This regressed once: making the scope input-dependent dropped the guard
+  /// from the consuming side, and every operation on the device started
+  /// skipping its readback - including ones whose evidence only means
+  /// something as a fresh machine readback.
+  func testOnlyASessionSubIntentCarriesTheEvidenceASessionRead() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init())
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+
+    for i in 0..<2 {
+      let shot = try await engine.submit(
+        try screenshotOnlyRequest(key: "idem-session-shot-\(i)"))
+      _ = try await engine.run(jobID: shot.jobID)
+    }
+    let carriedSteps = dispatcher.dispatchedActions.filter {
+      $0 == "evidenceModel" || $0 == "evidenceFirmware"
+    }
+    XCTAssertEqual(
+      carriedSteps.count, 2,
+      "the first screenshot reads model and firmware; the second carries them")
+
+    let larger = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-not-a-sub-intent", withScreenshot: true))
+    _ = try await engine.run(jobID: larger.jobID)
+    XCTAssertEqual(
+      dispatcher.dispatchedActions.filter {
+        $0 == "evidenceModel" || $0 == "evidenceFirmware"
+      }.count, 4,
+      "a capture larger than a screenshot reads its own model and firmware")
+  }
+
+  private func screenshotOnlyRequest(key: String) throws -> Data {
+    try JSONSerialization.data(
+      withJSONObject: [
+        "documentType": "runtime-operation-request",
+        "schemaVersion": "2.0.0",
+        "requestId": "req-session-shot",
+        "idempotencyKey": key,
+        "target": ["targetId": "TGT-1", "expectedBindingRevision": 7],
+        "operation": ["id": "capture.diagnostics", "version": 1],
+        "inputs": [
+          "durationSeconds": 1, "captureHilog": false, "uiDump": false,
+          "crashLogs": false, "uiScreenshot": true, "uiComponentTree": false,
+        ],
+      ], options: [.sortedKeys])
+  }
+
   private func publishedJSON(
     named name: String,
     jobID: String,

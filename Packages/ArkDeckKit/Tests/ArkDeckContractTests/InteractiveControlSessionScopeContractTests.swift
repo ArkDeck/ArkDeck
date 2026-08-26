@@ -199,6 +199,90 @@ final class InteractiveControlSessionScopeContractTests: XCTestCase {
       "the session budget must be tighter than the standing default it replaces")
   }
 
+  // MARK: - What a session may own (TASK-IDC-003 stage 3)
+
+  private func captureInputs(_ pairs: [String: JSONValue]) -> [String: JSONValue] {
+    var inputs: [String: JSONValue] = ["durationSeconds": .integer(1)]
+    for (key, value) in pairs { inputs[key] = value }
+    return inputs
+  }
+
+  /// A session's standing authorization covers marking and looking. A capture
+  /// that only takes a screenshot is a session's own sub-intent; anything
+  /// larger is an ordinary request and gets an ordinary admission.
+  func testOnlyAScreenshotOnlyCaptureIsASessionSubIntent() throws {
+    let capture = try descriptor("capture.diagnostics@1")
+    XCTAssertTrue(
+      RuntimeJobEngine.isSessionScoped(
+        descriptor: capture,
+        inputs: captureInputs([
+          "uiScreenshot": .bool(true), "captureHilog": .bool(false),
+          "uiDump": .bool(false), "crashLogs": .bool(false),
+          "uiComponentTree": .bool(false),
+        ])))
+
+    for larger in [
+      ["uiScreenshot": JSONValue.bool(true), "captureHilog": .bool(true)],
+      ["uiScreenshot": JSONValue.bool(true), "uiDump": .bool(true)],
+      ["uiScreenshot": JSONValue.bool(true), "uiComponentTree": .bool(true)],
+      ["uiScreenshot": JSONValue.bool(true), "traceCategories": .array([.string("ohos")])],
+    ] {
+      var inputs = captureInputs([
+        "captureHilog": .bool(false), "uiDump": .bool(false),
+        "crashLogs": .bool(false), "uiComponentTree": .bool(false),
+      ])
+      for (key, value) in larger { inputs[key] = value }
+      XCTAssertFalse(
+        RuntimeJobEngine.isSessionScoped(descriptor: capture, inputs: inputs),
+        "\(larger.keys.sorted()) is more than a session's standing authorization covers")
+    }
+  }
+
+  /// A capture that takes no screenshot has no sub-intent to own.
+  func testACaptureThatLooksAtNothingIsNotASubIntent() throws {
+    XCTAssertFalse(
+      RuntimeJobEngine.isSessionScoped(
+        descriptor: try descriptor("capture.diagnostics@1"),
+        inputs: captureInputs([
+          "uiScreenshot": .bool(false), "captureHilog": .bool(false),
+          "uiDump": .bool(false), "crashLogs": .bool(false),
+          "uiComponentTree": .bool(false),
+        ])))
+  }
+
+  /// The rule reads the catalog's own step selection rather than re-listing
+  /// the inputs that turn legs on, and consults only the optional steps: a
+  /// step that is not optional runs for the largest capture too and so
+  /// distinguishes nothing. A hand-kept list of the steps that always run is
+  /// what goes stale - the first version of this omitted `postprocess-index`
+  /// and refused every screenshot-only capture.
+  func testOnlyTheOptionalLegsDecideAndTheyAreTheScreenshotOnes() throws {
+    let capture = try descriptor("capture.diagnostics@1")
+    let inputs = captureInputs([
+      "uiScreenshot": .bool(true), "captureHilog": .bool(false),
+      "uiDump": .bool(false), "crashLogs": .bool(false),
+      "uiComponentTree": .bool(false),
+    ])
+    let selectedOptional = capture.steps
+      .filter { $0.isOptional }
+      .filter {
+        CatalogOperationEffectResolver.stepIsSelected($0, descriptor: capture, inputs: inputs)
+      }
+      .map(\.stepID)
+    XCTAssertEqual(
+      Set(selectedOptional), RuntimeJobEngine.screenshotOnlyCaptureStepIDs,
+      "a screenshot-only capture must select exactly the screenshot legs")
+  }
+
+  /// Gestures stay session-scoped whatever their inputs say.
+  func testEveryPointerGestureIsAlwaysASessionSubIntent() throws {
+    for reference in ["input.tap@1", "input.long-press@1", "input.swipe@1"] {
+      XCTAssertTrue(
+        RuntimeJobEngine.isSessionScoped(
+          descriptor: try descriptor(reference), inputs: [:]))
+    }
+  }
+
   // MARK: - Session-carried evidence (stage 4)
 
   /// The two property readbacks cost a device round trip each (measured:

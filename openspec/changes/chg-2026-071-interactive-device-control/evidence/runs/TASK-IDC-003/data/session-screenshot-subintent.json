@@ -1,0 +1,53 @@
+{
+  "measurement": "session-screenshot-subintent",
+  "question": "Does a screenshot taken during a session ride the session, and does anything larger still stand on its own?",
+  "measuredAtUTC": "2026-08-26T01:15:00Z",
+  "device": "DAYU200 development board, target TGT-958780b2ffb7 binding r4",
+  "design": [
+    "The design rules out a new operation, so a session's scope is decided from the",
+    "request rather than the reference: a capture qualifies only when the legs it chose",
+    "to run are a screenshot and nothing else. A session's standing authorization covers",
+    "marking and looking, not a full diagnostic capture.",
+    "The rule reads the catalog's own step selection and consults only the optional",
+    "steps, because a step that is not optional runs for the largest capture too and",
+    "therefore distinguishes nothing."
+  ],
+  "measured": {
+    "firstScreenshotOfASession": {
+      "milliseconds": 2101,
+      "deviceSteps": [
+        "confirm-evidence-target", "read-evidence-model", "read-evidence-firmware",
+        "preflight-device-storage", "capture-screenshot", "receive-screenshot",
+        "cleanup-screenshot-temp"
+      ],
+      "carriedFragments": 0
+    },
+    "laterScreenshotsInTheSameSession": {
+      "milliseconds": [1482, 1479, 1483],
+      "deviceSteps": [
+        "confirm-evidence-target", "preflight-device-storage", "capture-screenshot",
+        "receive-screenshot", "cleanup-screenshot-temp"
+      ],
+      "carriedFragments": 2
+    },
+    "savedPerMarkerScreenshotMs": 620
+  },
+  "twoDefectsThisRunCaught": [
+    {
+      "what": "the first version kept a hand-written list of the steps that always run",
+      "how": "it omitted `postprocess-index`, so the predicate refused every screenshot-only capture",
+      "caughtBy": "its own contract test, immediately",
+      "fix": "consult only the optional steps - a non-optional step runs for the largest capture too, so the hand-kept list was never needed"
+    },
+    {
+      "what": "making the scope input-dependent dropped the guard from the consuming side of evidence carrying",
+      "how": "every operation on the device began skipping its own model and firmware readback, including ones whose evidence only means something as a fresh machine readback. A capture asking for hilog came back carrying two fragments it had no session to carry them from.",
+      "caughtBy": "running a larger capture on the device and reading its steps",
+      "fix": "the consuming side decides from the job's own inputs; a test asserts a larger capture reads its own model and firmware, and fails when the guard is removed"
+    }
+  ],
+  "boundaryVerifiedOnHardware": [
+    "A capture asking for hilog alongside the screenshot runs its own evidence preamble",
+    "and is not a session sub-intent."
+  ]
+}

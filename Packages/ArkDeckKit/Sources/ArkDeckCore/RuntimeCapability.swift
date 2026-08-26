@@ -296,11 +296,22 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   /// authorize a change to it, not what the change may be: the scope, the
   /// revision and the exact inputs are pinned identically either way.
   public let workspaceIsIsolatedTaskCopy: Bool
+  /// Whether this request is one a control session owns rather than a request
+  /// standing on its own.
+  ///
+  /// It is decided from the operation and its inputs, and it has to be decided
+  /// once and carried: the scope fingerprint sees only this query, and if it
+  /// re-derived the answer from the reduced subject it would get a different
+  /// one than the issue did. That exact mismatch - a fingerprint and a consume
+  /// record disagreeing about what the request was - is what made every
+  /// pointer gesture fail admission once already.
+  public let sessionScoped: Bool
 
   public init(
     operationID: String,
     operationVersion: Int? = nil,
     effect: WorkflowEffect,
+    sessionScoped: Bool = false,
     targetStableIdentitySHA256: String?,
     targetBindingRevision: Int?,
     planDigest: String?,
@@ -323,6 +334,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     self.workspaceRevision = workspaceRevision
     self.workspaceFileScopesDigest = workspaceFileScopesDigest
     self.workspaceIsIsolatedTaskCopy = workspaceIsIsolatedTaskCopy
+    self.sessionScoped = sessionScoped
   }
 
   public var operationReference: String {

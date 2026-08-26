@@ -3928,7 +3928,8 @@ public actor RuntimeJobEngine {
 
     if accumulator.isComplete {
       rememberCarriableEvidence(
-        accumulator: accumulator, descriptor: descriptor, outcomeAtUTC: outcomeAtUTC)
+        accumulator: accumulator, descriptor: descriptor,
+        inputs: runtime.record.request.inputs, outcomeAtUTC: outcomeAtUTC)
       runtime.record.evidenceObservation = Self.evidenceObservation(from: accumulator)
       // observe.device publishes its evidence-bearing products from the
       // final preflight outcome itself; the other operations set this at
@@ -6912,6 +6913,10 @@ public actor RuntimeJobEngine {
         operationID: descriptor.id,
         operationVersion: descriptor.version,
         effect: effect,
+        // Decided from the request, once, and carried. Both this site and the
+        // consume below have to reach the same answer from the same inputs,
+        // or the fingerprint they compute will not be the same fingerprint.
+        sessionScoped: Self.isSessionScoped(descriptor: descriptor, inputs: request.inputs),
         targetStableIdentitySHA256: identity,
         targetBindingRevision: bindingRevision,
         // The digest travels even for a session-scoped subject: the consume
@@ -7138,7 +7143,7 @@ public actor RuntimeJobEngine {
     recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
   ) async throws -> RuntimeCapabilityReference {
     let issuedAtUTC = nowUTC()
-    let sessionScoped = Self.sessionScopedInputOperations.contains(descriptor.reference)
+    let sessionScoped = query.sessionScoped
     guard
       let expiresAtUTC = Self.automaticCapabilityExpiry(
         issuedAtUTC: issuedAtUTC, effect: query.effect, sessionScoped: sessionScoped)
@@ -7548,6 +7553,8 @@ public actor RuntimeJobEngine {
         operationID: descriptor.id,
         operationVersion: descriptor.version,
         effect: effect,
+        sessionScoped: Self.isSessionScoped(
+          descriptor: descriptor, inputs: runtime.record.request.inputs),
         targetStableIdentitySHA256: stableIdentity,
         targetBindingRevision: bindingRevision,
         planDigest: planDigest,
@@ -8285,6 +8292,40 @@ public actor RuntimeJobEngine {
     "read-evidence-model", "read-evidence-firmware",
   ]
 
+  /// The legs a screenshot needs and nothing else.
+  static let screenshotOnlyCaptureStepIDs: Set<String> = [
+    "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp",
+  ]
+
+  /// Whether a request is one a control session owns.
+  ///
+  /// A gesture always is. A capture is only when the legs it chose to run are
+  /// a screenshot and nothing else.
+  ///
+  /// Only optional steps are consulted, because a step that is not optional
+  /// runs for the largest capture too and therefore distinguishes nothing.
+  /// Reading the catalog's own selection rather than re-listing the inputs
+  /// that turn legs on is what stops a new leg joining a session's envelope
+  /// by being added to the operation - and a hand-kept list of the steps that
+  /// always run is exactly the thing that goes stale. It already did: the
+  /// first version of this omitted `postprocess-index` and refused every
+  /// screenshot-only capture.
+  static func isSessionScoped(
+    descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
+  ) -> Bool {
+    if sessionScopedInputOperations.contains(descriptor.reference) { return true }
+    guard descriptor.reference == "capture.diagnostics@1" else { return false }
+    var sawScreenshot = false
+    for step in descriptor.steps where step.isOptional {
+      guard CatalogOperationEffectResolver.stepIsSelected(
+        step, descriptor: descriptor, inputs: inputs)
+      else { continue }
+      guard screenshotOnlyCaptureStepIDs.contains(step.stepID) else { return false }
+      sawScreenshot = true
+    }
+    return sawScreenshot
+  }
+
   /// Model and firmware, remembered from the readback that did reach the
   /// device, together with the identity they were read under.
   ///
@@ -8342,9 +8383,10 @@ public actor RuntimeJobEngine {
   private func rememberCarriableEvidence(
     accumulator: RuntimeEvidencePreflightAccumulator,
     descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
     outcomeAtUTC: String
   ) {
-    guard Self.sessionScopedInputOperations.contains(descriptor.reference),
+    guard Self.isSessionScoped(descriptor: descriptor, inputs: inputs),
       !accumulator.steps.contains(where: { $0.carriedFromUTC != nil }),
       let model = accumulator.model, let firmware = accumulator.firmware
     else { return }
@@ -8366,9 +8408,13 @@ public actor RuntimeJobEngine {
     jobID: String, step: CatalogStepDescriptor,
     descriptor: CatalogOperationDescriptor
   ) -> Bool {
-    guard Self.sessionScopedInputOperations.contains(descriptor.reference),
-      Self.sessionCarriableEvidenceStepIDs.contains(step.stepID),
+    guard Self.sessionCarriableEvidenceStepIDs.contains(step.stepID),
       var runtime = jobs[jobID],
+      // Only a request a session owns may carry what the session read. Losing
+      // this guard let every operation on the device skip its own model and
+      // firmware readback - including ones whose evidence has to be a fresh
+      // machine readback to mean anything.
+      Self.isSessionScoped(descriptor: descriptor, inputs: runtime.record.request.inputs),
       var accumulator = runtime.record.evidencePreflight,
       // Nothing is carried into a job that has not re-read the identity for
       // itself. That readback is the entire reason carrying is sound, and it
@@ -8422,9 +8468,12 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) -> [String: JSONValue] {
-    guard sessionScopedInputOperations.contains(descriptor.reference) else {
+    guard isSessionScoped(descriptor: descriptor, inputs: inputs) else {
       return inputs
     }
+    // A session screenshot has no coordinates to drop: what it is authorized
+    // against is the device and the session, which the query already carries.
+    guard sessionScopedInputOperations.contains(descriptor.reference) else { return [:] }
     // The frame a gesture was mapped against stays part of the authorized
     // subject; the coordinates inside that frame do not. A rotation or a
     // resolution change therefore produces a different subject, so a mapping
@@ -8451,8 +8500,7 @@ public actor RuntimeJobEngine {
       // with each one. Excluding it here is what bounds the record count; the
       // digest itself still reaches the consume record through the query.
       "planDigest="
-        + (sessionScopedInputOperations.contains(query.operationReference)
-          ? "session-scoped" : (query.planDigest ?? "-")),
+        + (query.sessionScoped ? "session-scoped" : (query.planDigest ?? "-")),
     ]
     let encoder = CanonicalJSONEncoders.canonical()
     guard
