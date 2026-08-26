@@ -224,7 +224,7 @@ public enum TraceDurationInputUnit: String, CaseIterable, Sendable, Identifiable
 
   public var quickValues: [Int] {
     switch self {
-    case .seconds: [15, 30, 45, 60]
+    case .seconds: [5, 10, 15, 30]
     case .minutes: [1, 2, 3]
     }
   }

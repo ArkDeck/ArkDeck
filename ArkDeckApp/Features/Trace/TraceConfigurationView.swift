@@ -207,10 +207,10 @@ struct TraceConfigurationView: View {
 
   private func quickDurationAccessibilityLabel(_ value: Int) -> String {
     switch (model.durationUnit, value) {
+    case (.seconds, 5): traceString("trace.duration.set5Seconds")
+    case (.seconds, 10): traceString("trace.duration.set10Seconds")
     case (.seconds, 15): traceString("trace.duration.set15Seconds")
     case (.seconds, 30): traceString("trace.duration.set30Seconds")
-    case (.seconds, 45): traceString("trace.duration.set45Seconds")
-    case (.seconds, 60): traceString("trace.duration.set60Seconds")
     case (.minutes, 1): traceString("trace.duration.set1Minute")
     case (.minutes, 2): traceString("trace.duration.set2Minutes")
     case (.minutes, 3): traceString("trace.duration.set3Minutes")

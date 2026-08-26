@@ -882,7 +882,7 @@ const S = {
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
   viewer:{hasCapture:PARAMS.get("viewerState")==="captured",selected:42,showBounds:false,query:"",tab:"attributes",capturedAt:"2026-08-25T02:08:31Z",treeSize:60,expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
-  trace:{running:false,duration:15,unit:"seconds",profile:"arkuiDeep",availability:PARAMS.get("traceState")==="ready"?"available":"unavailable"},
+  trace:{running:false,duration:10,unit:"seconds",profile:"arkuiDeep",availability:PARAMS.get("traceState")==="ready"?"available":"unavailable"},
   diagnostics:{view:PARAMS.get("diagnostics") === "capture" ? "capture" : "session", running:false, finishing:false,
          preset:0, dur:60, session:0, cursor:13.242, rangeStart:null, selectedEvent:"render-42", selectedLog:"log-3", logWindow:100,
          elapsed:13, markers:[], timer:null, job:null,
@@ -949,7 +949,13 @@ const COPY={
     startFlash:"擦除数据并开始刷机",flashImpact:"将擦除 DAYU200 上的用户数据。请保持设备连接和稳定供电。",flashDetails:"查看刷机详情",
     preparing:"正在准备镜像",enteringLoader:"正在进入 Loader",writing:"正在写入镜像",verifying:"写入完成，正在重启并验证",estimatedProgress:"镜像写入估算",confirmedBytes:"已确认写入",
     stagePrepare:"准备",stageWrite:"写入镜像",stageVerify:"重启与验证",keepConnected:"刷机过程中请勿拔线、断电或合盖。当前分区写入不会被强制中断。",
-    flashSuccess:"刷机成功",flashSuccessBody:"设备已重新连接，回报版本与所选镜像一致。",flashAgain:"再次刷机",openHistory:"打开历史记录",elapsed:"用时 3 分 18 秒"},
+    flashSuccess:"刷机成功",flashSuccessBody:"设备已重新连接，回报版本与所选镜像一致。",flashAgain:"再次刷机",openHistory:"打开历史记录",elapsed:"用时 3 分 18 秒",
+    traceWorkspaceSummary:"从已接管的 OpenHarmony 设备抓取 Trace，然后在内置查看器中分析。",traceCaptureTitle:"抓取 Trace",traceAvailable:"可以抓取",traceUnavailable:"暂时无法抓取",
+    traceDevice:"设备",traceProfile:"抓取场景",traceDuration:"时长",traceSeconds:"秒",traceMinutes:"分钟",traceQuick:"快捷时长",
+    traceLocalOnly:"Trace 只保存在这台 Mac，并会在完成后自动打开。",traceAdapterUnsupported:"当前 ArkDeck 版本尚未支持此设备的 hitrace 分类列表。请更新 ArkDeck 或使用已支持的设备。",
+    traceRunning:"正在抓取…",traceCancel:"取消抓取",traceStart:"开始抓取",traceViewerTitle:"查看 Trace",traceViewerDescription:"在查看器中打开本地 Trace，或继续查看最近的 Trace。",traceOpenViewer:"打开 Trace 查看器",
+    traceProfileApp:"应用响应",traceProfileAppDetail:"适合分析交互迟缓、布局耗时和 ArkUI 卡顿。",traceProfileRender:"渲染与动画",traceProfileRenderDetail:"适合分析出帧、图形和动画问题。",
+    traceProfileCPU:"CPU 调度",traceProfileCPUDetail:"适合分析线程调度、资源争用和 IPC 问题。",traceProfileIO:"I/O",traceProfileIODetail:"适合分析文件、存储和工作队列问题。",traceProfileSystem:"系统概览",traceProfileSystemDetail:"覆盖最广的系统活动，生成的 Trace 也最大。"},
   en:{devices:"Devices",workflows:"Workflows",addTarget:"Add TCP / UART target…",jobs:"Jobs",emptyJobs:"No running jobs",appearance:"System appearance",ac:"AC labels",
     needsTrust:"Needs trust — click to resolve",ready:"Adopted",rename:"Rename…",recheck:"Re-check",renameTitle:"Rename device",cancel:"Cancel",save:"Save",
     statusActions:"Status and actions",facts:"Runtime facts",readyNotice:"Adopted and connected — device ready.",recheckNote:"Re-check only reloads the current candidate list; it sends nothing to the device.",
@@ -959,7 +965,13 @@ const COPY={
     startFlash:"Erase data and start flashing",flashImpact:"This erases user data on DAYU200. Keep the device connected to stable power.",flashDetails:"Show flash details",
     preparing:"Preparing image",enteringLoader:"Entering Loader",writing:"Writing image",verifying:"Write complete — rebooting and verifying",estimatedProgress:"Estimated image write",confirmedBytes:"Confirmed written",
     stagePrepare:"Prepare",stageWrite:"Write image",stageVerify:"Reboot & verify",keepConnected:"Do not unplug, power off, or close the Mac during flashing. The current partition write will not be force-stopped.",
-    flashSuccess:"Flash succeeded",flashSuccessBody:"The device reconnected and its reported build matches the selected image.",flashAgain:"Flash again",openHistory:"Open History",elapsed:"3 min 18 sec"}
+    flashSuccess:"Flash succeeded",flashSuccessBody:"The device reconnected and its reported build matches the selected image.",flashAgain:"Flash again",openHistory:"Open History",elapsed:"3 min 18 sec",
+    traceWorkspaceSummary:"Capture a trace from an adopted OpenHarmony device, then inspect it in the built-in viewer.",traceCaptureTitle:"Capture trace",traceAvailable:"Ready",traceUnavailable:"Unavailable",
+    traceDevice:"Device",traceProfile:"Profile",traceDuration:"Duration",traceSeconds:"Seconds",traceMinutes:"Minutes",traceQuick:"Quick duration",
+    traceLocalOnly:"The trace stays on this Mac and opens automatically.",traceAdapterUnsupported:"This device's hitrace category list is not supported by this ArkDeck version. Update ArkDeck or use a supported device.",
+    traceRunning:"Capturing…",traceCancel:"Cancel capture",traceStart:"Start capture",traceViewerTitle:"View traces",traceViewerDescription:"Open a local trace or choose a recent trace in the viewer.",traceOpenViewer:"Open trace viewer",
+    traceProfileApp:"App responsiveness",traceProfileAppDetail:"Best for slow interactions, layout work and ArkUI jank.",traceProfileRender:"Rendering and animation",traceProfileRenderDetail:"Best for frame production, graphics and animation issues.",
+    traceProfileCPU:"CPU scheduling",traceProfileCPUDetail:"Best for thread scheduling, contention and IPC investigations.",traceProfileIO:"I/O",traceProfileIODetail:"Best for file, storage and work-queue investigations.",traceProfileSystem:"System overview",traceProfileSystemDetail:"Captures the broadest system activity and produces the largest trace."}
 };
 function tx(key){return COPY[S.language][key]||key;}
 
@@ -1544,45 +1556,45 @@ function pViewer(){
 
 /* ---------- Trace ---------- */
 const TRACE_PROFILES={
-  arkuiDeep:{label:"应用响应",detail:"适合分析交互迟缓、布局耗时和 ArkUI 卡顿。"},
-  renderAnimation:{label:"渲染与动画",detail:"适合分析出帧、图形和动画问题。"},
-  schedulingIpc:{label:"CPU 调度",detail:"适合分析线程调度、资源争用和 IPC 问题。"},
-  io:{label:"I/O",detail:"适合分析文件、存储和工作队列问题。"},
-  attachmentPanorama:{label:"系统概览",detail:"覆盖最广的系统活动，生成的 Trace 也最大。"}
+  arkuiDeep:{label:"traceProfileApp",detail:"traceProfileAppDetail"},
+  renderAnimation:{label:"traceProfileRender",detail:"traceProfileRenderDetail"},
+  schedulingIpc:{label:"traceProfileCPU",detail:"traceProfileCPUDetail"},
+  io:{label:"traceProfileIO",detail:"traceProfileIODetail"},
+  attachmentPanorama:{label:"traceProfileSystem",detail:"traceProfileSystemDetail"}
 };
 function setTraceDuration(value){S.trace.duration=value;renderPage();}
-function setTraceUnit(value){S.trace.unit=value;S.trace.duration=value==="seconds"?15:1;renderPage();}
+function setTraceUnit(value){S.trace.unit=value;S.trace.duration=value==="seconds"?10:1;renderPage();}
 function traceDurationSuffix(){return S.trace.unit==="seconds"?"s":" min";}
-function traceQuickValues(){return S.trace.unit==="seconds"?[15,30,45,60]:[1,2,3];}
+function traceQuickValues(){return S.trace.unit==="seconds"?[5,10,15,30]:[1,2,3];}
 function pTrace(){
   const t=S.trace;
   const blocked=t.availability!=="available";
   return `<div class="trace-shell" data-page-title="Trace" data-acin><span class="acin">TRACE-IMPLEMENTATION-SYNC</span>
-    <p class="trace-summary" data-sync-id="trace.workspace.summary">从已接管的 OpenHarmony 设备抓取 Trace，然后在内置查看器中分析。</p>
+    <p class="trace-summary" data-sync-id="trace.workspace.summary">${tx("traceWorkspaceSummary")}</p>
     <section class="trace-section" aria-labelledby="traceCaptureTitle" data-sync-id="trace.capture.section">
-      <div class="trace-section-head"><h2 id="traceCaptureTitle">抓取 Trace</h2>
-        <span class="trace-availability ${blocked?"unavailable":"available"}" data-sync-id="trace.availability.status">${blocked?"暂时无法抓取":"可以抓取"}</span></div>
+      <div class="trace-section-head"><h2 id="traceCaptureTitle">${tx("traceCaptureTitle")}</h2>
+        <span class="trace-availability ${blocked?"unavailable":"available"}" data-sync-id="trace.availability.status">${blocked?tx("traceUnavailable"):tx("traceAvailable")}</span></div>
       <div class="trace-form">
-        <label class="trace-label" for="traceDevice">设备</label><div class="trace-control">
+        <label class="trace-label" for="traceDevice">${tx("traceDevice")}</label><div class="trace-control">
           <select id="traceDevice" class="inp" data-sync-id="trace.target.picker"><option>TGT-1a62a0dbedd6</option></select>
           <span class="trace-device-note" data-sync-id="trace.target.deviceSummary">5SM0…00252</span></div>
-        <label class="trace-label" for="traceProfile">抓取场景</label><div class="trace-control">
-          <select id="traceProfile" class="inp" data-sync-id="trace.profile.picker" onchange="S.trace.profile=this.value;renderPage()">${Object.entries(TRACE_PROFILES).map(([value,profile])=>`<option value="${value}" ${t.profile===value?"selected":""}>${profile.label}</option>`).join("")}</select>
-          <span class="trace-profile-note">${TRACE_PROFILES[t.profile].detail}</span></div>
-        <span class="trace-label">时长</span><div class="trace-control">
-          <div class="trace-duration-row"><input class="inp trace-duration-input" data-sync-id="trace.duration.input" inputmode="numeric" value="${t.duration}" onchange="setTraceDuration(Number(this.value)||15)">
-            <span class="seg mini trace-unit" data-sync-id="trace.duration.unit"><button class="${t.unit==="seconds"?"on":""}" onclick="setTraceUnit('seconds')">秒</button><button class="${t.unit==="minutes"?"on":""}" onclick="setTraceUnit('minutes')">分钟</button></span></div>
-          <span class="trace-quick-label">快捷时长</span>
+        <label class="trace-label" for="traceProfile">${tx("traceProfile")}</label><div class="trace-control">
+          <select id="traceProfile" class="inp" data-sync-id="trace.profile.picker" onchange="S.trace.profile=this.value;renderPage()">${Object.entries(TRACE_PROFILES).map(([value,profile])=>`<option value="${value}" ${t.profile===value?"selected":""}>${tx(profile.label)}</option>`).join("")}</select>
+          <span class="trace-profile-note">${tx(TRACE_PROFILES[t.profile].detail)}</span></div>
+        <span class="trace-label">${tx("traceDuration")}</span><div class="trace-control">
+          <div class="trace-duration-row"><input class="inp trace-duration-input" data-sync-id="trace.duration.input" inputmode="numeric" value="${t.duration}" onchange="setTraceDuration(Number(this.value)||10)">
+            <span class="seg mini trace-unit" data-sync-id="trace.duration.unit"><button class="${t.unit==="seconds"?"on":""}" onclick="setTraceUnit('seconds')">${tx("traceSeconds")}</button><button class="${t.unit==="minutes"?"on":""}" onclick="setTraceUnit('minutes')">${tx("traceMinutes")}</button></span></div>
+          <span class="trace-quick-label">${tx("traceQuick")}</span>
           <div class="trace-quick" data-sync-id="trace.duration.quick">${traceQuickValues().map(value=>`<button class="btn ${t.duration===value?"on":""}" onclick="setTraceDuration(${value})">${value}${traceDurationSuffix()}</button>`).join("")}</div>
         </div>
       </div>
-      <div class="trace-section-foot"><div class="trace-message ${blocked?"warn":""}" data-sync-id="trace.capture.status">${t.running?"正在抓取…":blocked?"当前 ArkDeck 版本尚未支持此设备的 hitrace 分类列表。请更新 ArkDeck 或使用已支持的设备。":"Trace 只保存在这台 Mac，并会在完成后自动打开。"}</div>
-        <button class="btn pri" data-sync-id="trace.start" onclick="startTrace()">${t.running?"取消抓取":"开始抓取"}</button></div>
+      <div class="trace-section-foot"><div class="trace-message ${blocked?"warn":""}" data-sync-id="trace.capture.status">${t.running?tx("traceRunning"):blocked?tx("traceAdapterUnsupported"):tx("traceLocalOnly")}</div>
+        <button class="btn pri" data-sync-id="trace.start" onclick="startTrace()">${t.running?tx("traceCancel"):tx("traceStart")}</button></div>
     </section>
     <section class="trace-section" aria-labelledby="traceViewerTitle" data-sync-id="trace.viewer.section">
-      <div class="trace-section-head"><h2 id="traceViewerTitle">查看 Trace</h2></div>
-      <div class="trace-viewer-entry"><p data-sync-id="trace.viewer.empty">在查看器中打开本地 Trace，或继续查看最近的 Trace。</p>
-        <button class="btn" data-sync-id="trace.openViewer">${icon("trace",true)} 打开 Trace 查看器</button></div>
+      <div class="trace-section-head"><h2 id="traceViewerTitle">${tx("traceViewerTitle")}</h2></div>
+      <div class="trace-viewer-entry"><p data-sync-id="trace.viewer.empty">${tx("traceViewerDescription")}</p>
+        <button class="btn" data-sync-id="trace.openViewer">${icon("trace",true)} ${tx("traceOpenViewer")}</button></div>
     </section>
   </div>`;
 }

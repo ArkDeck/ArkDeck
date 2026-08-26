@@ -161,7 +161,7 @@ final class TraceWorkspaceViewModel {
   private(set) var deviceObservation = DeviceListPresentation.loading
   private(set) var deviceNames: [String: String] = [:]
   private(set) var selectedPresetID = TracePresetID.arkuiDeep
-  private(set) var durationText = "15"
+  private(set) var durationText = "10"
   private(set) var durationUnit = TraceDurationInputUnit.seconds
   private(set) var isRefreshing = false
   private(set) var activeJobID: String?
@@ -408,7 +408,7 @@ final class TraceWorkspaceViewModel {
     if case .valid(let seconds) = durationValidation {
       currentSeconds = seconds
     } else {
-      currentSeconds = min(durationRange.upperBound, max(durationRange.lowerBound, 15))
+      currentSeconds = min(durationRange.upperBound, max(durationRange.lowerBound, 10))
     }
     guard
       let value = unit.inputValue(
