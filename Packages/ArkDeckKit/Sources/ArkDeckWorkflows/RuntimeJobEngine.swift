@@ -1145,6 +1145,10 @@ public actor RuntimeJobEngine {
   private let mutationLane = DeviceMutationLaneCoordinator()
   private let admissionService: RuntimeAdmissionService
   private let nowUTC: @Sendable () -> String
+  /// The same instant at whatever finer resolution the composition root can
+  /// offer. It defaults to `nowUTC`, so a test pinning the clock still gets a
+  /// pinned - and therefore comparable - observation window.
+  private let nowPreciseUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
   private var activeDispatches: [String: ActiveRuntimeDispatch] = [:]
@@ -1162,7 +1166,8 @@ public actor RuntimeJobEngine {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     powerActivityController: PowerActivityController? = nil,
     agentUsageLedger: AgentAuthorityUsageLedger? = nil,
-    nowUTC: @escaping @Sendable () -> String
+    nowUTC: @escaping @Sendable () -> String,
+    nowPreciseUTC: (@Sendable () -> String)? = nil
   ) throws {
     self.configuration = configuration
     self.providers = providers
@@ -1173,6 +1178,7 @@ public actor RuntimeJobEngine {
     self.powerActivityController = powerActivityController
     self.agentUsageLedger = agentUsageLedger
     self.nowUTC = nowUTC
+    self.nowPreciseUTC = nowPreciseUTC ?? nowUTC
     try FileManager.default.createDirectory(
       at: configuration.stateDirectory.appending(path: "jobs", directoryHint: .isDirectory),
       withIntermediateDirectories: true,
@@ -3513,6 +3519,11 @@ public actor RuntimeJobEngine {
       await self?.recordProcessProgress(
         progress, jobID: jobID, stepID: step.stepID)
     }
+    // What the host can actually observe about when a step reached the
+    // device: the interval it was dispatching in. A screenshot's shutter
+    // opened somewhere inside this, and that is as precise as anything here
+    // can honestly be.
+    let dispatchOpenedAt = nowPreciseUTC()
     let dispatchTask = Task { [dispatcher, progressHandler] in
       try await dispatcher.dispatch(plan, progress: progressHandler)
     }
@@ -3528,6 +3539,10 @@ public actor RuntimeJobEngine {
     }
     do {
       receipt = try await dispatchTask.value
+      // The window closes where the dispatch returned, and stays with the
+      // step so whatever it publishes can say when it was observed.
+      stepObservationWindows["\(jobID)|\(step.stepID)"] = ArtifactObservationWindow(
+        startUTC: dispatchOpenedAt, endUTC: nowPreciseUTC())
       if cancellationRequests.contains(jobID), isImmediateAnalyzer {
         // The task completed without a cancellation receipt.  Do not infer
         // descendant cleanup from a leader/result race; preserve the intent
@@ -4137,7 +4152,9 @@ public actor RuntimeJobEngine {
               retentionClass: declaration.retentionClass,
               sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
               bindingSnapshot: binding, sourceFileURL: landed.localURL,
-              expectedByteCount: landed.byteCount, expectedSHA256: sha256))
+              expectedByteCount: landed.byteCount, expectedSHA256: sha256,
+              observationWindow: observationWindow(
+                jobID: jobID, stepID: step.stepID, descriptor: descriptor)))
           // The store now owns the bytes; the staging copy is sensitive
           // capture data and does not outlive the publication.
           try? FileManager.default.removeItem(at: landed.localURL)
@@ -4171,7 +4188,9 @@ public actor RuntimeJobEngine {
               sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
               bindingSnapshot: binding, contents: contents,
               derivation: traceDerivation,
-              preservesValidatedMachineBytes: traceDerivation != nil))
+              preservesValidatedMachineBytes: traceDerivation != nil,
+              observationWindow: observationWindow(
+                jobID: jobID, stepID: step.stepID, descriptor: descriptor)))
           if let landed { try? FileManager.default.removeItem(at: landed.localURL) }
         }
         appendTimeline(jobID: jobID, entry: "artifact \(name) -> \(metadata.artifactID)")
@@ -8346,6 +8365,34 @@ public actor RuntimeJobEngine {
   /// one session are the same person working on the same device, and the
   /// facts they would each re-read are identical.
   var carriedDeviceEvidence: [String: CarriedDeviceEvidence] = [:]
+
+  /// The window that matters for a received product belongs to the step that
+  /// produced the file, not the one that fetched it.
+  ///
+  /// A screenshot is published by `receive-screenshot`, whose window is a file
+  /// transfer - measured on the device at 91-118 ms, and once 781 ms. The
+  /// shutter opened during `capture-screenshot`. Publishing the receive window
+  /// as the shutter window would have been a precise-looking number for the
+  /// wrong event, which is worse than the second-granularity value it replaced.
+  func observationWindow(
+    jobID: String, stepID: String, descriptor: CatalogOperationDescriptor
+  ) -> ArtifactObservationWindow? {
+    let producing = Self.optionalStepUpstream[descriptor.reference]?[stepID] ?? stepID
+    return stepObservationWindows["\(jobID)|\(producing)"]
+      ?? stepObservationWindows["\(jobID)|\(stepID)"]
+  }
+
+  /// When each step was reaching the device, keyed by job and step, so a
+  /// product can say when it was observed rather than only when it was filed.
+  var stepObservationWindows: [String: ArtifactObservationWindow] = [:]
+
+  /// Reads one step's observed window. A seam for the test that pins which
+  /// step's window a received product carries.
+  package func observationWindowForTesting(
+    jobID: String, stepID: String
+  ) -> ArtifactObservationWindow? {
+    stepObservationWindows["\(jobID)|\(stepID)"]
+  }
 
   static func carriedEvidenceKey(stableIdentitySHA256: String, bindingRevision: Int) -> String {
     "\(stableIdentitySHA256)\n\(bindingRevision)"

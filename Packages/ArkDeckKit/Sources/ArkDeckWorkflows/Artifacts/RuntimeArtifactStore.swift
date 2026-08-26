@@ -64,6 +64,35 @@ public struct ArtifactRetention: Sendable, Equatable, Codable {
   }
 }
 
+/// When the step that produced an artifact was actually reaching the device.
+///
+/// A screenshot is the case that needs this: the design asks for the moment
+/// the shutter opened, and the host cannot observe that moment. What it can
+/// observe is the interval it was dispatching in, and the shutter opened
+/// somewhere inside it. Recording the interval is the honest form; recording a
+/// point would be inventing a precision nobody measured.
+///
+/// Both ends are host time at whatever resolution the runtime's clock offers.
+public struct ArtifactObservationWindow: Sendable, Equatable, Codable {
+  public let startUTC: String
+  public let endUTC: String
+
+  public init(startUTC: String, endUTC: String) {
+    self.startUTC = startUTC
+    self.endUTC = endUTC
+  }
+
+  /// How wide the uncertainty is. A reader comparing this against a rule
+  /// measured in milliseconds needs to know when the window is wider than the
+  /// rule, because then the rule cannot decide anything.
+  public var widthMs: Int? {
+    guard let start = ISO8601Timestamps.parse(startUTC),
+      let end = ISO8601Timestamps.parse(endUTC)
+    else { return nil }
+    return Int((end.timeIntervalSince(start) * 1000).rounded())
+  }
+}
+
 public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   public let artifactID: String
   public let jobID: String
@@ -82,6 +111,9 @@ public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   public let status: ArtifactStatus
   public let redactionApplied: Bool
   package var derivation: RuntimeArtifactDerivation? = nil
+  /// When the producing step was reaching the device. Absent for products no
+  /// step observed, such as the ones finalization composes.
+  public var observationWindow: ArtifactObservationWindow? = nil
 }
 
 package struct RuntimeArtifactDerivation: Sendable, Equatable, Codable {
@@ -377,13 +409,15 @@ public struct RuntimeArtifactPublicationRequest: Sendable {
   /// validator and are themselves the reviewed product. Generic text
   /// redaction must not rewrite them after their digest was attested.
   package let preservesValidatedMachineBytes: Bool
+  package let observationWindow: ArtifactObservationWindow?
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
     privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
     sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
-    contents: Data
+    contents: Data, observationWindow: ArtifactObservationWindow? = nil
   ) {
+    self.observationWindow = observationWindow
     self.jobID = jobID
     self.sessionID = sessionID
     self.stepID = stepID
@@ -404,8 +438,10 @@ public struct RuntimeArtifactPublicationRequest: Sendable {
     privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
     sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
     contents: Data, derivation: RuntimeArtifactDerivation?,
-    preservesValidatedMachineBytes: Bool = false
+    preservesValidatedMachineBytes: Bool = false,
+    observationWindow: ArtifactObservationWindow? = nil
   ) {
+    self.observationWindow = observationWindow
     self.jobID = jobID
     self.sessionID = sessionID
     self.stepID = stepID
@@ -442,13 +478,16 @@ public struct RuntimeArtifactFilePublicationRequest: Sendable {
   package let sourceFileURL: URL
   package let expectedByteCount: Int
   package let expectedSHA256: String
+  package let observationWindow: ArtifactObservationWindow?
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
     privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
     sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
-    sourceFileURL: URL, expectedByteCount: Int, expectedSHA256: String
+    sourceFileURL: URL, expectedByteCount: Int, expectedSHA256: String,
+    observationWindow: ArtifactObservationWindow? = nil
   ) {
+    self.observationWindow = observationWindow
     self.jobID = jobID
     self.sessionID = sessionID
     self.stepID = stepID
@@ -692,6 +731,7 @@ public actor RuntimeArtifactStore {
       status: .published,
       redactionApplied: redacted)
     metadata.derivation = request.derivation
+    metadata.observationWindow = request.observationWindow
 
     let jobDirectory = try directory(for: request.jobID)
     let existing = try loadIndex(jobID: request.jobID).artifacts.first {
@@ -778,7 +818,7 @@ public actor RuntimeArtifactStore {
     let createdAtUTC = nowUTC()
     let retention = try retentionPolicy.retention(
       for: request.retentionClass, createdAtUTC: createdAtUTC)
-    let metadata = RuntimeArtifactMetadata(
+    var metadata = RuntimeArtifactMetadata(
       artifactID: artifactID,
       jobID: request.jobID,
       sessionID: request.sessionID,
@@ -795,6 +835,7 @@ public actor RuntimeArtifactStore {
       retention: retention,
       status: .published,
       redactionApplied: false)
+    metadata.observationWindow = request.observationWindow
 
     let jobDirectory = try directory(for: request.jobID)
     if let existing = try loadIndex(jobID: request.jobID).artifacts.first(where: {

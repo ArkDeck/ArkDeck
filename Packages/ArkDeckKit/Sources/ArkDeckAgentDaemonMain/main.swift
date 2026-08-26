@@ -65,6 +65,16 @@ func utcNow() -> String {
   ISO8601Timestamps.string(from: Date())
 }
 
+/// The same instant with its fractional part kept.
+///
+/// Durable records stay on the plain form, which everything downstream parses
+/// and compares. This one exists for facts whose whole point is where inside a
+/// second something happened - a screenshot's shutter, measured against a rule
+/// written in milliseconds.
+func utcNowPrecise() -> String {
+  ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
+}
+
 let defaultStateDirectory = ArkDeckAgentFilesystemLayout.defaultStateDirectory()
 var stateDirectory = defaultStateDirectory
 
@@ -720,7 +730,7 @@ Task.detached {
       traceRuntimeProbe: traceRuntimeProbe,
       powerActivityController: PowerActivityController(),
       agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
-      nowUTC: utcNow)
+      nowUTC: utcNow, nowPreciseUTC: utcNowPrecise)
     // The engine is the reference ledger for sweep testimony; it exists
     // only now, so the handle the dispatcher already holds is filled here.
     workspaceReferenceLedger.install(engine)
