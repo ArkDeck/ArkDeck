@@ -7,6 +7,13 @@ name: Swift slow lanes
 # scale regressions could only surface in production. This workflow is that
 # caller.
 #
+# The App's XCUITest target is the second such case, and a worse one: the
+# required gate builds it and never runs it, so a failing assertion is
+# invisible while a compile break is not. Five of its tests had been broken
+# for weeks by unrelated merges — a stale expectation, a list-order
+# assumption, and shared scene state leaking between launches — because
+# nothing executed them. This workflow is that caller too.
+#
 # Semantics: scheduled regression detection, NOT a merge gate. A red run
 # here never blocks a PR; it is a signal to file a product defect. The
 # required gate remains swift-ci.yml's full `swift test`.
@@ -53,3 +60,62 @@ jobs:
           echo "simulation, 10k terminal-history recovery, large-artifact" >> "$GITHUB_STEP_SUMMARY"
           echo "redaction streaming. Red here = file a product defect; this" >> "$GITHUB_STEP_SUMMARY"
           echo "job is not a merge gate." >> "$GITHUB_STEP_SUMMARY"
+
+  ui-tests:
+    runs-on: macos-26
+    # Its own runner, deliberately: XCUITest drives a real window server and
+    # these tests are load-sensitive. Sharing a machine with another lane
+    # produces batches of wait timeouts that look like product failures and
+    # are not.
+    #
+    # Measured locally (warm build): 35 tests in ~500s. 45 minutes covers a
+    # cold CI build with the margin the slow lanes use.
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          git rev-parse HEAD
+      - name: Select the pinned toolchain
+        run: |
+          set -eu
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+      - name: Run the App UI tests
+        run: |
+          # pipefail matters here: the run is piped through tee for live
+          # output, and without it the step would read tee's status instead of
+          # the test run's and never retry — or never fail.
+          set -euo pipefail
+          # One bounded retry, and only for the runner failing to bootstrap.
+          # A UI-test runner that never establishes its connection has told us
+          # nothing about the product, and on a fresh machine it is the first
+          # launch that pays for enabling automation. Assertion failures are
+          # never retried: a test that fails twice as often as it passes is a
+          # defect, and hiding it here would recreate the gap this lane exists
+          # to close.
+          log="$RUNNER_TEMP/ui-tests.log"
+          if sh scripts/ci/run-ui-tests.sh 2>&1 | tee "$log"; then
+            exit 0
+          fi
+          if grep -qE 'failed to initialize for UI testing|before establishing connection' "$log"
+          then
+            echo "::warning::UI-test runner did not bootstrap; retrying once"
+            sh scripts/ci/run-ui-tests.sh
+          else
+            exit 1
+          fi
+      - name: Summary
+        if: always()
+        run: |
+          echo "UI tests cover the App shell, HDC diagnostics, the Overview" >> "$GITHUB_STEP_SUMMARY"
+          echo "record and the Viewer against a launched window. The required" >> "$GITHUB_STEP_SUMMARY"
+          echo "gate only builds this target, so this is the only place its" >> "$GITHUB_STEP_SUMMARY"
+          echo "assertions run. Red here = file a product defect; this job is" >> "$GITHUB_STEP_SUMMARY"
+          echo "not a merge gate. Reproduce with scripts/ci/run-ui-tests.sh." >> "$GITHUB_STEP_SUMMARY"
