@@ -47,10 +47,10 @@ Needs Attention）与折叠的 Advanced Diagnostics。定位问题有五条：
    健康时整页没有一个可点的东西；唯一可行动的 Needs Attention 位于两栏布局的右下角。
 4. **有状态、没有后果。** 能力矩阵给出 `可用 / 受限 / 不可用 / 无法确认` 四档形容词，但不说明
    「所以现在不能抓 Trace」。这是「没测到 ≠ 测到的值」那族缺陷的 UI 版本。
-5. **能力矩阵绑的是 `targets.first`。**
-   [`OverviewCapabilityApplicationFacade.swift:77`](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewCapabilityApplicationFacade.swift)
-   取列表首项；多设备时它描述的是一台任意设备，用户既看不出是哪台也选不了。这是独立于本次
-   重设计的既有缺陷。
+5. **能力矩阵绑的是 `targets.first`。** 取列表首项；多设备时它描述的是一台任意设备，用户
+   既看不出是哪台也选不了。**已修**：provider 现在接收显式 target，多台已接管时拒绝并报出
+   候选，由 §3.1 的设备条提供选择（见
+   [`OverviewCapabilityApplicationFacade.swift`](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewCapabilityApplicationFacade.swift)）。
 
 ## 2. 重新定位
 
@@ -137,7 +137,8 @@ sheet，是「方便继续」真正发生的地方，四段：
 
 能力四项来自 `OverviewCapabilityApplicationFacade`（`hidumper` / `hitrace` / `bytrace` /
 RockUSB Flash）；效果分级来自 Catalog（`capture.diagnostics@1` = `readOnly`、`debug.hap@1` =
-`deviceMutation`、`flash.dayu200@1` = `destructive`）。这些都不需要新 operation、新 provider、
+`deviceMutation`、`flash.full-restore@1` = `destructive`；Flash 身份一律走
+`ArkForgeFlashOperation` 的规范策略，不硬编码别名）。这些都不需要新 operation、新 provider、
 新 integration/device profile，也不改 destructive 准入策略，因此按 `AGENTS.md` 的四类清单不需要
 OpenSpec change。
 
@@ -192,12 +193,19 @@ Agent 不修改已 accepted 的 requirement。两条可选处置，供维护者�
 
 在裁决之前，实现按「保守」执行。
 
-## 7. 本轮不做的事
+## 7. 已落地与仍未做的
+
+已落地（本稿之后的垂直 PR）：调试线分组键与 §5.2 的前置、记录与「再来一次」确认面、
+显式 target 选择、以及一条每晚真跑 UI 测试的车道（`scripts/ci/run-ui-tests.sh` 与
+`swift-slow-lanes.yml`）——在此之前 CI 只构建 UI 测试、从不执行它。
+
+仍未做的：
 
 - 不改 `openspec/specs/**` 与 `macos-ux-interaction-spec.md`；
 - 不新增 operation、provider 或 integration/device profile；
-- 不把 `targets.first` 的修复混进本稿——那是既有缺陷，应单独一个垂直 PR；
 - 不在页面里做 raw shell、任意重放或一键「修复」；
 - 不改 `sessionID` 的语义、存储布局或 manifest/audit 身份；
 - 记录里的 `outstandingResidueCount`（设备端残留）与 `executionMode`（planOnly / execute）本稿
-  暂未上版面，待实际用过之后再决定放行内还是线卡头。
+  暂未上版面，待实际用过之后再决定放行内还是线卡头；
+- 多台已接管设备时的设备条 picker 只有契约测试覆盖拒绝路径，UI 测试没有覆盖——现有 fixture
+  只有一台已接管 target，加第二台会改动其他套件依赖的固定事实。
