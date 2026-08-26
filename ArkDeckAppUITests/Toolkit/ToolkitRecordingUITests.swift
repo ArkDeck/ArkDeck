@@ -57,27 +57,39 @@ final class ToolkitRecordingUITests: XCTestCase {
         + (app.descendants(matching: .any)["toolkit.record.failed"].value as? String ?? "-"))
 
     // The rate is measured, not promised, and it lands where the device
-    // measurements said it would: about 1.8 frames a second.
-    let summary = "\(ready.value ?? "")"
+    // measurements said it would: about 1.8 frames a second. A combined
+    // element carries its text as the label.
+    let summary = ready.label.isEmpty ? "\(ready.value ?? "")" : ready.label
     XCTAssertTrue(summary.contains("fps"), summary)
-    let rate = summary.split(separator: " ").compactMap { Double($0) }.first { $0 > 0 && $0 < 60 }
+    // The number immediately before "fps" - not merely the first number in the
+    // line, which is the frame count and would pass for the wrong reason.
+    let beforeFps = summary.components(separatedBy: "fps")[0]
+      .split(whereSeparator: { $0 == " " || $0 == "\u{00A0}" })
+    let rate = beforeFps.last.flatMap { Double($0) }
     XCTAssertNotNil(rate, summary)
-    XCTAssertEqual(try XCTUnwrap(rate), 1.84, accuracy: 0.1, summary)
+    XCTAssertEqual(
+      try XCTUnwrap(rate), 1.84, accuracy: 0.1,
+      "the rate is measured off the movie's own span, and the device's readback "
+        + "puts it near 1.8: \(summary)")
 
     // Where it went, and the three things a person can do with it.
     let location = app.descendants(matching: .any)["toolkit.record.location"]
     XCTAssertTrue(location.exists, "a recording nobody can find is not delivered")
     XCTAssertTrue("\(location.value ?? "")".hasSuffix(".mov"), "\(location.value ?? "")")
+    // Link-styled controls are not `buttons` in the accessibility tree, so the
+    // query is by identifier rather than by element type.
     for control in ["toolkit.record.reveal", "toolkit.record.saveAs", "toolkit.record.again"] {
-      XCTAssertTrue(app.buttons[control].exists, control)
+      XCTAssertTrue(
+        app.descendants(matching: .any)[control].exists,
+        "the result bar must offer \(control)")
     }
 
     // Recording again returns the pane to where a second run starts from.
-    app.buttons["toolkit.record.again"].click()
+    app.descendants(matching: .any)["toolkit.record.again"].firstMatch.click()
     XCTAssertTrue(
       ready.waitForNonExistence(timeout: 10),
       "the previous result must not stand while a new run is offered")
-    XCTAssertTrue(app.buttons["toolkit.record.start"].isEnabled)
+    XCTAssertTrue(start.isEnabled, "a second run must be offered")
   }
 }
 

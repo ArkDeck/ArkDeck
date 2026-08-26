@@ -95,11 +95,18 @@ T02/T03 不进入实现。
   报 `truncated(afterFrames:)` 而不是静默当读完。
   证据：16 条契约测试，其中 3 条用**真机取回的 `frames.tar`**（20 帧 / 720×1280）
   跑通「fixture 取帧 → 合成 → 读回校验」整条流水线，实测 1.84 fps。
-  **未跑到：`ToolkitRecordingUITests`**（真机 UI 闸，覆盖四态跃迁与结果条三个按钮）。
-  已写好、已注册、build-for-testing 通过，但本机 XCUITest 起不来：
-  `Failed to initialize for UI testing: Timed out while enabling automation mode`。
-  **不是这条测试的问题——当天早些时候通过的 `ToolkitStaleFrameUITests` 此刻同样报这个错**；
-  Developer mode 已启用，重启 testmanagerd 无效，再往下要动系统安全设置。待环境恢复后补跑。
+  **`ToolkitRecordingUITests` 已补跑（2026-08-26 晚，环境恢复后）**：passed 12.2s，
+  与 `ToolkitStaleFrameUITests`（passed 29.8s）一并对真机通过。闸本身修了两处：
+  结果条的标识挂在 HStack 上导致图标与文字都继承（`.accessibilityElement(children:
+  .combine)` 收成单元素），以及 `.buttonStyle(.link)` 的控件不在 `app.buttons` 里
+  （改按标识查）。取速率也改为取 "fps" 前的那个数——原先取行内第一个数会撞上帧数 20，
+  会因为错误的原因通过。
+  两条负向对照都命中：①把逐帧时长换成固定 1/30，闸报 `30.00 fps` 并失败——这正是它要
+  拦的那种误导；②让合成一帧不写，**Validating 抓住**（AVFoundation「此媒体可能已损坏」），
+  结果条根本不出现。
+  **顺带查实一条不是本任务的失败**：`AppShellUITests.testEnglishSweepOfEveryWorkspace`
+  在本机红，断言开窗尺寸 1180×760 而实际 1195×802。**干净 main 上一模一样地失败**
+  （同样 1195×802），故与录屏面板无关，是本机先前就有的状况，未在此处修。
   **未做**：录屏面板与 Diagnostics 会话的对齐（录屏目前不落进诊断会话制品）。
   ③ **开始前的配额 preflight 未做**——AC-8 要求失败即阻断。
   ④ **performance notice 未做**——AC-8 要求它与 production-boundary 一样不可删除；

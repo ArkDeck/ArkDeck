@@ -323,6 +323,9 @@ struct ToolkitWorkspaceView: View {
           .font(.system(size: 11, weight: .medium))
           .monospacedDigit()
       }
+      // One result is one thing, so it reads as one element rather than as an
+      // icon and a sentence a reader has to stitch back together.
+      .accessibilityElement(children: .combine)
       .accessibilityIdentifier("toolkit.record.ready")
 
       if ready.framesMissing > 0 {
