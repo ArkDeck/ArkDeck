@@ -458,6 +458,10 @@ private struct UpdateAttentionToolbarContent: ToolbarContent {
 private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
+
+  /// Test-only: see the startup task. Never true in a shipped launch.
+  private static let resetsShellSelection = ProcessInfo.processInfo.arguments.contains(
+    "--ui-test-reset-shell-selection")
   @State private var isJobInspectorExpanded = false
   @State private var renamingDeviceConnectKey: String?
   @State private var pendingDeviceName = ""
@@ -558,6 +562,13 @@ private struct AppShellView: View {
     }
     .task(id: deviceList.startupInformationReady) {
       guard deviceList.startupInformationReady else { return }
+      // `@SceneStorage` outlives `-ApplePersistenceIgnoreState`, so a UI test
+      // inherits whichever workspace the previous run happened to leave
+      // selected — a sweep that walks every workspace poisons its own next
+      // launch. This restores the declared landing selection so a test can
+      // still assert what a first launch shows, instead of asserting whatever
+      // the last one ended on.
+      if Self.resetsShellSelection { storedSelection = ArkDeckNavigationItem.overview.rawValue }
       // Yield the main actor once so SwiftUI can commit the complete device
       // row before independent secondary reads fan out concurrently.
       await Task.yield()
