@@ -51,8 +51,11 @@ struct HDCStatusView: View {
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
-      if let header { header }
+      // The strip stays first: spec §5.1 puts it at the top of the page, and
+      // pushing it below the record moved it out of a standard window
+      // entirely — the four facts nobody should have to scroll for.
       statusStrip
+      if let header { header }
       // Two fixed columns, not an adaptive grid: `.adaptive` derives its column
       // count from the pane width, so a maximised window laid all four sections
       // side by side and crushed the capability matrix. `.grid2` in the
