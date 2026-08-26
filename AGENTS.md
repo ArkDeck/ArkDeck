@@ -188,7 +188,28 @@
 
   该入口使用稳定的 worktree 外 SwiftPM cache；只改测试时不会重编未变化的生产
   module，只改 App 时不会额外执行 ArkDeckKit 全量测试。分类器完成后再执行上面的
-  preflight,才等价于 CI 的门。改动触及 `Catalog/**`、`openspec/contracts/**` 或生成物
+  preflight,才等价于 CI 的门。
+- **UI 测试不在任何门里,要跑必须手动跑**。`swift-ci.yml` 对 `ArkDeckHDCUITests`
+  只做 `build-for-testing`,所以 XCUITest 编译不过会红、断言挂了不会。需要验证
+  App 真实呈现时用:
+
+  ```bash
+  sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/<Suite>
+  ```
+
+  不要直接手写 `xcodebuild test`：有两个坑会伪装成「这台机器不行」——
+  ① CI 用的 `CODE_SIGNING_ALLOWED=NO` 会产出无签名 runner，arm64 一启动即被
+  SIGKILL，报错写作 `Test crashed with signal kill before establishing connection`
+  或 `hung before establishing connection`，只字不提签名；
+  ② runner 二进制执行过一次后无法就地重链，下次 `ld` 报 `can't write output file`
+  并指向一个明明存在且可写的路径，必须先删 runner bundle。该脚本已封装这两条
+  以及独立 DerivedData 与残留进程清理。首次在一个全新 DerivedData 上跑可能报
+  `Timed out while enabling automation mode`——同一条命令再跑一次即可，不是环境坏了。
+
+  UI 测试**对负载敏感**:与其他构建并行跑会出现成片的 wait 超时假红。判断一条
+  失败是否是自己引入的,先在安静的机器上单独重跑,再用 `git worktree add` 拉出
+  改动前的 commit 跑同一条对照——不要凭失败本身下结论。
+改动触及 `Catalog/**`、`openspec/contracts/**` 或生成物
   时仍须确认 schema、生成器词表/pin、Swift 校验器与合约测试多处 lockstep，分类器
   不改变这三道通用门及 Swift 面全量回归的语义。
 - **产品工作不需要治理载体**:修复 Golden Journey 产品缺陷不要求 ready 任务包、不创建新
