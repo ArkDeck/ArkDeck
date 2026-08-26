@@ -558,13 +558,14 @@ final class AppShellUITests: XCTestCase {
     logsTab.typeKey(.leftArrow, modifierFlags: [])
     XCTAssertTrue(artifactsTab.isSelected, file: file, line: line)
     clickCorrectingNavigationSplitAXOffset(element("debug.tab.logs", in: app), in: app)
-    // Starting a log capture needs an explicit target and an available
-    // operation. This sweep launches with a ready device fixture, so both hold
-    // and the action is offered — it stopped being unconditionally disabled
-    // when the Debug workflow gained its server-backed path.
+    // The sweep asserts the workspace renders its controls, not whether this
+    // one can be pressed: starting a log capture needs the Runtime to report
+    // capture.diagnostics available, which a developer machine has and a
+    // hosted runner has not. Asserting either state makes this test pass in
+    // one environment and fail in the other — it did both, in that order.
+    // Enablement belongs in a Debug test that controls that availability.
     let debugStart = app.buttons["debug.logs.start"]
     XCTAssertTrue(debugStart.exists, file: file, line: line)
-    XCTAssertTrue(debugStart.isEnabled, file: file, line: line)
     // Pausing is a viewport action that exists only while a capture runs; in
     // this read-only build nothing captures, so the button stays disabled.
     let pauseViewport = app.buttons["debug.logs.pauseViewport"]
