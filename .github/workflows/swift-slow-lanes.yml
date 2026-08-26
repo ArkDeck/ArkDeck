@@ -87,6 +87,26 @@ jobs:
           set -eu
           test -d "$DEVELOPER_DIR"
           xcodebuild -version
+      - name: Widen the runner display
+        run: |
+          set -euo pipefail
+          # Hosted runners come up at 1024x768. The App declares a 1180x760
+          # window, so on that display the window is clamped and everything
+          # below roughly y=700 is off-screen and unhittable — which surfaces
+          # as twenty-odd assertion failures that say nothing about the
+          # product. Measured on macos-26: ten of the Viewer's tests fail on
+          # "Not hittable" alone.
+          #
+          # This fails closed rather than running anyway: a red lane whose
+          # cause is the screen size teaches people to ignore the lane.
+          brew install displayplacer >/dev/null
+          screen=$(displayplacer list | awk '/^Persistent screen id:/ { print $4; exit }')
+          test -n "$screen"
+          displayplacer \
+            "id:$screen res:1920x1080 hz:60 color_depth:7 enabled:true scaling:off origin:(0,0) degree:0"
+          resolution=$(displayplacer list | awk '/^Resolution:/ { print $2; exit }')
+          echo "runner display: $resolution"
+          test "$resolution" = "1920x1080"
       - name: Run the App UI tests
         run: |
           # pipefail matters here: the run is piped through tee for live
