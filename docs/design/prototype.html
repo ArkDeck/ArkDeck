@@ -231,6 +231,27 @@ select.inp{cursor:pointer}
 .two{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
 @media(max-width:940px){.two{grid-template-columns:1fr}}
 .debug-shell{width:min(920px,100%);display:flex;flex-direction:column;gap:16px}
+.gsec{display:flex;flex-direction:column;gap:10px;min-width:0}
+.gsec>.sechead{display:flex;align-items:baseline;gap:8px;margin:0;font-size:13px;font-weight:600;
+  padding-bottom:7px;border-bottom:1px solid var(--line)}
+.gsec>.sechead .acc{margin-left:auto;font-size:12px;font-weight:500;color:var(--ink2)}
+.gsec>.sechead .acc.ok{color:var(--ok)}
+.debug-cols{display:grid;grid-template-columns:minmax(260px,.82fr) minmax(300px,1.18fr);gap:20px;align-items:start}
+.debug-stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.debug-disclose>summary{cursor:pointer;list-style:none;color:var(--ink2);font-size:11.5px;font-weight:600}
+.debug-disclose>summary::-webkit-details-marker{display:none}
+.debug-disclose>summary::before{content:"\25B8 "}
+.debug-disclose[open]>summary::before{content:"\25BE "}
+.debug-disclose[open]{display:flex;flex-direction:column;gap:6px}
+.debug-entry{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:6px 10px;
+  border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}
+.debug-entry:hover{background:var(--panel2)}
+.debug-entry.on{background:var(--accent-weak);border-color:var(--accent)}
+.debug-entry .nm{font-family:var(--mono);font-size:12px}
+.debug-entry .sz{margin-left:auto;color:var(--ink2);font-size:11.5px}
+.debug-list{border:1px solid var(--line);border-radius:9px;padding:5px;background:var(--panel-solid);max-height:300px;overflow:auto}
+.hair-gap{height:1px;background:var(--line);margin:4px 0}
+.modal.wide{max-width:720px}
 .debug-scope{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink2);font-size:12px}
 .debug-source{display:grid;grid-template-columns:minmax(210px,.8fr) minmax(300px,1.2fr);gap:12px}
 .debug-field{display:flex;flex-direction:column;gap:5px;min-width:0;color:var(--ink2);font-size:11.5px}
@@ -248,7 +269,7 @@ select.inp{cursor:pointer}
 .debug-manager-row .meta{color:var(--ink2);font:11.5px/1.45 var(--mono);overflow-wrap:anywhere}
 .debug-manager-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .debug-row-disabled{opacity:.58}
-@media(max-width:940px){.debug-source{grid-template-columns:1fr}}
+@media(max-width:940px){.debug-source{grid-template-columns:1fr}.debug-cols{grid-template-columns:1fr}}
 @media(max-width:760px){
   .debug-search{grid-template-columns:1fr}.debug-search .btn{justify-self:start}
   .debug-manager-row{grid-template-columns:1fr}.debug-manager-actions{justify-content:flex-start}
@@ -894,8 +915,8 @@ const S = {
   flashPrerequisitesReady:true, loaderBound:true, flashJob:null, flashImage:null, flashView:"idle",
   flashProgress:{stage:"idle",tick:0,bytesDone:0,totalBytes:0},lastFlash:null,
   debugTab:"artifacts",
-  debug:{server:"remote-ohos",root:"remote-debug",query:"",kind:"all",
-    selected:new Set(["libace-engine","entry-abc"]),deployState:"idle",lastDeploy:null},
+  debug:{sourceKind:"local",server:"build-nightly",picked:null,pickedFrom:null,
+    bundle:"",lib:"",stage:"idle",jobID:null,browsePath:"",browseSel:null},
   hf:{st:"all", mode:"all", dev:"all"}, histSel:null, histSeq:1,
   hdcSel:"deveco",
   jobs:[], jobSeq:1
@@ -2084,472 +2105,641 @@ function pTools(){
 }
 
 /* ---------- Debug ---------- */
+/* Mirrors the shipped Debug workbench: five tabs with Artifacts first, one
+   signed app-owned .so per request from a local file or a verified read-only
+   SSH build source, and every group drawn as a section title over a hairline
+   rather than a bordered card. Unshipped design directions (SMB, WSL, batch
+   selection, .abc replacement, standalone device restart, per-package
+   lifecycle) stay visible as unavailable instead of being faked. */
 let DEBUG_SERVERS=[
-  {id:"remote-ohos",name:"远端 · OHOS 编译集群",kind:"ssh",host:"build-ohos.internal",port:"22",username:"builder",auth:"key",keyName:"id_ed25519",credentialStored:true,hostKey:"SHA256:Zt8f…Q2m",status:"已连接",
-    roots:[
-      {id:"remote-debug",name:"rk3568 · Debug",path:"/build/openharmony/out/rk3568/debug"},
-      {id:"remote-release",name:"rk3568 · Release",path:"/build/openharmony/out/rk3568/release"}
-    ]},
-  {id:"local-deveco",name:"本地 · DevEco 输出",kind:"directory",directory:"~/Workspace/WaterFlow/entry/build/default/intermediates",status:"可用",
-    roots:[{id:"local-debug",name:"WaterFlow · Debug",path:"~/Workspace/WaterFlow/entry/build/default/intermediates"}]},
-  {id:"smb-nightly",name:"局域网 · Nightly 共享",kind:"smb",share:"smb://build-nas/openharmony",username:"build-reader",credentialStored:true,status:"已挂载",
-    roots:[{id:"smb-debug",name:"rk3568 · Nightly",path:"/nightly/rk3568/debug"}]},
-  {id:"wsl-ubuntu",name:"本机 · WSL Ubuntu",kind:"wsl",distribution:"Ubuntu-24.04",status:"可用",
-    roots:[{id:"wsl-debug",name:"rk3568 · WSL Debug",path:"/home/builder/openharmony/out/rk3568/debug"}]}
+  {id:"build-nightly",name:"build · nightly",host:"build.example.internal",port:"22",
+   username:"builder",auth:"key",keyName:"id_ed25519",credentialStored:true,
+   hostKey:"SHA256:Zt8f…Q2m",root:"/home/builder/out/rk3568/debug"}
 ];
-const DEBUG_ARTIFACTS=[
-  {id:"libace-engine",server:"remote-ohos",root:"remote-debug",name:"libace_engine.z.so",kind:".so",relative:"arkui/lib64/libace_engine.z.so",size:"6.8 MB",modified:"今天 22:41",validation:"arm64-v8a · ELF64 · Build ID 7f32…c91a",ready:true},
-  {id:"libfeature",server:"remote-ohos",root:"remote-debug",name:"libfeature_debug.so",kind:".so",relative:"product/lib64/libfeature_debug.so",size:"1.3 MB",modified:"今天 22:38",validation:"arm64-v8a · ELF64 · Build ID 11ad…402e",ready:true},
-  {id:"entry-abc",server:"remote-ohos",root:"remote-debug",name:"entry.abc",kind:".abc",relative:"ets/modules.abc/entry.abc",size:"842 KB",modified:"今天 22:42",validation:"ABC · API 18 · 编译器指纹匹配",ready:true},
-  {id:"legacy32",server:"remote-ohos",root:"remote-debug",name:"liblegacy32.so",kind:".so",relative:"legacy/lib/liblegacy32.so",size:"904 KB",modified:"昨天 18:09",validation:"armeabi-v7a · 与目标 arm64-v8a 不一致",ready:false},
-  {id:"release-engine",server:"remote-ohos",root:"remote-release",name:"libace_engine.z.so",kind:".so",relative:"arkui/lib64/libace_engine.z.so",size:"6.5 MB",modified:"今天 20:16",validation:"arm64-v8a · Release · Build ID a803…d021",ready:true},
-  {id:"local-native",server:"local-deveco",root:"local-debug",name:"libwaterflow.so",kind:".so",relative:"libs/arm64-v8a/libwaterflow.so",size:"516 KB",modified:"今天 23:02",validation:"arm64-v8a · ELF64 · Build ID 4b8c…a107",ready:true},
-  {id:"local-abc",server:"local-deveco",root:"local-debug",name:"entry.abc",kind:".abc",relative:"default/intermediates/loader_out/entry.abc",size:"318 KB",modified:"今天 23:02",validation:"ABC · API 18 · 编译器指纹匹配",ready:true},
-  {id:"smb-native",server:"smb-nightly",root:"smb-debug",name:"libnightly_feature.so",kind:".so",relative:"system/lib64/libnightly_feature.so",size:"1.1 MB",modified:"今天 21:56",validation:"arm64-v8a · ELF64 · Build ID b8ce…0d41",ready:true},
-  {id:"wsl-abc",server:"wsl-ubuntu",root:"wsl-debug",name:"entry.abc",kind:".abc",relative:"ets/modules.abc/entry.abc",size:"836 KB",modified:"今天 22:18",validation:"ABC · API 18 · 编译器指纹匹配",ready:true}
+const DEBUG_TREE={
+  "":[{k:"dir",n:"arkui"},{k:"dir",n:"graphic"},{k:"dir",n:"libs"},
+      {k:"so",n:"libfeature_debug.so",size:"2.4 MB"},{k:"so",n:"libperf_probe.so",size:"812 KB"}],
+  "arkui":[{k:"so",n:"libace_compatible.so",size:"6.1 MB"}],
+  "graphic":[{k:"dir",n:"render"}],
+  "graphic/render":[{k:"so",n:"librender_service.so",size:"3.3 MB"}],
+  "libs":[{k:"so",n:"libhilog_shim.so",size:"148 KB"},{k:"so",n:"libnapi_bridge.so",size:"402 KB"}]
+};
+const DEBUG_PLAN_STEPS=[
+  ["preflight.target","preflight","readOnly"],
+  ["artifact.lease","artifact","hostOnly"],
+  ["validate.elf","validate","hostOnly"],
+  ["backup.current","backup","deviceMutation"],
+  ["publish.atomic","publish","deviceMutation"],
+  ["restart.ability","lifecycle","deviceMutation"],
+  ["readback.maps","verify","readOnly"]
 ];
 function debugServer(){return DEBUG_SERVERS.find(s=>s.id===S.debug.server)||DEBUG_SERVERS[0]}
-function debugRoot(){const s=debugServer();return s.roots.find(r=>r.id===S.debug.root)||s.roots[0]}
-function debugUseServer(id){
-  const s=DEBUG_SERVERS.find(x=>x.id===id);if(!s)return;
-  S.debug.server=id;S.debug.root=s.roots[0]?.id||"";S.debug.selected.clear();S.debug.deployState="idle";
-  closeModal();renderPage();
+function debugAuthLabel(s){
+  if(!s)return "";
+  if(s.auth==="key")return s.keyName?("OpenSSH 私钥 · "+s.keyName+" · Keychain"):"系统默认（id_rsa → id_ed25519）";
+  return "密码 · Keychain";
 }
-function debugUseRoot(id){S.debug.root=id;S.debug.selected.clear();S.debug.deployState="idle";renderPage()}
-function debugArtifactRows(){
-  const q=S.debug.query.trim().toLowerCase();
-  return DEBUG_ARTIFACTS.filter(a=>a.server===S.debug.server&&a.root===S.debug.root)
-    .filter(a=>S.debug.kind==="all"||a.kind===S.debug.kind)
-    .filter(a=>!q||[a.name,a.relative,a.validation].some(v=>v.toLowerCase().includes(q)));
+function debugBundleValid(v){return /^[A-Za-z][\w]*(\.[A-Za-z][\w]*)+$/.test(v)}
+function debugLibValid(v){return /^lib[\w.-]+\.so$/.test(v)}
+function debugInputsReady(){
+  return !!S.debug.picked&&debugBundleValid(S.debug.bundle)&&debugLibValid(S.debug.lib);
 }
-function debugToggleArtifact(id,checked){
-  const a=DEBUG_ARTIFACTS.find(x=>x.id===id);if(!a?.ready)return;
-  if(checked)S.debug.selected.add(id);else S.debug.selected.delete(id);
-  S.debug.deployState="idle";renderPage();
+function debugResetDeployment(){
+  S.debug.stage="idle";S.debug.jobID=null;renderPage();
 }
-function debugSelectVisible(){
-  const rows=debugArtifactRows().filter(a=>a.ready);const all=rows.length&&rows.every(a=>S.debug.selected.has(a.id));
-  rows.forEach(a=>all?S.debug.selected.delete(a.id):S.debug.selected.add(a.id));S.debug.deployState="idle";renderPage();
+function debugSetSourceKind(kind){
+  if(S.debug.sourceKind===kind)return;
+  S.debug.sourceKind=kind;S.debug.picked=null;S.debug.pickedFrom=null;S.debug.stage="idle";renderPage();
 }
-function debugSelectedArtifacts(){return DEBUG_ARTIFACTS.filter(a=>S.debug.selected.has(a.id)&&a.ready)}
-function debugSourceKindLabel(s){
-  return {ssh:"SSH 远端服务器",directory:"本机目录",smb:"SMB 共享",wsl:"WSL 发行版"}[s.kind]||"编译来源";
+function debugSetBundle(el){S.debug.bundle=el.value;S.debug.stage="idle";}
+function debugSetLib(el){S.debug.lib=el.value;S.debug.stage="idle";}
+function debugPickLocal(){
+  S.debug.picked="libfeature_debug.so";S.debug.pickedFrom=null;
+  if(!S.debug.lib)S.debug.lib=S.debug.picked;
+  S.debug.stage="idle";renderPage();
 }
-function debugSourceEndpoint(s){
-  if(s.kind==="ssh")return `${s.username||"builder"}@${s.host||"host"}:${s.port||"22"}`;
-  if(s.kind==="directory")return s.directory||"本机目录";
-  if(s.kind==="smb")return s.share||"smb://server/share";
-  if(s.kind==="wsl")return s.distribution||"未选择发行版";
-  return "未配置";
+
+/* --- remote build browser (read-only SFTP, bounded to the saved build root) --- */
+function debugBrowseRemote(){
+  S.debug.browsePath="";S.debug.browseSel=null;
+  if(!DEBUG_SERVERS.length){
+    modal(`<div class="modal"><h3>远端编译产物</h3>
+      <p class="hint">尚未配置服务器。先在“设置 › 服务器”中添加并验证 SSH 服务器，随后即可在 Debug 中浏览远端编译产物。</p>
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button>
+        <button class="btn pri" onclick="closeModal();debugServerManager()">打开服务器设置</button></div></div>`);
+    return;
+  }
+  renderDebugBrowser();
 }
-function debugSourceAuthLabel(s){
-  if(s.kind==="ssh")return `${s.auth==="password"?"密码":"SSH 密钥"}认证 · ${s.credentialStored?"凭据已保存在 Keychain":"需要凭据"}`;
-  if(s.kind==="smb")return `${s.username||"系统账户"} · ${s.credentialStored?"密码已保存在 Keychain":"需要密码"}`;
-  if(s.kind==="wsl")return "通过封闭 WSL 文件适配器访问";
-  return "目录安全书签";
+function renderDebugBrowser(){
+  const s=debugServer(),path=S.debug.browsePath,entries=DEBUG_TREE[path]||[];
+  const rows=entries.map(e=>{
+    const on=e.k==="so"&&S.debug.browseSel===e.n;
+    const act=e.k==="dir"?`debugBrowseInto('${esc(e.n)}')`:`debugBrowseSelect('${esc(e.n)}')`;
+    return `<button class="debug-entry${on?" on":""}" onclick="${act}" aria-pressed="${e.k==="so"?on:"false"}">
+      <span aria-hidden="true">${e.k==="dir"?"🗀":"▣"}</span>
+      <span class="nm">${esc(e.n)}</span>
+      <span class="sz">${e.k==="dir"?"›":esc(e.size)+(on?" ✓":"")}</span></button>`;
+  }).join("")||'<p class="empty">此处没有文件夹或动态库</p>';
+  modal(`<div class="modal wide"><h3>远端编译产物</h3>
+    <p class="hint">浏览已验证编译根目录以内的文件夹；这里只显示 lib*.so 文件。</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select class="inp" onchange="S.debug.server=this.value;S.debug.browsePath='';S.debug.browseSel=null;renderDebugBrowser()">
+        ${DEBUG_SERVERS.map(x=>`<option value="${x.id}" ${x.id===s.id?"selected":""}>${esc(x.name)} · ${esc(x.username)}@${esc(x.host)}</option>`).join("")}
+      </select>
+      <button class="btn" onclick="debugBrowseUp()" ${path?"":"disabled"}>↑ 上一级</button>
+      <button class="btn" onclick="renderDebugBrowser()" aria-label="刷新目录">↻</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center"><span aria-hidden="true">🗀</span>
+      <span class="mono" style="font-size:11.5px">${path?esc(path):"编译根目录 "+esc(s.root)}</span></div>
+    <div class="debug-list">${rows}</div>
+    <p class="hint">SSH 能力为只读 SFTP:不提供 SSH 命令、Shell、上传、删除、重命名或任意路径接口。</p>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="debugUseSelectedLibrary()" ${S.debug.browseSel?"":"disabled"}>使用所选动态库</button></div></div>`);
 }
-function debugDefaultRootPath(kind){
-  return kind==="ssh"?"/build/output":kind==="directory"?"~/BuildOutput":kind==="smb"?"/nightly/output":"/home/builder/output";
+function debugBrowseInto(name){
+  S.debug.browsePath=S.debug.browsePath?S.debug.browsePath+"/"+name:name;
+  S.debug.browseSel=null;renderDebugBrowser();
 }
-function debugRootPlaceholder(s){return debugDefaultRootPath(s.kind)}
+function debugBrowseUp(){
+  S.debug.browsePath=S.debug.browsePath.split("/").slice(0,-1).join("/");
+  S.debug.browseSel=null;renderDebugBrowser();
+}
+function debugBrowseSelect(name){S.debug.browseSel=name;renderDebugBrowser();}
+function debugUseSelectedLibrary(){
+  const s=debugServer(),path=S.debug.browsePath;
+  S.debug.picked=S.debug.browseSel;
+  S.debug.pickedFrom=s.name+" · "+(path?path+"/":"")+S.debug.browseSel;
+  if(!S.debug.lib)S.debug.lib=S.debug.picked;
+  S.debug.stage="idle";closeModal();renderPage();
+}
+
+/* --- Settings › Servers: SSH only, host-key pinned, read-only SFTP --- */
 function debugServerManager(){
-  const current=debugServer();
-  modal(`<div class="modal" style="max-width:820px"><h3>管理编译来源与根目录</h3>
-    <p class="hint">来源可以是 SSH 服务器、本机目录、SMB 共享或 WSL 发行版；配置只定义受信的编译产物空间，不能在这里输入设备目标路径。</p>
+  modal(`<div class="modal wide"><h3>设置 › 服务器</h3>
+    <p class="hint">管理用于浏览和导入远端编译产物的 SSH 服务器。ArkDeck 只会浏览已验证编译根目录以内的内容，并导入选中的 lib*.so 文件。</p>
     <div class="debug-manager-list">${DEBUG_SERVERS.map(s=>`<div class="debug-manager-row ${s.id===S.debug.server?"on":""}">
-      <div><b>${esc(s.name)}</b><div class="hint">${debugSourceKindLabel(s)} · ${esc(s.status)}</div></div>
-      <div class="meta">${esc(debugSourceEndpoint(s))}<br>${esc(debugSourceAuthLabel(s))}<br>${s.roots.length} 个编译根目录</div>
-      <div class="debug-manager-actions">${s.id===S.debug.server?'<span class="chip ok">当前来源</span>':`<button class="btn" onclick="debugUseServer('${s.id}')">切换到此来源</button>`}
+      <div><b>${esc(s.name)}</b><div class="hint">SSH 服务器 · 主机密钥已固定</div></div>
+      <div class="meta">${esc(s.username)}@${esc(s.host)}:${esc(s.port)}<br>${esc(debugAuthLabel(s))}<br>${esc(s.root)}</div>
+      <div class="debug-manager-actions">
         <button class="btn" onclick="openDebugServerEditor('${s.id}')">编辑</button>
-        <button class="btn" onclick="deleteDebugServerModal('${s.id}')" ${DEBUG_SERVERS.length===1?"disabled":""}>删除</button></div></div>`).join("")}</div>
-    <div class="debug-selection"><b>当前来源的编译根目录</b><span class="summary mono">${esc(current.name)}</span>
-      <button class="btn" onclick="openDebugRootEditor('${current.id}','')">添加根目录…</button></div>
-    <div class="tablewrap"><table><tr><th>名称</th><th>根目录</th><th></th></tr>
-      ${current.roots.map(r=>`<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.path)}</td><td><button class="btn" onclick="openDebugRootEditor('${current.id}','${r.id}')">编辑</button> <button class="btn" onclick="deleteDebugRootModal('${current.id}','${r.id}')" ${current.roots.length===1?"disabled":""}>删除</button></td></tr>`).join("")}</table></div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">完成</button><button class="btn pri" onclick="openDebugServerEditor('')">添加来源…</button></div></div>`);
+        <button class="btn" onclick="deleteDebugServerModal('${s.id}')">移除服务器</button></div></div>`).join("")
+      ||'<p class="empty">尚未配置服务器。先添加 SSH 服务器，随后即可在 Debug 中浏览远端编译产物。</p>'}</div>
+    <div class="okbox">${icon("warning",true)} 安全边界：只读 SFTP;首次验证的指纹需显式保存，后续连接若主机密钥变化将直接拒绝；导入的凭据只存入 Keychain，秘密不会进入配置、日志、命令行或 Runtime XPC。</div>
+    <p class="hint">本机目录、SMB 共享与 WSL 发行版是 v0.9 设计输入,对应 typed behavior 发布前保持不可用。</p>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">完成</button>
+      <button class="btn pri" onclick="openDebugServerEditor('')">添加服务器</button></div></div>`);
 }
 function openDebugServerEditor(id){
-  const s=DEBUG_SERVERS.find(x=>x.id===id),editing=!!s,kind=s?.kind||"ssh";
-  const sshPasswordHint=s?.kind==="ssh"&&s.auth==="password"&&s.credentialStored?"已保存在 Keychain；留空则保持不变":"输入后保存到系统 Keychain";
-  const sshKeyHint=s?.kind==="ssh"&&s.auth==="key"&&s.credentialStored?"口令已保存在 Keychain；留空则保持不变":"如密钥已加密，请输入口令";
-  const smbPasswordHint=s?.kind==="smb"&&s.credentialStored?"已保存在 Keychain；留空则保持不变":"输入后保存到系统 Keychain";
-  modal(`<div class="modal" style="max-width:700px"><h3>${editing?"编辑编译来源":"添加编译来源"}</h3>
-    <label class="debug-field"><span>配置名称</span><input class="inp" id="debugServerName" value="${esc(s?.name||"")}" placeholder="例如：远端 · nightly 集群"></label>
-    <label class="debug-field"><span>来源类型</span><select class="inp" id="debugServerKind" onchange="updateDebugServerEditorFields()">
-      <option value="ssh" ${kind==="ssh"?"selected":""}>SSH 远端服务器</option>
-      <option value="directory" ${kind==="directory"?"selected":""}>本机目录</option>
-      <option value="smb" ${kind==="smb"?"selected":""}>SMB 共享</option>
-      <option value="wsl" ${kind==="wsl"?"selected":""}>WSL 发行版</option>
-    </select></label>
-    <div id="debugSSHFields" class="debug-source">
-      <label class="debug-field"><span>SSH 主机</span><input class="inp mono" id="debugSSHHost" value="${esc(s?.host||"")}" placeholder="build.example.internal"></label>
-      <label class="debug-field"><span>端口</span><input class="inp mono" id="debugSSHPort" type="number" min="1" max="65535" value="${esc(s?.port||"22")}" inputmode="numeric"></label>
-      <label class="debug-field"><span>用户名</span><input class="inp mono" id="debugSSHUser" name="ssh-username" value="${esc(s?.username||"")}" autocomplete="username" placeholder="builder"></label>
-      <label class="debug-field"><span>登录方式</span><select class="inp" id="debugSSHAuth" onchange="updateDebugServerEditorFields()"><option value="password" ${s?.auth==="password"?"selected":""}>密码</option><option value="key" ${s?.auth!=="password"?"selected":""}>SSH 密钥</option></select></label>
+  const s=DEBUG_SERVERS.find(x=>x.id===id),editing=!!s;
+  modal(`<div class="modal wide"><h3>${editing?"编辑服务器":"添加服务器"}</h3>
+    <label class="debug-field"><span>显示名称</span><input class="inp" id="dbgName" value="${esc(s?.name||"")}" placeholder="build · nightly"></label>
+    <label class="debug-field"><span>来源类型</span><select class="inp" id="dbgKind">
+      <option value="ssh" selected>SSH 服务器</option>
+      <option value="dir" disabled>本机目录 — 暂不可用</option>
+      <option value="smb" disabled>SMB 共享 — 暂不可用</option>
+      <option value="wsl" disabled>WSL 发行版 — 暂不可用</option></select></label>
+    <div class="debug-source">
+      <label class="debug-field"><span>主机名或 IP</span><input class="inp mono" id="dbgHost" value="${esc(s?.host||"")}" placeholder="build.example.internal"></label>
+      <label class="debug-field"><span>端口</span><input class="inp mono" id="dbgPort" type="number" min="1" max="65535" value="${esc(s?.port||"22")}" inputmode="numeric"></label>
     </div>
-    <label class="debug-field" id="debugSSHPasswordFields"><span>SSH 密码</span><input class="inp" id="debugSSHPassword" name="ssh-password" type="password" autocomplete="current-password" placeholder="${esc(sshPasswordHint)}"><span class="hint">密码只写入系统 Keychain，不写入配置列表、Job 或 Artifact evidence。</span></label>
-    <div id="debugSSHKeyFields" class="debug-source">
-      <label class="debug-field"><span>SSH 私钥</span><input class="inp mono" id="debugSSHKey" value="${esc(s?.keyName||"")}" placeholder="选择密钥文件，例如 id_ed25519"><span class="hint">界面只保留安全书签与文件名，不显示完整密钥路径。</span></label>
-      <label class="debug-field"><span>密钥口令（可选）</span><input class="inp" id="debugSSHKeyPassphrase" name="ssh-key-passphrase" type="password" autocomplete="current-password" placeholder="${esc(sshKeyHint)}"></label>
+    <label class="debug-field"><span>用户名</span><input class="inp mono" id="dbgUser" name="ssh-username" autocomplete="username" value="${esc(s?.username||"")}" placeholder="builder"></label>
+    <label class="debug-field"><span>认证方式</span><select class="inp" id="dbgAuth" onchange="updateDebugServerEditorFields()">
+      <option value="password" ${s?.auth==="password"?"selected":""}>密码</option>
+      <option value="key" ${s?.auth!=="password"?"selected":""}>OpenSSH 私钥</option></select></label>
+    <label class="debug-field" id="dbgPwdRow"><span>密码</span><input class="inp" id="dbgPwd" name="ssh-password" type="password" autocomplete="current-password" placeholder="${s?.credentialStored?"留空则使用 Keychain":"保存后只写入 Keychain"}"></label>
+    <div id="dbgKeyRow">
+      <label class="debug-field"><span>OpenSSH 私钥</span><input class="inp mono" id="dbgKey" value="${esc(s?.keyName||"")}" placeholder="留空则使用系统默认(id_rsa → id_ed25519)"><span class="hint">不选择文件时，ArkDeck 依次尝试 ~/.ssh/id_rsa、~/.ssh/id_ed25519;不会读取 SSH config、known_hosts 或其他文件。</span></label>
+      <label class="debug-field"><span>私钥口令（可选）</span><input class="inp" id="dbgPass" name="ssh-key-passphrase" type="password" autocomplete="current-password"></label>
     </div>
-    <div id="debugSSHHostKey" class="warnbox">${icon("warning",true)} 首次连接会显示并固定 SSH 主机密钥指纹；已固定指纹变化时停止连接，不能静默接受。</div>
-    <label class="debug-field" id="debugDirectoryFields"><span>本机目录</span><input class="inp mono" id="debugDirectoryPath" value="${esc(s?.directory||"")}" placeholder="~/Workspace/Project/out"><span class="hint">通过系统目录选择器保存安全书签，不扫描书签范围之外的文件。</span></label>
-    <div id="debugSMBFields" class="debug-source">
-      <label class="debug-field"><span>SMB 共享地址</span><input class="inp mono" id="debugSMBShare" value="${esc(s?.share||"")}" placeholder="smb://server/share"></label>
-      <label class="debug-field"><span>SMB 账户</span><input class="inp mono" id="debugSMBUser" name="smb-username" value="${esc(s?.username||"")}" autocomplete="username" placeholder="DOMAIN\\build-reader"></label>
-      <label class="debug-field"><span>SMB 密码</span><input class="inp" id="debugSMBPassword" name="smb-password" type="password" autocomplete="current-password" placeholder="${esc(smbPasswordHint)}"><span class="hint">密码只写入系统 Keychain；可见配置只显示账户名。</span></label>
-    </div>
-    <div id="debugWSLFields">
-      <label class="debug-field"><span>WSL 发行版</span><input class="inp mono" id="debugWSLDistribution" value="${esc(s?.distribution||"")}" placeholder="Ubuntu-24.04"></label>
-      <p class="hint">根目录使用发行版内的 Linux 路径；Provider 通过封闭文件适配器读取，不提供 wsl.exe 命令或终端。</p>
-    </div>
-    <p class="hint" id="debugServerError" role="alert" hidden></p>
-    <p class="hint">保存只建立编译产物来源；连接成功不代表设备已授权，也不会执行远端命令。</p>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" onclick="saveDebugServer('${id}')">${editing?"保存来源":"添加来源"}</button></div></div>`);
+    <label class="debug-field"><span>编译根目录（绝对路径）</span><input class="inp mono" id="dbgRoot" value="${esc(s?.root||"")}" placeholder="/home/builder/out/rk3568/debug"></label>
+    <div class="warnbox">${icon("warning",true)} 固定 SSH 主机密钥：请核对指纹 <span class="mono">${esc(s?.hostKey||"SHA256:Zt8f…Q2m")}</span>;保存后只信任这一枚主机密钥。</div>
+    <p class="hint" id="dbgError" role="alert" hidden></p>
+    <div class="modal-actions"><button class="btn" onclick="debugServerManager()">取消</button>
+      <button class="btn" onclick="debugTestConnection()">测试连接并检查主机密钥</button>
+      <button class="btn pri" onclick="saveDebugServer('${esc(id||"")}')">保存已验证服务器</button></div></div>`);
   updateDebugServerEditorFields();
 }
-function setDebugEditorSection(id,visible){
-  const section=$(id);if(!section)return;section.hidden=!visible;section.toggleAttribute("inert",!visible);
-  section.querySelectorAll("input,select,button").forEach(control=>control.disabled=!visible);
-}
 function updateDebugServerEditorFields(){
-  const kind=$("debugServerKind")?.value||"ssh",auth=$("debugSSHAuth")?.value||"password";
-  const error=$("debugServerError");if(error){error.hidden=true;error.textContent="";}
-  $("modalHost").querySelectorAll("[aria-invalid]").forEach(field=>{field.removeAttribute("aria-invalid");field.removeAttribute("aria-describedby");});
-  setDebugEditorSection("debugSSHFields",kind==="ssh");
-  setDebugEditorSection("debugSSHPasswordFields",kind==="ssh"&&auth==="password");
-  setDebugEditorSection("debugSSHKeyFields",kind==="ssh"&&auth==="key");
-  setDebugEditorSection("debugSSHHostKey",kind==="ssh");
-  setDebugEditorSection("debugDirectoryFields",kind==="directory");
-  setDebugEditorSection("debugSMBFields",kind==="smb");
-  setDebugEditorSection("debugWSLFields",kind==="wsl");
+  const auth=$("dbgAuth")?.value||"key";
+  const pwd=$("dbgPwdRow"),key=$("dbgKeyRow");
+  if(pwd)pwd.hidden=auth!=="password";
+  if(key)key.hidden=auth!=="key";
+  const error=$("dbgError");if(error){error.hidden=true;error.textContent="";}
 }
 function debugServerEditorError(message,fieldID){
-  const error=$("debugServerError"),field=$(fieldID);if(error){error.hidden=false;error.textContent=message;}
-  if(field){field.setAttribute("aria-invalid","true");field.setAttribute("aria-describedby","debugServerError");field.focus();}
+  const error=$("dbgError"),field=$(fieldID);
+  if(error){error.hidden=false;error.textContent=message;}
+  if(field){field.setAttribute("aria-invalid","true");field.setAttribute("aria-describedby","dbgError");field.focus();}
+}
+function debugTestConnection(){
+  const error=$("dbgError");
+  if(!error)return;
+  error.hidden=false;
+  error.textContent="正在通过 SSH/SFTP 连接……";
+  setTimeout(()=>{if($("dbgError"))$("dbgError").textContent="连接、凭据、SFTP 根目录与主机密钥均已验证。";},500);
 }
 function saveDebugServer(id){
-  const old=DEBUG_SERVERS.find(x=>x.id===id),name=$("debugServerName").value.trim(),kind=$("debugServerKind").value;
-  $("modalHost").querySelectorAll("[aria-invalid]").forEach(field=>field.removeAttribute("aria-invalid"));
-  if(!name){debugServerEditorError("输入用于识别这个编译来源的名称。","debugServerName");return;}
-  const newID=id||"server-"+Date.now(),next={id:newID,name,kind,status:"待验证",roots:old?.kind===kind?old.roots:[{id:newID+"-root",name:"默认编译根目录",path:debugDefaultRootPath(kind)}]};
-  if(kind==="ssh"){
-    const host=$("debugSSHHost").value.trim(),port=$("debugSSHPort").value.trim(),username=$("debugSSHUser").value.trim(),auth=$("debugSSHAuth").value;
-    if(!host){debugServerEditorError("输入 SSH 主机名或地址。","debugSSHHost");return;}
-    if(!/^\d+$/.test(port)||Number(port)<1||Number(port)>65535){debugServerEditorError("端口必须是 1 到 65535 的十进制数字。","debugSSHPort");return;}
-    if(!username){debugServerEditorError("输入 SSH 登录用户名。","debugSSHUser");return;}
-    next.host=host;next.port=port;next.username=username;next.auth=auth;
-    next.hostKey=old?.kind==="ssh"&&old.host===host&&old.port===port?old.hostKey:"首次连接时确认";
-    if(auth==="password"){
-      if(!$("debugSSHPassword").value&&!(old?.kind==="ssh"&&old.auth==="password"&&old.credentialStored)){debugServerEditorError("输入 SSH 密码；保存后密码只进入系统 Keychain。","debugSSHPassword");return;}
-      next.credentialStored=true;
-    }else{
-      const keyName=$("debugSSHKey").value.trim()||(old?.kind==="ssh"&&old.auth==="key"?old.keyName:"");
-      if(!keyName){debugServerEditorError("选择用于登录的 SSH 私钥。","debugSSHKey");return;}
-      next.keyName=keyName;next.credentialStored=true;
-    }
-  }else if(kind==="directory"){
-    const directory=$("debugDirectoryPath").value.trim();
-    if(!directory){debugServerEditorError("选择或输入本机编译目录。","debugDirectoryPath");return;}
-    next.directory=directory;
-  }else if(kind==="smb"){
-    const share=$("debugSMBShare").value.trim(),username=$("debugSMBUser").value.trim();
-    if(!/^smb:\/\//i.test(share)){debugServerEditorError("SMB 共享地址必须以 smb:// 开头。","debugSMBShare");return;}
-    if(!username){debugServerEditorError("输入用于访问 SMB 共享的账户。","debugSMBUser");return;}
-    if(!$("debugSMBPassword").value&&!(old?.kind==="smb"&&old.credentialStored)){debugServerEditorError("输入 SMB 密码；保存后密码只进入系统 Keychain。","debugSMBPassword");return;}
-    next.share=share;next.username=username;next.credentialStored=true;
-  }else{
-    const distribution=$("debugWSLDistribution").value.trim();
-    if(!distribution){debugServerEditorError("输入或选择 WSL 发行版名称。","debugWSLDistribution");return;}
-    next.distribution=distribution;
-  }
-  if(id){const index=DEBUG_SERVERS.findIndex(x=>x.id===id);if(index>=0)DEBUG_SERVERS[index]=next;if(old?.kind!==kind&&S.debug.server===id){S.debug.root=next.roots[0].id;S.debug.selected.clear();}}
-  else {DEBUG_SERVERS.push(next);S.debug.server=newID;S.debug.root=next.roots[0].id;S.debug.selected.clear();}
-  closeModal();renderPage();
+  const name=$("dbgName").value.trim(),host=$("dbgHost").value.trim(),port=$("dbgPort").value.trim();
+  const username=$("dbgUser").value.trim(),auth=$("dbgAuth").value,root=$("dbgRoot").value.trim();
+  if(!name){debugServerEditorError("输入用于识别这台服务器的显示名称。","dbgName");return;}
+  if(!host){debugServerEditorError("输入 SSH 主机名或 IP。","dbgHost");return;}
+  if(!/^\d+$/.test(port)||Number(port)<1||Number(port)>65535){debugServerEditorError("端口必须是 1 到 65535 的十进制数字。","dbgPort");return;}
+  if(!username){debugServerEditorError("输入 SSH 登录用户名。","dbgUser");return;}
+  if(!root.startsWith("/")){debugServerEditorError("编译根目录必须是绝对路径。","dbgRoot");return;}
+  const old=DEBUG_SERVERS.find(x=>x.id===id);
+  const next={id:id||("srv-"+(DEBUG_SERVERS.length+1)),name,host,port,username,auth,
+    keyName:auth==="key"?$("dbgKey").value.trim():"",
+    credentialStored:true,hostKey:old?.hostKey||"SHA256:Zt8f…Q2m",root};
+  if(old){DEBUG_SERVERS[DEBUG_SERVERS.indexOf(old)]=next;}
+  else{DEBUG_SERVERS.push(next);S.debug.server=next.id;}
+  debugServerManager();
 }
 function deleteDebugServerModal(id){
   const s=DEBUG_SERVERS.find(x=>x.id===id);if(!s)return;
-  modal(`<div class="modal dangerm"><h3>删除编译来源</h3><div class="impact">将删除 <b>${esc(s.name)}</b>、编译根目录书签及 ArkDeck 保存的 Keychain 凭据；不会删除 SSH 私钥文件、源服务器或共享中的编译产物，也不会修改设备。</div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" onclick="deleteDebugServer('${id}')">删除编译来源</button></div></div>`);
+  modal(`<div class="modal"><h3>移除此服务器?</h3>
+    <p class="hint">服务器配置及其 Keychain 凭据将从这台 Mac 上移除。远端主机上的文件、私钥与设备数据都不会被删除。</p>
+    <dl class="kv"><dt>服务器</dt><dd>${esc(s.name)}</dd><dt>端点</dt><dd>${esc(s.username)}@${esc(s.host)}:${esc(s.port)}</dd></dl>
+    <div class="modal-actions"><button class="btn" onclick="debugServerManager()">取消</button>
+      <button class="btn danger" onclick="deleteDebugServer('${s.id}')">移除服务器</button></div></div>`);
 }
 function deleteDebugServer(id){
-  if(DEBUG_SERVERS.length===1)return;DEBUG_SERVERS=DEBUG_SERVERS.filter(s=>s.id!==id);
-  if(S.debug.server===id){S.debug.server=DEBUG_SERVERS[0].id;S.debug.root=DEBUG_SERVERS[0].roots[0].id;S.debug.selected.clear();}
-  closeModal();renderPage();
+  DEBUG_SERVERS=DEBUG_SERVERS.filter(x=>x.id!==id);
+  if(S.debug.server===id)S.debug.server=DEBUG_SERVERS[0]?.id||"";
+  debugServerManager();
 }
-function openDebugRootEditor(serverID,rootID){
-  const s=DEBUG_SERVERS.find(x=>x.id===serverID),r=s?.roots.find(x=>x.id===rootID),editing=!!r;if(!s)return;
-  modal(`<div class="modal"><h3>${editing?"编辑编译根目录":"添加编译根目录"}</h3>
-    <p class="hint">来源：${esc(s.name)}</p>
-    <label class="debug-field"><span>显示名称</span><input class="inp" id="debugRootName" value="${esc(r?.name||"")}" placeholder="例如：rk3568 · Debug"></label>
-    <label class="debug-field"><span>根目录</span><input class="inp mono" id="debugRootPath" value="${esc(r?.path||"")}" placeholder="${esc(debugRootPlaceholder(s))}"></label>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" onclick="saveDebugRoot('${serverID}','${rootID}')">${editing?"保存根目录":"添加根目录"}</button></div></div>`);
+
+/* --- validate → reviewed plan → run → verified --- */
+function debugValidatePlan(){
+  if(!debugInputsReady())return;
+  if(S.debug.stage==="ready"){debugPlanModal();return;}
+  S.debug.stage="validating";renderPage();
+  setTimeout(()=>{S.debug.stage="ready";renderPage();debugPlanModal();},700);
 }
-function saveDebugRoot(serverID,rootID){
-  const s=DEBUG_SERVERS.find(x=>x.id===serverID),name=$("debugRootName").value.trim(),path=$("debugRootPath").value.trim();if(!s||!name||!path)return;
-  if(rootID){const r=s.roots.find(x=>x.id===rootID);if(r){r.name=name;r.path=path;}}
-  else {const id=serverID+"-root-"+Date.now();s.roots.push({id,name,path});S.debug.root=id;}
-  closeModal();renderPage();
-}
-function deleteDebugRootModal(serverID,rootID){
-  const s=DEBUG_SERVERS.find(x=>x.id===serverID),r=s?.roots.find(x=>x.id===rootID);if(!s||!r||s.roots.length===1)return;
-  modal(`<div class="modal dangerm"><h3>删除编译根目录</h3><div class="impact">将从 <b>${esc(s.name)}</b> 移除书签 <span class="mono">${esc(r.path)}</span>；源目录及其中产物不会被删除。</div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" onclick="deleteDebugRoot('${serverID}','${rootID}')">删除根目录</button></div></div>`);
-}
-function deleteDebugRoot(serverID,rootID){
-  const s=DEBUG_SERVERS.find(x=>x.id===serverID);if(!s||s.roots.length===1)return;s.roots=s.roots.filter(r=>r.id!==rootID);
-  if(S.debug.root===rootID)S.debug.root=s.roots[0].id;S.debug.selected.clear();closeModal();renderPage();
-}
-function debugReview(){
-  const selected=debugSelectedArtifacts();if(!selected.length)return;
-  modal(`<div class="modal" style="max-width:720px"><h3>检查替换计划</h3>
-    <div class="warnbox">${icon("warning",true)} ABI / ABC 兼容性校验用于阻止错误产物进入设备；替换前备份用于发布或启动验证失败后的回滚。两道保护都会在首个设备写入前成为硬门。</div>
-    <dl class="kv"><dt>目标</dt><dd>DAYU200 · TGT-9587… · binding r12</dd><dt>编译来源</dt><dd>${esc(debugServer().name)} · ${debugSourceKindLabel(debugServer())} · ${esc(debugRoot().name)}</dd><dt>effect</dt><dd>deviceMutation</dd><dt>回滚策略</dt><dd>每项先备份 · 验证失败自动恢复并复验</dd></dl>
-    <div class="tablewrap"><table><tr><th>产物</th><th>主机侧校验</th><th>发布策略</th></tr>${selected.map(a=>`<tr><td><b>${esc(a.name)}</b><div class="mono">${esc(a.relative)}</div></td><td>${esc(a.validation)}</td><td>staging → 备份当前版本 → 原子替换 → readback</td></tr>`).join("")}</table></div>
-    <p class="hint">源路径只用于读取受信编译产物；设备目标路径由 Runtime 根据 operation/profile materialize，界面不接受任意远端路径。</p>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">返回选择</button><button class="btn pri" onclick="startDebugDeployment()">备份并替换 ${selected.length} 个产物</button></div></div>`);
+function debugPlanModal(){
+  modal(`<div class="modal wide"><h3>检查替换计划</h3>
+    <div class="warnbox">${icon("warning",true)} ABI 与签名校验会在设备写入前阻止不兼容输入。Runtime 随后备份当前动态库、原子发布、重启所属 Ability，并要求动态库加载 maps;任一验证失败都会自动恢复并复验旧动态库。</div>
+    <dl class="kv">
+      <dt>精确目标设备</dt><dd>TGT-9587… · binding r12</dd>
+      <dt>动态库</dt><dd>${esc(S.debug.lib)}</dd>
+      <dt>所属 Bundle</dt><dd>${esc(S.debug.bundle)}</dd>
+      <dt>effect</dt><dd>deviceMutation</dd>
+      <dt>必需验证</dt><dd>验证 hash、进程与已加载 maps</dd>
+      <dt>失败处理</dt><dd>失败时恢复并复验旧动态库</dd>
+      <dt>Plan digest</dt><dd>sha256:7b2e04c9…a13f</dd>
+    </dl>
+    <h4 style="margin:2px 0 0;font-size:13px">已生成步骤</h4>
+    <div class="tablewrap"><table><tr><th>#</th><th>step</th><th>kind</th><th>effect</th></tr>
+      ${DEBUG_PLAN_STEPS.map(([id,kind,fx],i)=>`<tr><td>${i+1}</td><td class="mono">${esc(id)}</td><td>${esc(kind)}</td>
+        <td><span class="effect ${fx==="deviceMutation"?"mut":fx==="hostOnly"?"host":"read"}">${esc(fx)}</span></td></tr>`).join("")}
+    </table></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">返回选择</button>
+      <button class="btn pri" data-sync-id="debug.artifacts.submit" onclick="startDebugDeployment()">备份、替换、重启并验证</button></div></div>`);
 }
 function startDebugDeployment(){
-  const selected=debugSelectedArtifacts();if(!selected.length)return;closeModal();S.debug.deployState="running";
-  startJob(addJob({title:"Debug 产物替换 · "+selected.length+" 项 · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
-    phases:["Preflight","LeaseArtifacts","VerifyCompatibility","Stage","BackupCurrent","AtomicPublish","Readback","Complete"],phaseIdx:0,safeBoundary:4,tick:430,
-    log:["→ Preflight","编译来源:"+debugServer().name+" / "+debugRoot().name],pages:["debug"],
-    doneMsg:"完成:已备份并原子替换 "+selected.length+" 个产物;等待显式重启目标。",
-    onDone:st=>{S.debug.deployState=st==="succeeded"?"ready":"idle";S.debug.lastDeploy=st==="succeeded"?{count:selected.length,backupCount:selected.length}:null;renderPageIf(["debug"]);}}));
+  closeModal();
+  S.debug.stage="running";
+  startJob(addJob({title:"部署 app-owned 动态库 · "+S.debug.lib+" · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
+    phases:["Preflight","LeaseArtifact","ValidateELF","BackupCurrent","AtomicPublish","RestartAbility","ReadbackMaps","Complete"],
+    phaseIdx:0,safeBoundary:3,tick:460,
+    log:["→ Preflight","来源："+(S.debug.pickedFrom||"本地文件 · "+S.debug.picked)],pages:["debug"],
+    doneMsg:"完成：动态库已发布,Ability 已重启,加载状态已验证。",
+    onDone:st=>{S.debug.stage=st==="succeeded"?"verified":"idle";renderPageIf(["debug"]);}}));
   renderPage();
 }
-function debugRestartModal(){
-  if(S.debug.deployState!=="ready")return;
-  modal(`<div class="modal dangerm"><h3>重启设备以加载替换产物</h3>
-    <div class="impact"><b>影响范围</b><ul><li>目标：DAYU200 · binding r12</li><li>当前前台应用和其他设备会话将中断</li><li>重启后 Runtime 必须重新绑定，并验证已替换产物与启动状态；失败时恢复备份</li></ul></div>
-    <p class="hint">重启是独立 typed action，不由“替换成功”自动触发，也不从 UI 点击获得 Runtime authority。</p>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">暂不重启</button><button class="btn danger" onclick="startDebugRestart()">重启 DAYU200</button></div></div>`);
+
+function debugCancelDeployment(){
+  S.debug.stage="idle";S.debug.jobID=null;renderPage();
 }
-function startDebugRestart(){
-  closeModal();S.debug.deployState="restarting";
-  startJob(addJob({title:"重启并验证 Debug 产物 · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
-    phases:["Preflight","Restart","WaitReconnect","Rebind","VerifyArtifacts","VerifyBoot","Complete"],phaseIdx:0,safeBoundary:1,tick:520,
-    log:["→ Preflight"],pages:["debug"],doneMsg:"完成:设备已重连,产物 readback 与启动状态验证通过。",
-    onDone:st=>{S.debug.deployState=st==="succeeded"?"verified":"ready";renderPageIf(["debug"]);}}));
-  renderPage();
-}
-function debugResetDeployment(){S.debug.deployState="idle";S.debug.lastDeploy=null;renderPage()}
-function debugOpenLogs(){S.debugTab="logs";renderPage()}
+function debugOpenLogs(){S.debugTab="logs";renderPage();}
 function debugTabKey(event,current){
-  const keys=["artifacts","logs","apps","net","cmd"],i=keys.indexOf(current);let next=i;
-  if(event.key==="ArrowRight")next=(i+1)%keys.length;else if(event.key==="ArrowLeft")next=(i+keys.length-1)%keys.length;else if(event.key==="Home")next=0;else if(event.key==="End")next=keys.length-1;else return;
-  event.preventDefault();S.debugTab=keys[next];renderPage();$("debug-tab-"+keys[next])?.focus();
+  const order=["artifacts","logs","apps","net","cmd"];const i=order.indexOf(current);
+  let next=null;
+  if(event.key==="ArrowRight")next=order[(i+1)%order.length];
+  else if(event.key==="ArrowLeft")next=order[(i-1+order.length)%order.length];
+  else if(event.key==="Home")next=order[0];
+  else if(event.key==="End")next=order[order.length-1];
+  if(!next)return;
+  event.preventDefault();S.debugTab=next;renderPage();
+  requestAnimationFrame(()=>$("debug-tab-"+next)?.focus());
 }
+
 const LOGPOOL=[
-  ["I","ArkUI","[pipeline] vsync frame scheduled"],
-  ["W","ArkUI","[list_layout] measure retry, node 94"],
-  ["I","RenderService","flush composition, 1 surface dirty"],
-  ["W","ArkUI","[render] flush delayed 18ms"],
-  ["E","AbilityMS","connect timeout, bundle=com.example.settings"],
-  ["I","Hiview","cpu usage snapshot written"],
-  ["W","Multimodal","touch dispatch queue depth 3"],
-  ["I","WindowManager","focus window unchanged (12)"]
+  {lv:"I",tag:"ArkUI",m:"[list_layout] measure ok, node 104"},
+  {lv:"W",tag:"ArkUI",m:"[render] flush delayed 19ms"},
+  {lv:"W",tag:"Graphic",m:"buffer queue starved, dropping 1 frame"},
+  {lv:"E",tag:"AbilityMS",m:"connect timeout, bundle=com.example.settings"},
+  {lv:"I",tag:"AppSpawn",m:"loaded app-owned libfeature_debug.so"},
+  {lv:"W",tag:"Net",m:"reverse rule tcp:9229 already bound, reusing"},
+  {lv:"E",tag:"Ability",m:"onForeground took 118ms"},
+  {lv:"W",tag:"ArkUI",m:"image decode fell back to software path"}
 ];
 const LVORD={D:0,I:1,W:2,E:3};
 function logText(){
-  const q=S.lg.tag.trim().toLowerCase();
-  const rows=S.lg.lines.filter(l=>LVORD[l.lv]>=LVORD[S.lg.lvl]&&(!q||l.tag.toLowerCase().includes(q)))
-    .slice(-200).map(l=>"07-13 "+l.t+" "+l.lv+" "+l.tag+": "+l.m);
-  return rows.join("\n")||"(当前过滤条件下没有日志)";
+  const g=S.lg;
+  return g.lines.filter(l=>LVORD[l.lv]>=LVORD[g.lvl]&&(!g.tag||l.tag.toLowerCase().includes(g.tag.toLowerCase())))
+    .map(l=>`${l.t}  ${l.lv}  ${l.tag}: ${l.m}`).join("\n");
 }
 function updateLogDom(){
-  const el=$("logstream");if(el){el.textContent=logText();el.scrollTop=el.scrollHeight;}
-  const sc=$("shardchip");if(sc)sc.textContent="host 轮转: 片 #"+S.lg.piece+" · "+S.lg.shard.toFixed(1)+"MB/64MB · 配额 1GB";
+  const stream=$("logstream");if(stream)stream.textContent=logText();
+  const chip=$("shardchip");if(chip)chip.textContent=`host 轮转： 片 #${S.lg.piece} · ${S.lg.shard.toFixed(1)}MB/64MB · 配额 1GB`;
 }
 function setLogTag(el){S.lg.tag=el.value;updateLogDom();}
 function startLogs(){
-  if(S.lg.on)return;S.lg.on=true;
+  if(S.lg.on)return;
+  S.lg.on=true;S.lg.paused=false;S.lg.pend=0;
   S.lg.timer=setInterval(()=>{
-    const p=LOGPOOL[Math.floor(Math.random()*LOGPOOL.length)];
-    S.lg.ms+=137+Math.floor(Math.random()*420);
-    const sec=Math.floor(S.lg.ms/1000);
-    const t="11:"+String(2+Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")+"."+String(S.lg.ms%1000).padStart(3,"0");
-    S.lg.lines.push({t,lv:p[0],tag:p[1],m:p[2]});
-    if(S.lg.lines.length>400)S.lg.lines.shift();
-    S.lg.shard+=0.05;if(S.lg.shard>=64){S.lg.shard=0;S.lg.piece++;}
-    if(S.lg.paused){S.lg.pend++;const pc=$("pendchip");if(pc)pc.textContent="界面已暂停 · "+S.lg.pend+" 行待补";}
-    else if(S.nav==="debug"&&S.debugTab==="logs")updateLogDom();
-  },650);
+    const seed=LOGPOOL[S.lg.lines.length%LOGPOOL.length];
+    const t=new Date(Date.now()).toISOString().slice(11,23);
+    S.lg.lines.push({t,lv:seed.lv,tag:seed.tag,m:seed.m});
+    if(S.lg.lines.length>60)S.lg.lines.shift();
+    S.lg.shard+=0.4;
+    if(S.lg.shard>=64){S.lg.shard=0;S.lg.piece++;}
+    if(S.lg.paused)S.lg.pend++;else updateLogDom();
+  },700);
   renderPage();
 }
 function stopLogs(){if(!S.lg.on)return;clearInterval(S.lg.timer);S.lg.on=false;S.lg.paused=false;S.lg.pend=0;renderPage();}
 function togglePauseLogs(){S.lg.paused=!S.lg.paused;if(!S.lg.paused)S.lg.pend=0;renderPage();}
-function clearBufModal(){
-  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
-    <h3>⚠ 清空设备日志 buffer?</h3>
-    <div class="impact"><span class="mono">hilog -r</span> 是<b>全局且不可恢复</b>的设备端操作,会影响其他工具的采集;普通开始/停止绝不自动清空。该操作计入审计。</div>
-    <div class="checks"><label><input type="checkbox" onchange="ckGate('goClr',1)"> 我了解这会清空所有工具可见的设备日志</label></div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn danger" id="goClr" disabled onclick="doClearBuf()">清空设备 buffer</button></div>
-  </div>`);
-}
-function doClearBuf(){
-  closeModal();
-  S.lg.lines=[{t:"11:04:00.000",lv:"I",tag:"audit",m:"hilog -r executed (user-confirmed); device-side buffer cleared"}];
-  renderPage();
-}
-function toggleApp(i){const a=S.apps[i];a.running=!a.running;a.pid=a.running?2000+Math.floor(Math.random()*3000):0;renderPage();}
-function uninstallModal(i){
-  const a=S.apps[i];
-  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
-    <h3>⚠ 卸载 ${esc(a.pkg)}</h3>
-    <div class="impact"><b>影响范围</b><ul>
-      <li>设备:DAYU200 · target TGT-…</li>
-      <li>应用本体与其数据将从设备移除(deviceMutation,计入审计)</li>
-      <li>ArkDeck 不保留该应用数据的副本</li></ul></div>
-    <div class="checks"><label><input type="checkbox" onchange="ckGate('goUn',1)"> 我确认卸载 ${esc(a.pkg)} 及其数据</label></div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn danger" id="goUn" disabled onclick="closeModal();S.apps.splice(${i},1);renderPage()">卸载 ${esc(a.pkg)}</button></div>
-  </div>`);
-}
-function installModal(){
-  modal(`<div class="modal" role="dialog" aria-modal="true">
-    <h3>安装 HAP</h3>
-    <dl class="kv">
-      <dt>文件</dt><dd>~/Downloads/todo-demo.hap · 4.2MB</dd>
-      <dt>包名 / 版本</dt><dd>com.sample.todo · 0.3.0</dd>
-      <dt>签名</dt><dd>证书链完整 · profile 含本设备 <span class="chip ok">✓</span></dd>
-    </dl>
-    <p class="hint">安装是 deviceMutation:进入任务抽屉,按阶段推进,可在安全边界取消。</p>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="closeModal();doInstall()">安装到 DAYU200</button></div>
-  </div>`);
-}
-function doInstall(){
-  startJob(addJob({title:"安装 HAP · todo-demo.hap · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
-    phases:["Preflight","Transfer","Install","Verify","Complete"],phaseIdx:0,safeBoundary:1,tick:450,
-    log:["→ Preflight"],pages:["debug"],
-    onDone:st=>{if(st==="succeeded"&&!S.apps.some(a=>a.pkg==="com.sample.todo"))
-      S.apps.push({pkg:"com.sample.todo",ver:"0.3.0",running:false,pid:0});renderPageIf(["debug"]);}}));
+function logFilterTokens(){
+  const parts=[];
+  if(S.lg.tag.trim())parts.push("tag:"+S.lg.tag.trim());
+  parts.push("level:"+({I:"info",W:"warn",E:"error"}[S.lg.lvl]||"warn"));
+  return "["+parts.join(", ")+"]";
 }
 function fwdModal(){
-  modal(`<div class="modal" role="dialog" aria-modal="true">
-    <h3>新建端口转发</h3>
-    <p class="hint">forward:本机端口 → 设备端口(hdc fport)。</p>
-    <div style="display:flex;gap:8px;align-items:center">
-      <span class="hint">本机 tcp:</span><input class="inp mono" id="fl" value="9223" style="width:90px">
-      <span class="hint">→ 设备 tcp:</span><input class="inp mono" id="fr" value="9223" style="width:90px">
-    </div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="addFwd()">添加转发</button></div>
-  </div>`);
+  modal(`<div class="modal"><h3>新建 typed 端口规则</h3>
+    <p class="hint">只接受 1024 到 65535 的十进制 TCP 端口；不接受 shell 片段、scheme、host 或 flag。</p>
+    <label class="debug-field"><span>Host 端口</span><input class="inp mono" id="fwdL" placeholder="8080" inputmode="numeric"></label>
+    <label class="debug-field"><span>设备端口</span><input class="inp mono" id="fwdR" placeholder="9229" inputmode="numeric"></label>
+    <p class="hint" id="fwdErr" role="alert" hidden></p>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="addFwd()">添加规则</button></div></div>`);
 }
 function addFwd(){
-  const l=($("fl").value.trim()||"9223").replace(/[^0-9]/g,""),r=($("fr").value.trim()||"9223").replace(/[^0-9]/g,"");
+  const l=$("fwdL").value.trim(),r=$("fwdR").value.trim(),err=$("fwdErr");
+  const ok=v=>/^\d+$/.test(v)&&Number(v)>=1024&&Number(v)<=65535;
+  if(!ok(l)){err.hidden=false;err.textContent="Host 端口必须在 1024 到 65535 之间。";$("fwdL").focus();return;}
+  if(!ok(r)){err.hidden=false;err.textContent="设备端口必须在 1024 到 65535 之间。";$("fwdR").focus();return;}
   S.fwd.push({l:"tcp:"+l,r:"tcp:"+r});closeModal();renderPage();
 }
 function delFwd(i){S.fwd.splice(i,1);renderPage();}
 const CMDS={
-  "device.packageInventory":{label:"已安装包清单",effect:"readOnly",argv:"hdc -t <redacted-connect-key> shell bm dump -a",out:"包清单来自 production probe；此原型不硬编码设备数据。",ms:812},
-  "device.debugParameterRead":{label:"读取 ArkUI Debug 参数",effect:"readOnly",argv:"hdc -t <redacted-connect-key> shell param get persist.ace.debug.enabled",out:"参数值来自 production probe。",ms:104},
-  "device.windowInventory":{label:"窗口清单",effect:"readOnly",argv:"hdc -t <redacted-connect-key> shell hidumper -s WindowManagerService -a -a",out:"窗口清单来自 production probe。",ms:436},
-  "device.uptime":{label:"设备运行时长",effect:"readOnly",argv:"hdc -t <redacted-connect-key> shell uptime",out:"运行时长来自 production probe。",ms:96}
+  "device.packageInventory":{label:"device.packageInventory",effect:"readOnly",
+    argv:"hdc -t TGT-9587… shell bm dump -a",out:"com.example.app\ncom.ohos.launcher\ncom.ohos.settings"},
+  "device.debugParameterRead":{label:"device.debugParameterRead",effect:"readOnly",
+    argv:"hdc -t TGT-9587… shell param get persist.hdc.mode",out:"persist.hdc.mode=all\npersist.debug.trace=1"},
+  "device.windowInventory":{label:"device.windowInventory",effect:"readOnly",
+    argv:"hdc -t TGT-9587… shell hidumper -s WindowManager",out:"WindowName: EntryAbility  id=12  visible=true"},
+  "device.uptime":{label:"device.uptime",effect:"readOnly",
+    argv:"hdc -t TGT-9587… shell uptime",out:"up 4 days, 02:17,  load average: 0.41 0.38 0.35"}
 };
 function runCmd(){
-  const c=S.cmd.val.trim();if(!c)return;
-  const t=CMDS[c];
-  if(!t)return;
-  S.cmd.hist.unshift({c,label:t.label,argv:t.argv,exit:0,ms:t.ms,out:t.out});
-  if(S.cmd.hist.length>5)S.cmd.hist.pop();
+  const t=CMDS[S.cmd.val];
+  S.cmd.hist=[{c:S.cmd.val,label:t.label,argv:t.argv,exit:0,ms:148,out:t.out,
+    sha:"b2c40e91f7a5d3086c1e4b77a09fd521"}];
   renderPage();
 }
+
 function pDebug(){
-  const tb=S.debugTab;
+  const tb=S.debugTab,d=S.debug;
   const tabs=S.language==="en"?[["artifacts","Artifacts"],["logs","Logs"],["apps","Apps"],["net","Network"],["cmd","Commands"]]
     :[["artifacts","产物替换"],["logs","获取日志"],["apps","应用"],["net","网络"],["cmd","只读工具"]];
+  const availability=(ok,reference)=>ok
+    ?`<span class="acc ok" data-sync-id="debug.availability.status">✓ Provider 报告可用</span>`
+    :`<span class="acc" style="color:var(--danger)" data-sync-id="debug.availability.status">⊘ 不可用</span>`;
   let body="";
+
   if(tb==="artifacts"){
-    const server=debugServer(),root=debugRoot(),rows=debugArtifactRows(),selected=debugSelectedArtifacts();
-    const state=S.debug.deployState;
-    const result=state==="running"?`<div class="card" role="status"><div class="debug-selection"><b>正在校验、备份并替换</b><span class="chip warn pulse">运行中</span></div><div class="ibar" style="max-width:none;width:100%"></div><p class="hint">完整阶段、取消边界和 readback 在底部任务检查器中持续更新。</p></div>`
-      :state==="ready"?`<div class="debug-result" role="status"><span class="chip ok">✓ 替换完成</span><div class="copy"><b>${S.debug.lastDeploy?.count||selected.length} 个产物已备份并通过发布 readback</b><p>新产物尚未通过重启后的加载验证。你可以现在重启，也可以先保留当前运行态。</p><div class="actions"><button class="btn danger" onclick="debugRestartModal()">重启设备…</button><button class="btn" onclick="debugOpenLogs()">获取日志</button></div></div></div>`
-      :state==="restarting"?`<div class="card" role="status"><div class="debug-selection"><b>正在重启并验证替换结果</b><span class="chip warn pulse">等待设备重连</span></div><div class="ibar" style="max-width:none;width:100%"></div><p class="hint">重连前不会向其他候选设备继续派发。</p></div>`
-      :state==="verified"?`<div class="debug-result" role="status"><span class="chip ok">✓ 重启验证通过</span><div class="copy"><b>设备已重连，产物与启动状态匹配</b><p>下一步可获取有界日志，确认问题是否消失。</p><div class="actions"><button class="btn pri" onclick="debugOpenLogs()">获取日志并验证</button><button class="btn" onclick="debugResetDeployment()">再次选择产物</button></div></div></div>`:"";
+    const ready=debugInputsReady();
+    const stage=d.stage;
+    const picked=d.picked
+      ?`<div class="mono" style="font-size:12px">${esc(d.picked)}</div>${d.pickedFrom?`<div class="hint mono">${esc(d.pickedFrom)}</div>`:""}`
+      :`<div class="hint mono">${d.sourceKind==="local"?"尚未选择本地动态库":"尚未选择远端动态库"}</div>`;
+    const feedback=stage==="validating"
+      ?`<div class="hint">◴ 正在校验已签名 ELF 并生成 Runtime 计划…</div>`
+      :stage==="ready"
+      ?`<div class="okbox">${icon("warning",true)}<div><b>Runtime 计划已可检查</b>
+          <div class="hint mono">ELF arm64-v8a · ELF64 · machine AArch64</div>
+          <div class="hint mono">Build ID 4f2a91c7e0b3d8a5 · SHA-256 9c1d7ae4…f0b2</div></div></div>`
+      :stage==="running"
+      ?`<div class="card" role="status" style="gap:8px"><div class="debug-selection"><b>Runtime 正在部署并验证动态库</b><span class="chip warn pulse">运行中</span></div>
+          <div class="ibar" style="max-width:none;width:100%"></div>
+          <p class="hint">完整阶段、取消边界与 readback 在底部任务检查器中持续更新。</p></div>`
+      :stage==="verified"
+      ?`<div class="debug-result" role="status"><span class="chip ok">✓</span><div class="copy">
+          <b>动态库已发布，Ability 已重启，加载状态已验证</b>
+          <p>下一步可获取有界日志，确认问题是否消失。</p></div></div>`:"";
     body=`<div class="debug-shell">
-      <div class="debug-scope"><b>目标设备</b><span class="mono">DAYU200 · TGT-9587… · binding r12</span><span class="chip ok">✓ 已确认</span><span class="effect mut">deviceMutation</span></div>
-      <div class="card" data-acin><span class="ac">GJ-3 · proposed source browser</span>
-        <div class="debug-selection"><div><h2>编译来源</h2><p class="hint">切换 SSH 服务器、本机目录、SMB 共享或 WSL 发行版，再选择该来源登记的编译根目录。</p></div><span style="flex:1"></span><button class="btn" onclick="debugServerManager()">管理来源与根目录…</button></div>
-        <div class="debug-source">
-          <label class="debug-field"><span>编译来源</span><select class="inp" onchange="debugUseServer(this.value)">${DEBUG_SERVERS.map(s=>`<option value="${s.id}" ${s.id===server.id?"selected":""}>${esc(s.name)} · ${esc(s.status)}</option>`).join("")}</select><span class="hint">${debugSourceKindLabel(server)} · ${esc(debugSourceAuthLabel(server))}</span></label>
-          <label class="debug-field"><span>编译根目录</span><select class="inp mono" onchange="debugUseRoot(this.value)">${server.roots.map(r=>`<option value="${r.id}" ${r.id===root.id?"selected":""}>${esc(r.name)} — ${esc(r.path)}</option>`).join("")}</select></label>
-        </div>
+      <div class="debug-scope"><b>目标设备</b><span class="mono">DAYU200 · TGT-9587… · binding r12</span>
+        <span class="chip ok">✓ Binding 已确认</span><span class="effect mut">deviceMutation</span></div>
+
+      <div class="debug-cols">
+        <section class="gsec">
+          <h2 class="sechead">编译产物${availability(true)}</h2>
+          <p class="hint">从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。</p>
+          <span class="seg mini" aria-label="构建来源">
+            <button class="${d.sourceKind==="local"?"on":""}" onclick="debugSetSourceKind('local')">本地文件</button>
+            <button class="${d.sourceKind==="remote"?"on":""}" onclick="debugSetSourceKind('remote')">远端服务器</button>
+          </span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${d.sourceKind==="local"
+              ?`<button class="btn" onclick="debugPickLocal()">选择本地 .so…</button>`
+              :`<button class="btn" onclick="debugBrowseRemote()">浏览远端 .so…</button>
+                 <button class="btn" onclick="debugServerManager()">管理服务器…</button>`}
+          </div>
+          <div><div class="hint">已选动态库</div>${picked}</div>
+          <p class="hint">SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。</p>
+        </section>
+
+        <section class="gsec">
+          <h2 class="sechead">部署目标</h2>
+          <p class="hint">填写所属应用与动态库名称。Runtime 根据已发布 profile 推导 app-owned 设备目标位置；此页面不接受远端路径。</p>
+          <label class="debug-field"><span>目标 Bundle</span>
+            <input class="inp mono" value="${esc(d.bundle)}" placeholder="com.example.app" oninput="debugSetBundle(this)" onchange="renderPage()"></label>
+          <label class="debug-field"><span>动态库名称</span>
+            <input class="inp mono" value="${esc(d.lib)}" placeholder="libfeature_debug.so" oninput="debugSetLib(this)" onchange="renderPage()"></label>
+          <dl class="kv"><dt>产物 ABI</dt><dd>校验时从已签名 ELF 自动读取</dd></dl>
+          ${d.bundle&&!debugBundleValid(d.bundle)?'<p class="hint" style="color:var(--danger)">请输入 com.example.app 形式的 Bundle 名称。</p>':""}
+          ${d.lib&&!debugLibValid(d.lib)?'<p class="hint" style="color:var(--danger)">请输入不含目录的 lib&lt;name&gt;.so 文件名。</p>':""}
+          <details class="debug-disclose"><summary>必需的验证与回滚</summary>
+            <dl class="kv"><dt>发布后验证</dt><dd>验证 hash、进程与已加载 maps</dd>
+              <dt>回滚策略</dt><dd>失败时恢复并复验旧动态库</dd></dl>
+            <p class="hint">Native Debug 路径始终验证发布 hash、重启后的进程与动态库加载 maps;任一验证失败都会自动恢复并复验旧动态库。</p>
+          </details>
+        </section>
       </div>
-      <div class="card">
-        <div><h2>搜索编译产物</h2><p class="hint">只搜索当前根目录下的 <span class="mono">.so</span> / <span class="mono">.abc</span>；结果路径是编译来源，不是可编辑的设备目标路径。</p></div>
-        <div class="debug-search">
-          <label class="debug-field"><span>文件名或相对路径</span><input class="inp mono" value="${esc(S.debug.query)}" placeholder="例如：libace 或 entry.abc" oninput="S.debug.query=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();renderPage()}"></label>
-          <span class="seg mini" aria-label="产物类型">${[["all","全部"],[".so",".so"],[".abc",".abc"]].map(([k,l])=>`<button class="${S.debug.kind===k?"on":""}" onclick="S.debug.kind='${k}';renderPage()">${l}</button>`).join("")}</span>
-          <button class="btn pri" onclick="renderPage()">搜索产物</button>
+
+      <section class="gsec">
+        <h2 class="sechead">检查并运行</h2>
+        <p class="hint">校验完成后才能提交计划。已检查的 plan digest 会固定精确 target、binding、Artifact lease、输入和步骤序列。</p>
+        ${feedback}
+        <div class="debug-selection">
+          ${stage==="running"
+            ?`<button class="btn danger" onclick="debugCancelDeployment()">当前步骤后停止</button>`
+            :`<button class="btn pri" data-sync-id="debug.artifacts.preview" onclick="debugValidatePlan()" ${ready?"":"disabled"}>${stage==="ready"?"检查已准备计划":"校验并检查替换计划"}</button>`}
+          ${stage==="verified"?`<button class="btn" data-sync-id="debug.artifacts.openLogs" onclick="debugOpenLogs()">获取日志并验证</button>`:""}
+          <span style="flex:1"></span>
+          ${ready||stage==="running"?"":'<span class="hint">先选择动态库并填写所属 Bundle 与 lib&lt;name&gt;.so。</span>'}
         </div>
-        <div class="tablewrap"><table><tr><th><button class="btn" onclick="debugSelectVisible()" aria-label="全选或清除当前结果">全选</button></th><th>产物</th><th>来源相对路径</th><th>构建信息</th><th>兼容性</th></tr>
-          ${rows.map(a=>`<tr class="${a.ready?"":"debug-row-disabled"}"><td><label><input type="checkbox" ${S.debug.selected.has(a.id)?"checked":""} ${a.ready?"":"disabled"} onchange="debugToggleArtifact('${a.id}',this.checked)" aria-label="选择 ${esc(a.name)}"></label></td><td><b>${esc(a.name)}</b><div class="hint">${a.kind} · ${a.size}</div></td><td class="mono">${esc(a.relative)}</td><td>${esc(a.modified)}</td><td>${a.ready?`<span class="chip ok">可替换</span><div class="hint">${esc(a.validation)}</div>`:`<span class="chip danger">已阻止</span><div class="hint">${esc(a.validation)}</div>`}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">当前根目录没有匹配的产物。修改搜索词或清除类型筛选。</td></tr>'}
-        </table></div>
-        <div class="debug-selection" role="status" aria-live="polite"><span class="summary">已选择 <b>${selected.length}</b> 个产物；Runtime 会先校验 ABI / 编译器指纹 / hash，再为每个现有目标创建备份。</span><button class="btn pri" onclick="debugReview()" ${selected.length&&state==="idle"?"":"disabled"}>检查并预览替换</button></div>
-      </div>${result}
-      <div class="warnbox">${icon("warning",true)} 设计边界：当前生产 Catalog 只发布单个 app-owned <span class="mono">.so</span> 的校验、备份、替换、回滚和 Ability restart；批量来源浏览、<span class="mono">.abc</span> 替换与独立设备重启仍需对应 behavior contract / typed operation 后才能显示 AVAILABLE。</div>
+      </section>
+
+      <div class="warnbox" data-sync-id="debug.artifacts.productionBoundary">${icon("warning",true)} 当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。</div>
+
+      ${stage==="verified"?`<section class="gsec"><h2 class="sechead">发布与验证 Artifact</h2>
+        <div class="tablewrap"><table><tr><th>Artifact</th><th>SHA-256</th><th>大小</th></tr>
+          <tr><td class="mono">native-library-publish.json</td><td class="mono">9c1d7ae4c0f5b81d</td><td class="mono">4 KB</td></tr>
+          <tr><td class="mono">loaded-maps-readback.txt</td><td class="mono">1b8e0d33a97c45f2</td><td class="mono">18 KB</td></tr>
+        </table></div></section>`:""}
+
+      <section class="gsec"><h2 class="sechead">最近的 Runtime Job</h2>
+        <p class="hint">${stage==="idle"?"Runtime 未报告相关 Job。":"完整阶段与取消边界在底部任务检查器中。"}</p></section>
     </div>`;
   }
+
   if(tb==="logs"){
     const g=S.lg;
-    body=`
-    <div class="card" data-acin><span class="ac">host 分片轮转</span>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        ${g.on?'<button class="btn" onclick="stopLogs()">停止采集</button>'
-              :'<button class="btn pri" onclick="startLogs()">开始采集</button>'}
-        <button class="btn" onclick="togglePauseLogs()" ${g.on?"":"disabled"}>${g.paused?"恢复界面":"暂停界面"}</button>
-        <span class="hint">level ≥</span>
-        <span class="seg mini">${["I","W","E"].map(x=>`<button class="${g.lvl===x?"on":""}" onclick="S.lg.lvl='${x}';renderPage()">${x}</button>`).join("")}</span>
-        <input class="inp mono" style="width:110px" placeholder="tag 过滤" value="${esc(g.tag)}" oninput="setLogTag(this)">
-        <span class="chip dim" id="shardchip">host 轮转: 片 #${g.piece} · ${g.shard.toFixed(1)}MB/64MB · 配额 1GB</span>
-        <span style="flex:1"></span>
-        <button class="btn danger" onclick="clearBufModal()">清空设备 buffer…</button>
+    body=`<div class="debug-shell">
+      <div class="debug-cols">
+        <div class="debug-stack">
+          <section class="gsec">
+            <h2 class="sechead">有界 HiLog 采集${availability(true)}</h2>
+            <dl class="kv"><dt>精确目标设备</dt><dd>TGT-9587… · binding r12</dd></dl>
+            <label class="debug-field"><span>时长（秒）</span><input class="inp mono" style="width:110px" value="30" inputmode="numeric"></label>
+            <div class="debug-selection"><span class="hint">最低等级</span>
+              <span class="seg mini" aria-label="最低等级">${["I","W","E"].map(x=>`<button class="${g.lvl===x?"on":""}" onclick="S.lg.lvl='${x}';renderPage()">${x}</button>`).join("")}</span></div>
+            <label class="debug-field"><span>Tag 筛选</span><input class="inp mono" placeholder="ArkUI" value="${esc(g.tag)}" oninput="setLogTag(this)"></label>
+            <label class="debug-field"><span>Domain 筛选</span><input class="inp mono" placeholder="0xD003900"></label>
+            <label class="debug-field"><span>PID 筛选</span><input class="inp mono" placeholder="1234"></label>
+            <label class="debug-field"><span>关键字</span><input class="inp mono" placeholder="render"></label>
+            <label class="debug-field"><span>标记</span><input class="inp mono" placeholder="checkout-start"></label>
+            <p class="hint">每项筛选都是有界 typed token，不接受任何自由 shell 片段。</p>
+            <p class="hint">✓ 保存 raw HiLog Artifact（必需）</p>
+            <details class="debug-disclose" data-sync-id="debug.logs.request"><summary>Typed 请求预览</summary>
+              <dl class="kv"><dt>Operation</dt><dd>capture.diagnostics@1</dd>
+                <dt>durationSeconds</dt><dd>30</dd>
+                <dt>hilogFilters</dt><dd>${esc(logFilterTokens())}</dd>
+                <dt>uiDump</dt><dd>false</dd></dl>
+              <p class="hint">最低 effect：readOnly</p></details>
+            <div class="debug-selection">
+              ${g.on?`<button class="btn danger" onclick="stopLogs()">当前步骤后停止</button>`
+                    :`<button class="btn pri" data-sync-id="debug.logs.start" onclick="startLogs()">开始采集</button>`}
+              ${g.on?'<span class="chip warn pulse">运行中 · job-11c4</span>':""}
+            </div>
+          </section>
+
+          <section class="gsec">
+            <h2 class="sechead">独立危险操作</h2>
+            <div><button class="btn" disabled title="这些操作会修改设备全局日志状态，必须单独进行能力检查、确认与审计。">设备 buffer 操作 ⌄</button></div>
+            <p class="hint">🔒 当前没有已发布 Runtime operation 提供设备 buffer 变更；普通采集绝不会清空、扩容或 flush。</p>
+          </section>
+        </div>
+
+        <section class="gsec">
+          <h2 class="sechead">实时视图
+            <span class="acc"><button class="btn" data-sync-id="debug.logs.pauseViewport" onclick="togglePauseLogs()" ${g.on?"":"disabled"}>${g.paused?"恢复界面":"暂停界面"}</button></span></h2>
+          ${g.paused?'<span class="chip warn">界面已暂停 · '+g.pend+' 行待补</span>':""}
+          <div class="logtail stream" id="logstream">${esc(logText())}</div>
+          <p class="hint">↘ 有界内存窗口 · <span id="shardchip">host 轮转： 片 #${g.piece} · ${g.shard.toFixed(1)}MB/64MB · 配额 1GB</span></p>
+          <p class="hint">${g.on?"采集中：host 侧按 64MB/片轮转,暂停界面绝不停止 host 采集。":"未在采集。开始/停止只影响 host 侧拉流,绝不清空设备 buffer。"}</p>
+        </section>
       </div>
-      ${g.paused?'<span class="chip warn" id="pendchip">界面已暂停 · '+g.pend+' 行待补</span>':""}
-      <div class="logtail stream" id="logstream">${esc(logText())}</div>
-      <p class="hint">${g.on?"采集中:设备端持续拉流,host 侧按 64MB/片轮转,不清设备 buffer。":"未在采集。开始/停止只影响 host 侧拉流,绝不清空设备 buffer。"}</p>
+
+      <section class="gsec">
+        <h2 class="sechead">Host 分片与保留策略</h2>
+        <div class="tablewrap"><table><tr><th>顺序 / 分片</th><th>大小</th><th>SHA-256</th><th></th></tr>
+          ${g.on||g.lines.length>4
+            ?`<tr><td class="mono">hilog-0001.log<div class="hint">published · sensitive</div></td><td class="mono">1.2 MB</td>
+               <td class="mono">a91c4f0d2b7e</td><td><button class="btn">导出…</button></td></tr>
+              <tr><td class="mono">hilog-manifest.json<div class="hint">published · internal</div></td><td class="mono">6 KB</td>
+               <td class="mono">0d3b81f6ac52</td><td><button class="btn">导出…</button></td></tr>`
+            :'<tr><td colspan="4" class="empty">没有 host 分片。已完成分片将按 manifest 顺序显示精确大小与 hash。</td></tr>'}
+        </table></div>
+        <p class="hint">🛡 Artifact 字节通过有界分块读取并校验；保存位置只由 App 处理，不会发送给 Runtime。</p>
+        <p class="hint mono">已发布 operation 总输出预算：256 MB</p>
+      </section>
+
+      <section class="gsec"><h2 class="sechead">最近的 Runtime Job</h2>
+        <p class="hint">${g.on?"job-11c4 · 运行中 · capture.diagnostics@1":"Runtime 未报告相关 Job。"}</p></section>
     </div>`;
   }
-  if(tb==="apps")body=`<div class="card">
-      <div class="tablewrap"><table>
-        <tr><th>包名</th><th>版本</th><th>状态</th><th></th></tr>
-        ${S.apps.map((a,i)=>`<tr><td class="mono">${esc(a.pkg)}</td><td>${esc(a.ver)}</td>
-          <td>${a.running?'<span class="chip ok">运行中 · pid '+a.pid+'</span>':'<span class="chip dim">未运行</span>'}</td>
-          <td>${a.running?`<button class="btn" onclick="toggleApp(${i})">停止</button>`
-                        :`<button class="btn" onclick="toggleApp(${i})">启动 Ability</button> <button class="btn danger" onclick="uninstallModal(${i})">卸载…</button>`}</td></tr>`).join("")}
-      </table></div>
-      <div style="display:flex;gap:8px"><button class="btn pri" onclick="installModal()">安装 HAP…</button></div></div>`;
-  if(tb==="net")body=`<div class="card">
-      <div class="tablewrap"><table>
-        <tr><th>类型</th><th>本机</th><th>设备</th><th></th></tr>
-        ${S.fwd.map((f,i)=>`<tr><td>forward</td><td class="mono">${esc(f.l)}</td><td class="mono">${esc(f.r)}</td>
-          <td><button class="btn" onclick="delFwd(${i})">删除</button></td></tr>`).join("")||'<tr><td colspan="4" class="empty">无转发规则</td></tr>'}
-      </table></div>
-      <button class="btn pri" style="align-self:flex-start" onclick="fwdModal()">新建转发…</button></div>`;
-  if(tb==="cmd"){
-    const selected=CMDS[S.cmd.val];
-    body=`<div class="card" data-acin><span class="ac">typed template only · no raw surface</span>
-      <div class="warnbox">${icon("warning",true)} App 只提交 approved typed template 与 schema-defined inputs。下面的 executable / argv 是 Provider lowering 的只读预览,不是输入框。</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <select class="inp mono" onchange="S.cmd.val=this.value;renderPage()">
-          ${Object.entries(CMDS).map(([id,t])=>`<option value="${id}" ${S.cmd.val===id?"selected":""}>${esc(t.label)}</option>`).join("")}
-        </select>
-        <button class="btn pri" onclick="runCmd()">运行 typed template</button>
+
+  if(tb==="apps"){
+    body=`<div class="debug-shell">
+      <div class="debug-cols">
+        <div class="debug-stack">
+          <section class="gsec">
+            <h2 class="sechead">HAP 安装包${availability(false)}</h2>
+            <div class="warnbox">${icon("warning",true)}<div><b>不可用</b>
+              <div class="hint mono">providerLoweringMissing: debug.hap@1 尚未为 profile dayu200-3.2.0f 发布 lowering</div></div></div>
+            <dl class="kv"><dt>精确目标设备</dt><dd>TGT-9587… · binding r12</dd></dl>
+            <div><button class="btn" disabled>选择本地 HAP…</button></div>
+            <p class="hint mono">尚未选择本地 HAP</p>
+            <p class="hint">App 会在本地计算所选 HAP 的哈希，再分块发送；本地路径不会进入 Runtime。</p>
+          </section>
+          <section class="gsec">
+            <h2 class="sechead">应用身份</h2>
+            <label class="debug-field"><span>Bundle 名称</span><input class="inp mono" placeholder="com.example.app"></label>
+            <label class="debug-field"><span>Ability 名称</span><input class="inp mono" placeholder="EntryAbility"></label>
+            <p class="hint">名称按 Catalog schema 校验，绝不会被解释为命令参数。</p>
+          </section>
+        </div>
+        <div class="debug-stack">
+          <section class="gsec">
+            <h2 class="sechead">生命周期请求</h2>
+            <label class="debug-field"><span>安装策略</span><select class="inp"><option>安装或替换</option><option>全新安装</option></select></label>
+            <label class="debug-field"><span>清理策略</span><select class="inp"><option>运行后卸载</option><option>保留已安装应用</option><option>恢复之前版本</option></select></label>
+            <label class="debug-field"><span>运行结束后</span><select class="inp"><option>停止 Ability</option><option>保持运行</option></select></label>
+            <label class="debug-field"><span>诊断时长（秒）</span><input class="inp mono" style="width:110px" value="30" inputmode="numeric"></label>
+            <div class="warnbox">${icon("warning",true)}<div><b>设备变更影响范围明确可见</b>
+              <div class="hint">安装、启动、停止、卸载与远端暂存均为设备变更。每次 dispatch 必须绑定持久设备 revision 并消费匹配授权。</div></div></div>
+          </section>
+          <section class="gsec">
+            <h2 class="sechead">已发布 operation 计划</h2>
+            <details class="debug-disclose"><summary>Typed 请求预览</summary>
+              <dl class="kv"><dt>Operation</dt><dd>debug.hap@1</dd><dt>bundleName</dt><dd>—</dd>
+                <dt>abilityName</dt><dd>—</dd><dt>installPolicy</dt><dd>installOrReplace</dd>
+                <dt>cleanupPolicy</dt><dd>uninstall</dd><dt>postRunAbilityState</dt><dd>stopped</dd>
+                <dt>captureDiagnostics</dt><dd>true</dd></dl></details>
+            <div class="tablewrap"><table><tr><th>step</th><th>kind</th><th>effect</th></tr>
+              <tr><td class="mono">preflight.target</td><td>preflight</td><td><span class="effect read">readOnly</span></td></tr>
+              <tr><td class="mono">artifact.import</td><td>artifact</td><td><span class="effect host">hostOnly</span></td></tr>
+              <tr><td class="mono">hap.install</td><td>install</td><td><span class="effect mut">deviceMutation</span></td></tr>
+              <tr><td class="mono">ability.start</td><td>lifecycle</td><td><span class="effect mut">deviceMutation</span></td></tr>
+              <tr><td class="mono">capture.diagnostics</td><td>capture</td><td><span class="effect read">readOnly</span></td></tr>
+              <tr><td class="mono">hap.uninstall</td><td>cleanup</td><td><span class="effect mut">deviceMutation</span></td></tr>
+            </table></div>
+            <div class="debug-selection"><button class="btn pri" disabled>导入并运行</button>
+              <span style="flex:1"></span><span class="hint">被 Runtime 可用性阻止。</span></div>
+          </section>
+        </div>
       </div>
-      <dl class="kv"><dt>template id</dt><dd>${esc(S.cmd.val)}</dd><dt>effect</dt><dd>${selected.effect}</dd><dt>lowered argv</dt><dd>${esc(selected.argv)}</dd></dl>
-      ${S.cmd.hist.map(h=>`<div class="logtail">template ${esc(h.c)} · ${esc(h.label)}
-provider lowering (read-only): ${esc(h.argv)}
-exit ${h.exit} · ${h.ms}ms
-${esc(h.out)}</div>`).join("")||'<p class="empty">尚未运行 typed template。运行后显示 Provider lowering、退出码与耗时。</p>'}
-      <p class="hint">不存在自由文本 command / argv / path 字段;PTY 与 raw shell 不属于此界面。</p></div>`;
+
+      <section class="gsec">
+        <h2 class="sechead">应用与可调试进程</h2>
+        <div class="tablewrap"><table><tr><th>应用 / 进程</th><th>PID</th><th>可调试</th></tr>
+          ${S.apps.map(a=>`<tr><td class="mono">${esc(a.pkg)}</td><td class="hint">不可用</td><td class="hint">不可用</td></tr>`).join("")}
+        </table></div>
+        <div class="debug-selection"><button class="btn" disabled>启动 Ability</button><button class="btn" disabled>停止进程</button>
+          <span style="flex:1"></span><button class="btn danger" disabled>卸载…</button></div>
+        <p class="hint">🔒 当前没有已发布 Runtime operation 可以启动、停止或卸载单个应用；请使用上方的 typed HAP 生命周期。</p>
+      </section>
+
+      <section class="gsec"><h2 class="sechead">最近的 Runtime Job</h2>
+        <p class="hint">Runtime 未报告相关 Job。</p></section>
+    </div>`;
   }
+
+  if(tb==="net"){
+    body=`<div class="debug-shell"><div class="debug-cols">
+      <section class="gsec">
+        <h2 class="sechead">Typed 端口规则</h2>
+        <dl class="kv"><dt>精确目标设备</dt><dd>TGT-9587… · binding r12</dd></dl>
+        <div class="debug-selection"><span class="hint">方向</span>
+          <span class="seg mini" aria-label="方向"><button class="on">Forward</button><button>Reverse</button></span></div>
+        <div><button class="btn pri" data-sync-id="debug.network.add" onclick="fwdModal()">添加规则</button></div>
+        <div class="hair-gap"></div>
+        <p class="hint" style="font-weight:600">校验与影响范围</p>
+        <p class="hint">№ 仅接受 1024 到 65535 的十进制 TCP 端口</p>
+        <p class="hint">⌫ 不接受 shell 片段、scheme、host 或 flag</p>
+        <p class="hint">🔗 每个新建/删除操作绑定一个持久目标设备 revision</p>
+      </section>
+      <section class="gsec">
+        <h2 class="sechead">Forward / reverse 规则</h2>
+        <div class="tablewrap"><table><tr><th>方向</th><th>Host 端点</th><th>设备端点</th><th>状态</th><th>操作</th></tr>
+          ${S.fwd.map((f,i)=>`<tr><td>forward</td><td class="mono">${esc(f.l)}</td><td class="mono">${esc(f.r)}</td>
+            <td><span class="chip ok">active</span></td>
+            <td><button class="btn danger" onclick="delFwd(${i})">删除所选规则…</button></td></tr>`).join("")
+            ||'<tr><td colspan="5" class="empty">没有端口转发清单。当前 Runtime 未发布读取 forward/reverse 规则的 operation。</td></tr>'}
+        </table></div>
+        <p class="hint">◎ 删除必须明确指定规则与持久目标设备 binding</p>
+      </section>
+    </div></div>`;
+  }
+
+  if(tb==="cmd"){
+    const selected=CMDS[S.cmd.val],h=S.cmd.hist[0];
+    body=`<div class="debug-shell">
+      <div class="warnbox">${icon("warning",true)} App 只提交 approved typed template 与 schema 定义的输入。下方 executable / argv 是 Provider lowering 的只读预览，不是输入框。</div>
+      <div class="debug-cols">
+        <section class="gsec">
+          <h2 class="sechead">选择 approved 模板</h2>
+          ${Object.entries(CMDS).map(([id,t])=>`<button class="debug-entry${S.cmd.val===id?" on":""}" aria-pressed="${S.cmd.val===id}"
+            onclick="S.cmd.val='${id}';S.cmd.hist=[];renderPage()"><span aria-hidden="true">◉</span>
+            <span class="nm">${esc(id)}</span><span class="sz">${esc(t.effect)}</span></button>`).join("")}
+        </section>
+        <div class="debug-stack">
+          <section class="gsec">
+            <h2 class="sechead">Provider 调用披露<span class="acc"><span class="effect read">${esc(selected.effect)}</span></span></h2>
+            <dl class="kv"><dt>catalog</dt><dd>arkdeck-remote-operations@1.0.0</dd>
+              <dt>actionId</dt><dd>${esc(S.cmd.val)}</dd>
+              <dt>精确目标设备</dt><dd>TGT-9587… · binding r12</dd></dl>
+            <p class="hint">此模板没有用户参数。</p>
+            <dl class="kv"><dt>Executable</dt><dd>${h?esc(h.argv.split(" ")[0])+" · sha256:3f9a11c7d240":"未生成——没有已准入 Runtime operation"}</dd>
+              <dt>参数</dt><dd>${h?esc(h.argv.split(" ").slice(1).join(" ")):"未生成——没有已准入 Runtime operation"}</dd>
+              ${h?`<dt>lowering sha256</dt><dd>${esc(h.sha)}</dd>`:""}</dl>
+            <p class="hint">只有 provider 可在 Runtime 准入后将 typed action 降级为 executable + argv;UI 不猜测也不拼接 shell 命令。</p>
+            <div class="debug-selection"><button class="btn pri" data-sync-id="debug.commands.run" onclick="runCmd()"
+              title="不提供 PTY、密码提示、sudo 或交互会话">运行一次</button></div>
+          </section>
+          <section class="gsec">
+            <h2 class="sechead">一次性执行结果</h2>
+            <dl class="kv"><dt>退出码</dt><dd>${h?h.exit:"—"}</dd><dt>耗时</dt><dd>${h?h.ms+" ms":"—"}</dd></dl>
+            <div class="logtail">${h?esc(h.out):"没有结果"}</div>
+          </section>
+        </div>
+      </div>
+      <p class="hint" data-sync-id="debug.commands.footer">不存在自由文本 command / argv / path 字段；PTY 与 raw shell 不属于此界面。</p>
+    </div>`;
+  }
+
   return recoveryHTML()+`
   <div class="page-lead" data-page-title="Debug 工作台"><span class="acin">REQ-DEBUG-*</span></div>
-  <div class="debug-shell"><div class="tabs" role="tablist" aria-label="Debug 工作台视图">${tabs.map(([k,l])=>`<button id="debug-tab-${k}" role="tab" aria-selected="${tb===k}" aria-controls="debug-panel" tabindex="${tb===k?"0":"-1"}" class="${tb===k?"on":""}" onclick="S.debugTab='${k}';renderPage()" onkeydown="debugTabKey(event,'${k}')">${l}</button>`).join("")}</div></div>
+  <p class="hint" data-sync-id="debug.scope" style="max-width:66ch">Typed 产物部署、日志、应用生命周期、网络规则和 approved 只读工具——绝非 raw terminal。</p>
+  <div class="debug-scope" data-sync-id="debug.target"><span>目标设备</span>
+    <select class="inp mono" style="width:230px" aria-label="目标设备"><option>TGT-9587…</option><option>没有已接管目标设备</option></select>
+    <span class="chip">🔗 Binding r12 · HDC 3.2.0f</span></div>
+  <div class="debug-shell"><div class="tabs" role="tablist" aria-label="Debug 工作区" data-sync-id="debug.tabs">${tabs.map(([k,l])=>`<button id="debug-tab-${k}" role="tab" aria-selected="${tb===k}" aria-controls="debug-panel" tabindex="${tb===k?"0":"-1"}" class="${tb===k?"on":""}" onclick="S.debugTab='${k}';renderPage()" onkeydown="debugTabKey(event,'${k}')">${l}</button>`).join("")}</div></div>
   <div id="debug-panel" role="tabpanel" aria-labelledby="debug-tab-${tb}">${body}</div>`;
 }
 
