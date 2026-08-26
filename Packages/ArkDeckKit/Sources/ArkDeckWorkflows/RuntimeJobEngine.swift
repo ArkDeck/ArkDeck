@@ -4075,7 +4075,13 @@ public actor RuntimeJobEngine {
     } else {
       binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
     }
-    for name in mapping {
+    // Two encodings of one product are not two products: the screenshot leg
+    // publishes the one it received and the other is simply not what this
+    // capture took. A step that genuinely owns several products - signing,
+    // which writes a HAP and a report - still publishes all of them.
+    let publishable = RuntimeArtifactService.publishableArtifacts(
+      mapping: mapping, requestInputs: runtime.record.request.inputs)
+    for name in publishable {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
       }
@@ -8907,7 +8913,7 @@ public actor RuntimeJobEngine {
           "artifactId": .string("artifact-\(step.stepID)"),
           "ownedRemotePath": .string(path.remotePath),
         ]
-      } else if case .hdc(.captureScreenshot(let path))? = action {
+      } else if case .hdc(.captureScreenshot(_, let path))? = action {
         arguments = [
           "catalogId": .string("trace-presets"),
           "actionId": .string("custom"),
@@ -8949,7 +8955,17 @@ public actor RuntimeJobEngine {
       let localName: String
       switch step.stepID {
       case "receive-ui-tree": localName = "ui-tree.json"
-      case "receive-screenshot": localName = "screenshot.png"
+      case "receive-screenshot":
+        // The landing name carries the encoding, because a `.png` holding
+        // JFIF bytes is a file nothing downstream can read for what it says
+        // it is.
+        if case .hdc(.receiveOwnedArtifact(let artifact))? = action,
+          artifact.path.remotePath.hasSuffix(".jpeg")
+        {
+          localName = "screenshot.jpeg"
+        } else {
+          localName = "screenshot.png"
+        }
       case "receive-screen-sequence": localName = "frames.tar"
       default: localName = "trace.htrace"
       }

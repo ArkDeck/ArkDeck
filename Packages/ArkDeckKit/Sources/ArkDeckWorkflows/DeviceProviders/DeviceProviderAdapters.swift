@@ -226,10 +226,12 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
               jobID: context.jobID, stepID: "capture-screen-sequence")))
       }
       if step.stepID == "capture-screenshot" {
+        let imageType = Self.screenshotImageType(inputs: inputs)
         return .hdc(
           .captureScreenshot(
+            imageType,
             into: try mintStableOwnedRemotePath(
-              jobID: context.jobID, stepID: "capture-screenshot")))
+              jobID: context.jobID, stepID: "capture-screenshot", imageType: imageType)))
       }
       if step.stepID == "capture-ui-tree" {
         return .hdc(
@@ -245,14 +247,19 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case .receiveFile:
       // Each receive leg re-mints its own producer's owned path, which is
       // what keeps the received bytes bound to the step that wrote them.
+      let producer = Self.fileProducerStepID(for: step.stepID)
+      let receivedType = Self.screenshotImageType(inputs: inputs)
       return .hdc(
         .receiveOwnedArtifact(
           HDCOwnedRemoteArtifact(
             path: try mintStableOwnedRemotePath(
-              jobID: context.jobID, stepID: Self.fileProducerStepID(for: step.stepID)),
+              jobID: context.jobID, stepID: producer, imageType: receivedType),
             expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024,
+            // A screenshot that is not the format it claims is a failure, not
+            // an artifact - and the two formats have different magic, so the
+            // check follows the type rather than staying pinned to PNG.
             expectedLeadingBytes: step.stepID == "receive-screenshot"
-              ? HDCFileMagic.png : nil)))
+              ? (receivedType == .png ? HDCFileMagic.png : HDCFileMagic.jfif) : nil)))
     case .cleanupOwnedRemotePath:
       if step.stepID == "cleanup-screen-sequence-temp" {
         return .hdc(
@@ -274,7 +281,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .hdc(
         .cleanupOwnedRemotePath(
-          try mintStableOwnedRemotePath(jobID: context.jobID, stepID: ownerStepID)))
+          try mintStableOwnedRemotePath(
+            jobID: context.jobID, stepID: ownerStepID,
+            imageType: Self.screenshotImageType(inputs: inputs))))
     case .finalizeSession, .preflightHostStorage, .postprocessArtifact:
       throw DeviceProviderError.unsupportedStepKind(
         "\(step.kind.rawValue) is engine-internal, not a provider action")
@@ -1004,10 +1013,11 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
                 ["shell", "ls", "-l", path.remotePath], context: context),
               timeoutSeconds: 15),
           ]))
-    case .captureScreenshot(let path):
-      // `-t png` is mandatory, not a retry: this build defaults to jpeg and
+    case .captureScreenshot(let imageType, let path):
+      // `-t` is mandatory, not a retry: this build defaults to jpeg and
       // refuses a name whose suffix disagrees with the type (OH 3.2,
-      // measured 2026-07-31). The status line it prints is not evidence —
+      // measured 2026-07-31), so the flag and the path's suffix are the same
+      // decision made once. The status line it prints is not evidence —
       // the `ls -l` readback is, same as every other file leg.
       return TypedProcessPlan(
         action: action,
@@ -1016,7 +1026,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           invocations: [
             TypedProcessInvocation(
               arguments: try deviceArguments(
-                ["shell", "snapshot_display", "-t", "png", "-f", path.remotePath],
+                ["shell", "snapshot_display", "-t", imageType.rawValue, "-f", path.remotePath],
                 context: context),
               timeoutSeconds: 60, continueAfterNonZero: true),
             TypedProcessInvocation(
@@ -1757,9 +1767,25 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   /// (capture/receive/cleanup or send/install/cleanup) derive the same
   /// provider-owned path without persisting or accepting a raw path.
   private func mintStableOwnedRemotePath(
-    jobID: String, stepID: String
+    jobID: String, stepID: String,
+    imageType: HDCScreenSequenceRequest.ImageType = .png
   ) throws -> HDCOwnedRemotePath {
-    try HDCOwnedRemotePath(jobID: jobID, stepID: stepID, nonce: "owned")
+    try HDCOwnedRemotePath(
+      jobID: jobID, stepID: stepID, nonce: "owned", imageType: imageType)
+  }
+
+  /// PNG unless the request asked otherwise. PNG is the evidence format, so
+  /// it stays what a caller gets by not choosing: JPEG is measurably cheaper
+  /// (p50 638 ms against 858, 40,947 bytes against 448,352, over 50 captures
+  /// each on 2026-08-26) but it is lossy, and evidence that quietly became
+  /// lossy because it was faster is not a trade a default should make.
+  static func screenshotImageType(
+    inputs: [String: JSONValue]
+  ) -> HDCScreenSequenceRequest.ImageType {
+    guard case .string(let requested)? = inputs["screenshotImageType"],
+      let parsed = HDCScreenSequenceRequest.ImageType(rawValue: requested)
+    else { return .png }
+    return parsed
   }
 
   private func mintStableOwnedFrameDirectory(
@@ -2084,7 +2110,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["remoteByteCount": String(byteCount)])
 
-    case .captureScreenshot(let path):
+    case .captureScreenshot(_, let path):
       guard receipt.subprocesses.count == 2 else {
         return .unknown(reason: "screenshot did not produce its readback sequence")
       }
@@ -3370,7 +3396,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     let readback: TypedProviderAction
     switch intent.action {
     case .hdc(.captureTrace(_, let path)), .hdc(.cleanupOwnedRemotePath(let path)),
-      .hdc(.captureComponentTree(let path)), .hdc(.captureScreenshot(let path)):
+      .hdc(.captureComponentTree(let path)), .hdc(.captureScreenshot(_, let path)):
       readback = .hdc(.readOwnedPathPresence(path))
     case .hdc(.sendArtifactToStaging(let staged)):
       readback = .hdc(.readOwnedPathPresence(staged.path))

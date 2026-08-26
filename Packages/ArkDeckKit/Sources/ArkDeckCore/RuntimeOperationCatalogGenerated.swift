@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "8033c66ff0d4ab703e9a619f55324b01003555337c24cefa8e09c7840ff002dc"
+  public static let catalogDigest = "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -159,6 +159,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "processName", type: .string, isRequired: false, pattern: "^[a-zA-Z][a-zA-Z0-9_.:]*$", maxLength: 200, summary: "Optional process identity. Defaults to bundleName and is lowered only by the HDC provider."),
         CatalogFieldDescriptor(name: "redactionProfile", type: .string, isRequired: false, enumValues: ["standard"], summary: "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists.", defaultValue: .string("standard")),
         CatalogFieldDescriptor(name: "ringBuffered", type: .boolean, isRequired: false, summary: "Arm the trace ring, let the window pass, then snapshot it, instead of blocking for the window with `-t N`. The snapshot carries everything since the arm, bounded by the buffer, so the decision to keep a trace can be made after the thing worth keeping rather than before it. Only consulted when traceCategories selects the trace leg.", defaultValue: .bool(false)),
+        CatalogFieldDescriptor(name: "screenshotImageType", type: .string, isRequired: false, enumValues: ["png", "jpeg"], summary: "Encoding for the screenshot leg. PNG is the evidence format and stays the default; JPEG is measurably cheaper - p50 638 ms against 858 ms and 40,947 bytes against 448,352, over 50 captures each on 2026-08-26 - and is for work that wants a current picture rather than a record. The device validates the file suffix against this, so the type and the owned path are one decision.", defaultValue: .string("png")),
         CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912, summary: "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product.", defaultValue: .integer(134217728)),
         CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536, summary: "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise.", defaultValue: .integer(8192)),
         CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: false, maxLength: 64, maxItems: 24, summary: "Trace categories; presence selects the remote-file trace leg and escalates the effective effect to deviceMutation."),
@@ -205,6 +206,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "advanced-dump.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "ui-tree.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "screenshot.png", role: .raw, mediaType: "image/png", privacy: .sensitive, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "screenshot.jpeg", role: .raw, mediaType: "image/jpeg", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "crash-index.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "crash-log.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "application-liveness.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: false, retentionClass: .default),

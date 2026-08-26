@@ -310,7 +310,10 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
   /// Full remote path under the provider's fixed staging root.
   package let remotePath: String
 
-  package init(jobID: String, stepID: String, nonce: String) throws {
+  package init(
+    jobID: String, stepID: String, nonce: String,
+    imageType: HDCScreenSequenceRequest.ImageType = .png
+  ) throws {
     let componentPattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
     for (field, value) in [("jobID", jobID), ("stepID", stepID), ("nonce", nonce)] {
       guard value.range(of: componentPattern, options: .regularExpression) != nil else {
@@ -335,7 +338,9 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
     case "capture-screenshot":
       // Not cosmetic: `snapshot_display` rejects a name whose suffix does
       // not match the requested type (measured on OH 3.2, CHG-2026-049 r5).
-      suffix = ".png"
+      // Which is why the type has to reach the path rather than being fixed
+      // here: the two are one decision.
+      suffix = "." + imageType.rawValue
     case "capture-screen-sequence":
       // The frames live in the owned directory; this is the archive they are
       // collected into, because a receive lands one file.
@@ -405,6 +410,11 @@ public struct HDCFaultLogName: Sendable, Equatable {
 package enum HDCFileMagic {
   /// 89 50 4E 47 0D 0A 1A 0A — confirmed on a device-produced screenshot.
   package static let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  /// SOI plus a JFIF APP0 segment, which is what `snapshot_display -t jpeg`
+  /// writes on this firmware: `FF D8 FF E0 00 10 4A 46 49 46` (measured
+  /// 2026-08-26). Four bytes is the whole of the fixed prefix - the two after
+  /// it are the segment length, which is not.
+  package static let jfif = Data([0xFF, 0xD8, 0xFF, 0xE0])
 }
 
 // MARK: - E1 mutation surface (CHG-2026-049, T13)
