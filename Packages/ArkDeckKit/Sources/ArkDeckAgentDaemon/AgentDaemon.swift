@@ -1994,6 +1994,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
         .map { .integer(Int64($0)) } ?? .null,
       "stableIdentitySha256": metadata.bindingSnapshot.stableIdentitySHA256
         .map(JSONValue.string) ?? .null,
+      // When the producing step was reaching the device. A reader deciding
+      // whether a picture is a given moment needs this and not `createdAtUtc`,
+      // which is when the bytes were filed.
+      "observedFromUtc": metadata.observationWindow.map { .string($0.startUTC) } ?? .null,
+      "observedToUtc": metadata.observationWindow.map { .string($0.endUTC) } ?? .null,
     ])
   }
 

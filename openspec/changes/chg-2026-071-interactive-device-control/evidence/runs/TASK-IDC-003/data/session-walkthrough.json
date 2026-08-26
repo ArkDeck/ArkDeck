@@ -29,7 +29,11 @@
     "anchor": "ARKDECKANCHORebf587fcda2ffbc7fa7e73982cbbcapturetrace",
     "ringHeldAnchorAsRecordedByTheVerdict": true,
     "anchorFoundInThePublishedTrace": true,
-    "thisSnapshotsReach": { "beforeTheAnchorSeconds": 0.08, "afterTheAnchorSeconds": 8.35, "events": 79 }
+    "thisSnapshotsReach": {
+      "beforeTheAnchorSeconds": 0.08,
+      "afterTheAnchorSeconds": 8.35,
+      "events": 79
+    }
   },
   "whatTheReaderSaid": [
     "alignment: cannotAlign - no host-to-device calibration was established, which is the honest state and the default",
@@ -56,7 +60,8 @@
       "resolution, as a fact on the artifact - the design's `截图 Artifact 记录实际拍摄时刻`",
       "read literally. Until then the ±150 ms rule is written and tested but cannot fire",
       "on real data, and this file is the place that says so."
-    ]
+    ],
+    "supersededBy": "shutter-instant.json. The granularity described here was the symptom. With the instant recorded at millisecond resolution the rule still cannot be met: the capture itself is ~930 ms wide, so the host cannot locate the shutter to ±150 ms no matter how precise its clock is."
   },
   "acceptanceReading": {
     "IDC-AC-7": [

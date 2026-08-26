@@ -1,0 +1,51 @@
+{
+  "measurement": "shutter-instant",
+  "question": "Can a screenshot be placed against a mark to the 150 ms the design asks for?",
+  "measuredAtUTC": "2026-08-26T03:20:00Z",
+  "answerOnThisHardware": "no, and not because of clock resolution",
+  "whatWasBuilt": [
+    "A published product now carries the interval the producing step was reaching the",
+    "device in, at millisecond resolution, as `observationWindow` - reaching the wire",
+    "as observedFromUtc/observedToUtc.",
+    "An interval rather than an instant, because the host cannot see a shutter open.",
+    "It sees the interval it was dispatching in, and the shutter opened somewhere",
+    "inside. Recording a point would be inventing a precision nobody measured."
+  ],
+  "measuredWindows": {
+    "operation": "capture.diagnostics@1 screenshot leg on DAYU200",
+    "milliseconds": [965, 913, 935, 927, 926],
+    "ruleMs": 150,
+    "reading": [
+      "Taking a screenshot occupies about 930 ms. The host therefore cannot locate the",
+      "shutter inside that to better than roughly ±465 ms - about six times the window",
+      "the applicability rule is written to.",
+      "So `shutterWindowWiderThanTheRule` is not an edge case on this hardware. It is",
+      "the normal answer, and the reader saying that nothing here can decide is the",
+      "correct one until the device itself reports when the shutter opened."
+    ]
+  },
+  "correctionMadeWhileMeasuring": {
+    "what": "the first version attached the wrong step's window",
+    "detail": [
+      "`screenshot.png` is published by `receive-screenshot`, so the window that got",
+      "attached was a file transfer: measured at 91, 118 and once 781 ms. The shutter",
+      "opened during `capture-screenshot`, which measures 913-965 ms.",
+      "Publishing the receive window would have been a precise-looking number for the",
+      "wrong event - worse than the second-granularity value it replaced, because it",
+      "would have looked like it settled the question.",
+      "The producing step is now resolved through the operation's own declared",
+      "receive-to-capture relationship, and a test pins that a received product carries",
+      "its producer's window."
+    ]
+  },
+  "supersedes": [
+    "session-walkthrough.json recorded the gap as one of timestamp granularity. That",
+    "was the symptom. Millisecond resolution is now recorded and the rule still cannot",
+    "be met, because the capture itself is ~930 ms wide."
+  ],
+  "whatWouldActuallyCloseIt": [
+    "The device reporting when the shutter opened - a fact only it can observe. Short",
+    "of that, a reader can say a picture is near a mark and how wide the uncertainty",
+    "is, which is what it now does, and cannot say the picture is that moment."
+  ]
+}

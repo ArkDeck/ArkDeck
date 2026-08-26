@@ -83,6 +83,58 @@ final class DiagnosticSessionReadingContractTests: XCTestCase {
     XCTAssertEqual(reading.marks[0].screenshot?.takenAfterMarkMs, 20)
   }
 
+  // MARK: - What the host could actually observe
+
+  /// The host cannot see the shutter open; it sees the interval it was
+  /// dispatching in. When that interval is wider than the rule consuming it,
+  /// nothing here can decide whether the picture is this moment - and saying
+  /// so is different from saying the picture is not this moment.
+  ///
+  /// This is not hypothetical: taking a screenshot on the device occupies
+  /// about 550 ms, against a 150 ms rule.
+  func testAShutterWindowWiderThanTheRuleIsSaidToBeUndecidable() {
+    let reading = DiagnosticSessionReading.make(
+      markersDocument: markers([manual("2026-08-26T10:00:00.300Z")]),
+      observedScreenshots: [
+        .init(
+          artifactName: "screenshot.png",
+          windowStartUTC: "2026-08-26T10:00:00.000Z",
+          windowEndUTC: "2026-08-26T10:00:00.550Z")
+      ])
+    XCTAssertNil(reading.marks[0].screenshot)
+    XCTAssertEqual(
+      reading.marks[0].screenshotAbsence, .shutterWindowWiderThanTheRule(windowMs: 550))
+  }
+
+  /// A window inside the rule decides normally, and the offset is measured
+  /// from where the window opened - the earliest the shutter can have been.
+  func testATightShutterWindowStandsForTheMark() {
+    let reading = DiagnosticSessionReading.make(
+      markersDocument: markers([manual("2026-08-26T10:00:00.000Z")]),
+      observedScreenshots: [
+        .init(
+          artifactName: "screenshot.png",
+          windowStartUTC: "2026-08-26T10:00:00.040Z",
+          windowEndUTC: "2026-08-26T10:00:00.120Z")
+      ])
+    XCTAssertEqual(reading.marks[0].screenshot?.artifactName, "screenshot.png")
+    XCTAssertEqual(reading.marks[0].screenshot?.takenAfterMarkMs, 40)
+  }
+
+  /// A mark outside the window entirely is not undecidable - there is simply
+  /// no capture at it.
+  func testAMarkOutsideEveryObservedWindowHasNoCapture() {
+    let reading = DiagnosticSessionReading.make(
+      markersDocument: markers([manual("2026-08-26T10:00:09.000Z")]),
+      observedScreenshots: [
+        .init(
+          artifactName: "screenshot.png",
+          windowStartUTC: "2026-08-26T10:00:00.000Z",
+          windowEndUTC: "2026-08-26T10:00:00.550Z")
+      ])
+    XCTAssertEqual(reading.marks[0].screenshotAbsence, .notCaptured)
+  }
+
   // MARK: - Alignment
 
   /// Without a calibration fact, nothing in the session may be lined up

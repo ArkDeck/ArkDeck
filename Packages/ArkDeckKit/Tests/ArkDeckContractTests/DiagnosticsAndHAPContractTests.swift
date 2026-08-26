@@ -1075,6 +1075,44 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       ], options: [.sortedKeys])
   }
 
+  /// The host cannot see a shutter open; it sees the interval it was
+  /// dispatching in. A published product therefore says when it was observed,
+  /// not only when it was filed - which is the difference between a reader
+  /// being able to ask "is this picture that moment" and having to guess.
+  func testAPublishedProductSaysWhenItWasObserved() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init())
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-observed", withScreenshot: true))
+    _ = try await engine.run(jobID: acceptance.jobID)
+
+    let inventory = try await artifacts.list(jobID: acceptance.jobID)
+    let shot = try XCTUnwrap(inventory.first { $0.name == "screenshot.png" })
+    let window = try XCTUnwrap(
+      shot.observationWindow,
+      "a product a step produced has to carry the interval that step was observed in")
+    XCTAssertFalse(window.startUTC.isEmpty)
+    XCTAssertFalse(window.endUTC.isEmpty)
+
+    // The window belongs to the step that produced the file, not the one that
+    // fetched it. A screenshot is published by `receive-screenshot`, whose
+    // window is a file transfer; the shutter opened during `capture-screenshot`.
+    // Publishing the receive window would be a precise-looking number for the
+    // wrong event.
+    let captureWindow = await engine.observationWindowForTesting(
+      jobID: acceptance.jobID, stepID: "capture-screenshot")
+    XCTAssertEqual(
+      window, captureWindow,
+      "the screenshot must carry the window its capture ran in, not its receive")
+
+    // Finalization composes its own products without reaching the device, so
+    // there is no interval to claim for them.
+    let markers = try XCTUnwrap(inventory.first { $0.name == "markers.json" })
+    XCTAssertNil(
+      markers.observationWindow,
+      "a product nothing observed must not present an observation window")
+  }
+
   private func publishedJSON(
     named name: String,
     jobID: String,

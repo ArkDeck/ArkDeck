@@ -31,6 +31,11 @@ public struct DiagnosticSessionReading: Sendable, Equatable {
   public enum ScreenshotAbsence: Sendable, Equatable {
     /// A screenshot exists but was taken too far from the mark to stand for it.
     case takenTooFarFromTheMark(offsetMs: Int)
+    /// A screenshot exists and might be this moment, but the window the host
+    /// could observe it in is wider than the tolerance this rule is written
+    /// to, so nothing here can decide. Measured on the device: taking a
+    /// screenshot occupies about 550 ms, against a 150 ms rule.
+    case shutterWindowWiderThanTheRule(windowMs: Int)
     /// The capture tried and failed, and said why.
     case captureFailed(reason: String)
     /// Nothing was captured for this mark.
@@ -49,6 +54,23 @@ public struct DiagnosticSessionReading: Sendable, Equatable {
       self.artifactName = artifactName
       self.capturedAtUTC = capturedAtUTC
       self.takenAfterMarkMs = takenAfterMarkMs
+    }
+  }
+
+  /// A screenshot and the interval the host could observe its shutter in.
+  ///
+  /// The host cannot see the shutter open; it sees the interval it was
+  /// dispatching in. Carrying the interval is what lets the reader distinguish
+  /// "this picture is not this moment" from "nothing here can tell".
+  public struct ObservedScreenshot: Sendable, Equatable {
+    public let artifactName: String
+    public let windowStartUTC: String
+    public let windowEndUTC: String
+
+    public init(artifactName: String, windowStartUTC: String, windowEndUTC: String) {
+      self.artifactName = artifactName
+      self.windowStartUTC = windowStartUTC
+      self.windowEndUTC = windowEndUTC
     }
   }
 
@@ -129,6 +151,7 @@ extension DiagnosticSessionReading {
   public static func make(
     markersDocument: [String: Any],
     screenshots: [(artifactName: String, capturedAtUTC: String)] = [],
+    observedScreenshots: [ObservedScreenshot] = [],
     failedScreenshots: [(atHostUTC: String, reason: String)] = [],
     declaredButMissing: [MissingProduct] = [],
     calibration: Alignment? = nil
@@ -162,6 +185,36 @@ extension DiagnosticSessionReading {
             screenshot = nearest.0
           } else {
             absence = .takenTooFarFromTheMark(offsetMs: nearest.0.takenAfterMarkMs)
+          }
+        }
+
+        // A capture whose observed window contains the mark might be this
+        // moment. Whether it is depends on where inside that window the
+        // shutter opened, which nothing recorded - so when the window is
+        // wider than the rule, the reader says the rule cannot decide rather
+        // than deciding on its behalf.
+        if screenshot == nil {
+          let tolerance = Double(screenshotAppliesWithinMs) / 1000
+          for observed in observedScreenshots {
+            guard let start = ISO8601Timestamps.parse(observed.windowStartUTC),
+              let end = ISO8601Timestamps.parse(observed.windowEndUTC),
+              // A mark comes first and the shutter follows, so the mark is
+              // usually just before the window rather than inside it. What
+              // matters is whether the window overlaps the mark's tolerance
+              // at all.
+              end.timeIntervalSince(instant) >= -tolerance,
+              start.timeIntervalSince(instant) <= tolerance
+            else { continue }
+            let width = Int((end.timeIntervalSince(start) * 1000).rounded())
+            if width <= screenshotAppliesWithinMs {
+              screenshot = Screenshot(
+                artifactName: observed.artifactName,
+                capturedAtUTC: observed.windowStartUTC,
+                takenAfterMarkMs: Int((start.timeIntervalSince(instant) * 1000).rounded()))
+            } else {
+              absence = .shutterWindowWiderThanTheRule(windowMs: width)
+            }
+            break
           }
         }
         if screenshot == nil, absence == nil {

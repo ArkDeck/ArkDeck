@@ -232,9 +232,20 @@ T02/T03 不进入实现。
   150 ms，而 runtime 记录的是制品的 `createdAtUtc`、**秒级粒度**（且它是「制品写入时刻」
   不是「快门时刻」）。粒度比消费它的窗口粗约七倍，任何瞄准都进不了窗。reader 没有错，
   它拒绝得对也说清了差多少；它需要的那个事实**尚未被发布**。
-  收口：`截图 Artifact 记录实际拍摄时刻` 需按字面实现——截图腿把自己回读观察到的时刻
-  以毫秒精度记为制品事实。在那之前 ±150 ms 规则已实现且有测试，但在真实数据上无法触发。
-  证据 `evidence/runs/TASK-IDC-003/data/session-walkthrough.json`。
+  ⑥ 快门时刻已按毫秒精度落进制品，并把上面那条缺口的读法一并更正。
+  落的是**区间不是点**：宿主看不见快门张开，只看得见自己派发的那段区间，快门在其中；
+  记一个点是在发明没人测过的精度。制品新增 `observationWindow`（上线为
+  observedFromUtc/observedToUtc）。
+  **测量结果推翻了先前的诊断**：先前记为「时间戳秒级粒度」——那只是症状。毫秒精度落地后
+  规则仍然满足不了：真机上 `capture-screenshot` 本身宽 **913–965 ms**（五次），
+  宿主定位快门的不确定度约 ±465 ms，是那条 150 ms 规则的六倍左右。
+  所以 reader 的 `shutterWindowWiderThanTheRule` **不是边角情形，是这套硬件上的常态**；
+  在设备自己报告快门时刻之前，「此处无法判定」就是正确答案。
+  测量中还改掉一处自己的错：`screenshot.png` 由 `receive-screenshot` 发布，第一版挂上去的
+  是**接收**区间（实测 91/118/781 ms），而快门在 `capture-screenshot`。那会是一个「精确得
+  很像回事、但属于另一个事件」的数字，比它替换掉的秒级值更糟。现按 operation 自己声明的
+  receive→capture 关系解析产出步骤，并有测试钉住「接收产物携带其生产者的窗口」。
+  证据 `evidence/runs/TASK-IDC-003/data/shutter-instant.json`。
   原 ready 依据：proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
   Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
   trace_marker 且必须加落笔回读、回溯窗口与类目集联动预算且 dump 后立即重臂、
