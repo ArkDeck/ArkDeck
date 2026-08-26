@@ -855,12 +855,12 @@ final class AppShellUITests: XCTestCase {
         app.buttons[pane].waitForExistenceFast(timeout: 10),
         "Settings must expose the \(pane) pane", file: file, line: line)
     }
-    app.buttons[workspaces.settingsPanes[1]].click()
+    settingsPane(workspaces.settingsPanes[1], in: app).click()
     XCTAssertTrue(
       app.buttons["settings.toolchains.choose"].waitForExistenceFast(timeout: 10),
       file: file, line: line)
     XCTAssertTrue(app.buttons["settings.toolchains.refresh"].exists, file: file, line: line)
-    app.buttons[workspaces.settingsPanes[2]].click()
+    settingsPane(workspaces.settingsPanes[2], in: app).click()
     XCTAssertTrue(
       app.buttons["settings.remoteSources.add"].waitForExistenceFast(timeout: 10),
       file: file, line: line)
@@ -876,7 +876,7 @@ final class AppShellUITests: XCTestCase {
       app.buttons["settings.remoteSources.save"].isEnabled,
       "an unverified server must not be saved", file: file, line: line)
     app.buttons["settings.remoteSources.cancel"].click()
-    app.buttons[workspaces.settingsPanes[3]].click()
+    settingsPane(workspaces.settingsPanes[3], in: app).click()
     for identifier in [
       "settings.storage.chooseRoot", "settings.storage.quota", "settings.storage.margin",
       "settings.storage.retention", "settings.storage.save",
@@ -885,12 +885,12 @@ final class AppShellUITests: XCTestCase {
         element(identifier, in: app).waitForExistenceFast(timeout: 10),
         "\(identifier) missing", file: file, line: line)
     }
-    app.buttons[workspaces.settingsPanes[5]].click()
+    settingsPane(workspaces.settingsPanes[5], in: app).click()
     XCTAssertTrue(
       app.buttons["settings.diagnostics.preview"].waitForExistenceFast(timeout: 10),
       file: file, line: line)
     XCTAssertFalse(app.buttons["settings.diagnostics.export"].exists, file: file, line: line)
-    app.buttons[workspaces.settingsPanes[4]].click()
+    settingsPane(workspaces.settingsPanes[4], in: app).click()
     XCTAssertTrue(
       app.staticTexts["update.status"].waitForExistenceFast(timeout: 10),
       "the Updates pane must render its status", file: file, line: line)
@@ -1573,6 +1573,28 @@ final class AppShellUITests: XCTestCase {
     }
     XCTAssertTrue(
       element("settings.general.appIcon.keycap", in: app).waitForExistenceFast(timeout: 10))
+  }
+
+  /// A Settings pane button, addressed inside the Settings window.
+  ///
+  /// `app.buttons["Diagnostics"]` used to be unambiguous. It stopped being so
+  /// when the shell gained a Diagnostics sidebar item with the same title:
+  /// XCUITest then refuses the click rather than guessing which window meant
+  /// it. Panes are toolbar items of the Settings window, so that is where they
+  /// are looked up.
+  private func settingsPane(
+    _ title: String, in app: XCUIApplication,
+    file: StaticString = #filePath, line: UInt = #line
+  ) -> XCUIElement {
+    let window = app.windows["com_apple_SwiftUI_Settings_window"]
+    XCTAssertTrue(
+      window.waitForExistenceFast(timeout: 10), "Settings window must be open",
+      file: file, line: line)
+    let pane = window.toolbars.buttons[title]
+    XCTAssertTrue(
+      pane.waitForExistenceFast(timeout: 10), "Settings pane \(title) must exist",
+      file: file, line: line)
+    return pane
   }
 
   private func openSettings(in app: XCUIApplication) {
