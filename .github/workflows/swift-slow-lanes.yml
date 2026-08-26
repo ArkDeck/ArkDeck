@@ -120,14 +120,34 @@ jobs:
           # never retried: a test that fails twice as often as it passes is a
           # defect, and hiding it here would recreate the gap this lane exists
           # to close.
+          # Two cases are skipped here and nowhere else: they assert things a
+          # hosted runner cannot supply, and both pass locally.
+          #
+          #   testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe reads
+          #   a real HDC toolchain identity through the App's sandbox. The
+          #   runner has no such toolchain, so the test would report the
+          #   runner's emptiness as a product failure.
+          #
+          #   testSelectingADeepWideRowCentersItInBothTreeAxes asserts a
+          #   selected row lands within 32pt of the tree's centre. That
+          #   tolerance is written against a real display; it is a statement
+          #   about scroll behaviour, not about the runner's geometry.
+          #
+          # They stay in the target and run under scripts/ci/run-ui-tests.sh
+          # locally, which is where their claims are meaningful.
+          # Named once: a retry that ran a different set than the first
+          # attempt would report on tests nobody chose.
+          set -- \
+            -skip-testing:ArkDeckHDCUITests/HDCStatusUITests/testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe \
+            -skip-testing:ArkDeckHDCUITests/ViewerUITests/testSelectingADeepWideRowCentersItInBothTreeAxes
           log="$RUNNER_TEMP/ui-tests.log"
-          if sh scripts/ci/run-ui-tests.sh 2>&1 | tee "$log"; then
+          if sh scripts/ci/run-ui-tests.sh "$@" 2>&1 | tee "$log"; then
             exit 0
           fi
           if grep -qE 'failed to initialize for UI testing|before establishing connection' "$log"
           then
             echo "::warning::UI-test runner did not bootstrap; retrying once"
-            sh scripts/ci/run-ui-tests.sh
+            sh scripts/ci/run-ui-tests.sh "$@"
           else
             exit 1
           fi
@@ -137,5 +157,7 @@ jobs:
           echo "UI tests cover the App shell, HDC diagnostics, the Overview" >> "$GITHUB_STEP_SUMMARY"
           echo "record and the Viewer against a launched window. The required" >> "$GITHUB_STEP_SUMMARY"
           echo "gate only builds this target, so this is the only place its" >> "$GITHUB_STEP_SUMMARY"
+          echo "assertions run — minus two cases that need a real display and" >> "$GITHUB_STEP_SUMMARY"
+          echo "a real HDC toolchain, which stay local. Red here = file a" >> "$GITHUB_STEP_SUMMARY"
           echo "assertions run. Red here = file a product defect; this job is" >> "$GITHUB_STEP_SUMMARY"
           echo "not a merge gate. Reproduce with scripts/ci/run-ui-tests.sh." >> "$GITHUB_STEP_SUMMARY"
