@@ -52,6 +52,7 @@
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000E0 /* ViewerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* ViewerUITests.swift */; };
+		A10000000000000000000F10 /* ToolkitStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
@@ -106,6 +107,7 @@
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
+		A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitStaleFrameUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 		E10000000000000000000002 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -157,6 +159,7 @@
 				A10000000000000000000036 /* HDC UI Tests */,
 				A100000000000000000000EB /* Overview UI Tests */,
 				A1000000000000000000003A /* App Shell UI Tests */,
+				A10000000000000000000F12 /* Toolkit UI Tests */,
 				A10000000000000000000033 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -370,6 +373,14 @@
 			path = Features/Shared;
 			sourceTree = "<group>";
 		};
+		A10000000000000000000F12 /* Toolkit UI Tests */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */,
+			);
+			path = ArkDeckAppUITests/Toolkit;
+			sourceTree = "<group>";
+		};
 		A1000000000000000000003A /* App Shell UI Tests */ = {
 			isa = PBXGroup;
 			children = (
@@ -574,6 +585,7 @@
 			files = (
 				A1000000000000000000001F /* AppShellUITests.swift in Sources */,
 				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
+				A10000000000000000000F10 /* ToolkitStaleFrameUITests.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
 				A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */,

@@ -26,6 +26,10 @@ final class ToolkitWorkspaceViewModel {
     let detail: String
     let systemImage: String
     let tintName: String
+    /// A refusal is a different kind of row from a result: nothing was sent,
+    /// so nothing has an outcome. Naming it separately is what lets anyone -
+    /// a reader, a test - tell the two apart without reading the prose.
+    let isRefusal: Bool
 
     var tint: Color {
       switch tintName {
@@ -43,6 +47,15 @@ final class ToolkitWorkspaceViewModel {
   private(set) var pendingMarker: Marker?
   private(set) var lastMarker: Marker?
   private(set) var log: [LogEntry] = []
+  /// Whether the picture on screen still shows the device.
+  ///
+  /// Not a matter of age. The runtime's own freshness budget is a second,
+  /// and a still is read at a person's own pace - they look, they think,
+  /// they decide where to press. See `ToolkitFrameLiveness` for why the rule
+  /// is about what changed the screen rather than about how old the picture
+  /// is; here it only decides whether the next press is sent or refused.
+  private(set) var liveness = ToolkitFrameLiveness()
+  var frameIsStale: Bool { liveness.refusesInput }
   private(set) var deviceObservation = DeviceListPresentation.loading
   private(set) var captureFailure: String?
 
@@ -115,6 +128,9 @@ final class ToolkitWorkspaceViewModel {
       captureFailure = nil
       pendingMarker = nil
       lastMarker = nil
+      // A fresh picture is the only thing that clears staleness. There is no
+      // way to un-change a screen.
+      liveness.captured()
       append(
         title: toolkitText("toolkit.log.captured"),
         detail: "\(frame.width)×\(frame.height)", systemImage: "camera", tint: "neutral")
@@ -148,6 +164,17 @@ final class ToolkitWorkspaceViewModel {
       pendingMarker = nil
       return
     }
+    // Refused here rather than sent and explained afterwards: the point is
+    // that this press never reaches the device, and saying why is what makes
+    // the refusal act on instead of merely be complained about.
+    guard !frameIsStale else {
+      pendingMarker = nil
+      append(
+        title: toolkitText("toolkit.stale.refused"),
+        detail: toolkitText("toolkit.stale.refused.detail"),
+        systemImage: "exclamationmark.triangle.fill", tint: "failed", isRefusal: true)
+      return
+    }
     let travelled = hypot(end.x - start.x, end.y - start.y)
     let request = Self.gesture(
       start: start, end: end, travelled: travelled, heldFor: heldFor,
@@ -169,6 +196,10 @@ final class ToolkitWorkspaceViewModel {
     let outcome = await provider.send(request, to: target)
     lastMarker = pendingMarker
     pendingMarker = nil
+    // Confirmed and unknown both change the screen as far as anyone here can
+    // tell: one is known to have landed and the other may have. Only a clean
+    // failure leaves the picture still true.
+    liveness.settled(outcome)
 
     let coordinates = Self.describe(request)
     switch outcome {
@@ -250,9 +281,15 @@ final class ToolkitWorkspaceViewModel {
     }
   }
 
-  private func append(title: String, detail: String, systemImage: String, tint: String) {
+  private func append(
+    title: String, detail: String, systemImage: String, tint: String,
+    isRefusal: Bool = false
+  ) {
     log.insert(
-      LogEntry(title: title, detail: detail, systemImage: systemImage, tintName: tint), at: 0)
+      LogEntry(
+        title: title, detail: detail, systemImage: systemImage, tintName: tint,
+        isRefusal: isRefusal),
+      at: 0)
     if log.count > 40 { log.removeLast(log.count - 40) }
   }
 }

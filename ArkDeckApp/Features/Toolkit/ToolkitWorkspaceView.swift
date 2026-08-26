@@ -78,6 +78,7 @@ struct ToolkitWorkspaceView: View {
               .interpolation(.high)
               .scaledToFit()
             gestureSurface(frame: frame, rendered: rendered)
+            if model.frameIsStale { staleOverlay }
             if let marker = model.pendingMarker {
               touchMarker(marker, rendered: rendered, pending: true)
             } else if let marker = model.lastMarker {
@@ -117,6 +118,27 @@ struct ToolkitWorkspaceView: View {
           }
       )
       .disabled(model.isSendingGesture)
+  }
+
+  /// The picture stays on screen - it is still the last thing the device is
+  /// known to have shown - but it is marked, so nobody aims at it by mistake.
+  private var staleOverlay: some View {
+    VStack {
+      HStack {
+        Label(toolkitText("toolkit.stale.badge"), systemImage: "clock.badge.exclamationmark")
+          .font(.system(size: 11, weight: .medium))
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(.orange.opacity(0.85))
+          .foregroundStyle(.white)
+          .clipShape(Capsule())
+          .padding(8)
+        Spacer()
+      }
+      Spacer()
+    }
+    .allowsHitTesting(false)
+    .accessibilityIdentifier("toolkit.stale.badge")
   }
 
   private func touchMarker(
@@ -195,7 +217,10 @@ struct ToolkitWorkspaceView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier("toolkit.log.entry")
+    // One row is one thing that happened, so it reads as one element rather
+    // than as a title and a detail a reader has to stitch back together.
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier(entry.isRefusal ? "toolkit.log.refused" : "toolkit.log.entry")
   }
 
   // MARK: - Footer

@@ -2479,6 +2479,77 @@ final class AgentDaemonContractTests: XCTestCase {
   /// A store-less composition
   /// refuses rather than answering with an empty list (which would read as
   /// "this job produced nothing").
+  /// What the workspace reads must be what the runtime writes (TASK-IDC-002).
+  ///
+  /// Measured on hardware: every Toolkit capture succeeded as a Runtime Job,
+  /// published `screenshot.png`, and still showed "capture failed" in the
+  /// workspace. Two independent mistakes on the same never-exercised path -
+  /// `artifact.list` answers with a bare array and was read as an object, and
+  /// every `artifact.read` chunk is scoped to its job and was sent without
+  /// one. Either alone is fatal, and no test noticed because both sides were
+  /// only ever tested against themselves.
+  ///
+  /// So this drives the workspace's own reader with the daemon's own reply.
+  func testTheWorkspaceReadsTheArtifactIndexTheRuntimeActuallyWrites() async throws {
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-26T00:00:00Z" })
+    let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 7, count: 24)
+    let published = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-toolkit-index-001", sessionID: "session-toolkit-index-001",
+        stepID: "receive-screenshot", name: "screenshot.png",
+        mediaType: "image/png",
+        privacy: .standard, retentionClass: .pinnedUntilVerified,
+        sourceOperation: "capture.diagnostics", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-001", bindingRevision: 1,
+          stableIdentitySHA256: String(repeating: "a", count: 64)),
+        contents: png))
+    let (handler, _) = try makeStack(artifactStore: artifactStore)
+
+    // `handleLine` returns the bytes that go on the wire, so the reader is
+    // driven by the daemon's actual reply rather than by a fixture written to
+    // match whatever the reader already expected.
+    let listed = await handler.handleLine(
+      Data(
+        """
+        {"protocolVersion":"1.0.0","id":"a","method":"artifact.list",\
+        "params":{"jobId":"job-toolkit-index-001"}}
+        """.utf8))
+
+    let entries = try ToolkitArtifactIndex.entries(
+      inEnvelope: listed, label: "Toolkit artifacts")
+    let screenshot = try XCTUnwrap(
+      ToolkitArtifactIndex.screenshot(in: entries),
+      "the workspace must find the screenshot the runtime published")
+    XCTAssertEqual(screenshot.artifactID, published.artifactID)
+    XCTAssertEqual(screenshot.byteCount, png.count)
+
+    // The read is scoped to the job that published it. Asking without one is
+    // refused, which is the second half of what made every capture fail.
+    let withoutJob = await handler.handleFrame(
+      Data(
+        """
+        {"protocolVersion":"1.0.0","id":"b","method":"artifact.read",\
+        "params":{"artifactId":"\(screenshot.artifactID)","offset":0,"maxBytes":1048576,\
+        "allowSensitive":true}}
+        """.utf8))
+    XCTAssertFalse(
+      withoutJob.ok,
+      "an artifact read without its job id is refused, so the workspace has to send one")
+
+    let read = await handler.handleFrame(
+      Data(
+        """
+        {"protocolVersion":"1.0.0","id":"c","method":"artifact.read",\
+        "params":{"jobId":"job-toolkit-index-001",\
+        "artifactId":"\(screenshot.artifactID)","offset":0,"maxBytes":1048576,\
+        "allowSensitive":true}}
+        """.utf8))
+    XCTAssertTrue(read.ok, read.error?.message ?? "-")
+  }
+
   func testArtifactMethodsAreIDOnlyAndFailClosedWithoutAStore() async throws {
     let (handler, _) = try makeStack(includeDefaultArtifactStore: false)
     for method in [
