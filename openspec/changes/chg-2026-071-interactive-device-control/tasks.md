@@ -40,9 +40,16 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-002 — 交互式输入 + Toolkit 真机操作（垂直交付）
 
-- Status:in-progress（2026-08-26 复核：九刀已交付且逐刀有真机证据，**但对照本任务自己的
-  「交付内容」与 IDC-AC-8，还有五项未做**，逐条列在这里，而不是含糊地挂着 in-progress。
-  ① 已于 2026-08-26 交付，余四项未做：
+- Status:done（2026-08-26 收官。此前一次复核对照本任务自己的「交付内容」与 IDC-AC-8
+  发现**五项未做**，没有含糊地挂着 in-progress，而是逐条列出并逐条交付；五项现已全部
+  交付且各有真机证据（#1543 / #1545+#1546+#1547 / #1548 / #1550 / #1551）。
+  **置 done 前逐条核了 IDC-AC-8，不只是数自己做的那五项**——因而发现它的前两句
+  「长按（≥500 ms, <6 pt）产出 long-press 而非 tap」与「tap 锚定 down 点」
+  **此前从无测试**：规则住在视图模型里，App target 没有单元测试落脚点，所以那两句
+  一直只是注释里的声称。现已抽到 `ToolkitGestureClassification` 并由 10 条契约测试把住；
+  负向对照：把阈值从 `>=` 改成 `>` 红 2 处，把锚点从按下点改成抬起点红 6 处。
+  验收读法与遗留边界见下。
+  ——五项的逐条记录——
   ① ~~**stale 帧不拒绝输入**~~ **已交付**——AC-8 要求「stale 时 pointer down 被拒且
   有说明」。**这里的 stale 不是帧龄**：runtime 自己的新鲜度预算是 1 秒，而静止画面是人
   按自己的节奏看的——看、想、决定点哪里，没人在一秒内做完，按秒计的规则会拒掉有史以来
@@ -56,7 +63,7 @@ T02/T03 不进入实现。
   runtime 任务成功、`screenshot.png` 已发布，而工作区显示「截图失败」；没有画面，本条
   拒绝也就是死码。现由 `testTheWorkspaceReadsTheArtifactIndexTheRuntimeActuallyWrites`
   用 daemon 自己的 `handleLine` 出线字节驱动工作区自己的读取器把住，不用手写 fixture。
-  ② **宿主合成录屏**——运行时腿已交付（2026-08-26），**App 面板未做**。
+  ② **宿主合成录屏已交付（2026-08-26）**——运行时腿 + App 面板。
   先答「系统没有录屏接口吗」：这台设备上 `/system/bin`、`/vendor/bin` **没有任何录屏
   程序**，只有 `snapshot_display`（单张）与 `setresolution_screen`；`uitest` 的
   `screenCap` 是单张、`uiRecord` 录的是 **UI 事件写 CSV** 不是像素。平台确有真正的屏幕
@@ -173,6 +180,22 @@ T02/T03 不进入实现。
   读侧已就位：`ToolkitScreenshotIntegrity.pixelSize` 能读 JPEG 的 SOF 尺寸（用真机文件
   验过 720×1280），制品查找两种名字都认——floor 抬起来那天，要改的只有请求那一行。
   **至此 IDC-AC-8 的五项全部交付**；AC-5 与 AC-6 的输入侧由已交付部分覆盖并有真机证据。
+  ——**done 不等于什么**（写在这里，不散在各个 PR 评论里）——
+  1. **录屏不落进 Diagnostics 会话**。录屏与采集会话仍是两回事：录屏产出一个宿主文件，
+     不进会话制品、时间轴上也没有它。设计里「会话内按预览链路循环取帧」那条路没有走，
+     走的是独立的 `capture.screen-sequence@1`。
+  2. **Toolkit 取景器仍请求 PNG**，见上：抬 daemon 下限是要有人明确做的决定。
+  3. **持续预览腿从未建过**。原型 performance note 里「预览常显画面年龄」「录屏开始后
+     预览不会自动开启」描述的是它；产品文案因此按已建成之物重写，没有照抄。
+  4. **配额满那条路径没有真机证据**——daemon 的配额没有旋钮、默认 8 GiB，在真机上填满
+     不是一次值得做的检查；它只由包内小配额契约测试覆盖（含「设备一次都没被碰到」的
+     见证断言）。
+  5. **AC-8 第一句「pending 触点 ≤ 100 ms 出现」没有计时证据**。两态触点存在且视觉可分
+     （`toolkit.touch.pending` / `toolkit.touch.settled`，标记在 await 之前同步落下），
+     但 100 ms 这个数没有被量过，本次也没量。
+  6. 真机闸依赖本机 XCUITest 自动化，而它这两天**间歇性起不来**
+     （`Timed out while enabling automation mode`），与被测代码无关；四条闸在收官这次
+     全部通过（stale 25.5s、录屏 11.7s、配额拦截 11.4s、双 notice 15.6s）。
   ——以下为逐刀记录——
   已交付 ① typed input operations + Provider lowering
   + 契约测试 + 真机单发验证（#1498）；②a 会话 scope 授权 + TTL/预算（#1500）；
