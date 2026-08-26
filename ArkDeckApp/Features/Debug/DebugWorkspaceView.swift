@@ -99,38 +99,36 @@ struct DebugWorkspaceView: View {
     }
   }
 
+  /// The scope line and the target this page submits against — the page's own
+  /// chrome, and nothing else.
+  ///
+  /// Three per-operation availability badges used to stack here, restating
+  /// what the `Runtime availability` card inside every panel already said.
+  /// Availability is now one line beside the section title it gates, so the
+  /// header is a sentence and a target rather than a third column of state.
   private var workspaceHeader: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: WorkspaceMetrics.blockGap) {
-        titleAndScope
-        Spacer(minLength: WorkspaceMetrics.contentGap)
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      // The page title lives in the window toolbar; repeating it here would
+      // give the detail two perceivable main headings. Only the scope line
+      // stays.
+      WorkspaceHeaderBar(
+        summary: Text(DebugL10n.text("debug.scope")),
+        summaryIdentifier: "debug.scope"
+      ) {
         targetPicker
-        operationBadges
       }
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        titleAndScope
-        HStack(spacing: WorkspaceMetrics.contentGap) {
-          targetPicker
-          Spacer(minLength: WorkspaceMetrics.tightGap)
-          operationBadges
+      if let failure = model.workspace.targetLoadFailure {
+        WorkspaceNotice(tone: .danger, identifier: "debug.target.failure") {
+          Text(failure).textSelection(.enabled)
         }
       }
     }
   }
 
-  // The page title lives in the window toolbar; repeating it here would give
-  // the detail two perceivable main headings. Only the scope line stays.
-  private var titleAndScope: some View {
-    Text(DebugL10n.text("debug.scope"))
-      .font(WorkspaceFont.secondary)
-      .foregroundStyle(.secondary)
-      .accessibilityIdentifier("debug.scope")
-  }
-
   private var targetPicker: some View {
-    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
       Text(DebugL10n.text("debug.target.label"))
-        .font(WorkspaceFont.caption)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
       Picker(DebugL10n.text("debug.target.label"), selection: $selectedTargetID) {
         Text(DebugL10n.text("debug.target.none")).tag(String?.none)
@@ -142,51 +140,14 @@ struct DebugWorkspaceView: View {
       .frame(width: 230)
       .accessibilityIdentifier("debug.target")
       if let selectedTarget {
-        Text(
-          String(
-            localized: LocalizedStringResource.DebugLocalizable.debugTargetBinding(
-              Int32(clamping: selectedTarget.bindingRevision), selectedTarget.toolVersion))
-        )
-        .font(WorkspaceFont.monospacedDense.monospacedDigit())
-        .foregroundStyle(.secondary)
-      } else if let failure = model.workspace.targetLoadFailure {
-        Text(failure)
-          .font(WorkspaceFont.caption)
-          .foregroundStyle(.red)
-          .lineLimit(2)
+        WorkspaceChip(
+          text: Text(
+            String(
+              localized: LocalizedStringResource.DebugLocalizable.debugTargetBinding(
+                Int32(clamping: selectedTarget.bindingRevision), selectedTarget.toolVersion))),
+          symbol: "link",
+          identifier: "debug.target.binding")
       }
-    }
-  }
-
-  private var operationBadges: some View {
-    VStack(alignment: .trailing, spacing: WorkspaceMetrics.tightGap) {
-      operationBadge(
-        reference: DebugApplicationFacade.nativeLibraryReference,
-        shortTitle: DebugL10n.text("debug.operation.native"))
-      operationBadge(
-        reference: DebugApplicationFacade.captureDiagnosticsReference,
-        shortTitle: DebugL10n.text("debug.operation.capture"))
-      operationBadge(
-        reference: DebugApplicationFacade.debugHAPReference,
-        shortTitle: DebugL10n.text("debug.operation.hap"))
-    }
-  }
-
-  private func operationBadge(reference: String, shortTitle: String) -> some View {
-    let operation = model.workspace.operation(reference)
-    return WorkspaceChip(
-      text: Text(shortTitle),
-      tone: operationChipTone(operation?.availability),
-      symbol: operationStatusSymbol(operation?.availability)
-    )
-    .help(reference)
-  }
-
-  private func operationChipTone(_ availability: DebugRuntimeAvailability?) -> WorkspaceTone {
-    switch availability {
-    case .available: .ok
-    case .checking: .neutral
-    case .unavailable, nil: .warning
     }
   }
 
@@ -293,14 +254,6 @@ struct DebugWorkspaceView: View {
         probeFailure: model.workspace.probeFailure)
     case .commands:
       DebugCommandsWorkspace(model: model, target: selectedTarget)
-    }
-  }
-
-  private func operationStatusSymbol(_ availability: DebugRuntimeAvailability?) -> String {
-    switch availability {
-    case .available: "checkmark.circle.fill"
-    case .checking: "hourglass"
-    case .unavailable, nil: "exclamationmark.triangle.fill"
     }
   }
 
@@ -773,18 +726,16 @@ private struct DebugArtifactsWorkspace: View {
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
       targetScope
-      DebugAvailabilityCard(operation: operation)
-      ViewThatFits(in: .horizontal) {
-        HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
-          buildSource
-            .frame(minWidth: 300, idealWidth: 360, maxWidth: 430)
-          deploymentInputs
-            .frame(minWidth: 440, maxWidth: .infinity)
-        }
-        VStack(spacing: WorkspaceMetrics.blockGap) {
-          buildSource
-          deploymentInputs
-        }
+      // `WorkspaceColumns` measures the container instead of comparing ideal
+      // sizes, so the fold happens at a real width. `ViewThatFits` could not:
+      // a column of prose has an unbounded ideal width.
+      WorkspaceColumns(
+        spacing: WorkspaceMetrics.sectionGap,
+        leadingRatio: WorkspaceMetrics.splitLeadingColumnRatio
+      ) {
+        buildSource
+      } trailing: {
+        deploymentInputs
       }
       reviewAndRun
         .background {
@@ -792,7 +743,7 @@ private struct DebugArtifactsWorkspace: View {
         }
       productionBoundary
       if !runtimeArtifacts.isEmpty { resultArtifacts }
-      DebugRecentJobsCard(model: model, jobs: relatedJobs)
+      DebugRecentJobsSection(model: model, jobs: relatedJobs)
     }
     .fileImporter(
       isPresented: $isImporterPresented,
@@ -847,73 +798,75 @@ private struct DebugArtifactsWorkspace: View {
   }
 
   private var buildSource: some View {
-    DebugCard(
-      title: DebugL10n.text("debug.artifacts.source.title"),
-      symbol: "shippingbox"
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.artifacts.source.title")),
+      accessory: { DebugAvailabilityStatus(operation: operation) }
     ) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        Text(DebugL10n.text("debug.artifacts.source.detail"))
-          .font(WorkspaceFont.secondary)
+      // Spec §4.4: state availability before offering the configuration it
+      // gates. A ready operation is the accessory line above and nothing
+      // more; only a blocker earns page space.
+      DebugAvailabilityNotice(operation: operation)
+      Text(DebugL10n.text("debug.artifacts.source.detail"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      Picker("", selection: $buildSourceKind) {
+        Text(DebugL10n.text("debug.artifacts.source.local"))
+          .tag(BuildSourceKind.local)
+        Text(DebugL10n.text("debug.artifacts.source.remote"))
+          .tag(BuildSourceKind.remote)
+      }
+      .labelsHidden()
+      .pickerStyle(.segmented)
+      .accessibilityLabel(DebugL10n.text("debug.artifacts.source.kind"))
+      .accessibilityIdentifier("debug.artifacts.source.kind")
+      if buildSourceKind == .local {
+        Button {
+          isImporterPresented = true
+        } label: {
+          Label(
+            DebugL10n.text("debug.artifacts.chooseLibrary"),
+            systemImage: "doc.badge.plus")
+        }
+        .accessibilityIdentifier("debug.artifacts.chooseLibrary")
+      } else {
+        Button {
+          isRemoteBrowserPresented = true
+        } label: {
+          Label(
+            DebugL10n.text("debug.artifacts.browseRemote"),
+            systemImage: "server.rack")
+        }
+        .accessibilityIdentifier("debug.artifacts.browseRemote")
+      }
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Text(DebugL10n.text("debug.artifacts.selectedLibrary"))
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
+        Text(
+          selectedRemoteLibrary?.entry.name ?? selectedLibraryURL?.lastPathComponent
+            ?? DebugL10n.text("debug.artifacts.noLibrary")
+        )
+        .font(WorkspaceFont.monospacedValue)
+        .foregroundStyle(selectedLibraryURL == nil ? .secondary : .primary)
+        .textSelection(.enabled)
+      }
+      if let selectedRemoteLibrary {
+        Text("\(selectedRemoteLibrary.sourceName) · \(selectedRemoteLibrary.entry.relativePath)")
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .help(selectedRemoteLibrary.entry.relativePath)
+      }
+      if let selectionError {
+        Label(selectionError, systemImage: "xmark.octagon")
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.red)
           .fixedSize(horizontal: false, vertical: true)
-        Picker("", selection: $buildSourceKind) {
-          Text(DebugL10n.text("debug.artifacts.source.local"))
-            .tag(BuildSourceKind.local)
-          Text(DebugL10n.text("debug.artifacts.source.remote"))
-            .tag(BuildSourceKind.remote)
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .accessibilityLabel(DebugL10n.text("debug.artifacts.source.kind"))
-        .accessibilityIdentifier("debug.artifacts.source.kind")
-        if buildSourceKind == .local {
-          Button {
-            isImporterPresented = true
-          } label: {
-            Label(
-              DebugL10n.text("debug.artifacts.chooseLibrary"),
-              systemImage: "doc.badge.plus")
-          }
-          .accessibilityIdentifier("debug.artifacts.chooseLibrary")
-        } else {
-          Button {
-            isRemoteBrowserPresented = true
-          } label: {
-            Label(
-              DebugL10n.text("debug.artifacts.browseRemote"),
-              systemImage: "server.rack")
-          }
-          .accessibilityIdentifier("debug.artifacts.browseRemote")
-        }
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-          Text(DebugL10n.text("debug.artifacts.selectedLibrary"))
-            .font(WorkspaceFont.caption)
-            .foregroundStyle(.secondary)
-          Text(
-            selectedRemoteLibrary?.entry.name ?? selectedLibraryURL?.lastPathComponent
-              ?? DebugL10n.text("debug.artifacts.noLibrary")
-          )
-          .font(WorkspaceFont.monospacedValue)
-          .foregroundStyle(selectedLibraryURL == nil ? .secondary : .primary)
-          .textSelection(.enabled)
-        }
-        if let selectedRemoteLibrary {
-          Text("\(selectedRemoteLibrary.sourceName) · \(selectedRemoteLibrary.entry.relativePath)")
-            .font(WorkspaceFont.monospacedDense)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-            .truncationMode(.middle)
-            .help(selectedRemoteLibrary.entry.relativePath)
-        }
-        if let selectionError {
-          Label(selectionError, systemImage: "xmark.octagon")
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        WorkspaceNotice(tone: .neutral, symbol: "externaldrive") {
-          Text(DebugL10n.text("debug.artifacts.sourceBoundary"))
-        }
+      }
+      WorkspaceNotice(tone: .neutral, symbol: "externaldrive") {
+        Text(DebugL10n.text("debug.artifacts.sourceBoundary"))
       }
     }
     .onChange(of: buildSourceKind) { _, _ in
@@ -925,182 +878,172 @@ private struct DebugArtifactsWorkspace: View {
   }
 
   private var deploymentInputs: some View {
-    DebugCard(
-      title: DebugL10n.text("debug.artifacts.destination.title"),
-      symbol: "app.badge"
-    ) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        Text(DebugL10n.text("debug.artifacts.destination.detail"))
-          .font(WorkspaceFont.secondary)
+    WorkspaceSection(Text(DebugL10n.text("debug.artifacts.destination.title"))) {
+      Text(DebugL10n.text("debug.artifacts.destination.detail"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      LabeledContent(DebugL10n.text("debug.artifacts.bundle")) {
+        TextField("com.example.app", text: $targetBundle)
+          .textFieldStyle(.roundedBorder)
+          .frame(minWidth: 220)
+          .accessibilityIdentifier("debug.artifacts.bundle")
+      }
+      LabeledContent(DebugL10n.text("debug.artifacts.logicalName")) {
+        TextField("libfeature_debug.so", text: $libraryLogicalName)
+          .textFieldStyle(.roundedBorder)
+          .frame(minWidth: 220)
+          .accessibilityIdentifier("debug.artifacts.logicalName")
+      }
+      LabeledContent(DebugL10n.text("debug.artifacts.abi")) {
+        Text(DebugL10n.text("debug.artifacts.abi.observed"))
           .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        LabeledContent(DebugL10n.text("debug.artifacts.bundle")) {
-          TextField("com.example.app", text: $targetBundle)
-            .textFieldStyle(.roundedBorder)
-            .frame(minWidth: 220)
-            .accessibilityIdentifier("debug.artifacts.bundle")
-        }
-        LabeledContent(DebugL10n.text("debug.artifacts.logicalName")) {
-          TextField("libfeature_debug.so", text: $libraryLogicalName)
-            .textFieldStyle(.roundedBorder)
-            .frame(minWidth: 220)
-            .accessibilityIdentifier("debug.artifacts.logicalName")
-        }
-        LabeledContent(DebugL10n.text("debug.artifacts.abi")) {
-          Text(DebugL10n.text("debug.artifacts.abi.observed"))
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.trailing)
-        }
-        if !targetBundle.isEmpty
-          && !DebugTypedValueValidator.isValidBundleName(targetBundle)
-        {
-          Label(
-            DebugL10n.text("debug.artifacts.bundleInvalid"),
-            systemImage: "exclamationmark.circle"
-          )
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.red)
-          .accessibilityIdentifier("debug.artifacts.bundle.invalid")
-        }
-        if !libraryLogicalName.isEmpty
-          && !DebugTypedValueValidator.isValidNativeLibraryLogicalName(libraryLogicalName)
-        {
-          Label(
-            DebugL10n.text("debug.artifacts.logicalNameInvalid"),
-            systemImage: "exclamationmark.circle"
-          )
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.red)
-          .accessibilityIdentifier("debug.artifacts.logicalName.invalid")
-        }
-        DisclosureGroup(DebugL10n.text("debug.artifacts.advanced")) {
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-            LabeledContent(DebugL10n.text("debug.artifacts.verification")) {
-              Text(DebugL10n.text("debug.artifacts.verify.maps"))
-                .multilineTextAlignment(.trailing)
-            }
-            LabeledContent(DebugL10n.text("debug.artifacts.rollback")) {
-              Text(DebugL10n.text("debug.artifacts.rollback.auto"))
-                .multilineTextAlignment(.trailing)
-            }
-            Text(DebugL10n.text("debug.artifacts.policy.required"))
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
+          .multilineTextAlignment(.trailing)
+      }
+      if !targetBundle.isEmpty
+        && !DebugTypedValueValidator.isValidBundleName(targetBundle)
+      {
+        Label(
+          DebugL10n.text("debug.artifacts.bundleInvalid"),
+          systemImage: "exclamationmark.circle"
+        )
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.red)
+        .accessibilityIdentifier("debug.artifacts.bundle.invalid")
+      }
+      if !libraryLogicalName.isEmpty
+        && !DebugTypedValueValidator.isValidNativeLibraryLogicalName(libraryLogicalName)
+      {
+        Label(
+          DebugL10n.text("debug.artifacts.logicalNameInvalid"),
+          systemImage: "exclamationmark.circle"
+        )
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.red)
+        .accessibilityIdentifier("debug.artifacts.logicalName.invalid")
+      }
+      DisclosureGroup(DebugL10n.text("debug.artifacts.advanced")) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          LabeledContent(DebugL10n.text("debug.artifacts.verification")) {
+            Text(DebugL10n.text("debug.artifacts.verify.maps"))
+              .multilineTextAlignment(.trailing)
           }
-          .padding(.top, WorkspaceMetrics.tightGap)
+          LabeledContent(DebugL10n.text("debug.artifacts.rollback")) {
+            Text(DebugL10n.text("debug.artifacts.rollback.auto"))
+              .multilineTextAlignment(.trailing)
+          }
+          Text(DebugL10n.text("debug.artifacts.policy.required"))
+            .font(WorkspaceFont.secondary)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.top, WorkspaceMetrics.tightGap)
       }
     }
   }
 
   private var reviewAndRun: some View {
-    DebugCard(
-      title: DebugL10n.text("debug.artifacts.review.title"),
-      symbol: "list.number"
-    ) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        Text(DebugL10n.text("debug.artifacts.review.detail"))
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        if let preparation = currentPreparation {
-          WorkspaceNotice(tone: .ok, identifier: "debug.artifacts.planReady") {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              Text(DebugL10n.text("debug.artifacts.planReady"))
-                .fontWeight(.semibold)
-              DebugCodeRow(
-                label: "ELF",
-                value:
-                  "\(preparation.abi) · ELF\(preparation.elfClassBits) · machine \(preparation.machine)"
-              )
-              DebugCodeRow(label: "Build ID", value: preparation.buildID)
-              DebugCodeRow(label: "SHA-256", value: preparation.sha256)
-            }
-          }
-        }
-        if model.isPreparingNativeLibrary && nativeLibraryFeedbackMatchesTarget {
-          HStack(spacing: WorkspaceMetrics.tightGap) {
-            ProgressView().controlSize(.small)
-            Text(DebugL10n.text("debug.artifacts.preparing"))
-          }
-          .accessibilityElement(children: .combine)
-          .accessibilityIdentifier("debug.artifacts.preparing")
-        }
-        if model.isSubmittingNativeLibrary && nativeLibraryFeedbackMatchesTarget {
-          WorkspaceNotice(tone: .accent, identifier: "debug.artifacts.running") {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              Text(DebugL10n.text("debug.artifacts.running"))
-                .fontWeight(.semibold)
-              Text(
-                model.workspace.jobs.first(where: {
-                  $0.id == model.activeNativeLibraryJobID
-                })?.timeline.last ?? DebugL10n.text("debug.artifacts.running.detail")
-              )
-              .font(WorkspaceFont.monospacedDense)
-            }
-          }
-        }
-        if let terminal = currentTerminal {
-          WorkspaceNotice(
-            tone: terminal.state == "succeeded" && !terminal.outcomeUnknown ? .ok : .danger,
-            identifier: "debug.artifacts.terminal"
-          ) {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              Text(
-                terminal.state == "succeeded" && !terminal.outcomeUnknown
-                  ? DebugL10n.text("debug.artifacts.verified")
-                  : DebugL10n.text("debug.artifacts.notVerified")
-              )
+    WorkspaceSection(Text(DebugL10n.text("debug.artifacts.review.title"))) {
+      Text(DebugL10n.text("debug.artifacts.review.detail"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if let preparation = currentPreparation {
+        WorkspaceNotice(tone: .ok, identifier: "debug.artifacts.planReady") {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(DebugL10n.text("debug.artifacts.planReady"))
               .fontWeight(.semibold)
-              if let latest = terminal.timeline.last {
-                Text(latest)
-                  .font(WorkspaceFont.monospacedDense)
-                  .textSelection(.enabled)
-              }
-            }
-          }
-        }
-        if let failure = currentFailure {
-          Label(failure, systemImage: "xmark.octagon")
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
-            .accessibilityIdentifier("debug.artifacts.failure")
-        }
-        HStack(spacing: WorkspaceMetrics.contentGap) {
-          if model.isSubmittingNativeLibrary && nativeLibraryFeedbackMatchesTarget {
-            Button(DebugL10n.text("debug.action.cancel")) {
-              model.cancelNativeLibrary()
-            }
-            .disabled(model.isCancellingNativeLibrary)
-            .accessibilityIdentifier("debug.artifacts.cancel")
-          } else {
-            Button(
-              currentPreparation == nil
-                ? DebugL10n.text("debug.artifacts.preview")
-                : DebugL10n.text("debug.artifacts.reopenPlan")
-            ) {
-              if currentPreparation != nil {
-                isPlanPresented = true
-              } else {
-                preparePlan()
-              }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(
-              !inputsAreValid || !operationIsAvailable
-                || model.isPreparingNativeLibrary || model.isSubmittingNativeLibrary
+            DebugCodeRow(
+              label: "ELF",
+              value:
+                "\(preparation.abi) · ELF\(preparation.elfClassBits) · machine \(preparation.machine)"
             )
-            .accessibilityIdentifier("debug.artifacts.preview")
+            DebugCodeRow(label: "Build ID", value: preparation.buildID)
+            DebugCodeRow(label: "SHA-256", value: preparation.sha256)
           }
-          if currentTerminal?.state == "succeeded" {
-            Button(DebugL10n.text("debug.artifacts.openLogs"), action: onOpenLogs)
-              .accessibilityIdentifier("debug.artifacts.openLogs")
-          }
-          Spacer(minLength: 0)
         }
+      }
+      if model.isPreparingNativeLibrary && nativeLibraryFeedbackMatchesTarget {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
+          ProgressView().controlSize(.small)
+          Text(DebugL10n.text("debug.artifacts.preparing"))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("debug.artifacts.preparing")
+      }
+      if model.isSubmittingNativeLibrary && nativeLibraryFeedbackMatchesTarget {
+        WorkspaceNotice(tone: .accent, identifier: "debug.artifacts.running") {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(DebugL10n.text("debug.artifacts.running"))
+              .fontWeight(.semibold)
+            Text(
+              model.workspace.jobs.first(where: {
+                $0.id == model.activeNativeLibraryJobID
+              })?.timeline.last ?? DebugL10n.text("debug.artifacts.running.detail")
+            )
+            .font(WorkspaceFont.monospacedDense)
+          }
+        }
+      }
+      if let terminal = currentTerminal {
+        WorkspaceNotice(
+          tone: terminal.state == "succeeded" && !terminal.outcomeUnknown ? .ok : .danger,
+          identifier: "debug.artifacts.terminal"
+        ) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(
+              terminal.state == "succeeded" && !terminal.outcomeUnknown
+                ? DebugL10n.text("debug.artifacts.verified")
+                : DebugL10n.text("debug.artifacts.notVerified")
+            )
+            .fontWeight(.semibold)
+            if let latest = terminal.timeline.last {
+              Text(latest)
+                .font(WorkspaceFont.monospacedDense)
+                .textSelection(.enabled)
+            }
+          }
+        }
+      }
+      if let failure = currentFailure {
+        Label(failure, systemImage: "xmark.octagon")
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+          .textSelection(.enabled)
+          .accessibilityIdentifier("debug.artifacts.failure")
+      }
+      HStack(spacing: WorkspaceMetrics.contentGap) {
+        if model.isSubmittingNativeLibrary && nativeLibraryFeedbackMatchesTarget {
+          Button(DebugL10n.text("debug.action.cancel")) {
+            model.cancelNativeLibrary()
+          }
+          .disabled(model.isCancellingNativeLibrary)
+          .accessibilityIdentifier("debug.artifacts.cancel")
+        } else {
+          Button(
+            currentPreparation == nil
+              ? DebugL10n.text("debug.artifacts.preview")
+              : DebugL10n.text("debug.artifacts.reopenPlan")
+          ) {
+            if currentPreparation != nil {
+              isPlanPresented = true
+            } else {
+              preparePlan()
+            }
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(
+            !inputsAreValid || !operationIsAvailable
+              || model.isPreparingNativeLibrary || model.isSubmittingNativeLibrary
+          )
+          .accessibilityIdentifier("debug.artifacts.preview")
+        }
+        if currentTerminal?.state == "succeeded" {
+          Button(DebugL10n.text("debug.artifacts.openLogs"), action: onOpenLogs)
+            .accessibilityIdentifier("debug.artifacts.openLogs")
+        }
+        Spacer(minLength: 0)
       }
     }
   }
@@ -1112,26 +1055,24 @@ private struct DebugArtifactsWorkspace: View {
   }
 
   private var resultArtifacts: some View {
-    DebugCard(
-      title: DebugL10n.text("debug.artifacts.results.title"),
-      symbol: "checkmark.seal"
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.artifacts.results.title")),
+      spacing: WorkspaceMetrics.tightGap
     ) {
-      VStack(spacing: WorkspaceMetrics.tightGap) {
-        ForEach(runtimeArtifacts) { row in
-          HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              Text(row.artifact.name).font(WorkspaceFont.monospacedValue)
-              Text(row.artifact.sha256)
-                .font(WorkspaceFont.monospacedDense)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-            }
-            Spacer()
-            Text(
-              ByteCountFormatter.string(fromByteCount: row.artifact.byteCount, countStyle: .file)
-            )
-            .font(WorkspaceFont.tabularSecondary)
+      ForEach(runtimeArtifacts) { row in
+        HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(row.artifact.name).font(WorkspaceFont.monospacedValue)
+            Text(row.artifact.sha256)
+              .font(WorkspaceFont.monospacedDense)
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
           }
+          Spacer()
+          Text(
+            ByteCountFormatter.string(fromByteCount: row.artifact.byteCount, countStyle: .file)
+          )
+          .font(WorkspaceFont.tabularSecondary)
         }
       }
     }
@@ -1279,7 +1220,7 @@ private struct DebugLogsWorkspace: View {
   @State private var keyword = ""
   @State private var marker = ""
   @State private var isViewportPaused = false
-  @State private var savesRawHiLog = true
+  @State private var isRequestExpanded = false
   @State private var pendingExport: DebugRuntimeArtifactRow?
   @State private var isExportPreviewPresented = false
 
@@ -1321,24 +1262,23 @@ private struct DebugLogsWorkspace: View {
   }
 
   var body: some View {
-    GeometryReader { geometry in
-      ViewThatFits(in: .horizontal) {
-        HSplitView {
-          configuration
-            .frame(minWidth: 300, idealWidth: 340, maxWidth: 390, maxHeight: .infinity)
-          liveAndStorage
-            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      // Configuration beside the viewport it feeds; the evidence tables below
+      // both, at the page's full measure, because a shard row carries a name,
+      // a size, a hash and two actions and does not fit a narrow column.
+      WorkspaceColumns(
+        spacing: WorkspaceMetrics.sectionGap,
+        leadingRatio: WorkspaceMetrics.splitLeadingColumnRatio
+      ) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+          captureSection
+          destructiveSection
         }
-        .frame(width: geometry.size.width, height: geometry.size.height)
-
-        ScrollView {
-          VStack(spacing: WorkspaceMetrics.blockGap) {
-            configuration
-            liveAndStorage
-          }
-          .padding(WorkspaceMetrics.pageInsetHorizontal)
-        }
+      } trailing: {
+        liveViewportSection
       }
+      shardsSection
+      DebugRecentJobsSection(model: model, jobs: relatedJobs)
     }
     .confirmationDialog(
       DebugL10n.text("debug.logs.exportPreview.title"),
@@ -1365,299 +1305,362 @@ private struct DebugLogsWorkspace: View {
     }
   }
 
-  private var configuration: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-        DebugCard(
-          title: DebugL10n.text("debug.logs.capture.title"), symbol: "record.circle"
-        ) {
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-            LabeledContent(DebugL10n.text("debug.logs.target")) {
-              Text(target?.id ?? DebugL10n.text("debug.target.none"))
-                .font(WorkspaceFont.monospacedValue)
-            }
-            Stepper(
-              String(
-                localized: LocalizedStringResource.DebugLocalizable.debugLogsDuration(
-                  Int32(clamping: durationSeconds))),
-              value: $durationSeconds, in: 1...600)
-            // Three closed steps, defaulting to Warn: the viewport's default
-            // reading is "what needs attention", not the full Info firehose.
-            LabeledContent(DebugL10n.text("debug.logs.level")) {
-              Picker(DebugL10n.text("debug.logs.level"), selection: $minimumLevel) {
-                Text(verbatim: "I").tag("Info")
-                  .accessibilityLabel("Info")
-                Text(verbatim: "W").tag("Warn")
-                  .accessibilityLabel("Warn")
-                Text(verbatim: "E").tag("Error")
-                  .accessibilityLabel("Error")
-              }
-              .pickerStyle(.segmented)
-              .labelsHidden()
-              .controlSize(.small)
-              .frame(maxWidth: 140)
-              .accessibilityIdentifier("debug.logs.level")
-            }
-            typedField("debug.logs.domain", text: $domain, prompt: "0xD003900")
-            typedField("debug.logs.tag", text: $tag, prompt: "ArkUI")
-            typedField("debug.logs.pid", text: $pid, prompt: "1234")
-            typedField("debug.logs.keyword", text: $keyword, prompt: "render")
-            typedField("debug.logs.marker", text: $marker, prompt: "checkout-start")
-            Toggle(DebugL10n.text("debug.logs.rawSave"), isOn: $savesRawHiLog)
-              .disabled(true)
-            Text(DebugL10n.text("debug.logs.filters.note"))
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.secondary)
-            if !invalidFilterNames.isEmpty {
-              Label(
-                String(
-                  localized: LocalizedStringResource.DebugLocalizable.debugLogsFiltersInvalid(
-                    invalidFilterNames.joined(separator: ", "))),
-                systemImage: "exclamationmark.circle"
-              )
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.red)
-            }
-          }
-        }
-
-        DebugAvailabilityCard(operation: operation)
-
-        DebugCard(
-          title: DebugL10n.text("debug.logs.request.title"), symbol: "list.bullet.rectangle"
-        ) {
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-            DebugCodeRow(
-              label: "operation", value: DebugApplicationFacade.captureDiagnosticsReference)
-            DebugCodeRow(label: "durationSeconds", value: String(durationSeconds))
-            DebugCodeRow(
-              label: "hilogFilters",
-              value: filterTokens.isEmpty ? "[]" : "[\(filterTokens.joined(separator: ", "))]")
-            DebugCodeRow(label: "uiDump", value: "false")
-            HStack {
-              if scopedActiveJobID != nil {
-                Button(DebugL10n.text("debug.action.cancel")) { model.cancelLogs() }
-                  .disabled(model.isCancellingLogs)
-                  .accessibilityIdentifier("debug.logs.cancel")
-              } else {
-                Button(DebugL10n.text("debug.logs.start")) {
-                  guard let target else { return }
-                  model.submitLogs(
-                    target: target, durationSeconds: durationSeconds, filters: filterTokens)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                  target == nil || !operationIsAvailable || !invalidFilterNames.isEmpty
-                    || model.isSubmittingLogs
-                )
-                .accessibilityIdentifier("debug.logs.start")
-              }
-              if let jobID = scopedActiveJobID {
-                ProgressView().controlSize(.small)
-                Text(jobID).font(WorkspaceFont.monospacedDense).lineLimit(1)
-              }
-            }
-            if feedbackMatchesTarget, let failure = model.logFailure {
-              Label(failure, systemImage: "xmark.octagon")
-                .font(WorkspaceFont.secondary)
-                .foregroundStyle(.red)
-                .textSelection(.enabled)
-            } else if let terminal = scopedTerminal {
-              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                Label(
-                  "\(terminal.state) · \(terminal.jobID)",
-                  systemImage: terminal.state == "succeeded"
-                    ? "checkmark.circle.fill" : "info.circle"
-                )
-                if let failure = terminal.operationFailure {
-                  Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("debug.logs.typedFailure")
-                }
-              }
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(terminal.state == "succeeded" ? .green : .secondary)
-            }
-          }
-        }
-
-        destructiveActions
+  private var captureSection: some View {
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.logs.capture.title")),
+      accessory: { DebugAvailabilityStatus(operation: operation) }
+    ) {
+      // Spec §4.4: state availability before offering the configuration it
+      // gates. A ready operation is the accessory line above and nothing
+      // more; only a blocker earns page space.
+      DebugAvailabilityNotice(operation: operation)
+      LabeledContent(DebugL10n.text("debug.logs.target")) {
+        Text(target?.id ?? DebugL10n.text("debug.target.none"))
+          .font(WorkspaceFont.monospacedValue)
       }
-      .padding(WorkspaceMetrics.pageInsetHorizontal)
+      Stepper(
+        String(
+          localized: LocalizedStringResource.DebugLocalizable.debugLogsDuration(
+            Int32(clamping: durationSeconds))),
+        value: $durationSeconds, in: 1...600)
+      // Three closed steps, defaulting to Warn: the viewport's default
+      // reading is "what needs attention", not the full Info firehose.
+      LabeledContent(DebugL10n.text("debug.logs.level")) {
+        Picker(DebugL10n.text("debug.logs.level"), selection: $minimumLevel) {
+          Text(verbatim: "I").tag("Info")
+            .accessibilityLabel("Info")
+          Text(verbatim: "W").tag("Warn")
+            .accessibilityLabel("Warn")
+          Text(verbatim: "E").tag("Error")
+            .accessibilityLabel("Error")
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .frame(maxWidth: 140)
+        .accessibilityIdentifier("debug.logs.level")
+      }
+      filtersGroup
+      // The raw shard is not optional, so it was never a choice: an always-on
+      // disabled toggle only looks like a control the build has broken.
+      Label(DebugL10n.text("debug.logs.rawSave"), systemImage: "checkmark.circle")
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+      captureFooter
     }
   }
 
-  private var liveAndStorage: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-        DebugCard(title: DebugL10n.text("debug.logs.live.title"), symbol: "text.alignleft") {
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-            HStack {
-              // Pausing is deliberately a local viewport state; it never
-              // cancels or suspends the Runtime Job.
-              Button(
-                DebugL10n.text(isViewportPaused ? "debug.logs.resume" : "debug.logs.pause")
-              ) {
-                isViewportPaused.toggle()
-              }
-              .disabled(scopedActiveJobID == nil)
-              .help(DebugL10n.text("debug.logs.pause.requiresCapture"))
-              .accessibilityIdentifier("debug.logs.pauseViewport")
-              Spacer()
-              Label(
-                DebugL10n.text("debug.logs.viewport.bounded"),
-                systemImage: "arrow.down.right.and.arrow.up.left"
-              )
-              .font(WorkspaceFont.caption)
-              .foregroundStyle(.secondary)
-            }
-            ZStack(alignment: .topLeading) {
-              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor))
-              if let terminal = scopedTerminal, !terminal.timeline.isEmpty {
-                ScrollView {
-                  VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap / 2) {
-                    ForEach(Array(terminal.timeline.suffix(12).enumerated()), id: \.offset) {
-                      _, entry in
-                      Text(entry)
-                        .font(WorkspaceFont.monospacedDense)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                  }
-                  .padding(WorkspaceMetrics.contentGap)
-                }
-              } else {
-                VStack(spacing: WorkspaceMetrics.tightGap) {
-                  Image(systemName: "text.page.badge.magnifyingglass")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                  Text(DebugL10n.text("debug.logs.live.empty"))
-                    .font(WorkspaceFont.body.weight(.medium))
-                  Text(DebugL10n.text("debug.logs.live.empty.detail"))
-                    .font(WorkspaceFont.secondary)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 420)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(WorkspaceMetrics.pageInsetTop)
-              }
-            }
-            .frame(minHeight: 250)
-            .overlay {
-              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-                .stroke(.separator, lineWidth: 1)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("debug.logs.viewport")
-          }
+  private var filtersGroup: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      typedField("debug.logs.domain", text: $domain, prompt: "0xD003900")
+      typedField("debug.logs.tag", text: $tag, prompt: "ArkUI")
+      typedField("debug.logs.pid", text: $pid, prompt: "1234")
+      typedField("debug.logs.keyword", text: $keyword, prompt: "render")
+      typedField("debug.logs.marker", text: $marker, prompt: "checkout-start")
+      Text(DebugL10n.text("debug.logs.filters.note"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if !invalidFilterNames.isEmpty {
+        WorkspaceNotice(tone: .danger, identifier: "debug.logs.filters.invalid") {
+          Text(
+            String(
+              localized: LocalizedStringResource.DebugLocalizable.debugLogsFiltersInvalid(
+                invalidFilterNames.joined(separator: ", "))))
         }
-
-        DebugCard(title: DebugL10n.text("debug.logs.shards.title"), symbol: "externaldrive") {
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-            HStack {
-              Text(DebugL10n.text("debug.logs.shards.sequence"))
-              Spacer()
-              Text(DebugL10n.text("debug.logs.shards.size"))
-                .frame(width: 72, alignment: .trailing)
-              Text(DebugL10n.text("debug.logs.shards.hash"))
-                .frame(width: 100, alignment: .trailing)
-              Color.clear.frame(width: 96, height: 1)
-            }
-            .font(WorkspaceFont.label)
-            .foregroundStyle(.secondary)
-            Divider()
-            if runtimeArtifacts.isEmpty {
-              ContentUnavailableView {
-                Label(
-                  DebugL10n.text("debug.logs.shards.empty"),
-                  systemImage: "externaldrive.badge.questionmark")
-              } description: {
-                Text(DebugL10n.text("debug.logs.shards.empty.detail"))
-              }
-              .frame(minHeight: 110)
-            } else {
-              ForEach(runtimeArtifacts) { row in
-                let artifact = row.artifact
-                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                  HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
-                    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                      Text(artifact.name).font(WorkspaceFont.monospacedValue)
-                      Text("\(artifact.status) · \(artifact.privacy)")
-                        .font(WorkspaceFont.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: WorkspaceMetrics.contentGap)
-                    Text(
-                      ByteCountFormatter.string(
-                        fromByteCount: artifact.byteCount, countStyle: .file)
-                    )
-                    .font(WorkspaceFont.monospacedDense.monospacedDigit())
-                    .frame(width: 72, alignment: .trailing)
-                    Text(String(artifact.sha256.prefix(12)))
-                      .font(WorkspaceFont.monospacedDense)
-                      .frame(width: 100, alignment: .trailing)
-                      .help(artifact.sha256)
-                    HStack(spacing: WorkspaceMetrics.tightGap) {
-                      Button(DebugL10n.text("debug.logs.export")) {
-                        pendingExport = row
-                        isExportPreviewPresented = true
-                      }
-                      .disabled(
-                        artifact.status != "published"
-                          || model.exportStatesByArtifactID[artifact.id] == .exporting
-                      )
-                      .accessibilityIdentifier("debug.logs.export.\(artifact.id)")
-                      if model.exportStatesByArtifactID[artifact.id] == .exporting {
-                        ProgressView()
-                          .controlSize(.small)
-                          .accessibilityLabel(DebugL10n.text("debug.logs.exporting"))
-                      }
-                      if case .completed(let url) = model.exportStatesByArtifactID[artifact.id] {
-                        Button(DebugL10n.text("debug.logs.showInFinder")) {
-                          NSWorkspace.shared.activateFileViewerSelecting([url])
-                        }
-                        .accessibilityIdentifier("debug.logs.showInFinder.\(artifact.id)")
-                      }
-                    }
-                    // minWidth, not a hard width: a localized button title must
-                    // not be clipped to keep the column edge.
-                    .frame(minWidth: 96, alignment: .trailing)
-                  }
-                  if case .failed(let reason) = model.exportStatesByArtifactID[artifact.id] {
-                    Label(reason, systemImage: "xmark.octagon")
-                      .font(WorkspaceFont.caption)
-                      .foregroundStyle(.red)
-                      .fixedSize(horizontal: false, vertical: true)
-                      .accessibilityIdentifier("debug.logs.exportFailure.\(artifact.id)")
-                  }
-                }
-              }
-            }
-            Divider()
-            HStack {
-              Label(
-                DebugL10n.text("debug.logs.exportBoundary"),
-                systemImage: "checkmark.shield")
-            }
-            .font(WorkspaceFont.secondary)
-            if let operation {
-              Text(
-                String(
-                  localized: LocalizedStringResource.DebugLocalizable.debugLogsStorageTotalBudget(
-                    ByteCountFormatter.string(
-                      fromByteCount: Int64(operation.outputByteBudget), countStyle: .file)))
-              )
-              .font(WorkspaceFont.monospacedDense.monospacedDigit())
-              .foregroundStyle(.secondary)
-            }
-          }
-        }
-
-        DebugRecentJobsCard(model: model, jobs: relatedJobs)
       }
-      .padding(WorkspaceMetrics.pageInsetHorizontal)
+    }
+  }
+
+  private var captureFooter: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      Divider()
+      typedRequestDisclosure
+      captureActionRow
+      captureStatus
+    }
+  }
+
+  /// The form above already names every value in words. Echoing the same
+  /// values back as a mono key/value list doubles the section, so the exact
+  /// typed request stays one disclosure away instead of always on.
+  private var typedRequestDisclosure: some View {
+    DisclosureGroup(isExpanded: $isRequestExpanded) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        DebugCodeRow(
+          label: DebugL10n.text("debug.availability.operation"),
+          value: DebugApplicationFacade.captureDiagnosticsReference)
+        DebugCodeRow(label: "durationSeconds", value: String(durationSeconds))
+        DebugCodeRow(
+          label: "hilogFilters",
+          value: filterTokens.isEmpty ? "[]" : "[\(filterTokens.joined(separator: ", "))]")
+        DebugCodeRow(label: "uiDump", value: "false")
+        if let operation {
+          Text(
+            LocalizedStringResource.DebugLocalizable.debugAvailabilityEffect(
+              operation.minimumEffect)
+          )
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+        }
+      }
+      .padding(.top, WorkspaceMetrics.rowGap)
+    } label: {
+      Text(DebugL10n.text("debug.logs.request.title"))
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+    }
+    .accessibilityIdentifier("debug.logs.request")
+  }
+
+  private var captureActionRow: some View {
+    HStack(spacing: WorkspaceMetrics.contentGap) {
+      if scopedActiveJobID != nil {
+        Button(DebugL10n.text("debug.action.cancel")) { model.cancelLogs() }
+          .disabled(model.isCancellingLogs)
+          .accessibilityIdentifier("debug.logs.cancel")
+      } else {
+        Button(DebugL10n.text("debug.logs.start")) {
+          guard let target else { return }
+          model.submitLogs(
+            target: target, durationSeconds: durationSeconds, filters: filterTokens)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(
+          target == nil || !operationIsAvailable || !invalidFilterNames.isEmpty
+            || model.isSubmittingLogs
+        )
+        .accessibilityIdentifier("debug.logs.start")
+      }
+      if let jobID = scopedActiveJobID {
+        ProgressView().controlSize(.small)
+        Text(jobID)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      Spacer(minLength: 0)
+    }
+  }
+
+  @ViewBuilder
+  private var captureStatus: some View {
+    if feedbackMatchesTarget, let failure = model.logFailure {
+      Label(failure, systemImage: "xmark.octagon")
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.red)
+        .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
+    } else if let terminal = scopedTerminal {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Label(
+          "\(terminal.state) · \(terminal.jobID)",
+          systemImage: terminal.state == "succeeded"
+            ? "checkmark.circle.fill" : "info.circle"
+        )
+        if let failure = terminal.operationFailure {
+          Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("debug.logs.typedFailure")
+        }
+      }
+      .font(WorkspaceFont.secondary)
+      .foregroundStyle(terminal.state == "succeeded" ? .green : .secondary)
+    }
+  }
+
+  /// Exactly one destructive buffer action exists in the design vocabulary.
+  /// Inventing siblings (resize, flush) would present device mutations no
+  /// published operation defines, so the group stays a menu with its blocker.
+  private var destructiveSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.logs.destructive.title"))) {
+      Menu(DebugL10n.text("debug.logs.destructive.menu")) {
+        Button(DebugL10n.text("debug.logs.destructive.clear")) {}
+          .disabled(true)
+      }
+      .disabled(true)
+      .fixedSize()
+      .help(DebugL10n.text("debug.logs.destructive.scope"))
+      DebugBlockedReason(text: DebugL10n.text("debug.blocked.bufferOperation"))
+    }
+  }
+
+  private var liveViewportSection: some View {
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.logs.live.title")),
+      accessory: {
+        // Pausing is deliberately a local viewport state; it never cancels or
+        // suspends the Runtime Job.
+        Button(
+          DebugL10n.text(isViewportPaused ? "debug.logs.resume" : "debug.logs.pause")
+        ) {
+          isViewportPaused.toggle()
+        }
+        .controlSize(.small)
+        .disabled(scopedActiveJobID == nil)
+        .help(DebugL10n.text("debug.logs.pause.requiresCapture"))
+        .accessibilityIdentifier("debug.logs.pauseViewport")
+      }
+    ) {
+      viewport
+      Label(
+        DebugL10n.text("debug.logs.viewport.bounded"),
+        systemImage: "arrow.down.right.and.arrow.up.left"
+      )
+      .font(WorkspaceFont.caption)
+      .foregroundStyle(.secondary)
+    }
+  }
+
+  private var viewport: some View {
+    ZStack(alignment: .topLeading) {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+        .fill(Color(nsColor: .textBackgroundColor))
+      if let terminal = scopedTerminal, !terminal.timeline.isEmpty {
+        // A bounded window of entries, so the box grows to what it holds
+        // instead of nesting a second scroll view inside the page.
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap / 2) {
+          ForEach(Array(terminal.timeline.suffix(12).enumerated()), id: \.offset) {
+            _, entry in
+            Text(entry)
+              .font(WorkspaceFont.monospacedDense)
+              .textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        }
+        .padding(WorkspaceMetrics.contentGap)
+      } else {
+        VStack(spacing: WorkspaceMetrics.tightGap) {
+          Image(systemName: "text.page.badge.magnifyingglass")
+            .font(.title2)
+            .foregroundStyle(.secondary)
+          Text(DebugL10n.text("debug.logs.live.empty"))
+            .font(WorkspaceFont.body.weight(.medium))
+          Text(DebugL10n.text("debug.logs.live.empty.detail"))
+            .font(WorkspaceFont.secondary)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 420)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(WorkspaceMetrics.pageInsetTop)
+      }
+    }
+    .frame(minHeight: 320)
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+        .stroke(.separator, lineWidth: 1)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("debug.logs.viewport")
+  }
+
+  private var shardsSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.logs.shards.title"))) {
+      HStack {
+        Text(DebugL10n.text("debug.logs.shards.sequence"))
+        Spacer()
+        Text(DebugL10n.text("debug.logs.shards.size"))
+          .frame(width: 72, alignment: .trailing)
+        Text(DebugL10n.text("debug.logs.shards.hash"))
+          .frame(width: 100, alignment: .trailing)
+        Color.clear.frame(width: 96, height: 1)
+      }
+      .font(WorkspaceFont.label)
+      .foregroundStyle(.secondary)
+      Divider()
+      if runtimeArtifacts.isEmpty {
+        ContentUnavailableView {
+          Label(
+            DebugL10n.text("debug.logs.shards.empty"),
+            systemImage: "externaldrive.badge.questionmark")
+        } description: {
+          Text(DebugL10n.text("debug.logs.shards.empty.detail"))
+        }
+        .frame(minHeight: 110)
+      } else {
+        ForEach(runtimeArtifacts) { row in
+          shardRow(row)
+        }
+      }
+      Divider()
+      Label(
+        DebugL10n.text("debug.logs.exportBoundary"),
+        systemImage: "checkmark.shield"
+      )
+      .font(WorkspaceFont.secondary)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      if let operation {
+        Text(
+          String(
+            localized: LocalizedStringResource.DebugLocalizable.debugLogsStorageTotalBudget(
+              ByteCountFormatter.string(
+                fromByteCount: Int64(operation.outputByteBudget), countStyle: .file)))
+        )
+        .font(WorkspaceFont.monospacedDense.monospacedDigit())
+        .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private func shardRow(_ row: DebugRuntimeArtifactRow) -> some View {
+    let artifact = row.artifact
+    return VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Text(artifact.name).font(WorkspaceFont.monospacedValue)
+          Text("\(artifact.status) · \(artifact.privacy)")
+            .font(WorkspaceFont.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer(minLength: WorkspaceMetrics.contentGap)
+        Text(
+          ByteCountFormatter.string(
+            fromByteCount: artifact.byteCount, countStyle: .file)
+        )
+        .font(WorkspaceFont.monospacedDense.monospacedDigit())
+        .frame(width: 72, alignment: .trailing)
+        Text(String(artifact.sha256.prefix(12)))
+          .font(WorkspaceFont.monospacedDense)
+          .frame(width: 100, alignment: .trailing)
+          .help(artifact.sha256)
+        HStack(spacing: WorkspaceMetrics.tightGap) {
+          Button(DebugL10n.text("debug.logs.export")) {
+            pendingExport = row
+            isExportPreviewPresented = true
+          }
+          .controlSize(.small)
+          .disabled(
+            artifact.status != "published"
+              || model.exportStatesByArtifactID[artifact.id] == .exporting
+          )
+          .accessibilityIdentifier("debug.logs.export.\(artifact.id)")
+          if model.exportStatesByArtifactID[artifact.id] == .exporting {
+            ProgressView()
+              .controlSize(.small)
+              .accessibilityLabel(DebugL10n.text("debug.logs.exporting"))
+          }
+          if case .completed(let url) = model.exportStatesByArtifactID[artifact.id] {
+            Button(DebugL10n.text("debug.logs.showInFinder")) {
+              NSWorkspace.shared.activateFileViewerSelecting([url])
+            }
+            .controlSize(.small)
+            .accessibilityIdentifier("debug.logs.showInFinder.\(artifact.id)")
+          }
+        }
+        // minWidth, not a hard width: a localized button title must not be
+        // clipped to keep the column edge.
+        .frame(minWidth: 96, alignment: .trailing)
+      }
+      if case .failed(let reason) = model.exportStatesByArtifactID[artifact.id] {
+        Label(reason, systemImage: "xmark.octagon")
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("debug.logs.exportFailure.\(artifact.id)")
+      }
     }
   }
 
@@ -1682,27 +1685,6 @@ private struct DebugLogsWorkspace: View {
       .replacingOccurrences(of: "/", with: "_")
       .replacingOccurrences(of: ":", with: "_")
     return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
-  }
-
-  private var destructiveActions: some View {
-    DebugCard(
-      title: DebugL10n.text("debug.logs.destructive.title"),
-      symbol: "exclamationmark.triangle"
-    ) {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        Text(DebugL10n.text("debug.logs.destructive.scope"))
-          .font(.callout)
-        // Exactly one destructive buffer action exists in the design
-        // vocabulary. Inventing siblings (resize, flush) would present device
-        // mutations no published operation defines.
-        Menu(DebugL10n.text("debug.logs.destructive.menu")) {
-          Button(DebugL10n.text("debug.logs.destructive.clear")) {}
-            .disabled(true)
-        }
-        .disabled(true)
-        DebugBlockedReason(text: DebugL10n.text("debug.blocked.bufferOperation"))
-      }
-    }
   }
 
   /// A bare `TextField` hides its title on macOS, so the capture form rendered
@@ -1737,6 +1719,7 @@ private struct DebugAppsWorkspace: View {
   @State private var postRunState = "stopped"
   @State private var captureDiagnostics = true
   @State private var diagnosticsDuration = 30
+  @State private var isPlanRequestExpanded = false
 
   private var feedbackMatchesTarget: Bool {
     model.hapFeedbackMatches(target: target)
@@ -1759,24 +1742,24 @@ private struct DebugAppsWorkspace: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
-            packageAndIdentity.frame(minWidth: 300, maxWidth: 390)
-            lifecycleReview.frame(minWidth: 420, maxWidth: .infinity)
-          }
-          VStack(spacing: WorkspaceMetrics.blockGap) {
-            packageAndIdentity
-            lifecycleReview
-          }
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      WorkspaceColumns(
+        spacing: WorkspaceMetrics.sectionGap,
+        leadingRatio: WorkspaceMetrics.splitLeadingColumnRatio
+      ) {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+          packageSection
+          identitySection
         }
-        packageInventory
-        if !runtimeArtifacts.isEmpty { resultArtifacts }
-        DebugRecentJobsCard(model: model, jobs: relatedJobs)
+      } trailing: {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+          lifecycleSection
+          planSection
+        }
       }
-      .frame(maxWidth: WorkspaceMetrics.pageMaxWidth, alignment: .topLeading)
-      .padding(WorkspaceMetrics.pageInsetHorizontal)
+      inventorySection
+      if !runtimeArtifacts.isEmpty { artifactsSection }
+      DebugRecentJobsSection(model: model, jobs: relatedJobs)
     }
     .fileImporter(
       isPresented: $isImporterPresented,
@@ -1785,279 +1768,330 @@ private struct DebugAppsWorkspace: View {
       onCompletion: handleHAPSelection)
   }
 
-  private var packageAndIdentity: some View {
-    VStack(spacing: WorkspaceMetrics.blockGap) {
-      DebugAvailabilityCard(operation: operation)
-      DebugCard(title: DebugL10n.text("debug.apps.package.title"), symbol: "shippingbox") {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-          LabeledContent(DebugL10n.text("debug.apps.target")) {
-            Text(target?.id ?? DebugL10n.text("debug.target.none"))
-              .font(WorkspaceFont.monospacedValue)
-          }
-          Button {
-            isImporterPresented = true
-          } label: {
-            Label(DebugL10n.text("debug.apps.chooseHAP"), systemImage: "doc.badge.plus")
-          }
-          Text(selectedHAPURL?.lastPathComponent ?? DebugL10n.text("debug.apps.noHAP"))
-            .font(WorkspaceFont.monospacedValue)
-            .foregroundStyle(selectedHAPURL == nil ? .secondary : .primary)
-            .textSelection(.enabled)
-          if let selectionError {
-            Label(selectionError, systemImage: "xmark.octagon")
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.red)
-          }
-          Text(DebugL10n.text("debug.apps.localOnly"))
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
+  private var packageSection: some View {
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.apps.package.title")),
+      accessory: { DebugAvailabilityStatus(operation: operation) }
+    ) {
+      DebugAvailabilityNotice(operation: operation)
+      LabeledContent(DebugL10n.text("debug.apps.target")) {
+        Text(target?.id ?? DebugL10n.text("debug.target.none"))
+          .font(WorkspaceFont.monospacedValue)
+      }
+      Button {
+        isImporterPresented = true
+      } label: {
+        Label(DebugL10n.text("debug.apps.chooseHAP"), systemImage: "doc.badge.plus")
+      }
+      Text(selectedHAPURL?.lastPathComponent ?? DebugL10n.text("debug.apps.noHAP"))
+        .font(WorkspaceFont.monospacedValue)
+        .foregroundStyle(selectedHAPURL == nil ? .secondary : .primary)
+        .textSelection(.enabled)
+      if let selectionError {
+        WorkspaceNotice(tone: .danger, identifier: "debug.apps.selection.error") {
+          Text(selectionError)
         }
       }
-
-      DebugCard(title: DebugL10n.text("debug.apps.identity.title"), symbol: "tag") {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-          TextField(
-            DebugL10n.text("debug.apps.bundle"), text: $bundleName,
-            prompt: Text("com.example.app"))
-          TextField(
-            DebugL10n.text("debug.apps.ability"), text: $abilityName,
-            prompt: Text("EntryAbility"))
-          // The note below promises schema validation; these two fields are
-          // the argv-adjacent inputs on this tab, so the gate is applied
-          // here, not deferred to a future submit path.
-          if let invalid = invalidIdentityFieldNames {
-            Label(
-              String(
-                localized: LocalizedStringResource.DebugLocalizable.debugTypedInvalidIdentifier(
-                  invalid)),
-              systemImage: "exclamationmark.circle"
-            )
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.red)
-            .accessibilityIdentifier("debug.apps.identity.invalid")
-          }
-          Text(DebugL10n.text("debug.apps.identity.note"))
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-        }
-        .textFieldStyle(.roundedBorder)
-      }
+      Text(DebugL10n.text("debug.apps.localOnly"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 
-  private var lifecycleReview: some View {
-    VStack(spacing: WorkspaceMetrics.blockGap) {
-      DebugCard(
-        title: DebugL10n.text("debug.apps.lifecycle.title"), symbol: "arrow.triangle.2.circlepath"
+  private var identitySection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.apps.identity.title"))) {
+      TextField(
+        DebugL10n.text("debug.apps.bundle"), text: $bundleName,
+        prompt: Text("com.example.app")
+      )
+      .textFieldStyle(.roundedBorder)
+      TextField(
+        DebugL10n.text("debug.apps.ability"), text: $abilityName,
+        prompt: Text("EntryAbility")
+      )
+      .textFieldStyle(.roundedBorder)
+      // The note below promises schema validation; these two fields are the
+      // argv-adjacent inputs on this tab, so the gate is applied here, not
+      // deferred to a future submit path.
+      if let invalid = invalidIdentityFieldNames {
+        WorkspaceNotice(tone: .danger, identifier: "debug.apps.identity.invalid") {
+          Text(
+            String(
+              localized: LocalizedStringResource.DebugLocalizable.debugTypedInvalidIdentifier(
+                invalid)))
+        }
+      }
+      Text(DebugL10n.text("debug.apps.identity.note"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private var lifecycleSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.apps.lifecycle.title"))) {
+      Picker(DebugL10n.text("debug.apps.installPolicy"), selection: $installPolicy) {
+        Text(DebugL10n.text("debug.apps.install.replace")).tag("installOrReplace")
+        Text(DebugL10n.text("debug.apps.install.fresh")).tag("installFresh")
+      }
+      Picker(DebugL10n.text("debug.apps.cleanupPolicy"), selection: $cleanupPolicy) {
+        Text(DebugL10n.text("debug.apps.cleanup.uninstall")).tag("uninstall")
+        Text(DebugL10n.text("debug.apps.cleanup.retain")).tag("retain")
+        Text(DebugL10n.text("debug.apps.cleanup.restore")).tag("restorePrevious")
+      }
+      Picker(DebugL10n.text("debug.apps.postRun"), selection: $postRunState) {
+        Text(DebugL10n.text("debug.apps.postRun.stopped")).tag("stopped")
+        Text(DebugL10n.text("debug.apps.postRun.running")).tag("running")
+      }
+      Toggle(DebugL10n.text("debug.apps.captureDiagnostics"), isOn: $captureDiagnostics)
+      if captureDiagnostics {
+        Stepper(
+          String(
+            localized: LocalizedStringResource.DebugLocalizable.debugAppsDiagnosticsDuration(
+              Int32(clamping: diagnosticsDuration))),
+          value: $diagnosticsDuration, in: 1...300)
+      }
+      // What this tab changes on the device is a warning, not a paragraph of
+      // body text: the notice carries symbol, tone and wording together the
+      // way spec §4.4 asks.
+      WorkspaceNotice(
+        tone: .warning, symbol: "exclamationmark.shield",
+        identifier: "debug.apps.mutationScope"
       ) {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-          Picker(DebugL10n.text("debug.apps.installPolicy"), selection: $installPolicy) {
-            Text(DebugL10n.text("debug.apps.install.replace")).tag("installOrReplace")
-            Text(DebugL10n.text("debug.apps.install.fresh")).tag("installFresh")
-          }
-          Picker(DebugL10n.text("debug.apps.cleanupPolicy"), selection: $cleanupPolicy) {
-            Text(DebugL10n.text("debug.apps.cleanup.uninstall")).tag("uninstall")
-            Text(DebugL10n.text("debug.apps.cleanup.retain")).tag("retain")
-            Text(DebugL10n.text("debug.apps.cleanup.restore")).tag("restorePrevious")
-          }
-          Picker(DebugL10n.text("debug.apps.postRun"), selection: $postRunState) {
-            Text(DebugL10n.text("debug.apps.postRun.stopped")).tag("stopped")
-            Text(DebugL10n.text("debug.apps.postRun.running")).tag("running")
-          }
-          Toggle(DebugL10n.text("debug.apps.captureDiagnostics"), isOn: $captureDiagnostics)
-          if captureDiagnostics {
-            Stepper(
-              String(
-                localized: LocalizedStringResource.DebugLocalizable.debugAppsDiagnosticsDuration(
-                  Int32(clamping: diagnosticsDuration))),
-              value: $diagnosticsDuration, in: 1...300)
-          }
-          Divider()
-          Label(
-            DebugL10n.text("debug.apps.mutationScope"),
-            systemImage: "exclamationmark.shield"
-          )
-          .font(.callout.weight(.medium))
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Text(DebugL10n.text("debug.apps.mutationScope"))
+            .font(WorkspaceFont.secondary.weight(.medium))
           Text(DebugL10n.text("debug.apps.mutationDetail"))
-            .font(WorkspaceFont.secondary)
             .foregroundStyle(.secondary)
-        }
-      }
-
-      DebugCard(title: DebugL10n.text("debug.apps.plan.title"), symbol: "list.number") {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-          DebugCodeRow(label: "bundleName", value: bundleName.isEmpty ? "—" : bundleName)
-          DebugCodeRow(label: "abilityName", value: abilityName.isEmpty ? "—" : abilityName)
-          DebugCodeRow(label: "installPolicy", value: installPolicy)
-          DebugCodeRow(label: "cleanupPolicy", value: cleanupPolicy)
-          DebugCodeRow(label: "postRunAbilityState", value: postRunState)
-          DebugCodeRow(label: "captureDiagnostics", value: String(captureDiagnostics))
-          Divider()
-          if let operation {
-            ForEach(operation.steps) { step in
-              HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
-                Image(systemName: effectSymbol(step.effect))
-                  .frame(width: 18)
-                  .foregroundStyle(effectColor(step.effect))
-                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                  Text(step.id).font(.callout.monospaced().weight(.medium))
-                  Text("\(step.kind) · \(step.effect)")
-                    .font(WorkspaceFont.caption)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if step.isOptional {
-                  Text(DebugL10n.text("debug.optional"))
-                    .font(WorkspaceFont.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.quaternary, in: Capsule())
-                }
-              }
-              if step.id != operation.steps.last?.id { Divider() }
-            }
-          }
-          HStack {
-            if feedbackMatchesTarget && model.isSubmittingHAP {
-              ProgressView().controlSize(.small)
-              Text(
-                DebugL10n.text(
-                  scopedActiveJobID == nil
-                    ? "debug.apps.importing" : "debug.apps.running")
-              )
-              .font(WorkspaceFont.secondary)
-              if let jobID = scopedActiveJobID {
-                Text(jobID).font(WorkspaceFont.monospacedDense).lineLimit(1)
-                Spacer()
-                Button(DebugL10n.text("debug.action.cancel")) { model.cancelHAP() }
-                  .disabled(model.isCancellingHAP)
-                  .accessibilityIdentifier("debug.apps.cancel")
-              }
-            } else {
-              Button(DebugL10n.text("debug.apps.run")) {
-                guard let target, let selectedHAPURL else { return }
-                model.submitHAP(
-                  target: target,
-                  fileURL: selectedHAPURL,
-                  bundleName: bundleName,
-                  abilityName: abilityName,
-                  installPolicy: installPolicy,
-                  cleanupPolicy: cleanupPolicy,
-                  postRunAbilityState: postRunState,
-                  captureDiagnostics: captureDiagnostics,
-                  diagnosticsDurationSeconds: diagnosticsDuration)
-              }
-              .buttonStyle(.borderedProminent)
-              .disabled(!canSubmit)
-              .accessibilityIdentifier("debug.apps.run")
-            }
-          }
-          if feedbackMatchesTarget, let failure = model.hapFailure {
-            Label(failure, systemImage: "xmark.octagon")
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.red)
-              .fixedSize(horizontal: false, vertical: true)
-              .textSelection(.enabled)
-          }
-          if let terminal = scopedTerminal {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              Label(
-                "\(terminal.state) · \(terminal.jobID)",
-                systemImage: terminal.state == "succeeded"
-                  ? "checkmark.circle.fill" : "exclamationmark.circle"
-              )
-              if let failure = terminal.operationFailure {
-                Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
-                  .fixedSize(horizontal: false, vertical: true)
-                  .accessibilityIdentifier("debug.apps.typedFailure")
-              }
-            }
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
-          }
         }
       }
     }
   }
 
-  private var packageInventory: some View {
-    DebugCard(title: DebugL10n.text("debug.apps.inventory.title"), symbol: "tablecells") {
-      VStack(spacing: WorkspaceMetrics.contentGap) {
-        HStack {
-          Text(DebugL10n.text("debug.apps.inventory.package"))
-          Spacer()
-          Text(DebugL10n.text("debug.apps.inventory.pid"))
-            .frame(width: 72, alignment: .trailing)
-          Text(DebugL10n.text("debug.apps.inventory.debuggable"))
-            .frame(width: 100, alignment: .trailing)
+  private var planSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.apps.plan.title"))) {
+      planRequestDisclosure
+      if let operation {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+          ForEach(operation.steps) { step in
+            planStepRow(step, isLast: step.id == operation.steps.last?.id)
+          }
         }
+      }
+      planActionRow
+      planStatus
+    }
+  }
+
+  /// The lifecycle controls above already state each policy in words; the
+  /// exact typed inputs stay available but no longer repeat the whole form as
+  /// a mono key/value list above the plan itself.
+  private var planRequestDisclosure: some View {
+    DisclosureGroup(isExpanded: $isPlanRequestExpanded) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        DebugCodeRow(
+          label: DebugL10n.text("debug.availability.operation"),
+          value: DebugApplicationFacade.debugHAPReference)
+        DebugCodeRow(label: "bundleName", value: bundleName.isEmpty ? "—" : bundleName)
+        DebugCodeRow(label: "abilityName", value: abilityName.isEmpty ? "—" : abilityName)
+        DebugCodeRow(label: "installPolicy", value: installPolicy)
+        DebugCodeRow(label: "cleanupPolicy", value: cleanupPolicy)
+        DebugCodeRow(label: "postRunAbilityState", value: postRunState)
+        DebugCodeRow(label: "captureDiagnostics", value: String(captureDiagnostics))
+      }
+      .padding(.top, WorkspaceMetrics.rowGap)
+    } label: {
+      Text(DebugL10n.text("debug.logs.request.title"))
         .font(WorkspaceFont.label)
         .foregroundStyle(.secondary)
-        Divider()
-        if let currentRuntimeProbe, !currentRuntimeProbe.packages.isEmpty {
-          ForEach(currentRuntimeProbe.packages, id: \.self) { package in
-            HStack {
-              Text(package).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
-              Spacer()
-              Text(DebugL10n.text("debug.availability.unavailable"))
-                .font(WorkspaceFont.tabularSecondary)
-                .frame(width: 72, alignment: .trailing)
-                .foregroundStyle(.secondary)
-              Text(DebugL10n.text("debug.availability.unavailable"))
-                .font(WorkspaceFont.body)
-                .frame(width: 100, alignment: .trailing)
-                .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-          }
-        } else {
-          ContentUnavailableView {
-            Label(DebugL10n.text("debug.apps.inventory.empty"), systemImage: "app.dashed")
-          } description: {
-            Text(probeFailure ?? DebugL10n.text("debug.apps.inventory.empty.detail"))
-          }
-          .frame(minHeight: 120)
+    }
+    .accessibilityIdentifier("debug.apps.request")
+  }
+
+  private func planStepRow(_ step: DebugStepPresentation, isLast: Bool) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+      HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+        Image(systemName: effectSymbol(step.effect))
+          .frame(width: 18)
+          .foregroundStyle(effectColor(step.effect))
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Text(step.id).font(.callout.monospaced().weight(.medium))
+          Text("\(step.kind) · \(step.effect)")
+            .font(WorkspaceFont.caption)
+            .foregroundStyle(.secondary)
         }
-        if let warnings = currentRuntimeProbe?.warnings, !warnings.isEmpty {
-          Text(warnings.joined(separator: " · "))
+        Spacer(minLength: 0)
+        if step.isOptional {
+          Text(DebugL10n.text("debug.optional"))
+            .font(WorkspaceFont.caption)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(.quaternary, in: Capsule())
+        }
+      }
+      if !isLast { Divider() }
+    }
+  }
+
+  private var planActionRow: some View {
+    HStack(spacing: WorkspaceMetrics.contentGap) {
+      if feedbackMatchesTarget && model.isSubmittingHAP {
+        ProgressView().controlSize(.small)
+        Text(
+          DebugL10n.text(
+            scopedActiveJobID == nil
+              ? "debug.apps.importing" : "debug.apps.running")
+        )
+        .font(WorkspaceFont.secondary)
+        if let jobID = scopedActiveJobID {
+          Text(jobID)
             .font(WorkspaceFont.monospacedDense)
-            .foregroundStyle(.orange)
-            .textSelection(.enabled)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+          Spacer(minLength: 0)
+          Button(DebugL10n.text("debug.action.cancel")) { model.cancelHAP() }
+            .disabled(model.isCancellingHAP)
+            .accessibilityIdentifier("debug.apps.cancel")
         }
-        HStack {
-          Button(DebugL10n.text("debug.apps.action.start")) {}.disabled(true)
-          Button(DebugL10n.text("debug.apps.action.stop")) {}.disabled(true)
-          Spacer()
-          Button(DebugL10n.text("debug.apps.action.uninstall"), role: .destructive) {}
-            .disabled(true)
+      } else {
+        Button(DebugL10n.text("debug.apps.run")) {
+          guard let target, let selectedHAPURL else { return }
+          model.submitHAP(
+            target: target,
+            fileURL: selectedHAPURL,
+            bundleName: bundleName,
+            abilityName: abilityName,
+            installPolicy: installPolicy,
+            cleanupPolicy: cleanupPolicy,
+            postRunAbilityState: postRunState,
+            captureDiagnostics: captureDiagnostics,
+            diagnosticsDurationSeconds: diagnosticsDuration)
         }
+        .buttonStyle(.borderedProminent)
+        .disabled(!canSubmit)
+        .accessibilityIdentifier("debug.apps.run")
+        Spacer(minLength: 0)
       }
     }
   }
 
-  private var resultArtifacts: some View {
-    DebugCard(title: DebugL10n.text("debug.apps.artifacts.title"), symbol: "shippingbox.fill") {
-      VStack(spacing: WorkspaceMetrics.tightGap) {
-        ForEach(runtimeArtifacts) { row in
-          HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              Text(row.artifact.name).font(WorkspaceFont.monospacedValue)
-              Text("\(row.artifact.status) · \(row.artifact.privacy) · \(row.jobID)")
-                .font(WorkspaceFont.caption)
-                .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: WorkspaceMetrics.contentGap)
-            Text(
-              ByteCountFormatter.string(
-                fromByteCount: row.artifact.byteCount, countStyle: .file)
-            )
-            .font(WorkspaceFont.monospacedDense.monospacedDigit())
-            Text(String(row.artifact.sha256.prefix(12)))
-              .font(WorkspaceFont.monospacedDense)
-              .help(row.artifact.sha256)
+  @ViewBuilder
+  private var planStatus: some View {
+    if feedbackMatchesTarget, let failure = model.hapFailure {
+      Label(failure, systemImage: "xmark.octagon")
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.red)
+        .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
+    }
+    if let terminal = scopedTerminal {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Label(
+          "\(terminal.state) · \(terminal.jobID)",
+          systemImage: terminal.state == "succeeded"
+            ? "checkmark.circle.fill" : "exclamationmark.circle"
+        )
+        if let failure = terminal.operationFailure {
+          Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("debug.apps.typedFailure")
+        }
+      }
+      .font(WorkspaceFont.secondary)
+      .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
+    }
+  }
+
+  private var inventorySection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.apps.inventory.title"))) {
+      HStack {
+        Text(DebugL10n.text("debug.apps.inventory.package"))
+        Spacer()
+        Text(DebugL10n.text("debug.apps.inventory.pid"))
+          .frame(width: 72, alignment: .trailing)
+        Text(DebugL10n.text("debug.apps.inventory.debuggable"))
+          .frame(width: 100, alignment: .trailing)
+      }
+      .font(WorkspaceFont.label)
+      .foregroundStyle(.secondary)
+      Divider()
+      if let currentRuntimeProbe, !currentRuntimeProbe.packages.isEmpty {
+        ForEach(currentRuntimeProbe.packages, id: \.self) { package in
+          HStack {
+            Text(package).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
+            Spacer()
+            Text(DebugL10n.text("debug.availability.unavailable"))
+              .font(WorkspaceFont.tabularSecondary)
+              .frame(width: 72, alignment: .trailing)
+              .foregroundStyle(.secondary)
+            Text(DebugL10n.text("debug.availability.unavailable"))
+              .font(WorkspaceFont.body)
+              .frame(width: 100, alignment: .trailing)
+              .foregroundStyle(.secondary)
           }
           .accessibilityElement(children: .combine)
         }
+      } else {
+        ContentUnavailableView {
+          Label(DebugL10n.text("debug.apps.inventory.empty"), systemImage: "app.dashed")
+        } description: {
+          Text(probeFailure ?? DebugL10n.text("debug.apps.inventory.empty.detail"))
+        }
+        .frame(minHeight: 120)
+      }
+      if let warnings = currentRuntimeProbe?.warnings, !warnings.isEmpty {
+        Text(warnings.joined(separator: " · "))
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.orange)
+          .textSelection(.enabled)
+      }
+      inventoryActions
+    }
+  }
+
+  /// Per-package start / stop / uninstall are drawn because the design defines
+  /// them, but no published operation exposes them. They stay in one row with
+  /// the reason they cannot run, rather than three bare disabled buttons that
+  /// read as a broken build.
+  private var inventoryActions: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+      HStack {
+        Button(DebugL10n.text("debug.apps.action.start")) {}.disabled(true)
+        Button(DebugL10n.text("debug.apps.action.stop")) {}.disabled(true)
+        Spacer()
+        Button(DebugL10n.text("debug.apps.action.uninstall"), role: .destructive) {}
+          .disabled(true)
+      }
+      DebugBlockedReason(text: DebugL10n.text("debug.blocked.packageLifecycle"))
+    }
+  }
+
+  private var artifactsSection: some View {
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.apps.artifacts.title")),
+      spacing: WorkspaceMetrics.tightGap
+    ) {
+      ForEach(runtimeArtifacts) { row in
+        HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(row.artifact.name).font(WorkspaceFont.monospacedValue)
+            Text("\(row.artifact.status) · \(row.artifact.privacy) · \(row.jobID)")
+              .font(WorkspaceFont.caption)
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: WorkspaceMetrics.contentGap)
+          Text(
+            ByteCountFormatter.string(
+              fromByteCount: row.artifact.byteCount, countStyle: .file)
+          )
+          .font(WorkspaceFont.monospacedDense.monospacedDigit())
+          Text(String(row.artifact.sha256.prefix(12)))
+            .font(WorkspaceFont.monospacedDense)
+            .help(row.artifact.sha256)
+        }
+        .accessibilityElement(children: .combine)
       }
     }
   }
@@ -2142,95 +2176,119 @@ private struct DebugNetworkWorkspace: View {
     return runtimeProbe
   }
 
+  private var canAddRule: Bool {
+    guard target != nil, !model.isMutatingPortRule else { return false }
+    if case .valid = validation { return true }
+    return false
+  }
+
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
-            ruleEditor.frame(minWidth: 320, maxWidth: 410)
-            ruleList.frame(minWidth: 420, maxWidth: .infinity)
-          }
-          VStack(spacing: WorkspaceMetrics.blockGap) {
-            ruleEditor
-            ruleList
-          }
-        }
-        protocolAndSafety
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      WorkspaceColumns(
+        spacing: WorkspaceMetrics.sectionGap,
+        leadingRatio: WorkspaceMetrics.splitLeadingColumnRatio
+      ) {
+        ruleEditorSection
+      } trailing: {
+        ruleListSection
       }
-      .frame(maxWidth: WorkspaceMetrics.pageMaxWidth, alignment: .topLeading)
-      .padding(WorkspaceMetrics.pageInsetHorizontal)
     }
   }
 
-  private var ruleEditor: some View {
-    DebugCard(title: DebugL10n.text("debug.network.editor.title"), symbol: "plus.circle") {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        LabeledContent(DebugL10n.text("debug.network.target")) {
-          Text(target?.id ?? DebugL10n.text("debug.target.none"))
-            .font(WorkspaceFont.monospacedValue)
-        }
-        Picker(DebugL10n.text("debug.network.direction"), selection: $direction) {
-          Text(DebugL10n.text("debug.network.forward")).tag(DebugPortRuleDirection.forward)
-          Text(DebugL10n.text("debug.network.reverse")).tag(DebugPortRuleDirection.reverse)
-        }
-        .pickerStyle(.segmented)
-        TextField(DebugL10n.text("debug.network.localPort"), text: $localPort)
-          .textFieldStyle(.roundedBorder)
-        TextField(DebugL10n.text("debug.network.remotePort"), text: $remotePort)
-          .textFieldStyle(.roundedBorder)
-        validationMessage
-        if case .valid(let rule) = validation {
-          DebugCodeRow(
-            label: DebugL10n.text("debug.network.typedRule"),
-            value: "\(rule.direction.rawValue) · tcp:\(rule.localPort) → tcp:\(rule.remotePort)")
-        }
-        Button(DebugL10n.text("debug.network.add")) {
-          guard let target, case .valid(let rule) = validation else { return }
-          model.mutatePortRule(target: target, rule: rule, removing: false)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(
-          target == nil || model.isMutatingPortRule
-            || {
-              if case .valid = validation { return false }
-              return true
-            }())
-        if let jobID = scopedActiveJobID {
-          HStack(spacing: WorkspaceMetrics.tightGap) {
-            ProgressView().controlSize(.small)
-            Text(jobID).font(WorkspaceFont.monospacedDense).lineLimit(1)
-            Spacer()
-            Button(DebugL10n.text("debug.action.cancel")) {
-              model.cancelPortRuleMutation()
-            }
-            .disabled(model.isCancellingPortRule)
+  private var ruleEditorSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.network.editor.title"))) {
+      LabeledContent(DebugL10n.text("debug.network.target")) {
+        Text(target?.id ?? DebugL10n.text("debug.target.none"))
+          .font(WorkspaceFont.monospacedValue)
+      }
+      Picker(DebugL10n.text("debug.network.direction"), selection: $direction) {
+        Text(DebugL10n.text("debug.network.forward")).tag(DebugPortRuleDirection.forward)
+        Text(DebugL10n.text("debug.network.reverse")).tag(DebugPortRuleDirection.reverse)
+      }
+      .pickerStyle(.segmented)
+      TextField(DebugL10n.text("debug.network.localPort"), text: $localPort)
+        .textFieldStyle(.roundedBorder)
+      TextField(DebugL10n.text("debug.network.remotePort"), text: $remotePort)
+        .textFieldStyle(.roundedBorder)
+      validationMessage
+      if case .valid(let rule) = validation {
+        DebugCodeRow(
+          label: DebugL10n.text("debug.network.typedRule"),
+          value: "\(rule.direction.rawValue) · tcp:\(rule.localPort) → tcp:\(rule.remotePort)")
+      }
+      ruleActionFooter
+      safetyFooter
+    }
+  }
+
+  private var ruleActionFooter: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      Button(DebugL10n.text("debug.network.add")) {
+        guard let target, case .valid(let rule) = validation else { return }
+        model.mutatePortRule(target: target, rule: rule, removing: false)
+      }
+      .buttonStyle(.borderedProminent)
+      .disabled(!canAddRule)
+      .accessibilityIdentifier("debug.network.add")
+      if let jobID = scopedActiveJobID {
+        HStack(spacing: WorkspaceMetrics.tightGap) {
+          ProgressView().controlSize(.small)
+          Text(jobID)
+            .font(WorkspaceFont.monospacedDense)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+          Spacer(minLength: 0)
+          Button(DebugL10n.text("debug.action.cancel")) {
+            model.cancelPortRuleMutation()
           }
-          .accessibilityIdentifier("debug.network.activeJob")
+          .controlSize(.small)
+          .disabled(model.isCancellingPortRule)
         }
-        if feedbackMatchesTarget, let failure = model.portRuleFailure {
-          Label(failure, systemImage: "exclamationmark.triangle")
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        if let terminal = scopedTerminal {
-          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-            Label(
-              "\(terminal.state) · \(terminal.jobID)",
-              systemImage: terminal.state == "succeeded"
-                ? "checkmark.circle" : "exclamationmark.circle"
-            )
-            if let failure = terminal.operationFailure {
-              Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("debug.network.typedFailure")
-            }
-          }
+        .accessibilityIdentifier("debug.network.activeJob")
+      }
+      if feedbackMatchesTarget, let failure = model.portRuleFailure {
+        Label(failure, systemImage: "exclamationmark.triangle")
           .font(WorkspaceFont.secondary)
-          .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if let terminal = scopedTerminal {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Label(
+            "\(terminal.state) · \(terminal.jobID)",
+            systemImage: terminal.state == "succeeded"
+              ? "checkmark.circle" : "exclamationmark.circle"
+          )
+          if let failure = terminal.operationFailure {
+            Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("debug.network.typedFailure")
+          }
         }
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
       }
     }
+  }
+
+  /// The three validation and scope facts used to be a section of their own at
+  /// the foot of the page, one card away from the fields they describe. They
+  /// belong to this editor, so they close it.
+  private var safetyFooter: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      Divider()
+        .padding(.bottom, WorkspaceMetrics.rowGap)
+      Text(DebugL10n.text("debug.network.safety.title"))
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.secondary)
+      Label(DebugL10n.text("debug.network.safety.typed"), systemImage: "number")
+      Label(DebugL10n.text("debug.network.safety.noShell"), systemImage: "text.badge.xmark")
+      Label(DebugL10n.text("debug.network.safety.binding"), systemImage: "link")
+    }
+    .font(WorkspaceFont.secondary)
+    .foregroundStyle(.secondary)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   @ViewBuilder
@@ -2250,84 +2308,76 @@ private struct DebugNetworkWorkspace: View {
     }
   }
 
-  private var ruleList: some View {
-    DebugCard(title: DebugL10n.text("debug.network.rules.title"), symbol: "arrow.left.arrow.right")
-    {
-      VStack(spacing: WorkspaceMetrics.contentGap) {
-        HStack {
-          Text(DebugL10n.text("debug.network.rules.direction"))
-          Text(DebugL10n.text("debug.network.rules.local"))
-          Spacer()
-          Text(DebugL10n.text("debug.network.rules.remote"))
-          Text(DebugL10n.text("debug.network.rules.state"))
-            .frame(width: 90, alignment: .trailing)
-          Text(DebugL10n.text("debug.network.rules.action"))
-            .frame(width: 72, alignment: .trailing)
-        }
-        .font(WorkspaceFont.label)
-        .foregroundStyle(.secondary)
-        Divider()
-        if let currentRuntimeProbe, !currentRuntimeProbe.portRules.isEmpty {
-          ForEach(Array(currentRuntimeProbe.portRules.enumerated()), id: \.offset) { _, rule in
-            HStack {
-              Text(rule.direction.rawValue)
-              Text("tcp:\(rule.localPort)").font(WorkspaceFont.tabularSecondary)
-              Spacer()
-              Text("tcp:\(rule.remotePort)").font(WorkspaceFont.tabularSecondary)
-              Text("active")
-                .font(WorkspaceFont.label)
-                .foregroundStyle(.green)
-                .frame(width: 90, alignment: .trailing)
-              Button(DebugL10n.text("debug.network.delete"), role: .destructive) {
-                guard let target,
-                  let direction = DebugPortRuleDirection(rawValue: rule.direction.rawValue)
-                else { return }
-                model.mutatePortRule(
-                  target: target,
-                  rule: DebugValidatedPortRule(
-                    direction: direction,
-                    localPort: rule.localPort,
-                    remotePort: rule.remotePort),
-                  removing: true)
-              }
-              .frame(width: 72, alignment: .trailing)
-              .disabled(model.isMutatingPortRule)
-            }
-            .accessibilityElement(children: .combine)
-          }
-        } else {
-          ContentUnavailableView {
-            Label(
-              DebugL10n.text("debug.network.rules.empty"),
-              systemImage: "point.3.filled.connected.trianglepath.dotted")
-          } description: {
-            Text(probeFailure ?? DebugL10n.text("debug.network.rules.empty.detail"))
-          }
-          .frame(minHeight: 180)
-        }
-        if let warnings = currentRuntimeProbe?.warnings.filter({ $0.contains("Rules") }),
-          !warnings.isEmpty
-        {
-          Text(warnings.joined(separator: " · "))
-            .font(WorkspaceFont.monospacedDense)
-            .foregroundStyle(.orange)
-        }
-        Label(DebugL10n.text("debug.network.delete.scope"), systemImage: "target")
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.secondary)
+  private var ruleListSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.network.rules.title"))) {
+      HStack {
+        Text(DebugL10n.text("debug.network.rules.direction"))
+        Text(DebugL10n.text("debug.network.rules.local"))
+        Spacer()
+        Text(DebugL10n.text("debug.network.rules.remote"))
+        Text(DebugL10n.text("debug.network.rules.state"))
+          .frame(width: 90, alignment: .trailing)
+        Text(DebugL10n.text("debug.network.rules.action"))
+          .frame(width: 72, alignment: .trailing)
       }
+      .font(WorkspaceFont.label)
+      .foregroundStyle(.secondary)
+      Divider()
+      if let currentRuntimeProbe, !currentRuntimeProbe.portRules.isEmpty {
+        ForEach(Array(currentRuntimeProbe.portRules.enumerated()), id: \.offset) { _, rule in
+          ruleRow(rule)
+        }
+      } else {
+        ContentUnavailableView {
+          Label(
+            DebugL10n.text("debug.network.rules.empty"),
+            systemImage: "point.3.filled.connected.trianglepath.dotted")
+        } description: {
+          Text(probeFailure ?? DebugL10n.text("debug.network.rules.empty.detail"))
+        }
+        .frame(minHeight: 180)
+      }
+      if let warnings = currentRuntimeProbe?.warnings.filter({ $0.contains("Rules") }),
+        !warnings.isEmpty
+      {
+        Text(warnings.joined(separator: " · "))
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.orange)
+      }
+      Label(DebugL10n.text("debug.network.delete.scope"), systemImage: "target")
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 
-  private var protocolAndSafety: some View {
-    DebugCard(title: DebugL10n.text("debug.network.safety.title"), symbol: "checkmark.shield") {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-        Label(DebugL10n.text("debug.network.safety.typed"), systemImage: "number")
-        Label(DebugL10n.text("debug.network.safety.noShell"), systemImage: "text.badge.xmark")
-        Label(DebugL10n.text("debug.network.safety.binding"), systemImage: "link")
+  private func ruleRow(_ rule: DebugRuntimePortRule) -> some View {
+    HStack {
+      Text(rule.direction.rawValue)
+      Text("tcp:\(rule.localPort)").font(WorkspaceFont.tabularSecondary)
+      Spacer()
+      Text("tcp:\(rule.remotePort)").font(WorkspaceFont.tabularSecondary)
+      Text("active")
+        .font(WorkspaceFont.label)
+        .foregroundStyle(.green)
+        .frame(width: 90, alignment: .trailing)
+      Button(DebugL10n.text("debug.network.delete"), role: .destructive) {
+        guard let target,
+          let direction = DebugPortRuleDirection(rawValue: rule.direction.rawValue)
+        else { return }
+        model.mutatePortRule(
+          target: target,
+          rule: DebugValidatedPortRule(
+            direction: direction,
+            localPort: rule.localPort,
+            remotePort: rule.remotePort),
+          removing: true)
       }
-      .font(.callout)
+      .controlSize(.small)
+      .frame(width: 72, alignment: .trailing)
+      .disabled(model.isMutatingPortRule)
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -2357,292 +2407,351 @@ private struct DebugCommandsWorkspace: View {
   }
 
   var body: some View {
-    GeometryReader { geometry in
-      VStack(spacing: 0) {
-        // The whole tab's contract, stated before any template is chosen: a
-        // closed template set with schema-defined inputs, and the argv below
-        // is provider lowering echoed read-only, never an input.
-        Label(
-          DebugL10n.text("debug.commands.calloutTyped"),
-          systemImage: "exclamationmark.shield"
-        )
-        .font(WorkspaceFont.secondary)
-        .foregroundStyle(.secondary, Color.orange)
-        .symbolRenderingMode(.palette)
-        .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
-        .padding(.vertical, WorkspaceMetrics.tightGap)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityIdentifier("debug.commands.typedOnly")
-        Divider()
-        HSplitView {
-          List {
-            ForEach(DebugApplicationFacade.approvedCommandTemplates, id: \.id) { template in
-              Button {
-                selectedTemplateID = template.id
-              } label: {
-                DebugCommandTemplateRow(template: template)
-              }
-              .buttonStyle(.plain)
-              .listRowBackground(
-                selectedTemplateID == template.id
-                  ? Color(nsColor: .selectedContentBackgroundColor) : Color.clear)
-            }
-          }
-          .frame(minWidth: 240, idealWidth: 280, maxWidth: 330, maxHeight: .infinity)
-
-          commandDetail
-            .frame(minWidth: 440, maxWidth: .infinity, maxHeight: .infinity)
-        }
+    WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
+      // The whole tab's contract, stated before any template is chosen: a
+      // closed template set with schema-defined inputs, and the argv below is
+      // provider lowering echoed read-only, never an input.
+      WorkspaceNotice(
+        tone: .warning, symbol: "exclamationmark.shield",
+        identifier: "debug.commands.typedOnly"
+      ) {
+        Text(DebugL10n.text("debug.commands.calloutTyped"))
       }
-      .frame(width: geometry.size.width, height: geometry.size.height)
+      WorkspaceColumns(
+        spacing: WorkspaceMetrics.sectionGap,
+        leadingRatio: WorkspaceMetrics.splitLeadingColumnRatio
+      ) {
+        templatesSection
+      } trailing: {
+        templateDetail
+      }
+      Text(DebugL10n.text("debug.commands.footerNoFreeText"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("debug.commands.footer")
     }
     .onChange(of: selectedTemplateID) { _, _ in model.clearCommandResult() }
   }
 
-  private var commandDetail: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-        if let template = selectedTemplate {
-          DebugCard(title: template.id, symbol: "chevron.left.forwardslash.chevron.right") {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-              DebugCodeRow(label: "catalog", value: "arkdeck-remote-operations@1.0.0")
-              DebugCodeRow(label: "actionId", value: template.id)
-              DebugCodeRow(label: "effect", value: template.effect)
-              LabeledContent(DebugL10n.text("debug.commands.target")) {
-                Text(target?.id ?? DebugL10n.text("debug.target.none"))
-                  .font(WorkspaceFont.monospacedValue)
-              }
-              Text(DebugL10n.text("debug.commands.noParameters"))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            }
-          }
-
-          DebugCard(
-            title: DebugL10n.text("debug.commands.argv.title"), symbol: "list.bullet.rectangle"
-          ) {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-              DebugCodeRow(
-                label: DebugL10n.text("debug.commands.executable"),
-                value: currentCommandResult.map {
-                  "\($0.executable) · sha256:\($0.executableSHA256.prefix(12))"
-                } ?? DebugL10n.text("debug.commands.notGenerated"))
-              DebugCodeRow(
-                label: DebugL10n.text("debug.commands.arguments"),
-                value: currentCommandResult?.argumentDisclosure.joined(separator: " ")
-                  ?? DebugL10n.text("debug.commands.notGenerated"))
-              if let result = currentCommandResult {
-                DebugCodeRow(label: "lowering sha256", value: result.loweringSHA256)
-              }
-              Text(DebugL10n.text("debug.commands.argv.note"))
-                .font(WorkspaceFont.secondary)
-                .foregroundStyle(.secondary)
-            }
-          }
-
-          DebugCard(title: DebugL10n.text("debug.commands.result.title"), symbol: "doc.text") {
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-              HStack {
-                DebugCodeRow(
-                  label: DebugL10n.text("debug.commands.result.exitCode"),
-                  value: currentCommandResult?.exitCode.map(String.init) ?? "—")
-                Spacer()
-                DebugCodeRow(
-                  label: DebugL10n.text("debug.commands.result.duration"),
-                  value: currentCommandResult.map { "\($0.durationMilliseconds) ms" } ?? "—")
-              }
-              Divider()
-              LabeledContent(DebugL10n.text("debug.commands.result.stdout")) {
-                Text(currentCommandResult?.stdout ?? DebugL10n.text("debug.commands.result.none"))
-                  .font(WorkspaceFont.monospacedValue)
-                  .textSelection(.enabled)
-              }
-              LabeledContent(DebugL10n.text("debug.commands.result.stderr")) {
-                Text(currentCommandResult?.stderr ?? DebugL10n.text("debug.commands.result.none"))
-                  .font(WorkspaceFont.monospacedValue)
-                  .textSelection(.enabled)
-              }
-            }
-          }
-
-          HStack {
-            Button(DebugL10n.text("debug.commands.run")) {
-              guard let target else { return }
-              model.runTemplate(target: target, templateID: template.id)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
-            Spacer()
-            Label(DebugL10n.text("debug.commands.noPTY"), systemImage: "rectangle.slash")
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.secondary)
-          }
-          if feedbackMatchesSelection && model.isRunningCommand {
-            ProgressView().controlSize(.small)
-          }
-          if feedbackMatchesSelection, let failure = model.commandFailure {
-            Label(failure, systemImage: "xmark.octagon")
-              .font(WorkspaceFont.secondary)
-              .foregroundStyle(.red)
-              .textSelection(.enabled)
-          }
-          Text(DebugL10n.text("debug.commands.footerNoFreeText"))
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("debug.commands.footer")
-        } else {
-          ContentUnavailableView(DebugL10n.text("debug.commands.select"), systemImage: "terminal")
+  /// Four zero-parameter read-only templates never needed a split view with a
+  /// scrolling master list. They are a short closed set, so they read as one.
+  private var templatesSection: some View {
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.commands.select")),
+      spacing: WorkspaceMetrics.rowGap
+    ) {
+      ForEach(DebugApplicationFacade.approvedCommandTemplates, id: \.id) { template in
+        Button {
+          selectedTemplateID = template.id
+        } label: {
+          DebugCommandTemplateRow(
+            template: template, isSelected: selectedTemplateID == template.id)
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("debug.commands.template.\(template.id)")
       }
-      .frame(maxWidth: WorkspaceMetrics.pageMaxWidth, alignment: .topLeading)
-      .padding(WorkspaceMetrics.pageInsetHorizontal)
+    }
+  }
+
+  @ViewBuilder
+  private var templateDetail: some View {
+    if let template = selectedTemplate {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+        invocationSection(template)
+        resultSection()
+      }
+    } else {
+      ContentUnavailableView(DebugL10n.text("debug.commands.select"), systemImage: "terminal")
+    }
+  }
+
+  /// The template's identity and the provider's lowering of it are the same
+  /// subject — what exactly will be invoked — so they are one section instead
+  /// of two stacked cards repeating the action ID.
+  private func invocationSection(_ template: DebugCommandTemplatePresentation) -> some View {
+    WorkspaceSection(
+      Text(DebugL10n.text("debug.commands.argv.title")),
+      accessory: {
+        WorkspaceChip(
+          text: Text(template.effect),
+          tone: template.effect == "readOnly" ? .neutral : .warning,
+          symbol: effectSymbol(template.effect))
+      }
+    ) {
+      templateIdentity(template)
+      Divider()
+      DebugCodeRow(
+        label: DebugL10n.text("debug.commands.executable"),
+        value: currentCommandResult.map {
+          "\($0.executable) · sha256:\($0.executableSHA256.prefix(12))"
+        } ?? DebugL10n.text("debug.commands.notGenerated"))
+      DebugCodeRow(
+        label: DebugL10n.text("debug.commands.arguments"),
+        value: currentCommandResult?.argumentDisclosure.joined(separator: " ")
+          ?? DebugL10n.text("debug.commands.notGenerated"))
+      if let result = currentCommandResult {
+        DebugCodeRow(label: "lowering sha256", value: result.loweringSHA256)
+      }
+      Text(DebugL10n.text("debug.commands.argv.note"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      runActionRow(template)
+    }
+  }
+
+  private func templateIdentity(_ template: DebugCommandTemplatePresentation) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      DebugCodeRow(label: "catalog", value: "arkdeck-remote-operations@1.0.0")
+      DebugCodeRow(label: "actionId", value: template.id)
+      LabeledContent(DebugL10n.text("debug.commands.target")) {
+        Text(target?.id ?? DebugL10n.text("debug.target.none"))
+          .font(WorkspaceFont.monospacedValue)
+      }
+      Text(DebugL10n.text("debug.commands.noParameters"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func runActionRow(_ template: DebugCommandTemplatePresentation) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      Divider()
+      HStack(spacing: WorkspaceMetrics.contentGap) {
+        Button(DebugL10n.text("debug.commands.run")) {
+          guard let target else { return }
+          model.runTemplate(target: target, templateID: template.id)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
+        .help(DebugL10n.text("debug.commands.noPTY"))
+        .accessibilityIdentifier("debug.commands.run")
+        if feedbackMatchesSelection && model.isRunningCommand {
+          ProgressView().controlSize(.small)
+        }
+        Spacer(minLength: 0)
+      }
+      if feedbackMatchesSelection, let failure = model.commandFailure {
+        Label(failure, systemImage: "xmark.octagon")
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+          .textSelection(.enabled)
+      }
+    }
+  }
+
+  private func resultSection() -> some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.commands.result.title"))) {
+      HStack {
+        DebugCodeRow(
+          label: DebugL10n.text("debug.commands.result.exitCode"),
+          value: currentCommandResult?.exitCode.map(String.init) ?? "—")
+        Spacer()
+        DebugCodeRow(
+          label: DebugL10n.text("debug.commands.result.duration"),
+          value: currentCommandResult.map { "\($0.durationMilliseconds) ms" } ?? "—")
+      }
+      Divider()
+      LabeledContent(DebugL10n.text("debug.commands.result.stdout")) {
+        Text(currentCommandResult?.stdout ?? DebugL10n.text("debug.commands.result.none"))
+          .font(WorkspaceFont.monospacedValue)
+          .textSelection(.enabled)
+      }
+      LabeledContent(DebugL10n.text("debug.commands.result.stderr")) {
+        Text(currentCommandResult?.stderr ?? DebugL10n.text("debug.commands.result.none"))
+          .font(WorkspaceFont.monospacedValue)
+          .textSelection(.enabled)
+      }
     }
   }
 }
 
 private struct DebugCommandTemplateRow: View {
   let template: DebugCommandTemplatePresentation
-
-  private var symbol: String {
-    template.effect == "readOnly"
-      ? "doc.text.magnifyingglass" : "exclamationmark.shield"
-  }
+  let isSelected: Bool
 
   private var effectColor: Color {
     template.effect == "readOnly" ? .secondary : .orange
   }
 
   var body: some View {
-    Label {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
+      Image(systemName: effectSymbol(template.effect))
+        .foregroundStyle(effectColor)
+        .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(template.id).font(WorkspaceFont.monospacedValue)
         Text(template.effect)
           .font(WorkspaceFont.caption)
           .foregroundStyle(effectColor)
       }
-    } icon: {
-      Image(systemName: symbol)
+      Spacer(minLength: 0)
     }
+    .padding(.horizontal, WorkspaceMetrics.contentGap)
+    .padding(.vertical, WorkspaceMetrics.tightGap)
     .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    // An accent wash rather than the system selection fill: the row keeps its
+    // own effect colour, which white-on-blue would swallow.
+    .background(
+      isSelected ? Color.accentColor.opacity(0.14) : Color.clear,
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+        .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(isSelected ? [.isSelected] : [])
   }
 }
 
-private struct DebugAvailabilityCard: View {
+/// Availability as one line beside the section title it gates.
+///
+/// The workspace used to answer this question twice: per-operation badges in
+/// the page header and a `Runtime availability` card inside every panel, both
+/// reading "available" on nearly every visit. Spec §4.4 asks the page to
+/// state availability before it offers the configuration — it does not ask
+/// for a bordered card that is only ever green.
+private struct DebugAvailabilityStatus: View {
   let operation: DebugOperationPresentation?
 
   var body: some View {
-    DebugCard(title: DebugL10n.text("debug.availability.title"), symbol: "checkmark.seal") {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-        if let operation {
-          DebugCodeRow(
-            label: DebugL10n.text("debug.availability.operation"), value: operation.reference)
-          switch operation.availability {
-          case .checking:
-            Label(DebugL10n.text("debug.availability.checking"), systemImage: "hourglass")
-          case .available:
-            Label(
-              DebugL10n.text("debug.availability.available"), systemImage: "checkmark.circle.fill"
-            )
-            .foregroundStyle(.green)
-          case .unavailable(let reasons):
-            Label(
-              DebugL10n.text("debug.availability.unavailable"), systemImage: "xmark.octagon.fill"
-            )
-            .foregroundStyle(.red)
+    let state = DebugAvailabilityState(operation?.availability)
+    return Label(state.title, systemImage: state.symbol)
+      .font(WorkspaceFont.secondary)
+      .foregroundStyle(state.tone.color)
+      .help(operation?.reference ?? "")
+      .accessibilityIdentifier("debug.availability.status")
+  }
+}
+
+/// The blocker, and only the blocker. Nothing is drawn while Runtime reports
+/// the operation available or is still checking, so the reasons that do
+/// arrive are the loudest thing in the section rather than the last line of a
+/// card the eye has learned to skip.
+private struct DebugAvailabilityNotice: View {
+  let operation: DebugOperationPresentation?
+
+  var body: some View {
+    if let operation {
+      if case .unavailable(let reasons) = operation.availability {
+        WorkspaceNotice(
+          tone: .danger, symbol: "xmark.octagon.fill",
+          identifier: "debug.availability.blocked"
+        ) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(DebugL10n.text("debug.availability.unavailable"))
+              .font(WorkspaceFont.secondary.weight(.medium))
             ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
               Text(reason)
                 .font(WorkspaceFont.monospacedDense)
                 .textSelection(.enabled)
             }
           }
-          Text(
-            LocalizedStringResource.DebugLocalizable.debugAvailabilityEffect(
-              operation.minimumEffect)
-          )
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.secondary)
-        } else {
-          DebugBlockedReason(text: DebugL10n.text("debug.availability.missing"))
         }
+      }
+    } else {
+      WorkspaceNotice(
+        tone: .warning, symbol: "lock.fill", identifier: "debug.availability.missing"
+      ) {
+        Text(DebugL10n.text("debug.availability.missing"))
       }
     }
   }
 }
 
-private struct DebugRecentJobsCard: View {
+private struct DebugAvailabilityState {
+  let title: String
+  let symbol: String
+  let tone: WorkspaceTone
+
+  init(_ availability: DebugRuntimeAvailability?) {
+    switch availability {
+    case .checking:
+      title = DebugL10n.text("debug.availability.checking")
+      symbol = "hourglass"
+      tone = .neutral
+    case .available:
+      title = DebugL10n.text("debug.availability.available")
+      symbol = "checkmark.circle.fill"
+      tone = .ok
+    case .unavailable:
+      title = DebugL10n.text("debug.availability.unavailable")
+      symbol = "xmark.octagon.fill"
+      tone = .danger
+    case nil:
+      title = DebugL10n.text("debug.availability.unavailable")
+      symbol = "exclamationmark.triangle.fill"
+      tone = .warning
+    }
+  }
+}
+
+private struct DebugRecentJobsSection: View {
   var model: DebugWorkspaceViewModel
   let jobs: [DebugJobPresentation]
 
   var body: some View {
-    DebugCard(title: DebugL10n.text("debug.jobs.title"), symbol: "clock.arrow.circlepath") {
+    WorkspaceSection(Text(DebugL10n.text("debug.jobs.title"))) {
       if jobs.isEmpty {
         Text(DebugL10n.text("debug.jobs.empty"))
-          .font(.callout)
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, minHeight: 54, alignment: .center)
+          .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
       } else {
-        VStack(spacing: WorkspaceMetrics.tightGap) {
-          ForEach(jobs.prefix(5)) { job in
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              HStack(spacing: WorkspaceMetrics.contentGap) {
-                Image(systemName: job.needsAttention ? "exclamationmark.triangle" : "circle.fill")
-                  .font(WorkspaceFont.caption)
-                  .foregroundStyle(job.needsAttention ? .orange : .secondary)
-                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                  Text(job.id).font(WorkspaceFont.monospacedValue)
-                  Text("\(job.targetID) · \(job.operationReference)")
-                    .font(WorkspaceFont.monospacedDense)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(job.state)
-                  .font(WorkspaceFont.label)
-                if job.isActive {
-                  Button {
-                    model.cancelOutstandingJob(job)
-                  } label: {
-                    HStack(spacing: WorkspaceMetrics.rowGap) {
-                      if model.isCancellingOutstandingJob(job.id) {
-                        ProgressView().controlSize(.mini)
-                      }
-                      Text(DebugL10n.text("debug.action.cancel"))
-                    }
-                  }
-                  .controlSize(.small)
-                  .disabled(model.isCancellingOutstandingJob(job.id))
-                  .accessibilityIdentifier("debug.jobs.cancel.\(job.id)")
-                }
-              }
-              if let failure = job.operationFailure {
-                Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
-                  .font(WorkspaceFont.caption)
-                  .foregroundStyle(.secondary)
-                  .lineLimit(3)
-                  .accessibilityIdentifier("debug.jobs.typedFailure.\(job.id)")
-              } else if let latest = job.timeline.last {
-                Text(latest)
-                  .font(WorkspaceFont.monospacedDense)
-                  .foregroundStyle(.secondary)
-                  .lineLimit(2)
-              }
-            }
-          }
+        ForEach(jobs.prefix(5)) { job in
+          jobRow(job)
         }
       }
     }
   }
-}
 
-private struct DebugCard<Content: View>: View {
-  let title: String
-  let symbol: String
-  @ViewBuilder let content: Content
-
-  var body: some View {
-    WorkspaceTitledCard(Text(title), symbol: symbol) {
-      content
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+  private func jobRow(_ job: DebugJobPresentation) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      HStack(spacing: WorkspaceMetrics.contentGap) {
+        Image(systemName: job.needsAttention ? "exclamationmark.triangle" : "circle.fill")
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(job.needsAttention ? .orange : .secondary)
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Text(job.id).font(WorkspaceFont.monospacedValue)
+          Text("\(job.targetID) · \(job.operationReference)")
+            .font(WorkspaceFont.monospacedDense)
+            .foregroundStyle(.secondary)
+        }
+        Spacer(minLength: WorkspaceMetrics.contentGap)
+        Text(job.state)
+          .font(WorkspaceFont.label)
+        if job.isActive {
+          Button {
+            model.cancelOutstandingJob(job)
+          } label: {
+            HStack(spacing: WorkspaceMetrics.rowGap) {
+              if model.isCancellingOutstandingJob(job.id) {
+                ProgressView().controlSize(.mini)
+              }
+              Text(DebugL10n.text("debug.action.cancel"))
+            }
+          }
+          .controlSize(.small)
+          .disabled(model.isCancellingOutstandingJob(job.id))
+          .accessibilityIdentifier("debug.jobs.cancel.\(job.id)")
+        }
+      }
+      if let failure = job.operationFailure {
+        Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(3)
+          .accessibilityIdentifier("debug.jobs.typedFailure.\(job.id)")
+      } else if let latest = job.timeline.last {
+        Text(latest)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+      }
     }
   }
 }
