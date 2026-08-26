@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "436999a0a0062bf0375fa351f0d5fd590c0b0d5e8b6a123cebc3572e1070f5d3"
+  public static let catalogDigest = "9c7c71327cf85ef80e6c3ac70c8ceb0122c23d25441e2a3d1c833c9f8a66e6af"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -213,6 +213,47 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "markers.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
+    ),
+    CatalogOperationDescriptor(
+      id: "capture.screen-sequence",
+      version: 1,
+      title: "Capture a bounded run of stills off one display, collected into one archive",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "displayId", type: .integer, isRequired: false, minimum: 0, maximum: 64, summary: "Target display for multi-display devices. Omitted lowers to the device's default display."),
+        CatalogFieldDescriptor(name: "frameCount", type: .integer, isRequired: true, minimum: 2, maximum: 300, summary: "How many stills to take. There is no duration field: the rate is the device's display readback and cannot be asked for, so a caller bounds the run by frames and reads back what it actually achieved."),
+        CatalogFieldDescriptor(name: "height", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Scaled capture height. Requires width: a lone dimension lets the device pick the other one, and frames of differing size compose into nothing."),
+        CatalogFieldDescriptor(name: "imageType", type: .string, isRequired: false, enumValues: ["png", "jpeg"], summary: "Image type for every frame. The device validates the file suffix against this, so the two are lowered together. jpeg by default because it is the cheaper of the two by 222 ms a frame and a tenth of the bytes.", defaultValue: .string("jpeg")),
+        CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912, summary: "Ceiling on the bytes this capture may publish, checked against free device storage before the first frame.", defaultValue: .integer(134217728)),
+        CatalogFieldDescriptor(name: "width", type: .integer, isRequired: false, minimum: 1, maximum: 32767, summary: "Scaled capture width. Requires height. Measured to save no time at all - the cost is the readback, not the encode - so this is about bytes, not rate.")
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "artifactIndex", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "preflight-host-storage", kind: .preflightHostStorage, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "preflight-device-storage", kind: .preflightDeviceStorage, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "capture-screen-sequence", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "receive-screen-sequence", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "cleanup-screen-sequence-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "postprocess-index", kind: .postprocessArtifact, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 900,
+      outputByteBudget: 536870912,
+      preflightAttempts: 2,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "frames.tar", role: .raw, mediaType: "application/x-tar", privacy: .sensitive, isRequired: true, retentionClass: .default)
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),

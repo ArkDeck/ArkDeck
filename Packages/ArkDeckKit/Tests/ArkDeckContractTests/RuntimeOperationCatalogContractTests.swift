@@ -27,6 +27,10 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
     XCTAssertEqual(
       observed,
       [
+        "capture.screen-sequence@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "capture.screen-sequence@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
         "capture.diagnostics@1/capture-hilog": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
         "capture.diagnostics@1/capture-ui-dump": CatalogActionReference(

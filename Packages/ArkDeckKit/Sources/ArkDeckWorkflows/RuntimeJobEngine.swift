@@ -8884,7 +8884,19 @@ public actor RuntimeJobEngine {
         "artifactId": .string("artifact-\(step.stepID)"),
       ]
     case .captureRemoteFile:
-      if case .hdc(.captureScreenshot(let path))? = action {
+      if case .hdc(.captureScreenSequence(let request, let frames, let path))? = action {
+        arguments = [
+          "catalogId": .string("trace-presets"),
+          "actionId": .string("custom"),
+          "parameters": .object([
+            "frameCount": .integer(Int64(request.frameCount)),
+            "imageType": .string(request.imageType.rawValue),
+            "framesDirectory": .string(frames.remotePath),
+          ]),
+          "artifactId": .string("artifact-\(step.stepID)"),
+          "ownedRemotePath": .string(path.remotePath),
+        ]
+      } else if case .hdc(.captureScreenshot(let path))? = action {
         arguments = [
           "catalogId": .string("trace-presets"),
           "actionId": .string("custom"),
@@ -8927,6 +8939,7 @@ public actor RuntimeJobEngine {
       switch step.stepID {
       case "receive-ui-tree": localName = "ui-tree.json"
       case "receive-screenshot": localName = "screenshot.png"
+      case "receive-screen-sequence": localName = "frames.tar"
       default: localName = "trace.htrace"
       }
       if case .hdc(.receiveOwnedArtifact(let artifact))? = action {
@@ -8949,7 +8962,17 @@ public actor RuntimeJobEngine {
       }
     case .cleanupOwnedRemotePath:
       let path: String
-      if case .hdc(.cleanupOwnedRemotePath(let owned))? = action {
+      if case .hdc(.cleanupScreenSequence(_, let frames, let archive))? = action {
+        // Two owned things, not one: the archive and the directory the frames
+        // were written into. The journal names both so a residue record can
+        // be acted on without re-deriving either.
+        arguments = [
+          "remotePath": .string(archive.remotePath),
+          "framesDirectory": .string(frames.remotePath),
+          "ownershipEvidenceId": .string("owned-\(jobID)"),
+        ]
+        break
+      } else if case .hdc(.cleanupOwnedRemotePath(let owned))? = action {
         path = owned.remotePath
       } else if case .hdc(.cleanupNativeLibrary(let deployment))? = action {
         path = deployment.stagingPath

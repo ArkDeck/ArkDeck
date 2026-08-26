@@ -224,6 +224,82 @@ public struct HDCTraceCaptureRequest: Sendable, Equatable {
   }
 }
 
+/// A bounded run of stills off one display.
+///
+/// This exists because the platform offers nothing else. Measured on this
+/// device: `/system/bin` ships no recorder, `uitest uiRecord` records UI
+/// *events* into a CSV rather than pixels, and the real capability -
+/// `libnative_avscreen_capture.so` - is an in-app API whose permission
+/// `ohos.permission.CAPTURE_SCREEN` is declared `system_core` /
+/// `system_grant` in the device's own permission_definitions.json, so no
+/// side-loaded app can hold it and no shell can reach it.
+///
+/// What is reachable is one still at a time, and the rate is the display
+/// readback, not the encode: 543 ms/frame for JPEG at 720x1280, 537 ms at
+/// 360x640, 765 ms for PNG (measured 2026-08-26, 20 frames each). Scaling
+/// down buys nothing. So a "recording" here is about 1.8 frames a second,
+/// and the honest thing is to report the rate that was achieved rather than
+/// to imply a video one.
+public struct HDCScreenSequenceRequest: Sendable, Equatable {
+  package static let maximumFrames = 300
+
+  public enum ImageType: String, Sendable, Equatable {
+    case png
+    case jpeg
+  }
+
+  public let frameCount: Int
+  public let imageType: ImageType
+  /// Scaled capture, when asked for. Measured to save no time at all - the
+  /// cost is the readback - so this is about the bytes, not the rate.
+  public let width: Int?
+  public let height: Int?
+  public let displayID: Int?
+
+  public init(
+    frameCount: Int,
+    imageType: ImageType = .jpeg,
+    width: Int? = nil,
+    height: Int? = nil,
+    displayID: Int? = nil
+  ) throws {
+    guard (2...Self.maximumFrames).contains(frameCount) else {
+      throw HDCE0RequestError.outOfBounds(
+        field: "frameCount", detail: "2...\(Self.maximumFrames)")
+    }
+    // Both or neither: a lone dimension would let the device pick the other
+    // one, and a sequence whose frames are not all the same size cannot be
+    // composed into anything.
+    switch (width, height) {
+    case (nil, nil): break
+    case (let w?, let h?):
+      guard (1...32767).contains(w), (1...32767).contains(h) else {
+        throw HDCE0RequestError.outOfBounds(field: "width/height", detail: "1...32767")
+      }
+    default:
+      throw HDCE0RequestError.malformed(
+        field: "width/height", detail: "a scaled sequence needs both dimensions")
+    }
+    if let displayID {
+      guard (0...64).contains(displayID) else {
+        throw HDCE0RequestError.outOfBounds(field: "displayID", detail: "0...64")
+      }
+    }
+    self.frameCount = frameCount
+    self.imageType = imageType
+    self.width = width
+    self.height = height
+    self.displayID = displayID
+  }
+
+  /// Where frame `index` lands inside the owned directory. Zero-padded so the
+  /// archive's own ordering is the capture order, and named by index rather
+  /// than by any caller string.
+  package func frameName(index: Int) -> String {
+    String(format: "%04d", index + 1) + "." + imageType.rawValue
+  }
+}
+
 /// A provider-owned remote temporary path. Only this module can mint one
 /// (package init), the components make collisions structurally impossible,
 /// and cleanup actions accept only this type - never a raw string.
@@ -260,6 +336,10 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
       // Not cosmetic: `snapshot_display` rejects a name whose suffix does
       // not match the requested type (measured on OH 3.2, CHG-2026-049 r5).
       suffix = ".png"
+    case "capture-screen-sequence":
+      // The frames live in the owned directory; this is the archive they are
+      // collected into, because a receive lands one file.
+      suffix = ".tar"
     default:
       suffix = ""
     }
@@ -349,12 +429,22 @@ public struct HDCStagedArtifact: Sendable, Equatable {
 /// tuple makes collisions structurally impossible, and no caller can supply
 /// a device location.
 public struct HDCOwnedRemoteDirectory: Sendable, Equatable {
+  /// What the directory holds. Two purposes with one name would make a
+  /// frame directory read as a package directory in every cleanup record.
+  public enum Purpose: String, Sendable, Equatable {
+    case packages
+    case frames
+  }
+
   public let jobID: String
   public let stepID: String
   package let nonce: String
+  package let purpose: Purpose
   package let remotePath: String
 
-  package init(jobID: String, stepID: String, nonce: String) throws {
+  package init(
+    jobID: String, stepID: String, nonce: String, purpose: Purpose = .packages
+  ) throws {
     let componentPattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
     for (field, value) in [("jobID", jobID), ("stepID", stepID), ("nonce", nonce)] {
       guard value.range(of: componentPattern, options: .regularExpression) != nil else {
@@ -365,7 +455,8 @@ public struct HDCOwnedRemoteDirectory: Sendable, Equatable {
     self.jobID = jobID
     self.stepID = stepID
     self.nonce = nonce
-    let remotePath = "/data/local/tmp/arkdeck-\(jobID)-\(stepID)-\(nonce)-packages"
+    self.purpose = purpose
+    let remotePath = "/data/local/tmp/arkdeck-\(jobID)-\(stepID)-\(nonce)-\(purpose.rawValue)"
     guard remotePath.utf8.count <= 255 else {
       throw HDCE0RequestError.outOfBounds(
         field: "remotePath", detail: "provider-owned path must be at most 255 bytes")

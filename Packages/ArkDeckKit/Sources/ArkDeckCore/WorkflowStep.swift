@@ -288,7 +288,11 @@ package enum WorkflowStepRegistry {
     case .postprocessArtifact:
       host(required: ["inputArtifactIds", "outputArtifactId", "processorId", "parameters"])
     case .cleanupOwnedRemotePath:
-      deviceMutation(required: ["remotePath", "ownershipEvidenceId"])
+      // A sequence capture owns two things, not one: the archive and the
+      // directory its frames were written into. Naming both here is what lets
+      // a residue record be acted on without re-deriving either.
+      deviceMutation(
+        required: ["remotePath", "ownershipEvidenceId"], optional: ["framesDirectory"])
     case .requestConfirmation:
       host(required: ["confirmationId", "promptKey", "riskClass", "scopeHash"])
     case .installPackage:

@@ -15,6 +15,7 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "analyzer.summarize-hilog@1",
         "analyzer.summarize-trace@1",
         "capture.diagnostics@1",
+        "capture.screen-sequence@1",
         "debug.hap@1",
         "deploy.native-library.app-owned@1",
         "flash.dayu200",
@@ -120,8 +121,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     XCTAssertEqual(
-      withDefaults.count, 22,
-      "the catalog declares twenty-two input defaults; the runtime must see all of them")
+      withDefaults.count, 24,
+      "the catalog declares twenty-four input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -189,8 +190,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       }
     }
     XCTAssertEqual(
-      checked, 22,
-      "the catalog declares twenty-two input defaults; all of them must be exercised here")
+      checked, 24,
+      "the catalog declares twenty-four input defaults; all of them must be exercised here")
   }
 
   func testViewerCanOmitHilogWithoutChangingTheDefaultDiagnosticsPlan() throws {

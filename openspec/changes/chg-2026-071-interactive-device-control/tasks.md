@@ -56,8 +56,34 @@ T02/T03 不进入实现。
   runtime 任务成功、`screenshot.png` 已发布，而工作区显示「截图失败」；没有画面，本条
   拒绝也就是死码。现由 `testTheWorkspaceReadsTheArtifactIndexTheRuntimeActuallyWrites`
   用 daemon 自己的 `handleLine` 出线字节驱动工作区自己的读取器把住，不用手写 fixture。
-  ② **宿主合成录屏未做**——交付内容 4 与 AC-8 都要求 Assembling→Validating→结果条
-  （实测帧率 + 位置 + Finder/另存为/再录一段）。App 里没有任何录屏面。
+  ② **宿主合成录屏**——运行时腿已交付（2026-08-26），**App 面板未做**。
+  先答「系统没有录屏接口吗」：这台设备上 `/system/bin`、`/vendor/bin` **没有任何录屏
+  程序**，只有 `snapshot_display`（单张）与 `setresolution_screen`；`uitest` 的
+  `screenCap` 是单张、`uiRecord` 录的是 **UI 事件写 CSV** 不是像素。平台确有真正的屏幕
+  采集（设备上有 `libnative_avscreen_capture.so` / `libmedia_service_screen_capture.z.so`），
+  但那是**应用内 API**，其权限在设备自己的 `permission_definitions.json` 里写着
+  `ohos.permission.CAPTURE_SCREEN  grantMode: system_grant  availableLevel: system_core`
+  ——只有系统级签名的应用能持有，用户授权不了、shell 够不着。**故「宿主合成」不是设计
+  偏好而是唯一可走的路。**
+  代价实测（各 20 帧）：PNG 原生 765 ms/帧、JPEG 原生 543 ms、JPEG 360×640 537 ms、
+  PNG 360×640 613 ms。**降分辨率几乎不省——瓶颈是显示回读（扣掉 51 ms 进程启动约
+  490 ms），不是编码。上限约 1.8 fps。** 所以本腿只报**实测**帧率，不承诺速率。
+  （这三行第一次量错过：`snapshot_display` 要求文件后缀与 `-t` 一致，无后缀直接报错
+  退出且快得像成功，量到的是「拒绝」。上表为逐帧验证文件确实产出后的复测。）
+  已交付：`capture.screen-sequence@1`——拥有目录 + **每帧一次 typed 调用**（设备侧
+  `for` 循环是 shell 片段，且只快 54 ms/帧，不值）+ `tar` 归档 + `ls -l` 回读作为凭据；
+  清理只按名删自己写过的帧再 `rmdir`，判据是目录不在列表里而非退出码。
+  真机证据（TGT-958780b2ffb7）：20 帧 job-5002416b92d3bee45d13ed6427ed7695 succeeded；
+  120 帧 job-982bebf009b868db7b8f78d6a105b207 succeeded，74.9 s / 624 ms 每帧，取回
+  120 张 720×1280 JPEG，**第 1–39 帧一幅、第 40–120 帧另一幅，切换点正是锁屏钟
+  23:29→23:30**——截一次复制 120 份做不到这个。
+  **顺带修掉一个从没人发现的洞**：`ProviderSubprocessReceipt.durationSeconds` 对**每一次
+  派发**都写死 0，而 `ProviderProcessReceipt.durationSeconds` 是它们的和，所以每个
+  processSequence 报的总时长也一直是 0。没人消费过所以没显形；本腿是第一个消费者
+  （没有别处能观测到帧率）。现改为单调钟实测，并由
+  `DispatchedInvocationDurationContractTests` 对真实子进程把住。
+  **未做：App 录屏面**（Assembling→Validating→结果条：实测帧率 + 位置 +
+  Finder/另存为/再录一段），以及宿主侧把帧合成为一个文件。
   ③ **开始前的配额 preflight 未做**——AC-8 要求失败即阻断。
   ④ **performance notice 未做**——AC-8 要求它与 production-boundary 一样不可删除；
   现在只有 boundary（`toolkit.boundary`）。

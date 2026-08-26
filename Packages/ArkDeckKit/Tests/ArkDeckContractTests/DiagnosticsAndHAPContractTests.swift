@@ -607,6 +607,39 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           stdout: Data("process: display 0, file type: png, width: 720, height: 1280\n".utf8),
           stderr: Data(), stdoutTruncated: false, durationSeconds: 0.02,
           subprocesses: [shotSub(""), shotSub(shotListing)])
+      case .captureScreenSequence(let request, _, let archive):
+        note("captureScreenSequence")
+        func seqSub(_ stdout: String, seconds: Double = 0.55) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: seconds)
+        }
+        // mkdir + one per frame + tar + readback, which is the shape the
+        // lowering emits. The frame durations are the measured ~0.55s so a
+        // rate read off this fake is the rate the device actually gives.
+        var subs = [seqSub("", seconds: 0.01)]
+        subs += (0..<request.frameCount).map { _ in seqSub("") }
+        subs.append(seqSub("", seconds: 0.05))
+        subs.append(
+          seqSub(
+            "-rw-r--r-- 1 root root 863232 2026-08-26 00:00 \(archive.remotePath)\n",
+            seconds: 0.01))
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false,
+          durationSeconds: 0.6, subprocesses: subs)
+      case .cleanupScreenSequence(_, let frames, _):
+        note("cleanupScreenSequence")
+        func gone(_ exit: Int32) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(), stderr: Data(), stdoutTruncated: false,
+            durationSeconds: 0.01)
+        }
+        // The last invocation is `ls -d` on the directory; a non-zero exit is
+        // the proof it is gone.
+        _ = frames
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false,
+          durationSeconds: 0.04, subprocesses: [gone(0), gone(0), gone(0), gone(1)])
       case .captureComponentTree:
         note("captureComponentTree")
         // Same shape as the trace leg: a status line plus the `ls -l`
