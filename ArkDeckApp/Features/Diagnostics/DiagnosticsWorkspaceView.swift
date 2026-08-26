@@ -16,6 +16,8 @@ struct DiagnosticsWorkspaceView: View {
     VStack(spacing: 0) {
       toolbar
       Divider()
+      capturePane
+      Divider()
       if model.reading == nil {
         ContentUnavailableView {
           Label(diagnosticsText("diagnostics.session.none"), systemImage: "waveform.path")
@@ -43,6 +45,70 @@ struct DiagnosticsWorkspaceView: View {
       footer
     }
     .task { await model.refresh() }
+  }
+
+  // MARK: - Capture
+
+  /// The half of the tab that arms a session and takes marks. It sits above
+  /// the reader because that is the order the work happens in: arm, reproduce,
+  /// mark, then read.
+  private var capturePane: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 12) {
+        Button {
+          model.isArmed ? model.stop() : model.arm()
+        } label: {
+          Label(
+            model.captureTitle,
+            systemImage: model.isArmed ? "stop.circle" : "record.circle")
+        }
+        .disabled(!model.canArm && !model.isArmed)
+        .accessibilityIdentifier("diagnostics.capture.arm")
+
+        Button {
+          model.mark(at: ISO8601DateFormatter().string(from: Date()))
+        } label: {
+          Label(diagnosticsText("diagnostics.capture.mark"), systemImage: "bookmark")
+        }
+        .keyboardShortcut("m", modifiers: .command)
+        .disabled(!model.isArmed)
+        .accessibilityIdentifier("diagnostics.capture.mark")
+
+        if model.isArmed {
+          Text("\(model.pendingMarks.count) \(diagnosticsText("diagnostics.capture.marks.count"))")
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("diagnostics.capture.markCount")
+        }
+        Spacer()
+      }
+      // A mark is a host instant that reaches no device. Saying so is what
+      // stops it being read as an action on the device that might fail.
+      Text(diagnosticsText("diagnostics.capture.markIsHostTime"))
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+      if let notice = model.captureNotice {
+        VStack(alignment: .leading, spacing: 2) {
+          Label(
+            notice.title,
+            systemImage: notice.isRefusal ? "exclamationmark.octagon.fill" : "checkmark.circle")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(notice.isRefusal ? .orange : .secondary)
+          if !notice.detail.isEmpty {
+            Text(notice.detail)
+              .font(.system(size: 11))
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier(
+          notice.isRefusal ? "diagnostics.capture.refused" : "diagnostics.capture.notice")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 20)
+    .padding(.vertical, 12)
   }
 
   // MARK: - Toolbar
