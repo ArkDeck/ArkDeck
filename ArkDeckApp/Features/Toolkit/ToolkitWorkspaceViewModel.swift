@@ -9,11 +9,13 @@ final class ToolkitWorkspaceViewModel {
   /// Below this the pointer did not travel: the gesture is a press at one
   /// place, and how long it was held decides whether that is a tap or a long
   /// press.
-  static let travelThreshold: CGFloat = 6
+  static var travelThreshold: CGFloat { ToolkitGestureClassification.travelThresholdPoints }
   /// A press held at least this long is a long press. Anything shorter is a
   /// tap; nothing in between is silently promoted, because a long press the
   /// device receives as a tap is a different act than the one intended.
-  static let longPressThreshold: TimeInterval = 0.5
+  static var longPressThreshold: TimeInterval {
+    ToolkitGestureClassification.longPressThresholdSeconds
+  }
 
   struct Marker: Equatable {
     let unitX: CGFloat
@@ -227,38 +229,15 @@ final class ToolkitWorkspaceViewModel {
     }
   }
 
-  /// Classifies one completed pointer sequence and maps it into device
-  /// pixels. Travel decides between a swipe and a press; for a press, the
-  /// hold decides between tap and long press.
+  /// Classifying lives in `ToolkitGestureClassification`, where it can be
+  /// exercised directly; this workspace only decides when to ask.
   static func gesture(
     start: CGPoint, end: CGPoint, travelled: CGFloat, heldFor: TimeInterval,
     rendered: CGSize, frame: ToolkitScreenFrame
   ) -> ToolkitGestureRequest {
-    func devicePoint(_ point: CGPoint) -> (x: Int, y: Int) {
-      let x = Int((point.x / rendered.width) * CGFloat(frame.width))
-      let y = Int((point.y / rendered.height) * CGFloat(frame.height))
-      return (min(max(x, 0), frame.width - 1), min(max(y, 0), frame.height - 1))
-    }
-    let from = devicePoint(start)
-    if travelled >= travelThreshold {
-      let to = devicePoint(end)
-      // The swipe carries the real press-to-release time, clamped into the
-      // operation's published range rather than invented.
-      let duration = min(max(Int(heldFor * 1000), 80), 2000)
-      return ToolkitGestureRequest(
-        gesture: .swipe, x: from.x, y: from.y,
-        frameWidth: frame.width, frameHeight: frame.height,
-        toX: to.x, toY: to.y, durationMs: duration)
-    }
-    if heldFor >= longPressThreshold {
-      return ToolkitGestureRequest(
-        gesture: .longPress, x: from.x, y: from.y,
-        frameWidth: frame.width, frameHeight: frame.height,
-        durationMs: min(max(Int(heldFor * 1000), 500), 2000))
-    }
-    return ToolkitGestureRequest(
-      gesture: .tap, x: from.x, y: from.y,
-      frameWidth: frame.width, frameHeight: frame.height)
+    ToolkitGestureClassification.classify(
+      start: start, end: end, travelled: travelled, heldFor: heldFor,
+      rendered: rendered, frame: frame)
   }
 
   static func title(for gesture: ToolkitGesture) -> String {
