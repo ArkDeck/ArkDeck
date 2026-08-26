@@ -139,6 +139,9 @@ public protocol ToolkitDeviceControlProviding: Sendable {
   func recordScreen(
     frameCount: Int, target: ToolkitTargetPresentation
   ) async -> ToolkitScreenRecordingResult
+  /// How much room the artifact store has left. Read-only, and asked before a
+  /// run starts rather than discovered by one that gets refused.
+  func artifactHeadroomBytes() async -> Int?
 }
 
 /// The frames a run brought back, with the spacing they were taken at.
@@ -185,6 +188,11 @@ public enum ToolkitDeviceControlFacade {
         // measured on hardware. Scaling down was measured to save nothing at
         // all, so the frames stay at the device's own size.
         "imageType": .string("jpeg"),
+        // The same number the workspace preflighted. The operation's host
+        // storage preflight reads exactly this field, so sending a different
+        // one would mean two answers to one question.
+        "totalArtifactByteBudget": .integer(
+          Int64(ToolkitRecordingBudget.bytes(frameCount: frameCount))),
       ],
       requestedOutputs: [.hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
@@ -392,6 +400,15 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
     } catch {
       return .failed("\(error)")
     }
+  }
+
+  func artifactHeadroomBytes() async -> Int? {
+    guard
+      let quota = try? await requestObject(
+        method: "artifact.quota", params: [:], label: "Toolkit artifact quota"),
+      let remaining = quota["remainingBytes"] as? Int
+    else { return nil }
+    return remaining
   }
 
   /// One published artifact's bytes, in chunks, checked against the digest the

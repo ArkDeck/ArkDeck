@@ -1581,6 +1581,30 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return success(
         id: request.id, result: .object(["aborted": .bool(aborted)]))
 
+    case "artifact.quota":
+      // Read-only headroom, so a caller can be refused before it starts work
+      // rather than after. The store's rule is refuse-never-evict: a full
+      // store does not make room by discarding what somebody already
+      // captured, so "there is no room" is a fact a caller has to act on
+      // rather than something the runtime can quietly resolve.
+      guard let artifactStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "artifact store is not configured")
+      }
+      do {
+        let used = try await artifactStore.totalBytesUsed()
+        let total = await artifactStore.quotaTotalBytes
+        return success(
+          id: request.id,
+          result: .object([
+            "totalBytes": .integer(Int64(total)),
+            "usedBytes": .integer(Int64(used)),
+            "remainingBytes": .integer(Int64(max(0, total - used))),
+          ]))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "artifact.list":
       guard let artifactStore else {
         return failure(

@@ -41,6 +41,11 @@ public enum ToolkitRecordingFixture {
       .failed(reason: "the recording fixture injects nothing")
     }
 
+    /// The fixture stands in for a device, not for the store, so it reports
+    /// no headroom figure and the pane treats that as "cannot tell" rather
+    /// than as room.
+    func artifactHeadroomBytes() async -> Int? { nil }
+
     func recordScreen(
       frameCount: Int, target: ToolkitTargetPresentation
     ) async -> ToolkitScreenRecordingResult {

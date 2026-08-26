@@ -16,6 +16,13 @@ import SwiftUI
 final class ToolkitRecordingViewModel {
   enum Stage: Equatable {
     case idle
+    /// Refused before anything started. Distinct from `failed`: nothing was
+    /// attempted, nothing reached the device, and the run can be made to fit.
+    case refused(ToolkitRecordingBudget.Refusal)
+    /// The store could not be asked. Not the same as "there is room" - the
+    /// runtime will still refuse a recording it cannot keep, so the pane says
+    /// what it does not know rather than implying a check that never ran.
+    case headroomUnknown
     case capturing(frames: Int)
     case assembling
     case validating
@@ -52,14 +59,14 @@ final class ToolkitRecordingViewModel {
 
   var isBusy: Bool {
     switch stage {
-    case .idle, .ready, .failed: false
+    case .idle, .ready, .failed, .refused, .headroomUnknown: false
     case .capturing, .assembling, .validating: true
     }
   }
 
   var stageTitle: String {
     switch stage {
-    case .idle: toolkitText("toolkit.record.start")
+    case .idle, .refused, .headroomUnknown: toolkitText("toolkit.record.start")
     case .capturing(let frames): "\(toolkitText("toolkit.record.capturing")) · \(frames)"
     case .assembling: toolkitText("toolkit.record.assembling")
     case .validating: toolkitText("toolkit.record.validating")
@@ -74,6 +81,22 @@ final class ToolkitRecordingViewModel {
       stage = .failed(toolkitText("toolkit.record.noTarget"))
       return
     }
+
+    // Asked before anything starts, because a refusal that arrives after
+    // three minutes of capturing has already cost the three minutes - and
+    // the store refuses rather than evicting, so there is nothing that can
+    // be quietly resolved on the way.
+    guard let remaining = await provider.artifactHeadroomBytes() else {
+      stage = .headroomUnknown
+      return
+    }
+    if let refusal = ToolkitRecordingBudget.refusal(
+      frameCount: frameCount, remainingBytes: remaining)
+    {
+      stage = .refused(refusal)
+      return
+    }
+
     stage = .capturing(frames: frameCount)
     let outcome = await provider.recordScreen(frameCount: frameCount, target: target)
     guard case .captured(let recording) = outcome else {
@@ -113,6 +136,14 @@ final class ToolkitRecordingViewModel {
 
   func reset() {
     guard !isBusy else { return }
+    stage = .idle
+  }
+
+  /// Shrink the run to what the store can hold. Offered rather than done for
+  /// the person: a shorter recording may not be the recording they wanted.
+  func shrinkToFit(_ refusal: ToolkitRecordingBudget.Refusal) {
+    guard !isBusy, refusal.framesThatWouldFit >= 2 else { return }
+    frameCount = refusal.framesThatWouldFit
     stage = .idle
   }
 }

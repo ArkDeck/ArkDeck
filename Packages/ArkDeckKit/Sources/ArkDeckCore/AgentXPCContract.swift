@@ -96,6 +96,7 @@ package enum ArkDeckAgentXPC {
   package static let forwardableReadOnlyMethods: Set<String> = [
     "artifact.inspect",
     "artifact.list",
+    "artifact.quota",
     "artifact.read",
     "device.candidates",
     "debug.probe",

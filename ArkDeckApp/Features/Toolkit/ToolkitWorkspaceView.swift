@@ -298,6 +298,18 @@ struct ToolkitWorkspaceView: View {
           .foregroundStyle(.orange)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("toolkit.record.failed")
+      case .refused(let refusal):
+        refusalBar(refusal)
+      case .headroomUnknown:
+        // Said, not swallowed: "nothing was measured" is a different thing
+        // from "there is room", and only one of them is a check.
+        Label(
+          toolkitText("toolkit.record.headroomUnknown"),
+          systemImage: "questionmark.circle")
+          .font(.system(size: 10))
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("toolkit.record.headroomUnknown")
       case .idle:
         Text(toolkitText("toolkit.record.ceiling"))
           .font(.system(size: 10))
@@ -307,6 +319,51 @@ struct ToolkitWorkspaceView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(16)
+  }
+
+  /// Both numbers on one line. Split out of the view body because the
+  /// concatenation there was past what the type checker would take.
+  static func headroomSummary(_ refusal: ToolkitRecordingBudget.Refusal) -> String {
+    let needed = refusal.neededBytes.formatted(.byteCount(style: .file))
+    let free = refusal.remainingBytes.formatted(.byteCount(style: .file))
+    return "\(toolkitText("toolkit.record.needs")) \(needed) · "
+      + "\(free) \(toolkitText("toolkit.record.free"))"
+  }
+
+  /// Refused before anything started. It names both numbers, because "no
+  /// room" that names none cannot be acted on, and it offers the longest run
+  /// that would fit rather than only saying no.
+  private func refusalBar(_ refusal: ToolkitRecordingBudget.Refusal) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label(
+        toolkitText("toolkit.record.noRoom"), systemImage: "externaldrive.badge.exclamationmark")
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(.orange)
+      Text(Self.headroomSummary(refusal))
+        .font(.system(size: 10))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+      Text(toolkitText("toolkit.record.noRoom.detail"))
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if refusal.framesThatWouldFit >= 2 {
+        Button {
+          recording.shrinkToFit(refusal)
+        } label: {
+          Text(
+            "\(refusal.framesThatWouldFit) \(toolkitText("toolkit.record.frames")) "
+              + toolkitText("toolkit.record.wouldFit"))
+            .font(.system(size: 11))
+        }
+        .font(.system(size: 11))
+        .buttonStyle(.link)
+        .accessibilityIdentifier("toolkit.record.shrink")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("toolkit.record.refused")
   }
 
   /// What the run achieved and where it went. The rate is measured off the
