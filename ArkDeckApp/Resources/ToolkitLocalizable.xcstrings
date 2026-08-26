@@ -868,6 +868,40 @@
           }
         }
       }
+    },
+    "toolkit.performance.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing captures on its own."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不会自行取帧。"
+          }
+        }
+      }
+    },
+    "toolkit.performance.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every picture is one you asked for, and a recording is a bounded run of stills. Capturing raises the device's load while it runs, so what you are watching can move with it. The rate shown is the one that was measured, never a promised one."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每张画面都是你要来的，录屏是一段有限的连拍。采集期间会抬高设备负载，你正在观察的东西可能随之变化。显示的帧率是实测值，不是承诺值。"
+          }
+        }
+      }
     }
   }
 }

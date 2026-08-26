@@ -25,11 +25,23 @@ public enum ToolkitRecordingFixture {
     arguments: [String] = CommandLine.arguments
   ) -> (any ToolkitDeviceControlProviding)? {
     guard let flag = arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
-    return Provider(archivePath: String(flag.dropFirst(prefix.count)))
+    return Provider(
+      archivePath: String(flag.dropFirst(prefix.count)),
+      headroomBytes: requestedHeadroom(in: arguments) ?? (1 << 30))
   }
+
+  /// `--ui-test-toolkit-recording-headroom=<bytes>` so the refusal path can be
+  /// driven without filling a real store.
+  static func requestedHeadroom(in arguments: [String]) -> Int? {
+    guard let flag = arguments.first(where: { $0.hasPrefix(headroomPrefix) }) else { return nil }
+    return Int(flag.dropFirst(headroomPrefix.count))
+  }
+
+  private static let headroomPrefix = "--ui-test-toolkit-recording-headroom="
 
   private struct Provider: ToolkitDeviceControlProviding {
     let archivePath: String
+    let headroomBytes: Int
 
     func captureScreen(target: ToolkitTargetPresentation) async -> ToolkitScreenshotResult {
       .failed("the recording fixture supplies no screenshot")
@@ -41,10 +53,15 @@ public enum ToolkitRecordingFixture {
       .failed(reason: "the recording fixture injects nothing")
     }
 
-    /// The fixture stands in for a device, not for the store, so it reports
-    /// no headroom figure and the pane treats that as "cannot tell" rather
-    /// than as room.
-    func artifactHeadroomBytes() async -> Int? { nil }
+    /// The fixture replays an archive it already holds, so by construction
+    /// there is room for it.
+    ///
+    /// Reporting nothing here was wrong and shipped that way: the pane treats
+    /// "cannot tell" as a reason not to start, so a fixture that could not
+    /// answer made the pane unable to record at all. A stand-in that blocks
+    /// the flow it stands in for is not standing in for anything.
+    /// `--ui-test-toolkit-recording-headroom=<bytes>` drives the refusal path.
+    func artifactHeadroomBytes() async -> Int? { headroomBytes }
 
     func recordScreen(
       frameCount: Int, target: ToolkitTargetPresentation
