@@ -203,6 +203,16 @@ public enum ToolkitDeviceControlFacade {
   /// a diagnostic window: HiLog is off because draining its buffer can
   /// dominate the interaction, and the component tree is off because nothing
   /// here reads it.
+  ///
+  /// It does not yet ask for JPEG, though this is exactly what that leg is
+  /// for: measured over 50 captures each, p50 638 ms against 858 and 40,947
+  /// bytes against 448,352, for a viewfinder nobody keeps. Sending
+  /// `screenshotImageType` makes this request unplannable on any daemon that
+  /// predates the field - measured: `input screenshotImageType is not
+  /// declared by capture.diagnostics@1` - and the App carries no daemon-floor
+  /// gate, so every Toolkit capture would fail with a rejection the workspace
+  /// cannot explain. Raising that floor is a decision to make deliberately,
+  /// not a side effect of taking the faster encoding.
   public static func screenshotRequest(
     target: ToolkitTargetPresentation, nonce: String
   ) throws -> RuntimeOperationRequest {
@@ -489,8 +499,8 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
     guard ToolkitScreenshotIntegrity.sha256Hex(data) == expectedSHA.lowercased() else {
       throw ToolkitFailure(message: "the screenshot did not match its published digest")
     }
-    guard let size = ToolkitScreenshotIntegrity.pngPixelSize(data) else {
-      throw ToolkitFailure(message: "the screenshot is not a readable PNG")
+    guard let size = ToolkitScreenshotIntegrity.pixelSize(data) else {
+      throw ToolkitFailure(message: "the screenshot is not a readable picture")
     }
     return (data, size.width, size.height)
   }
@@ -544,6 +554,49 @@ public enum ToolkitScreenshotIntegrity {
   /// as big-endian 32-bit values. Reading them here means the frame the
   /// workspace maps against is the picture's own, not a number supplied
   /// alongside it.
+  /// The picture's own dimensions, whichever encoding it is in.
+  ///
+  /// Read from the bytes rather than taken from the request, because the
+  /// gesture mapping is only as right as this number: a frame mapped against
+  /// a size it does not have lands every press somewhere else.
+  public static func pixelSize(_ data: Data) -> (width: Int, height: Int)? {
+    pngPixelSize(data) ?? jpegPixelSize(data)
+  }
+
+  /// JPEG carries its size in a start-of-frame segment, which is not at a
+  /// fixed offset: the markers before it vary with the encoder. So the
+  /// segments are walked rather than indexed.
+  ///
+  /// SOF0-SOF3 are the baseline and progressive frames. C4, C8 and CC share
+  /// the range and are not frames (Huffman table, JPG extension, arithmetic
+  /// table), which is why they are excluded rather than the range taken whole.
+  public static func jpegPixelSize(_ data: Data) -> (width: Int, height: Int)? {
+    let bytes = [UInt8](data)
+    guard bytes.count > 4, bytes[0] == 0xFF, bytes[1] == 0xD8 else { return nil }
+    var index = 2
+    while index + 9 < bytes.count {
+      guard bytes[index] == 0xFF else { return nil }
+      let marker = bytes[index + 1]
+      // Padding fill bytes between segments are legal.
+      if marker == 0xFF { index += 1; continue }
+      // Standalone markers carry no length.
+      if marker == 0xD8 || (marker >= 0xD0 && marker <= 0xD9) { index += 2; continue }
+      let length = Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])
+      guard length >= 2 else { return nil }
+      if (0xC0...0xCF).contains(marker), marker != 0xC4, marker != 0xC8, marker != 0xCC {
+        guard index + 9 < bytes.count else { return nil }
+        let height = Int(bytes[index + 5]) << 8 | Int(bytes[index + 6])
+        let width = Int(bytes[index + 7]) << 8 | Int(bytes[index + 8])
+        guard width > 0, height > 0 else { return nil }
+        return (width, height)
+      }
+      // Entropy-coded data follows the scan header and holds no more sizes.
+      if marker == 0xDA { return nil }
+      index += 2 + length
+    }
+    return nil
+  }
+
   public static func pngPixelSize(_ data: Data) -> (width: Int, height: Int)? {
     let signature: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
     guard data.count >= 24, Array(data.prefix(8)) == signature else { return nil }
@@ -610,8 +663,13 @@ public enum ToolkitArtifactIndex {
     return PublishedEntry(artifactID: artifactID, sha256: sha256, byteCount: byteCount)
   }
 
+  /// The published still, whichever encoding was asked for. Looking only for
+  /// the PNG name would leave a JPEG capture reporting that it published
+  /// nothing - which is how the workspace showed "capture failed" for every
+  /// screenshot it ever took, from a different mismatch on this same path.
   public static func screenshot(in entries: [[String: Any]]) -> PublishedEntry? {
-    published(named: "screenshot.png", in: entries)
+    published(named: "screenshot.jpeg", in: entries)
+      ?? published(named: "screenshot.png", in: entries)
   }
 }
 

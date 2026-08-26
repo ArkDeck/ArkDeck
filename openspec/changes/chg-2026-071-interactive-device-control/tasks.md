@@ -147,9 +147,32 @@ T02/T03 不进入实现。
   这个回归会被当场抓住（原先它表现为「合成永远不结束」）。
   另修 `toolkit.record.refused` 上 `.combine` 把「放得下 N 帧」按钮一起吞掉——
   **一条唯一补救办法够不着的拒绝，等于没给补救办法**。
-  ⑤ **`snapshot_display` JPEG 腿未做**——交付内容 1 点名；现状只有 PNG。代码里出现的
-  jpeg 是「设备默认 jpeg，所以必须显式传 `-t png`」这条既有事实，不是一条 JPEG 腿。
-  **故 IDC-AC-8 未达成**；AC-5 与 AC-6 的输入侧由已交付部分覆盖并有真机证据。
+  ⑤ **`snapshot_display` JPEG 腿已交付（2026-08-26）**——`capture.diagnostics@1` 新增
+  `screenshotImageType`（png|jpeg，**默认 png**：PNG 是证据格式，有损格式因为更快就悄悄
+  变成证据，不是默认该做的交易）。
+  交付项 1.2 要的 p50/p95 已补测（各 50 次，逐张验证文件确实产出）：
+  **JPEG p50 638 ms / p95 656 ms，40,947 字节；PNG p50 858 ms / p95 875 ms，448,352 字节**
+  ——快 220 ms，小 10.9 倍。
+  这条腿难在设备**按后缀校验 `-t`**，不符即报错退出、快得像成功。所以类型必须同时到达
+  五处：`-t` 旗标、拥有路径后缀、收件的魔数校验、清理、以及发布名。契约测试逐一钉住，
+  并有一条专门断言三步命名同一个文件——任何一处走样都是静默失败。
+  JPEG 魔数按设备实写取 `FF D8 FF E0`（偏移 6 处 `JFIF`）；只钉四字节，因为其后两字节是
+  APP0 段长，不固定。
+  真机（TGT-958780b2ffb7）：PNG 跑发布 `screenshot.png` 450,499 字节（PNG 魔数），
+  `screenshot.jpeg` 记为 **missing**；JPEG 跑发布 `screenshot.jpeg` 41,197 字节
+  （`FF D8 FF E0 00 10 4A 46`），`screenshot.png` 记为 missing。
+  **路上修掉一处发布面缺陷**：两个名字映射到同一步时，发布循环会用**同一份字节把两个名字
+  都发布**——PNG 采集会顺带产出一个装着 PNG 字节的 `screenshot.jpeg`。第一版按落地文件名
+  过滤，既误伤了签名那一步（它一步合法产出 HAP + 报告），又把规则建在假件能左右的东西上。
+  现改为显式声明「两种编码是同一产物的替代」，并**由请求决定**——与 provider 读的是同一个
+  输入，两边由构造保证一致。
+  **明确未做（不是遗漏，是决定）**：Toolkit 取景器**仍请求 PNG**。它正是这条腿的用途，
+  但真机实测旧 daemon 直接拒收——`input screenshotImageType is not declared by
+  capture.diagnostics@1`——而 App 没有 daemon 下限闸，切过去会让**每一次截图都失败**且
+  工作区说不出原因（真机 UI 闸当场抓住了这一点）。抬这条下限该是有人明确做的决定。
+  读侧已就位：`ToolkitScreenshotIntegrity.pixelSize` 能读 JPEG 的 SOF 尺寸（用真机文件
+  验过 720×1280），制品查找两种名字都认——floor 抬起来那天，要改的只有请求那一行。
+  **至此 IDC-AC-8 的五项全部交付**；AC-5 与 AC-6 的输入侧由已交付部分覆盖并有真机证据。
   ——以下为逐刀记录——
   已交付 ① typed input operations + Provider lowering
   + 契约测试 + 真机单发验证（#1498）；②a 会话 scope 授权 + TTL/预算（#1500）；

@@ -394,25 +394,53 @@ extension DeviceProviderArgvContractTests {
 // MARK: - CHG-2026-049 r5: screenshot
 
 extension DeviceProviderArgvContractTests {
-  /// DHA-SHOT-001: `-t png` is mandatory and the `.png` suffix is
-  /// load-bearing. Measured on OH 3.2: this build defaults to jpeg and
-  /// rejects `-f <x>.png` outright unless the type is requested.
-  func testScreenshotLowersToTheTypedPNGFormAndItsReadback() throws {
-    let path = try HDCOwnedRemotePath(
-      jobID: "job-argv-1", stepID: "capture-screenshot", nonce: "n1")
-    XCTAssertTrue(path.remotePath.hasSuffix(".png"), "the device validates the suffix")
-    let plan = try provider.lower(
-      action: .hdc(.captureScreenshot(into: path)), context: context)
-    guard case .processSequence(_, let invocations) = plan.kind else {
-      return XCTFail("expected a capture + readback sequence")
+  /// DHA-SHOT-001: the `-t` flag and the file suffix are one decision.
+  ///
+  /// Measured on OH 3.2: this build defaults to jpeg and rejects a name whose
+  /// suffix disagrees with the requested type, exiting fast enough to look
+  /// like a capture. Both encodings are lowered here because both are
+  /// published, and a leg that got one of the two wrong would fail in exactly
+  /// that silent way.
+  func testScreenshotLowersEachEncodingWithAMatchingSuffixAndReadback() throws {
+    for imageType in [HDCScreenSequenceRequest.ImageType.png, .jpeg] {
+      let path = try HDCOwnedRemotePath(
+        jobID: "job-argv-1", stepID: "capture-screenshot", nonce: "n1",
+        imageType: imageType)
+      XCTAssertTrue(
+        path.remotePath.hasSuffix("." + imageType.rawValue),
+        "the device validates the suffix against \(imageType.rawValue)")
+      let plan = try provider.lower(
+        action: .hdc(.captureScreenshot(imageType, into: path)), context: context)
+      guard case .processSequence(_, let invocations) = plan.kind else {
+        return XCTFail("expected a capture + readback sequence")
+      }
+      XCTAssertEqual(
+        invocations.map { $0.arguments },
+        [
+          [
+            "-t", connectKey, "shell", "snapshot_display", "-t", imageType.rawValue,
+            "-f", path.remotePath,
+          ],
+          ["-t", connectKey, "shell", "ls", "-l", path.remotePath],
+        ])
+      XCTAssertTrue(invocations[0].continueAfterNonZero)
     }
+  }
+
+  /// PNG stays what a caller gets by not choosing. JPEG is cheaper - p50
+  /// 638 ms against 858, and 40,947 bytes against 448,352, over 50 captures
+  /// each on 2026-08-26 - but it is lossy, and evidence that quietly became
+  /// lossy because it was faster is not a trade a default should make.
+  func testTheEvidenceFormatIsWhatAnUnaskedCaptureGets() {
+    XCTAssertEqual(HDCObservationProviderAdapter.screenshotImageType(inputs: [:]), .png)
     XCTAssertEqual(
-      invocations.map(\.arguments),
-      [
-        ["-t", connectKey, "shell", "snapshot_display", "-t", "png", "-f", path.remotePath],
-        ["-t", connectKey, "shell", "ls", "-l", path.remotePath],
-      ])
-    XCTAssertTrue(invocations[0].continueAfterNonZero)
+      HDCObservationProviderAdapter.screenshotImageType(
+        inputs: ["screenshotImageType": .string("jpeg")]), .jpeg)
+    XCTAssertEqual(
+      HDCObservationProviderAdapter.screenshotImageType(
+        inputs: ["screenshotImageType": .string("webp")]), .png,
+      "an unregistered encoding falls back to the evidence format rather than "
+        + "being passed to a device that would refuse it")
   }
 
   /// The receive leg for a screenshot carries the PNG magic; the other file

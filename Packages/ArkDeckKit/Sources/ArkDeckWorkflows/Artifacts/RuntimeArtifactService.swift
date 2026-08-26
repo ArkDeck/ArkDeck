@@ -117,7 +117,8 @@ enum RuntimeArtifactService {
   /// dispatcher measured, and a missing file is a recorded absence — there
   /// is no path from "the step ran" to a published trace.
   static let fileBackedArtifacts: Set<String> = [
-    "trace.htrace", "screenshot.png", "frames.tar", "signed.hap", "unsigned.hap",
+    "trace.htrace", "screenshot.png", "screenshot.jpeg", "frames.tar",
+    "signed.hap", "unsigned.hap",
   ]
 
   /// A confirmed process failure still owns useful bounded diagnostics.
@@ -216,7 +217,10 @@ enum RuntimeArtifactService {
       "capture-advanced-ui-dump": ["advanced-dump.txt"],
       "receive-trace-artifact": ["trace.htrace"],
       "receive-ui-tree": ["ui-tree.json"],
-      "receive-screenshot": ["screenshot.png"],
+      // Whichever encoding was asked for. Both are declared and both are
+      // optional: a capture publishes the one it took, and the other's
+      // absence is a recorded absence rather than a missing product.
+      "receive-screenshot": ["screenshot.png", "screenshot.jpeg"],
       "capture-crash-index": ["crash-index.txt"],
       "capture-crash-log": ["crash-log.txt"],
     ],
@@ -249,6 +253,45 @@ enum RuntimeArtifactService {
     "capture.screen-sequence@1": ["sequence.json"],
     ArkForgeFlashOperation.canonicalReference: ["flash-report.json"],
   ]
+
+  /// Names that are two encodings of one product rather than two products.
+  ///
+  /// A step publishes exactly one of a group - whichever it received - and the
+  /// other's absence is not a missing product. Without this the screenshot leg
+  /// would publish both names from the same bytes, so a PNG capture would also
+  /// produce a `screenshot.jpeg` holding PNG bytes.
+  ///
+  /// Deliberately not "any step with several names": signing publishes a HAP
+  /// and a report from one step, and those are two products.
+  static let alternativeArtifactGroups: [Set<String>] = [
+    ["screenshot.png", "screenshot.jpeg"]
+  ]
+
+  /// The one name in `mapping` that a step actually produced, with the
+  /// alternatives it did not take removed.
+  ///
+  /// Decided from the request rather than from the received file's name: the
+  /// request is what the device was told, and the same field the provider read
+  /// when it chose the flag and the suffix. Reading the landed file's name
+  /// instead would make this depend on something a test double gets to
+  /// choose - which is how the first version of this passed against a fake
+  /// and dropped the real product.
+  static func publishableArtifacts(
+    mapping: [String], requestInputs: [String: JSONValue]
+  ) -> [String] {
+    var encoding = "png"
+    if case .string(let requested)? = requestInputs["screenshotImageType"],
+      ["png", "jpeg"].contains(requested)
+    {
+      encoding = requested
+    }
+    return mapping.filter { name in
+      guard let group = alternativeArtifactGroups.first(where: { $0.contains(name) }),
+        mapping.contains(where: { $0 != name && group.contains($0) })
+      else { return true }
+      return name.hasSuffix("." + encoding)
+    }
+  }
 
   static func artifacts(reference: String, stepID: String) -> [String]? {
     let key = ArkForgeFlashOperation.canonicalReference(for: reference) ?? reference

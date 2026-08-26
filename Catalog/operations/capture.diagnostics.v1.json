@@ -125,6 +125,13 @@
         "maxLength": 200,
         "description": "One Faultlogger entry to fetch, named exactly as the index lists it. An entry name, never a path."
       },
+      "screenshotImageType": {
+        "type": "string",
+        "required": false,
+        "enum": ["png", "jpeg"],
+        "default": "png",
+        "description": "Encoding for the screenshot leg. PNG is the evidence format and stays the default; JPEG is measurably cheaper - p50 638 ms against 858 ms and 40,947 bytes against 448,352, over 50 captures each on 2026-08-26 - and is for work that wants a current picture rather than a record. The device validates the file suffix against this, so the type and the owned path are one decision."
+      },
       "uiScreenshot": {
         "type": "boolean",
         "required": false,
@@ -406,6 +413,7 @@
     { "name": "advanced-dump.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "ui-tree.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "screenshot.png", "role": "raw", "mediaType": "image/png", "privacy": "sensitive", "required": false },
+    { "name": "screenshot.jpeg", "role": "raw", "mediaType": "image/jpeg", "privacy": "sensitive", "required": false },
     { "name": "crash-index.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "crash-log.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "application-liveness.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": false },

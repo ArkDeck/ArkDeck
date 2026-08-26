@@ -39,10 +39,17 @@ public enum HDCProviderAction: Sendable, Equatable {
   /// than to stdout. That product shape — not a missing windowId — is why
   /// it cannot ride the stdout UI dump action (CHG-2026-053 r2).
   case captureComponentTree(into: HDCOwnedRemotePath)
-  /// A PNG of the display. `snapshot_display` defaults to jpeg and checks
-  /// the file suffix against the requested type, so the lowering carries
-  /// both `-t png` and a `.png` owned path (CHG-2026-049 r5).
-  case captureScreenshot(into: HDCOwnedRemotePath)
+  /// One still of the display.
+  ///
+  /// `snapshot_display` checks the file suffix against the requested type, so
+  /// the type and the owned path are one decision and travel together
+  /// (CHG-2026-049 r5). PNG is the evidence format and stays the default;
+  /// JPEG exists because it is measurably cheaper - p50 638 ms against
+  /// 858 ms, and 40,947 bytes against 448,352, measured over 50 captures
+  /// each on 2026-08-26 - which is what makes it worth having for work that
+  /// wants a current picture rather than a record.
+  case captureScreenshot(
+    HDCScreenSequenceRequest.ImageType, into: HDCOwnedRemotePath)
   /// A bounded run of stills, collected into one archive.
   ///
   /// A set case rather than a repeated single one for the same reason the
@@ -621,8 +628,10 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(kind: "hdc.captureTrace", arguments: arguments)
     case .hdc(.captureComponentTree(let path)):
       self.init(kind: "hdc.captureComponentTree", arguments: pathArguments(path))
-    case .hdc(.captureScreenshot(let path)):
-      self.init(kind: "hdc.captureScreenshot", arguments: pathArguments(path))
+    case .hdc(.captureScreenshot(let imageType, let path)):
+      var arguments = pathArguments(path)
+      arguments["imageType"] = .string(imageType.rawValue)
+      self.init(kind: "hdc.captureScreenshot", arguments: arguments)
     case .hdc(.captureScreenSequence(let request, let frames, let path)):
       var arguments = pathArguments(path)
       arguments["framesDirectory"] = .string(frames.remotePath)
@@ -980,9 +989,15 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         previousIdentitySHA256: previousIdentity,
         usbTopology: topology)
     }
-    func path() throws -> HDCOwnedRemotePath {
+    /// The screenshot leg's suffix follows its image type, so a path decoded
+    /// without the type would reconstruct to a name the device never wrote
+    /// and the equality check below would (correctly) refuse it.
+    func path(
+      imageType: HDCScreenSequenceRequest.ImageType = .png
+    ) throws -> HDCOwnedRemotePath {
       let reconstructed = try HDCOwnedRemotePath(
-        jobID: string("jobId"), stepID: string("stepId"), nonce: string("nonce"))
+        jobID: string("jobId"), stepID: string("stepId"), nonce: string("nonce"),
+        imageType: imageType)
       let recordedRemotePath = try string("remotePath")
       guard reconstructed.remotePath == recordedRemotePath else {
         throw DeviceProviderError.unsupportedAction(
@@ -1181,7 +1196,9 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "hdc.captureComponentTree":
       return .hdc(.captureComponentTree(into: try path()))
     case "hdc.captureScreenshot":
-      return .hdc(.captureScreenshot(into: try path()))
+      let imageType =
+        HDCScreenSequenceRequest.ImageType(rawValue: (try? string("imageType")) ?? "png") ?? .png
+      return .hdc(.captureScreenshot(imageType, into: try path(imageType: imageType)))
     case "hdc.receiveOwnedArtifact":
       return .hdc(
         .receiveOwnedArtifact(
