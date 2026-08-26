@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "9c7c71327cf85ef80e6c3ac70c8ceb0122c23d25441e2a3d1c833c9f8a66e6af"
+  public static let catalogDigest = "8033c66ff0d4ab703e9a619f55324b01003555337c24cefa8e09c7840ff002dc"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -253,6 +253,7 @@ extension RuntimeOperationCatalog {
       outputByteBudget: 536870912,
       preflightAttempts: 2,
       artifacts: [
+        CatalogArtifactDescriptor(name: "sequence.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "frames.tar", role: .raw, mediaType: "application/x-tar", privacy: .sensitive, isRequired: true, retentionClass: .default)
       ],
       profiles: ["openharmony-standard@1", "dayu200"]

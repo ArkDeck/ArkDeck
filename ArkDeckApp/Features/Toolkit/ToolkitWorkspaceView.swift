@@ -2,6 +2,7 @@ import AppKit
 import ArkDeckWorkflows
 import Observation
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Toolkit · device control.
 ///
@@ -12,6 +13,7 @@ import SwiftUI
 /// way for the sake of a tidier list.
 struct ToolkitWorkspaceView: View {
   var model: ToolkitWorkspaceViewModel
+  var recording: ToolkitRecordingViewModel
 
   var body: some View {
     GeometryReader { geometry in
@@ -174,6 +176,8 @@ struct ToolkitWorkspaceView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(16)
       Divider()
+      recordingPane
+      Divider()
       VStack(alignment: .leading, spacing: 8) {
         Text(toolkitText("toolkit.log.title"))
           .font(.system(size: 13, weight: .semibold))
@@ -239,6 +243,134 @@ struct ToolkitWorkspaceView: View {
     }
     .padding(.horizontal, 20)
     .padding(.vertical, 10)
+  }
+
+
+  // MARK: - Recording
+
+  /// The device offers no recorder, so this is a run of stills composed on
+  /// this side. The pane says so rather than letting the word "record" imply
+  /// a video rate the platform cannot give.
+  private var recordingPane: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Text(toolkitText("toolkit.record.title"))
+          .font(.system(size: 13, weight: .semibold))
+        Spacer()
+        if recording.isBusy { ProgressView().controlSize(.small) }
+      }
+
+      // Frames, not seconds: the rate belongs to the device's readback and
+      // cannot be asked for, so the only honest control is how many stills.
+      HStack(spacing: 8) {
+        Stepper(
+          value: Binding(get: { recording.frameCount }, set: { recording.frameCount = $0 }),
+          in: 2...300, step: 10
+        ) {
+          Text("\(recording.frameCount) \(toolkitText("toolkit.record.frames"))")
+            .font(.system(size: 11))
+            .monospacedDigit()
+        }
+        .disabled(recording.isBusy)
+        .accessibilityIdentifier("toolkit.record.frames")
+      }
+
+      Button {
+        Task { await recording.record(target: model.target) }
+      } label: {
+        Label(recording.stageTitle, systemImage: "record.circle")
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .disabled(recording.isBusy)
+      .accessibilityIdentifier("toolkit.record.start")
+
+      switch recording.stage {
+      case .capturing, .assembling, .validating:
+        Text(recording.stageTitle)
+          .font(.system(size: 11))
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("toolkit.record.stage")
+      case .ready(let ready):
+        readyBar(ready)
+      case .failed(let reason):
+        Text(reason)
+          .font(.system(size: 11))
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("toolkit.record.failed")
+      case .idle:
+        Text(toolkitText("toolkit.record.ceiling"))
+          .font(.system(size: 10))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(16)
+  }
+
+  /// What the run achieved and where it went. The rate is measured off the
+  /// movie's own span, never a target, because the device sets it.
+  private func readyBar(_ ready: ToolkitRecordingViewModel.Ready) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        Text(
+          "\(ready.frameCount) \(toolkitText("toolkit.record.frames")) · "
+            + ready.framesPerSecond.formatted(
+              .number.precision(.fractionLength(2))) + " fps "
+            + toolkitText("toolkit.record.rate"))
+          .font(.system(size: 11, weight: .medium))
+          .monospacedDigit()
+      }
+      .accessibilityIdentifier("toolkit.record.ready")
+
+      if ready.framesMissing > 0 {
+        Label(
+          "\(ready.framesMissing) \(toolkitText("toolkit.record.gap"))",
+          systemImage: "exclamationmark.triangle.fill")
+          .font(.system(size: 10))
+          .foregroundStyle(.orange)
+          .accessibilityIdentifier("toolkit.record.gap")
+      }
+
+      Text(ready.url.path)
+        .font(.system(size: 10))
+        .monospaced()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .accessibilityIdentifier("toolkit.record.location")
+
+      Text(toolkitText("toolkit.record.timeline"))
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      HStack(spacing: 8) {
+        Button(toolkitText("toolkit.record.reveal")) {
+          NSWorkspace.shared.activateFileViewerSelecting([ready.url])
+        }
+        .accessibilityIdentifier("toolkit.record.reveal")
+        Button(toolkitText("toolkit.record.saveAs")) { save(ready) }
+          .accessibilityIdentifier("toolkit.record.saveAs")
+        Button(toolkitText("toolkit.record.again")) { recording.reset() }
+          .accessibilityIdentifier("toolkit.record.again")
+      }
+      .font(.system(size: 11))
+      .buttonStyle(.link)
+    }
+  }
+
+  /// Copied, never moved: the composed file stays where the workspace can
+  /// still show it if the copy is cancelled or fails.
+  private func save(_ ready: ToolkitRecordingViewModel.Ready) {
+    let panel = NSSavePanel()
+    panel.nameFieldStringValue = ready.url.lastPathComponent
+    panel.allowedContentTypes = [.quickTimeMovie]
+    guard panel.runModal() == .OK, let destination = panel.url else { return }
+    try? FileManager.default.removeItem(at: destination)
+    try? FileManager.default.copyItem(at: ready.url, to: destination)
   }
 
   /// The image is framed at exactly this size, so the gesture layer's

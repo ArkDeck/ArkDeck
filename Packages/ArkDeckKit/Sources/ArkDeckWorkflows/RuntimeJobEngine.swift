@@ -3698,6 +3698,17 @@ public actor RuntimeJobEngine {
         current.record.ringCoverage = RuntimeRingCoverage(
           anchor: anchor, ringHeldAnchor: held == "true")
       }
+      // The timeline keeps which facts were verified, not their values, so a
+      // run of stills would otherwise lose the only measurements anyone can
+      // lay a timeline out from.
+      if let requested = summary["requestedFrameCount"].flatMap(Int.init),
+        let captured = summary["capturedFrameCount"].flatMap(Int.init)
+      {
+        current.record.screenSequence = RuntimeScreenSequence(
+          requestedFrameCount: requested, capturedFrameCount: captured,
+          frameDurationsSeconds: (summary["frameDurationsSeconds"] ?? "")
+            .split(separator: ",").compactMap { Double($0) })
+      }
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
       current.record.recoveryAction = nil

@@ -24,6 +24,39 @@ public struct RuntimeRingCoverage: Codable, Sendable, Equatable {
   }
 }
 
+/// What a bounded run of stills actually achieved.
+///
+/// Kept on the record for the same reason `RuntimeRingCoverage` is: the
+/// timeline records which facts a step verified, not their values, so a value
+/// somebody downstream needs has to be named here or it is gone. Nothing else
+/// can reconstruct these - the device's wall clock reads years off the host's,
+/// and there is no recorder to ask.
+public struct RuntimeScreenSequence: Codable, Sendable, Equatable {
+  public let requestedFrameCount: Int
+  /// How many frames actually landed. A frame that failed is a gap in the run,
+  /// not the end of it, so this can be smaller than what was asked for.
+  public let capturedFrameCount: Int
+  /// Each frame's own observed span, in capture order. The composed movie is
+  /// laid out from these rather than from an average, because at the rate this
+  /// achieves the spacing is uneven enough to see.
+  public let frameDurationsSeconds: [Double]
+
+  public init(
+    requestedFrameCount: Int, capturedFrameCount: Int, frameDurationsSeconds: [Double]
+  ) {
+    self.requestedFrameCount = requestedFrameCount
+    self.capturedFrameCount = capturedFrameCount
+    self.frameDurationsSeconds = frameDurationsSeconds
+  }
+
+  /// Frames over the span they covered. Reported, never promised: the ceiling
+  /// is the device's display readback, measured at about 1.8 a second.
+  public var framesPerSecond: Double {
+    let elapsed = frameDurationsSeconds.reduce(0, +)
+    return elapsed > 0 ? Double(capturedFrameCount) / elapsed : 0
+  }
+}
+
 public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let jobID: String
   public let request: RuntimeOperationRequest
@@ -62,6 +95,7 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   /// should not be asked to redo a check the runtime performed - so the fact
   /// travels rather than the invitation to verify it.
   public var ringCoverage: RuntimeRingCoverage?
+  public var screenSequence: RuntimeScreenSequence?
   public var skipReasons: [String: String] = [:]
   public var outstandingResidueCount: Int?
 
