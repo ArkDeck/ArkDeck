@@ -8410,6 +8410,11 @@ public actor RuntimeJobEngine {
   ) -> Bool {
     guard Self.sessionCarriableEvidenceStepIDs.contains(step.stepID),
       var runtime = jobs[jobID],
+      // Only a request a session owns may carry what the session read. Losing
+      // this guard let every operation on the device skip its own model and
+      // firmware readback - including ones whose evidence has to be a fresh
+      // machine readback to mean anything.
+      Self.isSessionScoped(descriptor: descriptor, inputs: runtime.record.request.inputs),
       var accumulator = runtime.record.evidencePreflight,
       // Nothing is carried into a job that has not re-read the identity for
       // itself. That readback is the entire reason carrying is sound, and it

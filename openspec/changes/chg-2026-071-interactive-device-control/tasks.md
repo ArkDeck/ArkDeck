@@ -205,6 +205,13 @@ T02/T03 不进入实现。
   于是拒绝了每一次仅截图的采集；测试当场抓到，改为只看可选步骤后手列清单整个消失。
   作用域判定结果随 query 走（`sessionScoped`），因为指纹只拿得到 query：若让它从已归约的
   subject 再推一次，会推出与签发时不同的答案——那正是当初让每个手势准入失败的那类失配。
+  真机实测：会话首张截图 2101 ms 跑全前导，之后每张只剩身份复核 + 截图腿、carried 2、
+  1482 ms（每张标记截图省 620 ms）；带 hilog 的采集在硬件上确认落回普通准入。
+  **这一刀自己抓到两个缺陷**：①手列「恒跑步骤」漏了 `postprocess-index`，导致仅截图的
+  采集全被拒——测试当场红，改为只看可选步骤后手列清单消失；②把作用域改成按输入判定时，
+  我把沿用的**消费端**守卫一并删了，于是该设备上任何操作都开始跳过自己的型号/固件回读
+  （带 hilog 的采集回来带着 carried 2）——真机跑更大的采集才看出来，已补守卫与反向验证测试。
+  证据 `evidence/runs/TASK-IDC-003/data/session-screenshot-subintent.json`。
   剩余 ④App Diagnostics tab、⑤真机走查。
   原 ready 依据：proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
   Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
