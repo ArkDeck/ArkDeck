@@ -40,7 +40,22 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-002 — 交互式输入 + Toolkit 真机操作（垂直交付）
 
-- Status:in-progress（2026-08-25。已交付 ① typed input operations + Provider lowering
+- Status:in-progress（2026-08-26 复核：九刀已交付且逐刀有真机证据，**但对照本任务自己的
+  「交付内容」与 IDC-AC-8，还有五项未做**，逐条列在这里，而不是含糊地挂着 in-progress：
+  ① **stale 帧不拒绝输入**——AC-8 要求「stale 时 pointer down 被拒且有说明」。现状是帧龄
+  一直显示（`frameAgeSummary`），但 `pointerEnded` 只挡「正在发送中」，不挡陈旧帧：
+  对着一张旧画面点下去照样发得出去，且落点按那张旧画面换算。五项里只有这一项会把手势
+  送到没人瞄的地方，应当先做。
+  ② **宿主合成录屏未做**——交付内容 4 与 AC-8 都要求 Assembling→Validating→结果条
+  （实测帧率 + 位置 + Finder/另存为/再录一段）。App 里没有任何录屏面。
+  ③ **开始前的配额 preflight 未做**——AC-8 要求失败即阻断。
+  ④ **performance notice 未做**——AC-8 要求它与 production-boundary 一样不可删除；
+  现在只有 boundary（`toolkit.boundary`）。
+  ⑤ **`snapshot_display` JPEG 腿未做**——交付内容 1 点名；现状只有 PNG。代码里出现的
+  jpeg 是「设备默认 jpeg，所以必须显式传 `-t png`」这条既有事实，不是一条 JPEG 腿。
+  **故 IDC-AC-8 未达成**；AC-5 与 AC-6 的输入侧由已交付部分覆盖并有真机证据。
+  ——以下为逐刀记录——
+  已交付 ① typed input operations + Provider lowering
   + 契约测试 + 真机单发验证（#1498）；②a 会话 scope 授权 + TTL/预算（#1500）；
   ②b 帧 epoch 与超时作废 + display facts 漂移 fail-closed + 帧内坐标界（#1502）。
   **Spike 的达标路径结论已被 T02 实测推翻并取代**：`uitest start-daemon` 对 uiInput
