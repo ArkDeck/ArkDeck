@@ -16,7 +16,7 @@ import XCTest
 final class DiagnosticMarkersContractTests: XCTestCase {
   private func document(
     inputs: [String: JSONValue], recorded: [RuntimeArtifactMetadata] = [],
-    timeline: [String] = []
+    timeline: [String] = [], ringCoverage: RuntimeRingCoverage? = nil
   ) throws -> [String: Any] {
     var record = RuntimeJobRecord(
       jobID: "job-markers-1",
@@ -34,6 +34,7 @@ final class DiagnosticMarkersContractTests: XCTestCase {
       materializedStableTargetIdentitySHA256: nil,
       materializedBindingRevision: 1)
     record.timeline = timeline
+    record.ringCoverage = ringCoverage
     let data = try RuntimeArtifactService.markersDocument(record: record, recorded: recorded)
     return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
@@ -137,12 +138,33 @@ final class DiagnosticMarkersContractTests: XCTestCase {
     XCTAssertEqual(coverage["traceStatus"] as? String, "published")
     let how = try XCTUnwrap(coverage["how"] as? String)
     XCTAssertTrue(how.contains("string search"), how)
+    XCTAssertEqual(
+      coverage["ringHeldAnchor"] as? String, "notEstablished",
+      "a capture whose trace step never reported must not imply either outcome")
 
     let absent = try XCTUnwrap(
       try document(inputs: ["ringBuffered": .bool(true)])["coverage"] as? [String: Any])
     XCTAssertEqual(
       absent["traceStatus"] as? String, "absent",
       "an anchor with no trace to check it against says the trace is absent")
+  }
+
+  /// The verdict already asked the ring whether it was holding the anchor.
+  /// Asking a reader to redo that check would be asking them to repeat work
+  /// the runtime did, so the answer travels as a fact.
+  func testAProvenCoverageAnswerTravelsRatherThanAnInvitationToCheck() throws {
+    let trace = artifact(name: "trace.htrace", byteCount: 9_001)
+    for held in [true, false] {
+      let coverage = try XCTUnwrap(
+        try document(
+          inputs: ["ringBuffered": .bool(true)], recorded: [trace],
+          ringCoverage: RuntimeRingCoverage(anchor: "ARKDECKANCHORproved", ringHeldAnchor: held)
+        )["coverage"] as? [String: Any])
+      XCTAssertEqual(coverage["ringHeldAnchor"] as? Bool, held)
+      XCTAssertEqual(
+        coverage["anchor"] as? String, "ARKDECKANCHORproved",
+        "the anchor the ring actually answered about is the one recorded")
+    }
   }
 
   func testABlockingCaptureCarriesNoCoverageClaimAtAll() throws {

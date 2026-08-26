@@ -10,6 +10,20 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
+/// The coverage a ring capture proved for itself.
+public struct RuntimeRingCoverage: Codable, Sendable, Equatable {
+  public let anchor: String
+  /// Whether the device's ring answered that it was holding the anchor when
+  /// the capture armed it. False means the snapshot has no coverage to speak
+  /// of, which is a different thing from a snapshot nobody checked.
+  public let ringHeldAnchor: Bool
+
+  public init(anchor: String, ringHeldAnchor: Bool) {
+    self.anchor = anchor
+    self.ringHeldAnchor = ringHeldAnchor
+  }
+}
+
 public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let jobID: String
   public let request: RuntimeOperationRequest
@@ -43,6 +57,11 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public var startedAtUTC: String?
   public var firstEvidenceStepAtUTC: String?
   public var finishedAtUTC: String?
+  /// What a ring capture established about its own coverage anchor. The
+  /// verdict already checked whether the ring was holding it, and a reader
+  /// should not be asked to redo a check the runtime performed - so the fact
+  /// travels rather than the invitation to verify it.
+  public var ringCoverage: RuntimeRingCoverage?
   public var skipReasons: [String: String] = [:]
   public var outstandingResidueCount: Int?
 

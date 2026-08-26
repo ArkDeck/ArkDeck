@@ -1880,14 +1880,36 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         "faultLogName": name.value, "byteCount": String(receipt.stdout.count),
       ])
 
-    case .captureTrace(_, let path):
+    case .captureTrace(let request, let path):
       // Judged by the paired `ls -l` readback, never by hitrace's exit
       // status: `hdc shell` reports the client's status, so a clean exit
       // says nothing about whether the device wrote a trace.
-      guard receipt.subprocesses.count == 2 else {
+      //
+      // A ring capture runs more than the two invocations a blocking one
+      // does, and its readback is the last of them. Judging by a fixed index
+      // left every ring capture unknown - found by running one, because the
+      // argv these tests pinned was right and the verdict reading it was not.
+      // begin, [write anchor, read anchor,] window, dump, stop, readback.
+      let expected = request.ringBuffered ? (request.coverageAnchor == nil ? 5 : 7) : 2
+      guard receipt.subprocesses.count == expected,
+        let readback = receipt.subprocesses.last
+      else {
         return .unknown(reason: "trace capture did not produce its readback sequence")
       }
-      guard let byteCount = Self.remoteRegularFileByteCount(receipt.subprocesses[1]) else {
+      // The anchor readback is in this receipt, so whether the ring was
+      // holding it is a fact this verdict already has. Recording the anchor
+      // without checking it would publish a coverage claim nobody verified.
+      var anchorHeld: Bool?
+      if request.coverageAnchor != nil, receipt.subprocesses.count >= 3 {
+        let counted = String(decoding: receipt.subprocesses[2].stdout, as: UTF8.self)
+          .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let occurrences = Int(counted) else {
+          return .unknown(
+            reason: "the ring did not answer whether it was holding the coverage anchor")
+        }
+        anchorHeld = occurrences > 0
+      }
+      guard let byteCount = Self.remoteRegularFileByteCount(readback) else {
         // Includes `ls: ...: No such file or directory`. The mutation ran,
         // so this is genuinely unknown rather than a clean failure: the
         // engine keeps the intent outstanding for reconcile instead of
@@ -1900,7 +1922,10 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           code: "emptyTrace",
           detail: "hitrace left a zero-byte file at \(path.remotePath)")
       }
-      return .verified(summary: ["remoteByteCount": String(byteCount)])
+      var summary = ["remoteByteCount": String(byteCount)]
+      if let anchorHeld { summary["ringHeldCoverageAnchor"] = anchorHeld ? "true" : "false" }
+      if let anchor = request.coverageAnchor { summary["coverageAnchor"] = anchor }
+      return .verified(summary: summary)
     case .captureComponentTree(let path):
       guard receipt.subprocesses.count == 2 else {
         return .unknown(reason: "component tree dump did not produce its readback sequence")

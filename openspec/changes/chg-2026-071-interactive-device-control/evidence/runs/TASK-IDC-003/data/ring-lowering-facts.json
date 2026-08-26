@@ -4,7 +4,10 @@
   "measuredAtUTC": "2026-08-25T14:30:00Z",
   "device": "DAYU200 development board, OpenHarmony, kernel 6.6.101",
   "carrierChoice": {
-    "candidates": ["--trace_begin/--trace_dump/--trace_finish_nodump", "--start_bgsrv/--dump_bgsrv/--stop_bgsrv"],
+    "candidates": [
+      "--trace_begin/--trace_dump/--trace_finish_nodump",
+      "--start_bgsrv/--dump_bgsrv/--stop_bgsrv"
+    ],
     "chosen": "--trace_begin/--trace_dump/--trace_finish_nodump",
     "why": [
       "The Spike recommended evaluating bgsrv first, for its raw format and because a",
@@ -43,8 +46,16 @@
   ],
   "howFarBackASnapshotReaches": {
     "observations": [
-      { "armToMarkerSeconds": 12, "windowBeforeMarkerSeconds": 25.64, "note": "the kernel buffer already held events from before the arm" },
-      { "armToMarkerSeconds": 0, "windowBeforeMarkerSeconds": 0.06, "note": "the buffer had been drained by a preceding --trace_finish_nodump" }
+      {
+        "armToMarkerSeconds": 12,
+        "windowBeforeMarkerSeconds": 25.64,
+        "note": "the kernel buffer already held events from before the arm"
+      },
+      {
+        "armToMarkerSeconds": 0,
+        "windowBeforeMarkerSeconds": 0.06,
+        "note": "the buffer had been drained by a preceding --trace_finish_nodump"
+      }
     ],
     "reading": [
       "Retrospective reach is not a property of arming. It depends on what the buffer",
@@ -68,5 +79,52 @@
     "ls -l <owned path>                               -> 7039 bytes",
     "anchor found in the received dump: yes; 63 events spanning 5.35s"
   ],
-  "deviceLeftClean": "every file this run wrote under /data/local/tmp and /data/log/hitrace was removed, and the trace service was stopped"
+  "deviceLeftClean": "every file this run wrote under /data/local/tmp and /data/log/hitrace was removed, and the trace service was stopped",
+  "defectFoundByRunningIt": {
+    "symptom": "every ring capture came back outcomeUnknown: `trace capture did not produce its readback sequence`",
+    "cause": [
+      "The verdict required exactly two subprocesses and read the readback from a fixed",
+      "index. The blocking capture emits two; the ring emits seven. The argv the stage-1",
+      "tests pinned was right, and the verdict reading it was never told.",
+      "Contract tests over argv alone could not catch it: they assert what is sent, and",
+      "this was about what is read back."
+    ],
+    "fix": [
+      "The verdict now expects the count its own shape emits and reads the readback from",
+      "the last invocation.",
+      "It also checks the anchor while it is there: the `grep -c` answer is in the same",
+      "receipt, so whether the ring was holding the anchor is a fact the verdict already",
+      "has. Recording an anchor without checking it would publish a coverage claim nobody",
+      "verified. The summary now carries ringHeldCoverageAnchor.",
+      "A test ties the verdict's expected count to the lowering's actual output, so the",
+      "two cannot drift apart again - which is the shape of the defect, not just this",
+      "instance of it."
+    ]
+  },
+  "verifiedOnHardware": {
+    "daemon": "rebuilt from main at #1521 plus the verdict fix, re-signed with the maintainer's Developer ID; previous bundle kept under Helpers/.backup-20260826T073054/",
+    "capture": "job-a21498e612ac036f3682834d5ec0fb29, capture.diagnostics@1 with ringBuffered, traceCategories ohos+graphic, 20480 KiB, one manual marker",
+    "verdict": "verified capture-trace with coverageAnchor, remoteByteCount and ringHeldCoverageAnchor",
+    "artifacts": "trace.htrace 40793 bytes, markers.json 962 bytes, plus capture.log, artifact-index.json and capture-summary.json",
+    "anchorFoundInTheTrace": true,
+    "thisSnapshotsRealReach": {
+      "beforeTheAnchorSeconds": 0.08,
+      "afterTheAnchorSeconds": 8.37,
+      "events": 349,
+      "reading": [
+        "0.08s of reach before the anchor is the honest number for this capture: the",
+        "buffer was fresh when it armed. That is exactly what the corrected wording says",
+        "- reach is not a property of arming - and the anchor is what turned it from an",
+        "assumption into a measurement."
+      ]
+    },
+    "twoThingsLearnedOnTheWay": [
+      "A capture that ends outcomeUnknown leaves its capability use unresolved, and that",
+      "blocks the next mutation on the target. `job reconcile` clears the job but does not",
+      "settle the use; resuming the job with `job run` is what advances it to confirmed.",
+      "The daemon would not start while a stray hdc server held its port - one this",
+      "session's own direct probing had left running. Its foreground server exited 0",
+      "immediately and startup reported serverDidNotBecomeReady."
+    ]
+  }
 }

@@ -125,6 +125,103 @@ final class RingTraceCaptureContractTests: XCTestCase {
     XCTAssertTrue(argv[1].contains("ls"))
   }
 
+  private func receipt(_ outputs: [String]) -> ProviderProcessReceipt {
+    ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false,
+      durationSeconds: 0,
+      subprocesses: outputs.map {
+        ProviderSubprocessReceipt(
+          exitStatus: 0, stdout: Data($0.utf8), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0)
+      })
+  }
+
+  private func verdict(
+    _ outputs: [String], ringBuffered: Bool = true,
+    anchor: String? = "ARKDECKANCHORjobring1capturetrace"
+  ) throws -> ProviderSemanticOutcome {
+    let path = try hdc.mintOwnedRemotePath(jobID: "job-ring-1", stepID: "capture-trace")
+    let request = try HDCTraceCaptureRequest(
+      durationSeconds: 5, categories: ["ohos"], ringBuffered: ringBuffered,
+      coverageAnchor: ringBuffered ? anchor : nil)
+    return try hdc.verify(
+      receipt: receipt(outputs), action: .hdc(.captureTrace(request, into: path)),
+      context: context)
+  }
+
+  private var ringOutputs: [String] {
+    ["OpenRecording done", "", "1", "", "trace read done", "end capture trace"]
+  }
+
+  /// The ring runs more invocations than the blocking shape and its readback
+  /// is the last of them. Judging by a fixed index left every ring capture
+  /// unknown - found by running one on the device, because the argv the tests
+  /// above pin was right and the verdict reading it was not.
+  func testTheRingIsJudgedByItsLastReadbackNotAFixedIndex() throws {
+    var outputs = ringOutputs
+    outputs.append("-rw-r--r-- 1 root root 7039 2017-08-27 06:30 /data/local/tmp/t.trace")
+    guard case .verified(let summary) = try verdict(outputs) else {
+      return XCTFail("a ring that wrote a trace is verified: \(try verdict(outputs))")
+    }
+    XCTAssertEqual(summary["remoteByteCount"], "7039")
+    XCTAssertEqual(summary["ringHeldCoverageAnchor"], "true")
+    XCTAssertEqual(summary["coverageAnchor"], "ARKDECKANCHORjobring1capturetrace")
+  }
+
+  /// The anchor readback is in the receipt, so whether the ring was holding it
+  /// is a fact the verdict already has. Recording an anchor without checking
+  /// it would publish a coverage claim nobody verified.
+  func testARingThatWasNotHoldingTheAnchorSaysSo() throws {
+    var outputs = ringOutputs
+    outputs[2] = "0"
+    outputs.append("-rw-r--r-- 1 root root 7039 2017-08-27 06:30 /data/local/tmp/t.trace")
+    guard case .verified(let summary) = try verdict(outputs) else {
+      return XCTFail("the trace was still written; only its coverage is in doubt")
+    }
+    XCTAssertEqual(summary["ringHeldCoverageAnchor"], "false")
+  }
+
+  func testARingThatNeverAnsweredTheAnchorReadbackIsUnknown() throws {
+    var outputs = ringOutputs
+    outputs[2] = ""
+    outputs.append("-rw-r--r-- 1 root root 7039 2017-08-27 06:30 /data/local/tmp/t.trace")
+    guard case .unknown = try verdict(outputs) else {
+      return XCTFail("a ring that did not answer cannot be reported as covered")
+    }
+  }
+
+  func testAShortSequenceIsStillUnknown() throws {
+    guard case .unknown = try verdict(["OpenRecording done", "1"]) else {
+      return XCTFail("a truncated sequence is not a capture")
+    }
+  }
+
+  /// The verdict counts the invocations it expects, and the lowering decides
+  /// how many there are. Those two drifting apart is what left every ring
+  /// capture unknown once already, so they are tied together here: add a
+  /// segment to the ring and this fails until the verdict is told.
+  func testTheVerdictAndTheLoweringAgreeOnHowManySegmentsARingHas() throws {
+    for anchored in [true, false] {
+      let argv = try lowered(ringBuffered: true, anchor: anchored ? "ARKDECKANCHORdrift" : nil)
+      var outputs = Array(repeating: "", count: argv.count)
+      if anchored, outputs.count > 2 { outputs[2] = "1" }
+      outputs[outputs.count - 1] =
+        "-rw-r--r-- 1 root root 512 2017-08-27 06:30 /data/local/tmp/t.trace"
+      let path = try hdc.mintOwnedRemotePath(jobID: "job-ring-1", stepID: "capture-trace")
+      let request = try HDCTraceCaptureRequest(
+        durationSeconds: 5, categories: ["ohos", "graphic"], bufferKB: 20480,
+        ringBuffered: true, coverageAnchor: anchored ? "ARKDECKANCHORdrift" : nil)
+      let outcome = try hdc.verify(
+        receipt: receipt(outputs), action: .hdc(.captureTrace(request, into: path)),
+        context: context)
+      guard case .verified = outcome else {
+        return XCTFail(
+          "the verdict expects a different number of segments than the lowering emits "
+            + "(anchored: \(anchored), emitted: \(argv.count)): \(outcome)")
+      }
+    }
+  }
+
   /// Every invocation in the ring reaches the device, so every one of them has
   /// to name the target it reaches.
   func testEveryRingInvocationIsTargetBound() throws {
