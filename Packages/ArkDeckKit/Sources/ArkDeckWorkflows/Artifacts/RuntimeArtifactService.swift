@@ -117,7 +117,7 @@ enum RuntimeArtifactService {
   /// dispatcher measured, and a missing file is a recorded absence — there
   /// is no path from "the step ran" to a published trace.
   static let fileBackedArtifacts: Set<String> = [
-    "trace.htrace", "screenshot.png", "signed.hap", "unsigned.hap",
+    "trace.htrace", "screenshot.png", "frames.tar", "signed.hap", "unsigned.hap",
   ]
 
   /// A confirmed process failure still owns useful bounded diagnostics.
@@ -205,6 +205,9 @@ enum RuntimeArtifactService {
     "observe.device@1": [
       "probe-host-tool": ["tool-facts.json"],
       "read-evidence-firmware": ["device-facts.json", "binding-snapshot.json"],
+    ],
+    "capture.screen-sequence@1": [
+      "receive-screen-sequence": ["frames.tar"]
     ],
     "capture.diagnostics@1": [
       "observe-application-liveness": ["application-liveness.json"],

@@ -43,6 +43,20 @@ public enum HDCProviderAction: Sendable, Equatable {
   /// the file suffix against the requested type, so the lowering carries
   /// both `-t png` and a `.png` owned path (CHG-2026-049 r5).
   case captureScreenshot(into: HDCOwnedRemotePath)
+  /// A bounded run of stills, collected into one archive.
+  ///
+  /// A set case rather than a repeated single one for the same reason the
+  /// package-set cases exist: this shape has a directory to create and to
+  /// remove, and folding it into the single-still case is how the two would
+  /// start drifting. The frames are typed argv invocations, one per frame -
+  /// measured at 597 ms/frame against 543 ms for a device-side shell loop,
+  /// which is not worth a shell fragment.
+  case captureScreenSequence(
+    HDCScreenSequenceRequest, frames: HDCOwnedRemoteDirectory, into: HDCOwnedRemotePath)
+  /// Removes exactly what the sequence capture wrote: the frames it named,
+  /// the archive it collected them into, and then the directory.
+  case cleanupScreenSequence(
+    HDCScreenSequenceRequest, frames: HDCOwnedRemoteDirectory, archive: HDCOwnedRemotePath)
   case receiveOwnedArtifact(HDCOwnedRemoteArtifact)
   case cleanupOwnedRemotePath(HDCOwnedRemotePath)
   // E1 mutation family (T13). Success for the mutating members is decided
@@ -419,6 +433,7 @@ public enum TypedProviderAction: Sendable, Equatable {
       .hdc(.inspectNativeLibrary):
       return .readOnly
     case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.captureScreenshot),
+      .hdc(.captureScreenSequence), .hdc(.cleanupScreenSequence),
       .hdc(.cleanupOwnedRemotePath),
       .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
       .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet),
@@ -608,6 +623,24 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(kind: "hdc.captureComponentTree", arguments: pathArguments(path))
     case .hdc(.captureScreenshot(let path)):
       self.init(kind: "hdc.captureScreenshot", arguments: pathArguments(path))
+    case .hdc(.captureScreenSequence(let request, let frames, let path)):
+      var arguments = pathArguments(path)
+      arguments["framesDirectory"] = .string(frames.remotePath)
+      arguments["frameCount"] = .integer(Int64(request.frameCount))
+      arguments["imageType"] = .string(request.imageType.rawValue)
+      if let width = request.width, let height = request.height {
+        arguments["width"] = .integer(Int64(width))
+        arguments["height"] = .integer(Int64(height))
+      }
+      if let displayID = request.displayID {
+        arguments["displayId"] = .integer(Int64(displayID))
+      }
+      self.init(kind: "hdc.captureScreenSequence", arguments: arguments)
+    case .hdc(.cleanupScreenSequence(let request, let frames, let archive)):
+      var arguments = pathArguments(archive)
+      arguments["framesDirectory"] = .string(frames.remotePath)
+      arguments["frameCount"] = .integer(Int64(request.frameCount))
+      self.init(kind: "hdc.cleanupScreenSequence", arguments: arguments)
     case .hdc(.receiveOwnedArtifact(let artifact)):
       var arguments = pathArguments(artifact.path)
       arguments["maximumBytes"] = .integer(Int64(artifact.maximumBytes))

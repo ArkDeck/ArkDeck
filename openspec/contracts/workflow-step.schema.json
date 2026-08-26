@@ -959,6 +959,9 @@
         },
         "ownershipEvidenceId": {
           "$ref": "#/$defs/id"
+        },
+        "framesDirectory": {
+          "$ref": "#/$defs/remoteAbsolutePath"
         }
       }
     },

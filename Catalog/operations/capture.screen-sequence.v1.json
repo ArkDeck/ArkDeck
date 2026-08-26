@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "capture.screen-sequence",
+  "version": 1,
+  "title": "Capture a bounded run of stills off one display, collected into one archive",
+  "provider": "hdc",
+  "effect": {
+    "minimum": "deviceMutation",
+    "permitted": ["deviceMutation"]
+  },
+  "authorization": {
+    "deviceMutation": "standingCapability"
+  },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "frameCount": {
+        "type": "integer",
+        "required": true,
+        "minimum": 2,
+        "maximum": 300,
+        "description": "How many stills to take. There is no duration field: the rate is the device's display readback and cannot be asked for, so a caller bounds the run by frames and reads back what it actually achieved."
+      },
+      "imageType": {
+        "type": "string",
+        "required": false,
+        "enum": ["png", "jpeg"],
+        "default": "jpeg",
+        "description": "Image type for every frame. The device validates the file suffix against this, so the two are lowered together. jpeg by default because it is the cheaper of the two by 222 ms a frame and a tenth of the bytes."
+      },
+      "width": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 32767,
+        "description": "Scaled capture width. Requires height. Measured to save no time at all - the cost is the readback, not the encode - so this is about bytes, not rate."
+      },
+      "height": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 32767,
+        "description": "Scaled capture height. Requires width: a lone dimension lets the device pick the other one, and frames of differing size compose into nothing."
+      },
+      "displayId": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0,
+        "maximum": 64,
+        "description": "Target display for multi-display devices. Omitted lowers to the device's default display."
+      },
+      "totalArtifactByteBudget": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1048576,
+        "maximum": 536870912,
+        "default": 134217728,
+        "description": "Ceiling on the bytes this capture may publish, checked against free device storage before the first frame."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "artifactIndex": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "preflight-host-storage",
+      "kind": "preflightHostStorage",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "confirm-evidence-target",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-model",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": { "catalogId": "arkdeck-remote-operations", "actionId": "deviceModel" },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-firmware",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": { "catalogId": "arkdeck-remote-operations", "actionId": "firmwareBuild" },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "preflight-device-storage",
+      "kind": "preflightDeviceStorage",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "capture-screen-sequence",
+      "kind": "captureRemoteFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "compensation": "bestEffortCleanup",
+      "binding": "confirmedDevice",
+      "notes": "One typed snapshot_display invocation per frame into a provider-owned directory, then tar into a provider-owned archive. A device-side loop would be a shell fragment and buys 54 ms a frame, because the cost is the display readback. A frame that fails is a gap the readback reports, not the end of the run."
+    },
+    {
+      "stepID": "receive-screen-sequence",
+      "kind": "receiveFile",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Size and hash verified on receive. A tar carries its magic at offset 257 rather than at the front, so the leading-bytes check the screenshot leg uses does not apply here."
+    },
+    {
+      "stepID": "cleanup-screen-sequence-temp",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "bestEffortCleanup",
+      "notes": "Names exactly the frames the provider wrote, then the archive, then rmdir. Failure records cleanup residue for later reconcile; never silently dropped."
+    },
+    {
+      "stepID": "postprocess-index",
+      "kind": "postprocessArtifact",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 900,
+  "outputByteBudget": 536870912,
+  "retry": {
+    "preflightAttempts": 2,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "frames.tar",
+      "role": "raw",
+      "mediaType": "application/x-tar",
+      "privacy": "sensitive",
+      "required": true
+    }
+  ],
+  "profiles": ["openharmony-standard@1", "dayu200"]
+}

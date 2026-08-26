@@ -13,6 +13,7 @@
   "supportedOperations": [
     "observe.device@1",
     "capture.diagnostics@1",
+    "capture.screen-sequence@1",
     "debug.hap@1",
     "deploy.native-library.app-owned@1",
     "port-forward.create@1",

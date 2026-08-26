@@ -356,6 +356,12 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     defer { verifiedResources.forEach { $0.close() } }
     let launchResources = verifiedResources + (verifiedAnalyzerSource.map { [$0] } ?? [])
     let result: ProcessIdentityBoundExecutionResult
+    // Measured on a monotonic clock, not read off a wall clock: this is how
+    // long the child ran, and the host's wall clock can move under it. It had
+    // been reported as a literal zero for every invocation ever dispatched,
+    // which nothing noticed because nothing consumed it - and a bounded run
+    // of stills has no other way to say what rate it achieved.
+    let started = ContinuousClock.now
     do {
       result = try await executor.executeIdentityBound(
         ProcessIdentityBoundRequest(process: request, expectedSHA256: executable.sha256),
@@ -379,6 +385,9 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       throw RuntimeDispatchFailure.outcomeUnknown("dispatch outcome unobservable: \(error)")
     }
 
+    let ran = ContinuousClock.now - started
+    let elapsed =
+      Double(ran.components.seconds) + Double(ran.components.attoseconds) / 1e18
     let execution = result.execution
     switch execution.termination {
     case .exited(let status):
@@ -388,7 +397,7 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
         stderr: execution.stderr.data,
         stdoutTruncated:
           execution.stdout.wasTruncated || execution.stderr.wasTruncated,
-        durationSeconds: 0)
+        durationSeconds: elapsed)
     case .timedOut:
       throw RuntimeDispatchFailure.outcomeUnknown("process timed out before completion")
     case .cancelled:

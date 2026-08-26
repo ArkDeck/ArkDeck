@@ -130,7 +130,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     switch operation.reference {
-    case "observe.device@1", "capture.diagnostics@1", "debug.hap@1",
+    case "observe.device@1", "capture.diagnostics@1", "capture.screen-sequence@1",
+      "debug.hap@1",
       "port-forward.create@1", "port-forward.remove@1",
       "input.tap@1", "input.long-press@1", "input.swipe@1":
       return .available
@@ -215,6 +216,15 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case .captureRemoteStdout:
       return try captureAction(for: step, inputs: inputs)
     case .captureRemoteFile:
+      if step.stepID == "capture-screen-sequence" {
+        return .hdc(
+          .captureScreenSequence(
+            try screenSequenceRequest(from: inputs),
+            frames: try mintStableOwnedFrameDirectory(
+              jobID: context.jobID, stepID: "capture-screen-sequence"),
+            into: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "capture-screen-sequence")))
+      }
       if step.stepID == "capture-screenshot" {
         return .hdc(
           .captureScreenshot(
@@ -244,6 +254,15 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
             expectedLeadingBytes: step.stepID == "receive-screenshot"
               ? HDCFileMagic.png : nil)))
     case .cleanupOwnedRemotePath:
+      if step.stepID == "cleanup-screen-sequence-temp" {
+        return .hdc(
+          .cleanupScreenSequence(
+            try screenSequenceRequest(from: inputs),
+            frames: try mintStableOwnedFrameDirectory(
+              jobID: context.jobID, stepID: "capture-screen-sequence"),
+            archive: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "capture-screen-sequence")))
+      }
       let ownerStepID: String
       if operation.reference == "debug.hap@1" {
         if let packageSet = try stagedPackageSet(inputs: inputs, context: context) {
@@ -1005,6 +1024,88 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
                 ["shell", "ls", "-l", path.remotePath], context: context),
               timeoutSeconds: 15),
           ]))
+    case .captureScreenSequence(let request, let frames, let archive):
+      // One typed invocation per frame. A device-side `for` loop would be a
+      // shell fragment, and it buys 54 ms a frame (543 vs 597, measured over
+      // 20 frames on 2026-08-26) because the cost is the display readback,
+      // not the process. That is not a trade worth making here.
+      //
+      // `-t` and the file suffix have to agree or the device refuses the
+      // capture and exits fast enough to look like a success - the same rule
+      // the single-still leg carries, and the reason the frame names are
+      // built from the requested type rather than fixed.
+      var invocations: [TypedProcessInvocation] = [
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "mkdir", "-p", frames.remotePath], context: context),
+          timeoutSeconds: 30)
+      ]
+      for index in 0..<request.frameCount {
+        var capture = ["shell", "snapshot_display", "-t", request.imageType.rawValue]
+        if let width = request.width, let height = request.height {
+          capture += ["-w", String(width), "-h", String(height)]
+        }
+        if let displayID = request.displayID {
+          capture += ["-i", String(displayID)]
+        }
+        capture += ["-f", frames.remotePath + "/" + request.frameName(index: index)]
+        invocations.append(
+          TypedProcessInvocation(
+            arguments: try deviceArguments(capture, context: context),
+            // A frame that fails is a gap in the sequence, not the end of it:
+            // the archive readback is what decides the step, and a short
+            // sequence is reported by frame count rather than by a refusal.
+            timeoutSeconds: 60, continueAfterNonZero: true))
+      }
+      invocations.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "tar", "-c", "-f", archive.remotePath, "-C", frames.remotePath, "."],
+            context: context),
+          timeoutSeconds: 120, continueAfterNonZero: true))
+      invocations.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "ls", "-l", archive.remotePath], context: context),
+          timeoutSeconds: 15))
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch", invocations: invocations))
+    case .cleanupScreenSequence(let request, let frames, let archive):
+      // One `rm -f` naming exactly the frames this provider wrote, then the
+      // archive, then `rmdir` — never `rm -rf`. `rmdir` refuses a directory
+      // that still holds something, so a cleanup that did not fully clean
+      // reports instead of deleting what it was not asked to.
+      let frameNames = (0..<request.frameCount).map {
+        frames.remotePath + "/" + request.frameName(index: $0)
+      }
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch",
+          invocations: [
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "rm", "-f"] + frameNames, context: context),
+              timeoutSeconds: 60, continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "rm", "-f", archive.remotePath], context: context),
+              timeoutSeconds: 30, continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "rmdir", frames.remotePath], context: context),
+              timeoutSeconds: 30, continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                // `ls -ld`, not `ls -d`: the presence parser accepts exactly
+                // one listing line or the not-found grammar, and nothing
+                // else. HDC reports its own transport status rather than the
+                // remote command's, so the exit code cannot decide this.
+                ["shell", "ls", "-ld", frames.remotePath], context: context),
+              timeoutSeconds: 15, continueAfterNonZero: true),
+          ]))
     case .receiveOwnedArtifact(let artifact):
       // `file recv` takes both paths; with only the remote one hdc has no
       // destination to write (DEVICE-COMMAND-FACTS.md §4). The local name is
@@ -1618,6 +1719,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       return "capture-ui-tree"
     case "receive-screenshot", "cleanup-screenshot-temp":
       return "capture-screenshot"
+    case "receive-screen-sequence":
+      return "capture-screen-sequence"
     default:
       return "capture-trace"
     }
@@ -1657,6 +1760,42 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     jobID: String, stepID: String
   ) throws -> HDCOwnedRemotePath {
     try HDCOwnedRemotePath(jobID: jobID, stepID: stepID, nonce: "owned")
+  }
+
+  private func mintStableOwnedFrameDirectory(
+    jobID: String, stepID: String
+  ) throws -> HDCOwnedRemoteDirectory {
+    try HDCOwnedRemoteDirectory(
+      jobID: jobID, stepID: stepID, nonce: "owned", purpose: .frames)
+  }
+
+  /// The capture step and its cleanup both build this from the same inputs,
+  /// so the cleanup names exactly the frames the capture wrote rather than
+  /// reading the directory back and deleting whatever it finds.
+  private func screenSequenceRequest(
+    from inputs: [String: JSONValue]
+  ) throws -> HDCScreenSequenceRequest {
+    guard case .integer(let frameCount)? = inputs["frameCount"] else {
+      throw DeviceProviderError.unsupportedAction(
+        "screen sequence step selected without frameCount")
+    }
+    var imageType = HDCScreenSequenceRequest.ImageType.jpeg
+    if case .string(let requested)? = inputs["imageType"] {
+      guard let parsed = HDCScreenSequenceRequest.ImageType(rawValue: requested) else {
+        throw DeviceProviderError.unsupportedAction(
+          "screen sequence asked for an unregistered image type \(requested)")
+      }
+      imageType = parsed
+    }
+    var width: Int?
+    var height: Int?
+    if case .integer(let requested)? = inputs["width"] { width = Int(requested) }
+    if case .integer(let requested)? = inputs["height"] { height = Int(requested) }
+    var displayID: Int?
+    if case .integer(let requested)? = inputs["displayId"] { displayID = Int(requested) }
+    return try HDCScreenSequenceRequest(
+      frameCount: Int(frameCount), imageType: imageType,
+      width: width, height: height, displayID: displayID)
   }
 
   package func verify(
@@ -1959,6 +2098,71 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           detail: "snapshot_display left a zero-byte file at \(path.remotePath)")
       }
       return .verified(summary: ["remoteByteCount": String(byteCount)])
+
+    case .captureScreenSequence(let request, _, let archive):
+      // mkdir + N frames + tar + readback. Tying the expected count to the
+      // shape the lowering actually emits is what stops the two drifting:
+      // the single-still leg once hard-coded 2 and silently returned unknown
+      // for every ring capture, which emits 7.
+      let expected = 1 + request.frameCount + 2
+      guard receipt.subprocesses.count == expected else {
+        return .unknown(
+          reason: "screen sequence did not produce its \(expected)-step readback sequence")
+      }
+      guard let byteCount = Self.remoteRegularFileByteCount(receipt.subprocesses[expected - 1])
+      else {
+        return .unknown(
+          reason: "sequence readback did not describe \(archive.remotePath) as a regular file")
+      }
+      guard byteCount > 0 else {
+        return .failed(
+          code: "emptyScreenSequence",
+          detail: "tar left a zero-byte archive at \(archive.remotePath)")
+      }
+      // A frame that failed is a gap, not a failure of the run, so the count
+      // that was actually captured travels as a fact rather than being
+      // rounded up to what was asked for. Each frame's own duration travels
+      // too: the composed timeline is built from what was observed, and
+      // nothing here can turn a device instant into a host one - this
+      // device's wall clock reads 2017 while the host reads 2026.
+      let frames = receipt.subprocesses[1...request.frameCount]
+      let captured = frames.filter { ($0.exitStatus ?? 1) == 0 }.count
+      let elapsed = frames.reduce(0.0) { $0 + $1.durationSeconds }
+      var summary = [
+        "remoteByteCount": String(byteCount),
+        "requestedFrameCount": String(request.frameCount),
+        "capturedFrameCount": String(captured),
+        "frameDurationsSeconds": frames.map { String(format: "%.3f", $0.durationSeconds) }
+          .joined(separator: ","),
+      ]
+      if captured > 0, elapsed > 0 {
+        summary["observedFramesPerSecond"] = String(format: "%.2f", Double(captured) / elapsed)
+      }
+      return .verified(summary: summary)
+
+    case .cleanupScreenSequence(_, let frames, _):
+      // `rmdir` exiting zero is not the proof, and neither is the readback's
+      // exit code: HDC 3.2 reports the client transport status, not the
+      // remote command's, so an `ls` on a path that is gone still exits 0.
+      // The directory being absent from the listing is the proof.
+      guard let last = receipt.subprocesses.last else {
+        return .unknown(reason: "sequence cleanup produced no readback")
+      }
+      guard
+        let present = pathPresence(
+          exitStatus: last.exitStatus, stdout: last.stdout, stderr: last.stderr,
+          stdoutTruncated: last.stdoutTruncated)
+      else {
+        return .unknown(
+          reason: "sequence cleanup readback did not answer whether "
+            + "\(frames.remotePath) is still there")
+      }
+      guard !present else {
+        return .failed(
+          code: "sequenceCleanupResidue",
+          detail: "\(frames.remotePath) still exists after cleanup")
+      }
+      return .verified(summary: ["cleaned": "true"])
 
     case .receiveOwnedArtifact(let artifact):
       // The step's whole purpose is host bytes, so the verdict is read off
