@@ -172,7 +172,21 @@ T02/T03 不进入实现。
 
 ## TASK-IDC-003 — 环形诊断采集 + Diagnostics Session reader（垂直交付）
 
-- Status:in-progress（2026-08-25。① 环形 trace lowering 已交付：`ringBuffered` additive
+- Status:in-progress（2026-08-26 收尾结论：六刀已交付，**两项未交付**，故不置 done。
+  未交付一：**Diagnostics 采集页**——tab 只有 reader 面；布防会话、会话中打标、标记截图
+  在 runtime 侧都通了，但 App 里没有入口。reader 不依赖它，它是这个 tab 的另一半。
+  未交付二：**typed `deviceBusyBySession` 拒绝**——设计要求「另一 client 对被持有设备的
+  mutation 必须显式 typed 拒绝而非静默排队」。今日实测：相隔 0.05 s 提交的两次采集**都成功**，
+  第二次 2713 ms vs 第一次 1473 ms，即**排了队**，无人拒绝也无人告知。App 侧文案已写好，
+  缺的是「会话持有设备」这个概念本身——mutation lane 是按设备串行化，那是另一回事：
+  它让并发**安全且不可见**，而设计要的是**安全且可见**。**IDC-AC-6 因此未达成**。
+  收尾时的环境：现役 daemon 是 main@#1534 的构建、用维护者自己的 Developer ID 签名；
+  历次替换掉的 bundle 全在 Helpers/.backup-*/，拷回并重启 LaunchAgent 即可还原。设备上本轮
+  写过的 /data/local/tmp 与 /data/log/hitrace 文件已逐一删除、trace 服务已停；注入的点击
+  落在设置里并在其中导航，未安装、卸载或改动任何配置。
+  证据 `evidence/runs/TASK-IDC-003/data/closing-state.json`。
+  ——以下为逐刀记录——
+  ① 环形 trace lowering 已交付：`ringBuffered` additive
   typed input + `--trace_begin / --trace_dump / --trace_finish_nodump` 三段 lowering +
   覆盖锚点（arm 后立刻写设备侧 trace_marker 并回读）。**载体选择与 Spike 建议不同并给出
   理由**：`--dump_bgsrv` 写到服务自选路径，provider 无法拥有该路径，而本 operation 其余
