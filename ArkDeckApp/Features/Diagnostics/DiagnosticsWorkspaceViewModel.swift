@@ -73,6 +73,8 @@ final class DiagnosticsWorkspaceViewModel {
   func absenceTitle(_ mark: DiagnosticSessionReading.Mark) -> String? {
     switch mark.screenshotAbsence {
     case .takenTooFarFromTheMark: diagnosticsText("diagnostics.shot.tooFar")
+    // Different from "not this moment": nothing here can tell either way.
+    case .shutterWindowWiderThanTheRule: diagnosticsText("diagnostics.shot.undecidable")
     case .captureFailed: diagnosticsText("diagnostics.shot.failed")
     case .notCaptured: diagnosticsText("diagnostics.shot.none")
     case nil: nil
@@ -83,6 +85,9 @@ final class DiagnosticsWorkspaceViewModel {
     switch mark.screenshotAbsence {
     case .takenTooFarFromTheMark(let offset):
       "\(diagnosticsText("diagnostics.shot.tooFar.detail")) (+\(offset) ms)"
+    case .shutterWindowWiderThanTheRule(let window):
+      "\(diagnosticsText("diagnostics.shot.undecidable.detail")) "
+        + "(\(window) ms > \(DiagnosticSessionReading.screenshotAppliesWithinMs) ms)"
     case .captureFailed(let reason): reason
     case .notCaptured, nil: nil
     }
