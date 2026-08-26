@@ -41,11 +41,21 @@ T02/T03 不进入实现。
 ## TASK-IDC-002 — 交互式输入 + Toolkit 真机操作（垂直交付）
 
 - Status:in-progress（2026-08-26 复核：九刀已交付且逐刀有真机证据，**但对照本任务自己的
-  「交付内容」与 IDC-AC-8，还有五项未做**，逐条列在这里，而不是含糊地挂着 in-progress：
-  ① **stale 帧不拒绝输入**——AC-8 要求「stale 时 pointer down 被拒且有说明」。现状是帧龄
-  一直显示（`frameAgeSummary`），但 `pointerEnded` 只挡「正在发送中」，不挡陈旧帧：
-  对着一张旧画面点下去照样发得出去，且落点按那张旧画面换算。五项里只有这一项会把手势
-  送到没人瞄的地方，应当先做。
+  「交付内容」与 IDC-AC-8，还有五项未做**，逐条列在这里，而不是含糊地挂着 in-progress。
+  ① 已于 2026-08-26 交付，余四项未做：
+  ① ~~**stale 帧不拒绝输入**~~ **已交付**——AC-8 要求「stale 时 pointer down 被拒且
+  有说明」。**这里的 stale 不是帧龄**：runtime 自己的新鲜度预算是 1 秒，而静止画面是人
+  按自己的节奏看的——看、想、决定点哪里，没人在一秒内做完，按秒计的规则会拒掉有史以来
+  每一个手势，这也正是 `ToolkitScreenFrame.capturedAtUTC` 被刻意不写成新鲜度断言的原因。
+  作废画面的是「有东西改了屏幕」，而这个工作区唯一确知的改动就是它自己刚发出去的那个手势。
+  故规则为：确认或未知都作废画面，干净失败不作废（什么都没到设备），只有重新截图能恢复。
+  规则落在 `ToolkitFrameLiveness`（8 条契约测试 + 负向对照），接线由真机闸
+  `ToolkitStaleFrameUITests` 把住（拆掉守卫即变红）。
+  **顺带修掉两个从未被真机跑通的 wire 缺陷**：Toolkit 把 `artifact.list` 的**数组**回包
+  当对象读，且 `artifact.read` 少传 `jobId`——两者各自都足以让每一次截图都失败。表现是
+  runtime 任务成功、`screenshot.png` 已发布，而工作区显示「截图失败」；没有画面，本条
+  拒绝也就是死码。现由 `testTheWorkspaceReadsTheArtifactIndexTheRuntimeActuallyWrites`
+  用 daemon 自己的 `handleLine` 出线字节驱动工作区自己的读取器把住，不用手写 fixture。
   ② **宿主合成录屏未做**——交付内容 4 与 AC-8 都要求 Assembling→Validating→结果条
   （实测帧率 + 位置 + Finder/另存为/再录一段）。App 里没有任何录屏面。
   ③ **开始前的配额 preflight 未做**——AC-8 要求失败即阻断。

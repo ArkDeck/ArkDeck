@@ -215,6 +215,8 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
           jobID: jobID))
     } catch let failure as ToolkitFailure {
       return .failed(failure.message)
+    } catch let failure as ToolkitArtifactIndex.IndexUnreadable {
+      return .failed(failure.message)
     } catch {
       return .failed("\(error)")
     }
@@ -294,26 +296,26 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   private func readScreenshot(jobID: String) async throws -> (
     data: Data, width: Int, height: Int
   ) {
-    let listed = try await requestObject(
-      method: "artifact.list", params: ["jobId": .string(jobID)], label: "Toolkit artifacts")
-    guard let artifacts = listed["artifacts"] as? [[String: Any]] else {
-      throw ToolkitFailure(message: "the capture published no artifact index")
-    }
-    guard
-      let entry = artifacts.first(where: { $0["name"] as? String == "screenshot.png" }),
-      let artifactID = entry["artifactId"] as? String,
-      entry["status"] as? String == "published",
-      let expectedSHA = entry["sha256"] as? String,
-      let byteCount = entry["byteCount"] as? Int
-    else {
+    let label = "Toolkit artifacts"
+    let entries = try ToolkitArtifactIndex.entries(
+      inEnvelope: try await requestEnvelope(
+        method: "artifact.list", params: ["jobId": .string(jobID)], label: label),
+      label: label)
+    guard let entry = ToolkitArtifactIndex.screenshot(in: entries) else {
       throw ToolkitFailure(message: "the capture published no verified screenshot")
     }
+    let artifactID = entry.artifactID
+    let expectedSHA = entry.sha256
+    let byteCount = entry.byteCount
     var data = Data()
     var offset = 0
     while offset < byteCount {
       let chunk = try await requestObject(
         method: "artifact.read",
         params: [
+          // The runtime scopes every artifact read to the job that published
+          // it, so the job id travels with the artifact id on every chunk.
+          "jobId": .string(jobID),
           "artifactId": .string(artifactID),
           "offset": .integer(Int64(offset)),
           "maxBytes": .integer(Int64(Self.artifactChunkBytes)),
@@ -339,6 +341,19 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
       throw ToolkitFailure(message: "the screenshot is not a readable PNG")
     }
     return (data, size.width, size.height)
+  }
+
+  /// The raw reply bytes. Parsing lives in `ToolkitArtifactIndex` so a test
+  /// can drive it with what the daemon actually sends.
+  private func requestEnvelope(
+    method: String, params: [String: JSONValue], label: String
+  ) async throws -> Data {
+    switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
+    case .failure(let error):
+      throw ToolkitFailure(message: "\(label) failed: \(error.message)")
+    case .success(let data):
+      return data
+    }
   }
 
   private func requestObject(
@@ -394,6 +409,54 @@ public enum ToolkitScreenshotIntegrity {
 
 /// The timeline reader, kept outside the actor so it can be exercised
 /// directly rather than through a hole opened in the actor for tests.
+/// How the workspace reads the runtime's artifact index.
+///
+/// Split out from the transport so a test can drive it with the daemon's own
+/// reply bytes. Both halves of this were wrong and neither was caught: the
+/// runtime answers `artifact.list` with a bare array, and the workspace read
+/// it as an object; and every chunk of `artifact.read` is scoped to the job
+/// that published it, and the workspace sent only the artifact id. Each
+/// mistake alone makes every capture fail, which is what the workspace showed
+/// on hardware while the runtime job succeeded and the screenshot existed.
+public enum ToolkitArtifactIndex {
+  public struct IndexUnreadable: Error, Equatable { public let message: String }
+
+  public struct ScreenshotEntry: Sendable, Equatable {
+    public let artifactID: String
+    public let sha256: String
+    public let byteCount: Int
+  }
+
+  /// The entries in a control-plane reply to `artifact.list`.
+  public static func entries(inEnvelope data: Data, label: String) throws -> [[String: Any]] {
+    guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw IndexUnreadable(message: "\(label) returned an unreadable response")
+    }
+    if let error = envelope["error"] as? [String: Any] {
+      let message = error["message"] as? String ?? "\(error)"
+      throw IndexUnreadable(message: "\(label) was refused: \(message)")
+    }
+    guard let result = envelope["result"] as? [[String: Any]] else {
+      throw IndexUnreadable(message: "\(label) returned no list")
+    }
+    return result
+  }
+
+  /// The published screenshot, or nothing. A truncated or missing entry is
+  /// not a screenshot: the workspace would otherwise draw a partial picture
+  /// and let somebody aim at it.
+  public static func screenshot(in entries: [[String: Any]]) -> ScreenshotEntry? {
+    guard
+      let entry = entries.first(where: { $0["name"] as? String == "screenshot.png" }),
+      let artifactID = entry["artifactId"] as? String,
+      entry["status"] as? String == "published",
+      let sha256 = entry["sha256"] as? String,
+      let byteCount = entry["byteCount"] as? Int
+    else { return nil }
+    return ScreenshotEntry(artifactID: artifactID, sha256: sha256, byteCount: byteCount)
+  }
+}
+
 public enum ToolkitProductionProviderTestHook {
   /// The verified keys the runtime recorded for the injection step, read from
   /// the timeline it published rather than restated from the request. What

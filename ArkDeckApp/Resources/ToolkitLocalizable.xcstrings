@@ -2,206 +2,70 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
-    "toolkit.screen.capture": {
+    "toolkit.boundary": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Get screenshot"
+            "value": "A still, not a live view. Each gesture is one typed operation; an unknown outcome is never resent."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "获取截图"
+            "value": "这是静止画面，不是实时预览。每个手势都是一次 typed operation；结果未知时绝不重发。"
           }
         }
       }
     },
-    "toolkit.screen.capturing": {
+    "toolkit.frame.age": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Capturing…"
+            "value": "Picture taken"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在获取截图…"
+            "value": "画面拍摄于"
           }
         }
       }
     },
-    "toolkit.screen.empty.title": {
+    "toolkit.frame.none": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No screenshot yet"
+            "value": "No picture yet"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "尚未获取截图"
+            "value": "尚无画面"
           }
         }
       }
     },
-    "toolkit.screen.empty.ready": {
+    "toolkit.frame.unknownAge": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Get a screenshot to act on the device."
+            "value": "Picture age unknown"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "获取一张截图后即可在其上操作设备。"
-          }
-        }
-      }
-    },
-    "toolkit.screen.empty.noTarget": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Adopt exactly one device to use Toolkit."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "接管且仅接管一台设备后才能使用真机操作。"
-          }
-        }
-      }
-    },
-    "toolkit.target.none": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No device"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无设备"
-          }
-        }
-      }
-    },
-    "toolkit.target.none.detail": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Toolkit sends device mutations and will not guess which device you meant."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "真机操作会写设备，因此不会替你猜是哪一台。"
-          }
-        }
-      }
-    },
-    "toolkit.gestures.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "How input works"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "操作方式"
-          }
-        }
-      }
-    },
-    "toolkit.gestures.tap": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Click the picture to send a tap at that point."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "单击画面，在该点发送一次点击。"
-          }
-        }
-      }
-    },
-    "toolkit.gestures.longPress": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hold for half a second to send a long press."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "按住半秒以上，发送一次长按。"
-          }
-        }
-      }
-    },
-    "toolkit.gestures.swipe": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Drag to send a swipe; the time you held it is the swipe's duration."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "拖动发送一次滑动；你按住的时长就是滑动时长。"
-          }
-        }
-      }
-    },
-    "toolkit.gesture.tap": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tap"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "点击"
+            "value": "画面年龄未知"
           }
         }
       }
@@ -240,53 +104,87 @@
         }
       }
     },
-    "toolkit.log.title": {
+    "toolkit.gesture.tap": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Operation log"
+            "value": "Tap"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "操作记录"
+            "value": "点击"
           }
         }
       }
     },
-    "toolkit.log.empty": {
+    "toolkit.gestures.longPress": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nothing sent yet."
+            "value": "Hold for half a second to send a long press."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "尚未发送任何操作。"
+            "value": "按住半秒以上，发送一次长按。"
           }
         }
       }
     },
-    "toolkit.log.captured": {
+    "toolkit.gestures.swipe": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Screenshot captured"
+            "value": "Drag to send a swipe; the time you held it is the swipe's duration."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已获取截图"
+            "value": "拖动发送一次滑动；你按住的时长就是滑动时长。"
+          }
+        }
+      }
+    },
+    "toolkit.gestures.tap": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click the picture to send a tap at that point."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "单击画面，在该点发送一次点击。"
+          }
+        }
+      }
+    },
+    "toolkit.gestures.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How input works"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作方式"
           }
         }
       }
@@ -308,6 +206,23 @@
         }
       }
     },
+    "toolkit.log.captured": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screenshot captured"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已获取截图"
+          }
+        }
+      }
+    },
     "toolkit.log.confirmed": {
       "extractionState": "manual",
       "localizations": {
@@ -321,6 +236,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "已确认"
+          }
+        }
+      }
+    },
+    "toolkit.log.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing sent yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未发送任何操作。"
           }
         }
       }
@@ -342,6 +274,23 @@
         }
       }
     },
+    "toolkit.log.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operation log"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作记录"
+          }
+        }
+      }
+    },
     "toolkit.log.unknown": {
       "extractionState": "manual",
       "localizations": {
@@ -359,70 +308,172 @@
         }
       }
     },
-    "toolkit.frame.none": {
+    "toolkit.screen.capture": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No picture yet"
+            "value": "Get screenshot"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "尚无画面"
+            "value": "获取截图"
           }
         }
       }
     },
-    "toolkit.frame.age": {
+    "toolkit.screen.capturing": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Picture taken"
+            "value": "Capturing…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "画面拍摄于"
+            "value": "正在获取截图…"
           }
         }
       }
     },
-    "toolkit.frame.unknownAge": {
+    "toolkit.screen.empty.noTarget": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Picture age unknown"
+            "value": "Adopt exactly one device to use Toolkit."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "画面年龄未知"
+            "value": "接管且仅接管一台设备后才能使用真机操作。"
           }
         }
       }
     },
-    "toolkit.boundary": {
+    "toolkit.screen.empty.ready": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A still, not a live view. Each gesture is one typed operation; an unknown outcome is never resent."
+            "value": "Get a screenshot to act on the device."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这是静止画面，不是实时预览。每个手势都是一次 typed operation；结果未知时绝不重发。"
+            "value": "获取一张截图后即可在其上操作设备。"
+          }
+        }
+      }
+    },
+    "toolkit.screen.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No screenshot yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未获取截图"
+          }
+        }
+      }
+    },
+    "toolkit.stale.badge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Out of date"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已过期"
+          }
+        }
+      }
+    },
+    "toolkit.stale.refused": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent — this picture is out of date"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未发送——这张画面已经过期"
+          }
+        }
+      }
+    },
+    "toolkit.stale.refused.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your last gesture changed the device. Get a new screenshot before pressing again; a point picked on this one no longer means what it did."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一个手势已经改变了设备。再点之前先取一张新截图——在这张图上选的位置，已经不是它原来指的东西了。"
+          }
+        }
+      }
+    },
+    "toolkit.target.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无设备"
+          }
+        }
+      }
+    },
+    "toolkit.target.none.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toolkit sends device mutations and will not guess which device you meant."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "真机操作会写设备，因此不会替你猜是哪一台。"
           }
         }
       }
