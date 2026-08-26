@@ -30,34 +30,53 @@
       "evidence": "session-walkthrough.json"
     }
   ],
-  "notDelivered": [
-    {
-      "item": "the Diagnostics capture page",
-      "detail": [
-        "The tab carries the reader. Arming a session, marking during it and taking a",
-        "marker screenshot are all reachable through the runtime and none of them has a",
-        "surface in the App yet.",
-        "Nothing about the reader depends on it; it is the other half of the tab."
-      ]
-    },
-    {
-      "item": "the typed `deviceBusyBySession` refusal",
-      "detail": [
-        "The design says a second client's mutation on a held device must fail with a",
-        "typed reason rather than queue silently. Measured today: two captures submitted",
-        "0.05s apart both succeeded, the second taking 2713ms against the first's 1473ms.",
-        "It queued. Nothing refused it and nothing told anyone.",
-        "The copy for the refusal is written into the App's catalog; what does not exist",
-        "is the notion of a session holding a device, which is what the refusal would be",
-        "raised from. The mutation lane serializes per device, which is a different",
-        "thing: it makes contention safe and invisible, and the design asks for it to be",
-        "safe and visible."
-      ],
-      "acceptance": "IDC-AC-6 names this explicitly, so that criterion is not met"
-    }
-  ],
+  "notDelivered": [],
   "environmentLeftBehind": {
     "daemon": "the installed helper is a build of main at #1534, signed with the maintainer's own Developer ID. Every bundle it replaced is kept under Helpers/.backup-*/ and any of them can be restored by copying it back and restarting the LaunchAgent.",
     "device": "every file this work wrote under /data/local/tmp and /data/log/hitrace was removed, and the trace service is stopped. The taps this work injected landed in Settings and navigated it; nothing was installed, removed or reconfigured."
-  }
+  },
+  "deliveredAfterTheCloseOut": [
+    {
+      "item": "the typed deviceBusyBySession refusal",
+      "detail": [
+        "A session now holds its device. Another client's mutation on a held device is",
+        "refused before authorization, naming who holds it, since when, and that it was",
+        "refused rather than queued. A hold expires after 120s without an act.",
+        "Where it does not fire is pinned too: the holder is never blocked by its own",
+        "hold, a read is never blocked, another device is untouched, a host-only plan has",
+        "no device to be busy on, and ordinary work neither takes a hold nor is blocked",
+        "for lacking one. A rule that refused everybody would be worse than no rule."
+      ]
+    },
+    {
+      "item": "the Diagnostics capture page",
+      "detail": [
+        "Arm and stop, mark with Command-M, the count of marks so far, and the three",
+        "states a session can be in the middle of: armed, refused because the device is",
+        "busy, failed.",
+        "It says plainly that a mark records a host instant and touches nothing on the",
+        "device - otherwise marking reads as an action that might fail, and the reason it",
+        "can be made the moment somebody notices something is precisely that it cannot."
+      ]
+    }
+  ],
+  "stillNotBuilt": [
+    {
+      "item": "frameDeadline and logKeyword automatic markers",
+      "detail": [
+        "Deliverable 1 names them. They are implementable - not a platform limit, but a",
+        "consequence of putting the derivation in finalization, which holds artifact",
+        "metadata rather than bytes. The artifact names them in `notDerived` with the",
+        "reason, so their absence does not read as the absence of the thing."
+      ]
+    },
+    {
+      "item": "a screenshot that can be said to be a given moment",
+      "detail": [
+        "The shutter instant is recorded as the interval the host could observe, and that",
+        "interval is ~930 ms against a 150 ms rule. Closing it needs the device to report",
+        "when the shutter opened, which only it can observe."
+      ]
+    }
+  ]
 }
