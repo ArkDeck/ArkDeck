@@ -12,7 +12,7 @@ final class OverviewRecordUITests: XCTestCase {
   func testTheRecordShowsWhatCanBeStartedAndWhatAlreadyRan() {
     let app = launch()
     XCTAssertTrue(
-      element(app, "overview.record").waitForExistenceFast(timeout: 30),
+      element(app, "overview.record.device.name").waitForExistenceFast(timeout: 30),
       "the Overview record must render on the default landing page")
 
     // The entries keep a fixed order so their positions are learned once.
@@ -36,7 +36,7 @@ final class OverviewRecordUITests: XCTestCase {
 
   func testARunNeedingAPersonIsPinnedAndOffersNoReplay() {
     let app = launch()
-    XCTAssertTrue(element(app, "overview.record").waitForExistenceFast(timeout: 30))
+    XCTAssertTrue(element(app, "overview.record.device.name").waitForExistenceFast(timeout: 30))
 
     // job-fixture-0002 is an interrupted flash with an unknown outcome. It must
     // reach the page, be marked as needing a person, and offer no way to repeat
@@ -92,3 +92,4 @@ final class OverviewRecordUITests: XCTestCase {
     return app
   }
 }
+

@@ -35,7 +35,6 @@ struct OverviewRecordView: View {
       startSection
       recordSection
     }
-    .accessibilityIdentifier("overview.record")
   }
 
   // MARK: - Device bar
@@ -126,6 +125,30 @@ struct OverviewRecordView: View {
   }
 
   private func actionTile(_ action: OverviewAction) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      actionButton(action)
+      if let reason = unavailableReason(action.availability) {
+        Text(reason)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+          .padding(.bottom, WorkspaceMetrics.noticePaddingVertical)
+          .accessibilityIdentifier("overview.record.start.\(action.id).reason")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .background(
+      Color(nsColor: .controlBackgroundColor),
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+    }
+  }
+
+  private func actionButton(_ action: OverviewAction) -> some View {
     Button {
       onOpen(action.kind)
     } label: {
@@ -153,13 +176,6 @@ struct OverviewRecordView: View {
           .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
           .lineLimit(1)
-        if let reason = unavailableReason(action.availability) {
-          Text(reason)
-            .font(WorkspaceFont.monospacedDense)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("overview.record.start.\(action.id).reason")
-        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
@@ -167,14 +183,6 @@ struct OverviewRecordView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .background(
-      Color(nsColor: .controlBackgroundColor),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-    }
     .disabled(!action.availability.opensWorkspace)
     .accessibilityIdentifier("overview.record.start.\(action.id)")
   }
@@ -264,7 +272,6 @@ struct OverviewRecordView: View {
           thread.needsAttention ? WorkspaceTone.warning.color : Color(nsColor: .separatorColor),
           lineWidth: 1)
     }
-    .accessibilityIdentifier("overview.record.thread.\(thread.id)")
   }
 
   private func threadHeader(_ thread: OverviewRunThread) -> some View {
@@ -274,6 +281,7 @@ struct OverviewRecordView: View {
         .accessibilityHidden(true)
       Text(thread.threadID ?? String(localized: "overview.record.thread.ungrouped"))
         .font(WorkspaceFont.monospacedDense)
+        .accessibilityIdentifier("overview.record.thread.\(thread.id)")
       Text(threadSubtitle(thread))
         .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
@@ -308,6 +316,7 @@ struct OverviewRecordView: View {
       Text(run.id)
         .font(WorkspaceFont.monospacedDense)
         .foregroundStyle(.secondary)
+        .accessibilityIdentifier("overview.record.run.\(run.id)")
       Text(displayedOperation(run.operationReference))
         .font(WorkspaceFont.body)
         .lineLimit(1)
@@ -325,7 +334,6 @@ struct OverviewRecordView: View {
     }
     .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
     .padding(.vertical, WorkspaceMetrics.rowGap + 2)
-    .accessibilityIdentifier("overview.record.run.\(run.id)")
   }
 
   /// Every refusal names itself in place. A disabled control with no stated
