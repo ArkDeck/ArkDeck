@@ -136,10 +136,60 @@ public protocol ToolkitDeviceControlProviding: Sendable {
   func send(
     _ request: ToolkitGestureRequest, to target: ToolkitTargetPresentation
   ) async -> ToolkitGestureOutcome
+  func recordScreen(
+    frameCount: Int, target: ToolkitTargetPresentation
+  ) async -> ToolkitScreenRecordingResult
+}
+
+/// The frames a run brought back, with the spacing they were taken at.
+public struct ToolkitScreenRecording: Sendable, Equatable {
+  public let frames: [ToolkitFrameArchive.Frame]
+  public let frameDurationsSeconds: [Double]
+  /// Asked for minus captured. A frame that failed is a gap in the run, and
+  /// saying so is what stops a short recording reading as a complete one.
+  public let framesMissing: Int
+
+  public init(
+    frames: [ToolkitFrameArchive.Frame], frameDurationsSeconds: [Double], framesMissing: Int
+  ) {
+    self.frames = frames
+    self.frameDurationsSeconds = frameDurationsSeconds
+    self.framesMissing = framesMissing
+  }
+}
+
+public enum ToolkitScreenRecordingResult: Sendable, Equatable {
+  case captured(ToolkitScreenRecording)
+  case failed(String)
 }
 
 public enum ToolkitDeviceControlFacade {
   public static let screenshotOperationReference = "capture.diagnostics@1"
+  public static let recordingOperationReference = "capture.screen-sequence@1"
+
+  /// A bounded run of stills. There is no duration to ask for: the rate is
+  /// the device's display readback and cannot be requested, so a caller bounds
+  /// the run by frames and reads back what it achieved.
+  public static func recordingRequest(
+    frameCount: Int, target: ToolkitTargetPresentation, nonce: String
+  ) throws -> RuntimeOperationRequest {
+    try RuntimeOperationRequest(
+      requestID: "toolkit-record-\(nonce)",
+      idempotencyKey: "toolkit-record-\(nonce)",
+      target: DurableTargetReference(
+        targetID: target.id, expectedBindingRevision: target.bindingRevision),
+      operation: RuntimeOperationReference(id: "capture.screen-sequence", version: 1),
+      inputs: [
+        "frameCount": .integer(Int64(frameCount)),
+        // jpeg over png: 543 ms a frame against 765, and a tenth of the bytes,
+        // measured on hardware. Scaling down was measured to save nothing at
+        // all, so the frames stay at the device's own size.
+        "imageType": .string("jpeg"),
+      ],
+      requestedOutputs: [.hardwareEvidence],
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.toolkitDeviceControl, targetID: target.id))
+  }
 
   /// The screenshot leg alone. A Toolkit capture wants a current picture, not
   /// a diagnostic window: HiLog is off because draining its buffer can
@@ -293,6 +343,91 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
       injectionSummary: ToolkitProductionProviderTestHook.injectionSummary(in: timeline))
   }
 
+  func recordScreen(
+    frameCount: Int, target: ToolkitTargetPresentation
+  ) async -> ToolkitScreenRecordingResult {
+    do {
+      let request = try ToolkitDeviceControlFacade.recordingRequest(
+        frameCount: frameCount, target: target, nonce: UUID().uuidString)
+      let terminal = try await runToTerminal(request)
+      guard let jobID = terminal.jobID else {
+        return .failed("the runtime returned no job identifier for the recording")
+      }
+      guard terminal.state == "succeeded" else {
+        return .failed(terminal.failure ?? "the recording did not succeed")
+      }
+      let label = "Toolkit recording artifacts"
+      let entries = try ToolkitArtifactIndex.entries(
+        inEnvelope: try await requestEnvelope(
+          method: "artifact.list", params: ["jobId": .string(jobID)], label: label),
+        label: label)
+      guard let archive = ToolkitArtifactIndex.published(named: "frames.tar", in: entries) else {
+        return .failed("the recording published no verified frame archive")
+      }
+      let frames = try ToolkitFrameArchive.frames(
+        in: try await readArtifact(jobID: jobID, entry: archive, label: "Toolkit frames"))
+
+      // The timings are their own published product. Reading them rather than
+      // assuming a cadence is the difference between a timeline and a guess.
+      guard let indexEntry = ToolkitArtifactIndex.published(named: "sequence.json", in: entries)
+      else { return .failed("the recording published no observed frame timings") }
+      let measured = try JSONSerialization.jsonObject(
+        with: try await readArtifact(
+          jobID: jobID, entry: indexEntry, label: "Toolkit recording timings"))
+      guard let index = measured as? [String: Any],
+        let durations = index["frameDurationsSeconds"] as? [Double],
+        durations.count == frames.count
+      else {
+        return .failed(
+          "the recording brought back \(frames.count) frames with no matching timings")
+      }
+      return .captured(
+        ToolkitScreenRecording(
+          frames: frames, frameDurationsSeconds: durations,
+          framesMissing: index["framesMissing"] as? Int ?? 0))
+    } catch let failure as ToolkitFailure {
+      return .failed(failure.message)
+    } catch let failure as ToolkitArtifactIndex.IndexUnreadable {
+      return .failed(failure.message)
+    } catch {
+      return .failed("\(error)")
+    }
+  }
+
+  /// One published artifact's bytes, in chunks, checked against the digest the
+  /// runtime published for it.
+  private func readArtifact(
+    jobID: String, entry: ToolkitArtifactIndex.PublishedEntry, label: String
+  ) async throws -> Data {
+    var data = Data()
+    var offset = 0
+    while offset < entry.byteCount {
+      let chunk = try await requestObject(
+        method: "artifact.read",
+        params: [
+          "jobId": .string(jobID),
+          "artifactId": .string(entry.artifactID),
+          "offset": .integer(Int64(offset)),
+          "maxBytes": .integer(Int64(Self.artifactChunkBytes)),
+          "allowSensitive": .bool(true),
+        ], label: label)
+      guard let base64 = chunk["base64"] as? String, let part = Data(base64Encoded: base64)
+      else { throw ToolkitFailure(message: "\(label): a chunk was not readable") }
+      data.append(part)
+      guard let next = chunk["nextOffset"] as? Int, next > offset else { break }
+      offset = next
+      if chunk["eof"] as? Bool == true { break }
+    }
+    guard data.count == entry.byteCount else {
+      throw ToolkitFailure(
+        message: "\(label) is \(data.count) bytes but the runtime published \(entry.byteCount)")
+    }
+    guard ToolkitScreenshotIntegrity.sha256Hex(data) == entry.sha256.lowercased() else {
+      throw ToolkitFailure(message: "\(label) did not match its published digest")
+    }
+    return data
+  }
+
   private func readScreenshot(jobID: String) async throws -> (
     data: Data, width: Int, height: Int
   ) {
@@ -421,7 +556,7 @@ public enum ToolkitScreenshotIntegrity {
 public enum ToolkitArtifactIndex {
   public struct IndexUnreadable: Error, Equatable { public let message: String }
 
-  public struct ScreenshotEntry: Sendable, Equatable {
+  public struct PublishedEntry: Sendable, Equatable {
     public let artifactID: String
     public let sha256: String
     public let byteCount: Int
@@ -442,18 +577,24 @@ public enum ToolkitArtifactIndex {
     return result
   }
 
-  /// The published screenshot, or nothing. A truncated or missing entry is
-  /// not a screenshot: the workspace would otherwise draw a partial picture
-  /// and let somebody aim at it.
-  public static func screenshot(in entries: [[String: Any]]) -> ScreenshotEntry? {
+  /// One published product, or nothing. A truncated or missing entry is not a
+  /// product: the workspace would otherwise draw a partial picture and let
+  /// somebody aim at it, or compose a recording out of half an archive.
+  public static func published(
+    named name: String, in entries: [[String: Any]]
+  ) -> PublishedEntry? {
     guard
-      let entry = entries.first(where: { $0["name"] as? String == "screenshot.png" }),
+      let entry = entries.first(where: { $0["name"] as? String == name }),
       let artifactID = entry["artifactId"] as? String,
       entry["status"] as? String == "published",
       let sha256 = entry["sha256"] as? String,
       let byteCount = entry["byteCount"] as? Int
     else { return nil }
-    return ScreenshotEntry(artifactID: artifactID, sha256: sha256, byteCount: byteCount)
+    return PublishedEntry(artifactID: artifactID, sha256: sha256, byteCount: byteCount)
+  }
+
+  public static func screenshot(in entries: [[String: Any]]) -> PublishedEntry? {
+    published(named: "screenshot.png", in: entries)
   }
 }
 

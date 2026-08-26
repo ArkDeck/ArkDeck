@@ -153,6 +153,13 @@
   "unknownOutcome": "reconcileRequired",
   "artifacts": [
     {
+      "name": "sequence.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    },
+    {
       "name": "frames.tar",
       "role": "raw",
       "mediaType": "application/x-tar",

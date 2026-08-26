@@ -82,8 +82,25 @@ T02/T03 不进入实现。
   processSequence 报的总时长也一直是 0。没人消费过所以没显形；本腿是第一个消费者
   （没有别处能观测到帧率）。现改为单调钟实测，并由
   `DispatchedInvocationDurationContractTests` 对真实子进程把住。
-  **未做：App 录屏面**（Assembling→Validating→结果条：实测帧率 + 位置 +
-  Finder/另存为/再录一段），以及宿主侧把帧合成为一个文件。
+  **App 录屏面已交付（2026-08-26）**：Toolkit 工作区内 Recording 面板，四态
+  Capturing→Assembling→Validating→结果条（实测帧率 + 落盘位置 + 在访达中显示/
+  另存为/再录一段）。控件是**帧数不是秒数**——速率属于设备回读，要不来。
+  宿主合成走 `AVAssetWriter`（H.264/.mov），**每帧呈现时刻取自实测逐帧时长**而非
+  平均节奏；Validating 是把写出的文件用 `AVURLAsset` **读回来**比对时长与尺寸，
+  因为「写方说写完了」正是这一步该怀疑的那句话。
+  为把实测时长送到 App，新增 `RuntimeScreenSequence`（照 `RuntimeRingCoverage`
+  先例挂在 job record 上——**时间线只记事实的键名不记值**，不这么做这些测量就丢了），
+  并由终结阶段发布 `sequence.json`。
+  归档解析 `ToolkitFrameArchive` 是仓内纯字节实现（不 spawn `tar`），截断的归档
+  报 `truncated(afterFrames:)` 而不是静默当读完。
+  证据：16 条契约测试，其中 3 条用**真机取回的 `frames.tar`**（20 帧 / 720×1280）
+  跑通「fixture 取帧 → 合成 → 读回校验」整条流水线，实测 1.84 fps。
+  **未跑到：`ToolkitRecordingUITests`**（真机 UI 闸，覆盖四态跃迁与结果条三个按钮）。
+  已写好、已注册、build-for-testing 通过，但本机 XCUITest 起不来：
+  `Failed to initialize for UI testing: Timed out while enabling automation mode`。
+  **不是这条测试的问题——当天早些时候通过的 `ToolkitStaleFrameUITests` 此刻同样报这个错**；
+  Developer mode 已启用，重启 testmanagerd 无效，再往下要动系统安全设置。待环境恢复后补跑。
+  **未做**：录屏面板与 Diagnostics 会话的对齐（录屏目前不落进诊断会话制品）。
   ③ **开始前的配额 preflight 未做**——AC-8 要求失败即阻断。
   ④ **performance notice 未做**——AC-8 要求它与 production-boundary 一样不可删除；
   现在只有 boundary（`toolkit.boundary`）。

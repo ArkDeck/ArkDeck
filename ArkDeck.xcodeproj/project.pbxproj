@@ -26,6 +26,7 @@
 		A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AE /* JobsLocalizable.xcstrings */; };
 		G100000000000000000001 /* ToolkitWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000002 /* ToolkitWorkspaceView.swift */; };
 		G100000000000000000003 /* ToolkitWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000004 /* ToolkitWorkspaceViewModel.swift */; };
+		G100000000000000000090 /* ToolkitRecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000091 /* ToolkitRecordingViewModel.swift */; };
 		G100000000000000000005 /* ToolkitLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000006 /* ToolkitLocalization.swift */; };
 		G100000000000000000007 /* ToolkitLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = G100000000000000000008 /* ToolkitLocalizable.xcstrings */; };
 		G200000000000000000001 /* DiagnosticsWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G200000000000000000002 /* DiagnosticsWorkspaceView.swift */; };
@@ -53,6 +54,7 @@
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000E0 /* ViewerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* ViewerUITests.swift */; };
 		A10000000000000000000F10 /* ToolkitStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */; };
+		A10000000000000000000F20 /* ToolkitRecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F21 /* ToolkitRecordingUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
@@ -85,6 +87,7 @@
 		A100000000000000000000AE /* JobsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = JobsLocalizable.xcstrings; sourceTree = "<group>"; };
 		G100000000000000000002 /* ToolkitWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitWorkspaceView.swift; sourceTree = "<group>"; };
 		G100000000000000000004 /* ToolkitWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitWorkspaceViewModel.swift; sourceTree = "<group>"; };
+		G100000000000000000091 /* ToolkitRecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitRecordingViewModel.swift; sourceTree = "<group>"; };
 		G100000000000000000006 /* ToolkitLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitLocalization.swift; sourceTree = "<group>"; };
 		G100000000000000000008 /* ToolkitLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ToolkitLocalizable.xcstrings; sourceTree = "<group>"; };
 		G200000000000000000002 /* DiagnosticsWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsWorkspaceView.swift; sourceTree = "<group>"; };
@@ -108,6 +111,7 @@
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitStaleFrameUITests.swift; sourceTree = "<group>"; };
+		A10000000000000000000F21 /* ToolkitRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitRecordingUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 		E10000000000000000000002 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -307,6 +311,7 @@
 			children = (
 				G100000000000000000002 /* ToolkitWorkspaceView.swift */,
 				G100000000000000000004 /* ToolkitWorkspaceViewModel.swift */,
+				G100000000000000000091 /* ToolkitRecordingViewModel.swift */,
 				G100000000000000000006 /* ToolkitLocalization.swift */,
 			);
 			path = Features/Toolkit;
@@ -377,6 +382,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */,
+				A10000000000000000000F21 /* ToolkitRecordingUITests.swift */,
 			);
 			path = ArkDeckAppUITests/Toolkit;
 			sourceTree = "<group>";
@@ -567,6 +573,7 @@
 				G200000000000000000003 /* DiagnosticsWorkspaceViewModel.swift in Sources */,
 				G200000000000000000005 /* DiagnosticsLocalization.swift in Sources */,
 				G100000000000000000003 /* ToolkitWorkspaceViewModel.swift in Sources */,
+				G100000000000000000090 /* ToolkitRecordingViewModel.swift in Sources */,
 				G100000000000000000005 /* ToolkitLocalization.swift in Sources */,
 				A100000000000000000000E2 /* ViewerLocalization.swift in Sources */,
 				A100000000000000000000B0 /* DebugWorkspaceView.swift in Sources */,
@@ -586,6 +593,7 @@
 				A1000000000000000000001F /* AppShellUITests.swift in Sources */,
 				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
 				A10000000000000000000F10 /* ToolkitStaleFrameUITests.swift in Sources */,
+				A10000000000000000000F20 /* ToolkitRecordingUITests.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
 				A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */,

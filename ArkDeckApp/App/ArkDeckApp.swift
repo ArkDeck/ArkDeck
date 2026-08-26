@@ -115,6 +115,9 @@ private final class ArkDeckAppModelStore {
     provider: SettingsApplicationFacade.make())
   @ObservationIgnored lazy var toolkitWorkspace = ToolkitWorkspaceViewModel(
     provider: ToolkitDeviceControlFacade.make())
+  // A launch without `--ui-test-toolkit-recording=` never reaches the fixture.
+  @ObservationIgnored lazy var toolkitRecording = ToolkitRecordingViewModel(
+    provider: ToolkitRecordingFixture.provider() ?? ToolkitDeviceControlFacade.make())
   @ObservationIgnored lazy var diagnosticsWorkspace = DiagnosticsWorkspaceViewModel()
 
   init() {
@@ -857,7 +860,8 @@ private struct AppShellView: View {
     case .trace:
       TraceWorkspaceView(model: models.traceWorkspace)
     case .toolkit:
-      ToolkitWorkspaceView(model: models.toolkitWorkspace)
+      ToolkitWorkspaceView(
+        model: models.toolkitWorkspace, recording: models.toolkitRecording)
     case .diagnostics:
       DiagnosticsWorkspaceView(model: models.diagnosticsWorkspace)
     }

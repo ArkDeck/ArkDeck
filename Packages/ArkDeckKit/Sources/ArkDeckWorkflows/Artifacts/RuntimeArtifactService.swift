@@ -246,6 +246,7 @@ enum RuntimeArtifactService {
     "capture.diagnostics@1": [
       "capture.log", "markers.json", "artifact-index.json", "capture-summary.json",
     ],
+    "capture.screen-sequence@1": ["sequence.json"],
     ArkForgeFlashOperation.canonicalReference: ["flash-report.json"],
   ]
 
@@ -378,6 +379,36 @@ enum RuntimeArtifactService {
     return try encoder.encode(JSONValue.object(document))
   }
 
+  /// What the run achieved, published so the frames can be laid out on the
+  /// spacing they were actually taken at.
+  ///
+  /// Nothing downstream can reconstruct this: the device's wall clock reads
+  /// years off the host's, so the frames carry no usable instants of their
+  /// own, and the archive is only bytes in an order. Without this a composed
+  /// recording would have to invent a cadence.
+  static func sequenceDocument(record: RuntimeJobRecord) throws -> Data {
+    var document: [String: JSONValue] = ["schemaVersion": .string("1.0.0")]
+    if let sequence = record.screenSequence {
+      document["requestedFrameCount"] = .integer(Int64(sequence.requestedFrameCount))
+      document["capturedFrameCount"] = .integer(Int64(sequence.capturedFrameCount))
+      document["frameDurationsSeconds"] = .array(
+        sequence.frameDurationsSeconds.map(JSONValue.number))
+      document["observedFramesPerSecond"] = .number(sequence.framesPerSecond)
+      // A run that lost frames says so here rather than leaving a caller to
+      // notice the archive is short.
+      document["framesMissing"] = .integer(
+        Int64(max(0, sequence.requestedFrameCount - sequence.capturedFrameCount)))
+    } else {
+      // Recorded as an absence, never as an empty run: "nothing measured" and
+      // "measured nothing" are different, and only one of them is a recording.
+      document["measured"] = .bool(false)
+      document["reason"] = .string("the capture step published no observed frame timings")
+    }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+    return try encoder.encode(JSONValue.object(document))
+  }
+
   static func finalArtifactContents(
     name: String,
     descriptor: CatalogOperationDescriptor,
@@ -391,6 +422,9 @@ enum RuntimeArtifactService {
     }
     if descriptor.reference == "capture.diagnostics@1", name == "markers.json" {
       return try markersDocument(record: record, recorded: recorded)
+    }
+    if descriptor.reference == "capture.screen-sequence@1", name == "sequence.json" {
+      return try sequenceDocument(record: record)
     }
     var perArtifact: [String: JSONValue] = [:]
     for declaration in descriptor.artifacts
