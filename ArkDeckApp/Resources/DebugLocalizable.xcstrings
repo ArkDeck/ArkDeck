@@ -234,7 +234,8 @@
     "debug.failure.outcomeUnknown":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"The device effect is unknown. Keep the device unchanged while Runtime reconciles it."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备影响未知。Runtime 核对期间请保持设备状态不变。"}}}},
     "debug.failure.cancelled":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"The operation stopped at a safe boundary."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"操作已在安全边界停止。"}}}},
     "debug.failure.interrupted":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime was interrupted. Review the Job before continuing."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 已中断。继续前请检查此 Job。"}}}},
-    "debug.failure.legacyFailure":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"The operation failed. Review the Job timeline and artifacts."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"操作失败。请检查 Job timeline 和 Artifact。"}}}}
+    "debug.failure.legacyFailure":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"The operation failed. Review the Job timeline and artifacts."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"操作失败。请检查 Job timeline 和 Artifact。"}}}},
+    "debug.artifacts.remoteBindingFailed":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The artifact was selected, but its server could not be bound to this target."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"远端产物已选择，但无法把该服务器绑定到当前目标。"}}}}
   },
   "version" : "1.0"
 }

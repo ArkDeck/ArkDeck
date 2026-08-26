@@ -653,6 +653,8 @@ private struct DebugArtifactsWorkspace: View {
   @State private var selectedRemoteLibrary: DebugRemoteLibrarySelection?
   @State private var remoteBrowserModel = DebugRemoteBuildBrowserViewModel(
     provider: RemoteBuildSourceApplicationFacade.make())
+  private let remoteBindingProvider: any RemoteBuildSourceBindingProviding =
+    RemoteBuildSourceBindingApplicationFacade.make()
   @State private var selectionError: String?
   @State private var targetBundle = ""
   @State private var libraryLogicalName = ""
@@ -762,6 +764,18 @@ private struct DebugArtifactsWorkspace: View {
         selectedLibraryURL = selection.identityURL
         libraryLogicalName = selection.entry.name
         selectionError = nil
+        if let targetID = target?.id {
+          let remoteBindingProvider = remoteBindingProvider
+          Task { @MainActor in
+            do {
+              try await remoteBindingProvider.bind(
+                sourceID: selection.sourceID, toTargetID: targetID)
+            } catch {
+              selectionError = DebugL10n.text("debug.artifacts.remoteBindingFailed")
+                + " " + error.localizedDescription
+            }
+          }
+        }
         model.clearNativeLibraryPreparation()
         isRemoteBrowserPresented = false
       }

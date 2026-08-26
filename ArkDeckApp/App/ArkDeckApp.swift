@@ -98,6 +98,7 @@ private final class ArkDeckAppModelStore {
     provider: HDCApplicationDiagnosticsFacade.make())
   @ObservationIgnored lazy var overviewCapabilities = OverviewCapabilityViewModel(
     provider: OverviewCapabilityApplicationFacade.make())
+  @ObservationIgnored lazy var overviewRemoteServer = OverviewRemoteServerViewModel()
   @ObservationIgnored lazy var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
   // A launch without `--ui-test-viewer…` never reaches the fixture, so the
@@ -313,6 +314,7 @@ private enum ShellSelection: Hashable {
 private struct OverviewWorkspaceView: View {
   let hdcDiagnostics: HDCStatusViewModel
   let overviewCapabilities: OverviewCapabilityViewModel
+  let overviewRemoteServer: OverviewRemoteServerViewModel
   let deviceList: DeviceListViewModel
   let runtimeHistory: RuntimeHistoryViewModel
   let onOpenWorkspace: (ArkDeckNavigationItem) -> Void
@@ -326,6 +328,7 @@ private struct OverviewWorkspaceView: View {
       onRefresh: {
         hdcDiagnostics.refresh()
         overviewCapabilities.refresh()
+        overviewRemoteServer.load(targetID: overviewCapabilities.presentation.targetID)
         runtimeHistory.refresh()
       },
       isRefreshInFlight: hdcDiagnostics.isRefreshInFlight
@@ -350,16 +353,20 @@ private struct OverviewWorkspaceView: View {
       .onChange(of: runtimeHistory.presentation, initial: true) { _, presentation in
         readEvidenceForVisibleRuns(presentation)
       }
+      .onChange(of: overviewCapabilities.presentation.targetID, initial: true) {
+        _, targetID in
+        overviewRemoteServer.load(targetID: targetID)
+      }
   }
 
   private var record: some View {
     OverviewRecordView(
       devices: deviceList.presentation,
       capabilities: overviewCapabilities.presentation,
+      remoteServer: overviewRemoteServer.presentation,
       history: runtimeHistory.presentation,
       detailsByJobID: runtimeHistory.detailsByJobID,
       onSelectTarget: { overviewCapabilities.select(targetID: $0) },
-      onOpen: { onOpenWorkspace(Self.navigation(for: $0)) },
       onOpenHistory: { onOpenWorkspace(.history) },
       onOpenJob: { _ in onOpenWorkspace(.history) },
       onResume: { resumingRun = $0 })
@@ -667,6 +674,7 @@ private struct AppShellView: View {
   /// from rather than contradicting itself.
   private func publishDeviceObservation(_ observation: DeviceListPresentation) {
     let effective = ViewerUIFixture.deviceObservation() ?? observation
+    models.overviewCapabilities.applyDeviceObservation(observation)
     models.uiDumpWorkspace.applyDeviceObservation(
       effective, names: deviceDisplayNames(effective))
     // HDC diagnostics reads the real observation: a fixture Viewer capture
@@ -827,6 +835,7 @@ private struct AppShellView: View {
       OverviewWorkspaceView(
         hdcDiagnostics: models.hdcDiagnostics,
         overviewCapabilities: models.overviewCapabilities,
+        overviewRemoteServer: models.overviewRemoteServer,
         deviceList: models.deviceList,
         runtimeHistory: runtimeHistory,
         onOpenWorkspace: { item in
@@ -1328,6 +1337,8 @@ private final class OverviewCapabilityViewModel {
   /// when several are adopted.
   private(set) var selectedTargetID: String?
   private let provider: any OverviewCapabilityApplicationProviding
+  private var providerPresentation = OverviewCapabilityMatrixPresentation.loading
+  private var deviceObservation = DeviceListPresentation.loading
 
   init(provider: any OverviewCapabilityApplicationProviding) {
     self.provider = provider
@@ -1335,8 +1346,34 @@ private final class OverviewCapabilityViewModel {
 
   func select(targetID: String?) {
     guard targetID != selectedTargetID else { return }
+    let onlineTargetIDs = Set(
+      OverviewOnlineTargetProjection.targets(from: deviceObservation).map(\.id))
+    if let targetID {
+      guard onlineTargetIDs.contains(targetID) else { return }
+    }
     selectedTargetID = targetID
+    publishPresentation()
     refresh()
+  }
+
+  /// The App already owns one live device observation for every workspace.
+  /// Overview consumes that same fact instead of treating durable target
+  /// history as an online-device list or adding another HDC probe.
+  func applyDeviceObservation(_ observation: DeviceListPresentation) {
+    guard observation != deviceObservation else { return }
+    deviceObservation = observation
+    let onlineTargets = OverviewOnlineTargetProjection.targets(from: observation)
+    if let selectedTargetID,
+      !onlineTargets.contains(where: { $0.id == selectedTargetID })
+    {
+      self.selectedTargetID = onlineTargets.count == 1 ? onlineTargets[0].id : nil
+    } else if selectedTargetID == nil, onlineTargets.count == 1 {
+      selectedTargetID = onlineTargets[0].id
+    }
+    publishPresentation()
+    if let selectedTargetID, providerPresentation.targetID != selectedTargetID {
+      refresh()
+    }
   }
 
   func refresh() {
@@ -1349,13 +1386,30 @@ private final class OverviewCapabilityViewModel {
       guard let self else { return }
       self.isRefreshInFlight = false
       guard !Task.isCancelled else { return }
-      self.presentation = next
+      self.providerPresentation = next
       // A target that stopped being adopted must not keep being requested, or
       // every later refresh reports the same stale choice instead of the one
       // device now present.
       if let requested, !next.adoptedTargets.contains(where: { $0.id == requested }) {
         self.selectedTargetID = nil
       }
+      self.publishPresentation()
+      // A live-device update can arrive while the previous target probe is in
+      // flight. The guarded refresh above intentionally did not stack work;
+      // now that it is terminal, issue exactly one request for the new scope.
+      if let selectedTargetID = self.selectedTargetID,
+        selectedTargetID != requested,
+        next.targetID != selectedTargetID
+      {
+        self.refresh()
+      }
     }
+  }
+
+  private func publishPresentation() {
+    presentation = OverviewOnlineTargetProjection.presentation(
+      from: providerPresentation,
+      devices: deviceObservation,
+      preferredTargetID: selectedTargetID)
   }
 }

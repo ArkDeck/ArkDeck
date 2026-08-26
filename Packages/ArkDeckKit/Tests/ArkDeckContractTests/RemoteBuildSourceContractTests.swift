@@ -80,6 +80,54 @@ final class RemoteBuildSourceContractTests: XCTestCase {
     }
   }
 
+  func testTargetBindingIsExplicitPrivateAndRejectsAnUnknownSource() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-remote-binding-contract-\(UUID().uuidString)",
+      directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let sourceURL = directory.appending(path: "sources.json")
+    let bindingURL = directory.appending(path: "bindings.json")
+    let sourceID = UUID()
+    let records = FileRemoteBuildSourceRecordStore(fileURL: sourceURL)
+    try await records.replace([
+      RemoteBuildSourceRecord(
+        id: sourceID, name: "Builder", host: "builder.example", port: 22,
+        username: "build", rootPath: "/srv/build/out",
+        canonicalRootPath: "/srv/build/out", authentication: .privateKey,
+        hostPublicKey: "ssh-ed25519 AAAATEST", hostKeyFingerprint: "SHA256:test",
+        lastVerifiedAt: Date(timeIntervalSince1970: 1_700_000_000))
+    ])
+    let provider = ProductionRemoteBuildSourceBindingProvider(
+      records: records,
+      bindings: FileRemoteBuildSourceBindingStore(fileURL: bindingURL))
+
+    let initialBinding = try await provider.binding(forTargetID: "target-a")
+    XCTAssertNil(initialBinding)
+    try await provider.bind(sourceID: sourceID, toTargetID: "target-a")
+    let loadedBinding = try await provider.binding(forTargetID: "target-a")
+    let binding = try XCTUnwrap(loadedBinding)
+    XCTAssertEqual(binding.targetID, "target-a")
+    XCTAssertEqual(binding.sourceID, sourceID)
+    do {
+      try await provider.bind(sourceID: UUID(), toTargetID: "target-a")
+      XCTFail("an unknown source must not become a target binding")
+    } catch {
+      XCTAssertEqual(error as? RemoteBuildSourceError, .sourceNotFound)
+    }
+
+    let permissions = try XCTUnwrap(
+      (try FileManager.default.attributesOfItem(atPath: bindingURL.path)[.posixPermissions]
+        as? NSNumber)?.intValue)
+    XCTAssertEqual(permissions & 0o777, 0o600)
+    let contents = try String(contentsOf: bindingURL, encoding: .utf8)
+    XCTAssertTrue(contents.contains("target-a"))
+    XCTAssertFalse(contents.contains("builder.example"))
+
+    try await provider.unbind(targetID: "target-a")
+    let removedBinding = try await provider.binding(forTargetID: "target-a")
+    XCTAssertNil(removedBinding)
+  }
+
   func testSystemSSHIdentityResolverUsesOnlyFixedOwnerPrivateRegularFiles() throws {
     let home = FileManager.default.temporaryDirectory.appending(
       path: "arkdeck-system-ssh-contract-\(UUID().uuidString)",
