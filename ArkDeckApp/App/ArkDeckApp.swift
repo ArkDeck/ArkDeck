@@ -852,7 +852,17 @@ private struct AppShellView: View {
         onRefresh: runtimeHistory.refresh,
         onLoadOlder: runtimeHistory.loadOlder,
         onLoadDetail: runtimeHistory.loadDetail,
-        onExportArtifact: runtimeHistory.exportArtifact)
+        onExportArtifact: runtimeHistory.exportArtifact,
+        onOpenWorkspace: { destination in
+          let item: ArkDeckNavigationItem = switch destination {
+          case .flash: .flash
+          case .debug: .debug
+          case .uiDump: .uiDump
+          case .trace: .trace
+          case .diagnostics: .diagnostics
+          }
+          storedSelection = ShellSelection.navigation(item).storageValue
+        })
     case .flash:
       FlashWorkspaceView(
         model: models.flashWorkspace,

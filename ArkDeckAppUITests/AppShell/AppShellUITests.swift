@@ -68,6 +68,56 @@ final class AppShellUITests: XCTestCase {
       "Cold start took \(String(format: "%.3f", elapsed)) seconds to show the device row")
   }
 
+  /// Opt-in History acceptance against production Runtime state. The device
+  /// operation is executed headlessly before this test; this UI leg proves
+  /// that the resulting verified Job is discoverable and can reopen its
+  /// related workspace without replaying it.
+  func testRealDeviceHistoryReopensLatestCapture() throws {
+    guard
+      ProcessInfo.processInfo.environment[
+        Self.realDeviceStartupEnvironmentKey
+      ] == "1"
+    else {
+      throw XCTSkip(
+        "Set \(Self.realDeviceStartupEnvironmentKey)=1 for real-device History acceptance")
+    }
+
+    let app = XCUIApplication()
+    app.launchArguments = [
+      "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+      "--ui-test-auto-update-idle", "--ui-test-reset-shell-selection",
+    ]
+    app.launch()
+    app.activate()
+    XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
+
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(
+      element("history.table", in: app).waitForExistenceFast(timeout: 30),
+      "production Runtime history did not render")
+    XCTAssertTrue(
+      app.staticTexts["history.detail.select"].waitForNonExistenceFast(timeout: 10),
+      "the newest production Job was not selected")
+    assertDisplayed(
+      app.staticTexts["history.detail.operation"], equals: "capture.diagnostics@1", timeout: 30)
+    XCTAssertTrue(
+      element("history.artifacts", in: app).waitForExistenceFast(timeout: 30),
+      "the verified capture artifacts did not load")
+
+    let openWorkspace = app.buttons["history.openWorkspace"]
+    XCTAssertTrue(openWorkspace.waitForExistence(timeout: 10))
+    openWorkspace.click()
+    XCTAssertTrue(
+      element("app.navigation.diagnostics", in: app).waitForExistenceFast(timeout: 10),
+      "the diagnostics history did not reopen Diagnostics")
+
+    let evidence = XCTAttachment(
+      string: "Latest production Runtime capture was visible with verified artifacts and reopened Diagnostics without replay.")
+    evidence.name = "History real-device activity acceptance"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+  }
+
   // MARK: - One launch per language
 
   func testEnglishSweepOfEveryWorkspace() {
@@ -116,7 +166,7 @@ final class AppShellUITests: XCTestCase {
         ]),
       history: History(
         readOnlyNote:
-          "This workspace reads Runtime state. It cannot submit, cancel, or retry anything.",
+          "History only reads Runtime state. Opening a related tool never submits, cancels, or retries this Job.",
         outcomeUnknown: "Outcome unknown — this Job's effect on the device was never confirmed.",
         waitingForHuman: "Waiting for a person to act.",
         interruptedRowState: "Interrupted · outcome unknown",
@@ -163,7 +213,7 @@ final class AppShellUITests: XCTestCase {
         traceUnavailable: "暂时无法抓取",
         settingsPanes: ["通用", "工具链", "服务器", "存储", "更新", "诊断"]),
       history: History(
-        readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
+        readOnlyNote: "History 只读取 Runtime 状态。打开相关工具不会提交、取消或重试此 Job。",
         outcomeUnknown: "结果未知——此 Job 对设备的影响从未被确认。",
         waitingForHuman: "等待人工处理。",
         interruptedRowState: "已中断 · 结果未知",
@@ -637,6 +687,11 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("history.table", in: app).waitForExistenceFast(timeout: 10), file: file, line: line)
     assertDisplayed(app.staticTexts["history.readOnlyNote"], equals: history.readOnlyNote)
+    for category in ["all", "flash", "viewer", "trace", "diagnostics", "debug"] {
+      XCTAssertTrue(
+        element("history.activity.\(category)", in: app).exists,
+        "History activity category \(category) missing", file: file, line: line)
+    }
     for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
       XCTAssertFalse(
         app.buttons[forbidden].exists, "\(forbidden) must not exist", file: file, line: line)
@@ -670,6 +725,23 @@ final class AppShellUITests: XCTestCase {
     // entry remains individually accessible in order.
     assertDisplayed(app.staticTexts["history.detail.residue"], equals: history.residue)
     assertTimeline(["queued", "running", "interrupted"], in: app)
+
+    // Reopening a historical activity is navigation only. It must take the
+    // operator to the related typed workspace without replaying this Job.
+    let openWorkspace = app.buttons["history.openWorkspace"]
+    XCTAssertTrue(openWorkspace.exists, file: file, line: line)
+    openWorkspace.click()
+    XCTAssertTrue(
+      element("flash.workspace.title", in: app).waitForExistenceFast(timeout: 10),
+      "a Flash history must reopen the Flash workspace", file: file, line: line)
+    for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
+      XCTAssertFalse(
+        app.buttons[forbidden].exists, "navigation must not expose \(forbidden)",
+        file: file, line: line)
+    }
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(
+      element("history.table", in: app).waitForExistenceFast(timeout: 10), file: file, line: line)
 
     // The succeeded job is the control: every one of those is conditional on
     // the job, and on this one none of them may appear. Without it the four

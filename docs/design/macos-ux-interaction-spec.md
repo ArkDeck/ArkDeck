@@ -1,17 +1,17 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v1.3（design input，非 normative；2026-08-25 v1.2 新增独立 Toolkit tab、把 Diagnostics 调整为低干扰默认，并按当前 SwiftUI 实现回写 Viewer / Trace 页面结构（后续稿件变更必须与实现同车）；同日 v1.3 按设计评审修订：Diagnostics 的 Marker 改为「标记 + 环形缓冲回溯取证」、截图按实际拍摄时刻标注、新增自动 Marker、对齐承诺分两阶段、event identity 不被非事件点击清空；Toolkit 输入闭集扩为 tap/longClick/swipe、两态触点反馈、画面年龄与过期输入暂停、第一版录屏为宿主逐帧合成。详细2026-08-26 按当前 SwiftUI 实现回写 Debug 页面结构:五个 tab 的分组改为 section 标题加细线，Artifacts 改为单个已签名 app-owned `.so` 的本地 / 只读 SSH 来源流程，交互原型的 Debug 页同车重写。详细设计见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md) 与 [`toolkit-device-control-design.md`](./toolkit-device-control-design.md)；对应 OpenSpec 提案 `openspec/changes/chg-2026-071-interactive-device-control/`）
+> Status：draft v1.4（design input，非 normative；2026-08-25 v1.2 新增独立 Toolkit tab、把 Diagnostics 调整为低干扰默认，并按当前 SwiftUI 实现回写 Viewer / Trace 页面结构；同日 v1.3 按设计评审修订 Diagnostics Marker、时间对齐与 Toolkit 输入反馈。2026-08-26 回写 Debug 当前 SwiftUI 分组及单个已签名 app-owned `.so` 的本地 / 只读 SSH 来源流程；v1.4 将 History 从 Job 审计表重组为按工作类型回访的活动中心，同时保留完整 Runtime 证据、Artifact、恢复关联与导出能力。Diagnostics / Toolkit 详细设计见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md) 与 [`toolkit-device-control-design.md`](./toolkit-device-control-design.md)；对应 OpenSpec 提案 `openspec/changes/chg-2026-071-interactive-device-control/`）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v1.2 目标与当前实现边界
+## 0. v1.4 目标与当前实现边界
 
-v1.2 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Diagnostic Session Viewer，在 Diagnostics 之后新增独立 **Toolkit** tab。Diagnostics 默认只持续采集 Trace 与 HiLog，Marker 触发按需截图；连续录屏是明确 opt-in。Toolkit 的第一个工具是「真机操作」：默认显示最后一次确认截图，用户可独立获取截图、开启 5 fps 低帧率预览、开始有界录屏，以及发送一次点击或滑动。Diagnostics、Trace 与 Toolkit 各自保存 view state、配置和运行状态，互不替换，也不会静默开启彼此的高开销 channel。
+v1.4 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Diagnostic Session Viewer，在 Diagnostics 之后新增独立 **Toolkit** tab，并把 History 重组为可回访的活动中心。Diagnostics 默认只持续采集 Trace 与 HiLog，Marker 触发按需截图；连续录屏是明确 opt-in。Toolkit 的第一个工具是「真机操作」：默认显示最后一次确认截图，用户可独立获取截图、开启 5 fps 低帧率预览、开始有界录屏，以及发送一次点击或滑动。Diagnostics、Trace、Toolkit 与 History 各自保存 view state、配置和运行状态，互不替换，也不会静默开启彼此的高开销 channel。
 
 当前代码与目标设计的边界必须如实呈现：
 
-| Surface | 当前实现 | v1.2 设计方向 |
+| Surface | 当前实现 | v1.4 设计方向 |
 | --- | --- | --- |
 | App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / Viewer / Trace / History / Automation 均有实际工作区 | 保留原生 split view；在 Trace 后新增 Diagnostics 与 Toolkit；统一 toolbar、全局 Job inspector 与窗口自适应 |
 | Device detail | 未授权设备有接管引导；已接管设备能显示真实 binding / observation facts，并有原生右键重命名和重新检测 | 删除重复内容标题；宽屏拆分状态操作与事实；名称只是 App 展示别名，重新检测只刷新候选事实 |
@@ -19,6 +19,7 @@ v1.2 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Dia
 | Viewer | `UIDumpWorkspaceView` 已实现首次空态、显式 target、typed「抓取视图」、同 Job Artifact 校验，以及截图 + UI 树/节点属性联动检查器 | UI 稿直接镜像当前实现；不再把已经落地的 Viewer 写成未来方向 |
 | Debug | `DebugWorkspaceView` 已有 Artifacts / Logs / Apps / Network / Commands 五个 tab，Artifacts 为默认项;已发布单个 app-owned `.so` 的本地文件与只读 SSH 来源选择、ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability restart、加载 readback 与失败回滚，SSH 来源在「设置 › 服务器」中管理;每组以 section 标题加细线分组，Runtime 可用性只在标题旁一行呈现 | 默认进入 Artifacts；管理 SSH、本机目录、SMB、WSL 来源及其根目录，搜索、勾选、预览替换计划，完成替换后显式提供重启与日志验证。未发布的来源浏览、批量、`.abc` 与独立设备重启能力必须显示 unavailable，不用原型状态伪造生产可用性 |
 | Trace | 主窗口是精简的「抓取 Trace / 查看 Trace」两段式入口；原生 Timeline 在独立 ArkDeck Trace Viewer 窗口中打开 | UI 稿镜像当前入口，不复活自定义 tag、参数 diff、派生产物 dashboard 或页内 Timeline 模式；Diagnostics 不复用或改写 Trace 状态 |
+| History | `RuntimeHistoryView` 从 `job.list` 展示只读记录，按活动类型聚合 Flash、Debug、Viewer、Trace 与 Diagnostics；选择后按需加载 Runtime 证据、参数、Artifact 与恢复关联 | 宽屏使用活动类型导航、最近记录、详情 inspector 三栏；支持搜索及完整 Runtime 筛选、保存筛选，并从记录返回对应工作区；不得把演示数据或本地猜测混入 Runtime projection |
 | Diagnostics | 尚无独立 production surface；现有 `capture.diagnostics@1` 能产出 bounded HiLog、单张截图、UI dump/tree 和 raw Trace，但没有屏幕视频、并发/环形采集、会话内准入或跨来源 clock calibration；截图腿会把作业升级为 deviceMutation | 以独立 Diagnostic Session 统一采集 / Viewer；Trace/HiLog 以环形缓冲回溯保存，Marker 只记时间点、截图事后拍摄并标注 `+N ms`，自动 Marker 补齐人工反应延迟；连续录屏需明确开启。选择 Trace event 时联动可用截图/视频与日志；第一版对齐只承诺 `同一时钟` / `无法对齐` 两态，`已校准 ±N ms` 待 ground-truth 实验。原型中的环形采集、自动 Marker、视频与校准仍是目标设计，不代表 production availability |
 | Toolkit | 尚无独立 production surface；截图、录屏、点击和滑动也未必存在对应的已发布 operation / Provider lowering；OHOS 无已知设备侧录屏命令面；交互输入的端到端延迟未测 | 以独立 Toolkit 集合承载小工具，第一个工具为「真机操作」。默认按需截图；低帧率预览常显实测帧率与画面年龄、过期时输入暂停；第一版录屏为宿主逐帧合成（Assembling→Validating，无设备残留），设备侧编码 Spike-gated；点击/长按/滑动两态反馈（pending→confirmed）、绑定精确 target、binding、显示尺寸、方向与画面 epoch，排队超时输入作废。缺少已发布 typed operation 或延迟门槛未达标时显示 unavailable，绝不以 raw HDC 兜底 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
@@ -216,9 +217,12 @@ Primary Window
 
 ### 5.9 History（REQ-UX-004）
 
-- 三栏：filter/sidebar → Session table → detail inspector。筛选支持 status、executionMode、device、time 和全文搜索；filter 可保存为 toolbar menu。
-- interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。
-- Detail 分组为 Summary / Timeline / Parameters / Artifacts / Recovery linkage。Artifact 行展示 name / role / origin / size / SHA-256 / privacy / status。
+- History 是只读 Runtime 活动中心，不是第二套 Job 执行面。摘要只来自 `job.list`；选中记录后才按需加载详情与 Artifact metadata，不用 fixture 或本地推断补齐缺失事实。
+- 宽屏三栏为活动类型导航 → 最近记录 → detail inspector。活动类型按 published operation 归入 Flash、Debug、Viewer、Trace 与 Diagnostics；未识别 operation 保留在「全部记录」，不得错误映射到相似工具。窄窗把完整筛选移到记录上方，并保留记录与详情的关联。
+- 支持全文搜索、status、executionMode、session、device/target 与 time 筛选；筛选可保存到 toolbar menu。「需要关注」与「最近失败」是筛选预设，不改变 Runtime state。
+- interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。plan-only / simulated badge 在记录、详情与导出中永久保留。
+- 对已知活动类型提供「在 Flash / Debug / Viewer / Trace / Diagnostics 中打开」，只导航并恢复可由已验证记录支持的上下文；它不重放 operation、不把历史 Artifact 当成 fresh device fact，也不绕过目标工作区的 Runtime 准入。
+- Detail 分组为 Summary / Timeline / Correlation / Evidence / Parameters / Artifacts / Recovery linkage。Artifact 行展示 name / role / origin / size / SHA-256 / privacy / status；关联视图只表达同一 Runtime 投影中已证明的 Job、Session、operation、target 与 Artifact identity。
 - 导出以单个 Artifact 为边界：先显示文件名、size、privacy 与 SHA-256；敏感 Artifact 要求显式确认。App 以有界 chunk 读取、复算 byteCount / SHA-256 后写入用户选择的位置，目标路径不跨 daemon 边界。成功后可在 Finder 定位。
 
 ### 5.10 Settings

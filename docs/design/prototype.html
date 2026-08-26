@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArkDeck 交互原型 v1.3</title>
+<title>ArkDeck 交互原型 v1.4</title>
 <style>
 :root{
   color-scheme:light dark;
@@ -695,6 +695,11 @@ select.inp{cursor:pointer}
 .trace-section-foot .btn{flex:none}
 .trace-viewer-entry{display:flex;align-items:center;gap:16px}
 .trace-viewer-entry p{min-width:0;flex:1;margin:0;color:var(--ink2);font-size:12.5px;text-wrap:pretty}
+.history-shell{display:grid;grid-template-columns:180px minmax(320px,.92fr) minmax(360px,1.08fr);gap:14px;min-height:540px}.history-rail,.history-list,.history-inspector{min-width:0;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
+.history-rail{display:flex;flex-direction:column;gap:18px}.history-group{display:flex;flex-direction:column;gap:4px}.history-group-label{padding:0 8px 5px;color:var(--ink2);font-size:10.5px;font-weight:650;text-transform:uppercase;letter-spacing:.05em}.history-kind{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 8px;border:0;border-radius:7px;background:transparent;color:var(--ink);text-align:start;cursor:pointer}.history-kind:hover{background:var(--panel2)}.history-kind.on{background:var(--accent-weak);color:var(--accent);font-weight:650}.history-kind .symbol{width:15px;height:15px}.history-count{margin-inline-start:auto;color:var(--ink2);font-size:10.5px;font-variant-numeric:tabular-nums}
+.history-list{display:flex;flex-direction:column;gap:10px}.history-list-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.history-search{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink2)}.history-search input{min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--ink);font:inherit}.history-search .symbol{width:14px;height:14px}.history-day{padding:7px 3px 0;color:var(--ink2);font-size:10.5px;font-weight:650}.history-record{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:9px;align-items:start;width:100%;padding:10px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--ink);text-align:start;cursor:pointer}.history-record:hover{background:var(--panel2)}.history-record.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-weak)}.history-record-icon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:var(--panel2);color:var(--ink2)}.history-record.on .history-record-icon{background:var(--panel-solid);color:var(--accent)}.history-record-main{display:flex;flex-direction:column;gap:2px;min-width:0}.history-record-main b,.history-record-main span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-record-main b{font-size:12.5px}.history-record-main span,.history-record-time{color:var(--ink2);font-size:10.5px}.history-record-tags{display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap}
+.history-inspector{display:flex;flex-direction:column;gap:14px}.history-inspector-head{display:flex;align-items:flex-start;gap:11px}.history-inspector-head>div{min-width:0;flex:1}.history-inspector-head h2{font-size:17px;margin:0 0 3px}.history-inspector-head p{margin:0;color:var(--ink2);font-size:11.5px}.history-preview{min-height:124px;padding:14px;border-radius:10px;background:linear-gradient(145deg,var(--panel2),color-mix(in srgb,var(--panel2) 72%,var(--accent-weak)));display:flex;flex-direction:column;justify-content:flex-end;gap:4px;overflow:hidden}.history-preview.trace{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,var(--panel2)),var(--panel2))}.history-preview-line{height:34px;color:var(--accent);opacity:.72}.history-preview b{font-size:12px}.history-preview span{font-size:10.5px;color:var(--ink2)}.history-primary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.history-primary .pri{flex:1}.history-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.history-meta div{padding:9px 10px;border-radius:8px;background:var(--panel2);min-width:0}.history-meta small{display:block;color:var(--ink2);font-size:10px}.history-meta b{display:block;margin-top:2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-inspector details{border-top:1px solid var(--line);padding-top:10px}.history-inspector summary{color:var(--ink2);font-size:11.5px;cursor:pointer}
+@media(max-width:1050px){.history-shell{grid-template-columns:160px minmax(280px,1fr)}.history-inspector{grid-column:1/-1}}@media(max-width:760px){.history-shell{grid-template-columns:1fr}.history-rail{flex-direction:row;overflow-x:auto}.history-group{min-width:170px}.history-inspector{grid-column:auto}}
 @media(max-width:760px){
   .trace-form{grid-template-columns:1fr;gap:8px}.trace-label{padding-top:0}
   .trace-section-foot,.trace-viewer-entry{align-items:flex-start;flex-direction:column}
@@ -817,7 +822,7 @@ select.inp{cursor:pointer}
   </defs>
 </svg>
 
-<p class="note"><b>ArkDeck macOS 交互原型 v1.3</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v1.3）同版本。Viewer / Trace 已回写当前 SwiftUI 表面：Viewer 默认先显示真实空态，Trace 只保留抓取与查看入口。本轮按设计评审修订：Diagnostics 的 Marker 改为「标记 + 环形缓冲回溯取证」，截图按实际拍摄时刻标注（+N ms），新增自动 Marker；默认演示 Session 即第一版默认形态（无录屏），另有含录屏与 Partial/无法对齐两个 Session；选中 Trace event 的 identity 不再被日志/画面点击清空。Toolkit 新增长按、两态触点反馈（pending → confirmed）、tap 锚定按下点；预览常显画面年龄且断流时输入自动暂停；第一版录屏为宿主逐帧合成（无设备端拉取与残留）。所有数据均为演示数据，不连接设备；环形缓冲、自动 Marker、5 fps 预览、设备侧编码录屏均不代表相关 device operation 已 production available。</p>
+<p class="note"><b>ArkDeck macOS 交互原型 v1.4</b> — History 已从 Job 审计表重组为可回访的工作记录：按刷机镜像、Viewer、Trace 与诊断分类，保存上下文与产物，并提供返回对应工具的重新打开入口；运行证据与 Artifact 仍可展开查看。Viewer / Trace 已回写当前 SwiftUI 表面：Viewer 默认先显示真实空态，Trace 只保留抓取与查看入口。Diagnostics 的 Marker 采用「标记 + 环形缓冲回溯取证」，截图按实际拍摄时刻标注（+N ms），并含自动 Marker。Toolkit 包含长按、两态触点反馈（pending → confirmed）与 tap 锚定按下点；预览常显画面年龄且断流时输入自动暂停。所有数据均为演示数据，不连接设备；演示中的环形缓冲、自动 Marker、5 fps 预览等不代表相关 device operation 已 production available。</p>
 
 <div class="window" id="win" aria-label="ArkDeck 设计原型窗口">
   <div class="titlebar" role="toolbar" aria-label="窗口工具栏">
@@ -914,7 +919,7 @@ const S = {
   debugTab:"artifacts",
   debug:{sourceKind:"local",server:"build-nightly",picked:null,pickedFrom:null,
     bundle:"",lib:"",stage:"idle",jobID:null,browsePath:"",browseSel:null},
-  hf:{st:"all", mode:"all", dev:"all"}, histSel:null, histSeq:1,
+  hf:{kind:"all", query:""}, histSel:"S-0826-01", histSeq:1,
   hdcSel:"deveco",
   jobs:[], jobSeq:1
 };
@@ -926,6 +931,11 @@ const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug"
   ["dump","dump","Viewer"],["trace","trace","Trace"],["diagnostics","diagnostics","Diagnostics"],["tools","toolkit","Toolkit"],["history","history","History"],
   ["automation","automation","Automation"]];
 const HIST=[
+  {id:"S-0826-01",kind:"flash",st:"succeeded",mode:"execute",dev:"DAYU200",what:"OpenHarmony 5.0.0.71",detail:"rk3568_release_20260825.zip · 已验证",when:"今天 14:32",day:"今天",icon:"flash",action:"在 Flash 中打开"},
+  {id:"S-0826-02",kind:"viewer",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页组件树",detail:"128 个节点 · /settings/display",when:"今天 13:48",day:"今天",icon:"dump",action:"在 Viewer 中打开"},
+  {id:"S-0826-03",kind:"trace",st:"succeeded",mode:"execute",dev:"DAYU200",what:"应用响应 · 30 秒",detail:"trace_143102.htrace · 18.4 MB",when:"今天 13:31",day:"今天",icon:"trace",action:"打开 Trace"},
+  {id:"S-0826-04",kind:"diagnostics",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页启动闪退",detail:"HiLog + 截图 + 3 个 Marker",when:"今天 11:06",day:"今天",icon:"diagnostics",action:"打开诊断记录"},
+  {id:"S-0825-01",kind:"viewer",st:"succeeded",mode:"execute",dev:"DAYU200",what:"桌面窗口结构",detail:"96 个节点 · 截图已关联",when:"昨天 17:20",day:"昨天",icon:"dump",action:"在 Viewer 中打开"},
   {id:"S-0713-06", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
   {id:"S-0712-01", st:"succeeded",   mode:"execute",   dev:"DAYU200", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
   {id:"S-0712-02", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200", when:"07-12 15:40"},
@@ -933,6 +943,7 @@ const HIST=[
   {id:"S-0711-04", st:"interrupted", mode:"execute",   dev:"DAYU200", what:"Flash · flash-partitions(outcomeUnknown)", when:"07-11 23:47"},
   {id:"S-0711-05", st:"failed",      mode:"execute",   dev:"DAYU200", what:"Viewer · elementTree(设备离线)", when:"07-11 20:15"}
 ];
+HIST.forEach(h=>{if(!h.kind)h.kind=h.what.startsWith("Trace")?"trace":h.what.includes("Viewer")?"viewer":h.what.startsWith("Flash")?"flash":"diagnostics";if(!h.day)h.day="更早";if(!h.icon)h.icon=h.kind==="viewer"?"dump":h.kind;if(!h.detail)h.detail=h.dev+" · "+h.id;if(!h.action)h.action=h.kind==="trace"?"打开 Trace":h.kind==="viewer"?"在 Viewer 中打开":h.kind==="flash"?"在 Flash 中打开":"打开诊断记录";});
 const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span class="chip danger">✕ 失败</span>',
   planned:'<span class="chip planned">◇ PLANNED</span>',cancelled:'<span class="chip dim">⊘ 已取消</span>',
   interrupted:'<span class="chip warn">⚠ 已中断 · 结果未知</span>'};
@@ -2920,35 +2931,30 @@ function exportModal(id){
 }
 function pHistory(){
   const f=S.hf;
-  const devs=["all"].concat([...new Set(HIST.map(h=>h.dev))]);
-  const rows=HIST.filter(h=>(f.st==="all"||h.st===f.st)&&(f.mode==="all"||h.mode===f.mode)&&(f.dev==="all"||h.dev===f.dev));
+  const q=(f.query||"").trim().toLowerCase();
+  const rows=HIST.filter(h=>(f.kind==="all"||h.kind===f.kind)&&(!q||[h.what,h.detail,h.dev,h.id].join(" ").toLowerCase().includes(q)));
   const sel=HIST.find(h=>h.id===S.histSel);
+  const kinds=[["all","history","全部记录"],["flash","flash","刷机镜像"],["viewer","dump","Viewer"],["trace","trace","Trace"],["diagnostics","diagnostics","诊断记录"]];
+  const navFor={flash:"flash",viewer:"dump",trace:"trace",diagnostics:"diagnostics"};
+  const preview=sel?`<div class="history-preview ${sel.kind}">${sel.kind==="trace"?'<svg class="history-preview-line" viewBox="0 0 320 40" preserveAspectRatio="none"><path d="M0 26h30l12-20 18 31 18-25 13 14h28l9-18 16 28 16-22 12 12h35l10-16 14 24 18-18 13 10h38" fill="none" stroke="currentColor" stroke-width="2"/></svg>':""}<b>${esc(sel.what)}</b><span>${esc(sel.detail)}</span></div>`:"";
   return recoveryHTML()+`
   <div class="page-lead" data-page-title="History"><span class="acin">REQ-UX-004</span></div>
-  <div class="card" data-acin style="gap:8px"><span class="ac">AC-UX-004-01</span>
-    <div class="filters"><span class="fl">状态</span>
-      ${[["all","全部"],["succeeded","成功"],["failed","失败"],["cancelled","已取消"],["planned","planned"],["interrupted","已中断"]]
-        .map(([k,l])=>`<button class="${f.st===k?"on":""}" onclick="S.hf.st='${k}';renderPage()">${l}</button>`).join("")}
-    </div>
-    <div class="filters"><span class="fl">模式</span>
-      ${[["all","全部"],["execute","execute"],["planOnly","plan-only"],["simulated","simulated"]]
-        .map(([k,l])=>`<button class="${f.mode===k?"on":""}" onclick="S.hf.mode='${k}';renderPage()">${l}</button>`).join("")}
-      <span class="fl" style="margin-left:10px">设备</span>
-      ${devs.map(d=>`<button class="${f.dev===d?"on":""}" onclick="S.hf.dev='${d}';renderPage()">${d==="all"?"全部":esc(d)}</button>`).join("")}
-    </div>
-  </div>
-  <div class="two">
-    <div class="card"><div class="tablewrap"><table>
-      <tr><th>Session</th><th>状态</th><th>设备</th><th>内容</th><th>时间</th></tr>
-      ${rows.map(h=>`<tr class="${S.histSel===h.id?"sel-row":""}" tabindex="0" role="button" style="cursor:pointer" onclick="S.histSel='${h.id}';renderPage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();S.histSel='${h.id}';renderPage()}">
-        <td class="mono">${h.id}${h.live?' <span class="livetag">本会话</span>':""}</td>
-        <td>${STCHIP[h.st]||""}${h.mode!=="execute"&&h.st!=="planned"?" "+modeBadge(h.mode,""):""}</td>
-        <td class="mono">${esc(h.dev)}</td><td>${esc(h.what)}</td><td class="mono">${h.when}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">无匹配项</td></tr>'}
-    </table></div></div>
-    <div class="card" data-acin><span class="ac">AC-UX-006-01</span>
-      <h2>Session 详情</h2>
-      ${sel?histDetail(sel):'<p class="empty">选择左侧 Session 查看 manifest、参数 before/after、Artifact 与审计详情。planned/simulated 标识在历史与导出中永久保留。</p>'}
-    </div>
+  <div class="history-shell" data-acin><span class="ac">AC-UX-004-01</span>
+    <aside class="history-rail">
+      <div class="history-group"><span class="history-group-label">内容</span>${kinds.map(([k,i,l])=>`<button class="history-kind ${f.kind===k?"on":""}" onclick="S.hf.kind='${k}';renderPage()">${icon(i,true)}<span>${l}</span><span class="history-count">${k==="all"?HIST.length:HIST.filter(h=>h.kind===k).length}</span></button>`).join("")}</div>
+      <div class="history-group"><span class="history-group-label">快速筛选</span><button class="history-kind" onclick="S.hf.kind='all';S.hf.query='DAYU200';renderPage()">${icon("device-control",true)}<span>DAYU200</span></button><button class="history-kind" onclick="S.hf.kind='all';S.hf.query='outcomeUnknown';renderPage()">${icon("warning",true)}<span>需要关注</span><span class="history-count">1</span></button></div>
+    </aside>
+    <section class="history-list">
+      <div class="history-list-head"><div><h2>最近活动</h2><span class="hint">重新打开产物，或带着原记录回到对应工具</span></div><button class="btn" onclick="doneBtn(this,'已刷新历史记录')">刷新</button></div>
+      <label class="history-search">${icon("search",true)}<input aria-label="搜索历史记录" value="${esc(f.query)}" placeholder="搜索镜像、页面、Trace 或设备" onchange="S.hf.query=this.value;renderPage()" onkeydown="if(event.key==='Enter'){S.hf.query=this.value;renderPage()}"></label>
+      ${rows.map((h,index)=>`${index===0||rows[index-1].day!==h.day?`<div class="history-day">${h.day}</div>`:""}<button class="history-record ${S.histSel===h.id?"on":""}" onclick="S.histSel='${h.id}';renderPage()"><span class="history-record-icon">${icon(h.icon,true)}</span><span class="history-record-main"><b>${esc(h.what)}</b><span>${esc(h.detail)}</span><span class="history-record-tags">${STCHIP[h.st]||""}${h.mode!=="execute"?modeBadge(h.mode,""):""}</span></span><span class="history-record-time">${h.when}</span></button>`).join("")||'<p class="empty">没有匹配的记录。清除搜索或选择其他类型。</p>'}
+    </section>
+    <section class="history-inspector">
+      ${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon,true)}</span><div><h2>${esc(sel.what)}</h2><p>${esc(sel.dev)} · ${esc(sel.when)} · ${sel.id}</p></div>${STCHIP[sel.st]||""}</div>
+      ${preview}<div class="history-primary"><button class="btn pri" onclick="go('${navFor[sel.kind]}')">${sel.action}</button><button class="btn" onclick="doneBtn(this,'已在访达中显示(演示)')">在访达中显示</button></div>
+      <div class="history-meta"><div><small>原始设备</small><b>${esc(sel.dev)}</b></div><div><small>保存内容</small><b>${sel.kind==="flash"?"镜像 + 刷写结果":sel.kind==="viewer"?"组件树 + 截图":sel.kind==="trace"?"Trace + 抓取参数":"时间线 + 采集产物"}</b></div><div><small>运行模式</small><b>${sel.mode}</b></div><div><small>记录编号</small><b class="mono">${sel.id}</b></div></div>
+      <details><summary>查看运行证据与 Artifact</summary><div style="margin-top:12px">${histDetail(sel)}</div></details>`:'<p class="empty">选择一条记录，查看保存内容并重新打开。</p>'}
+    </section>
   </div>`;
 }
 
