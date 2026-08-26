@@ -212,7 +212,15 @@ T02/T03 不进入实现。
   我把沿用的**消费端**守卫一并删了，于是该设备上任何操作都开始跳过自己的型号/固件回读
   （带 hilog 的采集回来带着 carried 2）——真机跑更大的采集才看出来，已补守卫与反向验证测试。
   证据 `evidence/runs/TASK-IDC-003/data/session-screenshot-subintent.json`。
-  剩余 ④App Diagnostics tab、⑤真机走查。
+  ④ App Diagnostics tab 已交付（reader 面）。正确性放在纯模型 `DiagnosticSessionReading`：
+  截图只在拍摄时刻距标记 ≤150 ms 时才可代表该标记，并始终带 `+N ms`；超窗、拍摄失败、
+  未拍摄是三个不同事实，各自成文，**不用旧画面或占位图补齐**；缺声明产物即 Partial 并
+  点名；「未反推的种类」从采集穿透到 reader，使空 track 不被读成安全。
+  对齐三态里**没有第四态**：没有校准事实时默认就是「无法对齐」——时钟桥尚未进产品，
+  默认成「大概同一时钟」会让它下面的每一条判读都悄悄不成立。
+  选中事件在光标移开后保留并标注偏离（交叉看事件与邻近日志是排障基本动作，看一眼日志
+  不该丢掉选中项）。13 条 reader 契约测试。
+  剩余 ⑤真机走查（含手动 + 自动 Marker 的完整会话）。
   原 ready 依据：proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
   Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
   trace_marker 且必须加落笔回读、回溯窗口与类目集联动预算且 dump 后立即重臂、

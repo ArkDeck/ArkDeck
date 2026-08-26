@@ -1362,7 +1362,7 @@ final class AppShellUITests: XCTestCase {
     let items = [
       "app.navigation.overview", "app.navigation.flash", "app.navigation.debug",
       "app.navigation.uiDump", "app.navigation.trace", "app.navigation.toolkit",
-      "app.navigation.history",
+      "app.navigation.diagnostics", "app.navigation.history",
     ]
     guard let index = items.firstIndex(of: identifier) else {
       XCTFail("unknown sidebar item \(identifier)", file: file, line: line)

@@ -115,6 +115,7 @@ private final class ArkDeckAppModelStore {
     provider: SettingsApplicationFacade.make())
   @ObservationIgnored lazy var toolkitWorkspace = ToolkitWorkspaceViewModel(
     provider: ToolkitDeviceControlFacade.make())
+  @ObservationIgnored lazy var diagnosticsWorkspace = DiagnosticsWorkspaceViewModel()
 
   init() {
     AppStartupPerformance.beginStartup()
@@ -244,6 +245,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   case uiDump
   case trace
   case toolkit
+  case diagnostics
   case history
 
   var id: String { rawValue }
@@ -256,6 +258,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .uiDump: "app.navigation.uiDump"
     case .trace: "app.navigation.trace"
     case .toolkit: "app.navigation.toolkit"
+    case .diagnostics: "app.navigation.diagnostics"
     case .history: "app.navigation.history"
     }
   }
@@ -268,6 +271,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
     case .toolkit: "hand.tap"
+    case .diagnostics: "waveform.path"
     case .history: "clock.arrow.circlepath"
     }
   }
@@ -620,6 +624,7 @@ private struct AppShellView: View {
           navigationRow(.uiDump)
           navigationRow(.trace)
           navigationRow(.toolkit)
+          navigationRow(.diagnostics)
         }
         Section("app.navigation.section.records") {
           navigationRow(.history)
@@ -668,6 +673,7 @@ private struct AppShellView: View {
         observation, names: deviceDisplayNames(observation))
     }
     models.toolkitWorkspace.publish(deviceObservation: observation)
+    models.diagnosticsWorkspace.publish(deviceObservation: observation)
   }
 
   /// Presentation-only names, keyed by the adopted target the workspaces
@@ -707,6 +713,10 @@ private struct AppShellView: View {
       // Only routing. Toolkit shows a still the person asked for, so arriving
       // on the tab must not quietly photograph the device.
       models.toolkitWorkspace.publish(deviceObservation: deviceList.presentation)
+    case .navigation(.diagnostics):
+      // Routing as well. A diagnostic session is armed deliberately; opening
+      // the tab is not that decision.
+      models.diagnosticsWorkspace.publish(deviceObservation: deviceList.presentation)
     }
   }
 
@@ -847,6 +857,8 @@ private struct AppShellView: View {
       TraceWorkspaceView(model: models.traceWorkspace)
     case .toolkit:
       ToolkitWorkspaceView(model: models.toolkitWorkspace)
+    case .diagnostics:
+      DiagnosticsWorkspaceView(model: models.diagnosticsWorkspace)
     }
   }
 
