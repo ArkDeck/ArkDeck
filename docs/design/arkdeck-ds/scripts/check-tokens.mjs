@@ -379,13 +379,17 @@ for (const name of dsLight.keys()) {
     "debug-scope": "Debug target and binding summary row",
     "debug-source": "Debug source and build-root layout",
     "debug-field": "form-field layout around existing native controls",
-    "debug-search": "Debug artifact search control layout",
+    "debug-cols": "Debug two-column body layout",
+    "debug-stack": "Debug column stack layout",
     "debug-selection": "Debug selection summary and action row",
     "debug-result": "Debug deployment/restart result layout",
+    "debug-disclose": "native disclosure for the typed request preview",
+    "debug-entry": "Debug remote-browser and template row layout",
+    "debug-list": "Debug remote-browser listing layout",
     "debug-manager-list": "Debug server-manager list layout",
     "debug-manager-row": "Debug server-manager row layout",
     "debug-manager-actions": "Debug server-manager action layout",
-    "debug-row-disabled": "disabled artifact-result state utility",
+    "hair-gap": "hairline separator utility inside a section",
     "diagnostic-page": "Diagnostic Session page scaffolding",
     "diag-shell": "Diagnostic Session page layout",
     "diag-toolbar": "Diagnostic Session local toolbar layout",
@@ -493,6 +497,7 @@ for (const name of dsLight.keys()) {
    *  Empty today — every surface the prototype draws has a component. Put the
    *  next one here rather than leaving it unclassified, so it stays visible. */
   const KNOWN_GAPS = {
+    "gsec": "SectionGroup",
     "diag-align": "DiagnosticAlignmentDisclosure",
     "diag-log-row": "DiagnosticLogRow",
     "diag-timeline": "DiagnosticTimeline",
