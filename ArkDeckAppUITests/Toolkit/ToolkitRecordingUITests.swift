@@ -87,6 +87,46 @@ final class ToolkitRecordingUITests: XCTestCase {
       "a refusal that offers nothing cannot be acted on")
   }
 
+  /// A store that cannot be asked must not withhold the feature
+  /// (TASK-IDC-002 follow-up).
+  ///
+  /// This shipped as a block, and against a real daemon predating
+  /// `artifact.quota` - which answers `unknownMethod` - it made the pane
+  /// unable to record at all. IDC-AC-8 blocks on a *failed* preflight, and
+  /// "could not ask" is not one: the runtime's own host-storage preflight is
+  /// still the operation's first step. The pane's own copy said as much while
+  /// the code did the opposite.
+  func testAStoreThatCannotBeAskedDoesNotWithholdTheRecording() throws {
+    guard let archive = ProcessInfo.processInfo.environment[Self.archiveKey],
+      FileManager.default.fileExists(atPath: archive)
+    else {
+      throw XCTSkip("Set \(Self.archiveKey) to a frames.tar from a real capture")
+    }
+    // Negative headroom stands in for a store that cannot be asked at all.
+    let app = launch(archive: archive, headroomBytes: -1)
+
+    let start = app.buttons["toolkit.record.start"]
+    XCTAssertTrue(start.waitForExistence(timeout: 10))
+    let enabled = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "isEnabled == true"), object: start)
+    guard XCTWaiter().wait(for: [enabled], timeout: 30) == .completed else {
+      throw XCTSkip("no single adopted device is observed, so the pane has no target")
+    }
+    start.click()
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["toolkit.record.ready"].waitForExistence(timeout: 180),
+      "the run must go ahead; the pane is in " + Self.visibleStage(of: app))
+    // And it says the check did not happen, rather than letting a run that was
+    // never checked look like one that was.
+    XCTAssertTrue(
+      app.descendants(matching: .any)["toolkit.record.headroomUnknown"].exists,
+      "a run nothing checked must say so")
+    XCTAssertEqual(
+      app.descendants(matching: .any).matching(identifier: "toolkit.record.refused").count, 0,
+      "not being able to ask is not a refusal")
+  }
+
   /// Both notices must survive everything a person can do to the workspace
   /// (TASK-IDC-002, recorded gap 4 of 5; IDC-AC-8 names them together).
   ///

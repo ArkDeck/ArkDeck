@@ -858,13 +858,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not read the artifact store's remaining room; the runtime will still refuse a recording it cannot keep."
+            "value": "Could not read the artifact store's remaining room, so this run was not checked against it. The runtime still refuses a recording it cannot keep."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "读不到制品库剩余空间；即便如此，运行时仍会拒绝一段它存不下的录屏。"
+            "value": "读不到制品库剩余空间，这次运行没有对它做检查。运行时仍会拒绝一段它存不下的录屏。"
           }
         }
       }
