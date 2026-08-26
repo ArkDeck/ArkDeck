@@ -26,6 +26,11 @@ public enum RuntimeOperationErrorCode: String, Codable, Sendable, CaseIterable {
   case unsupportedVersion
   case governanceFieldRejected
   case requestTooLarge
+  /// A control session holds this device and the request came from somewhere
+  /// else. Refusing is the point: serialising it instead would make one
+  /// person's gesture land in the middle of another's capture, and neither of
+  /// them would be told.
+  case deviceBusyBySession
 }
 
 public struct RuntimeOperationRequestRejection: Error, Equatable, Sendable {

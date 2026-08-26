@@ -6990,6 +6990,13 @@ public actor RuntimeJobEngine {
     materialized: MaterializedAdmission
   ) async throws -> PreparedAuthorization {
     let admittedAt = nowUTC()
+    // Before anything is authorized: is somebody else already working this
+    // device? A refusal here is the whole point of the check - queueing the
+    // request would be safe and silent, and silence is what a diagnostic
+    // session cannot survive.
+    try admitAgainstDeviceHold(
+      request: request, descriptor: descriptor, effect: effect,
+      deviceIdentity: materialized.stableTargetIdentitySHA256)
     if request.campaignReservation != nil {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
@@ -8365,6 +8372,69 @@ public actor RuntimeJobEngine {
   /// one session are the same person working on the same device, and the
   /// facts they would each re-read are identical.
   var carriedDeviceEvidence: [String: CarriedDeviceEvidence] = [:]
+
+  /// Who is working this device right now.
+  ///
+  /// A session is one person with one device: they arm a capture, reproduce
+  /// something, mark it, look at it. While that is happening, another client's
+  /// mutation is not a queueing problem to be smoothed over - it is a second
+  /// pair of hands on the same screen. The lane already serialises such things
+  /// safely; what it cannot do is say so, and a gesture that lands silently in
+  /// the middle of someone's capture is exactly what a diagnostic session
+  /// cannot survive.
+  struct DeviceSessionHold: Sendable, Equatable {
+    let clientName: String
+    let heldSinceUTC: String
+    var lastActedUTC: String
+  }
+
+  /// How long a hold outlives its last act. A session is interactive; two
+  /// minutes without one is somebody having walked away, and the device
+  /// belongs to whoever asks next.
+  package static let deviceSessionHoldIdleTimeout: TimeInterval = 120
+
+  var deviceSessionHolds: [String: DeviceSessionHold] = [:]
+
+  /// Records that this client is working the device, or refuses because
+  /// somebody else is.
+  ///
+  /// Only a session-scoped request takes a hold. Ordinary work neither claims
+  /// the device nor is refused for lack of a claim - it is refused only while
+  /// somebody else's session is live.
+  func admitAgainstDeviceHold(
+    request: RuntimeOperationRequest,
+    descriptor: CatalogOperationDescriptor,
+    effect: WorkflowEffect,
+    deviceIdentity: String?
+  ) throws {
+    guard let deviceIdentity, effect >= .deviceMutation else { return }
+    let client = request.clientContext?.clientName ?? "anonymous"
+    let now = nowUTC()
+    if let held = deviceSessionHolds[deviceIdentity] {
+      let expired =
+        ISO8601Timestamps.parse(held.lastActedUTC).map { last in
+          ISO8601Timestamps.parse(now).map {
+            $0.timeIntervalSince(last) > Self.deviceSessionHoldIdleTimeout
+          } ?? false
+        } ?? true
+      if expired {
+        deviceSessionHolds[deviceIdentity] = nil
+      } else if held.clientName != client {
+        throw RuntimeJobEngineError.rejected(
+          .deviceBusyBySession,
+          "a control session opened by \(held.clientName) holds this device since "
+            + "\(held.heldSinceUTC); it was not queued behind that session")
+      }
+    }
+    guard Self.isSessionScoped(descriptor: descriptor, inputs: request.inputs) else { return }
+    if var held = deviceSessionHolds[deviceIdentity], held.clientName == client {
+      held.lastActedUTC = now
+      deviceSessionHolds[deviceIdentity] = held
+    } else {
+      deviceSessionHolds[deviceIdentity] = DeviceSessionHold(
+        clientName: client, heldSinceUTC: now, lastActedUTC: now)
+    }
+  }
 
   /// The window that matters for a received product belongs to the step that
   /// produced the file, not the one that fetched it.
