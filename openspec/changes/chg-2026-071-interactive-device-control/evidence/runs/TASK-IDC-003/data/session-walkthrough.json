@@ -1,0 +1,73 @@
+{
+  "measurement": "session-walkthrough",
+  "question": "Does a complete session produce what IDC-AC-7 asks for, and does the reader read it honestly?",
+  "measuredAtUTC": "2026-08-26T02:49:00Z",
+  "setup": {
+    "daemon": "rebuilt from main at #1529, re-signed with the maintainer's Developer ID; previous bundle kept under Helpers/.backup-20260826T104711/",
+    "device": "DAYU200 development board, target TGT-958780b2ffb7 binding r4",
+    "job": "job-f24eebf587fcda2ffbc7fa7e73982cbb",
+    "request": "capture.diagnostics@1, ringBuffered, ohos+graphic at 20480 KiB, hilog, crash log, screenshot, two manual marks"
+  },
+  "produced": {
+    "publishedArtifacts": 9,
+    "everyPublishedArtifactCarriesBytesAndASHA": true,
+    "privacy": "hilog, crash index, crash log, screenshot and trace are sensitive; capture log, markers, index and summary are standard",
+    "sizes": {
+      "trace.htrace": 8940,
+      "crash-log.txt": 395942,
+      "screenshot.png": 448421,
+      "markers.json": 1237,
+      "hilog.txt": 871207
+    }
+  },
+  "marks": {
+    "manual": 2,
+    "automatic": 1,
+    "automaticTrigger": "crashLogCaptured, from a crash log that really arrived (395942 bytes, from com.example.lazydemo on the device)"
+  },
+  "coverage": {
+    "anchor": "ARKDECKANCHORebf587fcda2ffbc7fa7e73982cbbcapturetrace",
+    "ringHeldAnchorAsRecordedByTheVerdict": true,
+    "anchorFoundInThePublishedTrace": true,
+    "thisSnapshotsReach": { "beforeTheAnchorSeconds": 0.08, "afterTheAnchorSeconds": 8.35, "events": 79 }
+  },
+  "whatTheReaderSaid": [
+    "alignment: cannotAlign - no host-to-device calibration was established, which is the honest state and the default",
+    "mark 1 'session start': the nearest screenshot was +16000 ms away, so no picture stands for it",
+    "mark 2 'stutter here': the nearest screenshot was -6000 ms away, so no picture stands for it",
+    "mark 3 (automatic, crashLogCaptured): no screenshot was taken at it",
+    "notDerived carried through: frameDeadline and logKeyword"
+  ],
+  "gapFound": {
+    "what": "the applies-to-this-mark case could not be demonstrated, and not because the marks were badly aimed",
+    "detail": [
+      "The rule the design sets is that a screenshot stands for a mark when the shutter",
+      "opened within 150 ms of it. What the runtime records is the artifact's",
+      "`createdAtUtc`, at one-second granularity: 2026-08-26T02:49:02Z.",
+      "Two things follow. The recorded instant is when the artifact was written, not",
+      "when the shutter opened; and its granularity is about seven times coarser than",
+      "the window that consumes it. No aim, however careful, can put a mark inside a",
+      "150 ms window measured against a value rounded to the second.",
+      "The reader is not wrong here - it refused correctly, and said by how much. The",
+      "fact it needs is not published yet."
+    ],
+    "whatWouldCloseIt": [
+      "The screenshot leg records the instant its own readback observed, at millisecond",
+      "resolution, as a fact on the artifact - the design's `截图 Artifact 记录实际拍摄时刻`",
+      "read literally. Until then the ±150 ms rule is written and tested but cannot fire",
+      "on real data, and this file is the place that says so."
+    ]
+  },
+  "acceptanceReading": {
+    "IDC-AC-7": [
+      "Met: a session with manual and automatic marks produced markers.json, a",
+      "retrospective trace whose reach is provable from its own anchor, hilog, a crash",
+      "log and a screenshot; every artifact passed status, privacy, byte and SHA checks;",
+      "the reader lines up only on time facts, shows the two-state alignment, and",
+      "degrades honestly when it cannot align or cannot find a picture.",
+      "Not met: the `+N ms` label on an applying screenshot. It is implemented and",
+      "tested, and cannot be exercised end to end until the shutter instant is recorded",
+      "at millisecond resolution."
+    ]
+  }
+}
