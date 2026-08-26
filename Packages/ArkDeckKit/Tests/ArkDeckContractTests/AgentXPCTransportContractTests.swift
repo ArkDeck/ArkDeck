@@ -101,8 +101,11 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableReadOnlyMethods,
       [
-        "artifact.inspect", "artifact.list", "artifact.read", "debug.probe",
-        "debug.template.run",
+        // artifact.quota reports headroom and nothing else: no job, no
+        // identifier, no bytes. It is here so a workspace can be refused
+        // before it starts work rather than after (TASK-IDC-002).
+        "artifact.inspect", "artifact.list", "artifact.quota", "artifact.read",
+        "debug.probe", "debug.template.run",
         // flash.lanePlanPreview is read-only by contract (CHG-2026-068
         // LPP-AC-1): exactly inspect/discover/materialize on the daemon,
         // no import, no permit, nothing durable.

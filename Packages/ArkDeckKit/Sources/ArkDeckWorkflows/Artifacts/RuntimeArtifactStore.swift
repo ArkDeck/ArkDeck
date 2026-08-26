@@ -1221,6 +1221,10 @@ public actor RuntimeArtifactStore {
 
   // MARK: - Lifecycle
 
+  /// The ceiling, so a caller can say how much room is left rather than only
+  /// whether one particular request fits.
+  public var quotaTotalBytes: Int { quota.totalBytes }
+
   public func preflightAdditionalBytes(_ requestedBytes: Int) throws {
     guard requestedBytes >= 0 else {
       throw RuntimeArtifactError.ioFailure("artifact preflight byte count must be nonnegative")
