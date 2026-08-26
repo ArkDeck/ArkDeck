@@ -1,0 +1,63 @@
+{
+  "measurement": "closing-state",
+  "question": "What of TASK-IDC-003 is delivered, and what is not?",
+  "measuredAtUTC": "2026-08-26T04:20:00Z",
+  "delivered": [
+    {
+      "item": "ringBuffered typed input and the three-segment ring lowering",
+      "evidence": "ring-lowering-facts.json; verified on the device, including the anchor that makes each snapshot's reach provable"
+    },
+    {
+      "item": "markers channel and markers.json, with automatic marks derived at finalization",
+      "evidence": "session-walkthrough.json; a real crash log produced a crashLogCaptured mark",
+      "note": "frameDeadline and logKeyword are not derived. They need artifact bytes and finalization holds metadata; the artifact names them in `notDerived` with the reason, so their absence does not read as the absence of the thing."
+    },
+    {
+      "item": "the session screenshot sub-intent",
+      "evidence": "session-screenshot-subintent.json; 2101ms for a session's first screenshot, 1482ms for later ones"
+    },
+    {
+      "item": "the shutter instant, recorded as the interval the host could observe",
+      "evidence": "shutter-instant.json",
+      "note": "and the finding that the design's 150 ms applicability rule cannot be met from a host-observed window, because the capture itself is ~930 ms wide"
+    },
+    {
+      "item": "the Diagnostics reader",
+      "evidence": "16 contract tests; alignment three-state with cannotAlign as the default, screenshot applicability and its four refusals, Partial, notDerived, retained event identity"
+    },
+    {
+      "item": "the real-device walkthrough",
+      "evidence": "session-walkthrough.json"
+    }
+  ],
+  "notDelivered": [
+    {
+      "item": "the Diagnostics capture page",
+      "detail": [
+        "The tab carries the reader. Arming a session, marking during it and taking a",
+        "marker screenshot are all reachable through the runtime and none of them has a",
+        "surface in the App yet.",
+        "Nothing about the reader depends on it; it is the other half of the tab."
+      ]
+    },
+    {
+      "item": "the typed `deviceBusyBySession` refusal",
+      "detail": [
+        "The design says a second client's mutation on a held device must fail with a",
+        "typed reason rather than queue silently. Measured today: two captures submitted",
+        "0.05s apart both succeeded, the second taking 2713ms against the first's 1473ms.",
+        "It queued. Nothing refused it and nothing told anyone.",
+        "The copy for the refusal is written into the App's catalog; what does not exist",
+        "is the notion of a session holding a device, which is what the refusal would be",
+        "raised from. The mutation lane serializes per device, which is a different",
+        "thing: it makes contention safe and invisible, and the design asks for it to be",
+        "safe and visible."
+      ],
+      "acceptance": "IDC-AC-6 names this explicitly, so that criterion is not met"
+    }
+  ],
+  "environmentLeftBehind": {
+    "daemon": "the installed helper is a build of main at #1534, signed with the maintainer's own Developer ID. Every bundle it replaced is kept under Helpers/.backup-*/ and any of them can be restored by copying it back and restarting the LaunchAgent.",
+    "device": "every file this work wrote under /data/local/tmp and /data/log/hitrace was removed, and the trace service is stopped. The taps this work injected landed in Settings and navigated it; nothing was installed, removed or reconfigured."
+  }
+}
