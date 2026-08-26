@@ -61,7 +61,13 @@ public enum ToolkitRecordingFixture {
     /// answer made the pane unable to record at all. A stand-in that blocks
     /// the flow it stands in for is not standing in for anything.
     /// `--ui-test-toolkit-recording-headroom=<bytes>` drives the refusal path.
-    func artifactHeadroomBytes() async -> Int? { headroomBytes }
+    /// A negative figure stands in for a store that cannot be asked at all -
+    /// what a daemon predating `artifact.quota` does, answering
+    /// `unknownMethod`. It is a distinct case from "no room", and the pane
+    /// treats it differently, so it needs its own way in.
+    func artifactHeadroomBytes() async -> Int? {
+      headroomBytes < 0 ? nil : headroomBytes
+    }
 
     func recordScreen(
       frameCount: Int, target: ToolkitTargetPresentation

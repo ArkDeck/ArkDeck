@@ -315,6 +315,20 @@ struct ToolkitWorkspaceView: View {
       .disabled(recording.isBusy)
       .accessibilityIdentifier("toolkit.record.start")
 
+      // Said, not swallowed, and said alongside whatever the run is doing:
+      // "nothing was measured" is a different thing from "there is room", and
+      // only one of them is a check. It no longer stops the run - see
+      // `headroomUnchecked`.
+      if recording.headroomUnchecked {
+        Label(
+          toolkitText("toolkit.record.headroomUnknown"),
+          systemImage: "questionmark.circle")
+          .font(.system(size: 10))
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("toolkit.record.headroomUnknown")
+      }
+
       switch recording.stage {
       case .capturing, .assembling, .validating:
         Text(recording.stageTitle)
@@ -331,16 +345,6 @@ struct ToolkitWorkspaceView: View {
           .accessibilityIdentifier("toolkit.record.failed")
       case .refused(let refusal):
         refusalBar(refusal)
-      case .headroomUnknown:
-        // Said, not swallowed: "nothing was measured" is a different thing
-        // from "there is room", and only one of them is a check.
-        Label(
-          toolkitText("toolkit.record.headroomUnknown"),
-          systemImage: "questionmark.circle")
-          .font(.system(size: 10))
-          .foregroundStyle(.orange)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("toolkit.record.headroomUnknown")
       case .idle:
         Text(toolkitText("toolkit.record.ceiling"))
           .font(.system(size: 10))

@@ -19,10 +19,6 @@ final class ToolkitRecordingViewModel {
     /// Refused before anything started. Distinct from `failed`: nothing was
     /// attempted, nothing reached the device, and the run can be made to fit.
     case refused(ToolkitRecordingBudget.Refusal)
-    /// The store could not be asked. Not the same as "there is room" - the
-    /// runtime will still refuse a recording it cannot keep, so the pane says
-    /// what it does not know rather than implying a check that never ran.
-    case headroomUnknown
     case capturing(frames: Int)
     case assembling
     case validating
@@ -42,6 +38,16 @@ final class ToolkitRecordingViewModel {
   }
 
   private(set) var stage = Stage.idle
+  /// Whether the store could be asked how much room is left.
+  ///
+  /// "Could not ask" is not a failed preflight, and IDC-AC-8 blocks on a
+  /// failed one. Blocking here would stop a run the runtime would have
+  /// accepted - measured against a daemon that predates `artifact.quota`,
+  /// which answers `unknownMethod` and made the pane unable to record at all.
+  /// The runtime's own `preflight-host-storage` still guards the quota as the
+  /// operation's first step, so the honest thing is to go ahead and say the
+  /// check did not happen rather than to withhold the feature.
+  private(set) var headroomUnchecked = false
   /// How long a run to ask for. There is no seconds control: the rate is the
   /// device's readback and cannot be requested, so the honest knob is frames.
   var frameCount = 40
@@ -59,14 +65,14 @@ final class ToolkitRecordingViewModel {
 
   var isBusy: Bool {
     switch stage {
-    case .idle, .ready, .failed, .refused, .headroomUnknown: false
+    case .idle, .ready, .failed, .refused: false
     case .capturing, .assembling, .validating: true
     }
   }
 
   var stageTitle: String {
     switch stage {
-    case .idle, .refused, .headroomUnknown: toolkitText("toolkit.record.start")
+    case .idle, .refused: toolkitText("toolkit.record.start")
     case .capturing(let frames): "\(toolkitText("toolkit.record.capturing")) · \(frames)"
     case .assembling: toolkitText("toolkit.record.assembling")
     case .validating: toolkitText("toolkit.record.validating")
@@ -86,15 +92,16 @@ final class ToolkitRecordingViewModel {
     // three minutes of capturing has already cost the three minutes - and
     // the store refuses rather than evicting, so there is nothing that can
     // be quietly resolved on the way.
-    guard let remaining = await provider.artifactHeadroomBytes() else {
-      stage = .headroomUnknown
-      return
-    }
-    if let refusal = ToolkitRecordingBudget.refusal(
-      frameCount: frameCount, remainingBytes: remaining)
-    {
-      stage = .refused(refusal)
-      return
+    if let remaining = await provider.artifactHeadroomBytes() {
+      headroomUnchecked = false
+      if let refusal = ToolkitRecordingBudget.refusal(
+        frameCount: frameCount, remainingBytes: remaining)
+      {
+        stage = .refused(refusal)
+        return
+      }
+    } else {
+      headroomUnchecked = true
     }
 
     stage = .capturing(frames: frameCount)
