@@ -220,7 +220,21 @@ T02/T03 不进入实现。
   默认成「大概同一时钟」会让它下面的每一条判读都悄悄不成立。
   选中事件在光标移开后保留并标注偏离（交叉看事件与邻近日志是排障基本动作，看一眼日志
   不该丢掉选中项）。13 条 reader 契约测试。
-  剩余 ⑤真机走查（含手动 + 自动 Marker 的完整会话）。
+  ⑤ 真机完整走查已跑（job-f24eebf587fcda2ffbc7fa7e73982cbb）：一次会话同时产出
+  2 个手动 Marker + 1 个自动 Marker（`crashLogCaptured`，来自设备上真实到达的
+  395942 字节崩溃日志）、回溯 trace、hilog、崩溃日志与截图；9 个已发布制品
+  status/privacy/byte/SHA 全过；判据记录 `ringHeldAnchor: true`，且锚点在已发布 trace 中
+  实地命中（该次快照锚点前 0.08 s、锚点后 8.35 s）。
+  reader 读真实数据的输出：alignment 为 `cannotAlign`（无校准，诚实的默认）；两个手动
+  Marker 分别因最近截图相差 +16000 ms / −6000 ms 而**拒绝配图并说出差多远**；notDerived
+  穿透到位。
+  **走查发现一条缺口**：`+N ms` 这一侧演示不出来，且不是瞄得不准——设计的判定窗口是
+  150 ms，而 runtime 记录的是制品的 `createdAtUtc`、**秒级粒度**（且它是「制品写入时刻」
+  不是「快门时刻」）。粒度比消费它的窗口粗约七倍，任何瞄准都进不了窗。reader 没有错，
+  它拒绝得对也说清了差多少；它需要的那个事实**尚未被发布**。
+  收口：`截图 Artifact 记录实际拍摄时刻` 需按字面实现——截图腿把自己回读观察到的时刻
+  以毫秒精度记为制品事实。在那之前 ±150 ms 规则已实现且有测试，但在真实数据上无法触发。
+  证据 `evidence/runs/TASK-IDC-003/data/session-walkthrough.json`。
   原 ready 依据：proposal 与 Spike 前置均已满足；与 T02 可并行实现、共享会话机械。
   Spike 已钉的 lowering 要点：bgsrv 快照服务优先于 begin/dump、Marker 走设备侧
   trace_marker 且必须加落笔回读、回溯窗口与类目集联动预算且 dump 后立即重臂、
