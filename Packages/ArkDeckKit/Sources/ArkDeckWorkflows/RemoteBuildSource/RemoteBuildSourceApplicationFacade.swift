@@ -70,6 +70,17 @@ public struct RemoteBuildSourcePresentation: Sendable, Equatable, Identifiable {
   public var endpoint: String { "\(username)@\(host):\(port)" }
 }
 
+/// An explicit association created by a user's remote-artifact selection.
+///
+/// It contains identifiers only: credentials and remote paths stay in their
+/// existing stores, and consumers still have to resolve `sourceID` against the
+/// current verified-source list before presenting it as usable.
+public struct RemoteBuildSourceBindingPresentation: Sendable, Equatable {
+  public let targetID: String
+  public let sourceID: UUID
+  public let boundAt: Date
+}
+
 /// A successful, short-lived connection probe. `trustToken` cannot be created
 /// by the App and is consumed exactly once by the provider when saving.
 public struct RemoteBuildSourceProbe: Sendable, Equatable, Identifiable {
@@ -183,12 +194,27 @@ public protocol RemoteBuildSourceProviding: Sendable {
   ) async throws -> RemoteBuildNativeLibraryArtifact
 }
 
+public protocol RemoteBuildSourceBindingProviding: Sendable {
+  func binding(forTargetID targetID: String) async throws
+    -> RemoteBuildSourceBindingPresentation?
+  func bind(sourceID: UUID, toTargetID targetID: String) async throws
+  func unbind(targetID: String) async throws
+}
+
 public enum RemoteBuildSourceApplicationFacade {
   public static func make() -> any RemoteBuildSourceProviding {
     ProductionRemoteBuildSourceProvider(
       records: RemoteBuildSourceProductionState.records,
       credentials: RemoteBuildSourceProductionState.credentials,
       audit: RemoteBuildSourceProductionState.audit)
+  }
+}
+
+public enum RemoteBuildSourceBindingApplicationFacade {
+  public static func make() -> any RemoteBuildSourceBindingProviding {
+    ProductionRemoteBuildSourceBindingProvider(
+      records: RemoteBuildSourceProductionState.records,
+      bindings: RemoteBuildSourceProductionState.bindings)
   }
 }
 
@@ -201,6 +227,8 @@ private enum RemoteBuildSourceProductionState {
 
   static let records = FileRemoteBuildSourceRecordStore(
     fileURL: root.appending(path: "sources-v1.json"))
+  static let bindings = FileRemoteBuildSourceBindingStore(
+    fileURL: root.appending(path: "target-bindings-v1.json"))
   static let credentials: any RemoteBuildCredentialStoring = KeychainRemoteBuildCredentialStore()
   static let audit = FileRemoteBuildSourceAuditStore(
     fileURL: root.appending(path: "audit-v1.jsonl"))
@@ -267,6 +295,113 @@ package actor FileRemoteBuildSourceRecordStore: RemoteBuildSourceRecordStoring {
     } catch {
       throw RemoteBuildSourceError.storageFailed
     }
+  }
+}
+
+package struct RemoteBuildSourceBindingRecord: Codable, Sendable, Equatable {
+  let targetID: String
+  let sourceID: UUID
+  let boundAt: Date
+}
+
+private struct RemoteBuildSourceBindingEnvelope: Codable, Sendable {
+  let version: Int
+  let bindings: [RemoteBuildSourceBindingRecord]
+}
+
+package protocol RemoteBuildSourceBindingStoring: Sendable {
+  func load() async throws -> [RemoteBuildSourceBindingRecord]
+  func replace(_ bindings: [RemoteBuildSourceBindingRecord]) async throws
+}
+
+package actor FileRemoteBuildSourceBindingStore: RemoteBuildSourceBindingStoring {
+  private let fileURL: URL
+
+  package init(fileURL: URL) { self.fileURL = fileURL.standardizedFileURL }
+
+  package func load() throws -> [RemoteBuildSourceBindingRecord] {
+    guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+    do {
+      let decoder = JSONDecoder()
+      decoder.dateDecodingStrategy = .iso8601
+      let envelope = try decoder.decode(
+        RemoteBuildSourceBindingEnvelope.self, from: Data(contentsOf: fileURL))
+      guard envelope.version == 1 else { throw RemoteBuildSourceError.storageFailed }
+      return envelope.bindings
+    } catch let error as RemoteBuildSourceError {
+      throw error
+    } catch {
+      throw RemoteBuildSourceError.storageFailed
+    }
+  }
+
+  package func replace(_ bindings: [RemoteBuildSourceBindingRecord]) throws {
+    do {
+      try FileManager.default.createDirectory(
+        at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys]
+      encoder.dateEncodingStrategy = .iso8601
+      let data = try encoder.encode(
+        RemoteBuildSourceBindingEnvelope(
+          version: 1, bindings: bindings.sorted { $0.targetID < $1.targetID }))
+      try data.write(to: fileURL, options: .atomic)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    } catch {
+      throw RemoteBuildSourceError.storageFailed
+    }
+  }
+}
+
+package actor ProductionRemoteBuildSourceBindingProvider:
+  RemoteBuildSourceBindingProviding
+{
+  private let records: any RemoteBuildSourceRecordStoring
+  private let bindings: any RemoteBuildSourceBindingStoring
+
+  package init(
+    records: any RemoteBuildSourceRecordStoring,
+    bindings: any RemoteBuildSourceBindingStoring
+  ) {
+    self.records = records
+    self.bindings = bindings
+  }
+
+  public func binding(forTargetID targetID: String) async throws
+    -> RemoteBuildSourceBindingPresentation?
+  {
+    let targetID = try validatedTargetID(targetID)
+    return try await bindings.load().first(where: { $0.targetID == targetID }).map {
+      RemoteBuildSourceBindingPresentation(
+        targetID: $0.targetID, sourceID: $0.sourceID, boundAt: $0.boundAt)
+    }
+  }
+
+  public func bind(sourceID: UUID, toTargetID targetID: String) async throws {
+    let targetID = try validatedTargetID(targetID)
+    guard try await records.load().contains(where: { $0.id == sourceID }) else {
+      throw RemoteBuildSourceError.sourceNotFound
+    }
+    var current = try await bindings.load().filter { $0.targetID != targetID }
+    current.append(
+      RemoteBuildSourceBindingRecord(
+        targetID: targetID, sourceID: sourceID, boundAt: Date()))
+    try await bindings.replace(current)
+  }
+
+  public func unbind(targetID: String) async throws {
+    let targetID = try validatedTargetID(targetID)
+    let current = try await bindings.load()
+    try await bindings.replace(current.filter { $0.targetID != targetID })
+  }
+
+  private func validatedTargetID(_ targetID: String) throws -> String {
+    let trimmed = targetID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed == targetID, !trimmed.isEmpty, trimmed.utf8.count <= 512,
+      trimmed.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) })
+    else { throw RemoteBuildSourceError.storageFailed }
+    return trimmed
   }
 }
 

@@ -61,6 +61,61 @@ public struct OverviewCapabilityMatrixPresentation: Sendable, Equatable {
     targetID: nil, bindingRevision: nil, items: [], failure: nil)
 }
 
+/// Restricts Overview's device scope to the App's shared, current device
+/// observation. `target.list` is durable history; it can contain an adopted
+/// target long after that device has gone offline. Such a target remains
+/// addressable in History, but it is not a device the live Overview can offer.
+public enum OverviewOnlineTargetProjection {
+  public static func targets(
+    from devices: DeviceListPresentation
+  ) -> [OverviewCapabilityTarget] {
+    var seen: Set<String> = []
+    return devices.candidates.compactMap { candidate in
+      guard candidate.isAuthorized,
+        let targetID = candidate.adoptedTargetID,
+        let bindingRevision = candidate.bindingRevision,
+        seen.insert(targetID).inserted
+      else { return nil }
+      return OverviewCapabilityTarget(id: targetID, bindingRevision: bindingRevision)
+    }
+  }
+
+  /// The preferred target is the reader's explicit choice. When it is no
+  /// longer online, one remaining online target may become the scope; with
+  /// zero or several remaining targets the page truthfully has no selection.
+  public static func presentation(
+    from capabilities: OverviewCapabilityMatrixPresentation,
+    devices: DeviceListPresentation,
+    preferredTargetID: String?
+  ) -> OverviewCapabilityMatrixPresentation {
+    let onlineTargets = targets(from: devices)
+    let selected: OverviewCapabilityTarget?
+    if let preferredTargetID,
+      let preferred = onlineTargets.first(where: { $0.id == preferredTargetID })
+    {
+      selected = preferred
+    } else if onlineTargets.count == 1 {
+      selected = onlineTargets[0]
+    } else {
+      selected = nil
+    }
+
+    // Target-probed rows cannot be carried from a device that is now offline
+    // to another target. The canonical Flash row is Catalog-owned and remains
+    // truthful without a selected device.
+    let describesSelectedTarget = capabilities.targetID == selected?.id
+    let items = describesSelectedTarget
+      ? capabilities.items
+      : capabilities.items.filter { $0.id == "rockusb-flash" }
+    return OverviewCapabilityMatrixPresentation(
+      targetID: selected?.id,
+      bindingRevision: selected?.bindingRevision,
+      items: items,
+      failure: capabilities.failure,
+      adoptedTargets: onlineTargets)
+  }
+}
+
 public protocol OverviewCapabilityApplicationProviding: Sendable {
   /// Probes one named target's capabilities.
   ///
@@ -77,7 +132,7 @@ public enum OverviewCapabilityApplicationFacade {
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any OverviewCapabilityApplicationProviding {
     if arguments.contains("--ui-test-hdc-diagnostics") {
-      return OverviewCapabilityFixtureProvider()
+      return OverviewCapabilityFixtureProvider(arguments: arguments)
     }
     return OverviewCapabilityProductionProvider()
   }
@@ -311,16 +366,26 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
 }
 
 private actor OverviewCapabilityFixtureProvider: OverviewCapabilityApplicationProviding {
+  private let includesOfflineTarget: Bool
+
+  init(arguments: [String]) {
+    includesOfflineTarget = arguments.contains("--ui-test-overview-offline-target")
+  }
+
   func refresh(targetID requested: String?) async -> OverviewCapabilityMatrixPresentation {
-    let adopted = [OverviewCapabilityTarget(id: "ui-fixture-target", bindingRevision: 7)]
-    guard requested == nil || requested == "ui-fixture-target" else {
+    let onlineTarget = OverviewCapabilityTarget(
+      id: "target-fixture-dayu200", bindingRevision: 3)
+    let adopted = [onlineTarget]
+      + (includesOfflineTarget
+        ? [OverviewCapabilityTarget(id: "target-fixture-offline", bindingRevision: 2)] : [])
+    guard requested == nil || requested == onlineTarget.id else {
       return OverviewCapabilityMatrixPresentation(
         targetID: nil, bindingRevision: nil, items: [],
         failure: "The selected target is no longer adopted: \(requested ?? "")",
         adoptedTargets: adopted)
     }
     return OverviewCapabilityMatrixPresentation(
-      targetID: "ui-fixture-target", bindingRevision: 7,
+      targetID: onlineTarget.id, bindingRevision: onlineTarget.bindingRevision,
       items: [
         OverviewCapabilityItemPresentation(
           id: "hidumper", name: "hidumper", state: .available,

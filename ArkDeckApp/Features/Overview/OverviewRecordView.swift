@@ -1,79 +1,144 @@
 import ArkDeckCore
 import ArkDeckWorkflows
+import Observation
 import SwiftUI
 
-/// The Overview's record-first content: which device this page is talking
-/// about, what can be started on it, and what has already run.
-///
-/// It renders above the HDC diagnostics rather than replacing them. The
-/// accepted `desktop-ux-observability` requirement still asks Overview to show
-/// the toolchain facts, so this adds the answer to "what ran and how do I
-/// continue" without moving anything that requirement names. Moving those
-/// fields to Settings is a behavior delta the maintainer has to rule on first
-/// (`docs/design/overview-redesign.md` §6).
+enum OverviewRemoteServerPresentation: Equatable {
+  case loading
+  case unbound
+  case bound(RemoteBuildSourcePresentation)
+  case stale
+  case unavailable(String)
+}
+
+/// Resolves only an explicit target-to-source binding. A configured source,
+/// recent source, or first source is never treated as the target's server.
+@MainActor
+@Observable
+final class OverviewRemoteServerViewModel {
+  private(set) var presentation: OverviewRemoteServerPresentation = .loading
+
+  private let sources: any RemoteBuildSourceProviding
+  private let bindings: any RemoteBuildSourceBindingProviding
+  private var generation = 0
+
+  init(
+    sources: any RemoteBuildSourceProviding = RemoteBuildSourceApplicationFacade.make(),
+    bindings: any RemoteBuildSourceBindingProviding =
+      RemoteBuildSourceBindingApplicationFacade.make()
+  ) {
+    self.sources = sources
+    self.bindings = bindings
+  }
+
+  func load(targetID: String?) {
+    generation += 1
+    let currentGeneration = generation
+    guard let targetID else {
+      presentation = .unbound
+      return
+    }
+    presentation = .loading
+    let sources = sources
+    let bindings = bindings
+    Task { [weak self] in
+      do {
+        async let availableSources = sources.listSources()
+        async let targetBinding = bindings.binding(forTargetID: targetID)
+        let (allSources, binding) = try await (availableSources, targetBinding)
+        guard let self, currentGeneration == self.generation else { return }
+        guard let binding else {
+          self.presentation = .unbound
+          return
+        }
+        guard let source = allSources.first(where: { $0.id == binding.sourceID }) else {
+          self.presentation = .stale
+          return
+        }
+        self.presentation = .bound(source)
+      } catch {
+        guard let self, currentGeneration == self.generation else { return }
+        self.presentation = .unavailable(error.localizedDescription)
+      }
+    }
+  }
+}
+
+/// Overview answers three questions in order: what target is in scope, what
+/// deserves attention next, and what just happened. New-work shortcuts stay
+/// in the sidebar; the complete archive stays in History.
 struct OverviewRecordView: View {
   let devices: DeviceListPresentation
   let capabilities: OverviewCapabilityMatrixPresentation
+  let remoteServer: OverviewRemoteServerPresentation
   let history: RuntimeHistoryPresentation
   let detailsByJobID: [String: RuntimeJobDetailPresentation]
   let onSelectTarget: (String?) -> Void
-  let onOpen: (OverviewAction.Kind) -> Void
   let onOpenHistory: () -> Void
   let onOpenJob: (String) -> Void
   let onResume: (RuntimeJobSummaryPresentation) -> Void
+
+  @State private var expandedThreadIDs: Set<String> = []
 
   private var threads: [OverviewRunThread] {
     OverviewRunRecordProjection.threads(from: history.jobs)
   }
 
-  private var actions: [OverviewAction] {
-    OverviewActionProjection.actions(from: capabilities)
-  }
-
   var body: some View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
       deviceBar
-      startSection
+      nextStepSection
       recordSection
     }
   }
 
-  // MARK: - Device bar
+  // MARK: - Scope
 
-  /// The target this page describes — chosen here, not inherited.
-  ///
-  /// Everything below is about one device, so the page states which and lets
-  /// the reader change it. It deliberately does not follow the sidebar
-  /// selection: spec §5.2 keeps a device row a navigation destination, not an
-  /// implicit scope for a workspace.
   private var deviceBar: some View {
     WorkspaceCard {
-      HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
-        Image(systemName: "iphone.gen3")
-          .foregroundStyle(.secondary)
-          .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-          if capabilities.adoptedTargets.count > 1 {
-            targetPicker
-          } else {
-            Text(boundDeviceName)
-              .font(WorkspaceFont.body.weight(.semibold))
-              .accessibilityIdentifier("overview.record.device.name")
-          }
-          Text(boundDeviceFacts)
-            .font(WorkspaceFont.monospacedDense)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("overview.record.device.facts")
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .top, spacing: WorkspaceMetrics.sectionGap) {
+          deviceScope
+          Divider().frame(minHeight: 46)
+          remoteServerScope
+            .frame(maxWidth: 410, alignment: .leading)
         }
-        Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          deviceScope
+          Divider()
+          remoteServerScope
+        }
       }
     }
   }
 
-  /// Offered only when there is something to choose between. With one adopted
-  /// target a picker would be a control with a single option, and with none it
-  /// would imply a choice the operator does not have.
+  private var deviceScope: some View {
+    HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+      Image(systemName: "iphone.gen3")
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Text("overview.record.device.label")
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(.secondary)
+        if capabilities.adoptedTargets.count > 1 {
+          targetPicker
+        } else {
+          Text(boundDeviceName)
+            .font(WorkspaceFont.body.weight(.semibold))
+            .accessibilityIdentifier("overview.record.device.name")
+        }
+        Text(boundDeviceFacts)
+          .font(WorkspaceFont.monospacedDense)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("overview.record.device.facts")
+      }
+      Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
   private var targetPicker: some View {
     Picker(
       selection: Binding(
@@ -83,6 +148,8 @@ struct OverviewRecordView: View {
       if capabilities.targetID == nil {
         Text("overview.record.device.choose").tag(String?.none)
       }
+      // The view model projects this list from the current authorized device
+      // observation. Historical adopted targets stay in History, not here.
       ForEach(capabilities.adoptedTargets) { target in
         Text(displayName(for: target.id)).tag(String?.some(target.id))
       }
@@ -92,6 +159,66 @@ struct OverviewRecordView: View {
     .labelsHidden()
     .fixedSize()
     .accessibilityIdentifier("overview.record.device.picker")
+  }
+
+  private var remoteServerScope: some View {
+    HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+      Image(systemName: "server.rack")
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Text("overview.record.remoteServer.label")
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(.secondary)
+        remoteServerContent
+      }
+      .accessibilityIdentifier("overview.record.remoteServer")
+      Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder
+  private var remoteServerContent: some View {
+    switch remoteServer {
+    case .loading:
+      HStack(spacing: WorkspaceMetrics.tightGap) {
+        ProgressView().controlSize(.small)
+        Text("overview.record.remoteServer.loading")
+          .foregroundStyle(.secondary)
+      }
+    case .unbound:
+      Text("overview.record.remoteServer.unbound")
+        .font(WorkspaceFont.body.weight(.semibold))
+      Text("overview.record.remoteServer.unboundDetail")
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+    case .bound(let source):
+      HStack(spacing: WorkspaceMetrics.tightGap) {
+        Text(source.name).font(WorkspaceFont.body.weight(.semibold))
+        WorkspaceChip(
+          text: Text("overview.record.remoteServer.bound"), tone: .ok,
+          symbol: "link")
+      }
+      Text(source.endpoint)
+        .font(WorkspaceFont.monospacedDense)
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+        .accessibilityIdentifier("overview.record.remoteServer.endpoint")
+    case .stale:
+      Text("overview.record.remoteServer.stale")
+        .font(WorkspaceFont.body.weight(.semibold))
+      Text("overview.record.remoteServer.staleDetail")
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+    case .unavailable(let reason):
+      Text("overview.record.remoteServer.unavailable")
+        .font(WorkspaceFont.body.weight(.semibold))
+      Text(reason)
+        .font(WorkspaceFont.monospacedDense)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+    }
   }
 
   private func displayName(for targetID: String) -> String {
@@ -123,11 +250,7 @@ struct OverviewRecordView: View {
 
   private var boundDeviceFacts: String {
     guard let targetID = capabilities.targetID else {
-      // With several adopted targets the provider refuses to describe any of
-      // them, and says so; that reason is more useful than a generic empty
-      // state, so it is shown verbatim.
-      return capabilities.failure
-        ?? String(localized: "overview.record.device.noneDetail")
+      return String(localized: "overview.record.device.noneDetail")
     }
     var parts = [targetID]
     if let revision = capabilities.bindingRevision {
@@ -144,90 +267,131 @@ struct OverviewRecordView: View {
     return parts.joined(separator: " · ")
   }
 
-  // MARK: - Start a new one
+  // MARK: - Next step
 
-  private var startSection: some View {
+  private var nextStepSection: some View {
     WorkspaceSection(
-      Text("overview.record.start.title"), identifier: "overview.record.start"
+      Text("overview.record.next.title"), identifier: "overview.record.next"
     ) {
-      // A fixed grid rather than a wrapping row: the entries must not
-      // reshuffle as probes come back, or the operator learns their positions
-      // twice.
-      LazyVGrid(
-        columns: Array(
-          repeating: GridItem(.flexible(minimum: 120), spacing: WorkspaceMetrics.contentGap),
-          count: 5),
-        alignment: .leading,
-        spacing: WorkspaceMetrics.contentGap
-      ) {
-        ForEach(actions) { action in
-          actionTile(action)
+      WorkspaceCard {
+        if let thread = threads.first, let run = featuredRun(in: thread) {
+          nextStep(for: run, in: thread)
+        } else {
+          HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+            Image(systemName: "arrow.left")
+              .foregroundStyle(.secondary)
+              .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+              Text("overview.record.next.empty.title")
+                .font(WorkspaceFont.body.weight(.semibold))
+              Text("overview.record.next.empty.detail")
+                .font(WorkspaceFont.secondary)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          .accessibilityIdentifier("overview.record.next.empty")
         }
       }
     }
   }
 
-  private func actionTile(_ action: OverviewAction) -> some View {
-    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-      actionButton(action)
-      if let reason = unavailableReason(action.availability) {
-        Text(reason)
-          .font(WorkspaceFont.monospacedDense)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-          .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
-          .padding(.bottom, WorkspaceMetrics.noticePaddingVertical)
-          .accessibilityIdentifier("overview.record.start.\(action.id).reason")
+  private func nextStep(
+    for run: RuntimeJobSummaryPresentation, in thread: OverviewRunThread
+  ) -> some View {
+    let disposition = resumeDisposition(for: run)
+    return ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: WorkspaceMetrics.sectionGap) {
+        nextStepSummary(for: run, in: thread)
+        Spacer(minLength: WorkspaceMetrics.contentGap)
+        nextStepActions(for: run, disposition: disposition)
+      }
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+        nextStepSummary(for: run, in: thread)
+        nextStepActions(for: run, disposition: disposition)
       }
     }
-    .frame(maxWidth: .infinity, alignment: .topLeading)
-    .background(
-      Color(nsColor: .controlBackgroundColor),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-    }
+    .accessibilityIdentifier("overview.record.next.\(run.id)")
   }
 
-  private func actionButton(_ action: OverviewAction) -> some View {
-    Button {
-      onOpen(action.kind)
-    } label: {
+  private func nextStepSummary(
+    for run: RuntimeJobSummaryPresentation, in thread: OverviewRunThread
+  ) -> some View {
+    HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+      Image(
+        systemName: run.needsAttention
+          ? "exclamationmark.triangle.fill" : "clock.arrow.circlepath"
+      )
+      .foregroundStyle(run.needsAttention ? WorkspaceTone.warning.color : Color.accentColor)
+      .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         HStack(spacing: WorkspaceMetrics.tightGap) {
-          Image(systemName: symbol(for: action.kind))
-            .foregroundStyle(action.availability.opensWorkspace ? Color.accentColor : .secondary)
-            .accessibilityHidden(true)
-          Text(LocalizedStringKey(titleKey(for: action.kind)))
-            .font(WorkspaceFont.body.weight(.semibold))
-          Spacer(minLength: 0)
-        }
-        HStack(spacing: WorkspaceMetrics.tightGap) {
-          Label {
-            Text(LocalizedStringKey(availabilityKey(action.availability)))
-              .font(WorkspaceFont.secondary)
-          } icon: {
-            Image(systemName: availabilityTone(action.availability).symbol)
-              .foregroundStyle(availabilityTone(action.availability).color)
-              .accessibilityHidden(true)
+          if run.needsAttention {
+            Text("overview.record.next.attention")
+          } else {
+            Text(workspaceTitle(for: run))
           }
-          effectChip(action.effect)
+          if !run.needsAttention {
+            WorkspaceChip(
+              text: Text(LocalizedStringKey(stateLabelKey(for: run))),
+              tone: stateTone(run))
+          }
         }
-        Text(action.operationReference)
+        .font(WorkspaceFont.sectionTitle)
+        if run.needsAttention {
+          Text(workspaceTitle(for: run))
+            .font(WorkspaceFont.body.weight(.semibold))
+        }
+        Text(nextStepDetail(for: run, in: thread))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        Text("\(run.targetID) · \(displayedOperation(run.operationReference))")
           .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
-          .lineLimit(1)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
-      .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .disabled(!action.availability.opensWorkspace)
-    .accessibilityIdentifier("overview.record.start.\(action.id)")
+  }
+
+  private func nextStepActions(
+    for run: RuntimeJobSummaryPresentation,
+    disposition: OverviewRunResumeDisposition
+  ) -> some View {
+    HStack(spacing: WorkspaceMetrics.tightGap) {
+      Button("overview.record.run.open") { onOpenJob(run.id) }
+        .accessibilityIdentifier("overview.record.next.open")
+      switch disposition {
+      case .resumable:
+        Button("overview.record.run.again") { onResume(run) }
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier("overview.record.next.again")
+      case .requiresAuthorization:
+        Button("overview.record.run.againGated") { onResume(run) }
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier("overview.record.next.again")
+      case .detailNotLoaded:
+        ProgressView().controlSize(.small)
+      case .neverReplayed, .notTerminal, .effectUnknown, .parametersNotReported:
+        EmptyView()
+      }
+    }
+  }
+
+  private func nextStepDetail(
+    for run: RuntimeJobSummaryPresentation, in thread: OverviewRunThread
+  ) -> String {
+    if run.outcomeUnknown, !run.hasEstablishedCurrentEpoch {
+      return String(localized: "overview.record.next.unknownDetail")
+    }
+    if run.waitingForHuman {
+      return String(localized: "overview.record.next.waitingDetail")
+    }
+    if run.outstandingResidueCount > 0 {
+      return String(
+        localized: .overviewRecordNextResidueDetail(run.outstandingResidueCount))
+    }
+    return String(
+      localized: .overviewRecordNextRecentDetail(thread.runs.count, runOutcome(run)))
   }
 
   // MARK: - Recent work
@@ -253,82 +417,78 @@ struct OverviewRecordView: View {
           }
         }
       case .available where threads.isEmpty:
-        emptyRecord
+        Text("overview.record.recent.empty")
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("overview.record.empty")
       case .available:
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           ForEach(threads) { thread in
             threadCard(thread)
           }
-          Text("overview.record.recent.rules")
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
         }
       }
     }
   }
 
-  /// A record page has to define its empty state, and it must not fill it with
-  /// example rows: what has not run has not run. What it can honestly do is say
-  /// what a run will record.
-  private var emptyRecord: some View {
-    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-      Text("overview.record.empty.title")
-        .font(WorkspaceFont.body.weight(.semibold))
-        .accessibilityIdentifier("overview.record.empty")
-      Text("overview.record.empty.description")
-        .font(WorkspaceFont.secondary)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-      ForEach(["run", "artifact", "thread"], id: \.self) { key in
-        Label {
-          Text(LocalizedStringKey("overview.record.empty.\(key)"))
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        } icon: {
-          Image(systemName: "circle.fill")
-            .font(.system(size: 4))
-            .foregroundStyle(.tertiary)
-            .accessibilityHidden(true)
-        }
-      }
-    }
-  }
-
+  @ViewBuilder
   private func threadCard(_ thread: OverviewRunThread) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      threadHeader(thread)
-      Divider()
-      ForEach(Array(thread.runs.enumerated()), id: \.element.id) { index, run in
-        if index > 0 { Divider() }
-        runRow(run)
+    if let featured = featuredRun(in: thread) {
+      let otherRuns = additionalRuns(in: thread, excluding: featured)
+      VStack(alignment: .leading, spacing: 0) {
+        threadHeader(thread, featured: featured)
+        Divider()
+        runRow(featured)
+        if !otherRuns.isEmpty {
+          Divider()
+          DisclosureGroup(
+            isExpanded: expandedBinding(for: thread.id)
+          ) {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(Array(otherRuns.enumerated()), id: \.element.id) { index, run in
+                if index > 0 { Divider() }
+                runRow(run)
+              }
+            }
+            .padding(.top, WorkspaceMetrics.tightGap)
+          } label: {
+            Text(String(localized: .overviewRecordThreadMore(otherRuns.count)))
+              .font(WorkspaceFont.secondary.weight(.medium))
+          }
+          .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+          .padding(.vertical, WorkspaceMetrics.tightGap)
+          .accessibilityIdentifier("overview.record.thread.\(thread.id).more")
+        }
       }
-    }
-    .background(
-      Color(nsColor: .controlBackgroundColor),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
-        .stroke(
-          thread.needsAttention ? WorkspaceTone.warning.color : Color(nsColor: .separatorColor),
-          lineWidth: 1)
+      .background(
+        Color(nsColor: .controlBackgroundColor),
+        in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+          .stroke(
+            thread.needsAttention ? WorkspaceTone.warning.color : Color(nsColor: .separatorColor),
+            lineWidth: 1)
+      }
     }
   }
 
-  private func threadHeader(_ thread: OverviewRunThread) -> some View {
+  private func threadHeader(
+    _ thread: OverviewRunThread, featured: RuntimeJobSummaryPresentation
+  ) -> some View {
     HStack(spacing: WorkspaceMetrics.tightGap) {
-      Image(systemName: "clock.arrow.circlepath")
+      Image(systemName: symbol(for: featured))
         .foregroundStyle(.secondary)
         .accessibilityHidden(true)
-      Text(thread.threadID ?? String(localized: "overview.record.thread.ungrouped"))
-        .font(WorkspaceFont.monospacedDense)
-        .accessibilityIdentifier("overview.record.thread.\(thread.id)")
-      Text(threadSubtitle(thread))
-        .font(WorkspaceFont.secondary)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(workspaceTitle(for: featured))
+          .font(WorkspaceFont.body.weight(.semibold))
+        Text(threadSubtitle(thread))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+      .accessibilityIdentifier("overview.record.thread.\(thread.id)")
       Spacer(minLength: 0)
       if thread.needsAttention {
         WorkspaceChip(
@@ -342,17 +502,38 @@ struct OverviewRecordView: View {
   }
 
   private func threadSubtitle(_ thread: OverviewRunThread) -> String {
-    var parts = thread.operationReferences
-    parts.append(thread.targetID)
-    parts.append(String(localized: .overviewRecordRunCount(thread.runs.count)))
-    return parts.joined(separator: " · ")
+    [thread.targetID, String(localized: .overviewRecordRunCount(thread.runs.count))]
+      .joined(separator: " · ")
   }
 
   private func runRow(_ run: RuntimeJobSummaryPresentation) -> some View {
-    let disposition = OverviewRunRecordProjection.resumeDisposition(
-      for: run,
-      parametersWereReported: detailsByJobID[run.id]?.evidence?.parametersWereReported)
-    return HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+    let disposition = resumeDisposition(for: run)
+    return ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: WorkspaceMetrics.contentGap) {
+        runIdentity(run)
+        Spacer(minLength: WorkspaceMetrics.contentGap)
+        Text(runOutcome(run))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .accessibilityIdentifier("overview.record.run.\(run.id).outcome")
+        runActions(run, disposition: disposition)
+      }
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+        runIdentity(run)
+        Text(runOutcome(run))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("overview.record.run.\(run.id).outcome")
+        runActions(run, disposition: disposition)
+      }
+    }
+    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
+    .padding(.vertical, WorkspaceMetrics.rowGap + 2)
+  }
+
+  private func runIdentity(_ run: RuntimeJobSummaryPresentation) -> some View {
+    HStack(spacing: WorkspaceMetrics.tightGap) {
       Image(systemName: stateTone(run).symbol)
         .foregroundStyle(stateTone(run).color)
         .accessibilityHidden(true)
@@ -360,27 +541,22 @@ struct OverviewRecordView: View {
         .font(WorkspaceFont.monospacedDense)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("overview.record.run.\(run.id)")
-      Text(displayedOperation(run.operationReference))
-        .font(WorkspaceFont.body)
-        .lineLimit(1)
       if let effect = run.actualEffect { effectChip(effect) }
-      Spacer(minLength: 0)
-      Text(runOutcome(run))
-        .font(WorkspaceFont.secondary)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .accessibilityIdentifier("overview.record.run.\(run.id).outcome")
+    }
+  }
+
+  private func runActions(
+    _ run: RuntimeJobSummaryPresentation,
+    disposition: OverviewRunResumeDisposition
+  ) -> some View {
+    HStack(spacing: WorkspaceMetrics.tightGap) {
       resumeControl(run, disposition: disposition)
       Button("overview.record.run.open") { onOpenJob(run.id) }
         .buttonStyle(.link)
         .accessibilityIdentifier("overview.record.run.\(run.id).open")
     }
-    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
-    .padding(.vertical, WorkspaceMetrics.rowGap + 2)
   }
 
-  /// Every refusal names itself in place. A disabled control with no stated
-  /// reason is the thing this page was redesigned to stop doing.
   @ViewBuilder
   private func resumeControl(
     _ run: RuntimeJobSummaryPresentation,
@@ -404,44 +580,63 @@ struct OverviewRecordView: View {
     }
   }
 
-  // MARK: - Vocabulary
+  // MARK: - Presentation helpers
 
-  private func symbol(for kind: OverviewAction.Kind) -> String {
-    switch kind {
+  private func featuredRun(in thread: OverviewRunThread) -> RuntimeJobSummaryPresentation? {
+    OverviewRunRecordProjection.featuredRun(in: thread)
+  }
+
+  private func additionalRuns(
+    in thread: OverviewRunThread, excluding featured: RuntimeJobSummaryPresentation
+  ) -> [RuntimeJobSummaryPresentation] {
+    OverviewRunRecordProjection.additionalRuns(in: thread, excluding: featured)
+  }
+
+  private func expandedBinding(for threadID: String) -> Binding<Bool> {
+    Binding(
+      get: { expandedThreadIDs.contains(threadID) },
+      set: { expanded in
+        if expanded {
+          expandedThreadIDs.insert(threadID)
+        } else {
+          expandedThreadIDs.remove(threadID)
+        }
+      })
+  }
+
+  private func resumeDisposition(
+    for run: RuntimeJobSummaryPresentation
+  ) -> OverviewRunResumeDisposition {
+    OverviewRunRecordProjection.resumeDisposition(
+      for: run,
+      parametersWereReported: detailsByJobID[run.id]?.evidence?.parametersWereReported)
+  }
+
+  private func workspaceKind(for run: RuntimeJobSummaryPresentation) -> OverviewAction.Kind? {
+    OverviewActionProjection.workspaceKind(
+      forOperation: run.operationReference,
+      parameters: detailsByJobID[run.id]?.evidence?.parameters ?? [])
+  }
+
+  private func workspaceTitle(for run: RuntimeJobSummaryPresentation) -> LocalizedStringKey {
+    switch workspaceKind(for: run) {
+    case .uiDump: "overview.record.workspace.viewer"
+    case .trace: "overview.record.workspace.trace"
+    case .debugHAP: "overview.record.workspace.debug"
+    case .flash: "overview.record.workspace.flash"
+    case .toolkit: "overview.record.workspace.toolkit"
+    case nil: LocalizedStringKey(displayedOperation(run.operationReference))
+    }
+  }
+
+  private func symbol(for run: RuntimeJobSummaryPresentation) -> String {
+    switch workspaceKind(for: run) {
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
     case .debugHAP: "ladybug"
     case .flash: "bolt"
     case .toolkit: "hand.tap"
-    }
-  }
-
-  private func titleKey(for kind: OverviewAction.Kind) -> String {
-    "overview.record.action.\(kind.rawValue)"
-  }
-
-  private func availabilityKey(_ availability: OverviewAction.Availability) -> String {
-    switch availability {
-    case .available: "overview.record.availability.available"
-    case .limited: "overview.record.availability.limited"
-    case .unavailable: "overview.record.availability.unavailable"
-    case .notProbed: "overview.record.availability.notProbed"
-    }
-  }
-
-  private func availabilityTone(_ availability: OverviewAction.Availability) -> WorkspaceTone {
-    switch availability {
-    case .available: .ok
-    case .limited: .warning
-    case .unavailable: .danger
-    case .notProbed: .neutral
-    }
-  }
-
-  private func unavailableReason(_ availability: OverviewAction.Availability) -> String? {
-    switch availability {
-    case .available: nil
-    case .limited(let reason), .unavailable(let reason), .notProbed(let reason): reason
+    case nil: "clock.arrow.circlepath"
     }
   }
 
@@ -461,7 +656,7 @@ struct OverviewRecordView: View {
 
   private func effectTone(_ effect: String) -> WorkspaceTone {
     switch effect {
-    case "readOnly": .ok
+    case "readOnly", "hostOnly": .ok
     case "deviceMutation": .warning
     case "destructive": .danger
     default: .neutral
@@ -474,9 +669,18 @@ struct OverviewRecordView: View {
     switch state {
     case .succeeded, .recovered: return .ok
     case .failed: return .danger
-    case .cancelled, .planned: return .neutral
     case .interrupted: return .warning
     default: return .neutral
+    }
+  }
+
+  private func stateLabelKey(for run: RuntimeJobSummaryPresentation) -> String {
+    switch JobState(rawValue: run.state) {
+    case .succeeded, .recovered: "overview.record.state.succeeded"
+    case .failed: "overview.record.state.failed"
+    case .interrupted: "overview.record.state.interrupted"
+    case .cancelled: "overview.record.state.cancelled"
+    default: "overview.record.state.inProgress"
     }
   }
 
@@ -494,8 +698,6 @@ struct OverviewRecordView: View {
     return parts.joined(separator: " · ")
   }
 
-  /// Runtime prints the reference; the row shows it without the schema noise a
-  /// reader does not need at a glance.
   private func displayedOperation(_ reference: String) -> String {
     reference.split(separator: "@").first.map(String.init) ?? reference
   }

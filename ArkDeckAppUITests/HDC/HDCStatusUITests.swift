@@ -189,6 +189,7 @@ final class HDCStatusUITests: XCTestCase {
     guard writeFixtureState(["--ui-test-hdc-refresh-delay"]) else { return }
     defer { try? FileManager.default.removeItem(at: fixtureStateFileURL) }
     let app = launch(arguments: ["--ui-test-fixture-state", fixtureStateFileURL.path])
+    expandAdvancedDiagnostics(app)
     let refresh = app.buttons["hdc.devices.refresh"]
     let chooser = app.buttons["hdc.toolchain.chooseExecutable"]
     XCTAssertTrue(refresh.waitForExistenceFast(timeout: 15))
@@ -480,33 +481,47 @@ final class HDCStatusUITests: XCTestCase {
     }
     XCTAssertTrue(
       app.windows.firstMatch.waitForExistenceFast(timeout: 5), "ArkDeck must create a test window")
-    // The absolute path now lives in the collapsed Advanced Diagnostics
-    // section, so readiness is anchored on a field the Overview always shows.
+    // Complete diagnostics are now under the Environment disclosure, so
+    // readiness is anchored on the summary that always remains visible.
     XCTAssertTrue(
-      element("hdc.endpoint", in: app).waitForExistenceFast(timeout: 15),
+      element("overview.status.server.value", in: app).waitForExistenceFast(timeout: 15),
       "ArkDeck must render an accessible HDC diagnostics root before assertions")
     return app
   }
 
-  /// Advanced Diagnostics is collapsed by default. Expanding it is a user
-  /// action, not a fixture: the same raw values stay behind the same
-  /// identifiers once the section is open.
+  /// Environment is collapsed by default. Expanding it is a user action, not
+  /// a fixture: the same raw values stay behind the same identifiers.
   private func expandAdvancedDiagnostics(
     _ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line
   ) {
-    let toggle = app.buttons["overview.advanced.toggle"]
+    let toggle = element("overview.advanced.toggle", in: app)
     XCTAssertTrue(
       toggle.waitForExistenceFast(timeout: 15),
-      "Overview must expose the Advanced Diagnostics disclosure", file: file, line: line)
+      "Overview must expose the Environment disclosure", file: file, line: line)
     guard !element("hdc.toolchain.path", in: app).exists else { return }
-    // NavigationSplitView accessibility geometry is unreliable on macOS 26;
-    // the product's public shortcut reaches the same action without spending
-    // up to 25 AppKit scroll/idle cycles or risking a click on the Job bar.
-    app.typeKey("d", modifierFlags: [.command, .shift])
+    let workspace = overviewScrollView(in: app)
+    for _ in 0..<6 where !toggle.isHittable {
+      workspace?.scroll(byDeltaX: 0, deltaY: -320)
+    }
+    toggle.click()
+    let path = element("hdc.toolchain.path", in: app)
+    for _ in 0..<6 where !path.exists {
+      workspace?.scroll(byDeltaX: 0, deltaY: -420)
+    }
     XCTAssertTrue(
-      element("hdc.toolchain.path", in: app).waitForExistenceFast(timeout: 5),
-      "expanding Advanced Diagnostics must reveal the raw toolchain facts",
+      path.waitForExistenceFast(timeout: 5),
+      "expanding Environment must reveal the raw toolchain facts",
       file: file, line: line)
+  }
+
+  /// The Overview owns the widest ScrollView in the window; the narrow one is
+  /// the sidebar. Bringing the disclosure into that viewport avoids asking
+  /// XCUITest to click the off-screen AX proxy SwiftUI still publishes.
+  private func overviewScrollView(in app: XCUIApplication) -> XCUIElement? {
+    let window = app.windows.firstMatch.frame
+    return app.scrollViews.allElementsBoundByIndex
+      .filter { $0.frame.width > window.width * 0.5 }
+      .max(by: { $0.frame.width < $1.frame.width })
   }
 
   private func displayedText(for element: XCUIElement) -> String {

@@ -3,34 +3,27 @@ import XCTest
 /// The Overview's record, against the real view hierarchy.
 ///
 /// The projections are unit-tested in ArkDeckKit; what only a launched app can
-/// answer is whether the page renders them — that the entries exist in their
-/// fixed order, that a capability nothing probed is refused *and says why*
-/// rather than silently disabled, and that a run needing a person is pinned
-/// where someone will see it.
+/// answer is whether the page renders the next action without duplicating the
+/// sidebar, keeps target/server scope explicit, and pins a run needing a
+/// person where someone will see it.
 @MainActor
 final class OverviewRecordUITests: XCTestCase {
-  func testTheRecordShowsWhatCanBeStartedAndWhatAlreadyRan() {
+  func testOverviewFocusesTheNextStepAndDoesNotDuplicateSidebarShortcuts() {
     let app = launch()
     XCTAssertTrue(
       element(app, "overview.record.device.name").waitForExistenceFast(timeout: 30),
       "the Overview record must render on the default landing page")
 
-    // The entries keep a fixed order so their positions are learned once.
-    for kind in ["uiDump", "trace", "debugHAP", "flash", "toolkit"] {
-      XCTAssertTrue(
-        element(app, "overview.record.start.\(kind)").exists,
-        "\(kind) must be listed whether or not it can be used")
-    }
+    XCTAssertTrue(element(app, "overview.record.next").exists)
+    XCTAssertTrue(element(app, "overview.record.remoteServer").exists)
+    XCTAssertFalse(
+      element(app, "overview.record.device.picker").exists,
+      "an adopted target that is absent from the live device observation must not appear")
 
-    // The rule the page exists to hold: nothing probes HAP debugging or device
-    // control yet, so both are refused with their own stated reason — never
-    // shown as unavailable, and never disabled in silence.
-    for kind in ["debugHAP", "toolkit"] {
-      let entry = element(app, "overview.record.start.\(kind)")
-      XCTAssertFalse(entry.isEnabled, "\(kind) has no probe, so it cannot open")
-      XCTAssertTrue(
-        element(app, "overview.record.start.\(kind).reason").exists,
-        "\(kind) must say why it cannot open")
+    // Viewer, Trace, Debug, Flash and Toolkit are already one click away in
+    // the sidebar, so Overview must not render a second launch grid.
+    for kind in ["uiDump", "trace", "debugHAP", "flash", "toolkit"] {
+      XCTAssertFalse(element(app, "overview.record.start.\(kind)").exists)
     }
   }
 
@@ -84,14 +77,24 @@ final class OverviewRecordUITests: XCTestCase {
     if app.state != .notRunning { app.terminate() }
     app.launchArguments = [
       "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
-      "--ui-test-hdc-diagnostics", "--ui-test-auto-update-idle", "--ui-test-runtime-history",
+      "--ui-test-hdc-diagnostics", "--ui-test-devices", "--ui-test-auto-update-idle",
+      "--ui-test-runtime-history",
+      "--ui-test-overview-offline-target",
       "--ui-test-reset-shell-selection",
     ]
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
     app.launch()
+    app.activate()
+    // macOS can restore the process with no windows even when persistence is
+    // ignored. Use the product's New Window command, as the shell and Viewer
+    // suites do, so a missing window is not reported as a missing Overview.
+    if !app.windows.firstMatch.waitForExistenceFast(timeout: 5) {
+      app.typeKey("n", modifierFlags: .command)
+      XCTAssertTrue(
+        app.windows.firstMatch.waitForExistenceFast(timeout: 10),
+        "ArkDeck must create a test window")
+    }
     return app
   }
 }
-
-

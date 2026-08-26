@@ -22,7 +22,7 @@ struct HDCStatusView: View {
   let header: AnyView?
   @State private var isSelectingExecutable = false
   @State private var importerError: String?
-  @State private var isAdvancedExpanded = false
+  @State private var isEnvironmentExpanded = false
   @State private var isImpactReviewRequested = false
 
   init(
@@ -51,27 +51,8 @@ struct HDCStatusView: View {
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
-      // The strip stays first: spec §5.1 puts it at the top of the page, and
-      // pushing it below the record moved it out of a standard window
-      // entirely — the four facts nobody should have to scroll for.
-      statusStrip
       if let header { header }
-      // Two fixed columns, not an adaptive grid: `.adaptive` derives its column
-      // count from the pane width, so a maximised window laid all four sections
-      // side by side and crushed the capability matrix. `.grid2` in the
-      // prototype is two columns or one, never four.
-      WorkspaceColumns(spacing: WorkspaceMetrics.sectionGap) {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
-          serverAndToolchainSection
-          capabilitiesSection
-        }
-      } trailing: {
-        VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
-          deviceAndChannelSection
-          needsAttentionSection
-        }
-      }
-      advancedDiagnosticsSection
+      environmentSection
     }
     // The refresh control renders in the window's unified toolbar but is
     // declared here, so it exists — and `⌘R` is live — only while the Overview
@@ -113,125 +94,86 @@ struct HDCStatusView: View {
     }
   }
 
-  // MARK: - Status strip
+  // MARK: - Environment disclosure
 
-  /// `.summary-strip` in the prototype: one bordered band whose four cells are
-  /// separated by the same hairline as everything else. The adaptive grid this
-  /// replaces derived its column count from the pane width, so a wide window
-  /// clumped all four cells into the left third; the refresh indicator was an
-  /// overlay that landed on top of the fourth cell every time ⌘R ran.
-  private var statusStrip: some View {
-    VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-      HStack(spacing: WorkspaceMetrics.tightGap) {
-        Spacer(minLength: 0)
-        if isRefreshInFlight {
-          ProgressView().controlSize(.small)
-          Text("overview.status.refreshing")
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-            .accessibilityIdentifier("overview.status.refreshing")
-        }
-      }
-      .frame(height: 18)
-
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 0) {
-          statusItem(statusStripItems[0])
-          Divider()
-          statusItem(statusStripItems[1])
-          Divider()
-          statusItem(statusStripItems[2])
-          Divider()
-          statusItem(statusStripItems[3])
-        }
-        VStack(spacing: 0) {
-          HStack(spacing: 0) {
-            statusItem(statusStripItems[0])
-            Divider()
-            statusItem(statusStripItems[1])
+  /// The accepted observability fields remain on Overview, but they no longer
+  /// compete with the user's next action. The collapsed label keeps the four
+  /// summary facts visible and the disclosure reveals the complete evidence.
+  private var environmentSection: some View {
+    WorkspaceCard {
+      VStack(alignment: .leading, spacing: 0) {
+        Button {
+          isEnvironmentExpanded.toggle()
+        } label: {
+          HStack(alignment: .center, spacing: WorkspaceMetrics.contentGap) {
+            Image(systemName: "gauge.with.dots.needle.50percent")
+              .foregroundStyle(needsAttentionTone.color)
+              .accessibilityHidden(true)
+            Text("overview.environment.title")
+              .font(WorkspaceFont.sectionTitle)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .rotationEffect(.degrees(isEnvironmentExpanded ? 90 : 0))
+              .accessibilityHidden(true)
           }
-          Divider()
-          HStack(spacing: 0) {
-            statusItem(statusStripItems[2])
-            Divider()
-            statusItem(statusStripItems[3])
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("overview.advanced.toggle")
+        .accessibilityValue(
+          Text(LocalizedStringKey(
+            isEnvironmentExpanded
+              ? "overview.environment.expanded" : "overview.environment.collapsed")))
+
+        HStack(spacing: WorkspaceMetrics.tightGap) {
+          Text(LocalizedStringKey(serverHealthKey))
+            .accessibilityIdentifier("overview.status.server.value")
+          Text("·").accessibilityHidden(true)
+          Text(LocalizedStringKey(trustSummaryKey))
+            .accessibilityIdentifier("overview.status.trust.value")
+          Text("·").accessibilityHidden(true)
+          Text(LocalizedStringKey(channelSummaryKey))
+            .accessibilityIdentifier("overview.status.channel.value")
+          Text("·").accessibilityHidden(true)
+          Text(needsAttentionSummary)
+            .accessibilityIdentifier("overview.status.needsAttention.value")
+          Spacer(minLength: 0)
+          if isRefreshInFlight {
+            ProgressView()
+              .controlSize(.small)
+            Text("overview.status.refreshing")
+              .accessibilityIdentifier("overview.status.refreshing")
           }
         }
-      }
-      .fixedSize(horizontal: false, vertical: true)
-      .background(
-        Color(nsColor: .controlBackgroundColor),
-        in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
-      )
-      .clipShape(
-        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
-          .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-      }
-    }
-  }
-
-  /// The strip's four slots, declared once so the wide row and the folded
-  /// two-by-two grid cannot drift apart (spec §5.1 fixes both the slots and
-  /// their order).
-  private struct StatusStripItem {
-    let titleKey: String
-    let tone: StatusTone
-    let value: Text
-    let id: String
-  }
-
-  private var statusStripItems: [StatusStripItem] {
-    [
-      StatusStripItem(
-        titleKey: "overview.status.server",
-        tone: serverHealthTone,
-        value: Text(LocalizedStringKey(serverHealthKey)),
-        id: "overview.status.server.value"),
-      StatusStripItem(
-        titleKey: "overview.status.trust",
-        tone: trustTone,
-        value: Text(LocalizedStringKey(trustSummaryKey)),
-        id: "overview.status.trust.value"),
-      StatusStripItem(
-        titleKey: "overview.status.channel",
-        tone: channelTone,
-        value: Text(LocalizedStringKey(channelSummaryKey)),
-        id: "overview.status.channel.value"),
-      StatusStripItem(
-        titleKey: "overview.status.needsAttention",
-        tone: needsAttentionTone,
-        value: Text(needsAttentionSummary),
-        id: "overview.status.needsAttention.value"),
-    ]
-  }
-
-  private func statusItem(_ item: StatusStripItem) -> some View {
-    let titleKey = item.titleKey
-    let tone = item.tone
-    let value = item.value
-    let id = item.id
-    return VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-      Text(LocalizedStringKey(titleKey))
-        .font(WorkspaceFont.caption)
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
-      HStack(spacing: WorkspaceMetrics.tightGap) {
-        // The symbol is redundant with the adjacent status text on purpose:
-        // no status here may be readable by colour alone.
-        Image(systemName: tone.symbol)
-          .foregroundStyle(tone.color)
-          .accessibilityHidden(true)
-        value
-          .font(WorkspaceFont.body)
-          .lineLimit(2)
-          .accessibilityIdentifier(id)
+        .padding(.leading, WorkspaceMetrics.sectionGap + 4)
+        .padding(.top, WorkspaceMetrics.rowGap)
+
+        if isEnvironmentExpanded {
+          Divider()
+            .padding(.top, WorkspaceMetrics.contentGap)
+
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+            WorkspaceColumns(spacing: WorkspaceMetrics.sectionGap) {
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+                serverAndToolchainSection
+                capabilitiesSection
+              }
+            } trailing: {
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
+                deviceAndChannelSection
+                needsAttentionSection
+              }
+            }
+            advancedDiagnosticsSection
+          }
+          .padding(.top, WorkspaceMetrics.contentGap)
+        }
       }
     }
-    .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
-    .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
-    .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
   }
 
   // MARK: - Sections
@@ -415,53 +357,33 @@ struct HDCStatusView: View {
   private var advancedDiagnosticsSection: some View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionHeaderGap) {
-        Button {
-          isAdvancedExpanded.toggle()
-        } label: {
-          HStack(spacing: WorkspaceMetrics.tightGap) {
-            Image(systemName: isAdvancedExpanded ? "chevron.down" : "chevron.right")
-              .imageScale(.small)
-              .frame(width: 12)
-              .accessibilityHidden(true)
-            Text("overview.section.advanced")
-              .font(WorkspaceFont.sectionTitle)
-            Spacer(minLength: 0)
-          }
-          .frame(minHeight: 24)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .keyboardShortcut("d", modifiers: [.command, .shift])
-        .accessibilityIdentifier("overview.advanced.toggle")
-        .accessibilityAddTraits(.isHeader)
-        // The rule belongs to the section, not to the disclosure state: the
-        // last band of the page must not change structure on click.
+        Text("overview.section.advanced")
+          .font(WorkspaceFont.sectionTitle)
+          .accessibilityAddTraits(.isHeader)
         Divider()
       }
-      if isAdvancedExpanded {
-        diagnosticsGrid {
-          field(
-            "overview.field.path", presentation.absolutePath, id: "hdc.toolchain.path",
-            style: .monospaced)
-          field(
-            "overview.field.hash", presentation.hash, id: "hdc.toolchain.hash",
-            style: .monospaced)
-          field(
-            "overview.field.generation", presentation.generation, id: "hdc.generation",
-            style: .digits)
-          field("overview.field.endpointSource", endpointSourceText, id: "hdc.endpoint.source")
-          field("overview.field.ownershipBasis", ownershipBasisText, id: "hdc.ownership.basis")
-          field(
-            "overview.field.autoLifecycleDispatches",
-            String(presentation.automaticLifecycleDispatchCount),
-            id: "hdc.counters.autoLifecycle",
-            style: .digits)
-          field(
-            "overview.field.autoSubserverDispatches",
-            String(presentation.automaticSubserverDispatchCount),
-            id: "hdc.counters.autoSubserver",
-            style: .digits)
-        }
+      diagnosticsGrid {
+        field(
+          "overview.field.path", presentation.absolutePath, id: "hdc.toolchain.path",
+          style: .monospaced)
+        field(
+          "overview.field.hash", presentation.hash, id: "hdc.toolchain.hash",
+          style: .monospaced)
+        field(
+          "overview.field.generation", presentation.generation, id: "hdc.generation",
+          style: .digits)
+        field("overview.field.endpointSource", endpointSourceText, id: "hdc.endpoint.source")
+        field("overview.field.ownershipBasis", ownershipBasisText, id: "hdc.ownership.basis")
+        field(
+          "overview.field.autoLifecycleDispatches",
+          String(presentation.automaticLifecycleDispatchCount),
+          id: "hdc.counters.autoLifecycle",
+          style: .digits)
+        field(
+          "overview.field.autoSubserverDispatches",
+          String(presentation.automaticSubserverDispatchCount),
+          id: "hdc.counters.autoSubserver",
+          style: .digits)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -763,14 +685,6 @@ struct HDCStatusView: View {
     }
   }
 
-  private var serverHealthTone: StatusTone {
-    switch presentation.serverHealth {
-    case .healthy: .ok
-    case .unavailable: .danger
-    case .unknown: .unknown
-    }
-  }
-
   private var trustSummaryKey: String {
     switch presentation.authorization {
     case .ready: "overview.trust.ready"
@@ -783,25 +697,10 @@ struct HDCStatusView: View {
     }
   }
 
-  private var trustTone: StatusTone {
-    switch presentation.authorization {
-    case .ready: .ok
-    case .unauthorizedWaitingForTrust, .timedOut, .cancelled, .unavailable: .warning
-    case .denied, .keyAccessDenied: .danger
-    }
-  }
-
   private var channelSummaryKey: String {
     switch presentation.channelProtection {
     case .encryptedVerified: "overview.channel.encryptedVerified"
     case .unverifiedAssumeUnprotected: "overview.channel.unverified"
-    }
-  }
-
-  private var channelTone: StatusTone {
-    switch presentation.channelProtection {
-    case .encryptedVerified: .ok
-    case .unverifiedAssumeUnprotected: .warning
     }
   }
 

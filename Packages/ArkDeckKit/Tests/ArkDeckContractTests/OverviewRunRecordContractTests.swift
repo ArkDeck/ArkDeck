@@ -132,6 +132,36 @@ final class OverviewRunRecordContractTests: XCTestCase {
       threads.first?.operationReferences, ["capture.diagnostics@1", "debug.hap@1"])
   }
 
+  func testOverviewShowsOneFeaturedRunAndAtMostThreeMore() throws {
+    let thread = try XCTUnwrap(
+      OverviewRunRecordProjection.threads(
+        from: (1...7).map {
+          job("job-\($0)", thread: "t-aaa", finishedAt: stamp($0))
+        },
+        limit: 1
+      ).first)
+    let featured = try XCTUnwrap(OverviewRunRecordProjection.featuredRun(in: thread))
+    XCTAssertEqual(featured.id, "job-7")
+    XCTAssertEqual(
+      OverviewRunRecordProjection.additionalRuns(in: thread, excluding: featured).map(\.id),
+      ["job-6", "job-5", "job-4"])
+  }
+
+  func testAnUnresolvedRunRemainsFeaturedEvenWhenTheLineContinued() throws {
+    let thread = try XCTUnwrap(
+      OverviewRunRecordProjection.threads(
+        from: [
+          job(
+            "job-attention", thread: "t-aaa", outcomeUnknown: true,
+            finishedAt: stamp(1)),
+          job("job-later", thread: "t-aaa", finishedAt: stamp(2)),
+        ],
+        limit: 1
+      ).first)
+    XCTAssertEqual(
+      OverviewRunRecordProjection.featuredRun(in: thread)?.id, "job-attention")
+  }
+
   // MARK: - Resuming
 
   /// Every refusal has to name itself. A page that greys a button without

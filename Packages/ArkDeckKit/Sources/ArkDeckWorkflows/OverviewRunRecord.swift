@@ -123,6 +123,29 @@ public enum OverviewRunRecordProjection {
     return limit >= 0 ? Array(ranked.prefix(limit)) : ranked
   }
 
+  /// The one run Overview shows without another click. A still-unresolved run
+  /// takes precedence over the latest settled run; otherwise this is simply
+  /// the most recent run in the line.
+  public static func featuredRun(
+    in thread: OverviewRunThread
+  ) -> RuntimeJobSummaryPresentation? {
+    thread.runs.reversed().first(where: {
+      $0.needsAttention || $0.outstandingResidueCount > 0
+    }) ?? thread.runs.last
+  }
+
+  /// Bounded context revealed by the line's disclosure, newest first. History
+  /// owns everything older than this window.
+  public static func additionalRuns(
+    in thread: OverviewRunThread,
+    excluding featured: RuntimeJobSummaryPresentation,
+    limit: Int = 3
+  ) -> [RuntimeJobSummaryPresentation] {
+    guard limit > 0 else { return [] }
+    return Array(
+      thread.runs.filter { $0.id != featured.id }.suffix(limit).reversed())
+  }
+
   /// Whether this run may be offered as "run it again".
   ///
   /// `parametersWereReported` is nil until the run's evidence has been read;
