@@ -355,6 +355,7 @@ private struct OverviewWorkspaceView: View {
       capabilities: overviewCapabilities.presentation,
       history: runtimeHistory.presentation,
       detailsByJobID: runtimeHistory.detailsByJobID,
+      onSelectTarget: { overviewCapabilities.select(targetID: $0) },
       onOpen: { onOpenWorkspace(Self.navigation(for: $0)) },
       onOpenHistory: { onOpenWorkspace(.history) },
       onOpenJob: { _ in onOpenWorkspace(.history) },
@@ -1318,22 +1319,39 @@ private final class HDCStatusViewModel {
 private final class OverviewCapabilityViewModel {
   private(set) var presentation = OverviewCapabilityMatrixPresentation.loading
   private(set) var isRefreshInFlight = false
+  /// The target the operator chose. Nil means "resolve it only if there is
+  /// nothing to choose between"; the provider refuses rather than picking one
+  /// when several are adopted.
+  private(set) var selectedTargetID: String?
   private let provider: any OverviewCapabilityApplicationProviding
 
   init(provider: any OverviewCapabilityApplicationProviding) {
     self.provider = provider
   }
 
+  func select(targetID: String?) {
+    guard targetID != selectedTargetID else { return }
+    selectedTargetID = targetID
+    refresh()
+  }
+
   func refresh() {
     guard !isRefreshInFlight else { return }
     isRefreshInFlight = true
     let provider = provider
+    let requested = selectedTargetID
     Task { [weak self] in
-      let next = await provider.refresh()
+      let next = await provider.refresh(targetID: requested)
       guard let self else { return }
       self.isRefreshInFlight = false
       guard !Task.isCancelled else { return }
       self.presentation = next
+      // A target that stopped being adopted must not keep being requested, or
+      // every later refresh reports the same stale choice instead of the one
+      // device now present.
+      if let requested, !next.adoptedTargets.contains(where: { $0.id == requested }) {
+        self.selectedTargetID = nil
+      }
     }
   }
 }
