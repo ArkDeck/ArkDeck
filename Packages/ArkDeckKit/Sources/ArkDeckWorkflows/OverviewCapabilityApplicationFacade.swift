@@ -22,22 +22,39 @@ public struct OverviewCapabilityItemPresentation: Identifiable, Sendable, Equata
   }
 }
 
+/// One adopted target the capability matrix could describe.
+public struct OverviewCapabilityTarget: Identifiable, Sendable, Equatable {
+  public let id: String
+  public let bindingRevision: Int
+
+  public init(id: String, bindingRevision: Int) {
+    self.id = id
+    self.bindingRevision = bindingRevision
+  }
+}
+
 public struct OverviewCapabilityMatrixPresentation: Sendable, Equatable {
   public let targetID: String?
   public let bindingRevision: Int?
   public let items: [OverviewCapabilityItemPresentation]
   public let failure: String?
+  /// Every adopted target Runtime reported. The page offers these as a choice;
+  /// it must never present one device's capabilities as if the reader had
+  /// picked it.
+  public let adoptedTargets: [OverviewCapabilityTarget]
 
   public init(
     targetID: String?,
     bindingRevision: Int?,
     items: [OverviewCapabilityItemPresentation],
-    failure: String? = nil
+    failure: String? = nil,
+    adoptedTargets: [OverviewCapabilityTarget] = []
   ) {
     self.targetID = targetID
     self.bindingRevision = bindingRevision
     self.items = items
     self.failure = failure
+    self.adoptedTargets = adoptedTargets
   }
 
   public static let loading = OverviewCapabilityMatrixPresentation(
@@ -45,7 +62,14 @@ public struct OverviewCapabilityMatrixPresentation: Sendable, Equatable {
 }
 
 public protocol OverviewCapabilityApplicationProviding: Sendable {
-  func refresh() async -> OverviewCapabilityMatrixPresentation
+  /// Probes one named target's capabilities.
+  ///
+  /// `targetID` is the target the reader chose. Passing nil asks the provider
+  /// to resolve one only when there is nothing to choose between — exactly one
+  /// adopted target. With several, it refuses and reports them, because a
+  /// matrix that silently described whichever target came back first is a
+  /// matrix about a device nobody selected and the page cannot name.
+  func refresh(targetID: String?) async -> OverviewCapabilityMatrixPresentation
 }
 
 public enum OverviewCapabilityApplicationFacade {
@@ -60,7 +84,7 @@ public enum OverviewCapabilityApplicationFacade {
 }
 
 private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicationProviding {
-  func refresh() async -> OverviewCapabilityMatrixPresentation {
+  func refresh(targetID requested: String?) async -> OverviewCapabilityMatrixPresentation {
     async let operationResponse = DebugXPCReadTransport.request(method: "operation.list")
     async let targetResponse = DebugXPCReadTransport.request(method: "target.list")
     let operations: [[String: Any]]
@@ -74,15 +98,44 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
         failure: String(describing: error))
     }
 
-    guard let target = targets.first,
-      let targetID = target["targetId"] as? String,
-      let bindingRevision = target["bindingRevision"] as? Int
-    else {
-      return OverviewCapabilityMatrixPresentation(
+
+    let adopted: [OverviewCapabilityTarget] = targets.compactMap { entry in
+      guard let id = entry["targetId"] as? String,
+        let revision = entry["bindingRevision"] as? Int
+      else { return nil }
+      return OverviewCapabilityTarget(id: id, bindingRevision: revision)
+    }
+
+    func unresolved(_ reason: String) -> OverviewCapabilityMatrixPresentation {
+      // The Flash row is a Catalog fact about the published operation, not a
+      // device probe, so it survives having no target to describe.
+      OverviewCapabilityMatrixPresentation(
         targetID: nil, bindingRevision: nil,
         items: [Self.flashCapability(from: operations)],
-        failure: "No adopted target is available for device capability probing")
+        failure: reason,
+        adoptedTargets: adopted)
     }
+
+    let resolved: OverviewCapabilityTarget
+    if let requested {
+      guard let match = adopted.first(where: { $0.id == requested }) else {
+        return unresolved(
+          "The selected target is no longer adopted: \(requested)")
+      }
+      resolved = match
+    } else if adopted.count == 1, let only = adopted.first {
+      resolved = only
+    } else if adopted.isEmpty {
+      return unresolved("No adopted target is available for device capability probing")
+    } else {
+      // Refusing here is the point. Probing the first entry would answer a
+      // question nobody asked, about a device the page could not truthfully
+      // name as the reader's choice.
+      return unresolved(
+        "\(adopted.count) adopted targets are available; choose which one to describe")
+    }
+    let targetID = resolved.id
+    let bindingRevision = resolved.bindingRevision
 
     async let traceResponse = DebugXPCReadTransport.request(
       method: "trace.probe", params: ["targetId": .string(targetID)])
@@ -110,7 +163,8 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
       at: 0)
     items.append(Self.flashCapability(from: operations))
     return OverviewCapabilityMatrixPresentation(
-      targetID: targetID, bindingRevision: bindingRevision, items: items)
+      targetID: targetID, bindingRevision: bindingRevision, items: items,
+      adoptedTargets: adopted)
   }
 
   private static func resultArray(
@@ -257,8 +311,15 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
 }
 
 private actor OverviewCapabilityFixtureProvider: OverviewCapabilityApplicationProviding {
-  func refresh() async -> OverviewCapabilityMatrixPresentation {
-    OverviewCapabilityMatrixPresentation(
+  func refresh(targetID requested: String?) async -> OverviewCapabilityMatrixPresentation {
+    let adopted = [OverviewCapabilityTarget(id: "ui-fixture-target", bindingRevision: 7)]
+    guard requested == nil || requested == "ui-fixture-target" else {
+      return OverviewCapabilityMatrixPresentation(
+        targetID: nil, bindingRevision: nil, items: [],
+        failure: "The selected target is no longer adopted: \(requested ?? "")",
+        adoptedTargets: adopted)
+    }
+    return OverviewCapabilityMatrixPresentation(
       targetID: "ui-fixture-target", bindingRevision: 7,
       items: [
         OverviewCapabilityItemPresentation(
@@ -273,6 +334,7 @@ private actor OverviewCapabilityFixtureProvider: OverviewCapabilityApplicationPr
         OverviewCapabilityItemPresentation(
           id: "rockusb-flash", name: "RockUSB Flash", state: .available,
           evidence: "UI fixture · canonical ArkForge Flash available"),
-      ])
+      ],
+      adoptedTargets: adopted)
   }
 }

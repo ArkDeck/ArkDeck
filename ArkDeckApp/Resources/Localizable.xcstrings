@@ -3853,6 +3853,40 @@
           }
         }
       }
+    },
+    "overview.record.device.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device this page describes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本页描述的设备"
+          }
+        }
+      }
+    },
+    "overview.record.device.choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a device…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一台设备…"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

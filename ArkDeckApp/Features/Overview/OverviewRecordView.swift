@@ -16,6 +16,7 @@ struct OverviewRecordView: View {
   let capabilities: OverviewCapabilityMatrixPresentation
   let history: RuntimeHistoryPresentation
   let detailsByJobID: [String: RuntimeJobDetailPresentation]
+  let onSelectTarget: (String?) -> Void
   let onOpen: (OverviewAction.Kind) -> Void
   let onOpenHistory: () -> Void
   let onOpenJob: (String) -> Void
@@ -39,10 +40,12 @@ struct OverviewRecordView: View {
 
   // MARK: - Device bar
 
-  /// The target this page is describing, stated rather than assumed. The
-  /// capability matrix binds one adopted target, so the page says which one
-  /// instead of leaving the reader to guess which device the entries below
-  /// describe.
+  /// The target this page describes — chosen here, not inherited.
+  ///
+  /// Everything below is about one device, so the page states which and lets
+  /// the reader change it. It deliberately does not follow the sidebar
+  /// selection: spec §5.2 keeps a device row a navigation destination, not an
+  /// implicit scope for a workspace.
   private var deviceBar: some View {
     WorkspaceCard {
       HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
@@ -50,9 +53,13 @@ struct OverviewRecordView: View {
           .foregroundStyle(.secondary)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-          Text(boundDeviceName)
-            .font(WorkspaceFont.body.weight(.semibold))
-            .accessibilityIdentifier("overview.record.device.name")
+          if capabilities.adoptedTargets.count > 1 {
+            targetPicker
+          } else {
+            Text(boundDeviceName)
+              .font(WorkspaceFont.body.weight(.semibold))
+              .accessibilityIdentifier("overview.record.device.name")
+          }
           Text(boundDeviceFacts)
             .font(WorkspaceFont.monospacedDense)
             .foregroundStyle(.secondary)
@@ -62,6 +69,38 @@ struct OverviewRecordView: View {
         Spacer(minLength: 0)
       }
     }
+  }
+
+  /// Offered only when there is something to choose between. With one adopted
+  /// target a picker would be a control with a single option, and with none it
+  /// would imply a choice the operator does not have.
+  private var targetPicker: some View {
+    Picker(
+      selection: Binding(
+        get: { capabilities.targetID },
+        set: { onSelectTarget($0) })
+    ) {
+      if capabilities.targetID == nil {
+        Text("overview.record.device.choose").tag(String?.none)
+      }
+      ForEach(capabilities.adoptedTargets) { target in
+        Text(displayName(for: target.id)).tag(String?.some(target.id))
+      }
+    } label: {
+      Text("overview.record.device.label")
+    }
+    .labelsHidden()
+    .fixedSize()
+    .accessibilityIdentifier("overview.record.device.picker")
+  }
+
+  private func displayName(for targetID: String) -> String {
+    guard
+      let candidate = devices.candidates.first(where: { $0.adoptedTargetID == targetID }),
+      let name = candidate.deviceInformation?.name ?? candidate.observedFacts?.model,
+      !name.isEmpty
+    else { return targetID }
+    return "\(name) · \(targetID)"
   }
 
   private var boundCandidate: DeviceCandidatePresentation? {
@@ -84,7 +123,11 @@ struct OverviewRecordView: View {
 
   private var boundDeviceFacts: String {
     guard let targetID = capabilities.targetID else {
-      return String(localized: "overview.record.device.noneDetail")
+      // With several adopted targets the provider refuses to describe any of
+      // them, and says so; that reason is more useful than a generic empty
+      // state, so it is shown verbatim.
+      return capabilities.failure
+        ?? String(localized: "overview.record.device.noneDetail")
     }
     var parts = [targetID]
     if let revision = capabilities.bindingRevision {
