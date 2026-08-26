@@ -196,7 +196,38 @@ struct ToolkitWorkspaceView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(16)
       Spacer()
+      Divider()
+      performanceNotice
     }
+  }
+
+  /// What watching costs.
+  ///
+  /// It carries no dismiss control on purpose. A person reading a device is
+  /// measuring something, and capturing moves what they are measuring:
+  /// measured on hardware, a 30-frame run took the device's one-minute load
+  /// average from 2.00 to 2.24 with a second runnable process appearing. A
+  /// notice that can be closed is a notice that is absent exactly when
+  /// somebody has been using the workspace long enough for it to matter.
+  private var performanceNotice: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Image(systemName: "gauge.with.dots.needle.33percent")
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(toolkitText("toolkit.performance.title"))
+          .font(.system(size: 11, weight: .medium))
+        Text(toolkitText("toolkit.performance.detail"))
+          .font(.system(size: 10))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(16)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("toolkit.performance")
   }
 
   private func gestureRow(_ key: String) -> some View {
@@ -335,18 +366,7 @@ struct ToolkitWorkspaceView: View {
   /// that would fit rather than only saying no.
   private func refusalBar(_ refusal: ToolkitRecordingBudget.Refusal) -> some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label(
-        toolkitText("toolkit.record.noRoom"), systemImage: "externaldrive.badge.exclamationmark")
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(.orange)
-      Text(Self.headroomSummary(refusal))
-        .font(.system(size: 10))
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-      Text(toolkitText("toolkit.record.noRoom.detail"))
-        .font(.system(size: 10))
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+      refusalText(refusal)
       if refusal.framesThatWouldFit >= 2 {
         Button {
           recording.shrinkToFit(refusal)
@@ -360,6 +380,28 @@ struct ToolkitWorkspaceView: View {
         .buttonStyle(.link)
         .accessibilityIdentifier("toolkit.record.shrink")
       }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  /// The refusal's prose, combined into one element so it reads as one
+  /// statement. The button that acts on it stays outside: combining children
+  /// swallows a control, and a refusal whose only remedy is unreachable is
+  /// back to offering nothing.
+  private func refusalText(_ refusal: ToolkitRecordingBudget.Refusal) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label(
+        toolkitText("toolkit.record.noRoom"), systemImage: "externaldrive.badge.exclamationmark")
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(.orange)
+      Text(Self.headroomSummary(refusal))
+        .font(.system(size: 10))
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+      Text(toolkitText("toolkit.record.noRoom.detail"))
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .combine)
