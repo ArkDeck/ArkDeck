@@ -39,6 +39,7 @@ package enum ArkDeckAgentClientName {
   public static let flashWorkspace = "ArkDeckApp.FlashWorkspace"
   public static let traceWorkspace = "ArkDeckApp.TraceWorkspace"
   package static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
+  package static let debugArtifactsWorkspace = "ArkDeckApp.DebugWorkspace.Artifacts"
   package static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
   package static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
   /// Toolkit's device-control workspace. It is named apart from the Viewer's
@@ -133,6 +134,18 @@ package enum ArkDeckAgentXPC {
     "artifact.importHap.commit",
   ]
 
+  /// Native-library ingestion is the closed App-owned upload for the
+  /// published deploy.native-library.app-owned operation. The caller supplies
+  /// a selected target, a safe lib*.so basename, exact byte facts and bounded
+  /// chunks; Runtime validates the signed ELF and returns an identity-bound
+  /// lease. No host path or device destination crosses XPC.
+  package static let forwardableNativeLibraryImportMethods: Set<String> = [
+    "artifact.importNativeLibrary.abort",
+    "artifact.importNativeLibrary.append",
+    "artifact.importNativeLibrary.begin",
+    "artifact.importNativeLibrary.commit",
+  ]
+
   /// The App may ask Runtime to bind one freshly re-read Loader candidate to
   /// the explicitly selected adopted target. This method is not a device
   /// command and cannot dispatch Flash; the daemon applies Core rebind policy
@@ -154,6 +167,7 @@ package enum ArkDeckAgentXPC {
     forwardableReadOnlyMethods
     .union(forwardableFlashBundleMethods)
     .union(forwardableHAPImportMethods)
+    .union(forwardableNativeLibraryImportMethods)
     .union(forwardableRockchipBindingMethods)
     .union(gatedAppJobMethods)
 

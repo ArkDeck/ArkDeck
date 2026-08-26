@@ -27,6 +27,21 @@ let package = Package(
   ],
   dependencies: [
     .package(
+      url: "https://github.com/orlandos-nl/Citadel.git",
+      exact: "0.12.1"),
+    .package(
+      url: "https://github.com/Wellz26/swift-nio-ssh.git",
+      exact: "0.3.4"),
+    .package(
+      url: "https://github.com/apple/swift-nio.git",
+      exact: "2.101.3"),
+    .package(
+      url: "https://github.com/apple/swift-crypto.git",
+      exact: "3.15.1"),
+    .package(
+      url: "https://github.com/apple/swift-log.git",
+      exact: "1.15.0"),
+    .package(
       url: "https://github.com/ArkDeck/ArkForge.git",
       revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"),
     .package(
@@ -51,6 +66,11 @@ let package = Package(
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
         "ArkDeckStorage",
+        .product(name: "Citadel", package: "Citadel"),
+        .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOSSH", package: "swift-nio-ssh"),
+        .product(name: "Logging", package: "swift-log"),
         .product(name: "ArkForgeProtocol", package: "ArkForge"),
         .product(name: "ArkForgeClient", package: "ArkForge"),
       ],

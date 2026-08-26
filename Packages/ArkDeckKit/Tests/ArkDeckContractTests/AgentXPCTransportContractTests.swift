@@ -28,11 +28,11 @@ final class AgentXPCTransportContractTests: XCTestCase {
     let expected = Data("first".utf8)
     let result = await RuntimeXPCRequestTransport.awaitReply(
       timeoutSeconds: 0.01,
-      cleanup: { cleanupCount.withLock { $0 += 1 } }
-    ) { finish in
-      finish(.success(expected))
-      finish(.failure(.emptyResponse))
-    }
+      cleanup: { cleanupCount.withLock { $0 += 1 } },
+      start: { finish in
+        finish(.success(expected))
+        finish(.failure(.emptyResponse))
+      })
 
     XCTAssertEqual(result, .success(expected))
     try? await Task.sleep(for: .milliseconds(20))
@@ -82,6 +82,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
     for method in ArkDeckAgentXPC.forwardableReadOnlyMethods
       .union(ArkDeckAgentXPC.forwardableFlashBundleMethods)
       .union(ArkDeckAgentXPC.forwardableHAPImportMethods)
+      .union(ArkDeckAgentXPC.forwardableNativeLibraryImportMethods)
       .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
     {
       XCTAssertEqual(
@@ -126,6 +127,13 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ],
       "HAP upload must remain the four closed ID-and-chunk methods")
     XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableNativeLibraryImportMethods,
+      [
+        "artifact.importNativeLibrary.abort", "artifact.importNativeLibrary.append",
+        "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.commit",
+      ],
+      "native-library upload must remain the four closed ID-and-chunk methods")
+    XCTAssertEqual(
       ArkDeckAgentXPC.forwardableRockchipBindingMethods,
       ["flash.bind-current-loader"],
       "Loader binding must remain one closed Runtime-owned identity action")
@@ -163,6 +171,13 @@ final class AgentXPCTransportContractTests: XCTestCase {
           operationVersion: 1,
           clientName: ArkDeckAgentClientName.debugAppsWorkspace)),
       .appSubmit(requestID: "contract-submit", kind: .debugHAP))
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "deploy.native-library.app-owned",
+          operationVersion: 1,
+          clientName: ArkDeckAgentClientName.debugArtifactsWorkspace)),
+      .appSubmit(requestID: "contract-submit", kind: .debugNativeLibrary))
     for operationID in ["port-forward.create", "port-forward.remove"] {
       XCTAssertEqual(
         AgentXPCEndpoint.admission(
@@ -272,7 +287,6 @@ final class AgentXPCTransportContractTests: XCTestCase {
     for method in [
       "job.reconcile", "job.plan",
       "target.adopt", "artifact.export",
-      "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.commit",
       "capability.draft", "capability.install", "capability.revoke",
     ] {
       XCTAssertNil(
