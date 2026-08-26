@@ -40,6 +40,24 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
     return try XCTUnwrap(unit["value"] as? String)
   }
 
+  private func pngDimensions(_ path: String) throws -> (width: Int, height: Int) {
+    let data = try Data(contentsOf: repositoryRoot.appending(path: path))
+    guard data.count >= 24 else {
+      XCTFail("truncated PNG: \(path)")
+      return (0, 0)
+    }
+    let bytes = [UInt8](data)
+    XCTAssertEqual(
+      Array(bytes.prefix(8)),
+      [UInt8](arrayLiteral: 137, 80, 78, 71, 13, 10, 26, 10),
+      "reference is not a PNG: \(path)")
+
+    func uint32(at offset: Int) -> Int {
+      bytes[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+    }
+    return (uint32(at: 16), uint32(at: 20))
+  }
+
   func testPrototypeMirrorsProductionSynchronizationIdentifiers() throws {
     let prototype = try source("docs/design/prototype.html")
     let viewerSource = try source(
@@ -131,13 +149,31 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
     ]
 
     for (table, keys) in keysByTable {
-      for key in keys {
-        let value = try localizedValue(key, table: table)
-        XCTAssertTrue(
-          prototype.contains(value),
-          "design draft does not contain current \(table) value for \(key): \(value)")
+      let locales = table == "TraceLocalizable"
+        ? ["zh-Hans", "en"] : ["zh-Hans"]
+      for locale in locales {
+        for key in keys {
+          let value = try localizedValue(key, table: table, locale: locale)
+          XCTAssertTrue(
+            prototype.contains(value),
+            "design draft does not contain current \(locale) \(table) value for \(key): \(value)")
+        }
       }
     }
+  }
+
+  func testTraceReferenceImagesAreBilingualAndUseTheDesignReferenceSize() throws {
+    let readme = try source("docs/design/references/v1.3/README.md")
+    for locale in ["zh-Hans", "en"] {
+      let path = "docs/design/references/v1.3/trace-\(locale).png"
+      let dimensions = try pngDimensions(path)
+      XCTAssertEqual(dimensions.width, 1180, path)
+      XCTAssertEqual(dimensions.height, 760, path)
+      XCTAssertTrue(readme.contains("trace-\(locale).png"))
+      XCTAssertTrue(readme.contains("lang=\(locale)"))
+    }
+    XCTAssertTrue(readme.contains("page=trace"))
+    XCTAssertTrue(readme.contains("traceState=ready"))
   }
 
   func testPrototypeKeepsViewerEmptyFirstAndTraceFocusedOnCaptureAndView() throws {
@@ -159,9 +195,11 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
     XCTAssertTrue(prototype.contains("showBounds:false"))
     XCTAssertTrue(viewerDesignSystem.contains("showBounds = false"))
     XCTAssertFalse(viewerDesignSystem.contains("<h1"))
-    XCTAssertTrue(durationSource.contains("case .seconds: [15, 30, 45, 60]"))
+    XCTAssertTrue(durationSource.contains("case .seconds: [5, 10, 15, 30]"))
     XCTAssertTrue(durationSource.contains("case .minutes: [1, 2, 3]"))
-    XCTAssertTrue(prototype.contains("[15,30,45,60]"))
+    XCTAssertTrue(prototype.contains(#"trace:{running:false,duration:10,unit:"seconds""#))
+    XCTAssertTrue(prototype.contains(#"value==="seconds"?10:1"#))
+    XCTAssertTrue(prototype.contains("[5,10,15,30]"))
     XCTAssertTrue(prototype.contains("[1,2,3]"))
 
     for retiredTraceSurface in [

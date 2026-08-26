@@ -250,12 +250,14 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - Toolbar「AC 标注」只用于设计走查，叠加对应 REQ/AC chip，不进入产品。
 - 原型必须声明演示数据，不连接设备；任何 simulated、planned、fake 结果不得展示为真实硬件结果。
 - 每次原型变更至少检查：UTF-8/中文；light/dark；900×600 与宽屏；键盘遍历与 modal focus return；Reduce Motion；所有导航页；typed-only 命令面；Job 跨页可见。
+- 所有用户可见交互修改必须与产品代码同车更新对应原型页面/状态、表达该事实的本规格或 design brief，以及 `docs/design/references/` 当前设计版本下受影响页面的简体中文与英文 1180×760 UI 参考图；缺少页面、状态或参考图时由本次改动补建，不得延期。
+- UI 参考图必须从 `prototype.html?reference=1&page=<page>&lang=<locale>` 加必要的显式状态参数生成，持续显示演示数据；它只校验布局、文案和状态，不是 App 实机截图、Runtime 输出或硬件验收证据。生成入口与状态参数记录在对应 reference 目录的 README 中。
 
 ### 7.1 v0.5 基线、v0.6 Flash、v0.8 Viewer、v0.9 Debug 与 v1.3 Diagnostics / Toolkit 评审
 
 - `docs/design/references/v0.5/` 固定保存 1180×760 的简体中文与英文设备详情参考截图；原型通过显式 locale / reference state 生成，不依赖浏览器记忆状态。v0.6 Flash 先在交互原型中评审，确认后再固定同尺寸中英文参考截图并进入 SwiftUI 对齐。
 - Viewer 以 `prototype.html?page=dump` 的首次空态为默认可点击事实；点击「抓取视图」后进入与 `prototype.html?page=dump&viewerState=captured` 相同的检查器态。检查器默认选中 `Toggle #42`，可从截图与完整树双向切换节点，且下方属性、布局、无障碍和 raw 内容同步更新；水平分隔条可用指针和键盘调整。
-- Trace 以 `prototype.html?page=trace` 为实现同步稿：只保留显式设备、抓取场景、秒/分钟时长、快捷时长、「开始抓取」以及独立「打开 Trace 查看器」入口。旧自定义 tag、参数 snapshot、Artifact 状态卡不得作为后续实现输入恢复。
+- Trace 以 `prototype.html?page=trace` 为实现同步稿：只保留显式设备、抓取场景、秒/分钟时长、快捷时长、「开始抓取」以及独立「打开 Trace 查看器」入口。秒快捷值为 `5s / 10s / 15s / 30s`，默认选中 `10s`；分钟快捷值为 `1 min / 2 min / 3 min`。旧自定义 tag、参数 snapshot、Artifact 状态卡不得作为后续实现输入恢复。
 - Debug 以 `prototype.html?page=debug` 为实现同步稿:五个 tab（Artifacts / Logs / Apps / Network / Commands，Artifacts 默认）使用 roving focus 与左右方向键、Home / End;每组以 section 标题加细线分组，不再逐组画有边界卡片;Runtime 可用性只在标题旁一行呈现，被阻止时才在配置之上展开 reason code。Artifacts 走查「本地文件 / 远端服务器 → 选择或浏览一个已签名 `.so` → 填写所属 Bundle 与 `lib<name>.so` → 校验并检查替换计划（plan digest 与七个 materialized step）→ 备份、替换、重启并验证 → 获取日志并验证」;远端浏览只在已验证编译根目录内列出 `lib*.so`，空态跳转「设置 › 服务器」，服务器编辑必须走查密码 / OpenSSH 私钥分支、端口与绝对路径的字段级错误聚焦，以及主机密钥固定提示。旧的本机目录 / SMB / WSL 来源浏览、按名称与类型搜索、勾选批量替换和独立设备重启不得作为后续实现输入恢复，只能以 unavailable 呈现。原型底部的 production-boundary callout 不得删除。
 - v1.3 Diagnostics 以 `prototype.html?page=diagnostics` 为可点击事实：sidebar 同时保留 Trace、Diagnostics 与 Toolkit，切换时各自的 preset、时长、筛选、选择和运行状态不得串扰。默认打开的演示 Session 即第一版默认形态（无录屏、Marker 截图事后拍摄），另有「含录屏」与「Partial + 无法对齐」两个可切换 Session。点击 Marker 截图、可选视频帧、Trace event、HiLog marker 或 Timeline slider 都必须更新同一个时间光标并同步可用画面、`Δt` 与邻近日志；已选 event identity 不被非事件点击清空，光标离开时显示偏离标注。可返回采集页走查「开始诊断 → required channels ready（环形缓冲）→ 自动 Marker 触发 → 标记并截图（pending → +N ms）→ 停止并生成结果 → 生成新 marker-only Session」；`⌘M` 必须可用，默认屏幕录制必须关闭，Partial 横幅、无法对齐降级、截图失败原位说明、对齐 disclosure 和 production-boundary callout 不得删除。
 - v1.3 Toolkit 以 `prototype.html?page=tools` 为可点击事实：默认状态必须显示「按需截图 · 无持续取帧」。走查获取截图（pending → 完成）、画面单击（pending 空心触点 → confirmed 实心、落点为按下位置）、按住 ≥0.5 秒长按（不降级为点击）、按住拖动 swipe、方向键虚拟指针、非闭集手势就地提示、独立开启/停止预览（实测帧率 + 画面年龄常显；断流窗口出现「画面已过期 · 输入已暂停」且 pointer down 被拒绝）、独立开始/停止录屏（接近上限倒计时）。停止录屏后必须先显示「正在合成视频」（Assembling → Validating），再显示 Mac 本地位置、实测帧率、「在 Finder 中显示」「另存为…」与「再录一段」。每次完成的 pointer sequence 只更新一条操作记录，录屏不能隐式开启预览。切换 Trace / Diagnostics 后返回 Toolkit，截图时间、预览、录屏合成与结果状态必须保留；performance notice 与 production-boundary callout 不得删除。

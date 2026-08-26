@@ -226,7 +226,8 @@ detail 从上到下固定为：
 - `抓取场景`：单选 Picker，生产列表为 `应用响应`、`渲染与动画`、`CPU 调度`、
   `I/O`、`系统概览`；下方显示当前场景对应的生产说明；
 - `时长`：72pt 数字输入 + `秒 / 分钟` segmented control；秒快捷值固定为
-  `15s / 30s / 45s / 60s`，分钟快捷值固定为 `1 min / 2 min / 3 min`；
+  `5s / 10s / 15s / 30s`，默认选中 `10s`；分钟快捷值固定为
+  `1 min / 2 min / 3 min`；
 - section footer 左侧只显示当前事实：正在提交、失败、terminal outcome、首个 blocker，
   或 `Trace 只保存在这台 Mac，并会在完成后自动打开。`；
 - footer 右侧未运行时为 primary `开始抓取`；存在 active Job 时显示 job ID 和 `取消抓取`。

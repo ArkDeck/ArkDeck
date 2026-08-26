@@ -42,7 +42,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
   }
 
   func testDurationUnitsKeepRuntimeRequestsInCanonicalSeconds() {
-    XCTAssertEqual(TraceDurationInputUnit.seconds.quickValues, [15, 30, 45, 60])
+    XCTAssertEqual(TraceDurationInputUnit.seconds.quickValues, [5, 10, 15, 30])
     XCTAssertEqual(TraceDurationInputUnit.minutes.quickValues, [1, 2, 3])
     XCTAssertEqual(
       TraceDurationInputUnit.seconds.inputRange(forDurationSecondsRange: 1...600),
@@ -283,6 +283,10 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(workspace.contains("model.submit()"))
     XCTAssertTrue(workspace.contains("traceString(\"trace.action.start\")"))
     XCTAssertTrue(workspace.contains("model.cancel()"))
+    XCTAssertTrue(workspace.contains(#"private(set) var durationText = "10""#))
+    XCTAssertTrue(
+      workspace.contains(
+        "min(durationRange.upperBound, max(durationRange.lowerBound, 10))"))
     XCTAssertTrue(configuration.contains("model.capturePresets"))
     XCTAssertTrue(configuration.contains("TextField(traceString(\"trace.bounds.duration\")"))
     XCTAssertTrue(configuration.contains("selection: durationUnitBinding"))
