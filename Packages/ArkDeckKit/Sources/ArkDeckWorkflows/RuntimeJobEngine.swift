@@ -3679,6 +3679,10 @@ public actor RuntimeJobEngine {
           schemaVersion: Self.journalSchemaVersion(of: current.record)))
       current.nextSequence += 1
       current.record.timeline.append("verified \(step.stepID) \(summary.keys.sorted())")
+      if let anchor = summary["coverageAnchor"], let held = summary["ringHeldCoverageAnchor"] {
+        current.record.ringCoverage = RuntimeRingCoverage(
+          anchor: anchor, ringHeldAnchor: held == "true")
+      }
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
       current.record.recoveryAction = nil

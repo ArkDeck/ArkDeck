@@ -350,15 +350,25 @@ enum RuntimeArtifactService {
       let anchor = HDCTraceCaptureRequest.anchor(
         sessionID: record.jobID, stepID: "capture-trace")
       let trace = recorded.first { $0.name == "trace.htrace" }
-      document["coverage"] = .object([
-        "anchor": .string(anchor),
+      var coverage: [String: JSONValue] = [
+        "anchor": .string(record.ringCoverage?.anchor ?? anchor),
         "writtenIntoTheDeviceRingAt": .string("capture-trace"),
         "checkAgainst": .string("trace.htrace"),
         "traceStatus": .string(trace?.status.isPublished == true ? "published" : "absent"),
         "how": .string(
-          "the anchor's presence in the trace is what says how far back this snapshot "
-            + "reaches; a string search settles it, no decoder needed"),
-      ])
+          "the anchor marks where this snapshot reaches back to; finding it in the trace "
+            + "is a string search, no decoder needed"),
+      ]
+      // The verdict already asked the ring whether it was holding the anchor,
+      // so that answer travels here as a fact. Where it did not - an older
+      // record, a capture whose trace step never reported - the document says
+      // the check did not happen rather than implying either outcome.
+      if let proved = record.ringCoverage {
+        coverage["ringHeldAnchor"] = .bool(proved.ringHeldAnchor)
+      } else {
+        coverage["ringHeldAnchor"] = .string("notEstablished")
+      }
+      document["coverage"] = .object(coverage)
     }
 
     let encoder = CanonicalJSONEncoders.canonicalPretty()

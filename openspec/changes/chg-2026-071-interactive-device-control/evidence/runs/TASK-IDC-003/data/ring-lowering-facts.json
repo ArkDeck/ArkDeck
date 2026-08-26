@@ -100,5 +100,31 @@
       "two cannot drift apart again - which is the shape of the defect, not just this",
       "instance of it."
     ]
+  },
+  "verifiedOnHardware": {
+    "daemon": "rebuilt from main at #1521 plus the verdict fix, re-signed with the maintainer's Developer ID; previous bundle kept under Helpers/.backup-20260826T073054/",
+    "capture": "job-a21498e612ac036f3682834d5ec0fb29, capture.diagnostics@1 with ringBuffered, traceCategories ohos+graphic, 20480 KiB, one manual marker",
+    "verdict": "verified capture-trace with coverageAnchor, remoteByteCount and ringHeldCoverageAnchor",
+    "artifacts": "trace.htrace 40793 bytes, markers.json 962 bytes, plus capture.log, artifact-index.json and capture-summary.json",
+    "anchorFoundInTheTrace": true,
+    "thisSnapshotsRealReach": {
+      "beforeTheAnchorSeconds": 0.08,
+      "afterTheAnchorSeconds": 8.37,
+      "events": 349,
+      "reading": [
+        "0.08s of reach before the anchor is the honest number for this capture: the",
+        "buffer was fresh when it armed. That is exactly what the corrected wording says",
+        "- reach is not a property of arming - and the anchor is what turned it from an",
+        "assumption into a measurement."
+      ]
+    },
+    "twoThingsLearnedOnTheWay": [
+      "A capture that ends outcomeUnknown leaves its capability use unresolved, and that",
+      "blocks the next mutation on the target. `job reconcile` clears the job but does not",
+      "settle the use; resuming the job with `job run` is what advances it to confirmed.",
+      "The daemon would not start while a stray hdc server held its port - one this",
+      "session's own direct probing had left running. Its foreground server exited 0",
+      "immediately and startup reported serverDidNotBecomeReady."
+    ]
   }
 }
