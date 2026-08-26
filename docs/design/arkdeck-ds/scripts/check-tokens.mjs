@@ -28,11 +28,11 @@ function srcFiles(dir) {
 // Bump ONLY after re-reading the docs and confirming this package still
 // expresses them. This is the deliberate acknowledgement step: a docs version
 // bump is exactly the event that silently invalidated the library once.
-// v1.3 (2026-08-25) re-read: the revision is behavioral (Diagnostics marker
-// retro-capture, Toolkit input semantics) — §1 direction, the §2 token table
-// and the prototype's `:root` palette are byte-identical to v1.2; the five
-// new prototype classes are classified below.
-const ALIGNED_VERSION = "v1.3";
+// v1.4 (2026-08-26) re-read: the revision reorganizes History into an
+// activity center. §1 direction, the §2 token table and the prototype's
+// `:root` palette are byte-identical to v1.3; the four new top-level History
+// layout classes are classified below.
+const ALIGNED_VERSION = "v1.4";
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const designDir = join(pkgRoot, "..");
@@ -487,6 +487,10 @@ for (const name of dsLight.keys()) {
     "trace-quick": "Trace quick-duration layout",
     "trace-section-foot": "Trace capture footer layout",
     "trace-viewer-entry": "Trace viewer-entry layout",
+    "history-shell": "History activity-center page layout",
+    "history-rail": "History activity-type navigation layout",
+    "history-list": "History activity-record list layout",
+    "history-inspector": "History selected-record inspector layout",
     sec: "sidebar section heading",
     hint: "text utility", note: "text utility", empty: "empty-state text utility",
     mono: "type utility", "visually-hidden": "accessibility utility", livetag: "inline marker in a History row",
