@@ -85,6 +85,7 @@ final class OverviewRecordUITests: XCTestCase {
     app.launchArguments = [
       "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
       "--ui-test-hdc-diagnostics", "--ui-test-auto-update-idle", "--ui-test-runtime-history",
+      "--ui-test-reset-shell-selection",
     ]
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
@@ -92,4 +93,5 @@ final class OverviewRecordUITests: XCTestCase {
     return app
   }
 }
+
 

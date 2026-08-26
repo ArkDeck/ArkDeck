@@ -267,6 +267,13 @@ final class ViewerUITests: XCTestCase {
       button.click()
     }
 
+    // The loop above proves every tab is reachable and leaves the last one
+    // selected, so Raw dump is selected again before its content is read.
+    // Relying on the walk to end there made this assertion depend on Raw dump
+    // being last in the list, which stopped being true when the advanced dump
+    // inspector was added after it.
+    app.buttons["viewer.inspector.tab.rawDump"].click()
+
     let raw = app.staticTexts["viewer.rawDump"]
     XCTAssertTrue(raw.waitForExistence(timeout: 5), "Raw dump must render")
     let rendered = (raw.value as? String) ?? raw.label
@@ -482,12 +489,24 @@ final class ViewerUITests: XCTestCase {
     app.launchArguments = [
       "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
       "--ui-test-hdc-diagnostics", "--ui-test-auto-update-idle", "--ui-test-viewer",
+      // Scene storage survives `-ApplePersistenceIgnoreState`, so without this
+      // the window opens on whichever workspace the previous run left behind.
+      "--ui-test-reset-shell-selection",
     ] + extra
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
     app.launch()
     app.activate()
-    XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10), "ArkDeck must open a window")
+    // A relaunch can restore a session that had no open window, and macOS then
+    // gives the app back exactly that: a running process with nothing on
+    // screen. The App's own New Window command is the recovery, and it is the
+    // same one AppShellUITests uses — a launch is not a window.
+    if !app.windows.firstMatch.waitForExistence(timeout: 5) {
+      app.typeKey("n", modifierFlags: .command)
+      XCTAssertTrue(
+        app.windows.firstMatch.waitForExistence(timeout: 10),
+        "ArkDeck must open a window, and did not reopen one either")
+    }
     openViewer(in: app)
     return app
   }

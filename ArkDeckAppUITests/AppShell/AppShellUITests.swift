@@ -558,9 +558,13 @@ final class AppShellUITests: XCTestCase {
     logsTab.typeKey(.leftArrow, modifierFlags: [])
     XCTAssertTrue(artifactsTab.isSelected, file: file, line: line)
     clickCorrectingNavigationSplitAXOffset(element("debug.tab.logs", in: app), in: app)
+    // Starting a log capture needs an explicit target and an available
+    // operation. This sweep launches with a ready device fixture, so both hold
+    // and the action is offered — it stopped being unconditionally disabled
+    // when the Debug workflow gained its server-backed path.
     let debugStart = app.buttons["debug.logs.start"]
     XCTAssertTrue(debugStart.exists, file: file, line: line)
-    XCTAssertFalse(debugStart.isEnabled, file: file, line: line)
+    XCTAssertTrue(debugStart.isEnabled, file: file, line: line)
     // Pausing is a viewport action that exists only while a capture runs; in
     // this read-only build nothing captures, so the button stays disabled.
     let pauseViewport = app.buttons["debug.logs.pauseViewport"]
@@ -1539,6 +1543,10 @@ final class AppShellUITests: XCTestCase {
       // free of network effects. A test that wants a different update state
       // passes its own argument; this only makes the default one declared.
       "--ui-test-auto-update-idle",
+      // Scene storage survives `-ApplePersistenceIgnoreState`, so without this
+      // a sweep lands on whichever workspace the previous run left selected
+      // and its Overview assertions fail against, say, Trace.
+      "--ui-test-reset-shell-selection",
     ]
     if resetDeviceNames { launchArguments.append("--ui-test-reset-device-names") }
     app.launchArguments = launchArguments + arguments
