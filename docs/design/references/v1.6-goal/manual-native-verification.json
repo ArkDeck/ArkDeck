@@ -145,8 +145,30 @@
       "jobID": null,
       "purpose": "Latest F30 native Chinese App: running + uninstall warning visible; Bundle and Ability labels remain after typing. No submission.",
       "visuallyReviewed": true
+    },
+    {
+      "file": "native-entry-hsp-duplicate-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 146384,
+      "sha256": "4f8c8ca335b5cb739a7e1d08029dab89852f7dd62312ec7125b97a8c034e2da5",
+      "jobID": null,
+      "purpose": "Chinese entry and HSP filenames are separate from instructions; duplicate HSP refused, no second row, run disabled. Selection-only sample was not imported. Captured before the follow-up static-text trait addition.",
+      "visuallyReviewed": true
     }
   ],
   "boundary": "Earlier four captures are read-only navigation. F29 dummy HSP checks only local selection and never submit the dummy. The real entry + feature submission is one new Job, independently verified with Runtime status and exported Artifact hashes. Images/raw logs remain local. Not an XCUITest pass, F28 installed-cache verification, or HSP device acceptance.",
-  "traceInteractionBoundary": "Real immutable capture read in production Viewer, Chinese locale. Event/range/zoom/reset/flag rename/reload/remove observed through Computer Use, not XCUITest. Test-created annotation removed; no device dispatch from these interactions. This checks presentation and source identity, not independent correctness of all aggregated analyzer metrics."
+  "traceInteractionBoundary": "Real immutable capture read in production Viewer, Chinese locale. Event/range/zoom/reset/flag rename/reload/remove observed through Computer Use, not XCUITest. Test-created annotation removed; no device dispatch from these interactions. This checks presentation and source identity, not independent correctness of all aggregated analyzer metrics.",
+  "latestPackageSelectionChecks": {
+    "locale": "zh-Hans",
+    "source": "Computer Use on the rebuilt workspace App, no Runtime/device fixtures",
+    "checks": [
+      "Entry empty state and selected filename read independently after explicit element/label fix",
+      "Additional HSP filename and remove button have independent identifiers",
+      "All four cleanup/post-run combinations show the warning only for uninstall plus running",
+      "Duplicate HSP reports error, adds no row, and disables submission",
+      "Remove clears the row and error; clear selection disables additional picker and removes clear button"
+    ],
+    "boundary": "No installation was submitted. The later static-text trait and role assertion still require native verification. English verification was interrupted by the Computer Use service crash when opening Settings."
+  }
 }

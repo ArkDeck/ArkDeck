@@ -82,14 +82,17 @@ Runtime 报告无 unknown、残留为零。三份 Artifact 已本机导出并独
 F30 再修正移除按钮的标识覆盖，补 Bundle/Ability 持续可见标签及“卸载 + 保持运行”的中英文说明。
 最新构建的中文警告与填写后的两项标签已在屏幕上核对，未提交新安装请求。
 分栏 contain 修正后，AX 已独立报告 `debug.apps.runningCleanupHint`；保留/运行及保留/停止时均无警告。
-本地 HSP 选择又确认移除按钮有自己的标识；移除后没有残留该行。附加区与文件行的进一步 contain
-修正待最新构建复查，不把先前截图当作该修正的通过证据。
+附加区与文件行 contain 已在实际 App 复查，HSP 文件名和移除按钮保持独立标识。
+入口文件名仍与下方说明合并，改为显式 accessibility element/label 后重建 App，确认空状态和文件名
+独立读出；随后补静态文本 trait 和既有用例的角色断言，最终角色的原生复验仍待完成。
+中文四种策略组合、重复拒绝、提交禁用、移除清错及清空均已通过 Computer Use 检查，未提交安装。
 Device stale-frame 原生用例也停在系统 automation mode 初始化（exit 65），没有执行任何用例断言；
 日志显示测试会话授权成功，自动化模式等待 60 秒超时。没有更改系统权限或把超时记为通过。
-重启当前用户测试服务、释放交互工具会话后的文件选择测试仍遇相同初始化超时；
-[四次尝试](native-ui-initialization-attempts.json)保留日志哈希；最终代码重建并等待全部构建结束后，
-仍在系统初始化超时，没有开始断言。随后 Computer Use 连接中断且未恢复，
-尚未完成原生英文提示、最终文件行分组及剩余 Device 交互复验。
+只读采样发现旧测试服务停在本地认证同步等待，并确认此前 SIGTERM 并未让它退出，重启记录已更正。
+之后确认旧服务退出，再次独立运行仍在初始化超时；[五次尝试](native-ui-initialization-attempts.json)
+保留日志哈希，没有一次开始用例断言。Computer Use 恢复后补完上述中文检查，但打开 Settings 后
+其服务在 Array.remove 调用中崩溃；独立窗口读取也超时。原生英文提示、最终文本角色及剩余 Device
+交互尚未复验，不能把服务恢复或编译当作通过。
 
 真实 Trace 的中文交互已补 Computer Use 核查：键盘选择 `thread_state:967`，检查器显示
 hilogd（PID/TID 198）、开始 570.566 ms、时长 8 µs；拖选 413.904 ms—1.908 s 后显示

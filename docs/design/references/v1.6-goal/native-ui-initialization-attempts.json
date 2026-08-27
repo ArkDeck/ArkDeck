@@ -17,7 +17,9 @@
       "exitCode": 65,
       "assertionsStarted": false,
       "result": "automation_initialization_timeout",
-      "testManagerRestartedBeforeRun": true
+      "testManagerRestartedBeforeRun": false,
+      "testManagerTerminationRequestedBeforeRun": true,
+      "restartVerification": "A later process inspection and sample confirmed the original service was still running; successful SIGTERM delivery did not establish a restart."
     },
     {
       "logFile": "f30-native-picker-isolated.log",
@@ -37,7 +39,53 @@
       "result": "automation_initialization_timeout",
       "finalAppCodeBuilt": true,
       "otherBuildsFinishedBeforeRun": true
+    },
+    {
+      "logFile": "native-picker-after-service-exit.log",
+      "localLogSHA256": "702bf8b6997e44ba836c977e1baa3b3bdf6cac7827c9001d9a658cdb035a0ff6",
+      "test": "AppShellUITests/testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages",
+      "exitCode": 65,
+      "assertionsStarted": false,
+      "result": "automation_initialization_timeout",
+      "oldTestManagerExitConfirmedBeforeRun": true,
+      "otherBuildsFinishedBeforeRun": true
     }
   ],
-  "boundary": "No test case began. These are neither assertion passes nor hardware operation results. No macOS permissions changed. Earlier attempts remain in their original logs."
+  "boundary": "No test case began. These are neither assertion passes nor hardware operation results. No macOS permissions changed. Earlier attempts remain in their original logs.",
+  "investigation": {
+    "sampleFile": "testmanagerd-initialization-sample.txt",
+    "localSampleSHA256": "23ce9fd6e10c48d7e240de37c453d46f6c5fa348d9ff8018f7b724a9ce2e161e",
+    "observation": "The original testmanagerd was waiting in XAMLocalAuthenticationProvider.authorizationWithError / LAContext.evaluatePolicy; later test sessions waited on the automation-mode lock. Its launch time and PID proved the earlier SIGTERM did not restart it.",
+    "controlledServiceExit": "The original current-user testmanagerd was force-terminated after checking there were no active tests; a process inspection confirmed its exit and the unchanged device Runtime process. The subsequent test still timed out before any case began.",
+    "permissionsChanged": false,
+    "computerUse": "Control recovered and Chinese file selection/policy checks completed. Opening Settings then crashed SkyComputerUseService; a separate window read timed out. English and remaining Device interactions remain unverified."
+  },
+  "computerUseCrashes": [
+    {
+      "file": "SkyComputerUseService-2026-08-28-032231.ips",
+      "localOnly": true,
+      "sha256": "e65e2a0fb2afff32c48be03816160d0e2c929c3b14042990788727504895dc4a",
+      "process": "SkyComputerUseService",
+      "signal": "SIGTRAP",
+      "observedFrames": [
+        "Swift assertion failure",
+        "Array.remove(at:)",
+        "Sequence.compactMap"
+      ],
+      "boundary": "Service crash, not an ArkDeck test assertion or device operation result."
+    },
+    {
+      "file": "SkyComputerUseService-2026-08-28-032255.ips",
+      "localOnly": true,
+      "sha256": "aa5b10deb69dd2f9158f435947298b4a624f0bed98d4d4a28e4381117b1114c6",
+      "process": "SkyComputerUseService",
+      "signal": "SIGTRAP",
+      "observedFrames": [
+        "Swift assertion failure",
+        "Array.remove(at:)",
+        "Sequence.compactMap"
+      ],
+      "boundary": "Service crash, not an ArkDeck test assertion or device operation result."
+    }
+  ]
 }

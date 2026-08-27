@@ -85,6 +85,20 @@
     "logSHA256": "b59b1042c1cd2484c40f2d9262f96ead3062497124263e696c032f2955d1464e",
     "count": 31
   },
+  "entryFilenameFollowup": {
+    "date": "2026-08-28",
+    "logFile": "entry-accessibility-final-local-gate.log",
+    "localLogSHA256": "77172db961ca62d4c725f41b76314bc8462568f13c67868cc0889cc57d5570d5",
+    "exitCode": 0,
+    "swiftLanes": [
+      { "lane": "full-parallel", "exitCode": 0, "testCount": 1826, "durationSeconds": 573 },
+      { "lane": "full-process-identity-race", "exitCode": 0, "testCount": 1, "durationSeconds": 11 },
+      { "lane": "full-viewer-scale", "exitCode": 0, "testCount": 5, "durationSeconds": 13 }
+    ],
+    "totalScheduledSwiftTests": 1832,
+    "appAndUITestBundle": "TEST BUILD SUCCEEDED",
+    "boundary": "The full local gate includes the explicit entry filename accessibility element, static-text trait and UI role assertion. Compilation does not prove native UI assertions. The Chinese filename separation and policy checks were observed before the final static-text trait was added; English and remaining device interactions remain unverified."
+  },
   "reviewGalleryBuild": {
     "exitCode": 0,
     "logSHA256": "548e75fe0cc63c3811035509a560f8a07888ccb3257e5f9cc8e8d9ea492a9613"

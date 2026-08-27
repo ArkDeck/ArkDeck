@@ -1844,6 +1844,12 @@ private struct DebugAppsWorkspace: View {
         .foregroundStyle(selectedHAPURL == nil ? .secondary : .primary)
         .textSelection(.enabled)
         .help(selectedHAPURL?.path ?? "")
+        // Keep the selected filename separate from the following package
+        // instructions when macOS coalesces adjacent static text.
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isStaticText)
+        .accessibilityLabel(
+          selectedHAPURL?.lastPathComponent ?? DebugL10n.text("debug.apps.noHAP"))
         .accessibilityIdentifier("debug.apps.entry.name")
       additionalPackages
       if selectedHAPURL != nil {
