@@ -158,7 +158,8 @@ Primary Window
 
 ### 5.5 Diagnostics
 
-- Diagnostics 是 Trace 之后的独立 sidebar tab，包含「新建诊断」和「Diagnostic Session Viewer」两种状态。它不替换 Trace、不打开 ArkTrace 独立 App shell，也不读写 Trace 的 preset、时长、筛选、选择、Recent 与运行状态。详细行为见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md)。
+- Diagnostics 位于 Device 之后，是独立 sidebar tab，包含「新建诊断」和「Diagnostic Session Viewer」两种状态。它不替换 Trace、不打开 ArkTrace 独立 App shell，也不读写 Trace 的 preset、时长、筛选、选择、Recent 与运行状态。详细行为见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md)。
+- 工作区名称固定为 **Diagnostics**：侧栏、窗口标题与页面标题在中英文中均保留英文，切换页面或语言时不得变成「诊断」。按钮、preset、状态和说明文案继续按各自的本地化规则显示；Settings 中用于应用诊断包的「诊断」仍是独立文案，不随工作区名称更改。
 - 新建诊断默认提供「低干扰诊断」与「图形诊断」preset。Trace 与 bounded HiLog 以环形缓冲/缓冲区回溯方式采集（在 Marker 或停止时回溯保存问题前窗口）；Marker 只记录时间点并触发一次事后截图；自动 Marker（frame deadline missed / crash 触发，默认开）补齐人工反应延迟；屏幕录制是默认关闭的 optional channel，只有用户明确勾选后才加入 Session。preset 只组合 reviewed typed inputs；高级 disclosure 才展示 duration、Trace categories、HiLog filters、Artifact byte budget 与 optional channels。设备未确认支持 required channel（含环形能力）时在主操作旁显示 unavailable 原因，不把 unsupported tag 或 channel 伪装成可选。
 - 点击「开始诊断」后先进入 Arming；只有 required channel 全部 recording，界面才显示「采集已开始，现在开始复现」。录制中突出 elapsed / bounded limit、精确 target / binding、各 channel 状态和 Marker 数量，提供「标记并截图」（`⌘M`）与「停止并生成结果」。手动 Marker 立即记录时间点，截图先显示「正在截图…（事后拍摄）」，完成后显示「拍摄于标记后 +N ms」；截图失败时 Marker 保留并显示原因。无可靠总量时只显示阶段和 elapsed；屏幕录制关闭时明确显示「无持续取帧」。采集期间对同一设备的其他 mutation（含 Device 输入）在 in-session 准入语义发布前 fail closed 并解释原因。
 - Diagnostic Session 以 Session monotonic time 为主轴。Trace event、视频 frame PTS 和 HiLog timestamp 都通过带适用区间与 `maxError` 的映射进入该时间轴；UI 词表为 `同一时钟`、`已校准 ±N ms`、`无法对齐` 三档，但**第一版只承诺前后两档**——`已校准 ±N ms` 在 ground-truth 实验量化误差后才启用，任何 ±N ms 数字在此之前不进产品 UI。重启、重连、recorder restart 或 timestamp 回退切断 alignment segment，并在 Timeline 画 gap。

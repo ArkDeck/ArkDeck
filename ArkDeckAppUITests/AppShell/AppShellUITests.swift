@@ -330,10 +330,10 @@ final class AppShellUITests: XCTestCase {
 
   // MARK: - One launch per language
 
-  func testDeviceWorkspaceNameAndEmptyStateInBothLanguages() {
-    for (language, capture, emptyTitle) in [
-      ("(en)", "Get screenshot", "No screenshot yet"),
-      ("(zh-Hans)", "获取截图", "尚未获取截图"),
+  func testWorkspaceNamesAndEmptyStatesInBothLanguages() {
+    for (language, capture, emptyTitle, diagnosticsEmptyTitle) in [
+      ("(en)", "Get screenshot", "No screenshot yet", "No session open"),
+      ("(zh-Hans)", "获取截图", "尚未获取截图", "尚无诊断会话"),
     ] {
       let app = launch(
         arguments: [
@@ -352,6 +352,17 @@ final class AppShellUITests: XCTestCase {
       screenshot.name = "Device workspace \(language)"
       screenshot.lifetime = .keepAlways
       add(screenshot)
+
+      assertDisplayed(element("app.navigation.diagnostics", in: app), equals: "Diagnostics")
+      select("app.navigation.diagnostics", in: app)
+      assertDisplayed(app.staticTexts["diagnostics.workspace.title"], equals: "Diagnostics")
+      XCTAssertTrue(element("diagnostics.session.empty", in: app).exists)
+      XCTAssertTrue(app.staticTexts[diagnosticsEmptyTitle].exists)
+
+      let diagnosticsScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      diagnosticsScreenshot.name = "Diagnostics workspace \(language)"
+      diagnosticsScreenshot.lifetime = .keepAlways
+      add(diagnosticsScreenshot)
       app.terminate()
     }
   }

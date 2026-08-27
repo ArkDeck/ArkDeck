@@ -10,6 +10,8 @@ const script = html.split('<script>')[1].split('</script>')[0];
 const start = script.indexOf('/* ---------- Device · implementation-synced workspace ---------- */');
 const end = script.indexOf('/* ---------- Debug ---------- */', start);
 const device = script.slice(start, end);
+const navigation = script.slice(script.indexOf('const NAV='), script.indexOf('const HIST='))
+  + script.slice(script.indexOf('function renderNav(){'), script.indexOf('function renderPage(){'));
 
 function harness(scenario = 'empty') {
   const timers = [];
@@ -18,7 +20,7 @@ function harness(scenario = 'empty') {
     Date, URL, performance:{now:()=>0},
     location:{href:'http://localhost/prototype.html?page=device-control'},
     history:{replaceState(){}},
-    $:()=>element, render(){}, renderPageIf(){},
+    $:()=>element, icon:()=>'', render(){}, renderPageIf(){},
     setTimeout(callback){timers.push(callback);},
   });
   vm.runInContext('const S={language:"zh-Hans",nav:"device-control"};' + device, context);
@@ -37,6 +39,18 @@ function harness(scenario = 'empty') {
   };
   return {run,state,tick,flush,press,timers};
 }
+
+test('Diagnostics keeps its product name across Device navigation and locale changes', () => {
+  const h=harness();h.run(navigation);
+  for(const language of ['zh-Hans','en','zh-Hans']) {
+    for(const page of ['device-control','diagnostics','device-control']) {
+      h.run(`S.language=${JSON.stringify(language)};S.nav=${JSON.stringify(page)};renderNav()`);
+      assert.match(h.run('$("nav").innerHTML'),
+        /onclick="go\('diagnostics'\)"[^>]*>.*?<\/span>Diagnostics<\/button>/,
+        `${page} must keep the Diagnostics product name in ${language}`);
+    }
+  }
+});
 
 test('default is empty; screenshot is explicit and no background refresh is scheduled', () => {
   const h=harness();assert.equal(h.state().frame,null);assert.equal(h.state().events.length,0);

@@ -17,7 +17,7 @@
 5. 查看器以 Trace 时间轴为主轴。选择事件或时间点后，左侧显示可证明对应的 Marker 截图或显式录屏帧，右侧显示选中事件和邻近日志；已选 event 的 identity 不会被画面/日志/slider 点击清空；
 6. 跨来源时间映射必须展示误差。无法证明对齐时显示缺口，不沿用旧画面或猜测日志关系。第一版只承诺「同一时钟 / 无法对齐」两态；「已校准 ±N ms」在 ground-truth 实验量化误差后启用。
 
-信息架构上，Diagnostic Session 使用独立的 **Diagnostics** tab。现有 **Trace** tab 的抓取配置、参数快照、抓取状态、Artifact 结果和 ArkTrace Viewer 入口全部保留；Diagnostics 不复用或改写 Trace 页的 view state、preset、时长、筛选条件与最近打开记录。按帧录屏、按需截图和设备输入位于 [`Device · 真机操作`](./device-control-design.md)，不会被 Diagnostics 静默启动。
+信息架构上，Diagnostic Session 使用独立的 **Diagnostics** tab，工作区名称在中英文界面的侧栏、窗口标题和页面标题中均不翻译；操作与说明文案仍可本地化。现有 **Trace** tab 的抓取配置、参数快照、抓取状态、Artifact 结果和 ArkTrace Viewer 入口全部保留；Diagnostics 不复用或改写 Trace 页的 view state、preset、时长、筛选条件与最近打开记录。按帧录屏、按需截图和设备输入位于 [`Device · 真机操作`](./device-control-design.md)，不会被 Diagnostics 静默启动。
 
 第一版默认只在 Marker 时保存截图。用户显式开启录屏时才保存原始视频和帧索引，不为每个视频帧生成一张长期保存的 PNG。Viewer 按需解码当前帧，缩略图属于可删除、可重建的 derived Artifact。
 

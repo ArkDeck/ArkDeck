@@ -3171,7 +3171,7 @@ function renderDevs(){
 }
 function renderNav(){
   if(S.nav==="device-control"){
-    $("nav").innerHTML=NAV.filter(([k])=>!["overview","automation"].includes(k)).map(([k,ic,l])=>`${k==="history"?`<div class="sec">${deviceLocale("记录","Records")}</div>`:""}<button class="${S.nav===k?"on":""}" onclick="go('${k}')" ${S.nav===k?'aria-current="page"':""}><span class="ic">${icon(ic)}</span>${k==="diagnostics"?deviceLocale("诊断","Diagnostics"):l}</button>`).join("");return;
+    $("nav").innerHTML=NAV.filter(([k])=>!["overview","automation"].includes(k)).map(([k,ic,l])=>`${k==="history"?`<div class="sec">${deviceLocale("记录","Records")}</div>`:""}<button class="${S.nav===k?"on":""}" onclick="go('${k}')" ${S.nav===k?'aria-current="page"':""}><span class="ic">${icon(ic)}</span>${l}</button>`).join("");return;
   }
   $("nav").innerHTML=NAV.map(([k,ic,l,badge])=>`<button class="${S.nav===k?"on":""}" onclick="go('${k}')" ${S.nav===k?'aria-current="page"':""}><span class="ic">${icon(ic)}</span>${l}${badge?`<span class="preview">${badge}</span>`:""}</button>`).join("");
 }

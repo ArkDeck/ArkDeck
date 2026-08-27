@@ -144,6 +144,7 @@ final class AppLocalizationLookupContractTests: XCTestCase {
       "app.navigation.uiDump": "Viewer",
       "app.navigation.trace": "Trace",
       "app.navigation.device": "Device",
+      "app.navigation.diagnostics": "Diagnostics",
       "app.navigation.history": "History",
     ]
 

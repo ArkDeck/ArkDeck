@@ -117,6 +117,7 @@ struct DiagnosticsWorkspaceView: View {
     HStack(spacing: 12) {
       Text(diagnosticsText("diagnostics.title"))
         .font(.system(size: 13, weight: .semibold))
+        .accessibilityIdentifier("diagnostics.workspace.title")
       Spacer()
       // The alignment state is not decoration: it decides whether anything
       // below it can be lined up with what the device recorded.
