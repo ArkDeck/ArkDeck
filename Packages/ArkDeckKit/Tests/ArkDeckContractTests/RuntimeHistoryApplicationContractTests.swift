@@ -788,7 +788,8 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       encoding: .utf8)
 
     for identifier in [
-      "history.filter.status", "history.filter.mode", "history.filter.session",
+      "history.filter.activity", "history.filter.status", "history.filter.mode",
+      "history.filter.session",
       "history.filter.device", "history.filter.time",
     ] {
       XCTAssertTrue(view.contains(".accessibilityIdentifier(\"\(identifier)\")"))
@@ -823,6 +824,21 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "a superseded read must not clear the newer request's loading state")
     XCTAssertTrue(view.contains("case .loading:"))
     XCTAssertTrue(view.contains("history.loading"))
+
+    let refresh = try XCTUnwrap(view.range(of: "  func refresh() {"))
+    let loadOlder = try XCTUnwrap(view.range(of: "  func loadOlder() {"))
+    let loadDetail = try XCTUnwrap(view.range(of: "  func loadDetail(jobID:"))
+    let refreshBody = String(view[refresh.lowerBound..<loadOlder.lowerBound])
+    let olderBody = String(view[loadOlder.lowerBound..<loadDetail.lowerBound])
+    XCTAssertTrue(refreshBody.contains("historyGeneration &+= 1"))
+    XCTAssertTrue(refreshBody.contains("isLoadOlderInFlight = false"))
+    let generationGuard = try XCTUnwrap(
+      olderBody.range(of: "self.historyGeneration == generation"))
+    let spinnerReset = try XCTUnwrap(
+      olderBody.range(of: "defer { self.isLoadOlderInFlight = false }"))
+    let assignment = try XCTUnwrap(olderBody.range(of: "self.presentation = next"))
+    XCTAssertLessThan(generationGuard.lowerBound, spinnerReset.lowerBound)
+    XCTAssertLessThan(generationGuard.lowerBound, assignment.lowerBound)
 
     XCTAssertTrue(app.contains("RuntimeHistoryWorkspaceContext"))
     XCTAssertTrue(app.contains("HistoryWorkspaceContextBanner"))

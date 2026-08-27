@@ -133,6 +133,7 @@ final class AppShellUITests: XCTestCase {
         "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
         "-AppleLanguages", "(en)",
       ])
+    Self.resizeHistoryWindow(in: app, to: 1180)
     select("app.navigation.history", in: app)
     XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
 
@@ -178,6 +179,71 @@ final class AppShellUITests: XCTestCase {
     element("history.filter.saved", in: app).click()
     let delete = app.menuItems["Delete saved filter"]
     if delete.waitForExistenceFast(timeout: 2) { delete.click() }
+  }
+
+  func testHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter() {
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "-AppleLanguages", "(en)",
+      ])
+    // macOS can preserve the last frame even with persistence disabled,
+    // especially after an interrupted run. Establish the viewport we test.
+    Self.resizeHistoryWindow(in: app, to: 1180)
+    addTeardownBlock {
+      await MainActor.run {
+        if app.windows.firstMatch.exists {
+          Self.resizeHistoryWindow(in: app, to: 1180)
+        }
+      }
+    }
+    select("app.navigation.history", in: app)
+    let wideFlash = element("history.activity.flash", in: app)
+    XCTAssertTrue(wideFlash.waitForExistenceFast(timeout: 10))
+    wideFlash.click()
+    element("history.filter.saved", in: app).click()
+    app.menuItems["Save current filter"].click()
+
+    Self.resizeHistoryWindow(in: app, to: 900)
+    let activity = element("history.filter.activity", in: app)
+    XCTAssertTrue(activity.waitForExistenceFast(timeout: 5))
+    XCTAssertFalse(wideFlash.exists, "the test must actually enter the compact layout")
+    XCTAssertTrue(activity.isHittable, "category selection must remain reachable at minimum width")
+    assertDisplayed(activity, equals: "Flashed images")
+    XCTAssertEqual(
+      app.descendants(matching: .any).matching(identifier: "history.filter.search").count, 1)
+
+    let viewerRow = app.cells
+      .containing(.staticText, identifier: "history.row.state.job-fixture-0001").firstMatch
+    let flashRow = app.cells
+      .containing(.staticText, identifier: "history.row.state.job-fixture-0002").firstMatch
+    XCTAssertFalse(viewerRow.exists)
+    activity.click()
+    app.menuItems["All records"].click()
+    XCTAssertTrue(viewerRow.waitForExistenceFast(timeout: 5))
+
+    element("history.filter.saved", in: app).click()
+    app.menuItems["Apply saved filter"].click()
+    XCTAssertTrue(viewerRow.waitForNonExistenceFast(timeout: 5))
+    assertDisplayed(activity, equals: "Flashed images")
+
+    // The native picker keeps its keyboard menu behavior in the compact layout.
+    activity.click()
+    app.typeKey(XCUIKeyboardKey.downArrow.rawValue, modifierFlags: [])
+    app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
+    assertDisplayed(activity, equals: "Viewer and observe")
+    XCTAssertTrue(viewerRow.waitForExistenceFast(timeout: 5))
+    XCTAssertTrue(flashRow.waitForNonExistenceFast(timeout: 5))
+
+    Self.resizeHistoryWindow(in: app, to: 1180)
+    XCTAssertTrue(wideFlash.waitForExistenceFast(timeout: 5))
+    XCTAssertFalse(activity.exists)
+    XCTAssertTrue(viewerRow.exists, "expanding must preserve the compact category selection")
+    XCTAssertFalse(flashRow.exists)
+    element("history.activity.all", in: app).click()
+    XCTAssertTrue(flashRow.waitForExistenceFast(timeout: 5))
+    element("history.filter.saved", in: app).click()
+    app.menuItems["Delete saved filter"].click()
   }
 
   func testHistoryReopensExactFixtureContextWithoutReplay() {
@@ -1417,6 +1483,20 @@ final class AppShellUITests: XCTestCase {
   /// for the same reason. Ask by identifier and let the type be whatever it is.
   private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+  }
+
+  private static func resizeHistoryWindow(
+    in app: XCUIApplication, to width: CGFloat,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let window = app.windows.firstMatch
+    if abs(window.frame.width - width) <= 2 { return }
+    let origin = window.coordinate(withNormalizedOffset: .zero)
+    let edge = origin.withOffset(CGVector(dx: window.frame.width - 1, dy: 150))
+    edge.click(
+      forDuration: 0.1,
+      thenDragTo: origin.withOffset(CGVector(dx: width - 1, dy: 150)))
+    XCTAssertEqual(window.frame.width, width, accuracy: 2, file: file, line: line)
   }
 
   /// Lightweight visual regression for the current device detail layout. Native
