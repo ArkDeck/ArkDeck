@@ -481,12 +481,16 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(newest["jobId"], .string(accepted[2].jobID))
     XCTAssertEqual(newest["timeline"], .null)
     XCTAssertEqual(
+      newest["workspaceKind"], .string(RuntimeWorkspaceKind.viewer.rawValue),
+      "History classification must travel on the compact job-list wire response")
+    XCTAssertEqual(
       Set(
         current.compactMap { value -> String? in
           guard case .object(let fields) = value,
             case .string(let jobID)? = fields["jobId"]
           else { return nil }
           XCTAssertEqual(fields["timeline"], .null)
+          XCTAssertEqual(fields["workspaceKind"], .string(RuntimeWorkspaceKind.viewer.rawValue))
           return jobID
         }),
       Set(accepted.prefix(2).map(\.jobID)))

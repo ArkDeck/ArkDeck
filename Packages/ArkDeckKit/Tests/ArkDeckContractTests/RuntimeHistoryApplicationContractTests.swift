@@ -8,6 +8,7 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckCore
 @testable import ArkDeckWorkflows
 
 final class RuntimeHistoryApplicationContractTests: XCTestCase {
@@ -74,6 +75,185 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertNil(job.createdAtUTC)
     XCTAssertNil(job.startedAtUTC)
     XCTAssertNil(job.finishedAtUTC)
+  }
+
+  func testWorkspaceKindProjectionDistinguishesSharedDiagnosticsRequests() {
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        inputs: [
+          "uiDump": .bool(true),
+          "uiScreenshot": .bool(true),
+          "uiComponentTree": .bool(true),
+        ]),
+      .viewer)
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        inputs: ["traceCategories": .array([.string("ace")])]),
+      .trace)
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        inputs: [
+          "uiScreenshot": .bool(true),
+          "captureHilog": .bool(false),
+          "crashLogs": .bool(false),
+        ]),
+      .toolkit)
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        inputs: [
+          "uiScreenshot": .bool(true),
+          "captureHilog": .bool(true),
+        ],
+        clientName: ArkDeckAgentClientName.debugLogsWorkspace),
+      .debug,
+      "a diagnostic capture with HiLog must not become Toolkit merely because it has a screenshot")
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1", inputs: [:]),
+      .diagnostics)
+  }
+
+  func testWorkspaceKindProjectionMapsOnlyKnownProductSurfaces() {
+    let cases: [(String, RuntimeWorkspaceKind)] = [
+      ("flash.dayu200@1", .flash),
+      ("observe.device@1", .viewer),
+      ("analyzer.analyze-trace@1", .trace),
+      ("analyzer.summarize-hilog@1", .diagnostics),
+      ("debug.hap@1", .debug),
+      ("input.tap@1", .toolkit),
+    ]
+    for (operation, expected) in cases {
+      XCTAssertEqual(
+        RuntimeWorkspaceKindProjection.kind(forOperation: operation, inputs: [:]),
+        expected,
+        operation)
+    }
+    XCTAssertNil(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "future.unknown@1", inputs: [:]))
+    XCTAssertNil(
+      RuntimeWorkspaceKindProjection.unambiguousKind(
+        forOperation: "capture.diagnostics@1"),
+      "an older daemon did not publish enough facts to guess a shared diagnostics origin")
+  }
+
+  func testCurrentDaemonWorkspaceKindDecodesWhileOlderUnambiguousJobsRemainCompatible() throws {
+    let presentation = decode(
+      """
+      {"ok":true,"id":"x","result":[
+        {"jobId":"job-viewer","operation":"capture.diagnostics@1","targetId":"t-1",
+         "state":"succeeded","workspaceKind":"viewer"},
+        {"jobId":"job-old-debug","operation":"debug.hap@1","targetId":"t-1",
+         "state":"succeeded"},
+        {"jobId":"job-old-shared","operation":"capture.diagnostics@1","targetId":"t-1",
+         "state":"succeeded"}]}
+      """)
+
+    XCTAssertEqual(presentation.jobs[0].workspaceKind, .viewer)
+    XCTAssertEqual(presentation.jobs[0].resolvedWorkspaceKind, .viewer)
+    XCTAssertNil(presentation.jobs[1].workspaceKind)
+    XCTAssertEqual(presentation.jobs[1].resolvedWorkspaceKind, .debug)
+    XCTAssertNil(presentation.jobs[2].resolvedWorkspaceKind)
+  }
+
+  func testLegacyDetailParametersOnlyResolveUnambiguousSharedCaptures() {
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        parameters: [.init(name: "uiComponentTree", value: "true")]),
+      .viewer)
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        parameters: [.init(name: "traceCategories", value: "[\"ace\"]")]),
+      .trace)
+    XCTAssertEqual(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        parameters: [
+          .init(name: "uiScreenshot", value: "true"),
+          .init(name: "captureHilog", value: "false"),
+          .init(name: "traceCategories", value: "[]"),
+        ]),
+      .toolkit)
+    XCTAssertNil(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1", parameters: []))
+    XCTAssertNil(
+      RuntimeWorkspaceKindProjection.kind(
+        forOperation: "capture.diagnostics@1",
+        parameters: [.init(name: "captureHilog", value: "true")]),
+      "the old evidence has no client provenance to separate Diagnostics and Debug")
+  }
+
+  func testHistoryWorkspaceContextCarriesExactReadOnlyRecordAndRefusesMismatches() throws {
+    let job = RuntimeJobSummaryPresentation(
+      id: "job-viewer", operationReference: "capture.diagnostics@1",
+      targetID: "TGT-1", state: "succeeded", waitingForHuman: false,
+      outcomeUnknown: false, outstandingResidueCount: 0, timeline: ["succeeded"],
+      executionMode: "execute", sessionID: "session-viewer", threadID: "thread-viewer",
+      workspaceKind: .viewer, finishedAtUTC: "2026-08-27T00:00:00Z")
+    let detail = RuntimeJobDetailResponseDecoding.presentation(
+      jobID: job.id,
+      operationReference: job.operationReference,
+      evidenceResponse: try response([
+        "jobId": job.id,
+        "operationReference": job.operationReference,
+        "catalogDigest": String(repeating: "a", count: 64),
+        "bindingRevision": 7,
+        "providerId": "openharmony-hdc",
+        "executionMode": "execute",
+        "terminalState": "succeeded",
+        "parameters": ["uiComponentTree": true],
+      ]),
+      artifactResponse: try response([]))
+
+    let context = try XCTUnwrap(RuntimeHistoryWorkspaceContext(job: job, detail: detail))
+    XCTAssertEqual(context.jobID, job.id)
+    XCTAssertEqual(context.operationReference, job.operationReference)
+    XCTAssertEqual(context.targetID, "TGT-1")
+    XCTAssertEqual(context.bindingRevision, 7)
+    XCTAssertEqual(context.executionMode, "execute")
+    XCTAssertEqual(context.sessionID, "session-viewer")
+    XCTAssertEqual(context.threadID, "thread-viewer")
+    XCTAssertEqual(context.parameters.map(\.name), ["uiComponentTree"])
+
+    let anotherJob = RuntimeJobSummaryPresentation(
+      id: "job-other", operationReference: job.operationReference,
+      targetID: job.targetID, state: job.state, waitingForHuman: false,
+      outcomeUnknown: false, outstandingResidueCount: 0, timeline: [],
+      workspaceKind: .viewer)
+    XCTAssertNil(RuntimeHistoryWorkspaceContext(job: anotherJob, detail: detail))
+
+    let legacyShared = RuntimeJobSummaryPresentation(
+      id: job.id, operationReference: job.operationReference,
+      targetID: job.targetID, state: job.state, waitingForHuman: false,
+      outcomeUnknown: false, outstandingResidueCount: 0, timeline: [])
+    let legacyContext = try XCTUnwrap(
+      RuntimeHistoryWorkspaceContext(job: legacyShared, detail: detail))
+    XCTAssertEqual(legacyContext.workspaceKind, .viewer)
+
+    let ambiguousDetail = RuntimeJobDetailResponseDecoding.presentation(
+      jobID: job.id,
+      operationReference: job.operationReference,
+      evidenceResponse: try response([
+        "jobId": job.id,
+        "operationReference": job.operationReference,
+        "catalogDigest": String(repeating: "a", count: 64),
+        "bindingRevision": 7,
+        "providerId": "openharmony-hdc",
+        "executionMode": "execute",
+        "terminalState": "succeeded",
+        "parameters": ["captureHilog": true, "uiScreenshot": true],
+      ]),
+      artifactResponse: try response([]))
+    XCTAssertNil(
+      RuntimeHistoryWorkspaceContext(job: legacyShared, detail: ambiguousDetail),
+      "legacy diagnostics and Debug requests remain unknown without client provenance")
   }
 
   func testPagedSummaryMergesCurrentJobsWithoutInventingACompactTimeline() throws {
@@ -591,6 +771,114 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(view.contains("history.loadOlder"))
     XCTAssertTrue(view.contains("job.activityDate"))
     XCTAssertTrue(localization.contains("\"history.action.loadOlder\""))
+  }
+
+  func testHistoryActivityCenterClosesFilterCacheAndContextRegressions() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(
+        path: "ArkDeckApp/Features/History/RuntimeHistoryView.swift"),
+      encoding: .utf8)
+    let app = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/HistoryLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    for identifier in [
+      "history.filter.activity", "history.filter.status", "history.filter.mode",
+      "history.filter.session",
+      "history.filter.device", "history.filter.time",
+    ] {
+      XCTAssertTrue(view.contains(".accessibilityIdentifier(\"\(identifier)\")"))
+    }
+    XCTAssertEqual(
+      view.components(separatedBy: ".accessibilityIdentifier(\"history.filter.search\")").count
+        - 1,
+      1,
+      "wide and compact layouts must share one search field rather than duplicate state")
+    XCTAssertTrue(view.contains("filterSidebar"))
+    XCTAssertTrue(view.contains("compactFilters"))
+    XCTAssertTrue(view.contains("filterPickers"))
+    XCTAssertTrue(view.contains(".contentShape(Rectangle())"))
+
+    XCTAssertTrue(view.contains("history.savedFilter.activity"))
+    XCTAssertTrue(view.contains("savedActivity = activityFilter.rawValue"))
+    XCTAssertTrue(
+      view.contains("activityFilter = HistoryActivityFilter(rawValue: savedActivity) ?? .all"))
+
+    XCTAssertTrue(view.contains("detailGeneration &+= 1"))
+    XCTAssertTrue(view.contains("self.detailsByJobID = [:]"))
+    XCTAssertTrue(view.contains("func reloadDetail(jobID:"))
+    XCTAssertTrue(
+      view.contains(".onChange(of: isRefreshInFlight)"),
+      "refresh must restart an invalidated detail even when the cache was already empty")
+    XCTAssertTrue(view.contains("self.detailGeneration == generation"))
+    XCTAssertTrue(view.contains("self.detailRequestIDs[jobID] == requestID"))
+    let requestCheck = try XCTUnwrap(view.range(of: "self.detailRequestIDs[jobID] == requestID"))
+    let loadingRemoval = try XCTUnwrap(view.range(of: "self.loadingDetailJobIDs.remove(jobID)"))
+    XCTAssertLessThan(
+      requestCheck.lowerBound, loadingRemoval.lowerBound,
+      "a superseded read must not clear the newer request's loading state")
+    XCTAssertTrue(view.contains("case .loading:"))
+    XCTAssertTrue(view.contains("history.loading"))
+
+    let refresh = try XCTUnwrap(view.range(of: "  func refresh() {"))
+    let loadOlder = try XCTUnwrap(view.range(of: "  func loadOlder() {"))
+    let loadDetail = try XCTUnwrap(view.range(of: "  func loadDetail(jobID:"))
+    let refreshBody = String(view[refresh.lowerBound..<loadOlder.lowerBound])
+    let olderBody = String(view[loadOlder.lowerBound..<loadDetail.lowerBound])
+    XCTAssertTrue(refreshBody.contains("historyGeneration &+= 1"))
+    XCTAssertTrue(refreshBody.contains("isLoadOlderInFlight = false"))
+    let generationGuard = try XCTUnwrap(
+      olderBody.range(of: "self.historyGeneration == generation"))
+    let spinnerReset = try XCTUnwrap(
+      olderBody.range(of: "defer { self.isLoadOlderInFlight = false }"))
+    let assignment = try XCTUnwrap(olderBody.range(of: "self.presentation = next"))
+    XCTAssertLessThan(generationGuard.lowerBound, spinnerReset.lowerBound)
+    XCTAssertLessThan(generationGuard.lowerBound, assignment.lowerBound)
+
+    XCTAssertTrue(app.contains("RuntimeHistoryWorkspaceContext"))
+    XCTAssertTrue(app.contains("HistoryWorkspaceContextBanner"))
+    XCTAssertTrue(app.contains("openHistoryWorkspace"))
+    XCTAssertTrue(app.contains("openHistoryContext(context)"))
+    XCTAssertTrue(app.contains("historyContext: visibleHistoryContext"))
+    XCTAssertFalse(
+      app.contains("HistoryWorkspaceDestination"),
+      "History must pass exact record context rather than a destination-only navigation token")
+
+    for key in [
+      "history.activity.toolkit", "history.activity.other",
+      "history.activity.open.detailUnavailable", "history.activity.open.unsupported",
+      "history.context.title", "history.context.readOnly", "history.detail.reload",
+      "history.loading",
+    ] {
+      XCTAssertTrue(localization.contains("\"\(key)\""), "missing localized key \(key)")
+    }
+  }
+
+  func testHistoricalWorkspaceReadsRejectSupersededPresentationResults() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let viewer = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift"),
+      encoding: .utf8)
+    let toolkit = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Toolkit/ToolkitWorkspaceViewModel.swift"),
+      encoding: .utf8)
+    let trace = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Trace/TraceWorkspaceView.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(viewer.contains("self.captureGeneration == generation"))
+    XCTAssertTrue(viewer.contains("captureGeneration &+= 1"))
+    XCTAssertTrue(viewer.contains("viewer.history.loading"))
+    XCTAssertTrue(toolkit.contains("self.screenGeneration == generation"))
+    XCTAssertTrue(toolkit.contains("adopted.filter { $0.adoptedTargetID == targetID }"))
+    XCTAssertTrue(toolkit.contains("liveness = ToolkitFrameLiveness()"))
+    XCTAssertTrue(trace.contains("viewerReadGeneration == generation"))
+    XCTAssertTrue(trace.contains("self.viewerReadGeneration == viewerGenerationAtSubmission"))
   }
 
   func testDebugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {

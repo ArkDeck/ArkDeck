@@ -93,6 +93,7 @@ private final class ArkDeckAppModelStore {
   let runtimeHistory: RuntimeHistoryViewModel
   let deviceList: DeviceListViewModel
   var requestedNavigation: ArkDeckNavigationItem?
+  var reopenedHistoryContext: RuntimeHistoryWorkspaceContext?
 
   @ObservationIgnored lazy var hdcDiagnostics = HDCStatusViewModel(
     provider: HDCApplicationDiagnosticsFacade.make())
@@ -659,6 +660,14 @@ private struct AppShellView: View {
   private var workspaceWithRecovery: some View {
     VStack(spacing: 0) {
       RuntimeRecoveryBanner(model: runtimeHistory, onOpenHistory: openHistory)
+      if let context = visibleHistoryContext {
+        HistoryWorkspaceContextBanner(context: context) {
+          if context.workspaceKind == .toolkit {
+            models.toolkitWorkspace.dismissHistoryContext()
+          }
+          models.reopenedHistoryContext = nil
+        }
+      }
       detail
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -666,6 +675,51 @@ private struct AppShellView: View {
 
   private func openHistory() {
     storedSelection = ShellSelection.navigation(.history).storageValue
+  }
+
+  private var visibleHistoryContext: RuntimeHistoryWorkspaceContext? {
+    guard let context = models.reopenedHistoryContext,
+      navigationItem(for: context.workspaceKind) == selectedItem
+    else { return nil }
+    return context
+  }
+
+  private func navigationItem(for kind: RuntimeWorkspaceKind) -> ArkDeckNavigationItem {
+    switch kind {
+    case .flash: .flash
+    case .viewer: .uiDump
+    case .trace: .trace
+    case .diagnostics: .diagnostics
+    case .debug: .debug
+    case .toolkit: .toolkit
+    }
+  }
+
+  private func openHistoryWorkspace(_ context: RuntimeHistoryWorkspaceContext) {
+    models.reopenedHistoryContext = context
+    let item = navigationItem(for: context.workspaceKind)
+    storedSelection = ShellSelection.navigation(item).storageValue
+
+    // Let SwiftUI install the destination's observers before an Artifact read
+    // can complete (Trace opens its viewer when that read publishes).
+    Task { @MainActor in
+      await Task.yield()
+      guard visibleHistoryContext?.id == context.id else { return }
+      switch context.workspaceKind {
+      case .flash:
+        models.flashWorkspace.focusHistoryContext(context)
+      case .viewer:
+        models.uiDumpWorkspace.openHistoryContext(context)
+      case .trace:
+        models.traceWorkspace.openHistoryContext(context)
+      case .debug:
+        models.debugWorkspace.rememberHistoryContext(context)
+      case .toolkit:
+        models.toolkitWorkspace.openHistoryContext(context)
+      case .diagnostics:
+        break
+      }
+    }
   }
 
   /// Fans the shared observation out to the workspaces that need routing.
@@ -852,17 +906,9 @@ private struct AppShellView: View {
         onRefresh: runtimeHistory.refresh,
         onLoadOlder: runtimeHistory.loadOlder,
         onLoadDetail: runtimeHistory.loadDetail,
+        onReloadDetail: runtimeHistory.reloadDetail,
         onExportArtifact: runtimeHistory.exportArtifact,
-        onOpenWorkspace: { destination in
-          let item: ArkDeckNavigationItem = switch destination {
-          case .flash: .flash
-          case .debug: .debug
-          case .uiDump: .uiDump
-          case .trace: .trace
-          case .diagnostics: .diagnostics
-          }
-          storedSelection = ShellSelection.navigation(item).storageValue
-        })
+        onOpenWorkspace: openHistoryWorkspace)
     case .flash:
       FlashWorkspaceView(
         model: models.flashWorkspace,
@@ -873,7 +919,8 @@ private struct AppShellView: View {
     case .debug:
       DebugWorkspaceView(
         model: models.debugWorkspace,
-        onOpenHistory: openHistory)
+        onOpenHistory: openHistory,
+        historyContext: visibleHistoryContext)
     case .uiDump:
       UIDumpWorkspaceView(model: models.uiDumpWorkspace)
     case .trace:

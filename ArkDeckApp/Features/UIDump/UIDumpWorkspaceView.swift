@@ -19,7 +19,13 @@ struct UIDumpWorkspaceView: View {
       VStack(spacing: 0) {
         toolbar
         Divider()
-        if let capture = model.capture {
+        if model.isOpeningHistoryCapture {
+          ProgressView {
+            Text("history.loading", tableName: "HistoryLocalizable")
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .accessibilityIdentifier("viewer.history.loading")
+        } else if let capture = model.capture {
           if geometry.size.width >= 880 {
             HStack(spacing: 0) {
               screenshot(capture)
@@ -1189,6 +1195,7 @@ final class UIDumpWorkspaceViewModel {
   private(set) var inspectorTab: ViewerInspectorTab = .properties
   private(set) var isRefreshing = false
   private(set) var isCapturing = false
+  private(set) var isOpeningHistoryCapture = false
   private(set) var captureFailure: String?
   private(set) var advancedDumpNodeIdentity: String?
   private(set) var advancedDumpFields: [ViewerDumpField] = []
@@ -1200,6 +1207,8 @@ final class UIDumpWorkspaceViewModel {
   private(set) var deviceObservation = DeviceListPresentation.loading
   private(set) var deviceNames: [String: String] = [:]
   private let provider: any UIDumpApplicationProviding
+  private var historyPinnedTargetID: String?
+  private var captureGeneration = 0
 
   init(provider: any UIDumpApplicationProviding) { self.provider = provider }
 
@@ -1246,7 +1255,9 @@ final class UIDumpWorkspaceViewModel {
     return viewerText("viewer.empty.explain")
   }
   var canRecapture: Bool {
-    guard !isCapturing, selectedTarget?.isCaptureReady == true else { return false }
+    guard !isCapturing, !isOpeningHistoryCapture, selectedTarget?.isCaptureReady == true else {
+      return false
+    }
     if case .available = workspace.operation.availability { return true }
     return false
   }
@@ -1277,6 +1288,10 @@ final class UIDumpWorkspaceViewModel {
     }
   }
   private func preferredTargetID(in targets: [UIDumpTargetPresentation]) -> String {
+    // A History context names an exact target. If that target no longer
+    // exists, keep the unmatched selection so recapture stays disabled rather
+    // than silently switching the historical screen to another device.
+    if let historyPinnedTargetID { return historyPinnedTargetID }
     // Preserve an explicit exact selection even if it goes offline. Replacing
     // it behind the user's back could send a capture to a different device.
     if !selectedTargetID.isEmpty, targets.contains(where: { $0.id == selectedTargetID }) {
@@ -1289,31 +1304,74 @@ final class UIDumpWorkspaceViewModel {
   func recapture() {
     guard let target = selectedTarget, canRecapture else { return }
     isCapturing = true; captureFailure = nil
+    captureGeneration &+= 1
+    let generation = captureGeneration
     let provider = provider
     Task { [weak self] in
       let result = await provider.recapture(target: target)
-      guard let self, !Task.isCancelled else { return }
+      guard let self else { return }
       self.isCapturing = false
+      guard !Task.isCancelled, self.captureGeneration == generation else { return }
       switch result {
-      case .captured(let next):
-        self.resetAdvancedDump()
-        self.capture = next
-        let root = next.primaryRootIdentity ?? ""
-        self.selectedRootIdentity = root
-        // A previous screen's query must not leave a fresh capture looking
-        // empty or hide the row selected from the screenshot.
-        self.searchQuery = ""
-        self.searchMatchIdentities = []
-        self.selectedSearchMatchIndex = nil
-        self.expandedNodeIdentities = next.node(identity: root)?.children.isEmpty == false
-          ? [root] : []
-        self.select(root)
+      case .captured(let next): self.applyCapture(next)
       case .failed(let reason): self.captureFailure = reason
       }
       self.refresh()
     }
   }
+
+  /// Opens the immutable Artifact set named by History. No operation is
+  /// submitted and the resulting capture never grants permission to recapture.
+  func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
+    guard context.workspaceKind == .viewer else { return }
+    captureGeneration &+= 1
+    let generation = captureGeneration
+    selectedTargetID = context.targetID
+    historyPinnedTargetID = context.targetID
+    isOpeningHistoryCapture = false
+    resetAdvancedDump()
+    // A previous record must not appear under the newly selected Job banner.
+    capture = nil
+    selectedNodeIdentity = nil
+    guard let bindingRevision = context.bindingRevision else {
+      captureFailure = "Historical Viewer context has no binding revision"
+      return
+    }
+    isOpeningHistoryCapture = true
+    captureFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let result = await provider.loadHistoricalCapture(
+        jobID: context.jobID,
+        targetID: context.targetID,
+        bindingRevision: bindingRevision)
+      guard let self, self.captureGeneration == generation else { return }
+      self.isOpeningHistoryCapture = false
+      guard !Task.isCancelled else { return }
+      switch result {
+      case .captured(let capture): self.applyCapture(capture)
+      case .failed(let reason): self.captureFailure = reason
+      }
+    }
+  }
+
+  private func applyCapture(_ next: ViewerCapture) {
+    resetAdvancedDump()
+    capture = next
+    let root = next.primaryRootIdentity ?? ""
+    selectedRootIdentity = root
+    // A previous screen's query must not leave a fresh capture looking empty
+    // or hide the row selected from the screenshot.
+    searchQuery = ""
+    searchMatchIdentities = []
+    selectedSearchMatchIndex = nil
+    expandedNodeIdentities = next.node(identity: root)?.children.isEmpty == false ? [root] : []
+    select(root)
+  }
   func setTargetID(_ value: String) {
+    captureGeneration &+= 1
+    isOpeningHistoryCapture = false
+    historyPinnedTargetID = nil
     selectedTargetID = value
     captureFailure = nil
     resetAdvancedDump()

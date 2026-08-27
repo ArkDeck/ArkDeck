@@ -408,6 +408,10 @@ struct OverviewRecordView: View {
       }
     ) {
       switch history.availability {
+      case .loading:
+        ProgressView()
+          .controlSize(.small)
+          .accessibilityLabel(Text("overview.record.recent.title"))
       case .unavailable(let reason):
         WorkspaceNotice(tone: .warning, identifier: "overview.record.recent.unavailable") {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
