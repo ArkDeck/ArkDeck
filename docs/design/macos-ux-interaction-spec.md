@@ -274,6 +274,7 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 ## 8. v1.2 已决视觉项
 
 - 图标：产品使用 SF Symbols；HTML 原型使用单色 inline SVG 近似，禁止 Emoji 作为最终导航图标。
+- 2026-08-27 图标评审：Debug 改用 `terminal`，同步 Sidebar、Overview 返回入口与 History；Device 保留 `iphone`。Sidebar 统一 22×22 pt 图标占位，其余 symbol 使用系统 medium scale，手机使用 large scale 做光学补偿；保留各自长宽比与原生字重，不用拉伸统一轮廓。原型使用 22×22 px 占位、18 px 常规图标／20 px 手机，手机笔画随尺寸补偿，保持视觉线重一致。Viewer、Trace、诊断的图标造型不变。
 - 密度：默认紧凑舒适（macOS medium sidebar size）；不额外提供 App 内密度开关，尊重系统设置。
 - Job Inspector：默认折叠；有 running / waiting / humanRequired 时显示摘要但不自动抢焦点。
 - 外观：跟随系统；不默认强制 dark。

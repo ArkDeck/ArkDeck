@@ -272,7 +272,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     switch self {
     case .overview: "rectangle.grid.2x2"
     case .flash: "bolt"
-    case .debug: "ladybug"
+    case .debug: "terminal"
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
     case .device: "iphone"
@@ -942,6 +942,10 @@ private struct AppShellView: View {
         Text(LocalizedStringKey(item.localizationKey))
       } icon: {
         Image(systemName: item.systemImageName)
+          // Keep the native symbol weight and aspect ratio. The narrow phone
+          // needs the next SF scale to balance the wider workspace symbols.
+          .imageScale(item == .device ? .large : .medium)
+          .frame(width: 22, height: 22)
       }
       .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
       .contentShape(Rectangle())

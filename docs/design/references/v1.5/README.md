@@ -2,6 +2,8 @@
 
 本版把 Device 交互稿回写到当前 SwiftUI：默认空态、按需截图、按帧录屏，以及旧画面拒绝输入。可点击入口为 [`prototype.html?page=device-control`](../../prototype.html?page=device-control)。去掉 `reference=1` 后可使用窗口外的状态、语言、外观及宽／窄窗评审控件。
 
+2026-08-27 图标复核：Debug 改为终端，Device 保留手机；侧栏图标统一占位并对窄手机轮廓做等比补偿。下列七张演示参考图已按此版重新截图。原生中英文 `AppShellUITests/testDeviceWorkspaceNameAndEmptyStateInBothLanguages` 通过（17.822 秒），并检查了测试附带的原生窗口截图；使用 fixture，只证明 App 呈现，不是新的硬件结果。
+
 本轮参考图由内置浏览器的 **1280×720 viewport** 直接截取，保留浏览器返回的 JPEG，不裁剪、不加工。区别于旧版 1180×760 PNG 基线：宽窗画布为 1180×720，窄窗为 960×720；两侧背景是 viewport 留白。不要把下列图当作原生 App 截图或真机证据。
 
 | 文件 | 原型参数／复现步骤 |

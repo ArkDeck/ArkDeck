@@ -97,7 +97,9 @@ body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:
 .nav button:hover{background:var(--selection)}
 .nav button.on{background:var(--selection);font-weight:600}
 .nav button.on .ic{color:var(--accent)}
-.nav .ic{width:18px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink2)}
+.nav .ic{width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink2)}
+.nav .ic .symbol{width:18px;height:18px}
+.nav .ic .symbol:has(use[href="#i-device"]){width:20px;height:20px;stroke-width:1.485}
 .nav .preview{margin-inline-start:auto;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink2);
   border:1px solid var(--line);padding:1px 5px;border-radius:4px}
 .content{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -756,7 +758,7 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
     <symbol id="i-sidebar" viewBox="0 0 20 20"><rect x="2.5" y="3" width="15" height="14" rx="2"/><path d="M7 3v14"/></symbol>
     <symbol id="i-overview" viewBox="0 0 20 20"><rect x="3" y="3" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="3" width="5.5" height="5.5" rx="1"/><rect x="3" y="11.5" width="5.5" height="5.5" rx="1"/><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1"/></symbol>
     <symbol id="i-flash" viewBox="0 0 20 20"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></symbol>
-    <symbol id="i-debug" viewBox="0 0 20 20"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></symbol>
+    <symbol id="i-debug" viewBox="0 0 20 20"><rect x="2.5" y="4" width="15" height="12" rx="2"/><path d="m5.5 7.5 2.5 2.5-2.5 2.5M10.5 12.5h4"/></symbol>
     <symbol id="i-dump" viewBox="0 0 20 20"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></symbol>
     <symbol id="i-trace" viewBox="0 0 20 20"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></symbol>
     <symbol id="i-diagnostics" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="12" rx="2"/><path d="M4.5 10h2l1.5-3 2.2 6 1.7-4 1.1 1.5h2.5M7 17.5h6"/></symbol>

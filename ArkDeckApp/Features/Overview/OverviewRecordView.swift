@@ -637,7 +637,7 @@ struct OverviewRecordView: View {
     switch workspaceKind(for: run) {
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
-    case .debugHAP: "ladybug"
+    case .debugHAP: "terminal"
     case .flash: "bolt"
     case .device: "iphone"
     case nil: "clock.arrow.circlepath"
