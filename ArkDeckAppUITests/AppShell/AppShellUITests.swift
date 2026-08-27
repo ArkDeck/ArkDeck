@@ -455,11 +455,26 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(element("overview.status.channel.value", in: app), equals: overview.channel)
     assertDisplayed(
       element("overview.status.needsAttention.value", in: app), equals: overview.attention)
+    // The four environment sections are no longer on the first screen. Overview
+    // was focused on the next device action (TASK-AIN-021, #1549) and they now
+    // sit behind a collapsed disclosure, so asserting them here asserted the
+    // old design - which is what turned the nightly red.
+    //
+    // They are not dropped: the Advanced Diagnostics block below already opens
+    // the disclosure with ⌘⇧D and asserts the fields inside it, and it does so
+    // from the collapsed state on purpose. Opening it here would take that
+    // precondition away. So what the first screen owes is the way in.
+    XCTAssertTrue(
+      element("overview.advanced.toggle", in: app).waitForExistenceFast(timeout: 10),
+      "Overview must offer a way into the environment detail", file: file, line: line)
     for section in [
       "overview.section.serverToolchain", "overview.section.deviceChannel",
       "overview.section.capabilities", "overview.section.needsAttention",
     ] {
-      XCTAssertTrue(element(section, in: app).exists, "\(section) missing", file: file, line: line)
+      XCTAssertFalse(
+        element(section, in: app).exists,
+        "\(section) is behind the disclosure now; the first screen is the next "
+          + "device action", file: file, line: line)
     }
 
     // A workspace that has nothing to report has to say so, not go blank. The
