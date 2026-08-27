@@ -108,3 +108,18 @@ export type {
   DumpInspectorProps,
   DumpField,
 } from "./components/viewer.js";
+
+export {
+  SectionGroup, DiagnosticAlignmentDisclosure, DiagnosticLogRow,
+  DiagnosticTimeline, DiagnosticTrack, DiagnosticTimeCursor, DiagnosticScreenThumbnail,
+  DiagnosticTraceEvent, DiagnosticLogMarker, DiagnosticMarker, DiagnosticScreenshotPoint,
+  DiagnosticUnalignedTrackNotice, PartialSessionBanner, ProductionBoundaryCallout,
+  DiagnosticPresetPicker, DiagnosticChannelStatus, DeviceScreenshotEmptyState,
+  DeviceFrameCountStepper, DeviceControlSurface, DeviceTouchFeedback, DeviceStaleInputGuard,
+  DeviceControlEventRow, PerformanceImpactNotice, RecordingArtifactResult,
+} from "./components/session.js";
+export type {
+  SectionGroupProps, DiagnosticAlignment, DiagnosticLogRowProps, DiagnosticTimeCursorProps,
+  DiagnosticPointProps, DiagnosticScreenThumbnailProps, DiagnosticPresetPickerProps,
+  DeviceFrameCountStepperProps, RecordingArtifactResultProps,
+} from "./components/session.js";

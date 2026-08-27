@@ -280,14 +280,16 @@ struct DebugWorkspaceView: View {
   private func applyHistoryContext() {
     guard let historyContext, historyContext.workspaceKind == .debug else { return }
     selectedTargetID = historyContext.targetID
-    let tab: DebugWorkspaceTab = switch historyContext.operationReference {
-    case DebugApplicationFacade.debugHAPReference: .apps
-    case DebugApplicationFacade.nativeLibraryReference: .artifacts
-    case DebugApplicationFacade.createPortForwardReference,
-      DebugApplicationFacade.removePortForwardReference: .network
-    case DebugApplicationFacade.captureDiagnosticsReference: .logs
-    default: .artifacts
-    }
+    let tab: DebugWorkspaceTab =
+      switch historyContext.operationReference {
+      case DebugApplicationFacade.debugHAPReference: .apps
+      case DebugApplicationFacade.nativeLibraryReference: .artifacts
+      case DebugApplicationFacade.createPortForwardReference,
+        DebugApplicationFacade.removePortForwardReference:
+        .network
+      case DebugApplicationFacade.captureDiagnosticsReference: .logs
+      default: .artifacts
+      }
     activateTab(tab)
     model.rememberHistoryContext(historyContext)
   }
@@ -794,7 +796,8 @@ private struct DebugArtifactsWorkspace: View {
               try await remoteBindingProvider.bind(
                 sourceID: selection.sourceID, toTargetID: targetID)
             } catch {
-              selectionError = DebugL10n.text("debug.artifacts.remoteBindingFailed")
+              selectionError =
+                DebugL10n.text("debug.artifacts.remoteBindingFailed")
                 + " " + error.localizedDescription
             }
           }
@@ -1748,10 +1751,12 @@ private struct DebugAppsWorkspace: View {
 
   @State private var isImporterPresented = false
   @State private var selectedHAPURL: URL?
+  @State private var isSelectingAdditionalHAP = false
+  @State private var additionalHAPURLs: [URL] = []
   @State private var selectionError: String?
   @State private var bundleName = ""
   @State private var abilityName = ""
-  @State private var installPolicy = "installOrReplace"
+  private let installPolicy = "installOrReplace"
   @State private var cleanupPolicy = "uninstall"
   @State private var postRunState = "stopped"
   @State private var captureDiagnostics = true
@@ -1788,11 +1793,15 @@ private struct DebugAppsWorkspace: View {
           packageSection
           identitySection
         }
+        .accessibilityElement(children: .contain)
       } trailing: {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) {
           lifecycleSection
           planSection
         }
+        // Keep the warning in its lifecycle column. Otherwise macOS merges
+        // nearby static text from both columns and drops the notice identity.
+        .accessibilityElement(children: .contain)
       }
       inventorySection
       if !runtimeArtifacts.isEmpty { artifactsSection }
@@ -1800,9 +1809,16 @@ private struct DebugAppsWorkspace: View {
     }
     .fileImporter(
       isPresented: $isImporterPresented,
-      allowedContentTypes: [UTType(filenameExtension: "hap") ?? .data],
-      allowsMultipleSelection: false,
-      onCompletion: handleHAPSelection)
+      allowedContentTypes: (isSelectingAdditionalHAP ? ["hap", "hsp"] : ["hap"])
+        .map { UTType(filenameExtension: $0) ?? .data },
+      allowsMultipleSelection: isSelectingAdditionalHAP
+    ) { result in
+      if isSelectingAdditionalHAP {
+        handleAdditionalHAPSelection(result)
+      } else {
+        handleHAPSelection(result)
+      }
+    }
   }
 
   private var packageSection: some View {
@@ -1816,14 +1832,29 @@ private struct DebugAppsWorkspace: View {
           .font(WorkspaceFont.monospacedValue)
       }
       Button {
+        isSelectingAdditionalHAP = false
         isImporterPresented = true
       } label: {
         Label(DebugL10n.text("debug.apps.chooseHAP"), systemImage: "doc.badge.plus")
       }
+      .disabled(model.isSubmittingHAP)
+      .accessibilityIdentifier("debug.apps.entry.choose")
       Text(selectedHAPURL?.lastPathComponent ?? DebugL10n.text("debug.apps.noHAP"))
         .font(WorkspaceFont.monospacedValue)
         .foregroundStyle(selectedHAPURL == nil ? .secondary : .primary)
         .textSelection(.enabled)
+        .help(selectedHAPURL?.path ?? "")
+        .accessibilityIdentifier("debug.apps.entry.name")
+      additionalPackages
+      if selectedHAPURL != nil {
+        Button(DebugL10n.text("debug.apps.clearSelection")) {
+          selectedHAPURL = nil
+          additionalHAPURLs = []
+          selectionError = nil
+        }
+        .disabled(model.isSubmittingHAP)
+        .accessibilityIdentifier("debug.apps.packages.clear")
+      }
       if let selectionError {
         WorkspaceNotice(tone: .danger, identifier: "debug.apps.selection.error") {
           Text(selectionError)
@@ -1836,18 +1867,71 @@ private struct DebugAppsWorkspace: View {
     }
   }
 
+  private var additionalPackages: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+      Text(DebugL10n.text("debug.apps.additional.title"))
+        .font(WorkspaceFont.label)
+      Text(DebugL10n.text("debug.apps.additional.note"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      ForEach(Array(additionalHAPURLs.enumerated()), id: \.element) { index, url in
+        HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+          Text(url.lastPathComponent)
+            .font(WorkspaceFont.monospacedValue)
+            .lineLimit(2)
+            .truncationMode(.middle)
+            .textSelection(.enabled)
+            .help(url.path)
+            .accessibilityIdentifier("debug.apps.additional.file.\(index)")
+          Spacer(minLength: 0)
+          Button {
+            additionalHAPURLs.removeAll { $0 == url }
+            selectionError = nil
+          } label: {
+            Label(DebugL10n.text("debug.apps.additional.remove"), systemImage: "minus.circle")
+          }
+          .disabled(model.isSubmittingHAP)
+          .accessibilityLabel(
+            String(
+              localized: LocalizedStringResource.DebugLocalizable.debugAppsAdditionalRemoveNamed(
+                url.lastPathComponent))
+          )
+          .accessibilityIdentifier("debug.apps.additional.remove.\(index)")
+        }
+        .accessibilityElement(children: .contain)
+      }
+      Button(DebugL10n.text("debug.apps.additional.add")) {
+        isSelectingAdditionalHAP = true
+        isImporterPresented = true
+      }
+      .disabled(
+        selectedHAPURL == nil || model.isSubmittingHAP
+          || additionalHAPURLs.count >= DebugHAPPackageSelection.maximumAdditionalPackages
+      )
+      .accessibilityIdentifier("debug.apps.additional.add")
+    }
+    .accessibilityElement(children: .contain)
+  }
+
   private var identitySection: some View {
     WorkspaceSection(Text(DebugL10n.text("debug.apps.identity.title"))) {
-      TextField(
-        DebugL10n.text("debug.apps.bundle"), text: $bundleName,
-        prompt: Text("com.example.app")
-      )
-      .textFieldStyle(.roundedBorder)
-      TextField(
-        DebugL10n.text("debug.apps.ability"), text: $abilityName,
-        prompt: Text("EntryAbility")
-      )
-      .textFieldStyle(.roundedBorder)
+      LabeledContent(DebugL10n.text("debug.apps.bundle")) {
+        TextField(
+          DebugL10n.text("debug.apps.bundle"), text: $bundleName,
+          prompt: Text("com.example.app")
+        )
+        .textFieldStyle(.roundedBorder)
+        .accessibilityIdentifier("debug.apps.bundle")
+      }
+      LabeledContent(DebugL10n.text("debug.apps.ability")) {
+        TextField(
+          DebugL10n.text("debug.apps.ability"), text: $abilityName,
+          prompt: Text("EntryAbility")
+        )
+        .textFieldStyle(.roundedBorder)
+        .accessibilityIdentifier("debug.apps.ability")
+      }
       // The note below promises schema validation; these two fields are the
       // argv-adjacent inputs on this tab, so the gate is applied here, not
       // deferred to a future submit path.
@@ -1868,18 +1952,23 @@ private struct DebugAppsWorkspace: View {
 
   private var lifecycleSection: some View {
     WorkspaceSection(Text(DebugL10n.text("debug.apps.lifecycle.title"))) {
-      Picker(DebugL10n.text("debug.apps.installPolicy"), selection: $installPolicy) {
-        Text(DebugL10n.text("debug.apps.install.replace")).tag("installOrReplace")
-        Text(DebugL10n.text("debug.apps.install.fresh")).tag("installFresh")
+      LabeledContent(DebugL10n.text("debug.apps.installPolicy")) {
+        Text(DebugL10n.text("debug.apps.install.replace"))
       }
       Picker(DebugL10n.text("debug.apps.cleanupPolicy"), selection: $cleanupPolicy) {
         Text(DebugL10n.text("debug.apps.cleanup.uninstall")).tag("uninstall")
         Text(DebugL10n.text("debug.apps.cleanup.retain")).tag("retain")
-        Text(DebugL10n.text("debug.apps.cleanup.restore")).tag("restorePrevious")
       }
+      .accessibilityIdentifier("debug.apps.cleanupPolicy")
       Picker(DebugL10n.text("debug.apps.postRun"), selection: $postRunState) {
         Text(DebugL10n.text("debug.apps.postRun.stopped")).tag("stopped")
         Text(DebugL10n.text("debug.apps.postRun.running")).tag("running")
+      }
+      .accessibilityIdentifier("debug.apps.postRun")
+      if cleanupPolicy == "uninstall", postRunState == "running" {
+        WorkspaceNotice(tone: .warning, identifier: "debug.apps.runningCleanupHint") {
+          Text(DebugL10n.text("debug.apps.runningCleanupHint"))
+        }
       }
       Toggle(DebugL10n.text("debug.apps.captureDiagnostics"), isOn: $captureDiagnostics)
       if captureDiagnostics {
@@ -1930,12 +2019,22 @@ private struct DebugAppsWorkspace: View {
         DebugCodeRow(
           label: DebugL10n.text("debug.availability.operation"),
           value: DebugApplicationFacade.debugHAPReference)
+        DebugCodeRow(
+          label: DebugL10n.text("debug.apps.package.title"),
+          value: selectedHAPURL?.lastPathComponent ?? "—")
+        DebugCodeRow(
+          label: DebugL10n.text("debug.apps.additional.title"),
+          value: additionalHAPURLs.isEmpty
+            ? "—"
+            : additionalHAPURLs.map(\.lastPathComponent).joined(separator: "\n"))
         DebugCodeRow(label: "bundleName", value: bundleName.isEmpty ? "—" : bundleName)
         DebugCodeRow(label: "abilityName", value: abilityName.isEmpty ? "—" : abilityName)
         DebugCodeRow(label: "installPolicy", value: installPolicy)
         DebugCodeRow(label: "cleanupPolicy", value: cleanupPolicy)
         DebugCodeRow(label: "postRunAbilityState", value: postRunState)
         DebugCodeRow(label: "captureDiagnostics", value: String(captureDiagnostics))
+        DebugCodeRow(label: "diagnosticsDurationSeconds", value: String(diagnosticsDuration))
+        DebugCodeRow(label: "portForwardProfile", value: "none")
       }
       .padding(.top, WorkspaceMetrics.rowGap)
     } label: {
@@ -1998,6 +2097,7 @@ private struct DebugAppsWorkspace: View {
           model.submitHAP(
             target: target,
             fileURL: selectedHAPURL,
+            additionalFileURLs: additionalHAPURLs,
             bundleName: bundleName,
             abilityName: abilityName,
             installPolicy: installPolicy,
@@ -2142,7 +2242,7 @@ private struct DebugAppsWorkspace: View {
   private var canSubmit: Bool {
     target != nil && selectedHAPURL != nil && operationIsAvailable
       && invalidIdentityFieldNames == nil && !bundleName.isEmpty && !abilityName.isEmpty
-      && !model.isSubmittingHAP
+      && selectionError == nil && !model.isSubmittingHAP
   }
 
   private var invalidIdentityFieldNames: String? {
@@ -2164,16 +2264,36 @@ private struct DebugAppsWorkspace: View {
   private func handleHAPSelection(_ result: Result<[URL], Error>) {
     switch result {
     case .failure:
-      selectedHAPURL = nil
       selectionError = DebugL10n.text("debug.apps.selection.failed")
     case .success(let urls):
-      guard let url = urls.first, url.pathExtension.lowercased() == "hap" else {
-        selectedHAPURL = nil
+      guard urls.count == 1, let url = urls.first else {
         selectionError = DebugL10n.text("debug.apps.selection.invalid")
         return
       }
-      selectedHAPURL = url
+      validatePackageSelection(entry: url, additional: additionalHAPURLs)
+    }
+  }
+
+  private func handleAdditionalHAPSelection(_ result: Result<[URL], Error>) {
+    switch result {
+    case .failure:
+      selectionError = DebugL10n.text("debug.apps.selection.failed")
+    case .success(let urls):
+      guard let entry = selectedHAPURL else { return }
+      validatePackageSelection(entry: entry, additional: additionalHAPURLs + urls)
+    }
+  }
+
+  private func validatePackageSelection(entry: URL, additional: [URL]) {
+    do {
+      try DebugHAPPackageSelection.validate(entry: entry, additional: additional)
+      selectedHAPURL = entry
+      additionalHAPURLs = additional
       selectionError = nil
+    } catch let error as DebugHAPPackageSelection.Failure {
+      selectionError = DebugL10n.text("debug.apps.selection.\(error.rawValue)")
+    } catch {
+      selectionError = DebugL10n.text("debug.apps.selection.failed")
     }
   }
 }
@@ -3095,6 +3215,7 @@ final class DebugWorkspaceViewModel {
   func submitHAP(
     target: DebugTargetPresentation,
     fileURL: URL,
+    additionalFileURLs: [URL],
     bundleName: String,
     abilityName: String,
     installPolicy: String,
@@ -3112,7 +3233,8 @@ final class DebugWorkspaceViewModel {
     let provider = provider
     Task { [weak self] in
       let submitted = await provider.submitHAP(
-        target: target, fileURL: fileURL, bundleName: bundleName, abilityName: abilityName,
+        target: target, fileURL: fileURL, additionalFileURLs: additionalFileURLs,
+        bundleName: bundleName, abilityName: abilityName,
         installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
         postRunAbilityState: postRunAbilityState,
         captureDiagnostics: captureDiagnostics,

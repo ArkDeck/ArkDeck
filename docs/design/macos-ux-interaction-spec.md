@@ -1,30 +1,37 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v1.5（design input，非 normative；2026-08-25 v1.2 新增独立 Device tab、把 Diagnostics 调整为低干扰默认，并按当前 SwiftUI 实现回写 Viewer / Trace 页面结构；同日 v1.3 按设计评审修订 Diagnostics Marker、时间对齐与 Device 输入反馈。2026-08-26 回写 Debug 当前 SwiftUI 分组及单个已签名 app-owned `.so` 的本地 / 只读 SSH 来源流程；v1.4 将 History 从 Job 审计表重组为按工作类型回访的活动中心，同时保留完整 Runtime 证据、Artifact、恢复关联与导出能力。2026-08-27 v1.5 同步 Device 命名、图标及当前 App 交互：空态、按需截图、按帧录屏与旧画面输入拒绝。Diagnostics / Device 详细设计见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md) 与 [`device-control-design.md`](./device-control-design.md)；对应 OpenSpec 提案 `openspec/changes/chg-2026-071-interactive-device-control/`）
+> Status：draft v1.6（design input，非 normative；2026-08-25 v1.2 新增独立 Device tab、把 Diagnostics 调整为低干扰默认，并按当前 SwiftUI 实现回写 Viewer / Trace 页面结构；同日 v1.3 按设计评审修订 Diagnostics Marker、时间对齐与 Device 输入反馈。2026-08-26 回写 Debug 当前 SwiftUI 分组及单个已签名 app-owned `.so` 的本地 / 只读 SSH 来源流程；v1.4 将 History 从 Job 审计表重组为按工作类型回访的活动中心，同时保留完整 Runtime 证据、Artifact、恢复关联与导出能力。2026-08-27 v1.5 同步 Device 命名、图标及当前 App 交互：空态、按需截图、按帧录屏与旧画面输入拒绝。Diagnostics / Device 详细设计见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md) 与 [`device-control-design.md`](./device-control-design.md)；对应 OpenSpec 提案 `openspec/changes/chg-2026-071-interactive-device-control/`）
+> 本轮基线：2026-08-27 `origin/main` = `e1d52e68`。v1.6 全页核对、当前/未来分层及验证证据见 [`implementation-audit-2026-08-27.md`](implementation-audit-2026-08-27.md)；不是全部目标行为已交付的声明。
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v1.5 目标与当前实现边界
+## 0. v1.6 当前实现与目标设计
 
-v1.5 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Diagnostic Session Viewer，在 Trace 之后、Diagnostics 之前提供独立 **Device** tab，并把 History 重组为可回访的活动中心。Diagnostics 默认只持续采集 Trace 与 HiLog，Marker 触发按需截图；连续录屏是明确 opt-in。Device 已有实际 SwiftUI 工作区：首次进入为空态，手动获取截图后可发送一次点击、长按或滑动；按帧数进行有界采集并在本机合成 .mov。当前没有持续预览和按秒启停录屏入口。Diagnostics、Trace、Device 与 History 各自保存 view state、配置和运行状态，互不替换，也不会静默开启彼此的高开销 channel。
+本版先按最新代码确认实际入口，再比较 accepted specs、Catalog、交互稿和接线。
+**当前镜像**与**未来目标**必须分开；disabled 入口不等于目标功能完成，CLI/Runtime 能力不等于 App 已接通。
+完整逐页、子标签、窗口、弹层及组件镜像清单见全页扫描报告。
 
-当前代码与目标设计的边界必须如实呈现：
-
-| Surface | 当前实现 | v1.5 设计方向 |
+| Surface | 已实现并接通 | 仍未实现或未接通 |
 | --- | --- | --- |
-| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / Viewer / Trace / History / Automation 均有实际工作区 | 保留原生 split view；在 Trace 后依次排列 Device 与 Diagnostics；统一 toolbar、全局 Job inspector 与窗口自适应 |
-| Device detail | 未授权设备有接管引导；已接管设备能显示真实 binding / observation facts，并有原生右键重命名和重新检测 | 删除重复内容标题；宽屏拆分状态操作与事实；名称只是 App 展示别名，重新检测只刷新候选事实 |
-| Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
-| Viewer | `UIDumpWorkspaceView` 已实现首次空态、显式 target、typed「抓取视图」、同 Job Artifact 校验，以及截图 + UI 树/节点属性联动检查器 | UI 稿直接镜像当前实现；不再把已经落地的 Viewer 写成未来方向 |
-| Debug | `DebugWorkspaceView` 已有 Artifacts / Logs / Apps / Network / Commands 五个 tab，Artifacts 为默认项;已发布单个 app-owned `.so` 的本地文件与只读 SSH 来源选择、ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability restart、加载 readback 与失败回滚，SSH 来源在「设置 › 服务器」中管理;每组以 section 标题加细线分组，Runtime 可用性只在标题旁一行呈现 | 默认进入 Artifacts；管理 SSH、本机目录、SMB、WSL 来源及其根目录，搜索、勾选、预览替换计划，完成替换后显式提供重启与日志验证。未发布的来源浏览、批量、`.abc` 与独立设备重启能力必须显示 unavailable，不用原型状态伪造生产可用性 |
-| Trace | 主窗口是精简的「抓取 Trace / 查看 Trace」两段式入口；原生 Timeline 在独立 ArkDeck Trace Viewer 窗口中打开 | UI 稿镜像当前入口，不复活自定义 tag、参数 diff、派生产物 dashboard 或页内 Timeline 模式；Diagnostics 不复用或改写 Trace 状态 |
-| History | `RuntimeHistoryView` 从 `job.list` 展示只读记录，按活动类型聚合 Flash、Debug、Viewer、Trace 与 Diagnostics；选择后按需加载 Runtime 证据、参数、Artifact 与恢复关联 | 宽屏使用活动类型导航、最近记录、详情 inspector 三栏；支持搜索及完整 Runtime 筛选、保存筛选，并从记录返回对应工作区；不得把演示数据或本地猜测混入 Runtime projection |
-| Diagnostics | 尚无独立 production surface；现有 `capture.diagnostics@1` 能产出 bounded HiLog、单张截图、UI dump/tree 和 raw Trace，但没有屏幕视频、并发/环形采集、会话内准入或跨来源 clock calibration；截图腿会把作业升级为 deviceMutation | 以独立 Diagnostic Session 统一采集 / Viewer；Trace/HiLog 以环形缓冲回溯保存，Marker 只记时间点、截图事后拍摄并标注 `+N ms`，自动 Marker 补齐人工反应延迟；连续录屏需明确开启。选择 Trace event 时联动可用截图/视频与日志；第一版对齐只承诺 `同一时钟` / `无法对齐` 两态，`已校准 ±N ms` 待 ground-truth 实验。原型中的环形采集、自动 Marker、视频与校准仍是目标设计，不代表 production availability |
-| Device | 已有 DeviceWorkspaceView、按需截图、typed 点击／长按／滑动、按帧序列采集与本机 .mov 合成；无持续预览或设备侧编码入口 | 与当前实现保持同步：默认空态、880 pt 内容区断点与 320 pt Inspector；已确认／unknown 使旧图过期；录屏默认 40 帧，先预检后采集／合成／校验，显示实测帧率、缺帧、路径；评审状态和模拟数据单独标注 |
-| Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
-| Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
-| Runtime data | Trace tag / 参数快照、Debug probe、Flash prerequisite / postflight、Artifact metadata 均有生产 facade | 缺失字段显示 unknown / unavailable，不使用 fixture、占位行或默认值补齐 |
+| App shell | 八个主页面：Overview / Flash / Debug / Viewer / Trace / Device / Diagnostics / History；动态设备详情；独立 Settings、Trace Viewer 和快捷键帮助窗口 | Automation 与 task.* 已在 CHG-2026-064 退役；不是待补 UI |
+| Overview | 当前目标、SSH source、调试线、环境与来源检查；校验过的 readOnly `observe.device@1` / `capture.diagnostics@1` 可复制原始 typed inputs 和 thread 至新草稿 | 仅导航不会提交；变更操作、旧 Marker 时间、目标/binding 漂移和 unknown 禁止复用。新 Job 在目标工作区显式启动，不复制 authority/lease/Runtime Session |
+| Device detail / trust | 真实候选状态、binding/observation、重命名和重新检测、有界授权等待 | App 不执行 target.adopt；TCP/UART 添加不能画为已发布 App 功能 |
+| Flash | 导入镜像、fresh exact plan、前置条件、同页影响说明、Runtime 执行/进度/结果、细节 disclosure、Loader 激活绑定 | 不提供人工确认覆盖未知 outcome、不从成功字符串推定 postflight |
+| Debug | Artifacts / Logs / Apps / Network / Commands 五个 tab；单个已签名 app-owned `.so` 的本地/只读 SSH 来源、校验、计划、部署及 readback/rollback；HAP、bounded logs、typed 网络规则和闭集命令 | `.abc`、批量替换、SMB/WSL/目录 connector、独立设备重启、设备日志 buffer 清理及未发布 package lifecycle 保持 unavailable |
+| Viewer | 空态优先；精确 target、同 Job screenshot/tree 校验；截图/树/搜索联动；属性、布局、可访问性、原始和高级 Dump 五种 inspector | Fault/Crash 与 System Diagnostic Snapshot 不是 Viewer 首版能力；设计中旧“UI Dump”导航不再适用 |
+| Trace | 两段式采集/查看入口；已验证 raw `trace.htrace` 打开独立原生 Viewer；时长单位转换与校验 | 原型不应在 unavailable 时启用开始，也不能把非法输入静默改成 10 |
+| Trace Viewer | 最近文件、筛选、搜索、Timeline、事件/范围/标注、两种停靠、加载/取消/错误与帮助；App 普通文案中英双语；通用稿已有 loaded 样本和锁定目录的 19 条快捷键 | 原始字段、进程名和许可证正文不翻译；合成 loaded 图不构成真实 trace/设备验收 |
+| Device | 按需截图、一次 typed 点击/长按/滑动、旧图拒绝输入、2–300 帧有界采集与本机 .mov 合成/校验、实测帧率/缺帧/配额状态 | 无持续预览、键盘输入、设备端编码与按秒启停录屏 |
+| Diagnostics | History 精确来源 → Session reader → index/summary/markers 校验 → timeline/缺口/Artifact；显式读取文本/JSON；已发布 Trace 可转入独立 Viewer | 交互式 arm/append-marker/stop、会话内视频与时钟校准未接通。published bounded ringBuffered 与部分自动 Marker 已存在，不能误报为全缺失；无校准/事件时间时明确无法对齐/未记录时刻 |
+| History | 八类筛选、保存/分页、证据、参数、导出与精确来源上下文；Diagnostics 历史 Session 已加载并保留来源 | 不重放；未知 operation 不猜类型；Flash 来源目标已消失时显示缺失，不静默换设备 |
+| Settings | 独立七标签：General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics；Trace 内 Cache / Licenses | 不再内嵌完整更新设置；当前 App 诊断包不提供 device raw 勾选，敏感 Artifact 从 History 单独导出 |
+| Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。unknown 不取消/重放；恢复 rebind/archive 未有 App RPC 接线，仍保留为缺口，不删 accepted spec |
+
+`prototype.html` 默认展示当前边界。`?page=diagnostics&concept=diagnostics` 仅用于未来会话探索；
+`?page=automation` 解释退役旧链接，不显示任务控制。保存会话状态用 `diagnosticsState=loaded|partial|trace|failed`，
+Trace Viewer 用 `traceViewerState=loaded|loading|failed`。所有页面保持演示披露，不连接 Runtime/设备。
+视觉 token 与 §1/§2 未改变。
 
 ## 1. 现代 macOS 设计原则
 
@@ -81,6 +88,9 @@ Primary Window
 
 ### 4.1 全局 Job Inspector（AC-UX-001-01）
 
+**实现边界**：当前 `GlobalJobInspectorView` 只展示 `job.list` 事实，不含以下目标中的
+全局日志尾部、取消与拖动布局能力；普通原型只镜像当前只读入口。下列是尚需闭合的设计要求。
+
 - 折叠态 36pt：运行中数量、最高风险 Job 的 symbol/阶段/elapsed、indeterminate 或真实进度、展开按钮。
 - 展开态 220–320pt，可拖动：左侧 Job 列表，右侧阶段、当前 typed operation、目标 binding、预算、日志尾部 200 行和 Artifact 增量。
 - 取消按钮直接使用 `CancellationPolicy` 文案，如「在安全边界停止」；critical step 期间显示后续动作会停止，但当前写入不会被强杀。
@@ -88,6 +98,9 @@ Primary Window
 - 状态变更写入稳定的 accessibility live region；日志流本身不逐行播报。
 
 ### 4.2 Recovery 与 HumanActionRequired（REQ-UX-003）
+
+**实现边界**：当前全局 banner 只导航 History；下列 resume/archive/human resolution 不是
+App 现有动作。Runtime 已发布且准入的恢复能力与 App 缺失入口分开记录。
 
 - Recovery banner 位于 detail 顶部、页面内容之前，但不覆盖 toolbar；分为 resume-safe、waiting、outcomeUnknown、archivable。
 - `outcomeUnknown` 使用 system warning symbol + 明确文字，只有 RecoveryGuide 与显式归档；不渲染看似可继续的主按钮。
@@ -110,12 +123,13 @@ Primary Window
 
 ### 5.1 Overview（REQ-UX-002）
 
-- Toolbar：设备 scope、`⌘R` 刷新、必要时「选择 HDC…」。刷新中保留原快照并显示小型 progress，不让内容跳空。
-- 顶部 status strip：HDC server health、target ready、channel protection、需要处理数量。
-- 内容按四个 section 排列：Server & Toolchain；Selected Device & Binding；Capabilities；Needs Attention。path/hash 允许复制，长值用中间省略且可查看完整值。
-- 能力矩阵只显示生产探测的 `hidumper`、`hitrace`、`bytrace` 与 Catalog 发布状态 `RockUSB Flash`；不得硬编码设备、虚构 `flashd` 探测或把 probe failure 写成“不存在”。
-- Rockchip 访问诊断必须把 `permissionDenied`、`driverUnavailable` 与 offline / unauthorized 分开显示，并给出责任方、ArkDeck 外的最小修复步骤和可否重新探测；不得建议 App 自行 sudo、安装驱动或放宽全局权限。
-- recovery preview / exact-generation confirmation / dispatch 保持三步，不合并成一个“修复”按钮；host-wide 影响用 sheet 列出 affected devices / Jobs / other clients。
+- 阅读顺序：当前设备与已绑定 SSH source → 下一步 → 每条调试线最新运行（可展开此前三次）→ 默认折叠的环境与连接。结构依据 `OverviewRecordView` / `HDCStatusView`，不恢复旧四卡 dashboard。
+- target picker 只包含当前已授权、已接管且有 binding revision 的在线观察；设备行只是详情导航，不能暗中改变各工作区 scope。服务器来自 `RemoteBuildSourceBindingApplicationFacade` 的显式绑定，不取服务器列表第一项。
+- “查看这次运行”必须携带精确 Job ID 到 History 并选中它；不是打开任意最新记录。
+- “继续”sheet 展示来源 target/binding、effect、Catalog digest 与已上报参数。当前出口仅打开工作区，不预填/提交；缺失参数或 unknown destructive outcome 不提供貌似可执行的继续。
+- 环境 disclosure 保留 Server/Toolchain、Selected Device/Binding、Capabilities、Needs Attention，支持 ⌘⇧D 展开/折叠。path/hash 可查看完整值；unknown 与 unavailable、授权与通道加密分别呈现。
+- Rockchip 的 permissionDenied / driverUnavailable 区别于 offline/unauthorized；不自动 sudo、安装驱动或放宽权限。
+- HDC recovery 仍是 impact preview → exact-generation confirmation → dispatch；sheet 展示受影响设备/Jobs/其他客户端。原型无 proof 时禁用，不以确认文案代替 Runtime 证明。
 
 ### 5.2 设备接管与授权（REQ-HDC-007）
 
@@ -135,7 +149,8 @@ Primary Window
 - 宽屏使用左右双区：左侧「设备截图」；右侧参考 Chrome DevTools Elements 检查器纵向分为「UI 树」和「节点属性」。同一选中组件在截图中用 accent 边界框标记、在树中使用唯一选中行，并立即刷新下方属性。截图或树发起选择都必须更新另外两处。
 - 「显示组件边界」默认关闭；当前组件始终使用 2px accent 边界和 `#<componentId> <type>` 标签。打开开关后才显示其余节点的低对比度边界。重叠 bounds 命中最深的可见节点；父节点可从 breadcrumb 或树中选择，不用多个重叠透明热区争抢指针事件。
 - UI 树是完整节点序列，默认展开到当前节点并自动滚动使其可见；深层缩进不截断节点名，树区域同时支持横向与纵向滚动。搜索只改变树的呈现，不改变 capture 与选中 identity。树遵循 macOS outline keyboard pattern：上下移动，左键折叠或返回父节点，右键展开或进入首个子节点，Enter / Space 选择。
-- 下方节点属性区使用「属性 / 布局 / 无障碍 / Raw dump」分类。结构化字段只作为快速阅读；`Raw dump` 必须保留该节点的全部原始字段，不因 UI 未识别字段而丢失信息。
+- 下方节点属性区使用 `Properties / Layout / Accessibility / Raw dump / Advanced Dump` 五个分类；这些 Provider/调试技术词在两种 App 语言中均保留英文。结构化字段只作为快速阅读；`Raw dump` 必须保留该节点的全部原始字段，不因 UI 未识别字段而丢失信息。
+- `Advanced Dump` 已接入生产：选中标签时才读取当前 capture、target/binding 和组件数字 `hostWindowId/componentId` 所关联的 `componentDetail`，提供字段/值搜索、loading、缺失数字 ID、失败和重试。不得沿用上一组件字段，也不得把缺少 ID 当作成功的空结果。原型 `viewerTab=advanced` 的字段和各状态均为显式演示数据。
 - 选中后不强制移动键盘焦点；变化通过稳定的 polite status 播报。截图可点区域与树行都使用原生 button 语义和可见 `focusVisible`，不只依赖颜色表达选中。
 - UI 树默认获得右侧较多高度；树与属性之间使用可拖动的水平分隔条，键盘可用上下方向键微调、Home / End 跳到允许范围两端。调整只改变可视比例，不改变节点选择和滚动身份。
 - 窗口变窄时仍保持右侧「UI 树在上、节点属性在下」的关联结构；无法容纳左右双区时按「设备截图 → 右侧检查器」单列排列。任一宽度下当前节点、搜索、树的双向滚动和 raw 信息都不可被裁掉。
@@ -146,8 +161,9 @@ Primary Window
 
 - Trace 主窗口固定为一条 secondary summary 和两个顺序 section：「抓取 Trace」在上，「查看 Trace」在下；不使用双栏 card dashboard，也不在内容区重复页面标题。
 - 「抓取 Trace」header 右侧显示 `正在检查… / 可以抓取 / 暂时无法抓取`。表单只保留显式设备、抓取场景和时长；抓取场景是单一 picker，不再提供 Preset / Custom 模式或直接 tag 编辑。
-- 时长由十进制输入、秒/分钟 segmented unit 和快捷值组成：秒为 15 / 30 / 45 / 60，分钟为 1 / 2 / 3。Runtime request 始终规范化为秒；无效输入在原位显示范围错误。
-- section footer 左侧只呈现一个可行动状态：本地保存说明、正在抓取、terminal 结果、outcome unknown 或首个 blocker；右侧是「开始抓取」，有 active Job 时替换为 Job ID +「取消抓取」。完整进度、参数、计划和 Artifact 事实留在全局 Job Inspector / History，不重新塞回页面。
+- 时长由十进制输入、秒/分钟 segmented unit 和快捷值组成：秒为 5 / 10 / 15 / 30，分钟为 1 / 2 / 3。Runtime request 始终规范化为秒；切换到分钟向上取整，避免缩短已有时长。无效输入保留原值并在原位显示范围错误；Catalog 当前界限为 1–600 秒（1–10 分钟）。
+- section footer 左侧只呈现一个可行动状态：本地保存说明、正在抓取、terminal 结果、outcome unknown 或首个 blocker；右侧是「开始抓取」，有 active Job 时替换为 Job ID +「取消抓取」。完整参数、计划和 Artifact 事实留在 History（全局 Inspector 的读取/取消及恢复边界见 §4.1），不重新塞回页面。
+- 当前 App 在 blocked/invalid 时仍保留可点击的开始按钮，用于显示首个明确错误；`submit()` 的 `canStartCapture` 校验不通过时零提交。原型同样只反馈错误，不能切到假采集中；只有提交进行中禁用重复动作。不要把“可点击”误判为 Runtime 可执行。
 - 「查看 Trace」只显示本地/最近 Trace 说明和「打开 Trace 查看器」。最近一次抓取通过唯一 published raw `trace.htrace` 校验后可显示就绪文件名；校验失败提供同一入口的重试，不画 Artifact 列表 dashboard。
 - Trace Viewer 是 ArkDeck 的独立窗口，不替换主窗口 detail。Viewer toolbar 提供 Capture、Open、reload、search、zoom 和 Inspector；返回 Capture 聚焦/打开主窗口的 Trace 页面，不复制第二套设备控制面。
 - 自动进入 Viewer 之前必须从本次 terminal Job 精确选中唯一的 published raw `trace.htrace`，经 sensitive opt-in 的 Artifact API 分块读取，并同时匹配 byte count 与 lowercase SHA-256。任一校验失败不替换当前文档、不写 Recent、不启动 parser。
@@ -157,6 +173,14 @@ Primary Window
 - 所有 toolbar 动作在 Trace menu 有键盘等价入口，完整快捷键目录位于 Help 菜单。Timeline 焦点、选区、搜索结果与状态变化有稳定无障碍语义；不以颜色作为唯一信号，并尊重 Reduce Motion。
 
 ### 5.5 Diagnostics
+
+**当前 UI**：已经存在 `DiagnosticsWorkspaceView`，默认显示未打开 Session；布防和打标记禁用，
+显示 `diagnostic_session_capture_not_connected` 与缺失交互式采集接口的说明。
+保存会话的 reader 已接通：History 传递精确来源，重新查询并校验 index / summary / markers
+的身份、byteCount、SHA-256 与 completeness 后才 `publish(reading:)`。可查看 partial、无时间的
+Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace 可转交 Viewer。不会推算截图时刻，
+也不会只因存在 adopted target 就报告采集已开始。JPEG 与 PNG 可满足截图通道，但不豁免另行声明的 required 文件。
+**以下为未来目标**，仅 `concept=diagnostics` 可查看；不代表当前可用性或真实设备验收。
 
 - Diagnostics 位于 Device 之后，是独立 sidebar tab，包含「新建诊断」和「Diagnostic Session Viewer」两种状态。它不替换 Trace、不打开 ArkTrace 独立 App shell，也不读写 Trace 的 preset、时长、筛选、选择、Recent 与运行状态。详细行为见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md)。
 - 工作区名称固定为 **Diagnostics**：侧栏、窗口标题与页面标题在中英文中均保留英文，切换页面或语言时不得变成「诊断」。按钮、preset、状态和说明文案继续按各自的本地化规则显示；Settings 中用于应用诊断包的「诊断」仍是独立文案，不随工作区名称更改。
@@ -186,19 +210,21 @@ Primary Window
 
 ### 5.7 Debug 工作台
 
-- 五个 tab：Artifacts / Logs / Apps / Network / Commands，Artifacts 为默认项。Tab 使用 roving focus 与左右方向键、Home / End；切换只替换工作区内容，不把焦点强制移到内容区。
-- Artifacts 的固定阅读顺序为：显式 target / binding → 编译来源 → 编译根目录 → 搜索与结果 → 已选摘要 → 替换计划 → 替换结果 → 重启 → Logs。页面不把最近选中的 sidebar 设备暗中当成 target，也不让服务器配置同时承担设备 scope。
-- 编译来源固定为四种封闭 connector：SSH 远端服务器、本机目录、SMB 共享、WSL 发行版。用户可切换、添加、编辑、删除来源配置；每个来源可独立添加、编辑、删除多个编译根目录。根目录始终在所选 connector 的命名空间内解释，绝不是设备目标路径。
-- SSH 配置展示 host、1…65535 端口、用户名与「密码 / SSH 密钥」登录方式。密码、私钥安全书签和可选密钥口令进入 Keychain / 系统安全存储，列表、Job、日志和 Artifact evidence 只显示认证方式与凭据是否就绪，绝不回显 secret 或完整私钥路径。首次连接必须展示并固定 SSH host-key fingerprint；已固定指纹变化时 fail closed，不能静默接受新指纹。SSH connector 只允许 bounded browse/read/import，不提供 raw command、任意远端执行或终端。
-- 本机目录通过系统目录选择器建立安全书签；SMB 使用 `smb://server/share`、账户和 Keychain 密码；WSL 选择发行版，并使用发行版内 Linux 路径作为根目录。SMB / WSL 同样只经封闭文件 connector 读取，不把 mount、`wsl.exe` 或 shell fragment 暴露为 UI 输入。删除来源会移除 ArkDeck 配置、目录书签和 ArkDeck 保存的 Keychain credential item，但不会删除外部 SSH 私钥、服务器/共享/WSL 内文件或任何设备数据；只删除某个根目录则仅移除该书签。
-- 搜索只在当前服务器的当前根目录内运行，支持文件名 / 相对路径与 `.so` / `.abc` 类型筛选。结果表以 checkbox 多选，至少展示名称、类型、来源相对路径、size、mtime 与兼容性事实；不可识别、ABI 不一致、签名/Build ID 缺失、ABC 编译器/API 指纹不匹配的行显示原因并禁用选择，不能只用红色表达。
-- 「检查并预览替换」先展示 target / binding、来源、每项 host-side validation、effect、备份与发布策略。确认按钮使用完整动作名「备份并替换 N 个产物」，不用 `确定`。source path 只用于导入 Artifact lease；device path 必须由 published operation/profile materialize，App 不提交任意目标路径。
-- ABI / ELF class / machine / Build ID / code-sign / hash 或 ABC compatibility 的**预检**负责在首个设备写入前阻止不兼容产物；每个现有目标的 immutable **备份**负责原子发布、启动或 readback 失败后的 rollback。界面必须分别表达这两层，不能把「有备份」写成「ABI 一定兼容」，也不能在 backup 未确认时进入 publish。
-- 替换进入全局 Job Inspector，阶段至少区分 Preflight、Artifact lease、compatibility verification、staging、backup、atomic publish 与 readback。取消遵循实际 safe boundary；publish outcome unknown 时不重放，转入 Runtime recovery。只有全部选中项的 backup 与 publish readback confirmed，页面才显示「替换完成」。
-- 替换成功后在原位显示独立「重启目标…」操作，并同时提供「获取日志」。重启页必须明确重启的是 Ability、进程还是整台设备及其影响；整机重启走危险 sheet，展示精确 target / binding、将中断的会话和重连后验证。点击只是 UX acknowledgement，不是 Runtime authority；没有已发布 closed restart operation 或 fresh facts 时显示 unavailable，不能用 raw HDC reboot 兜底。
-- 重启完成后主操作变为「获取日志并验证」，切到保留的 Logs 工作区。Logs 继续提供 bounded live viewport、等级/tag/filter、host shard 状态；「暂停界面」不停止 host capture。「清空设备 buffer」位于 destructive actions menu，走危险 sheet。日志是 Debug 反馈 Artifact，与替换输入分开保存，不因切 tab 丢失采集状态。
-- Apps：HAP import、install/start/stop/uninstall；mutation 与 read-only action 分组，package/PID 使用 tabular numbers。Network：`port-forward.create@1` / `port-forward.remove@1` 产生真实 Runtime Job，端口只接受 1024…65535 的十进制字段；失败后以 exact inverse + readback 补偿，不接受 shell fragment。Commands：只能选择 daemon 实现的 closed read-only template，显示 Provider lowering 的只读 disclosure，没有任意文本命令输入或 PTY。
-- Production availability 必须如实：当前 Catalog 只覆盖单个 app-owned `.so` 的 `deploy.native-library.app-owned@1`，且 restartAbility 位于同一 typed plan 内；批量来源浏览、`.abc` deployment 与独立 device restart 仍是 v0.9 设计输入。它们只有在对应 behavior delta、Catalog operation、Provider lowering 与 recovery/readback 全部发布后才能从 unavailable 变为可操作。原型可演示目标交互，但必须持续标明其不代表生产可用性。
+本节描述 2026-08-27 的当前实现。生产可用性必须读取 exact target/binding 的 Runtime facts；原型中的 demo 状态不能替代它们。更完整的来源管理、批量替换和独立重启仍是设计输入，见本节末尾，不能画成已发布能力。
+
+- 五个 tab：Artifacts / Logs / Apps / Network / Commands，Artifacts 为默认项。使用 roving focus、左右方向键及 Home / End，切换不强制焦点进入内容区。设备 scope 显式显示 target / binding；来源连接成功不代表设备已接管。
+- **Artifacts** 当前只接单个 signed app-owned `.so` 的 `deploy.native-library.app-owned@1`。来源为本地文件选择器，或已在 Settings → Servers 验证的 SSH 来源；SSH browser 只在登记 root 下 browse/read/import，允许返回上级但不能越 root。没有四 connector 管理器、checkbox 批量选择或 `.abc` 筛选。
+- 阅读顺序为 target/binding → 来源及单文件 → bundle/library 标识 → host validation → 预览计划 → Runtime 结果。改变 target/binding/来源/标识须使旧 preparation 失效；不能拿上一目标的成功反馈继续提交。
+- 本地文件和 SSH relative path 只用于导入 Artifact lease。设备目标路径由 published operation/profile materialize，App 不允许任意 device path、raw command、SSH 命令或 PTY。SSH 密码/私钥/口令仅进入 Keychain；首次 host-key 固定与指纹漂移拒绝由来源配置负责。
+- 计划 sheet 展示精确 target/binding、bundle、逻辑库名、hash、ABI/ELF/Build ID/code-sign、effect、备份/原子发布/readback/rollback。兼容性预检与不可变备份是两层不同保护；不能用“有备份”代替兼容性证明。无 preparation 或校验失败时不得启用提交。
+- `restartAbility` 已位于同一 typed plan 内，不再画“替换完成后点击独立整机重启”的当前流程。只有 Runtime 的完整 terminal/postflight 支持时才显示成功；unknown 不重放。页面和全局 Inspector 显示真实 Job facts，全局 Inspector 本身仍只读。
+- **Logs** 是 `capture.diagnostics@1` 的 bounded capture：1–600 秒，Info/Warn/Error、domain/tag/PID/keyword/marker 的 typed filters，raw shard 必保留。开始前验证 target/availability/输入；采集中显示 Job 和 typed cancel。暂停只暂停 viewport，切 tab 不取消 Job；host shard/预算/导出与设备 buffer 分开表达。清空本地视口不等于清空设备日志；设备 buffer operation 尚未发布，入口禁用并说明原因，不能画可提交的危险确认。
+- **Apps** 已接 `debug.hap@1`：单 HAP 导入、bundle/Ability 校验；安装策略固定 installOrReplace，清理仅 uninstall/retain，结束状态 stopped/running，可选 diagnostics（1–300 秒）。全新安装与恢复之前版本未发布，不提供选项。typed request 默认折叠，完整计划按 Catalog 的 14 个步骤显示；可用性、文件和身份输入共同决定运行按钮。真实 submit/cancel、terminal 和 Artifact 已接线，原型仅预览参数，不创建演示 Job 冒充执行。
+- 包库存的独立启动/停止/卸载与整套 HAP workflow 是不同入口；前者未有对应独立闭集 operation，仍禁用并说明原因，不能把 HAP workflow 的发布当作包行操作授权。
+- **Network** 使用 `port-forward.create@1` / `port-forward.remove@1`，支持 forward/reverse，端口只接受 1024…65535 的十进制字段。真实 Runtime Job 与 exact inverse/readback 补偿可见，不接受 shell fragment。
+- **Commands** 只允许 daemon 已实现的 closed read-only template；lowered argv 是只读 disclosure，结果保留 Artifact 来源与失败原因。Root、任意终端等不提供执行入口。
+
+**尚未实现的设计输入**：SMB/WSL connector、多 root/批量来源搜索与多选、`.abc` deployment、独立 device restart、设备日志 buffer 清除。保留相应需求与安全边界；只有对应 behavior/Catalog/Provider/recovery/readback 发布后才进入当前可操作稿。当前原型不画这些功能的虚假成功态，也不以删规格来消除实现缺口。
 
 ### 5.8 Flash
 
@@ -222,28 +248,31 @@ Primary Window
 ### 5.9 History（REQ-UX-004）
 
 - History 是只读 Runtime 活动中心，不是第二套 Job 执行面。摘要只来自 `job.list`；选中记录后才按需加载详情与 Artifact metadata，不用 fixture 或本地推断补齐缺失事实。
-- 宽屏三栏为活动类型导航 → 最近记录 → detail inspector。活动类型按 published operation 归入 Flash、Debug、Viewer、Trace 与 Diagnostics；未识别 operation 保留在「全部记录」，不得错误映射到相似工具。窄窗把完整筛选移到记录上方，并保留记录与详情的关联。
+- 宽屏三栏为活动类型导航 → 最近记录 → detail inspector。活动类型按 published operation 归入 Flash、Debug、Viewer、Trace、Diagnostics 与 Device；未识别 operation 保留在「其他」和「全部记录」，不得错误映射到相似工具。窄窗把完整筛选移到记录上方，并保留记录与详情的关联。
 - 支持全文搜索、status、executionMode、session、device/target 与 time 筛选；筛选可保存到 toolbar menu。「需要关注」与「最近失败」是筛选预设，不改变 Runtime state。
 - interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。plan-only / simulated badge 在记录、详情与导出中永久保留。
 - 对已知活动类型提供「在 Flash / Debug / Viewer / Trace / Diagnostics 中打开」，只导航并恢复可由已验证记录支持的上下文；它不重放 operation、不把历史 Artifact 当成 fresh device fact，也不绕过目标工作区的 Runtime 准入。
+- `capture.diagnostics@1` 即使归类为 Viewer / Trace，也另提供「打开诊断工具」来读取同一 Job 的多通道制品。原分类不变；Diagnostics → Trace 的只读转交继续显示 exact Job 来源，不创建或重放 Job。
 - Detail 分组为 Summary / Timeline / Correlation / Evidence / Parameters / Artifacts / Recovery linkage。Artifact 行展示 name / role / origin / size / SHA-256 / privacy / status；关联视图只表达同一 Runtime 投影中已证明的 Job、Session、operation、target 与 Artifact identity。
 - 导出以单个 Artifact 为边界：先显示文件名、size、privacy 与 SHA-256；敏感 Artifact 要求显式确认。App 以有界 chunk 读取、复算 byteCount / SHA-256 后写入用户选择的位置，目标路径不跨 daemon 边界。成功后可在 Finder 定位。
 
 ### 5.10 Settings
 
-- 使用系统 Settings scene，分为 General / Toolchains / Storage / Updates / Diagnostics。
+- 使用独立系统 Settings scene，七个标签为 General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics。Trace 内分 Cache / Licenses；按需读取避免首窗被 I/O 阻塞。
 - Toolchain 切换明确「只影响新 Job」；Storage 展示 root、quota、retention、pinned 与当前使用量；Updates 复用已实现的 signed update flow。
-- 诊断包默认不含 device raw，可预览勾选且无自动上传（AC-DIAG-002-01）。
+- Servers 支持 SSH password / key，test connection 产生 fingerprint 和 canonical root，保存验证事实；漂移 fail closed。移除来源不删除服务器文件。
+- Storage 可设置新 Job root、quota、safety margin、retention；使用量来自 inventory，不用示例数字补 unknown。
+- Trace Cache 只清理未使用的 derived database，不删除原始 Trace；Licenses 展示随包许可证与第三方 notice。
+- Updates 只检查已签名 feed、下载并校验，再显式 Finder handoff，不静默安装。
+- App 诊断包目前始终排除 device raw；先选择目的地、预览 entry/hash/估算大小，再显式本地导出（AC-DIAG-002-01）。单个敏感 device Artifact 的导出入口在 History，不在 App 诊断包增加无效勾选。
 
-### 5.11 Automation / Bounded AI Debug Loop
+### 5.11 Automation（退役历史，不作为实现待办）
 
-Automation 是现有 Harness task plane 的生产监控与有限生命周期控制面，不是 Git `TASK-*` 看板，也不带 Preview badge。
-
-- 两栏 split view：左栏列出既有 `HTASK-*`；右栏展示 goal、type、lifecycle、stage、target、round、version、updated、active Job、wait reason 与 Runtime 返回的 allowed operations。
-- App 只开放 `task.list`、`task.reconcile`、`task.pause`、`task.cancel`；不能 submit 新 task、提供 human resolution、resume、propose patch、导出 promotion、GC workspace 或管理 capability。
-- reconcile / pause / cancel 的响应必须返回同一个 HTASK 的完整新快照；task ID 漂移或字段不完整即失败，不局部拼接事实。
-- allowed operations 只读展示。页面不得出现 raw command、argv、远端路径、预算编辑器、源码 patch 输入或权限安装入口。
-- Attempt、budgets、conditions 与 HumanActionRequired 只有在 Runtime wire 完整投影后才能新增；v0.4 不用模拟数据补这些区域。
+CHG-2026-064 已移除内置 Harness、daemon `task.*`、CLI `task` 命令族和 App Automation
+投影；`ArchitectureBoundaryContractTests` 禁止重新引入这个决策平面。
+旧 Automation 设计和相关 StatusStrip/StageTrack/BudgetMeters 示例仅保留为历史组件资料。
+当前 App 不显示导航或 task 控制；原型旧 URL 显示退役说明，不模拟 running HTASK。
+GJ-5 由外部 Agent 调用已发布的 `agent` / `job` / `artifact` 等面推进，不因此新增 App task 宿主。
 
 ## 6. 可访问性、本地化与动效
 

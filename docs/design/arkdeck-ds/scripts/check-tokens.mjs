@@ -33,7 +33,8 @@ function srcFiles(dir) {
 // `:root` palette are byte-identical to v1.3; the four new top-level History
 // layout classes are classified below.
 // v1.5 changes Device layout/behavior; spec §1 and §2 retain the same tokens.
-const ALIGNED_VERSION = "v1.5";
+// v1.6 re-read: §1/§2 and palette unchanged; current/future surfaces separated.
+const ALIGNED_VERSION = "v1.6";
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const designDir = join(pkgRoot, "..");
@@ -331,10 +332,42 @@ for (const name of dsLight.keys()) {
     "viewer-group-title": "DumpInspector",
     "viewer-inspector-body": "DumpInspector", "viewer-kv": "DumpInspector",
     "viewer-disclosure": "DumpInspector", "viewer-raw": "DumpInspector",
+    "gsec": "SectionGroup",
+    "diag-align": "DiagnosticAlignmentDisclosure",
+    "diag-log-row": "DiagnosticLogRow",
+    "diag-timeline": "DiagnosticTimeline",
+    "diag-track": "DiagnosticTrack",
+    "diag-scrubber": "DiagnosticTimeCursor",
+    "diag-thumb": "DiagnosticScreenThumbnail",
+    "diag-event": "DiagnosticTraceEvent",
+    "diag-log-dot": "DiagnosticLogMarker",
+    "diag-marker": "DiagnosticMarker",
+    "diag-shot": "DiagnosticScreenshotPoint",
+    "diag-track-flat": "DiagnosticUnalignedTrackNotice",
+    "diag-partial": "PartialSessionBanner",
+    "diag-boundary": "ProductionBoundaryCallout",
+    "diag-preset": "DiagnosticPresetPicker",
+    "diag-channel": "DiagnosticChannelStatus",
+    "device-empty": "DeviceScreenshotEmptyState",
+    "device-record-stepper": "DeviceFrameCountStepper",
+    "device-screen": "DeviceControlSurface",
+    "device-touch-feedback": "DeviceTouchFeedback",
+    "device-stale-overlay": "DeviceStaleInputGuard",
+    "device-log-row": "DeviceControlEventRow",
+    "performance-note": "PerformanceImpactNotice",
+    "device-workspace-boundary": "ProductionBoundaryCallout",
+    "device-recording-result": "RecordingArtifactResult",
   };
 
   /** Never becomes a component. */
   const SCAFFOLDING = {
+    "prototype-disclosure": "persistent design-only demo disclosure",
+    "overview-record": "Overview record layout",
+    "overview-scope": "Overview target and build-source layout",
+    "overview-run": "Overview recent-run row layout",
+    "settings-workspace": "native Settings scene approximation",
+    "settings-tabs": "Settings scene navigation layout",
+    "history-filter-row": "history filter layout",
     // vs-* 画的是被抓取的那台设备自己的界面（占位截图），不是 ArkDeck 的界面。
     // 生产 Viewer 这里放的是 screenshot.png，所以它们永远不会变成 DS 组件。
     "vs-card": "device-screenshot stand-in", "vs-nav": "device-screenshot stand-in",
@@ -382,6 +415,7 @@ for (const name of dsLight.keys()) {
     "debug-field": "form-field layout around existing native controls",
     "debug-cols": "Debug two-column body layout",
     "debug-stack": "Debug column stack layout",
+    "debug-packages": "compact optional-package layout around existing file rows and buttons",
     "debug-selection": "Debug selection summary and action row",
     "debug-result": "Debug deployment/restart result layout",
     "debug-disclose": "native disclosure for the typed request preview",
@@ -468,6 +502,23 @@ for (const name of dsLight.keys()) {
     "trace-quick": "Trace quick-duration layout",
     "trace-section-foot": "Trace capture footer layout",
     "trace-viewer-entry": "Trace viewer-entry layout",
+    "inspector-split": "Global inspector list/detail composition",
+    "inspector-list": "Global inspector selection rail",
+    "inspector-detail": "Global inspector selected-record layout",
+    "tv-layout": "ArkTrace-owned window illustration: sidebar and content composition",
+    "tv-sidebar": "ArkTrace-owned window illustration: recent and process rail",
+    "tv-reading": "ArkTrace-owned window illustration: canvas and dock arrangement",
+    "tv-canvas": "Synthetic illustration of the upstream ArkTrace canvas; not an ArkDeck renderer",
+    "tv-inspector": "ArkTrace event/range inspector page layout",
+    "tv-metadata": "Trace document metadata line layout",
+    "tv-overview": "Synthetic sample of ArkTrace's upstream overview renderer",
+    "tv-track": "Synthetic sample of an upstream ArkTrace rendered track",
+    "tv-track-label": "Upstream trace lane label illustration",
+    "tv-track-body": "Upstream trace lane geometry illustration",
+    "tv-ruler": "Upstream trace time ruler illustration",
+    "tv-slice": "Synthetic event rectangles; actual rendering belongs to ArkTrace",
+    "tv-range": "Synthetic range overlay; actual selection belongs to ArkTrace",
+    "tv-hit": "Trace recent/search result page layout",
     "history-shell": "History activity-center page layout",
     "history-rail": "History activity-type navigation layout",
     "history-list": "History activity-record list layout",
@@ -479,35 +530,10 @@ for (const name of dsLight.keys()) {
   };
 
   /** Should be a component; isn't yet. Reported on every run, never silent.
-   *  Empty today — every surface the prototype draws has a component. Put the
+   *  Empty today — declared ArkDeck shared surfaces have components; page
+   *  composition and the upstream ArkTrace renderer are classified above. Put the
    *  next one here rather than leaving it unclassified, so it stays visible. */
-  const KNOWN_GAPS = {
-    "gsec": "SectionGroup",
-    "diag-align": "DiagnosticAlignmentDisclosure",
-    "diag-log-row": "DiagnosticLogRow",
-    "diag-timeline": "DiagnosticTimeline",
-    "diag-track": "DiagnosticTrack",
-    "diag-scrubber": "DiagnosticTimeCursor",
-    "diag-thumb": "DiagnosticScreenThumbnail",
-    "diag-event": "DiagnosticTraceEvent",
-    "diag-log-dot": "DiagnosticLogMarker",
-    "diag-marker": "DiagnosticMarker",
-    "diag-shot": "DiagnosticScreenshotPoint",
-    "diag-track-flat": "DiagnosticUnalignedTrackNotice",
-    "diag-partial": "PartialSessionBanner",
-    "diag-boundary": "ProductionBoundaryCallout",
-    "diag-preset": "DiagnosticPresetPicker",
-    "diag-channel": "DiagnosticChannelStatus",
-    "device-empty": "DeviceScreenshotEmptyState",
-    "device-record-stepper": "DeviceFrameCountStepper",
-    "device-screen": "DeviceControlSurface",
-    "device-touch-feedback": "DeviceTouchFeedback",
-    "device-stale-overlay": "DeviceStaleInputGuard",
-    "device-log-row": "DeviceControlEventRow",
-    "performance-note": "PerformanceImpactNotice",
-    "device-workspace-boundary": "ProductionBoundaryCallout",
-    "device-recording-result": "RecordingArtifactResult",
-  };
+  const KNOWN_GAPS = {};
 
   // Read what the package *exports*, not what some previous build emitted.
   // Anchoring this to the converter's output deadlocks the one workflow the

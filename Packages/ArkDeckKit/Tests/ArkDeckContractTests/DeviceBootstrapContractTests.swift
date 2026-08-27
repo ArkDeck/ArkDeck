@@ -101,6 +101,174 @@ final class DeviceBootstrapContractTests: XCTestCase {
     }
   }
 
+  private final class PresentationTimestamp: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = "2026-08-28T00:00:00Z"
+    func read() -> String { lock.withLock { value } }
+    func advance() { lock.withLock { value = "2026-08-28T00:00:01Z" } }
+  }
+
+  private actor InformationObservation: BootstrapObservationPort {
+    let candidate = BootstrapCandidate(connectKey: "display-only-route", state: "Connected")
+    private var candidateState = "Connected"
+    private var name = "First name"
+    private var delay: Duration = .zero
+    private var failsInformation = false
+    private var failsCandidates = false
+    private(set) var informationReads = 0
+
+    func configure(
+      name: String = "Updated name", delay: Duration = .zero,
+      state: String = "Connected", failsInformation: Bool = false,
+      failsCandidates: Bool = false
+    ) {
+      self.name = name
+      self.delay = delay
+      candidateState = state
+      self.failsInformation = failsInformation
+      self.failsCandidates = failsCandidates
+    }
+
+    func observeToolVersion() async throws -> String { "3.2.0f" }
+    func listCandidates() async throws -> [BootstrapCandidate] {
+      if failsCandidates { throw BootstrapError.observationFailed("candidate probe failed") }
+      return [BootstrapCandidate(connectKey: candidate.connectKey, state: candidateState)]
+    }
+    func observeDeviceInformation(connectKey: String) async throws -> BootstrapDeviceInformation? {
+      informationReads += 1
+      let value = name
+      let shouldFail = failsInformation
+      try await Task.sleep(for: delay)
+      if shouldFail { throw BootstrapError.observationFailed("property probe failed") }
+      return BootstrapDeviceInformation(name: value, systemVersion: "Observed version", transport: "USB")
+    }
+    func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
+      XCTFail("display information must never ask the adoption identity path")
+      return [:]
+    }
+  }
+
+  private func informationMachine(
+    observation: InformationObservation, timestamp: PresentationTimestamp = PresentationTimestamp()
+  ) throws -> (DeviceBootstrapMachine, RuntimeTargetStore) {
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    return (
+      DeviceBootstrapMachine(
+        observation: observation, targetStore: store, nowUTC: { timestamp.read() }), store
+    )
+  }
+
+  private func waitForInformationRead(
+    _ observation: InformationObservation, after count: Int
+  ) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(2))
+    while await observation.informationReads <= count {
+      guard clock.now < deadline else {
+        XCTFail("the requested information refresh did not start")
+        return
+      }
+      try await Task.sleep(for: .milliseconds(1))
+    }
+  }
+
+  func testWarmDeviceInformationDoesNotJoinAPropertyRefreshOrRestampItsTime() async throws {
+    let observation = InformationObservation()
+    let timestamp = PresentationTimestamp()
+    let (machine, store) = try informationMachine(observation: observation, timestamp: timestamp)
+    await machine.startCandidateMonitoring(interval: .seconds(30))
+    try await waitForInformationRead(observation, after: 0)
+    let candidates = try await machine.candidateSnapshotForPresentation().candidates
+    let initial = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    let reads = await observation.informationReads
+    XCTAssertEqual(reads, 1, "the monitor must warm decoration before the first App request")
+    timestamp.advance()
+    await observation.configure(delay: .milliseconds(250))
+    let refresh = Task { await machine.deviceInformationSnapshotForPresentation(candidates: candidates) }
+    try await waitForInformationRead(observation, after: reads)
+
+    let clock = ContinuousClock()
+    let start = clock.now
+    let warm = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertLessThan(start.duration(to: clock.now), .milliseconds(50))
+    XCTAssertEqual(warm, initial, "a new candidate timestamp cannot restamp cached property facts")
+    let refreshed = await refresh.value
+    XCTAssertEqual(refreshed.information[candidates[0].connectKey]?.name, "Updated name")
+    XCTAssertNotEqual(refreshed.observedAtUTC, initial.observedAtUTC)
+    XCTAssertTrue(try store.list().isEmpty)
+  }
+
+  func testExpiredDeviceInformationWaitsForTheNewRead() async throws {
+    let observation = InformationObservation()
+    let (machine, _) = try informationMachine(observation: observation)
+    let candidates = try await machine.refreshCandidateSnapshotForPresentation().candidates
+    _ = await machine.deviceInformationSnapshotForPresentation(candidates: candidates)
+    try await Task.sleep(for: .milliseconds(5_050))
+    await observation.configure(delay: .milliseconds(50))
+    _ = try await machine.refreshCandidateSnapshotForPresentation()
+    let refreshed = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertEqual(refreshed.information[candidates[0].connectKey]?.name, "Updated name")
+  }
+
+  func testOfflineTransitionInvalidatesInFlightInformationBeforeReconnect() async throws {
+    let observation = InformationObservation()
+    let (machine, store) = try informationMachine(observation: observation)
+    let candidates = try await machine.refreshCandidateSnapshotForPresentation().candidates
+    _ = await machine.deviceInformationSnapshotForPresentation(candidates: candidates)
+    let reads = await observation.informationReads
+    await observation.configure(name: "Must not survive disconnect", delay: .milliseconds(250))
+    let refresh = Task { await machine.deviceInformationSnapshotForPresentation(candidates: candidates) }
+    try await waitForInformationRead(observation, after: reads)
+    await observation.configure(state: "Offline")
+    _ = try await machine.refreshCandidateSnapshotForPresentation()
+    let offline = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertTrue(offline.information.isEmpty)
+    let invalidated = await refresh.value
+    XCTAssertTrue(invalidated.information.isEmpty)
+
+    await observation.configure(state: "Unauthorized")
+    let beforeUnauthorized = await observation.informationReads
+    _ = try await machine.refreshCandidateSnapshotForPresentation()
+    let unauthorized = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertTrue(unauthorized.information.isEmpty)
+    let afterUnauthorized = await observation.informationReads
+    XCTAssertEqual(afterUnauthorized, beforeUnauthorized)
+
+    await observation.configure(name: "Reconnected")
+    _ = try await machine.refreshCandidateSnapshotForPresentation()
+    let connected = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertEqual(connected.information[candidates[0].connectKey]?.name, "Reconnected")
+    XCTAssertTrue(try store.list().isEmpty)
+  }
+
+  func testFailedPropertyAndCandidateReadsDoNotResurrectOldInformation() async throws {
+    let observation = InformationObservation()
+    let (machine, _) = try informationMachine(observation: observation)
+    let candidates = try await machine.refreshCandidateSnapshotForPresentation().candidates
+    _ = await machine.deviceInformationSnapshotForPresentation(candidates: candidates)
+    await observation.configure(failsInformation: true)
+    let failedProperties = await machine.deviceInformationSnapshotForPresentation(candidates: candidates)
+    XCTAssertTrue(failedProperties.information.isEmpty)
+    let warm = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertTrue(warm.information.isEmpty)
+
+    await observation.configure(failsCandidates: true)
+    do {
+      _ = try await machine.refreshCandidateSnapshotForPresentation()
+      XCTFail("candidate failure was hidden")
+    } catch BootstrapError.observationFailed(_) { }
+    let unavailable = await machine.deviceInformationSnapshotForPresentation(
+      candidates: candidates, useWarmSnapshot: true)
+    XCTAssertTrue(unavailable.information.isEmpty)
+  }
+
   private func makeMachine(
     _ observation: ScriptedObservation
   ) throws -> (DeviceBootstrapMachine, RuntimeTargetStore) {

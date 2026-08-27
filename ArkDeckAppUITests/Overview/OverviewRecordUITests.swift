@@ -63,6 +63,58 @@ final class OverviewRecordUITests: XCTestCase {
       "the archive link must land on History")
   }
 
+  func testViewingARunSelectsThatExactHistoryRecord() {
+    let app = launch()
+    let open = element(app, "overview.record.run.job-fixture-0001.open")
+    XCTAssertTrue(open.waitForExistenceFast(timeout: 30))
+    clickRecentRunAction(open, in: app)
+    let job = element(app, "history.detail.job")
+    XCTAssertTrue(job.waitForExistenceFast(timeout: 15))
+    XCTAssertTrue([job.label, job.value as? String].contains("job-fixture-0001"))
+  }
+
+  func testContinueSeparatesNavigationFromSafeDraftPreparation() {
+    let app = launch()
+    let again = element(app, "overview.record.run.job-fixture-0001.again")
+    XCTAssertTrue(again.waitForExistenceFast(timeout: 30))
+    clickRecentRunAction(again, in: app)
+    let explanation = element(app, "overview.resume.explanation")
+    XCTAssertTrue(explanation.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(
+      [explanation.label, explanation.value as? String].compactMap { $0 }
+        .contains { $0.contains("Preparing never submits") })
+    XCTAssertFalse(element(app, "overview.resume.prepare").isEnabled)
+    XCTAssertTrue(element(app, "overview.resume.prepare.reason").exists)
+    XCTAssertEqual(element(app, "overview.resume.open").label, "Open Workspace")
+    element(app, "overview.resume.cancel").click()
+  }
+
+  func testReadOnlyContinuationShowsTypedInputsAndThreadBeforeAnySubmission() {
+    let app = launch(arguments: ["--ui-test-diagnostics-session"], offlineTarget: false)
+    let again = element(app, "overview.record.run.job-fixture-diagnostics.again")
+    XCTAssertTrue(again.waitForExistenceFast(timeout: 30))
+    clickRecentRunAction(again, in: app)
+    let prepare = element(app, "overview.resume.prepare")
+    XCTAssertTrue(prepare.waitForExistenceFast(timeout: 10))
+    let enabled = NSPredicate(format: "enabled == true")
+    XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: enabled, object: prepare)], timeout: 10), .completed)
+    prepare.click()
+    let inputs = element(app, "overview.continuation.inputs")
+    XCTAssertTrue(inputs.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(displayedText(inputs).contains("durationSeconds"))
+    XCTAssertTrue(displayedText(inputs).contains("false"), "typed booleans must not become display strings")
+    XCTAssertEqual(displayedText(element(app, "overview.continuation.thread")), "t-diagnostics-fixture")
+    XCTAssertFalse(element(app, "overview.continuation.openJob").exists, "preparing must not create a Job")
+    let submit = element(app, "overview.continuation.submit")
+    XCTAssertTrue(submit.isEnabled)
+    submit.click()
+    let result = element(app, "overview.continuation.result")
+    XCTAssertTrue(result.waitForExistenceFast(timeout: 10))
+    XCTAssertEqual(displayedText(result), "fixture_continuation_not_dispatched")
+    XCTAssertFalse(submit.isEnabled, "an unconfirmed request must not be repeated implicitly")
+    XCTAssertFalse(element(app, "overview.continuation.openJob").exists)
+  }
+
   // MARK: - Support
 
   /// Identifiers are asserted across element types: SwiftUI decides whether a
@@ -72,16 +124,41 @@ final class OverviewRecordUITests: XCTestCase {
     app.descendants(matching: .any)[identifier].firstMatch
   }
 
-  private func launch() -> XCUIApplication {
+  private func displayedText(_ element: XCUIElement) -> String {
+    if let value = element.value as? String, !value.isEmpty { return value }
+    return element.label
+  }
+
+  /// Recent runs may be below the visible fold when the recovery banner is
+  /// present. Scroll their actual content view before clicking; translating a
+  /// NavigationSplitView AX offset alone can still click below the window.
+  private func clickRecentRunAction(_ action: XCUIElement, in app: XCUIApplication) {
+    let content = app.scrollViews.containing(.any, identifier: action.identifier).firstMatch
+    guard content.waitForExistenceFast(timeout: 5) else {
+      XCTFail("the recent run must belong to the Overview scroll view")
+      return
+    }
+    for _ in 0..<6 {
+      if content.frame.insetBy(dx: 4, dy: 12).contains(action.frame) {
+        action.click()
+        return
+      }
+      content.scroll(byDeltaX: 0, deltaY: action.frame.midY > content.frame.midY ? -260 : 260)
+    }
+    XCTFail("the recent run action did not enter the visible Overview")
+  }
+
+  private func launch(arguments: [String] = [], offlineTarget: Bool = true) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning { app.terminate() }
     app.launchArguments = [
       "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
       "--ui-test-hdc-diagnostics", "--ui-test-devices", "--ui-test-auto-update-idle",
       "--ui-test-runtime-history",
-      "--ui-test-overview-offline-target",
       "--ui-test-reset-shell-selection",
-    ]
+      "-AppleLanguages", "(en)",
+    ] + arguments
+    if offlineTarget { app.launchArguments.append("--ui-test-overview-offline-target") }
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
     app.launch()

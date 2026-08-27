@@ -8,9 +8,9 @@ import SwiftUI
 /// run recorded, which of those facts still hold, and — when the run did not
 /// report its typed inputs — refuses instead of filling the gap with defaults.
 ///
-/// Its primary action opens the workspace. Runtime's history surface is
-/// read-only by construction, and submitting stays where the operator can see
-/// the whole request: ArkDeck does not submit on their behalf from here.
+/// It may open the source workspace or prepare a closed read-only request
+/// draft. Neither action submits; submitting stays in the destination where
+/// the operator can inspect the new request and its target again.
 struct OverviewResumeSheet: View {
   let run: RuntimeJobSummaryPresentation
   let detail: RuntimeJobDetailPresentation?
@@ -18,9 +18,18 @@ struct OverviewResumeSheet: View {
   let currentTargetID: String?
   let currentBindingRevision: Int?
   let onOpenWorkspace: () -> Void
+  let onPrepare: (RuntimeWorkspaceContinuation) -> Void
   let onCancel: () -> Void
 
   private var evidence: RuntimeJobEvidencePresentation? { detail?.evidence }
+
+  private var preparation: Result<RuntimeWorkspaceContinuation, RuntimeContinuationFailure> {
+    RuntimeWorkspaceContinuation.prepare(
+      job: run, detail: detail, currentTargetID: currentTargetID,
+      currentBindingRevision: currentBindingRevision)
+  }
+
+  private var prepared: RuntimeWorkspaceContinuation? { try? preparation.get() }
 
   private var disposition: OverviewRunResumeDisposition {
     OverviewRunRecordProjection.resumeDisposition(
@@ -42,10 +51,17 @@ struct OverviewResumeSheet: View {
         .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("overview.resume.explanation")
 
       checks
       driftNotice
       parameters
+      if case .failure(let failure) = preparation, !isLoadingDetail {
+        Text(String(localized: "overview.resume.prepare.unavailable") + " · " + failure.reason)
+          .font(WorkspaceFont.caption).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("overview.resume.prepare.reason")
+      }
 
       HStack(spacing: WorkspaceMetrics.contentGap) {
         Spacer(minLength: 0)
@@ -53,13 +69,19 @@ struct OverviewResumeSheet: View {
           .keyboardShortcut(.cancelAction)
           .accessibilityIdentifier("overview.resume.cancel")
         Button("overview.resume.open", action: onOpenWorkspace)
-          .keyboardShortcut(.defaultAction)
           .disabled(!disposition.isResumable)
           .accessibilityIdentifier("overview.resume.open")
+        Button("overview.resume.prepare") {
+          if let prepared { onPrepare(prepared) }
+        }
+        .keyboardShortcut(.defaultAction)
+        .disabled(prepared == nil)
+        .accessibilityIdentifier("overview.resume.prepare")
       }
     }
     .padding(WorkspaceMetrics.cardPaddingHorizontal + 6)
     .frame(width: 560)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("overview.resume")
   }
 
@@ -169,6 +191,97 @@ struct OverviewResumeSheet: View {
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
+    }
+  }
+}
+
+/// The copied request is visible in its workspace before the user submits.
+/// This is distinct from opening historical artifacts, and never imports a
+/// past authorization, artifact lease or Runtime session identity.
+struct WorkspaceContinuationCard: View {
+  let draft: RuntimeWorkspaceContinuation
+  let currentTargetID: String?
+  let currentBindingRevision: Int?
+  let onOpenJob: (String) -> Void
+  let onClose: () -> Void
+  @State private var attempted = false
+  @State private var isSubmitting = false
+  @State private var jobID: String?
+  @State private var result: String?
+  @State private var inputsExpanded = true
+  @State private var provider = RuntimeContinuationApplicationFacade.make()
+
+  private var targetMatches: Bool {
+    currentTargetID == draft.sourceJob.targetID && currentBindingRevision == draft.bindingRevision
+  }
+  private var encodedInputs: String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    guard let bytes = try? encoder.encode(draft.inputs) else { return "—" }
+    return String(decoding: bytes, as: UTF8.self)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("overview.continuation.title").font(WorkspaceFont.label)
+        Text(draft.sourceJob.id).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+        Spacer()
+        Button("overview.continuation.close", action: onClose)
+          .accessibilityIdentifier("overview.continuation.close")
+      }
+      Text(LocalizedStringKey(attempted ? "overview.continuation.statusNote" : "overview.continuation.explanation"))
+        .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+      DisclosureGroup(draft.sourceJob.operationReference + " · " + draft.sourceJob.targetID, isExpanded: $inputsExpanded) {
+        ScrollView {
+          Text(encodedInputs).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("overview.continuation.inputs")
+        }.frame(maxHeight: 140)
+        Text(draft.sourceJob.threadID ?? String(localized: "overview.record.thread.ungrouped"))
+          .font(WorkspaceFont.monospacedDense)
+          .accessibilityIdentifier("overview.continuation.thread")
+      }
+      if !targetMatches {
+        Text("overview.resume.drift.target").font(WorkspaceFont.secondary).foregroundStyle(.orange)
+      }
+      HStack {
+        Button("overview.continuation.submit", action: submit)
+          .disabled(attempted || !targetMatches)
+          .accessibilityIdentifier("overview.continuation.submit")
+        if isSubmitting { ProgressView().controlSize(.small) }
+        if let jobID {
+          Button("overview.continuation.openJob") { onOpenJob(jobID) }
+            .accessibilityIdentifier("overview.continuation.openJob")
+        }
+        if let result {
+          Text(result).font(WorkspaceFont.secondary).textSelection(.enabled)
+            .accessibilityIdentifier("overview.continuation.result")
+        }
+      }
+    }
+    .padding(12)
+    .background(Color.accentColor.opacity(0.06))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("overview.continuation")
+  }
+
+  private func submit() {
+    guard !attempted, targetMatches else { return }
+    attempted = true
+    isSubmitting = true
+    Task {
+      switch await provider.submit(draft) {
+      case .failure(let failure): result = failure.reason
+      case .success(let accepted):
+        jobID = accepted
+        result = String(localized: "overview.continuation.submitted")
+        switch await provider.run(jobID: accepted) {
+        case .success(let state): result = state
+        case .failure(let failure): result = failure.reason
+        }
+      }
+      isSubmitting = false
     }
   }
 }

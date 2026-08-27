@@ -240,6 +240,107 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertThrowsError(
       try DebugHAPLocalArtifactInspector.inspect(
         directory.appending(path: "entry.zip")))
+    let shared = directory.appending(path: "shared.hsp")
+    try Data([0x50, 0x4b, 0x03, 0x04, 0x03]).write(to: shared)
+    XCTAssertThrowsError(try DebugHAPLocalArtifactInspector.inspect(shared))
+    XCTAssertEqual(
+      try DebugHAPLocalArtifactInspector.inspect(shared, allowsHSP: true).name, "shared.hsp")
+  }
+
+  func testHAPPackageSelectionPreservesEntryRoleAndBoundsAdditionalFiles() throws {
+    let entry = URL(filePath: "/tmp/entry.hap")
+    let additional = (0..<16).map { URL(filePath: "/tmp/module-\($0).hsp") }
+    XCTAssertNoThrow(try DebugHAPPackageSelection.validate(entry: entry, additional: additional))
+    for invalid in [
+      additional + [URL(filePath: "/tmp/overflow.hap")], [entry],
+      [URL(filePath: "/tmp/a/../entry.hap")], [URL(filePath: "/tmp/a b.hap")],
+      [URL(filePath: "/tmp/module.zip")],
+    ] {
+      XCTAssertThrowsError(try DebugHAPPackageSelection.validate(entry: entry, additional: invalid))
+    }
+    XCTAssertThrowsError(
+      try DebugHAPPackageSelection.validate(entry: additional[0], additional: []))
+    // Different modules commonly have the same output basename in separate
+    // directories. Only a repeated file is a duplicate at selection time.
+    XCTAssertNoThrow(
+      try DebugHAPPackageSelection.validate(
+        entry: entry, additional: [URL(filePath: "/tmp/feature/entry.hap")]))
+  }
+
+  func testHAPSubmissionImportsTheWholeSetBeforeSubmittingOneOrderedRequest() async throws {
+    let files = try makeHAPSelectionFiles()
+    defer { try? FileManager.default.removeItem(at: files[0].deletingLastPathComponent()) }
+    let transport = HAPSubmissionTransport()
+    let result = await submitHAPFixture(files: files, transport: transport)
+    guard case .submitted(let acceptance) = result else { return XCTFail("\(result)") }
+    XCTAssertEqual(acceptance.jobID, "job-hap-fixture")
+    let snapshot = await transport.snapshot()
+    XCTAssertEqual(snapshot.methods.filter { $0 == "artifact.importHap.commit" }.count, 3)
+    XCTAssertEqual(snapshot.methods.last, "job.submit")
+    XCTAssertEqual(snapshot.requests.count, 1)
+    let encoded = try XCTUnwrap(snapshot.requests.first)
+    let request = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(encoded.utf8)) as? [String: Any])
+    let inputs = try XCTUnwrap(request["inputs"] as? [String: Any])
+    XCTAssertEqual(inputs["hapArtifactLease"] as? String, "lease-entry.hap")
+    XCTAssertEqual(
+      inputs["additionalHapArtifactLeases"] as? [String], ["lease-feature.hap", "lease-shared.hsp"])
+    XCTAssertFalse(encoded.contains(files[0].deletingLastPathComponent().path))
+    XCTAssertFalse(
+      snapshot.methods.contains("job.run"), "execution remains the separate caller step")
+  }
+
+  func testHAPSubmissionNeverSubmitsAPartialSetAfterImportFailureOrBindingDrift() async throws {
+    let files = try makeHAPSelectionFiles()
+    defer { try? FileManager.default.removeItem(at: files[0].deletingLastPathComponent()) }
+    for failure in [HAPSubmissionTransport.Failure.append, .binding] {
+      let transport = HAPSubmissionTransport(failure: failure)
+      let result = await submitHAPFixture(files: files, transport: transport)
+      guard case .failed = result else { return XCTFail("\(result)") }
+      let snapshot = await transport.snapshot()
+      XCTAssertTrue(snapshot.requests.isEmpty)
+      XCTAssertEqual(snapshot.methods.filter { $0 == "artifact.importHap.begin" }.count, 2)
+      XCTAssertEqual(
+        snapshot.methods.filter { $0 == "artifact.importHap.abort" }.count,
+        failure == .append ? 1 : 0,
+        "only an uncommitted upload is aborted; committed immutable artifacts are not deleted")
+    }
+  }
+
+  func testHAPSubmissionRejectsDuplicateBytesBeforeAnyUpload() async throws {
+    let files = try makeHAPSelectionFiles()
+    defer { try? FileManager.default.removeItem(at: files[0].deletingLastPathComponent()) }
+    try Data(contentsOf: files[0]).write(to: files[1])
+    let transport = HAPSubmissionTransport()
+    let result = await submitHAPFixture(files: files, transport: transport)
+    guard case .failed = result else { return XCTFail("\(result)") }
+    let snapshot = await transport.snapshot()
+    XCTAssertTrue(snapshot.methods.isEmpty)
+  }
+
+  private func makeHAPSelectionFiles() throws -> [URL] {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-debug-packages-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return try ["entry.hap", "feature.hap", "shared.hsp"].enumerated().map { index, name in
+      let file = directory.appending(path: name)
+      try (Data([0x50, 0x4b, 0x03, 0x04]) + Data(repeating: UInt8(index), count: 700_000))
+        .write(to: file)
+      return file
+    }
+  }
+
+  private func submitHAPFixture(
+    files: [URL], transport: HAPSubmissionTransport
+  ) async -> DebugLogJobSubmissionResult {
+    await DebugHAPSubmission.submit(
+      target: DebugTargetPresentation(
+        id: "TGT-fixture", bindingRevision: 9, toolVersion: "3.2.0f", adoptedAtUTC: "fixture"),
+      fileURL: files[0], additionalFileURLs: Array(files.dropFirst()),
+      bundleName: "com.example.app", abilityName: "EntryAbility", installPolicy: "installOrReplace",
+      cleanupPolicy: "uninstall", postRunAbilityState: "stopped",
+      captureDiagnostics: true, diagnosticsDurationSeconds: 30,
+      send: { await transport.request($0, $1) })
   }
 
   func testHAPRequestBuilderPinsTargetLeaseInputsAndAppsClient() throws {
@@ -264,16 +365,54 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(targetObject["targetId"] as? String, target.id)
     XCTAssertEqual(targetObject["expectedBindingRevision"] as? Int, 9)
     XCTAssertEqual(inputs["hapArtifactLease"] as? String, "LEASE-HAP-1")
+    XCTAssertNil(inputs["additionalHapArtifactLeases"], "single-package plans preserve absence")
     XCTAssertEqual(inputs["bundleName"] as? String, "com.example.app")
     XCTAssertEqual(inputs["abilityName"] as? String, "EntryAbility")
     XCTAssertEqual(inputs["portForwardProfile"] as? String, "none")
     XCTAssertEqual(context["clientName"] as? String, ArkDeckAgentClientName.debugAppsWorkspace)
+    for (installPolicy, cleanupPolicy) in [
+      ("installFresh", "uninstall"), ("installOrReplace", "restorePrevious"),
+    ] {
+      XCTAssertThrowsError(
+        try DebugHAPRequestBuilder.request(
+          target: target, lease: "LEASE-HAP-1", bundleName: "com.example.app",
+          abilityName: "EntryAbility", installPolicy: installPolicy,
+          cleanupPolicy: cleanupPolicy, postRunAbilityState: "stopped",
+          captureDiagnostics: true, diagnosticsDurationSeconds: 30),
+        "an unpublished lifecycle policy must not produce a typed request")
+    }
+    XCTAssertNoThrow(
+      try DebugHAPRequestBuilder.request(
+        target: target, lease: "LEASE-HAP-1", bundleName: "com.example.app",
+        abilityName: "EntryAbility", installPolicy: "installOrReplace",
+        cleanupPolicy: "retain", postRunAbilityState: "running",
+        captureDiagnostics: false, diagnosticsDurationSeconds: 30))
     XCTAssertThrowsError(
       try DebugHAPRequestBuilder.request(
         target: target, lease: "LEASE-HAP-1", bundleName: "not-a-bundle",
         abilityName: "EntryAbility", installPolicy: "installOrReplace",
         cleanupPolicy: "uninstall", postRunAbilityState: "stopped",
         captureDiagnostics: true, diagnosticsDurationSeconds: 30))
+  }
+
+  func testHAPRequestBuilderPreservesLeaseOrderAndRejectsDuplicateOrOversizedSets() throws {
+    let target = DebugTargetPresentation(
+      id: "TGT-fixture", bindingRevision: 9, toolVersion: "3.2.0f", adoptedAtUTC: "fixture")
+    func request(_ additional: [String]) throws -> RuntimeOperationRequest {
+      try DebugHAPRequestBuilder.request(
+        target: target, lease: "entry", additionalLeases: additional,
+        bundleName: "com.example.app", abilityName: "EntryAbility",
+        installPolicy: "installOrReplace",
+        cleanupPolicy: "retain", postRunAbilityState: "stopped",
+        captureDiagnostics: false, diagnosticsDurationSeconds: 30)
+    }
+    XCTAssertEqual(
+      try request(["feature", "shared"]).inputs["additionalHapArtifactLeases"],
+      .array([.string("feature"), .string("shared")]))
+    XCTAssertNoThrow(try request((0..<16).map { "lease-\($0)" }))
+    for invalid in [["entry"], ["feature", "feature"], [""], (0..<17).map { "lease-\($0)" }] {
+      XCTAssertThrowsError(try request(invalid))
+    }
   }
 
   func testApprovedTemplatesAreClosedRunnableAndReadOnly() throws {
@@ -577,5 +716,67 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
   private func objectResponse(_ result: [String: Any]) throws -> Data {
     try JSONSerialization.data(
       withJSONObject: ["ok": true, "id": "debug-contract", "result": result])
+  }
+}
+
+/// Host-only RPC fixture. It never connects to XPC, the Runtime or a device.
+private actor HAPSubmissionTransport {
+  enum Failure { case append, binding }
+  private let failure: Failure?
+  private var methods: [String] = []
+  private var requests: [String] = []
+  private var active: [String: JSONValue] = [:]
+  private var uploadCount = 0
+
+  init(failure: Failure? = nil) { self.failure = failure }
+
+  func snapshot() -> (methods: [String], requests: [String]) { (methods, requests) }
+
+  func request(_ method: String, _ params: [String: JSONValue]?)
+    -> Result<Data, DebugXPCReadFailure>
+  {
+    methods.append(method)
+    let params = params ?? [:]
+    var result: [String: JSONValue] = [:]
+    switch method {
+    case "artifact.importHap.begin":
+      active = params
+      uploadCount += 1
+      result = [
+        "uploadId": .string("upload-\(uploadCount)"), "maximumChunkBytes": .integer(512 * 1_024),
+        "targetId": .string("TGT-fixture"), "bindingRevision": .integer(9),
+      ]
+    case "artifact.importHap.append":
+      if uploadCount == 2, failure == .append {
+        return .failure(.transport("fixture refused append"))
+      }
+      guard case .integer(let offset)? = params["offset"],
+        case .string(let encoded)? = params["base64"], let data = Data(base64Encoded: encoded),
+        !data.isEmpty, data.count <= 512 * 1_024
+      else { return .failure(.transport("unbounded fixture chunk")) }
+      result = ["nextOffset": .integer(offset + Int64(data.count))]
+    case "artifact.importHap.commit":
+      guard case .string(let name)? = active["name"] else {
+        return .failure(.transport("no active upload"))
+      }
+      result = active
+      result["lease"] = .string("lease-\(name)")
+      result["bindingRevision"] = .integer(uploadCount == 2 && failure == .binding ? 10 : 9)
+    case "artifact.importHap.abort": break
+    case "job.submit":
+      guard case .string(let encoded)? = params["requestJson"] else {
+        return .failure(.transport("missing typed request"))
+      }
+      requests.append(encoded)
+      result = ["jobId": .string("job-hap-fixture")]
+    default: return .failure(.transport("unexpected fixture method: \(method)"))
+    }
+    do {
+      return .success(
+        try CanonicalJSONEncoders.canonical().encode(
+          JSONValue.object([
+            "ok": .bool(true), "id": .string("fixture"), "result": .object(result),
+          ])))
+    } catch { return .failure(.transport(String(describing: error))) }
   }
 }

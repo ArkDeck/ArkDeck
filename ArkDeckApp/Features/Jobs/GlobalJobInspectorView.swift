@@ -1,6 +1,7 @@
 import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
+import Observation
 import SwiftUI
 
 private func jobsText(_ key: String) -> String {
@@ -12,16 +13,99 @@ private struct EstablishedCurrentEpochRelation {
   let messageKey: String
 }
 
-/// Cross-workspace, read-only Runtime status. This surface consumes only the
-/// daemon's `job.list` projection; it has no submit, cancel, retry, resume,
-/// reconcile or archive action to call.
+@MainActor
+@Observable
+private final class GlobalJobInspectorModel {
+  private(set) var detail: RuntimeJobDetailPresentation?
+  private(set) var isLoading = false
+  private(set) var isReadingLog = false
+  private(set) var logText: String?
+  private(set) var logError: String?
+  private(set) var cancellingJobID: String?
+  private(set) var cancellationJobID: String?
+  private(set) var cancellationMessage: String?
+  private var generation = UUID()
+  private var loadedJobID: String?
+  @ObservationIgnored private let reader = RuntimeJobDetailApplicationFacade.make()
+  @ObservationIgnored private let control = RuntimeJobControlApplicationFacade.make()
+
+  func load(_ job: RuntimeJobSummaryPresentation?) {
+    loadedJobID = job?.id
+    generation = UUID()
+    let ticket = generation
+    detail = nil
+    logText = nil
+    logError = nil
+    isReadingLog = false
+    guard let job else { isLoading = false; return }
+    isLoading = true
+    Task { [weak self, reader] in
+      let result = await reader.loadJobDetail(jobID: job.id, operationReference: job.operationReference)
+      guard let self, generation == ticket else { return }
+      detail = result
+      isLoading = false
+    }
+  }
+
+  func cancel(_ job: RuntimeJobSummaryPresentation, onRefresh: @escaping () -> Void) {
+    guard cancellingJobID == nil else { return }
+    cancellingJobID = job.id
+    cancellationJobID = job.id
+    cancellationMessage = nil
+    Task { [weak self, control] in
+      let result = await control.cancel(job)
+      guard let self else { return }
+      cancellingJobID = nil
+      switch result {
+      case .requested: cancellationMessage = jobsText("jobInspector.cancel.requested")
+      case .refused(let reason):
+        cancellationMessage = jobsText("jobInspector.cancel.refused") + " · " + reason
+      }
+      onRefresh()
+      // A late cancellation response must not replace a newly selected Job.
+      if loadedJobID == job.id { load(job) }
+    }
+  }
+
+  func readLog(job: RuntimeJobSummaryPresentation, artifact: RuntimeArtifactPresentation) {
+    guard !isReadingLog, let detail, detail.jobID == job.id,
+      detail.correlation?.targetID == job.targetID, detail.correlation?.sessionID == job.sessionID,
+      detail.artifacts.contains(artifact), artifact.role == "log", artifact.privacy == "standard"
+    else { return }
+    let ticket = generation
+    isReadingLog = true
+    logText = nil
+    logError = nil
+    Task { [weak self, reader] in
+      let result = await reader.readArtifact(
+        jobID: job.id, artifact: artifact, maximumBytes: 2 * 1_024 * 1_024, allowSensitive: false)
+      guard let self, generation == ticket else { return }
+      isReadingLog = false
+      switch result {
+      case .loaded(let bytes):
+        guard let text = String(data: bytes, encoding: .utf8) else {
+          logError = jobsText("jobInspector.log.notText")
+          return
+        }
+        logText = text.split(separator: "\n", omittingEmptySubsequences: false)
+          .suffix(200).joined(separator: "\n")
+      case .failed(let reason): logError = reason
+      }
+    }
+  }
+}
+
+/// Cross-workspace Runtime status with a separate closed cancellation caller.
+/// A cancel request is never presented as a confirmed terminal outcome.
 struct GlobalJobInspectorView: View {
   let presentation: RuntimeHistoryPresentation
   let isRefreshInFlight: Bool
   let onRefresh: () -> Void
   let onOpenHistory: () -> Void
+  let onOpenJob: (String) -> Void
   @Binding var isExpanded: Bool
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
+  @State private var actions = GlobalJobInspectorModel()
 
   private var orderedJobs: [RuntimeJobSummaryPresentation] {
     presentation.jobs.enumerated().sorted { lhs, rhs in
@@ -56,6 +140,12 @@ struct GlobalJobInspectorView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobInspector")
+    .task(id: focusedJob?.id) {
+      if isExpanded { actions.load(focusedJob) }
+    }
+    .onChange(of: isExpanded) { _, expanded in
+      if expanded { actions.load(focusedJob) }
+    }
   }
 
   @ViewBuilder
@@ -162,9 +252,26 @@ struct GlobalJobInspectorView: View {
                 .accessibilityLabel(jobsText("jobInspector.progress"))
             }
             Spacer(minLength: WorkspaceMetrics.contentGap)
-            Text(jobsText("jobInspector.readOnly"))
+            Text(jobsText("jobInspector.runtimeFacts"))
+              .accessibilityIdentifier("jobInspector.runtimeFacts")
               .font(WorkspaceFont.caption)
               .foregroundStyle(.secondary)
+          }
+
+          HStack(spacing: WorkspaceMetrics.contentGap) {
+            Button(jobsText("jobInspector.action.openRecord")) { onOpenJob(job.id) }
+              .accessibilityIdentifier("jobInspector.openRecord")
+            if RuntimeJobControlApplicationFacade.canCancel(job) {
+              Button(jobsText("jobInspector.action.cancel")) {
+                actions.cancel(job, onRefresh: onRefresh)
+              }
+              .disabled(actions.cancellingJobID != nil)
+              .accessibilityIdentifier("jobInspector.cancel")
+            }
+          }
+          if actions.cancellationJobID == job.id, let message = actions.cancellationMessage {
+            Text(message).font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+              .accessibilityIdentifier("jobInspector.cancel.result")
           }
 
           Grid(
@@ -230,7 +337,37 @@ struct GlobalJobInspectorView: View {
             .fixedSize(horizontal: false, vertical: true)
           }
 
-          if !job.timeline.isEmpty {
+          if let detail = actions.detail, detail.jobID == job.id {
+            if case .unavailable(let reason) = detail.timelineAvailability {
+              Text(reason).font(WorkspaceFont.secondary).foregroundStyle(.orange)
+            } else if !detail.timeline.isEmpty {
+              Text(jobsText("jobInspector.timeline")).font(WorkspaceFont.label)
+              Text(detail.timeline.suffix(200).joined(separator: "\n"))
+                .font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+                .accessibilityIdentifier("jobInspector.timeline.entries")
+              if detail.timeline.count > 200 {
+                Text(jobsText("jobInspector.log.tail")).font(WorkspaceFont.caption)
+              }
+            }
+            ForEach(detail.artifacts.filter { $0.role == "log" && $0.status == "published" }) { artifact in
+              Button(jobsText("jobInspector.action.readLog") + " · " + artifact.name) {
+                actions.readLog(job: job, artifact: artifact)
+              }
+              .disabled(actions.isReadingLog || artifact.privacy == "sensitive")
+              .help(jobsText("jobInspector.log.privacy"))
+              .accessibilityIdentifier("jobInspector.readLog.\(artifact.id)")
+            }
+            if let log = actions.logText {
+              Text(jobsText("jobInspector.log.tail")).font(WorkspaceFont.caption).foregroundStyle(.secondary)
+              Text(log).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+                .accessibilityIdentifier("jobInspector.log.text")
+            }
+            if let error = actions.logError {
+              Text(error).font(WorkspaceFont.secondary).foregroundStyle(.orange)
+            }
+          } else if actions.isLoading {
+            ProgressView().controlSize(.small)
+          } else if !job.timeline.isEmpty {
             VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
               Text(jobsText("jobInspector.timeline"))
                 .font(WorkspaceFont.label)
@@ -296,7 +433,10 @@ struct GlobalJobInspectorView: View {
           .controlSize(.small)
           .accessibilityLabel(jobsText("jobInspector.refreshing"))
       }
-      Button(jobsText("jobInspector.action.refresh"), action: onRefresh)
+      Button(jobsText("jobInspector.action.refresh")) {
+        onRefresh()
+        if isExpanded { actions.load(focusedJob) }
+      }
         .disabled(isRefreshInFlight)
         .accessibilityIdentifier("jobInspector.refresh")
       Button(jobsText("jobInspector.action.openHistory"), action: onOpenHistory)

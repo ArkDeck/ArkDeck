@@ -1,6 +1,7 @@
 # ArkDeck macOS 首个实现提案：原生应用骨架与 Device Overview
 
-> Status：ready for implementation
+> Status：historical implementation proposal（非当前任务入口）
+> 2026-08-27：当前页面与接线已超出这份初期切片；最新边界见 [全页差异扫描](../../docs/design/implementation-audit-2026-08-27.md) 和 [v1.6 交互定义](../../docs/design/macos-ux-interaction-spec.md)。不要重启本文的历史任务/状态。
 > Baseline：`origin/main@5d84e9565a00663d61c721d8e2d46720a993de3b`
 > Design input：`docs/design/macos-ux-interaction-spec.md` draft v0.3、`docs/design/prototype.html`
 > Product mapping：P4 App 体验；主要服务 GJ-1 Device Observe，并保持已取得的真实设备结论不变

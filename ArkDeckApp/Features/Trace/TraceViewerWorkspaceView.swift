@@ -7,6 +7,38 @@ import ArkTraceRendering
 import SwiftUI
 import UniformTypeIdentifiers
 
+nonisolated func traceViewerText(_ key: String) -> String {
+    Bundle.main.localizedString(forKey: key, value: key, table: "TraceViewerLocalizable")
+}
+
+private nonisolated func traceViewerText(_ key: String, values: [String: String]) -> String {
+    values.reduce(traceViewerText(key)) { text, value in
+        text.replacingOccurrences(of: "{" + value.key + "}", with: value.value)
+    }
+}
+
+/// Localized recovery summary; the upstream diagnostic and original message
+/// remain available verbatim in the disclosure rather than being translated
+/// by guessing at arbitrary parser output.
+private nonisolated func traceViewerErrorReason(_ error: TraceAppErrorPresentation) -> String {
+    switch error.titleKey {
+    case .traceCouldNotBeOpened: traceViewerText("error.reason.chooseFile")
+    case .bundledParserUnavailable: traceViewerText("error.reason.parser")
+    case .cacheNeedsAttention: traceViewerText("error.reason.cache")
+    case .openingCancelled: traceViewerText("error.reason.cancelled")
+    case .couldNotFinish: traceViewerText("error.reason.operation")
+    }
+}
+
+private nonisolated func traceViewerGroupTitle(_ group: TraceTrackGroup) -> String {
+    switch group.kind {
+    case .cpu: "CPU"
+    case .cpuCounter: traceViewerText("CPU Counters")
+    case .unattributed: traceViewerText("Unattributed")
+    case .process: group.title // a process name is source data
+    }
+}
+
 /// Layout skeleton only. Every `TraceDocumentController` property is read
 /// inside the narrowest child view that needs it, so Observation invalidates
 /// exactly that child: viewport/snapshot updates never rebuild the sidebar or
@@ -211,15 +243,15 @@ struct TraceViewerRootView: View {
         // content-size boundary observed in release builds.
         ToolbarItem(placement: .primaryAction) {
             Button(action: openCapture) {
-                Label("Capture", systemImage: "record.circle")
+                Label(traceViewerText("Capture"), systemImage: "record.circle")
             }
-            .help("Capture a trace from a connected OpenHarmony device")
+            .help(traceViewerText("Capture a trace from a connected OpenHarmony device"))
             .accessibilityIdentifier("trace.viewer.capture")
             .primaryToolbarTarget()
         }
         ToolbarItemGroup(placement: .primaryAction) {
             Button(action: presentOpenPanel) {
-                Label("Open", systemImage: "folder")
+                Label(traceViewerText("Open"), systemImage: "folder")
             }
             .primaryToolbarTarget()
             TraceReloadButton(controller: controller)
@@ -304,7 +336,7 @@ struct TraceViewerRootView: View {
     @MainActor
     private func presentOpenPanel() {
         let panel = NSOpenPanel()
-        panel.title = "Open Trace"
+        panel.title = traceViewerText("viewer.openPanel.title")
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
@@ -360,16 +392,16 @@ private struct TrackRow: View {
                 .imageScale(.small)
             }
             .buttonStyle(.borderless)
-            .help(controller.isFavorite(track.id) ? "Unpin lane" : "Pin lane")
+            .help(controller.isFavorite(track.id) ? traceViewerText("Unpin lane") : traceViewerText("Pin lane"))
             .accessibilityLabel(
-                controller.isFavorite(track.id)
-                    ? "Unpin \(track.title)" : "Pin \(track.title)"
+                traceViewerText(controller.isFavorite(track.id) ? "Unpin {name}" : "Pin {name}",
+                    values: ["name": track.title])
             )
             .arktraceAccessibleTarget()
         }
         // The pinned copy and the in-group copy are the same lane; distinguish
         // them for VoiceOver so the duplicate is not confusing.
-        .accessibilityHint(isPinnedArea ? "In the pinned area" : "")
+        .accessibilityHint(isPinnedArea ? traceViewerText("In the pinned area") : "")
     }
 }
 
@@ -399,20 +431,20 @@ private struct RecentDocumentRow: View {
         }
         .accessibilityLabel(
             document.isMissing
-                ? Text("\(document.url.lastPathComponent), missing")
+                ? Text(traceViewerText("{name}, missing", values: ["name": document.url.lastPathComponent]))
                 : Text(document.url.lastPathComponent)
         )
         .help(
             document.isMissing
-                ? "Missing — \(document.url.path)"
+                ? traceViewerText("Missing — {path}", values: ["path": document.url.path])
                 : document.url.path
         )
         .arktraceAccessibleTarget()
         .contextMenu {
-            Button("Open") { controller.open(document.url) }
+            Button(traceViewerText("Open")) { controller.open(document.url) }
                 .disabled(document.isMissing)
-            Button("Remove from Recent") { controller.removeRecentDocument(document) }
-            Button("Show in Finder") { showInFinder() }
+            Button(traceViewerText("Remove from Recent")) { controller.removeRecentDocument(document) }
+            Button(traceViewerText("Show in Finder")) { showInFinder() }
                 .disabled(finderTarget == nil)
         }
     }
@@ -456,7 +488,7 @@ private struct RecentDocumentsSection: View {
     @Environment(\.controlActiveState) private var controlActiveState
 
     var body: some View {
-        Section("Recent") {
+        Section(traceViewerText("Recent")) {
             ForEach(controller.recentDocuments.prefix(8)) { document in
                 RecentDocumentRow(controller: controller, document: document)
             }
@@ -510,6 +542,8 @@ private struct FocusableTextField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.parent = self
+        field.placeholderString = placeholder
+        field.setAccessibilityLabel(accessibilityLabel)
         if field.stringValue != text { field.stringValue = text }
         context.coordinator.focusIfAsked(field, id: focusRequestID)
     }
@@ -575,8 +609,8 @@ private struct ProcessFilterBar: View {
             if isOpen {
                 FocusableTextField(
                     text: $controller.processFilterText,
-                    placeholder: "Filter by process name or PID",
-                    accessibilityLabel: "Filter processes by name or PID",
+                    placeholder: traceViewerText("Filter by process name or PID"),
+                    accessibilityLabel: traceViewerText("Filter processes by name or PID"),
                     focusRequestID: controller.processFilterFocusRequestID,
                     onSubmit: { controller.announceProcessFilterResults() },
                     onCancel: close
@@ -589,8 +623,8 @@ private struct ProcessFilterBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .help("Stop filtering")
-                .accessibilityLabel("Stop filtering processes")
+                .help(traceViewerText("Stop filtering"))
+                .accessibilityLabel(traceViewerText("Stop filtering processes"))
                 .arktraceAccessibleTarget()
             } else {
                 Button {
@@ -602,8 +636,8 @@ private struct ProcessFilterBar: View {
                         .imageScale(.medium)
                 }
                 .buttonStyle(.borderless)
-                .help("Filter processes by name or PID")
-                .accessibilityLabel("Filter processes")
+                .help(traceViewerText("Filter processes by name or PID"))
+                .accessibilityLabel(traceViewerText("Filter processes"))
                 .arktraceAccessibleTarget()
                 Spacer(minLength: 0)
             }
@@ -670,13 +704,13 @@ private struct TraceViewerSidebar: View {
                             controller.moveFavorite(from: source, to: destination)
                         }
                     } label: {
-                        Text("Pinned")
+                        Text(traceViewerText("Pinned"))
                     }
                     .arktraceAccessibleTarget()
                 }
             }
             if groups.isEmpty, !controller.trackGroups.isEmpty {
-                Text("No process matches the filter")
+                Text(traceViewerText("No process matches the filter"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -684,11 +718,11 @@ private struct TraceViewerSidebar: View {
                 Section {
                     DisclosureGroup {
                         if !group.capabilityAvailable {
-                            Text("Not available in this trace")
+                            Text(traceViewerText("Not available in this trace"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if group.tracks.isEmpty {
-                            Text("No matching tracks")
+                            Text(traceViewerText("No matching tracks"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -705,7 +739,7 @@ private struct TraceViewerSidebar: View {
                             controller.revealTrackGroup(group.id)
                         } label: {
                             HStack {
-                                Text(group.title)
+                                Text(traceViewerGroupTitle(group))
                                     .lineLimit(nil)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .multilineTextAlignment(.leading)
@@ -714,7 +748,7 @@ private struct TraceViewerSidebar: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help("Show these lanes in the timeline")
+                        .help(traceViewerText("Show these lanes in the timeline"))
                     }
                     .arktraceAccessibleTarget()
                 }
@@ -725,8 +759,7 @@ private struct TraceViewerSidebar: View {
             // times and none of them is about that process.
             if controller.trackListTruncated {
                 Label(
-                    "Some lanes are not listed: this trace has more threads or"
-                        + " counter series than the list holds",
+                    traceViewerText("Some lanes are not listed: this trace has more threads or counter series than the list holds"),
                     systemImage: "ellipsis.circle"
                 )
                 .font(.caption)
@@ -752,11 +785,11 @@ private struct SearchResultsSection: View {
     @FocusState private var focusedIndex: Int?
 
     var body: some View {
-        Section("Search Results") {
+        Section(traceViewerText("Search Results")) {
             if controller.isSearching {
                 ProgressView().controlSize(.small)
             } else if controller.searchResults.items.isEmpty {
-                Text("No matches")
+                Text(traceViewerText("No matches"))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(Array(controller.searchResults.items.enumerated()), id: \.offset) {
@@ -790,13 +823,15 @@ private struct SearchResultsSection: View {
                 }
                 if let position = controller.searchSelectionIndex {
                     Text(
-                        "\(position + 1) of \(controller.searchResults.items.count)"
-                            + (controller.searchResults.truncated ? "+" : "")
+                        traceViewerText("{position} of {count}{suffix}", values: [
+                            "position": String(position + 1), "count": String(controller.searchResults.items.count),
+                            "suffix": controller.searchResults.truncated ? "+" : "",
+                        ])
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 } else if controller.searchResults.truncated {
-                    Text("More matches exist")
+                    Text(traceViewerText("More matches exist"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -838,24 +873,24 @@ private struct TraceTimelinePane: View {
             // their ideal content instead and the placeholder ends up in the
             // top-left corner of a mostly empty window.
             ContentUnavailableView {
-                Label("Open a trace", systemImage: "waveform.path.ecg")
+                Label(traceViewerText("Open a trace"), systemImage: "waveform.path.ecg")
             } description: {
-                Text("Open, drop, or choose a recent .htrace/.ftrace/.systrace file.")
+                Text(traceViewerText("Open, drop, or choose a recent .htrace/.ftrace/.systrace file."))
             } actions: {
                 HStack(spacing: 12) {
-                    Button("Capture Trace…", action: openCapture)
+                    Button(traceViewerText("Capture Trace…"), action: openCapture)
                         .buttonStyle(.borderedProminent)
                         .arktraceAccessibleTarget()
-                    Button("Open Trace…", action: openPanel)
+                    Button(traceViewerText("Open Trace…"), action: openPanel)
                         .arktraceAccessibleTarget()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed where controller.snapshot == nil:
             ContentUnavailableView(
-                "Trace unavailable",
+                traceViewerText("Trace unavailable"),
                 systemImage: "exclamationmark.triangle",
-                description: Text(controller.errorPresentation?.reason ?? "The trace could not be opened.")
+                description: Text(controller.errorPresentation.map(traceViewerErrorReason) ?? traceViewerText("The trace could not be opened."))
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         default:
@@ -1005,7 +1040,7 @@ private struct TraceTimelinePane: View {
                                 } ?? stageLabel(stage)
                             )
                             .monospacedDigit()
-                            Button("Cancel") { controller.cancel() }
+                            Button(traceViewerText("Cancel")) { controller.cancel() }
                                 .buttonStyle(.link)
                                 .arktraceAccessibleTarget()
                         }
@@ -1068,11 +1103,11 @@ private struct TraceLoadingPane: View {
         // offering the one thing there is left to do.
         if stage == .cancelled {
             ContentUnavailableView {
-                Label("Opening cancelled", systemImage: "xmark.circle")
+                Label(traceViewerText("Opening cancelled"), systemImage: "xmark.circle")
             } description: {
                 Text(fileName ?? "")
             } actions: {
-                Button("Open Trace…", action: openPanel)
+                Button(traceViewerText("Open Trace…"), action: openPanel)
                     .buttonStyle(.borderedProminent)
                     .arktraceAccessibleTarget()
             }
@@ -1108,7 +1143,7 @@ private struct TraceLoadingPane: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-            Button("Cancel", action: cancel)
+            Button(traceViewerText("Cancel"), action: cancel)
                 .keyboardShortcut(.cancelAction)
                 .arktraceAccessibleTarget()
         }
@@ -1131,7 +1166,7 @@ private struct TraceLoadingPane: View {
     /// and copying the source into an immutable snapshot on a miss. Only the
     /// second has bytes to count, so a fraction here is the tell.
     private var stageText: String {
-        stage == .cacheLookup && fraction != nil ? "Copying trace…" : stageLabel(stage)
+        stage == .cacheLookup && fraction != nil ? traceViewerText("Copying trace…") : stageLabel(stage)
     }
 
     private var statusText: String {
@@ -1168,7 +1203,7 @@ private struct TraceInspectorPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Inspector").font(.headline)
+                    Text(traceViewerText("Inspector")).font(.headline)
                     Spacer()
                     // Docking and hiding are operations on a pane that is
                     // showing something. With no trace open there is nothing
@@ -1178,10 +1213,7 @@ private struct TraceInspectorPane: View {
                     if controller.metadata != nil {
                         InspectorDockMenu(dock: $dock)
                         InspectorFocusButton(
-                            title: String(
-                                localized: "Hide Inspector",
-                                comment: "Button that collapses the Inspector pane."
-                            ),
+                            title: traceViewerText("Hide Inspector"),
                             // A close box, not another pane glyph: the dock
                             // menu beside it already wears the pane, and two
                             // identical icons doing different things is worse
@@ -1210,18 +1242,18 @@ private struct TraceInspectorPane: View {
                         onRevealSlice: { controller.revealSliceAggregate($0) }
                     )
                 } else if let hovered = controller.hoveredEvent {
-                    Text("Hover").font(.subheadline.weight(.semibold))
+                    Text(traceViewerText("Hover")).font(.subheadline.weight(.semibold))
                     EventInspectorView(event: hovered)
                 } else if let metadata = controller.metadata {
-                    LabeledContent("Duration", value: time(metadata.durationNs))
-                    LabeledContent("Source bytes", value: bytes(metadata.sourceByteCount))
+                    LabeledContent(traceViewerText("Duration"), value: time(metadata.durationNs))
+                    LabeledContent(traceViewerText("Source bytes"), value: bytes(metadata.sourceByteCount))
                     LabeledContent(
-                        "Schema",
+                        traceViewerText("Schema"),
                         value: String(metadata.schemaFingerprint.prefix(12))
                     )
-                    LabeledContent("Cache", value: controller.cacheHit ? "Hit" : "Miss")
+                    LabeledContent(traceViewerText("Cache"), value: controller.cacheHit ? traceViewerText("Hit") : traceViewerText("Miss"))
                 } else {
-                    Text("Select an event or drag a time range.")
+                    Text(traceViewerText("Select an event or drag a time range."))
                         .foregroundStyle(.secondary)
                 }
                 if !controller.annotations.isEmpty {
@@ -1248,9 +1280,9 @@ private struct TraceErrorBannerOverlay: View {
         if let error = controller.errorPresentation {
             VStack(alignment: .leading, spacing: 8) {
                 Text(error.titleKey.localizedResource).font(.headline)
-                Text(error.reason).font(.callout)
-                DisclosureGroup("Diagnostics", isExpanded: $showDiagnostics) {
-                    Text(error.diagnostic)
+                Text(traceViewerErrorReason(error)).font(.callout)
+                DisclosureGroup(traceViewerText("Diagnostics"), isExpanded: $showDiagnostics) {
+                    Text(error.reason + "\n" + error.diagnostic)
                         .font(.caption.monospaced())
                         .textSelection(.enabled)
                 }
@@ -1258,13 +1290,13 @@ private struct TraceErrorBannerOverlay: View {
                 HStack {
                     switch error.recoveryAction {
                     case .retry:
-                        Button("Retry") { controller.reload() }
+                        Button(traceViewerText("Retry")) { controller.reload() }
                             .arktraceAccessibleTarget()
                     case .chooseAnotherFile:
-                        Button("Choose Another File…", action: openPanel)
+                        Button(traceViewerText("Choose Another File…"), action: openPanel)
                             .arktraceAccessibleTarget()
                     case .openCacheSettings:
-                        SettingsLink { Text("Cache Settings…") }
+                        SettingsLink { Text(traceViewerText("Cache Settings…")) }
                             .arktraceAccessibleTarget()
                     case .dismiss:
                         EmptyView()
@@ -1334,7 +1366,7 @@ private struct TraceReloadButton: View {
 
     var body: some View {
         Button { controller.reload() } label: {
-            Label("Reload", systemImage: "arrow.clockwise")
+            Label(traceViewerText("Reload"), systemImage: "arrow.clockwise")
         }
         .disabled(controller.sourceURL == nil)
         .primaryToolbarTarget()
@@ -1350,8 +1382,8 @@ private struct TraceSearchField: View {
     var body: some View {
         FocusableTextField(
             text: $controller.searchFieldText,
-            placeholder: "Search TID, thread, or slice",
-            accessibilityLabel: "Search TID, thread, or slice",
+            placeholder: traceViewerText("Search TID, thread, or slice"),
+            accessibilityLabel: traceViewerText("Search TID, thread, or slice"),
             focusRequestID: controller.searchFocusRequestID,
             onSubmit: { controller.search(controller.searchFieldText) },
             onCancel: {}
@@ -1372,7 +1404,7 @@ private struct TraceZoomSelectionButton: View {
 
     var body: some View {
         Button { controller.zoomToSelection() } label: {
-            Label("Zoom Selection", systemImage: "viewfinder")
+            Label(traceViewerText("Zoom Selection"), systemImage: "viewfinder")
         }
         .disabled(controller.selectedRange == nil)
         .primaryToolbarTarget()
@@ -1385,7 +1417,7 @@ private struct TraceZoomInButton: View {
 
     var body: some View {
         Button { controller.zoomIn() } label: {
-            Label("Zoom In", systemImage: "plus.magnifyingglass")
+            Label(traceViewerText("Zoom In"), systemImage: "plus.magnifyingglass")
         }
         .disabled(controller.snapshot == nil)
         .primaryToolbarTarget()
@@ -1398,7 +1430,7 @@ private struct TraceZoomOutButton: View {
 
     var body: some View {
         Button { controller.zoomOut() } label: {
-            Label("Zoom Out", systemImage: "minus.magnifyingglass")
+            Label(traceViewerText("Zoom Out"), systemImage: "minus.magnifyingglass")
         }
         .disabled(controller.snapshot == nil)
         .primaryToolbarTarget()
@@ -1410,7 +1442,7 @@ private struct TraceResetZoomButton: View {
 
     var body: some View {
         Button { controller.resetViewport() } label: {
-            Label("Reset Zoom", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
+            Label(traceViewerText("Reset Zoom"), systemImage: "arrow.up.left.and.down.right.magnifyingglass")
         }
         .primaryToolbarTarget()
     }
@@ -1436,7 +1468,7 @@ private struct FlagTagEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("Tag", text: $text)
+            TextField(traceViewerText("Tag"), text: $text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 240)
                 .focused($fieldIsFocused)
@@ -1446,21 +1478,21 @@ private struct FlagTagEditor: View {
                 }
             HStack(spacing: 10) {
                 Button(action: cycleColor) {
-                    Label("Change Colour", systemImage: "circle.fill")
+                    Label(traceViewerText("Change Colour"), systemImage: "circle.fill")
                         .foregroundStyle(
                             Color(cgColor: TimelineAnnotationColor.cgColor(at: flag.colorIndex))
                         )
                 }
                 .buttonStyle(.borderless)
                 .labelStyle(.iconOnly)
-                .help("Change Colour")
+                .help(traceViewerText("Change Colour"))
                 .arktraceAccessibleTarget()
                 Text(time(flag.timestampNs))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
                 Spacer()
-                Button("Remove", role: .destructive, action: remove)
+                Button(traceViewerText("Remove"), role: .destructive, action: remove)
                     .arktraceAccessibleTarget()
             }
         }
@@ -1504,14 +1536,8 @@ private struct InspectorToolbarToggle: View {
     let dock: TraceInspectorDock
     let toggle: @MainActor () -> Void
 
-    private static let show = String(
-        localized: "Show Inspector",
-        comment: "Button that restores the Inspector pane."
-    )
-    private static let hide = String(
-        localized: "Hide Inspector",
-        comment: "Button that collapses the Inspector pane."
-    )
+    private static let show = traceViewerText("Show Inspector")
+    private static let hide = traceViewerText("Hide Inspector")
 
     private var title: String { isShowing ? Self.hide : Self.show }
 
@@ -1535,17 +1561,14 @@ private struct InspectorToolbarToggle: View {
 private struct InspectorDockMenu: View {
     @Binding var dock: TraceInspectorDock
 
-    private static let title = String(
-        localized: "Dock Inspector",
-        comment: "Menu that chooses which edge the Inspector is docked to."
-    )
+    private static let title = traceViewerText("Dock Inspector")
 
     var body: some View {
         Menu {
             Picker(selection: $dock) {
-                Label("Dock to Right", systemImage: TraceInspectorDock.trailing.symbolName)
+                Label(traceViewerText("Dock to Right"), systemImage: TraceInspectorDock.trailing.symbolName)
                     .tag(TraceInspectorDock.trailing)
-                Label("Dock to Bottom", systemImage: TraceInspectorDock.bottom.symbolName)
+                Label(traceViewerText("Dock to Bottom"), systemImage: TraceInspectorDock.bottom.symbolName)
                     .tag(TraceInspectorDock.bottom)
             } label: {
                 Text(Self.title)
@@ -1664,19 +1687,19 @@ private struct AnnotationInspectorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Annotations").font(.title3.weight(.semibold))
+            Text(traceViewerText("Annotations")).font(.title3.weight(.semibold))
             // Say where they live, so "will these be here tomorrow?" has a
             // visible answer.
-            Text("Saved with this trace — they return when you reopen it.")
+            Text(traceViewerText("Saved with this trace — they return when you reopen it."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             if controller.annotations.flags.isEmpty {
-                Text("Click the time ruler to place a flag.")
+                Text(traceViewerText("Click the time ruler to place a flag."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Flags").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Flags")).font(.subheadline.weight(.semibold))
                 ForEach(controller.annotations.orderedFlags) { flag in
                     AnnotationRow(
                         label: flag.label,
@@ -1694,11 +1717,11 @@ private struct AnnotationInspectorView: View {
             }
 
             if !controller.annotations.marks.isEmpty {
-                Text("Marks").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Marks")).font(.subheadline.weight(.semibold))
                 ForEach(controller.annotations.orderedMarks) { mark in
                     AnnotationRow(
-                        label: mark.label
-                            + (mark.isPersistent ? "" : " (temporary)"),
+                        label: mark.isPersistent ? mark.label
+                            : traceViewerText("{name} (temporary)", values: ["name": mark.label]),
                         detail: time(mark.range.startNs) + " – "
                             + time(mark.range.endNs),
                         colorIndex: mark.colorIndex,
@@ -1736,11 +1759,11 @@ private struct AnnotationRow: View {
                     .frame(width: 10, height: 10)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel("Change colour of \(label)")
+            .accessibilityLabel(traceViewerText("Change colour of {name}", values: ["name": label]))
             .arktraceAccessibleTarget()
 
             if isEditing {
-                TextField("Name", text: $draft)
+                TextField(traceViewerText("Name"), text: $draft)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit {
                         onRename(draft)
@@ -1754,7 +1777,7 @@ private struct AnnotationRow: View {
                     Text(label).lineLimit(1)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Rename \(label)")
+                .accessibilityLabel(traceViewerText("Rename {name}", values: ["name": label]))
                 .arktraceAccessibleTarget()
             }
 
@@ -1766,7 +1789,7 @@ private struct AnnotationRow: View {
                 Image(systemName: "trash").imageScale(.small)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel("Delete \(label)")
+            .accessibilityLabel(traceViewerText("Delete {name}", values: ["name": label]))
             .arktraceAccessibleTarget()
         }
         .accessibilityElement(children: .contain)
@@ -1794,21 +1817,14 @@ private struct DepthDisclosureButton: View {
         .buttonStyle(.borderless)
         .help(
             isExpanded
-                ? String(
-                    localized: "Flatten call depth",
-                    comment: "Collapses a track's nested call stack to one row."
-                )
-                : String(
-                    localized: "Show call depth",
-                    comment: "Expands a track's nested call stack into per-depth rows."
-                )
+                ? traceViewerText("Flatten call depth")
+                : traceViewerText("Show call depth")
         )
         .accessibilityLabel(
-            isExpanded
-                ? "Flatten call depth for \(title)"
-                : "Show call depth for \(title)"
+            traceViewerText(isExpanded ? "Flatten call depth for {name}" : "Show call depth for {name}",
+                values: ["name": title])
         )
-        .accessibilityValue(isExpanded ? "Expanded" : "Flattened")
+        .accessibilityValue(isExpanded ? traceViewerText("Expanded") : traceViewerText("Flattened"))
         .arktraceAccessibleTarget()
     }
 }
@@ -1821,34 +1837,34 @@ private struct EventInspectorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(event.name ?? event.type.rawValue).font(.title3.weight(.semibold))
-            LabeledContent("Type", value: event.type.rawValue)
-            LabeledContent("Identity", value: "\(event.key.table.rawValue):\(event.key.rowID)")
-            LabeledContent("Start", value: time(event.range.startNs))
+            LabeledContent(traceViewerText("viewer.eventType"), value: event.type.rawValue)
+            LabeledContent(traceViewerText("Identity"), value: "\(event.key.table.rawValue):\(event.key.rowID)")
+            LabeledContent(traceViewerText("Start"), value: time(event.range.startNs))
             LabeledContent(
-                "Duration",
+                traceViewerText("Duration"),
                 value: event.isOpenEnded
-                    ? "Open ended"
+                    ? traceViewerText("Open ended")
                     : time(event.semanticDurationNs ?? 0)
             )
             optional("PID", event.pid)
             optional("TID", event.tid)
             optional("CPU", event.cpu)
-            optional("Process key", event.processKey?.ipid)
-            optional("Thread key", event.threadKey?.itid)
-            optional("Process", event.processName)
-            optional("Thread", event.threadName)
-            optional("Category", event.category)
-            optional("State", event.state)
+            optional(traceViewerText("Process key"), event.processKey?.ipid)
+            optional(traceViewerText("Thread key"), event.threadKey?.itid)
+            optional(traceViewerText("Process"), event.processName)
+            optional(traceViewerText("Thread"), event.threadName)
+            optional(traceViewerText("Category"), event.category)
+            optional(traceViewerText("State"), event.state)
             // Only CPU slices carry a priority; every other type leaves it nil
             // and `optional` renders no row.
-            optional("Priority", event.priority)
-            optional("Value", event.value)
-            optional("Unit", event.unit)
+            optional(traceViewerText("Priority"), event.priority)
+            optional(traceViewerText("Value"), event.value)
+            optional(traceViewerText("Unit"), event.unit)
             // Only slices carrying an argument set have this; a trace without
             // an `args` table shows no section at all rather than an empty one.
             if !arguments.isEmpty {
                 Divider()
-                Text("Arguments").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Arguments")).font(.subheadline.weight(.semibold))
                 ForEach(Array(arguments.enumerated()), id: \.offset) { _, argument in
                     LabeledContent(argument.key, value: argument.value)
                         .accessibilityElement(children: .combine)
@@ -1859,7 +1875,7 @@ private struct EventInspectorView: View {
                         )
                 }
                 if argumentsTruncated {
-                    Text("More arguments exist")
+                    Text(traceViewerText("More arguments exist"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1884,10 +1900,10 @@ private enum SliceAggregateSort: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .total: "Total"
-        case .average: "Avg"
-        case .occurrences: "Count"
-        case .name: "Name"
+        case .total: traceViewerText("Total")
+        case .average: traceViewerText("Avg")
+        case .occurrences: traceViewerText("Count")
+        case .name: traceViewerText("Name")
         }
     }
 }
@@ -1941,7 +1957,8 @@ private struct RangeInspectorView: View {
         let duration: String = time(value.durationNs)
         let percentage: String = statePercentage(value)
         let intervals: String = String(value.intervalCount)
-        return duration + " · " + percentage + " · " + intervals + " intervals"
+        return traceViewerText("{duration} · {percentage} · intervals: {count}",
+            values: ["duration": duration, "percentage": percentage, "count": intervals])
     }
 
     private func topThreadTitle(_ value: TraceTopThread) -> String {
@@ -1974,7 +1991,7 @@ private struct RangeInspectorView: View {
     ) -> String {
         let thread: String = threadTitle(value)
         let state: String = value.rawState
-        return thread + ", state " + state
+        return traceViewerText("{thread}, state {state}", values: ["thread": thread, "state": state])
     }
 
     private func stateRowAccessibilityValue(
@@ -1983,13 +2000,14 @@ private struct RangeInspectorView: View {
         let duration: String = time(value.durationNs)
         let percentage: String = statePercentage(value)
         let intervals: String = String(value.intervalCount)
-        return duration + ", " + percentage + " of range, " + intervals + " intervals"
+        return traceViewerText("{duration}, {percentage} of range, intervals: {count}",
+            values: ["duration": duration, "percentage": percentage, "count": intervals])
     }
 
     private func stateRowCountSummary(_ analysis: TraceRangeAnalysis) -> String {
         let shown: String = String(stateRows.count)
         let total: String = String(analysis.threadStateDistribution.count)
-        return "Showing " + shown + " of " + total + " thread states"
+        return traceViewerText("Thread states: {shown} / {total}", values: ["shown": shown, "total": total])
     }
 
     private static let displayedSliceRowLimit = 50
@@ -2024,39 +2042,43 @@ private struct RangeInspectorView: View {
         let total: String = time(value.totalDurationNs)
         let average: String = time(value.averageDurationNs)
         let count: String = String(value.occurrences)
-        return total + " · avg " + average + " · ×" + count
+        return traceViewerText("{total} · avg {average} · ×{count}",
+            values: ["total": total, "average": average, "count": count])
     }
 
     private func sliceRowAccessibilityValue(_ value: TraceSliceNameAggregate) -> String {
         let total: String = time(value.totalDurationNs)
         let average: String = time(value.averageDurationNs)
         let count: String = String(value.occurrences)
-        return "total " + total + ", average " + average + ", " + count + " occurrences"
+        return traceViewerText("total {total}, average {average}, occurrences: {count}",
+            values: ["total": total, "average": average, "count": count])
     }
 
     private func sliceRowCountSummary(_ analysis: TraceRangeAnalysis) -> String {
         let shown: String = String(sliceRows.count)
         let total: String = String(analysis.sliceNameAggregates.count)
-        return "Showing " + shown + " of " + total + " slice names"
+        return traceViewerText("Slice names: {shown} / {total}", values: ["shown": shown, "total": total])
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Selected Range").font(.title3.weight(.semibold))
-            LabeledContent("Start", value: time(range.startNs))
-            LabeledContent("End", value: time(range.endNs))
-            LabeledContent("Duration", value: time(range.durationNs))
+            Text(traceViewerText("Selected Range")).font(.title3.weight(.semibold))
+            LabeledContent(traceViewerText("Start"), value: time(range.startNs))
+            LabeledContent(traceViewerText("End"), value: time(range.endNs))
+            LabeledContent(traceViewerText("Duration"), value: time(range.durationNs))
             Divider()
             if let analysis {
-                Text("CPU Utilization").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("CPU Utilization")).font(.subheadline.weight(.semibold))
                 ForEach(analysis.cpuUtilization, id: \.cpu) { value in
                     LabeledContent(
                         "CPU \(value.cpu)",
-                        value: value.utilization.formatted(.percent.precision(.fractionLength(1)))
-                            + " · \(value.sliceCount) slices"
+                        value: traceViewerText("{share} · {count} slices", values: [
+                            "share": value.utilization.formatted(.percent.precision(.fractionLength(1))),
+                            "count": value.sliceCount.formatted(),
+                        ])
                     )
                 }
-                Text("Top Threads").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Top Threads")).font(.subheadline.weight(.semibold))
                 ForEach(analysis.topThreads, id: \.threadKey) { value in
                     VStack(alignment: .leading, spacing: 1) {
                         LabeledContent(
@@ -2075,9 +2097,9 @@ private struct RangeInspectorView: View {
                             + topThreadCPUSplit(value, separator: ", ")
                     )
                 }
-                Text("Thread States").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Thread States")).font(.subheadline.weight(.semibold))
                 if analysis.threadStateDistribution.isEmpty {
-                    Text("No thread state intervals in this range.")
+                    Text(traceViewerText("No thread state intervals in this range."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
@@ -2099,16 +2121,16 @@ private struct RangeInspectorView: View {
                     }
                     if analysis.threadStateDistributionTruncated {
                         Label(
-                            "Thread states reached their interval budget",
+                            traceViewerText("Thread states reached their interval budget"),
                             systemImage: "ellipsis.circle"
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
                 }
-                Text("Slices by Name").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Slices by Name")).font(.subheadline.weight(.semibold))
                 if analysis.sliceNameAggregates.isEmpty {
-                    Text("No named slices in this range.")
+                    Text(traceViewerText("No named slices in this range."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
@@ -2120,7 +2142,7 @@ private struct RangeInspectorView: View {
                             Button(option.title) { sliceSort = option }
                                 .buttonStyle(.borderless)
                                 .font(.caption.weight(sliceSort == option ? .bold : .regular))
-                                .accessibilityLabel("Sort slices by \(option.title)")
+                                .accessibilityLabel(traceViewerText("Sort slices by {name}", values: ["name": option.title]))
                                 .accessibilityAddTraits(
                                     sliceSort == option ? [.isSelected] : []
                                 )
@@ -2130,7 +2152,7 @@ private struct RangeInspectorView: View {
                     if analysis.sliceNameAggregatesTruncated {
                         // A bounded reduction must never read as an exact total.
                         Label(
-                            "Totals are a lower bound: slice page reached its budget",
+                            traceViewerText("Totals are a lower bound: slice page reached its budget"),
                             systemImage: "exclamationmark.triangle"
                         )
                         .font(.caption)
@@ -2146,7 +2168,7 @@ private struct RangeInspectorView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(row.name)
                         .accessibilityValue(sliceRowAccessibilityValue(row))
-                        .accessibilityHint("Reveals the first occurrence on the timeline")
+                        .accessibilityHint(traceViewerText("Reveals the first occurrence on the timeline"))
                         .arktraceAccessibleTarget()
                     }
                     if analysis.sliceNameAggregates.count > sliceRows.count {
@@ -2155,7 +2177,7 @@ private struct RangeInspectorView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text("Long Slices").font(.subheadline.weight(.semibold))
+                Text(traceViewerText("Long Slices")).font(.subheadline.weight(.semibold))
                 ForEach(analysis.longSlices, id: \.key) { value in
                     LabeledContent(
                         value.name,
@@ -2163,12 +2185,12 @@ private struct RangeInspectorView: View {
                     )
                 }
                 if analysis.truncated {
-                    Label("Analysis is a bounded lower estimate", systemImage: "ellipsis.circle")
+                    Label(traceViewerText("Analysis is a bounded lower estimate"), systemImage: "ellipsis.circle")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } else {
-                ProgressView("Analyzing range…")
+                ProgressView(traceViewerText("Analyzing range…"))
                     .controlSize(.small)
             }
         }
@@ -2183,27 +2205,40 @@ private struct RangeInspectorView: View {
 /// generated from — `ShortcutCatalogTests` fails if either drifts, so there is
 /// no second list to keep in step by hand.
 struct ShortcutHelpView: View {
+    private var usesSimplifiedChinese: Bool {
+        Bundle.main.preferredLocalizations.first?.hasPrefix("zh") == true
+    }
+
+    private func keys(_ shortcut: TraceShortcut) -> String {
+        guard usesSimplifiedChinese, let chinese = shortcut.keysMarkdownSimplifiedChinese else {
+            return shortcut.keys
+        }
+        return chinese.replacingOccurrences(of: "<kbd>", with: "")
+            .replacingOccurrences(of: "</kbd>", with: "")
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(TraceShortcutCatalog.sections) { section in
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(section.title)
+                        Text(usesSimplifiedChinese ? section.titleSimplifiedChinese : section.title)
                             .font(.headline)
+                            .accessibilityIdentifier("trace.shortcuts.section.\(section.id)")
                         ForEach(section.shortcuts) { shortcut in
-                            LabeledContent(shortcut.action) {
-                                Text(shortcut.keys)
+                            LabeledContent(usesSimplifiedChinese ? shortcut.actionSimplifiedChinese : shortcut.action) {
+                                Text(keys(shortcut))
                                     .font(.system(.body, design: .monospaced))
                                     .textSelection(.enabled)
                             }
                             .accessibilityElement(children: .combine)
-                            .accessibilityLabel(shortcut.action)
-                            .accessibilityValue(shortcut.keys)
+                            .accessibilityLabel(usesSimplifiedChinese ? shortcut.actionSimplifiedChinese : shortcut.action)
+                            .accessibilityValue(keys(shortcut))
                         }
                     }
                 }
                 Text(
-                    "Timeline shortcuts act on the focused timeline, so typing in the search field stays typing."
+                    traceViewerText("Timeline shortcuts act on the focused timeline, so typing in the search field stays typing.")
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2211,6 +2246,8 @@ struct ShortcutHelpView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("trace.shortcuts")
     }
 }
 
@@ -2231,15 +2268,15 @@ struct TraceSettingsPane: View {
 
         var title: String {
             switch self {
-            case .cache: "Cache"
-            case .licenses: "Licenses"
+            case .cache: traceViewerText("Cache")
+            case .licenses: traceViewerText("Licenses")
             }
         }
     }
 
     var body: some View {
         VStack(spacing: 12) {
-            Picker("Trace settings section", selection: $selection) {
+            Picker(traceViewerText("Trace settings section"), selection: $selection) {
                 ForEach(Section.allCases) { section in
                     Text(section.title).tag(section)
                 }
@@ -2270,32 +2307,32 @@ struct TraceCacheSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Content-addressed Cache") {
+            Section(traceViewerText("Content-addressed Cache")) {
                 LabeledContent(
-                    "Size",
+                    traceViewerText("Size"),
                     value: controller.cacheInventory.map { bytes($0.totalByteCount) } ?? "—"
                 )
                 LabeledContent(
-                    "Entries",
+                    traceViewerText("Entries"),
                     value: controller.cacheInventory.map { String($0.entryCount) } ?? "—"
                 )
                 LabeledContent(
-                    "In use",
+                    traceViewerText("In use"),
                     value: controller.cacheInventory.map { String($0.activeEntryCount) } ?? "—"
                 )
                 HStack {
-                    Button("Refresh") {
+                    Button(traceViewerText("Refresh")) {
                         Task { await controller.refreshCacheInventory() }
                     }
                     .arktraceAccessibleTarget()
-                    Button("Purge Unused Entries", role: .destructive) {
+                    Button(traceViewerText("Purge Unused Entries"), role: .destructive) {
                         Task { await controller.purgeUnusedCache() }
                     }
                     .arktraceAccessibleTarget()
                     Spacer()
                 }
             }
-            Text("ArkTrace only purges inactive derived databases. Original trace files are never cache targets.")
+            Text(traceViewerText("ArkTrace only purges inactive derived databases. Original trace files are never cache targets."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -2314,17 +2351,17 @@ struct TraceLicensesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Open Source Licenses")
+            Text(traceViewerText("Open Source Licenses"))
                 .font(.title2.weight(.semibold))
-            Text("ArkTrace includes a pinned TraceStreamer build and its reviewed source closure.")
+            Text(traceViewerText("ArkTrace includes a pinned TraceStreamer build and its reviewed source closure."))
                 .foregroundStyle(.secondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("ArkTrace — MIT License").font(.headline)
-                    Text(productLicense ?? "Loading license…")
+                    Text(traceViewerText("ArkTrace — MIT License")).font(.headline)
+                    Text(productLicense ?? traceViewerText("Loading license…"))
                     Divider()
-                    Text("Third-Party Notices").font(.headline)
-                    Text(notice ?? "Loading notices…")
+                    Text(traceViewerText("Third-Party Notices")).font(.headline)
+                    Text(notice ?? traceViewerText("Loading notices…"))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
@@ -2334,7 +2371,7 @@ struct TraceLicensesView: View {
                 Text(.TraceViewerLocalizable.arkTraceAndThirdPartyLicenseNotices)
             )
             HStack {
-                Button("Show License Files in Finder") {
+                Button(traceViewerText("Show License Files in Finder")) {
                     guard let url = Bundle.main.resourceURL?
                         .appending(path: "ArkTrace/Licenses", directoryHint: .isDirectory)
                     else { return }
@@ -2342,7 +2379,7 @@ struct TraceLicensesView: View {
                 }
                 .arktraceAccessibleTarget()
                 Spacer()
-                Text("14 reviewed components")
+                Text(traceViewerText("14 reviewed components"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -2375,7 +2412,7 @@ struct TraceLicensesView: View {
             ),
             let text = String(data: data, encoding: .utf8)
         else {
-            return "License resources are unavailable in this build."
+            return traceViewerText("License resources are unavailable in this build.")
         }
         return text
     }
@@ -2423,16 +2460,16 @@ private extension TraceAppErrorTitle {
 
 private func stageLabel(_ stage: TraceLoadingStage) -> String {
     switch stage {
-    case .preparing: "Preparing…"
-    case .hashing: "Snapshotting trace…"
-    case .cacheLookup: "Checking cache…"
-    case .parsing: "Parsing trace…"
-    case .validating: "Validating database…"
-    case .indexing: "Preparing indexes…"
-    case .openingDatabase: "Opening database…"
-    case .ready: "Ready"
-    case .failed: "Failed"
-    case .cancelled: "Cancelled"
+    case .preparing: traceViewerText("Preparing…")
+    case .hashing: traceViewerText("Snapshotting trace…")
+    case .cacheLookup: traceViewerText("Checking cache…")
+    case .parsing: traceViewerText("Parsing trace…")
+    case .validating: traceViewerText("Validating database…")
+    case .indexing: traceViewerText("Preparing indexes…")
+    case .openingDatabase: traceViewerText("Opening database…")
+    case .ready: traceViewerText("Ready")
+    case .failed: traceViewerText("Failed")
+    case .cancelled: traceViewerText("Cancelled")
     }
 }
 

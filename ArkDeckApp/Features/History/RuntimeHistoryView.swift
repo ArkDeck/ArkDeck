@@ -26,6 +26,8 @@ struct RuntimeHistoryView: View {
   let onReloadDetail: ((String, String) -> Void)?
   let onExportArtifact: ((String, RuntimeArtifactPresentation, URL, Bool) -> Void)?
   let onOpenWorkspace: ((RuntimeHistoryWorkspaceContext) -> Void)?
+  var onOpenDiagnostics: ((RuntimeHistoryWorkspaceContext) -> Void)? = nil
+  let requestedJobID: String?
 
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
   @State private var searchText = ""
@@ -98,6 +100,13 @@ struct RuntimeHistoryView: View {
     .onChange(of: filteredJobs.map(\.id), initial: true) { _, visibleIDs in
       if let selectedJobID, visibleIDs.contains(selectedJobID) { return }
       selectedJobID = visibleIDs.first
+    }
+    .onChange(of: requestedJobID, initial: true) { _, jobID in
+      // A specific run's "View" action must open that run, not whichever row
+      // sorts first. This only selects immutable evidence; it never replays.
+      guard let jobID, presentation.jobs.contains(where: { $0.id == jobID }) else { return }
+      resetFilters()
+      selectedJobID = jobID
     }
     .onChange(of: selectedJobID, initial: true) { _, jobID in
       guard let jobID,
@@ -540,6 +549,17 @@ struct RuntimeHistoryView: View {
           }
           .buttonStyle(.borderedProminent)
           .accessibilityIdentifier("history.openWorkspace")
+          if context.operationReference == "capture.diagnostics@1",
+            context.workspaceKind != .diagnostics, let onOpenDiagnostics
+          {
+            Button {
+              onOpenDiagnostics(context)
+            } label: {
+              Label(historyLocalized("history.activity.open.diagnostics"), systemImage: "waveform.path")
+            }
+            .help(historyLocalized("history.context.readOnly"))
+            .accessibilityIdentifier("history.openDiagnostics")
+          }
         } else if !loadingDetailJobIDs.contains(job.id) {
           Text(historyLocalized("history.activity.open.detailUnavailable"))
             .font(WorkspaceFont.secondary)

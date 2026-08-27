@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ArkDeck · Session component review</title>
+  <link rel="stylesheet" href="arkdeck-ds/dist/styles.css">
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--ad-ground); }
+    header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--ad-panel); color: var(--ad-ink); border-bottom: 1px solid var(--ad-line); flex-wrap: wrap; }
+    header a { color: var(--ad-accent); text-underline-offset: 3px; }
+    main { max-width: 1180px; margin-inline: auto; }
+    :focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <header><strong id="review-title">ArkDeck · 组件核对</strong><a id="language-zh" href="?lang=zh-Hans">中文</a><a id="language-en" href="?lang=en">English</a><a id="appearance" href="?appearance=dark">切换外观</a><span id="review-boundary">仅设计样本 · 不访问 Runtime 或文件</span></header>
+  <main id="root"></main>
+  <script type="module" src="arkdeck-ds/dist/session-review.js"></script>
+</body>
+</html>

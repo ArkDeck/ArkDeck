@@ -1,0 +1,464 @@
+{
+  "baseline": "e1d52e68db435bdfeb326962767ca4626a77322b",
+  "date": "2026-08-27",
+  "scope": {
+    "surfaceUnits": 60,
+    "appViewFiles": 20,
+    "previewFiles": 31,
+    "goldenJourneys": [
+      "GJ-1",
+      "GJ-2",
+      "GJ-3",
+      "GJ-4"
+    ],
+    "retiredAutomationBoundary": "GJ-5"
+  },
+  "hardwareRun": false,
+  "committed": false,
+  "pushed": false,
+  "gate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "sdd": {
+      "errors": 0,
+      "warnings": 0,
+      "acceptanceIDs": 121
+    },
+    "catalogGeneratorTests": 49,
+    "catalogZeroDrift": true,
+    "swiftLanes": [
+      {
+        "name": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1815,
+        "durationSeconds": 869
+      },
+      {
+        "name": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1,
+        "durationSeconds": 12
+      },
+      {
+        "name": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5,
+        "durationSeconds": 30
+      }
+    ],
+    "swiftTestCount": 1821,
+    "xcodeBuildForTesting": "TEST BUILD SUCCEEDED",
+    "localLog": "/private/tmp/arkdeck-ui-followup-final-ci.log",
+    "sha256": "99a3ebcc73189574ed21631da2a6edac47eb2c9e999a0181aecf7265db73cc64",
+    "scopeNote": "Gate covered final production Swift/resources and UI-test code. Subsequent changes were HTML/DS interaction, documentation, and reference evidence; final DS tests/build/previews reran."
+  },
+  "design": {
+    "testCount": 38,
+    "failed": 0,
+    "build": "passed",
+    "galleryBuild": "passed",
+    "previewBundleCount": 31,
+    "logs": [
+      {
+        "localLog": "/private/tmp/arkdeck-ui-followup-design-tests-final.log",
+        "sha256": "a51843ebda487b01bb4574766eb38a3858542acb73d7d224356d172067a0edda"
+      },
+      {
+        "localLog": "/private/tmp/arkdeck-ui-followup-design-build.log",
+        "sha256": "bb09531677c5e8ab4904d6d4a50cea240a8c3fb1463c5b420b71809c0ae75c31"
+      },
+      {
+        "localLog": "/private/tmp/arkdeck-ui-followup-design-gallery-build.log",
+        "sha256": "849fb12c3e4bb33a7af579cabed450b4da2acb3b06d92e35fa41064c9a7e5871"
+      },
+      {
+        "localLog": "/private/tmp/arkdeck-ui-followup-preview-build.log",
+        "sha256": "d999860832c06db9f8e7fe8e7467ac49ca1cdb074a6b6cd6bca7fbe73ab7f508"
+      }
+    ]
+  },
+  "uiBatches": [
+    {
+      "batch": "shell-regression",
+      "exitCode": 65,
+      "localLog": "/private/tmp/arkdeck-ui-followup-shell-regression.log",
+      "sha256": "5e83a7930a0c39f3e738d96667dbff7034dbf88bab73859c9120d0c8ef01bfe9",
+      "counts": {
+        "passed": 20,
+        "failed": 2,
+        "skipped": 2
+      },
+      "tests": [
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testApplicationIconSwitchesFromSettings",
+          "status": "passed",
+          "durationSeconds": 8.668
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testDefaultWindowReportsNativeGeometryAndDoesNotOpenAtMinimumSize",
+          "status": "passed",
+          "durationSeconds": 3.893
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testDeviceContextMenuRenamesAndRefreshesDeviceState",
+          "status": "passed",
+          "durationSeconds": 19.121
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testDeviceRecordingLocksControlsWhileCheckingStorage",
+          "status": "passed",
+          "durationSeconds": 22.101
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment",
+          "status": "passed",
+          "durationSeconds": 131.738
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testEnglishSweepOfEveryWorkspace",
+          "status": "failed",
+          "durationSeconds": 145.788
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testGlobalCancellationFixtureRefusesWithoutChangingTheJobOutcome",
+          "status": "passed",
+          "durationSeconds": 8.842
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter",
+          "status": "passed",
+          "durationSeconds": 29.513
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testHistoryReopensExactFixtureContextWithoutReplay",
+          "status": "passed",
+          "durationSeconds": 27.369
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testHistorySavedFilterRestoresActivityAndExposesOneFilterSet",
+          "status": "passed",
+          "durationSeconds": 26.354
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testRealDeviceColdStartShowsConnectedDeviceWithinTwoSeconds",
+          "status": "skipped",
+          "durationSeconds": 0.342
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testRealDeviceHistoryReopensLatestViewerCapture",
+          "status": "skipped",
+          "durationSeconds": 0.182
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testReferenceLayoutsInEnglishAndSimplifiedChinese",
+          "status": "passed",
+          "durationSeconds": 28.67
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testRemoteBuildSourceSettingsSurfaceIsReachableAndFailClosed",
+          "status": "passed",
+          "durationSeconds": 12.896
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testSimplifiedChineseLocalizationSweep",
+          "status": "failed",
+          "durationSeconds": 53.622
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testTraceSettingsCacheAndLicensesAreReachableInBothLanguages",
+          "status": "passed",
+          "durationSeconds": 15.266
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages",
+          "status": "passed",
+          "durationSeconds": 48.004
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testWorkspaceNamesAndEmptyStatesInBothLanguages",
+          "status": "passed",
+          "durationSeconds": 56.906
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.OverviewRecordUITests/testARunNeedingAPersonIsPinnedAndOffersNoReplay",
+          "status": "passed",
+          "durationSeconds": 12.097
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.OverviewRecordUITests/testContinueSeparatesNavigationFromSafeDraftPreparation",
+          "status": "passed",
+          "durationSeconds": 15.154
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.OverviewRecordUITests/testOverviewFocusesTheNextStepAndDoesNotDuplicateSidebarShortcuts",
+          "status": "passed",
+          "durationSeconds": 13.735
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.OverviewRecordUITests/testReadOnlyContinuationShowsTypedInputsAndThreadBeforeAnySubmission",
+          "status": "passed",
+          "durationSeconds": 20.057
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.OverviewRecordUITests/testTheRecordLinksToTheFullArchive",
+          "status": "passed",
+          "durationSeconds": 13.688
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.OverviewRecordUITests/testViewingARunSelectsThatExactHistoryRecord",
+          "status": "passed",
+          "durationSeconds": 15.515
+        }
+      ]
+    },
+    {
+      "batch": "shell-sweeps-confirmed",
+      "exitCode": 0,
+      "localLog": "/private/tmp/arkdeck-ui-followup-shell-sweeps-confirmed.log",
+      "sha256": "c4491ad6c4b8e5408284971b5325ae0c7373118f1c134f7a0f62467d574b2779",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "tests": [
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testEnglishSweepOfEveryWorkspace",
+          "status": "passed",
+          "durationSeconds": 157.683
+        },
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testSimplifiedChineseLocalizationSweep",
+          "status": "passed",
+          "durationSeconds": 75.252
+        }
+      ]
+    },
+    {
+      "batch": "trace-localized-final",
+      "exitCode": 0,
+      "localLog": "/private/tmp/arkdeck-ui-followup-trace-localized-final.log",
+      "sha256": "48de9a736e4eabfb95a62724a8b355047b9e57b8ad08aa8342213fa4dfaef198",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "tests": [
+        {
+          "testIdentifier": "ArkDeckHDCUITests.AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages",
+          "status": "passed",
+          "durationSeconds": 79.987
+        }
+      ]
+    }
+  ],
+  "latestUniqueUIResults": {
+    "passed": 22,
+    "failed": 0,
+    "skipped": 2,
+    "singleCleanBatch": false
+  },
+  "referenceImages": {
+    "browserDesignDemo": 49,
+    "nativeApp": 9,
+    "manifest": "manifest.json",
+    "hashAndDimensionCheck": "passed"
+  },
+  "verificationLimits": [
+    "No real device operation or REAL_DEVICE_PASS.",
+    "Native Trace loaded-timeline pixel review was not performed; browser timeline is a synthetic sample.",
+    "Remote design library was not connected or updated.",
+    "Interactive Diagnostics, App recovery RPCs, and mutation continuation remain separate product work."
+  ],
+  "sourceSnapshot": [
+    {
+      "path": ".design-sync/previews/BudgetMeters.tsx",
+      "sha256": "e0b4e47c40ac748efa9d58e7af512cf2797cea3f6de72af8fc4a10a2b0f0220f"
+    },
+    {
+      "path": ".design-sync/previews/JobInspector.tsx",
+      "sha256": "0cf5b66d0ac501d5387d0fe96126cbcefecc6c9e7e7c74bde26c7c19a8ba0603"
+    },
+    {
+      "path": ".design-sync/previews/NavItem.tsx",
+      "sha256": "bb0c92d23addd42e9a7cac3aeb97626ccfd7cb2752a5ebe8ad54123f54991309"
+    },
+    {
+      "path": ".design-sync/previews/OperationList.tsx",
+      "sha256": "9ce905d27d5b4343f84ca7a13188fd84ae1b2517f94987a82799e972be19e0ac"
+    },
+    {
+      "path": ".design-sync/previews/RecoveryBanner.tsx",
+      "sha256": "dd72b2337e7bb32efbe28992aac57c4fa0259202302be570e6b6ef912be875bc"
+    },
+    {
+      "path": ".design-sync/previews/SessionSurfaces.tsx",
+      "sha256": "d574cbd30ce088a56ccfe64e04e9dcebd8a7a7f74fadead27c61680289c4dab0"
+    },
+    {
+      "path": ".design-sync/previews/StageTrack.tsx",
+      "sha256": "8e7072f12db5b098c66eba60d552161a0ee55b9c3d9fc16e2bd257ee32dd8afa"
+    },
+    {
+      "path": ".design-sync/previews/StatusStrip.tsx",
+      "sha256": "c464ee62bd6cd946a2973ce42198526d7d3aaeb4fc6a51f42184e15e20d3ad69"
+    },
+    {
+      "path": ".design-sync/previews/Symbol.tsx",
+      "sha256": "121cb79d087ce6f9ecf0e187181d647589384d7ac49975205c197f20aefed94f"
+    },
+    {
+      "path": "ArkDeckApp/App/ArkDeckApp.swift",
+      "sha256": "a05df943b735406643bbedced49622c0139ffff4eaa8340a481be742e879d314"
+    },
+    {
+      "path": "ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift",
+      "sha256": "c3bed8fcdd54d8fdc1f7c26ea736700afe262791a3d405e5d3b63e4e3295911d"
+    },
+    {
+      "path": "ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceViewModel.swift",
+      "sha256": "f6f76d136e5113342d9a287bce6af05c73e4a6d664da3cb86ec8b9ac62d13672"
+    },
+    {
+      "path": "ArkDeckApp/Features/Flash/FlashWorkspaceView.swift",
+      "sha256": "2259ac412770f2fa156f04856a00410fa71052ab974b1b37ca0a9884abf3e6bd"
+    },
+    {
+      "path": "ArkDeckApp/Features/HDC/HDCStatusView.swift",
+      "sha256": "80dc2ae84a59646f019fd20952f855a800d3523e63130ba93840dc4a730ab8fa"
+    },
+    {
+      "path": "ArkDeckApp/Features/History/RuntimeHistoryView.swift",
+      "sha256": "eeea39029ae0099147008451751288b0adc4911f5b3966f19c4428f0509d9943"
+    },
+    {
+      "path": "ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift",
+      "sha256": "b80ad10228808f2197cabd587070b18e52c4ef981ff0a72d80863a61994cdb48"
+    },
+    {
+      "path": "ArkDeckApp/Features/Overview/OverviewResumeSheet.swift",
+      "sha256": "ff7d4b0c1dd1fc1f2da51ec1b85797c765d8eb47250520c1ba69ea6eedbe3951"
+    },
+    {
+      "path": "ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift",
+      "sha256": "423bb559c4c2ab6f876191afcd185fb12502fda632f5e182ba1ea1414d80dc66"
+    },
+    {
+      "path": "ArkDeckApp/Features/Trace/TraceWorkspaceView.swift",
+      "sha256": "12b867ed93a56efe7d4923bbf2d49176e407d7e448e4726324582951e8fb31aa"
+    },
+    {
+      "path": "ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings",
+      "sha256": "ea335b81d970a5344c4c835ae7c1bc739bc3a98930edce5adb01eb784e6aed39"
+    },
+    {
+      "path": "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
+      "sha256": "2ece117080ca976174d10d39dd6b6eac066104b0a59e564719f2607572f4f7ac"
+    },
+    {
+      "path": "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
+      "sha256": "6f2993e679914a181608f529d6f1689644ed9c8de79fa92ba56f3d0c76f2e4d0"
+    },
+    {
+      "path": "ArkDeckApp/Resources/Localizable.xcstrings",
+      "sha256": "f66eb72691488b55158f2b99a5408fb7c454b7c8aca12712e2655c3261c095eb"
+    },
+    {
+      "path": "ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
+      "sha256": "3fdc98ed1f8bd01abe1e5df413da8b10753fd5a03d7e7a32d314a70a922c7438"
+    },
+    {
+      "path": "ArkDeckAppUITests/AppShell/AppShellUITests.swift",
+      "sha256": "fd5501a86797af86600998b30f1b21f7297a28812f6cd91cf80a1aaeb9964c87"
+    },
+    {
+      "path": "ArkDeckAppUITests/Overview/OverviewRecordUITests.swift",
+      "sha256": "826b2098492d998e37b73657b6c43e0e89086ef87a48080875ab032dba615712"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift",
+      "sha256": "6e53f9834849fc931d7f7200fec7bfb205516c590bed05056137a2ff00a94980"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionUIFixture.swift",
+      "sha256": "166ac57d3aaabde41a15c3fda31d2b0d3ffd885580755aa687dd67f380be7e28"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift",
+      "sha256": "33ba0eff7ef1885477bd80b2b18545a682579e0532c458c4f9895faed3f6a1fe"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobControlApplicationFacade.swift",
+      "sha256": "8c75306349ce536dcffc37ffb52a386cb273f1062c696cfc571112a8060a41dc"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceContinuation.swift",
+      "sha256": "b07976ebd1454c809d5e73c6bed81345bd9f1e8f9a9be0b07b8bfe09fe83fa9e"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/AppLocalizationLookupContractTests.swift",
+      "sha256": "28a4982b73cb21b238971f34ac41676a91d62bcc8e508b96ef07535cbefac72b"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/DiagnosticSessionReadingContractTests.swift",
+      "sha256": "7a1d08e268a7222ec7f4a71fb17cd72ce2186bff6d902534c4ca9bde525a7f5a"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/OverviewRunRecordContractTests.swift",
+      "sha256": "60b933be59fd99231539a0f472e18e913028a39ff1877955c049fc19563e9b9f"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeHistoryApplicationContractTests.swift",
+      "sha256": "8ca0e599717c961df1d97a12264d2fc43048f208f52ae43ae2ba061d6b4f6e70"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/ViewerTraceDesignSynchronizationContractTests.swift",
+      "sha256": "66a29b5719ce76476eac60f8a124c36c630fb6f3e9e899d854a56e67208f765f"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/scripts/check-tokens.mjs",
+      "sha256": "4c62386057c02bd224dbc165dc31723673edbc71beae69e66ca5b2621c05d323"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/scripts/session-review.tsx",
+      "sha256": "98852f3a39947ac280ca7eda773f77244d3b9c5ba32b95e472f9dc652e17c393"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs",
+      "sha256": "b2b4f41efb932267a028f781452534a5bf8ba5f10c6aaeef3e57e7f180534fc0"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/components/controls.tsx",
+      "sha256": "286100aed8d63e460d05c650c18e86f8d030015da0dd624d5eccb48937fdfedd"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/components/feedback.tsx",
+      "sha256": "dcb5711cc5aa5745ab67a6c5387440c6780747f70f60abed8e3c345b8deaacdc"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/components/session.tsx",
+      "sha256": "a134816a1c5a0318cf1ba5a3567b77c4260a5ed8a4bbd24dfa6a51bb99a86928"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/components/shell.tsx",
+      "sha256": "12a60bd2bafc166a10c143abd5e2271336110036baafe7fc7e75e378ceedf6f0"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/components/viewer.tsx",
+      "sha256": "813a9e900cd968dabb9f607f99c90293adf9b037fdce2808bc55ee1f324c7fc6"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/index.ts",
+      "sha256": "9e015cc77e0987f8dbc56154a2673e201cc3abae754355e38f72aeb1b7156003"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/src/styles.css",
+      "sha256": "803a01634407ea66f3bf0abc881566a01de3ba9ec230d6a6213ff7c5e32c511a"
+    },
+    {
+      "path": "docs/design/prototype.html",
+      "sha256": "b9d2731d6dae4f00bc34f6f929c8c09bd792955ee5990c5405c836ee307ffd39"
+    }
+  ]
+}

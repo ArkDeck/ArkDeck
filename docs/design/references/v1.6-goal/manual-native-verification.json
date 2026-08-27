@@ -1,0 +1,152 @@
+{
+  "date": "2026-08-28",
+  "source": "Computer Use of the workspace App with installed protected-main Runtime; each UI-only selection fixture and real Job is labeled separately.",
+  "captures": [
+    {
+      "file": "diagnostics-real-hilog-warning-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 204764,
+      "sha256": "0090fd58a16689ab9187ff865aa93212c4f0b159f9bae9bf16f29572bff31e42",
+      "jobID": "job-c0df89f6b6f6d12997666448c25010db",
+      "purpose": "Explicit HiLog preview, truncation and invalid UTF-8 warning",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "hap-debug-context-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 132293,
+      "sha256": "7d59e3814ebd6db749ab3944df309408b91e5a9ba0a140c6aea0c6b52c6215c5",
+      "jobID": "job-ff7578b8e20756c2aeb6406e6d0c9e78",
+      "purpose": "Exact real HAP History context opens Apps tab, fresh form remains unsubmitted",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "native-debug-context-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 146454,
+      "sha256": "f23ac54bda81ca401390dab7737f2cc31b0cfa5d2f3f47e982da3d0ea7615ee7",
+      "jobID": "job-5e0d1123a7a3512c28ffeadfb7744bf4",
+      "purpose": "Exact real Native History context opens Artifacts tab, no replay",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "native-history-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 163031,
+      "sha256": "963d7f2489e7a35d9aea987de1a5de1074727fdf4418c7396c52935d62ec3b3e",
+      "jobID": "job-5e0d1123a7a3512c28ffeadfb7744bf4",
+      "purpose": "Overview opens the exact newly completed Native record",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "f29-hsp-selected-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 138439,
+      "sha256": "ddd11d1a0c6522722ea5077e1a66b5a46b84ca1971876ec4b901f5489973e213",
+      "jobID": null,
+      "purpose": "UI-only dummy HSP selection; no import or execution",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "f29-hsp-duplicate-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 143430,
+      "sha256": "98a79b169a38973d6b70a344f6c11220ff4f4dd0d45186e826d7bfe84f4d10a0",
+      "jobID": null,
+      "purpose": "Duplicate HSP refused without adding a row; run disabled",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "f29-packages-cleared-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 128615,
+      "sha256": "85cb745d61715d6b1cad1b95d22bc728c10e6d59e3eaeebbc4c4808a2a44cfce",
+      "jobID": null,
+      "purpose": "Remove clears error; clear selection restores entry-empty and disables additional picker",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "f29-multipackage-request-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 151363,
+      "sha256": "6d1f6db27c61ef7d5ae3e77cc3c501aa6425bae46baf55458f9bf045319ae054",
+      "jobID": "job-2c4e67f6d107999cc5a996403387ac3a",
+      "purpose": "Exact real entry and feature selection plus typed request preview",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "f29-multipackage-succeeded-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 110581,
+      "sha256": "1a569c600835c434f50ff4814cfc1e7d7bfe392fcd2294db810d69335e0734f8",
+      "jobID": "job-2c4e67f6d107999cc5a996403387ac3a",
+      "purpose": "App displays succeeded for the new real multi-package Job",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "trace-real-event-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 123594,
+      "sha256": "e34688c23c18c7d99c6a27ea5a03640d6d8c5af812a5fad25daf7f161a10c442",
+      "jobID": "job-c0df89f6b6f6d12997666448c25010db",
+      "sourceArtifactSHA256": "c85c0d6174d396c60e8ea52340f351c5aae9b60d8b18fc1b829cbe9dd87300d3",
+      "purpose": "Keyboard selects thread_state 967: hilogd PID/TID 198, 570.566 ms, 8 microseconds.",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "trace-real-range-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 152623,
+      "sha256": "d7c082abf1e8abb2ae8de5a8068f89197b57a69f94d6e317af46dc51248c4c71",
+      "jobID": "job-c0df89f6b6f6d12997666448c25010db",
+      "sourceArtifactSHA256": "c85c0d6174d396c60e8ea52340f351c5aae9b60d8b18fc1b829cbe9dd87300d3",
+      "purpose": "Drag selects 413.904 ms–1.908 s, range analysis appears; zoom preserves range and reset/escape clear selection.",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "trace-real-annotation-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 119474,
+      "sha256": "b020fa6ee729d463ff39695bf87bb0b014020f67134279f703a954575519ea72",
+      "jobID": "job-c0df89f6b6f6d12997666448c25010db",
+      "sourceArtifactSHA256": "c85c0d6174d396c60e8ea52340f351c5aae9b60d8b18fc1b829cbe9dd87300d3",
+      "purpose": "Create and rename one test flag at 1.161 s; local annotation only.",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "trace-real-annotation-reloaded-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 119279,
+      "sha256": "c0e60658cbf36aa7329f5374663154cfe4e19bba5e39a6c2d5ee4c204914b06c",
+      "jobID": "job-c0df89f6b6f6d12997666448c25010db",
+      "sourceArtifactSHA256": "c85c0d6174d396c60e8ea52340f351c5aae9b60d8b18fc1b829cbe9dd87300d3",
+      "purpose": "Reload the same trace preserves test flag, then remove it; no test annotation remains.",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "f30-native-policy-warning-zh.jpg",
+      "localOnly": true,
+      "mediaType": "image/jpeg",
+      "byteCount": 134473,
+      "sha256": "9b0718d2069107814f4cbe56965406e3172827423113acbbb6fec20536aeba6a",
+      "jobID": null,
+      "purpose": "Latest F30 native Chinese App: running + uninstall warning visible; Bundle and Ability labels remain after typing. No submission.",
+      "visuallyReviewed": true
+    }
+  ],
+  "boundary": "Earlier four captures are read-only navigation. F29 dummy HSP checks only local selection and never submit the dummy. The real entry + feature submission is one new Job, independently verified with Runtime status and exported Artifact hashes. Images/raw logs remain local. Not an XCUITest pass, F28 installed-cache verification, or HSP device acceptance.",
+  "traceInteractionBoundary": "Real immutable capture read in production Viewer, Chinese locale. Event/range/zoom/reset/flag rename/reload/remove observed through Computer Use, not XCUITest. Test-created annotation removed; no device dispatch from these interactions. This checks presentation and source identity, not independent correctness of all aggregated analyzer metrics."
+}

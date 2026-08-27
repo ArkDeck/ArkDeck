@@ -1,0 +1,152 @@
+{
+  "date": "2026-08-27/28",
+  "exitCode": 65,
+  "testCount": 5,
+  "passed": 4,
+  "failed": 1,
+  "results": [
+    {
+      "test": "AppShellUITests/testRealDeviceColdStartShowsConnectedDeviceWithinTwoSeconds",
+      "outcome": "failed",
+      "durationSeconds": 11.293
+    },
+    {
+      "test": "AppShellUITests/testRealDeviceDiagnosticsReopensExactCaptureAndItsTraceInBothLanguages",
+      "outcome": "passed",
+      "durationSeconds": 296.019
+    },
+    {
+      "test": "AppShellUITests/testRealDeviceHistoryReopensExactViewerCapture",
+      "outcome": "passed",
+      "durationSeconds": 77.755
+    },
+    {
+      "test": "DeviceRecordingUITests/testRealDeviceRecordingCapturesFortyFramesAndOffersALocalMovie",
+      "outcome": "passed",
+      "durationSeconds": 114.335
+    },
+    {
+      "test": "ViewerUITests/testRealDeviceCaptureFillsTheStageTimings",
+      "outcome": "passed",
+      "durationSeconds": 29.52
+    }
+  ],
+  "logSHA256": "5ca36410b18b53b129450f39865ddf1fd7d6e7da68a5b4d3f9e8eb9dcb9f892f",
+  "captures": [
+    {
+      "privateAttachment": "65953763-1881-4A1B-823C-2942F9F11D13.png",
+      "state": "Trace metadata zh-Hans",
+      "width": 2560,
+      "height": 1600,
+      "byteCount": 554380,
+      "sha256": "9f9b322fe59430eb52278826e59c298bdadafee8690765e343e3407860075291",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "E6A5CD53-ACC1-4984-9283-3018C14B4402.png",
+      "state": "Trace metadata en",
+      "width": 2560,
+      "height": 1600,
+      "byteCount": 551425,
+      "sha256": "a0d20f30363d3129c99fae6bf1c13bd7407e31ba07c30b86d489228a757fd672",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "C4B95FDB-E231-493C-9C8F-EFE28463695B.png",
+      "state": "Diagnostics en",
+      "width": 2360,
+      "height": 1566,
+      "byteCount": 459409,
+      "sha256": "4c1c35d5827ea0f7da3ce258f9ff8e7e8a31b02c212f7d7f5a42770a25ab8db5",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "217FBFFD-7926-4B84-BF9B-3933A862B200.png",
+      "state": "Diagnostics zh-Hans",
+      "width": 2360,
+      "height": 1566,
+      "byteCount": 470179,
+      "sha256": "271538194756a1ef4ee4f4258ed029642352a272fad7563c6875b0452b0cfd0d",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "73D6418C-8BD8-4168-912E-C99136770673.png",
+      "state": "Device real recording ready en",
+      "width": 2940,
+      "height": 1912,
+      "byteCount": 1902890,
+      "sha256": "0b337ad068696efff14ff3b8d75d0cd93f3cae292a95db78057156838424d9ea",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "D580DAA0-AA60-4F01-AB54-98591A791594.png",
+      "state": "Viewer real capture zh-Hans",
+      "width": 2360,
+      "height": 1566,
+      "byteCount": 387266,
+      "sha256": "30b46bbb93fa15668cd3eee63dcf1e6e0de2d9193200dff6965abad9be3b19e9",
+      "viewed": true
+    }
+  ],
+  "newRuntimeJobs": [
+    {
+      "jobId": "job-bb6e9a12d4c005dd329d9f4db0a8d109",
+      "operation": "capture.screen-sequence@1",
+      "state": "succeeded",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "outcomeUnknown": false,
+      "outstandingResidueCount": 0,
+      "createdAtUtc": "2026-08-27T16:04:12Z",
+      "finishedAtUtc": "2026-08-27T16:04:45Z"
+    },
+    {
+      "jobId": "job-e8d650ad2fdb55d9a61c17488806e4f5",
+      "operation": "capture.diagnostics@1",
+      "state": "succeeded",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "outcomeUnknown": false,
+      "outstandingResidueCount": 0,
+      "createdAtUtc": "2026-08-27T16:06:08Z",
+      "finishedAtUtc": "2026-08-27T16:06:18Z"
+    }
+  ],
+  "currentJobsAfter": [],
+  "coldStart": {
+    "seconds": 4.2231345,
+    "maximumSeconds": 2,
+    "outcome": "failed",
+    "isolatedRetrySeconds": 4.643645166,
+    "baselineComparison": {
+      "revision": "e1d52e68db435bdfeb326962767ca4626a77322b",
+      "seconds": 7.646853125,
+      "outcome": "failed",
+      "exitCode": 65,
+      "logSHA256": "a7750169aee2551ed1630bb2eab14957d80b81af318a57b93ffca101d16c1efd",
+      "boundary": "First baseline build and real App launch; does not isolate every host load variable, and does not demonstrate the uninstalled F28 Runtime fix."
+    }
+  },
+  "recording": {
+    "requestedFrames": 40,
+    "displayedFrames": 40,
+    "displayedMeasuredFPS": 1.29,
+    "byteCount": 132994,
+    "sha256": "dd4a66e932180d6fed8bc17e3c8a3aac3ad8ec370b0bf9124fb140eb2b6cbe5e",
+    "nativeValidation": "AVFoundation video track, dimensions and duration passed before ready",
+    "independentDecode": {
+      "byteCount": 132994,
+      "decodedFrameCount": 40,
+      "durationSeconds": 30.94333333333333,
+      "firstPTSSeconds": 0,
+      "height": 1280,
+      "lastPTSSeconds": 30.238333333333333,
+      "presentationTimestampsStrictlyIncrease": true,
+      "reader": "AVAssetReader BGRA decoded pixel buffers",
+      "sha256": "dd4a66e932180d6fed8bc17e3c8a3aac3ad8ec370b0bf9124fb140eb2b6cbe5e",
+      "status": "completed",
+      "width": 720
+    }
+  },
+  "boundary": "Four native cases passed against the real Runtime and device; the five-case batch failed its cold-start requirement. Screenshots and raw video remain local. History/Diagnostics reopens did not create new jobs."
+}

@@ -6,27 +6,106 @@ import SwiftUI
 @MainActor
 @Observable
 final class DiagnosticsWorkspaceViewModel {
-  /// A session is armed, or it is not, or the device would not have it. There
-  /// is no state for "probably running": a person about to reproduce a bug
-  /// needs to know whether anything is being kept.
-  enum CaptureState: Equatable {
-    case idle
-    case arming
-    case armed(marks: Int)
-    case refusedBusy(String)
-    case failed(String)
-  }
-
   private(set) var reading: DiagnosticSessionReading?
   private(set) var selection = DiagnosticReaderSelection(cursorUTC: "")
   private(set) var deviceObservation = DeviceListPresentation.loading
-  private(set) var capture = CaptureState.idle
-  /// The marks a person made while the ring was holding. They are host
-  /// instants and reach no device, which is why marking can be instant and
-  /// why it keeps working when the device is busy doing something else.
-  private(set) var pendingMarks: [String] = []
+  private(set) var session: DiagnosticSessionPresentation?
+  private(set) var isLoading = false
+  private(set) var loadError: String?
+  private(set) var previewText: String?
+  private(set) var previewName: String?
+  private(set) var previewError: String?
+  private(set) var isPreviewLoading = false
+  private(set) var previewWasClipped = false
+  private(set) var previewReplacedInvalidUTF8 = false
+  private var context: RuntimeHistoryWorkspaceContext?
+  private var generation = UUID()
+  private var previewGeneration = UUID()
+  @ObservationIgnored private var loadTask: Task<Void, Never>?
+  @ObservationIgnored private let provider: any RuntimeJobDetailApplicationProviding
 
-  init() {}
+  /// No Diagnostic Session capture provider is composed into the App. The
+  /// published capture supports a bounded ring snapshot, but not interactive
+  /// append-marker/stop orchestration. These controls must not imply otherwise.
+  /// An adopted device or a local button press cannot prove recording began.
+  let captureUnavailableReasonCode = "diagnostic_session_capture_not_connected"
+
+  init(provider: any RuntimeJobDetailApplicationProviding) {
+    self.provider = provider
+  }
+
+  func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
+    self.context = context
+    reload()
+  }
+
+  var traceContext: RuntimeHistoryWorkspaceContext? {
+    guard let session, TracePublishedArtifactPolicy.selectRawTrace(from: session.artifacts) != nil else { return nil }
+    return context
+  }
+
+  func reload() {
+    guard let context else { return }
+    loadTask?.cancel()
+    let ticket = UUID()
+    generation = ticket
+    previewGeneration = UUID()
+    reading = nil
+    session = nil
+    loadError = nil
+    previewText = nil
+    previewName = nil
+    previewError = nil
+    previewWasClipped = false
+    previewReplacedInvalidUTF8 = false
+    isPreviewLoading = false
+    isLoading = true
+    loadTask = Task { [weak self, provider] in
+      let result = await DiagnosticSessionApplicationReader(provider: provider).load(context)
+      guard let self, !Task.isCancelled, generation == ticket else { return }
+      isLoading = false
+      switch result {
+      case .loaded(let session):
+        self.session = session
+        publish(reading: session.reading)
+      case .unavailable(let reason): loadError = reason
+      }
+    }
+  }
+
+  /// Reading device text is a separate, explicit local action. No raw bytes
+  /// are fetched on History navigation, exported, or sent to another service.
+  func preview(_ artifact: RuntimeArtifactPresentation) {
+    guard let context, session?.artifacts.contains(artifact) == true,
+      artifact.mediaType == "text/plain" || artifact.mediaType == "application/json"
+    else { return }
+    let ticket = UUID()
+    previewGeneration = ticket
+    isPreviewLoading = true
+    previewName = artifact.name
+    previewText = nil
+    previewError = nil
+    previewWasClipped = false
+    previewReplacedInvalidUTF8 = false
+    Task { [weak self, provider] in
+      let result = await provider.readArtifact(
+        jobID: context.jobID, artifact: artifact, maximumBytes: 2 * 1_024 * 1_024,
+        allowSensitive: artifact.privacy == "sensitive")
+      guard let self, previewGeneration == ticket else { return }
+      isPreviewLoading = false
+      switch result {
+      case .loaded(let bytes):
+        guard let preview = DiagnosticArtifactTextPreview(bytes: bytes, mediaType: artifact.mediaType) else {
+          previewError = diagnosticsText("diagnostics.preview.invalidStructuredText")
+          return
+        }
+        previewWasClipped = preview.wasClipped
+        previewReplacedInvalidUTF8 = preview.replacedInvalidUTF8
+        previewText = preview.text
+      case .failed(let reason): previewError = reason
+      }
+    }
+  }
 
   // MARK: - Capture
 
@@ -42,80 +121,6 @@ final class DiagnosticsWorkspaceViewModel {
       id: targetID, bindingRevision: device.bindingRevision, displayName: name)
   }
 
-  var canArm: Bool {
-    guard target != nil else { return false }
-    if case .idle = capture { return true }
-    if case .failed = capture { return true }
-    if case .refusedBusy = capture { return true }
-    return false
-  }
-
-  var isArmed: Bool {
-    if case .armed = capture { return true }
-    return false
-  }
-
-  func arm() {
-    guard canArm else { return }
-    capture = .arming
-    pendingMarks = []
-    capture = .armed(marks: 0)
-  }
-
-  /// A mark is a host instant. It reaches no device, so it costs nothing and
-  /// cannot fail - which is the whole reason it can be made in the moment
-  /// somebody notices something.
-  func mark(at instant: String) {
-    guard isArmed else { return }
-    pendingMarks.append(instant)
-    capture = .armed(marks: pendingMarks.count)
-  }
-
-  func stop() {
-    capture = .idle
-  }
-
-  /// A device somebody else's session holds. Refused rather than queued, and
-  /// said so: a request that waited its turn would run later without anyone
-  /// deciding that it should.
-  func refuseBusy(_ detail: String) {
-    capture = .refusedBusy(detail)
-  }
-
-  func fail(_ reason: String) {
-    capture = .failed(reason)
-  }
-
-  var captureTitle: String {
-    switch capture {
-    case .idle: diagnosticsText("diagnostics.capture.arm")
-    case .arming: diagnosticsText("diagnostics.capture.arming")
-    case .armed: diagnosticsText("diagnostics.capture.stop")
-    case .refusedBusy: diagnosticsText("diagnostics.capture.arm")
-    case .failed: diagnosticsText("diagnostics.capture.arm")
-    }
-  }
-
-  var captureNotice: (title: String, detail: String, isRefusal: Bool)? {
-    switch capture {
-    case .armed:
-      (
-        diagnosticsText("diagnostics.capture.armed"),
-        diagnosticsText("diagnostics.capture.armed.detail"), false
-      )
-    case .refusedBusy(let detail):
-      (
-        diagnosticsText("diagnostics.busy.title"),
-        "\(diagnosticsText("diagnostics.busy.detail")) \(detail)", true
-      )
-    case .failed(let reason):
-      (diagnosticsText("diagnostics.capture.failed"), reason, true)
-    case .idle, .arming:
-      target == nil
-        ? (diagnosticsText("diagnostics.capture.noTarget"), "", false) : nil
-    }
-  }
-
   func publish(deviceObservation: DeviceListPresentation) {
     self.deviceObservation = deviceObservation
   }
@@ -124,8 +129,6 @@ final class DiagnosticsWorkspaceViewModel {
     self.reading = reading
     selection = DiagnosticReaderSelection(cursorUTC: reading.marks.first?.atHostUTC ?? "")
   }
-
-  func refresh() async {}
 
   // MARK: - Alignment
 
@@ -147,6 +150,9 @@ final class DiagnosticsWorkspaceViewModel {
 
   var alignmentDetail: String? {
     guard case .cannotAlign(let reason) = reading?.alignment else { return nil }
+    if reason == "capture artifacts contain no host-to-device calibration" {
+      return diagnosticsText("diagnostics.alignment.explain")
+    }
     return "\(diagnosticsText("diagnostics.alignment.explain")) (\(reason))"
   }
 

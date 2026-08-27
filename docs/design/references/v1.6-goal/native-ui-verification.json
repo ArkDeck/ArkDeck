@@ -1,0 +1,60 @@
+{
+  "test": "AppShellUITests/testRealDeviceDiagnosticsReopensExactCaptureAndItsTraceInBothLanguages",
+  "exitCode": 0,
+  "testCount": 1,
+  "failures": 0,
+  "durationSeconds": 245.808,
+  "logSHA256": "52191d8f4972c92d7dd1d8ee3f7ebe5056df671634199ccce9896be735cac29e",
+  "captures": [
+    {
+      "privateAttachment": "C8A60255-2A81-47DD-975C-2FB9912CEBE4.png",
+      "state": "Diagnostics en",
+      "width": 2360,
+      "height": 1566,
+      "byteCount": 459400,
+      "sha256": "e3979012c7c4cf399b9da818a33d0ca5be4cd9c6f4df01557970f05b25e1c2d2",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "E21778D1-2CD6-4B96-8D8E-4F00CAF145A9.png",
+      "state": "Trace en",
+      "width": 2560,
+      "height": 1600,
+      "byteCount": 552174,
+      "sha256": "5c9b992ef6aa9e46863231647df679f6d2d1d9e003f8d973349885f4a5de60a8",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "1898EA80-773F-4BA7-88EC-9F6EF1FE0067.png",
+      "state": "Diagnostics zh-Hans",
+      "width": 2360,
+      "height": 1566,
+      "byteCount": 470162,
+      "sha256": "32e400736502bfdabfb20448ce1b652613ca20099dfa172e5f6f5f01f4fd4588",
+      "viewed": true
+    },
+    {
+      "privateAttachment": "DE2937AB-52FF-48FB-996B-5105BBDCA823.png",
+      "state": "Trace zh-Hans",
+      "width": 2560,
+      "height": 1600,
+      "byteCount": 552908,
+      "sha256": "570b912e7dc0b1739016bd11ffb4f7de614524cf7299e919e8b9ec0b98cfcb86",
+      "viewed": true
+    }
+  ],
+  "boundary": "F24/F25 native real-artifact verification. F27 metadata labels were identified during review of these screenshots and are tested in the next batch. Raw screenshots remain private.",
+  "noReplay": {
+    "beforeCount": 1929,
+    "afterCount": 1930,
+    "additionalJobs": [
+      {
+        "jobID": "job-1135caed2f0ca45f14222dbd8002ebc4",
+        "operation": "analyzer.summarize-trace@1",
+        "submittedBeforeUIRun": true
+      }
+    ],
+    "newJobsDuringUIRun": 0,
+    "afterInventorySHA256": "5ac2296a111f77fa277937e4822ef644b62b05f79de67059365dc416e3e1ec0f"
+  }
+}

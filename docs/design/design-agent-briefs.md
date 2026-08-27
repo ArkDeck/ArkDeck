@@ -1,19 +1,44 @@
-# ArkDeck 设计稿 brief(九页)
+# ArkDeck 设计稿 briefs（v1.6 全入口索引）
 
 每份对应规格 `docs/design/macos-ux-interaction-spec.md` §5.x 的一个功能页。
 用法:在 claude.ai/design 的 ArkDeck 项目里**开新对话,一次贴一份**。不要一次让它画完整个 app。
+
+2026-08-27 按 `e1d52e68` 全页复核。当前优先读取 [v1.6 §0 / §5](macos-ux-interaction-spec.md) 与
+[完整覆盖矩阵](implementation-audit-2026-08-27.md)；旧九页列表遗漏 Device、Diagnostics、Trace Viewer/帮助及 Settings 子标签。
+
+| 当前入口 | 必须附带的子页面/状态 | 实现边界 |
+| --- | --- | --- |
+| Overview | scope/SSH 绑定、下一步、调试线、环境、继续检查 sheet、HDC impact sheet | 已落地结构；仅校验通过的只读观测可准备原始 typed inputs / thread 新草稿；导航与提交分开 |
+| 设备详情 | unauthorized/polling/timeout/authorized-unadopted/adopted/offline、rename、re-check | App 不执行接管；HDC 修复去 Overview |
+| Flash | 镜像选择、计划/前置条件、Loader、写入/重启/postflight、失败/unknown | 当前同页主动作，不恢复旧第二确认框 |
+| Debug | Artifacts/Logs/Apps/Network/Commands、SSH browser、单库计划 sheet、buffer/export 提示 | 本地单文件/只读 SSH 已接通；批量/abc/独立重启未实现 |
+| Viewer | 空态/capture、截图/树、搜索；属性/布局/可访问性/原始/高级 Dump | 不新增 UI Dump 独立导航 |
+| Trace | 可用/不可用、数字校验、单位/快捷值、active/terminal/Artifact 失败 | 秒 5/10/15/30；分钟 1/2/3 |
+| Trace Viewer / 帮助 | 空态/recent、loading/cancel/error、loaded timeline、event/range/annotation、dock、快捷键 | 独立窗口与普通文案双语；通用稿补齐 loaded、选择/范围/标注/停靠；帮助镜像上游 19 条 |
+| Device | 空态/截图/过期/输入 unknown、配额预检/逐帧/合成/校验/失败 | 默认 40 帧；无持续预览或键盘输入 |
+| Diagnostics | empty/loading/failed/loaded/partial；缺失事件时刻/无校准；显式文本读取与 Trace 转交 | 保存 Session reader 已接通；交互式 arm/append/stop 未接通 |
+| History | 八类活动；完整 filters/saved/page；detail/evidence/artifact export/context | History 本身只读；Diagnostics 历史 reader 已接通 |
+| Settings | General/Toolchains/Servers/Storage/Trace/Updates/Diagnostics；Cache/Licenses；server editor/delete；导出预览 | 独立窗口；App diagnostics 排除 raw |
+| 横切 | Job 详情/标准日志/取消请求、恢复 banner、系统文件选择器/保存框 | 日志/取消已接线；rebind/archive 仍不可用，不能用确认覆盖 unknown |
+| Automation | 旧链接只说明退役 | CHG-2026-064 已删除 App/CLI/daemon task 平面；不作为待实现功能 |
+
+**旧 brief 使用限制**：以下保留历史细节以便追溯；凡与上表或 v1.6 冲突的导航数量、
+Overview 四卡布局、Debug 多 connector、Settings 五标签、Automation production 声明、
+旧无边界 cancel/rebind/archive、HDC 直接重启及任意操作参数复用都已失效，不可单独复制为当前实现任务。
 
 三点使用须知:
 
 1. **设计 agent 看不到这个仓库。** 它自动拿到的只有组件 bundle、每个组件的 `.prompt.md` / `.d.ts`,以及 README 里的约定头(token 词表、危险语义规则)。它不知道 §5 的页面定义,也没读过 `prototype.html`——所以 brief 必须自带事实。这也是每份 brief 里「内容」段要逐字照抄的原因。
 2. **「必须画出的语义」段是重点。** ArkDeck 的设计价值几乎全在非顺利路径上;不点名,agent 只会画顺利路径,那样的稿子没有评审价值。
-3. **画出来的是候选稿,不是规格的替代。** 规格 §5 是 normative 的 HOW;两者不一致时以规格为准,发现行为级缺口要走 behavior delta,不能只改稿子。
+3. **画出来的是候选稿,不是规格的替代。** 本目录 §5 是非 normative 的 HOW 设计输入，accepted specs/Catalog 才是行为事实源;两者不一致时以规格为准,发现行为级缺口要走 behavior delta,不能只改稿子。
 
-写这九份时对照发现的规格↔原型不一致,以及规格要求但原型无内容的地方,都已就地标注在对应 brief 里。
+下面九份历史 brief 写成时发现的规格↔原型不一致,以及规格要求但原型无内容的地方,都已就地标注在对应 brief 里。
 
 ---
 
 ## 5.1 Overview
+
+> 历史细节：当前实现以本文顶部 v1.6 索引与对应交互定义为准；不得把下文旧入口视作已发布能力。
 
 > 贴进 claude.ai/design 项目的新对话。
 
@@ -70,6 +95,8 @@ StatusStrip 四格:
 ---
 
 ## 5.2 设备接管与授权
+
+> 历史细节：当前实现以本文顶部 v1.6 索引与对应交互定义为准；不得把下文旧入口视作已发布能力。
 
 > 贴进 claude.ai/design 项目的新对话。
 
@@ -148,7 +175,7 @@ StatusStrip 四格:
 步骤、控件或默认状态。窗口工具栏只显示一个 `Viewer` 主标题，内容区不要再重复 `<h1>`。
 
 **布局** — `WindowFrame`，标题 `ArkDeck — Viewer`。左栏：`DeviceRow` × 2
-（DAYU200 · ready；unknown-tablet · unauthorized）+ `NavItem` × 7，`Viewer` 为当前页。
+（DAYU200 · ready；unknown-tablet · unauthorized）+ `NavItem` × 8，`Viewer` 为当前页。
 detail 默认不是 inspector，而是生产实现的空态；完成一次抓取后才切换为占满可用空间的
 DevTools 式双区 inspector：左侧 `ViewerScreenshot`；右侧 `ViewerInspectorStack`，上方
 `ComponentTree`、下方 `DumpInspector`。底部 `JobInspector` 折叠态常驻。
@@ -179,11 +206,12 @@ DevTools 式双区 inspector：左侧 `ViewerScreenshot`；右侧 `ViewerInspect
 
 **右侧下方「节点属性」**
 - 与 UI 树之间使用紧凑的水平拖动分隔条，默认 UI 树约占右侧高度 60%；分隔条支持指针拖动和上下方向键调整。
-- header：`节点属性 / Toggle` + chips `#42 / 可交互 / 可见`。
+- header：`Toggle` + chips `#42 / Interactive / Visible`；技术词与实际 Inspector 一致，不随 App 语言切换。
 - breadcrumb：`Root / Stage / Column / List / Row / Toggle`。
-- tabs：`属性 / 布局 / 无障碍 / Raw dump`，默认选中「属性」。
+- tabs：`Properties / Layout / Accessibility / Raw dump / Advanced Dump`，默认选中 `Properties`。
 - 属性表展示：`id / type / inspectorId / text / bounds / enabled / visible / clickable / focusable / checked / opacity / zIndex / hitTestBehavior`。
 - 下方 disclosure：`布局与渲染 / 无障碍 / 原始 dump`。`Raw dump` 必须可查看该节点的全部原始字段，不因结构化 inspector 未识别字段而丢失信息。
+- `Advanced Dump` 已实现按选中组件惰性读取 `componentDetail`、字段/值搜索、loading、缺失数字 ID 和失败重试；必须画出第五标签，不得沿用上一组件的结果。原型使用 `viewerTab=advanced`，拒绝/失败/加载演示分别使用 `advancedState=missingIDs/failed/loading`。
 
 **必须画出的语义**：
 
@@ -208,7 +236,7 @@ DevTools 式双区 inspector：左侧 `ViewerScreenshot`；右侧 `ViewerInspect
 `prototype.html?page=trace` 只镜像它。Trace 页只承担两件事：抓取 Trace、打开 Trace
 查看器。窗口工具栏只显示一个 `Trace` 主标题，内容区不要重复标题。
 
-**布局** — `WindowFrame`，标题 `ArkDeck — Trace`。左栏：已接管设备 + `NavItem` × 7，
+**布局** — `WindowFrame`，标题 `ArkDeck — Trace`。左栏：已接管设备 + `NavItem` × 8，
 `Trace` 为当前页。detail 是一个纵向、单阅读顺序页面，不使用两列 dashboard，也不放
 `RecoveryBanner`、参数快照卡或 Artifact 状态卡。底部全局 `JobInspector` 仍由 App shell
 负责，不复制进 Trace 内容。
@@ -231,7 +259,7 @@ detail 从上到下固定为：
 - section footer 左侧只显示当前事实：正在提交、失败、terminal outcome、首个 blocker，
   或 `Trace 只保存在这台 Mac，并会在完成后自动打开。`；
 - footer 右侧未运行时为 primary `开始抓取`；存在 active Job 时显示 job ID 和 `取消抓取`。
-  按钮是否可用与 blocker / validation 同步，不靠样式假装可执行。
+  blocked/invalid 时仍可点击，以明确显示首个错误，但不会提交 Runtime 请求；提交中禁用重复动作。
 
 **查看 Trace**:
 
@@ -245,7 +273,7 @@ detail 从上到下固定为：
 1. **页内只有抓取与查看。** 能力探测、typed Job、Artifact 验证和 viewer preparation
    仍在 facade / Runtime 后面完成，不把内部实现细节扩写成配置 dashboard。
 2. **不可用也保留动作位置。** 页头状态与 footer blocker 清楚说明原因；`开始抓取` 按
-   生产逻辑禁用，不用一个看似可点、实际无响应的按钮。
+   生产逻辑反馈校验错误，不切入演示采集中。可点击不代表 Runtime 可执行。
 3. **时长控件和生产边界一致。** 设计稿只使用秒/分钟及当前快捷值；输入非法时在控件下方
    显示 validation，不发明新档位。
 4. **Viewer 是单独窗口。** 打开本地或最近 Trace 后进入共享查看器，抓取页本身不承担
@@ -262,114 +290,58 @@ before → desired diff、`应用参数并开始抓取(…)`、raw / filtered Ar
 
 ## 5.5 Debug 工作台
 
-> 贴进 claude.ai/design 项目的新对话。
+> 当前实现稿，2026-08-27。依据 `DebugWorkspaceView.swift`、已发布 Catalog 与交互定义 §5.7；本节替换原来的四 connector / 批量 / 独立重启概念 brief。
 
-用 ArkDeck 组件画 **Debug 工作台**页。Debug 的主链路是“编译产物替换后用日志验证”，不是一张日志查看器。至少画：Artifacts 默认态、来源管理 sheet、SSH 密码/密钥与目录/SMB/WSL 条件配置态、替换计划 sheet、替换完成待重启态、重启验证完成态、Logs 采集中态；Apps / Network / Commands 各保留一张。
+用 ArkDeck 组件画 **Debug 工作台**。必须分别画五个标签和各自不可用、输入未完成、已准备、运行、失败状态；演示数据持续标明，不得将原型当作设备证据。
 
-**布局** — `WindowFrame`，标题 `ArkDeck — OpenHarmony 设备工作台`。左栏 `DeviceRow` × 2（DAYU200 / 待授权设备）+ `NavItem` × 7（Overview · Flash · Debug · Viewer · Trace · History · Automation，Debug 为当前页），不画 Settings 导航项。内容区自上而下：`RecoveryBanner`（有跨页 recovery 时才出现）→ `Tabs` 五项 → 当前面板。底部 `JobInspector` 折叠态常驻。本页没有 `StatusStrip`。
+**外壳**：设备区 + 八项导航 Overview / Flash / Debug / Viewer / Trace / Device / Diagnostics / History，Debug 选中。Settings 属独立窗口，Automation 已退役。内容区为显式 target/binding → 五标签 → 当前面板；RecoveryBanner 仅有真实待处理投影时显示，全局 JobInspector 当前只读。页面不使用 Harness StatusStrip。
 
-Tabs 五项，顺序固定：`产物替换` · `获取日志` · `应用` · `网络` · `只读工具`。默认 `产物替换`。Tab 使用 roving focus；左右方向键移动，Home / End 到两端，切换后焦点留在 tab。
+五个 tab 固定为 Artifacts / Logs / Apps / Network / Commands；中文标签依 `DebugLocalizable.xcstrings`。默认 Artifacts，左右方向键与 Home/End 切换，焦点留在 tab。示意 target 必须标为 demo，不能把 sidebar 最近点过的设备隐式作为 scope。
 
-### Artifacts / 产物替换默认态
+### Artifacts：单个 app-owned `.so`
 
-先画一行无边界 scope：`目标设备` + mono `DAYU200 · TGT-9587… · binding r12` + ok `Chip` `已确认` + `EffectBadge deviceMutation`。
+按顺序画：
 
-第一张 `Card` 标题 `编译来源`，说明 `切换 SSH 服务器、本机目录、SMB 共享或 WSL 发行版，再选择该来源登记的编译根目录。`，右上 `管理来源与根目录…`。下面两列：
+1. **来源**：本地文件或已验证 SSH 来源，两种选择。选择单个 `.so`，显示来源、文件名及大小；未选时按钮不假装有输入。不画 SMB/WSL、`.abc` 或 checkbox 多选。
+2. **SSH browser sheet**：已登记来源、当前 root/relative path、返回上级/刷新、目录与文件、选择/取消；loading/empty/refused 均有状态。不能越 verified root。来源新增/编辑在 Settings → Servers，不在此处拼一个四 connector 管理器。
+3. **身份**：bundle、逻辑库名和必要的 typed 字段，字段旁给格式错误。来源 path 与设备 path 分开；用户不能输入任意设备路径。
+4. **预览**：`检查并预览替换`，只有文件/身份/target/availability 可用才启用。展示 host validation、hash、ABI/ELF/Build ID/code-sign 和缺失原因；不把预检画成设备执行成功。
+5. **计划 sheet**：精确 target/binding、单库、effect、backup → atomic publish → readback → restartAbility/postflight 与 rollback 语义。确认动作清楚说明单库替换；取消返回原输入。
+6. **结果**：submitting/active/terminal/refused/unknown 分开，阶段和进度来自 Runtime；只有完整结果支持时才显示成功。保留到 Logs 的入口。改变 scope 或输入使旧 preparation 失效。
 
-- `Select`：label `编译来源`，当前 `远端 · OHOS 编译集群 · 已连接`；其余选项 `本地 · DevEco 输出 · 可用`、`局域网 · Nightly 共享 · 已挂载`、`本机 · WSL Ubuntu · 可用`。控件下显示当前类型和认证摘要，例如 `SSH 远端服务器 · SSH 密钥认证 · 凭据已保存在 Keychain`，绝不显示密码或完整私钥路径。
-- mono `Select`：label `编译根目录`，当前 `rk3568 · Debug — /build/openharmony/out/rk3568/debug`，另一个 `rk3568 · Release — /build/openharmony/out/rk3568/release`。
+兼容性验证阻止错误产物进入设备，备份用于失败恢复，二者不能互相替代。`restartAbility` 在同一 typed plan 内，当前稿**不画独立“重启设备…”及其成功页**。unknown intent 永不重放，也不能用 toast 文本当恢复证明。
 
-第二张 `Card` 标题 `搜索编译产物`，说明 `只搜索当前根目录下的 .so / .abc；结果路径是编译来源，不是可编辑的设备目标路径。`。搜索行：可见 label `文件名或相对路径` + mono `TextField` placeholder `例如：libace 或 entry.abc`；`SegmentedControl` 三项 `全部 / .so / .abc`；primary `搜索产物`。
+### Logs：bounded 采集与本地视口
 
-`DataTable` 列 = 选择 / 产物 / 来源相对路径 / 构建信息 / 兼容性，逐字使用四行：
+控制区包含 target、availability、1–600 秒、Info/Warn/Error、domain/tag/PID/keyword/marker。raw shard 必保存，不画可关闭的假选项。typed request 默认折叠，仍可检查精确字段。
 
-| 选择 | 产物 | 来源相对路径 | 构建信息 | 兼容性 |
-| --- | --- | --- | --- | --- |
-| ☑ | `libace_engine.z.so` · `.so · 6.8 MB` | `arkui/lib64/libace_engine.z.so` | 今天 22:41 | ok `可替换` + `arm64-v8a · ELF64 · Build ID 7f32…c91a` |
-| ☐ | `libfeature_debug.so` · `.so · 1.3 MB` | `product/lib64/libfeature_debug.so` | 今天 22:38 | ok `可替换` + `arm64-v8a · ELF64 · Build ID 11ad…402e` |
-| ☑ | `entry.abc` · `.abc · 842 KB` | `ets/modules.abc/entry.abc` | 今天 22:42 | ok `可替换` + `ABC · API 18 · 编译器指纹匹配` |
-| disabled | `liblegacy32.so` · `.so · 904 KB` | `legacy/lib/liblegacy32.so` | 昨天 18:09 | danger `已阻止` + `armeabi-v7a · 与目标 arm64-v8a 不一致` |
+- 开始需 available + target + valid inputs；采集中显示 Job 和 typed cancel，不称无限持续流。
+- 暂停仅暂停 viewport；未采集时禁用。筛选、host shard/预算、导出与 Runtime 状态分开，切标签不取消 Job。
+- 清空本地显示与设备 buffer 分开；设备 buffer operation 未发布，危险入口禁用并带原因，不画可确认的执行 sheet。
+- 显式导出使用系统保存面板并呈现 privacy/hash。示意日志不得写成真实设备观测。
 
-表下 stable live status：`已选择 2 个产物；Runtime 会先校验 ABI / 编译器指纹 / hash，再为每个现有目标创建备份。`，右侧 primary `检查并预览替换`。0 项时按钮 disabled；被阻止行不能选，状态不能只靠红色。
+### Apps：已发布 HAP workflow
 
-页尾 `Callout warn` 必须保留：`设计边界：当前生产 Catalog 只发布单个 app-owned .so 的校验、备份、替换、回滚和 Ability restart；批量来源浏览、.abc 替换与独立设备重启仍需对应 behavior contract / typed operation 后才能显示 AVAILABLE。`
+此页已接 `debug.hap@1`，不能固定写 `providerLoweringMissing`。布局为左侧 HAP/身份，右侧生命周期/计划，下方包库存与 Artifact/近期 Job。
 
-### 来源与根目录管理 sheet
+- 单 HAP 文件选择；bundle 与 Ability 有可见标签和 typed 校验。
+- 安装策略当前固定 `installOrReplace`；清理策略仅 `uninstall / retain`；结束状态 `stopped / running`；diagnostics 可选，1–300 秒。全新安装与恢复之前版本未发布，不提供可选项。
+- 输入摘要放在折叠 request 内；计划必须使用 `Catalog/operations/debug.hap.v1.json` 的完整 14 个 step ID/kind/effect，不另造六阶段流程。
+- missing file/identity、unavailable、submitting/active/cancel/terminal/failed 各有呈现；运行按钮由实际条件决定。HTML demo 的提交只展示参数，明确不会导入文件、创建 Job 或操作设备。
+- 包库存的独立启动/停止/卸载仍禁用：它们不是已发布 HAP workflow 的别名。不要把这些行按钮画成已实现。
 
-title `管理编译来源与根目录`，说明 `来源可以是 SSH 服务器、本机目录、SMB 共享或 WSL 发行版；配置只定义受信的编译产物空间，不能在这里输入设备目标路径。`。
+### Network 与 Commands
 
-四条来源配置：
+**Network**：forward/reverse、两端 1024–65535 十进制端口、创建/移除；展示 typed Job、失败与 exact inverse/readback 补偿结果。无任意 shell 输入。
 
-- 选中态 `远端 · OHOS 编译集群` / `SSH 远端服务器 · 已连接` / mono `builder@build-ohos.internal:22` / `SSH 密钥认证 · 凭据已保存在 Keychain` / `2 个编译根目录` / ok `当前来源` / `编辑` / `删除`。
-- `本地 · DevEco 输出` / `本机目录 · 可用` / mono `~/Workspace/WaterFlow/entry/build/default/intermediates` / `目录安全书签` / `1 个编译根目录` / `切换到此来源` / `编辑` / `删除`。
-- `局域网 · Nightly 共享` / `SMB 共享 · 已挂载` / mono `smb://build-nas/openharmony` / `build-reader · 密码已保存在 Keychain` / `1 个编译根目录` / `切换到此来源` / `编辑` / `删除`。
-- `本机 · WSL Ubuntu` / `WSL 发行版 · 可用` / mono `Ubuntu-24.04` / `通过封闭 WSL 文件适配器访问` / `1 个编译根目录` / `切换到此来源` / `编辑` / `删除`。
+**Commands**：只读模板选择、各自 typed 输入、lowered argv 只读 disclosure、Runtime 结果和 raw Artifact；空态、输入错误、不可用和失败都可读。不能提供 Root、自由命令或 PTY。
 
-下方标题 `当前来源的编译根目录`，右侧 `添加根目录…`；表列名称 / 根目录 / 操作：`rk3568 · Debug` / `/build/openharmony/out/rk3568/debug` / `编辑` `删除`；`rk3568 · Release` / `/build/openharmony/out/rk3568/release` / `编辑` `删除`。footer `完成` / primary `添加来源…`。
+### 共同行为与仍未实现的边界
 
-添加/编辑来源 sheet 先显示可见 label `配置名称` 与 `来源类型`，类型固定为 `SSH 远端服务器 / 本机目录 / SMB 共享 / WSL 发行版`，再渐进披露：
-
-- SSH：`SSH 主机`、`端口`、`用户名`、`登录方式（密码 / SSH 密钥）`。密码分支只显示 password field；密钥分支显示 `SSH 私钥` 与可选 `密钥口令`。首次连接显示并固定 host-key fingerprint；指纹变化时停止连接。所有 secret 只进入 Keychain，列表、Job、日志和 evidence 不回显。
-- 本机目录：`本机目录` + 系统目录选择器，保存 security-scoped bookmark，不扫描书签以外路径。
-- SMB：`SMB 共享地址`（必须是 `smb://`）、`SMB 账户`、password field；密码只进入 Keychain。
-- WSL：`WSL 发行版`；根目录另用发行版内 Linux 路径登记，不出现 `wsl.exe` 参数、raw command 或 terminal。
-
-隐藏分支必须同时 `hidden` / `inert`，不能进入 tab order。提交错误在字段旁给出修复动作、设置 `aria-invalid` 并聚焦首个错误。删除来源先确认：删除 ArkDeck 配置、根目录书签与 ArkDeck-owned Keychain credential item，但不删除外部 SSH 私钥或来源内文件；删除单个根目录只移除书签。
-
-### 替换计划 sheet
-
-title `检查替换计划`。顶部 warn `Callout`：`ABI / ABC 兼容性校验用于阻止错误产物进入设备；替换前备份用于发布或启动验证失败后的回滚。两道保护都会在首个设备写入前成为硬门。`
-
-`KeyValueList`：
-
-- `目标` → `DAYU200 · TGT-9587… · binding r12`
-- `编译来源` → `远端 · OHOS 编译集群 · rk3568 · Debug`
-- `effect` → `deviceMutation`
-- `回滚策略` → `每项先备份 · 验证失败自动恢复并复验`
-
-`DataTable` 每个选中项一行，列 = 产物 / 主机侧校验 / 发布策略；发布策略逐字写 `staging → 备份当前版本 → 原子替换 → readback`。footer `返回选择` / primary `备份并替换 2 个产物`，不要写 `确定`。
-
-派发后 `JobInspector` 显示 `Debug 产物替换 · 2 项 · DAYU200`，阶段 `Preflight / LeaseArtifacts / VerifyCompatibility / Stage / BackupCurrent / AtomicPublish / Readback / Complete`。没有可信总量，不画百分比。
-
-### 替换完成与重启
-
-替换成功在原位显示带 ok symbol 的状态块：`2 个产物已备份并通过发布 readback`，正文 `新产物尚未通过重启后的加载验证。你可以现在重启，也可以先保留当前运行态。`，按钮 danger `重启设备…` / default `获取日志`。
-
-`重启设备…` 打开 `DangerConfirmDialog`：title `重启设备以加载替换产物`；影响三条 `目标：DAYU200 · binding r12` / `当前前台应用和其他设备会话将中断` / `重启后 Runtime 必须重新绑定，并验证已替换产物与启动状态；失败时恢复备份`；footer `暂不重启` / danger `重启 DAYU200`。不要加 checkbox 或确认短语。重启成功后的状态块：`设备已重连，产物与启动状态匹配`，primary `获取日志并验证`，secondary `再次选择产物`。
-
-### Logs / 获取日志
-
-保留原日志工作区。控制行：`开始采集`（采集中变 `停止采集`）/ `暂停界面`（未采集 disabled）/ `level ≥` + `I W E`（当前 W）/ mono `tag 过滤` / dim `Chip` `host 轮转: 片 #3 · 11.8MB/64MB · 配额 1GB` / danger `清空设备 buffer…`。
-
-`LogTail` 只使用这些行：
-
-```text
-07-13 11:02:11.482 W ArkUI: [list_layout] measure retry, node 88
-07-13 11:02:11.490 W ArkUI: [render] flush delayed 22ms
-07-13 11:02:12.013 E AbilityMS: connect timeout, bundle=com.example.settings
-07-13 11:02:12.400 W ArkUI: [list_layout] measure retry, node 91
-```
-
-采集中 hint：`采集中:设备端持续拉流,host 侧按 64MB/片轮转,不清设备 buffer。`；未采集：`未在采集。开始/停止只影响 host 侧拉流,绝不清空设备 buffer。`。暂停只暂停 viewport，继续显示 `界面已暂停 · N 行待补`。`清空设备 buffer…` 仍走危险 sheet，title `清空设备日志 buffer?`，确认动作 `清空设备 buffer`。
-
-### 既有辅助 tab
-
-- Apps：保留 `com.example.settings` / `com.demo.gallery` 表，安装 HAP、启动 Ability、停止、卸载；mutation 与 read-only 分组，卸载走危险 sheet。
-- Network：保留 `forward · tcp:9222 → tcp:9222`，创建/删除都提交 typed port-forward；只接受 1024…65535 十进制端口。
-- Commands 改名为 `只读工具`：只用 approved typed template 封闭下拉（已安装包清单 / 读取 ArkUI Debug 参数 / 窗口清单 / 设备运行时长）；lowered argv 是 mono 只读 disclosure，不是输入框。
-
-**必须画出的语义**：
-
-1. **Debug 的首要心智是闭环，不是文件管理器。** 编译来源、搜索、替换、重启、日志按阅读顺序前进；来源配置是辅助入口，不能抢成首页主栏。
-2. **预检与备份分开表达。** ABI / compiler fingerprint 阻止不兼容输入，backup 支撑失败 rollback；不能写成“有备份所以 ABI 安全”。
-3. **来源路径与设备目标路径分开。** 用户能管理编译根目录，但永远不能输入设备目标 path；后者只来自 published profile。
-4. **替换完成不等于重启验证成功。** 替换 readback 后才出现独立重启按钮；重启重连与加载验证完成后才显示最终成功。
-5. **日志是反馈腿。** 替换完成态和重启完成态都保留直达 Logs 的动作；切 tab 不停止采集，也不丢选中 target 或运行中 Job。
-6. **当前 production boundary 必须可见。** `.abc`、批量来源浏览和独立设备重启尚未发布，候选稿不能把它们伪装成当前 AVAILABLE。
-7. **tab 与 sheet 可键盘完成。** roving tab、可见 focus、modal focus trap / Escape / focus return 都要成立；动态选择数与任务状态使用稳定 polite live region，日志流不逐行播报。
-8. **认证信息与设备权限正交。** SSH/SMB 连接状态只证明来源可读，不代表设备已接管；密码、私钥与口令不进入 UI 摘要、Job、日志或 Artifact evidence。
-
-**不要做的事**：不要把主按钮写成 `确定`；不要加入任意 device path、raw command、SSH / WSL 命令或终端；不要在列表、Job、日志或 evidence 中展示密码、私钥完整路径或密钥口令；不要把来源连接成功当成设备授权；不要用备份替代 ABI / ABC compatibility 校验；不要在替换完成前显示重启；不要用同一个绿色成功状态吞并 publish、restart、rebind 和 postflight；不要删除 Logs / Apps / Network / Commands。
+- 操作可用性由 exact target/binding 的 Runtime facts 决定，SSH 成功只证明来源可读。
+- 密码、私钥和口令仅存 Keychain，不进入列表、Job、日志、导出或演示截图。
+- modal 支持焦点限制、Escape 与焦点返回；状态使用稳定 polite live region，日志不逐行播报。
+- **未来设计输入**：SMB/WSL、多 root/批量搜索和替换、`.abc`、独立设备重启、设备 buffer 清除。另页标明“未实现”，不混入当前导航或演示成功态；安全需求仍保留。
 
 ---
 
@@ -406,7 +378,7 @@ title `检查替换计划`。顶部 warn `Callout`：`ABI / ABC 兼容性校验�
 <summary>已废止的 rk3568 / flashd 原型参考（仅供追溯，不得用于新设计或实现）</summary>
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(Flash 为当前页)。
+左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 8(Flash 为当前页)。
 内容区自上而下:`RecoveryBanner` → 页标题 `Flash` + 紧随其后的模式 badge → `SegmentedControl`(Execute / Plan only / Simulated,label「执行模式」)→ 两列区域。
 左列自上而下三张 `Card`:`Profile / Image Set — rk3568-5.0-full` → `Prerequisites` → (执行成功后才出现)`上次执行 · Postflight`。
 右列一张 `Card`:`Exact Plan`,表下面就是 Review & Run 区。
@@ -510,6 +482,8 @@ rebind 区块(在 Job inspector 里,不是弹窗):粗体 `设备回连,需确认
 
 ## 5.7 History
 
+> 历史细节：当前实现以本文顶部 v1.6 索引与对应交互定义为准；不得把下文旧入口视作已发布能力。
+
 > 贴进 claude.ai/design 项目的新对话。
 
 用 ArkDeck 组件画 **History** 页,三栏。至少画两种选中态:`S-0711-04`(已中断 · 结果未知)与 `S-0712-02`(planned)。
@@ -590,6 +564,8 @@ Artifacts,小标题 `Artifact`,`DataTable` 列 = 文件(mono)/ role / origin / s
 
 ## 5.8 Settings
 
+> 历史细节：当前实现以本文顶部 v1.6 索引与对应交互定义为准；不得把下文旧入口视作已发布能力。
+
 > 贴进 claude.ai/design 项目的新对话。
 
 用 ArkDeck 组件画 **Settings** 页。
@@ -644,99 +620,21 @@ Artifacts,小标题 `Artifact`,`DataTable` 列 = 文件(mono)/ role / origin / s
 
 ---
 
-## 5.9 Automation / Bounded AI Debug Loop
+## 5.9 Automation（已退役）
 
-> 贴进 claude.ai/design 项目的新对话。
+CHG-2026-064 已删除 App Automation、daemon task.* 与 CLI task 命令族。
+旧设计不再作为候选方案或待办；不要根据此 brief 重建 Harness 决策平面。
+历史内容可从 Git 追溯；当前原型 `page=automation` 只提供退役说明。
 
-用 ArkDeck 组件画 **Automation** 页。该页已经是生产工作区：它只监控现有 Harness task，并开放 Runtime 已实现的三个有界生命周期动作；不带 Preview badge。
+## 补充：独立 Device 与 Diagnostics
 
-**当前权威 brief（只画 production wire 已有字段）**:
+Device 使用 `device-control-design.md` 和 v1.6 当前原型；覆盖 empty/captured/stale/unknown/
+inputFailed、frameCount preflight、quota/refused、capturing/assembling/validating/ready/failed。
+Diagnostics 使用 `diagnostic-mode-design.md`：当前页面禁用 arm/mark，未来 recorder/reader 目标
+必须单独标注。两个工作区不共享状态或静默启动对方的 channel。
 
-- Sidebar 的第七项是 Automation，正常导航样式，不带 Preview / planned badge。`HTASK-*` 是 Runtime task ID，与 Git `TASK-*` 无关。
-- 内容使用两栏 `HSplitView`。左栏是 Runtime 返回的 task list：lifecycle symbol + 文字、active round、HTASK ID、goal；右栏是所选 task 详情。
-- 详情顶部依次显示 lifecycle、stage、type 与 goal；Facts 区只显示 task ID、target ID、round、version、updated UTC，以及有值时的 active Job ID / wait reason。
-- Allowed operations 区只读显示 Runtime 返回的字符串；空数组显示明确空态，不把它变成按钮或输入。
-- 动作固定为 `Reconcile`（primary）、`Pause`、`Cancel`（destructive），分别映射 `task.reconcile` / `task.pause` / `task.cancel`。terminal task 禁用全部动作；waiting / humanRequired 额外禁用 Pause。动作期间禁用重复提交并显示小型 progress。
-- 页面底部常驻 boundary callout：App 不能创建 task、提供 human resolution、resume、propose patch、导出 promotion、GC workspace 或管理 capability。失败原因行内显示并可完整阅读。
-- toolbar 只有 Refresh。unavailable 显示 Runtime reason + 连接指导；空 list 显示“没有 Automation task”；未选中显示选择提示。
-- 不画 Attempts、budgets、conditions、StageTrack 或 HumanActionRequired action，因为这些字段尚未由当前 App facade 投影。不得用 v0.3 演示数据补齐。
+## 补充：独立窗口、Settings 与全局层
 
-**必须画出的语义**:
-
-1. lifecycle 与 stage 是两条独立事实，均使用 Runtime 原文；lifecycle 以 symbol + 文字表达，不只靠颜色。
-2. 所有动作都绑定当前选中的完整 HTASK ID；响应若返回不同 ID 或缺字段，整次刷新失败，不拼接局部事实。
-3. Allowed operations 是证据，不是 authority 或快捷操作入口。
-4. `Cancel` 取消的是现有 Harness task，不等同于任意 Runtime Job 的取消，也不扩大 task 的 allowed operations。
-5. 900×600 下仍保留 list / detail 对应关系；键盘焦点和 VoiceOver 先读任务，再读事实、操作和 boundary。
-
-**不要做的事**:不要画 task submit、resume、human decision 文本框、patch 编辑器、预算编辑器、workspace GC、promotion 导出或 capability admin；不要发明 HTASK、target、goal、round、wait reason 或 allowed operation；不要提供 raw command / argv / 远端路径输入。
-
-<details>
-<summary>已废止的 v0.3 Automation Preview 候选（仅供追溯，不得用于新设计或实现）</summary>
-
-**布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(Overview · Flash · Debug · Viewer · Trace · History · Automation,Automation 为当前页)。Automation 的 label 后面跟一枚小 `Chip tone="dim"` `Preview`——`NavItem` 没有 badge 属性,徽标从 label 传进去。icon 用 `Symbol`(`overview` / `flash` / `debug` / `dump` / `trace` / `history` / `automation`),不用 emoji。
-内容区自上而下:`RecoveryBanner`(§4.2 的 banner,humanRequired 一项,落在页面内容之前、toolbar 之下)→ 页标题 `Automation` + `Chip tone="planned"` → `StatusStrip` 四格 → `Card`「修复目标」内含 `StageTrack` → `Card`「预算」内含 `BudgetMeters` → 两列并排:`Card`「Attempts」(`DataTable`)与 `Card`「Attempt 2 · Evidence」(`KeyValueList` + `OperationList` + warn `Callout`)。
-底部 `JobInspector` 折叠态常驻,`jobs` 为空,摘要读作「没有运行中的任务」。
-spec 给 Automation Attempt 留的是三栏 split view;原型用内容区内的两列实现「清单 + 详情」。照两列画即可,但两列的对应关系要显式:Attempts 表第 2 行是选中行(`selectedId`),右卡标题就是 Attempt 2。
-
-**内容** — 逐字使用,不要改写、不要翻译、不要补充:
-
-RecoveryBanner 一项,kind = `humanRequired`:
-- 标题 `Automation · HTASK-DEMO-001 · unknown-tablet`
-- 正文 `typed HAP deployment 需要一台已授权设备。unknown-tablet 的授权被拒绝或弹窗超时,ArkDeck 不自动重试。`
-- `reasonCode` → `E000003`
-- `需要你做` → `解锁设备屏幕,在设备弹出的「是否信任此计算机?」中选择「信任」或「始终信任」;若重试无效,再检查设备的 USB 调试开关。`
-- `之后回到` → `deploying`
-- 按钮 `我已完成上述动作`
-
-页标题:`Automation` + `Chip tone="planned"` `Preview · code-backed candidate`
-
-`StatusStrip` 四格:
-- `Runtime task` → `HTASK-DEMO-001 · debugCrash`(mono)
-- `Lifecycle` → `Chip tone="warn"` `● running`
-- `Current stage` → `patching`
-- `Target binding` → `rk3568-dev · rev 4`(mono)
-
-卡片「修复目标」:
-正文 `复现并修复设置页启动后闪退；完成 build、typed HAP deployment 与同一设备复验后才允许成功。`
-`StageTrack`,stages 固定八项:`initializing` `reproducing` `collecting` `analyzing` `patching` `building` `deploying` `verifying`,`currentIndex = 4`(停在 patching)
-尾注 `阶段、lifecycle 与 conditions 是三条正交信息；回退到 analyzing 不会被画成新的成功阶段。`
-
-卡片「预算」,标题右侧 `Chip tone="dim"` `停止条件已固化`,`BudgetMeters` 五条:
-| Rounds | 4 / 8 | 50% |
-| Wall clock | 07:42 / 30:00 | 26% |
-| Artifacts | 18.4 / 64 MB | 29% |
-| E1 mutations | 2 / 4 | 50% |
-| Model calls | 3 / 12 | 25% |
-尾注 `no-progress 0/2 · action retry 0/2。任一预算耗尽即停止并保存 machine reason，不自动扩大预算。`
-
-卡片「Attempts」,`DataTable`,列 = `#` / `Outcome` / `Strategy fingerprint` / `Observation`(第一列与 fingerprint 列 mono):
-- `1` · `Chip tone="dim"` `noProgress` · `91ac…74e0` · `crash signature unchanged`
-- `2` · `Chip tone="warn"` `● active` · `6f2b…9d18` · `candidate built; deployment pending`(选中行)
-尾注 `重复失败由 strategy fingerprint 判断，不因改写 hypothesis 文案而伪装成新策略。`
-
-卡片「Attempt 2 · Evidence」,`KeyValueList`:
-| base revision | 7c9e…e218 |
-| patch revision | candidate:2 · diff 6f2b…9d18 |
-| confirmed | crash=SIGABRT; source guard missing |
-| disproved | device offline; package mismatch |
-| next readback | launch state + crash signature absent |
-
-`OperationList` 四枚:`workspace.apply-patch@1` `workspace.run-tests@1` `debug.hap@1` `capture.diagnostics@1`
-`Callout tone="warn"` + `Symbol name="warning" small`:`只允许上面的 typed operation。raw argv、shell、远端路径和未登记命令在提交前拒绝。`
-
-原型没有内容的三处,如实空着,不要补:spec 还点名 Attempt detail 要展示 ActionRun、evaluation 与 runtime/build Artifact,原型的 Evidence 只有上面五行;spec 的摘要条要 goal / round / elapsed,原型把 goal 放进「修复目标」卡、把 round 与 elapsed 交给 Rounds 与 Wall clock 两条预算,摘要条只有四格;原型这一页复用的是共用的 Flash outcomeUnknown / Trace waiting 两条恢复项——那不是 Harness block,所以本稿改画 §5.9 点名的 humanRequired 项。
-
-**必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
-
-1. **`HTASK-*` 是运行单元,与 Git 的 `TASK-*` 不是一回事。** 页面上出现的任务标识永远是 `HTASK-DEMO-001`,mono,不缩写、不换前缀、不链去 issue 或 PR。sidebar 那枚 `Preview` 徽标也是这个意思的一部分:这是 Harness 的运行单元视图,不是任务看板。
-2. **阶段轨是固定的八段序列,回退不是新阶段。** 八个阶段永远全部画出,当前标记停在 `patching`(第 5 格)。要表达 verifying 未过后回到 `analyzing`,做法是把当前标记退回同一条轨上的第 4 格:不追加节点、不抹掉已走过的阶段、不给回退配成功色。spec 说这条回退用「回向箭头」表达,`StageTrack` 用的是标记回退——两种画法都行,前提是满足同一条不变量:analyzing 不能被画成一个新的成功阶段。若加箭头,它必须落在同一条轨上、指向已存在的 analyzing 节点。
-3. **stage / lifecycle / conditions 是三条正交事实,不能压成一个指示器。** `● running` 与 `patching` 各占摘要条的一格。压成一个总状态之后就再也读不出「running 的任务正停在 patching」,更读不出「running 的任务刚退回 analyzing」——而后者恰恰是这一页最需要说清的事。
-4. **预算是 consumed / max:接近上限只警告,耗尽才停,并且说得出机器可读的理由。** 五条都写成「已用 / 上限」,进度条允许画确定百分比,因为分母是 host 自己持有的(轮次、墙钟、字节、E1 改动次数、模型调用);设备侧工作没有这样的分母,那里该用 `IndeterminateBar`,绝不编百分比。耗尽时的行为是停止并保存 machine reason,不是弹窗问「要不要加预算」;页面上不能出现任何放宽上限的控件。`Rounds 4 / 8` 与 `E1 mutations 2 / 4` 已过半,画面要读得出「再有两次设备侧改动就触顶」。
-5. **Allowed operations 是只读 chip:那是允许清单本身,不是历史记录,更不是输入框。** 不在这四枚里的东西根本无法提交。`@1` 是标识的一部分,不折叠、不美化、不译成中文动词,用 mono 以便和 host 侧登记表逐字符比对。chip 必须与那句拒绝声明同屏——单看四枚 chip 会被读成「用过的命令」,配上声明才读得出「只有这四个能用」。整页不得出现 raw argv、shell、远端路径或任何自由文本命令面。
-6. **`humanRequired` 复用 §4.2 的同一个 banner family,理由要具体到 block 类型。** 它摊开三行事实:`reasonCode`(机器可读的 block)、`需要你做`(最小人工动作,不是一句「请检查设备」)、`之后回到`(恢复到哪个 stage,让人知道按下按钮会发生什么)。按钮写「我已完成上述动作」,不写「继续」——人只能为自己做过的事作证。ArkDeck 在这里不自动重试。授权缺失、outcomeUnknown、strategy exhausted、evidence integrity、environment unavailable 是五种不同的 block,各有各的准确文案;原型只给了授权缺失这一种(E000003),另外四种没有文案,不要照着编。
-
-**不要做的事**:不要发明 HTASK 编号、设备名、fingerprint、revision、阶段名或预算数字;不要把 Attempt 的 Outcome 与任务的 Lifecycle 用同一枚 chip 表达(`noProgress` / `● active` 说的是这一次尝试,`● running` 说的是整个任务);不要在底部 Job inspector 里给 HTASK 补一条假的运行中 Job——HTASK 与 Job 是两套单位;不要画 AC 标注 chip(`HarnessTask lifecycle / stage`、`bounded debug loop budgets` 这类只在原型评审模式里叠加,不进产品);不要把「Preview · code-backed candidate」徽标删掉或降级成灰字,它是这一页尚未被接受为 production 的唯一可见证据。
-
-</details>
+Trace Viewer、Trace Keyboard Shortcuts 与 Settings 都是独立 scene；七个 Settings 标签和
+Cache/Licenses 都要评审。详见本文顶部全入口表和全页覆盖清单。
+Job Inspector 当前只读；恢复 banner 只去 History；这些 UI 缺口不能推断为 Runtime 缺失。

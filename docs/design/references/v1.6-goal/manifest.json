@@ -1,0 +1,162 @@
+{
+  "source": "browser design demo; not real-device evidence",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "referenceWindow": {
+    "width": 1180,
+    "height": 760
+  },
+  "images": [
+    {
+      "file": "history-diagnostics-entry-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=history&lang=en",
+      "action": "Select S-0826-03; Open Workspace and Open Diagnostics remain separate.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 73041,
+      "sha256": "0dbf7d74e3e3e40804e4c1386b53aef2c0c99c5d5f4503a55960681f0838ff82",
+      "viewed": true
+    },
+    {
+      "file": "diagnostics-encoding-warning-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&diagnosticsState=loaded&diagnosticsEncoding=repaired&lang=en",
+      "action": "Read sensitive content locally; scroll to the encoding warning.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 70319,
+      "sha256": "cc3899fd291ee8f95a2976174c8e2b5ad05f8cd89a34cba298212a214692376a",
+      "viewed": true
+    },
+    {
+      "file": "diagnostics-encoding-warning-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&diagnosticsState=loaded&diagnosticsEncoding=repaired&lang=zh-Hans",
+      "action": "Click 在本机读取敏感内容; scroll to the encoding warning.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 62915,
+      "sha256": "41b1a79f75656faa4541f174bdbdd503163aba43e42132cfee35589921a25837",
+      "viewed": true
+    },
+    {
+      "file": "hap-published-policies-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=en",
+      "action": "Select the Lifecycle request heading; install policy is fixed and cleanup has only uninstall/retain.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 83077,
+      "sha256": "fa324108bcf821fa2941e7ccdb6ab2b8672091d5095b3525a13cac0356b0bba1",
+      "viewed": true
+    },
+    {
+      "file": "hap-published-policies-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=zh-Hans",
+      "action": "Select the Lifecycle request heading; install policy is fixed and cleanup has only uninstall/retain.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 72952,
+      "sha256": "51c1fc2c5947e51bfd71090e894b889eb8d74dfdda478d58705c0948c6077bad",
+      "viewed": true
+    },
+    {
+      "file": "trace-file-metadata-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=en",
+      "action": "Open the loaded sample with no event selected; inspect file metadata. Explicitly selecting DrawFrame later switches to event details.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 74630,
+      "sha256": "58ca46ef89bf472f908a8da299d35621d7e9c6830e207effe22916659f4a8327",
+      "viewed": true
+    },
+    {
+      "file": "trace-file-metadata-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=zh-Hans",
+      "action": "Open the loaded sample with no event selected; inspect file metadata. Explicitly selecting DrawFrame later switches to event details.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 67861,
+      "sha256": "2ee2cfc3b0f19ce31b4b607a25c31c8d70e9fbe8880ac7053c20e169bfb736eb",
+      "viewed": true
+    },
+    {
+      "file": "hap-multipackage-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?page=debug&debugTab=apps&lang=zh",
+      "action": "Select entry fixture, add feature HAP and shared HSP, add/remove a third package; switch to English; inspect visible package list. Design only, no import or Job.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 101295,
+      "sha256": "6378b6f4b4b675503e70fc1da6d22c6fd614b11edb53135d62e68ad1b8a79674",
+      "viewed": true,
+      "referenceMode": false
+    },
+    {
+      "file": "hap-multipackage-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?page=debug&debugTab=apps&lang=zh",
+      "action": "Select entry fixture, add feature HAP and shared HSP, add/remove a third package; inspect visible package list. Design only, no import or Job.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 93296,
+      "sha256": "16833708fe553c5703e2d994f199cccbdaa5e26e4f235ccc23e4ac21014a164f",
+      "viewed": true,
+      "referenceMode": false
+    },
+    {
+      "file": "hap-running-cleanup-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?page=debug&debugTab=apps&lang=en",
+      "action": "Select Leave running while Uninstall after run is selected; Chinese image switches language with toolbar. Retain installed app removes the warning.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "referenceMode": false,
+      "byteCount": 88538,
+      "sha256": "61bf5aa3b02a38c65c9d947e5eea6a80523f43d001f97ea3004fa08dd8add134",
+      "viewed": true
+    },
+    {
+      "file": "hap-running-cleanup-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?page=debug&debugTab=apps&lang=en",
+      "action": "Select Leave running while Uninstall after run is selected; Chinese image switches language with toolbar. Retain installed app removes the warning.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "referenceMode": false,
+      "byteCount": 82426,
+      "sha256": "5d7577c7bb689f7717a46746d2717e4ff4de28b628e37dde537f94f8d2eb0027",
+      "viewed": true
+    },
+    {
+      "file": "trace-annotations-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?page=trace-viewer&traceViewerState=loaded&lang=zh-Hans",
+      "action": "Add flag at 2 s; create temporary and kept marks for DrawFrame; select performLayout and create a replacement temporary mark. Keep 3.800–5.050 s; temporary becomes 0.600–1.780 s. Inspect names and visible range bands; scroll inspector to marks. Switch the toolbar language to EN before capture. Reload after capture clears the page-only demo state.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "referenceMode": false,
+      "byteCount": 95466,
+      "sha256": "626c0d0def0d90381d035e7c9c81377ee06a25758dca3a248af1c611ce9f9027",
+      "viewed": true
+    },
+    {
+      "file": "trace-annotations-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?page=trace-viewer&traceViewerState=loaded&lang=zh-Hans",
+      "action": "Add flag at 2 s; create temporary and kept marks for DrawFrame; select performLayout and create a replacement temporary mark. Keep 3.800–5.050 s; temporary becomes 0.600–1.780 s. Inspect names and visible range bands; scroll inspector to marks. Reload after capture clears the page-only demo state.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "referenceMode": false,
+      "byteCount": 89080,
+      "sha256": "699b9fc7c8544c9d2a8e0957d9034752745ff8fe1656fbdf34e8d2a1b699e564",
+      "viewed": true
+    }
+  ]
+}

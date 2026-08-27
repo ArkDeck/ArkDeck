@@ -148,10 +148,10 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
       ],
     ]
 
-    for (table, keys) in keysByTable {
-      let locales = table == "TraceLocalizable"
-        ? ["zh-Hans", "en"] : ["zh-Hans"]
-      for locale in locales {
+    for (table, keys) in keysByTable.merging([
+      "TraceViewerLocalizable": ["Source bytes", "Schema"]
+    ], uniquingKeysWith: +) {
+      for locale in ["zh-Hans", "en"] {
         for key in keys {
           let value = try localizedValue(key, table: table, locale: locale)
           XCTAssertTrue(
@@ -198,7 +198,11 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
     XCTAssertTrue(durationSource.contains("case .seconds: [5, 10, 15, 30]"))
     XCTAssertTrue(durationSource.contains("case .minutes: [1, 2, 3]"))
     XCTAssertTrue(prototype.contains(#"trace:{running:false,duration:10,unit:"seconds""#))
-    XCTAssertTrue(prototype.contains(#"value==="seconds"?10:1"#))
+    // Unit changes preserve the requested interval (rounding minutes up),
+    // rather than discarding it and choosing a new default on every toggle.
+    XCTAssertTrue(prototype.contains("Math.ceil(seconds/60)"))
+    XCTAssertTrue(prototype.contains("traceDurationValid()"))
+    XCTAssertFalse(prototype.contains("setTraceDuration(Number(this.value)||10)"))
     XCTAssertTrue(prototype.contains("[5,10,15,30]"))
     XCTAssertTrue(prototype.contains("[1,2,3]"))
 

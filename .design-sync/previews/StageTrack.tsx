@@ -1,3 +1,4 @@
+// Historical Harness illustration: CHG-2026-064 removed App/CLI/daemon task.*. Not a product backlog.
 import { Card, Chip, PhaseTrack, StageTrack } from "@arkdeck/ds";
 
 const hint = { margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ad-ink-2)" };
@@ -21,6 +22,7 @@ export const RepairGoal = () => (
       <p style={goal}>
         复现并修复设置页启动后闪退;完成 build、typed HAP deployment 与同一设备复验后才允许成功。
       </p>
+      <p style={hint}>退役 Harness 阶段示例；外部 Agent 决策，不新增 App task 平面。</p>
       <StageTrack stages={STAGES} currentIndex={4} />
       <p style={hint}>
         阶段、lifecycle 与 conditions 是三条正交信息;回退到 analyzing 不会被画成新的成功阶段。
@@ -33,6 +35,7 @@ export const RepairGoal = () => (
 export const BackToAnalyzing = () => (
   <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", gap: 12 }}>
     <Card title="修复目标" action={<Chip tone="warn">● running</Chip>}>
+      <p style={hint}>退役 Harness 阶段示例；外部 Agent 决策，不新增 App task 平面。</p>
       <StageTrack stages={STAGES} currentIndex={3} />
       <p style={hint}>
         verifying 未通过后任务退回 analyzing:阶段序列不变,只是当前标记回到第 4 个节点。
@@ -48,6 +51,7 @@ export const BackToAnalyzing = () => (
 export const BeforeTaskStarts = () => (
   <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", gap: 12 }}>
     <Card title="修复目标" action={<Chip tone="dim">尚未开始</Chip>}>
+      <p style={hint}>退役 Harness 阶段示例；外部 Agent 决策，不新增 App task 平面。</p>
       <StageTrack stages={STAGES} currentIndex={-1} />
       <p style={hint}>
         任务已声明阶段但还未进入第一个:先把要走的路摊开,再开始走。没有「正在进行」的绿点或 accent 点。
@@ -60,6 +64,7 @@ export const BeforeTaskStarts = () => (
 export const NotAPhaseTrack = () => (
   <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", gap: 12 }}>
     <Card title="StageTrack — HarnessTask 声明的阶段(可回退)">
+      <p style={hint}>退役 Harness 阶段示例；外部 Agent 决策，不新增 App task 平面。</p>
       <StageTrack stages={STAGES} currentIndex={4} />
     </Card>
     <Card title="PhaseTrack — 单个 Job 的执行阶段(只前进)">

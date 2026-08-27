@@ -1,3 +1,4 @@
+// Historical Harness illustration: CHG-2026-064 removed App/CLI/daemon task.*. Not a product backlog.
 import { Callout, Card, Chip, DataTable, KeyValueList, OperationList, Symbol } from "@arkdeck/ds";
 
 const hint = { margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ad-ink-2)" };

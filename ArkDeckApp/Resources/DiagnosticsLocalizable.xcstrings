@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "diagnostics.capture.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session capture is not available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断会话采集尚不可用"
+          }
+        }
+      }
+    },
+    "diagnostics.capture.unavailable.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。"
+          }
+        }
+      }
+    },
     "diagnostics.alignment.calibrated": {
       "extractionState": "manual",
       "localizations": {
@@ -534,13 +568,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Arm a capture, work the device, then mark what you saw."
+            "value": "Open a capture.diagnostics Job from History to read its verified artifacts. No connected device is needed to read a saved capture."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "先布防一次采集，在设备上复现，然后标记你看到的东西。"
+            "value": "从 History 打开 capture.diagnostics 记录，读取校验后的产物。读取已保存的采集无需连接设备。"
           }
         }
       }
@@ -694,6 +728,324 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnostics"
+          }
+        }
+      }
+    },
+    "diagnostics.session.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading session artifacts…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取会话产物…"
+          }
+        }
+      }
+    },
+    "diagnostics.session.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot read this session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取此会话"
+          }
+        }
+      }
+    },
+    "diagnostics.session.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry reading"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新读取"
+          }
+        }
+      }
+    },
+    "diagnostics.session.reload": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新加载会话"
+          }
+        }
+      }
+    },
+    "diagnostics.session.readOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved capture · read only. Viewing does not start a new Job."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存的采集 · 只读。查看不会启动新 Job。"
+          }
+        }
+      }
+    },
+    "diagnostics.session.timeline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime timeline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime 时间线"
+          }
+        }
+      }
+    },
+    "diagnostics.ring.covered": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime found the coverage anchor in the ring snapshot."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime 已在环形快照中找到覆盖锚点。"
+          }
+        }
+      }
+    },
+    "diagnostics.ring.lost": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The ring snapshot lost its coverage anchor. Earlier events may be missing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "环形快照未保留覆盖锚点，较早事件可能缺失。"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session artifacts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话产物"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text previews stay in this App. Sensitive content is read only when you select it; nothing is exported or uploaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本预览仅留在此 App。敏感内容仅在选择后读取，不会导出或上传。"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.read": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read locally"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在本机读取"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.readSensitive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read sensitive content locally"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在本机读取敏感内容"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.openElsewhere": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A published Trace can open in Trace Viewer. Other files can be exported explicitly from History. Job times are never used as screenshot timestamps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已发布的 Trace 可在 Trace Viewer 打开；其他文件可从 History 显式导出。不会使用 Job 时间推算截图时刻。"
+          }
+        }
+      }
+    },
+    "diagnostics.preview.clipped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview shows the first 120,000 characters. Export the artifact from History to read the complete file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览显示前 120,000 个字符。可从 History 导出产物以读取完整文件。"
+          }
+        }
+      }
+    },
+    "diagnostics.mark.timeMissing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time not reported"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未记录时刻"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.openTrace": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open sensitive Trace in Viewer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Viewer 中打开敏感 Trace"
+          }
+        }
+      }
+    },
+    "diagnostics.artifacts.openTrace.privacy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reads the selected Job’s immutable Trace into the local viewer cache. No upload."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将所选 Job 的不可变 Trace 读取到本机查看器缓存，不上传。"
+          }
+        }
+      }
+    },
+    "diagnostics.preview.replacedInvalidUTF8": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some bytes are not valid UTF-8 and appear as � in this preview. The original Artifact and its SHA-256 are unchanged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分字节不是有效 UTF-8，在此预览中显示为 �。原始 Artifact 及其 SHA-256 未改变。"
+          }
+        }
+      }
+    },
+    "diagnostics.preview.invalidStructuredText": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This structured text is not valid UTF-8. Inspect or export the original Artifact from History."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这份结构化文本不是有效 UTF-8。请在 History 中检查或导出原始 Artifact。"
           }
         }
       }

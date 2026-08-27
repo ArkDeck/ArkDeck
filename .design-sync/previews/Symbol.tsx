@@ -101,28 +101,18 @@ export const SidebarNavGlyphs = () => (
         transport="USB"
         state="unauthorized"
       />
-      <span style={addLink}>
-        <Symbol name="plus" small />
-        添加 TCP / UART 目标…
-      </span>
+
     </div>
     <div style={group}>
       <span style={sectionLabel}>功能</span>
       <NavItem icon={<Symbol name="overview" />} label="Overview" />
       <NavItem icon={<Symbol name="flash" />} label="Flash" />
       <NavItem icon={<Symbol name="debug" />} label="Debug" />
-      <NavItem icon={<Symbol name="dump" />} label="UI Dump" />
+      <NavItem icon={<Symbol name="dump" />} label="Viewer" />
       <NavItem icon={<Symbol name="trace" />} label="Trace" />
       <NavItem icon={<Symbol name="history" />} label="History" />
-      <NavItem
-        icon={<Symbol name="automation" />}
-        label={
-          <>
-            Automation<span style={previewTag}>Preview</span>
-          </>
-        }
-        active
-      />
+      <NavItem icon={<Symbol name="device" />} label="Device" />
+      <NavItem icon={<Symbol name="diagnostics" />} label="Diagnostics" active />
     </div>
   </div>
 );
@@ -176,7 +166,7 @@ export const ColorFromContext = () => (
         padding: "6px 10px",
       }}
     >
-      <NavItem icon={<Symbol name="automation" />} label="Automation" active />
+      <NavItem icon={<Symbol name="diagnostics" />} label="Diagnostics" active />
       <NavItem icon={<Symbol name="trace" />} label="Trace" />
     </div>
     <Callout tone="warn" icon={<Symbol name="warning" small />}>

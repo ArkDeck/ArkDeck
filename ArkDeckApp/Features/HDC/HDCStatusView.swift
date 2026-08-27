@@ -121,6 +121,7 @@ struct HDCStatusView: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .keyboardShortcut("d", modifiers: [.command, .shift])
         .accessibilityIdentifier("overview.advanced.toggle")
         .accessibilityValue(
           Text(LocalizedStringKey(

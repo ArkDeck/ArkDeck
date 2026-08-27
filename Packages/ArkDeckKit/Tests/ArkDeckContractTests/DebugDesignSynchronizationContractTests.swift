@@ -78,6 +78,11 @@ final class DebugDesignSynchronizationContractTests: XCTestCase {
         prototype.contains("data-sync-id=\"\(identifier)\""),
         "Debug draft is no longer synchronized at \(identifier)")
     }
+    for unpublishedPolicy in ["installFresh", "restorePrevious"] {
+      XCTAssertFalse(
+        debugSource.contains(".tag(\"\(unpublishedPolicy)\")"),
+        "the App must not offer a lifecycle policy the Catalog refuses")
+    }
   }
 
   func testPrototypeUsesCurrentDebugLocalizedCopy() throws {

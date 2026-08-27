@@ -343,6 +343,41 @@ private enum DebugNativeLibraryLocalArtifactInspector {
   }
 }
 
+/// Selection checks do not import bytes or grant device authority. Runtime
+/// independently checks every lease and binding when admitting the one Job.
+public enum DebugHAPPackageSelection {
+  public static let maximumAdditionalPackages = 16
+
+  public enum Failure: String, Error, Sendable {
+    case invalidEntry, invalidAdditional, tooManyPackages, duplicatePackage
+  }
+
+  public static func validate(entry: URL, additional: [URL]) throws {
+    guard entry.isFileURL, isSafeName(entry.lastPathComponent, allowsHSP: false) else {
+      throw Failure.invalidEntry
+    }
+    guard additional.count <= maximumAdditionalPackages else {
+      throw Failure.tooManyPackages
+    }
+    guard
+      additional.allSatisfy({
+        $0.isFileURL && isSafeName($0.lastPathComponent, allowsHSP: true)
+      })
+    else { throw Failure.invalidAdditional }
+    let paths = ([entry] + additional).map { $0.standardizedFileURL.path }
+    guard Set(paths).count == paths.count else { throw Failure.duplicatePackage }
+  }
+
+  package static func isSafeName(_ name: String, allowsHSP: Bool) -> Bool {
+    name.count <= 128
+      && name.range(
+        of: allowsHSP
+          ? #"^[A-Za-z0-9][A-Za-z0-9._-]*\.(hap|hsp)$"#
+          : #"^[A-Za-z0-9][A-Za-z0-9._-]*\.hap$"#,
+        options: .regularExpression) != nil
+  }
+}
+
 struct DebugHAPLocalArtifact: Sendable, Equatable {
   let name: String
   let byteCount: Int64
@@ -357,11 +392,11 @@ enum DebugHAPLocalArtifactError: Error, CustomStringConvertible {
   var description: String {
     switch self {
     case .invalidName:
-      "Choose a .hap file whose basename contains only letters, numbers, dot, underscore or hyphen"
+      "Choose a package with a safe .hap basename, or .hsp for an additional package"
     case .invalidSize:
-      "The selected HAP must be between 1 byte and 64 MiB"
+      "Each selected package must be between 1 byte and 64 MiB"
     case .notRegularFile:
-      "The selected HAP is not a readable regular file"
+      "The selected package is not a readable regular file"
     }
   }
 }
@@ -370,12 +405,9 @@ enum DebugHAPLocalArtifactInspector {
   static let maximumBytes: Int64 = 64 * 1_024 * 1_024
   static let readChunkBytes = 512 * 1_024
 
-  static func inspect(_ url: URL) throws -> DebugHAPLocalArtifact {
+  static func inspect(_ url: URL, allowsHSP: Bool = false) throws -> DebugHAPLocalArtifact {
     let name = url.lastPathComponent
-    guard name.count <= 128,
-      name.range(
-        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.hap$"#,
-        options: .regularExpression) != nil
+    guard DebugHAPPackageSelection.isSafeName(name, allowsHSP: allowsHSP)
     else { throw DebugHAPLocalArtifactError.invalidName }
     let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
     guard values.isRegularFile == true else {
@@ -535,6 +567,7 @@ public protocol DebugApplicationProviding: Sendable {
   func submitHAP(
     target: DebugTargetPresentation,
     fileURL: URL,
+    additionalFileURLs: [URL],
     bundleName: String,
     abilityName: String,
     installPolicy: String,
@@ -576,10 +609,177 @@ public protocol DebugApplicationProviding: Sendable {
   ) async -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure>
 }
 
+enum DebugHAPSubmission {
+  typealias Request =
+    @Sendable (String, [String: JSONValue]?) async
+    -> Result<Data, DebugXPCReadFailure>
+
+  static func submit(
+    target: DebugTargetPresentation,
+    fileURL: URL,
+    additionalFileURLs: [URL],
+    bundleName: String,
+    abilityName: String,
+    installPolicy: String,
+    cleanupPolicy: String,
+    postRunAbilityState: String,
+    captureDiagnostics: Bool,
+    diagnosticsDurationSeconds: Int,
+    send: Request = { await DebugXPCReadTransport.request(method: $0, params: $1) }
+  ) async -> DebugLogJobSubmissionResult {
+    do {
+      try DebugHAPPackageSelection.validate(entry: fileURL, additional: additionalFileURLs)
+      // Validate the closed request dimensions before importing any bytes.
+      _ = try DebugHAPRequestBuilder.request(
+        target: target, lease: "validation-only", bundleName: bundleName,
+        abilityName: abilityName, installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
+        postRunAbilityState: postRunAbilityState, captureDiagnostics: captureDiagnostics,
+        diagnosticsDurationSeconds: diagnosticsDurationSeconds)
+      let files = [fileURL] + additionalFileURLs
+      let scopedFiles = files.filter { $0.startAccessingSecurityScopedResource() }
+      defer { scopedFiles.forEach { $0.stopAccessingSecurityScopedResource() } }
+      // Finish bounded local inspection for the entire set before the first
+      // upload. Equal basenames from different folders are valid; equal bytes
+      // are not two modules. No local path is sent to Runtime.
+      var locals: [DebugHAPLocalArtifact] = []
+      for (index, file) in files.enumerated() {
+        try Task.checkCancellation()
+        let local = try await Task.detached(priority: .userInitiated) {
+          try DebugHAPLocalArtifactInspector.inspect(file, allowsHSP: index > 0)
+        }.value
+        guard !locals.contains(where: { $0.sha256 == local.sha256 }) else {
+          throw DebugHAPPackageSelection.Failure.duplicatePackage
+        }
+        locals.append(local)
+      }
+      var leases: [String] = []
+      for (file, local) in zip(files, locals) {
+        try Task.checkCancellation()
+        leases.append(
+          try await importPackage(target: target, fileURL: file, local: local, send: send))
+      }
+      try Task.checkCancellation()
+      let request = try DebugHAPRequestBuilder.request(
+        target: target, lease: leases[0], additionalLeases: Array(leases.dropFirst()),
+        bundleName: bundleName, abilityName: abilityName,
+        installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
+        postRunAbilityState: postRunAbilityState, captureDiagnostics: captureDiagnostics,
+        diagnosticsDurationSeconds: diagnosticsDurationSeconds)
+      let requestData = try CanonicalJSONEncoders.canonical().encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        throw DebugXPCReadFailure.transport("Could not encode the typed HAP request")
+      }
+      let submitted = try DebugRuntimeResponseDecoding.resultObject(
+        await send("job.submit", ["requestJson": .string(requestJSON)]))
+      guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
+        throw DebugXPCReadFailure.transport("Runtime accepted HAP Debug without returning a Job ID")
+      }
+      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as DebugHAPPackageSelection.Failure {
+      return .failed(failureMessage(failure))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  private static func failureMessage(_ failure: DebugHAPPackageSelection.Failure) -> String {
+    switch failure {
+    case .invalidEntry: "Choose one entry .hap with a safe basename"
+    case .invalidAdditional: "Choose additional .hap or .hsp packages with safe basenames"
+    case .tooManyPackages: "Choose at most 16 additional packages"
+    case .duplicatePackage: "Select each package only once; duplicate files or bytes were found"
+    }
+  }
+
+  private static func importPackage(
+    target: DebugTargetPresentation, fileURL: URL, local: DebugHAPLocalArtifact, send: Request
+  ) async throws -> String {
+    var uploadID: String?
+    do {
+      let begin = try DebugRuntimeResponseDecoding.resultObject(
+        await send(
+          "artifact.importHap.begin",
+          [
+            "targetId": .string(target.id),
+            "name": .string(local.name),
+            "byteCount": .integer(local.byteCount),
+            "sha256": .string(local.sha256),
+          ]))
+      guard let startedUploadID = begin["uploadId"] as? String else {
+        throw DebugXPCReadFailure.transport("Runtime returned no HAP upload identity")
+      }
+      uploadID = startedUploadID
+      guard let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
+        maximumChunkBytes > 0,
+        maximumChunkBytes <= DebugHAPLocalArtifactInspector.readChunkBytes,
+        begin["targetId"] as? String == target.id,
+        begin["bindingRevision"] as? Int == target.bindingRevision
+      else { throw DebugXPCReadFailure.transport("Runtime returned incomplete HAP import facts") }
+
+      let handle = try FileHandle(forReadingFrom: fileURL)
+      defer { try? handle.close() }
+      var offset = 0
+      while Int64(offset) < local.byteCount {
+        guard !Task.isCancelled else { throw CancellationError() }
+        let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
+        guard !chunk.isEmpty else {
+          throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
+        }
+        let appended = try DebugRuntimeResponseDecoding.resultObject(
+          await send(
+            "artifact.importHap.append",
+            [
+              "uploadId": .string(startedUploadID),
+              "offset": .integer(Int64(offset)),
+              "base64": .string(chunk.base64EncodedString()),
+            ]))
+        guard let nextOffset = appended["nextOffset"] as? Int,
+          nextOffset == offset + chunk.count
+        else { throw DebugXPCReadFailure.transport("Runtime HAP import offset drifted") }
+        offset = nextOffset
+      }
+      guard Int64(offset) == local.byteCount else {
+        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
+      }
+      guard (try handle.read(upToCount: 1) ?? Data()).isEmpty else {
+        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
+      }
+
+      let imported = try DebugRuntimeResponseDecoding.resultObject(
+        await send(
+          "artifact.importHap.commit",
+          ["uploadId": .string(startedUploadID)]))
+      uploadID = nil
+      guard let lease = imported["lease"] as? String,
+        imported["targetId"] as? String == target.id,
+        imported["bindingRevision"] as? Int == target.bindingRevision,
+        imported["name"] as? String == local.name,
+        imported["byteCount"] as? Int == Int(local.byteCount),
+        imported["sha256"] as? String == local.sha256
+      else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime import facts no longer match the selected target and package")
+      }
+
+      return lease
+    } catch {
+      // Abort only the current uncommitted upload. Completed immutable leases
+      // remain in Runtime storage; failure never submits a partial package set.
+      if let uploadID {
+        _ = await send("artifact.importHap.abort", ["uploadId": .string(uploadID)])
+      }
+      throw error
+    }
+  }
+}
+
 enum DebugHAPRequestBuilder {
   static func request(
     target: DebugTargetPresentation,
     lease: String,
+    additionalLeases: [String] = [],
     bundleName: String,
     abilityName: String,
     installPolicy: String,
@@ -589,31 +789,39 @@ enum DebugHAPRequestBuilder {
     diagnosticsDurationSeconds: Int,
     nonce: String = UUID().uuidString.lowercased()
   ) throws -> RuntimeOperationRequest {
-    guard !lease.isEmpty,
+    let allLeases = [lease] + additionalLeases
+    guard allLeases.allSatisfy({ !$0.isEmpty }),
+      additionalLeases.count <= DebugHAPPackageSelection.maximumAdditionalPackages,
+      Set(allLeases).count == allLeases.count,
       DebugTypedValueValidator.isValidBundleName(bundleName),
       DebugTypedValueValidator.isValidAbilityName(abilityName),
-      ["installOrReplace", "installFresh"].contains(installPolicy),
-      ["uninstall", "retain", "restorePrevious"].contains(cleanupPolicy),
+      installPolicy == "installOrReplace",
+      ["uninstall", "retain"].contains(cleanupPolicy),
       ["stopped", "running"].contains(postRunAbilityState),
       (1...300).contains(diagnosticsDurationSeconds)
     else { throw DebugXPCReadFailure.transport("HAP request is outside the published bounds") }
+    var inputs: [String: JSONValue] = [
+      "hapArtifactLease": .string(lease),
+      "bundleName": .string(bundleName),
+      "abilityName": .string(abilityName),
+      "installPolicy": .string(installPolicy),
+      "cleanupPolicy": .string(cleanupPolicy),
+      "postRunAbilityState": .string(postRunAbilityState),
+      "captureDiagnostics": .bool(captureDiagnostics),
+      "diagnosticsDurationSeconds": .integer(Int64(diagnosticsDurationSeconds)),
+      "portForwardProfile": .string("none"),
+    ]
+    // Preserveerving absence keeps the published single-package plan unchanged.
+    if !additionalLeases.isEmpty {
+      inputs["additionalHapArtifactLeases"] = .array(additionalLeases.map(JSONValue.string))
+    }
     return try RuntimeOperationRequest(
       requestID: "debug-hap-ui-\(nonce)",
       idempotencyKey: "debug-hap-ui-\(nonce)",
       target: DurableTargetReference(
         targetID: target.id, expectedBindingRevision: target.bindingRevision),
       operation: RuntimeOperationReference(id: "debug.hap", version: 1),
-      inputs: [
-        "hapArtifactLease": .string(lease),
-        "bundleName": .string(bundleName),
-        "abilityName": .string(abilityName),
-        "installPolicy": .string(installPolicy),
-        "cleanupPolicy": .string(cleanupPolicy),
-        "postRunAbilityState": .string(postRunAbilityState),
-        "captureDiagnostics": .bool(captureDiagnostics),
-        "diagnosticsDurationSeconds": .integer(Int64(diagnosticsDurationSeconds)),
-        "portForwardProfile": .string("none"),
-      ],
+      inputs: inputs,
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
         clientName: ArkDeckAgentClientName.debugAppsWorkspace, targetID: target.id))
@@ -812,7 +1020,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeWorkspaceThread.clientContext(
-        clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
+          clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
       let encoder = CanonicalJSONEncoders.canonical()
       let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
@@ -835,6 +1043,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
   func submitHAP(
     target: DebugTargetPresentation,
     fileURL: URL,
+    additionalFileURLs: [URL],
     bundleName: String,
     abilityName: String,
     installPolicy: String,
@@ -843,112 +1052,12 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     captureDiagnostics: Bool,
     diagnosticsDurationSeconds: Int
   ) async -> DebugLogJobSubmissionResult {
-    guard DebugTypedValueValidator.isValidBundleName(bundleName),
-      DebugTypedValueValidator.isValidAbilityName(abilityName)
-    else { return .failed("Bundle or ability name is outside the published schema") }
-    let gainedScope = fileURL.startAccessingSecurityScopedResource()
-    defer {
-      if gainedScope { fileURL.stopAccessingSecurityScopedResource() }
-    }
-    var uploadID: String?
-    do {
-      let local = try await Task.detached(priority: .userInitiated) {
-        try DebugHAPLocalArtifactInspector.inspect(fileURL)
-      }.value
-      let begin = try DebugRuntimeResponseDecoding.resultObject(
-        await DebugXPCReadTransport.request(
-          method: "artifact.importHap.begin",
-          params: [
-            "targetId": .string(target.id),
-            "name": .string(local.name),
-            "byteCount": .integer(local.byteCount),
-            "sha256": .string(local.sha256),
-          ]))
-      guard let startedUploadID = begin["uploadId"] as? String else {
-        throw DebugXPCReadFailure.transport("Runtime returned no HAP upload identity")
-      }
-      uploadID = startedUploadID
-      guard let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
-        maximumChunkBytes > 0,
-        maximumChunkBytes <= DebugHAPLocalArtifactInspector.readChunkBytes,
-        begin["targetId"] as? String == target.id,
-        begin["bindingRevision"] as? Int == target.bindingRevision
-      else { throw DebugXPCReadFailure.transport("Runtime returned incomplete HAP import facts") }
-
-      let handle = try FileHandle(forReadingFrom: fileURL)
-      defer { try? handle.close() }
-      var offset = 0
-      while Int64(offset) < local.byteCount {
-        guard !Task.isCancelled else { throw CancellationError() }
-        let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
-        guard !chunk.isEmpty else {
-          throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
-        }
-        let appended = try DebugRuntimeResponseDecoding.resultObject(
-          await DebugXPCReadTransport.request(
-            method: "artifact.importHap.append",
-            params: [
-              "uploadId": .string(startedUploadID),
-              "offset": .integer(Int64(offset)),
-              "base64": .string(chunk.base64EncodedString()),
-            ]))
-        guard let nextOffset = appended["nextOffset"] as? Int,
-          nextOffset == offset + chunk.count
-        else { throw DebugXPCReadFailure.transport("Runtime HAP import offset drifted") }
-        offset = nextOffset
-      }
-      guard Int64(offset) == local.byteCount else {
-        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
-      }
-      guard (try handle.read(upToCount: 1) ?? Data()).isEmpty else {
-        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
-      }
-
-      let imported = try DebugRuntimeResponseDecoding.resultObject(
-        await DebugXPCReadTransport.request(
-          method: "artifact.importHap.commit",
-          params: ["uploadId": .string(startedUploadID)]))
-      uploadID = nil
-      guard let lease = imported["lease"] as? String,
-        imported["targetId"] as? String == target.id,
-        imported["bindingRevision"] as? Int == target.bindingRevision,
-        imported["name"] as? String == local.name,
-        imported["byteCount"] as? Int == Int(local.byteCount),
-        imported["sha256"] as? String == local.sha256
-      else {
-        return .failed("Runtime import facts no longer match the selected target and HAP")
-      }
-
-      let request = try DebugHAPRequestBuilder.request(
-        target: target, lease: lease, bundleName: bundleName, abilityName: abilityName,
-        installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
-        postRunAbilityState: postRunAbilityState,
-        captureDiagnostics: captureDiagnostics,
-        diagnosticsDurationSeconds: diagnosticsDurationSeconds)
-      let requestData = try CanonicalJSONEncoders.canonical().encode(request)
-      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
-        return .failed("Could not encode the typed HAP request")
-      }
-      let submitted = try DebugRuntimeResponseDecoding.resultObject(
-        await DebugXPCReadTransport.request(
-          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
-      guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
-        return .failed("Runtime accepted HAP Debug without returning a Job ID")
-      }
-      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
-    } catch let failure as DebugXPCReadFailure {
-      if let uploadID {
-        _ = await DebugXPCReadTransport.request(
-          method: "artifact.importHap.abort", params: ["uploadId": .string(uploadID)])
-      }
-      return .failed(failure.message)
-    } catch {
-      if let uploadID {
-        _ = await DebugXPCReadTransport.request(
-          method: "artifact.importHap.abort", params: ["uploadId": .string(uploadID)])
-      }
-      return .failed(String(describing: error))
-    }
+    await DebugHAPSubmission.submit(
+      target: target, fileURL: fileURL, additionalFileURLs: additionalFileURLs,
+      bundleName: bundleName, abilityName: abilityName,
+      installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
+      postRunAbilityState: postRunAbilityState, captureDiagnostics: captureDiagnostics,
+      diagnosticsDurationSeconds: diagnosticsDurationSeconds)
   }
 
   func prepareNativeLibrary(
@@ -1265,7 +1374,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
         ],
         requestedOutputs: [.derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeWorkspaceThread.clientContext(
-        clientName: ArkDeckAgentClientName.debugNetworkWorkspace, targetID: target.id))
+          clientName: ArkDeckAgentClientName.debugNetworkWorkspace, targetID: target.id))
       let encoder = CanonicalJSONEncoders.canonical()
       let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {

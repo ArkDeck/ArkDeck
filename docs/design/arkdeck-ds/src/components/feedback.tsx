@@ -65,7 +65,9 @@ export interface DangerConfirmDialogProps {
 }
 
 /**
- * Danger confirmation dialog — the fixed structure every destructive action goes through.
+ * Optional confirmation layout for flows that explicitly call for one.
+ * This is not Runtime authority. The current one-click Flash flow uses an
+ * inline impact statement, and headless execution does not require this UI.
  *
  * The shape is deliberately not configurable: title naming the action, an
  * impact block spelling out device identity and what is overwritten, one

@@ -120,7 +120,8 @@ private final class ArkDeckAppModelStore {
   // A launch without `--ui-test-device-recording=` never reaches the fixture.
   @ObservationIgnored lazy var deviceRecording = DeviceRecordingViewModel(
     provider: DeviceRecordingFixture.provider() ?? DeviceControlFacade.make())
-  @ObservationIgnored lazy var diagnosticsWorkspace = DiagnosticsWorkspaceViewModel()
+  @ObservationIgnored lazy var diagnosticsWorkspace = DiagnosticsWorkspaceViewModel(
+    provider: RuntimeJobDetailApplicationFacade.make())
 
   init() {
     AppStartupPerformance.beginStartup()
@@ -159,30 +160,36 @@ struct ArkDeckApp: App {
     WindowGroup(id: ArkDeckWindow.main) {
       AppShellView(models: models)
         .onOpenURL(perform: openTrace)
+        .overlay(alignment: .bottomTrailing) {
+          if ProcessInfo.processInfo.arguments.contains("--ui-test-window-geometry") {
+            WindowGeometryEvidence()
+              .frame(width: 1, height: 1)
+          }
+        }
     }
     .defaultSize(width: 1180, height: 760)
     .commands {
       CommandMenu("Trace") {
-        Button("Capture Trace…") {
+        Button(traceViewerText("Capture Trace…")) {
           models.requestTraceWorkspace()
           openWindow(id: ArkDeckWindow.main)
         }
         .keyboardShortcut("n")
-        Button("Open Trace…", action: presentTraceOpenPanel)
+        Button(traceViewerText("Open Trace…"), action: presentTraceOpenPanel)
           .keyboardShortcut("o", modifiers: [.command, .shift])
-        Button("Reload Trace") { models.traceDocument.reload() }
+        Button(traceViewerText("Reload Trace")) { models.traceDocument.reload() }
           .keyboardShortcut("r", modifiers: [.command, .shift])
           .disabled(models.traceDocument.sourceURL == nil)
         Divider()
-        Button("Filter Trace Processes") { models.traceDocument.focusProcessFilter() }
+        Button(traceViewerText("Filter Trace Processes")) { models.traceDocument.focusProcessFilter() }
           .keyboardShortcut("f")
           .disabled(models.traceDocument.trackGroups.isEmpty)
-        Button("Search Trace Events") { models.traceDocument.focusTraceSearch() }
+        Button(traceViewerText("viewer.searchEvents.menu")) { models.traceDocument.focusTraceSearch() }
           .keyboardShortcut("f", modifiers: [.command, .shift])
           .disabled(models.traceDocument.metadata == nil)
       }
       CommandGroup(replacing: .help) {
-        Button("Trace Keyboard Shortcuts") {
+        Button(traceViewerText("Trace Keyboard Shortcuts")) {
           openWindow(id: ArkDeckWindow.traceShortcuts)
         }
       }
@@ -191,7 +198,7 @@ struct ArkDeckApp: App {
       TraceViewerSceneView(models: models)
     }
     .defaultSize(width: 1_280, height: 800)
-    Window("Trace Keyboard Shortcuts", id: ArkDeckWindow.traceShortcuts) {
+    Window(traceViewerText("Trace Keyboard Shortcuts"), id: ArkDeckWindow.traceShortcuts) {
       ShortcutHelpView()
     }
     .defaultSize(width: 520, height: 620)
@@ -203,8 +210,8 @@ struct ArkDeckApp: App {
   @MainActor
   private func presentTraceOpenPanel() {
     let panel = NSOpenPanel()
-    panel.title = "Open Trace"
-    panel.prompt = "Open"
+    panel.title = traceViewerText("viewer.openPanel.title")
+    panel.prompt = traceViewerText("Open")
     panel.canChooseFiles = true
     panel.canChooseDirectories = false
     panel.allowsMultipleSelection = false
@@ -225,6 +232,58 @@ enum ArkDeckWindow {
   static let main = "arkdeck.window.main"
   static let traceViewer = "arkdeck.window.traceViewer"
   static let traceShortcuts = "arkdeck.window.traceShortcuts"
+}
+
+/// Opt-in UI-test observation of the actual window, not a synthetic AppKit
+/// style mask. The actual frame, full-size content and unobscured layout are
+/// separate measurements; none is inferred from a generic title-bar size.
+/// This never resizes a window or overrides its saved placement.
+private struct WindowGeometryEvidence: NSViewRepresentable {
+  func makeNSView(context: Context) -> Probe {
+    Probe(frame: .zero)
+  }
+
+  func updateNSView(_ view: Probe, context: Context) {
+    view.publish()
+  }
+
+  final class Probe: NSView {
+    override init(frame: NSRect) {
+      super.init(frame: frame)
+      setAccessibilityElement(true)
+      setAccessibilityRole(.staticText)
+      setAccessibilityIdentifier("uiTest.windowGeometry")
+      setAccessibilityLabel("Window geometry")
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      publish()
+    }
+
+    override func layout() {
+      super.layout()
+      publish()
+    }
+
+    func publish() {
+      DispatchQueue.main.async { [weak self] in
+        guard let self, let window = self.window else { return }
+        let frame = window.frame
+        let content = window.contentRect(forFrameRect: frame)
+        let layout = window.contentLayoutRect
+        let facts = [
+          "frameWidth": frame.width, "frameHeight": frame.height,
+          "contentWidth": content.width, "contentHeight": content.height,
+          "layoutWidth": layout.width, "layoutHeight": layout.height,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: facts) else { return }
+        self.setAccessibilityValue(String(decoding: data, as: UTF8.self))
+      }
+    }
+  }
 }
 
 private struct TraceViewerSceneView: View {
@@ -322,6 +381,8 @@ private struct OverviewWorkspaceView: View {
   let deviceList: DeviceListViewModel
   let runtimeHistory: RuntimeHistoryViewModel
   let onOpenWorkspace: (ArkDeckNavigationItem) -> Void
+  let onOpenJob: (String) -> Void
+  let onPrepare: (RuntimeWorkspaceContinuation) -> Void
 
   @State private var resumingRun: RuntimeJobSummaryPresentation?
 
@@ -352,6 +413,10 @@ private struct OverviewWorkspaceView: View {
           currentTargetID: overviewCapabilities.presentation.targetID,
           currentBindingRevision: overviewCapabilities.presentation.bindingRevision,
           onOpenWorkspace: { openWorkspace(continuing: run) },
+          onPrepare: { draft in
+            resumingRun = nil
+            onPrepare(draft)
+          },
           onCancel: { resumingRun = nil })
       }
       .onChange(of: runtimeHistory.presentation, initial: true) { _, presentation in
@@ -372,7 +437,7 @@ private struct OverviewWorkspaceView: View {
       detailsByJobID: runtimeHistory.detailsByJobID,
       onSelectTarget: { overviewCapabilities.select(targetID: $0) },
       onOpenHistory: { onOpenWorkspace(.history) },
-      onOpenJob: { _ in onOpenWorkspace(.history) },
+      onOpenJob: onOpenJob,
       onResume: { resumingRun = $0 })
   }
 
@@ -394,20 +459,21 @@ private struct OverviewWorkspaceView: View {
   private func openWorkspace(continuing run: RuntimeJobSummaryPresentation) {
     let parameters = runtimeHistory.detailsByJobID[run.id]?.evidence?.parameters ?? []
     guard
-      let kind = OverviewActionProjection.workspaceKind(
+      let kind = run.resolvedWorkspaceKind ?? RuntimeWorkspaceKindProjection.kind(
         forOperation: run.operationReference, parameters: parameters)
     else { return }
     resumingRun = nil
     onOpenWorkspace(Self.navigation(for: kind))
   }
 
-  private static func navigation(for kind: OverviewAction.Kind) -> ArkDeckNavigationItem {
+  private static func navigation(for kind: RuntimeWorkspaceKind) -> ArkDeckNavigationItem {
     switch kind {
-    case .uiDump: .uiDump
+    case .viewer: .uiDump
     case .trace: .trace
-    case .debugHAP: .debug
+    case .debug: .debug
     case .flash: .flash
     case .device: .device
+    case .diagnostics: .diagnostics
     }
   }
 }
@@ -417,6 +483,7 @@ private struct OverviewWorkspaceView: View {
 private struct RuntimeHistoryJobInspector: View {
   let model: RuntimeHistoryViewModel
   let onOpenHistory: () -> Void
+  let onOpenJob: (String) -> Void
   @Binding var isExpanded: Bool
 
   var body: some View {
@@ -425,6 +492,7 @@ private struct RuntimeHistoryJobInspector: View {
       isRefreshInFlight: model.isRefreshInFlight,
       onRefresh: model.refresh,
       onOpenHistory: onOpenHistory,
+      onOpenJob: onOpenJob,
       isExpanded: $isExpanded)
   }
 }
@@ -475,6 +543,10 @@ private struct UpdateAttentionToolbarContent: ToolbarContent {
 }
 
 private struct AppShellView: View {
+  @State private var requestedHistoryJobID: String?
+  @State private var preparedContinuation: RuntimeWorkspaceContinuation?
+  @State private var forwardedTraceContextID: String?
+  @State private var forwardedDiagnosticsContextID: String?
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
 
@@ -618,6 +690,7 @@ private struct AppShellView: View {
     RuntimeHistoryJobInspector(
       model: runtimeHistory,
       onOpenHistory: openHistory,
+      onOpenJob: openHistoryJob,
       isExpanded: $isJobInspectorExpanded)
   }
 
@@ -663,6 +736,15 @@ private struct AppShellView: View {
   private var workspaceWithRecovery: some View {
     VStack(spacing: 0) {
       RuntimeRecoveryBanner(model: runtimeHistory, onOpenHistory: openHistory)
+      if let draft = preparedContinuation, navigationItem(for: draft.workspaceKind) == selectedItem {
+        WorkspaceContinuationCard(
+          draft: draft,
+          currentTargetID: models.overviewCapabilities.presentation.targetID,
+          currentBindingRevision: models.overviewCapabilities.presentation.bindingRevision,
+          onOpenJob: openHistoryJob,
+          onClose: { preparedContinuation = nil })
+          .id(draft.id)
+      }
       if let context = visibleHistoryContext {
         HistoryWorkspaceContextBanner(context: context) {
           if context.workspaceKind == .device {
@@ -677,12 +759,20 @@ private struct AppShellView: View {
   }
 
   private func openHistory() {
+    requestedHistoryJobID = nil
+    storedSelection = ShellSelection.navigation(.history).storageValue
+  }
+
+  private func openHistoryJob(_ jobID: String) {
+    requestedHistoryJobID = jobID
     storedSelection = ShellSelection.navigation(.history).storageValue
   }
 
   private var visibleHistoryContext: RuntimeHistoryWorkspaceContext? {
     guard let context = models.reopenedHistoryContext,
       navigationItem(for: context.workspaceKind) == selectedItem
+        || (selectedItem == .trace && forwardedTraceContextID == context.id)
+        || (selectedItem == .diagnostics && forwardedDiagnosticsContextID == context.id)
     else { return nil }
     return context
   }
@@ -699,6 +789,8 @@ private struct AppShellView: View {
   }
 
   private func openHistoryWorkspace(_ context: RuntimeHistoryWorkspaceContext) {
+    forwardedTraceContextID = nil
+    forwardedDiagnosticsContextID = nil
     models.reopenedHistoryContext = context
     let item = navigationItem(for: context.workspaceKind)
     storedSelection = ShellSelection.navigation(item).storageValue
@@ -720,8 +812,24 @@ private struct AppShellView: View {
       case .device:
         models.deviceWorkspace.openHistoryContext(context)
       case .diagnostics:
-        break
+        models.diagnosticsWorkspace.openHistoryContext(context)
       }
+    }
+  }
+
+  /// A capture can contain several channels even when its original workspace
+  /// was Viewer or Trace. Read the same immutable record in Diagnostics;
+  /// never relabel its source workspace or prepare a new request.
+  private func openHistoryDiagnostics(_ context: RuntimeHistoryWorkspaceContext) {
+    guard context.operationReference == "capture.diagnostics@1" else { return }
+    forwardedTraceContextID = nil
+    forwardedDiagnosticsContextID = context.id
+    models.reopenedHistoryContext = context
+    storedSelection = ShellSelection.navigation(.diagnostics).storageValue
+    Task { @MainActor in
+      await Task.yield()
+      guard selectedItem == .diagnostics, visibleHistoryContext == context else { return }
+      models.diagnosticsWorkspace.openHistoryContext(context)
     }
   }
 
@@ -896,7 +1004,14 @@ private struct AppShellView: View {
         deviceList: models.deviceList,
         runtimeHistory: runtimeHistory,
         onOpenWorkspace: { item in
+          requestedHistoryJobID = nil
           storedSelection = ShellSelection.navigation(item).storageValue
+        },
+        onOpenJob: openHistoryJob,
+        onPrepare: { draft in
+          preparedContinuation = draft
+          models.reopenedHistoryContext = nil
+          storedSelection = ShellSelection.navigation(navigationItem(for: draft.workspaceKind)).storageValue
         })
     case .history:
       RuntimeHistoryView(
@@ -911,7 +1026,9 @@ private struct AppShellView: View {
         onLoadDetail: runtimeHistory.loadDetail,
         onReloadDetail: runtimeHistory.reloadDetail,
         onExportArtifact: runtimeHistory.exportArtifact,
-        onOpenWorkspace: openHistoryWorkspace)
+        onOpenWorkspace: openHistoryWorkspace,
+        onOpenDiagnostics: openHistoryDiagnostics,
+        requestedJobID: requestedHistoryJobID)
     case .flash:
       FlashWorkspaceView(
         model: models.flashWorkspace,
@@ -932,7 +1049,16 @@ private struct AppShellView: View {
       DeviceWorkspaceView(
         model: models.deviceWorkspace, recording: models.deviceRecording)
     case .diagnostics:
-      DiagnosticsWorkspaceView(model: models.diagnosticsWorkspace)
+      DiagnosticsWorkspaceView(model: models.diagnosticsWorkspace) { context in
+        forwardedTraceContextID = context.id
+        models.reopenedHistoryContext = context
+        storedSelection = ShellSelection.navigation(.trace).storageValue
+        Task { @MainActor in
+          await Task.yield()
+          guard selectedItem == .trace, visibleHistoryContext == context else { return }
+          models.traceWorkspace.openHistoryContext(context)
+        }
+      }
     }
   }
 

@@ -1,7 +1,8 @@
 # ArkDeck Overview 重设计（下一步优先）
 
 > Status：final v1.5（design input，非 normative）
-> Date：2026-08-26
+> Date：2026-08-26；2026-08-27 按 `e1d52e68` 校正实现边界（设计版本保持历史 v1.5）
+> 当前差异：[`implementation-audit-2026-08-27.md`](implementation-audit-2026-08-27.md)。本文的历史方案不替代 v1.6 当前镜像。
 > Golden Journey：GJ-1 Device Observe、GJ-2 HAP Debug、GJ-5 Bounded AI Debug Loop
 > 交互稿：[`overview-redesign.html`](overview-redesign.html)（日常 / 需处理 / 空态）
 > 行为事实源：Catalog、Runtime contracts 与 accepted specs；本文只定义产品信息架构与交互。
@@ -25,7 +26,7 @@ v1.5 的六个结构变化：
 
 ## 1. 现状问题
 
-现有 Overview 已经加入运行记录，但页面仍叠放了新旧两套中心：上半部分是工作记录，下半部分仍是完整
+以下记录 v1.5 实现前的问题；当前 `OverviewRecordView` 与折叠环境已经落地。旧 Overview 曾叠放新旧两套中心：上半部分是工作记录，下半部分仍是完整
 HDC doctor 报告。信息都正确，却产生三个体验问题：
 
 1. **没有明确主次。** 健康、能力、设备、诊断、记录都使用相近的卡片重量，用户要自己判断下一步；
@@ -86,11 +87,16 @@ Overview 以调试线为继续工作的单位，但每条线默认只显示最�
 确认面分三层：
 
 1. 来源运行、target / binding、效果分级和 Catalog digest；
-2. 来源 typed inputs 与本次预填值的逐项对照；
-3. 「打开 Trace 并预填」出口。
+2. 展示来源运行已上报的 typed inputs；
+3. 「打开工作区」仅导航；另一个「准备参数」只对校验通过的 `readOnly` / `hostOnly` 观测开放。
 
-如果 Catalog digest 已变化，参数仍可预填，但必须说明旧结论不能直接沿用。这个动作不是 Runtime replay，
-也不会在 Overview 立即执行。
+当前闭集为 `observe.device@1` 和 `capture.diagnostics@1`。原始 typed inputs 与 thread 显示在
+目标工作区的新草稿中，用户另行启动；提交前重新读取来源 Job 和目标 binding，并再次校验
+当前 Catalog 字段及 effectiveEffect。旧 Marker 时间、Artifact lease、authority 和 Runtime Session
+身份不复制。目标漂移、unknown、变更操作与缺少原始参数均给出不可准备原因。
+
+Trace 采集包含变更步骤时仍不能走这条只读延续路径；不把打开 Trace 当成任意操作预填完成。
+来源 Catalog digest 仅作为历史信息展示，不声称已有可比较的 daemon 当前 digest。
 
 ### 3.5 outcome unknown 恢复面
 
@@ -137,7 +143,7 @@ ownership/health、key strategy、授权、设备能力与 channel protection ev
 2. **参数没上报就不承诺重放。** 不用默认值伪装成来源参数；
 3. **继续不会降低效果等级。** `deviceMutation` / `destructive` 仍重新 materialize plan 并走准入；
 4. **未知 destructive intent 永不 replay。** 只能进入满足完整证明的 distinct recovery；
-5. **Overview 只预填和跳转，不提交 operation；**
+5. **Overview 当前只检查和跳转，不预填、不提交 operation；未来预填也不携带 authority；**
 6. **调试线是展示和审计标注，不携带 authority，也不改变 sessionID、存储或 Runtime identity。**
 
 ## 7. 数据与落地边界
@@ -150,9 +156,9 @@ Viewer 是唯一的界面检查产品工作区；UI dump 只作为 Viewer 内部
 不在 Overview 或侧栏中形成独立入口。
 
 [`RemoteBuildSourcePresentation`](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RemoteBuildSource/RemoteBuildSourceApplicationFacade.swift)
-已经提供服务器名称、SSH endpoint 与最后验证时间，但当前生产模型没有可供 Overview 读取的
-`device target → remote source` 显式关联。实现时必须增加或读取真实绑定事实；不得用服务器列表第一项、
-最近使用项或默认值推断绑定。交互稿中的两组服务器数据只是该关联的展示示例。
+已经提供服务器名称、SSH endpoint 与最后验证时间；当前 `RemoteBuildSourceBindingApplicationFacade`
+已持久化并校验 `device target → remote source` 显式关联，`OverviewRemoteServerViewModel` 已消费。
+未绑定、stale 与 unavailable 分别显示；不得改为列表第一项、最近使用项或默认值。交互稿数据仍是演示。
 
 调试线继续使用不带权限的 `clientContext.provenance["arkdeck.threadId"]`，不能复用每个 Job 独占、
 同时参与磁盘与 audit identity 的 `sessionID`。

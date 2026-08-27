@@ -2833,13 +2833,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The binding revision has changed since the source run. Its parameters can be prefilled, but the target epoch is not the one that run observed."
+            "value": "The binding revision has changed since the source run. The recorded parameters describe the old target epoch and are not applied automatically."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自来源运行以来 binding revision 已变化。参数可以预填，但目标代次已不是那次运行观测到的。"
+            "value": "自来源运行以来 binding revision 已变化。所列参数属于旧目标代次，不会自动应用。"
           }
         }
       }
@@ -2850,13 +2850,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The source run used a different target from the one this page is bound to. Its parameters can be prefilled, but this would not be a repeat of that run."
+            "value": "The source run used a different target. Check the target and inputs in the workspace before starting a new run."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "来源运行的目标与本页当前绑定的目标不同。参数可以预填，但这不是那一次运行的重复。"
+            "value": "来源运行的目标与本页当前绑定的目标不同。开始新运行前，请在工作区重新检查目标和输入。"
           }
         }
       }
@@ -2918,13 +2918,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This files a new run under the same thread. ArkDeck does not submit for you — confirming opens the workspace with these parameters prefilled, and you start it there."
+            "value": "Open the source workspace, or prepare the recorded typed inputs for a supported read-only operation. Preparing never submits a Job. Target and binding must still match; Runtime checks them again on submission."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本次将以同一条调试线提交一个新的运行。ArkDeck 不代你提交——确认后在对应工作区预填这些参数，由你按下开始。"
+            "value": "可打开来源工作区，或为受支持的只读操作准备已记录的类型化参数。准备草稿不会提交 Job。目标与绑定必须一致，提交时 Runtime 会再次检查。"
           }
         }
       }
@@ -2969,13 +2969,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This run's external effect is unknown. ArkDeck never replays an unknown intent; use the recovery flow in History instead."
+            "value": "This run's external effect is unknown. ArkDeck never replays an unknown intent; review its recovery evidence in History instead."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "该次运行的外部效果未知。ArkDeck 永不重放未知的意图；请改用 History 中的恢复流程。"
+            "value": "该次运行的外部效果未知。ArkDeck 永不重放未知的意图；请到 History 查看恢复证据。"
           }
         }
       }
@@ -3020,13 +3020,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Workspace and Prefill"
+            "value": "Open Workspace"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在工作区打开并预填"
+            "value": "打开工作区"
           }
         }
       }
@@ -3054,13 +3054,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You can change these in the workspace before starting."
+            "value": "These are recorded values. Only the prepared draft carries them forward. Historical authority, artifact leases, marker times and Runtime session IDs are never reused."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开始之前可以在工作区里修改这些参数。"
+            "value": "这些是历史记录值，仅“准备参数草稿”会带入。不会沿用历史授权、产物租约、标记时刻或 Runtime Session ID。"
           }
         }
       }
@@ -3888,37 +3888,686 @@
         }
       }
     },
-    "overview.environment.title":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Environment"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"运行环境"}}}},
-    "overview.environment.collapsed":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Collapsed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已收起"}}}},
-    "overview.environment.expanded":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Expanded"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已展开"}}}},
-    "overview.record.remoteServer.label":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Remote build server"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"远端构建服务器"}}}},
-    "overview.record.remoteServer.loading":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Checking binding…"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在读取绑定…"}}}},
-    "overview.record.remoteServer.unbound":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Not bound"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未绑定"}}}},
-    "overview.record.remoteServer.unboundDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Choose a remote artifact in Debug to bind a verified server to this target."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在 Debug 中选择远端产物后，会把已验证服务器绑定到当前目标。"}}}},
-    "overview.record.remoteServer.bound":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Bound"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已绑定"}}}},
-    "overview.record.remoteServer.stale":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Binding needs attention"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"绑定需要处理"}}}},
-    "overview.record.remoteServer.staleDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The bound server was removed. Choose another remote artifact in Debug."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已绑定的服务器已被删除，请在 Debug 中重新选择远端产物。"}}}},
-    "overview.record.remoteServer.unavailable":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Binding unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法读取绑定"}}}},
-    "overview.record.next.title":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Next step"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下一步"}}}},
-    "overview.record.next.empty.title":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Start from a workflow in the sidebar"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"从左侧工作流开始"}}}},
-    "overview.record.next.empty.detail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Viewer, Trace, Debug, Flash and Device already provide the shortest route. New runs and artifacts will appear here automatically."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Viewer、Trace、Debug、Flash 和 Device 已经是最短入口；新的运行与产物会自动出现在这里。"}}}},
-    "overview.record.next.attention":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Needs attention"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"需要处理"}}}},
-    "overview.record.next.unknownDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The external effect is unknown. The original request will not be replayed; inspect durable recovery evidence in History."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"外部效果未知，原请求不会重放；请到 History 查看持久化恢复证据。"}}}},
-    "overview.record.next.waitingDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime is waiting for a required human action. Open the Job to continue from the recorded boundary."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 正在等待必要的人工动作，请打开 Job 从已记录边界继续。"}}}},
-    "overview.record.next.residueDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"This run has %lld outstanding device effects. Review the Job before changing the target."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这次运行还有 %lld 项设备残留，修改目标前请先查看 Job。"}}}},
-    "overview.record.next.recentDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Latest result in a line of %1$lld runs: %2$@"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"这条调试线共 %1$lld 次运行，最近结果：%2$@"}}}},
-    "overview.record.recent.empty":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"No recent runs yet. Start from a workflow in the sidebar."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"还没有最近运行，请从左侧工作流开始。"}}}},
-    "overview.record.thread.more":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Show %lld more runs"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"显示另外 %lld 次"}}}},
-    "overview.record.workspace.viewer":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Viewer inspection"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Viewer 界面检查"}}}},
-    "overview.record.workspace.trace":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Trace capture"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Trace 抓取"}}}},
-    "overview.record.workspace.debug":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"HAP debugging"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"HAP 调试"}}}},
-    "overview.record.workspace.flash":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Device flash"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备刷机"}}}},
-    "overview.record.workspace.device":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Device control"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"真机操作"}}}},
-    "overview.record.state.succeeded":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Succeeded"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已成功"}}}},
-    "overview.record.state.failed":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Failed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已失败"}}}},
-    "overview.record.state.interrupted":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Interrupted"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已中断"}}}},
-    "overview.record.state.cancelled":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Cancelled"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已取消"}}}},
-    "overview.record.state.inProgress":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"In progress"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"进行中"}}}}
+    "overview.environment.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environment"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行环境"
+          }
+        }
+      }
+    },
+    "overview.environment.collapsed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收起"
+          }
+        }
+      }
+    },
+    "overview.environment.expanded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remote build server"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "远端构建服务器"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking binding…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取绑定…"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.unbound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not bound"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未绑定"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.unboundDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a remote artifact in Debug to bind a verified server to this target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Debug 中选择远端产物后，会把已验证服务器绑定到当前目标。"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.bound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bound"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已绑定"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.stale": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Binding needs attention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "绑定需要处理"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.staleDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The bound server was removed. Choose another remote artifact in Debug."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已绑定的服务器已被删除，请在 Debug 中重新选择远端产物。"
+          }
+        }
+      }
+    },
+    "overview.record.remoteServer.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Binding unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取绑定"
+          }
+        }
+      }
+    },
+    "overview.record.next.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next step"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步"
+          }
+        }
+      }
+    },
+    "overview.record.next.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start from a workflow in the sidebar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从左侧工作流开始"
+          }
+        }
+      }
+    },
+    "overview.record.next.empty.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viewer, Trace, Debug, Flash and Device already provide the shortest route. New runs and artifacts will appear here automatically."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viewer、Trace、Debug、Flash 和 Device 已经是最短入口；新的运行与产物会自动出现在这里。"
+          }
+        }
+      }
+    },
+    "overview.record.next.attention": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs attention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要处理"
+          }
+        }
+      }
+    },
+    "overview.record.next.unknownDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The external effect is unknown. The original request will not be replayed; inspect durable recovery evidence in History."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外部效果未知，原请求不会重放；请到 History 查看持久化恢复证据。"
+          }
+        }
+      }
+    },
+    "overview.record.next.waitingDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime is waiting for a required human action. Open the Job to continue from the recorded boundary."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime 正在等待必要的人工动作，请打开 Job 从已记录边界继续。"
+          }
+        }
+      }
+    },
+    "overview.record.next.residueDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This run has %lld outstanding device effects. Review the Job before changing the target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这次运行还有 %lld 项设备残留，修改目标前请先查看 Job。"
+          }
+        }
+      }
+    },
+    "overview.record.next.recentDetail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest result in a line of %1$lld runs: %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这条调试线共 %1$lld 次运行，最近结果：%2$@"
+          }
+        }
+      }
+    },
+    "overview.record.recent.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No recent runs yet. Start from a workflow in the sidebar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有最近运行，请从左侧工作流开始。"
+          }
+        }
+      }
+    },
+    "overview.record.thread.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show %lld more runs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示另外 %lld 次"
+          }
+        }
+      }
+    },
+    "overview.record.workspace.viewer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viewer inspection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viewer 界面检查"
+          }
+        }
+      }
+    },
+    "overview.record.workspace.trace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace capture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace 抓取"
+          }
+        }
+      }
+    },
+    "overview.record.workspace.debug": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HAP debugging"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HAP 调试"
+          }
+        }
+      }
+    },
+    "overview.record.workspace.flash": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device flash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备刷机"
+          }
+        }
+      }
+    },
+    "overview.record.workspace.device": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device control"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "真机操作"
+          }
+        }
+      }
+    },
+    "overview.record.state.succeeded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Succeeded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已成功"
+          }
+        }
+      }
+    },
+    "overview.record.state.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已失败"
+          }
+        }
+      }
+    },
+    "overview.record.state.interrupted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrupted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已中断"
+          }
+        }
+      }
+    },
+    "overview.record.state.cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消"
+          }
+        }
+      }
+    },
+    "overview.record.state.inProgress": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In progress"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "进行中"
+          }
+        }
+      }
+    },
+    "overview.resume.prepare": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prepare inputs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备参数草稿"
+          }
+        }
+      }
+    },
+    "overview.resume.prepare.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A safe typed draft cannot be prepared from this record"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此记录无法生成安全的类型化参数草稿"
+          }
+        }
+      }
+    },
+    "overview.continuation.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prepared read-only request"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已准备的只读请求"
+          }
+        }
+      }
+    },
+    "overview.continuation.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inputs are copied exactly from the source record. Starting creates a new Job after fresh identity checks and keeps its recorded thread as provenance only. Nothing has been submitted yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参数完整复制自来源记录。开始后经最新身份检查创建新 Job，原 thread 仅作为来源记录保留。当前尚未提交。"
+          }
+        }
+      }
+    },
+    "overview.continuation.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard draft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "丢弃草稿"
+          }
+        }
+      }
+    },
+    "overview.continuation.submit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start new read-only Job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始新的只读 Job"
+          }
+        }
+      }
+    },
+    "overview.continuation.submitted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Submitted · awaiting Runtime outcome"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已提交 · 等待 Runtime 结果"
+          }
+        }
+      }
+    },
+    "overview.continuation.openJob": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open new Job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开新 Job"
+          }
+        }
+      }
+    },
+    "overview.continuation.statusNote": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This draft has been attempted once. Check its Job record for the outcome; this view does not retry or replay."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此草稿已尝试提交一次。请以 Job 记录中的结果为准；此界面不会重试或重放。"
+          }
+        }
+      }
+    }
   },
   "version": "1.0"
 }

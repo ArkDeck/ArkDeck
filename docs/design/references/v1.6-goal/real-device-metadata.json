@@ -1,0 +1,315 @@
+{
+  "status": "in_progress",
+  "baseline": "e1d52e68db435bdfeb326962767ca4626a77322b",
+  "installedRuntimeRevision": "09c44c16e879a832b3a47a645e02c30d935f93b4",
+  "runtimeReplaced": false,
+  "realDeviceExecutions": [
+    {
+      "jobID": "job-704b93164b06d96278528e3c27335e7a",
+      "operationReference": "observe.device@1",
+      "executionMode": "execute",
+      "actualEffect": "readOnly",
+      "terminalState": "succeeded",
+      "outcomeUnknown": false,
+      "evidenceBlockers": [],
+      "bindingRevision": 4,
+      "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+      "startedAtUTC": "2026-08-27T15:04:49Z",
+      "finishedAtUTC": "2026-08-27T15:04:50Z",
+      "runtimeFactsObserved": true,
+      "receiptSHA256": "b987f0b12814b1712267aedd2fc5decbefb5f907299e4078fd3d5920ccb99fc5",
+      "authorityKind": "defaultReadOnlyPolicy",
+      "device": {
+        "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+        "model": "OpenHarmony 3.2",
+        "firmware": "OpenHarmony-7.0.0.38",
+        "transport": "usb",
+        "confirmationMethod": "machineReadback",
+        "toolVersion": "3.2.0f",
+        "toolSha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
+      },
+      "artifacts": [
+        {
+          "reference": "arkdeck-artifact://job-704b93164b06d96278528e3c27335e7a/ART-05805c054ec4b44e5aeaa31fd0a19477",
+          "byteCount": 240,
+          "sha256": "346880b874b7f23aea1a083ceed7cdc7e03c6b9352fa970189c33a451e3c2e57",
+          "bytesVerified": true
+        },
+        {
+          "reference": "arkdeck-artifact://job-704b93164b06d96278528e3c27335e7a/ART-22b7925fc4566871a45148a89b3ff5a3",
+          "byteCount": 438,
+          "sha256": "60b491105c9bfbb060b35df6ef63ddd615aeb1de1e99645ce8a4740e88f95951",
+          "bytesVerified": true
+        },
+        {
+          "reference": "arkdeck-artifact://job-704b93164b06d96278528e3c27335e7a/ART-7b1bf4ecd9fd439ebe85a91da0da5108",
+          "byteCount": 510,
+          "sha256": "429de67c520369aa0da3db610c615290b51ba386d2d7c026025f178f8cddb871",
+          "bytesVerified": true
+        }
+      ]
+    },
+    {
+      "jobID": "job-c0df89f6b6f6d12997666448c25010db",
+      "operationReference": "capture.diagnostics@1",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "terminalState": "succeeded",
+      "outcomeUnknown": false,
+      "evidenceBlockers": [],
+      "bindingRevision": 4,
+      "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+      "startedAtUTC": "2026-08-27T15:06:40Z",
+      "finishedAtUTC": "2026-08-27T15:07:06Z",
+      "runtimeFactsObserved": true,
+      "receiptSHA256": "a2614a71f361334af9b87062fdb946a6969df0aba0c0e4ad317c3da25d8aa8e4",
+      "authorityKind": "runtimeCapability",
+      "device": {
+        "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+        "model": "OpenHarmony 3.2",
+        "firmware": "OpenHarmony-7.0.0.38",
+        "transport": "usb",
+        "confirmationMethod": "machineReadback",
+        "toolVersion": "3.2.0f",
+        "toolSha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
+      },
+      "artifacts": [
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-65c3b9dee375970786d0eb329ae71cd3",
+          "byteCount": 892119,
+          "sha256": "4d1de732639bc7b54ca29d134a052b0d1b81c33ec39e124ef319338bd94177a9",
+          "bytesVerified": true,
+          "name": "hilog.txt"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-7563127c65094e9c845fd4066cd8546d",
+          "byteCount": 1793,
+          "sha256": "f81b5aa654c84cb0a63b4d5270fb0af81d74edb7696c5f0487296293185a9c72",
+          "bytesVerified": true,
+          "name": "ui-dump.json"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-c4ec28ed96d5e607c25c36bc551cb934",
+          "byteCount": 110043,
+          "sha256": "f4c196573e0ffe7da93f419a15364f1d7d0665110f60ec91937bf78bb0cf7d63",
+          "bytesVerified": true,
+          "name": "ui-tree.json"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-ee3e142047e50f585ede15a2adf0304f",
+          "byteCount": 78687,
+          "sha256": "523fa980ee4cf90cd58608dfa2abdaaf5c0cc95a145efa997d9b0c4ad613e6be",
+          "bytesVerified": true,
+          "name": "screenshot.png"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-f0c40b6c3457330fe23235ef6af40369",
+          "byteCount": 1142577,
+          "sha256": "c85c0d6174d396c60e8ea52340f351c5aae9b60d8b18fc1b829cbe9dd87300d3",
+          "bytesVerified": true,
+          "name": "trace.htrace"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-31bd12f1a088e164c289d3784b95a370",
+          "byteCount": 2254,
+          "sha256": "9d2675ac9b8d9828e32f4036ecaa572d4a305f8b54555c5fda864c4f2f13b285",
+          "bytesVerified": true,
+          "name": "capture.log"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-98747d5b57e22f7d5cdcbc1d53624916",
+          "byteCount": 859,
+          "sha256": "bb7503d4f1413fb3fb85e46816d71aaeef40fa5e5b73a0a3215339a169444b4e",
+          "bytesVerified": true,
+          "name": "markers.json"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-d4c137a32fb3a642c6058651fff40e52",
+          "byteCount": 4810,
+          "sha256": "8a9d4fcc9b3f4e767989a95f9a12e27027dbf1c40a0489230f2a9f73224079f2",
+          "bytesVerified": true,
+          "name": "artifact-index.json"
+        },
+        {
+          "reference": "arkdeck-artifact://job-c0df89f6b6f6d12997666448c25010db/ART-9ebad3a6c6de51f4d940fe1577f59c2f",
+          "byteCount": 4871,
+          "sha256": "677883779e77fe832b4d11d9009d27a4b44cba012dbeea877fd3790e8ae90989",
+          "bytesVerified": true,
+          "name": "capture-summary.json"
+        }
+      ]
+    }
+  ],
+  "verificationBoundary": "Typed device execution only; updated App presentation and full goal acceptance remain pending.",
+  "operationAvailability": {
+    "total": 29,
+    "available": 26,
+    "unavailable": [
+      {
+        "availability": "unavailable",
+        "reasonCodes": [
+          "operation_not_supported"
+        ],
+        "reasonOrigins": [
+          "product_build"
+        ],
+        "reasons": [
+          "analyzer.notImplemented"
+        ],
+        "reference": "analyzer.summarize-hilog@1"
+      },
+      {
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable",
+          "provider_tool_unavailable"
+        ],
+        "reasonOrigins": [
+          "host_configuration",
+          "host_configuration"
+        ],
+        "reasons": [
+          "no ArkForge lane: ARKDECK_ARKFORGE_BUNDLE_PATH is unset, so this daemon performs no Rockchip writes. canonical ArkForge Flash refuses before authorization",
+          "ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")"
+        ],
+        "reference": "flash.dayu200"
+      },
+      {
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable",
+          "provider_tool_unavailable"
+        ],
+        "reasonOrigins": [
+          "host_configuration",
+          "host_configuration"
+        ],
+        "reasons": [
+          "no ArkForge lane: ARKDECK_ARKFORGE_BUNDLE_PATH is unset, so this daemon performs no Rockchip writes. canonical ArkForge Flash refuses before authorization",
+          "ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")"
+        ],
+        "reference": "flash.full-restore@1"
+      }
+    ]
+  },
+  "realTraceHostAnalysis": {
+    "jobID": "job-1135caed2f0ca45f14222dbd8002ebc4",
+    "operationReference": "analyzer.summarize-trace@1",
+    "actualEffect": "hostOnly",
+    "executionMode": "execute",
+    "terminalState": "succeeded",
+    "outcomeUnknown": false,
+    "evidenceBlockers": [],
+    "startedAtUTC": "2026-08-27T15:43:35Z",
+    "finishedAtUTC": "2026-08-27T15:43:43Z",
+    "sourceTrace": {
+      "byteCount": 1142577,
+      "durationNs": 5736493000,
+      "parser": {
+        "binarySha256": "7c5ed515fc4d74517476fb901e3f7812914cb33b651324f49466d709d4641b35",
+        "name": "trace_streamer",
+        "upstreamRevision": "447a0a49a7b3b914d6e9bd00648ba5a340f6fbf6",
+        "version": "4.3.7"
+      },
+      "schemaFingerprint": "cb34d8b668c21d9a5f50949338e0f4777fcd113f1ecfac4446afcb6ddf25bfc3",
+      "sha256": "c85c0d6174d396c60e8ea52340f351c5aae9b60d8b18fc1b829cbe9dd87300d3"
+    },
+    "result": {
+      "capabilities": {
+        "cpuCounters": false,
+        "cpuScheduling": true,
+        "namedSlices": true,
+        "processCounters": false,
+        "threadStates": true
+      },
+      "counterSeriesCount": null,
+      "cpuCount": 4,
+      "cpuSliceCount": 4408,
+      "durationNs": 5736493000,
+      "eventCountBySource": [
+        {
+          "count": 6857,
+          "source": "trace"
+        }
+      ],
+      "namedSliceCount": 54,
+      "processCount": 84,
+      "range": {
+        "endNs": 5736493000,
+        "startNs": 0
+      },
+      "threadCount": 255,
+      "threadStateCount": 7074
+    },
+    "dataQuality": {
+      "status": "warnings",
+      "warnings": [
+        {
+          "category": "droppedValue",
+          "count": 416,
+          "message": null,
+          "scope": "stat.stat_type"
+        },
+        {
+          "category": "probeTruncated",
+          "count": null,
+          "message": null,
+          "scope": "sched_slice.cpu"
+        },
+        {
+          "category": "probeTruncated",
+          "count": null,
+          "message": null,
+          "scope": "sched_slice.dur"
+        },
+        {
+          "category": "probeTruncated",
+          "count": null,
+          "message": null,
+          "scope": "sched_slice.ts"
+        },
+        {
+          "category": "probeTruncated",
+          "count": null,
+          "message": null,
+          "scope": "thread_state.cpu"
+        },
+        {
+          "category": "probeTruncated",
+          "count": null,
+          "message": null,
+          "scope": "thread_state.dur"
+        },
+        {
+          "category": "probeTruncated",
+          "count": null,
+          "message": null,
+          "scope": "thread_state.ts"
+        },
+        {
+          "category": "unavailableValue",
+          "count": 84,
+          "message": null,
+          "scope": "process.start_ts"
+        },
+        {
+          "category": "unavailableValue",
+          "count": 255,
+          "message": null,
+          "scope": "thread.start_ts"
+        }
+      ]
+    },
+    "truncation": {
+      "sections": [],
+      "truncated": false
+    },
+    "receiptSHA256": "1cd115d57e9e86859c20270b5bf437ae5df2d2c7eb7e6ee66c80e76d95de40ca",
+    "artifact": {
+      "reference": "arkdeck-artifact://job-1135caed2f0ca45f14222dbd8002ebc4/ART-65dc3e57830e2414dd3f35f5cce59306",
+      "byteCount": 2286,
+      "bytesVerified": true,
+      "sha256": "b48ee7da4a30761fafa50fa4e1aa5d78c8fcee404d52a33349e6faeb330f97d9"
+    }
+  }
+}

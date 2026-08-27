@@ -33,6 +33,7 @@ const shellBody = { padding: 14, display: "flex", flexDirection: "column" as con
 
 const Dock = ({ above, children }: { above?: ReactNode; children: ReactNode }) => (
   <div style={shell}>
+    <p style={{ ...hint, padding: 12 }}>组件交互样本：App 已接通精确记录、标准日志与取消请求；本例不连接 Runtime。rebind 确认仍是未接通的历史概念，不得用于续刷或替代身份/覆盖证明。</p>
     {above ? <div style={shellBody}>{above}</div> : null}
     {children}
   </div>
@@ -169,10 +170,10 @@ export const RebindParked = () => (
     <Dock>
       <JobInspector jobs={[SIM_REBIND]} open height={260} />
     </Dock>
-    <Card title="设备回连要人签字,ArkDeck 不静默续刷">
+    <Card title="历史 rebind 概念 · 当前 App 不提供确认续刷">
       <p style={hint}>
-        这里被要求为「是同一台设备」作证,所以摊开原始比对 —— 同一 serial、binding revision 3→4、
-        updater 阶段与 plan 一致 —— 而不是给一个「已校验通过」的结论。
+        当前 App 只读取 Runtime 恢复证据；同一 serial、binding revision 或用户确认都不能
+        单独证明安全。原 unknown intent 永不重放，只有 Runtime 的完整机械证明可建立独立恢复。
       </p>
       <p style={hint}>
         它不提供取消:此刻没有任何东西在跑可以取消。折叠条上这台会显示「等待 rebind 确认(6/8)」。

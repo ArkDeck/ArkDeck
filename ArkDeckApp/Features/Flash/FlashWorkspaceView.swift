@@ -1153,12 +1153,24 @@ struct FlashWorkspaceView: View {
           .foregroundStyle(.secondary)
       } else {
         Picker(flashText("flash.target.label"), selection: targetBinding) {
+          if model.selectedTarget == nil, !model.selectedTargetID.isEmpty {
+            Text("\(model.selectedTargetID) — \(flashText("flash.target.unavailable"))")
+              .tag(model.selectedTargetID)
+              .disabled(true)
+          }
           ForEach(model.workspace.targets) { target in
             Text(target.id).tag(target.id)
           }
         }
         .accessibilityIdentifier("flash.target")
         .disabled(model.isPreparingPlan)
+        if model.selectedTarget == nil, !model.selectedTargetID.isEmpty {
+          Text(flashText("flash.target.historyMissing"))
+            .font(WorkspaceFont.secondary)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("flash.target.historyMissing")
+        }
         if let target = model.selectedTarget {
           LabeledContent(flashText("flash.target.binding")) {
             Text(target.bindingRevision, format: .number)

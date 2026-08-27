@@ -134,7 +134,7 @@ export interface NavItemProps {
  * Sidebar navigation row.
  *
  * One row per workbench capability (Overview, Flash, Debug, Viewer, Trace,
- * History, Settings). The active row is the only accent-colored element in the
+ * Device, Diagnostics, History). Settings is a separate scene. The active row is the only accent-colored element in the
  * sidebar.
  */
 export function NavItem({ icon, label, active, onClick, className }: NavItemProps) {

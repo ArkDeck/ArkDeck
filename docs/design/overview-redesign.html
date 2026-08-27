@@ -299,7 +299,7 @@ dialog::backdrop { background: rgba(15, 18, 22, 0.44); backdrop-filter: blur(2px
 <header class="doc">
   <div class="doc-copy">
     <h1>Overview 交互设计稿 · 聚焦下一步</h1>
-    <p>切换“日常 / 需处理 / 空态”查看信息层级；设备选择只列当前在线且已接管的目标，历史离线目标不展示。页面内还可展开调试线与运行环境、打开继续工作确认面。所有按钮只演示跳转和预填，不执行真实 operation。</p>
+    <p>切换“日常 / 需处理 / 空态”查看信息层级；设备选择只列当前在线且已接管的目标，历史离线目标不展示。页面内还可展开调试线与运行环境、打开继续工作确认面。当前主稿见 prototype.html v1.6。此独立稿保留 Trace 延续概念；当前 App 仅对安全只读观测提供 typed inputs 新草稿，不执行此页演示操作。</p>
   </div>
   <div class="prototype-controls" aria-label="设计稿控制">
     <div class="segmented" aria-label="场景">
@@ -446,9 +446,9 @@ dialog::backdrop { background: rgba(15, 18, 22, 0.44); backdrop-filter: blur(2px
     <div class="dialog-body">
       <header class="dialog-header"><svg class="sym t-dim" aria-hidden="true"><use href="#i-trace"/></svg><div class="dialog-header-copy"><h2 id="resume-title">再次抓取 Trace</h2><p>以来源运行的参数打开 Trace 工作区。这里不会提交 operation；开始按钮仍在 Trace 工作区。</p></div><button type="button" class="icon-button dialog-close" aria-label="关闭" data-close-dialog><svg class="sym" aria-hidden="true"><use href="#i-x"/></svg></button></header>
       <section class="dialog-section"><h3>核对</h3><dl class="kv"><dt>来源运行</dt><dd>S-0712-03 · succeeded</dd><dt>目标</dt><dd data-device-target>TGT-958780b2ffb7 · binding 4</dd><dt>效果</dt><dd>只读 (readOnly)</dd><dt>Catalog digest</dt><dd>7d31… → 9a02…</dd></dl></section>
-      <div class="notice"><svg class="sym sym-sm" aria-hidden="true"><use href="#i-warning"/></svg><span>Catalog digest 已变化：参数仍可预填，但这不是同一次运行的重复，旧结论不能直接沿用。</span></div>
-      <section class="dialog-section"><h3>预填参数 · 来自来源运行上报的参数</h3><table class="compare-table"><thead><tr><th>参数</th><th>来源运行</th><th>本次预填</th></tr></thead><tbody><tr><td>时长</td><td>15 秒</td><td>15 秒</td></tr><tr><td>Trace 分类</td><td>ark · ui · graphic</td><td>ark · ui · graphic</td></tr><tr><td>目标</td><td data-device-target>TGT-958780b2ffb7</td><td data-device-target>TGT-958780b2ffb7</td></tr></tbody></table></section>
-      <footer class="dialog-footer"><button type="button" class="button" data-close-dialog>取消</button><button type="button" class="button primary" id="confirm-prefill">打开 Trace 并预填</button></footer>
+      <div class="notice"><svg class="sym sym-sm" aria-hidden="true"><use href="#i-warning"/></svg><span>此 Trace 预填仍是概念。当前 App 已有安全只读观测的新草稿入口，但不复用变更操作；本页仅打开 Trace。来源 digest 不代表已比较当前 Runtime digest。</span></div>
+      <section class="dialog-section"><h3>未来参数对照 · 尚未接入 App</h3><table class="compare-table"><thead><tr><th>参数</th><th>来源运行</th><th>本次预填</th></tr></thead><tbody><tr><td>时长</td><td>15 秒</td><td>15 秒</td></tr><tr><td>Trace 分类</td><td>ark · ui · graphic</td><td>ark · ui · graphic</td></tr><tr><td>目标</td><td data-device-target>TGT-958780b2ffb7</td><td data-device-target>TGT-958780b2ffb7</td></tr></tbody></table></section>
+      <footer class="dialog-footer"><button type="button" class="button" data-close-dialog>取消</button><button type="button" class="button primary" id="confirm-prefill">打开 Trace（尚无预填）</button></footer>
     </div>
   </dialog>
 
@@ -537,7 +537,7 @@ dialog::backdrop { background: rgba(15, 18, 22, 0.44); backdrop-filter: blur(2px
   }));
   document.getElementById('confirm-prefill').addEventListener('click', () => {
     resumeDialog.close();
-    showToast('已准备跳转到 Trace：参数将被预填，但尚未提交运行。');
+    showToast('演示跳转到 Trace：此 Trace 来源不会自动预填或提交。安全只读观测的新草稿见通用稿 Overview。');
   });
   document.getElementById('view-recovery-evidence').addEventListener('click', () => {
     recoveryDialog.close();
