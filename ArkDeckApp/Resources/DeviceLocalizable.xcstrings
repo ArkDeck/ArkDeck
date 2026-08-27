@@ -2,7 +2,18 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
-    "toolkit.boundary": {
+    "device.screen.picture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": { "state": "translated", "value": "Device screenshot" }
+        },
+        "zh-Hans": {
+          "stringUnit": { "state": "translated", "value": "设备截图" }
+        }
+      }
+    },
+    "device.boundary": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -19,7 +30,7 @@
         }
       }
     },
-    "toolkit.frame.age": {
+    "device.frame.age": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -36,7 +47,7 @@
         }
       }
     },
-    "toolkit.frame.none": {
+    "device.frame.none": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -53,7 +64,7 @@
         }
       }
     },
-    "toolkit.frame.unknownAge": {
+    "device.frame.unknownAge": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -70,7 +81,7 @@
         }
       }
     },
-    "toolkit.gesture.longPress": {
+    "device.gesture.longPress": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -87,7 +98,7 @@
         }
       }
     },
-    "toolkit.gesture.swipe": {
+    "device.gesture.swipe": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -104,7 +115,7 @@
         }
       }
     },
-    "toolkit.gesture.tap": {
+    "device.gesture.tap": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -121,7 +132,7 @@
         }
       }
     },
-    "toolkit.gestures.longPress": {
+    "device.gestures.longPress": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -138,7 +149,7 @@
         }
       }
     },
-    "toolkit.gestures.swipe": {
+    "device.gestures.swipe": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -155,7 +166,7 @@
         }
       }
     },
-    "toolkit.gestures.tap": {
+    "device.gestures.tap": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -172,7 +183,7 @@
         }
       }
     },
-    "toolkit.gestures.title": {
+    "device.gestures.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -189,7 +200,7 @@
         }
       }
     },
-    "toolkit.log.captureFailed": {
+    "device.log.captureFailed": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -206,7 +217,7 @@
         }
       }
     },
-    "toolkit.log.captured": {
+    "device.log.captured": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -223,7 +234,7 @@
         }
       }
     },
-    "toolkit.log.confirmed": {
+    "device.log.confirmed": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -240,7 +251,7 @@
         }
       }
     },
-    "toolkit.log.empty": {
+    "device.log.empty": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -257,7 +268,7 @@
         }
       }
     },
-    "toolkit.log.failed": {
+    "device.log.failed": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -274,7 +285,7 @@
         }
       }
     },
-    "toolkit.log.title": {
+    "device.log.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -291,7 +302,7 @@
         }
       }
     },
-    "toolkit.log.unknown": {
+    "device.log.unknown": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -308,7 +319,7 @@
         }
       }
     },
-    "toolkit.screen.capture": {
+    "device.screen.capture": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -325,7 +336,7 @@
         }
       }
     },
-    "toolkit.screen.capturing": {
+    "device.screen.capturing": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -342,13 +353,13 @@
         }
       }
     },
-    "toolkit.screen.empty.noTarget": {
+    "device.screen.empty.noTarget": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Adopt exactly one device to use Toolkit."
+            "value": "Adopt exactly one device to use Device."
           }
         },
         "zh-Hans": {
@@ -359,7 +370,7 @@
         }
       }
     },
-    "toolkit.screen.empty.ready": {
+    "device.screen.empty.ready": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -376,7 +387,7 @@
         }
       }
     },
-    "toolkit.screen.empty.title": {
+    "device.screen.empty.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -393,7 +404,7 @@
         }
       }
     },
-    "toolkit.stale.badge": {
+    "device.stale.badge": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -410,7 +421,7 @@
         }
       }
     },
-    "toolkit.stale.refused": {
+    "device.stale.refused": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -427,7 +438,7 @@
         }
       }
     },
-    "toolkit.stale.refused.detail": {
+    "device.stale.refused.detail": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -444,7 +455,7 @@
         }
       }
     },
-    "toolkit.target.none": {
+    "device.target.none": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -461,13 +472,13 @@
         }
       }
     },
-    "toolkit.target.none.detail": {
+    "device.target.none.detail": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Toolkit sends device mutations and will not guess which device you meant."
+            "value": "Device sends device mutations and will not guess which device you meant."
           }
         },
         "zh-Hans": {
@@ -478,7 +489,7 @@
         }
       }
     },
-    "toolkit.record.title": {
+    "device.record.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -495,7 +506,7 @@
         }
       }
     },
-    "toolkit.record.start": {
+    "device.record.start": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -512,7 +523,7 @@
         }
       }
     },
-    "toolkit.record.stop": {
+    "device.record.stop": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -529,7 +540,7 @@
         }
       }
     },
-    "toolkit.record.frames": {
+    "device.record.frames": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -546,7 +557,24 @@
         }
       }
     },
-    "toolkit.record.capturing": {
+    "device.record.preflighting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking storage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查空间中"
+          }
+        }
+      }
+    },
+    "device.record.capturing": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -563,7 +591,7 @@
         }
       }
     },
-    "toolkit.record.assembling": {
+    "device.record.assembling": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -580,7 +608,7 @@
         }
       }
     },
-    "toolkit.record.validating": {
+    "device.record.validating": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -597,7 +625,7 @@
         }
       }
     },
-    "toolkit.record.ready": {
+    "device.record.ready": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -614,7 +642,7 @@
         }
       }
     },
-    "toolkit.record.failed": {
+    "device.record.failed": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -631,7 +659,7 @@
         }
       }
     },
-    "toolkit.record.reveal": {
+    "device.record.reveal": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -648,7 +676,7 @@
         }
       }
     },
-    "toolkit.record.saveAs": {
+    "device.record.saveAs": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -665,7 +693,7 @@
         }
       }
     },
-    "toolkit.record.again": {
+    "device.record.again": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -682,7 +710,7 @@
         }
       }
     },
-    "toolkit.record.rate": {
+    "device.record.rate": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -699,7 +727,7 @@
         }
       }
     },
-    "toolkit.record.gap": {
+    "device.record.gap": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -716,7 +744,7 @@
         }
       }
     },
-    "toolkit.record.noTarget": {
+    "device.record.noTarget": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -733,7 +761,7 @@
         }
       }
     },
-    "toolkit.record.ceiling": {
+    "device.record.ceiling": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -750,7 +778,7 @@
         }
       }
     },
-    "toolkit.record.timeline": {
+    "device.record.timeline": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -767,7 +795,7 @@
         }
       }
     },
-    "toolkit.record.noRoom": {
+    "device.record.noRoom": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -784,7 +812,7 @@
         }
       }
     },
-    "toolkit.record.noRoom.detail": {
+    "device.record.noRoom.detail": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -801,7 +829,7 @@
         }
       }
     },
-    "toolkit.record.wouldFit": {
+    "device.record.wouldFit": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -818,7 +846,7 @@
         }
       }
     },
-    "toolkit.record.needs": {
+    "device.record.needs": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -835,7 +863,7 @@
         }
       }
     },
-    "toolkit.record.free": {
+    "device.record.free": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -852,7 +880,7 @@
         }
       }
     },
-    "toolkit.record.headroomUnknown": {
+    "device.record.headroomUnknown": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -869,7 +897,7 @@
         }
       }
     },
-    "toolkit.performance.title": {
+    "device.performance.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -886,7 +914,7 @@
         }
       }
     },
-    "toolkit.performance.detail": {
+    "device.performance.detail": {
       "extractionState": "manual",
       "localizations": {
         "en": {

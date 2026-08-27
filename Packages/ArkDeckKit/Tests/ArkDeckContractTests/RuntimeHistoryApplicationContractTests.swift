@@ -100,7 +100,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
           "captureHilog": .bool(false),
           "crashLogs": .bool(false),
         ]),
-      .toolkit)
+      .device)
     XCTAssertEqual(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
@@ -110,11 +110,27 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         ],
         clientName: ArkDeckAgentClientName.debugLogsWorkspace),
       .debug,
-      "a diagnostic capture with HiLog must not become Toolkit merely because it has a screenshot")
+      "a diagnostic capture with HiLog must not become Device merely because it has a screenshot")
     XCTAssertEqual(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1", inputs: [:]),
       .diagnostics)
+  }
+
+  func testDeviceWorkspaceReadsThePublishedHistoryNameAfterRename() throws {
+    let presentation = decode(
+      """
+      {"ok":true,"id":"x","result":[
+        {"jobId":"job-device","operation":"input.tap@1","targetId":"t-1",
+         "workspaceKind":"toolkit","state":"succeeded","waitingForHuman":false,
+         "outcomeUnknown":false,"outstandingResidueCount":0,"timeline":["succeeded"]}]}
+      """)
+    XCTAssertEqual(presentation.availability, .available)
+    XCTAssertEqual(try XCTUnwrap(presentation.jobs.first).workspaceKind, .device)
+    XCTAssertEqual(
+      String(decoding: try JSONEncoder().encode(RuntimeWorkspaceKind.device), as: UTF8.self),
+      "\"toolkit\"",
+      "the rename must remain readable by an existing daemon or App")
   }
 
   func testWorkspaceKindProjectionMapsOnlyKnownProductSurfaces() {
@@ -124,7 +140,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       ("analyzer.analyze-trace@1", .trace),
       ("analyzer.summarize-hilog@1", .diagnostics),
       ("debug.hap@1", .debug),
-      ("input.tap@1", .toolkit),
+      ("input.tap@1", .device),
     ]
     for (operation, expected) in cases {
       XCTAssertEqual(
@@ -179,7 +195,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
           .init(name: "captureHilog", value: "false"),
           .init(name: "traceCategories", value: "[]"),
         ]),
-      .toolkit)
+      .device)
     XCTAssertNil(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1", parameters: []))
@@ -807,7 +823,11 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(view.contains("history.savedFilter.activity"))
     XCTAssertTrue(view.contains("savedActivity = activityFilter.rawValue"))
     XCTAssertTrue(
-      view.contains("activityFilter = HistoryActivityFilter(rawValue: savedActivity) ?? .all"))
+      view.contains("activityFilter = savedActivity == \"toolkit\""),
+      "saved filters from before the rename must still restore Device")
+    XCTAssertTrue(
+      view.contains("? .device : HistoryActivityFilter(rawValue: savedActivity) ?? .all"),
+      "current filters must restore normally and unknown values must still fall back")
 
     XCTAssertTrue(view.contains("detailGeneration &+= 1"))
     XCTAssertTrue(view.contains("self.detailsByJobID = [:]"))
@@ -850,7 +870,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "History must pass exact record context rather than a destination-only navigation token")
 
     for key in [
-      "history.activity.toolkit", "history.activity.other",
+      "history.activity.device", "history.activity.other",
       "history.activity.open.detailUnavailable", "history.activity.open.unsupported",
       "history.context.title", "history.context.readOnly", "history.detail.reload",
       "history.loading",
@@ -865,8 +885,8 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let viewer = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift"),
       encoding: .utf8)
-    let toolkit = try String(
-      contentsOf: repository.appending(path: "ArkDeckApp/Features/Toolkit/ToolkitWorkspaceViewModel.swift"),
+    let device = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Device/DeviceWorkspaceViewModel.swift"),
       encoding: .utf8)
     let trace = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Features/Trace/TraceWorkspaceView.swift"),
@@ -874,9 +894,9 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(viewer.contains("self.captureGeneration == generation"))
     XCTAssertTrue(viewer.contains("captureGeneration &+= 1"))
     XCTAssertTrue(viewer.contains("viewer.history.loading"))
-    XCTAssertTrue(toolkit.contains("self.screenGeneration == generation"))
-    XCTAssertTrue(toolkit.contains("adopted.filter { $0.adoptedTargetID == targetID }"))
-    XCTAssertTrue(toolkit.contains("liveness = ToolkitFrameLiveness()"))
+    XCTAssertTrue(device.contains("self.screenGeneration == generation"))
+    XCTAssertTrue(device.contains("adopted.filter { $0.adoptedTargetID == targetID }"))
+    XCTAssertTrue(device.contains("liveness = DeviceFrameLiveness()"))
     XCTAssertTrue(trace.contains("viewerReadGeneration == generation"))
     XCTAssertTrue(trace.contains("self.viewerReadGeneration == viewerGenerationAtSubmission"))
   }

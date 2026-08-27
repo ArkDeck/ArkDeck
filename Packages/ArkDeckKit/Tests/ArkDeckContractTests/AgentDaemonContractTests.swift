@@ -2485,7 +2485,7 @@ final class AgentDaemonContractTests: XCTestCase {
   /// "this job produced nothing").
   /// What the workspace reads must be what the runtime writes (TASK-IDC-002).
   ///
-  /// Measured on hardware: every Toolkit capture succeeded as a Runtime Job,
+  /// Measured on hardware: every Device capture succeeded as a Runtime Job,
   /// published `screenshot.png`, and still showed "capture failed" in the
   /// workspace. Two independent mistakes on the same never-exercised path -
   /// `artifact.list` answers with a bare array and was read as an object, and
@@ -2501,7 +2501,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 7, count: 24)
     let published = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
-        jobID: "job-toolkit-index-001", sessionID: "session-toolkit-index-001",
+        jobID: "job-device-index-001", sessionID: "session-device-index-001",
         stepID: "receive-screenshot", name: "screenshot.png",
         mediaType: "image/png",
         privacy: .standard, retentionClass: .pinnedUntilVerified,
@@ -2519,13 +2519,13 @@ final class AgentDaemonContractTests: XCTestCase {
       Data(
         """
         {"protocolVersion":"1.0.0","id":"a","method":"artifact.list",\
-        "params":{"jobId":"job-toolkit-index-001"}}
+        "params":{"jobId":"job-device-index-001"}}
         """.utf8))
 
-    let entries = try ToolkitArtifactIndex.entries(
-      inEnvelope: listed, label: "Toolkit artifacts")
+    let entries = try DeviceArtifactIndex.entries(
+      inEnvelope: listed, label: "Device artifacts")
     let screenshot = try XCTUnwrap(
-      ToolkitArtifactIndex.screenshot(in: entries),
+      DeviceArtifactIndex.screenshot(in: entries),
       "the workspace must find the screenshot the runtime published")
     XCTAssertEqual(screenshot.artifactID, published.artifactID)
     XCTAssertEqual(screenshot.byteCount, png.count)
@@ -2547,7 +2547,7 @@ final class AgentDaemonContractTests: XCTestCase {
       Data(
         """
         {"protocolVersion":"1.0.0","id":"c","method":"artifact.read",\
-        "params":{"jobId":"job-toolkit-index-001",\
+        "params":{"jobId":"job-device-index-001",\
         "artifactId":"\(screenshot.artifactID)","offset":0,"maxBytes":1048576,\
         "allowSensitive":true}}
         """.utf8))

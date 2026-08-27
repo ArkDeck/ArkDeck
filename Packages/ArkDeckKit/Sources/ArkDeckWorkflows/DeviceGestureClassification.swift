@@ -8,7 +8,7 @@ import Foundation
 /// is a long press and not a tap, and a tap is anchored where the press began
 /// rather than where it was released - and neither had anywhere to be tested
 /// while it lived in a view model.
-public enum ToolkitGestureClassification {
+public enum DeviceGestureClassification {
   /// Past this much travel the sequence is a drag, whatever it was going to
   /// be. Six points is the design's figure: below it a press is a press that
   /// wobbled, and moving the landing point to the release would put the
@@ -26,8 +26,8 @@ public enum ToolkitGestureClassification {
 
   public static func classify(
     start: CGPoint, end: CGPoint, travelled: CGFloat, heldFor: TimeInterval,
-    rendered: CGSize, frame: ToolkitScreenFrame
-  ) -> ToolkitGestureRequest {
+    rendered: CGSize, frame: DeviceScreenFrame
+  ) -> DeviceGestureRequest {
     func devicePoint(_ point: CGPoint) -> (x: Int, y: Int) {
       let x = Int((point.x / rendered.width) * CGFloat(frame.width))
       let y = Int((point.y / rendered.height) * CGFloat(frame.height))
@@ -41,20 +41,20 @@ public enum ToolkitGestureClassification {
       let to = devicePoint(end)
       let duration = min(
         max(Int(heldFor * 1000), swipeDurationBoundsMs.lower), swipeDurationBoundsMs.upper)
-      return ToolkitGestureRequest(
+      return DeviceGestureRequest(
         gesture: .swipe, x: from.x, y: from.y,
         frameWidth: frame.width, frameHeight: frame.height,
         toX: to.x, toY: to.y, durationMs: duration)
     }
     if heldFor >= longPressThresholdSeconds {
-      return ToolkitGestureRequest(
+      return DeviceGestureRequest(
         gesture: .longPress, x: from.x, y: from.y,
         frameWidth: frame.width, frameHeight: frame.height,
         durationMs: min(
           max(Int(heldFor * 1000), longPressDurationBoundsMs.lower),
           longPressDurationBoundsMs.upper))
     }
-    return ToolkitGestureRequest(
+    return DeviceGestureRequest(
       gesture: .tap, x: from.x, y: from.y,
       frameWidth: frame.width, frameHeight: frame.height)
   }

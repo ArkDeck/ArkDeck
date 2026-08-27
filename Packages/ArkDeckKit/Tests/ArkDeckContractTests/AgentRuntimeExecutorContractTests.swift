@@ -77,6 +77,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         return receipt("01-01 00:00:00 I app: hello\n")
       case .captureUIDump:
         return receipt("{\"windows\":[]}\n")
+      case .injectPointerInput:
+        return receipt("click coordinate is (640, 1500)\n")
       default:
         throw RuntimeDispatchFailure.failed("unexpected action \(action)")
       }
@@ -450,6 +452,26 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertFalse(
       receipt.artifacts.contains { $0.reference.contains("ART-MISSING-") },
       "an honest optional omission is index metadata, not an evidence artifact")
+  }
+
+  func testInputWithoutDeclaredArtifactsDoesNotRequireAnArtifactIndex() throws {
+    let client = try startDaemon()
+    let outcome = try executor(client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "input.tap", operationVersion: 1,
+        inputs: [
+          "x": .integer(640), "y": .integer(1500),
+          "displayWidth": .integer(1280), "displayHeight": .integer(2776),
+        ]))
+    guard case .completed(let receipt) = outcome else {
+      return XCTFail("the typed input must complete: \(outcome)")
+    }
+    XCTAssertEqual(receipt.terminalState, "succeeded")
+    XCTAssertTrue(receipt.runtimeFactsObserved)
+    XCTAssertFalse(receipt.outcomeUnknown)
+    XCTAssertTrue(receipt.evidenceBlockers.isEmpty, "\(receipt.evidenceBlockers)")
+    XCTAssertTrue(receipt.artifacts.isEmpty, "input operations do not invent file output")
+    XCTAssertEqual(receipt.authority?.kind, .runtimeCapability)
   }
 
   func testUnauthorizedDeviceBecomesAResumableHumanActionNotAFailure() throws {

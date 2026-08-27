@@ -195,17 +195,17 @@ final class AgentXPCTransportContractTests: XCTestCase {
         of: try submitFrame(
           operationID: "capture.diagnostics",
           operationVersion: 1,
-          clientName: ArkDeckAgentClientName.toolkitDeviceControl)),
-      .appSubmit(requestID: "contract-submit", kind: .toolkitScreenshot))
+          clientName: ArkDeckAgentClientName.deviceControl)),
+      .appSubmit(requestID: "contract-submit", kind: .deviceScreenshot))
     for operationID in ["input.tap", "input.long-press", "input.swipe"] {
       XCTAssertEqual(
         AgentXPCEndpoint.admission(
           of: try submitFrame(
             operationID: operationID,
             operationVersion: 1,
-            clientName: ArkDeckAgentClientName.toolkitDeviceControl)),
-        .appSubmit(requestID: "contract-submit", kind: .toolkitInput))
-      // A gesture is admitted for the Toolkit client and no other: the pair
+            clientName: ArkDeckAgentClientName.deviceControl)),
+        .appSubmit(requestID: "contract-submit", kind: .deviceInput))
+      // A gesture is admitted for the Device client and no other: the pair
       // is the subject, so the same operation from another workspace's client
       // is not an App submission at all.
       XCTAssertNil(
@@ -249,6 +249,29 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "unexpected": .bool(true),
       ], requestID: "injected")
     XCTAssertNil(AgentXPCEndpoint.admission(of: injected))
+  }
+
+  func testDeviceRecordingRequestReachesTheExactPublishedAppGate() throws {
+    let request = try DeviceControlFacade.recordingRequest(
+      frameCount: 40,
+      target: DeviceTargetPresentation(id: "target-1", bindingRevision: 2, displayName: "Fixture"),
+      nonce: "xpc-recording-contract")
+    let requestJSON = try XCTUnwrap(String(data: JSONEncoder().encode(request), encoding: .utf8))
+    for method in ["job.plan", "job.submit"] {
+      let wire = try ArkDeckAgentXPC.requestFrame(
+        method: method, params: ["requestJson": .string(requestJSON)], requestID: "record")
+      XCTAssertNotNil(
+        AgentXPCEndpoint.admission(of: wire),
+        "the production recording request must reach Runtime admission through XPC")
+    }
+    for version: Int? in [nil, 0, 2] {
+      XCTAssertNil(AgentXPCEndpoint.admission(of: try submitFrame(
+        operationID: "capture.screen-sequence", operationVersion: version,
+        clientName: ArkDeckAgentClientName.deviceControl)))
+    }
+    XCTAssertNil(AgentXPCEndpoint.admission(of: try submitFrame(
+      operationID: "capture.screen-sequence", operationVersion: 1,
+      clientName: ArkDeckAgentClientName.debugNetworkWorkspace)))
   }
 
   func testOnlySuccessfulMatchingSubmitResponseCreatesAJobBinding() {

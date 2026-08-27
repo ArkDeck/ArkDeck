@@ -864,15 +864,23 @@ public struct RuntimeControlPlaneHandler: Sendable {
         let snapshot = try await engine.evidenceSnapshot(jobID: jobID)
         var artifacts: [RuntimeVerifiedArtifactEvidence] = []
         var blockers: [String] = []
+        let declaresNoArtifacts = RuntimeOperationCatalog.descriptor(
+          reference: snapshot.operationReference)?.artifacts.isEmpty == true
         if let artifactStore {
           do {
-            let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: jobID)
-            artifacts = try await artifactStore.verifiedEvidenceArtifacts(
-              jobID: jobID, intentionallyOmittedNames: omitted)
+            let inventory = try await artifactStore.list(jobID: jobID)
+            // Typed input operations have journal evidence but no file output.
+            // Only the published descriptor can establish that empty is valid;
+            // any existing metadata still receives the full byte/hash check.
+            if !declaresNoArtifacts || !inventory.isEmpty {
+              let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: jobID)
+              artifacts = try await artifactStore.verifiedEvidenceArtifacts(
+                jobID: jobID, intentionallyOmittedNames: omitted)
+            }
           } catch {
             blockers.append("artifactVerification:\(error)")
           }
-        } else {
+        } else if !declaresNoArtifacts {
           blockers.append("artifactStoreUnavailable")
         }
         return success(

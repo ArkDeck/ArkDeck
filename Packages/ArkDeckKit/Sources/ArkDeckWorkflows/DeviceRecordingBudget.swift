@@ -12,7 +12,7 @@ import Foundation
 /// request, so a workspace that estimated its own figure and sent a different
 /// one could pass its own check and still be refused - two answers to one
 /// question. Sending this as the budget makes the two agree by construction.
-public enum ToolkitRecordingBudget {
+public enum DeviceRecordingBudget {
   /// Measured on hardware, 2026-08-26: a 20-frame JPEG archive off a
   /// 720x1280 display came back at 851,456 bytes, which is 42,573 a frame
   /// including the archive's own block padding.

@@ -7,7 +7,7 @@ import Foundation
 /// workspace from spawning anything: the format is fixed-position headers, so
 /// parsing it is cheaper than the process would be, and a malformed archive
 /// becomes a typed refusal instead of an exit code.
-public enum ToolkitFrameArchive {
+public enum DeviceFrameArchive {
   public struct Frame: Sendable, Equatable {
     /// The name the provider wrote, which is the capture index zero-padded.
     public let name: String

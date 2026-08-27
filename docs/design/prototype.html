@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArkDeck 交互原型 v1.4</title>
+<title>ArkDeck 交互原型 v1.5</title>
 <style>
 :root{
   color-scheme:light dark;
@@ -569,103 +569,74 @@ select.inp{cursor:pointer}
   .diag-overview{flex:0 0 285px}.diag-timeline{flex:none;height:245px}
 }
 
-/* ---------- Toolkit · Device Control ---------- */
-.tools-page{padding:12px;gap:12px;background:color-mix(in srgb,var(--ground) 70%,var(--panel-solid));overflow:auto}
-.tools-shell{width:100%;min-height:100%;display:grid;grid-template-columns:172px minmax(0,1fr);gap:12px}
-.tools-rail{align-self:start;position:sticky;inset-block-start:0;display:flex;flex-direction:column;gap:8px;padding:10px;
-  border:1px solid var(--line);border-radius:11px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
-.tools-rail-title{padding:2px 4px 6px;color:var(--ink2);font-size:11px;font-weight:600}
-.tool-nav-item{width:100%;min-height:44px;display:flex;align-items:center;gap:9px;padding:7px 8px;border:0;border-radius:8px;
-  background:transparent;color:var(--ink);text-align:start;cursor:pointer}
-.tool-nav-item:hover,.tool-nav-item.on{background:var(--selection)}
-.tool-nav-item.on{box-shadow:inset 2px 0 0 var(--accent)}
-.tool-nav-item .symbol{color:var(--accent)}
-.tool-nav-copy{display:flex;flex-direction:column;gap:1px;min-width:0}.tool-nav-copy b{font-size:12px}.tool-nav-copy span{font-size:10px;color:var(--ink2)}
-.tool-placeholder{margin:4px;padding:10px 6px 2px;border-top:1px solid var(--line);color:var(--ink2);font-size:10.5px;line-height:1.45}
-.device-tool{min-width:0;display:flex;flex-direction:column;gap:12px}
-.tool-toolbar{min-height:46px;display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;
-  background:var(--panel-solid);box-shadow:var(--control-shadow);flex-wrap:wrap}
-.tool-target{display:flex;align-items:center;gap:8px;min-width:0}.tool-target-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
-.tool-target-copy b{font-size:12px}.tool-target-copy span{font:10px/1.35 var(--mono);color:var(--ink2);white-space:nowrap}
-.tool-toolbar-actions{margin-inline-start:auto;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.tool-recording{display:inline-flex;align-items:center;gap:6px;color:var(--danger);font:600 11px var(--mono);font-variant-numeric:tabular-nums}
-.tool-recording .dot{background:var(--danger);box-shadow:0 0 0 3px var(--danger-weak)}
-.recording-result{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid color-mix(in srgb,var(--ok) 52%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--panel-solid) 92%,var(--ok) 8%);box-shadow:var(--control-shadow)}
-.recording-result.receiving{border-color:var(--line);background:var(--panel-solid)}
-.recording-result-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ok);background:color-mix(in srgb,var(--panel-solid) 82%,var(--ok) 18%)}
-.recording-result.receiving .recording-result-icon{color:var(--accent);background:var(--accent-weak)}
-.recording-result-copy{min-width:0}.recording-result-copy b{display:block;font-size:12px}.recording-result-copy>span{display:block;margin-top:2px;color:var(--ink2);font-size:10.5px}
-.recording-path{margin-top:4px;font:10px/1.4 var(--mono);color:var(--ink);overflow-wrap:anywhere}
-.recording-result-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
-.device-control-grid{display:grid;grid-template-columns:minmax(320px,1.15fr) minmax(280px,.85fr);gap:12px;align-items:start}
-.device-preview-pane,.device-inspector{min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
-.device-preview-pane{display:flex;flex-direction:column;overflow:hidden}
-.device-pane-head{min-height:42px;display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.device-pane-head .spacer{flex:1}.device-pane-head .seg button{min-height:28px}
-.device-stage{min-height:436px;display:grid;place-items:center;padding:16px;background:color-mix(in srgb,var(--ground) 84%,var(--panel-solid));overflow:auto}
-.device-screen{width:min(246px,72%);aspect-ratio:9/16;position:relative;overflow:hidden;padding:0;border:0;border-radius:24px;
-  background:#f4f5f7;color:#202124;box-shadow:0 0 0 1px oklch(0 0 0 / .1),0 14px 38px rgba(0,0,0,.18);cursor:default;text-align:start;touch-action:none}
-.device-screen:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
-.device-screen-content{position:absolute;inset:0;padding:16px 11px 12px;display:flex;flex-direction:column;gap:9px;pointer-events:none}
-.device-screen-status{display:flex;justify-content:space-between;font-size:8px;font-weight:650;padding:0 4px;color:#34363a}
-.device-screen-title{font-size:15px;font-weight:720;padding:5px 4px 2px}
-.device-screen-search{height:29px;border-radius:8px;background:#e6e8ec;color:#858991;font-size:9px;display:flex;align-items:center;padding:0 10px}
-.device-screen-card{min-height:54px;border-radius:10px;background:white;padding:10px;display:flex;align-items:center;gap:9px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.device-screen-card i{width:28px;height:28px;border-radius:50%;background:linear-gradient(145deg,#ced5df,#9caabd);flex:none}
-.device-screen-card b{font-size:10px}.device-screen-card span{display:block;color:#858991;font-size:7px;margin-top:2px}
-.device-screen-row{height:42px;border-radius:10px;background:white;padding:0 10px;display:flex;align-items:center;gap:9px;font-size:9.5px;font-weight:620;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.device-screen-row .glyph{width:22px;height:22px;border-radius:6px;background:#3478f6;color:white;display:grid;place-items:center;font-size:10px}
-.device-screen-row .value{margin-inline-start:auto;color:#777b82;font-size:8px;font-weight:500}
-.device-screen-switch{width:31px;height:18px;border-radius:999px;background:#3478f6;padding:2px;display:flex;justify-content:flex-end}
-.device-screen-switch::after{content:"";height:14px;aspect-ratio:1;border-radius:50%;background:white;box-shadow:0 1px 2px rgba(0,0,0,.25)}
-.device-touch-feedback{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:2px solid #ff9f0a;border-radius:50%;
-  background:rgba(255,159,10,.14);box-shadow:0 0 0 5px rgba(255,159,10,.08);pointer-events:none}
-.device-touch-feedback.pending{border-style:dashed;background:transparent;box-shadow:none}
-.device-touch-feedback.long{box-shadow:0 0 0 5px rgba(255,159,10,.08),0 0 0 9px rgba(255,159,10,.14)}
-.device-touch-feedback.failed{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 14%,transparent)}
-.device-stale-overlay{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;
-  background:color-mix(in srgb,#14161a 55%,transparent);color:#fff;font-size:10.5px;border-radius:inherit;pointer-events:none;padding:10px}
-.device-stale-overlay b{font-size:11.5px}
-.device-frame-age{font:10px var(--mono);color:var(--ink2)}
-.device-swipe-feedback{position:absolute;height:3px;transform-origin:0 50%;background:#ff9f0a;border-radius:999px;pointer-events:none}
-.device-swipe-feedback::after{content:"";position:absolute;inset-inline-end:-2px;inset-block-start:-4px;border-block:5px solid transparent;border-inline-start:8px solid #ff9f0a}
-.device-drag-preview{position:absolute;height:3px;transform-origin:0 50%;background:#006edb;border-radius:999px;pointer-events:none;box-shadow:0 0 0 3px rgba(0,110,219,.12)}
-.device-drag-preview::before,.device-drag-preview::after{content:"";position:absolute;width:9px;height:9px;margin-top:-3px;border-radius:50%;background:#006edb}
-.device-drag-preview::before{inset-inline-start:-2px}.device-drag-preview::after{inset-inline-end:-2px}
-.device-keyboard-cursor{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border:2px solid #006edb;border-radius:50%;pointer-events:none;display:none}
-.device-keyboard-cursor::before,.device-keyboard-cursor::after{content:"";position:absolute;background:#006edb}
-.device-keyboard-cursor::before{width:2px;height:26px;inset-inline-start:7px;inset-block-start:-5px}.device-keyboard-cursor::after{height:2px;width:26px;inset-inline-start:-5px;inset-block-start:7px}
-.device-screen:focus-visible .device-keyboard-cursor{display:block}
-.device-preview-meta{min-height:48px;display:flex;align-items:center;gap:9px;padding:8px 10px;border-top:1px solid var(--line);color:var(--ink2);font-size:10.5px;flex-wrap:wrap}
-.device-preview-meta .mono{color:var(--ink)}
-.device-inspector{display:flex;flex-direction:column;overflow:hidden}
-.tool-section{display:flex;flex-direction:column;gap:9px;padding:12px;border-bottom:1px solid var(--line)}.tool-section:last-child{border-bottom:0}
-.tool-section-head{display:flex;align-items:center;gap:8px}.tool-section-head .spacer{flex:1}.tool-section-head p{margin:0;color:var(--ink2);font-size:10.5px}
-.gesture-guide{display:flex;flex-direction:column;gap:8px}
-.gesture-guide-row{display:grid;grid-template-columns:28px minmax(0,1fr);gap:9px;align-items:start;padding:9px;border-radius:9px;background:var(--panel2)}
-.gesture-guide-row>.symbol{width:18px;height:18px;margin:2px 0 0 4px;color:var(--accent)}
-.gesture-guide-copy b{display:block;font-size:11.5px}.gesture-guide-copy span{display:block;margin-top:2px;color:var(--ink2);font-size:10.5px;line-height:1.45}
-.tool-event-list{display:flex;flex-direction:column;gap:2px;max-height:172px;overflow:auto}
-.tool-event-row{display:grid;grid-template-columns:60px 18px minmax(0,1fr);gap:7px;padding:6px 5px;border-radius:6px;font-size:10.5px;align-items:start}
-.tool-event-row:hover{background:var(--selection)}.tool-event-row time{font-family:var(--mono);color:var(--ink2)}
-.tool-event-icon{color:var(--accent);display:flex;padding-top:1px}.tool-event-copy b{display:block;font-size:10.5px}.tool-event-copy span{display:block;color:var(--ink2);font:9.5px/1.45 var(--mono);overflow-wrap:anywhere}
-.performance-note,.tools-boundary{display:flex;align-items:flex-start;gap:8px;padding:9px 10px;border-radius:9px;font-size:11px;line-height:1.45}
-.performance-note{background:var(--panel2);color:var(--ink2)}.performance-note b{color:var(--ink)}
-.tools-boundary{border:1px solid var(--warn);color:var(--warn)}
-.performance-note .symbol,.tools-boundary .symbol{margin-top:1px;flex:none}
-@media (prefers-reduced-motion:no-preference){
-  .tool-nav-item,.device-screen,.tool-event-row{transition-property:background-color,box-shadow,transform;transition-duration:120ms;transition-timing-function:cubic-bezier(.2,0,0,1)}
-  .tool-nav-item:active{transform:scale(.96)}
+/* ---------- Device · implementation-synced workspace ---------- */
+.device-workspace-page{padding:0;gap:0;overflow:hidden;scrollbar-gutter:auto;container-type:inline-size;background:var(--panel)}
+.device-workspace-shell{height:100%;min-height:0;display:flex;flex-direction:column}
+.device-workspace-shell p{margin:0}
+.device-workspace-shell .btn{min-height:24px;padding-block:2px;box-shadow:none;background:var(--panel2)}
+.device-toolbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);flex:none}
+.device-target{min-width:0;display:flex;flex-direction:column;gap:2px}.device-target b{font-size:13px;font-weight:600}
+.device-target span{font:11px var(--mono);color:var(--ink2);overflow-wrap:anywhere}.device-toolbar>.btn{margin-inline-start:auto;flex:none}
+.device-control-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px}
+.device-stage{min-width:0;min-height:0;display:grid;place-items:center;container-type:size;overflow:hidden}
+.device-empty{display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px;text-align:center;color:var(--ink2)}
+.device-empty>.symbol{width:40px;height:40px;color:var(--ink3);margin-bottom:12px}.device-empty h2{font-size:24px;font-weight:700;color:var(--ink2)}
+.device-empty p{font-size:13px;line-height:1.5;max-width:380px}
+.device-screen{position:relative;height:min(calc(100cqh - 24px),calc((100cqw - 24px) * 16 / 9));aspect-ratio:9/16;overflow:hidden;touch-action:none;background:var(--ground);border:1px solid var(--line)}
+.device-screen:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.device-screen-content{position:absolute;inset:0;display:grid;place-content:center;gap:8px;text-align:center;padding:20px;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
+.device-screen-content b,.device-screen-content span{background:var(--ground);padding:4px 8px;font-size:12px;color:var(--ink2)}
+.device-touch-feedback{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:2px solid var(--warn);border-radius:50%;background:color-mix(in srgb,var(--warn) 25%,transparent);pointer-events:none}
+.device-touch-feedback.pending{background:transparent}
+.device-stale-overlay{position:absolute;inset-block-start:8px;inset-inline-start:8px;display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;background:var(--warn);color:var(--panel-solid);font-size:11px;font-weight:600;pointer-events:none}
+.device-inspector{min-height:0;border-inline-start:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
+.device-control-section{display:flex;flex-direction:column;gap:8px;padding:16px;border-bottom:1px solid var(--line);flex:none}
+.device-control-section h2{display:flex;align-items:center;font-size:13px}.device-control-section p{color:var(--ink2);font-size:11px;line-height:1.5}
+.device-record-progress{width:12px;height:12px;margin-left:auto;border:1.5px solid var(--line);border-top-color:var(--ink2);border-radius:50%;animation:device-spin .8s linear infinite}
+@keyframes device-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.device-record-progress{animation:none}}
+.device-control-section .device-small{font-size:10px}.device-control-section .device-warning{color:var(--warn)}
+.device-record-stepper{display:flex;align-items:center;gap:8px;font-size:11px;font-variant-numeric:tabular-nums}
+.device-record-stepper>span{display:flex;flex-direction:column;background:var(--panel2);border-radius:6px}
+.device-record-stepper button{display:grid;place-items:center;border:0;background:transparent;min-width:24px;height:14px;cursor:pointer;border-radius:4px}
+.device-record-stepper button:disabled{opacity:.4;cursor:default}.device-record-stepper button:focus-visible{outline:2px solid var(--accent)}
+.device-record-stepper .symbol{width:12px;height:12px}.device-record-stepper button:first-child .symbol{transform:rotate(180deg)}
+.device-record-start{width:100%;display:flex;align-items:center;gap:8px;text-align:start;background:var(--panel2)}
+.device-recording-result{display:flex;flex-direction:column;gap:6px}.device-recording-result strong{font-size:11px;font-weight:500;display:flex;align-items:center;gap:6px}
+.device-recording-result strong .symbol{color:var(--ok)}.device-recording-path{font:10px var(--mono);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.device-record-actions{display:flex;gap:8px;flex-wrap:wrap}.device-record-actions button,.device-shrink{background:none;border:0;padding:2px 0;min-height:24px;color:var(--accent);font-size:11px;cursor:pointer;text-align:start}
+.device-record-actions button:focus-visible,.device-shrink:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.device-log{flex:1;min-height:72px;border-bottom:0}.device-log-list{display:flex;flex-direction:column;gap:6px;min-height:0;overflow-y:auto}
+.device-log-row{display:flex;align-items:flex-start;gap:8px}.device-log-row>.symbol{margin-top:1px;color:var(--ink2)}
+.device-log-row[data-outcome="confirmed"]>.symbol{color:var(--ok)}.device-log-row[data-outcome="failed"]>.symbol{color:var(--danger)}.device-log-row[data-outcome="unknown"]>.symbol{color:var(--warn)}
+.device-log-row b{font-size:11px;font-weight:500}.device-log-row p{font:10px/1.5 var(--mono);overflow-wrap:anywhere}
+.performance-note{display:flex;align-items:flex-start;gap:8px;padding:16px;border-top:1px solid var(--line);flex:none}
+.performance-note>.symbol{color:var(--ink2);margin-top:2px}.performance-note b{font-size:11px;font-weight:500}.performance-note p{font-size:10px;line-height:1.45;color:var(--ink2);margin-top:2px}
+.device-footer{padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);font-size:11px;color:var(--ink2);flex:none}
+.device-frame-age{display:flex;align-items:center;gap:8px;white-space:nowrap}.device-footer>p:last-child{max-width:650px;text-align:end}
+.device-workspace-boundary{padding:5px 20px;border-top:1px dashed var(--line);font-size:10px;color:var(--ink2);flex:none}
+.device-review{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:min(1180px,100%);font-size:12px;color:var(--ink2)}
+.device-review select{max-width:240px;min-height:28px;border:1px solid var(--line);border-radius:6px;background:var(--panel-solid);color:var(--ink);padding:2px 6px}
+.device-review select:focus-visible{outline:2px solid var(--accent)}.device-review[hidden],body.reference .device-review{display:none}
+body.device-native .window{position:relative}body.device-native .titlebar{grid-template-columns:238px minmax(0,1fr) auto;background:var(--panel);border-bottom:0}
+body.reference.device-native .window{height:min(760px,100vh);min-height:600px}
+body.reference.device-native{min-height:0;height:100vh;overflow:hidden}
+body.device-native.device-compact .window{width:min(960px,100%)}
+body.device-native .titlebar .leading{justify-content:space-between}body.device-native .titlebar .t{text-align:start;padding-inline-start:8px;font-size:15px}
+body.device-native #languageToggle,body.device-native #themeToggle,body.device-native #jobsToggle,body.device-native #acToggle,body.device-native #addTargetButton{display:none}
+body.device-native .sidebar{border:1px solid var(--line);border-radius:18px;margin:0 8px 8px;width:242px;padding:8px;gap:18px;background:var(--panel2)}
+body.device-native .main{padding-bottom:34px}body.device-native .drawer{position:absolute;inset-inline:0;bottom:0}
+body.device-native .nav button{min-height:40px;font-weight:500}body.device-native .nav button.on{background:var(--accent-fill);color:var(--accent-ink)}
+body.device-native .nav button.on .ic{color:var(--accent-ink)}body.device-native .nav .sec{padding-top:18px}
+body.device-native .dev{margin-top:4px}body.device-native #devlist>.nav{margin-bottom:4px}
+body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@container (max-width:879px){
+  .device-control-grid{display:flex;flex-direction:column;overflow-y:auto}.device-stage{height:420px;min-height:420px;flex:none}
+  .device-inspector{overflow:visible;min-height:auto;border-inline-start:0;border-top:1px solid var(--line);flex:none}
+  .device-footer{align-items:flex-start;flex-wrap:wrap}.device-footer>p:last-child{text-align:start}
 }
-@media(max-width:1050px){
-  .tools-shell{grid-template-columns:1fr}.tools-rail{position:static;flex-direction:row;align-items:center}.tools-rail-title{display:none}
-  .tool-nav-item{width:auto;min-width:160px}.tool-placeholder{margin:0 0 0 auto;padding:4px 6px;border-top:0;border-inline-start:1px solid var(--line);max-width:240px}
-}
-@media(max-width:980px){.device-control-grid{grid-template-columns:1fr}.device-stage{min-height:420px}}
-@media(max-width:760px){
-  .tools-page{padding:10px}.tools-rail{align-items:stretch;flex-direction:column}.tool-placeholder{margin:0;padding:8px 4px 2px;border-inline-start:0;border-top:1px solid var(--line);max-width:none}
-  .tool-nav-item{width:100%}.tool-toolbar-actions{margin-inline-start:0;width:100%}.recording-result{grid-template-columns:34px minmax(0,1fr)}.recording-result-actions{grid-column:1/-1;justify-content:flex-start}
-}
+@media(max-width:760px){body.device-native .sidebar{width:180px}body.device-native .titlebar{grid-template-columns:176px minmax(0,1fr) auto}.device-toolbar{padding:12px;flex-wrap:wrap}.device-target span{font-size:10px}}
 
 /* ---------- Trace: implementation-synced capture + viewer entry ---------- */
 .trace-shell{width:min(920px,100%);display:flex;flex-direction:column;gap:22px}
@@ -789,8 +760,9 @@ select.inp{cursor:pointer}
     <symbol id="i-dump" viewBox="0 0 20 20"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></symbol>
     <symbol id="i-trace" viewBox="0 0 20 20"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></symbol>
     <symbol id="i-diagnostics" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="12" rx="2"/><path d="M4.5 10h2l1.5-3 2.2 6 1.7-4 1.1 1.5h2.5M7 17.5h6"/></symbol>
-    <symbol id="i-toolkit" viewBox="0 0 20 20"><path d="M6.5 5V3.8c0-.7.6-1.3 1.3-1.3h4.4c.7 0 1.3.6 1.3 1.3V5"/><rect x="2.5" y="5" width="15" height="12.5" rx="2"/><path d="M2.5 9.5h15M6.7 9.5v2.2M13.3 9.5v2.2"/></symbol>
-    <symbol id="i-device-control" viewBox="0 0 20 20"><rect x="5" y="2.5" width="10" height="15" rx="2"/><path d="M8.2 14.8h3.6M16.5 6.5l1.5-1.5m-1.5 5h2"/></symbol>
+    <symbol id="i-device" viewBox="0 0 20 20"><rect x="5.5" y="2.5" width="9" height="15" rx="1.8"/><path d="M8.5 4.5h3M8.5 15.2h3"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 20 20"><path d="m4 7 6 6 6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="m6.5 10 2.5 2.5 4.5-5"/></symbol>
     <symbol id="i-camera" viewBox="0 0 20 20"><path d="M3 6.5h3l1.3-2h5.4l1.3 2h3v9H3z"/><circle cx="10" cy="11" r="3"/></symbol>
     <symbol id="i-record" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="3" fill="currentColor" stroke="none"/></symbol>
     <symbol id="i-download" viewBox="0 0 20 20"><path d="M10 2.5v10M6.5 9.5 10 13l3.5-3.5M3 15.5h14"/></symbol>
@@ -822,8 +794,9 @@ select.inp{cursor:pointer}
   </defs>
 </svg>
 
-<p class="note"><b>ArkDeck macOS 交互原型 v1.4</b> — History 已从 Job 审计表重组为可回访的工作记录：按刷机镜像、Viewer、Trace 与诊断分类，保存上下文与产物，并提供返回对应工具的重新打开入口；运行证据与 Artifact 仍可展开查看。Viewer / Trace 已回写当前 SwiftUI 表面：Viewer 默认先显示真实空态，Trace 只保留抓取与查看入口。Diagnostics 的 Marker 采用「标记 + 环形缓冲回溯取证」，截图按实际拍摄时刻标注（+N ms），并含自动 Marker。Toolkit 包含长按、两态触点反馈（pending → confirmed）与 tap 锚定按下点；预览常显画面年龄且断流时输入自动暂停。所有数据均为演示数据，不连接设备；演示中的环形缓冲、自动 Marker、5 fps 预览等不代表相关 device operation 已 production available。</p>
+<p class="note"><b>ArkDeck macOS 交互原型 v1.5</b> — Device 已按当前 SwiftUI 回写：默认空态、按需截图、按帧数录制、一次手势后画面过期。Viewer / Trace / Debug 与 History 保留各自工作区。所有原型数据均为演示，不连接设备；Diagnostics 中的目标能力不代表已经实现。</p>
 
+<div class="device-review" id="deviceReview" hidden></div>
 <div class="window" id="win" aria-label="ArkDeck 设计原型窗口">
   <div class="titlebar" role="toolbar" aria-label="窗口工具栏">
     <div class="leading">
@@ -873,15 +846,16 @@ select.inp{cursor:pointer}
 </div>
 <div id="modalHost"></div>
 <div id="deviceMenu" class="context-menu" role="menu" hidden></div>
-<p class="visually-hidden" id="toolActionStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+<p class="visually-hidden" id="deviceActionStatus" role="status" aria-live="polite" aria-atomic="true"></p>
 
 <script>
 "use strict";
 /* ---------- state ---------- */
 const PARAMS=new URLSearchParams(location.search);
 const S = {
-  nav:PARAMS.get("page")||(PARAMS.has("reference")?"device":"overview"), device:"dayu200", language:PARAMS.get("lang")==="en"?"en":"zh-Hans",
-  acMode:false, drawerOpen:false, sidebarOpen:true, appearance:"system", lastChecked:null,
+  nav:(PARAMS.get("page")==="tools"?"device-control":PARAMS.get("page"))||(PARAMS.has("reference")?"device":"overview"), device:"dayu200", language:PARAMS.get("lang")==="en"?"en":"zh-Hans",
+  acMode:false, drawerOpen:false, sidebarOpen:true, appearance:["light","dark"].includes(PARAMS.get("appearance"))?PARAMS.get("appearance"):"system", lastChecked:null,
+  deviceCompact:PARAMS.get("deviceWidth")==="compact",
   deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
   recovery:{archived:false},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
@@ -893,14 +867,7 @@ const S = {
          elapsed:13, markers:[], timer:null, job:null,
          includeVideo:false, markerScreenshot:true, autoMarker:true,
          tags:new Set(["ace","app","ability","graphic","ohos","sched","freq","sync"])},
-  tools:{tool:"device-control",preview:"snapshot",showTouches:true,recording:false,recordPhase:"idle",recordSeconds:0,timer:null,receiveTimer:null,lastRecording:null,
-         previewTimer:null,previewTick:0,previewStale:false,recordNotice:"",
-         screenshotAt:"11:26:42.184",pointerStart:null,pointerNow:null,pointerStartedAt:0,pointerId:null,keyboardCursor:{x:540,y:960},lastInput:{kind:"click",x:540,y:958,status:"confirmed"},
-         events:[
-           {time:"11:26:42",kind:"capture",text:"已获取截图",detail:"screen-112642.png · 428 KB"},
-           {time:"11:26:38",kind:"input",text:"点击",detail:"(540, 958) · confirmed"},
-           {time:"11:26:31",kind:"input",text:"向上滑动",detail:"(540, 1420) → (540, 520) · 320 ms"}
-         ]},
+  deviceControl:deviceDraftState(PARAMS.get("deviceState")||"empty"),
   lg:{on:false, paused:false, pend:0, shard:11.8, piece:3, lvl:"W", tag:"", timer:null, ms:12400,
       lines:[
         {t:"11:02:11.482",lv:"W",tag:"ArkUI",m:"[list_layout] measure retry, node 88"},
@@ -928,7 +895,7 @@ const DEVICES=[
   {id:"tab01", name:"Unknown tablet", tp:"USB", state:"unauthorized", build:"—", key:"connect key 已脱敏"}
 ];
 const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug","debug","Debug"],
-  ["dump","dump","Viewer"],["trace","trace","Trace"],["diagnostics","diagnostics","Diagnostics"],["tools","toolkit","Toolkit"],["history","history","History"],
+  ["dump","dump","Viewer"],["trace","trace","Trace"],["device-control","device","Device"],["diagnostics","diagnostics","Diagnostics"],["history","history","History"],
   ["automation","automation","Automation"]];
 const HIST=[
   {id:"S-0826-01",kind:"flash",st:"succeeded",mode:"execute",dev:"DAYU200",what:"OpenHarmony 5.0.0.71",detail:"rk3568_release_20260825.zip · 已验证",when:"今天 14:32",day:"今天",icon:"flash",action:"在 Flash 中打开"},
@@ -1965,163 +1932,312 @@ document.addEventListener("keydown",e=>{
   if((e.metaKey||e.ctrlKey)&&(e.key==="m"||e.key==="M")&&S.nav==="diagnostics"&&S.diagnostics.view==="recording"&&S.diagnostics.running){e.preventDefault();addDiagMarker();}
 });
 
-/* ---------- Toolkit · Device Control ---------- */
-function toolTime(){return new Date().toLocaleTimeString("zh-CN",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});}
-function toolRecordTime(){const s=S.tools.recordSeconds;return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
-function toolPushEvent(kind,text,detail){S.tools.events.unshift({time:toolTime(),kind,text,detail});S.tools.events=S.tools.events.slice(0,12);const status=$("toolActionStatus");if(status)status.textContent=text+"，"+detail;}
-function captureToolScreenshot(){
-  if(S.tools.screenshotPending)return;S.tools.screenshotPending=true;
-  const ev={time:toolTime(),kind:"capture",text:"正在获取截图…",detail:"bounded read 已提交 · 等待结果"};
-  S.tools.events.unshift(ev);S.tools.events=S.tools.events.slice(0,12);
-  const st=$("toolActionStatus");if(st)st.textContent="正在获取截图";renderPage();
-  setTimeout(()=>{S.tools.screenshotPending=false;S.tools.screenshotAt=toolTime()+"."+String(Math.floor(Math.random()*1000)).padStart(3,"0");
-    ev.time=toolTime();ev.text="已获取截图";ev.detail="screen-"+S.tools.screenshotAt.replaceAll(":","").replace(".","-")+".png · 431 KB";
-    const s2=$("toolActionStatus");if(s2)s2.textContent="已获取截图，"+ev.detail;renderPageIf(["tools"]);},700);
-}
-function toggleToolPreview(){
-  const t=S.tools;
-  if(t.preview==="snapshot"){
-    t.preview="live";t.previewTick=0;t.previewStale=false;
-    toolPushEvent("preview","已开启低帧率预览","目标 5 fps · 实测帧率与画面年龄常显 · 仅用于操作反馈");
-    clearInterval(t.previewTimer);
-    t.previewTimer=setInterval(()=>{if(t.preview!=="live")return;t.previewTick++;
-      t.previewStale=t.previewTick%24>=19; /* 每 ~12 秒演示一段 2.5 秒断流：画面过期时输入自动暂停 */
-      renderPageIf(["tools"]);},500);
-  }else{
-    t.preview="snapshot";t.previewStale=false;clearInterval(t.previewTimer);t.previewTimer=null;
-    toolPushEvent("preview","已停止持续预览","恢复按需截图");
+/* ---------- Device · implementation-synced workspace ---------- */
+// Review data only. No transport, Runtime client, download or device command.
+// Copy is kept in lockstep with DeviceLocalizable; timers demonstrate phases,
+// not hardware latency, recording duration or a promised capture rate.
+const DEVICE_COPY = {
+  "zh-Hans": {
+    "device.boundary": "这是静止画面，不是实时预览。每个手势都是一次 typed operation；结果未知时绝不重发。",
+    "device.frame.age": "画面拍摄于",
+    "device.frame.none": "尚无画面",
+    "device.frame.unknownAge": "画面年龄未知",
+    "device.gesture.longPress": "长按",
+    "device.gesture.swipe": "滑动",
+    "device.gesture.tap": "点击",
+    "device.gestures.longPress": "按住半秒以上，发送一次长按。",
+    "device.gestures.swipe": "拖动发送一次滑动；你按住的时长就是滑动时长。",
+    "device.gestures.tap": "单击画面，在该点发送一次点击。",
+    "device.gestures.title": "操作方式",
+    "device.log.captureFailed": "截图失败",
+    "device.log.captured": "已获取截图",
+    "device.log.confirmed": "已确认",
+    "device.log.empty": "尚未发送任何操作。",
+    "device.log.failed": "失败",
+    "device.log.title": "操作记录",
+    "device.log.unknown": "结果未知",
+    "device.screen.capture": "获取截图",
+    "device.screen.capturing": "正在获取截图…",
+    "device.screen.empty.noTarget": "接管且仅接管一台设备后才能使用真机操作。",
+    "device.screen.empty.ready": "获取一张截图后即可在其上操作设备。",
+    "device.screen.empty.title": "尚未获取截图",
+    "device.stale.badge": "已过期",
+    "device.stale.refused": "未发送——这张画面已经过期",
+    "device.stale.refused.detail": "上一个手势已经改变了设备。再点之前先取一张新截图——在这张图上选的位置，已经不是它原来指的东西了。",
+    "device.target.none": "无设备",
+    "device.target.none.detail": "真机操作会写设备，因此不会替你猜是哪一台。",
+    "device.record.title": "录屏",
+    "device.record.start": "录制",
+    "device.record.stop": "停止",
+    "device.record.frames": "帧",
+    "device.record.preflighting": "检查空间中",
+    "device.record.capturing": "采集中",
+    "device.record.assembling": "合成中",
+    "device.record.validating": "校验中",
+    "device.record.ready": "录屏已就绪",
+    "device.record.failed": "录屏失败",
+    "device.record.reveal": "在访达中显示",
+    "device.record.saveAs": "另存为…",
+    "device.record.again": "再录一段",
+    "device.record.rate": "实测",
+    "device.record.gap": "帧丢失",
+    "device.record.noTarget": "采纳且仅采纳一台设备才能录制",
+    "device.record.ceiling": "设备没有录屏接口，这是在本机把一串静止画面合成出来的。它的显示回读只允许约每秒 1.8 帧。",
+    "device.record.timeline": "各帧按实际拍摄间距排布，不是按平均值。",
+    "device.record.noRoom": "放不下这段录屏",
+    "device.record.noRoom.detail": "制品库会拒绝新录屏，而不是删掉你已有的那一段。",
+    "device.record.wouldFit": "放得下",
+    "device.record.needs": "需要",
+    "device.record.free": "剩余",
+    "device.record.headroomUnknown": "读不到制品库剩余空间，这次运行没有对它做检查。运行时仍会拒绝一段它存不下的录屏。",
+    "device.performance.title": "不会自行取帧。",
+    "device.performance.detail": "每张画面都是你要来的，录屏是一段有限的连拍。采集期间会抬高设备负载，你正在观察的东西可能随之变化。显示的帧率是实测值，不是承诺值。"
+  },
+  "en": {
+    "device.boundary": "A still, not a live view. Each gesture is one typed operation; an unknown outcome is never resent.",
+    "device.frame.age": "Picture taken",
+    "device.frame.none": "No picture yet",
+    "device.frame.unknownAge": "Picture age unknown",
+    "device.gesture.longPress": "Long press",
+    "device.gesture.swipe": "Swipe",
+    "device.gesture.tap": "Tap",
+    "device.gestures.longPress": "Hold for half a second to send a long press.",
+    "device.gestures.swipe": "Drag to send a swipe; the time you held it is the swipe's duration.",
+    "device.gestures.tap": "Click the picture to send a tap at that point.",
+    "device.gestures.title": "How input works",
+    "device.log.captureFailed": "Screenshot failed",
+    "device.log.captured": "Screenshot captured",
+    "device.log.confirmed": "confirmed",
+    "device.log.empty": "Nothing sent yet.",
+    "device.log.failed": "failed",
+    "device.log.title": "Operation log",
+    "device.log.unknown": "outcome unknown",
+    "device.screen.capture": "Get screenshot",
+    "device.screen.capturing": "Capturing…",
+    "device.screen.empty.noTarget": "Adopt exactly one device to use Device.",
+    "device.screen.empty.ready": "Get a screenshot to act on the device.",
+    "device.screen.empty.title": "No screenshot yet",
+    "device.stale.badge": "Out of date",
+    "device.stale.refused": "Not sent — this picture is out of date",
+    "device.stale.refused.detail": "Your last gesture changed the device. Get a new screenshot before pressing again; a point picked on this one no longer means what it did.",
+    "device.target.none": "No device",
+    "device.target.none.detail": "Device sends device mutations and will not guess which device you meant.",
+    "device.record.title": "Recording",
+    "device.record.start": "Record",
+    "device.record.stop": "Stop",
+    "device.record.frames": "frames",
+    "device.record.preflighting": "Checking storage",
+    "device.record.capturing": "Capturing",
+    "device.record.assembling": "Assembling",
+    "device.record.validating": "Validating",
+    "device.record.ready": "Recording ready",
+    "device.record.failed": "Recording failed",
+    "device.record.reveal": "Show in Finder",
+    "device.record.saveAs": "Save As…",
+    "device.record.again": "Record again",
+    "device.record.rate": "measured",
+    "device.record.gap": "frames were lost",
+    "device.record.noTarget": "Adopt exactly one device to record",
+    "device.record.ceiling": "The device offers no recorder, so this is a run of stills composed here. About 1.8 a second is what its display readback allows.",
+    "device.record.timeline": "Frames are laid out at the spacing they were taken at, not at an average.",
+    "device.record.noRoom": "Not enough room to keep this recording",
+    "device.record.noRoom.detail": "The artifact store refuses a new recording rather than deleting one you already have.",
+    "device.record.wouldFit": "would fit",
+    "device.record.needs": "needs",
+    "device.record.free": "free",
+    "device.record.headroomUnknown": "Could not read the artifact store's remaining room, so this run was not checked against it. The runtime still refuses a recording it cannot keep.",
+    "device.performance.title": "Nothing captures on its own.",
+    "device.performance.detail": "Every picture is one you asked for, and a recording is a bounded run of stills. Capturing raises the device's load while it runs, so what you are watching can move with it. The rate shown is the one that was measured, never a promised one."
   }
-  renderPage();
+};
+function deviceText(key){return DEVICE_COPY[S.language][key]||key;}
+function deviceLocale(zh,en){return S.language==="en"?en:zh;}
+const DEVICE_SCENARIOS=[
+  ["empty","默认 · 尚未截图","Default · no screenshot"],
+  ["captured","已截图 · 可操作一次","Screenshot · one gesture"],
+  ["stale","已过期 · 拒绝旧画面输入","Stale · refuse input"],
+  ["history","历史截图 · 只读","Historical screenshot · read only"],
+  ["unknown","下一次输入 · 结果未知","Next input · unknown outcome"],
+  ["inputFailed","下一次输入 · 明确失败","Next input · clean failure"],
+  ["noTarget","无唯一已接管设备","No unique adopted device"],
+  ["captureFailed","下一次截图 · 失败保留旧图","Next capture · keep old frame on failure"],
+  ["quota","录屏 · 空间不足","Recording · insufficient space"],
+  ["headroomUnknown","录屏 · 读不到剩余空间","Recording · headroom unavailable"],
+  ["recordingFailed","录屏 · 采集失败","Recording · capture failure"],
+  ["runtimeUnavailable","录屏 · Runtime 入口未接通","Recording · Runtime entry unavailable"],
+  ["missingFrames","录屏 · 缺帧结果","Recording · missing frames"],
+  ["ready","录屏 · 已校验结果","Recording · validated result"]
+];
+function deviceDraftState(scenario="empty"){
+  const t={scenario,hasTarget:scenario!=="noTarget",frame:null,isCapturing:false,captureFailure:null,
+    frameCount:40,recordStage:"idle",headroomUnchecked:false,remainingBytes:64*1024*1024,
+    refusal:null,lastRecording:null,recordFailure:null,events:[],gesturePending:false,pointer:null,marker:null};
+  if(["captured","stale","history","unknown","inputFailed","captureFailed"].includes(scenario)){
+    t.frame={width:720,height:1280,capturedAt:Date.now(),stale:["stale","history"].includes(scenario)};
+  }
+  if(scenario==="quota")t.remainingBytes=1500000;
+  if(scenario==="headroomUnknown")t.remainingBytes=null;
+  if(scenario==="ready"){t.recordStage="ready";t.lastRecording={frameCount:40,fps:1.8,missing:0,path:"/tmp/ArkDeck-recording-demo.mov"};}
+  return t;
 }
-function startToolRecording(){
-  if(S.tools.recording||S.tools.recordPhase==="assembling")return;clearInterval(S.tools.timer);clearTimeout(S.tools.receiveTimer);S.tools.recording=true;S.tools.recordPhase="recording";S.tools.recordSeconds=0;S.tools.recordNotice="";
-  const j={id:"J"+(S.jobSeq++),title:"真机录屏 · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
-    phases:["Preflight","Recording","Assembling","Validating"],phaseIdx:1,safeBoundary:1,log:["→ Preflight · 宿主 Artifact 配额余量已检查","→ Recording · 宿主逐帧合成 · 实测 ~2 fps（演示）"],pages:["tools"],cancelled:false};
-  S.tools.recordJob=j;S.jobs.push(j);toolPushEvent("record","已开始录屏（宿主逐帧合成）","实测 ~2 fps · 最长 60 秒 · 无设备端驻留文件");renderDrawer();renderPage();
-  S.tools.timer=setInterval(()=>{if(!S.tools.recording)return;if(j.cancelled){stopToolRecording("cancelled");return;}S.tools.recordSeconds++;
-    if(S.tools.recordSeconds===50)S.tools.recordNotice="10 秒后到达 60 秒上限；停止后可「再录一段」";
-    if(S.tools.recordSeconds>=60){stopToolRecording("succeeded");return;}renderPageIf(["tools"]);},1000);
+function setDeviceScenario(scenario){
+  if(!DEVICE_SCENARIOS.some(([key])=>key===scenario))return;
+  S.deviceControl=deviceDraftState(scenario); // Old callbacks cannot publish into a new review scenario.
+  const url=new URL(location.href);url.searchParams.set("deviceState",scenario);history.replaceState(null,"",url);
+  render();$("deviceScenario").focus();deviceAnnounce(deviceLocale("已切换演示状态，未连接设备。","Review state changed. No device is connected."));
 }
-function stopToolRecording(result="succeeded"){
-  if(!S.tools.recording)return;clearInterval(S.tools.timer);S.tools.recording=false;S.tools.recordNotice="";
-  S.tools.recordPhase="assembling";const j=S.tools.recordJob;if(j){j.phaseIdx=2;j.log.push("→ Assembling · 宿主侧合成 MP4，无设备拉取环节");}
-  toolPushEvent("record","已停止录制，正在合成视频",`${Math.max(1,Math.round(S.tools.recordSeconds*2.1))} 帧 → MP4 · ${toolRecordTime()}`);renderDrawer();renderPage();
-  S.tools.receiveTimer=setTimeout(()=>finalizeToolRecording(j?.cancelled?"cancelled":result),900);
+function deviceAnnounce(text){$("deviceActionStatus").textContent=text;}
+function deviceRender(){renderPageIf(["device-control"]);}
+function devicePushEvent(t,key,detail,outcome="neutral",refused=false){
+  t.events.unshift({key,detail,outcome,refused});t.events=t.events.slice(0,40);
+  deviceAnnounce(deviceText(key)+" · "+detail);
 }
-function finalizeToolRecording(result="succeeded"){
-  const j=S.tools.recordJob,partial=result!=="succeeded",name=partial?"screen-recording-partial.mp4":"screen-recording.mp4",size=Math.max(1.2,S.tools.recordSeconds*.35).toFixed(1)+" MB";
-  S.tools.recordPhase="ready";S.tools.lastRecording={name,duration:toolRecordTime(),size,hash:"9d7a…e241",fps:"2.1 fps · 宿主合成",path:`~/Library/Application Support/ArkDeck/Artifacts/${j?.id||"CTRL-001"}/${name}`,partial};
-  if(j){j.phaseIdx=3;j.state=result;j.log.push("→ Validating · byte count / SHA-256 / MP4 container",partial?"已合成到停止点的帧；无设备端残留文件":"完成：本地 Artifact 已校验并原子发布；无设备端残留文件");histFromJob(j);}
-  toolPushEvent("record",partial?"部分录屏已合成到 Mac":"录屏已保存到 Mac",`${name} · ${size} · SHA-256 9d7a…e241`);renderDrawer();renderPage();
+function captureDeviceScreenshot(){
+  const t=S.deviceControl;if(!t.hasTarget||t.isCapturing)return;
+  t.isCapturing=true;deviceAnnounce(deviceText("device.screen.capturing"));deviceRender();
+  setTimeout(()=>{
+    if(S.deviceControl!==t)return;t.isCapturing=false;
+    if(t.scenario==="captureFailed"){
+      t.captureFailure=deviceLocale("演示：截图任务失败，保留上一张画面。","Demo: capture failed; the previous frame is retained.");
+      devicePushEvent(t,"device.log.captureFailed",t.captureFailure,"failed");
+    }else{
+      t.frame={width:720,height:1280,capturedAt:Date.now(),stale:false};t.captureFailure=null;t.marker=null;
+      devicePushEvent(t,"device.log.captured","720×1280");
+    }
+    deviceRender();
+  },700);
 }
-function toolRevealRecording(el){doneBtn(el,"已在 Finder 中显示（演示）");const status=$("toolActionStatus");if(status)status.textContent="已在 Finder 中显示录屏（演示）";}
-function toolSaveRecordingAsModal(){
-  const r=S.tools.lastRecording;if(!r)return;modal(`<div class="modal"><h3>另存为录屏</h3><p class="hint">产品中这里使用 macOS 保存面板导出副本；ArkDeck managed raw Artifact 保持不变。</p><div class="kv"><dt>文件名</dt><dd>${esc(r.name)}</dd><dt>默认位置</dt><dd>下载</dd><dt>来源</dt><dd>${esc(r.path)}</dd></div><div class="mfoot"><button class="btn" onclick="closeModal()">取消</button><button class="btn pri" onclick="closeModal();document.getElementById('toolActionStatus').textContent='已保存录屏副本（演示）'">保存副本（演示）</button></div></div>`);
+function devicePoint(event){
+  const r=event.currentTarget.getBoundingClientRect(),f=S.deviceControl.frame;
+  return {x:Math.min(f.width-1,Math.max(0,Math.trunc((event.clientX-r.left)/r.width*f.width))),
+    y:Math.min(f.height-1,Math.max(0,Math.trunc((event.clientY-r.top)/r.height*f.height)))};
 }
-function toolPoint(event){
-  const r=event.currentTarget.getBoundingClientRect();
-  return{x:Math.max(0,Math.min(1080,Math.round((event.clientX-r.left)/r.width*1080))),y:Math.max(0,Math.min(1920,Math.round((event.clientY-r.top)/r.height*1920)))};
+function devicePointerDown(event){
+  const t=S.deviceControl;if(event.button!==0||!t.frame||t.gesturePending||t.pointer)return;
+  t.pointer={...devicePoint(event),clientX:event.clientX,clientY:event.clientY,startedAt:performance.now(),id:event.pointerId};
+  event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault();
+  deviceMoveMarker(t.pointer,true);
 }
-function sendToolInput(input,detailPending,detailDone){
-  /* 两态反馈：提交即 pending（空心触点），Runtime 结果确认后才 confirmed（实心）。结果未知时保持 unknown，不自动重放。 */
-  const ev={time:toolTime(),kind:"input",text:input.label+"（发送中…）",detail:detailPending};
-  S.tools.events.unshift(ev);S.tools.events=S.tools.events.slice(0,12);
-  input.status="pending";S.tools.lastInput=input;
-  const st=$("toolActionStatus");if(st)st.textContent=input.label+" 已提交，等待结果";
-  renderPage();
-  setTimeout(()=>{input.status="confirmed";ev.time=toolTime();ev.text=input.label;ev.detail=detailDone;
-    const s2=$("toolActionStatus");if(s2)s2.textContent=input.label+"，"+detailDone;renderPageIf(["tools"]);},600);
+function deviceMoveMarker(point,pending){
+  const t=S.deviceControl;t.marker={x:point.x,y:point.y,pending};
+  const marker=$("deviceTouch");if(!marker)return;
+  marker.hidden=false;marker.classList.toggle("pending",pending);
+  marker.style.left=100*point.x/t.frame.width+"%";marker.style.top=100*point.y/t.frame.height+"%";
 }
-function sendToolClick(x,y){x=Math.round(Number(x));y=Math.round(Number(y));
-  sendToolInput({kind:"click",x,y,label:"点击"},`(${x}, ${y}) · dispatching`,`(${x}, ${y}) · confirmed`);}
-function sendToolLongClick(x,y,duration=650){x=Math.round(Number(x));y=Math.round(Number(y));duration=Math.round(Number(duration));
-  sendToolInput({kind:"longClick",x,y,label:"长按"},`(${x}, ${y}) · ${duration} ms · dispatching`,`(${x}, ${y}) · ${duration} ms · confirmed`);}
-function sendToolSwipe(x1,y1,x2,y2,duration=320){
-  [x1,y1,x2,y2,duration]=[x1,y1,x2,y2,duration].map(Number);
-  sendToolInput({kind:"swipe",x1,y1,x2,y2,duration,label:"滑动"},`(${x1}, ${y1}) → (${x2}, ${y2}) · dispatching`,`(${x1}, ${y1}) → (${x2}, ${y2}) · ${duration} ms · confirmed`);
+function devicePointerMove(event){
+  const t=S.deviceControl;if(t.pointer?.id===event.pointerId)deviceMoveMarker(devicePoint(event),true);
 }
-function updateToolDragPreview(a,b){
-  const el=$("toolDragPreview");if(!el)return;const x1=a.x/10.8,y1=a.y/19.2,x2=b.x/10.8,y2=b.y/19.2,dx=x2-x1,dy=y2-y1;
-  el.hidden=false;el.style.left=x1+"%";el.style.top=y1+"%";el.style.width=Math.hypot(dx,dy)+"%";el.style.transform=`rotate(${Math.atan2(dy,dx)*180/Math.PI}deg)`;
+function devicePointerCancel(event){
+  const t=S.deviceControl;if(t.pointer?.id!==event.pointerId)return;t.pointer=null;t.marker=null;deviceRender();
 }
-function clearToolPointer(){S.tools.pointerStart=null;S.tools.pointerNow=null;S.tools.pointerStartedAt=0;S.tools.pointerId=null;const el=$("toolDragPreview");if(el)el.hidden=true;}
-function handleToolPointerDown(event){
-  if(event.button!==0)return;
-  if(S.tools.preview==="live"&&S.tools.previewStale){const st=$("toolActionStatus");if(st)st.textContent="画面已过期，输入已暂停；等待预览恢复后再操作";return;}
-  const p=toolPoint(event);S.tools.pointerStart={...p,clientX:event.clientX,clientY:event.clientY};S.tools.pointerNow=p;S.tools.pointerStartedAt=performance.now();S.tools.pointerId=event.pointerId;
-  event.currentTarget.focus({preventScroll:true});event.currentTarget.setPointerCapture?.(event.pointerId);event.preventDefault();updateToolDragPreview(p,p);
+function devicePointerUp(event){
+  const t=S.deviceControl,a=t.pointer;if(!a||a.id!==event.pointerId)return;
+  const b=devicePoint(event),distance=Math.hypot(event.clientX-a.clientX,event.clientY-a.clientY),held=performance.now()-a.startedAt;
+  event.currentTarget.releasePointerCapture(event.pointerId);t.pointer=null;
+  if(t.frame.stale){t.marker=null;devicePushEvent(t,"device.stale.refused",deviceText("device.stale.refused.detail"),"failed",true);deviceRender();return;}
+  if(!t.hasTarget||t.gesturePending){t.marker=null;deviceRender();return;}
+  const kind=distance>=6?"swipe":held>=500?"longPress":"tap";
+  const duration=Math.min(2000,Math.max(kind==="longPress"?500:80,Math.trunc(held)));
+  const detail=`(${a.x}, ${a.y})`+(kind==="swipe"?` → (${b.x}, ${b.y})`:"")+(kind!=="tap"?` · ${duration}ms`:"");
+  t.gesturePending=true;t.marker={x:a.x,y:a.y,pending:true};
+  deviceAnnounce(deviceLocale("输入已提交，等待结果。","Input submitted; awaiting a result."));deviceRender();
+  setTimeout(()=>{
+    if(S.deviceControl!==t)return;
+    const outcome=t.scenario==="unknown"?"unknown":t.scenario==="inputFailed"?"failed":"confirmed";
+    t.gesturePending=false;if(t.marker)t.marker.pending=false;
+    // A clean failure leaves liveness intact. Confirmed AND unknown spend it.
+    if(outcome!=="failed")t.frame.stale=true;
+    t.events.unshift({key:"device.gesture."+kind,detail,outcome,refused:false,isInput:true});t.events=t.events.slice(0,40);
+    deviceAnnounce(deviceText("device.gesture."+kind)+" · "+deviceText("device.log."+outcome));deviceRender();
+  },650);
 }
-function handleToolPointerMove(event){if(!S.tools.pointerStart||event.pointerId!==S.tools.pointerId)return;S.tools.pointerNow=toolPoint(event);updateToolDragPreview(S.tools.pointerStart,S.tools.pointerNow);}
-function handleToolPointerUp(event){
-  if(!S.tools.pointerStart||event.pointerId!==S.tools.pointerId)return;const a=S.tools.pointerStart,b=toolPoint(event),distance=Math.hypot(event.clientX-a.clientX,event.clientY-a.clientY),duration=Math.max(80,Math.min(2000,Math.round(performance.now()-S.tools.pointerStartedAt)));
-  event.currentTarget.releasePointerCapture?.(event.pointerId);clearToolPointer();
-  /* tap/longClick 锚定 pointer down 位置（抖动不改变落点）；位移 <6pt 且按住 ≥500ms 是长按，不再静默降级为点击。 */
-  if(distance<6){duration>=500?sendToolLongClick(a.x,a.y,duration):sendToolClick(a.x,a.y);}
-  else sendToolSwipe(a.x,a.y,b.x,b.y,duration);
+function deviceRecordingBusy(t=S.deviceControl){return ["preflighting","capturing","assembling","validating"].includes(t.recordStage);}
+function deviceRecordingBytes(frames){return Math.max(1<<20,Math.trunc(frames*42573*3/2)+(64<<10));}
+function deviceChangeFrames(delta){const t=S.deviceControl;if(deviceRecordingBusy(t))return;t.frameCount=Math.min(300,Math.max(2,t.frameCount+delta));deviceRender();}
+function deviceRecordingTitle(t){
+  if(["idle","refused"].includes(t.recordStage))return deviceText("device.record.start");
+  return deviceText("device.record."+t.recordStage)+(t.recordStage==="capturing"?" · "+t.frameCount:"");
 }
-function toolUnsupportedGesture(event){
-  event.preventDefault();const st=$("toolActionStatus");if(st)st.textContent="该手势不会发送到设备；当前闭集只有单击、长按和拖动滑动";
+function startDeviceRecording(){
+  const t=S.deviceControl;if(deviceRecordingBusy(t))return;
+  if(!t.hasTarget){t.recordStage="failed";t.recordFailure=deviceText("device.record.noTarget");deviceRender();return;}
+  const requestedFrames=t.frameCount;
+  t.lastRecording=null;t.refusal=null;t.headroomUnchecked=false;t.recordStage="preflighting";
+  deviceAnnounce(deviceRecordingTitle(t));deviceRender();
+  const advance=(stage,after)=>setTimeout(()=>{if(S.deviceControl!==t)return;t.recordStage=stage;deviceAnnounce(deviceRecordingTitle(t));deviceRender();after?.();},900);
+  setTimeout(()=>{
+    if(S.deviceControl!==t)return;
+    t.headroomUnchecked=t.remainingBytes===null;
+    const needed=deviceRecordingBytes(requestedFrames);
+    if(t.remainingBytes!==null&&needed>t.remainingBytes){
+      let fit=0;while(deviceRecordingBytes(fit+1)<=t.remainingBytes)fit++;
+      t.refusal={needed,remaining:t.remainingBytes,fit};t.recordStage="refused";deviceAnnounce(deviceText("device.record.noRoom"));deviceRender();return;
+    }
+    if(t.scenario==="runtimeUnavailable"){
+      t.recordStage="failed";t.recordFailure=deviceLocale("演示：当前 Runtime 未接通录屏入口（methodNotAllowlisted），未开始采集。","Demo: this Runtime has no recording entry (methodNotAllowlisted); capture did not start.");
+      deviceAnnounce(deviceText("device.record.failed"));deviceRender();return;
+    }
+    t.recordStage="capturing";deviceAnnounce(deviceRecordingTitle(t));deviceRender();
+    advance(t.scenario==="recordingFailed"?"failed":"assembling",()=>{
+      if(t.recordStage==="failed"){t.recordFailure=deviceLocale("演示：采集失败，没有可导出的录屏。","Demo: capture failed; no recording can be exported.");deviceRender();return;}
+      advance("validating",()=>advance("ready",()=>{
+        const missing=t.scenario==="missingFrames"?3:0;
+        t.lastRecording={frameCount:Math.max(1,requestedFrames-missing),fps:1.8,missing:Math.min(missing,requestedFrames-1),path:"/tmp/ArkDeck-recording-demo.mov"};deviceRender();
+      }));
+    });
+  },900);
 }
-function handleToolPointerCancel(event){if(event.pointerId!==S.tools.pointerId)return;clearToolPointer();}
-function positionToolKeyboardCursor(){const el=$("toolKeyboardCursor"),p=S.tools.keyboardCursor;if(el){el.style.left=p.x/10.8+"%";el.style.top=p.y/19.2+"%";}}
-function handleToolCanvasKey(event){
-  const p=S.tools.keyboardCursor;if(event.key==="Enter"||event.key===" "){event.preventDefault();sendToolClick(p.x,p.y);requestAnimationFrame(()=>document.querySelector(".device-screen")?.focus());return;}
-  const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];if(!delta)return;event.preventDefault();const step=event.shiftKey?280:54,next={x:Math.max(0,Math.min(1080,p.x+delta[0]*step)),y:Math.max(0,Math.min(1920,p.y+delta[1]*step))};S.tools.keyboardCursor=next;
-  if(event.shiftKey){sendToolSwipe(p.x,p.y,next.x,next.y,280);requestAnimationFrame(()=>document.querySelector(".device-screen")?.focus());}else positionToolKeyboardCursor();
+function deviceShrinkRecording(){const t=S.deviceControl;if(deviceRecordingBusy(t)||!t.refusal||t.refusal.fit<2)return;t.frameCount=t.refusal.fit;t.recordStage="idle";deviceRender();}
+function resetDeviceRecording(){const t=S.deviceControl;if(deviceRecordingBusy(t))return;t.recordStage="idle";deviceRender();}
+function deviceSaveRecording(){
+  modal(`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="deviceSaveTitle"><h3 id="deviceSaveTitle">${deviceText("device.record.saveAs")}</h3><p class="hint">${deviceLocale("当前 App 使用 macOS 保存面板复制 .mov 文件，原文件保留。此处只演示交互，不创建文件。","The App uses the macOS save panel to copy the .mov file, retaining the original. This draft does not create files.")}</p><div class="mfoot"><button class="btn" onclick="closeModal()">${deviceLocale("关闭演示","Close demo")}</button></div></div>`);
 }
-function toolInputFeedback(){
-  const i=S.tools.lastInput;if(!i)return"";
-  const cls=i.status==="pending"?" pending":i.status==="failed"?" failed":"";
-  if(i.kind==="click"||i.kind==="longClick")return `<span class="device-touch-feedback${i.kind==="longClick"?" long":""}${cls}" style="left:${i.x/10.8}%;top:${i.y/19.2}%" aria-hidden="true"></span>`;
-  const x1=i.x1/10.8,y1=i.y1/19.2,x2=i.x2/10.8,y2=i.y2/19.2,dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),angle=Math.atan2(dy,dx)*180/Math.PI;
-  return `<span class="device-swipe-feedback" style="left:${x1}%;top:${y1}%;width:${len}%;transform:rotate(${angle}deg);opacity:${i.status==="pending"?".45":"1"}" aria-hidden="true"></span>`;
+function deviceFrameHTML(t){
+  if(!t.frame)return `<div class="device-empty" data-sync-id="device.screen.empty">${icon("device")}<h2>${deviceText("device.screen.empty.title")}</h2><p>${esc(t.captureFailure||deviceText(t.hasTarget?"device.screen.empty.ready":"device.screen.empty.noTarget"))}</p></div>`;
+  const m=t.marker;
+  return `<div class="device-screen" data-sync-id="device.screen.surface" role="group" aria-label="${deviceLocale("演示截图操作面：单击、长按或拖动；没有键盘输入映射","Demo screenshot: click, hold or drag; keyboard input is not mapped")}" tabindex="0" aria-busy="${t.gesturePending}" onpointerdown="devicePointerDown(event)" onpointermove="devicePointerMove(event)" onpointerup="devicePointerUp(event)" onpointercancel="devicePointerCancel(event)">
+    <div class="device-screen-content" aria-hidden="true"><b>${deviceLocale("演示截图","Demo screenshot")}</b><span>720 × 1280</span><span>${deviceLocale("不包含真实设备内容","No real device content")}</span></div>
+    ${t.frame.stale?`<span class="device-stale-overlay" data-sync-id="device.stale.badge">${icon("history",true)}${deviceText("device.stale.badge")}</span>`:""}
+    <span id="deviceTouch" class="device-touch-feedback${m?.pending?" pending":""}" ${m?"":"hidden"} style="left:${m?100*m.x/t.frame.width:0}%;top:${m?100*m.y/t.frame.height:0}%" aria-hidden="true"></span>
+  </div>`;
 }
-function toolDeviceScreenHTML(){
-  const p=S.tools.keyboardCursor;
-  return `<button class="device-screen" aria-label="设备操作画面：单击发送点击，按住不动发送长按，按住拖动发送滑动；键盘方向键移动指针，Enter 点击，Shift 加方向键滑动" onkeydown="handleToolCanvasKey(event)" onpointerdown="handleToolPointerDown(event)" onpointermove="handleToolPointerMove(event)" onpointerup="handleToolPointerUp(event)" onpointercancel="handleToolPointerCancel(event)" oncontextmenu="toolUnsupportedGesture(event)" onwheel="toolUnsupportedGesture(event)">
-    <span class="device-screen-content" aria-hidden="true"><span class="device-screen-status"><span>11:26</span><span>5G&nbsp;&nbsp;▰</span></span><span class="device-screen-title">设置</span>
-      <span class="device-screen-search">搜索设置项</span><span class="device-screen-card"><i></i><span><b>小艺</b><span>华为账号、云空间与服务</span></span></span>
-      <span class="device-screen-row"><span class="glyph">W</span><span>WLAN</span><span class="value">已连接</span><span class="device-screen-switch"></span></span>
-      <span class="device-screen-row"><span class="glyph" style="background:#4f79db">B</span><span>蓝牙</span><span class="value">已开启</span></span>
-      <span class="device-screen-row"><span class="glyph" style="background:#34a853">M</span><span>移动网络</span></span>
-    </span>${S.tools.showTouches?toolInputFeedback():""}${S.tools.preview==="live"&&S.tools.previewStale?'<span class="device-stale-overlay"><b>画面已过期</b><span>预览断流 · 输入已暂停</span></span>':""}<span class="device-drag-preview" id="toolDragPreview" hidden aria-hidden="true"></span><span class="device-keyboard-cursor" id="toolKeyboardCursor" style="left:${p.x/10.8}%;top:${p.y/19.2}%" aria-hidden="true"></span></button>`;
+function deviceRecordingHTML(t){
+  let state="";
+  if(t.recordStage==="idle")state=`<p class="device-small">${deviceText("device.record.ceiling")}</p>`;
+  if(deviceRecordingBusy(t))state=`<p role="status" data-sync-id="device.record.stage">${deviceRecordingTitle(t)}</p>`;
+  if(t.recordStage==="failed")state=`<p class="device-warning" role="status" data-sync-id="device.record.failed">${esc(t.recordFailure||deviceText("device.record.failed"))}</p>`;
+  if(t.recordStage==="refused"){
+    const r=t.refusal,mb=n=>(n/1000000).toFixed(1)+" MB";
+    state=`<div class="device-recording-result" data-sync-id="device.record.refused" role="status"><p class="device-warning">${deviceText("device.record.noRoom")}</p><p class="device-small">${deviceText("device.record.needs")} ${mb(r.needed)} · ${mb(r.remaining)} ${deviceText("device.record.free")}</p><p class="device-small">${deviceText("device.record.noRoom.detail")}</p></div>${r.fit>=2?`<button class="device-shrink" data-sync-id="device.record.shrink" onclick="deviceShrinkRecording()">${r.fit} ${deviceText("device.record.frames")} ${deviceText("device.record.wouldFit")}</button>`:""}`;
+  }
+  if(t.recordStage==="ready"&&t.lastRecording){const r=t.lastRecording;
+    state=`<div class="device-recording-result"><strong data-sync-id="device.record.ready" role="status">${icon("check",true)}${r.frameCount} ${deviceText("device.record.frames")} · ${r.fps.toFixed(2)} fps ${deviceText("device.record.rate")}</strong>${r.missing?`<p class="device-warning device-small" data-sync-id="device.record.gap">${r.missing} ${deviceText("device.record.gap")}</p>`:""}<span class="device-recording-path" title="${r.path}" data-sync-id="device.record.location">${r.path}</span><p class="device-small">${deviceText("device.record.timeline")}</p><div class="device-record-actions"><button data-sync-id="device.record.reveal" onclick="deviceAnnounce(deviceLocale('演示稿不会打开访达，也没有生成文件。','This draft does not open Finder or generate a file.'))">${deviceText("device.record.reveal")}</button><button data-sync-id="device.record.saveAs" onclick="deviceSaveRecording()">${deviceText("device.record.saveAs")}</button><button data-sync-id="device.record.again" onclick="resetDeviceRecording()">${deviceText("device.record.again")}</button></div></div>`;
+  }
+  return `<section class="device-control-section"><h2>${deviceText("device.record.title")}${deviceRecordingBusy(t)?'<span class="device-record-progress" aria-hidden="true"></span>':""}</h2><div class="device-record-stepper" data-sync-id="device.record.frames"><output aria-label="${deviceLocale("录制帧数","Frame count")}">${t.frameCount} ${deviceText("device.record.frames")}</output><span><button data-focus-key="device-frames-increase" aria-label="${deviceLocale("增加帧数","Increase frame count")}" onclick="deviceChangeFrames(10)" ${deviceRecordingBusy(t)||t.frameCount>=300?"disabled":""}>${icon("chevron",true)}</button><button data-focus-key="device-frames-decrease" aria-label="${deviceLocale("减少帧数","Decrease frame count")}" onclick="deviceChangeFrames(-10)" ${deviceRecordingBusy(t)||t.frameCount<=2?"disabled":""}>${icon("chevron",true)}</button></span></div><button class="btn device-record-start" data-sync-id="device.record.start" onclick="startDeviceRecording()" ${deviceRecordingBusy(t)?"disabled":""}>${icon("record",true)}${deviceRecordingTitle(t)}</button>${t.headroomUnchecked?`<p class="device-warning device-small" data-sync-id="device.record.headroomUnknown">${deviceText("device.record.headroomUnknown")}</p>`:""}${state}</section>`;
 }
-function toolEventRows(){return S.tools.events.map(e=>`<div class="tool-event-row"><time>${esc(e.time)}</time><span class="tool-event-icon">${icon(e.kind==="capture"?"camera":e.kind==="record"?"record":e.kind==="preview"?"eye":"pointer",true)}</span><span class="tool-event-copy"><b>${esc(e.text)}</b><span>${esc(e.detail)}</span></span></div>`).join("");}
-function toolRecordingResultHTML(){
-  const t=S.tools;if(t.recordPhase==="assembling")return `<div class="recording-result receiving" role="status"><span class="recording-result-icon">${icon("download",true)}</span><span class="recording-result-copy"><b>正在合成视频</b><span>宿主侧把已取帧合成 MP4 并校验；第一版无设备端拉取环节，也没有设备端残留文件。</span><span class="recording-path">Assembling → Validating · byte count / SHA-256 / MP4 container</span></span></div>`;
-  const r=t.lastRecording;if(!r)return"";return `<div class="recording-result" role="status"><span class="recording-result-icon" aria-hidden="true">✓</span><span class="recording-result-copy"><b>${r.partial?"部分录屏已合成到 Mac":"录屏已保存到 Mac"}</b><span>${esc(r.name)} · ${esc(r.duration)} · ${esc(r.size)} · ${esc(r.fps||"")} · SHA-256 ${esc(r.hash)}</span><span class="recording-path" title="${esc(r.path)}">${esc(r.path)}</span></span><span class="recording-result-actions"><button class="btn" onclick="toolRevealRecording(this)">在 Finder 中显示</button><button class="btn" onclick="toolSaveRecordingAsModal()">另存为…</button><button class="btn" onclick="startToolRecording()">再录一段</button></span></div>`;
+function pDeviceControl(){
+  const t=S.deviceControl;
+  const age=t.frame?`${deviceText("device.frame.age")} ${Math.max(0,Math.floor((Date.now()-t.frame.capturedAt)/1000))}s · ${t.frame.width}×${t.frame.height}`:deviceText("device.frame.none");
+  return `<div class="device-workspace-shell" data-page-title="Device">
+    <header class="device-toolbar"><div class="device-target"><b>${t.hasTarget?"OpenHarmony 3.2":deviceText("device.target.none")}</b><span>${t.hasTarget?"TGT-DEMO-001 · binding r4":deviceText("device.target.none.detail")}</span></div><button class="btn" data-sync-id="device.capture" onclick="captureDeviceScreenshot()" ${!t.hasTarget||t.isCapturing?"disabled":""}>${icon("camera",true)} ${deviceText(t.isCapturing?"device.screen.capturing":"device.screen.capture")}</button></header>
+    <div class="device-control-grid"><section class="device-stage" aria-label="${deviceLocale("设备画面","Device screen")}">${deviceFrameHTML(t)}</section><aside class="device-inspector" aria-label="${deviceLocale("设备操作","Device controls")}">
+      <section class="device-control-section"><h2>${deviceText("device.gestures.title")}</h2><p>${deviceText("device.gestures.tap")}</p><p>${deviceText("device.gestures.longPress")}</p><p>${deviceText("device.gestures.swipe")}</p></section>
+      ${deviceRecordingHTML(t)}
+      <section class="device-control-section device-log"><h2>${deviceText("device.log.title")}</h2>${t.events.length?`<div class="device-log-list">${t.events.map(e=>`<div class="device-log-row" data-outcome="${e.outcome}" data-sync-id="${e.refused?"device.log.refused":"device.log.entry"}">${icon(e.refused||e.outcome==="failed"||e.outcome==="unknown"?"warning":e.outcome==="confirmed"?"check":"camera",true)}<div><b>${deviceText(e.key)}${e.isInput?" · "+deviceText("device.log."+e.outcome):""}</b><p>${esc(e.detail)}</p></div></div>`).join("")}</div>`:`<p>${deviceText("device.log.empty")}</p>`}</section>
+      <section class="performance-note" data-sync-id="device.performance">${icon("trace",true)}<div><b>${deviceText("device.performance.title")}</b><p>${deviceText("device.performance.detail")}</p></div></section>
+    </aside></div>
+    <footer class="device-footer"><p class="device-frame-age" data-sync-id="device.frame.age">${icon("history",true)}${age}</p><p data-sync-id="device.boundary">${deviceText("device.boundary")}</p></footer>
+    <p class="device-workspace-boundary">${deviceLocale("交互稿 · 演示数据，不连接设备；阶段计时、帧率和路径仅用于走查，不代表本次真机测量。","Design draft · demo data; no device connection. Timing, rate and paths are illustrative, not hardware measurements.")}</p>
+  </div>`;
 }
-function pTools(){
-  const t=S.tools,live=t.preview==="live",assembling=t.recordPhase==="assembling";
-  const frameAge=(0.3+(t.previewTick%3)*0.15).toFixed(1);
-  return `<div class="tools-shell" data-page-title="Toolkit · 真机操作" data-acin><span class="ac">TOOLKIT-DEVICE-CONTROL</span>
-    <aside class="tools-rail" aria-label="工具列表"><div class="tools-rail-title">工具</div>
-      <button class="tool-nav-item on" aria-current="page"><svg class="symbol"><use href="#i-device-control"></use></svg><span class="tool-nav-copy"><b>真机操作</b><span>画面与输入</span></span></button>
-      <div class="tool-placeholder">后续工具只在对应 typed operation 发布后出现，不提供 raw shell。</div>
-    </aside>
-    <div class="device-tool"><div class="tool-toolbar">
-      <div class="tool-target"><span class="dot ok"></span><span class="tool-target-copy"><b>DAYU200 · USB</b><span>TGT-9587… · binding r3 · 1080×1920 · portrait</span></span></div>
-      <div class="tool-toolbar-actions">${t.recording?`<span class="tool-recording" aria-label="正在录屏，已录制 ${toolRecordTime()}"><span class="dot"></span> REC ${toolRecordTime()}</span>`:""}${t.recordNotice?`<span class="chip warn">${esc(t.recordNotice)}</span>`:""}
-        <button class="btn" onclick="captureToolScreenshot()" ${t.screenshotPending?"disabled":""}>${icon("camera",true)} ${t.screenshotPending?"正在获取截图…":"获取截图"}</button>
-        <button class="btn ${live?"danger":""}" onclick="toggleToolPreview()">${icon("eye",true)} ${live?"停止持续预览":"开启低帧率预览"}</button>
-        <button class="btn ${t.recording?"danger":"pri"}" onclick="${t.recording?"stopToolRecording()":"startToolRecording()"}" ${assembling?"disabled":""}>${icon(assembling?"download":"record",true)} ${assembling?"正在合成视频…":t.recording?"停止录制":"开始录屏"}</button>
-      </div></div>
-      ${toolRecordingResultHTML()}
-      <div class="device-control-grid">
-        <section class="device-preview-pane" aria-labelledby="devicePreviewTitle"><div class="device-pane-head"><h2 id="devicePreviewTitle">设备画面</h2><span class="spacer"></span><span class="chip dim">单击 · 长按 · 拖动</span></div>
-          <div class="device-stage">${toolDeviceScreenHTML()}</div>
-          <div class="device-preview-meta"><span class="chip ${live?"warn":"ok"}">${live?"● 低帧率预览 · 实测 2.1 fps（目标 5）":"✓ 按需截图 · 无持续取帧"}</span>${live?`<span class="device-frame-age">画面 ${t.previewStale?"1.9 s 前 · 断流":frameAge+" s 前"}</span>`:`<span class="mono">${esc(t.screenshotAt)}</span>`}<span>显示触点 ${t.showTouches?"开":"关"}</span></div>
-        </section>
-        <aside class="device-inspector" aria-label="真机操作控制与历史">
-          <section class="tool-section"><div class="tool-section-head"><h2>操作方式</h2><span class="spacer"></span><p>直接转换系统鼠标事件</p></div>
-            <div class="gesture-guide"><div class="gesture-guide-row">${icon("pointer",true)}<span class="gesture-guide-copy"><b>单击设备画面</b><span>以 pointer down 位置转换为一次点击，无需输入坐标；抖动不改变落点。</span></span></div><div class="gesture-guide-row">${icon("pointer",true)}<span class="gesture-guide-copy"><b>按住不动（≥ 0.5 秒）</b><span>转换为一次长按；不会被静默降级为点击。</span></span></div><div class="gesture-guide-row">${icon("swipe",true)}<span class="gesture-guide-copy"><b>按住并拖动</b><span>拖动方向和实际按住时长转换为一次滑动，松开后才发送。</span></span></div><div class="gesture-guide-row">${icon("keyboard",true)}<span class="gesture-guide-copy"><b>键盘操作</b><span>方向键移动虚拟指针，Enter 点击，Shift + 方向键滑动。</span></span></div></div>
-          </section>
-          <section class="tool-section"><div class="tool-section-head"><h2>操作记录</h2><span class="spacer"></span><p>最近 ${t.events.length} 项</p></div><div class="tool-event-list">${toolEventRows()}</div></section>
-          <section class="tool-section"><div class="performance-note">${icon("warning",true)} <span><b>默认不持续取帧。</b> 低帧率预览和录屏都可能改变设备负载；预览常显画面年龄，画面过期时输入自动暂停；录屏为宿主逐帧合成，帧率按实测标注。录屏开始后预览不会自动开启。</span></div></section>
-        </aside>
-      </div>
-      <div class="tools-boundary">${icon("warning",true)} <span><b>目标设计 · 演示数据。</b> 截图、录屏、点击、长按和滑动必须分别由已发布 typed operation materialize；每次输入绑定当前 target、binding、分辨率、方向与画面 epoch，排队超时的输入作废而不延迟补发，结果未知时不自动重放。5 fps 预览与设备侧编码录屏未经真机证实，当前录屏为宿主逐帧合成并按实测帧率标注。当前原型不会向设备发送操作。</span></div>
-    </div></div>`;
+function renderDeviceReview(){
+  const review=$("deviceReview");review.hidden=S.nav!=="device-control";if(review.hidden)return;
+  review.innerHTML=`<b>${deviceLocale("Device 交互走查","Device interaction review")}</b><label for="deviceScenario">${deviceLocale("演示状态","Demo state")}</label><select id="deviceScenario" onchange="setDeviceScenario(this.value)">${DEVICE_SCENARIOS.map(([key,zh,en])=>`<option value="${key}" ${S.deviceControl.scenario===key?"selected":""}>${deviceLocale(zh,en)}</option>`).join("")}</select><button class="toolbar-btn" onclick="toggleLanguage()">${S.language==="en"?"中文":"EN"}</button><button class="toolbar-btn" onclick="toggleTheme()">${deviceLocale("切换外观","Change appearance")}</button><button class="toolbar-btn" id="deviceWidthToggle" onclick="toggleDeviceWidth()">${S.deviceCompact?deviceLocale("宽窗","Wide window"):deviceLocale("窄窗","Compact window")}</button><span>${deviceLocale("上方为设计评审控件，不属于 App。","These review controls are not part of the App.")}</span>`;
+}
+function toggleDeviceWidth(){
+  S.deviceCompact=!S.deviceCompact;
+  const url=new URL(location.href);url.searchParams.set("deviceWidth",S.deviceCompact?"compact":"wide");history.replaceState(null,"",url);
+  render();$("deviceWidthToggle").focus();
 }
 
 /* ---------- Debug ---------- */
@@ -3039,8 +3155,11 @@ function diagModal(){
 }
 
 /* ---------- render ---------- */
-const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pViewer,trace:pTrace,diagnostics:pDiagnostics,tools:pTools,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
+const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pViewer,trace:pTrace,diagnostics:pDiagnostics,"device-control":pDeviceControl,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
 function renderDevs(){
+  if(S.nav==="device-control"){
+    $("devlist").innerHTML=`<nav class="nav"><button onclick="go('overview')"><span class="ic">${icon("overview")}</span>Overview</button></nav>${S.deviceControl.hasTarget?`<button class="dev" onclick="pickDevice('dayu200')"><span class="dot ok"></span><span class="dn"><b>OpenHarmony 3.2</b><span>${deviceLocale("就绪","Ready")} · OpenHarmony-7.0.0.38 · USB</span></span></button>`:""}`;return;
+  }
   $("devlist").innerHTML=DEVICES.map(d=>`
     <button class="dev ${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"on":""}" onclick="pickDevice('${d.id}')" oncontextmenu="openDeviceMenu(event,'${d.id}')" aria-current="${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"page":"false"}">
       <span class="dot ${d.state==="ready"?"ok":d.state==="unauthorized"?"warn":"off"}"></span>
@@ -3049,27 +3168,37 @@ function renderDevs(){
     </button>`).join("");
 }
 function renderNav(){
+  if(S.nav==="device-control"){
+    $("nav").innerHTML=NAV.filter(([k])=>!["overview","automation"].includes(k)).map(([k,ic,l])=>`${k==="history"?`<div class="sec">${deviceLocale("记录","Records")}</div>`:""}<button class="${S.nav===k?"on":""}" onclick="go('${k}')" ${S.nav===k?'aria-current="page"':""}><span class="ic">${icon(ic)}</span>${k==="diagnostics"?deviceLocale("诊断","Diagnostics"):l}</button>`).join("");return;
+  }
   $("nav").innerHTML=NAV.map(([k,ic,l,badge])=>`<button class="${S.nav===k?"on":""}" onclick="go('${k}')" ${S.nav===k?'aria-current="page"':""}><span class="ic">${icon(ic)}</span>${l}${badge?`<span class="preview">${badge}</span>`:""}</button>`).join("");
 }
 function renderPage(){
+  const deviceFocus=S.nav==="device-control"?document.activeElement?.getAttribute("data-sync-id"):null;
+  const deviceFocusKey=S.nav==="device-control"?document.activeElement?.getAttribute("data-focus-key"):null;
+  document.body.classList.toggle("device-native",S.nav==="device-control");
+  document.body.classList.toggle("device-compact",S.nav==="device-control"&&S.deviceCompact);
   $("page").classList.toggle("viewer-page",S.nav==="dump");
   $("page").classList.toggle("diagnostic-page",S.nav==="diagnostics"&&S.diagnostics.view!=="capture");
-  $("page").classList.toggle("tools-page",S.nav==="tools");
+  $("page").classList.toggle("device-workspace-page",S.nav==="device-control");
   $("page").innerHTML=PAGES[S.nav]();
   const titled=$("page").querySelector("[data-page-title]");
   if(titled){document.querySelector(".titlebar .t").textContent=titled.dataset.pageTitle;$("page").setAttribute("aria-label",titled.dataset.pageTitle);}
+  if(deviceFocus)$("page").querySelector(`[data-sync-id="${deviceFocus}"]`)?.focus({preventScroll:true});
+  if(deviceFocusKey)$("page").querySelector(`[data-focus-key="${deviceFocusKey}"]`)?.focus({preventScroll:true});
   const ls=$("logstream");if(ls)ls.scrollTop=ls.scrollHeight;
   if(S.nav==="dump")requestAnimationFrame(()=>document.querySelector(`[data-viewer-node="${S.viewer.selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"}));
 }
 function renderShellText(){
   document.documentElement.lang=S.language==="en"?"en":"zh-CN";
+  if(S.appearance!=="system")document.documentElement.dataset.theme=S.appearance;
   document.body.classList.toggle("reference",PARAMS.has("reference"));
   $("devicesSectionLabel").textContent=tx("devices");$("workflowsSectionLabel").textContent=tx("workflows");
   $("addTargetButton").querySelector("span").textContent=tx("addTarget");$("jobsLabel").textContent=tx("jobs");$("drawerLabel").textContent=tx("jobs");
   $("drawerSt").textContent=tx("emptyJobs");$("languageToggle").textContent=S.language==="en"?"中文":"EN";
   $("acToggle").textContent=tx("ac");$("themeToggle").textContent=tx("appearance");
 }
-function render(){renderShellText();renderDevs();renderNav();renderPage();renderDrawer();}
+function render(){renderShellText();renderDevs();renderNav();renderPage();renderDrawer();renderDeviceReview();if(S.nav==="device-control"){$("workflowsSectionLabel").textContent=deviceLocale("工作流","Workflows");$("drawerLabel").textContent=deviceLocale("Job 检查器","Job inspector");}}
 render();
 </script>
 </body>

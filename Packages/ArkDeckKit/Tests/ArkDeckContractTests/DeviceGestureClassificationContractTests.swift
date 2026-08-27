@@ -13,16 +13,16 @@ import XCTest
 /// wrong in a way nobody would notice: a downgraded long press still reaches
 /// the device and still reports success, and a gesture anchored at the release
 /// lands a few points from where somebody aimed.
-final class ToolkitGestureClassificationContractTests: XCTestCase {
-  private let frame = ToolkitScreenFrame(
+final class DeviceGestureClassificationContractTests: XCTestCase {
+  private let frame = DeviceScreenFrame(
     imageData: Data(), width: 720, height: 1280,
     capturedAtUTC: "2026-08-26T00:00:00Z", jobID: "job-1")
   private let rendered = CGSize(width: 360, height: 640)
 
   private func classify(
     from start: CGPoint, to end: CGPoint, heldFor: TimeInterval
-  ) -> ToolkitGestureRequest {
-    ToolkitGestureClassification.classify(
+  ) -> DeviceGestureRequest {
+    DeviceGestureClassification.classify(
       start: start, end: end,
       travelled: hypot(end.x - start.x, end.y - start.y), heldFor: heldFor,
       rendered: rendered, frame: frame)
@@ -113,19 +113,19 @@ final class ToolkitGestureClassificationContractTests: XCTestCase {
   /// invented: a gesture the device would refuse never leaves here.
   func testDurationsStayInsideTheirPublishedRange() {
     let brief = classify(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 200, y: 10), heldFor: 0.01)
-    XCTAssertEqual(brief.durationMs, ToolkitGestureClassification.swipeDurationBoundsMs.lower)
+    XCTAssertEqual(brief.durationMs, DeviceGestureClassification.swipeDurationBoundsMs.lower)
     let endless = classify(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 200, y: 10), heldFor: 30)
-    XCTAssertEqual(endless.durationMs, ToolkitGestureClassification.swipeDurationBoundsMs.upper)
+    XCTAssertEqual(endless.durationMs, DeviceGestureClassification.swipeDurationBoundsMs.upper)
     let held = classify(from: .zero, to: .zero, heldFor: 0.6)
     XCTAssertEqual(held.durationMs, 600)
     let veryLongHold = classify(from: .zero, to: .zero, heldFor: 30)
     XCTAssertEqual(
-      veryLongHold.durationMs, ToolkitGestureClassification.longPressDurationBoundsMs.upper)
+      veryLongHold.durationMs, DeviceGestureClassification.longPressDurationBoundsMs.upper)
   }
 
   /// Every classification produces a request the catalog would accept.
   func testEveryClassificationIsSubmittable() throws {
-    let target = ToolkitTargetPresentation(
+    let target = DeviceTargetPresentation(
       id: "TGT-1", bindingRevision: 1, displayName: "DAYU200")
     for request in [
       classify(from: .zero, to: .zero, heldFor: 0.1),
@@ -133,7 +133,7 @@ final class ToolkitGestureClassificationContractTests: XCTestCase {
       classify(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 200, y: 200), heldFor: 0.3),
     ] {
       XCTAssertNoThrow(
-        try ToolkitDeviceControlFacade.gestureRequest(request, target: target, nonce: "n"),
+        try DeviceControlFacade.gestureRequest(request, target: target, nonce: "n"),
         "\(request.gesture) must be submittable as it stands")
     }
   }

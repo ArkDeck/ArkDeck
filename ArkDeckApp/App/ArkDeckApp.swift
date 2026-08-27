@@ -115,11 +115,11 @@ private final class ArkDeckAppModelStore {
     documentController: traceDocument)
   @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
-  @ObservationIgnored lazy var toolkitWorkspace = ToolkitWorkspaceViewModel(
-    provider: ToolkitDeviceControlFacade.make())
-  // A launch without `--ui-test-toolkit-recording=` never reaches the fixture.
-  @ObservationIgnored lazy var toolkitRecording = ToolkitRecordingViewModel(
-    provider: ToolkitRecordingFixture.provider() ?? ToolkitDeviceControlFacade.make())
+  @ObservationIgnored lazy var deviceWorkspace = DeviceWorkspaceViewModel(
+    provider: DeviceControlFacade.make())
+  // A launch without `--ui-test-device-recording=` never reaches the fixture.
+  @ObservationIgnored lazy var deviceRecording = DeviceRecordingViewModel(
+    provider: DeviceRecordingFixture.provider() ?? DeviceControlFacade.make())
   @ObservationIgnored lazy var diagnosticsWorkspace = DiagnosticsWorkspaceViewModel()
 
   init() {
@@ -249,7 +249,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   case debug
   case uiDump
   case trace
-  case toolkit
+  case device
   case diagnostics
   case history
 
@@ -262,7 +262,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "app.navigation.debug"
     case .uiDump: "app.navigation.uiDump"
     case .trace: "app.navigation.trace"
-    case .toolkit: "app.navigation.toolkit"
+    case .device: "app.navigation.device"
     case .diagnostics: "app.navigation.diagnostics"
     case .history: "app.navigation.history"
     }
@@ -275,7 +275,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "ladybug"
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
-    case .toolkit: "hand.tap"
+    case .device: "iphone"
     case .diagnostics: "waveform.path"
     case .history: "clock.arrow.circlepath"
     }
@@ -302,6 +302,9 @@ private enum ShellSelection: Hashable {
   init(storageValue: String) {
     if storageValue.hasPrefix("device:") {
       self = .device(connectKey: String(storageValue.dropFirst("device:".count)))
+    } else if storageValue == "toolkit" {
+      // Restore the previous workspace name without changing device-row routing.
+      self = .navigation(.device)
     } else {
       self = .navigation(ArkDeckNavigationItem(rawValue: storageValue) ?? .overview)
     }
@@ -404,7 +407,7 @@ private struct OverviewWorkspaceView: View {
     case .trace: .trace
     case .debugHAP: .debug
     case .flash: .flash
-    case .toolkit: .toolkit
+    case .device: .device
     }
   }
 }
@@ -573,7 +576,7 @@ private struct AppShellView: View {
     .onChange(of: models.uiDumpWorkspace.isCapturing) { _, capturing in
       deviceList.setLiveObservationPaused(capturing)
     }
-    .onChange(of: models.toolkitWorkspace.isCapturing) { _, capturing in
+    .onChange(of: models.deviceWorkspace.isCapturing) { _, capturing in
       deviceList.setLiveObservationPaused(capturing)
     }
     .task(id: deviceList.startupInformationReady) {
@@ -635,7 +638,7 @@ private struct AppShellView: View {
           navigationRow(.debug)
           navigationRow(.uiDump)
           navigationRow(.trace)
-          navigationRow(.toolkit)
+          navigationRow(.device)
           navigationRow(.diagnostics)
         }
         Section("app.navigation.section.records") {
@@ -662,8 +665,8 @@ private struct AppShellView: View {
       RuntimeRecoveryBanner(model: runtimeHistory, onOpenHistory: openHistory)
       if let context = visibleHistoryContext {
         HistoryWorkspaceContextBanner(context: context) {
-          if context.workspaceKind == .toolkit {
-            models.toolkitWorkspace.dismissHistoryContext()
+          if context.workspaceKind == .device {
+            models.deviceWorkspace.dismissHistoryContext()
           }
           models.reopenedHistoryContext = nil
         }
@@ -691,7 +694,7 @@ private struct AppShellView: View {
     case .trace: .trace
     case .diagnostics: .diagnostics
     case .debug: .debug
-    case .toolkit: .toolkit
+    case .device: .device
     }
   }
 
@@ -714,8 +717,8 @@ private struct AppShellView: View {
         models.traceWorkspace.openHistoryContext(context)
       case .debug:
         models.debugWorkspace.rememberHistoryContext(context)
-      case .toolkit:
-        models.toolkitWorkspace.openHistoryContext(context)
+      case .device:
+        models.deviceWorkspace.openHistoryContext(context)
       case .diagnostics:
         break
       }
@@ -738,7 +741,7 @@ private struct AppShellView: View {
       models.traceWorkspace.applyDeviceObservation(
         observation, names: deviceDisplayNames(observation))
     }
-    models.toolkitWorkspace.publish(deviceObservation: observation)
+    models.deviceWorkspace.publish(deviceObservation: observation)
     models.diagnosticsWorkspace.publish(deviceObservation: observation)
   }
 
@@ -775,10 +778,10 @@ private struct AppShellView: View {
       models.traceWorkspace.applyDeviceObservation(
         deviceList.presentation, names: deviceDisplayNames(deviceList.presentation))
       models.traceWorkspace.refresh()
-    case .navigation(.toolkit):
-      // Only routing. Toolkit shows a still the person asked for, so arriving
+    case .navigation(.device):
+      // Only routing. Device shows a still the person asked for, so arriving
       // on the tab must not quietly photograph the device.
-      models.toolkitWorkspace.publish(deviceObservation: deviceList.presentation)
+      models.deviceWorkspace.publish(deviceObservation: deviceList.presentation)
     case .navigation(.diagnostics):
       // Routing as well. A diagnostic session is armed deliberately; opening
       // the tab is not that decision.
@@ -925,9 +928,9 @@ private struct AppShellView: View {
       UIDumpWorkspaceView(model: models.uiDumpWorkspace)
     case .trace:
       TraceWorkspaceView(model: models.traceWorkspace)
-    case .toolkit:
-      ToolkitWorkspaceView(
-        model: models.toolkitWorkspace, recording: models.toolkitRecording)
+    case .device:
+      DeviceWorkspaceView(
+        model: models.deviceWorkspace, recording: models.deviceRecording)
     case .diagnostics:
       DiagnosticsWorkspaceView(model: models.diagnosticsWorkspace)
     }

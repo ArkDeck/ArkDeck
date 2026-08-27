@@ -42,11 +42,13 @@ package enum ArkDeckAgentClientName {
   package static let debugArtifactsWorkspace = "ArkDeckApp.DebugWorkspace.Artifacts"
   package static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
   package static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
-  /// Toolkit's device-control workspace. It is named apart from the Viewer's
+  /// Device's device-control workspace. It is named apart from the Viewer's
   /// client even though both capture a screenshot, because the daemon decides
   /// what an App may submit from the pair of client name and operation: a
   /// client that may also inject a gesture must be a distinct subject.
-  package static let toolkitDeviceControl = "ArkDeckApp.Toolkit.DeviceControl"
+  // This published client identity also keys durable workspace history. The
+  // Device product rename must not change admission or split existing threads.
+  package static let deviceControl = "ArkDeckApp.Toolkit.DeviceControl"
 }
 
 /// The global Mach service name the daemon vends and the App looks up. It is

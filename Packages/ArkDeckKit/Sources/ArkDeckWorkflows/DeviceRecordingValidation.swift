@@ -8,7 +8,7 @@ import Foundation
 /// claims" are different facts and only the second is worth showing a person.
 /// The writer reporting `.completed` is what a validating step is there to
 /// doubt.
-public enum ToolkitRecordingValidation {
+public enum DeviceRecordingValidation {
   public struct Reading: Sendable, Equatable {
     public let durationSeconds: Double
     public let width: Int
@@ -32,7 +32,7 @@ public enum ToolkitRecordingValidation {
   static let toleranceSeconds = 0.25
 
   public static func validate(
-    _ composition: ToolkitRecordingComposer.Composition
+    _ composition: DeviceRecordingComposer.Composition
   ) async throws -> Reading {
     let byteCount =
       (try? FileManager.default.attributesOfItem(atPath: composition.url.path)[.size] as? Int)

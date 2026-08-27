@@ -24,11 +24,11 @@
 		A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A9 /* FlashRuntimeActivityView.swift */; };
 		A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AC /* GlobalJobInspectorView.swift */; };
 		A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AE /* JobsLocalizable.xcstrings */; };
-		G100000000000000000001 /* ToolkitWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000002 /* ToolkitWorkspaceView.swift */; };
-		G100000000000000000003 /* ToolkitWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000004 /* ToolkitWorkspaceViewModel.swift */; };
-		G100000000000000000090 /* ToolkitRecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000091 /* ToolkitRecordingViewModel.swift */; };
-		G100000000000000000005 /* ToolkitLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000006 /* ToolkitLocalization.swift */; };
-		G100000000000000000007 /* ToolkitLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = G100000000000000000008 /* ToolkitLocalizable.xcstrings */; };
+		G100000000000000000001 /* DeviceWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000002 /* DeviceWorkspaceView.swift */; };
+		G100000000000000000003 /* DeviceWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000004 /* DeviceWorkspaceViewModel.swift */; };
+		G100000000000000000090 /* DeviceRecordingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000091 /* DeviceRecordingViewModel.swift */; };
+		G100000000000000000005 /* DeviceLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = G100000000000000000006 /* DeviceLocalization.swift */; };
+		G100000000000000000007 /* DeviceLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = G100000000000000000008 /* DeviceLocalizable.xcstrings */; };
 		G200000000000000000001 /* DiagnosticsWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G200000000000000000002 /* DiagnosticsWorkspaceView.swift */; };
 		G200000000000000000003 /* DiagnosticsWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = G200000000000000000004 /* DiagnosticsWorkspaceViewModel.swift */; };
 		G200000000000000000005 /* DiagnosticsLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = G200000000000000000006 /* DiagnosticsLocalization.swift */; };
@@ -53,8 +53,8 @@
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000E0 /* ViewerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* ViewerUITests.swift */; };
-		A10000000000000000000F10 /* ToolkitStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */; };
-		A10000000000000000000F20 /* ToolkitRecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F21 /* ToolkitRecordingUITests.swift */; };
+		A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */; };
+		A10000000000000000000F20 /* DeviceRecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F21 /* DeviceRecordingUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
@@ -85,11 +85,11 @@
 		A100000000000000000000A9 /* FlashRuntimeActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashRuntimeActivityView.swift; sourceTree = "<group>"; };
 		A100000000000000000000AC /* GlobalJobInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalJobInspectorView.swift; sourceTree = "<group>"; };
 		A100000000000000000000AE /* JobsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = JobsLocalizable.xcstrings; sourceTree = "<group>"; };
-		G100000000000000000002 /* ToolkitWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitWorkspaceView.swift; sourceTree = "<group>"; };
-		G100000000000000000004 /* ToolkitWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitWorkspaceViewModel.swift; sourceTree = "<group>"; };
-		G100000000000000000091 /* ToolkitRecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitRecordingViewModel.swift; sourceTree = "<group>"; };
-		G100000000000000000006 /* ToolkitLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitLocalization.swift; sourceTree = "<group>"; };
-		G100000000000000000008 /* ToolkitLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ToolkitLocalizable.xcstrings; sourceTree = "<group>"; };
+		G100000000000000000002 /* DeviceWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWorkspaceView.swift; sourceTree = "<group>"; };
+		G100000000000000000004 /* DeviceWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWorkspaceViewModel.swift; sourceTree = "<group>"; };
+		G100000000000000000091 /* DeviceRecordingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingViewModel.swift; sourceTree = "<group>"; };
+		G100000000000000000006 /* DeviceLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocalization.swift; sourceTree = "<group>"; };
+		G100000000000000000008 /* DeviceLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = DeviceLocalizable.xcstrings; sourceTree = "<group>"; };
 		G200000000000000000002 /* DiagnosticsWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsWorkspaceView.swift; sourceTree = "<group>"; };
 		G200000000000000000004 /* DiagnosticsWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsWorkspaceViewModel.swift; sourceTree = "<group>"; };
 		G200000000000000000006 /* DiagnosticsLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsLocalization.swift; sourceTree = "<group>"; };
@@ -110,8 +110,8 @@
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
-		A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitStaleFrameUITests.swift; sourceTree = "<group>"; };
-		A10000000000000000000F21 /* ToolkitRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolkitRecordingUITests.swift; sourceTree = "<group>"; };
+		A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStaleFrameUITests.swift; sourceTree = "<group>"; };
+		A10000000000000000000F21 /* DeviceRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 		E10000000000000000000002 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -163,7 +163,7 @@
 				A10000000000000000000036 /* HDC UI Tests */,
 				A100000000000000000000EB /* Overview UI Tests */,
 				A1000000000000000000003A /* App Shell UI Tests */,
-				A10000000000000000000F12 /* Toolkit UI Tests */,
+				A10000000000000000000F12 /* Device UI Tests */,
 				A10000000000000000000033 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -181,7 +181,7 @@
 				A100000000000000000000A2 /* Flash Feature */,
 				A100000000000000000000AF /* Jobs Feature */,
 				A100000000000000000000C4 /* UI Dump Feature */,
-				G100000000000000000009 /* Toolkit Feature */,
+				G100000000000000000009 /* Device Feature */,
 				G200000000000000000009 /* Diagnostics Feature */,
 				A100000000000000000000B4 /* Debug Feature */,
 				B10000000000000000000009 /* Trace Feature */,
@@ -235,7 +235,7 @@
 				A100000000000000000000A4 /* FlashLocalizable.xcstrings */,
 				A100000000000000000000AE /* JobsLocalizable.xcstrings */,
 				A100000000000000000000C3 /* UIDumpLocalizable.xcstrings */,
-				G100000000000000000008 /* ToolkitLocalizable.xcstrings */,
+				G100000000000000000008 /* DeviceLocalizable.xcstrings */,
 				G200000000000000000008 /* DiagnosticsLocalizable.xcstrings */,
 				A100000000000000000000B2 /* HistoryLocalizable.xcstrings */,
 				A100000000000000000000B3 /* DebugLocalizable.xcstrings */,
@@ -306,15 +306,15 @@
 			path = Features/Jobs;
 			sourceTree = "<group>";
 		};
-		G100000000000000000009 /* Toolkit Feature */ = {
+		G100000000000000000009 /* Device Feature */ = {
 			isa = PBXGroup;
 			children = (
-				G100000000000000000002 /* ToolkitWorkspaceView.swift */,
-				G100000000000000000004 /* ToolkitWorkspaceViewModel.swift */,
-				G100000000000000000091 /* ToolkitRecordingViewModel.swift */,
-				G100000000000000000006 /* ToolkitLocalization.swift */,
+				G100000000000000000002 /* DeviceWorkspaceView.swift */,
+				G100000000000000000004 /* DeviceWorkspaceViewModel.swift */,
+				G100000000000000000091 /* DeviceRecordingViewModel.swift */,
+				G100000000000000000006 /* DeviceLocalization.swift */,
 			);
-			path = Features/Toolkit;
+			path = Features/Device;
 			sourceTree = "<group>";
 		};
 		G200000000000000000009 /* Diagnostics Feature */ = {
@@ -378,13 +378,13 @@
 			path = Features/Shared;
 			sourceTree = "<group>";
 		};
-		A10000000000000000000F12 /* Toolkit UI Tests */ = {
+		A10000000000000000000F12 /* Device UI Tests */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000F11 /* ToolkitStaleFrameUITests.swift */,
-				A10000000000000000000F21 /* ToolkitRecordingUITests.swift */,
+				A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */,
+				A10000000000000000000F21 /* DeviceRecordingUITests.swift */,
 			);
-			path = ArkDeckAppUITests/Toolkit;
+			path = ArkDeckAppUITests/Device;
 			sourceTree = "<group>";
 		};
 		A1000000000000000000003A /* App Shell UI Tests */ = {
@@ -538,7 +538,7 @@
 				A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */,
 				A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */,
 				A100000000000000000000C1 /* UIDumpLocalizable.xcstrings in Resources */,
-				G100000000000000000007 /* ToolkitLocalizable.xcstrings in Resources */,
+				G100000000000000000007 /* DeviceLocalizable.xcstrings in Resources */,
 				G200000000000000000007 /* DiagnosticsLocalizable.xcstrings in Resources */,
 				A100000000000000000000B1 /* HistoryLocalizable.xcstrings in Resources */,
 				A100000000000000000000B6 /* DebugLocalizable.xcstrings in Resources */,
@@ -568,13 +568,13 @@
 				A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */,
 				A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */,
 				A100000000000000000000C0 /* UIDumpWorkspaceView.swift in Sources */,
-				G100000000000000000001 /* ToolkitWorkspaceView.swift in Sources */,
+				G100000000000000000001 /* DeviceWorkspaceView.swift in Sources */,
 				G200000000000000000001 /* DiagnosticsWorkspaceView.swift in Sources */,
 				G200000000000000000003 /* DiagnosticsWorkspaceViewModel.swift in Sources */,
 				G200000000000000000005 /* DiagnosticsLocalization.swift in Sources */,
-				G100000000000000000003 /* ToolkitWorkspaceViewModel.swift in Sources */,
-				G100000000000000000090 /* ToolkitRecordingViewModel.swift in Sources */,
-				G100000000000000000005 /* ToolkitLocalization.swift in Sources */,
+				G100000000000000000003 /* DeviceWorkspaceViewModel.swift in Sources */,
+				G100000000000000000090 /* DeviceRecordingViewModel.swift in Sources */,
+				G100000000000000000005 /* DeviceLocalization.swift in Sources */,
 				A100000000000000000000E2 /* ViewerLocalization.swift in Sources */,
 				A100000000000000000000B0 /* DebugWorkspaceView.swift in Sources */,
 				B10000000000000000000001 /* TraceWorkspaceView.swift in Sources */,
@@ -592,8 +592,8 @@
 			files = (
 				A1000000000000000000001F /* AppShellUITests.swift in Sources */,
 				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
-				A10000000000000000000F10 /* ToolkitStaleFrameUITests.swift in Sources */,
-				A10000000000000000000F20 /* ToolkitRecordingUITests.swift in Sources */,
+				A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */,
+				A10000000000000000000F20 /* DeviceRecordingUITests.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
 				A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */,

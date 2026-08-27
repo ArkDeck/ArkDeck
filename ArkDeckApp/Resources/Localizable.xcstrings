@@ -178,19 +178,19 @@
         }
       }
     },
-    "app.navigation.toolkit": {
+    "app.navigation.device": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Toolkit"
+            "value": "Device"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Toolkit"
+            "value": "Device"
           }
         }
       }
@@ -2168,7 +2168,7 @@
         }
       }
     },
-    "overview.record.action.toolkit": {
+    "overview.record.action.device": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3901,7 +3901,7 @@
     "overview.record.remoteServer.unavailable":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Binding unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法读取绑定"}}}},
     "overview.record.next.title":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Next step"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下一步"}}}},
     "overview.record.next.empty.title":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Start from a workflow in the sidebar"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"从左侧工作流开始"}}}},
-    "overview.record.next.empty.detail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Viewer, Trace, Debug, Flash and Toolkit already provide the shortest route. New runs and artifacts will appear here automatically."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Viewer、Trace、Debug、Flash 和 Toolkit 已经是最短入口；新的运行与产物会自动出现在这里。"}}}},
+    "overview.record.next.empty.detail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Viewer, Trace, Debug, Flash and Device already provide the shortest route. New runs and artifacts will appear here automatically."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Viewer、Trace、Debug、Flash 和 Device 已经是最短入口；新的运行与产物会自动出现在这里。"}}}},
     "overview.record.next.attention":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Needs attention"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"需要处理"}}}},
     "overview.record.next.unknownDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The external effect is unknown. The original request will not be replayed; inspect durable recovery evidence in History."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"外部效果未知，原请求不会重放；请到 History 查看持久化恢复证据。"}}}},
     "overview.record.next.waitingDetail":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Runtime is waiting for a required human action. Open the Job to continue from the recorded boundary."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Runtime 正在等待必要的人工动作，请打开 Job 从已记录边界继续。"}}}},
@@ -3913,7 +3913,7 @@
     "overview.record.workspace.trace":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Trace capture"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Trace 抓取"}}}},
     "overview.record.workspace.debug":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"HAP debugging"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"HAP 调试"}}}},
     "overview.record.workspace.flash":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Device flash"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备刷机"}}}},
-    "overview.record.workspace.toolkit":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Device control"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"真机操作"}}}},
+    "overview.record.workspace.device":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Device control"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"真机操作"}}}},
     "overview.record.state.succeeded":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Succeeded"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已成功"}}}},
     "overview.record.state.failed":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Failed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已失败"}}}},
     "overview.record.state.interrupted":{"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Interrupted"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已中断"}}}},

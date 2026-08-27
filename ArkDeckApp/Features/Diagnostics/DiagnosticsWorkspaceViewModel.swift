@@ -32,13 +32,13 @@ final class DiagnosticsWorkspaceViewModel {
 
   /// Exactly one adopted candidate, or none. A capture writes to a device, so
   /// it will not guess which one when the machine offers more than one.
-  var target: ToolkitTargetPresentation? {
+  var target: DeviceTargetPresentation? {
     let adopted = deviceObservation.candidates.filter { $0.isAdopted }
     guard adopted.count == 1, let device = adopted.first,
       let targetID = device.adoptedTargetID
     else { return nil }
     let name = device.deviceInformation?.name ?? device.observedFacts?.model ?? targetID
-    return ToolkitTargetPresentation(
+    return DeviceTargetPresentation(
       id: targetID, bindingRevision: device.bindingRevision, displayName: name)
   }
 

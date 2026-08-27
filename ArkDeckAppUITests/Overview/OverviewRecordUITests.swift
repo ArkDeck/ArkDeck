@@ -20,9 +20,9 @@ final class OverviewRecordUITests: XCTestCase {
       element(app, "overview.record.device.picker").exists,
       "an adopted target that is absent from the live device observation must not appear")
 
-    // Viewer, Trace, Debug, Flash and Toolkit are already one click away in
+    // Viewer, Trace, Debug, Flash and Device are already one click away in
     // the sidebar, so Overview must not render a second launch grid.
-    for kind in ["uiDump", "trace", "debugHAP", "flash", "toolkit"] {
+    for kind in ["uiDump", "trace", "debugHAP", "flash", "device"] {
       XCTAssertFalse(element(app, "overview.record.start.\(kind)").exists)
     }
   }

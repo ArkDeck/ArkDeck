@@ -3,7 +3,7 @@ import XCTest
 /// The recording pane, driven end to end over a real device archive
 /// (TASK-IDC-002, recorded gap 2 of 5, App leg).
 ///
-/// The provider is replaced by `ToolkitRecordingFixture`, which replays frames
+/// The provider is replaced by `DeviceRecordingFixture`, which replays frames
 /// a device actually produced. What that covers is everything on this side:
 /// the four states, composing the movie, validating it by reading the written
 /// file back, and the result bar. What it deliberately does not cover is the
@@ -11,9 +11,9 @@ import XCTest
 /// `ScreenSequenceCaptureContractTests` and by the hardware runs recorded with
 /// it.
 ///
-/// Opt-in, because it needs an archive on disk and an adopted device for the
-/// workspace to have a target at all.
-final class ToolkitRecordingUITests: XCTestCase {
+/// The separate real-device case uses the installed Runtime, with no archive,
+/// quota or device fixture. Its evidence must not be conflated with replay.
+final class DeviceRecordingUITests: XCTestCase {
   private static let archiveKey = "ARKDECK_UI_TEST_FRAME_ARCHIVE"
 
   /// Which state the pane is showing, for a failure message that says what
@@ -21,32 +21,92 @@ final class ToolkitRecordingUITests: XCTestCase {
   /// `firstMatch` on a missing identifier, which throws rather than reporting.
   static func visibleStage(of app: XCUIApplication) -> String {
     for identifier in [
-      "toolkit.record.failed", "toolkit.record.refused", "toolkit.record.headroomUnknown",
-      "toolkit.record.stage", "toolkit.record.ready",
+      "device.record.failed", "device.record.refused", "device.record.headroomUnknown",
+      "device.record.stage", "device.record.ready",
     ] where app.descendants(matching: .any).matching(identifier: identifier).count > 0 {
       return identifier
     }
     return "no recognisable state"
   }
 
-  private func launch(archive: String, headroomBytes: Int? = nil) -> XCUIApplication {
+  private func launch(archive: String? = nil, headroomBytes: Int? = nil) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning { app.terminate() }
     app.launchArguments = [
       "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
       "--ui-test-auto-update-idle",
-      "--ui-test-toolkit-recording=\(archive)",
+      "--ui-test-reset-shell-selection", "-AppleLanguages", "(en)",
     ]
+    if let archive { app.launchArguments.append("--ui-test-device-recording=\(archive)") }
     if let headroomBytes {
-      app.launchArguments.append("--ui-test-toolkit-recording-headroom=\(headroomBytes)")
+      app.launchArguments.append("--ui-test-device-recording-headroom=\(headroomBytes)")
     }
     app.launch()
     app.activate()
     XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
-    let row = app.descendants(matching: .any)["app.navigation.toolkit"]
+    let row = app.descendants(matching: .any)["app.navigation.device"]
     XCTAssertTrue(row.waitForExistence(timeout: 10))
     row.click()
     return app
+  }
+
+  func testRealDeviceRecordingCapturesFortyFramesAndOffersALocalMovie() throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_UI_TEST_DEVICE_REAL_DEVICE"] == "1"
+    else { throw XCTSkip("Opt in to a real device capture with ARKDECK_UI_TEST_DEVICE_REAL_DEVICE=1") }
+    let app = launch()
+    let capture = app.buttons["device.capture"]
+    XCTAssertTrue(capture.waitForExistence(timeout: 10))
+    let connected = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "isEnabled == true"), object: capture)
+    guard XCTWaiter().wait(for: [connected], timeout: 30) == .completed else {
+      return XCTFail("real-device validation requires exactly one observed adopted device")
+    }
+
+    let start = app.buttons["device.record.start"]
+    XCTAssertTrue(start.isEnabled)
+    start.click()
+    let ready = app.descendants(matching: .any)["device.record.ready"]
+    let failed = app.descendants(matching: .any)["device.record.failed"]
+    let refused = app.descendants(matching: .any)["device.record.refused"]
+    let terminal = XCTNSPredicateExpectation(
+      predicate: NSPredicate { _, _ in ready.exists || failed.exists || refused.exists },
+      object: nil)
+    guard XCTWaiter().wait(for: [terminal], timeout: 180) == .completed, ready.exists else {
+      let detail = failed.exists ? "\(failed.value ?? failed.label)" : Self.visibleStage(of: app)
+      let screenshot = XCTAttachment(screenshot: app.screenshot())
+      screenshot.name = "Device real recording did not finish"
+      screenshot.lifetime = .keepAlways
+      add(screenshot)
+      return XCTFail("real capture/composition failed: " + detail)
+    }
+    let summary = ready.label.isEmpty ? "\(ready.value ?? "")" : ready.label
+    XCTAssertTrue(summary.contains("40 frames"), summary)
+    let rateText = summary.components(separatedBy: "fps")[0]
+      .split(whereSeparator: { $0 == " " || $0 == "\u{00A0}" }).last
+    let rate = try XCTUnwrap(rateText.flatMap { Double($0) }, summary)
+    XCTAssertGreaterThan(rate, 0, "the result shows a measured rate, not a target")
+    XCTAssertFalse(app.descendants(matching: .any)["device.record.gap"].exists)
+    XCTAssertFalse(app.descendants(matching: .any)["device.record.headroomUnknown"].exists)
+
+    let location = app.descendants(matching: .any)["device.record.location"]
+    let path = location.value as? String ?? location.label
+    XCTAssertTrue(path.hasSuffix(".mov"), path)
+    let attributes = try FileManager.default.attributesOfItem(atPath: path)
+    XCTAssertGreaterThan((attributes[.size] as? NSNumber)?.intValue ?? 0, 0)
+    let evidence = XCTAttachment(string: "Real Runtime capture: \(summary)\nMovie: \(path)")
+    evidence.name = "Real device recording result"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Device real recording ready"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    for identifier in ["device.record.reveal", "device.record.saveAs", "device.record.again"] {
+      XCTAssertTrue(app.descendants(matching: .any)[identifier].exists)
+    }
+    app.descendants(matching: .any)["device.record.again"].click()
+    XCTAssertTrue(ready.waitForNonExistence(timeout: 10))
+    XCTAssertTrue(start.isEnabled)
   }
 
   /// A run there is no room to keep is refused before it starts, and the
@@ -61,7 +121,7 @@ final class ToolkitRecordingUITests: XCTestCase {
     // Two mebibytes holds a handful of frames and nothing like a full run.
     let app = launch(archive: archive, headroomBytes: 2 << 20)
 
-    let start = app.buttons["toolkit.record.start"]
+    let start = app.buttons["device.record.start"]
     XCTAssertTrue(start.waitForExistence(timeout: 10))
     let enabled = XCTNSPredicateExpectation(
       predicate: NSPredicate(format: "isEnabled == true"), object: start)
@@ -70,20 +130,20 @@ final class ToolkitRecordingUITests: XCTestCase {
     }
     start.click()
 
-    let refused = app.descendants(matching: .any)["toolkit.record.refused"]
+    let refused = app.descendants(matching: .any)["device.record.refused"]
     XCTAssertTrue(
       refused.waitForExistence(timeout: 20),
       "the run must be blocked; the pane is in " + Self.visibleStage(of: app))
     // Nothing was composed, so nothing is offered.
     XCTAssertEqual(
-      app.descendants(matching: .any).matching(identifier: "toolkit.record.ready").count, 0,
+      app.descendants(matching: .any).matching(identifier: "device.record.ready").count, 0,
       "a refused run has no result to show")
 
     // Both numbers, and a run that would fit rather than only a refusal.
     let summary = refused.label.isEmpty ? "\(refused.value ?? "")" : refused.label
     XCTAssertTrue(summary.contains("MB") || summary.contains("KB"), summary)
     XCTAssertTrue(
-      app.descendants(matching: .any)["toolkit.record.shrink"].exists,
+      app.descendants(matching: .any)["device.record.shrink"].exists,
       "a refusal that offers nothing cannot be acted on")
   }
 
@@ -105,7 +165,7 @@ final class ToolkitRecordingUITests: XCTestCase {
     // Negative headroom stands in for a store that cannot be asked at all.
     let app = launch(archive: archive, headroomBytes: -1)
 
-    let start = app.buttons["toolkit.record.start"]
+    let start = app.buttons["device.record.start"]
     XCTAssertTrue(start.waitForExistence(timeout: 10))
     let enabled = XCTNSPredicateExpectation(
       predicate: NSPredicate(format: "isEnabled == true"), object: start)
@@ -115,15 +175,15 @@ final class ToolkitRecordingUITests: XCTestCase {
     start.click()
 
     XCTAssertTrue(
-      app.descendants(matching: .any)["toolkit.record.ready"].waitForExistence(timeout: 180),
+      app.descendants(matching: .any)["device.record.ready"].waitForExistence(timeout: 180),
       "the run must go ahead; the pane is in " + Self.visibleStage(of: app))
     // And it says the check did not happen, rather than letting a run that was
     // never checked look like one that was.
     XCTAssertTrue(
-      app.descendants(matching: .any)["toolkit.record.headroomUnknown"].exists,
+      app.descendants(matching: .any)["device.record.headroomUnknown"].exists,
       "a run nothing checked must say so")
     XCTAssertEqual(
-      app.descendants(matching: .any).matching(identifier: "toolkit.record.refused").count, 0,
+      app.descendants(matching: .any).matching(identifier: "device.record.refused").count, 0,
       "not being able to ask is not a refusal")
   }
 
@@ -144,14 +204,14 @@ final class ToolkitRecordingUITests: XCTestCase {
     }
     let app = launch(archive: archive)
 
-    let performance = app.descendants(matching: .any)["toolkit.performance"]
-    let boundary = app.descendants(matching: .any)["toolkit.boundary"]
+    let performance = app.descendants(matching: .any)["device.performance"]
+    let boundary = app.descendants(matching: .any)["device.boundary"]
     XCTAssertTrue(performance.waitForExistence(timeout: 10))
     XCTAssertTrue(boundary.exists)
 
     // Nothing offers to close either of them. A dismiss control that exists
     // is a dismiss control somebody will use.
-    for notice in ["toolkit.performance", "toolkit.boundary"] {
+    for notice in ["device.performance", "device.boundary"] {
       let element = app.descendants(matching: .any)[notice]
       XCTAssertFalse(
         element.buttons.element(boundBy: 0).exists,
@@ -160,21 +220,21 @@ final class ToolkitRecordingUITests: XCTestCase {
 
     // And they survive the workspace being used: a run composed, validated
     // and offered is the longest thing a person does here.
-    let start = app.buttons["toolkit.record.start"]
+    let start = app.buttons["device.record.start"]
     XCTAssertTrue(start.waitForExistence(timeout: 10))
     let enabled = XCTNSPredicateExpectation(
       predicate: NSPredicate(format: "isEnabled == true"), object: start)
     if XCTWaiter().wait(for: [enabled], timeout: 30) == .completed {
       start.click()
-      _ = app.descendants(matching: .any)["toolkit.record.ready"].waitForExistence(timeout: 180)
+      _ = app.descendants(matching: .any)["device.record.ready"].waitForExistence(timeout: 180)
     }
     XCTAssertTrue(performance.exists, "the notice went away while the workspace was used")
     XCTAssertTrue(boundary.exists, "the boundary went away while the workspace was used")
 
-    // Including after leaving Toolkit and coming back, which is where a
+    // Including after leaving Device and coming back, which is where a
     // dismissed-state bug would otherwise hide.
     app.descendants(matching: .any)["app.navigation.overview"].firstMatch.click()
-    app.descendants(matching: .any)["app.navigation.toolkit"].firstMatch.click()
+    app.descendants(matching: .any)["app.navigation.device"].firstMatch.click()
     XCTAssertTrue(
       performance.waitForExistence(timeout: 10),
       "the notice must come back with the workspace")
@@ -190,7 +250,7 @@ final class ToolkitRecordingUITests: XCTestCase {
 
     let app = launch(archive: archive)
 
-    let start = app.buttons["toolkit.record.start"]
+    let start = app.buttons["device.record.start"]
     XCTAssertTrue(start.waitForExistence(timeout: 10))
     // The pane refuses without exactly one adopted device, and a click on a
     // disabled button is silently nothing - which would read as a composition
@@ -207,11 +267,11 @@ final class ToolkitRecordingUITests: XCTestCase {
     // headroom silently made every run impossible - it looked like a
     // composition that never finished.
     XCTAssertEqual(
-      app.descendants(matching: .any).matching(identifier: "toolkit.record.headroomUnknown")
+      app.descendants(matching: .any).matching(identifier: "device.record.headroomUnknown")
         .count, 0,
       "the run never started: the pane could not read the store's headroom")
 
-    let ready = app.descendants(matching: .any)["toolkit.record.ready"]
+    let ready = app.descendants(matching: .any)["device.record.ready"]
     XCTAssertTrue(
       ready.waitForExistence(timeout: 180),
       "composing and validating must finish; the pane is in "
@@ -234,19 +294,19 @@ final class ToolkitRecordingUITests: XCTestCase {
         + "puts it near 1.8: \(summary)")
 
     // Where it went, and the three things a person can do with it.
-    let location = app.descendants(matching: .any)["toolkit.record.location"]
+    let location = app.descendants(matching: .any)["device.record.location"]
     XCTAssertTrue(location.exists, "a recording nobody can find is not delivered")
     XCTAssertTrue("\(location.value ?? "")".hasSuffix(".mov"), "\(location.value ?? "")")
     // Link-styled controls are not `buttons` in the accessibility tree, so the
     // query is by identifier rather than by element type.
-    for control in ["toolkit.record.reveal", "toolkit.record.saveAs", "toolkit.record.again"] {
+    for control in ["device.record.reveal", "device.record.saveAs", "device.record.again"] {
       XCTAssertTrue(
         app.descendants(matching: .any)[control].exists,
         "the result bar must offer \(control)")
     }
 
     // Recording again returns the pane to where a second run starts from.
-    app.descendants(matching: .any)["toolkit.record.again"].firstMatch.click()
+    app.descendants(matching: .any)["device.record.again"].firstMatch.click()
     XCTAssertTrue(
       ready.waitForNonExistence(timeout: 10),
       "the previous result must not stand while a new run is offered")

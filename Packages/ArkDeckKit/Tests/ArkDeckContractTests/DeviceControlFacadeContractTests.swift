@@ -5,36 +5,54 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckWorkflows
 
-/// The Toolkit workspace's submission surface (TASK-IDC-002 stage 3).
-final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
-  private let target = ToolkitTargetPresentation(
+/// The Device workspace's submission surface (TASK-IDC-002 stage 3).
+final class DeviceControlFacadeContractTests: XCTestCase {
+  private let target = DeviceTargetPresentation(
     id: "TGT-1a62a0dbedd6", bindingRevision: 1, displayName: "DAYU200")
 
-  func testEveryToolkitSubmissionNamesItsOwnClient() throws {
-    let screenshot = try ToolkitDeviceControlFacade.screenshotRequest(
+  func testProductRenamePreservesExistingIntentAndClientIdentity() throws {
+    let screenshot = try DeviceControlFacade.screenshotRequest(target: target, nonce: "upgrade")
+    let recording = try DeviceControlFacade.recordingRequest(
+      frameCount: 2, target: target, nonce: "upgrade")
+    let gesture = try DeviceControlFacade.gestureRequest(
+      DeviceGestureRequest(gesture: .tap, x: 1, y: 2, frameWidth: 100, frameHeight: 200),
+      target: target, nonce: "upgrade")
+
+    for (request, prefix) in [
+      (screenshot, "toolkit-screen"), (recording, "toolkit-record"),
+      (gesture, "toolkit-input"),
+    ] {
+      XCTAssertEqual(request.requestID, "\(prefix)-upgrade")
+      XCTAssertEqual(request.idempotencyKey, "\(prefix)-upgrade")
+      XCTAssertEqual(request.clientContext?.clientName, "ArkDeckApp.Toolkit.DeviceControl")
+    }
+  }
+
+  func testEveryDeviceSubmissionNamesItsOwnClient() throws {
+    let screenshot = try DeviceControlFacade.screenshotRequest(
       target: target, nonce: "n1")
     XCTAssertEqual(
-      screenshot.clientContext?.clientName, ArkDeckAgentClientName.toolkitDeviceControl,
-      "the daemon admits a submission by client and operation together, so Toolkit "
+      screenshot.clientContext?.clientName, ArkDeckAgentClientName.deviceControl,
+      "the daemon admits a submission by client and operation together, so Device "
         + "cannot borrow another workspace's client name")
     XCTAssertEqual(screenshot.target.targetID, target.id)
     XCTAssertEqual(screenshot.target.expectedBindingRevision, 1)
 
-    for gesture in ToolkitGesture.allCases {
-      let request = try ToolkitDeviceControlFacade.gestureRequest(
-        ToolkitGestureRequest(
+    for gesture in DeviceGesture.allCases {
+      let request = try DeviceControlFacade.gestureRequest(
+        DeviceGestureRequest(
           gesture: gesture, x: 10, y: 20, frameWidth: 1280, frameHeight: 2832,
           toX: 30, toY: 40, durationMs: 300),
         target: target, nonce: "n-\(gesture.rawValue)")
       XCTAssertEqual(
-        request.clientContext?.clientName, ArkDeckAgentClientName.toolkitDeviceControl)
+        request.clientContext?.clientName, ArkDeckAgentClientName.deviceControl)
       XCTAssertEqual(request.operation.id, gesture.operationID)
       XCTAssertEqual(request.operation.version, 1)
     }
   }
 
   func testTheScreenshotLegAsksForNothingItDoesNotRead() throws {
-    let request = try ToolkitDeviceControlFacade.screenshotRequest(target: target, nonce: "n")
+    let request = try DeviceControlFacade.screenshotRequest(target: target, nonce: "n")
     XCTAssertEqual(request.inputs["uiScreenshot"], .bool(true))
     // Draining the log buffer can dominate the interaction, and nothing in
     // this workspace reads a component tree.
@@ -45,8 +63,8 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
   }
 
   func testEveryGestureCarriesTheFrameItWasReadFrom() throws {
-    for gesture in ToolkitGesture.allCases {
-      let inputs = ToolkitGestureRequest(
+    for gesture in DeviceGesture.allCases {
+      let inputs = DeviceGestureRequest(
         gesture: gesture, x: 1, y: 2, frameWidth: 1280, frameHeight: 2832,
         toX: 3, toY: 4, durationMs: 500
       ).typedInputs
@@ -58,7 +76,7 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
   }
 
   func testGestureInputsUseEachOperationsOwnFieldNames() {
-    let tap = ToolkitGestureRequest(
+    let tap = DeviceGestureRequest(
       gesture: .tap, x: 640, y: 1400, frameWidth: 1280, frameHeight: 2832
     ).typedInputs
     XCTAssertEqual(tap["x"], .integer(640))
@@ -66,7 +84,7 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
     XCTAssertNil(tap["durationMs"], "a tap has no hold time")
     XCTAssertNil(tap["fromX"])
 
-    let long = ToolkitGestureRequest(
+    let long = DeviceGestureRequest(
       gesture: .longPress, x: 5, y: 6, frameWidth: 1280, frameHeight: 2832,
       durationMs: 900
     ).typedInputs
@@ -75,7 +93,7 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
       long["durationMs"], .integer(900),
       "the caller's real hold time is passed through, not replaced by a default")
 
-    let swipe = ToolkitGestureRequest(
+    let swipe = DeviceGestureRequest(
       gesture: .swipe, x: 100, y: 200, frameWidth: 1280, frameHeight: 2832,
       toX: 100, toY: 1200, durationMs: 500
     ).typedInputs
@@ -88,11 +106,11 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
   }
 
   func testTwoGesturesAtOneCoordinateAreTwoIntents() throws {
-    let gesture = ToolkitGestureRequest(
+    let gesture = DeviceGestureRequest(
       gesture: .tap, x: 640, y: 1400, frameWidth: 1280, frameHeight: 2832)
-    let first = try ToolkitDeviceControlFacade.gestureRequest(
+    let first = try DeviceControlFacade.gestureRequest(
       gesture, target: target, nonce: "a")
-    let second = try ToolkitDeviceControlFacade.gestureRequest(
+    let second = try DeviceControlFacade.gestureRequest(
       gesture, target: target, nonce: "b")
     XCTAssertNotEqual(
       first.idempotencyKey, second.idempotencyKey,
@@ -108,15 +126,15 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
     png.append(contentsOf: Array("IHDR".utf8))
     png.append(contentsOf: [0x00, 0x00, 0x05, 0x00])
     png.append(contentsOf: [0x00, 0x00, 0x0B, 0x10])
-    let size = ToolkitScreenshotIntegrity.pngPixelSize(png)
+    let size = DeviceScreenshotIntegrity.pngPixelSize(png)
     XCTAssertEqual(size?.width, 1280)
     XCTAssertEqual(size?.height, 2832)
 
     XCTAssertNil(
-      ToolkitScreenshotIntegrity.pngPixelSize(Data([0x89, 0x50])),
+      DeviceScreenshotIntegrity.pngPixelSize(Data([0x89, 0x50])),
       "a truncated file has no dimensions to read")
     XCTAssertNil(
-      ToolkitScreenshotIntegrity.pngPixelSize(Data(repeating: 0, count: 64)),
+      DeviceScreenshotIntegrity.pngPixelSize(Data(repeating: 0, count: 64)),
       "a file that is not a PNG must not be measured as one")
   }
 
@@ -126,11 +144,11 @@ final class ToolkitDeviceControlFacadeContractTests: XCTestCase {
       "intent inject-pointer-input",
       "verified inject-pointer-input [\"frame\", \"gesture\", \"x\", \"y\"]",
     ]
-    let summary = ToolkitProductionProviderTestHook.injectionSummary(in: timeline)
+    let summary = DeviceProductionProviderTestHook.injectionSummary(in: timeline)
     XCTAssertEqual(summary["verifiedFacts"], "frame, gesture, x, y")
 
     XCTAssertTrue(
-      ToolkitProductionProviderTestHook.injectionSummary(in: ["jobCreated"]).isEmpty,
+      DeviceProductionProviderTestHook.injectionSummary(in: ["jobCreated"]).isEmpty,
       "with no verified injection recorded there is nothing to show, and nothing "
         + "may be invented in its place")
   }

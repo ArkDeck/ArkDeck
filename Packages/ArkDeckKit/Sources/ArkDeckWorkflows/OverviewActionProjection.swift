@@ -18,7 +18,7 @@ public struct OverviewAction: Identifiable, Sendable, Equatable {
     case trace
     case debugHAP
     case flash
-    case toolkit
+    case device
   }
 
   public enum Availability: Sendable, Equatable {
@@ -57,11 +57,11 @@ public enum OverviewActionProjection {
     .trace: ("hitrace", "capture.diagnostics@1", "readOnly"),
     .debugHAP: (nil, "debug.hap@1", "deviceMutation"),
     .flash: ("rockusb-flash", ArkForgeFlashOperation.canonicalReference, "destructive"),
-    .toolkit: (nil, "input.tap@1", "deviceMutation"),
+    .device: (nil, "input.tap@1", "deviceMutation"),
   ]
 
   /// Fixed order, so the row does not reshuffle as probes come back.
-  static let order: [OverviewAction.Kind] = [.uiDump, .trace, .debugHAP, .flash, .toolkit]
+  static let order: [OverviewAction.Kind] = [.uiDump, .trace, .debugHAP, .flash, .device]
 
   /// Which workspace owns a finished run, so "run it again" opens the one that
   /// submitted it.
@@ -91,7 +91,7 @@ public enum OverviewActionProjection {
 
     switch reference.split(separator: "@").first.map(String.init) {
     case "debug.hap": return .debugHAP
-    case "input.tap", "input.long-press", "input.swipe": return .toolkit
+    case "input.tap", "input.long-press", "input.swipe": return .device
     case "capture.diagnostics":
       if isTrue("uiComponentTree") || isTrue("advancedDump") { return .uiDump }
       if let categories = values["traceCategories"],
@@ -99,9 +99,9 @@ public enum OverviewActionProjection {
       {
         return .trace
       }
-      // A screenshot-only capture is the Toolkit's, but only when nothing else
+      // A screenshot-only capture is the Device's, but only when nothing else
       // in the request claims it.
-      if isTrue("uiScreenshot"), !isTrue("uiDump") { return .toolkit }
+      if isTrue("uiScreenshot"), !isTrue("uiDump") { return .device }
       return nil
     default: return nil
     }
