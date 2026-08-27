@@ -45,6 +45,7 @@ final class ToolkitWorkspaceViewModel {
 
   private(set) var frame: ToolkitScreenFrame?
   private(set) var isCapturing = false
+  private(set) var isOpeningHistoryScreen = false
   private(set) var isSendingGesture = false
   private(set) var pendingMarker: Marker?
   private(set) var lastMarker: Marker?
@@ -63,6 +64,8 @@ final class ToolkitWorkspaceViewModel {
 
   private let provider: any ToolkitDeviceControlProviding
   private var pressStartedAt: Date?
+  private var screenGeneration = 0
+  private var historyPinnedTargetID: String?
 
   init(provider: any ToolkitDeviceControlProviding) {
     self.provider = provider
@@ -70,12 +73,15 @@ final class ToolkitWorkspaceViewModel {
 
   // MARK: - Target
 
-  /// Exactly one adopted candidate, or none. Toolkit sends device mutations,
-  /// so it will not guess which device the person meant when the machine
-  /// offers more than one.
+  /// The exact target explicitly chosen through History, or one unambiguous
+  /// adopted candidate. Toolkit never switches a historical screen to a
+  /// different device merely because that device is currently connected.
   var target: ToolkitTargetPresentation? {
     let adopted = deviceObservation.candidates.filter { $0.isAdopted }
-    guard adopted.count == 1, let device = adopted.first,
+    let candidates = historyPinnedTargetID.map { targetID in
+      adopted.filter { $0.adoptedTargetID == targetID }
+    } ?? adopted
+    guard candidates.count == 1, let device = candidates.first,
       let targetID = device.adoptedTargetID
     else { return nil }
     let name = device.deviceInformation?.name ?? device.observedFacts?.model ?? targetID
@@ -91,7 +97,7 @@ final class ToolkitWorkspaceViewModel {
     return "\(target.id) · binding r\(revision)"
   }
 
-  var canCapture: Bool { target != nil }
+  var canCapture: Bool { target != nil && !isOpeningHistoryScreen }
 
   var emptyMessage: String {
     if let captureFailure { return captureFailure }
@@ -121,10 +127,14 @@ final class ToolkitWorkspaceViewModel {
   // MARK: - Screenshot
 
   func captureScreen() async {
-    guard let target, !isCapturing else { return }
+    guard let target, !isCapturing, !isOpeningHistoryScreen else { return }
     isCapturing = true
+    screenGeneration &+= 1
+    let generation = screenGeneration
     defer { isCapturing = false }
-    switch await provider.captureScreen(target: target) {
+    let result = await provider.captureScreen(target: target)
+    guard !Task.isCancelled, screenGeneration == generation else { return }
+    switch result {
     case .captured(let frame):
       self.frame = frame
       captureFailure = nil
@@ -145,6 +155,53 @@ final class ToolkitWorkspaceViewModel {
         title: toolkitText("toolkit.log.captureFailed"), detail: reason,
         systemImage: "exclamationmark.triangle.fill", tint: "failed")
     }
+  }
+
+  /// Restores a screenshot Artifact for inspection. Historical frames begin
+  /// stale and therefore cannot be used as authority for a new gesture.
+  func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
+    guard context.workspaceKind == .toolkit else { return }
+    screenGeneration &+= 1
+    let generation = screenGeneration
+    historyPinnedTargetID = context.targetID
+    isOpeningHistoryScreen = false
+    frame = nil
+    pendingMarker = nil
+    lastMarker = nil
+    pressStartedAt = nil
+    liveness = ToolkitFrameLiveness()
+    guard context.operationReference == "capture.diagnostics@1" else { return }
+    isOpeningHistoryScreen = true
+    captureFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let result = await provider.loadHistoricalScreen(
+        jobID: context.jobID, targetID: context.targetID)
+      guard let self, self.screenGeneration == generation else { return }
+      self.isOpeningHistoryScreen = false
+      guard !Task.isCancelled else { return }
+      switch result {
+      case .captured(let frame):
+        self.frame = frame
+        self.pendingMarker = nil
+        self.lastMarker = nil
+        // Deliberately do not call `captured()`: a historical still is not a
+        // live input surface. A new explicit capture is required first.
+        self.liveness = ToolkitFrameLiveness()
+        self.append(
+          title: toolkitText("toolkit.log.captured"),
+          detail: "History · \(frame.width)×\(frame.height)",
+          systemImage: "clock.arrow.circlepath", tint: "neutral")
+      case .failed(let reason):
+        self.captureFailure = reason
+      }
+    }
+  }
+
+  func dismissHistoryContext() {
+    screenGeneration &+= 1
+    isOpeningHistoryScreen = false
+    historyPinnedTargetID = nil
   }
 
   // MARK: - Gestures

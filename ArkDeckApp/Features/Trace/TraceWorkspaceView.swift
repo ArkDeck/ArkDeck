@@ -176,6 +176,8 @@ final class TraceWorkspaceViewModel {
 
   private let provider: any TraceApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
+  private var historyPinnedTargetID: String?
+  private var viewerReadGeneration = 0
   let documentController: TraceDocumentController
 
   init(
@@ -353,7 +355,11 @@ final class TraceWorkspaceViewModel {
       }
       let selectionAtCompletion = self.selectedTargetID
       let resolvedTargetID: String
-      if !selectionAtCompletion.isEmpty,
+      if let historyPinnedTargetID = self.historyPinnedTargetID {
+        // History names one exact target. Keeping an unmatched value leaves
+        // capture blocked instead of switching the context to another device.
+        resolvedTargetID = historyPinnedTargetID
+      } else if !selectionAtCompletion.isEmpty,
         next.targets.contains(where: { $0.id == selectionAtCompletion })
       {
         resolvedTargetID = selectionAtCompletion
@@ -384,6 +390,7 @@ final class TraceWorkspaceViewModel {
 
   func setTargetID(_ targetID: String) {
     guard selectedTargetID != targetID else { return }
+    historyPinnedTargetID = nil
     selectedTargetID = targetID
     submissionFailure = nil
     refresh()
@@ -461,8 +468,11 @@ final class TraceWorkspaceViewModel {
     terminalSubmission = nil
     submissionFailure = nil
     viewerArtifactFailure = nil
+    viewerReadGeneration &+= 1
+    isPreparingViewer = false
     let provider = provider
     let tags = requestedTags
+    let viewerGenerationAtSubmission = viewerReadGeneration
     Task { [weak self] in
       let submitted = await provider.submitCapture(
         target: target, durationSeconds: durationSeconds, tags: tags, bufferKB: bufferKB)
@@ -488,7 +498,9 @@ final class TraceWorkspaceViewModel {
         switch result {
         case .completed(let terminal):
           self.terminalSubmission = terminal
-          if terminal.state == "succeeded", !terminal.outcomeUnknown {
+          if terminal.state == "succeeded", !terminal.outcomeUnknown,
+            self.viewerReadGeneration == viewerGenerationAtSubmission
+          {
             await self.openPublishedTrace(jobID: terminal.jobID)
           }
         case .failed(let failure):
@@ -519,8 +531,11 @@ final class TraceWorkspaceViewModel {
       !terminalSubmission.outcomeUnknown,
       !isPreparingViewer
     else { return }
+    viewerReadGeneration &+= 1
+    let generation = viewerReadGeneration
     Task { [weak self] in
-      await self?.openPublishedTrace(jobID: terminalSubmission.jobID)
+      await self?.openPublishedTrace(
+        jobID: terminalSubmission.jobID, requestGeneration: generation)
     }
   }
 
@@ -528,15 +543,41 @@ final class TraceWorkspaceViewModel {
     viewerOpenRequestID &+= 1
   }
 
-  private func openPublishedTrace(jobID: String) async {
-    guard !isPreparingViewer else { return }
+  /// Restores the exact target and, for a capture Job, opens its immutable raw
+  /// trace Artifact. Analyzer records still restore their context banner but
+  /// are not mistaken for a raw capture.
+  func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
+    guard context.workspaceKind == .trace else { return }
+    historyPinnedTargetID = context.targetID
+    selectedTargetID = context.targetID
+    viewerReadGeneration &+= 1
+    let generation = viewerReadGeneration
+    isPreparingViewer = false
+    viewerArtifactFailure = nil
+    latestViewerArtifactName = nil
+    guard context.operationReference == TraceApplicationFacade.operationReference else { return }
+    Task { [weak self] in
+      await self?.openPublishedTrace(jobID: context.jobID, requestGeneration: generation)
+    }
+  }
+
+  private func openPublishedTrace(jobID: String, requestGeneration: Int? = nil) async {
+    if let requestGeneration {
+      guard viewerReadGeneration == requestGeneration else { return }
+    } else {
+      viewerReadGeneration &+= 1
+    }
+    let generation = viewerReadGeneration
     isPreparingViewer = true
     viewerArtifactFailure = nil
-    defer { isPreparingViewer = false }
+    defer {
+      if viewerReadGeneration == generation { isPreparingViewer = false }
+    }
 
     let detail = await detailProvider.loadJobDetail(
       jobID: jobID,
       operationReference: TraceApplicationFacade.operationReference)
+    guard !Task.isCancelled, viewerReadGeneration == generation else { return }
     guard case .available = detail.artifactAvailability else {
       viewerArtifactFailure = traceString("trace.viewer.artifactListUnavailable")
       return
@@ -553,12 +594,13 @@ final class TraceWorkspaceViewModel {
       viewerArtifactFailure = traceString("trace.viewer.stagingUnavailable")
       return
     }
-    switch await detailProvider.exportArtifact(
+    let result = await detailProvider.exportArtifact(
       jobID: jobID,
       artifact: artifact,
       destinationURL: destination,
       allowSensitive: true)
-    {
+    guard !Task.isCancelled, viewerReadGeneration == generation else { return }
+    switch result {
     case .completed(let url):
       latestViewerArtifactName = artifact.name
       documentController.open(url)

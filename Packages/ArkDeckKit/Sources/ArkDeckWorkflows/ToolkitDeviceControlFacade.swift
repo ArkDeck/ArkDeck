@@ -133,6 +133,12 @@ public enum ToolkitScreenshotResult: Sendable, Equatable {
 
 public protocol ToolkitDeviceControlProviding: Sendable {
   func captureScreen(target: ToolkitTargetPresentation) async -> ToolkitScreenshotResult
+  /// Reads one immutable screenshot from a completed historical Job. This
+  /// path cannot submit a gesture or mark the frame live for input.
+  func loadHistoricalScreen(
+    jobID: String,
+    targetID: String
+  ) async -> ToolkitScreenshotResult
   func send(
     _ request: ToolkitGestureRequest, to target: ToolkitTargetPresentation
   ) async -> ToolkitGestureOutcome
@@ -142,6 +148,15 @@ public protocol ToolkitDeviceControlProviding: Sendable {
   /// How much room the artifact store has left. Read-only, and asked before a
   /// run starts rather than discovered by one that gets refused.
   func artifactHeadroomBytes() async -> Int?
+}
+
+public extension ToolkitDeviceControlProviding {
+  func loadHistoricalScreen(
+    jobID _: String,
+    targetID _: String
+  ) async -> ToolkitScreenshotResult {
+    .failed("This Toolkit provider cannot read historical screenshots")
+  }
 }
 
 /// The frames a run brought back, with the spacing they were taken at.
@@ -280,6 +295,44 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
           width: screenshot.width,
           height: screenshot.height,
           capturedAtUTC: terminal.finishedAtUTC ?? "",
+          jobID: jobID))
+    } catch let failure as ToolkitFailure {
+      return .failed(failure.message)
+    } catch let failure as ToolkitArtifactIndex.IndexUnreadable {
+      return .failed(failure.message)
+    } catch {
+      return .failed("\(error)")
+    }
+  }
+
+  func loadHistoricalScreen(
+    jobID: String,
+    targetID: String
+  ) async -> ToolkitScreenshotResult {
+    guard !jobID.isEmpty, !targetID.isEmpty else {
+      return .failed("the historical Toolkit context is incomplete")
+    }
+    do {
+      let status = try await requestObject(
+        method: "job.status", params: ["jobId": .string(jobID)],
+        label: "Historical Toolkit Job")
+      guard status["jobId"] as? String == jobID,
+        status["targetId"] as? String == targetID,
+        status["operation"] as? String == "capture.diagnostics@1",
+        status["state"] as? String == "succeeded",
+        status["waitingForHuman"] as? Bool == false,
+        status["outcomeUnknown"] as? Bool == false,
+        status["outstandingResidueCount"] as? Int == 0
+      else {
+        return .failed("the historical Toolkit Job is not a confirmed screenshot capture")
+      }
+      let screenshot = try await readScreenshot(jobID: jobID)
+      return .captured(
+        ToolkitScreenFrame(
+          imageData: screenshot.data,
+          width: screenshot.width,
+          height: screenshot.height,
+          capturedAtUTC: status["finishedAtUtc"] as? String ?? "",
           jobID: jobID))
     } catch let failure as ToolkitFailure {
       return .failed(failure.message)

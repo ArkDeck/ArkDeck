@@ -2155,6 +2155,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "executionMode": status.executionMode.map(JSONValue.string) ?? .null,
       "sessionId": status.sessionID.map(JSONValue.string) ?? .null,
       "threadId": status.threadID.map(JSONValue.string) ?? .null,
+      "workspaceKind": status.workspaceKind.map { .string($0.rawValue) } ?? .null,
       "actualEffect": status.actualEffect.map(JSONValue.string) ?? .null,
       "createdAtUtc": status.createdAtUTC.map(JSONValue.string) ?? .null,
       "startedAtUtc": status.startedAtUTC.map(JSONValue.string) ?? .null,

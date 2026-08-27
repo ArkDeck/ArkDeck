@@ -61,6 +61,11 @@ struct GlobalJobInspectorView: View {
   @ViewBuilder
   private var expandedContent: some View {
     switch presentation.availability {
+    case .loading:
+      ProgressView()
+        .controlSize(.small)
+        .accessibilityLabel(jobsText("jobInspector.refreshing"))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .unavailable(let reason):
       ContentUnavailableView {
         Label(
@@ -304,6 +309,9 @@ struct GlobalJobInspectorView: View {
   @ViewBuilder
   private var compactStatus: some View {
     switch presentation.availability {
+    case .loading:
+      Label(jobsText("jobInspector.refreshing"), systemImage: "arrow.clockwise")
+        .foregroundStyle(.secondary)
     case .unavailable:
       Label(
         jobsText("jobInspector.compact.unavailable"),

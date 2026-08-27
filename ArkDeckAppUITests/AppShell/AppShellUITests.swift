@@ -72,7 +72,7 @@ final class AppShellUITests: XCTestCase {
   /// operation is executed headlessly before this test; this UI leg proves
   /// that the resulting verified Job is discoverable and can reopen its
   /// related workspace without replaying it.
-  func testRealDeviceHistoryReopensLatestCapture() throws {
+  func testRealDeviceHistoryReopensLatestViewerCapture() throws {
     guard
       ProcessInfo.processInfo.environment[
         Self.realDeviceStartupEnvironmentKey
@@ -108,14 +108,116 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(openWorkspace.waitForExistence(timeout: 10))
     openWorkspace.click()
     XCTAssertTrue(
-      element("app.navigation.diagnostics", in: app).waitForExistenceFast(timeout: 10),
-      "the diagnostics history did not reopen Diagnostics")
+      element("history.context", in: app).waitForExistenceFast(timeout: 10),
+      "the Viewer destination did not retain its exact History context")
+    XCTAssertTrue(
+      displayedText(for: element("history.context.operation", in: app))
+        .contains("capture.diagnostics@1"))
+    XCTAssertTrue(
+      element("viewer.pane.screenshot", in: app).waitForExistenceFast(timeout: 30),
+      "the historical screenshot Artifact did not reopen in Viewer")
+    XCTAssertTrue(
+      element("viewer.tree.scroll", in: app).waitForExistenceFast(timeout: 30),
+      "the historical component-tree Artifact did not reopen in Viewer")
 
     let evidence = XCTAttachment(
-      string: "Latest production Runtime capture was visible with verified artifacts and reopened Diagnostics without replay.")
+      string: "Latest production Runtime Viewer capture was visible with verified artifacts and reopened its screenshot and component tree without replay.")
     evidence.name = "History real-device activity acceptance"
     evidence.lifetime = .keepAlways
     add(evidence)
+  }
+
+  func testHistorySavedFilterRestoresActivityAndExposesOneFilterSet() {
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "-AppleLanguages", "(en)",
+      ])
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
+
+    for identifier in [
+      "history.filter.status", "history.filter.mode", "history.filter.session",
+      "history.filter.device", "history.filter.time",
+    ] {
+      XCTAssertTrue(
+        element(identifier, in: app).exists,
+        "the wide activity-center layout must expose \(identifier)")
+    }
+    XCTAssertEqual(
+      app.descendants(matching: .any).matching(identifier: "history.filter.search").count,
+      1,
+      "wide and compact composition must share one search control")
+
+    let flashFilter = element("history.activity.flash", in: app)
+    XCTAssertTrue(flashFilter.waitForExistenceFast(timeout: 5))
+    // The row's padding is part of its hit target, not only its text and icon.
+    flashFilter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).click()
+    let viewerRow = app.cells
+      .containing(.staticText, identifier: "history.row.state.job-fixture-0001").firstMatch
+    XCTAssertTrue(viewerRow.waitForNonExistenceFast(timeout: 5))
+
+    element("history.filter.saved", in: app).click()
+    let save = app.menuItems["Save current filter"]
+    XCTAssertTrue(save.waitForExistenceFast(timeout: 5))
+    save.click()
+    XCTAssertTrue(save.waitForNonExistenceFast(timeout: 5))
+
+    element("history.activity.all", in: app)
+      .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).click()
+    XCTAssertTrue(viewerRow.waitForExistenceFast(timeout: 5))
+    element("history.filter.saved", in: app).click()
+    let apply = app.menuItems["Apply saved filter"]
+    XCTAssertTrue(apply.waitForExistenceFast(timeout: 5))
+    apply.click()
+    XCTAssertTrue(
+      viewerRow.waitForNonExistenceFast(timeout: 5),
+      "applying the saved filter must restore the activity category")
+
+    // Leave persistent AppStorage clean for the language sweeps.
+    element("history.filter.saved", in: app).click()
+    let delete = app.menuItems["Delete saved filter"]
+    if delete.waitForExistenceFast(timeout: 2) { delete.click() }
+  }
+
+  func testHistoryReopensExactFixtureContextWithoutReplay() {
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "-AppleLanguages", "(en)",
+      ])
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
+    assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0002", timeout: 10)
+
+    let openWorkspace = app.buttons["history.openWorkspace"]
+    XCTAssertTrue(openWorkspace.waitForExistenceFast(timeout: 10))
+    app.buttons["history.detail.reload"].click()
+    XCTAssertTrue(openWorkspace.waitForExistenceFast(timeout: 10))
+    app.buttons["history.refresh"].click()
+    XCTAssertTrue(
+      openWorkspace.waitForExistenceFast(timeout: 10),
+      "refreshing unchanged history must reload the selected Job's detail")
+    assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0002", timeout: 10)
+    openWorkspace.click()
+
+    XCTAssertTrue(
+      element("flash.workspace.title", in: app).waitForExistenceFast(timeout: 10),
+      "a Flash history must reopen the related workspace")
+    XCTAssertTrue(
+      element("history.context", in: app).waitForExistenceFast(timeout: 10),
+      "the destination must retain visible immutable History provenance")
+    XCTAssertTrue(
+      displayedText(for: element("history.context.job", in: app)).contains("job-fixture-0002"))
+    XCTAssertTrue(
+      displayedText(for: element("history.context.target", in: app)).contains("target-fixture-b"))
+    XCTAssertTrue(
+      displayedText(for: element("history.context.operation", in: app)).contains("flash.dayu200"))
+    for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
+      XCTAssertFalse(
+        app.buttons[forbidden].exists,
+        "opening immutable History context must not expose the legacy \(forbidden) action")
+    }
   }
 
   // MARK: - One launch per language
@@ -687,7 +789,9 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("history.table", in: app).waitForExistenceFast(timeout: 10), file: file, line: line)
     assertDisplayed(app.staticTexts["history.readOnlyNote"], equals: history.readOnlyNote)
-    for category in ["all", "flash", "viewer", "trace", "diagnostics", "debug"] {
+    for category in [
+      "all", "flash", "viewer", "trace", "diagnostics", "debug", "toolkit", "other",
+    ] {
       XCTAssertTrue(
         element("history.activity.\(category)", in: app).exists,
         "History activity category \(category) missing", file: file, line: line)
@@ -726,7 +830,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(app.staticTexts["history.detail.residue"], equals: history.residue)
     assertTimeline(["queued", "running", "interrupted"], in: app)
 
-    // Reopening a historical activity is navigation only. It must take the
+    // Reopening restores the exact immutable record context. It must take the
     // operator to the related typed workspace without replaying this Job.
     let openWorkspace = app.buttons["history.openWorkspace"]
     XCTAssertTrue(openWorkspace.exists, file: file, line: line)
@@ -734,6 +838,18 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("flash.workspace.title", in: app).waitForExistenceFast(timeout: 10),
       "a Flash history must reopen the Flash workspace", file: file, line: line)
+    XCTAssertTrue(
+      element("history.context", in: app).waitForExistenceFast(timeout: 10),
+      "the destination must retain visible History provenance", file: file, line: line)
+    XCTAssertTrue(
+      displayedText(for: element("history.context.job", in: app)).contains("job-fixture-0002"),
+      file: file, line: line)
+    XCTAssertTrue(
+      displayedText(for: element("history.context.target", in: app)).contains("target-fixture-b"),
+      file: file, line: line)
+    XCTAssertTrue(
+      displayedText(for: element("history.context.operation", in: app)).contains("flash.dayu200"),
+      file: file, line: line)
     for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
       XCTAssertFalse(
         app.buttons[forbidden].exists, "navigation must not expose \(forbidden)",

@@ -209,6 +209,9 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   /// Display and audit only: History groups by it, nothing decides by it.
   /// Distinct from `sessionID`, which is this Job's own storage identity.
   public let threadID: String?
+  /// Presentation-only origin projected from the persisted operation, typed
+  /// inputs, and client provenance. It never participates in Runtime policy.
+  public let workspaceKind: RuntimeWorkspaceKind?
   public let actualEffect: String?
   public let createdAtUTC: String?
   public let startedAtUTC: String?
@@ -237,6 +240,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     executionMode: String? = nil,
     sessionID: String? = nil,
     threadID: String? = nil,
+    workspaceKind: RuntimeWorkspaceKind? = nil,
     actualEffect: String? = nil,
     createdAtUTC: String? = nil,
     startedAtUTC: String? = nil,
@@ -258,6 +262,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     self.executionMode = executionMode
     self.sessionID = sessionID
     self.threadID = threadID
+    self.workspaceKind = workspaceKind
     self.actualEffect = actualEffect
     self.createdAtUTC = createdAtUTC
     self.startedAtUTC = startedAtUTC
@@ -8194,6 +8199,10 @@ public actor RuntimeJobEngine {
       executionMode: "execute",
       sessionID: record.sessionID,
       threadID: record.request.clientContext?.threadID,
+      workspaceKind: RuntimeWorkspaceKindProjection.kind(
+        forOperation: record.operationReference,
+        inputs: record.request.inputs,
+        clientName: record.request.clientContext?.clientName),
       actualEffect: record.actualEffect,
       createdAtUTC: record.createdAtUTC,
       startedAtUTC: record.startedAtUTC,

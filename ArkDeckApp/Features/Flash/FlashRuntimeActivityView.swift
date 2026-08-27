@@ -43,6 +43,10 @@ struct FlashRuntimeActivityView: View {
 
       WorkspaceSection(Text(flashText("flash.runtime.title"))) {
         switch presentation.availability {
+        case .loading:
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel(flashText("flash.action.refresh"))
         case .unavailable(let reason):
           unavailable(reason)
         case .available:
