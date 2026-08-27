@@ -781,6 +781,9 @@ final class AppShellUITests: XCTestCase {
       app.buttons["debug.apps.entry.choose"].click()
       chooseDebugPackage(entry, in: app)
       assertDisplayed(element("debug.apps.entry.name", in: app), equals: "entry.hap")
+      XCTAssertTrue(
+        app.staticTexts["debug.apps.entry.name"].exists,
+        "the selected filename must retain its static-text accessibility role")
       XCTAssertTrue(addPackage.isEnabled)
       scrollIntoView(addPackage, in: app)
       addPackage.click()
