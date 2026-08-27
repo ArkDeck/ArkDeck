@@ -1418,6 +1418,7 @@ final class FlashWorkspaceViewModel {
   private let uiTestFixtureStateURL: URL?
   @ObservationIgnored private var didPrepareUITestPlan = false
   @ObservationIgnored private var shouldRegeneratePlanWhenReady = false
+  @ObservationIgnored private var historyPinnedTargetID: String?
 
   init(
     provider: any FlashApplicationProviding,
@@ -1516,9 +1517,10 @@ final class FlashWorkspaceViewModel {
       guard !Task.isCancelled else { return }
       let previousTarget = self.selectedTarget
       let nextSelectedTargetID =
-        next.targets.contains(where: { $0.id == self.selectedTargetID })
-        ? self.selectedTargetID
-        : next.targets.first?.id ?? ""
+        self.historyPinnedTargetID
+        ?? (next.targets.contains(where: { $0.id == self.selectedTargetID })
+          ? self.selectedTargetID
+          : next.targets.first?.id ?? "")
       let nextTarget = next.targets.first { $0.id == nextSelectedTargetID }
       self.workspace = next
       self.selectedTargetID = nextSelectedTargetID
@@ -1569,9 +1571,21 @@ final class FlashWorkspaceViewModel {
 
   func setTargetID(_ targetID: String) {
     guard selectedTargetID != targetID else { return }
+    historyPinnedTargetID = nil
     selectedTargetID = targetID
     invalidatePlan()
     preparePlan()
+  }
+
+  /// Focuses the exact historical target without rebuilding or submitting a
+  /// Flash plan. A missing target remains missing so a different device is
+  /// never selected on behalf of the historical record.
+  func focusHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
+    guard context.workspaceKind == .flash else { return }
+    historyPinnedTargetID = context.targetID
+    guard selectedTargetID != context.targetID else { return }
+    selectedTargetID = context.targetID
+    invalidatePlan()
   }
 
   func selectArchive(_ url: URL) {

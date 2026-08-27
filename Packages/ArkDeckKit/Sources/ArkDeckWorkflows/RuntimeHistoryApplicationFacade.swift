@@ -16,6 +16,7 @@ import Foundation
 import os
 
 public enum RuntimeHistoryAvailability: Sendable, Equatable {
+  case loading
   case available
   case unavailable(reason: String)
 }
@@ -40,6 +41,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
   /// declare none; History must show those as ungrouped rather than inventing
   /// a line for them.
   public let threadID: String?
+  public let workspaceKind: RuntimeWorkspaceKind?
   public let actualEffect: String?
   public let createdAtUTC: String?
   public let startedAtUTC: String?
@@ -54,6 +56,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     waitingForHuman: Bool, outcomeUnknown: Bool, outstandingResidueCount: Int,
     timeline: [String], executionMode: String? = nil, sessionID: String? = nil,
     threadID: String? = nil,
+    workspaceKind: RuntimeWorkspaceKind? = nil,
     actualEffect: String? = nil,
     createdAtUTC: String? = nil, startedAtUTC: String? = nil, finishedAtUTC: String? = nil,
     supersededByRecoveryEpochID: String? = nil, recoveryEpochID: String? = nil,
@@ -70,6 +73,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     self.executionMode = executionMode
     self.sessionID = sessionID
     self.threadID = threadID
+    self.workspaceKind = workspaceKind
     self.actualEffect = actualEffect
     self.createdAtUTC = createdAtUTC
     self.startedAtUTC = startedAtUTC
@@ -126,6 +130,14 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     else { return false }
     return !state.isTerminal
   }
+
+  /// A current daemon reports `workspaceKind`. An older daemon may still be
+  /// classified when the operation reference alone is unambiguous, but the
+  /// shared diagnostics operation is never guessed.
+  public var resolvedWorkspaceKind: RuntimeWorkspaceKind? {
+    workspaceKind
+      ?? RuntimeWorkspaceKindProjection.unambiguousKind(forOperation: operationReference)
+  }
 }
 
 public struct RuntimeHistoryPresentation: Sendable, Equatable {
@@ -147,7 +159,7 @@ public struct RuntimeHistoryPresentation: Sendable, Equatable {
   }
 
   public static let loading = RuntimeHistoryPresentation(
-    availability: .unavailable(reason: "Runtime history is loading"), jobs: [])
+    availability: .loading, jobs: [])
 
   static func unavailable(_ reason: String) -> RuntimeHistoryPresentation {
     RuntimeHistoryPresentation(availability: .unavailable(reason: reason), jobs: [])
@@ -263,6 +275,53 @@ public struct RuntimeJobDetailPresentation: Sendable, Equatable {
   public let artifacts: [RuntimeArtifactPresentation]
   public let correlationAvailability: RuntimeJobDetailSectionAvailability
   public let correlation: RuntimeJobCorrelationPresentation?
+}
+
+/// Immutable context carried when History opens the workspace that produced a
+/// Job. It restores read-only inputs and Artifact identity; it is not a request
+/// and cannot submit, run, retry, cancel, or replay the historical Job.
+public struct RuntimeHistoryWorkspaceContext: Sendable, Equatable, Identifiable {
+  public let jobID: String
+  public let operationReference: String
+  public let targetID: String
+  public let state: String
+  public let executionMode: String?
+  public let sessionID: String?
+  public let threadID: String?
+  public let workspaceKind: RuntimeWorkspaceKind
+  public let bindingRevision: Int?
+  public let finishedAtUTC: String?
+  public let parameters: [RuntimeJobParameterPresentation]
+  public let artifacts: [RuntimeArtifactPresentation]
+
+  public var id: String { jobID }
+
+  public init?(
+    job: RuntimeJobSummaryPresentation,
+    detail: RuntimeJobDetailPresentation
+  ) {
+    guard detail.jobID == job.id else { return nil }
+    let workspaceKind = job.resolvedWorkspaceKind
+      ?? detail.evidence.flatMap {
+        RuntimeWorkspaceKindProjection.kind(
+          forOperation: job.operationReference,
+          parameters: $0.parameters)
+      }
+    guard let workspaceKind else { return nil }
+    jobID = job.id
+    operationReference = job.operationReference
+    targetID = job.targetID
+    state = job.state
+    executionMode = job.executionMode
+    sessionID = job.sessionID
+    threadID = job.threadID
+    self.workspaceKind = workspaceKind
+    bindingRevision = detail.evidence?.bindingRevision
+      ?? detail.evidence?.observedBindingRevision
+    finishedAtUTC = job.finishedAtUTC
+    parameters = detail.evidence?.parameters ?? []
+    artifacts = detail.artifacts
+  }
 }
 
 public enum RuntimeArtifactExportResult: Sendable, Equatable {
@@ -676,6 +735,8 @@ enum RuntimeHistoryResponseDecoding {
           executionMode: entry["executionMode"] as? String,
           sessionID: entry["sessionId"] as? String,
           threadID: entry["threadId"] as? String,
+          workspaceKind: (entry["workspaceKind"] as? String)
+            .flatMap(RuntimeWorkspaceKind.init(rawValue:)),
           actualEffect: entry["actualEffect"] as? String,
           createdAtUTC: entry["createdAtUtc"] as? String,
           startedAtUTC: entry["startedAtUtc"] as? String,
@@ -1192,6 +1253,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             timeline: ["queued", "preflight", "running"],
             executionMode: "execute",
             sessionID: "session-job-fixture-flash-running",
+            workspaceKind: .flash,
             actualEffect: "destructive",
             createdAtUTC: "2026-08-06T08:00:00Z",
             startedAtUTC: "2026-08-06T08:00:01Z")
@@ -1212,6 +1274,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             timeline: ["queued", "preflight", "running", "waitingForRecovery"],
             executionMode: "execute",
             sessionID: "session-job-fixture-flash-resolved-recovery",
+            workspaceKind: .flash,
             actualEffect: "destructive",
             createdAtUTC: "2026-08-06T08:00:00Z",
             startedAtUTC: "2026-08-06T08:00:01Z",
@@ -1233,6 +1296,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             timeline: ["queued", "preflight", "running", "waitingForDevice", "succeeded"],
             executionMode: "execute",
             sessionID: "session-job-fixture-flash-succeeded",
+            workspaceKind: .flash,
             actualEffect: "destructive",
             createdAtUTC: "2026-08-06T08:00:00Z",
             startedAtUTC: "2026-08-06T08:00:01Z",
@@ -1256,6 +1320,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           // One fixture run carries a thread and one does not, so the Overview
           // fixture exercises both a grouped line and an ungrouped run.
           threadID: "t-fixture0001",
+          workspaceKind: .viewer,
           actualEffect: "readOnly",
           createdAtUTC: "2026-08-06T07:00:00Z",
           startedAtUTC: "2026-08-06T07:00:01Z",
@@ -1271,6 +1336,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           timeline: ["queued", "running", "interrupted"],
           executionMode: "execute",
           sessionID: "session-job-fixture-0002",
+          workspaceKind: .flash,
           actualEffect: "destructive",
           createdAtUTC: "2026-08-06T08:00:00Z",
           startedAtUTC: "2026-08-06T08:00:01Z",

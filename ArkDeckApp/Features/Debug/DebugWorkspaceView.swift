@@ -33,6 +33,7 @@ enum DebugWorkspaceTab: String, CaseIterable, Hashable {
 struct DebugWorkspaceView: View {
   var model: DebugWorkspaceViewModel
   let onOpenHistory: () -> Void
+  let historyContext: RuntimeHistoryWorkspaceContext?
 
   @SceneStorage("debug.workspace.tab.v2")
   private var storedTab = DebugWorkspaceTab.artifacts.rawValue
@@ -93,6 +94,9 @@ struct DebugWorkspaceView: View {
       }
     }
     .onAppear(perform: reconcileTargetSelection)
+    .onChange(of: historyContext?.id, initial: true) { _, _ in
+      if historyContext == nil { reconcileTargetSelection() } else { applyHistoryContext() }
+    }
     .onChange(of: model.workspace.targets) { _, _ in reconcileTargetSelection() }
     .onChange(of: selectedTargetID) { _, targetID in
       model.refresh(targetID: targetID)
@@ -258,6 +262,10 @@ struct DebugWorkspaceView: View {
   }
 
   private func reconcileTargetSelection() {
+    if let historyContext, historyContext.workspaceKind == .debug {
+      selectedTargetID = historyContext.targetID
+      return
+    }
     guard !model.workspace.targets.isEmpty else {
       selectedTargetID = nil
       return
@@ -267,6 +275,21 @@ struct DebugWorkspaceView: View {
       return
     }
     selectedTargetID = model.workspace.targets.first?.id
+  }
+
+  private func applyHistoryContext() {
+    guard let historyContext, historyContext.workspaceKind == .debug else { return }
+    selectedTargetID = historyContext.targetID
+    let tab: DebugWorkspaceTab = switch historyContext.operationReference {
+    case DebugApplicationFacade.debugHAPReference: .apps
+    case DebugApplicationFacade.nativeLibraryReference: .artifacts
+    case DebugApplicationFacade.createPortForwardReference,
+      DebugApplicationFacade.removePortForwardReference: .network
+    case DebugApplicationFacade.captureDiagnosticsReference: .logs
+    default: .artifacts
+    }
+    activateTab(tab)
+    model.rememberHistoryContext(historyContext)
   }
 
   private func moveSelectedTab(by offset: Int) -> KeyPress.Result {
@@ -2877,6 +2900,7 @@ final class DebugWorkspaceViewModel {
   private(set) var nativeLibraryTerminal: DebugLogJobTerminalPresentation?
   private(set) var nativeLibraryFailure: String?
   private(set) var cancellingOutstandingJobIDs: Set<String> = []
+  private var historyArtifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
 
   private var logFeedbackScope: TargetBindingScope?
   private var hapFeedbackScope: TargetBindingScope?
@@ -3000,8 +3024,17 @@ final class DebugWorkspaceViewModel {
       defer { self.isRefreshing = false }
       guard !Task.isCancelled else { return }
       self.workspace = next
+      artifacts.merge(self.historyArtifactsByJobID) { _, historical in historical }
       self.artifactsByJobID = artifacts
     }
+  }
+
+  /// Makes immutable Artifact metadata from the selected History record
+  /// available to Debug without submitting or running anything.
+  func rememberHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
+    guard context.workspaceKind == .debug else { return }
+    historyArtifactsByJobID[context.jobID] = context.artifacts
+    artifactsByJobID[context.jobID] = context.artifacts
   }
 
   func submitLogs(

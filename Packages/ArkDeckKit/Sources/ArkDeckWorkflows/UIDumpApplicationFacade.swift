@@ -979,11 +979,28 @@ public protocol UIDumpApplicationProviding: Sendable {
     deviceObservation: DeviceListPresentation
   ) async -> UIDumpWorkspacePresentation
   func recapture(target: UIDumpTargetPresentation) async -> ViewerCaptureSubmissionResult
+  /// Reads the immutable Viewer Artifact set produced by an existing terminal
+  /// Job. This is a bounded read only: it never submits or runs an operation.
+  func loadHistoricalCapture(
+    jobID: String,
+    targetID: String,
+    bindingRevision: Int
+  ) async -> ViewerCaptureSubmissionResult
   func advancedDump(
     target: UIDumpTargetPresentation,
     selection: ViewerAdvancedDumpSelection
   ) async -> ViewerAdvancedDumpSubmissionResult
   func cancel(jobID: String) async -> Bool
+}
+
+public extension UIDumpApplicationProviding {
+  func loadHistoricalCapture(
+    jobID _: String,
+    targetID _: String,
+    bindingRevision _: Int
+  ) async -> ViewerCaptureSubmissionResult {
+    .failed("This Viewer provider cannot read historical captures")
+  }
 }
 
 public enum ViewerCaptureRequestBuilder {
@@ -1133,7 +1150,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       }
       return .captured(
         try await loadCapture(
-          facts: facts, target: target,
+          facts: facts, targetID: target.id, bindingRevision: target.bindingRevision,
           submitMilliseconds: submitMilliseconds, runMilliseconds: runMilliseconds))
     } catch let failure as ViewerTransportFailure {
       return .failed(failure.message)
@@ -1143,6 +1160,45 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       return .failed(failure.message)
     } catch {
       return .failed("Viewer capture failed: \(error)")
+    }
+  }
+
+  func loadHistoricalCapture(
+    jobID: String,
+    targetID: String,
+    bindingRevision: Int
+  ) async -> ViewerCaptureSubmissionResult {
+    guard !jobID.isEmpty, !targetID.isEmpty, bindingRevision >= 0 else {
+      return .failed("Historical Viewer context is incomplete")
+    }
+    do {
+      let target = UIDumpTargetPresentation(
+        id: targetID,
+        bindingRevision: bindingRevision,
+        toolVersion: "history",
+        adoptedAtUTC: "")
+      let status = try resultObject(
+        await UIDumpXPCTransport.request(
+          method: "job.status", params: ["jobId": .string(jobID)]),
+        label: "Historical Viewer Job")
+      let facts = try terminalFacts(status, jobID: jobID, target: target)
+      guard facts.state == "succeeded", !facts.outcomeUnknown,
+        !facts.waitingForHuman, facts.outstandingResidueCount == 0
+      else {
+        return .failed(
+          "Historical Viewer Job did not finish with a confirmed capture (\(facts.state))")
+      }
+      return .captured(
+        try await loadCapture(
+          facts: facts, targetID: targetID, bindingRevision: bindingRevision))
+    } catch let failure as ViewerTransportFailure {
+      return .failed(failure.message)
+    } catch let failure as ViewerArtifactFailure {
+      return .failed(failure.message)
+    } catch let failure as ViewerCaptureFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed("Historical Viewer capture failed: \(error)")
     }
   }
 
@@ -1202,7 +1258,8 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
 
   private func loadCapture(
     facts: ViewerTerminalFacts,
-    target: UIDumpTargetPresentation,
+    targetID: String,
+    bindingRevision: Int,
     submitMilliseconds: Double = 0,
     runMilliseconds: Double = 0
   ) async throws -> ViewerCapture {
@@ -1249,8 +1306,8 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         rawDumpData: rawDumpData,
         identity: ViewerCaptureIdentity(
           jobID: facts.jobID,
-          targetID: target.id,
-          bindingRevision: target.bindingRevision,
+          targetID: targetID,
+          bindingRevision: bindingRevision,
           capturedAtUTC: capturedAtUTC))
     }
     return capture.withMetrics(

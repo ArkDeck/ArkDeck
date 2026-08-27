@@ -70,7 +70,12 @@ struct ToolkitWorkspaceView: View {
     GeometryReader { proxy in
       ZStack {
         Color(nsColor: .windowBackgroundColor)
-        if let frame = model.frame, let image = NSImage(data: frame.imageData) {
+        if model.isOpeningHistoryScreen {
+          ProgressView {
+            Text("history.loading", tableName: "HistoryLocalizable")
+          }
+          .accessibilityIdentifier("toolkit.history.loading")
+        } else if let frame = model.frame, let image = NSImage(data: frame.imageData) {
           let rendered = Self.fittedSize(
             container: proxy.size,
             aspect: CGFloat(frame.width) / CGFloat(frame.height))
