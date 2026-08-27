@@ -200,9 +200,14 @@ T02/T03 不进入实现。
   5. **AC-8 第一句「pending 触点 ≤ 100 ms 出现」没有计时证据**。两态触点存在且视觉可分
      （`toolkit.touch.pending` / `toolkit.touch.settled`，标记在 await 之前同步落下），
      但 100 ms 这个数没有被量过，本次也没量。
-  6. 真机闸依赖本机 XCUITest 自动化，而它这两天**间歇性起不来**
-     （`Timed out while enabling automation mode`），与被测代码无关；四条闸在收官这次
-     全部通过（stale 25.5s、录屏 11.7s、配额拦截 11.4s、双 notice 15.6s）。
+  6. 真机闸依赖本机 XCUITest 自动化。四条闸在收官这次全部通过（stale 25.5s、录屏
+     11.7s、配额拦截 11.4s、双 notice 15.6s）。
+     **原先此处记作「间歇性起不来、原因不明」，现已查明（2026-08-27）：是屏幕锁着。**
+     `Timed out while enabling automation mode` 出现时 `ioreg -n Root -d1` 读到
+     `IOConsoleLocked = True` / `CGSSessionScreenIsLocked: True`；锁屏起始时刻与两天来
+     每一次失败、以及每一次「重试就好了」的解锁时刻都对得上。**XCUITest 驱动不了锁屏
+     状态下的界面**，所以这不是 flake，是前置条件：跑真机闸前必须让这台 Mac 处于已解锁
+     的活动 GUI 会话。诊断法记在这里，省得下次再当成玄学重试。
   ——以下为逐刀记录——
   已交付 ① typed input operations + Provider lowering
   + 契约测试 + 真机单发验证（#1498）；②a 会话 scope 授权 + TTL/预算（#1500）；
