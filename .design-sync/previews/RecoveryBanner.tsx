@@ -16,7 +16,7 @@ const FLASH_DETAIL = (
   <>
     上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。设备最后处于 updater 模式。
     <br />
-    Provider 未声明 restartSafe —— <b>不提供自动续跑</b>,请按 RecoveryGuide 人工确认设备状态。
+    原 unknown intent 永不重放；只有 Runtime 证明完整覆盖后才可执行独立恢复，人工确认不能代替证明。
   </>
 );
 
@@ -53,7 +53,7 @@ const AUTH_BLOCKED: RecoveryItem = {
   kind: "humanRequired",
   title: "Automation · HTASK-DEMO-001 · unknown-tablet",
   detail:
-    "typed HAP deployment 需要一台已授权设备。unknown-tablet 的授权被拒绝或弹窗超时,ArkDeck 不自动重试。",
+    "typed HAP deployment 需要一台已授权设备。unknown-tablet 的授权等待超时（不等同于 denied）,ArkDeck 不自动重试。",
   reasonCode: "E000003",
   minimalAction:
     "解锁设备屏幕,在设备弹出的「是否信任此计算机?」中选择「信任」或「始终信任」;若重试无效,再检查设备的 USB 调试开关。",
@@ -64,6 +64,7 @@ const AUTH_BLOCKED: RecoveryItem = {
 /** 原型 detail 顶部真实出现的那条 banner:一条 outcomeUnknown + 一条 waiting。 */
 export const SessionBanner = () => (
   <div style={col}>
+    <p style={hint}>历史组件示例：当前 App banner 只打开 History，不提供 resume/archive；内置 Harness/task.* 已退役。确认不能覆盖未知 destructive outcome。</p>
     <RecoveryBanner items={[flashUnknown(), TRACE_WAITING]} />
     <Card title="它为什么在页面内容之前">
       <p style={hint}>
@@ -80,6 +81,7 @@ export const SessionBanner = () => (
 /** 四种 kind 同框,按「现在就需要人」递减排列。 */
 export const AllFourKinds = () => (
   <div style={col}>
+    <p style={hint}>历史组件示例：当前 App banner 只打开 History，不提供 resume/archive；内置 Harness/task.* 已退役。确认不能覆盖未知 destructive outcome。</p>
     <RecoveryBanner items={[flashUnknown(), AUTH_BLOCKED, DUMP_RESUME, TRACE_WAITING]} />
     <Card title="四种 kind 的动作面各不相同">
       <p style={hint}>
@@ -93,6 +95,7 @@ export const AllFourKinds = () => (
 /** outcomeUnknown:没有任何看起来可以继续的主按钮,连回调都没处传。 */
 export const OutcomeUnknownNoResume = () => (
   <div style={col}>
+    <p style={hint}>历史组件示例：当前 App banner 只打开 History，不提供 resume/archive；内置 Harness/task.* 已退役。确认不能覆盖未知 destructive outcome。</p>
     <RecoveryBanner items={[flashUnknown()]} />
     <Card title="规格 §4.2:这里不渲染任何像是可续跑的东西">
       <p style={hint}>
@@ -109,10 +112,11 @@ export const OutcomeUnknownNoResume = () => (
 /** humanRequired:三行事实块,不给笼统的「继续」。 */
 export const HumanRequiredBlock = () => (
   <div style={col}>
+    <p style={hint}>历史组件示例：当前 App banner 只打开 History，不提供 resume/archive；内置 Harness/task.* 已退役。确认不能覆盖未知 destructive outcome。</p>
     <RecoveryBanner items={[AUTH_BLOCKED]} />
     <Card title="被人挡住时,要说清哪一步、做什么、之后回到哪">
       <p style={hint}>
-        reasonCode 是机器可读的 block(E000003 = 授权被拒绝或弹窗超时);「需要你做」是最小人工动作,
+        reasonCode 是机器可读的 block(E000003 = 授权等待超时（不等同于 denied）);「需要你做」是最小人工动作,
         不是一句「请检查设备」;「之后回到」写明恢复到的 stage,让人知道自己按下按钮会发生什么。
       </p>
       <p style={hint}>按钮写「我已完成上述动作」,而不是「继续」—— 人只能为自己做过的事作证。</p>
@@ -123,6 +127,7 @@ export const HumanRequiredBlock = () => (
 /** 归档被拒:按钮 disabled 且带原因;waiting 项同时说明为什么还在等。 */
 export const ArchiveBlocked = () => (
   <div style={col}>
+    <p style={hint}>历史组件示例：当前 App banner 只打开 History，不提供 resume/archive；内置 Harness/task.* 已退役。确认不能覆盖未知 destructive outcome。</p>
     <RecoveryBanner items={[flashUnknown("仍在等待窗口内,归档不可用"), TRACE_WAITING]} />
     <Card title="critical child 未到安全边界时,归档被拒并说明原因">
       <p style={hint}>

@@ -72,7 +72,7 @@ final class AppShellUITests: XCTestCase {
   /// operation is executed headlessly before this test; this UI leg proves
   /// that the resulting verified Job is discoverable and can reopen its
   /// related workspace without replaying it.
-  func testRealDeviceHistoryReopensLatestViewerCapture() throws {
+  func testRealDeviceHistoryReopensExactViewerCapture() throws {
     guard
       ProcessInfo.processInfo.environment[
         Self.realDeviceStartupEnvironmentKey
@@ -81,6 +81,9 @@ final class AppShellUITests: XCTestCase {
       throw XCTSkip(
         "Set \(Self.realDeviceStartupEnvironmentKey)=1 for real-device History acceptance")
     }
+    guard let jobID = ProcessInfo.processInfo.environment["ARKDECK_REAL_DEVICE_VIEWER_JOB_ID"],
+      jobID.hasPrefix("job-"), jobID.count > 4
+    else { throw XCTSkip("Supply the exact real Viewer capture Job ID; newest history may be an analyzer Job") }
 
     let app = XCUIApplication()
     app.launchArguments = [
@@ -95,9 +98,15 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("history.table", in: app).waitForExistenceFast(timeout: 30),
       "production Runtime history did not render")
+    let search = app.textFields["history.filter.search"]
+    XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+    search.click()
+    search.typeKey("a", modifierFlags: .command)
+    search.typeText(jobID)
     XCTAssertTrue(
       app.staticTexts["history.detail.select"].waitForNonExistenceFast(timeout: 10),
-      "the newest production Job was not selected")
+      "the requested production capture was not selected")
+    assertDisplayed(element("history.detail.job", in: app), equals: jobID, timeout: 30)
     assertDisplayed(
       app.staticTexts["history.detail.operation"], equals: "capture.diagnostics@1", timeout: 30)
     XCTAssertTrue(
@@ -121,7 +130,7 @@ final class AppShellUITests: XCTestCase {
       "the historical component-tree Artifact did not reopen in Viewer")
 
     let evidence = XCTAttachment(
-      string: "Latest production Runtime Viewer capture was visible with verified artifacts and reopened its screenshot and component tree without replay.")
+      string: "The exact requested Runtime Viewer capture was visible with verified artifacts and reopened its screenshot and component tree without replay.")
     evidence.name = "History real-device activity acceptance"
     evidence.lifetime = .keepAlways
     add(evidence)
@@ -358,6 +367,13 @@ final class AppShellUITests: XCTestCase {
       assertDisplayed(app.staticTexts["diagnostics.workspace.title"], equals: "Diagnostics")
       XCTAssertTrue(element("diagnostics.session.empty", in: app).exists)
       XCTAssertTrue(app.staticTexts[diagnosticsEmptyTitle].exists)
+      // The fixture has an adopted device. That fact alone cannot turn a
+      // disconnected recorder into a running session or save host markers.
+      XCTAssertFalse(app.buttons["diagnostics.capture.arm"].isEnabled)
+      XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
+      XCTAssertTrue(element("diagnostics.capture.unavailable", in: app).exists)
+      XCTAssertTrue(app.staticTexts["diagnostic_session_capture_not_connected"].exists)
+      XCTAssertFalse(element("diagnostics.capture.markCount", in: app).exists)
 
       let diagnosticsScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
       diagnosticsScreenshot.name = "Diagnostics workspace \(language)"
@@ -400,7 +416,7 @@ final class AppShellUITests: XCTestCase {
           "Runtime reports success after the Flash and postflight checks."),
       workspaces: Workspaces(
         inspectorShow: "Show job inspector",
-        inspectorReadOnly: "Read-only Runtime facts",
+        inspectorRuntimeFacts: "Runtime facts",
         debugPanels: [
           "Build Artifact", "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
           "Provider invocation disclosure",
@@ -409,7 +425,7 @@ final class AppShellUITests: XCTestCase {
         traceAvailable: "Ready",
         traceUnavailable: "Unavailable",
         settingsPanes: [
-          "General", "Toolchains", "Servers", "Storage", "Updates", "Diagnostics",
+          "General", "Toolchains", "Servers", "Storage", "Updates", "Diagnostics", "Trace",
         ]),
       history: History(
         readOnlyNote:
@@ -450,7 +466,7 @@ final class AppShellUITests: XCTestCase {
         runtimeSucceededResult: "Runtime 报告刷机及 postflight 检查成功。"),
       workspaces: Workspaces(
         inspectorShow: "展开 Job 检查器",
-        inspectorReadOnly: "只读 Runtime 事实",
+        inspectorRuntimeFacts: "Runtime 事实",
         debugPanels: [
           "编译产物", "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则",
           "Provider 调用披露",
@@ -458,7 +474,7 @@ final class AppShellUITests: XCTestCase {
         viewerEmptyTitle: "没有已验证的 capture",
         traceAvailable: "可以抓取",
         traceUnavailable: "暂时无法抓取",
-        settingsPanes: ["通用", "工具链", "服务器", "存储", "更新", "诊断"]),
+        settingsPanes: ["通用", "工具链", "服务器", "存储", "更新", "诊断", "跟踪"]),
       history: History(
         readOnlyNote: "History 只读取 Runtime 状态。打开相关工具不会提交、取消或重试此 Job。",
         outcomeUnknown: "结果未知——此 Job 对设备的影响从未被确认。",
@@ -550,6 +566,57 @@ final class AppShellUITests: XCTestCase {
     app.buttons["settings.remoteSources.cancel"].click()
   }
 
+  func testTraceSettingsCacheAndLicensesAreReachableInBothLanguages() {
+    for (language, title) in [("(en)", "Trace"), ("(zh-Hans)", "跟踪")] {
+      let app = launch(arguments: ["-AppleLanguages", language])
+      openSettings(in: app)
+      assertTraceSettings(in: app, title: title)
+      app.terminate()
+    }
+  }
+
+  func testTraceViewerAndShortcutHelpUseBothLanguages() {
+    for (language, emptyTitle, openTitle, helpTitle, timelineTitle, searchTitle) in [
+      ("(en)", "Open a trace", "Open Trace…", "Trace Keyboard Shortcuts", "Timeline", "Search TID, thread, or slice"),
+      ("(zh-Hans)", "打开 Trace", "打开 Trace…", "Trace 键盘快捷键", "时间轴", "搜索 TID、线程或 slice"),
+    ] {
+      let app = launch(arguments: ["-AppleLanguages", language])
+      select("app.navigation.trace", in: app)
+      let openViewer = app.buttons["trace.openViewer"]
+      XCTAssertTrue(openViewer.waitForExistenceFast(timeout: 10))
+      scrollIntoView(openViewer, in: app)
+      openViewer.click()
+      let viewer = app.windows["Trace Viewer"]
+      XCTAssertTrue(viewer.waitForExistenceFast(timeout: 10))
+      XCTAssertTrue(viewer.staticTexts[emptyTitle].waitForExistenceFast(timeout: 10))
+      XCTAssertTrue(viewer.buttons[openTitle].exists)
+      let search = viewer.textFields[searchTitle]
+      XCTAssertTrue(search.exists, "search has a localized accessibility label")
+      XCTAssertEqual(search.placeholderValue, searchTitle)
+      let empty = XCTAttachment(screenshot: viewer.screenshot())
+      empty.name = "Native Trace Viewer empty \(language)"
+      empty.lifetime = .keepAlways
+      add(empty)
+
+      let helpMenu = app.menuBars.menuBarItems.matching(
+        NSPredicate(format: "title IN %@", ["Help", "帮助"])).firstMatch
+      XCTAssertTrue(helpMenu.waitForExistenceFast(timeout: 5))
+      helpMenu.click()
+      let shortcuts = helpMenu.menuItems[helpTitle]
+      XCTAssertTrue(shortcuts.waitForExistenceFast(timeout: 5))
+      shortcuts.click()
+      let help = app.windows[helpTitle]
+      XCTAssertTrue(help.waitForExistenceFast(timeout: 10))
+      assertDisplayed(
+        help.staticTexts["trace.shortcuts.section.Timeline"], equals: timelineTitle)
+      let reference = XCTAttachment(screenshot: help.screenshot())
+      reference.name = "Native Trace shortcut catalog \(language)"
+      reference.lifetime = .keepAlways
+      add(reference)
+      app.terminate()
+    }
+  }
+
   func testDeviceContextMenuRenamesAndRefreshesDeviceState() {
     try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
     let fixtureArguments = [
@@ -621,7 +688,7 @@ final class AppShellUITests: XCTestCase {
 
   private struct Workspaces {
     let inspectorShow: String
-    let inspectorReadOnly: String
+    let inspectorRuntimeFacts: String
     let debugPanels: [String]
     let viewerEmptyTitle: String
     let traceAvailable: String
@@ -664,6 +731,306 @@ final class AppShellUITests: XCTestCase {
     return FileManager.default.temporaryDirectory.appending(path: name)
   }
 
+  func testDefaultWindowReportsNativeGeometryAndDoesNotOpenAtMinimumSize() {
+    let app = launch(arguments: ["-AppleLanguages", "(en)"])
+    assertDefaultWindowGeometry(in: app)
+  }
+
+  /// File-picker UI only: these are deliberately not installable packages and
+  /// the test never presses Import and run. Device execution has separate evidence.
+  func testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages() throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-hap-picker-\(UUID().uuidString)", directoryHint: .isDirectory)
+      .resolvingSymlinksInPath().standardizedFileURL
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let entry = directory.appending(path: "entry.hap")
+    let shared = directory.appending(path: "shared.hsp")
+    for file in [entry, shared] { try Data("UI selection fixture only".utf8).write(to: file) }
+
+    for language in ["(en)", "(zh-Hans)"] {
+      let app = launch(arguments: ["--ui-test-devices", "-AppleLanguages", language])
+      select("app.navigation.debug", in: app)
+      app.buttons["debug.tab.apps"].click()
+      let cleanup = app.popUpButtons["debug.apps.cleanupPolicy"]
+      let postRun = app.popUpButtons["debug.apps.postRun"]
+      XCTAssertTrue(postRun.waitForExistenceFast(timeout: 15))
+      let policyHint = element("debug.apps.runningCleanupHint", in: app)
+      XCTAssertFalse(policyHint.exists)
+      postRun.click()
+      app.menuItems[language == "(en)" ? "Leave running" : "保持运行"].click()
+      XCTAssertTrue(policyHint.waitForExistenceFast(timeout: 5))
+      cleanup.click()
+      app.menuItems[language == "(en)" ? "Retain installed app" : "保留已安装应用"].click()
+      XCTAssertFalse(policyHint.exists)
+      postRun.click()
+      app.menuItems[language == "(en)" ? "Stop Ability" : "停止 Ability"].click()
+      XCTAssertFalse(policyHint.exists)
+      postRun.click()
+      app.menuItems[language == "(en)" ? "Leave running" : "保持运行"].click()
+      XCTAssertFalse(policyHint.exists)
+      cleanup.click()
+      app.menuItems[language == "(en)" ? "Uninstall after run" : "运行后卸载"].click()
+      XCTAssertTrue(policyHint.waitForExistenceFast(timeout: 5))
+      postRun.click()
+      app.menuItems[language == "(en)" ? "Stop Ability" : "停止 Ability"].click()
+      XCTAssertFalse(policyHint.exists)
+      let addPackage = app.buttons["debug.apps.additional.add"]
+      XCTAssertTrue(addPackage.waitForExistenceFast(timeout: 15))
+      XCTAssertFalse(addPackage.isEnabled, "an entry HAP must be selected first")
+      app.buttons["debug.apps.entry.choose"].click()
+      chooseDebugPackage(entry, in: app)
+      assertDisplayed(element("debug.apps.entry.name", in: app), equals: "entry.hap")
+      XCTAssertTrue(addPackage.isEnabled)
+      scrollIntoView(addPackage, in: app)
+      addPackage.click()
+      chooseDebugPackage(shared, in: app)
+      let remove = app.buttons["debug.apps.additional.remove.0"]
+      XCTAssertTrue(remove.waitForExistenceFast(timeout: 10), "the .hsp selection must be retained")
+      XCTAssertTrue(remove.label.contains("shared.hsp"))
+      assertDisplayed(element("debug.apps.additional.file.0", in: app), equals: "shared.hsp")
+      scrollIntoView(addPackage, in: app)
+      addPackage.click()
+      chooseDebugPackage(shared, in: app)
+      let error = element("debug.apps.selection.error", in: app)
+      XCTAssertTrue(error.waitForExistenceFast(timeout: 10))
+      XCTAssertFalse(app.buttons["debug.apps.additional.remove.1"].exists)
+      XCTAssertFalse(app.buttons["debug.apps.run"].isEnabled)
+      scrollIntoView(error, in: app)
+      let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      screenshot.name = "HAP HSP selection and duplicate refusal \(language)"
+      screenshot.lifetime = .keepAlways
+      add(screenshot)
+      scrollIntoView(remove, in: app)
+      remove.click()
+      XCTAssertFalse(remove.exists)
+      XCTAssertFalse(error.exists)
+      app.buttons["debug.apps.packages.clear"].click()
+      XCTAssertFalse(addPackage.isEnabled)
+      XCTAssertFalse(app.buttons["debug.apps.packages.clear"].exists)
+      app.terminate()
+    }
+  }
+
+  private func chooseDebugPackage(_ file: URL, in app: XCUIApplication) {
+    let panel = app.sheets.firstMatch
+    guard panel.waitForExistenceFast(timeout: 10) else { return XCTFail("file picker did not open") }
+    app.typeKey("g", modifierFlags: [.command, .shift])
+    let path = panel.textFields.firstMatch
+    guard path.waitForExistenceFast(timeout: 10) else { return XCTFail("Go to Folder did not open") }
+    KeyboardInputSourcePin.pinPlainKeyboardLayout()
+    path.typeKey("a", modifierFlags: .command)
+    path.typeText(file.path)
+    path.typeKey(.return, modifierFlags: [])
+    let selected = panel.textFields.matching(
+      NSPredicate(format: "value == %@", file.lastPathComponent)).firstMatch
+    guard selected.waitForExistenceFast(timeout: 10) else { return XCTFail("package was not selected") }
+    selected.click()
+    let open = panel.buttons["OKButton"]
+    guard open.waitForExistenceFast(timeout: 5), open.isEnabled else {
+      return XCTFail("package picker did not enable Open")
+    }
+    open.click()
+    XCTAssertTrue(panel.waitForNonExistenceFast(timeout: 10))
+  }
+
+  func testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment() {
+    for (language, alignment, missingTime) in [
+      ("(en)", "Cannot align", "Time not reported"),
+      ("(zh-Hans)", "无法对齐", "未记录时刻"),
+    ] {
+      let app = launch(arguments: [
+        "--ui-test-runtime-history", "--ui-test-diagnostics-session", "--ui-test-devices",
+        "-AppleLanguages", language,
+      ])
+      select("app.navigation.history", in: app)
+      let open = app.buttons["history.openWorkspace"]
+      XCTAssertTrue(open.waitForExistenceFast(timeout: 20))
+      open.click()
+      assertDisplayed(element("diagnostics.session.job", in: app), equals: "job-fixture-diagnostics", timeout: 15)
+      assertDisplayed(element("diagnostics.alignment", in: app), equals: alignment)
+      assertDisplayed(element("diagnostics.mark.time.1", in: app), equals: missingTime)
+      XCTAssertFalse(element("diagnostics.partial", in: app).exists, "an unselected trace channel is not a partial failure")
+      XCTAssertFalse(app.buttons["diagnostics.capture.arm"].isEnabled)
+      XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
+      XCTAssertFalse(element("diagnostics.preview.text", in: app).exists, "raw bytes must not be read on navigation")
+      let sessionScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      sessionScreenshot.name = "Diagnostics session and missing calibration \(language)"
+      sessionScreenshot.lifetime = .keepAlways
+      add(sessionScreenshot)
+      let read = app.buttons["diagnostics.artifact.read.hilog.txt"]
+      XCTAssertTrue(read.waitForExistenceFast(timeout: 10))
+      scrollIntoView(read, in: app)
+      read.click()
+      let preview = element("diagnostics.preview.text", in: app)
+      XCTAssertTrue(preview.waitForExistenceFast(timeout: 10))
+      XCTAssertTrue(displayedText(for: preview).contains("UI fixture only: bounded HiLog sample"))
+      scrollIntoView(preview, in: app)
+      let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      screenshot.name = "Diagnostics published-artifact UI fixture \(language)"
+      screenshot.lifetime = .keepAlways
+      add(screenshot)
+
+      app.buttons["jobInspector.toggle"].click()
+      let log = app.buttons["jobInspector.readLog.fixture-capture.log"]
+      XCTAssertTrue(log.waitForExistenceFast(timeout: 10))
+      scrollIntoView(log, in: app)
+      log.click()
+      let logText = element("jobInspector.log.text", in: app)
+      XCTAssertTrue(logText.waitForExistenceFast(timeout: 10))
+      XCTAssertTrue(displayedText(for: logText).contains("UI fixture only"))
+      XCTAssertFalse(app.buttons["jobInspector.cancel"].exists, "a terminal Job cannot be cancelled")
+      let record = app.buttons["jobInspector.openRecord"]
+      scrollIntoView(record, in: app)
+      record.click()
+      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-diagnostics")
+      app.terminate()
+    }
+  }
+
+  /// The Job is created by the signed headless Runtime before this test.
+  /// Only its exact ID is supplied; every byte and identity is still read
+  /// through production XPC. No device/History/Trace fixture is installed.
+  func testRealDeviceDiagnosticsReopensExactCaptureAndItsTraceInBothLanguages() throws {
+    guard let jobID = ProcessInfo.processInfo.environment["ARKDECK_REAL_DEVICE_DIAGNOSTICS_JOB_ID"],
+      jobID.hasPrefix("job-"), jobID.count > 4
+    else { throw XCTSkip("Supply a real bounded diagnostic capture Job ID for this read-only acceptance") }
+
+    for (language, alignment, timelineLabel, searchLabel) in [
+      ("(en)", "Cannot align", "Trace Timeline", "Search TID, thread, or slice"),
+      ("(zh-Hans)", "无法对齐", "Trace 时间轴", "搜索 TID、线程或 slice"),
+    ] {
+      let app = XCUIApplication()
+      if app.state != .notRunning { app.terminate() }
+      app.launchArguments = [
+        "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+        "--ui-test-auto-update-idle", "--ui-test-reset-shell-selection",
+        "-AppleLanguages", language,
+      ]
+      app.launch()
+      app.activate()
+      XCTAssertTrue(app.windows.firstMatch.waitForExistenceFast(timeout: 15))
+      select("app.navigation.history", in: app)
+      let search = app.textFields["history.filter.search"]
+      XCTAssertTrue(search.waitForExistenceFast(timeout: 30))
+      search.click()
+      search.typeKey("a", modifierFlags: .command)
+      search.typeText(jobID)
+      assertDisplayed(element("history.detail.job", in: app), equals: jobID, timeout: 30)
+      assertDisplayed(element("history.detail.operation", in: app), equals: "capture.diagnostics@1")
+      let open = app.buttons["history.openDiagnostics"]
+      XCTAssertTrue(open.waitForExistenceFast(timeout: 20), "a multi-channel Viewer/Trace capture must also open in Diagnostics")
+      open.click()
+      let session = element("diagnostics.session.job", in: app)
+      guard session.waitForExistenceFast(timeout: 30) else {
+        let evidence = XCTAttachment(string: app.debugDescription)
+        evidence.name = "Real Diagnostics load failure"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        XCTFail("the production reader failed: " + displayedText(for: element("diagnostics.session.failed", in: app)))
+        return
+      }
+      assertDisplayed(session, equals: jobID)
+      XCTAssertTrue(displayedText(for: element("history.context.job", in: app)).contains(jobID))
+      assertDisplayed(element("diagnostics.alignment", in: app), equals: alignment)
+      XCTAssertFalse(element("diagnostics.partial", in: app).exists, "the required complete capture must remain complete in the App")
+      XCTAssertFalse(element("diagnostics.preview.text", in: app).exists, "navigation must not read raw device text")
+      let summary = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      summary.name = "Real Diagnostics session \(language)"
+      summary.lifetime = .keepAlways
+      add(summary)
+
+      let read = app.buttons["diagnostics.artifact.read.hilog.txt"]
+      XCTAssertTrue(read.waitForExistenceFast(timeout: 10))
+      scrollIntoView(read, in: app)
+      read.click()
+      let preview = element("diagnostics.preview.text", in: app)
+      XCTAssertTrue(preview.waitForExistenceFast(timeout: 20), "explicit local reading must load the verified real HiLog")
+      XCTAssertFalse(displayedText(for: preview).isEmpty)
+
+      let trace = app.buttons["diagnostics.artifacts.openTrace"]
+      XCTAssertTrue(trace.exists)
+      scrollIntoView(trace, in: app)
+      trace.click()
+      let viewer = app.windows["Trace Viewer"]
+      XCTAssertTrue(viewer.waitForExistenceFast(timeout: 30))
+      let timeline = viewer.descendants(matching: .any).matching(
+        NSPredicate(format: "label == %@", timelineLabel)).firstMatch
+      XCTAssertTrue(timeline.waitForExistenceFast(timeout: 90), "the same real trace must parse and render its timeline")
+      XCTAssertEqual(viewer.textFields[searchLabel].placeholderValue, searchLabel)
+      let sourceBytesLabel = language == "(en)" ? "Source bytes" : "源文件大小"
+      let schemaLabel = language == "(en)" ? "Schema" : "Schema 指纹"
+      XCTAssertTrue(viewer.staticTexts[sourceBytesLabel].exists)
+      XCTAssertTrue(viewer.staticTexts[schemaLabel].exists)
+      let loaded = XCTAttachment(screenshot: viewer.screenshot())
+      loaded.name = "Real Trace loaded from Diagnostics \(language)"
+      loaded.lifetime = .keepAlways
+      add(loaded)
+      app.terminate()
+    }
+  }
+
+  func testGlobalCancellationFixtureRefusesWithoutChangingTheJobOutcome() {
+    let app = launch(arguments: [
+      "--ui-test-runtime-history", "--ui-test-runtime-flash-running", "--ui-test-devices",
+      "-AppleLanguages", "(en)",
+    ])
+    let toggle = app.buttons["jobInspector.toggle"]
+    XCTAssertTrue(toggle.waitForExistenceFast(timeout: 20))
+    toggle.click()
+    let cancel = app.buttons["jobInspector.cancel"]
+    XCTAssertTrue(cancel.waitForExistenceFast(timeout: 10))
+    cancel.click()
+    let result = element("jobInspector.cancel.result", in: app)
+    XCTAssertTrue(result.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(displayedText(for: result).contains("fixture_cancellation_not_dispatched"))
+    XCTAssertTrue(cancel.exists, "a refused cancellation must not fabricate a terminal state")
+    XCTAssertFalse(app.buttons["jobInspector.retry"].exists)
+  }
+
+  private func assertDefaultWindowGeometry(
+    in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let geometry = app.staticTexts["uiTest.windowGeometry"]
+    let available = NSPredicate { _, _ in
+      guard geometry.exists, let value = geometry.value as? String,
+        let data = value.data(using: .utf8),
+        let facts = try? JSONSerialization.jsonObject(with: data) as? [String: Double]
+      else { return false }
+      return (facts["contentWidth"] ?? 0) > 900
+    }
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: available, object: nil)], timeout: 10),
+      .completed, "the actual window must publish its geometry", file: file, line: line)
+    guard let value = geometry.value as? String, let data = value.data(using: .utf8),
+      let facts = try? JSONSerialization.jsonObject(with: data) as? [String: Double],
+      let frameWidth = facts["frameWidth"], let frameHeight = facts["frameHeight"],
+      let layoutWidth = facts["layoutWidth"], let layoutHeight = facts["layoutHeight"]
+    else { return XCTFail("window geometry is missing", file: file, line: line) }
+    let windowFrame = app.windows.firstMatch.frame
+    let evidence = XCTAttachment(string: "AppKit window facts: \(value); AX frame: \(windowFrame)")
+    evidence.name = "Actual window frame and content layout"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+    XCTAssertEqual(windowFrame.width, frameWidth, accuracy: 1, file: file, line: line)
+    XCTAssertEqual(windowFrame.height, frameHeight, accuracy: 1, file: file, line: line)
+    XCTAssertGreaterThan(layoutWidth, 900, "window opened at its minimum", file: file, line: line)
+    XCTAssertLessThanOrEqual(layoutHeight, frameHeight, file: file, line: line)
+    let nativeChromeHeight = frameHeight - layoutHeight
+    if let visible = NSScreen.main?.visibleFrame,
+      visible.width >= 1180, visible.height >= 760 + nativeChromeHeight
+    {
+      XCTAssertEqual(frameWidth, 1180, accuracy: 1, file: file, line: line)
+      // `.defaultSize` is a SwiftUI proposal, not an AX frame contract. The
+      // unified title/toolbar may extend the outer frame or overlap content.
+      // Bound it by the observed native chrome, without a fixed title-bar
+      // correction. This still catches a regression to the 600pt floor and
+      // retains the exact frame/content/layout facts in the attachment.
+      XCTAssertGreaterThanOrEqual(frameHeight, 760, file: file, line: line)
+      XCTAssertLessThanOrEqual(frameHeight, 760 + nativeChromeHeight, file: file, line: line)
+    }
+  }
+
   /// DONE-01 / DONE-02 / DONE-03 / DONE-07 in one pass.
   private func sweep(
     language: String, overview: Overview, flash: Flash, workspaces: Workspaces, history: History,
@@ -685,13 +1052,7 @@ final class AppShellUITests: XCTestCase {
     // was 340pt wide with all three of its columns truncated. A display too
     // small for the declared size clamps the window, so only the exact check
     // is conditional; opening at the floor is a failure on any display.
-    let windowFrame = app.windows.firstMatch.frame
-    XCTAssertGreaterThan(
-      windowFrame.width, 900, "the window opened at its minimum", file: file, line: line)
-    if let visible = NSScreen.main?.visibleFrame, visible.width >= 1180, visible.height >= 760 {
-      XCTAssertEqual(windowFrame.width, 1180, accuracy: 1, file: file, line: line)
-      XCTAssertEqual(windowFrame.height, 760, accuracy: 1, file: file, line: line)
-    }
+    assertDefaultWindowGeometry(in: app, file: file, line: line)
 
     // Overview answers its four questions on the first screen.
     XCTAssertTrue(
@@ -707,10 +1068,8 @@ final class AppShellUITests: XCTestCase {
     // sit behind a collapsed disclosure, so asserting them here asserted the
     // old design - which is what turned the nightly red.
     //
-    // They are not dropped: the Advanced Diagnostics block below already opens
-    // the disclosure with ⌘⇧D and asserts the fields inside it, and it does so
-    // from the collapsed state on purpose. Opening it here would take that
-    // precondition away. So what the first screen owes is the way in.
+    // Assert the collapsed entry first. The empty-attention branch below opens
+    // it explicitly, then restores collapse for the keyboard route at the end.
     XCTAssertTrue(
       element("overview.advanced.toggle", in: app).waitForExistenceFast(timeout: 10),
       "Overview must offer a way into the environment detail", file: file, line: line)
@@ -735,11 +1094,13 @@ final class AppShellUITests: XCTestCase {
       return
     }
     app.buttons["hdc.devices.refresh"].click()
+    app.typeKey("d", modifierFlags: [.command, .shift])
     let attentionClear = app.staticTexts["overview.attention.clear"]
     XCTAssertTrue(attentionClear.waitForExistenceFast(timeout: 10), file: file, line: line)
     assertDisplayed(attentionClear, equals: overview.attentionClear)
     assertDisplayed(
       app.staticTexts["overview.status.needsAttention.value"], equals: overview.attentionNone)
+    app.typeKey("d", modifierFlags: [.command, .shift])
 
     // Update settings live in the Settings scene, not the main window.
     XCTAssertFalse(app.buttons["update.checkNow"].exists, file: file, line: line)
@@ -1157,8 +1518,8 @@ final class AppShellUITests: XCTestCase {
     select("app.navigation.overview", in: app)
 
     // Job inspection is global rather than another navigation destination.
-    // It renders the same Runtime fixture as History and remains read-only:
-    // expanding it exposes facts and recovery guidance, never lifecycle actions.
+    // It renders the same Runtime fixture as History. The selected unknown
+    // outcome has only facts and recovery guidance, never cancel or replay.
     // Keep it at the end because AppKit may retain the expanded split view's AX
     // offset after collapse; no later sidebar navigation should depend on it.
     XCTAssertTrue(
@@ -1173,7 +1534,11 @@ final class AppShellUITests: XCTestCase {
       element("jobInspector.list", in: app).waitForExistenceFast(timeout: 10),
       file: file, line: line)
     assertDisplayed(
-      app.staticTexts[workspaces.inspectorReadOnly], equals: workspaces.inspectorReadOnly)
+      element("jobInspector.runtimeFacts", in: app), equals: workspaces.inspectorRuntimeFacts)
+    let inspectorReference = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+    inspectorReference.name = "Global Job inspector fixture \(workspaces.inspectorRuntimeFacts)"
+    inspectorReference.lifetime = .keepAlways
+    add(inspectorReference)
     XCTAssertTrue(element("jobInspector.attention", in: app).exists, file: file, line: line)
     XCTAssertTrue(
       element("jobInspector.timeline.entries", in: app).exists,
@@ -1195,7 +1560,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
 
     // The Settings scene is its own window, so it comes after every sidebar
-    // interaction. Both languages verify the six product panes and the safe controls;
+    // interaction. Both languages verify all seven panes and the safe controls;
     // the update state machine asserts English status strings, so English
     // carries that walk.
     openSettings(in: app)
@@ -1204,6 +1569,7 @@ final class AppShellUITests: XCTestCase {
         app.buttons[pane].waitForExistenceFast(timeout: 10),
         "Settings must expose the \(pane) pane", file: file, line: line)
     }
+    assertTraceSettings(in: app, title: workspaces.settingsPanes[6], file: file, line: line)
     settingsPane(workspaces.settingsPanes[1], in: app).click()
     XCTAssertTrue(
       app.buttons["settings.toolchains.choose"].waitForExistenceFast(timeout: 10),
@@ -1314,6 +1680,7 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(refresh.waitForExistenceFast(timeout: 10), file: file, line: line)
     XCTAssertEqual(refresh.label, "刷新设备", file: file, line: line)
     XCTAssertTrue(refresh.isEnabled, file: file, line: line)
+    app.typeKey("d", modifierFlags: [.command, .shift])
     app.typeKey("r", modifierFlags: .command)
     assertDisplayed(
       app.staticTexts["hdc.devices.events"],
@@ -1331,6 +1698,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(
       app.staticTexts["overview.status.needsAttention.value"], equals: overview.attentionNone,
       file: file, line: line)
+    app.typeKey("d", modifierFlags: [.command, .shift])
     writeFixtureState("", in: app, file: file, line: line)
 
     select("app.navigation.flash", in: app, file: file, line: line)
@@ -1426,7 +1794,7 @@ final class AppShellUITests: XCTestCase {
       element("jobInspector.list", in: app).waitForExistenceFast(timeout: 10),
       file: file, line: line)
     assertDisplayed(
-      app.staticTexts[workspaces.inspectorReadOnly], equals: workspaces.inspectorReadOnly)
+      element("jobInspector.runtimeFacts", in: app), equals: workspaces.inspectorRuntimeFacts)
 
     openSettings(in: app)
     for pane in workspaces.settingsPanes {
@@ -1438,8 +1806,8 @@ final class AppShellUITests: XCTestCase {
 
   /// The exact-plan fixture is presentation-only: it bypasses the system file
   /// picker so this flow can walk the complete inline review inside the
-  /// sweep's launch. The enabled one-click Flash action is never clicked, so
-  /// the fixture run exercises the one-click Loader-bind + Flash handoff only
+  /// sweep's launch. Clicking its enabled one-click Flash action exercises
+  /// the one-click Loader-bind + Flash handoff only
   /// against the in-process presentation fixture; no device transport exists.
   private func walkExactFlashPlanRunAction(
     in app: XCUIApplication, file: StaticString, line: UInt
@@ -1454,6 +1822,14 @@ final class AppShellUITests: XCTestCase {
     let details = element("flash.workspace.details", in: app)
     XCTAssertTrue(details.waitForExistenceFast(timeout: 10), file: file, line: line)
     toggleFlashDetails(in: app, file: file, line: line)
+    // The earlier History walk deliberately pinned a different, now missing
+    // target. The product must not silently select another device for it.
+    let target = app.popUpButtons["flash.target"]
+    scrollWorkspaceUntilExists(target, in: app, deltaY: -400, file: file, line: line)
+    scrollIntoView(target, in: app)
+    XCTAssertTrue(element("flash.target.historyMissing", in: app).exists, file: file, line: line)
+    target.click()
+    app.menuItems["target-fixture-dayu200"].click()
     XCTAssertTrue(
       element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
       "the fixture must materialize an exact execute plan", file: file, line: line)
@@ -1754,6 +2130,9 @@ final class AppShellUITests: XCTestCase {
   private func clickCorrectingNavigationSplitAXOffset(
     _ element: XCUIElement, in app: XCUIApplication
   ) {
+    // Coordinate clicks must target this App even if another desktop window
+    // became foreground between assertions. Do not close or alter that app.
+    app.activate()
     let window = app.windows.firstMatch
     let windowFrame = window.frame
     let toolbar = app.toolbars.firstMatch
@@ -1915,6 +2294,7 @@ final class AppShellUITests: XCTestCase {
     app.launchArguments = launchArguments + arguments
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
+    app.launchArguments += ["--ui-test-window-geometry"]
     app.launch()
     app.activate()
     let openedInitialWindow = app.windows.firstMatch.waitForExistenceFast(timeout: 2)
@@ -1938,13 +2318,37 @@ final class AppShellUITests: XCTestCase {
       element("settings.general.appIcon.keycap", in: app).waitForExistenceFast(timeout: 10))
   }
 
+  /// Trace's embedded sections use their own table in both locales.
+  private func assertTraceSettings(
+    in app: XCUIApplication, title: String,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    settingsPane(title, in: app).click()
+    XCTAssertTrue(
+      element("settings.trace.section", in: app).waitForExistenceFast(timeout: 10),
+      file: file, line: line)
+    let chinese = title == "跟踪"
+    let cache = app.radioButtons[chinese ? "缓存" : "Cache"].firstMatch
+    XCTAssertTrue(cache.waitForExistenceFast(timeout: 10), file: file, line: line)
+    cache.click()
+    XCTAssertTrue(
+      app.staticTexts[chinese ? "按内容寻址的缓存" : "Content-addressed Cache"].waitForExistenceFast(timeout: 10),
+      file: file, line: line)
+    let licenses = app.radioButtons[chinese ? "许可证" : "Licenses"].firstMatch
+    XCTAssertTrue(licenses.waitForExistenceFast(timeout: 10), file: file, line: line)
+    licenses.click()
+    XCTAssertTrue(
+      app.staticTexts[chinese ? "开源许可证" : "Open Source Licenses"].waitForExistenceFast(timeout: 10),
+      file: file, line: line)
+  }
+
   /// A Settings pane button, addressed inside the Settings window.
   ///
   /// `app.buttons["Diagnostics"]` used to be unambiguous. It stopped being so
   /// when the shell gained a Diagnostics sidebar item with the same title:
   /// XCUITest then refuses the click rather than guessing which window meant
-  /// it. Panes are toolbar items of the Settings window, so that is where they
-  /// are looked up.
+  /// it. Scope to the Settings window without requiring a private Toolbar AX
+  /// ancestor; window ownership remains stable across native tab layouts.
   private func settingsPane(
     _ title: String, in app: XCUIApplication,
     file: StaticString = #filePath, line: UInt = #line
@@ -1953,7 +2357,7 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       window.waitForExistenceFast(timeout: 10), "Settings window must be open",
       file: file, line: line)
-    let pane = window.toolbars.buttons[title]
+    let pane = window.buttons[title]
     XCTAssertTrue(
       pane.waitForExistenceFast(timeout: 10), "Settings pane \(title) must exist",
       file: file, line: line)

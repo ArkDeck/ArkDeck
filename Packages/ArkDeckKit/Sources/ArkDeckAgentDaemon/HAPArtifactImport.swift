@@ -19,7 +19,7 @@ enum HAPArtifactImportError: Error, Equatable, CustomStringConvertible {
   var description: String {
     switch self {
     case .invalidName:
-      return "HAP name must be a safe .hap basename"
+      return "Package name must be a safe .hap or .hsp basename"
     case .invalidByteCount:
       return "HAP byteCount must be 1...\(HAPArtifactImportCoordinator.maximumHAPBytes)"
     case .invalidSHA256:
@@ -39,7 +39,7 @@ enum HAPArtifactImportError: Error, Equatable, CustomStringConvertible {
     case .digestMismatch:
       return "HAP import sha256 does not match the declared digest"
     case .invalidHAPContainer:
-      return "HAP import is not a ZIP-based .hap container"
+      return "Package import is not a ZIP-based .hap or .hsp container"
     }
   }
 }
@@ -173,10 +173,7 @@ actor HAPArtifactImportCoordinator {
   }
 
   private static func isSafeHAPName(_ name: String) -> Bool {
-    name.count <= 128
-      && name.range(
-        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.hap$"#,
-        options: .regularExpression) != nil
+    DebugHAPPackageSelection.isSafeName(name, allowsHSP: true)
   }
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {

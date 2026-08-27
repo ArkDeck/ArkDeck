@@ -1,4 +1,4 @@
-import { NavItem } from "@arkdeck/ds";
+import { NavItem, Symbol } from "@arkdeck/ds";
 
 const sidebar = {
   width: 200,
@@ -24,14 +24,17 @@ const sectionLabel = {
 /** 侧栏功能导航全表 —— 选中行是整个侧栏里唯一使用 accent 的元素。 */
 export const SidebarNav = () => (
   <div style={sidebar}>
-    <span style={sectionLabel}>功能</span>
-    <NavItem icon="◎" label="Overview" />
-    <NavItem icon="⚡" label="Flash" active />
-    <NavItem icon="🐞" label="Debug" />
-    <NavItem icon="🌲" label="UI Dump" />
-    <NavItem icon="📈" label="Trace" />
-    <NavItem icon="🗂" label="History" />
-    <NavItem icon="⚙" label="Settings" />
+    <span style={sectionLabel}>设备</span>
+    <NavItem icon={<Symbol name="overview" />} label="Overview" />
+    <span style={sectionLabel}>工作流</span>
+    <NavItem icon={<Symbol name="flash" />} label="Flash" active />
+    <NavItem icon={<Symbol name="debug" />} label="Debug" />
+    <NavItem icon={<Symbol name="dump" />} label="Viewer" />
+    <NavItem icon={<Symbol name="trace" />} label="Trace" />
+    <NavItem icon={<Symbol name="device" />} label="Device" />
+    <NavItem icon={<Symbol name="diagnostics" />} label="Diagnostics" />
+    <span style={sectionLabel}>记录</span>
+    <NavItem icon={<Symbol name="history" />} label="History" />
   </div>
 );
 
@@ -39,10 +42,10 @@ export const SidebarNav = () => (
 export const ActiveVsInactive = () => (
   <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
     <div style={{ width: 180 }}>
-      <NavItem icon="🗂" label="History" active />
+      <NavItem icon={<Symbol name="history" />} label="History" active />
     </div>
     <div style={{ width: 180 }}>
-      <NavItem icon="🗂" label="History" />
+      <NavItem icon={<Symbol name="history" />} label="History" />
     </div>
   </div>
 );
@@ -50,13 +53,16 @@ export const ActiveVsInactive = () => (
 /** History 停留态 —— 导航切页不改变目标设备,也不改变正在运行的任务。 */
 export const SidebarNavOnHistory = () => (
   <div style={sidebar}>
-    <span style={sectionLabel}>功能</span>
-    <NavItem icon="◎" label="Overview" />
-    <NavItem icon="⚡" label="Flash" />
-    <NavItem icon="🐞" label="Debug" />
-    <NavItem icon="🌲" label="UI Dump" />
-    <NavItem icon="📈" label="Trace" />
-    <NavItem icon="🗂" label="History" active />
-    <NavItem icon="⚙" label="Settings" />
+    <span style={sectionLabel}>设备</span>
+    <NavItem icon={<Symbol name="overview" />} label="Overview" />
+    <span style={sectionLabel}>工作流</span>
+    <NavItem icon={<Symbol name="flash" />} label="Flash" />
+    <NavItem icon={<Symbol name="debug" />} label="Debug" />
+    <NavItem icon={<Symbol name="dump" />} label="Viewer" />
+    <NavItem icon={<Symbol name="trace" />} label="Trace" />
+    <NavItem icon={<Symbol name="device" />} label="Device" />
+    <NavItem icon={<Symbol name="diagnostics" />} label="Diagnostics" />
+    <span style={sectionLabel}>记录</span>
+    <NavItem icon={<Symbol name="history" />} label="History" active />
   </div>
 );

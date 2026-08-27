@@ -1,8 +1,16 @@
 # design-sync notes — ArkDeck
 
-> **Current sync target: design v0.9 (2026-08-23).** The authoritative files are
+> v1.6 current-surface audit: `docs/design/implementation-audit-2026-08-27.md`.
+> Eight App destinations include Device and Diagnostics, not Automation; Settings has seven tabs.
+> App JobInspector now reads exact Job details and standard log tails and requests bounded cancellation.
+> Recovery rebind/archive controls remain unconnected; old Harness examples are retired (CHG-2026-064).
+> Diagnostics reads saved bounded sessions with verified artifacts; interactive arm/append/stop is unavailable.
+> Overview prepares new drafts only for validated read-only captures; no old authority or Session identity is reused.
+> Local single-file and read-only SSH artifact import are implemented; SMB/WSL/batch/abc are not.
+
+> **Current sync target: design v1.6 (2026-08-27).** The authoritative files are
 > `docs/design/macos-ux-interaction-spec.md` and `docs/design/prototype.html`.
-> `docs/design/arkdeck-ds/scripts/check-tokens.mjs` pins `ALIGNED_VERSION = "v0.9"`.
+> `docs/design/arkdeck-ds/scripts/check-tokens.mjs` pins `ALIGNED_VERSION = "v1.6"`.
 > The paragraphs below that mention v0.2/v0.3 describe the historical first-sync
 > incident; they are not the current design version.
 
@@ -35,7 +43,7 @@ each drift kind. It catches seven things:
 
 1. any mapped token whose value differs from the prototype's;
 2. a docs version bump (`ALIGNED_VERSION` in the script pins the current design version —
-   v0.9 as of 2026-08-23 — and must be bumped only after
+   v1.6 as of 2026-08-27 — and must be bumped only after
    re-reading §2 and §1, which is the acknowledgement step that was missing the first time);
 3. a token added to the prototype that this package neither mirrors nor explicitly declines;
 4. a token this package re-themes in dark that the prototype doesn't, or vice versa
@@ -54,8 +62,9 @@ each drift kind. It catches seven things:
    somebody hand-diffed the two prototypes. The check also fails if a mapping
    names a component the package doesn't export, or if the prototype drops a
    class still mapped. **`KNOWN_GAPS` prints on every run** when it has
-   entries — it is **empty today**: every surface the prototype draws has a
-   component. It started at eight (Recovery banner, Job inspector, form
+   entries — it is **empty today**: all declared ArkDeck shared surfaces have
+   components. Page layout and the upstream-owned ArkTrace canvas illustration
+   are explicitly classified as scaffolding. It started at eight (Recovery banner, Job inspector, form
    controls) and was worked down deliberately. Put the next gap there rather
    than leaving a class unclassified, so it stays visible instead of becoming
    the kind of silent hole this rule exists to prevent.
@@ -277,8 +286,8 @@ so it fills its own row when used alone and yields when used beside text, and
   Build-source kinds are `ssh / directory / smb / wsl`; SSH authentication is
   `password / key`. Hidden connector/auth branches stay inert, and secrets are never
   copied into visible summaries, Jobs, logs, or Artifact evidence.
-  Artifact-source browsing, `.abc` replacement and a separate device restart are
-  v0.9 design inputs, not current production availability; every composed screen
+  Read-only SSH artifact browsing and local single-file import are shipped. SMB/WSL,
+  batch and `.abc` replacement and a separate device restart are design inputs; every composed screen
   must retain that boundary instead of presenting the proposal as shipped.
 - The History device filter list is *derived* from the session list, so its real
   membership is 全部 / DAYU200 / SIM-fixture-a3 — a simulated fixture sits in the
@@ -344,16 +353,15 @@ Flash execution-mode previews with real-execution-only image/progress/result exa
 and removed stale rk3568 / flashd product literals from the preview set. The local
 package build, token/version guard and all preview TSX bundles pass. Any previously
 published remote component sheet remains a historical snapshot until the documented
-resync command is run; when they disagree, this repository's current v0.9 spec and
+resync command is run; when they disagree, this repository's current v1.6 spec and
 prototype remain authoritative (the paragraph above records what the v0.6 alignment
 changed historically).
 
 ## Re-sync risks
 
-- **The package is hand-maintained and can drift from the spec.** Nothing checks that
-  `src/tokens.css` still matches `macos-ux-interaction-spec.md` §1, or that a component
-  added to `prototype.html` exists here. Before trusting a re-sync, diff the token
-  block against the spec table.
+- **The package is hand-maintained and can drift from the spec.** `check-tokens.mjs` checks version, token and top-level class coverage.
+  That does not prove behavioral parity or Runtime wiring; use the full-page audit
+  and executable interaction tests before trusting a re-sync.
 - **The prototype is the composition source for the previews.** Preview `.tsx` files
   under `.design-sync/previews/` were written from `docs/design/prototype.html` usage.
   If the prototype's interaction paths change materially, the previews illustrate a
@@ -378,3 +386,14 @@ changed historically).
   ignored) — but the skill's documented commands use `./ds-bundle`, so the local
   exclude keeps this repo consistent with the skill. Either way, **never `git add -A`
   mid-sync without checking**: an unignored `ds-bundle/` is ~100 generated files.
+
+## v1.6 follow-up component closure
+
+The 25 declared Diagnostics/Device mappings now resolve to 24 exported controlled
+components in `src/components/session.tsx` (the production-boundary callout is
+shared). `.design-sync/previews/SessionSurfaces.tsx` is the 31st preview.
+Run `npm run build && npm run build:review` in `docs/design/arkdeck-ds`, then open
+`docs/design/session-components.html?lang=en&appearance=dark` through a local server.
+All states are synthetic, including failed screenshots and unknown input outcomes;
+the gallery has no Runtime, recording or export connection. These local artifacts
+do not imply that the remote design library has been synchronized.

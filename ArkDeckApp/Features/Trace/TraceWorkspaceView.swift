@@ -547,7 +547,9 @@ final class TraceWorkspaceViewModel {
   /// trace Artifact. Analyzer records still restore their context banner but
   /// are not mistaken for a raw capture.
   func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
-    guard context.workspaceKind == .trace else { return }
+    guard context.workspaceKind == .trace
+      || context.operationReference == TraceApplicationFacade.operationReference
+    else { return }
     historyPinnedTargetID = context.targetID
     selectedTargetID = context.targetID
     viewerReadGeneration &+= 1
@@ -557,11 +559,13 @@ final class TraceWorkspaceViewModel {
     latestViewerArtifactName = nil
     guard context.operationReference == TraceApplicationFacade.operationReference else { return }
     Task { [weak self] in
-      await self?.openPublishedTrace(jobID: context.jobID, requestGeneration: generation)
+      await self?.openPublishedTrace(jobID: context.jobID, requestGeneration: generation, expectedContext: context)
     }
   }
 
-  private func openPublishedTrace(jobID: String, requestGeneration: Int? = nil) async {
+  private func openPublishedTrace(
+    jobID: String, requestGeneration: Int? = nil, expectedContext: RuntimeHistoryWorkspaceContext? = nil
+  ) async {
     if let requestGeneration {
       guard viewerReadGeneration == requestGeneration else { return }
     } else {
@@ -578,6 +582,17 @@ final class TraceWorkspaceViewModel {
       jobID: jobID,
       operationReference: TraceApplicationFacade.operationReference)
     guard !Task.isCancelled, viewerReadGeneration == generation else { return }
+    if let expectedContext {
+      guard detail.jobID == expectedContext.jobID,
+        detail.correlation?.jobID == expectedContext.jobID,
+        detail.correlation?.targetID == expectedContext.targetID,
+        detail.correlation?.sessionID == expectedContext.sessionID,
+        detail.correlation?.operationReference == expectedContext.operationReference
+      else {
+        viewerArtifactFailure = traceString("trace.viewer.artifactListUnavailable")
+        return
+      }
+    }
     guard case .available = detail.artifactAvailability else {
       viewerArtifactFailure = traceString("trace.viewer.artifactListUnavailable")
       return

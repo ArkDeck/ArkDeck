@@ -1,6 +1,14 @@
-## Building with ArkDeck — design v0.9
+## Building with ArkDeck — design v1.6
 
-> Current design: **draft v0.9, 2026-08-23**. Authority order for design work is
+> v1.6 current-surface audit: `docs/design/implementation-audit-2026-08-27.md`.
+> Eight App destinations include Device and Diagnostics, not Automation; Settings has seven tabs.
+> App JobInspector now reads exact Job details and standard log tails and requests bounded cancellation.
+> Recovery rebind/archive controls remain unconnected; old Harness examples are retired (CHG-2026-064).
+> Diagnostics reads saved bounded sessions with verified artifacts; interactive arm/append/stop is unavailable.
+> Overview prepares new drafts only for validated read-only captures; no old authority or Session identity is reused.
+> Local single-file and read-only SSH artifact import are implemented; SMB/WSL/batch/abc are not.
+
+> Current design: **draft v1.6, 2026-08-27**. Authority order for design work is
 > `docs/design/macos-ux-interaction-spec.md` → `docs/design/prototype.html` →
 > `docs/design/arkdeck-ds` → `.design-sync/previews`. If a preview conflicts with
 > the spec or prototype, the preview is stale. v0.9 keeps the v0.6 Flash and v0.8

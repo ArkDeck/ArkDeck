@@ -1,0 +1,92 @@
+{
+  "date": "2026-08-28",
+  "baseline": "e1d52e68db435bdfeb326962767ca4626a77322b",
+  "command": "ARKDECK_TEST_WORKERS=4 python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+  "exitCode": 0,
+  "swiftLanes": [
+    {
+      "lane": "full-parallel",
+      "exitCode": 0,
+      "testCount": 1826,
+      "durationSeconds": 1193
+    },
+    {
+      "lane": "full-process-identity-race",
+      "exitCode": 0,
+      "testCount": 1,
+      "durationSeconds": 24
+    },
+    {
+      "lane": "full-viewer-scale",
+      "exitCode": 0,
+      "testCount": 5,
+      "durationSeconds": 20
+    }
+  ],
+  "totalScheduledSwiftTests": 1832,
+  "appAndUITestBundle": "TEST BUILD SUCCEEDED",
+  "localLogSHA256": "6cda9f26948ea7739faa8d78a077c5c275677f6c91a00d3e12886e0702e4bb16",
+  "designInteractions": {
+    "exitCode": 0,
+    "logSHA256": "63c95f782fb370d474e3c2eb8a746fcc590f0e63dfa15161f3dca8af14418000",
+    "count": 40
+  },
+  "designBuild": {
+    "exitCode": 0,
+    "logSHA256": "7f5cd66082157ee64912dd10a1de1840b680ea4643e8a4d78decafa2efa1447c"
+  },
+  "boundary": "Full Swift and final App/UI bundle lanes passed; the App build includes the final accessibility column/optional-package/row groups. Later prototype-only Mark replacement/colour/band changes passed 40 design interactions, design build and 7 existing Debug/ViewerTrace synchronization contracts. UI automation and hardware outcomes are recorded separately; no F28 installed-cache, HSP device or Flash acceptance is implied.",
+  "previousGate": {
+    "date": "2026-08-28",
+    "baseline": "e1d52e68db435bdfeb326962767ca4626a77322b",
+    "command": "ARKDECK_TEST_WORKERS=4 python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "swiftLanes": [
+      {
+        "lane": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1826,
+        "durationSeconds": 1492
+      },
+      {
+        "lane": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1,
+        "durationSeconds": 25
+      },
+      {
+        "lane": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5,
+        "durationSeconds": 24
+      }
+    ],
+    "totalScheduledSwiftTests": 1832,
+    "appAndUITestBundle": "TEST BUILD SUCCEEDED",
+    "localLogSHA256": "40b26f950c04a4485ff8f2dbc456d0b1254c576d3f0b7b12cbe908ba73f7ef7e",
+    "designInteractions": {
+      "count": 40,
+      "exitCode": 0,
+      "logSHA256": "349bec05dddc0109ef792e0ec5aea7fd237326b22740de4bb2b99385afc8f995"
+    },
+    "designBuild": {
+      "exitCode": 0,
+      "logSHA256": "b7150b99b7e6a4c112b7a23a417afdef87afcbcaed2b602581902e52e370d432"
+    },
+    "boundary": "Full product-code lanes include F28–F30. F31 changes only prototype, design tests and references, checked separately by Node interactions and token/types/JS/CSS build. This does not imply native UI assertions or hardware acceptance of F28/HSP/Flash."
+  },
+  "designSynchronizationContracts": {
+    "exitCode": 0,
+    "logSHA256": "24a8b1bff3572e3104bc2ad0b5854b779bec606e6f0bcaeaf42d3b7b58a394a7",
+    "count": 7
+  },
+  "previewBundles": {
+    "exitCode": 0,
+    "logSHA256": "b59b1042c1cd2484c40f2d9262f96ead3062497124263e696c032f2955d1464e",
+    "count": 31
+  },
+  "reviewGalleryBuild": {
+    "exitCode": 0,
+    "logSHA256": "548e75fe0cc63c3811035509a560f8a07888ccb3257e5f9cc8e8d9ea492a9613"
+  }
+}

@@ -13,6 +13,163 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class OverviewRunRecordContractTests: XCTestCase {
+  func testContinuationCopiesTypedInputsAndThreadButCreatesNewRequestIdentity() throws {
+    let job = DiagnosticSessionUIFixture.job
+    let draft = try RuntimeWorkspaceContinuation.prepare(
+      job: job, detail: DiagnosticSessionUIFixture.detail(),
+      currentTargetID: job.targetID, currentBindingRevision: 3).get()
+    let first = try draft.request(nonce: "first-request")
+    let second = try draft.request(nonce: "second-request")
+    XCTAssertEqual(first.inputs, ["durationSeconds": .integer(10), "captureHilog": .bool(true), "uiDump": .bool(false)])
+    XCTAssertEqual(first.clientContext?.threadID, job.threadID)
+    XCTAssertEqual(first.clientContext?.provenance?["arkdeck.continuedFromJob"], job.id)
+    XCTAssertNotEqual(first.requestID, second.requestID)
+    XCTAssertNotEqual(first.idempotencyKey, second.idempotencyKey)
+    XCTAssertNil(first.authorization)
+    XCTAssertNil(first.campaignReservation)
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(first)) as? [String: Any])
+    XCTAssertNil(json["sessionId"], "a thread must not become a Runtime session identity")
+  }
+
+  func testContinuationRefusesBindingAndTargetDrift() throws {
+    let job = DiagnosticSessionUIFixture.job
+    let detail = try DiagnosticSessionUIFixture.detail()
+    for (target, binding) in [(job.targetID, Optional(4)), ("other-target", Optional(3)), (job.targetID, nil)] {
+      let result = RuntimeWorkspaceContinuation.prepare(
+        job: job, detail: detail, currentTargetID: target, currentBindingRevision: binding)
+      guard case .failure(let failure) = result else { return XCTFail("drift was accepted") }
+      XCTAssertEqual(failure.reason, "continuation_target_or_binding_changed")
+    }
+  }
+
+  func testContinuationRefusesMutationOldMarkerTimesAndMalformedTypedInputs() throws {
+    let job = DiagnosticSessionUIFixture.job
+    let cases: [[String: Any]] = [
+      ["durationSeconds": 10, "uiScreenshot": true],
+      ["durationSeconds": 10, "traceCategories": ["ace"]],
+      ["durationSeconds": 10, "markers": ["2026-08-27T08:00:00Z#old"]],
+      ["durationSeconds": "10"], ["durationSeconds": 601],
+      ["durationSeconds": 10, "artifactLease": "old-lease"],
+    ]
+    func response(_ result: Any) throws -> RuntimeHistoryTransportResult {
+      .success(try JSONSerialization.data(withJSONObject: ["ok": true, "result": result]))
+    }
+    for inputs in cases {
+      let detail = RuntimeJobDetailResponseDecoding.presentation(
+        jobID: job.id, operationReference: job.operationReference,
+        statusResponse: try response([
+          "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
+          "sessionId": job.sessionID!, "timeline": [],
+        ]),
+        evidenceResponse: try response([
+          "jobId": job.id, "operationReference": job.operationReference,
+          "catalogDigest": String(repeating: "a", count: 64), "providerId": "hdc",
+          "executionMode": "execute", "terminalState": "succeeded", "actualEffect": "readOnly",
+          "bindingRevision": 3, "parameters": inputs,
+        ]), artifactResponse: try response([]))
+      let result = RuntimeWorkspaceContinuation.prepare(
+        job: job, detail: detail, currentTargetID: job.targetID, currentBindingRevision: 3)
+      guard case .failure = result else { return XCTFail("accepted unsafe or invalid draft: \(inputs)") }
+    }
+  }
+
+  private func continuationResponse(_ value: Any) throws -> RuntimeHistoryTransportResult {
+    .success(try JSONSerialization.data(withJSONObject: ["ok": true, "result": value]))
+  }
+
+  private func continuationSourceStatus() -> [String: Any] {
+    let job = DiagnosticSessionUIFixture.job
+    return [
+      "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
+      "sessionId": job.sessionID!, "state": job.state, "outcomeUnknown": false,
+    ]
+  }
+
+  private func continuationDraft() throws -> RuntimeWorkspaceContinuation {
+    try RuntimeWorkspaceContinuation.prepare(
+      job: DiagnosticSessionUIFixture.job, detail: DiagnosticSessionUIFixture.detail(),
+      currentTargetID: DiagnosticSessionUIFixture.job.targetID, currentBindingRevision: 3).get()
+  }
+
+  func testContinuationFreshChecksPrecedeSubmissionAndRunIsOneShot() async throws {
+    let source = DiagnosticSessionUIFixture.job
+    let transport = HistoryRPCScenario([
+      ("target.list", try continuationResponse([["targetId": source.targetID, "bindingRevision": 3]])),
+      ("job.status", try continuationResponse(continuationSourceStatus())),
+      ("job.submit", try continuationResponse(["jobId": "job-new", "deduplicated": false])),
+      ("job.run", try continuationResponse([
+        "jobId": "job-new", "operation": source.operationReference, "targetId": source.targetID,
+        "state": "succeeded", "outcomeUnknown": false,
+      ])),
+    ])
+    let provider = RuntimeContinuationXPCProvider(
+      reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
+      request: { await transport.request($0, $1) })
+    let submission = await provider.submit(try continuationDraft())
+    XCTAssertEqual(try submission.get(), "job-new")
+    let first = await provider.run(jobID: "job-new")
+    XCTAssertEqual(try first.get(), "succeeded")
+    guard case .failure = await provider.run(jobID: "job-new") else { return XCTFail("run was dispatched twice") }
+    let calls = await transport.recordedCalls()
+    XCTAssertEqual(calls.map(\.0), ["target.list", "job.status", "job.submit", "job.run"])
+    guard case .string(let requestJSON)? = calls[2].1["requestJson"] else { return XCTFail("missing typed request") }
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(requestJSON.utf8)) as? [String: Any])
+    XCTAssertNil(json["sessionId"])
+    XCTAssertNil(json["authorization"])
+    XCTAssertNil(json["campaignReservation"])
+    XCTAssertEqual(calls[3].1, ["jobId": .string("job-new")])
+  }
+
+  func testContinuationFreshBindingDriftAndForeignRunReadNoNewJob() async throws {
+    let transport = HistoryRPCScenario([
+      ("target.list", try continuationResponse([["targetId": DiagnosticSessionUIFixture.job.targetID, "bindingRevision": 4]])),
+      ("job.status", try continuationResponse(continuationSourceStatus())),
+    ])
+    let provider = RuntimeContinuationXPCProvider(
+      reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
+      request: { await transport.request($0, $1) })
+    guard case .failure = await provider.run(jobID: DiagnosticSessionUIFixture.job.id) else {
+      return XCTFail("historical Job reached run")
+    }
+    let initial = await transport.recordedCalls()
+    XCTAssertTrue(initial.isEmpty)
+    guard case .failure = await provider.submit(try continuationDraft()) else { return XCTFail("binding drift reached submit") }
+    let calls = await transport.recordedCalls()
+    XCTAssertEqual(calls.map(\.0), ["target.list", "job.status"])
+  }
+
+  func testContinuationRejectsDeduplicationAndDoesNotRetryUnknownRunOutcome() async throws {
+    let source = DiagnosticSessionUIFixture.job
+    for deduplicated in [true, false] {
+      var answers: [(String, RuntimeHistoryTransportResult)] = [
+        ("target.list", try continuationResponse([["targetId": source.targetID, "bindingRevision": 3]])),
+        ("job.status", try continuationResponse(continuationSourceStatus())),
+        ("job.submit", try continuationResponse(["jobId": "job-new", "deduplicated": deduplicated])),
+      ]
+      if !deduplicated {
+        answers.append(("job.run", try continuationResponse([
+          "jobId": "job-new", "operation": source.operationReference, "targetId": source.targetID,
+          "state": "waitingForRecovery", "outcomeUnknown": true,
+        ])))
+      }
+      let transport = HistoryRPCScenario(answers)
+      let provider = RuntimeContinuationXPCProvider(
+        reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
+        request: { await transport.request($0, $1) })
+      let result = await provider.submit(try continuationDraft())
+      if deduplicated {
+        guard case .failure = result else { return XCTFail("deduplicated Job became a new continuation") }
+      } else {
+        XCTAssertEqual(try result.get(), "job-new")
+      }
+      for _ in 0..<2 {
+        guard case .failure = await provider.run(jobID: "job-new") else { return XCTFail("unknown result was retried") }
+      }
+      let calls = await transport.recordedCalls()
+      XCTAssertEqual(calls.filter { $0.0 == "job.run" }.count, deduplicated ? 0 : 1)
+    }
+  }
+
   private func job(
     _ id: String,
     thread: String? = nil,

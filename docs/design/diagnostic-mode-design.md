@@ -53,6 +53,22 @@
 
 ## 2. 当前产品边界
 
+2026-08-27 后续修正：保存会话的生产读取链已接通。History 传递 exact Job / operation /
+Session / target；reader 重新查询来源详情，读取并校验 index、summary、markers 的 byteCount / SHA-256，
+再发布到独立 Diagnostics 工作区。页面提供 loading / retry / partial、原始 timeline、untimed Marker、
+notDerived、Artifact 元数据、显式文本读取和已发布 Trace 的转交入口。JPEG 与 PNG 都可满足截图通道，
+但不会给截图补造采集时刻。敏感 raw 不会在导航时读取。
+
+含 UI Dump 或 Trace 的同一次采集仍保留 Runtime 原始 Viewer / Trace 分类；History 在
+`capture.diagnostics@1` 的原工作区入口旁另提供「打开诊断工具」。这只把同一不可变上下文交给
+Diagnostics reader，不改写原分类、target、binding 或参数，也不提交新 Job。由该 reader 打开
+Trace 时仍展示同一 History 来源，不能因原分类是 Viewer 而丢失关联。
+
+交互式布防/追加 Marker/停止仍未发布为可调用的会话操作。App 保持禁用并显示
+`diagnostic_session_capture_not_connected`，没有“本地已布防”状态。无时钟校准时固定显示“无法对齐”；
+自动 Marker 没有时间字段时显示“未记录时刻”。以下完整联动体验仍是目标设计。
+详细证据见 [`implementation-audit-2026-08-27.md`](implementation-audit-2026-08-27.md)。
+
 当前已发布的 `capture.diagnostics@1` 可以在一个 bounded Job 中产出 `hilog.txt`、`ui-dump.json`、`ui-tree.json`、`screenshot.png`、`trace.htrace`、`capture.log`、`artifact-index.json` 与 `capture-summary.json` 等 Artifact。它已经解决精确 target/binding、typed inputs、Artifact 校验和本地保存问题。
 
 它尚未提供以下目标能力：
@@ -61,15 +77,15 @@
 | --- | --- |
 | 屏幕视频 Artifact | 只能看到单张截图，无法逐帧回放复现过程 |
 | 多 channel 并发 arm/stop 证明 | 现有 Artifact 同属一个 Job，不等于采集区间天然重合；当前 lowering 甚至是顺序执行（hilog drain 在前、trace 阻塞在后），两者并不覆盖同一区间 |
-| 环形缓冲 / 回溯窗口 | 无法在“问题已经出现之后”回头保存问题前的现场；Marker 的取证价值取决于此（设备侧 `hitrace` 环形模式待真机确认） |
+| 交互式回溯会话 | published `ringBuffered` 已支持有界环形采集；这不等于 App 可在运行中 arm/append-marker/stop。完整交互式会话仍缺操作与并发证明 |
 | 会话内并发准入 | 采集会话 Job 持有 per-device mutation lane；Marker 截图与 Device 输入在会话期间会被结构性阻塞，需要新的 in-session 准入语义 |
 | source clock calibration | 无法给出 Trace、视频 PTS 与 HiLog 之间的误差上界；Marker 位于 host 时域，还需要 host↔device 校准 |
-| Marker track | 用户无法在问题出现时留下稳定时间锚点 |
+| 动态 Marker track | published markers.json 已含请求时给定的手动标记和部分自动标记；运行中追加标记及事后截图时刻尚无完整闭环 |
 | frame/log linkage index | Viewer 需要临时猜测或全文件扫描，无法稳定联动 |
 
 另有两个与设计声明冲突的 Runtime 事实必须在实现前对齐：`uiScreenshot` 腿在当前 Catalog 中会把作业升级为 deviceMutation（截图不是 read-only）；`hilog -x` 是一次性缓冲区 drain 而非持续采集——后者恰好是回溯窗口可以直接利用的性质。
 
-因此，本轮原型表达的是目标体验，不声称这些能力已经 production available。后续实现若新增 operation，或改变已发布 operation 的行为与 Artifact 契约，必须按仓库规则走对应 OpenSpec change + PR；不能只把原型按钮接到 raw command。
+因此，默认原型与保存会话状态镜像当前读取能力；`concept=diagnostics` 才展示未来完整体验。后续实现若新增 operation，或改变已发布 operation 的行为与 Artifact 契约，必须按仓库规则走对应 OpenSpec change + PR；不能只把原型按钮接到 raw command。
 
 ## 3. 产品心智：一个 Session，多个有证据边界的 Track
 
@@ -295,7 +311,9 @@ Derived Artifact 必须记录 source hash、tool identity、参数、size 和 ha
 - 200% text/zoom 和 900×600 下，主操作、当前画面 metadata、对齐状态和日志内容仍可达；布局按“当前画面 → 时间上下文 → Timeline”单列重排。
 - 中英文使用完整本地化字符串；时间、bytes、duration 按 locale 格式化，ID/hash 使用 monospaced 与 tabular numbers。
 
-## 11. 原型走查
+## 11. 未来概念走查
+
+入口必须带 `prototype.html?page=diagnostics&concept=diagnostics`；普通 Diagnostics 页面展示当前不可用状态。
 
 `prototype.html?page=diagnostics` 默认打开**第一版默认形态的演示 Session（无录屏、仅 Marker 截图）**，另有「含录屏」与「Partial + 无法对齐」两个 Session，并必须支持：
 

@@ -2084,7 +2084,8 @@ final class AgentDaemonContractTests: XCTestCase {
     // atomic record write needs to create a temporary file in the job's own
     // directory. This is a real failure of the persistence `requestCancel`
     // performs, not a stubbed error.
-    let jobDirectory = stateDirectory
+    let jobDirectory =
+      stateDirectory
       .appending(path: "engine", directoryHint: .isDirectory)
       .appending(path: "jobs", directoryHint: .isDirectory)
       .appending(path: jobID, directoryHint: .isDirectory)
@@ -2498,7 +2499,8 @@ final class AgentDaemonContractTests: XCTestCase {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-26T00:00:00Z" })
-    let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 7, count: 24)
+    let png =
+      Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 7, count: 24)
     let published = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
         jobID: "job-device-index-001", sessionID: "session-device-index-001",
@@ -2780,126 +2782,132 @@ final class AgentDaemonContractTests: XCTestCase {
       nowUTC: { "2026-07-29T00:00:00Z" })
     let (handler, _) = try makeStack(
       targetStore: targetStore, artifactStore: artifactStore)
-    let hap = Data([0x50, 0x4b, 0x03, 0x04]) + Data(repeating: 0x41, count: 700_000)
-    let digest = SHA256.hash(data: hap)
-      .map { String(format: "%02x", $0) }.joined()
+    for (name, fill) in [("entry-default-signed.hap", UInt8(0x41)), ("shared.hsp", UInt8(0x42))] {
+      let hap = Data([0x50, 0x4b, 0x03, 0x04]) + Data(repeating: fill, count: 700_000)
+      let digest = SHA256.hash(data: hap)
+        .map { String(format: "%02x", $0) }.joined()
 
-    let begin = try await request(
-      handler,
-      method: "artifact.importHap.begin",
-      params: [
-        "targetId": .string(target.targetID),
-        "name": .string("entry-default-signed.hap"),
-        "byteCount": .integer(Int64(hap.count)),
-        "sha256": .string(digest),
-      ])
-    XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
-    guard case .object(let beginFields)? = begin.result,
-      case .string(let uploadID)? = beginFields["uploadId"]
-    else {
-      return XCTFail("begin must return an upload identity")
-    }
-
-    let boundary = 400_000
-    for (offset, bytes) in [
-      (0, hap.subdata(in: 0..<boundary)),
-      (boundary, hap.subdata(in: boundary..<hap.count)),
-    ] {
-      let append = try await request(
+      let begin = try await request(
         handler,
-        method: "artifact.importHap.append",
+        method: "artifact.importHap.begin",
         params: [
-          "uploadId": .string(uploadID),
-          "offset": .integer(Int64(offset)),
-          "base64": .string(bytes.base64EncodedString()),
+          "targetId": .string(target.targetID),
+          "name": .string(name),
+          "byteCount": .integer(Int64(hap.count)),
+          "sha256": .string(digest),
         ])
-      XCTAssertTrue(append.ok, append.error?.message ?? "-")
+      XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
+      guard case .object(let beginFields)? = begin.result,
+        case .string(let uploadID)? = beginFields["uploadId"]
+      else {
+        return XCTFail("begin must return an upload identity")
+      }
+
+      let boundary = 400_000
+      for (offset, bytes) in [
+        (0, hap.subdata(in: 0..<boundary)),
+        (boundary, hap.subdata(in: boundary..<hap.count)),
+      ] {
+        let append = try await request(
+          handler,
+          method: "artifact.importHap.append",
+          params: [
+            "uploadId": .string(uploadID),
+            "offset": .integer(Int64(offset)),
+            "base64": .string(bytes.base64EncodedString()),
+          ])
+        XCTAssertTrue(append.ok, append.error?.message ?? "-")
+      }
+
+      let commit = try await request(
+        handler,
+        method: "artifact.importHap.commit",
+        params: ["uploadId": .string(uploadID)])
+      XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
+      guard case .object(let fields)? = commit.result,
+        case .string(let jobID)? = fields["jobId"],
+        case .string(let artifactID)? = fields["artifactId"],
+        case .string(let lease)? = fields["lease"],
+        case .string(let returnedDigest)? = fields["sha256"],
+        case .string(let returnedTarget)? = fields["targetId"],
+        case .integer(let returnedRevision)? = fields["bindingRevision"],
+        case .string(let returnedIdentity)? = fields["stableIdentitySha256"]
+      else {
+        return XCTFail("commit must return the Artifact identity and lease")
+      }
+      XCTAssertEqual(returnedDigest, digest)
+      XCTAssertEqual(returnedTarget, target.targetID)
+      XCTAssertEqual(returnedRevision, Int64(target.bindingRevision))
+      XCTAssertEqual(returnedIdentity, aliasIdentity)
+      XCTAssertTrue(jobID.contains(String(aliasIdentity.prefix(16))))
+      XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
+      XCTAssertFalse(lease.contains(stateDirectory.path))
+
+      let metadata = try await artifactStore.inspect(
+        jobID: jobID, artifactID: artifactID)
+      XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
+      XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
+      // The lease binds the HDC provider's proven post-Flash route, not the
+      // canonical target's historical connect key or store identity.
+      XCTAssertEqual(
+        metadata.bindingSnapshot.stableIdentitySHA256,
+        aliasIdentity)
+      XCTAssertNotEqual(
+        metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity,
+        "the store identity must not leak into an HDC-consumed lease")
+      XCTAssertNotEqual(
+        metadata.bindingSnapshot.stableIdentitySHA256,
+        HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey),
+        "the canonical target's historical address must not override a proven alias route")
+      XCTAssertEqual(metadata.name, name)
+      XCTAssertEqual(
+        metadata.mediaType,
+        name.hasSuffix(".hsp")
+          ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap")
+      let resolution = try await artifactStore.resolveLease(lease)
+      XCTAssertEqual(resolution.sha256, digest)
+      XCTAssertEqual(resolution.byteCount, hap.count)
+      XCTAssertEqual(try Data(contentsOf: resolution.fileURL), hap)
+
+      let inspect = try await request(
+        handler,
+        method: "artifact.inspect",
+        params: ["jobId": .string(jobID), "artifactId": .string(artifactID)])
+      guard case .object(let inspectFields)? = inspect.result else {
+        return XCTFail("Artifact inspection must return durable binding metadata")
+      }
+      XCTAssertEqual(inspectFields["jobId"], .string(jobID))
+      XCTAssertEqual(inspectFields["targetId"], .string(target.targetID))
+      XCTAssertEqual(
+        inspectFields["bindingRevision"], .integer(Int64(target.bindingRevision)))
+      XCTAssertEqual(
+        inspectFields["stableIdentitySha256"],
+        .string(aliasIdentity))
+
+      // The import reply has always carried the lease; discovery did not, so an
+      // Artifact found through `artifact.list`/`inspect` rather than imported in
+      // this session could not be passed to any `artifactLease` input without
+      // the caller reconstructing the grammar itself. Both projections now
+      // answer the same way, and the answer is the one `resolveLease` accepts.
+      XCTAssertEqual(inspectFields["lease"], .string(lease))
+
+      let listed = try await request(
+        handler, method: "artifact.list", params: ["jobId": .string(jobID)])
+      guard case .array(let rows)? = listed.result,
+        case .object(let row)? = rows.first(where: { value in
+          guard case .object(let fields) = value else { return false }
+          return fields["artifactId"] == .string(artifactID)
+        })
+      else {
+        return XCTFail("artifact.list must project the imported Artifact")
+      }
+      XCTAssertEqual(row["lease"], .string(lease))
+      // Discovery must not hand out a reference the store would refuse; a lease
+      // taken straight from the listing has to resolve to the same bytes.
+      let listedResolution = try await artifactStore.resolveLease(
+        { if case .string(let value)? = row["lease"] { return value } else { return "" } }())
+      XCTAssertEqual(listedResolution.sha256, digest)
     }
-
-    let commit = try await request(
-      handler,
-      method: "artifact.importHap.commit",
-      params: ["uploadId": .string(uploadID)])
-    XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
-    guard case .object(let fields)? = commit.result,
-      case .string(let jobID)? = fields["jobId"],
-      case .string(let artifactID)? = fields["artifactId"],
-      case .string(let lease)? = fields["lease"],
-      case .string(let returnedDigest)? = fields["sha256"],
-      case .string(let returnedTarget)? = fields["targetId"],
-      case .integer(let returnedRevision)? = fields["bindingRevision"],
-      case .string(let returnedIdentity)? = fields["stableIdentitySha256"]
-    else {
-      return XCTFail("commit must return the Artifact identity and lease")
-    }
-    XCTAssertEqual(returnedDigest, digest)
-    XCTAssertEqual(returnedTarget, target.targetID)
-    XCTAssertEqual(returnedRevision, Int64(target.bindingRevision))
-    XCTAssertEqual(returnedIdentity, aliasIdentity)
-    XCTAssertTrue(jobID.contains(String(aliasIdentity.prefix(16))))
-    XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
-    XCTAssertFalse(lease.contains(stateDirectory.path))
-
-    let metadata = try await artifactStore.inspect(
-      jobID: jobID, artifactID: artifactID)
-    XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
-    XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
-    // The lease binds the HDC provider's proven post-Flash route, not the
-    // canonical target's historical connect key or store identity.
-    XCTAssertEqual(
-      metadata.bindingSnapshot.stableIdentitySHA256,
-      aliasIdentity)
-    XCTAssertNotEqual(
-      metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity,
-      "the store identity must not leak into an HDC-consumed lease")
-    XCTAssertNotEqual(
-      metadata.bindingSnapshot.stableIdentitySHA256,
-      HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey),
-      "the canonical target's historical address must not override a proven alias route")
-    XCTAssertEqual(metadata.mediaType, "application/vnd.openharmony.hap")
-    let resolution = try await artifactStore.resolveLease(lease)
-    XCTAssertEqual(resolution.sha256, digest)
-    XCTAssertEqual(resolution.byteCount, hap.count)
-    XCTAssertEqual(try Data(contentsOf: resolution.fileURL), hap)
-
-    let inspect = try await request(
-      handler,
-      method: "artifact.inspect",
-      params: ["jobId": .string(jobID), "artifactId": .string(artifactID)])
-    guard case .object(let inspectFields)? = inspect.result else {
-      return XCTFail("Artifact inspection must return durable binding metadata")
-    }
-    XCTAssertEqual(inspectFields["jobId"], .string(jobID))
-    XCTAssertEqual(inspectFields["targetId"], .string(target.targetID))
-    XCTAssertEqual(
-      inspectFields["bindingRevision"], .integer(Int64(target.bindingRevision)))
-    XCTAssertEqual(
-      inspectFields["stableIdentitySha256"],
-      .string(aliasIdentity))
-
-    // The import reply has always carried the lease; discovery did not, so an
-    // Artifact found through `artifact.list`/`inspect` rather than imported in
-    // this session could not be passed to any `artifactLease` input without
-    // the caller reconstructing the grammar itself. Both projections now
-    // answer the same way, and the answer is the one `resolveLease` accepts.
-    XCTAssertEqual(inspectFields["lease"], .string(lease))
-
-    let listed = try await request(
-      handler, method: "artifact.list", params: ["jobId": .string(jobID)])
-    guard case .array(let rows)? = listed.result,
-      case .object(let row)? = rows.first(where: { value in
-        guard case .object(let fields) = value else { return false }
-        return fields["artifactId"] == .string(artifactID)
-      })
-    else {
-      return XCTFail("artifact.list must project the imported Artifact")
-    }
-    XCTAssertEqual(row["lease"], .string(lease))
-    // Discovery must not hand out a reference the store would refuse; a lease
-    // taken straight from the listing has to resolve to the same bytes.
-    let listedResolution = try await artifactStore.resolveLease(
-      { if case .string(let value)? = row["lease"] { return value } else { return "" } }())
-    XCTAssertEqual(listedResolution.sha256, digest)
   }
 
   func testHAPImportRejectsUnknownTargetAndInvalidContainerWithoutPublication() async throws {

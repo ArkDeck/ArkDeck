@@ -11,6 +11,7 @@ import SwiftUI
 /// looked for is listed, so an empty track is not read as a quiet all-clear.
 struct DiagnosticsWorkspaceView: View {
   var model: DiagnosticsWorkspaceViewModel
+  let onOpenTrace: (RuntimeHistoryWorkspaceContext) -> Void
 
   var body: some View {
     VStack(spacing: 0) {
@@ -18,7 +19,20 @@ struct DiagnosticsWorkspaceView: View {
       Divider()
       capturePane
       Divider()
-      if model.reading == nil {
+      if model.isLoading {
+        ProgressView(diagnosticsText("diagnostics.session.loading"))
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .accessibilityIdentifier("diagnostics.session.loading")
+      } else if let reason = model.loadError {
+        ContentUnavailableView {
+          Label(diagnosticsText("diagnostics.session.failed"), systemImage: "exclamationmark.triangle")
+        } description: {
+          Text(reason).textSelection(.enabled)
+        } actions: {
+          Button(diagnosticsText("diagnostics.session.retry"), action: model.reload)
+        }
+        .accessibilityIdentifier("diagnostics.session.failed")
+      } else if model.reading == nil {
         ContentUnavailableView {
           Label(diagnosticsText("diagnostics.session.none"), systemImage: "waveform.path")
         } description: {
@@ -29,6 +43,7 @@ struct DiagnosticsWorkspaceView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
             if model.isPartial { partialNotice }
+            if let session = model.session { sessionSection(session) }
             marksSection
             if let reading = model.reading, !reading.notDerived.isEmpty {
               notDerivedSection(reading.notDerived)
@@ -36,6 +51,8 @@ struct DiagnosticsWorkspaceView: View {
             if let reading = model.reading, !reading.missingProducts.isEmpty {
               missingSection(reading.missingProducts)
             }
+            if let session = model.session { artifactsSection(session.artifacts) }
+            previewSection
           }
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(20)
@@ -44,67 +61,49 @@ struct DiagnosticsWorkspaceView: View {
       Divider()
       footer
     }
-    .task { await model.refresh() }
   }
 
   // MARK: - Capture
 
-  /// The half of the tab that arms a session and takes marks. It sits above
-  /// the reader because that is the order the work happens in: arm, reproduce,
-  /// mark, then read.
+  /// Keep the missing visible without pretending a local state change starts
+  /// a Runtime recording. Interactive session controls are not connected.
   private var capturePane: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 12) {
-        Button {
-          model.isArmed ? model.stop() : model.arm()
-        } label: {
-          Label(
-            model.captureTitle,
-            systemImage: model.isArmed ? "stop.circle" : "record.circle")
+        Button {} label: {
+          Label(diagnosticsText("diagnostics.capture.arm"), systemImage: "record.circle")
         }
-        .disabled(!model.canArm && !model.isArmed)
+        .disabled(true)
+        .help(diagnosticsText("diagnostics.capture.unavailable.detail"))
         .accessibilityIdentifier("diagnostics.capture.arm")
 
-        Button {
-          model.mark(at: ISO8601DateFormatter().string(from: Date()))
-        } label: {
+        Button {} label: {
           Label(diagnosticsText("diagnostics.capture.mark"), systemImage: "bookmark")
         }
         .keyboardShortcut("m", modifiers: .command)
-        .disabled(!model.isArmed)
+        .disabled(true)
         .accessibilityIdentifier("diagnostics.capture.mark")
 
-        if model.isArmed {
-          Text("\(model.pendingMarks.count) \(diagnosticsText("diagnostics.capture.marks.count"))")
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
-            .accessibilityIdentifier("diagnostics.capture.markCount")
-        }
         Spacer()
       }
-      // A mark is a host instant that reaches no device. Saying so is what
-      // stops it being read as an action on the device that might fail.
-      Text(diagnosticsText("diagnostics.capture.markIsHostTime"))
-        .font(.system(size: 10))
-        .foregroundStyle(.secondary)
-      if let notice = model.captureNotice {
-        VStack(alignment: .leading, spacing: 2) {
-          Label(
-            notice.title,
-            systemImage: notice.isRefusal ? "exclamationmark.octagon.fill" : "checkmark.circle")
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(notice.isRefusal ? .orange : .secondary)
-          if !notice.detail.isEmpty {
-            Text(notice.detail)
-              .font(.system(size: 11))
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityIdentifier(
-          notice.isRefusal ? "diagnostics.capture.refused" : "diagnostics.capture.notice")
+      VStack(alignment: .leading, spacing: 4) {
+        Label(
+          diagnosticsText("diagnostics.capture.unavailable"),
+          systemImage: "exclamationmark.triangle")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(.orange)
+        Text(diagnosticsText("diagnostics.capture.unavailable.detail"))
+          .font(.system(size: 11))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        Text(model.captureUnavailableReasonCode)
+          .font(.system(size: 10, design: .monospaced))
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("diagnostics.capture.unavailable")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 20)
@@ -119,6 +118,10 @@ struct DiagnosticsWorkspaceView: View {
         .font(.system(size: 13, weight: .semibold))
         .accessibilityIdentifier("diagnostics.workspace.title")
       Spacer()
+      if model.session != nil {
+        Button(diagnosticsText("diagnostics.session.reload"), action: model.reload)
+          .accessibilityIdentifier("diagnostics.session.reload")
+      }
       // The alignment state is not decoration: it decides whether anything
       // below it can be lined up with what the device recorded.
       Label(
@@ -130,6 +133,90 @@ struct DiagnosticsWorkspaceView: View {
     }
     .padding(.horizontal, 20)
     .padding(.vertical, 12)
+  }
+
+  private func sessionSection(_ session: DiagnosticSessionPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(session.reading.jobID).font(.system(size: 12, design: .monospaced))
+        .textSelection(.enabled).accessibilityIdentifier("diagnostics.session.job")
+      Text(diagnosticsText("diagnostics.session.readOnly"))
+        .font(.system(size: 11)).foregroundStyle(.secondary)
+      if let covered = session.ringHeldAnchor {
+        Label(
+          diagnosticsText(covered ? "diagnostics.ring.covered" : "diagnostics.ring.lost"),
+          systemImage: covered ? "checkmark.circle" : "exclamationmark.triangle")
+          .font(.system(size: 11)).foregroundStyle(covered ? Color.secondary : Color.orange)
+      }
+      DisclosureGroup(diagnosticsText("diagnostics.session.timeline")) {
+        Text(session.timeline.joined(separator: "\n"))
+          .font(.system(size: 10, design: .monospaced)).textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+  }
+
+  private func artifactsSection(_ artifacts: [RuntimeArtifactPresentation]) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(diagnosticsText("diagnostics.artifacts.title")).font(.system(size: 13, weight: .semibold))
+      Text(diagnosticsText("diagnostics.artifacts.privacy"))
+        .font(.system(size: 11)).foregroundStyle(.secondary)
+      if let context = model.traceContext {
+        Button(diagnosticsText("diagnostics.artifacts.openTrace")) { onOpenTrace(context) }
+          .help(diagnosticsText("diagnostics.artifacts.openTrace.privacy"))
+          .accessibilityIdentifier("diagnostics.artifacts.openTrace")
+      }
+      ForEach(artifacts) { artifact in
+        HStack(alignment: .firstTextBaseline) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(artifact.name).font(.system(size: 11, design: .monospaced))
+            Text("\(artifact.status) · \(artifact.byteCount) B · \(artifact.privacy)")
+              .font(.system(size: 10)).foregroundStyle(.secondary)
+          }
+          Spacer()
+          if artifact.status == "published",
+            artifact.mediaType == "text/plain" || artifact.mediaType == "application/json"
+          {
+            Button(diagnosticsText(
+              artifact.privacy == "sensitive" ? "diagnostics.artifacts.readSensitive" : "diagnostics.artifacts.read")) {
+              model.preview(artifact)
+            }
+            .disabled(model.isPreviewLoading)
+            .accessibilityIdentifier("diagnostics.artifact.read.\(artifact.name)")
+          }
+        }
+      }
+      Text(diagnosticsText("diagnostics.artifacts.openElsewhere"))
+        .font(.system(size: 11)).foregroundStyle(.secondary)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("diagnostics.artifacts")
+  }
+
+  @ViewBuilder private var previewSection: some View {
+    if let name = model.previewName {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(name).font(.system(size: 12, weight: .medium))
+        if model.isPreviewLoading { ProgressView() }
+        if let error = model.previewError {
+          Text(error).font(.system(size: 11)).foregroundStyle(.orange)
+            .accessibilityIdentifier("diagnostics.preview.failed")
+        }
+        if model.previewWasClipped {
+          Text(diagnosticsText("diagnostics.preview.clipped")).font(.system(size: 11)).foregroundStyle(.secondary)
+        }
+        if model.previewReplacedInvalidUTF8 {
+          Label(diagnosticsText("diagnostics.preview.replacedInvalidUTF8"), systemImage: "exclamationmark.triangle")
+            .font(.system(size: 11)).foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("diagnostics.preview.encodingWarning")
+        }
+        if let text = model.previewText {
+          Text(text).font(.system(size: 10, design: .monospaced))
+            .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("diagnostics.preview.text")
+        }
+      }
+    }
   }
 
   private var partialNotice: some View {
@@ -171,10 +258,11 @@ struct DiagnosticsWorkspaceView: View {
           .accessibilityHidden(true)
         Text(model.markTitle(mark)).font(.system(size: 12, weight: .medium))
         Spacer()
-        Text(mark.atHostUTC)
+        Text(mark.atHostUTC.isEmpty ? diagnosticsText("diagnostics.mark.timeMissing") : mark.atHostUTC)
           .font(.system(size: 10))
           .monospaced()
           .foregroundStyle(.secondary)
+          .accessibilityIdentifier("diagnostics.mark.time.\(mark.ordinal)")
       }
       if let caption = model.screenshotCaption(mark) {
         VStack(alignment: .leading, spacing: 2) {
@@ -198,6 +286,7 @@ struct DiagnosticsWorkspaceView: View {
     .padding(10)
     .background(Color(nsColor: .windowBackgroundColor))
     .clipShape(RoundedRectangle(cornerRadius: 6))
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("diagnostics.mark")
   }
 

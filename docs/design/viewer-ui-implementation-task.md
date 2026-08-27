@@ -28,6 +28,8 @@ admission 或设备命令 lowering。
 
 ## 2. 当前事实源与设计镜像
 
+2026-08-27 全页扫描补记：当前 Inspector 为 `Properties / Layout / Accessibility / Raw dump / Advanced Dump` 五标签，已接入惰性 `componentDetail` 读取、搜索与失败态；下文历史四标签描述不代表当前功能全集。见[全页差异记录](implementation-audit-2026-08-27.md) F18。
+
 - 当前 App 入口（产品表面事实源）：
   `ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift`
 - 当前本地化与 accessibility identifiers（用户可见文案和同步锚点）：

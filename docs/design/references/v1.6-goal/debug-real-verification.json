@@ -1,0 +1,259 @@
+{
+  "runs": [
+    {
+      "jobID": "job-ff7578b8e20756c2aeb6406e6d0c9e78",
+      "operationReference": "debug.hap@1",
+      "terminalState": "succeeded",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "bindingRevision": 4,
+      "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+      "outcomeUnknown": false,
+      "evidenceBlockers": [],
+      "startedAtUTC": "2026-08-27T16:37:35Z",
+      "finishedAtUTC": "2026-08-27T16:37:52Z",
+      "artifacts": [
+        {
+          "bindingRevision": 4,
+          "byteCount": 678,
+          "bytesVerified": true,
+          "jobId": "job-ff7578b8e20756c2aeb6406e6d0c9e78",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-ff7578b8e20756c2aeb6406e6d0c9e78/ART-9f6d855ccb9901b79d200d9945b2de34",
+          "sha256": "7ce84f9d759686dc0d7801f38223006dad37e0653c5d112e1a8d44838aeaf79d",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        },
+        {
+          "bindingRevision": 4,
+          "byteCount": 481,
+          "bytesVerified": true,
+          "jobId": "job-ff7578b8e20756c2aeb6406e6d0c9e78",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-ff7578b8e20756c2aeb6406e6d0c9e78/ART-638c7f410831ef4b3cbdb43e748abaea",
+          "sha256": "f2bf4719cf164263ad8e914e4d237f54dd783f7406b1f0cfe7054224fa7c6920",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        },
+        {
+          "bindingRevision": 4,
+          "byteCount": 922572,
+          "bytesVerified": true,
+          "jobId": "job-ff7578b8e20756c2aeb6406e6d0c9e78",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-ff7578b8e20756c2aeb6406e6d0c9e78/ART-de7e92a3c04b0bc63996fc6257bde230",
+          "sha256": "e4ac3317c267724ff67a71ba406d4fa85739c1b72a9265d49ec134b13eea8d02",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        }
+      ]
+    },
+    {
+      "jobID": "job-5e0d1123a7a3512c28ffeadfb7744bf4",
+      "operationReference": "deploy.native-library.app-owned@1",
+      "terminalState": "succeeded",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "bindingRevision": 4,
+      "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+      "outcomeUnknown": false,
+      "evidenceBlockers": [],
+      "startedAtUTC": "2026-08-27T16:42:34Z",
+      "finishedAtUTC": "2026-08-27T16:42:44Z",
+      "artifacts": [
+        {
+          "bindingRevision": 4,
+          "byteCount": 600,
+          "bytesVerified": true,
+          "jobId": "job-5e0d1123a7a3512c28ffeadfb7744bf4",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-5e0d1123a7a3512c28ffeadfb7744bf4/ART-6c871577579d438daf2ca718b49044bd",
+          "sha256": "94e91059167fe3ad585298d7426ebb94b36d6d61591bf38142b662020c0a95b1",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        },
+        {
+          "bindingRevision": 4,
+          "byteCount": 512,
+          "bytesVerified": true,
+          "jobId": "job-5e0d1123a7a3512c28ffeadfb7744bf4",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-5e0d1123a7a3512c28ffeadfb7744bf4/ART-269c33477e41897f1b103568891d8317",
+          "sha256": "d8eeaaeeb96589d2369c98c07e5e156ede3926afb5f9f2efa4453a92ad662ce5",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        }
+      ]
+    },
+    {
+      "jobID": "job-7dd6c251aa54620e77b24134c693cb85",
+      "operationReference": "debug.hap@1",
+      "terminalState": "succeeded",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "bindingRevision": 4,
+      "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+      "outcomeUnknown": false,
+      "evidenceBlockers": [],
+      "startedAtUTC": "2026-08-27T17:10:25Z",
+      "finishedAtUTC": "2026-08-27T17:10:45Z",
+      "artifacts": [
+        {
+          "bindingRevision": 4,
+          "byteCount": 658,
+          "bytesVerified": true,
+          "jobId": "job-7dd6c251aa54620e77b24134c693cb85",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-7dd6c251aa54620e77b24134c693cb85/ART-e6338e1e2179d5dc916323f87774a64e",
+          "sha256": "cf813cb9635ef65c03404e2d5a2ce4425d92bfefeebf48a3c4c608400bb0c9f8",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        },
+        {
+          "bindingRevision": 4,
+          "byteCount": 469,
+          "bytesVerified": true,
+          "jobId": "job-7dd6c251aa54620e77b24134c693cb85",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-7dd6c251aa54620e77b24134c693cb85/ART-f0a2860f6565884f7e5f1844a8ea1d24",
+          "sha256": "4e778163277ab0aa77b89f6bd22dd35b4f21d731187bfaa27ec5368e9635682f",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        },
+        {
+          "bindingRevision": 4,
+          "byteCount": 932968,
+          "bytesVerified": true,
+          "jobId": "job-7dd6c251aa54620e77b24134c693cb85",
+          "providerId": "hdc",
+          "reference": "arkdeck-artifact://job-7dd6c251aa54620e77b24134c693cb85/ART-31837f861bd49a246dd7dfd5c2234edf",
+          "sha256": "08bcc307faa72dc8a9afda5e878e0b450acacd2c959e103de52afeb9a9f37aff",
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7"
+        }
+      ],
+      "outstandingResidueCount": 0,
+      "materializedPlanDigest": "fe96d2acce7756515f8806375c871e31cb6648639941fb1e70d738610a0866b4",
+      "packageSelection": [
+        {
+          "name": "ART-effd30d8d2da276a4a63a647f82c27ec-entry-default-signed.hap",
+          "byteCount": 1512211,
+          "sha256": "e873aeb0a0da520e5d5eb8b648b9c60483af163a21ce59980dc241c4ba9607c9",
+          "bindingRevision": 4
+        },
+        {
+          "name": "ART-b4bc2e1a86f324ccfcf0d9f92dcd0ad6-feature1-default-signed.hap",
+          "byteCount": 156956,
+          "sha256": "06df8dc7c2b438e4257cffd17074c3604c7e3e527c1b443b227ffa2ec3e4fedb",
+          "bindingRevision": 4
+        }
+      ],
+      "scope": "Fresh protected-main typed CLI run with entry + one feature HAP, one directory install, process readback, stop/uninstall and staging cleanup. Not an App multi-select execution or an HSP/shared-module acceptance. Published install report does not enumerate individual installed module names.",
+      "policy": {
+        "bundleName": "com.example.waterflowdemo",
+        "abilityName": "EntryAbility",
+        "installPolicy": "installOrReplace",
+        "cleanupPolicy": "uninstall",
+        "postRunAbilityState": "stopped",
+        "captureDiagnostics": true,
+        "diagnosticsDurationSeconds": 5,
+        "portForwardProfile": "none"
+      },
+      "localReceiptSHA256": "ac3296b30bd20d7b717bfe7f4bdd568df8fa9fd89a71e6116731f5e35fa0543b"
+    },
+    {
+      "jobID": "job-2c4e67f6d107999cc5a996403387ac3a",
+      "operationReference": "debug.hap@1",
+      "terminalState": "succeeded",
+      "executionMode": "execute",
+      "actualEffect": "deviceMutation",
+      "bindingRevision": 4,
+      "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+      "outcomeUnknown": false,
+      "outstandingResidueCount": 0,
+      "startedAtUTC": "2026-08-27T17:35:19Z",
+      "finishedAtUTC": "2026-08-27T17:35:35Z",
+      "materializedPlanDigest": "fe98473b05b34a0b48d1a47769c6daf35c0b20c85d14bff09f20a4c6270e7de8",
+      "clientName": "ArkDeckApp.DebugWorkspace.Apps",
+      "artifacts": [
+        {
+          "artifactId": "ART-5112e46e42637cc949d1a4d7637c37b8",
+          "name": "install-readback.json",
+          "sha256": "372292b6c1c2fabfacda8edf01c27515dcfc6f0d62ffeee6b79e8da321cc1cc4",
+          "byteCount": 658,
+          "bindingRevision": 4,
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7",
+          "bytesVerified": true
+        },
+        {
+          "artifactId": "ART-a45814f1262b230b2fac718983924e6d",
+          "name": "process-readback.json",
+          "sha256": "9091b87942ceba63b20a10c6b9a699b6fa6ef5dcb3dc7604484aeb0448c6ad1e",
+          "byteCount": 469,
+          "bindingRevision": 4,
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7",
+          "bytesVerified": true
+        },
+        {
+          "artifactId": "ART-177f79dae29d0a5b4b3e0bb9f9dcb652",
+          "name": "debug-hilog.txt",
+          "sha256": "fa2333b7fa0b5518ef4e6dcb0fab7cb3f5d7f727fe0aeee3e338d3fd368281a2",
+          "byteCount": 885089,
+          "bindingRevision": 4,
+          "stableIdentitySha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+          "targetId": "TGT-958780b2ffb7",
+          "bytesVerified": true
+        }
+      ],
+      "packageSelection": [
+        {
+          "name": "ART-effd30d8d2da276a4a63a647f82c27ec-entry-default-signed.hap",
+          "byteCount": 1512211,
+          "sha256": "e873aeb0a0da520e5d5eb8b648b9c60483af163a21ce59980dc241c4ba9607c9",
+          "bindingRevision": 4
+        },
+        {
+          "name": "ART-b4bc2e1a86f324ccfcf0d9f92dcd0ad6-feature1-default-signed.hap",
+          "byteCount": 156956,
+          "sha256": "06df8dc7c2b438e4257cffd17074c3604c7e3e527c1b443b227ffa2ec3e4fedb",
+          "bindingRevision": 4
+        }
+      ],
+      "policy": {
+        "abilityName": "EntryAbility",
+        "bundleName": "com.example.waterflowdemo",
+        "captureDiagnostics": true,
+        "cleanupPolicy": "uninstall",
+        "diagnosticsDurationSeconds": 30,
+        "installPolicy": "installOrReplace",
+        "portForwardProfile": "none",
+        "postRunAbilityState": "stopped"
+      },
+      "scope": "Workspace App native file picker selected a real entry HAP plus one feature HAP, then imported both through production XPC and submitted one new published Runtime Job. Install/process readback, stop, uninstall and staging cleanup succeeded. Does not prove HSP/shared-module installation; install report does not enumerate individual module names. Diagnostic duration is the requested bound, not a measured continuous stream duration.",
+      "localStatusSHA256": "ad52a259cd2f4f915c0af35ec0546ff98156e69359ef22280882076ef152bc28"
+    }
+  ],
+  "hapInputSHA256": "1b84a6cd795832658622a13add0e87c7c35f26a7c27389d2099f1c24756ece07",
+  "nativeInputSHA256": "c20fcd9b29b46ae06a312aa2db6f053672fef82d80f7b482f0f90d154c80f2d3",
+  "nativeABI": "armeabi-v7a",
+  "nativeBuildID": "ba7d5110d13be1f3c0348e9bd6f2d613ca32169f",
+  "hapPolicy": {
+    "install": "installOrReplace",
+    "cleanup": "retain",
+    "postRunAbilityState": "stopped",
+    "diagnosticsDurationSeconds": 5
+  },
+  "nativePolicy": {
+    "verification": "hashProcessAndMaps",
+    "rollback": "autoRollback"
+  },
+  "inputBoundary": "Existing signed test artifacts were exported with byte verification and passed through current-target import validation. These are new execution jobs, not historical job replays; the HAP result covers one entry package only. An unsigned ELF extracted from the HAP was rejected before import or device dispatch, and was not used for execution.",
+  "localReceipts": {
+    "hap-receipt.json": "8f5f9df64d98d4c1a3dfb87bf090c2536f4e5855194a034061f1e1248f7f4ff6",
+    "native-receipt.json": "63c63f139f3990af1b074fe383fed2fb0e02c98b3738d6015d7c85507097798e",
+    "hap-plan.json": "f004c4572d45b0251e039936b8e660d026ade77ceca9ebe8ed48f67d55804828",
+    "native-plan.json": "a5112afd3bfad7de990a40a990747d19b2592d5507422fc867c9fe82bae4406e"
+  }
+}

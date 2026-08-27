@@ -1109,7 +1109,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
             sessionID: "session-\(jobID)",
             stepID: "import-hap",
             name: completed.name,
-            mediaType: "application/vnd.openharmony.hap",
+            mediaType: completed.name.hasSuffix(".hsp")
+              ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap",
             privacy: .standard,
             retentionClass: .pinnedUntilVerified,
             sourceOperation: "artifact.import-hap",
@@ -1803,11 +1804,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
         async let observationRead = try? engine.latestSucceededDeviceObservations()
         let (candidateSnapshot, observedFacts) = try await (candidateRead, observationRead)
         let observations = observedFacts ?? [:]
-        let deviceInformation =
+        let deviceInformationSnapshot =
           candidateSnapshot.health == .current
-          ? await bootstrap.deviceInformationForPresentation(
-            candidates: candidateSnapshot.candidates)
-          : [:]
+          ? await bootstrap.deviceInformationSnapshotForPresentation(
+            candidates: candidateSnapshot.candidates, useWarmSnapshot: usesWarmSnapshot)
+          : nil
         var projected: [(candidate: BootstrapCandidate, target: RuntimeTargetRecord?)] = []
         for candidate in candidateSnapshot.candidates {
           let target = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
@@ -1834,7 +1835,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
           result: .array(
             projected.map { row in
               let observation = row.target.flatMap { observations[$0.targetID] }
-              let information = deviceInformation[row.candidate.connectKey]
+              let information = deviceInformationSnapshot?.information[row.candidate.connectKey]
               return .object([
                 "connectKey": .string(row.candidate.connectKey),
                 "state": .string(row.candidate.state),
@@ -1849,7 +1850,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
                     "name": $0.name.map(JSONValue.string) ?? .null,
                     "systemVersion": $0.systemVersion.map(JSONValue.string) ?? .null,
                     "transport": .string($0.transport),
-                    "observedAtUtc": .string(candidateSnapshot.observedAtUTC),
+                    "observedAtUtc": deviceInformationSnapshot.map {
+                      .string($0.observedAtUTC)
+                    } ?? .null,
                   ])
                 } ?? .null,
                 "observedFacts": observation.map {

@@ -1,0 +1,313 @@
+# 规格 / 设计 / 实现全页差异扫描与修正
+
+日期：2026-08-27 · 基线：`e1d52e68db435bdfeb326962767ca4626a77322b`
+
+## 1. 范围与判定方式
+
+覆盖 **8 个主页面、动态设备页、独立 Settings / Trace Viewer / 帮助、所有子标签与关键弹层**，
+共 **60 个检查单元、20 个 App View 文件、31 个组件预览文件**。文件、路由和子标签清单由
+[机器覆盖表](implementation-coverage.json) 与
+[交互/覆盖测试](arkdeck-ds/scripts/workspace-interactions.test.mjs) 核对。
+
+对比顺序是 Safety/POL → PRODUCT-LOOP → living specs / Catalog / contracts → 设计稿 → 实际调用链。
+不仅看 View 是否存在，还追到 ViewModel、facade、RPC、参数和 Artifact 校验。主线映射为
+GJ-1（设备/观测/Trace/Diagnostics）、GJ-2（HAP）、GJ-3（Native）、GJ-4（Flash）；
+GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 task 平面。
+
+本文“已接通/修正”指本工作区代码，不表示已合入受保护 main、真实设备通过或远程设计库已更新。
+本轮未修改 accepted requirement / AC / 安全策略，未发布新 operation/provider/profile。
+产品修正通过 `agent/ui-design-alignment-20260828` 分支交付维护者审查；提交或合并不替代剩余真机验收。
+设计 demo、原生 App fixture、单元/合约验证和真实设备证据分别记录。
+
+## 2. 差异处理
+
+| 编号 | 原差异 | 修正后与保留边界 |
+| --- | --- | --- |
+| F01 | Diagnostics 按钮只改变本地状态，却显示已布防/已标记 | 删除假状态；arm/mark 保持禁用并说明缺少会话接口 |
+| F02 | Overview 查看记录只打开 History，丢失 Job ID | 传递 exact Job；清除旧筛选后选择该记录；原生回归覆盖 |
+| F03 | “再次运行”承诺预填，但没有 typed inputs 传递 | 保存原始 JSON；仅校验过的只读 observe/capture 可生成新草稿；显示 thread；明确另行启动新 Job；变更操作/旧 Marker/漂移/unknown 拒绝 |
+| F04 | 导航和旧稿仍把 Automation/task.* 画成当前功能 | 八页导航同步；旧链接只说明 CHG-2026-064 退役，历史组件不算产品能力 |
+| F05 | Settings 混入主导航，子页不完整 | 独立七标签及 Trace Cache/Licenses；App 内重复更新设置不再作为现行稿 |
+| F06 | Trace 非法输入被改成默认值，单位/quick values 与 App 不符 | 保留输入并给出校验；单位转换和快捷值一致；unavailable/invalid submit 不启动 |
+| F07 | Debug secondary UI 与真实能力/参数边界不同 | 五页及 SSH browser/editor/plan 对齐；HAP 与 Native 分别镜像 14/11 个 Catalog 步骤；旧不支持能力仍明示 unavailable |
+| F08 | App diagnostics 设计允许带 device raw，但 exporter 始终排除 | 删除无效选项；敏感 device Artifact 在 History 单独显式导出 |
+| F09 | History 缺活动类别、筛选/保存/分页；按标题猜 Artifact | 八类、全筛选、空态/选中行关系同步；按 kind 分派，不由标题猜实际 Artifact |
+| F10 | 默认 Diagnostics 稿展示完整 ring/视频/校准，误报 current 能力 | 默认镜像当前 reader；完整联动只在 concept URL；纠正“ring/自动 Marker 全未实现”的旧说明：bounded ringBuffered 和部分自动标记已发布 |
+| F11 | 全局 Inspector 没有设计中的日志/取消/恢复控制 | 接 exact detail、标准日志按需读取与 fresh identity 后取消请求；unknown 不重放；rebind/archive 没有 App RPC，仍是缺口 |
+| F12 | History Diagnostics 分支不读取 Session；publish 无生产调用 | 新严格 reader 读取 index/summary/markers，校验 identity/byteCount/SHA-256、required/completeness；展示 partial/notDerived/无时间/无校准；已发布 Trace 可转交原生 Viewer |
+| F13 | 独立 Trace Viewer 的 loaded/search/event/range/mark/dock/help 在稿中缺失 | 增加可操作的合成 loaded 样本、筛选/匹配导航/范围校验与显式应用/本地标注/停靠、loading/error/recent 和完整快捷键；不把样本当真实 Trace |
+| F14 | Trace Viewer/Cache/Licenses 普通 UI 英文固定；Debug/授权辅助稿中文固定 | App 普通 UI（含搜索输入的 placeholder/AX label）、恢复说明和帮助双语；使用上游中文 shortcut 字段；稿件次级表单/弹层补英文；raw、进程名与许可证正文保留 |
+| F15 | DS 版本/导航/图标过期，25 个组件映射仍缺失 | 补 24 个受控组件覆盖 25 个映射，31 个 previews；新画廊覆盖 empty/partial/unaligned/unknown/stale/disabled；远程设计库未连接 |
+| F16 | 九页 briefs 漏入口，历史 HOW 被误当规范 | 补完整索引与明确历史限制；同步本轮真实能力与剩余边界，不刷新旧治理任务 |
+| F17 | trust 超时稿直接重启共享 HDC，设备授权与接管混淆 | 超时去 Overview impact/proof；未授权候选深链正确；无 proof 不执行 HDC 恢复；不暗示已接管 |
+| F18 | Viewer 只有四标签稿，实际有五种 Inspector | 增加 Advanced Dump、惰性读取/搜索/noNumericIDs/retry/failed；技术字段保持原词 |
+| F19 | HAP 已实现，稿仍固定不可用，步骤也过时 | 根据 availability 演示；Catalog 14 步、身份/策略/1–300 秒联动；提交预览不伪造 Runtime Job |
+| F20 | Overview sheet 外层 AX 标识吞掉子项 | 明确 contain 分组，说明和按钮可按各自标识访问；回归检查精确来源与 typed draft |
+| F21 | 环境快捷键丢失；扫页误查折叠子项；窗口外框被当内容尺寸 | 恢复 ⌘⇧D，明确展开/收起；记录真实 frame/content/layout。尺寸回归验证默认窗未退到最小窗，按实际 native chrome 约束外框；不声称改变了 App 默认尺寸 |
+| F22 | Native 计划仍旧 7 步；SSH 未验证可保存；日志/网络字段未联动 | Native 同步 11 步和真实 Artifact 名称；SSH 输入变更使验证失效，demo 不保存秘密；HiLog 五字段与 1–600 秒、512 MiB预算；删除未采集时假日志与旧1GB轮转说明；Native 输入立即更新计划按钮；forward/reverse 明确选择，默认不伪造设备规则清单 |
+| F23 | 保存会话读取可能把 JPEG 通道误报为缺 PNG；弱类型参数可能误判 completeness | JPEG/PNG 可满足截图通道，但不豁免单独声明的 required 文件；按请求类型报告缺失，不伪造时间；错误布尔/trace 数组类型拒绝；单测覆盖显式 raw 读取与完整性失败 |
+| F24 | 带 UI Dump / Trace 的真实诊断采集归类到 Viewer / Trace，不能进入 Diagnostics reader；Trace 入口又静默拒绝 Viewer 来源 | History 对 exact capture.diagnostics@1 另给只读 Diagnostics 入口，保留原分类和 exact Job；Trace 按确切 operation 与重新校验的 Artifact 接受只读转交，不要求改写来源分类；真机双语 UI 回归通过 |
+| F25 | 真实 HiLog 含非 UTF-8 字节，Diagnostics 拒绝整份文本预览 | SHA-256/byteCount 完整校验后，仅 text/plain 允许显示替换字符并醒目标注；JSON 保持严格 UTF-8；原始制品不变，120k 显示上限与 2 MiB 读取上限保持 |
+| F26 | HAP App、caller 和稿件仍接受 Catalog 已不支持的 installFresh / restorePrevious | 安装策略固定 installOrReplace，清理仅 uninstall/retain；caller 先拒绝未发布值，保留 retain/running；行为测试与稿件选项对照当前 Catalog，未放宽 Runtime 准入 |
+| F27 | 真实 loaded Trace 默认显示文件信息，稿件却自动选择首个事件；两处文件信息漏译 | 稿件默认无选区并展示文件信息，显式选事件才切换检查器；无选区不生成标注；App 文件大小/Schema 指纹补齐双语，真机用例断言这些标签 |
+| F28 | 冷启动候选列表虽预热，设备名称/系统版本仍同步等待新 HDC 属性读取；实测超过 2 秒 | 工作区补显示信息预热、独立观察时间和 5 秒缓存；离线/未授权/失败及旧在途结果失效；四项回归通过。已安装 Runtime 未替换，真机时限仍未通过，不把源码修正记为硬件通过 |
+| F29 | `debug.hap@1` 已发布 additionalHapArtifactLeases，同 bundle 的 feature HAP / HSP 可一次安装，但 App 与稿件只允许一个 entry HAP | App/稿件补入口与最多 16 个附加包的选择、移除和清空；逐文件有界校验/导入后提交同一 Job，重复文件与绑定漂移拒绝；导入器与 CLI 补 HSP 文件入口。39 项设计、34 项定向 Swift 通过；CLI 与原生 App 的 entry+feature 两个新 Job 成功。HSP 选择/重复拒绝/移除/清空已手动检查；原生自动化尚未通过，HSP 真机仍待验。未替换已安装 Runtime，不用 feature 成功覆盖 HSP |
+| F30 | Apps 同时选择“保持运行”和“运行后卸载”未解释实际结果，填写后 Bundle/Ability 没有可见标签；附加包容器覆盖移除按钮的自动化标识 | App/稿件增加按真实策略显示的中英文提示，不修改已发布策略或静默改值；App 保留字段标签，将文件标识限定到文本；设计四种组合与双语回归通过，完整代码闸通过，最新原生中文提示和填写后标签已逐图核查；原生自动化继续 |
+| F31 | Trace 真机已有时刻标记的重命名、换色、删除和本机重载保留，稿件只有范围标记与保留复选框；清空选区还会隐藏所有标注 | 原型补时刻标记入口、完整范围、临时/保留标记演示、名称编辑/换色/删除；无选区仍显示注释，编辑保留检查器滚动位置。明确原型不落盘，不把演示当真实 sidecar；40 项设计测试通过，真实 Trace 中文事件/范围/标记已手动验证 |
+
+### 关键实现入口
+
+- [Session reader](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift)：fresh correlation、发布清单、两份索引一致性、受限读取、完整性与缺失判断。
+- [History facade](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift)：原始 typed parameters 与至多 16 MiB 的显式 Artifact reader；顺序分块和最终 SHA-256；sensitive 需 opt-in。
+- [只读延续 caller](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceContinuation.swift)：fresh source/target、Catalog 校验、新 request/idempotency/Job、一次 run；unknown/deduplicated/foreign Job 不继续。
+- [取消 caller](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobControlApplicationFacade.swift)：独立于只读 History；fresh job.status 的 Job/operation/target/session 必须一致，已知非终态才发 cancel；请求不等于已取消。
+- [新增组件](arkdeck-ds/src/components/session.tsx)与[可交互画廊](session-components.html)：25 个已声明 class 映射对应 24 个组件；输入边界、缺图、缺校准、未知结果不由组件补造。
+
+## 3. 全入口矩阵
+
+以下 **60 个检查单元**均已纳入并完成首轮源码、设计和接线核对；真机与字段级复查继续记录新差异（如 F29）。“已接线”不等于本轮硬件通过。浏览器/App fixture 验证范围见 §4。
+
+### 主窗口、全局层、动态设备（GJ-1—4）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役 |
+| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面 |
+| shell.recovery | needsAttention、unknown、等待人工、History 入口 | 只导航，不确认后续刷，不在 App 归档 |
+| device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管 |
+| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview |
+| device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
+
+### Overview（GJ-1/2/4）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| overview.main | scope、SSH source、下一步、调试线；empty/ready/多目标/离线/未绑定/stale | 已接线；只列当前在线观察，真实 target→source，不取第一台服务器 |
+| overview.environment | collapsed/expanded、healthy/mismatch/unknown/permissionDenied | HDC/tool/hash/endpoint/channel/能力完整保留 |
+| overview.resume | 来源检查 sheet、loading/无参数/target/binding漂移/unknown | F02/F03/F20；精确记录；导航与准备分开；仅安全只读输入复制至新草稿，原始 thread 保留，不复制 authority/session |
+| overview.hdcImpact | impact sheet、generation漂移、确认/拒绝 | 已接线；无 proof 不可执行，不自动重启 external server |
+
+### Flash（GJ-4）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框 |
+| flash.plan | 计划/前置条件 disclosure；target/hash/partitions/Loader/missing | Loader 激活属于执行前身份关联；历史目标缺失明确占位；测试显式选择当前目标后才 materialize exact plan，不静默换目标 |
+| flash.runtime | prepare/write/reboot/verify/failed/cancelled/unknown | bytes比例不是成功；postflight后才成功；unknown不重放 |
+
+### Debug（GJ-2/3）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| debug.artifacts | Artifacts；local/ssh/empty/importing/invalid/ready/failed | 单个 signed app-owned .so 已实现；batch/abc/SMB/WSL/独立重启未实现 |
+| debug.browser | SSH browser sheet；roots/loading/entries/up/selected/refused | 只读 SSH/SFTP 已实现，不越 verified root |
+| debug.plan | 单库计划 sheet；review/submitting/blocked | target/ABI/hash/readback/rollback；restartAbility 在 typed plan 内 |
+| debug.logs | Logs；bounded/active/pausedViewport/filter/shards/failed | 暂停视口不是停止设备；不能画无界“实时流” |
+| debug.logConfirm | 本地清屏、设备 buffer、保存日志 | buffer operation 未发布保持禁用；NSSavePanel 显式导出 |
+| debug.apps | Apps；HAP选择/计划/install/start/debug/库存/失败 | typed HAP 流已接通，原型固定不可用与旧计划已修 F19；独立包行 lifecycle 禁用有依据 |
+| debug.network | Network；forward/reverse/invalid/add/remove/补偿 | typed 端口1024–65535；不输入任意 shell |
+| debug.commands | Commands；select/inputs/disclosure/running/failed/rawArtifact | 闭集只读模板；Root 等缺口不画执行入口 |
+
+### Viewer（GJ-1）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| viewer.main | empty/loading/captured/search/selection/geometryUnavailable/failed | explicit target、同 Job screenshot/tree/hash；不默认伪造 capture |
+| viewer.properties | Properties；identity/state/geometry/paint/missing | 已接线；Provider 技术词表保留英文 |
+| viewer.layout | Layout；bounds/root/geometryUnavailable | 无 geometry 不编造命中区域 |
+| viewer.accessibility | Accessibility；semantics/focus/missing | 只读观测字段，不把缺值解释成通过 |
+| viewer.raw | Raw dump；raw/missing/large | raw origin 不合并覆盖 |
+| viewer.advanced | Advanced Dump；lazy/search/noNumericIDs/retry/failed | 已接线；原型/DS 补第五标签 F18；合法 component ID；Fault/Crash/System Snapshot 不属首版 |
+
+### Trace 与独立 Viewer/帮助（GJ-1）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| trace.capture | checking/unavailable/ready/invalid/unitChange/quick | 5/10/15/30秒、1/2/3分钟；原型 F06 已修正 |
+| trace.runtime | submitting/active/cancel/terminal/unknown/blocked | Runtime 状态，typed cancel；原型不证明设备结果 |
+| trace.artifact | empty/published/loading/hashMismatch/retry/open | 唯一 raw trace.htrace 校验后打开，不替换失败文档 |
+| traceViewer.recent | 独立窗口 empty/recent/missing/open/remove/reveal | 已实现；原型覆盖 empty/recent/missing/open/remove 和合成 loaded 样本 |
+| traceViewer.timeline | loaded/noTimedEvents/filter/search/lane/zoom/focus | ArkTrace canvas/query 已接线；真实 event identity |
+| traceViewer.event | Event Inspector/rightDock/bottomDock/hidden | 已接线；合成稿覆盖 event/range、hidden/rightDock/bottomDock；不替代原生 parser 验证 |
+| traceViewer.range | Range Inspector/aggregate/counter/selectionChange | 已接线；查询限额和来源 identity |
+| traceViewer.annotation | marks/flags/tag editor/edit/remove | 已接线；local sidecar 不作 device fact |
+| traceViewer.loading | hashing/cache/indexing/cancel/schema/error/reload | 有分母才百分比；普通错误/恢复操作双语，原始诊断留在 disclosure |
+| traceViewer.shortcuts | 独立 Keyboard Shortcuts；keyboard/pointer/search/focus | App 使用上游中文 action/title/gesture；通用稿镜像 pinned catalog 的 3 组/19 条 |
+
+### Device 与 Diagnostics（GJ-1）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| device.control | empty/captured/stale/unknown/inputFailed/history | 每次手势一个 typed input；confirmed/unknown使图过期；无持续预览/键盘 |
+| device.recording | preflight/quota/refused/capture/assemble/validate/ready/failed | 默认40、2–300帧；实测fps/缺帧；本机 .mov；无设备端视频编码 |
+| device.events | capture/input/refusal/recording/save log | 本地反馈与 Runtime 事实区分；不当硬件证据 |
+| diagnostics.capture | noSession/noTarget/adoptedTarget/disabledArm/disabledMark | F01；不会假布防或保存 Marker |
+| diagnostics.reader | partial/marks/noPicture/missing/notDerived/alignment | History → fresh correlation → index/summary/markers bounded read/hash → publish；无校准/时间不猜；PNG/JPEG 通道兼容；文本显式读取 |
+| diagnostics.concept | 显式未来 capture/recording/finalizing/session/partial/clockGap | 有界 ringBuffered 与部分自动 Marker 已发布；交互式会话/视频/校准仍为单独概念，不混入当前默认 |
+
+### History（GJ-1—4）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
+| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；不补默认值 |
+| history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；与App诊断导出不同 |
+| history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | 全部六类保留精确来源；Diagnostics 加载保存 Session，可将校验过的 Trace 转交 Viewer；不重放 |
+
+### Settings（GJ-1—4）
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| settings.general | General；keycap/waveform/build/localOnly | 已接线，版本取bundle |
+| settings.toolchains | Toolchains；loading/choose/probe/missing/activeJobs | 已接线；只影响新Job；来源/hash/ownership保留 |
+| settings.servers | Servers；empty/list/refresh/add/edit/remove | 已接线，只读SSH来源，不是四connector |
+| settings.serverEditor | password/key/defaultKey/probe/fingerprint/root/drift/save/refused | 未验证不能保存；秘密仅Keychain；次级原型已补中英文，修改输入使 demo 验证失效 |
+| settings.serverDelete | 移除确认/cancel/bindingStale | 只移本地来源，不删远端文件 |
+| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned |
+| settings.traceCache | Trace→Cache；loading/inventory/refresh/purge/activeEntries | 已接线，仅 inactive derived；普通文案双语 |
+| settings.traceLicenses | Trace→Licenses；lazy/loading/notice/missing/reveal | 已接线，14 reviewed components；许可证原文保留 |
+| settings.updates | idle/checking/current/available/download/verify/consent/error/reveal | 独立Settings，签名校验，显式Finder handoff，不静默安装 |
+| settings.diagnostics | destination/preview/scope/hash/estimatedBytes/export/error | 始终排除device raw；本地显式导出，无上传 |
+
+### 系统面与设计镜像
+
+| ID | 页面 / 状态 | 对比结论 |
+| --- | --- | --- |
+| system.panels | Flash镜像、入口 HAP / 附加 HAP/HSP / .so / HDC / key / root / Trace 导入；日志/Artifact/诊断包保存；Finder | 系统panel已纳入所属流程；不计为新业务页；HTML不真实读写 |
+| design.components | Workspace chrome；31预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；新增 SessionSurfaces 双语画廊；ArkTrace canvas 属上游插图，远程库未同步 |
+| automation.retired | 旧Automation/HTASK稿 | CHG-2026-064已移除；旧URL只解释退役，不是待办 |
+
+### 生产 View 文件索引（20/20）
+
+以下每个文件都由上表中的对应页面/子面覆盖，包含同文件的私有 View；ViewModel/facade/资源随交互追到调用点。
+
+- [App / scenes / navigation](../../ArkDeckApp/App/ArkDeckApp.swift)
+- [Workspace chrome](../../ArkDeckApp/DesignSystem/WorkspaceChrome.swift)
+- [Device detail / trust](../../ArkDeckApp/Features/Devices/DeviceWorkspace.swift)
+- [Overview record](../../ArkDeckApp/Features/Overview/OverviewRecordView.swift)、[Resume sheet](../../ArkDeckApp/Features/Overview/OverviewResumeSheet.swift)、[HDC / impact](../../ArkDeckApp/Features/HDC/HDCStatusView.swift)
+- [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)
+- [Debug 五标签与 sheets](../../ArkDeckApp/Features/Debug/DebugWorkspaceView.swift)
+- [Viewer 五 Inspector](../../ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift)
+- [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)
+- [Device](../../ArkDeckApp/Features/Device/DeviceWorkspaceView.swift)、[Diagnostics](../../ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift)
+- [History](../../ArkDeckApp/Features/History/RuntimeHistoryView.swift)、[Jobs / recovery](../../ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift)、[Settings 七标签](../../ArkDeckApp/Features/Settings/SettingsRootView.swift)
+
+## 4. 验证与证据分类
+
+### 首轮后续验证快照（F01–F23）
+
+以下为 goal 启动前的实际结果，原始日志保留在本机 `/private/tmp`。分批结果、日志 SHA-256 与原生截图来源记录于[验证摘要](references/v1.6-followup/verification-summary.json)。它是历史快照，不覆盖随后 F24/F25 的代码。
+
+| 检查 | 结果 |
+| --- | --- |
+| 全入口覆盖 | 60 单元、20 View 文件、31 previews；导航/子标签/文件清单自动核对 |
+| Prototype / DS 交互 | **38 tests，0 failures**；含保存会话、typed draft、Trace event/range、19 shortcuts、取消不造终态、Native即时输入/计划/日志空态、SSH漂移、次级英文 |
+| DS build / previews | **通过**：token/class 检查、TypeScript declarations、JS/CSS、画廊 build；**31 个 TSX previews** 全部独立 bundle |
+| 原生 App | 全批 **24 用例：20 通过、2 失败、2 真机跳过**；两个失败的中英文 sweep 修正后单独重跑 **2/2 通过**；最后 Trace 双语/搜索占位/帮助重跑 **1/1 通过**。按最后结果去重为 **22 通过、2 跳过**，不声称同一批次全绿 |
+| 统一本地闸 | **退出码0**：SDD 0 errors / 0 warnings / 121 AC IDs；catalog generator 49 tests 与零漂移通过；Swift **1815 并行 + 1 identity race + 5 scale = 1821 tests**，全部车道退出0；App / UI-test bundle **TEST BUILD SUCCEEDED** |
+| 浏览器可见交互 | 已实测范围 Apply/Mark/Keep/dock、筛选空态、Diagnostics 显式敏感预览/retry/Trace转交、readonly草稿无派发、取消不变终态/日志/精确History、SSH检查后输入漂移、组件帧数300→301拒绝；均为设计样本 |
+| 真实设备 | 未运行；两个原生真机用例因未显式开启而跳过；没有新 HDC/Flash/capture 验收，不登记 REAL_DEVICE_PASS |
+
+该次统一本地闸覆盖当时生产 Swift、资源与 UI 测试代码。随后 goal 真机验证又产生 F24/F25 修复，须单独重跑；未把 compile-only 当作 XCUITest 断言通过。
+
+### Goal 真机验证与修复（F24–F31，进行中）
+
+已重新确认已安装的 signed protected-main Runtime 健康；旧 v1.5 的 Runtime 不可用记录不是当前状态。
+新的 `observe.device@1` 与包含 HiLog、UI Dump、UI tree、截图和 Trace 的 `capture.diagnostics@1`
+均以 `execute` 在同一已接管 USB 设备上成功，Runtime 报告无 unknown outcome / evidence blocker。
+诊断采集发布九个经字节校验的 Artifact。详情和 SHA-256 见
+[真机记录](references/v1.6-goal/real-device-validation.md)。
+
+原生 App 实际打开该 Job 后，Diagnostics metadata 完整加载，未伪造跨时钟对齐；也因此发现
+Viewer 分类入口、Trace 转交与非 UTF-8 HiLog 预览缺陷。F24/F25 修复已在真实制品的中英文
+XCUITest 中通过（1 case / 2 locales，245.808 秒）；四张原生图已逐张查看，
+[附件哈希与无重放核对](references/v1.6-goal/native-ui-verification.json)单独记录。
+之前两次 automation mode 超时没有执行断言，保留为失败尝试，不混入通过计数。
+F24/F25 的 Swift 全量 1,823 项和 App/UI bundle 编译通过；后加 F26/F27 仍须最终回归。
+设计交互测试再次通过 38/38；[新增参考图](references/v1.6-goal/README.md)仅为设计样本。
+五项后续真机 UI 批次已结束：**4 通过、1 失败（exit 65）**。Diagnostics/Trace 双语（含 F27）、
+exact History、真实 40 帧录屏和 Viewer capture 通过，六张原生图已查看；仅新增两个成功的设备 Job。
+冷启动为 4.223 秒，单项重跑为 4.644 秒，改动前隔离基线也为 7.647 秒，均未达到 2 秒标准。
+主机其他项目构建是尚未排除的影响因素，不能直接声称本轮回归或环境误报。
+详见[批次结果及附件哈希](references/v1.6-goal/ui-batch-verification.json)；未放宽门限，也未将整个 goal 标为完成。
+
+本轮还新增已签名 HAP、Native 库和 entry+feature 多包的真实执行，结果均为 succeeded；
+Native 验证包括 hash / process / maps，多包流程包括安装、停止、卸载与暂存清理，清理无残留。
+精确参数、Artifact / receipt 哈希与不覆盖项见[Debug 真机元数据](references/v1.6-goal/debug-real-verification.json)。
+原生 App 又通过文件选择器选择真实 entry + feature，经生产 XPC 导入并提交新 Job
+`job-2c4e67f6d107999cc5a996403387ac3a`，结果 succeeded、无 unknown / 残留；三份产物导出后哈希一致。
+HSP 仅检查了本地选择，不从 feature HAP 成功推断 HSP 真机安装通过。
+真实 HiLog 编码提示及 HAP / Native 的 History→Debug 精确上下文已补逐图检查，
+[本机截图的哈希](references/v1.6-goal/manual-native-verification.json)不包含 raw 图片。
+F29 定向 Swift 34 项与设计测试 39 项通过；本次完整闸发现 App 使用旧式字符串格式化，
+已改为类型安全本地化资源，随后完整闸退出 0：Swift 调度 1,826 + 1 identity race + 5 scale = 1,832 项，
+三条车道均通过；SDD、catalog generator 49 tests、零漂移和 App/UI-test bundle 编译通过。
+见[最终本地闸元数据](references/v1.6-goal/local-gate-verification.json)。该闸覆盖 F28–F30 生产代码；
+F31 仅改设计与参考图，另行通过设计交互和构建，不把 compile-only 当作 UI 断言通过。
+原生文件选择测试两次未能初始化系统 automation mode，
+未执行断言；不能记为通过。Computer Use 已核对选择/重复拒绝/移除/清空，并发现和修正按钮标识覆盖。
+F30 四种生命周期组合的设计测试通过；原生中文提示及填写后的 Bundle/Ability 标签已逐图核查。
+后续 AX 检查发现跨列文本合并会吞掉警告标识，分栏 contain 后确认警告标识独立、策略切换移除提示；
+HSP 移除按钮也确认保持独立标识。入口/附加文件名仍与说明合并，继续补附加区与文件行 contain，
+原生用例同时断言独立文件名与全部四种策略组合。最终原生回归仍待完成。
+四次新的初始化超时见[失败尝试记录](references/v1.6-goal/native-ui-initialization-attempts.json)，
+最终代码重建并等待其他构建结束后仍未开始断言；Computer Use 连接也未恢复。
+不将这些失败当作产品断言通过。goal 目录现有 13 张设计参考，均已逐图查看。
+F31 来自真实 Trace 字段级复查：键盘事件选择、范围聚合/缩放、Flag 改名及重载保留已观察，
+本次测试 Flag 已删除；原型补齐相同操作，不引入新 Runtime 能力。40 项设计交互测试及设计包构建通过。
+继续对照锁定的 ArkTrace `TraceDocumentController.addMark` / `TimelineNSView.drawAnnotations`：
+临时 Mark 只保留最后一个，保留 Mark 累积；名称与颜色按当前同类条目数分配，ID 不复用。
+原型已修正替换语义并显示范围色带，中英文浏览器核对保留 3.800–5.050 s、替换为 0.600–1.780 s。
+两张参考图已更新、逐图查看；40 项设计交互及 7 项既有设计同步合约通过。
+
+### 尺寸与 UI 测试修正说明
+
+原断言把 AX 外框高直接与 `.defaultSize(height: 760)` 相等，基线也失败。
+实际测得 frame/content 为 1180×783，contentLayout 为 1180×731；通用 style-mask 估算又得到不同值，
+因此不再采用固定标题栏高度补偿。新 opt-in 探针只记录真实 NSWindow，不调整 frame 或用户存储位置。
+回归检查实际外框与 AX 一致、宽度 1180、未落入最小窗，并用实测 native chrome 约束高度。
+这修正的是测量契约，**没有修改 App 的默认尺寸，也不是像素一致性验收**。
+原生系统 chrome、首轮 1180×760 浏览器视口、后续实际 1280×720 视口分别标注；后者内的 reference window 仍固定为1180×760，部分图存在滚动，不能作为像素对齐证据。
+
+依据：[Apple fullSizeContentView](https://developer.apple.com/documentation/appkit/nswindow/stylemask-swift.struct/fullsizecontentview)、
+[contentLayoutRect](https://developer.apple.com/documentation/appkit/nswindow/contentlayoutrect)、
+[SwiftUI defaultSize](https://developer.apple.com/documentation/swiftui/scene/defaultsize(width:height:))。
+跨窗口装饰样式的测试边界是结合实际测量作出的工程选择，不是声称文档规定了固定 23pt 标题栏。
+
+全量扫页还发现 Job 详情标题现在为 AXHeading，旧测试强制用 StaticText 查询失败；已改为稳定
+`jobInspector.runtimeFacts` 标识，保留 heading 语义。Trace Help 与 Window 菜单存在同名项，测试现限定 Help 菜单。
+Flash 历史入口会正确 pin 已失联的旧目标；测试必须显式选择 fixture 当前目标，不能要求产品默换设备。
+
+### 可复现命令
+
+```sh
+npm --prefix docs/design/arkdeck-ds test
+npm --prefix docs/design/arkdeck-ds run build
+npm --prefix docs/design/arkdeck-ds run build:review
+
+python3 scripts/ci/plan.py --repo-root . --base-revision origin/main \
+  --head-revision HEAD --merge-base --include-worktree --run-local
+
+sh scripts/ci/run-ui-tests.sh \
+  -only-testing:ArkDeckHDCUITests/AppShellUITests \
+  -only-testing:ArkDeckHDCUITests/OverviewRecordUITests
+```
+
+UI 测试必须与其他构建串行执行。真实设备用例没有显式环境开关时跳过；fixture 永远不记为硬件证据。
+
+### 参考图
+
+首轮 [v1.6 的 63 张图](references/v1.6/README.md) 保留为首轮快照；后续变更页面需以新补充图为准。
+[后续参考图](references/v1.6-followup/README.md)包含 **49 张浏览器图 + 9 张原生 PNG**，均已逐张查看、校验尺寸与 SHA-256。原生附件未缩放或重绘。
+浏览器图是 design demo；原生 Diagnostics/Inspector 是 fixture，Trace 空窗包含本机 Recent 元数据但没有打开 Trace。
+**原生 loaded Trace / 全部交互状态的像素验收未做**；不能拿合成 timeline 替代 parser/设备结果。原生 `.xcresult` 的主机身份和无关 App 附件不写入仓库。
+
+## 5. 仍需后续产品任务的能力
+
+1. **Diagnostics 交互式会话**：arm/append-marker/stop、会话内视频和跨时钟校准；现有 bounded ringBuffered、markers.json 和 reader 不等于该完整体验。缺失 operation/并发契约不得从 App 接 raw HDC 补洞。
+2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
+3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
+4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动仍超时，F28 Runtime 修正须先回归并经维护者 review/merge，才能更新受保护运行时复验。其余适用流程继续验证；两种 Flash 操作当前缺少 ArkForge bundle 配置，HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
+
+这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
+不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。

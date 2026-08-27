@@ -100,6 +100,13 @@ public struct BootstrapDeviceInformation: Sendable, Equatable {
   }
 }
 
+/// Display decoration has its own observation time. A warm candidate list
+/// must not relabel older property values with the candidate probe's time.
+public struct BootstrapDeviceInformationSnapshot: Sendable, Equatable {
+  public let information: [String: BootstrapDeviceInformation]
+  public let observedAtUTC: String
+}
+
 public enum BootstrapHumanActionKind: String, Sendable, Equatable {
   case trustDevice
   case physicalReconnect
@@ -983,6 +990,12 @@ public actor DeviceBootstrapMachine {
     let task: Task<BootstrapCandidateSnapshot, Error>
   }
 
+  private struct InformationRead: Sendable {
+    let id: UInt64
+    let generation: UInt64
+    let task: Task<BootstrapDeviceInformationSnapshot, Never>
+  }
+
   public private(set) var phase: BootstrapPhase = .discoverHostTools
   private let observation: any BootstrapObservationPort
   private let targetStore: RuntimeTargetStore
@@ -995,6 +1008,12 @@ public actor DeviceBootstrapMachine {
   private var latestCandidateSnapshotObservedAt: ContinuousClock.Instant?
   private var latestCandidateRefreshFailed = false
   private var candidateMonitoringTask: Task<Void, Never>?
+  private var informationRoutes: Set<String> = []
+  private var informationGeneration: UInt64 = 0
+  private var nextInformationReadID: UInt64 = 0
+  private var informationRead: InformationRead?
+  private var latestInformation: BootstrapDeviceInformationSnapshot?
+  private var latestInformationObservedAt: ContinuousClock.Instant?
 
   public init(
     observation: any BootstrapObservationPort,
@@ -1050,28 +1069,105 @@ public actor DeviceBootstrapMachine {
   public func deviceInformationForPresentation(
     candidates: [BootstrapCandidate]
   ) async -> [String: BootstrapDeviceInformation] {
-    let observation = observation
-    return await withTaskGroup(
+    await Self.readDeviceInformation(
+      routes: Set(candidates.filter(\.isAuthorized).map(\.connectKey)),
+      observation: observation, nowUTC: nowUTC).information
+  }
+
+  /// Startup consumes completed, bounded-age decoration while the daemon
+  /// refreshes it independently. Explicit re-checks still await a property
+  /// read. Neither path changes target identity, binding or admission facts.
+  public func deviceInformationSnapshotForPresentation(
+    candidates: [BootstrapCandidate], useWarmSnapshot: Bool = false
+  ) async -> BootstrapDeviceInformationSnapshot {
+    let requestedRoutes = Set(candidates.filter(\.isAuthorized).map(\.connectKey))
+    let routes = requestedRoutes.intersection(informationRoutes)
+    guard !routes.isEmpty, !latestCandidateRefreshFailed else {
+      return BootstrapDeviceInformationSnapshot(information: [:], observedAtUTC: nowUTC())
+    }
+    if useWarmSnapshot, let latestInformation, let latestInformationObservedAt,
+      latestInformationObservedAt.duration(to: candidateClock.now)
+        <= candidateSnapshotFreshnessWindow
+    {
+      return BootstrapDeviceInformationSnapshot(
+        information: latestInformation.information.filter { routes.contains($0.key) },
+        observedAtUTC: latestInformation.observedAtUTC)
+    }
+
+    let read = beginInformationRead()
+    let snapshot = await resolveInformationRead(read)
+    return BootstrapDeviceInformationSnapshot(
+      information: snapshot.information.filter { routes.contains($0.key) },
+      observedAtUTC: snapshot.observedAtUTC)
+  }
+
+  private static func readDeviceInformation(
+    routes: Set<String>, observation: any BootstrapObservationPort,
+    nowUTC: @Sendable () -> String
+  ) async -> BootstrapDeviceInformationSnapshot {
+    let values = await withTaskGroup(
       of: (String, BootstrapDeviceInformation)?.self,
       returning: [String: BootstrapDeviceInformation].self
     ) { group in
-      for candidate in candidates where candidate.isAuthorized {
+      for route in routes {
         group.addTask {
-          guard
-            let information = try? await observation.observeDeviceInformation(
-              connectKey: candidate.connectKey)
+          guard let value = try? await observation.observeDeviceInformation(connectKey: route)
           else { return nil }
-          return (candidate.connectKey, information)
+          return (route, value)
         }
       }
-
-      var informationByConnectKey: [String: BootstrapDeviceInformation] = [:]
+      var values: [String: BootstrapDeviceInformation] = [:]
       for await result in group {
-        if let (connectKey, information) = result {
-          informationByConnectKey[connectKey] = information
-        }
+        if let (route, value) = result { values[route] = value }
       }
-      return informationByConnectKey
+      return values
+    }
+    return BootstrapDeviceInformationSnapshot(information: values, observedAtUTC: nowUTC())
+  }
+
+  private func beginInformationRead() -> InformationRead {
+    if let informationRead { return informationRead }
+    nextInformationReadID &+= 1
+    let observation = observation
+    let nowUTC = nowUTC
+    let routes = informationRoutes
+    let task = Task {
+      await Self.readDeviceInformation(routes: routes, observation: observation, nowUTC: nowUTC)
+    }
+    let read = InformationRead(
+      id: nextInformationReadID, generation: informationGeneration, task: task)
+    informationRead = read
+    return read
+  }
+
+  private func resolveInformationRead(
+    _ read: InformationRead
+  ) async -> BootstrapDeviceInformationSnapshot {
+    let snapshot = await read.task.value
+    guard read.generation == informationGeneration, !latestCandidateRefreshFailed else {
+      return BootstrapDeviceInformationSnapshot(information: [:], observedAtUTC: nowUTC())
+    }
+    if informationRead?.id == read.id {
+      informationRead = nil
+      latestInformation = snapshot
+      latestInformationObservedAt = candidateClock.now
+    }
+    return snapshot
+  }
+
+  private func invalidateDeviceInformation() {
+    informationGeneration &+= 1
+    informationRead?.task.cancel()
+    informationRead = nil
+    latestInformation = nil
+    latestInformationObservedAt = nil
+  }
+
+  private func warmDeviceInformation() {
+    guard informationRead == nil, !informationRoutes.isEmpty else { return }
+    let read = beginInformationRead()
+    Task { [weak self] in
+      _ = await self?.resolveInformationRead(read)
     }
   }
 
@@ -1084,7 +1180,9 @@ public actor DeviceBootstrapMachine {
       let clock = ContinuousClock()
       while !Task.isCancelled {
         guard let self else { return }
-        _ = try? await self.refreshCandidateSnapshot()
+        if (try? await self.refreshCandidateSnapshot()) != nil {
+          await self.warmDeviceInformation()
+        }
         do {
           try await clock.sleep(for: interval)
         } catch {
@@ -1137,12 +1235,18 @@ public actor DeviceBootstrapMachine {
         latestCandidateSnapshotObservedAt = candidateClock.now
         latestCandidateRefreshFailed = false
         targetStore.recordLiveHDCCandidates(snapshot.candidates)
+        let routes = Set(snapshot.candidates.filter(\.isAuthorized).map(\.connectKey))
+        if routes != informationRoutes {
+          invalidateDeviceInformation()
+          informationRoutes = routes
+        }
       }
       return snapshot
     } catch {
       if candidateEnumeration?.id == enumeration.id {
         candidateEnumeration = nil
         latestCandidateRefreshFailed = latestCandidateSnapshot != nil
+        invalidateDeviceInformation()
       }
       throw error
     }

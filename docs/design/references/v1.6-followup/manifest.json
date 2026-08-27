@@ -1,0 +1,974 @@
+{
+  "baseline": "e1d52e68db435bdfeb326962767ca4626a77322b",
+  "date": "2026-08-27",
+  "hardwareEvidence": false,
+  "browserCount": 49,
+  "nativeCount": 9,
+  "notes": [
+    "Browser references use an actual 1280x720 viewport around a fixed 1180x760 design window. They are not pixel-size equivalents of native windows.",
+    "Long surfaces use separately recorded scroll positions; screenshots do not prove all hidden content.",
+    "Native Diagnostic and global Job images use fixtures. Trace empty/recent images retain host recent-entry metadata but open no trace and run no device operation.",
+    "No original xcresult manifest, host device identifier, unrelated app attachment or crash report is included."
+  ],
+  "entries": [
+    {
+      "file": "components-en-light.jpg",
+      "url": "http://127.0.0.1:8765/session-components.html?lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "38515b4da81b149f38388639f2a2d5cd6a19ae415e7e60df62bad1fd9a989589",
+      "byteCount": 69830,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "components-en-light-device.jpg",
+      "url": "http://127.0.0.1:8765/session-components.html?lang=en",
+      "interaction": "Scroll to the Device section by selecting the No screenshot heading.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "24e93fdb2c8f77e1c3f4445ba998a953b3f76b40c813d52db2c3ec37e02fcea0",
+      "byteCount": 47863,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "components-zh-dark.jpg",
+      "url": "http://127.0.0.1:8765/session-components.html?lang=zh-Hans&appearance=dark",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "375120c2d4ed65f4a7e3f7753f690d95156747561631333a8e88ee6e90cf3c10",
+      "byteCount": 60737,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "components-zh-dark-device.jpg",
+      "url": "http://127.0.0.1:8765/session-components.html?lang=zh-Hans&appearance=dark",
+      "interaction": "Set frames to 300; enter 301 and verify the controlled field stays at 300; scroll to Device.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "9652cf0de8cb09d95b7eabe8cb771909534685f208c5beeb130bc671f1a3d377",
+      "byteCount": 42639,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-loaded-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "b4bf059d66abf89044ee1aff4a5801e6df4da4a1df8ff50be8c4fe600d7b1b70",
+      "byteCount": 78439,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-search-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=en",
+      "interaction": "Search Draw and choose Next match; selected sample event is DrawFrame.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "3f8ba1237f44fa1fc31a595018284a2d274d44cf1c441494c594a3a62f3c0925",
+      "byteCount": 75904,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-range-mark-bottom-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=en",
+      "interaction": "Select range, set From to 1, Apply range; Mark Selection and Keep; dock at Bottom.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "9a5dc1d35177e51e9fe2349cf44b464c2679615f036344860fa04d28b3ac6d55",
+      "byteCount": 69192,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-loaded-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "11612a33b3337b1293457160088a0bc3aa6773eef87a12f8f41bafc60b2317ba",
+      "byteCount": 70149,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-empty-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "ad4f39aeda3a1c34db1667e5135189df2a412e25d3baf3f2efe3c66ba5dc1f71",
+      "byteCount": 38496,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-failed-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=failed&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "9597a425ee35a50ac47713f2f551da0f5398191d2f7d494b36ed928ca16b815a",
+      "byteCount": 43710,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-loading-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loading&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "81da0e2c8d3627b985929880fb39fc12d0f60fa69bc7aecb5440cf35788c81e5",
+      "byteCount": 41126,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-shortcuts-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-shortcuts&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "c86ad2eda9b8b48ea6b6ec5ceae16df77f0efd8dd4ca0e925ebc66e1792a299a",
+      "byteCount": 61631,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-shortcuts-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-shortcuts&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "51ce76b1e04d4b45b498562fb71ceaa4dd57409cf63fbc7f930e4553de53ec1d",
+      "byteCount": 69636,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "trace-viewer-filter-empty-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&traceViewerState=loaded&lang=en",
+      "interaction": "Search Draw and select the result; filter processes by unmatched. Selected event is preserved while the lane list becomes empty.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "bec88b7857a0f1ef4a02165bee4e8fce080c36b8a796a4711072cfe082a177cb",
+      "byteCount": 64859,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "diagnostics-loaded-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&diagnosticsState=loaded&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "f011f9d1e7ef4090da26ee1305c813d395a98e9b844ff700c8c5697cd80f88cc",
+      "byteCount": 62077,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "diagnostics-loaded-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&diagnosticsState=loaded&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "5b400fc8df08a0497eaedf4d92ffe8f339c73680ad4bd7fef7f6ccf4319a56e8",
+      "byteCount": 59251,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "diagnostics-preview-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&lang=zh-Hans&diagnosticsState=loaded",
+      "interaction": "Click 在本机读取敏感内容, then hilog.txt heading to bring the explicit preview into view.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "bffb0d99de8b31e4a506b023cff9739c7d61edcc1fcbe41d83e7908f89b21493",
+      "byteCount": 58014,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "diagnostics-partial-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&lang=en&diagnosticsState=partial",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "4f8354d76aa44253692286930dcfe8cefc2d5e9dd958c519cff6aea0e2c92d9e",
+      "byteCount": 64408,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "diagnostics-failed-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&lang=zh-Hans&diagnosticsState=failed",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "bbdad2b8a5abb2aef436f788f32689f058d8598d19ccd0733d8c7a3599455675",
+      "byteCount": 49337,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "diagnostics-trace-source-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&lang=en&diagnosticsState=trace",
+      "interaction": "Scroll to Session artifacts; the published sensitive Trace has an explicit handoff button.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "a70689302104ce21901323ea956c01cce1eb02949b99ff335f2fb178a6578de3",
+      "byteCount": 62385,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "overview-prepare-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en",
+      "interaction": "Click Continue… on S-0826-04, the fourth Recent work row.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "2629fd4ff72da3167fa4567c20440b89024e4425bb2816abc09f0b9f8afb6328",
+      "byteCount": 45392,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "overview-readonly-draft-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en",
+      "interaction": "S-0826-04 → Continue… → Prepare Inputs, then scroll to New draft from history. No Job submitted.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "16eb2ccc62fc29b24cbb176c13541328aba1f159516b40457be8384e28d54656",
+      "byteCount": 66487,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "overview-prepare-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=zh-Hans",
+      "interaction": "Click 继续… on S-0826-04 (fourth row).",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "6f1affa3b18148f4a8e015559db344b8aedf6ed80284dbd15d13813768cac97c",
+      "byteCount": 41268,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "overview-readonly-draft-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=zh-Hans",
+      "interaction": "S-0826-04 → 继续… → 准备参数, then scroll to 来自历史记录的新草稿.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "07dc0b2d743ac60e92531b62e35ab3adda5f04983a2500649c894c6a20b4a623",
+      "byteCount": 59870,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "job-inspector-running-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en&jobState=running",
+      "interaction": "Open the global Job inspector.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "a5036e2b86100f9ec34054e4819f8eab7cb139cd39867cf81faf728e2b5e8e8d",
+      "byteCount": 63302,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "job-inspector-cancel-request-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en&jobState=running",
+      "interaction": "Open inspector → Request Cancellation. The state remains running.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "5c554676a4cef09869c4b96fad39ae32b6ab5154d0ccf96a2afcb62b1bceb441",
+      "byteCount": 65365,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "job-inspector-log-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en&jobState=running",
+      "interaction": "Open inspector → Request Cancellation → Read Log · capture.log. Scroll to the explicit log preview.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "764412c80ced7160899cef057cf584c92c6364522aeccbc86821270c17f61962",
+      "byteCount": 59484,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "job-inspector-unknown-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=zh-Hans&jobState=unknown",
+      "interaction": "Open global inspector; unknown outcome has no cancellation, replay, archive or confirmation override.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "cf902fabd8f82619d6330f461cbbfb9b451b2aa802ab57191668be3220ee4320",
+      "byteCount": 64521,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-artifacts-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "e7436363ca87cecdcce649cd6ae55f7a15adf1990d4da71e63b4e0f56b2f5989",
+      "byteCount": 87043,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-logs-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=logs&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "eef5e8c07ab21e6be267b48c81dbad2092165f4caf6305d42692d9eef478e93f",
+      "byteCount": 68729,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-apps-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "d63e563b2099b69a59341d44a0513b0ff1e78d8aa90521820c9b2902cc8466c5",
+      "byteCount": 82746,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-network-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=net&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "086765fa5b0b4ac7962ef6917447649ea9556a2dc71e72f52c1f9a01001b56cb",
+      "byteCount": 63623,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-commands-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=cmd&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "2646dd7aee16dcbd353a2342bfba70314108e635d7161d18a044a3a870e737be",
+      "byteCount": 81727,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-artifacts-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "d0c4badc25b45f128234c7470aff69019cbc6c3d5bbd1a761515364caba07a28",
+      "byteCount": 73739,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-apps-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "346e5a24c046f394bd7cb9b9af28f192b72e264174dcf22ce4093c1b3563a169",
+      "byteCount": 72727,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-logs-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=logs&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "1569aac48539cee98564d6c95fc57bf44949f408aa1a14b0015411bfbcc9f2f4",
+      "byteCount": 59190,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-network-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=net&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "657814de65dd0b3fcadcc7b0dffafdcefeba83ffdbaad61347b7a57a2cbdb6a4",
+      "byteCount": 57235,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-commands-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=cmd&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "5b90826ca479a0a1787058b0ace882ca8f75d0040cd9b52f40d15a02b00797bd",
+      "byteCount": 73222,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-native-plan-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "Choose local .so… → Target bundle com.example.app → Validate and review plan, wait for the demo plan sheet. No file read or device effect.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "43c8002651bbc4915780700fa555a029daebe78010af8fc599f9fb9b647f0a01",
+      "byteCount": 65861,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "debug-native-plan-steps-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "Choose demo .so, bundle com.example.app, Validate and review plan; scroll within Materialized steps to finalize-session (step 11).",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "26087c05020937faf41441ae60464a4f132e9e9e5b273acb28674b7523c18ad1",
+      "byteCount": 70145,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "ssh-manager-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "Remote server → Manage servers…; design fixtures only.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "005408cb5a4bc5ec6086b54f6ab456f1a8880539412de2b51af6008cdc549981",
+      "byteCount": 53422,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "ssh-editor-unverified-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "Remote server → Manage servers… → Edit. Save remains disabled before probing the current draft.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "830fff640e899d957b7051a406e0f3be32bc21a5a4b1fa4f798da795cd668567",
+      "byteCount": 50875,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "ssh-editor-verified-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "Remote server → Manage servers… → Edit → Username builder → Test connection and inspect host key. This is a synthetic probe, not SSH.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "51bf746b30ef603ddca6236eaa9d3dbef74bc562e1c046dd06e0e1d2bccd8626",
+      "byteCount": 60072,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "ssh-editor-drift-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "After synthetic verification, change Host or IP to build-changed.example.internal. Verify Save verified server is disabled again.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "defdff343e76eacf83ddfc1962267a725f11990ca0b72cd0f1679ca97cacdabf",
+      "byteCount": 52571,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "ssh-browser-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=artifacts&lang=en",
+      "interaction": "Remote server → Browse remote .so…; synthetic root-confined directory sample.",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "fcefcd8a6f9170612da23107009913a5fe7522ee2f0b152f6a0bab3026f9fd7f",
+      "byteCount": 42060,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "settings-trace-cache-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&traceSettingsTab=cache&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "6ddd82eeaf33f3b7e005d664754e3e44e03b67760039e72a3516832b1a7f21e0",
+      "byteCount": 38663,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "settings-trace-cache-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&traceSettingsTab=cache&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "8db540fde4212f268b24864b8f4c2ac143bc1ed81cc96a210fc3f909a54e35d2",
+      "byteCount": 31801,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "settings-trace-licenses-en.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&traceSettingsTab=licenses&lang=en",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "bec8f0fb4f81e36785a9ee4fd38c8f098d883e510b3c634a34ff65cfcd9df08b",
+      "byteCount": 46981,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "settings-trace-licenses-zh.jpg",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&traceSettingsTab=licenses&lang=zh-Hans",
+      "interaction": "",
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      },
+      "fullPage": false,
+      "kind": "browser_design_demo",
+      "sha256": "1fb57a0994ec1ff78a9d5a9b08afc145ea1a6fd1c1e5a4aac05104e3dfc5a2f4",
+      "byteCount": 39588,
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "visualReview": "viewed-in-session"
+    },
+    {
+      "file": "native/diagnostics-session-en.png",
+      "kind": "native_app_fixture",
+      "testIdentifier": "AppShellUITests/testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment",
+      "sourceBundle": "ArkDeck-ui-followup-shell-regression.xcresult",
+      "originalAttachment": "12772AAE-2115-4C09-B2A7-4717DD6C693D.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "23c6cc815d5ecb31630a0bf3374173c920ecdf1eaed03fb8477640ad69dabbf8",
+      "byteCount": 441287,
+      "mimeType": "image/png",
+      "width": 2360,
+      "height": 1566
+    },
+    {
+      "file": "native/diagnostics-preview-en.png",
+      "kind": "native_app_fixture",
+      "testIdentifier": "AppShellUITests/testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment",
+      "sourceBundle": "ArkDeck-ui-followup-shell-regression.xcresult",
+      "originalAttachment": "80EFD14A-9ACA-4AF1-B3C7-D3E7060B24F7.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "3784a109cc87ba930946806c3a10546262cbbfcac36d124df3d1601f68369fb1",
+      "byteCount": 454890,
+      "mimeType": "image/png",
+      "width": 2360,
+      "height": 1566
+    },
+    {
+      "file": "native/diagnostics-session-zh.png",
+      "kind": "native_app_fixture",
+      "testIdentifier": "AppShellUITests/testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment",
+      "sourceBundle": "ArkDeck-ui-followup-shell-regression.xcresult",
+      "originalAttachment": "9CCACC11-79A0-4A2A-A2FE-C07745E3F873.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "1b50b9099f619460b5d9b0f8297d7a75cd73245b0733b34ee3073bb3aad91d36",
+      "byteCount": 467759,
+      "mimeType": "image/png",
+      "width": 2360,
+      "height": 1566
+    },
+    {
+      "file": "native/diagnostics-preview-zh.png",
+      "kind": "native_app_fixture",
+      "testIdentifier": "AppShellUITests/testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment",
+      "sourceBundle": "ArkDeck-ui-followup-shell-regression.xcresult",
+      "originalAttachment": "13034E79-03D3-4124-B84F-DFEA8565FD54.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "20dc66a9c79ad07d6c5f875d7520b9c52a5c10855a58c75821cc002ac991abd6",
+      "byteCount": 474318,
+      "mimeType": "image/png",
+      "width": 2360,
+      "height": 1566
+    },
+    {
+      "file": "native/trace-viewer-empty-en.png",
+      "kind": "native_app_ui_test",
+      "testIdentifier": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages",
+      "sourceBundle": "ArkDeck-ui-followup-trace-localized-final.xcresult",
+      "originalAttachment": "F817D080-A2D2-4CD6-82B9-929D90769090.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "f228f7410678a99982103e197b4a840725c7be064b4225957634af4be731359f",
+      "byteCount": 183355,
+      "mimeType": "image/png",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "file": "native/trace-viewer-empty-zh.png",
+      "kind": "native_app_ui_test",
+      "testIdentifier": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages",
+      "sourceBundle": "ArkDeck-ui-followup-trace-localized-final.xcresult",
+      "originalAttachment": "6F70E9FB-B733-4035-BE0B-261705018B51.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "adfdbb6b54df0f0a11f86298deef4905316b415b2d20a9eece37cd6fe20e2538",
+      "byteCount": 188968,
+      "mimeType": "image/png",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "file": "native/trace-shortcuts-en.png",
+      "kind": "native_app_ui_test",
+      "testIdentifier": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages",
+      "sourceBundle": "ArkDeck-ui-followup-trace-localized-final.xcresult",
+      "originalAttachment": "AC7F2517-39A4-4F0C-8EBC-41CF32B74A5C.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "436610cfcd1c654956e8dccd0844d70d419e0dcf092cb18385580478fca736d1",
+      "byteCount": 193699,
+      "mimeType": "image/png",
+      "width": 1040,
+      "height": 1240
+    },
+    {
+      "file": "native/trace-shortcuts-zh.png",
+      "kind": "native_app_ui_test",
+      "testIdentifier": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages",
+      "sourceBundle": "ArkDeck-ui-followup-trace-localized-final.xcresult",
+      "originalAttachment": "363F6FAD-C9D0-4B42-AAD6-D03E23ECCE40.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "0b2a900b015f363ebe1c212e08986b92fcf79fb6c07b4eb10f7eea3479867247",
+      "byteCount": 211335,
+      "mimeType": "image/png",
+      "width": 1040,
+      "height": 1240
+    },
+    {
+      "file": "native/job-inspector-en.png",
+      "kind": "native_app_fixture",
+      "testIdentifier": "AppShellUITests/testEnglishSweepOfEveryWorkspace",
+      "sourceBundle": "ArkDeck-ui-followup-shell-sweeps-confirmed.xcresult",
+      "originalAttachment": "69F94735-830B-4F47-A815-74CE6F929BB5.png",
+      "visualReview": "viewed-in-session",
+      "byteForByteCopy": true,
+      "sha256": "1b7c375cb48976dee41fc973d36383a9f82b28565074ec098577634989ac3c97",
+      "byteCount": 370089,
+      "mimeType": "image/png",
+      "width": 2360,
+      "height": 1566
+    }
+  ]
+}

@@ -314,13 +314,16 @@ export interface DumpInspectorProps {
   fields: DumpField[];
   layoutFields?: DumpField[];
   accessibilityFields?: DumpField[];
+  /** Caller-owned loading, search, refusal or componentDetail fields. */
+  advancedContent?: ReactNode;
+  onRequestAdvancedDump?: () => void;
   raw: string;
   interactive?: boolean;
   visible?: boolean;
   className?: string;
 }
 
-type InspectorTab = "attributes" | "layout" | "accessibility" | "raw";
+type InspectorTab = "attributes" | "layout" | "accessibility" | "raw" | "advanced";
 
 /** Structured dump fields with the complete raw record always reachable. */
 export function DumpInspector({
@@ -330,6 +333,8 @@ export function DumpInspector({
   fields,
   layoutFields = [],
   accessibilityFields = [],
+  advancedContent,
+  onRequestAdvancedDump,
   raw,
   interactive,
   visible,
@@ -338,12 +343,18 @@ export function DumpInspector({
   const [tab, setTab] = useState<InspectorTab>("attributes");
   const tabBase = useId();
   const tabs: Array<[InspectorTab, string]> = [
-    ["attributes", "Attributes"],
+    ["attributes", "Properties"],
     ["layout", "Layout"],
     ["accessibility", "Accessibility"],
     ["raw", "Raw dump"],
+    ["advanced", "Advanced Dump"],
   ];
   const activeFields = tab === "layout" ? layoutFields : tab === "accessibility" ? accessibilityFields : fields;
+
+  function selectTab(value: InspectorTab) {
+    setTab(value);
+    if (value === "advanced") onRequestAdvancedDump?.();
+  }
 
   function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next = index;
@@ -353,7 +364,7 @@ export function DumpInspector({
     else if (event.key === "End") next = tabs.length - 1;
     else return;
     event.preventDefault();
-    setTab(tabs[next][0]);
+    selectTab(tabs[next][0]);
     const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]");
     buttons?.[next]?.focus();
   }
@@ -381,7 +392,7 @@ export function DumpInspector({
             aria-selected={tab === value}
             aria-controls={`${tabBase}-panel`}
             tabIndex={tab === value ? 0 : -1}
-            onClick={() => setTab(value)}
+            onClick={() => selectTab(value)}
             onKeyDown={(event) => handleTabKey(event, index)}
           >
             {label}
@@ -395,7 +406,9 @@ export function DumpInspector({
         aria-labelledby={`${tabBase}-${tab}-tab`}
         tabIndex={0}
       >
-        {tab === "raw" ? (
+        {tab === "advanced" ? (
+          advancedContent ?? <p>No componentDetail data was supplied to this preview.</p>
+        ) : tab === "raw" ? (
           <pre>{raw}</pre>
         ) : (
           <dl>

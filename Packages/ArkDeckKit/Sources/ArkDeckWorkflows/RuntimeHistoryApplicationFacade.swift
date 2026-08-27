@@ -217,6 +217,9 @@ public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
   public let finishedAtUTC: String?
   public let parameters: [RuntimeJobParameterPresentation]
   public let parametersWereReported: Bool
+  /// Original JSON types, retained separately from display strings. A UI may
+  /// prepare a new request from these values but never from formatted text.
+  public let typedParameters: [String: JSONValue]?
   public let actualStepKinds: [String]
   public let authorityKind: String?
   public let authorityReference: String?
@@ -292,6 +295,7 @@ public struct RuntimeHistoryWorkspaceContext: Sendable, Equatable, Identifiable 
   public let bindingRevision: Int?
   public let finishedAtUTC: String?
   public let parameters: [RuntimeJobParameterPresentation]
+  public let typedParameters: [String: JSONValue]?
   public let artifacts: [RuntimeArtifactPresentation]
 
   public var id: String { jobID }
@@ -320,12 +324,18 @@ public struct RuntimeHistoryWorkspaceContext: Sendable, Equatable, Identifiable 
       ?? detail.evidence?.observedBindingRevision
     finishedAtUTC = job.finishedAtUTC
     parameters = detail.evidence?.parameters ?? []
+    typedParameters = detail.evidence?.typedParameters
     artifacts = detail.artifacts
   }
 }
 
 public enum RuntimeArtifactExportResult: Sendable, Equatable {
   case completed(URL)
+  case failed(String)
+}
+
+public enum RuntimeArtifactReadResult: Sendable, Equatable {
+  case loaded(Data)
   case failed(String)
 }
 
@@ -357,6 +367,23 @@ public protocol RuntimeJobDetailApplicationProviding: Sendable {
     destinationURL: URL,
     allowSensitive: Bool
   ) async -> RuntimeArtifactExportResult
+  /// Bounded, metadata-verified local preview. This never exports or writes a
+  /// file and does not opt the caller into reading sensitive bytes implicitly.
+  func readArtifact(
+    jobID: String,
+    artifact: RuntimeArtifactPresentation,
+    maximumBytes: Int,
+    allowSensitive: Bool
+  ) async -> RuntimeArtifactReadResult
+}
+
+extension RuntimeJobDetailApplicationProviding {
+  public func readArtifact(
+    jobID: String, artifact: RuntimeArtifactPresentation,
+    maximumBytes: Int, allowSensitive: Bool
+  ) async -> RuntimeArtifactReadResult {
+    .failed("This detail provider does not support Artifact previews")
+  }
 }
 
 public enum RuntimeHistoryApplicationFacade {
@@ -459,23 +486,72 @@ actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
   }
 }
 
-private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding {
+actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding {
+  private let request: @Sendable (String, [String: JSONValue]) async -> RuntimeHistoryTransportResult
+
+  init(
+    request: @escaping @Sendable (String, [String: JSONValue]) async -> RuntimeHistoryTransportResult = {
+      await RuntimeHistoryXPCReadTransport.request(method: $0, params: $1)
+    }
+  ) {
+    self.request = request
+  }
+
   func loadJobDetail(
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
-    async let status = RuntimeHistoryXPCReadTransport.request(
-      method: "job.status", params: ["jobId": .string(jobID)])
-    async let evidence = RuntimeHistoryXPCReadTransport.request(
-      method: "job.evidence", params: ["jobId": .string(jobID)])
-    async let artifacts = RuntimeHistoryXPCReadTransport.request(
-      method: "artifact.list", params: ["jobId": .string(jobID)])
+    async let status = request("job.status", ["jobId": .string(jobID)])
+    async let evidence = request("job.evidence", ["jobId": .string(jobID)])
+    async let artifacts = request("artifact.list", ["jobId": .string(jobID)])
     return await RuntimeJobDetailResponseDecoding.presentation(
       jobID: jobID,
       operationReference: operationReference,
       statusResponse: await status,
       evidenceResponse: evidence,
       artifactResponse: artifacts)
+  }
+
+  func readArtifact(
+    jobID: String, artifact: RuntimeArtifactPresentation,
+    maximumBytes: Int, allowSensitive: Bool
+  ) async -> RuntimeArtifactReadResult {
+    // A caller can lower this ceiling, never raise it. Large artifacts stay
+    // on the explicit streaming export/Trace reader paths.
+    guard maximumBytes > 0, maximumBytes <= 16 * 1_024 * 1_024,
+      artifact.status == "published", artifact.byteCount >= 0,
+      artifact.byteCount <= Int64(maximumBytes)
+    else { return .failed("Artifact is unpublished or exceeds the bounded preview limit") }
+    guard ["standard", "sensitive"].contains(artifact.privacy),
+      artifact.privacy != "sensitive" || allowSensitive
+    else {
+      return .failed("Sensitive Artifact preview requires explicit opt-in")
+    }
+    do {
+      var bytes = Data()
+      var offset: Int64 = 0
+      while offset < artifact.byteCount {
+        try Task.checkCancellation()
+        let response = await request("artifact.read", [
+          "jobId": .string(jobID), "artifactId": .string(artifact.id),
+          "offset": .integer(offset), "maxBytes": .integer(256 * 1_024),
+          "allowSensitive": .bool(allowSensitive),
+        ])
+        let chunk = try RuntimeArtifactChunkResponseDecoding.chunk(
+          response, jobID: jobID, artifact: artifact, expectedOffset: offset)
+        guard chunk.data.count <= 256 * 1_024,
+          chunk.eof == (chunk.nextOffset == artifact.byteCount)
+        else { return .failed("Runtime Artifact chunk exceeds the read bound or has drifting EOF facts") }
+        bytes.append(chunk.data)
+        offset = chunk.nextOffset
+      }
+      guard SHA256Hex.string(of: bytes) == artifact.sha256 else {
+        return .failed("Artifact SHA-256 does not match Runtime metadata")
+      }
+      return .loaded(bytes)
+    } catch {
+      return .failed("Artifact preview failed: \(error)")
+    }
   }
 
   func exportArtifact(
@@ -949,6 +1025,10 @@ enum RuntimeJobDetailResponseDecoding {
         finishedAtUTC: envelope["finishedAtUtc"] as? String,
         parameters: parameters,
         parametersWereReported: parameterObject != nil,
+        typedParameters: parameterObject.flatMap { object in
+          guard let bytes = try? JSONSerialization.data(withJSONObject: object) else { return nil }
+          return try? JSONDecoder().decode([String: JSONValue].self, from: bytes)
+        },
         actualStepKinds: envelope["actualStepKinds"] as? [String] ?? [],
         authorityKind: authority?["kind"] as? String,
         authorityReference: authority?["reference"] as? String,
@@ -1121,6 +1201,9 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
+    if jobID == DiagnosticSessionUIFixture.job.id,
+      operationReference == DiagnosticSessionUIFixture.job.operationReference,
+      let detail = try? DiagnosticSessionUIFixture.detail() { return detail }
     let isFlash = ArkForgeFlashOperation.containsDurableRecordReference(
       operationReference)
     let isInterruptedHistoryFixture = jobID == "job-fixture-0002"
@@ -1147,6 +1230,7 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
           RuntimeJobParameterPresentation(name: "fixture", value: "presentation-only")
         ],
         parametersWereReported: true,
+        typedParameters: ["fixture": .string("presentation-only")],
         actualStepKinds: isFlash ? ["flashPartition"] : ["readDeviceFacts"],
         authorityKind: isFlash ? "runtimeCapability" : "defaultReadOnlyPolicy",
         authorityReference: "fixture-read-only",
@@ -1190,6 +1274,17 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
               sha256: String(repeating: "b", count: 64))
           ]
           : []))
+  }
+
+  func readArtifact(
+    jobID: String, artifact: RuntimeArtifactPresentation, maximumBytes: Int, allowSensitive: Bool
+  ) async -> RuntimeArtifactReadResult {
+    guard jobID == DiagnosticSessionUIFixture.job.id,
+      let documents = try? DiagnosticSessionUIFixture.documents(), let bytes = documents[artifact.name],
+      bytes.count <= maximumBytes, artifact.privacy != "sensitive" || allowSensitive,
+      artifact.id == "fixture-\(artifact.name)", SHA256Hex.string(of: bytes) == artifact.sha256
+    else { return .failed("fixture_artifact_unavailable") }
+    return .loaded(bytes)
   }
 
   func exportArtifact(
@@ -1253,6 +1348,9 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     }
     guard !empty else {
       return RuntimeHistoryPresentation(availability: .available, jobs: [])
+    }
+    if fixtureRequests("--ui-test-diagnostics-session") {
+      return RuntimeHistoryPresentation(availability: .available, jobs: [DiagnosticSessionUIFixture.job])
     }
     if flashRunning {
       return RuntimeHistoryPresentation(

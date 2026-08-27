@@ -1369,7 +1369,7 @@ enum RuntimeCLI {
         throw CLIError(
           exitCode: EX_USAGE,
           message:
-            "artifact import-hap requires --target <id> --file <unsigned-or-signed.hap>")
+            "artifact import-hap requires --target <id> --file <package.hap|package.hsp>")
       }
       let targetID = rest[targetIndex + 1]
       let payload = try readHAPImportPayload(path: rest[fileIndex + 1])
@@ -1772,13 +1772,10 @@ enum RuntimeCLI {
   private static func readHAPImportPayload(path: String) throws -> HAPImportPayload {
     let url = URL(filePath: path).standardizedFileURL
     let name = url.lastPathComponent
-    guard name.count <= 128,
-      name.range(
-        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.hap$"#,
-        options: .regularExpression) != nil
+    guard DebugHAPPackageSelection.isSafeName(name, allowsHSP: true)
     else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "HAP file must have a safe .hap basename")
+        exitCode: EX_USAGE, message: "Package file must have a safe .hap or .hsp basename")
     }
     let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
     guard descriptor >= 0 else {

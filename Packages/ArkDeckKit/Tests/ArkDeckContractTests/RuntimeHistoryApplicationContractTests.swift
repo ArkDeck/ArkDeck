@@ -27,6 +27,134 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         withJSONObject: ["ok": true, "id": "history-contract", "result": result]))
   }
 
+  private func previewArtifact(
+    _ bytes: Data, privacy: String = "standard", status: String = "published", hash: String? = nil
+  ) -> RuntimeArtifactPresentation {
+    RuntimeArtifactPresentation(
+      id: "artifact-preview", name: "capture.log", role: "log", mediaType: "text/plain",
+      byteCount: Int64(bytes.count), sha256: hash ?? SHA256Hex.string(of: bytes),
+      privacy: privacy, status: status, statusDetail: nil, sourceOperation: "capture.diagnostics@1",
+      createdAtUTC: "2026-08-27T08:00:00Z", redactionApplied: false)
+  }
+
+  private func chunk(
+    _ bytes: Data, total: Int, offset: Int, eof: Bool
+  ) throws -> RuntimeHistoryTransportResult {
+    try response([
+      "artifactId": "artifact-preview", "offset": offset, "nextOffset": offset + bytes.count,
+      "totalByteCount": total, "byteCount": bytes.count, "base64": bytes.base64EncodedString(),
+      "eof": eof,
+    ])
+  }
+
+  func testBoundedPreviewReadsExactChunksAndVerifiesTheCompleteHash() async throws {
+    let bytes = Data(repeating: 65, count: 300_000)
+    let boundary = 256 * 1_024
+    let transport = HistoryRPCScenario([
+      ("artifact.read", try chunk(bytes.prefix(boundary), total: bytes.count, offset: 0, eof: false)),
+      ("artifact.read", try chunk(bytes.suffix(bytes.count - boundary), total: bytes.count, offset: boundary, eof: true)),
+    ])
+    let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
+    let result = await reader.readArtifact(
+      jobID: "job-preview", artifact: previewArtifact(bytes), maximumBytes: 400_000, allowSensitive: false)
+    XCTAssertEqual(result, .loaded(bytes))
+    let calls = await transport.recordedCalls()
+    XCTAssertEqual(calls.map(\.0), ["artifact.read", "artifact.read"])
+    XCTAssertEqual(calls.map { $0.1["offset"] }, [.integer(0), .integer(Int64(boundary))])
+    XCTAssertTrue(calls.allSatisfy {
+      $0.1["jobId"] == .string("job-preview") && $0.1["artifactId"] == .string("artifact-preview")
+        && $0.1["maxBytes"] == .integer(Int64(boundary)) && $0.1["allowSensitive"] == .bool(false)
+    })
+  }
+
+  func testPreviewPrivacyPublicationAndSizeRefusalsReadNoBytes() async {
+    let bytes = Data("private".utf8)
+    let transport = HistoryRPCScenario([])
+    let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
+    for (artifact, limit) in [
+      (previewArtifact(bytes, privacy: "sensitive"), 100),
+      (previewArtifact(bytes, privacy: "future-unknown"), 100),
+      (previewArtifact(bytes, status: "missing"), 100),
+      (previewArtifact(bytes), bytes.count - 1),
+      (previewArtifact(bytes), 0),
+      (previewArtifact(bytes), 16 * 1_024 * 1_024 + 1),
+    ] {
+      guard case .failed = await reader.readArtifact(
+        jobID: "job-preview", artifact: artifact, maximumBytes: limit, allowSensitive: false)
+      else { return XCTFail("preview bypassed its privacy or byte bound") }
+    }
+    let calls = await transport.recordedCalls()
+    XCTAssertTrue(calls.isEmpty)
+  }
+
+  func testPreviewRejectsWrongOffsetEarlyEOFAndWrongHash() async throws {
+    let bytes = Data("proof".utf8)
+    let cases: [(RuntimeArtifactPresentation, RuntimeHistoryTransportResult)] = [
+      (previewArtifact(bytes), try chunk(bytes, total: bytes.count, offset: 1, eof: true)),
+      (previewArtifact(bytes), try chunk(bytes.prefix(1), total: bytes.count, offset: 0, eof: true)),
+      (previewArtifact(bytes, hash: String(repeating: "0", count: 64)),
+       try chunk(bytes, total: bytes.count, offset: 0, eof: true)),
+    ]
+    for (artifact, answer) in cases {
+      let transport = HistoryRPCScenario([("artifact.read", answer)])
+      let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
+      guard case .failed = await reader.readArtifact(
+        jobID: "job-preview", artifact: artifact, maximumBytes: 100, allowSensitive: false)
+      else { return XCTFail("drifting bytes were presented as verified") }
+      let calls = await transport.recordedCalls()
+      XCTAssertEqual(calls.count, 1)
+    }
+  }
+
+  private func cancellableJob(state: String = "running", unknown: Bool = false) -> RuntimeJobSummaryPresentation {
+    RuntimeJobSummaryPresentation(
+      id: "job-cancel", operationReference: "capture.diagnostics@1", targetID: "target-cancel",
+      state: state, waitingForHuman: false, outcomeUnknown: unknown, outstandingResidueCount: 0,
+      timeline: [], sessionID: "session-cancel", actualEffect: "readOnly")
+  }
+
+  func testGlobalCancellationUsesFreshIdentityAndOnlyRequestsTheSafeBoundary() async throws {
+    let transport = HistoryRPCScenario([
+      ("job.status", try response([
+        "jobId": "job-cancel", "operation": "capture.diagnostics@1", "targetId": "target-cancel",
+        "sessionId": "session-cancel", "state": "running", "outcomeUnknown": false,
+      ])),
+      ("job.cancel", try response(["cancelRequested": true])),
+    ])
+    let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
+    let result = await control.cancel(cancellableJob())
+    XCTAssertEqual(result, .requested, "acceptance must not be projected as terminal cancelled")
+    let calls = await transport.recordedCalls()
+    XCTAssertEqual(calls.map(\.0), ["job.status", "job.cancel"])
+    XCTAssertTrue(calls.allSatisfy { $0.1 == ["jobId": .string("job-cancel")] })
+  }
+
+  func testGlobalCancellationRefusesTerminalUnknownAndDriftingJobsWithoutCancelDispatch() async throws {
+    let noRead = HistoryRPCScenario([])
+    let closed = RuntimeJobControlXPCProvider(request: { await noRead.request($0, $1) })
+    for job in [cancellableJob(state: "succeeded"), cancellableJob(unknown: true), cancellableJob(state: "unrecognized")] {
+      guard case .refused = await closed.cancel(job) else { return XCTFail("non-cancellable Job was accepted") }
+    }
+    let initialCalls = await noRead.recordedCalls()
+    XCTAssertTrue(initialCalls.isEmpty)
+
+    for drift: [String: Any] in [
+      ["jobId": "another-job"], ["operation": "flash.dayu200@1"], ["targetId": "another-target"],
+      ["sessionId": "another-session"], ["state": "succeeded"], ["outcomeUnknown": true],
+    ] {
+      var status: [String: Any] = [
+        "jobId": "job-cancel", "operation": "capture.diagnostics@1", "targetId": "target-cancel",
+        "sessionId": "session-cancel", "state": "running", "outcomeUnknown": false,
+      ]
+      status.merge(drift) { _, new in new }
+      let transport = HistoryRPCScenario([("job.status", try response(status))])
+      let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
+      guard case .refused = await control.cancel(cancellableJob()) else { return XCTFail("fresh drift was accepted") }
+      let calls = await transport.recordedCalls()
+      XCTAssertEqual(calls.map(\.0), ["job.status"])
+    }
+  }
+
   // A complete answer is the only thing that produces an available history.
   func testACompleteJobListBecomesAvailableHistory() {
     let presentation = decode(
@@ -504,6 +632,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(detail.evidence?.parameters.map(\.name), ["includeToolFacts", "limit"])
     XCTAssertEqual(detail.evidence?.parameters.map(\.value), ["true", "2"])
     XCTAssertTrue(detail.evidence?.parametersWereReported == true)
+    XCTAssertEqual(detail.evidence?.typedParameters, ["includeToolFacts": .bool(true), "limit": .integer(2)])
     XCTAssertEqual(detail.evidence?.observedBindingRevision, 8)
     XCTAssertEqual(detail.artifactAvailability, .available)
     XCTAssertEqual(detail.artifacts.count, 1)
@@ -711,10 +840,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
     XCTAssertEqual(
-      detailProtocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 2,
-      "the App-facing Runtime detail surface must expose only detail and bounded export")
+      detailProtocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 3,
+      "the detail surface exposes only detail, bounded local preview and bounded export")
     XCTAssertTrue(detailProtocolBody.contains("func loadJobDetail("))
     XCTAssertTrue(detailProtocolBody.contains("func exportArtifact("))
+    XCTAssertTrue(detailProtocolBody.contains("func readArtifact("))
+    XCTAssertTrue(detailProtocolBody.contains("maximumBytes: Int"))
+    XCTAssertTrue(detailProtocolBody.contains("allowSensitive: Bool"))
 
     // Only the read-only method may be named anywhere in this file: a
     // mutating method name appearing here would mean the App can compose a
@@ -731,9 +863,9 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(source.contains("\"order\": .string(\"newestFirst\")"))
     XCTAssertTrue(source.contains("\"includeTimeline\": .bool(false)"))
     XCTAssertTrue(source.contains("\"includeCurrent\"] = .bool(true)"))
-    XCTAssertTrue(source.contains("method: \"job.status\""))
-    XCTAssertTrue(source.contains("method: \"job.evidence\""))
-    XCTAssertTrue(source.contains("method: \"artifact.list\""))
+    XCTAssertTrue(source.contains("request(\"job.status\""))
+    XCTAssertTrue(source.contains("request(\"job.evidence\""))
+    XCTAssertTrue(source.contains("request(\"artifact.list\""))
     XCTAssertTrue(source.contains("method: \"artifact.read\""))
   }
 
@@ -923,4 +1055,19 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       localization.contains("debug.blocked.artifactExport"),
       "copy must not claim the reviewed artifact.read channel is unavailable")
   }
+}
+
+actor HistoryRPCScenario {
+  private var answers: [(String, RuntimeHistoryTransportResult)]
+  private var calls: [(String, [String: JSONValue])] = []
+
+  init(_ answers: [(String, RuntimeHistoryTransportResult)]) { self.answers = answers }
+
+  func request(_ method: String, _ parameters: [String: JSONValue]) -> RuntimeHistoryTransportResult {
+    calls.append((method, parameters))
+    guard !answers.isEmpty, answers[0].0 == method else { return .failure("unexpected fixture RPC") }
+    return answers.removeFirst().1
+  }
+
+  func recordedCalls() -> [(String, [String: JSONValue])] { calls }
 }

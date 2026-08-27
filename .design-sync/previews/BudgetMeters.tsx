@@ -1,3 +1,4 @@
+// Historical Harness illustration: CHG-2026-064 removed App/CLI/daemon task.*. Not a product backlog.
 import { BudgetMeters, Card, Chip, StatusStrip } from "@arkdeck/ds";
 
 const hint = { margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ad-ink-2)" };
@@ -18,6 +19,7 @@ export const BoundedLoopBudgets = () => (
       title="预算"
       action={<Chip tone="dim">停止条件已固化</Chip>}
     >
+      <p style={hint}>退役 Harness 预算示例；不表示 App 已有自动任务控制。</p>
       <BudgetMeters budgets={BUDGETS} />
       <p style={hint}>
         no-progress 0/2 · action retry 0/2。任一预算耗尽即停止并保存 machine reason,不自动扩大预算。
@@ -29,6 +31,7 @@ export const BoundedLoopBudgets = () => (
 /** 与页顶摘要条同读:running 的任务还剩多少额度,一屏之内答完。 */
 export const BudgetsUnderLifecycle = () => (
   <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", gap: 12 }}>
+    <p style={hint}>退役 Harness 组件示例；不是当前 App 页面或 task.* 能力。</p>
     <StatusStrip
       cells={[
         { label: "Runtime task", value: <span style={mono}>HTASK-DEMO-001 · debugCrash</span> },
@@ -38,6 +41,7 @@ export const BudgetsUnderLifecycle = () => (
       ]}
     />
     <Card title="预算" action={<Chip tone="dim">停止条件已固化</Chip>}>
+      <p style={hint}>退役 Harness 预算示例；不表示 App 已有自动任务控制。</p>
       <BudgetMeters budgets={BUDGETS} />
       <p style={hint}>
         Rounds 4/8 与 E1 mutations 2/4 都已过半:再有两次设备侧改动就会触顶,循环随即停止。
@@ -50,6 +54,7 @@ export const BudgetsUnderLifecycle = () => (
 export const DeterminateOnlyWithARealDenominator = () => (
   <div style={{ width: "100%", maxWidth: 820 }}>
     <Card title="为什么这里可以画满格条">
+      <p style={hint}>退役 Harness 预算示例；不表示 App 已有自动任务控制。</p>
       <BudgetMeters budgets={BUDGETS} />
       <p style={hint}>
         轮次、墙钟、产物体积、E1 改动次数、模型调用都有 host 自己拥有的上限,百分比是算出来的,不是估的。
@@ -66,7 +71,8 @@ export const TabularStackInANarrowColumn = () => (
   <div style={{ width: "100%", maxWidth: 640, display: "flex", gap: 14, alignItems: "flex-start" }}>
     <div style={{ width: "100%", maxWidth: 190 }}>
       <Card title="预算">
-        <BudgetMeters budgets={BUDGETS} />
+        <p style={hint}>退役 Harness 预算示例；不表示 App 已有自动任务控制。</p>
+      <BudgetMeters budgets={BUDGETS} />
       </Card>
     </div>
     <div style={{ flex: 1, minWidth: 0 }}>

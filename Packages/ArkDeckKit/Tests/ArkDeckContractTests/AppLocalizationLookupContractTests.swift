@@ -32,6 +32,7 @@ final class AppLocalizationLookupContractTests: XCTestCase {
     ("jobsText", "JobsLocalizable"),
     ("flashText", "FlashLocalizable"),
     ("traceString", "TraceLocalizable"),
+    ("traceViewerText", "TraceViewerLocalizable"),
     ("historyLocalized", "HistoryLocalizable"),
     ("settingsText", "SettingsLocalizable"),
     ("deviceString", "Localizable"),
@@ -99,7 +100,7 @@ final class AppLocalizationLookupContractTests: XCTestCase {
     for (name, text) in try appSources() {
       for (helper, table) in Self.helperTables {
         let escaped = NSRegularExpression.escapedPattern(for: helper)
-        for key in try literals(escaped + #"\(\s*"([^"\\]+)"\s*\)"#, in: text) {
+        for key in try literals(escaped + #"\(\s*"([^"\\]+)"\s*(?:\)|,\s*values:)"#, in: text) {
           require(key, table, name, helper)
         }
       }
@@ -127,6 +128,23 @@ final class AppLocalizationLookupContractTests: XCTestCase {
       these lookups fall back to rendering the key itself, which no build or \
       test would otherwise notice: \(unresolved.sorted().joined(separator: "; "))
       """)
+  }
+
+  func testTraceViewerCopyAndNamedArgumentsArePresentInBothLanguages() throws {
+    let url = repositoryRoot().appending(path: "ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings")
+    let document = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    let strings = try XCTUnwrap(document["strings"] as? [String: [String: Any]])
+    for (key, entry) in strings {
+      let localizations = try XCTUnwrap(entry["localizations"] as? [String: [String: Any]], key)
+      let english = try XCTUnwrap((localizations["en"]?["stringUnit"] as? [String: Any])?["value"] as? String, key)
+      let chinese = try XCTUnwrap((localizations["zh-Hans"]?["stringUnit"] as? [String: Any])?["value"] as? String, key)
+      XCTAssertFalse(english.isEmpty, key)
+      XCTAssertFalse(chinese.isEmpty, key)
+      XCTAssertEqual(
+        Set(try literals(#"\{([A-Za-z]+)\}"#, in: english)),
+        Set(try literals(#"\{([A-Za-z]+)\}"#, in: chinese)),
+        "\(key) must not lose its named runtime values in translation")
+    }
   }
 
   func testSidebarProductNamesStayConsistentAcrossLocales() throws {

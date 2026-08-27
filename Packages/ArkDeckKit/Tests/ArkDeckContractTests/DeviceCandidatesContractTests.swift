@@ -663,7 +663,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(projection.contains("async let candidateRead"))
     XCTAssertTrue(projection.contains("async let observationRead"))
     XCTAssertTrue(projection.contains("latestSucceededDeviceObservations()"))
-    XCTAssertTrue(projection.contains("deviceInformationForPresentation"))
+    XCTAssertTrue(projection.contains("deviceInformationSnapshotForPresentation"))
     XCTAssertTrue(projection.contains("\"deviceInformation\""))
     XCTAssertTrue(projection.contains("\"observedFacts\""))
 

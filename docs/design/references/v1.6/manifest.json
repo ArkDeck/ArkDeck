@@ -1,0 +1,457 @@
+{
+  "date": "2026-08-27",
+  "baseline": "e1d52e68db435bdfeb326962767ca4626a77322b",
+  "kind": "browser_design_demo",
+  "viewport": {
+    "width": 1180,
+    "height": 760
+  },
+  "entries": [
+    {
+      "file": "debug-apps-en.jpg",
+      "query": "page=debug&debugTab=apps&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "e2d4d2f53998f16c3b3659a77b8b7e724b8fb2a349b4fda455dac710d7b29be6",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=en"
+    },
+    {
+      "file": "debug-apps-zh.jpg",
+      "query": "page=debug&debugTab=apps&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "631d04c2f3ef1491a0c4a54416db3f556e3a04f639dc6e808c5e6e33850bc8de",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=zh-Hans"
+    },
+    {
+      "file": "debug-artifacts-en.jpg",
+      "query": "page=debug&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "3b25fd73003fa114d2c249daf017da7df7291a5d40dab8e86e8f32c5e4950686",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&lang=en"
+    },
+    {
+      "file": "debug-artifacts-zh.jpg",
+      "query": "page=debug&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "928755adf2f8bc19f86251e99015087b6bfd45e6b860beceea0233389dfd24a0",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&lang=zh-Hans"
+    },
+    {
+      "file": "debug-commands-zh.jpg",
+      "query": "page=debug&debugTab=cmd&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "0fe4e90296fd628c005e82a1c8645949ab415544d6b4affa4afaec14dec1479f",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=cmd&lang=zh-Hans"
+    },
+    {
+      "file": "debug-hap-preview-en.jpg",
+      "query": "page=debug&debugTab=apps&lang=en",
+      "interaction": "Choose demo HAP, enter com.example.app / EntryAbility, click Import and run: opens a parameter preview only, no file import or Runtime Job.",
+      "mimeType": "image/jpeg",
+      "sha256": "bae0b78e7a96294d4a0c8a48179d3dc7a275b27066741b6db2973c91abad810c",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&lang=en"
+    },
+    {
+      "file": "debug-hap-unavailable-zh.jpg",
+      "query": "page=debug&debugTab=apps&hapState=unavailable&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "a56eff4390ef87a5457161ce1fff2e3146c52d73f2b9a3798ac637916b4a7fb7",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=apps&hapState=unavailable&lang=zh-Hans"
+    },
+    {
+      "file": "debug-logs-zh.jpg",
+      "query": "page=debug&debugTab=logs&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "3f8a58cf72765d42db6be773efd193a233e3b344085f99e6ebb7c601198820f8",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=logs&lang=zh-Hans"
+    },
+    {
+      "file": "debug-network-zh.jpg",
+      "query": "page=debug&debugTab=net&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "a8a041fe18627d9cebf7696969f1550b4d9ee2f10a8e1c0321dad7b4db8b0890",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=debug&debugTab=net&lang=zh-Hans"
+    },
+    {
+      "file": "device-detail-en.jpg",
+      "query": "page=device&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "cfd095ff5707c2c744e37f0137bda6060fbd9d2d5e8bddee64921f8bfbb07435",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=device&lang=en"
+    },
+    {
+      "file": "device-detail-zh.jpg",
+      "query": "page=device&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "6c5919b523e9ae5df04e02c2d13237f1395b739107cc0abc8b8c6f397738e912",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=device&lang=zh-Hans"
+    },
+    {
+      "file": "device-empty-en.jpg",
+      "query": "page=device-control&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "0605dcd3b77de0ff7b02aeb1fb07263dde7f4a51fe325e5420424f5e0b6c4252",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=device-control&lang=en"
+    },
+    {
+      "file": "device-empty-zh.jpg",
+      "query": "page=device-control&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "dcc363c65e53703c3ba4e700a95d8ba239b76d454c8a5836452733bb6c15fdef",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=device-control&lang=zh-Hans"
+    },
+    {
+      "file": "device-trust-en.jpg",
+      "query": "page=auth&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "8b47e23d5a47cea8ec1dd0b75db38036f80bba169497fd157940fa798a90c3d0",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=auth&lang=en"
+    },
+    {
+      "file": "device-trust-zh.jpg",
+      "query": "page=auth&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "ee71eb05a3f349400fdc0f0d1c0819ab4cc30aa2b7befd16c8cd2291e62760c4",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=auth&lang=zh-Hans"
+    },
+    {
+      "file": "diagnostics-en.jpg",
+      "query": "page=diagnostics&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "7da8d5d63e0ea7f74e321b2b2881a887605882d3789dc320d18bafbf174ef73f",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&lang=en"
+    },
+    {
+      "file": "diagnostics-zh.jpg",
+      "query": "page=diagnostics&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "d86834f998be4d0123cd0bcafbc4d536fe47080dbb6113b2e5df32fc9e259f0b",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=diagnostics&lang=zh-Hans"
+    },
+    {
+      "file": "flash-en.jpg",
+      "query": "page=flash&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "09320fd303b2744d808ff69ddc49cc849abd4965b1a07ab45952a2ec88a8c831",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=flash&lang=en"
+    },
+    {
+      "file": "flash-zh.jpg",
+      "query": "page=flash&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "faaf8eb52e4d5302cc6d98696cd744f36d0b4d682fded3cb24fe29fb52d12a86",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=flash&lang=zh-Hans"
+    },
+    {
+      "file": "history-en.jpg",
+      "query": "page=history&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "b839e2418daed1010776660b1fa67d069a115251b3d062f7d971177b04a12dcc",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=history&lang=en"
+    },
+    {
+      "file": "history-zh.jpg",
+      "query": "page=history&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "3e684d5352bc570734248cdd6e7914715e2362bc85ce1df7d608e443e3e87b71",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=history&lang=zh-Hans"
+    },
+    {
+      "file": "overview-continue-en.jpg",
+      "query": "page=overview&lang=en",
+      "interaction": "Click Continue on the Viewer run: explains navigation only, no prefill, submission or inherited thread.",
+      "mimeType": "image/jpeg",
+      "sha256": "1744465ef536a12d37eeeb071513217577b8151fa5311010021f33a3388ddaaf",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en"
+    },
+    {
+      "file": "overview-continue-zh.jpg",
+      "query": "page=overview&lang=zh-Hans",
+      "interaction": "点击 Viewer 记录的继续：仅打开工作区，不回填、不提交、不继承调试线。",
+      "mimeType": "image/jpeg",
+      "sha256": "16292255c574a4ab0c0b74eaa4182371f2bc91a33350367bb520405975ff90cd",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=zh-Hans"
+    },
+    {
+      "file": "overview-en.jpg",
+      "query": "page=overview&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "e9592bc42a937e031a44a627bdb6634cd3970bb6591846b35c21067445428d97",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=en"
+    },
+    {
+      "file": "overview-zh.jpg",
+      "query": "page=overview&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "e2a26f1fcc2b14cba83d261afe6e4a4f1d0a6a162e21e1b7c495dc8f0d0ee5b3",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=overview&lang=zh-Hans"
+    },
+    {
+      "file": "settings-diagnostics-en.jpg",
+      "query": "page=settings&settingsTab=diagnostics&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "c45b17b45db892e4566843bd81c86c039a60ee6a4f811d74037c894f4353b336",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=diagnostics&lang=en"
+    },
+    {
+      "file": "settings-diagnostics-zh.jpg",
+      "query": "page=settings&settingsTab=diagnostics&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "09d6e6a3cec10d93ca8f596f3ebc8464f4d9de8a840b259d1b9bcc388903b95b",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=diagnostics&lang=zh-Hans"
+    },
+    {
+      "file": "settings-general-en.jpg",
+      "query": "page=settings&settingsTab=general&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "3d080cabd3b8edeb4564f3c98f7a9cbd02b31e658c9d46ef50a526581735d614",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=general&lang=en"
+    },
+    {
+      "file": "settings-general-zh.jpg",
+      "query": "page=settings&settingsTab=general&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "f4a62616ede2b90c3291fdef11e5ac0c7b628c8974d40e1a5e518dd785e99399",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=general&lang=zh-Hans"
+    },
+    {
+      "file": "settings-servers-en.jpg",
+      "query": "page=settings&settingsTab=servers&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "17abf77e1c5a48f12a90d2f3d8ef8740cae8d4d9373db8e9b113e12cc71b1292",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=servers&lang=en"
+    },
+    {
+      "file": "settings-servers-zh.jpg",
+      "query": "page=settings&settingsTab=servers&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "9f859dd05ad06fe501d1d22b89a6a1e1b5183a52078be9b949246761c8819998",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=servers&lang=zh-Hans"
+    },
+    {
+      "file": "settings-storage-en.jpg",
+      "query": "page=settings&settingsTab=storage&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "f87920a71060ba2c3c3a5060e8a3e3bd837e45d9e9c61efee27c403c09575843",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=storage&lang=en"
+    },
+    {
+      "file": "settings-storage-zh.jpg",
+      "query": "page=settings&settingsTab=storage&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "0b0fce5ebdb4e6616ad0125754c419b71a7ff9f988e913235ba13bccf5e2bea1",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=storage&lang=zh-Hans"
+    },
+    {
+      "file": "settings-toolchains-en.jpg",
+      "query": "page=settings&settingsTab=toolchains&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "4d19144ff608b9bcceeb80fdb222b7fb637cdbdd506b28178f9f9c923ce3b6cb",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=toolchains&lang=en"
+    },
+    {
+      "file": "settings-toolchains-zh.jpg",
+      "query": "page=settings&settingsTab=toolchains&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "9ac9cf6b877ddcb56466faa23ca41b0c71002c19247e087d69a1a7c978eadaea",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=toolchains&lang=zh-Hans"
+    },
+    {
+      "file": "settings-trace-cache-en.jpg",
+      "query": "page=settings&settingsTab=trace&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "9c1cb78d9c432f3d0614c1522e17fbf15c07a2e35f60b95329f38972acfaf2ab",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&lang=en"
+    },
+    {
+      "file": "settings-trace-cache-zh.jpg",
+      "query": "page=settings&settingsTab=trace&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "1b611b2b21f4e9d601acb4f28721299c0d5df46ef4df637d49ca868dfbe76f12",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&lang=zh-Hans"
+    },
+    {
+      "file": "settings-trace-licenses-en.jpg",
+      "query": "page=settings&settingsTab=trace&traceSettingsTab=licenses&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "8e90b2a3861bee3359a4f42a214bf4ac0628ed58f9c819eeba96de7468158bbb",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&traceSettingsTab=licenses&lang=en"
+    },
+    {
+      "file": "settings-trace-licenses-zh.jpg",
+      "query": "page=settings&settingsTab=trace&traceSettingsTab=licenses&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "8aaaa62a621af8b1241062c6c3a0ce09410b587e1986bb3e2bd3fdc74ce64a02",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=trace&traceSettingsTab=licenses&lang=zh-Hans"
+    },
+    {
+      "file": "settings-updates-en.jpg",
+      "query": "page=settings&settingsTab=updates&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "b842b5cf4c1662cff299ea411c5c5dab39d543f5c8f0b21c0f9c8b699ef0aba9",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=updates&lang=en"
+    },
+    {
+      "file": "settings-updates-zh.jpg",
+      "query": "page=settings&settingsTab=updates&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "5a8e859c96e316628b09995b080f7e1530c822e5278a7bc104d605eca0cd8edd",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=settings&settingsTab=updates&lang=zh-Hans"
+    },
+    {
+      "file": "trace-invalid-en.jpg",
+      "query": "page=trace&traceState=ready&lang=en",
+      "interaction": "Enter 601, click Start capture: input is preserved, inline error appears, no capture starts.",
+      "mimeType": "image/jpeg",
+      "sha256": "6782e422edb4e33705bed3e49e26ff0646b0b649d2b8a9869b85c7e902531721",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace&traceState=ready&lang=en"
+    },
+    {
+      "file": "trace-ready-minutes-en.jpg",
+      "query": "page=trace&traceState=ready&lang=en",
+      "interaction": "Enter 15 seconds, then switch to Minutes: rounds up to 1 min.",
+      "mimeType": "image/jpeg",
+      "sha256": "f17e172820eb03749724145833f6772150190f9a680fd9b56f1cf53c94bd2beb",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace&traceState=ready&lang=en"
+    },
+    {
+      "file": "trace-shortcuts-en.jpg",
+      "query": "page=trace-shortcuts&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "6d0d97441d8e3415cf41ab4f001b7781ee46d444fe29d58a7d0bf104411fbb77",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-shortcuts&lang=en"
+    },
+    {
+      "file": "trace-shortcuts-zh.jpg",
+      "query": "page=trace-shortcuts&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "e0175530f2f680b23d2c4048e21fdd1ba684a4f762883e1570db864ef566b79f",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-shortcuts&lang=zh-Hans"
+    },
+    {
+      "file": "trace-unavailable-en.jpg",
+      "query": "page=trace&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "0e002b3022ae6f903eb1bf0de21a3be4bed07cc0efd0e28349e131a8fead9315",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace&lang=en"
+    },
+    {
+      "file": "trace-unavailable-zh.jpg",
+      "query": "page=trace&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "86cc58c32eecb71b7871281047ec7b41eaf0780f72da784659f556c28cda5908",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace&lang=zh-Hans"
+    },
+    {
+      "file": "trace-viewer-empty-en.jpg",
+      "query": "page=trace-viewer&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "e3418528ddb53e658c7819438e13843501d40215460cce8a9147d539aeb80306",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&lang=en"
+    },
+    {
+      "file": "trace-viewer-empty-zh.jpg",
+      "query": "page=trace-viewer&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "9af7251b39f4c2622a86e739d0cd40af21f3eb703a6872888862c2aeda973926",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=trace-viewer&lang=zh-Hans"
+    },
+    {
+      "file": "viewer-accessibility-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=accessibility&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "ce0d585b5d945fb5bf534003f7eb0108d4e2be265b73b67ec39b8bf3d646bd12",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=accessibility&lang=en"
+    },
+    {
+      "file": "viewer-accessibility-zh.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=accessibility&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "12ce0155498c58f3344ecf7ba1f37482c4db72f5ff269c5470cd8904eac006e3",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=accessibility&lang=zh-Hans"
+    },
+    {
+      "file": "viewer-advanced-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=advanced&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "c7bf3c872ecf1a51353b8058aaf3d5c80a7ca67a0c6df1c042e4643174b8a7f1",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=advanced&lang=en"
+    },
+    {
+      "file": "viewer-advanced-failed-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=advanced&advancedState=failed&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "865bdfb27f907c6675890a6a4c49068b2dbd65d74c3df9bec90e53e4e0bf7320",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=advanced&advancedState=failed&lang=en"
+    },
+    {
+      "file": "viewer-advanced-missing-ids-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=advanced&advancedState=missingIDs&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "5165080cc83ce9d41989e6a8a824bf8cb7ff16f8248a135dc1c4def4dcfe31f8",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=advanced&advancedState=missingIDs&lang=en"
+    },
+    {
+      "file": "viewer-advanced-zh.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=advanced&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "519bd18f852e7faa79dde662d2b58e23198a422c45b5e49c25625ade3ad01ad5",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=advanced&lang=zh-Hans"
+    },
+    {
+      "file": "viewer-empty-en.jpg",
+      "query": "page=dump&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "efb5171224624fb2337c567af5a71f7f5779ee3ef7d7b92e79bf349d61952602",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&lang=en"
+    },
+    {
+      "file": "viewer-empty-zh.jpg",
+      "query": "page=dump&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "eb45a510e6fe7b6dc985759df1ea594a8443f054356a978a32e4df3160bf543a",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&lang=zh-Hans"
+    },
+    {
+      "file": "viewer-layout-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=layout&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "b58fdb31ff2c1a79137220b71225a7c0fe98d85c397938d3548c6976ba6df2c7",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=layout&lang=en"
+    },
+    {
+      "file": "viewer-layout-zh.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=layout&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "4ac9bc88081cb05c6e07f9a0a4b6764d6ee254e5143374f8b5e561a27ce7ff8a",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=layout&lang=zh-Hans"
+    },
+    {
+      "file": "viewer-properties-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=attributes&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "ddbc3791d061654819b21b6adebbade51ce66c7be0ecbf98161f7a911c7e7ee4",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=attributes&lang=en"
+    },
+    {
+      "file": "viewer-properties-zh.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=attributes&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "e96f0e577846f6188000ce87a7185780f16b312905e0cd55f4e198e08c10652b",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=attributes&lang=zh-Hans"
+    },
+    {
+      "file": "viewer-raw-en.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=raw&lang=en",
+      "mimeType": "image/jpeg",
+      "sha256": "b630d79e85569e2d6cb0a0be10eef29c140b0a19ef191cccbfd63885726534a2",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=raw&lang=en"
+    },
+    {
+      "file": "viewer-raw-zh.jpg",
+      "query": "page=dump&viewerState=captured&viewerTab=raw&lang=zh-Hans",
+      "mimeType": "image/jpeg",
+      "sha256": "4cca784bf09c2b9d32908f918d5a7c24f6b58380bb8a37ffd28294f8689770fe",
+      "url": "http://127.0.0.1:8765/prototype.html?reference=1&page=dump&viewerState=captured&viewerTab=raw&lang=zh-Hans"
+    }
+  ]
+}

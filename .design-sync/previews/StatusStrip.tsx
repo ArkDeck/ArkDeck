@@ -1,3 +1,4 @@
+// Historical Harness illustration: CHG-2026-064 removed App/CLI/daemon task.*. Not a product backlog.
 import { Card, Chip, StageTrack, StatusStrip, WindowFrame } from "@arkdeck/ds";
 
 const hint = { margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ad-ink-2)" };
@@ -34,6 +35,7 @@ const pageTitle = {
 /** Automation 页顶部四格 —— 读别的东西之前先看的四件事。 */
 export const AutomationSummary = () => (
   <div style={{ width: "100%", maxWidth: 820 }}>
+    <p style={hint}>退役 Harness 组件示例；不是当前 App 页面或 task.* 能力。</p>
     <StatusStrip cells={CELLS} />
   </div>
 );
@@ -43,7 +45,8 @@ export const AutomationPageHeader = () => (
   <div style={{ width: "100%", maxWidth: 820 }}>
     <WindowFrame title="ArkDeck — OpenHarmony 设备工作台">
       <h1 style={pageTitle}>Automation</h1>
-      <StatusStrip cells={CELLS} />
+      <p style={hint}>退役 Harness 组件示例；不是当前 App 页面或 task.* 能力。</p>
+    <StatusStrip cells={CELLS} />
     </WindowFrame>
   </div>
 );
@@ -51,6 +54,7 @@ export const AutomationPageHeader = () => (
 /** Lifecycle 与 Current stage 各占一格 —— 两条正交事实,不合并成一个指示器。 */
 export const LifecycleStageOrthogonal = () => (
   <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", gap: 12 }}>
+    <p style={hint}>退役 Harness 组件示例；不是当前 App 页面或 task.* 能力。</p>
     <StatusStrip cells={CELLS} />
     <Card title="为什么是四格,而不是一个总状态">
       <p style={hint}>
@@ -68,11 +72,13 @@ export const LifecycleStageOrthogonal = () => (
 /** 页面阅读顺序:摘要条在最上,随后才是目标与阶段。 */
 export const PageTopReadingOrder = () => (
   <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", gap: 12 }}>
+    <p style={hint}>退役 Harness 组件示例；不是当前 App 页面或 task.* 能力。</p>
     <StatusStrip cells={CELLS} />
     <Card title="修复目标">
       <p style={{ ...hint, color: "var(--ad-ink)" }}>
         复现并修复设置页启动后闪退;完成 build、typed HAP deployment 与同一设备复验后才允许成功。
       </p>
+      <p style={hint}>退役 Harness 阶段示例；外部 Agent 决策，不新增 App task 平面。</p>
       <StageTrack stages={STAGES} currentIndex={4} />
     </Card>
   </div>

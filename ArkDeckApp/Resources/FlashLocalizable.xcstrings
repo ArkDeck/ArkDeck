@@ -1,6 +1,8 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "flash.target.unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"不可用"}}}},
+    "flash.target.historyMissing": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The historical target is not available. Select a current target explicitly to prepare a new plan; refreshing never switches devices for a historical run."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"历史目标当前不可用。请显式选择当前目标后准备新计划；刷新不会替历史运行切换设备。"}}}},
     "flash.action.cancel": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Cancel remaining steps"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"取消后续步骤"}}}},
     "flash.action.cancel.help": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"If a partition write is in progress, Runtime finishes that critical step and stops only at the next safe boundary."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"若正在写入分区，Runtime 会完成该临界步骤，仅在下一个安全边界停止。"}}}},
     "flash.action.preparePlan": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Prepare exact plan"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"生成精确计划"}}}},

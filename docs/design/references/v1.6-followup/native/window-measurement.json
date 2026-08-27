@@ -1,0 +1,15 @@
+{
+  "kind": "native_window_measurement",
+  "values": {
+    "frameWidth": 1180,
+    "contentWidth": 1180,
+    "contentHeight": 783,
+    "layoutWidth": 1180,
+    "frameHeight": 783,
+    "layoutHeight": 731
+  },
+  "axWidth": 1180,
+  "axHeight": 783,
+  "changesWindowSize": false,
+  "pixelParityClaim": false
+}

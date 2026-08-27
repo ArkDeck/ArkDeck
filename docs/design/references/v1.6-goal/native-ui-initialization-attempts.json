@@ -1,0 +1,43 @@
+{
+  "date": "2026-08-28",
+  "attempts": [
+    {
+      "logFile": "device-stale-real.log",
+      "localLogSHA256": "3720b1f67f5626d8b56ed5349128770ab5d15d8950330b8ec78c45b3882d4449",
+      "test": "DeviceStaleFrameUITests/testASecondPressOnASpentPictureIsRefusedAndNotSent",
+      "exitCode": 65,
+      "assertionsStarted": false,
+      "result": "automation_initialization_timeout",
+      "testManagerRestartedBeforeRun": false
+    },
+    {
+      "logFile": "f30-native-picker.log",
+      "localLogSHA256": "9810cb0e0e261db6745a4814b9d74020509e7ed174bfc95961caba4c17887ea8",
+      "test": "AppShellUITests/testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages",
+      "exitCode": 65,
+      "assertionsStarted": false,
+      "result": "automation_initialization_timeout",
+      "testManagerRestartedBeforeRun": true
+    },
+    {
+      "logFile": "f30-native-picker-isolated.log",
+      "localLogSHA256": "b47824d7132ce081df3a2e650b456ae04603a8fd6a1b063e9486c8747f2514ea",
+      "test": "AppShellUITests/testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages",
+      "exitCode": 65,
+      "assertionsStarted": false,
+      "result": "automation_initialization_timeout",
+      "interactiveToolKernelResetBeforeRun": true
+    },
+    {
+      "logFile": "f31-native-picker-final.log",
+      "localLogSHA256": "098fc2b42a61bfebb19e579b5f8f587309dd9de2a2d4a65c47a85f1b5b55e5a5",
+      "test": "AppShellUITests/testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages",
+      "exitCode": 65,
+      "assertionsStarted": false,
+      "result": "automation_initialization_timeout",
+      "finalAppCodeBuilt": true,
+      "otherBuildsFinishedBeforeRun": true
+    }
+  ],
+  "boundary": "No test case began. These are neither assertion passes nor hardware operation results. No macOS permissions changed. Earlier attempts remain in their original logs."
+}
