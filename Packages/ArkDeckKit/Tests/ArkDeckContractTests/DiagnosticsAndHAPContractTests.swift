@@ -689,7 +689,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         let payload: Data?
         switch landing.destination.pathExtension {
         case "json": payload = script.uiTreePayload
-        case "png": payload = script.screenshotPayload
+        case "png", "jpeg": payload = script.screenshotPayload
         default: payload = script.receivedTracePayload
         }
         if let payload {
@@ -1092,8 +1092,13 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       "a capture larger than a screenshot reads its own model and firmware")
   }
 
-  private func screenshotOnlyRequest(key: String) throws -> Data {
-    try JSONSerialization.data(
+  private func screenshotOnlyRequest(key: String, imageType: String? = nil) throws -> Data {
+    var inputs: [String: Any] = [
+      "durationSeconds": 1, "captureHilog": false, "uiDump": false,
+      "crashLogs": false, "uiScreenshot": true, "uiComponentTree": false,
+    ]
+    if let imageType { inputs["screenshotImageType"] = imageType }
+    return try JSONSerialization.data(
       withJSONObject: [
         "documentType": "runtime-operation-request",
         "schemaVersion": "2.0.0",
@@ -1101,10 +1106,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "idempotencyKey": key,
         "target": ["targetId": "TGT-1", "expectedBindingRevision": 7],
         "operation": ["id": "capture.diagnostics", "version": 1],
-        "inputs": [
-          "durationSeconds": 1, "captureHilog": false, "uiDump": false,
-          "crashLogs": false, "uiScreenshot": true, "uiComponentTree": false,
-        ],
+        "inputs": inputs,
       ], options: [.sortedKeys])
   }
 
@@ -3057,6 +3059,47 @@ extension DiagnosticsAndHAPContractTests {
     XCTAssertEqual(
       Array(bytes.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
     XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
+  }
+
+  func testDefaultPNGHasEvidenceWithoutAnUnrequestedJPEG() async throws {
+    try await assertScreenshotEvidence(imageType: nil, selected: "screenshot.png")
+  }
+
+  func testJPEGHasEvidenceWithoutAnUnrequestedPNG() async throws {
+    try await assertScreenshotEvidence(imageType: "jpeg", selected: "screenshot.jpeg")
+  }
+
+  private func assertScreenshotEvidence(imageType: String?, selected: String) async throws {
+    var script = ScriptedDispatcher.Script()
+    if imageType == "jpeg" {
+      script.screenshotPayload = Data([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9])
+    }
+    let (engine, _, artifacts) = try makeEngine(dispatcher: ScriptedDispatcher(script: script))
+    let acceptance = try await engine.submit(
+      screenshotOnlyRequest(key: "idem-shot-evidence", imageType: imageType))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+
+    let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: acceptance.jobID)
+    let other = selected == "screenshot.png" ? "screenshot.jpeg" : "screenshot.png"
+    XCTAssertTrue(omitted.contains(other), "the encoding not requested cannot block evidence")
+    XCTAssertFalse(omitted.contains(selected), "the requested picture must still be verified")
+    let evidence = try await artifacts.verifiedEvidenceArtifacts(
+      jobID: acceptance.jobID, intentionallyOmittedNames: omitted)
+    let inventory = try await artifacts.list(jobID: acceptance.jobID)
+    let shot = try XCTUnwrap(inventory.first { $0.name == selected })
+    XCTAssertTrue(evidence.contains { $0.reference.hasSuffix("/" + shot.artifactID) })
+
+    // Losing the selected picture is still a blocker, even though the other
+    // encoding is an intentional omission. Never infer this from status text.
+    let fixtureBytes = stateDirectory.appending(
+      path: "artifacts/\(shot.jobID)/\(shot.artifactID)")
+    try FileManager.default.removeItem(at: fixtureBytes)
+    do {
+      _ = try await artifacts.verifiedEvidenceArtifacts(
+        jobID: acceptance.jobID, intentionallyOmittedNames: omitted)
+      XCTFail("the selected screenshot is required for evidence")
+    } catch is RuntimeArtifactError {}
   }
 
   func testNonPNGScreenshotIsNotPublished() async throws {

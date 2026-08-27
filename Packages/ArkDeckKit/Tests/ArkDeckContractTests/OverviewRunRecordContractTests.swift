@@ -296,13 +296,13 @@ final class OverviewActionProjectionContractTests: XCTestCase {
     XCTAssertEqual(
       Dictionary(uniqueKeysWithValues: actions.map { ($0.kind, $0.operationReference) })[.flash],
       ArkForgeFlashOperation.canonicalReference)
-    XCTAssertEqual(grades[.toolkit], "deviceMutation")
+    XCTAssertEqual(grades[.device], "deviceMutation")
   }
 }
 
 /// Which workspace a finished run belongs to.
 ///
-/// Viewer, Trace and the Toolkit all submit `capture.diagnostics@1`. Opening
+/// Viewer, Trace and the Device all submit `capture.diagnostics@1`. Opening
 /// the wrong one would prefill a different request than the one being
 /// repeated, so an unsettled case has to end in nil rather than a guess.
 final class OverviewWorkspaceKindContractTests: XCTestCase {
@@ -325,7 +325,7 @@ final class OverviewWorkspaceKindContractTests: XCTestCase {
     }
     for gesture in ["input.tap@1", "input.long-press@1", "input.swipe@1"] {
       XCTAssertEqual(
-        OverviewActionProjection.workspaceKind(forOperation: gesture, parameters: []), .toolkit)
+        OverviewActionProjection.workspaceKind(forOperation: gesture, parameters: []), .device)
     }
   }
 
@@ -349,7 +349,7 @@ final class OverviewWorkspaceKindContractTests: XCTestCase {
       OverviewActionProjection.workspaceKind(
         forOperation: "capture.diagnostics@1",
         parameters: parameters([("uiScreenshot", "true"), ("durationSeconds", "1")])),
-      .toolkit)
+      .device)
   }
 
   /// The important half: silence, not a guess.

@@ -16,7 +16,7 @@ import XCTest
 /// TGT-958780b2ffb7 on 2026-08-26. Set ARKDECK_TEST_FRAME_ARCHIVE to a
 /// `frames.tar` to exercise the whole path against hardware output; without it
 /// the synthetic archive still pins every rule.
-final class ToolkitRecordingContractTests: XCTestCase {
+final class DeviceRecordingContractTests: XCTestCase {
   private var scratch: URL!
 
   override func setUpWithError() throws {
@@ -34,7 +34,7 @@ final class ToolkitRecordingContractTests: XCTestCase {
   func testFramesComeBackInCaptureOrder() throws {
     let archive = TarFixture.archive(
       entries: [("0003.jpeg", jpeg(3)), ("0001.jpeg", jpeg(1)), ("0002.jpeg", jpeg(2))])
-    let frames = try ToolkitFrameArchive.frames(in: archive)
+    let frames = try DeviceFrameArchive.frames(in: archive)
     XCTAssertEqual(frames.map(\.name), ["0001.jpeg", "0002.jpeg", "0003.jpeg"])
   }
 
@@ -43,7 +43,7 @@ final class ToolkitRecordingContractTests: XCTestCase {
   func testTheDirectoryEntryTarWritesIsNotAFrame() throws {
     var entries: [(String, Data)] = [("./", Data())]
     entries += (1...3).map { (String(format: "./%04d.jpeg", $0), jpeg($0)) }
-    let frames = try ToolkitFrameArchive.frames(
+    let frames = try DeviceFrameArchive.frames(
       in: TarFixture.archive(entries: entries, directories: ["./"]))
     XCTAssertEqual(frames.map(\.name), ["0001.jpeg", "0002.jpeg", "0003.jpeg"])
   }
@@ -53,14 +53,14 @@ final class ToolkitRecordingContractTests: XCTestCase {
   func testAnEntryThisProviderDidNotWriteIsNotComposed() throws {
     let archive = TarFixture.archive(
       entries: [("0001.jpeg", jpeg(1)), ("notes.txt", Data("hello".utf8))])
-    XCTAssertEqual(try ToolkitFrameArchive.frames(in: archive).map(\.name), ["0001.jpeg"])
+    XCTAssertEqual(try DeviceFrameArchive.frames(in: archive).map(\.name), ["0001.jpeg"])
   }
 
   func testSomethingThatIsNotATarIsRefusedRatherThanParsed() {
     XCTAssertThrowsError(
-      try ToolkitFrameArchive.frames(in: Data(repeating: 0x41, count: 4096))
+      try DeviceFrameArchive.frames(in: Data(repeating: 0x41, count: 4096))
     ) { error in
-      XCTAssertEqual(error as? ToolkitFrameArchive.ArchiveUnreadable, .notATarArchive)
+      XCTAssertEqual(error as? DeviceFrameArchive.ArchiveUnreadable, .notATarArchive)
     }
   }
 
@@ -74,17 +74,17 @@ final class ToolkitRecordingContractTests: XCTestCase {
 
     // Only the terminator is gone: every frame is intact, and the reader still
     // refuses, because it cannot know that.
-    XCTAssertThrowsError(try ToolkitFrameArchive.frames(in: whole.prefix(whole.count - 1024)))
+    XCTAssertThrowsError(try DeviceFrameArchive.frames(in: whole.prefix(whole.count - 1024)))
     { error in
       XCTAssertEqual(
-        error as? ToolkitFrameArchive.ArchiveUnreadable, .truncated(afterFrames: 4))
+        error as? DeviceFrameArchive.ArchiveUnreadable, .truncated(afterFrames: 4))
     }
 
     // Cut into the last entry: fewer frames survived, and the count says how
     // many, so a caller can tell how much of the run it is looking at.
-    XCTAssertThrowsError(try ToolkitFrameArchive.frames(in: whole.prefix(whole.count / 2)))
+    XCTAssertThrowsError(try DeviceFrameArchive.frames(in: whole.prefix(whole.count / 2)))
     { error in
-      guard case .truncated(let after) = error as? ToolkitFrameArchive.ArchiveUnreadable
+      guard case .truncated(let after) = error as? DeviceFrameArchive.ArchiveUnreadable
       else { return XCTFail("expected a truncation, got \(error)") }
       XCTAssertLessThan(after, 4)
     }
@@ -96,11 +96,11 @@ final class ToolkitRecordingContractTests: XCTestCase {
   /// about 1.8 frames a second the spacing is uneven enough to see, and a
   /// movie laid out on a mean rate would misplace every frame but the first.
   func testTheTimelineIsBuiltFromTheObservedDurations() async throws {
-    let frames = try ToolkitFrameArchive.frames(
+    let frames = try DeviceFrameArchive.frames(
       in: TarFixture.archive(
         entries: (1...4).map { (String(format: "%04d.jpeg", $0), jpeg($0)) }))
     let uneven = [0.51, 0.94, 0.48, 0.55]
-    let composition = try await ToolkitRecordingComposer.compose(
+    let composition = try await DeviceRecordingComposer.compose(
       frames: frames, frameDurationsSeconds: uneven,
       into: scratch.appending(path: "uneven.mov"))
     XCTAssertEqual(composition.frameCount, 4)
@@ -113,25 +113,25 @@ final class ToolkitRecordingContractTests: XCTestCase {
   /// Every frame needs its own duration. Inventing a missing one is exactly
   /// the averaging this is built to avoid.
   func testAFrameWithNoObservedDurationIsRefusedRatherThanAveraged() async throws {
-    let frames = try ToolkitFrameArchive.frames(
+    let frames = try DeviceFrameArchive.frames(
       in: TarFixture.archive(
         entries: (1...3).map { (String(format: "%04d.jpeg", $0), jpeg($0)) }))
     do {
-      _ = try await ToolkitRecordingComposer.compose(
+      _ = try await DeviceRecordingComposer.compose(
         frames: frames, frameDurationsSeconds: [0.5, 0.5],
         into: scratch.appending(path: "short.mov"))
       XCTFail("two durations cannot lay out three frames")
-    } catch let failure as ToolkitRecordingComposer.CompositionFailure {
+    } catch let failure as DeviceRecordingComposer.CompositionFailure {
       XCTAssertEqual(failure, .durationsDoNotMatchFrames(frames: 3, durations: 2))
     }
   }
 
   func testAnEmptyRunComposesNothing() async {
     do {
-      _ = try await ToolkitRecordingComposer.compose(
+      _ = try await DeviceRecordingComposer.compose(
         frames: [], frameDurationsSeconds: [], into: scratch.appending(path: "none.mov"))
       XCTFail("there is no recording without frames")
-    } catch let failure as ToolkitRecordingComposer.CompositionFailure {
+    } catch let failure as DeviceRecordingComposer.CompositionFailure {
       XCTAssertEqual(failure, .noFrames)
     } catch {
       XCTFail("\(error)")
@@ -142,15 +142,15 @@ final class ToolkitRecordingContractTests: XCTestCase {
   /// refuses a half-scaled request in the first place.
   func testFramesOfDifferingSizeAreRefused() async throws {
     let frames = [
-      ToolkitFrameArchive.Frame(name: "0001.jpeg", bytes: jpeg(1, width: 64, height: 64)),
-      ToolkitFrameArchive.Frame(name: "0002.jpeg", bytes: jpeg(2, width: 48, height: 64)),
+      DeviceFrameArchive.Frame(name: "0001.jpeg", bytes: jpeg(1, width: 64, height: 64)),
+      DeviceFrameArchive.Frame(name: "0002.jpeg", bytes: jpeg(2, width: 48, height: 64)),
     ]
     do {
-      _ = try await ToolkitRecordingComposer.compose(
+      _ = try await DeviceRecordingComposer.compose(
         frames: frames, frameDurationsSeconds: [0.5, 0.5],
         into: scratch.appending(path: "mixed.mov"))
       XCTFail("a movie has one frame size")
-    } catch let failure as ToolkitRecordingComposer.CompositionFailure {
+    } catch let failure as DeviceRecordingComposer.CompositionFailure {
       XCTAssertEqual(failure, .framesDifferInSize)
     }
   }
@@ -160,32 +160,32 @@ final class ToolkitRecordingContractTests: XCTestCase {
   /// Validating reads the file back. "The writer said it finished" is the
   /// claim a validating step exists to doubt.
   func testValidatingReadsTheWrittenFileRatherThanTrustingTheWriter() async throws {
-    let frames = try ToolkitFrameArchive.frames(
+    let frames = try DeviceFrameArchive.frames(
       in: TarFixture.archive(
         entries: (1...6).map { (String(format: "%04d.jpeg", $0), jpeg($0)) }))
     let durations = Array(repeating: 0.543, count: 6)
-    let composition = try await ToolkitRecordingComposer.compose(
+    let composition = try await DeviceRecordingComposer.compose(
       frames: frames, frameDurationsSeconds: durations,
       into: scratch.appending(path: "valid.mov"))
-    let reading = try await ToolkitRecordingValidation.validate(composition)
+    let reading = try await DeviceRecordingValidation.validate(composition)
     XCTAssertGreaterThan(reading.byteCount, 0)
     XCTAssertEqual(reading.width, 64)
     XCTAssertEqual(reading.height, 64)
     XCTAssertEqual(
       reading.durationSeconds, durations.reduce(0, +),
-      accuracy: ToolkitRecordingValidation.toleranceSeconds)
+      accuracy: DeviceRecordingValidation.toleranceSeconds)
   }
 
   /// A file that is not there, or is empty, is not a recording — even when the
   /// composition record says one was written.
   func testAMissingFileIsRefusedEvenWhenTheRecordSaysItWasWritten() async throws {
-    let claimed = ToolkitRecordingComposer.Composition(
+    let claimed = DeviceRecordingComposer.Composition(
       url: scratch.appending(path: "never-written.mov"), frameCount: 4,
       width: 64, height: 64, durationSeconds: 2)
     do {
-      _ = try await ToolkitRecordingValidation.validate(claimed)
+      _ = try await DeviceRecordingValidation.validate(claimed)
       XCTFail("nothing was written, so nothing can be shown")
-    } catch let refusal as ToolkitRecordingValidation.Refusal {
+    } catch let refusal as DeviceRecordingValidation.Refusal {
       XCTAssertEqual(refusal, .empty)
     }
   }
@@ -193,10 +193,10 @@ final class ToolkitRecordingContractTests: XCTestCase {
   /// The rate this reports is measured off the movie's own span, and it lands
   /// where the device measurements said it would: about 1.8 frames a second.
   func testTheReportedRateMatchesWhatTheDeviceCanActuallyDo() async throws {
-    let frames = try ToolkitFrameArchive.frames(
+    let frames = try DeviceFrameArchive.frames(
       in: TarFixture.archive(
         entries: (1...10).map { (String(format: "%04d.jpeg", $0), jpeg($0)) }))
-    let composition = try await ToolkitRecordingComposer.compose(
+    let composition = try await DeviceRecordingComposer.compose(
       frames: frames, frameDurationsSeconds: Array(repeating: 0.543, count: 10),
       into: scratch.appending(path: "rate.mov"))
     XCTAssertEqual(composition.framesPerSecond, 1.84, accuracy: 0.01)
@@ -212,13 +212,13 @@ final class ToolkitRecordingContractTests: XCTestCase {
       throw XCTSkip("set ARKDECK_TEST_FRAME_ARCHIVE to a frames.tar from a real capture")
     }
     let archive = try Data(contentsOf: URL(filePath: path))
-    let frames = try ToolkitFrameArchive.frames(in: archive)
+    let frames = try DeviceFrameArchive.frames(in: archive)
     XCTAssertGreaterThan(frames.count, 1)
     XCTAssertEqual(frames.map(\.name), frames.map(\.name).sorted())
-    let composition = try await ToolkitRecordingComposer.compose(
+    let composition = try await DeviceRecordingComposer.compose(
       frames: frames, frameDurationsSeconds: Array(repeating: 0.543, count: frames.count),
       into: scratch.appending(path: "device.mov"))
-    let reading = try await ToolkitRecordingValidation.validate(composition)
+    let reading = try await DeviceRecordingValidation.validate(composition)
     XCTAssertEqual(reading.width, 720)
     XCTAssertEqual(reading.height, 1280)
     XCTAssertGreaterThan(reading.byteCount, 0)
@@ -238,9 +238,9 @@ final class ToolkitRecordingContractTests: XCTestCase {
       throw XCTSkip("set ARKDECK_TEST_FRAME_ARCHIVE to a frames.tar from a real capture")
     }
     let provider = try XCTUnwrap(
-      ToolkitRecordingFixture.provider(arguments: ["--ui-test-toolkit-recording=\(path)"]),
+      DeviceRecordingFixture.provider(arguments: ["--ui-test-device-recording=\(path)"]),
       "the fixture installs only under its own launch argument")
-    let target = ToolkitTargetPresentation(
+    let target = DeviceTargetPresentation(
       id: "TGT-1a62a0dbedd6", bindingRevision: 1, displayName: "DAYU200")
 
     guard case .captured(let recording) = await provider.recordScreen(
@@ -249,10 +249,10 @@ final class ToolkitRecordingContractTests: XCTestCase {
     XCTAssertEqual(recording.frames.count, 20)
     XCTAssertEqual(recording.frameDurationsSeconds.count, recording.frames.count)
 
-    let composition = try await ToolkitRecordingComposer.compose(
+    let composition = try await DeviceRecordingComposer.compose(
       frames: recording.frames, frameDurationsSeconds: recording.frameDurationsSeconds,
       into: scratch.appending(path: "pane.mov"))
-    let reading = try await ToolkitRecordingValidation.validate(composition)
+    let reading = try await DeviceRecordingValidation.validate(composition)
     XCTAssertEqual(reading.width, 720)
     XCTAssertEqual(reading.height, 1280)
     XCTAssertGreaterThan(reading.byteCount, 0)
@@ -262,11 +262,11 @@ final class ToolkitRecordingContractTests: XCTestCase {
   /// An ordinary launch never reaches the fixture. Production is the only
   /// thing an ordinary launch can be talking to.
   func testAnOrdinaryLaunchNeverReachesTheFixture() {
-    XCTAssertNil(ToolkitRecordingFixture.provider(arguments: ["ArkDeck"]))
+    XCTAssertNil(DeviceRecordingFixture.provider(arguments: ["ArkDeck"]))
     XCTAssertNil(
-      ToolkitRecordingFixture.provider(arguments: ["--ui-test-auto-update-idle"]),
+      DeviceRecordingFixture.provider(arguments: ["--ui-test-auto-update-idle"]),
       "another workspace's UI-test argument must not install this one's fixture")
-    XCTAssertFalse(ToolkitRecordingFixture.isSelected(arguments: ["--ui-test-viewer"]))
+    XCTAssertFalse(DeviceRecordingFixture.isSelected(arguments: ["--ui-test-viewer"]))
   }
 
   /// The fixture replays what the archive holds and never invents a frame to
@@ -277,10 +277,10 @@ final class ToolkitRecordingContractTests: XCTestCase {
       entries: (1...3).map { (String(format: "%04d.jpeg", $0), jpeg($0)) }
     ).write(to: archive)
     let provider = try XCTUnwrap(
-      ToolkitRecordingFixture.provider(
-        arguments: ["--ui-test-toolkit-recording=\(archive.path)"]))
+      DeviceRecordingFixture.provider(
+        arguments: ["--ui-test-device-recording=\(archive.path)"]))
     guard case .captured(let recording) = await provider.recordScreen(
-      frameCount: 40, target: ToolkitTargetPresentation(
+      frameCount: 40, target: DeviceTargetPresentation(
         id: "TGT-1", bindingRevision: 1, displayName: "d"))
     else { return XCTFail("three frames are still a run") }
     XCTAssertEqual(recording.frames.count, 3)

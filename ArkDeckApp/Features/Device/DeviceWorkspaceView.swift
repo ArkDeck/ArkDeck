@@ -4,16 +4,16 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Toolkit · device control.
+/// Device · device control.
 ///
 /// The picture is a still, not a live view. Everything here is arranged so a
 /// person can tell the difference: the frame's age is always on screen, a
 /// gesture is shown pending until the runtime answers, and an outcome the
 /// runtime could not establish is shown as unknown rather than resolved one
 /// way for the sake of a tidier list.
-struct ToolkitWorkspaceView: View {
-  var model: ToolkitWorkspaceViewModel
-  var recording: ToolkitRecordingViewModel
+struct DeviceWorkspaceView: View {
+  var model: DeviceWorkspaceViewModel
+  var recording: DeviceRecordingViewModel
 
   var body: some View {
     GeometryReader { geometry in
@@ -54,11 +54,11 @@ struct ToolkitWorkspaceView: View {
       } label: {
         Label(
           model.isCapturing
-            ? toolkitText("toolkit.screen.capturing") : toolkitText("toolkit.screen.capture"),
+            ? deviceText("device.screen.capturing") : deviceText("device.screen.capture"),
           systemImage: "camera")
       }
       .disabled(!model.canCapture || model.isCapturing)
-      .accessibilityIdentifier("toolkit.capture")
+      .accessibilityIdentifier("device.capture")
     }
     .padding(.horizontal, 20)
     .padding(.vertical, 12)
@@ -74,7 +74,7 @@ struct ToolkitWorkspaceView: View {
           ProgressView {
             Text("history.loading", tableName: "HistoryLocalizable")
           }
-          .accessibilityIdentifier("toolkit.history.loading")
+          .accessibilityIdentifier("device.history.loading")
         } else if let frame = model.frame, let image = NSImage(data: frame.imageData) {
           let rendered = Self.fittedSize(
             container: proxy.size,
@@ -84,6 +84,8 @@ struct ToolkitWorkspaceView: View {
               .resizable()
               .interpolation(.high)
               .scaledToFit()
+              .accessibilityLabel(deviceText("device.screen.picture"))
+              .accessibilityIdentifier("device.screen.image")
             gestureSurface(frame: frame, rendered: rendered)
             if model.frameIsStale { staleOverlay }
             if let marker = model.pendingMarker {
@@ -96,11 +98,11 @@ struct ToolkitWorkspaceView: View {
           .clipped()
         } else {
           ContentUnavailableView {
-            Label(toolkitText("toolkit.screen.empty.title"), systemImage: "iphone")
+            Label(deviceText("device.screen.empty.title"), systemImage: "iphone")
           } description: {
             Text(model.emptyMessage)
           }
-          .accessibilityIdentifier("toolkit.screen.empty")
+          .accessibilityIdentifier("device.screen.empty")
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -109,10 +111,10 @@ struct ToolkitWorkspaceView: View {
 
   /// One transparent layer owns every pointer event. Stacked full-size
   /// containers otherwise swallow the clicks that were meant for the picture.
-  private func gestureSurface(frame: ToolkitScreenFrame, rendered: CGSize) -> some View {
+  private func gestureSurface(frame: DeviceScreenFrame, rendered: CGSize) -> some View {
     Color.clear
       .contentShape(Rectangle())
-      .accessibilityIdentifier("toolkit.screen.surface")
+      .accessibilityIdentifier("device.screen.surface")
       .gesture(
         DragGesture(minimumDistance: 0)
           .onChanged { value in model.pointerMoved(to: value.location, rendered: rendered) }
@@ -132,7 +134,7 @@ struct ToolkitWorkspaceView: View {
   private var staleOverlay: some View {
     VStack {
       HStack {
-        Label(toolkitText("toolkit.stale.badge"), systemImage: "clock.badge.exclamationmark")
+        Label(deviceText("device.stale.badge"), systemImage: "clock.badge.exclamationmark")
           .font(.system(size: 11, weight: .medium))
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
@@ -145,11 +147,11 @@ struct ToolkitWorkspaceView: View {
       Spacer()
     }
     .allowsHitTesting(false)
-    .accessibilityIdentifier("toolkit.stale.badge")
+    .accessibilityIdentifier("device.stale.badge")
   }
 
   private func touchMarker(
-    _ marker: ToolkitWorkspaceViewModel.Marker, rendered: CGSize, pending: Bool
+    _ marker: DeviceWorkspaceViewModel.Marker, rendered: CGSize, pending: Bool
   ) -> some View {
     // Pending is hollow, settled is filled: the difference is what tells a
     // person whether the device has answered yet, at a glance and without
@@ -164,7 +166,7 @@ struct ToolkitWorkspaceView: View {
         x: rendered.width * marker.unitX,
         y: rendered.height * marker.unitY)
       .allowsHitTesting(false)
-      .accessibilityIdentifier(pending ? "toolkit.touch.pending" : "toolkit.touch.settled")
+      .accessibilityIdentifier(pending ? "device.touch.pending" : "device.touch.settled")
   }
 
   // MARK: - Inspector
@@ -172,11 +174,11 @@ struct ToolkitWorkspaceView: View {
   private var inspector: some View {
     VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 8) {
-        Text(toolkitText("toolkit.gestures.title"))
+        Text(deviceText("device.gestures.title"))
           .font(.system(size: 13, weight: .semibold))
-        gestureRow("toolkit.gestures.tap")
-        gestureRow("toolkit.gestures.longPress")
-        gestureRow("toolkit.gestures.swipe")
+        gestureRow("device.gestures.tap")
+        gestureRow("device.gestures.longPress")
+        gestureRow("device.gestures.swipe")
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(16)
@@ -184,10 +186,10 @@ struct ToolkitWorkspaceView: View {
       recordingPane
       Divider()
       VStack(alignment: .leading, spacing: 8) {
-        Text(toolkitText("toolkit.log.title"))
+        Text(deviceText("device.log.title"))
           .font(.system(size: 13, weight: .semibold))
         if model.log.isEmpty {
-          Text(toolkitText("toolkit.log.empty"))
+          Text(deviceText("device.log.empty"))
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
         } else {
@@ -221,9 +223,9 @@ struct ToolkitWorkspaceView: View {
         .foregroundStyle(.secondary)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
-        Text(toolkitText("toolkit.performance.title"))
+        Text(deviceText("device.performance.title"))
           .font(.system(size: 11, weight: .medium))
-        Text(toolkitText("toolkit.performance.detail"))
+        Text(deviceText("device.performance.detail"))
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -232,17 +234,17 @@ struct ToolkitWorkspaceView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(16)
     .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("toolkit.performance")
+    .accessibilityIdentifier("device.performance")
   }
 
   private func gestureRow(_ key: String) -> some View {
-    Text(toolkitText(key))
+    Text(deviceText(key))
       .font(.system(size: 11))
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
   }
 
-  private func logRow(_ entry: ToolkitWorkspaceViewModel.LogEntry) -> some View {
+  private func logRow(_ entry: DeviceWorkspaceViewModel.LogEntry) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       Image(systemName: entry.systemImage)
         .foregroundStyle(entry.tint)
@@ -260,7 +262,7 @@ struct ToolkitWorkspaceView: View {
     // One row is one thing that happened, so it reads as one element rather
     // than as a title and a detail a reader has to stitch back together.
     .accessibilityElement(children: .combine)
-    .accessibilityIdentifier(entry.isRefusal ? "toolkit.log.refused" : "toolkit.log.entry")
+    .accessibilityIdentifier(entry.isRefusal ? "device.log.refused" : "device.log.entry")
   }
 
   // MARK: - Footer
@@ -270,12 +272,12 @@ struct ToolkitWorkspaceView: View {
       Label(model.frameAgeSummary, systemImage: "clock")
         .font(.system(size: 11))
         .foregroundStyle(.secondary)
-        .accessibilityIdentifier("toolkit.frame.age")
+        .accessibilityIdentifier("device.frame.age")
       Spacer()
-      Text(toolkitText("toolkit.boundary"))
+      Text(deviceText("device.boundary"))
         .font(.system(size: 11))
         .foregroundStyle(.secondary)
-        .accessibilityIdentifier("toolkit.boundary")
+        .accessibilityIdentifier("device.boundary")
     }
     .padding(.horizontal, 20)
     .padding(.vertical, 10)
@@ -290,7 +292,7 @@ struct ToolkitWorkspaceView: View {
   private var recordingPane: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
-        Text(toolkitText("toolkit.record.title"))
+        Text(deviceText("device.record.title"))
           .font(.system(size: 13, weight: .semibold))
         Spacer()
         if recording.isBusy { ProgressView().controlSize(.small) }
@@ -303,12 +305,12 @@ struct ToolkitWorkspaceView: View {
           value: Binding(get: { recording.frameCount }, set: { recording.frameCount = $0 }),
           in: 2...300, step: 10
         ) {
-          Text("\(recording.frameCount) \(toolkitText("toolkit.record.frames"))")
+          Text("\(recording.frameCount) \(deviceText("device.record.frames"))")
             .font(.system(size: 11))
             .monospacedDigit()
         }
         .disabled(recording.isBusy)
-        .accessibilityIdentifier("toolkit.record.frames")
+        .accessibilityIdentifier("device.record.frames")
       }
 
       Button {
@@ -318,7 +320,7 @@ struct ToolkitWorkspaceView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
       }
       .disabled(recording.isBusy)
-      .accessibilityIdentifier("toolkit.record.start")
+      .accessibilityIdentifier("device.record.start")
 
       // Said, not swallowed, and said alongside whatever the run is doing:
       // "nothing was measured" is a different thing from "there is room", and
@@ -326,20 +328,20 @@ struct ToolkitWorkspaceView: View {
       // `headroomUnchecked`.
       if recording.headroomUnchecked {
         Label(
-          toolkitText("toolkit.record.headroomUnknown"),
+          deviceText("device.record.headroomUnknown"),
           systemImage: "questionmark.circle")
           .font(.system(size: 10))
           .foregroundStyle(.orange)
           .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("toolkit.record.headroomUnknown")
+          .accessibilityIdentifier("device.record.headroomUnknown")
       }
 
       switch recording.stage {
-      case .capturing, .assembling, .validating:
+      case .preflighting, .capturing, .assembling, .validating:
         Text(recording.stageTitle)
           .font(.system(size: 11))
           .foregroundStyle(.secondary)
-          .accessibilityIdentifier("toolkit.record.stage")
+          .accessibilityIdentifier("device.record.stage")
       case .ready(let ready):
         readyBar(ready)
       case .failed(let reason):
@@ -347,11 +349,11 @@ struct ToolkitWorkspaceView: View {
           .font(.system(size: 11))
           .foregroundStyle(.orange)
           .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("toolkit.record.failed")
+          .accessibilityIdentifier("device.record.failed")
       case .refused(let refusal):
         refusalBar(refusal)
       case .idle:
-        Text(toolkitText("toolkit.record.ceiling"))
+        Text(deviceText("device.record.ceiling"))
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -363,17 +365,17 @@ struct ToolkitWorkspaceView: View {
 
   /// Both numbers on one line. Split out of the view body because the
   /// concatenation there was past what the type checker would take.
-  static func headroomSummary(_ refusal: ToolkitRecordingBudget.Refusal) -> String {
+  static func headroomSummary(_ refusal: DeviceRecordingBudget.Refusal) -> String {
     let needed = refusal.neededBytes.formatted(.byteCount(style: .file))
     let free = refusal.remainingBytes.formatted(.byteCount(style: .file))
-    return "\(toolkitText("toolkit.record.needs")) \(needed) · "
-      + "\(free) \(toolkitText("toolkit.record.free"))"
+    return "\(deviceText("device.record.needs")) \(needed) · "
+      + "\(free) \(deviceText("device.record.free"))"
   }
 
   /// Refused before anything started. It names both numbers, because "no
   /// room" that names none cannot be acted on, and it offers the longest run
   /// that would fit rather than only saying no.
-  private func refusalBar(_ refusal: ToolkitRecordingBudget.Refusal) -> some View {
+  private func refusalBar(_ refusal: DeviceRecordingBudget.Refusal) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       refusalText(refusal)
       if refusal.framesThatWouldFit >= 2 {
@@ -381,13 +383,13 @@ struct ToolkitWorkspaceView: View {
           recording.shrinkToFit(refusal)
         } label: {
           Text(
-            "\(refusal.framesThatWouldFit) \(toolkitText("toolkit.record.frames")) "
-              + toolkitText("toolkit.record.wouldFit"))
+            "\(refusal.framesThatWouldFit) \(deviceText("device.record.frames")) "
+              + deviceText("device.record.wouldFit"))
             .font(.system(size: 11))
         }
         .font(.system(size: 11))
         .buttonStyle(.link)
-        .accessibilityIdentifier("toolkit.record.shrink")
+        .accessibilityIdentifier("device.record.shrink")
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -397,52 +399,52 @@ struct ToolkitWorkspaceView: View {
   /// statement. The button that acts on it stays outside: combining children
   /// swallows a control, and a refusal whose only remedy is unreachable is
   /// back to offering nothing.
-  private func refusalText(_ refusal: ToolkitRecordingBudget.Refusal) -> some View {
+  private func refusalText(_ refusal: DeviceRecordingBudget.Refusal) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       Label(
-        toolkitText("toolkit.record.noRoom"), systemImage: "externaldrive.badge.exclamationmark")
+        deviceText("device.record.noRoom"), systemImage: "externaldrive.badge.exclamationmark")
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(.orange)
       Text(Self.headroomSummary(refusal))
         .font(.system(size: 10))
         .monospacedDigit()
         .foregroundStyle(.secondary)
-      Text(toolkitText("toolkit.record.noRoom.detail"))
+      Text(deviceText("device.record.noRoom.detail"))
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("toolkit.record.refused")
+    .accessibilityIdentifier("device.record.refused")
   }
 
   /// What the run achieved and where it went. The rate is measured off the
   /// movie's own span, never a target, because the device sets it.
-  private func readyBar(_ ready: ToolkitRecordingViewModel.Ready) -> some View {
+  private func readyBar(_ ready: DeviceRecordingViewModel.Ready) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 6) {
         Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         Text(
-          "\(ready.frameCount) \(toolkitText("toolkit.record.frames")) · "
+          "\(ready.frameCount) \(deviceText("device.record.frames")) · "
             + ready.framesPerSecond.formatted(
               .number.precision(.fractionLength(2))) + " fps "
-            + toolkitText("toolkit.record.rate"))
+            + deviceText("device.record.rate"))
           .font(.system(size: 11, weight: .medium))
           .monospacedDigit()
       }
       // One result is one thing, so it reads as one element rather than as an
       // icon and a sentence a reader has to stitch back together.
       .accessibilityElement(children: .combine)
-      .accessibilityIdentifier("toolkit.record.ready")
+      .accessibilityIdentifier("device.record.ready")
 
       if ready.framesMissing > 0 {
         Label(
-          "\(ready.framesMissing) \(toolkitText("toolkit.record.gap"))",
+          "\(ready.framesMissing) \(deviceText("device.record.gap"))",
           systemImage: "exclamationmark.triangle.fill")
           .font(.system(size: 10))
           .foregroundStyle(.orange)
-          .accessibilityIdentifier("toolkit.record.gap")
+          .accessibilityIdentifier("device.record.gap")
       }
 
       Text(ready.url.path)
@@ -451,22 +453,22 @@ struct ToolkitWorkspaceView: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
-        .accessibilityIdentifier("toolkit.record.location")
+        .accessibilityIdentifier("device.record.location")
 
-      Text(toolkitText("toolkit.record.timeline"))
+      Text(deviceText("device.record.timeline"))
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
 
       HStack(spacing: 8) {
-        Button(toolkitText("toolkit.record.reveal")) {
+        Button(deviceText("device.record.reveal")) {
           NSWorkspace.shared.activateFileViewerSelecting([ready.url])
         }
-        .accessibilityIdentifier("toolkit.record.reveal")
-        Button(toolkitText("toolkit.record.saveAs")) { save(ready) }
-          .accessibilityIdentifier("toolkit.record.saveAs")
-        Button(toolkitText("toolkit.record.again")) { recording.reset() }
-          .accessibilityIdentifier("toolkit.record.again")
+        .accessibilityIdentifier("device.record.reveal")
+        Button(deviceText("device.record.saveAs")) { save(ready) }
+          .accessibilityIdentifier("device.record.saveAs")
+        Button(deviceText("device.record.again")) { recording.reset() }
+          .accessibilityIdentifier("device.record.again")
       }
       .font(.system(size: 11))
       .buttonStyle(.link)
@@ -475,7 +477,7 @@ struct ToolkitWorkspaceView: View {
 
   /// Copied, never moved: the composed file stays where the workspace can
   /// still show it if the copy is cancelled or fails.
-  private func save(_ ready: ToolkitRecordingViewModel.Ready) {
+  private func save(_ ready: DeviceRecordingViewModel.Ready) {
     let panel = NSSavePanel()
     panel.nameFieldStringValue = ready.url.lastPathComponent
     panel.allowedContentTypes = [.quickTimeMovie]

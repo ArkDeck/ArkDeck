@@ -17,7 +17,7 @@
 5. 查看器以 Trace 时间轴为主轴。选择事件或时间点后，左侧显示可证明对应的 Marker 截图或显式录屏帧，右侧显示选中事件和邻近日志；已选 event 的 identity 不会被画面/日志/slider 点击清空；
 6. 跨来源时间映射必须展示误差。无法证明对齐时显示缺口，不沿用旧画面或猜测日志关系。第一版只承诺「同一时钟 / 无法对齐」两态；「已校准 ±N ms」在 ground-truth 实验量化误差后启用。
 
-信息架构上，Diagnostic Session 使用独立的 **Diagnostics** tab。现有 **Trace** tab 的抓取配置、参数快照、抓取状态、Artifact 结果和 ArkTrace Viewer 入口全部保留；Diagnostics 不复用或改写 Trace 页的 view state、preset、时长、筛选条件与最近打开记录。独立录屏、低帧率预览、截图和设备输入位于 [`Toolkit · 真机操作`](./toolkit-device-control-design.md)，不会被 Diagnostics 静默启动。
+信息架构上，Diagnostic Session 使用独立的 **Diagnostics** tab。现有 **Trace** tab 的抓取配置、参数快照、抓取状态、Artifact 结果和 ArkTrace Viewer 入口全部保留；Diagnostics 不复用或改写 Trace 页的 view state、preset、时长、筛选条件与最近打开记录。按帧录屏、按需截图和设备输入位于 [`Device · 真机操作`](./device-control-design.md)，不会被 Diagnostics 静默启动。
 
 第一版默认只在 Marker 时保存截图。用户显式开启录屏时才保存原始视频和帧索引，不为每个视频帧生成一张长期保存的 PNG。Viewer 按需解码当前帧，缩略图属于可删除、可重建的 derived Artifact。
 
@@ -62,7 +62,7 @@
 | 屏幕视频 Artifact | 只能看到单张截图，无法逐帧回放复现过程 |
 | 多 channel 并发 arm/stop 证明 | 现有 Artifact 同属一个 Job，不等于采集区间天然重合；当前 lowering 甚至是顺序执行（hilog drain 在前、trace 阻塞在后），两者并不覆盖同一区间 |
 | 环形缓冲 / 回溯窗口 | 无法在“问题已经出现之后”回头保存问题前的现场；Marker 的取证价值取决于此（设备侧 `hitrace` 环形模式待真机确认） |
-| 会话内并发准入 | 采集会话 Job 持有 per-device mutation lane；Marker 截图与 Toolkit 输入在会话期间会被结构性阻塞，需要新的 in-session 准入语义 |
+| 会话内并发准入 | 采集会话 Job 持有 per-device mutation lane；Marker 截图与 Device 输入在会话期间会被结构性阻塞，需要新的 in-session 准入语义 |
 | source clock calibration | 无法给出 Trace、视频 PTS 与 HiLog 之间的误差上界；Marker 位于 host 时域，还需要 host↔device 校准 |
 | Marker track | 用户无法在问题出现时留下稳定时间锚点 |
 | frame/log linkage index | Viewer 需要临时猜测或全文件扫描，无法稳定联动 |
@@ -132,7 +132,7 @@ Preset 是 reviewed typed input 的组合，不是 shell 模板。设备或 Prov
 - 录制中持续显示精确 target/binding、已用时、剩余上限、channel 状态、已采集大小和 Marker 数量。
 - Marker 本身是 host-owned session annotation，只记录时间点；“标记并截图”额外提交一次 bounded screenshot operation，不开启持续取帧。快捷键为 `⌘M`。**效果分级必须诚实**：截图腿在当前 Catalog 事实下会升级为 deviceMutation（远端临时文件 + cleanup），不得在 UI 或文档中称其为 read-only。
 - **截图是事后取证**：从点击到设备完成截图有人工反应 + 执行延迟。截图必须记录实际拍摄时刻，Viewer 与录制页固定显示 `拍摄于 Marker 后 +N ms`；问题瞬间的现场由环形缓冲回溯负责，不由截图假装（见 §4.4）。
-- **会话内并发准入是行为级缺口**：采集会话 Job 持有 per-device mutation lane，Marker 截图与 Toolkit 输入在会话期间需要显式的 in-session 准入语义；在对应 OpenSpec delta 发布前，产品必须 fail closed 并解释原因，不得静默排队到会话结束后执行。
+- **会话内并发准入是行为级缺口**：采集会话 Job 持有 per-device mutation lane，Marker 截图与 Device 输入在会话期间需要显式的 in-session 准入语义；在对应 OpenSpec delta 发布前，产品必须 fail closed 并解释原因，不得静默排队到会话结束后执行。
 - “停止并生成结果”只请求 Runtime 在已发布的安全边界停止和 finalize；按钮点击不是新的 authority。
 - required channel 在录制中失败时继续收集仍有价值的 channel，但 terminal 状态为 Partial，并明确失败时间和受影响的时间段。
 

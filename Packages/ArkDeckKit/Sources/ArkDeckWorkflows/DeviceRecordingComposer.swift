@@ -14,7 +14,7 @@ import ImageIO
 /// enough to see, and a movie laid out on an average would misplace every
 /// frame but the first - which for a diagnostics recording is the whole point
 /// of having it.
-public enum ToolkitRecordingComposer {
+public enum DeviceRecordingComposer {
   /// What was actually written, as opposed to what was asked for.
   public struct Composition: Sendable, Equatable {
     public let url: URL
@@ -45,7 +45,7 @@ public enum ToolkitRecordingComposer {
   static let minimumFrameSeconds = 0.001
 
   public static func compose(
-    frames: [ToolkitFrameArchive.Frame],
+    frames: [DeviceFrameArchive.Frame],
     frameDurationsSeconds: [Double],
     into url: URL
   ) async throws -> Composition {

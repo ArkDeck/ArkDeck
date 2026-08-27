@@ -15,21 +15,21 @@ import XCTest
 /// These pin both halves. A rule that refused too eagerly - anything
 /// time-based - would refuse every gesture anyone ever made, since nobody
 /// looks at a still and decides where to press inside a second.
-final class ToolkitFrameLivenessContractTests: XCTestCase {
+final class DeviceFrameLivenessContractTests: XCTestCase {
   /// Nothing has been shown yet, so there is nothing to aim at.
   func testAWorkspaceWithNoPictureRefuses() {
-    XCTAssertTrue(ToolkitFrameLiveness().refusesInput)
+    XCTAssertTrue(DeviceFrameLiveness().refusesInput)
   }
 
   func testAFreshPictureIsAimable() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     XCTAssertFalse(liveness.refusesInput)
   }
 
   /// The case the gap was about: press, then press again without looking.
   func testASecondPressOnTheSamePictureIsRefused() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.confirmed(summary: [:]))
     XCTAssertTrue(
@@ -42,7 +42,7 @@ final class ToolkitFrameLivenessContractTests: XCTestCase {
   /// leaves a picture that may already be wrong, and the two are the same
   /// thing from here.
   func testAnUnknownOutcomeAlsoSpendsThePicture() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.unknown(reason: "channel closed before the verdict"))
     XCTAssertTrue(liveness.refusesInput)
@@ -52,7 +52,7 @@ final class ToolkitFrameLivenessContractTests: XCTestCase {
   /// picture is still true and refusing here would cost a person their aim
   /// for nothing.
   func testACleanFailureLeavesThePictureAimable() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.failed(reason: "device not adopted"))
     XCTAssertFalse(
@@ -62,10 +62,10 @@ final class ToolkitFrameLivenessContractTests: XCTestCase {
 
   /// Time alone must never spend a picture. Applying the runtime's own
   /// one-second freshness budget here would refuse every gesture ever made,
-  /// which is why `ToolkitScreenFrame.capturedAtUTC` is deliberately not a
+  /// which is why `DeviceScreenFrame.capturedAtUTC` is deliberately not a
   /// freshness claim.
   func testAgeAloneNeverRefuses() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     // No call carries a clock, and none can: there is nothing here to pass a
     // later instant to. That absence is the assertion.
@@ -74,7 +74,7 @@ final class ToolkitFrameLivenessContractTests: XCTestCase {
 
   /// Recapturing is the way back, and the only way.
   func testOnlyAFreshPictureRestoresAim() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.confirmed(summary: [:]))
     XCTAssertTrue(liveness.refusesInput)
@@ -84,7 +84,7 @@ final class ToolkitFrameLivenessContractTests: XCTestCase {
 
   /// Two gestures in a row without a recapture do not somehow come back.
   func testStalenessDoesNotDecayBackToAimable() {
-    var liveness = ToolkitFrameLiveness()
+    var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.confirmed(summary: [:]))
     liveness.settled(.failed(reason: "refused before dispatch"))

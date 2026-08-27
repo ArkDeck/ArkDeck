@@ -1,19 +1,19 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v1.4（design input，非 normative；2026-08-25 v1.2 新增独立 Toolkit tab、把 Diagnostics 调整为低干扰默认，并按当前 SwiftUI 实现回写 Viewer / Trace 页面结构；同日 v1.3 按设计评审修订 Diagnostics Marker、时间对齐与 Toolkit 输入反馈。2026-08-26 回写 Debug 当前 SwiftUI 分组及单个已签名 app-owned `.so` 的本地 / 只读 SSH 来源流程；v1.4 将 History 从 Job 审计表重组为按工作类型回访的活动中心，同时保留完整 Runtime 证据、Artifact、恢复关联与导出能力。Diagnostics / Toolkit 详细设计见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md) 与 [`toolkit-device-control-design.md`](./toolkit-device-control-design.md)；对应 OpenSpec 提案 `openspec/changes/chg-2026-071-interactive-device-control/`）
+> Status：draft v1.5（design input，非 normative；2026-08-25 v1.2 新增独立 Device tab、把 Diagnostics 调整为低干扰默认，并按当前 SwiftUI 实现回写 Viewer / Trace 页面结构；同日 v1.3 按设计评审修订 Diagnostics Marker、时间对齐与 Device 输入反馈。2026-08-26 回写 Debug 当前 SwiftUI 分组及单个已签名 app-owned `.so` 的本地 / 只读 SSH 来源流程；v1.4 将 History 从 Job 审计表重组为按工作类型回访的活动中心，同时保留完整 Runtime 证据、Artifact、恢复关联与导出能力。2026-08-27 v1.5 同步 Device 命名、图标及当前 App 交互：空态、按需截图、按帧录屏与旧画面输入拒绝。Diagnostics / Device 详细设计见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md) 与 [`device-control-design.md`](./device-control-design.md)；对应 OpenSpec 提案 `openspec/changes/chg-2026-071-interactive-device-control/`）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v1.4 目标与当前实现边界
+## 0. v1.5 目标与当前实现边界
 
-v1.4 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Diagnostic Session Viewer，在 Diagnostics 之后新增独立 **Toolkit** tab，并把 History 重组为可回访的活动中心。Diagnostics 默认只持续采集 Trace 与 HiLog，Marker 触发按需截图；连续录屏是明确 opt-in。Toolkit 的第一个工具是「真机操作」：默认显示最后一次确认截图，用户可独立获取截图、开启 5 fps 低帧率预览、开始有界录屏，以及发送一次点击或滑动。Diagnostics、Trace、Toolkit 与 History 各自保存 view state、配置和运行状态，互不替换，也不会静默开启彼此的高开销 channel。
+v1.5 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Diagnostic Session Viewer，在 Trace 之后、Diagnostics 之前提供独立 **Device** tab，并把 History 重组为可回访的活动中心。Diagnostics 默认只持续采集 Trace 与 HiLog，Marker 触发按需截图；连续录屏是明确 opt-in。Device 已有实际 SwiftUI 工作区：首次进入为空态，手动获取截图后可发送一次点击、长按或滑动；按帧数进行有界采集并在本机合成 .mov。当前没有持续预览和按秒启停录屏入口。Diagnostics、Trace、Device 与 History 各自保存 view state、配置和运行状态，互不替换，也不会静默开启彼此的高开销 channel。
 
 当前代码与目标设计的边界必须如实呈现：
 
-| Surface | 当前实现 | v1.4 设计方向 |
+| Surface | 当前实现 | v1.5 设计方向 |
 | --- | --- | --- |
-| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / Viewer / Trace / History / Automation 均有实际工作区 | 保留原生 split view；在 Trace 后新增 Diagnostics 与 Toolkit；统一 toolbar、全局 Job inspector 与窗口自适应 |
+| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / Viewer / Trace / History / Automation 均有实际工作区 | 保留原生 split view；在 Trace 后依次排列 Device 与 Diagnostics；统一 toolbar、全局 Job inspector 与窗口自适应 |
 | Device detail | 未授权设备有接管引导；已接管设备能显示真实 binding / observation facts，并有原生右键重命名和重新检测 | 删除重复内容标题；宽屏拆分状态操作与事实；名称只是 App 展示别名，重新检测只刷新候选事实 |
 | Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
 | Viewer | `UIDumpWorkspaceView` 已实现首次空态、显式 target、typed「抓取视图」、同 Job Artifact 校验，以及截图 + UI 树/节点属性联动检查器 | UI 稿直接镜像当前实现；不再把已经落地的 Viewer 写成未来方向 |
@@ -21,7 +21,7 @@ v1.4 保留 v0.8 Viewer、v0.9 Debug、当前精简 Trace 工作区和既有 Dia
 | Trace | 主窗口是精简的「抓取 Trace / 查看 Trace」两段式入口；原生 Timeline 在独立 ArkDeck Trace Viewer 窗口中打开 | UI 稿镜像当前入口，不复活自定义 tag、参数 diff、派生产物 dashboard 或页内 Timeline 模式；Diagnostics 不复用或改写 Trace 状态 |
 | History | `RuntimeHistoryView` 从 `job.list` 展示只读记录，按活动类型聚合 Flash、Debug、Viewer、Trace 与 Diagnostics；选择后按需加载 Runtime 证据、参数、Artifact 与恢复关联 | 宽屏使用活动类型导航、最近记录、详情 inspector 三栏；支持搜索及完整 Runtime 筛选、保存筛选，并从记录返回对应工作区；不得把演示数据或本地猜测混入 Runtime projection |
 | Diagnostics | 尚无独立 production surface；现有 `capture.diagnostics@1` 能产出 bounded HiLog、单张截图、UI dump/tree 和 raw Trace，但没有屏幕视频、并发/环形采集、会话内准入或跨来源 clock calibration；截图腿会把作业升级为 deviceMutation | 以独立 Diagnostic Session 统一采集 / Viewer；Trace/HiLog 以环形缓冲回溯保存，Marker 只记时间点、截图事后拍摄并标注 `+N ms`，自动 Marker 补齐人工反应延迟；连续录屏需明确开启。选择 Trace event 时联动可用截图/视频与日志；第一版对齐只承诺 `同一时钟` / `无法对齐` 两态，`已校准 ±N ms` 待 ground-truth 实验。原型中的环形采集、自动 Marker、视频与校准仍是目标设计，不代表 production availability |
-| Toolkit | 尚无独立 production surface；截图、录屏、点击和滑动也未必存在对应的已发布 operation / Provider lowering；OHOS 无已知设备侧录屏命令面；交互输入的端到端延迟未测 | 以独立 Toolkit 集合承载小工具，第一个工具为「真机操作」。默认按需截图；低帧率预览常显实测帧率与画面年龄、过期时输入暂停；第一版录屏为宿主逐帧合成（Assembling→Validating，无设备残留），设备侧编码 Spike-gated；点击/长按/滑动两态反馈（pending→confirmed）、绑定精确 target、binding、显示尺寸、方向与画面 epoch，排队超时输入作废。缺少已发布 typed operation 或延迟门槛未达标时显示 unavailable，绝不以 raw HDC 兜底 |
+| Device | 已有 DeviceWorkspaceView、按需截图、typed 点击／长按／滑动、按帧序列采集与本机 .mov 合成；无持续预览或设备侧编码入口 | 与当前实现保持同步：默认空态、880 pt 内容区断点与 320 pt Inspector；已确认／unknown 使旧图过期；录屏默认 40 帧，先预检后采集／合成／校验，显示实测帧率、缺帧、路径；评审状态和模拟数据单独标注 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
 | Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
 | Runtime data | Trace tag / 参数快照、Debug probe、Flash prerequisite / postflight、Artifact metadata 均有生产 facade | 缺失字段显示 unknown / unavailable，不使用 fixture、占位行或默认值补齐 |
@@ -160,7 +160,7 @@ Primary Window
 
 - Diagnostics 是 Trace 之后的独立 sidebar tab，包含「新建诊断」和「Diagnostic Session Viewer」两种状态。它不替换 Trace、不打开 ArkTrace 独立 App shell，也不读写 Trace 的 preset、时长、筛选、选择、Recent 与运行状态。详细行为见 [`diagnostic-mode-design.md`](./diagnostic-mode-design.md)。
 - 新建诊断默认提供「低干扰诊断」与「图形诊断」preset。Trace 与 bounded HiLog 以环形缓冲/缓冲区回溯方式采集（在 Marker 或停止时回溯保存问题前窗口）；Marker 只记录时间点并触发一次事后截图；自动 Marker（frame deadline missed / crash 触发，默认开）补齐人工反应延迟；屏幕录制是默认关闭的 optional channel，只有用户明确勾选后才加入 Session。preset 只组合 reviewed typed inputs；高级 disclosure 才展示 duration、Trace categories、HiLog filters、Artifact byte budget 与 optional channels。设备未确认支持 required channel（含环形能力）时在主操作旁显示 unavailable 原因，不把 unsupported tag 或 channel 伪装成可选。
-- 点击「开始诊断」后先进入 Arming；只有 required channel 全部 recording，界面才显示「采集已开始，现在开始复现」。录制中突出 elapsed / bounded limit、精确 target / binding、各 channel 状态和 Marker 数量，提供「标记并截图」（`⌘M`）与「停止并生成结果」。手动 Marker 立即记录时间点，截图先显示「正在截图…（事后拍摄）」，完成后显示「拍摄于标记后 +N ms」；截图失败时 Marker 保留并显示原因。无可靠总量时只显示阶段和 elapsed；屏幕录制关闭时明确显示「无持续取帧」。采集期间对同一设备的其他 mutation（含 Toolkit 输入）在 in-session 准入语义发布前 fail closed 并解释原因。
+- 点击「开始诊断」后先进入 Arming；只有 required channel 全部 recording，界面才显示「采集已开始，现在开始复现」。录制中突出 elapsed / bounded limit、精确 target / binding、各 channel 状态和 Marker 数量，提供「标记并截图」（`⌘M`）与「停止并生成结果」。手动 Marker 立即记录时间点，截图先显示「正在截图…（事后拍摄）」，完成后显示「拍摄于标记后 +N ms」；截图失败时 Marker 保留并显示原因。无可靠总量时只显示阶段和 elapsed；屏幕录制关闭时明确显示「无持续取帧」。采集期间对同一设备的其他 mutation（含 Device 输入）在 in-session 准入语义发布前 fail closed 并解释原因。
 - Diagnostic Session 以 Session monotonic time 为主轴。Trace event、视频 frame PTS 和 HiLog timestamp 都通过带适用区间与 `maxError` 的映射进入该时间轴；UI 词表为 `同一时钟`、`已校准 ±N ms`、`无法对齐` 三档，但**第一版只承诺前后两档**——`已校准 ±N ms` 在 ground-truth 实验量化误差后才启用，任何 ±N ms 数字在此之前不进产品 UI。重启、重连、recorder restart 或 timestamp 回退切断 alignment segment，并在 Timeline 画 gap。
 - Viewer 顶部同时显示「当前画面」与「当前时间上下文」，底部为全宽 Timeline。当前画面在 Marker 截图的实际拍摄时刻（±150 ms）显示截图并固定标注「拍摄于 Marker 后 +N ms」；Session 明确包含录屏时，才按 `frame.pts ≤ t < nextFrame.pts` 解码视频帧并显示 `Δt`。没有覆盖光标的画面证据时显示缺口，不沿用旧截图。右侧展示选中 event 与默认 `±100 ms` 日志；点击截图、视频或日志只移动光标，不凭时间接近伪造 Trace event identity，**也不清空已选 event 的 identity**——光标离开事件区间时详情面板保留并显示偏离标注。
 - Timeline Track 顺序固定为 Marker → Screen → Frame/Display → CPU/Process/Thread → HiLog → 有事实的平台扩展 Track。所有 Track 共用一个 ruler、time cursor 和 selection range；Track header 固定，时间内容水平滚动。录屏 gap、secure surface、日志无法映射或 alignment 超限都保留可见缺口，不能沿用旧帧。
@@ -170,15 +170,18 @@ Primary Window
 - Trace 解析仍复用 ArkTrace 原生 AppKit/CoreGraphics timeline、真实 event identity、cache 和 query。滚动 / 捏合、键盘、range/event selection、flag、mark 与 search 不从像素位置伪造事件；Process filter 与 trace search 分开，隐藏 lane 时保留 view state。
 - 所有 toolbar 动作在 Diagnostics menu 有键盘等价入口。Timeline 提供可聚焦 slider 语义，方向键移动光标、`Shift + 方向键` 扩展 range、`⌘M` 添加 Marker；离散 marker/event 仍可单独 Tab 到达。状态使用 symbol + 文案，动态变化通过稳定 polite status 播报，并尊重 Reduce Motion。
 
-### 5.6 Toolkit · 真机操作
+### 5.6 Device · 真机操作
 
-- Toolkit 是 Diagnostics 之后的独立 sidebar tab，内部使用紧凑工具列表；第一个工具为「真机操作」。后续工具只有在对应 typed operation 已发布后才出现，不预留一排不可用卡片，也不提供 raw shell。完整设计见 [`toolkit-device-control-design.md`](./toolkit-device-control-design.md)。
-- 真机操作默认显示最后一次确认截图、获取时间和 stale 状态，不持续从设备取帧。用户可手动「获取截图」（先显示 pending，成功后原位替换）；低帧率预览与有界录屏彼此独立，开始录屏不会自动开启预览。预览常显**实测帧率与画面年龄**（5 fps 是目标值），画面年龄超阈值或断流时输入面进入暂停；第一版录屏为宿主逐帧合成（停止后 Assembling → Validating，无设备端拉取与残留），设备侧编码录屏与 remote artifact reference 是 Spike-gated 目标形态。两者旁边持续显示会改变设备负载的提示。
-- 页面固定为：顶部精确 target / binding / display facts 与画面动作；左侧设备画面；右侧操作方式、操作记录和性能提示。设备画面是唯一主要输入面，不显示坐标表单。窄窗按工具列表 → target → 画面 → 操作说明 → 边界说明排列，不隐藏主操作。
-- 画面不提供「点击 / 滑动」模式切换：一次 primary pointer sequence 位移 `<6 pt` 且按住 `<500 ms` 转换为 tap、位移 `<6 pt` 且按住 `≥500 ms` 转换为 longClick（两者坐标锚定 pointer down 位置，长按不得静默降级为点击）；位移达到阈值转换为 swipe，起点、终点与 duration 直接来自 pointer down / move / up。拖动期间只显示本地轨迹，pointer up 时恰好提交一个 typed intent。键盘使用方向键移动虚拟指针、Enter / Space 点击、`Shift + 方向键` 滑动；非闭集手势就地提示「该手势不会发送到设备」。每次发送前重新验证 target、binding revision、display size、orientation 与画面 epoch；任一事实变化都拒绝旧映射并要求刷新画面。
-- 每个输入 intent 提交后 ≤100 ms 显示 pending 触点（空心），结果事实到达才转 confirmed（实心）；failed / unknown 在触点原位显示符号。排队滞留超过阈值的输入作废并显示「画面已过期，输入未发送」，绝不延迟补发。操作记录展示提交时间、坐标与 pending / confirmed / failed / unknown 结果，是审计和反馈，不是可自动重放的宏；外部效果未知时绝不重发同一 input。
-- 截图和录屏作为 sensitive Artifact 处理。第一版录屏为宿主逐帧合成：停止后进入 Assembling → Validating（byte count、SHA-256、容器可读性），原子发布到 ArkDeck managed Artifact storage，再显示本地位置、实测帧率、「在 Finder 中显示」「另存为…」与「再录一段」；接近 60 秒上限前 10 秒显示倒计时。设备侧编码形态（720p · 15 fps 等封闭 preset + Receiving 链 + remote artifact reference）在对应 operation 与 Runtime 面发布前不出现在产品中；届时本地校验前不得删除设备端唯一副本。原型数值只表达信息层级，不构成生产默认值。
-- 当前可点击原型只使用演示画面，不连接设备。截图、预览、录屏、点击和滑动必须分别由 Catalog / Provider / Runtime 发布并 materialize；缺少 operation、availability 或 fresh facts 时显示 unavailable，App 不拼接 HDC 命令。
+2026-08-27 真机走查补充：CLI 截图、三类输入和 40 帧采集已真实执行，App 截图／旧图拒绝／刷新通过；已安装 Runtime 漏接 App 录屏的 XPC 入口，因此 App 录屏仍待修复审核合入与 Runtime 更新后再验。交互稿新增 `deviceState=runtimeUnavailable` 表达提交前失败，不展示虚假视频结果。详见 [真机走查记录](references/v1.5/real-device-validation.md)。
+
+- Device 位于 Trace 与 Diagnostics 之间，中英文同名，使用线框设备图标（SwiftUI `iphone`）。工作区没有内部工具列表；详情见 [`device-control-design.md`](./device-control-design.md)。
+- 顶部设备名及 target / binding，右侧仅「获取截图」。首次显示「尚未获取截图」和空操作记录，不自动抓图。截图请求期间按钮禁用；失败保留旧图，并显示失败原因。
+- 内容区 ≥880 pt 时画面在左、320 pt Inspector 在右；更窄时为 420 pt 高画面接 Inspector，整体滚动。Inspector 顺序为操作方式、录屏、操作记录、负载提示；页脚常显画面年龄／尺寸及静止画面边界。
+- 一次 pointer sequence 仅生成一个 typed input：<6 pt、<500 ms 为 tap；<6 pt、≥500 ms 为 long press；≥6 pt 为 swipe。坐标锚定按下点，长按限制 500–2000 ms，滑动限制 80–2000 ms。没有坐标表单、键盘虚拟指针或轨迹箭头。
+- pending 时显示空心触点并禁止另一条输入；settled 后触点有填充，具体结果从记录读取。confirmed 和 unknown 都使旧图过期，再点只产生本地拒绝记录；明确失败不改变原可用性。只有重新截图恢复可用，历史图默认只读；不使用 800 ms 年龄倒计时，不自动重发 unknown。
+- 录屏默认 40 帧，范围 2–300，Stepper 步长 10。点击后立即显示「检查空间中」，固定请求帧数并禁用帧数和录制按钮；配额查询返回后才决定拒绝或提交 `capture.screen-sequence@1`。随后显示采集／合成／校验，各阶段都禁止重复录制；拒绝或失败后恢复控件。没有停止按钮、秒数／fps 选择器、60 秒倒计时或持续预览。采集总帧数不冒充进度。
+- 空间不足在开始前拒绝，显示需要／剩余，允许用户缩至可容纳帧数但不自动开录；剩余空间不可读时说明未检查，仍由 Runtime 存储预检准入。完成后展示实际帧数、实测 fps、缺帧、本地临时 .mov 路径，以及「在访达中显示」「另存为…」「再录一段」。最后一项只回到 idle；前两项在 HTML 中仅演示说明，不写占位文件。
+- 原型窗口外提供异常状态选择，窗口内保留演示数据声明；示意截图不含真实设备内容。当前不支持的预览、设备编码、键盘控制和 Session 关联不绘成可用功能。所有实际设备副作用仍由已发布 Catalog / Provider / Runtime 准入；不得 raw HDC 兜底。
 
 ### 5.7 Debug 工作台
 
@@ -257,14 +260,14 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - 所有用户可见交互修改必须与产品代码同车更新对应原型页面/状态、表达该事实的本规格或 design brief，以及 `docs/design/references/` 当前设计版本下受影响页面的简体中文与英文 1180×760 UI 参考图；缺少页面、状态或参考图时由本次改动补建，不得延期。
 - UI 参考图必须从 `prototype.html?reference=1&page=<page>&lang=<locale>` 加必要的显式状态参数生成，持续显示演示数据；它只校验布局、文案和状态，不是 App 实机截图、Runtime 输出或硬件验收证据。生成入口与状态参数记录在对应 reference 目录的 README 中。
 
-### 7.1 v0.5 基线、v0.6 Flash、v0.8 Viewer、v0.9 Debug 与 v1.3 Diagnostics / Toolkit 评审
+### 7.1 v0.5 基线、v0.6 Flash、v0.8 Viewer、v0.9 Debug 与 v1.3 Diagnostics / Device 评审
 
 - `docs/design/references/v0.5/` 固定保存 1180×760 的简体中文与英文设备详情参考截图；原型通过显式 locale / reference state 生成，不依赖浏览器记忆状态。v0.6 Flash 先在交互原型中评审，确认后再固定同尺寸中英文参考截图并进入 SwiftUI 对齐。
 - Viewer 以 `prototype.html?page=dump` 的首次空态为默认可点击事实；点击「抓取视图」后进入与 `prototype.html?page=dump&viewerState=captured` 相同的检查器态。检查器默认选中 `Toggle #42`，可从截图与完整树双向切换节点，且下方属性、布局、无障碍和 raw 内容同步更新；水平分隔条可用指针和键盘调整。
 - Trace 以 `prototype.html?page=trace` 为实现同步稿：只保留显式设备、抓取场景、秒/分钟时长、快捷时长、「开始抓取」以及独立「打开 Trace 查看器」入口。秒快捷值为 `5s / 10s / 15s / 30s`，默认选中 `10s`；分钟快捷值为 `1 min / 2 min / 3 min`。旧自定义 tag、参数 snapshot、Artifact 状态卡不得作为后续实现输入恢复。
 - Debug 以 `prototype.html?page=debug` 为实现同步稿:五个 tab（Artifacts / Logs / Apps / Network / Commands，Artifacts 默认）使用 roving focus 与左右方向键、Home / End;每组以 section 标题加细线分组，不再逐组画有边界卡片;Runtime 可用性只在标题旁一行呈现，被阻止时才在配置之上展开 reason code。Artifacts 走查「本地文件 / 远端服务器 → 选择或浏览一个已签名 `.so` → 填写所属 Bundle 与 `lib<name>.so` → 校验并检查替换计划（plan digest 与七个 materialized step）→ 备份、替换、重启并验证 → 获取日志并验证」;远端浏览只在已验证编译根目录内列出 `lib*.so`，空态跳转「设置 › 服务器」，服务器编辑必须走查密码 / OpenSSH 私钥分支、端口与绝对路径的字段级错误聚焦，以及主机密钥固定提示。旧的本机目录 / SMB / WSL 来源浏览、按名称与类型搜索、勾选批量替换和独立设备重启不得作为后续实现输入恢复，只能以 unavailable 呈现。原型底部的 production-boundary callout 不得删除。
-- v1.3 Diagnostics 以 `prototype.html?page=diagnostics` 为可点击事实：sidebar 同时保留 Trace、Diagnostics 与 Toolkit，切换时各自的 preset、时长、筛选、选择和运行状态不得串扰。默认打开的演示 Session 即第一版默认形态（无录屏、Marker 截图事后拍摄），另有「含录屏」与「Partial + 无法对齐」两个可切换 Session。点击 Marker 截图、可选视频帧、Trace event、HiLog marker 或 Timeline slider 都必须更新同一个时间光标并同步可用画面、`Δt` 与邻近日志；已选 event identity 不被非事件点击清空，光标离开时显示偏离标注。可返回采集页走查「开始诊断 → required channels ready（环形缓冲）→ 自动 Marker 触发 → 标记并截图（pending → +N ms）→ 停止并生成结果 → 生成新 marker-only Session」；`⌘M` 必须可用，默认屏幕录制必须关闭，Partial 横幅、无法对齐降级、截图失败原位说明、对齐 disclosure 和 production-boundary callout 不得删除。
-- v1.3 Toolkit 以 `prototype.html?page=tools` 为可点击事实：默认状态必须显示「按需截图 · 无持续取帧」。走查获取截图（pending → 完成）、画面单击（pending 空心触点 → confirmed 实心、落点为按下位置）、按住 ≥0.5 秒长按（不降级为点击）、按住拖动 swipe、方向键虚拟指针、非闭集手势就地提示、独立开启/停止预览（实测帧率 + 画面年龄常显；断流窗口出现「画面已过期 · 输入已暂停」且 pointer down 被拒绝）、独立开始/停止录屏（接近上限倒计时）。停止录屏后必须先显示「正在合成视频」（Assembling → Validating），再显示 Mac 本地位置、实测帧率、「在 Finder 中显示」「另存为…」与「再录一段」。每次完成的 pointer sequence 只更新一条操作记录，录屏不能隐式开启预览。切换 Trace / Diagnostics 后返回 Toolkit，截图时间、预览、录屏合成与结果状态必须保留；performance notice 与 production-boundary callout 不得删除。
+- v1.3 Diagnostics 以 `prototype.html?page=diagnostics` 为可点击事实：sidebar 同时保留 Trace、Diagnostics 与 Device，切换时各自的 preset、时长、筛选、选择和运行状态不得串扰。默认打开的演示 Session 即第一版默认形态（无录屏、Marker 截图事后拍摄），另有「含录屏」与「Partial + 无法对齐」两个可切换 Session。点击 Marker 截图、可选视频帧、Trace event、HiLog marker 或 Timeline slider 都必须更新同一个时间光标并同步可用画面、`Δt` 与邻近日志；已选 event identity 不被非事件点击清空，光标离开时显示偏离标注。可返回采集页走查「开始诊断 → required channels ready（环形缓冲）→ 自动 Marker 触发 → 标记并截图（pending → +N ms）→ 停止并生成结果 → 生成新 marker-only Session」；`⌘M` 必须可用，默认屏幕录制必须关闭，Partial 横幅、无法对齐降级、截图失败原位说明、对齐 disclosure 和 production-boundary callout 不得删除。
+- v1.5 Device 以 `prototype.html?page=device-control` 走查当前实现：默认无画面、40 帧和空日志；截图后一次输入 pending → settled → stale，再点拒绝；unknown 不重发，明确失败保留图可用性。验证按帧录屏采集／合成／校验、缺帧、空间拒绝、缩短及空间不可读；「再录一段」仅重置。Trace 切换不清空 Device 状态；评审场景切换不接受旧回调。移除原 v1.3 的持续预览、键盘虚拟指针、60 秒倒计时与 MP4 路径设想。
 - 参考截图只校验导航层级、宽屏分栏、信息密度、context menu 和文案长度，不是生产 Runtime 截图，更不是硬件验收证据；截图中必须持续标明演示数据。
 - App UI 测试在同一 1180×760 默认窗口和中英文 fixture 下检查：设备详情只有一个主标题、双栏/单栏的几何关系；Flash 默认只显示设备、镜像和主操作，运行态显示阶段与真实 byte-derived 估算，结果态只在 postflight 成功后出现成功文案。测试附加当次窗口截图供人工 diff；系统字体、accent、材质和抗锯齿继续由 macOS 控制，不用逐像素阈值锁死原生渲染。
 
@@ -277,7 +280,7 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - Accent：跟随用户系统 accent；ArkDeck 不固定 teal 覆盖系统选择。
 - Viewer：首次进入先显示真实空态；抓取成功后使用左侧截图 + 右侧上下检查器。树与属性之间保留紧凑的可拖动结构分隔线，不使用圆角卡片。普通截图边界默认隐藏，当前选中边界、树行与 inspector 使用同一 accent selection，并保留 ID / type 文字线索。
 - Diagnostic：参考宽屏使用“上方当前画面 + 当前时间上下文、下方全宽 Timeline”，不做三个等宽文件查看器。Trace event 是主选择身份，Marker 截图、可选视频与日志可反向移动共享光标但不伪造也不清空 event identity。默认不持续录屏；Marker 截图按拍摄时刻显示并固定标注 `+N ms`；画面 metadata 与对齐状态固定可见（第一版两态）；自动与手动 Marker 在 track 上样式区分；Timeline 用结构分隔，不把每条 Track 包成卡片。
-- Toolkit：内部工具列表与真机操作工作区保持两层信息架构；参考宽屏使用左侧设备画面、右侧控制与历史，不把截图、录屏、点击和滑动拆成四张同权卡片。按需截图是安静默认，预览显示实测帧率与画面年龄、断流时以遮罩暂停输入；触点反馈两态（pending 空心 → confirmed 实心）；宿主合成录屏完成后用一个紧凑结果条展示本地位置、实测帧率与后续操作（含「再录一段」）；性能提示与 typed-only 边界固定可见。
+- Device：与当前 App 相同的无二级导航布局。顶部 target / binding 与截图动作，左图右 Inspector（窄窗纵向）；空态居中，无手机壳或虚构默认截图。录屏按帧数，结果在原分组内显示，性能提示和静止画面边界常显。详见 v1.5 中英文参考图。
 - Debug：Artifacts 是首个且默认 tab；编译来源配置和搜索结果各自成组，避免把来源管理、文件勾选与设备执行混成一张表。来源编辑器先选 SSH / 本机目录 / SMB / WSL，再渐进披露对应连接字段；SSH 再选密码或密钥，隐藏分支不进入 tab order。替换后的重启与日志反馈原位出现，不另开 dashboard；兼容性阻止、备份确认、替换 readback、重启后验证使用不同文案和状态，不用一个绿色「成功」吞并全部阶段。
 - 页面标题只在 toolbar：任何工作区的内容区都不再画与 toolbar 同名的主标题。原型此前每页一个 `<h1>` 且标题栏显示「ArkDeck — 页面名」，两者不重复；SwiftUI 的 `navigationTitle` 只显示裸页面名，内容区再画一遍就成了字面重复，违反 §3 与 §6 的「一个 detail 只有一个可感知主标题」。需要解释的页面改用一行 secondary 说明 + 页面级控件（Debug 的 scope 行即此形态）。原型已同步移除全部 `<h1>`，改由 `data-page-title` 提供标题栏文本。
 - 统一页面测量 920：Flash、设备详情与 Trace 此前各自取 760 / 920 / 1000。在 1180 参考窗口下 detail pane 约 926，920 正好填满而不留死白，在更宽的显示器上仍有界。正文段落另按约 620 收窄，Flash 的「一条平静阅读路径」不靠整页变窄来实现。

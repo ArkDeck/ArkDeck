@@ -286,7 +286,75 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
+  /// The quota query suspends before capture. It must already own the record
+  /// controls during that await, not leave a second request or new frame count
+  /// available. No archive is read: the fixture refuses before capture.
+  func testDeviceRecordingLocksControlsWhileCheckingStorage() {
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-devices", "-AppleLanguages", "(en)",
+        "--ui-test-device-recording=/unused-preflight-fixture.tar",
+        "--ui-test-device-recording-headroom=1500000",
+        "--ui-test-device-recording-headroom-delay-ms=10000",
+      ], resetDeviceNames: false)
+    select("app.navigation.device", in: app)
+    let start = app.buttons["device.record.start"]
+    XCTAssertTrue(start.waitForExistenceFast(timeout: 10))
+    start.click()
+
+    XCTAssertFalse(start.isEnabled, "the quota await must reject another recording")
+    XCTAssertFalse(
+      element("device.record.frames", in: app).isEnabled,
+      "the requested frame count must stay fixed during the quota await")
+    let phase = element("device.record.stage", in: app)
+    guard phase.waitForExistenceFast(timeout: 2) else {
+      XCTFail("the pending quota query must have a visible stage")
+      return
+    }
+    assertDisplayed(phase, equals: "Checking storage", timeout: 2)
+    let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+    screenshot.name = "Device recording storage preflight"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+
+    XCTAssertTrue(element("device.record.refused", in: app).waitForExistenceFast(timeout: 15))
+    XCTAssertTrue(start.isEnabled, "a refusal must release the recording controls")
+    XCTAssertTrue(element("device.record.frames", in: app).isEnabled)
+    XCTAssertFalse(element("device.record.ready", in: app).exists)
+    element("device.record.shrink", in: app).click()
+    XCTAssertTrue(app.staticTexts["22 frames"].exists)
+    XCTAssertFalse(element("device.record.stage", in: app).exists)
+    assertDisplayed(start, equals: "Record")
+    app.terminate()
+  }
+
   // MARK: - One launch per language
+
+  func testDeviceWorkspaceNameAndEmptyStateInBothLanguages() {
+    for (language, capture, emptyTitle) in [
+      ("(en)", "Get screenshot", "No screenshot yet"),
+      ("(zh-Hans)", "获取截图", "尚未获取截图"),
+    ] {
+      let app = launch(
+        arguments: [
+          "--ui-test-runtime-history", "--ui-test-devices", "-AppleLanguages", language,
+        ], resetDeviceNames: false)
+      let device = element("app.navigation.device", in: app)
+      assertDisplayed(device, equals: "Device")
+      select("app.navigation.device", in: app)
+      XCTAssertTrue(element("device.screen.empty", in: app).waitForExistenceFast(timeout: 10))
+      XCTAssertTrue(app.staticTexts[emptyTitle].exists)
+      assertDisplayed(app.buttons["device.capture"], equals: capture)
+      XCTAssertFalse(element("device.screen.surface", in: app).exists)
+      XCTAssertFalse(app.staticTexts["Toolkit"].exists)
+
+      let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      screenshot.name = "Device workspace \(language)"
+      screenshot.lifetime = .keepAlways
+      add(screenshot)
+      app.terminate()
+    }
+  }
 
   func testEnglishSweepOfEveryWorkspace() {
     sweep(
@@ -871,7 +939,7 @@ final class AppShellUITests: XCTestCase {
       element("history.table", in: app).waitForExistenceFast(timeout: 10), file: file, line: line)
     assertDisplayed(app.staticTexts["history.readOnlyNote"], equals: history.readOnlyNote)
     for category in [
-      "all", "flash", "viewer", "trace", "diagnostics", "debug", "toolkit", "other",
+      "all", "flash", "viewer", "trace", "diagnostics", "debug", "device", "other",
     ] {
       XCTAssertTrue(
         element("history.activity.\(category)", in: app).exists,
@@ -1645,7 +1713,7 @@ final class AppShellUITests: XCTestCase {
     // native keyboard selection instead of synthesizing an off-window click.
     let items = [
       "app.navigation.overview", "app.navigation.flash", "app.navigation.debug",
-      "app.navigation.uiDump", "app.navigation.trace", "app.navigation.toolkit",
+      "app.navigation.uiDump", "app.navigation.trace", "app.navigation.device",
       "app.navigation.diagnostics", "app.navigation.history",
     ]
     guard let index = items.firstIndex(of: identifier) else {

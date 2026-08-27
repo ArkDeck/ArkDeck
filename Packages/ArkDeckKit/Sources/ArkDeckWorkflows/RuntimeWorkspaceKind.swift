@@ -13,7 +13,8 @@ public enum RuntimeWorkspaceKind: String, Sendable, Equatable, Codable, CaseIter
   case trace
   case diagnostics
   case debug
-  case toolkit
+  // Keep the published wire value so existing daemons and history remain readable.
+  case device = "toolkit"
 }
 
 public enum RuntimeWorkspaceKindProjection {
@@ -45,7 +46,7 @@ public enum RuntimeWorkspaceKindProjection {
       "port-forward.remove":
       return .debug
     case "input.tap", "input.long-press", "input.swipe", "capture.screen-sequence":
-      return .toolkit
+      return .device
     case "observe.device", "observe.devices":
       return .viewer
     case "analyzer.analyze-trace", "analyzer.summarize-trace":
@@ -101,7 +102,7 @@ public enum RuntimeWorkspaceKindProjection {
     switch diagnosticsKind(inputs: inputs, clientName: nil) {
     case .viewer: return .viewer
     case .trace: return .trace
-    case .toolkit: return .toolkit
+    case .device: return .device
     case .flash, .diagnostics, .debug: return nil
     }
   }
@@ -125,14 +126,14 @@ public enum RuntimeWorkspaceKindProjection {
       !nonemptyArray("hilogFilters", in: inputs),
       !nonemptyArray("traceCategories", in: inputs)
     {
-      return .toolkit
+      return .device
     }
 
     switch clientName {
     case ArkDeckAgentClientName.traceWorkspace:
       return .trace
-    case ArkDeckAgentClientName.toolkitDeviceControl:
-      return .toolkit
+    case ArkDeckAgentClientName.deviceControl:
+      return .device
     case ArkDeckAgentClientName.debugLogsWorkspace:
       return .debug
     default:

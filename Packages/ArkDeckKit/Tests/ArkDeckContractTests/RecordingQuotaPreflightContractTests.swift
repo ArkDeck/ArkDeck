@@ -55,7 +55,7 @@ final class RecordingQuotaPreflightContractTests: XCTestCase {
         "frameCount": .integer(Int64(frames)),
         "totalArtifactByteBudget": .integer(Int64(budget)),
       ],
-        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.Toolkit")))
+        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.Device")))
   }
 
   /// The published step order is the load-bearing part: the host storage
@@ -141,16 +141,16 @@ final class RecordingQuotaPreflightContractTests: XCTestCase {
   /// pass its own check and still be refused, which is the outcome this whole
   /// gap exists to prevent.
   func testTheWorkspaceSendsTheSameBudgetItPreflighted() throws {
-    let target = ToolkitTargetPresentation(
+    let target = DeviceTargetPresentation(
       id: "TGT-1", bindingRevision: 1, displayName: "DAYU200")
     for frames in [2, 40, 120, 300] {
-      let request = try ToolkitDeviceControlFacade.recordingRequest(
+      let request = try DeviceControlFacade.recordingRequest(
         frameCount: frames, target: target, nonce: "n")
       guard case .integer(let sent)? = request.inputs["totalArtifactByteBudget"] else {
         return XCTFail("a recording request must carry the budget it preflighted")
       }
       XCTAssertEqual(
-        Int(sent), ToolkitRecordingBudget.bytes(frameCount: frames),
+        Int(sent), DeviceRecordingBudget.bytes(frameCount: frames),
         "\(frames) frames: the workspace preflighted one number and sent another")
     }
   }
@@ -163,7 +163,7 @@ final class RecordingQuotaPreflightContractTests: XCTestCase {
     let field = try XCTUnwrap(
       descriptor.inputs.first { $0.name == "totalArtifactByteBudget" })
     for frames in [2, 300] {
-      let budget = ToolkitRecordingBudget.bytes(frameCount: frames)
+      let budget = DeviceRecordingBudget.bytes(frameCount: frames)
       if let minimum = field.minimum {
         XCTAssertGreaterThanOrEqual(budget, minimum, "\(frames) frames")
       }
@@ -181,14 +181,14 @@ final class RecordingQuotaPreflightContractTests: XCTestCase {
   /// would hide an estimate that had drifted low.
   func testTheEstimateCoversWhatMeasuredRunsActuallyProduced() {
     XCTAssertGreaterThan(
-      ToolkitRecordingBudget.bytes(frameCount: 20), 851_456,
+      DeviceRecordingBudget.bytes(frameCount: 20), 851_456,
       "under-estimating lets a run start that the runtime will refuse")
     XCTAssertGreaterThan(
-      ToolkitRecordingBudget.bytes(frameCount: 120), 5_059_584,
+      DeviceRecordingBudget.bytes(frameCount: 120), 5_059_584,
       "the 120-frame measurement is above the floor, so this is the estimate "
         + "itself rather than the floor standing in for it")
     XCTAssertGreaterThan(
-      ToolkitRecordingBudget.bytes(frameCount: 120), 1 << 20,
+      DeviceRecordingBudget.bytes(frameCount: 120), 1 << 20,
       "if the floor still dominated at this length, neither assertion above "
         + "would be measuring the estimate")
   }
@@ -196,17 +196,17 @@ final class RecordingQuotaPreflightContractTests: XCTestCase {
   /// A refusal names both numbers and offers the longest run that would fit,
   /// because "no room" that offers nothing cannot be acted on.
   func testARefusalNamesBothNumbersAndOffersARunThatFits() throws {
-    let remaining = ToolkitRecordingBudget.bytes(frameCount: 30)
+    let remaining = DeviceRecordingBudget.bytes(frameCount: 30)
     let refusal = try XCTUnwrap(
-      ToolkitRecordingBudget.refusal(frameCount: 200, remainingBytes: remaining))
+      DeviceRecordingBudget.refusal(frameCount: 200, remainingBytes: remaining))
     XCTAssertEqual(refusal.remainingBytes, remaining)
-    XCTAssertEqual(refusal.neededBytes, ToolkitRecordingBudget.bytes(frameCount: 200))
+    XCTAssertEqual(refusal.neededBytes, DeviceRecordingBudget.bytes(frameCount: 200))
     XCTAssertGreaterThanOrEqual(refusal.framesThatWouldFit, 2)
     XCTAssertLessThanOrEqual(
-      ToolkitRecordingBudget.bytes(frameCount: refusal.framesThatWouldFit), remaining,
+      DeviceRecordingBudget.bytes(frameCount: refusal.framesThatWouldFit), remaining,
       "the run it offers has to actually fit")
     XCTAssertGreaterThan(
-      ToolkitRecordingBudget.bytes(frameCount: refusal.framesThatWouldFit + 1), remaining,
+      DeviceRecordingBudget.bytes(frameCount: refusal.framesThatWouldFit + 1), remaining,
       "and it has to be the longest one that does")
   }
 
@@ -214,16 +214,16 @@ final class RecordingQuotaPreflightContractTests: XCTestCase {
   /// would be worse than none.
   func testARunThatFitsIsNotRefused() {
     XCTAssertNil(
-      ToolkitRecordingBudget.refusal(
-        frameCount: 40, remainingBytes: ToolkitRecordingBudget.bytes(frameCount: 40)))
-    XCTAssertNil(ToolkitRecordingBudget.refusal(frameCount: 300, remainingBytes: 1 << 30))
+      DeviceRecordingBudget.refusal(
+        frameCount: 40, remainingBytes: DeviceRecordingBudget.bytes(frameCount: 40)))
+    XCTAssertNil(DeviceRecordingBudget.refusal(frameCount: 300, remainingBytes: 1 << 30))
   }
 
   /// An empty store offers nothing, and says so rather than offering a run of
   /// zero frames that the operation would refuse as out of bounds anyway.
   func testAStoreWithNoRoomOffersNoRun() throws {
     let refusal = try XCTUnwrap(
-      ToolkitRecordingBudget.refusal(frameCount: 40, remainingBytes: 0))
+      DeviceRecordingBudget.refusal(frameCount: 40, remainingBytes: 0))
     XCTAssertEqual(refusal.framesThatWouldFit, 0)
   }
 

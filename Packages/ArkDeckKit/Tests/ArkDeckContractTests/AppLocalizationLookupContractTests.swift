@@ -36,7 +36,7 @@ final class AppLocalizationLookupContractTests: XCTestCase {
     ("settingsText", "SettingsLocalizable"),
     ("deviceString", "Localizable"),
     ("viewerText", "UIDumpLocalizable"),
-    ("toolkitText", "ToolkitLocalizable"),
+    ("deviceText", "DeviceLocalizable"),
     ("diagnosticsText", "DiagnosticsLocalizable"),
   ]
 
@@ -143,6 +143,7 @@ final class AppLocalizationLookupContractTests: XCTestCase {
       "app.navigation.debug": "Debug",
       "app.navigation.uiDump": "Viewer",
       "app.navigation.trace": "Trace",
+      "app.navigation.device": "Device",
       "app.navigation.history": "History",
     ]
 

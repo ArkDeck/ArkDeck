@@ -1207,7 +1207,8 @@ struct RuntimeHistoryView: View {
     sessionFilter = sessions.contains(savedSession) ? savedSession : Self.allSessions
     targetFilter = targets.contains(savedTarget) ? savedTarget : Self.allTargets
     timeFilter = HistoryTimeFilter(rawValue: savedTime) ?? .anyTime
-    activityFilter = HistoryActivityFilter(rawValue: savedActivity) ?? .all
+    activityFilter = savedActivity == "toolkit"
+      ? .device : HistoryActivityFilter(rawValue: savedActivity) ?? .all
   }
 
   private func historyDate(_ job: RuntimeJobSummaryPresentation) -> Date? {
@@ -1375,7 +1376,7 @@ private enum HistoryActivityFilter: String, CaseIterable, Identifiable {
   case trace
   case diagnostics
   case debug
-  case toolkit
+  case device
   case other
 
   init(workspaceKind: RuntimeWorkspaceKind?) {
@@ -1385,7 +1386,7 @@ private enum HistoryActivityFilter: String, CaseIterable, Identifiable {
     case .trace: self = .trace
     case .diagnostics: self = .diagnostics
     case .debug: self = .debug
-    case .toolkit: self = .toolkit
+    case .device: self = .device
     case nil: self = .other
     }
   }
@@ -1401,7 +1402,7 @@ private enum HistoryActivityFilter: String, CaseIterable, Identifiable {
     case .trace: "waveform.path.ecg"
     case .diagnostics: "waveform.path"
     case .debug: "ladybug"
-    case .toolkit: "cursorarrow.motionlines"
+    case .device: "iphone"
     case .other: "ellipsis.circle"
     }
   }
@@ -1414,7 +1415,7 @@ private enum HistoryActivityFilter: String, CaseIterable, Identifiable {
     case .trace: .trace
     case .diagnostics: .diagnostics
     case .debug: .debug
-    case .toolkit: .toolkit
+    case .device: .device
     case .other: nil
     }
   }

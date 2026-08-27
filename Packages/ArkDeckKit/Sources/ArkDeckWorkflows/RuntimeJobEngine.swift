@@ -4583,7 +4583,7 @@ public actor RuntimeJobEngine {
   }
 
   /// Artifact names omitted by the exact materialized request, including
-  /// downstream optional products whose upstream was not selected. This
+  /// downstream optional products and unselected alternative encodings. This
   /// is derived from the persisted typed inputs, not from artifact status
   /// text, so an artifact that was selected but failed remains an evidence
   /// blocker.
@@ -4607,10 +4607,21 @@ public actor RuntimeJobEngine {
         omittedSteps.insert(step.stepID)
       }
     }
-    return Set(
-      omittedSteps.flatMap {
-        RuntimeArtifactService.artifacts(reference: descriptor.reference, stepID: $0) ?? []
-      })
+    var omittedNames: Set<String> = []
+    for step in descriptor.steps {
+      let mapping = RuntimeArtifactService.artifacts(
+        reference: descriptor.reference, stepID: step.stepID) ?? []
+      if omittedSteps.contains(step.stepID) {
+        omittedNames.formUnion(mapping)
+      } else {
+        // A PNG request owes one PNG, not both encodings. Use the same typed
+        // selection as publication; an absent selected product still blocks.
+        let selected = RuntimeArtifactService.publishableArtifacts(
+          mapping: mapping, requestInputs: inputs)
+        omittedNames.formUnion(Set(mapping).subtracting(selected))
+      }
+    }
+    return omittedNames
   }
 
   /// Returns both active Runtime snapshots and durable terminal history.  The

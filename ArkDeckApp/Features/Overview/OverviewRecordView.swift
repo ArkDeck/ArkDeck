@@ -628,7 +628,7 @@ struct OverviewRecordView: View {
     case .trace: "overview.record.workspace.trace"
     case .debugHAP: "overview.record.workspace.debug"
     case .flash: "overview.record.workspace.flash"
-    case .toolkit: "overview.record.workspace.toolkit"
+    case .device: "overview.record.workspace.device"
     case nil: LocalizedStringKey(displayedOperation(run.operationReference))
     }
   }
@@ -639,7 +639,7 @@ struct OverviewRecordView: View {
     case .trace: "waveform.path.ecg"
     case .debugHAP: "ladybug"
     case .flash: "bolt"
-    case .toolkit: "hand.tap"
+    case .device: "iphone"
     case nil: "clock.arrow.circlepath"
     }
   }

@@ -171,7 +171,7 @@ final class RuntimeWorkspaceThreadContractTests: XCTestCase {
       ("capture.diagnostics", ArkDeckAgentClientName.debugLogsWorkspace),
       ("debug.hap", ArkDeckAgentClientName.debugAppsWorkspace),
       ("port-forward.create", ArkDeckAgentClientName.debugNetworkWorkspace),
-      ("input.tap", ArkDeckAgentClientName.toolkitDeviceControl),
+      ("input.tap", ArkDeckAgentClientName.deviceControl),
     ]
     for (operationID, clientName) in cases {
       let without = AgentXPCEndpoint.admission(

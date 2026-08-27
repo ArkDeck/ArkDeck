@@ -2,7 +2,7 @@ import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
 
-/// The Toolkit device-control surface: an on-demand screenshot and the three
+/// The Device device-control surface: an on-demand screenshot and the three
 /// published gestures, submitted as typed operations.
 ///
 /// What this facade will not do is infer. A gesture's result is whatever the
@@ -13,7 +13,7 @@ import Foundation
 
 /// One frame the user is acting on, with the facts a gesture computed from it
 /// has to carry.
-public struct ToolkitScreenFrame: Sendable, Equatable {
+public struct DeviceScreenFrame: Sendable, Equatable {
   public let imageData: Data
   public let width: Int
   public let height: Int
@@ -33,7 +33,7 @@ public struct ToolkitScreenFrame: Sendable, Equatable {
   }
 }
 
-public enum ToolkitGesture: String, Sendable, Equatable, CaseIterable {
+public enum DeviceGesture: String, Sendable, Equatable, CaseIterable {
   case tap
   case longPress
   case swipe
@@ -51,8 +51,8 @@ public enum ToolkitGesture: String, Sendable, Equatable, CaseIterable {
 
 /// A gesture in device pixels, already mapped out of the view's coordinate
 /// space and bounded by the frame it was read from.
-public struct ToolkitGestureRequest: Sendable, Equatable {
-  public let gesture: ToolkitGesture
+public struct DeviceGestureRequest: Sendable, Equatable {
+  public let gesture: DeviceGesture
   public let x: Int
   public let y: Int
   public let toX: Int?
@@ -62,7 +62,7 @@ public struct ToolkitGestureRequest: Sendable, Equatable {
   public let frameHeight: Int
 
   public init(
-    gesture: ToolkitGesture,
+    gesture: DeviceGesture,
     x: Int,
     y: Int,
     frameWidth: Int,
@@ -108,13 +108,13 @@ public struct ToolkitGestureRequest: Sendable, Equatable {
 /// What the runtime said about one gesture. `unknown` is a real answer and is
 /// never rewritten into either of the others: an input whose outcome the
 /// runtime could not establish is reported as such, and is not resent.
-public enum ToolkitGestureOutcome: Sendable, Equatable {
+public enum DeviceGestureOutcome: Sendable, Equatable {
   case confirmed(summary: [String: String])
   case failed(reason: String)
   case unknown(reason: String)
 }
 
-public struct ToolkitTargetPresentation: Sendable, Equatable {
+public struct DeviceTargetPresentation: Sendable, Equatable {
   public let id: String
   public let bindingRevision: Int?
   public let displayName: String
@@ -126,49 +126,49 @@ public struct ToolkitTargetPresentation: Sendable, Equatable {
   }
 }
 
-public enum ToolkitScreenshotResult: Sendable, Equatable {
-  case captured(ToolkitScreenFrame)
+public enum DeviceScreenshotResult: Sendable, Equatable {
+  case captured(DeviceScreenFrame)
   case failed(String)
 }
 
-public protocol ToolkitDeviceControlProviding: Sendable {
-  func captureScreen(target: ToolkitTargetPresentation) async -> ToolkitScreenshotResult
+public protocol DeviceControlProviding: Sendable {
+  func captureScreen(target: DeviceTargetPresentation) async -> DeviceScreenshotResult
   /// Reads one immutable screenshot from a completed historical Job. This
   /// path cannot submit a gesture or mark the frame live for input.
   func loadHistoricalScreen(
     jobID: String,
     targetID: String
-  ) async -> ToolkitScreenshotResult
+  ) async -> DeviceScreenshotResult
   func send(
-    _ request: ToolkitGestureRequest, to target: ToolkitTargetPresentation
-  ) async -> ToolkitGestureOutcome
+    _ request: DeviceGestureRequest, to target: DeviceTargetPresentation
+  ) async -> DeviceGestureOutcome
   func recordScreen(
-    frameCount: Int, target: ToolkitTargetPresentation
-  ) async -> ToolkitScreenRecordingResult
+    frameCount: Int, target: DeviceTargetPresentation
+  ) async -> DeviceScreenRecordingResult
   /// How much room the artifact store has left. Read-only, and asked before a
   /// run starts rather than discovered by one that gets refused.
   func artifactHeadroomBytes() async -> Int?
 }
 
-public extension ToolkitDeviceControlProviding {
+public extension DeviceControlProviding {
   func loadHistoricalScreen(
     jobID _: String,
     targetID _: String
-  ) async -> ToolkitScreenshotResult {
-    .failed("This Toolkit provider cannot read historical screenshots")
+  ) async -> DeviceScreenshotResult {
+    .failed("This Device provider cannot read historical screenshots")
   }
 }
 
 /// The frames a run brought back, with the spacing they were taken at.
-public struct ToolkitScreenRecording: Sendable, Equatable {
-  public let frames: [ToolkitFrameArchive.Frame]
+public struct DeviceScreenRecording: Sendable, Equatable {
+  public let frames: [DeviceFrameArchive.Frame]
   public let frameDurationsSeconds: [Double]
   /// Asked for minus captured. A frame that failed is a gap in the run, and
   /// saying so is what stops a short recording reading as a complete one.
   public let framesMissing: Int
 
   public init(
-    frames: [ToolkitFrameArchive.Frame], frameDurationsSeconds: [Double], framesMissing: Int
+    frames: [DeviceFrameArchive.Frame], frameDurationsSeconds: [Double], framesMissing: Int
   ) {
     self.frames = frames
     self.frameDurationsSeconds = frameDurationsSeconds
@@ -176,12 +176,14 @@ public struct ToolkitScreenRecording: Sendable, Equatable {
   }
 }
 
-public enum ToolkitScreenRecordingResult: Sendable, Equatable {
-  case captured(ToolkitScreenRecording)
+public enum DeviceScreenRecordingResult: Sendable, Equatable {
+  case captured(DeviceScreenRecording)
   case failed(String)
 }
 
-public enum ToolkitDeviceControlFacade {
+public enum DeviceControlFacade {
+  // Preserve published request/idempotency prefixes across the product rename:
+  // the same nonce must continue to describe the same intent after an upgrade.
   public static let screenshotOperationReference = "capture.diagnostics@1"
   public static let recordingOperationReference = "capture.screen-sequence@1"
 
@@ -189,7 +191,7 @@ public enum ToolkitDeviceControlFacade {
   /// the device's display readback and cannot be requested, so a caller bounds
   /// the run by frames and reads back what it achieved.
   public static func recordingRequest(
-    frameCount: Int, target: ToolkitTargetPresentation, nonce: String
+    frameCount: Int, target: DeviceTargetPresentation, nonce: String
   ) throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
       requestID: "toolkit-record-\(nonce)",
@@ -207,14 +209,14 @@ public enum ToolkitDeviceControlFacade {
         // storage preflight reads exactly this field, so sending a different
         // one would mean two answers to one question.
         "totalArtifactByteBudget": .integer(
-          Int64(ToolkitRecordingBudget.bytes(frameCount: frameCount))),
+          Int64(DeviceRecordingBudget.bytes(frameCount: frameCount))),
       ],
       requestedOutputs: [.hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
-        clientName: ArkDeckAgentClientName.toolkitDeviceControl, targetID: target.id))
+        clientName: ArkDeckAgentClientName.deviceControl, targetID: target.id))
   }
 
-  /// The screenshot leg alone. A Toolkit capture wants a current picture, not
+  /// The screenshot leg alone. A Device capture wants a current picture, not
   /// a diagnostic window: HiLog is off because draining its buffer can
   /// dominate the interaction, and the component tree is off because nothing
   /// here reads it.
@@ -225,11 +227,11 @@ public enum ToolkitDeviceControlFacade {
   /// `screenshotImageType` makes this request unplannable on any daemon that
   /// predates the field - measured: `input screenshotImageType is not
   /// declared by capture.diagnostics@1` - and the App carries no daemon-floor
-  /// gate, so every Toolkit capture would fail with a rejection the workspace
+  /// gate, so every Device capture would fail with a rejection the workspace
   /// cannot explain. Raising that floor is a decision to make deliberately,
   /// not a side effect of taking the faster encoding.
   public static func screenshotRequest(
-    target: ToolkitTargetPresentation, nonce: String
+    target: DeviceTargetPresentation, nonce: String
   ) throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
       requestID: "toolkit-screen-\(nonce)",
@@ -249,15 +251,15 @@ public enum ToolkitDeviceControlFacade {
       ],
       requestedOutputs: [.rawArtifacts, .hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
-        clientName: ArkDeckAgentClientName.toolkitDeviceControl, targetID: target.id))
+        clientName: ArkDeckAgentClientName.deviceControl, targetID: target.id))
   }
 
   /// Every gesture is its own request with its own idempotency key. Two taps
   /// at one coordinate are two intents, not a retry of one, and a key that
   /// collapsed them would silently drop the second.
   public static func gestureRequest(
-    _ gesture: ToolkitGestureRequest,
-    target: ToolkitTargetPresentation,
+    _ gesture: DeviceGestureRequest,
+    target: DeviceTargetPresentation,
     nonce: String
   ) throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
@@ -269,20 +271,20 @@ public enum ToolkitDeviceControlFacade {
       inputs: gesture.typedInputs,
       requestedOutputs: [.hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
-        clientName: ArkDeckAgentClientName.toolkitDeviceControl, targetID: target.id))
+        clientName: ArkDeckAgentClientName.deviceControl, targetID: target.id))
   }
 
-  public static func make() -> any ToolkitDeviceControlProviding {
-    ToolkitProductionProvider()
+  public static func make() -> any DeviceControlProviding {
+    DeviceProductionProvider()
   }
 }
 
-private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
+private actor DeviceProductionProvider: DeviceControlProviding {
   private static let artifactChunkBytes = 1 << 20
 
-  func captureScreen(target: ToolkitTargetPresentation) async -> ToolkitScreenshotResult {
+  func captureScreen(target: DeviceTargetPresentation) async -> DeviceScreenshotResult {
     do {
-      let request = try ToolkitDeviceControlFacade.screenshotRequest(
+      let request = try DeviceControlFacade.screenshotRequest(
         target: target, nonce: UUID().uuidString)
       let terminal = try await runToTerminal(request)
       guard let jobID = terminal.jobID else {
@@ -290,15 +292,15 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
       }
       let screenshot = try await readScreenshot(jobID: jobID)
       return .captured(
-        ToolkitScreenFrame(
+        DeviceScreenFrame(
           imageData: screenshot.data,
           width: screenshot.width,
           height: screenshot.height,
           capturedAtUTC: terminal.finishedAtUTC ?? "",
           jobID: jobID))
-    } catch let failure as ToolkitFailure {
+    } catch let failure as DeviceFailure {
       return .failed(failure.message)
-    } catch let failure as ToolkitArtifactIndex.IndexUnreadable {
+    } catch let failure as DeviceArtifactIndex.IndexUnreadable {
       return .failed(failure.message)
     } catch {
       return .failed("\(error)")
@@ -308,14 +310,14 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   func loadHistoricalScreen(
     jobID: String,
     targetID: String
-  ) async -> ToolkitScreenshotResult {
+  ) async -> DeviceScreenshotResult {
     guard !jobID.isEmpty, !targetID.isEmpty else {
-      return .failed("the historical Toolkit context is incomplete")
+      return .failed("the historical Device context is incomplete")
     }
     do {
       let status = try await requestObject(
         method: "job.status", params: ["jobId": .string(jobID)],
-        label: "Historical Toolkit Job")
+        label: "Historical Device Job")
       guard status["jobId"] as? String == jobID,
         status["targetId"] as? String == targetID,
         status["operation"] as? String == "capture.diagnostics@1",
@@ -324,19 +326,19 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
         status["outcomeUnknown"] as? Bool == false,
         status["outstandingResidueCount"] as? Int == 0
       else {
-        return .failed("the historical Toolkit Job is not a confirmed screenshot capture")
+        return .failed("the historical Device Job is not a confirmed screenshot capture")
       }
       let screenshot = try await readScreenshot(jobID: jobID)
       return .captured(
-        ToolkitScreenFrame(
+        DeviceScreenFrame(
           imageData: screenshot.data,
           width: screenshot.width,
           height: screenshot.height,
           capturedAtUTC: status["finishedAtUtc"] as? String ?? "",
           jobID: jobID))
-    } catch let failure as ToolkitFailure {
+    } catch let failure as DeviceFailure {
       return .failed(failure.message)
-    } catch let failure as ToolkitArtifactIndex.IndexUnreadable {
+    } catch let failure as DeviceArtifactIndex.IndexUnreadable {
       return .failed(failure.message)
     } catch {
       return .failed("\(error)")
@@ -344,10 +346,10 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   }
 
   func send(
-    _ request: ToolkitGestureRequest, to target: ToolkitTargetPresentation
-  ) async -> ToolkitGestureOutcome {
+    _ request: DeviceGestureRequest, to target: DeviceTargetPresentation
+  ) async -> DeviceGestureOutcome {
     do {
-      let operation = try ToolkitDeviceControlFacade.gestureRequest(
+      let operation = try DeviceControlFacade.gestureRequest(
         request, target: target, nonce: UUID().uuidString)
       let terminal = try await runToTerminal(operation)
       // An unknown outcome stays unknown. The workspace shows it as such and
@@ -361,7 +363,7 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
         return .failed(reason: terminal.failure ?? "the gesture did not succeed")
       }
       return .confirmed(summary: terminal.injectionSummary)
-    } catch let failure as ToolkitFailure {
+    } catch let failure as DeviceFailure {
       return .failed(reason: failure.message)
     } catch {
       return .failed(reason: "\(error)")
@@ -370,7 +372,7 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
 
   // MARK: - Runtime plumbing
 
-  private struct ToolkitFailure: Error { let message: String }
+  private struct DeviceFailure: Error { let message: String }
 
   private struct TerminalJob {
     let jobID: String?
@@ -384,26 +386,26 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   private func runToTerminal(_ request: RuntimeOperationRequest) async throws -> TerminalJob {
     let encoded = try JSONEncoder().encode(request)
     guard let requestJSON = String(data: encoded, encoding: .utf8) else {
-      throw ToolkitFailure(message: "the typed request could not be encoded")
+      throw DeviceFailure(message: "the typed request could not be encoded")
     }
     let submitted = try await requestObject(
       method: "job.submit", params: ["requestJson": .string(requestJSON)],
-      label: "Toolkit submission")
+      label: "Device submission")
     guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
-      throw ToolkitFailure(message: "the runtime accepted no job for this request")
+      throw DeviceFailure(message: "the runtime accepted no job for this request")
     }
     let terminal = try await requestObject(
-      method: "job.run", params: ["jobId": .string(jobID)], label: "Toolkit run")
+      method: "job.run", params: ["jobId": .string(jobID)], label: "Device run")
     let state = terminal["state"] as? String ?? "unknown"
     let residue = terminal["outstandingResidueCount"] as? Int ?? 0
     let waitingForHuman = terminal["waitingForHuman"] as? Bool ?? false
     let unknown = terminal["outcomeUnknown"] as? Bool ?? false
     let timeline = terminal["timeline"] as? [String] ?? []
     if waitingForHuman {
-      throw ToolkitFailure(message: "the runtime stopped for a human decision")
+      throw DeviceFailure(message: "the runtime stopped for a human decision")
     }
     if residue > 0 {
-      throw ToolkitFailure(message: "the job left \(residue) unresolved device residue entries")
+      throw DeviceFailure(message: "the job left \(residue) unresolved device residue entries")
     }
     return TerminalJob(
       jobID: jobID,
@@ -411,14 +413,14 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
       outcomeUnknown: unknown,
       failure: (terminal["failure"] as? [String: Any])?["message"] as? String,
       finishedAtUTC: terminal["finishedAtUtc"] as? String,
-      injectionSummary: ToolkitProductionProviderTestHook.injectionSummary(in: timeline))
+      injectionSummary: DeviceProductionProviderTestHook.injectionSummary(in: timeline))
   }
 
   func recordScreen(
-    frameCount: Int, target: ToolkitTargetPresentation
-  ) async -> ToolkitScreenRecordingResult {
+    frameCount: Int, target: DeviceTargetPresentation
+  ) async -> DeviceScreenRecordingResult {
     do {
-      let request = try ToolkitDeviceControlFacade.recordingRequest(
+      let request = try DeviceControlFacade.recordingRequest(
         frameCount: frameCount, target: target, nonce: UUID().uuidString)
       let terminal = try await runToTerminal(request)
       guard let jobID = terminal.jobID else {
@@ -427,24 +429,24 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
       guard terminal.state == "succeeded" else {
         return .failed(terminal.failure ?? "the recording did not succeed")
       }
-      let label = "Toolkit recording artifacts"
-      let entries = try ToolkitArtifactIndex.entries(
+      let label = "Device recording artifacts"
+      let entries = try DeviceArtifactIndex.entries(
         inEnvelope: try await requestEnvelope(
           method: "artifact.list", params: ["jobId": .string(jobID)], label: label),
         label: label)
-      guard let archive = ToolkitArtifactIndex.published(named: "frames.tar", in: entries) else {
+      guard let archive = DeviceArtifactIndex.published(named: "frames.tar", in: entries) else {
         return .failed("the recording published no verified frame archive")
       }
-      let frames = try ToolkitFrameArchive.frames(
-        in: try await readArtifact(jobID: jobID, entry: archive, label: "Toolkit frames"))
+      let frames = try DeviceFrameArchive.frames(
+        in: try await readArtifact(jobID: jobID, entry: archive, label: "Device frames"))
 
       // The timings are their own published product. Reading them rather than
       // assuming a cadence is the difference between a timeline and a guess.
-      guard let indexEntry = ToolkitArtifactIndex.published(named: "sequence.json", in: entries)
+      guard let indexEntry = DeviceArtifactIndex.published(named: "sequence.json", in: entries)
       else { return .failed("the recording published no observed frame timings") }
       let measured = try JSONSerialization.jsonObject(
         with: try await readArtifact(
-          jobID: jobID, entry: indexEntry, label: "Toolkit recording timings"))
+          jobID: jobID, entry: indexEntry, label: "Device recording timings"))
       guard let index = measured as? [String: Any],
         let durations = index["frameDurationsSeconds"] as? [Double],
         durations.count == frames.count
@@ -453,12 +455,12 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
           "the recording brought back \(frames.count) frames with no matching timings")
       }
       return .captured(
-        ToolkitScreenRecording(
+        DeviceScreenRecording(
           frames: frames, frameDurationsSeconds: durations,
           framesMissing: index["framesMissing"] as? Int ?? 0))
-    } catch let failure as ToolkitFailure {
+    } catch let failure as DeviceFailure {
       return .failed(failure.message)
-    } catch let failure as ToolkitArtifactIndex.IndexUnreadable {
+    } catch let failure as DeviceArtifactIndex.IndexUnreadable {
       return .failed(failure.message)
     } catch {
       return .failed("\(error)")
@@ -468,7 +470,7 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   func artifactHeadroomBytes() async -> Int? {
     guard
       let quota = try? await requestObject(
-        method: "artifact.quota", params: [:], label: "Toolkit artifact quota"),
+        method: "artifact.quota", params: [:], label: "Device artifact quota"),
       let remaining = quota["remainingBytes"] as? Int
     else { return nil }
     return remaining
@@ -477,7 +479,7 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   /// One published artifact's bytes, in chunks, checked against the digest the
   /// runtime published for it.
   private func readArtifact(
-    jobID: String, entry: ToolkitArtifactIndex.PublishedEntry, label: String
+    jobID: String, entry: DeviceArtifactIndex.PublishedEntry, label: String
   ) async throws -> Data {
     var data = Data()
     var offset = 0
@@ -492,18 +494,18 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
           "allowSensitive": .bool(true),
         ], label: label)
       guard let base64 = chunk["base64"] as? String, let part = Data(base64Encoded: base64)
-      else { throw ToolkitFailure(message: "\(label): a chunk was not readable") }
+      else { throw DeviceFailure(message: "\(label): a chunk was not readable") }
       data.append(part)
       guard let next = chunk["nextOffset"] as? Int, next > offset else { break }
       offset = next
       if chunk["eof"] as? Bool == true { break }
     }
     guard data.count == entry.byteCount else {
-      throw ToolkitFailure(
+      throw DeviceFailure(
         message: "\(label) is \(data.count) bytes but the runtime published \(entry.byteCount)")
     }
-    guard ToolkitScreenshotIntegrity.sha256Hex(data) == entry.sha256.lowercased() else {
-      throw ToolkitFailure(message: "\(label) did not match its published digest")
+    guard DeviceScreenshotIntegrity.sha256Hex(data) == entry.sha256.lowercased() else {
+      throw DeviceFailure(message: "\(label) did not match its published digest")
     }
     return data
   }
@@ -511,13 +513,13 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   private func readScreenshot(jobID: String) async throws -> (
     data: Data, width: Int, height: Int
   ) {
-    let label = "Toolkit artifacts"
-    let entries = try ToolkitArtifactIndex.entries(
+    let label = "Device artifacts"
+    let entries = try DeviceArtifactIndex.entries(
       inEnvelope: try await requestEnvelope(
         method: "artifact.list", params: ["jobId": .string(jobID)], label: label),
       label: label)
-    guard let entry = ToolkitArtifactIndex.screenshot(in: entries) else {
-      throw ToolkitFailure(message: "the capture published no verified screenshot")
+    guard let entry = DeviceArtifactIndex.screenshot(in: entries) else {
+      throw DeviceFailure(message: "the capture published no verified screenshot")
     }
     let artifactID = entry.artifactID
     let expectedSHA = entry.sha256
@@ -535,10 +537,10 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
           "offset": .integer(Int64(offset)),
           "maxBytes": .integer(Int64(Self.artifactChunkBytes)),
           "allowSensitive": .bool(true),
-        ], label: "Toolkit screenshot read")
+        ], label: "Device screenshot read")
       guard let base64 = chunk["base64"] as? String, let part = Data(base64Encoded: base64)
       else {
-        throw ToolkitFailure(message: "the screenshot chunk was not readable")
+        throw DeviceFailure(message: "the screenshot chunk was not readable")
       }
       data.append(part)
       guard let next = chunk["nextOffset"] as? Int, next > offset else { break }
@@ -546,26 +548,26 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
       if chunk["eof"] as? Bool == true { break }
     }
     guard data.count == byteCount else {
-      throw ToolkitFailure(
+      throw DeviceFailure(
         message: "the screenshot is \(data.count) bytes but the runtime published \(byteCount)")
     }
-    guard ToolkitScreenshotIntegrity.sha256Hex(data) == expectedSHA.lowercased() else {
-      throw ToolkitFailure(message: "the screenshot did not match its published digest")
+    guard DeviceScreenshotIntegrity.sha256Hex(data) == expectedSHA.lowercased() else {
+      throw DeviceFailure(message: "the screenshot did not match its published digest")
     }
-    guard let size = ToolkitScreenshotIntegrity.pixelSize(data) else {
-      throw ToolkitFailure(message: "the screenshot is not a readable picture")
+    guard let size = DeviceScreenshotIntegrity.pixelSize(data) else {
+      throw DeviceFailure(message: "the screenshot is not a readable picture")
     }
     return (data, size.width, size.height)
   }
 
-  /// The raw reply bytes. Parsing lives in `ToolkitArtifactIndex` so a test
+  /// The raw reply bytes. Parsing lives in `DeviceArtifactIndex` so a test
   /// can drive it with what the daemon actually sends.
   private func requestEnvelope(
     method: String, params: [String: JSONValue], label: String
   ) async throws -> Data {
     switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
     case .failure(let error):
-      throw ToolkitFailure(message: "\(label) failed: \(error.message)")
+      throw DeviceFailure(message: "\(label) failed: \(error.message)")
     case .success(let data):
       return data
     }
@@ -576,19 +578,19 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
   ) async throws -> [String: Any] {
     switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
     case .failure(let error):
-      throw ToolkitFailure(message: "\(label) failed: \(error.message)")
+      throw DeviceFailure(message: "\(label) failed: \(error.message)")
     case .success(let data):
       guard
         let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any]
       else {
-        throw ToolkitFailure(message: "\(label) returned an unreadable response")
+        throw DeviceFailure(message: "\(label) returned an unreadable response")
       }
       if let error = envelope["error"] as? [String: Any] {
         let message = error["message"] as? String ?? "\(error)"
-        throw ToolkitFailure(message: "\(label) was refused: \(message)")
+        throw DeviceFailure(message: "\(label) was refused: \(message)")
       }
       guard let result = envelope["result"] as? [String: Any] else {
-        throw ToolkitFailure(message: "\(label) returned no result")
+        throw DeviceFailure(message: "\(label) returned no result")
       }
       return result
     }
@@ -597,7 +599,7 @@ private actor ToolkitProductionProvider: ToolkitDeviceControlProviding {
 
 /// Screenshot checks that do not need an image framework, so they can run in
 /// tests and on the actor without pulling AppKit into the workflow layer.
-public enum ToolkitScreenshotIntegrity {
+public enum DeviceScreenshotIntegrity {
   public static func sha256Hex(_ data: Data) -> String {
     RuntimeJobRecord.sha256Hex(data)
   }
@@ -676,7 +678,7 @@ public enum ToolkitScreenshotIntegrity {
 /// that published it, and the workspace sent only the artifact id. Each
 /// mistake alone makes every capture fail, which is what the workspace showed
 /// on hardware while the runtime job succeeded and the screenshot existed.
-public enum ToolkitArtifactIndex {
+public enum DeviceArtifactIndex {
   public struct IndexUnreadable: Error, Equatable { public let message: String }
 
   public struct PublishedEntry: Sendable, Equatable {
@@ -726,7 +728,7 @@ public enum ToolkitArtifactIndex {
   }
 }
 
-public enum ToolkitProductionProviderTestHook {
+public enum DeviceProductionProviderTestHook {
   /// The verified keys the runtime recorded for the injection step, read from
   /// the timeline it published rather than restated from the request. What
   /// the workspace shows is therefore what the runtime attested, and an

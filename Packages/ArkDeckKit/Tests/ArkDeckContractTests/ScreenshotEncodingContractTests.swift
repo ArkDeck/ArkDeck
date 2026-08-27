@@ -166,21 +166,21 @@ final class ScreenshotEncodingContractTests: XCTestCase {
       throw XCTSkip("set ARKDECK_TEST_DEVICE_JPEG to a snapshot_display -t jpeg file")
     }
     let data = try Data(contentsOf: URL(filePath: path))
-    let size = try XCTUnwrap(ToolkitScreenshotIntegrity.pixelSize(data))
+    let size = try XCTUnwrap(DeviceScreenshotIntegrity.pixelSize(data))
     XCTAssertEqual(size.width, 720)
     XCTAssertEqual(size.height, 1280)
     XCTAssertNil(
-      ToolkitScreenshotIntegrity.pngPixelSize(data),
+      DeviceScreenshotIntegrity.pngPixelSize(data),
       "a JPEG must not be read by the PNG parser")
   }
 
   /// Bytes that are not a picture report no size rather than a plausible one.
   func testSomethingThatIsNotAPictureHasNoSize() {
-    XCTAssertNil(ToolkitScreenshotIntegrity.pixelSize(Data("<html>error</html>".utf8)))
-    XCTAssertNil(ToolkitScreenshotIntegrity.pixelSize(Data()))
+    XCTAssertNil(DeviceScreenshotIntegrity.pixelSize(Data("<html>error</html>".utf8)))
+    XCTAssertNil(DeviceScreenshotIntegrity.pixelSize(Data()))
     // A JPEG cut short before its frame header: a size cannot be guessed from
     // what is missing.
-    XCTAssertNil(ToolkitScreenshotIntegrity.pixelSize(Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00])))
+    XCTAssertNil(DeviceScreenshotIntegrity.pixelSize(Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00])))
   }
 
   /// The workspace finds the still whichever encoding it asked for. Looking
@@ -193,10 +193,10 @@ final class ScreenshotEncodingContractTests: XCTestCase {
         "sha256": String(repeating: "a", count: 64), "byteCount": 41197,
       ]
     }
-    XCTAssertEqual(ToolkitArtifactIndex.screenshot(in: [entry("screenshot.png")])?.byteCount, 41197)
+    XCTAssertEqual(DeviceArtifactIndex.screenshot(in: [entry("screenshot.png")])?.byteCount, 41197)
     XCTAssertEqual(
-      ToolkitArtifactIndex.screenshot(in: [entry("screenshot.jpeg")])?.byteCount, 41197)
-    XCTAssertNil(ToolkitArtifactIndex.screenshot(in: [entry("frames.tar")]))
+      DeviceArtifactIndex.screenshot(in: [entry("screenshot.jpeg")])?.byteCount, 41197)
+    XCTAssertNil(DeviceArtifactIndex.screenshot(in: [entry("frames.tar")]))
   }
 
   /// The viewfinder does not ask for JPEG yet, and that is deliberate.
@@ -204,19 +204,19 @@ final class ScreenshotEncodingContractTests: XCTestCase {
   /// Sending the field makes the request unplannable on any daemon older than
   /// it - measured against the installed one: "input screenshotImageType is
   /// not declared by capture.diagnostics@1" - and the App has no daemon-floor
-  /// gate, so every Toolkit capture would fail with a rejection the workspace
+  /// gate, so every Device capture would fail with a rejection the workspace
   /// cannot explain. This pins the choice so that taking the faster encoding
   /// is a decision somebody makes rather than something that drifts in.
   func testTheViewfinderDoesNotYetRaiseTheDaemonFloor() throws {
-    let request = try ToolkitDeviceControlFacade.screenshotRequest(
-      target: ToolkitTargetPresentation(id: "TGT-1", bindingRevision: 1, displayName: "d"),
+    let request = try DeviceControlFacade.screenshotRequest(
+      target: DeviceTargetPresentation(id: "TGT-1", bindingRevision: 1, displayName: "d"),
       nonce: "n")
     XCTAssertNil(
       request.inputs["screenshotImageType"],
       "sending this requires a daemon that declares it; the App cannot say so")
     // But the workspace can already read either encoding, so the day that
     // floor is raised the only change is the request.
-    XCTAssertNotNil(ToolkitScreenshotIntegrity.jpegPixelSize(Data()) ?? (0, 0))
+    XCTAssertNotNil(DeviceScreenshotIntegrity.jpegPixelSize(Data()) ?? (0, 0))
   }
 }
 
