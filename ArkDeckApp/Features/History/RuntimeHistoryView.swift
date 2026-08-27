@@ -282,14 +282,22 @@ struct RuntimeHistoryView: View {
   }
 
   private var compactFilters: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: WorkspaceMetrics.contentGap) {
-        filterPickers.labelsHidden()
-        filterResultSummary
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      Picker(historyLocalized("history.activity.title"), selection: $activityFilter) {
+        ForEach(HistoryActivityFilter.allCases) { filter in
+          Text(historyLocalized(filter.localizationKey)).tag(filter)
+        }
       }
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        filterPickers.labelsHidden()
-        filterResultSummary
+      .accessibilityIdentifier("history.filter.activity")
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .center, spacing: WorkspaceMetrics.contentGap) {
+          filterPickers.labelsHidden()
+          filterResultSummary
+        }
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          filterPickers.labelsHidden()
+          filterResultSummary
+        }
       }
     }
     .padding(WorkspaceMetrics.pageInsetHorizontal)
@@ -1498,6 +1506,7 @@ final class RuntimeHistoryViewModel {
   private(set) var isLoadOlderInFlight = false
   private let provider: any RuntimeHistoryApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
+  @ObservationIgnored private var historyGeneration = 0
   @ObservationIgnored private var detailGeneration = 0
   @ObservationIgnored private var detailRequestIDs: [String: UUID] = [:]
 
@@ -1521,11 +1530,16 @@ final class RuntimeHistoryViewModel {
 
   func refresh() {
     guard !isRefreshInFlight else { return }
+    historyGeneration &+= 1
+    let generation = historyGeneration
+    // Refresh supersedes any older-page read, including its loading state.
+    // That read may still finish, but must not clear a newer page's spinner.
+    isLoadOlderInFlight = false
     isRefreshInFlight = true
     let provider = provider
     Task { [weak self] in
       let next = await provider.refreshHistory()
-      guard let self else { return }
+      guard let self, self.historyGeneration == generation else { return }
       defer { self.isRefreshInFlight = false }
       guard !Task.isCancelled else { return }
       self.presentation = next
@@ -1539,10 +1553,12 @@ final class RuntimeHistoryViewModel {
   func loadOlder() {
     guard !isRefreshInFlight, !isLoadOlderInFlight, presentation.hasOlderJobs else { return }
     isLoadOlderInFlight = true
+    let generation = historyGeneration
     let provider = provider
     Task { [weak self] in
+      guard self?.historyGeneration == generation else { return }
       let next = await provider.loadOlderHistory()
-      guard let self else { return }
+      guard let self, self.historyGeneration == generation else { return }
       defer { self.isLoadOlderInFlight = false }
       guard !Task.isCancelled else { return }
       self.presentation = next
