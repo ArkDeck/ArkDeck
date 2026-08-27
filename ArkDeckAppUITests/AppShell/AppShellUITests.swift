@@ -133,6 +133,7 @@ final class AppShellUITests: XCTestCase {
         "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
         "-AppleLanguages", "(en)",
       ])
+    Self.resizeHistoryWindow(in: app, to: 1180)
     select("app.navigation.history", in: app)
     XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
 
@@ -186,6 +187,16 @@ final class AppShellUITests: XCTestCase {
         "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
         "-AppleLanguages", "(en)",
       ])
+    // macOS can preserve the last frame even with persistence disabled,
+    // especially after an interrupted run. Establish the viewport we test.
+    Self.resizeHistoryWindow(in: app, to: 1180)
+    addTeardownBlock {
+      await MainActor.run {
+        if app.windows.firstMatch.exists {
+          Self.resizeHistoryWindow(in: app, to: 1180)
+        }
+      }
+    }
     select("app.navigation.history", in: app)
     let wideFlash = element("history.activity.flash", in: app)
     XCTAssertTrue(wideFlash.waitForExistenceFast(timeout: 10))
@@ -193,17 +204,7 @@ final class AppShellUITests: XCTestCase {
     element("history.filter.saved", in: app).click()
     app.menuItems["Save current filter"].click()
 
-    let window = app.windows.firstMatch
-    let originalWidth = window.frame.width
-    func resize(to width: CGFloat) {
-      let origin = window.coordinate(withNormalizedOffset: .zero)
-      let edge = origin.withOffset(CGVector(dx: window.frame.width - 1, dy: 150))
-      edge.click(
-        forDuration: 0.1,
-        thenDragTo: origin.withOffset(CGVector(dx: width - 1, dy: 150)))
-      XCTAssertEqual(window.frame.width, width, accuracy: 2)
-    }
-    resize(to: 900)
+    Self.resizeHistoryWindow(in: app, to: 900)
     let activity = element("history.filter.activity", in: app)
     XCTAssertTrue(activity.waitForExistenceFast(timeout: 5))
     XCTAssertFalse(wideFlash.exists, "the test must actually enter the compact layout")
@@ -234,7 +235,7 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(viewerRow.waitForExistenceFast(timeout: 5))
     XCTAssertTrue(flashRow.waitForNonExistenceFast(timeout: 5))
 
-    resize(to: originalWidth)
+    Self.resizeHistoryWindow(in: app, to: 1180)
     XCTAssertTrue(wideFlash.waitForExistenceFast(timeout: 5))
     XCTAssertFalse(activity.exists)
     XCTAssertTrue(viewerRow.exists, "expanding must preserve the compact category selection")
@@ -1482,6 +1483,20 @@ final class AppShellUITests: XCTestCase {
   /// for the same reason. Ask by identifier and let the type be whatever it is.
   private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+  }
+
+  private static func resizeHistoryWindow(
+    in app: XCUIApplication, to width: CGFloat,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let window = app.windows.firstMatch
+    if abs(window.frame.width - width) <= 2 { return }
+    let origin = window.coordinate(withNormalizedOffset: .zero)
+    let edge = origin.withOffset(CGVector(dx: window.frame.width - 1, dy: 150))
+    edge.click(
+      forDuration: 0.1,
+      thenDragTo: origin.withOffset(CGVector(dx: width - 1, dy: 150)))
+    XCTAssertEqual(window.frame.width, width, accuracy: 2, file: file, line: line)
   }
 
   /// Lightweight visual regression for the current device detail layout. Native
