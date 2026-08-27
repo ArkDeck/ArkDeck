@@ -26,6 +26,7 @@
 
 - 中英文统一使用 **Device**。Sidebar 顺序为 Flash、Debug、Viewer、Trace、Device、Diagnostics；History 位于记录分组。具体设备行仍打开设备详情，不等于 Device 工作区。
 - SwiftUI 使用 SF Symbol `iphone`；原型使用相同语义的线框设备轮廓。Overview 返回入口、History 分类图标与 Sidebar 保持一致。
+- 2026-08-27 评审后保留手机造型：Sidebar 使用统一 22×22 pt 图标占位，手机用 SF Symbols large scale 做少量光学补偿，其余图标保持 medium；不横向拉宽手机。Debug 同步改为 `terminal`，不再使用瓢虫。
 - 标题栏只显示 Device。内容顶部左侧为设备名和 `target · binding rN`，右侧只有「获取截图」。分辨率在获得画面后出现在页脚。
 - 工作区可用宽度 **≥880 pt**：画面占剩余宽度，Inspector 固定 **320 pt**；两侧以分隔线连接，不包成多张卡片。
 - 可用宽度 **<880 pt**：画面高 **420 pt**，下面接 Inspector，整体可滚动。断点针对内容区宽度，不是整个浏览器窗口。

@@ -1401,7 +1401,7 @@ private enum HistoryActivityFilter: String, CaseIterable, Identifiable {
     case .viewer: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
     case .diagnostics: "waveform.path"
-    case .debug: "ladybug"
+    case .debug: "terminal"
     case .device: "iphone"
     case .other: "ellipsis.circle"
     }

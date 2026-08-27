@@ -103,7 +103,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visib
   background: transparent; color: var(--ink); text-align: start; cursor: pointer;
 }
 .nav button { display: flex; align-items: center; gap: 9px; padding: 5px 9px; }
-.nav button .nav-icon { width: 18px; display: grid; place-items: center; color: var(--ink2); }
+.nav button .nav-icon { width: 22px; height: 22px; display: grid; place-items: center; color: var(--ink2); }
+.nav button .nav-icon .sym { width: 18px; height: 18px; }
+.nav button .nav-icon .sym:has(use[href="#i-device"]) { width: 20px; height: 20px; stroke-width: 1.485; }
 .nav button.active { background: var(--accent-weak); font-weight: 600; }
 .nav button.active .nav-icon { color: var(--accent); }
 .device-row { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
@@ -286,7 +288,7 @@ dialog::backdrop { background: rgba(15, 18, 22, 0.44); backdrop-filter: blur(2px
   <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8"/></symbol>
   <symbol id="i-trace" viewBox="0 0 20 20"><path d="M2 11h3l2-6 3.2 11 2.4-8 1.6 3H18"/></symbol>
   <symbol id="i-viewer" viewBox="0 0 20 20"><rect x="7" y="2.5" width="6" height="4" rx="1"/><rect x="2.5" y="13.5" width="6" height="4" rx="1"/><rect x="11.5" y="13.5" width="6" height="4" rx="1"/><path d="M10 6.5v3.2M5.5 13.5v-2h9v2"/></symbol>
-  <symbol id="i-bug" viewBox="0 0 20 20"><path d="M7 6.2V4.8a3 3 0 0 1 6 0v1.4M5 8.5h10v4.2a5 5 0 0 1-10 0zM2.5 9.5H5m10 0h2.5M2.5 14H5m10 0h2.5M10 8.5V17"/></symbol>
+  <symbol id="i-debug" viewBox="0 0 20 20"><rect x="2.5" y="4" width="15" height="12" rx="2"/><path d="m5.5 7.5 2.5 2.5-2.5 2.5M10.5 12.5h4"/></symbol>
   <symbol id="i-bolt" viewBox="0 0 20 20"><path d="M11.7 1.8 4.6 11h5l-1.2 7.2 7-10h-5z"/></symbol>
   <symbol id="i-history" viewBox="0 0 20 20"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></symbol>
   <symbol id="i-chevron" viewBox="0 0 20 20"><path d="M8 5.5 12.5 10 8 14.5"/></symbol>
@@ -335,7 +337,7 @@ dialog::backdrop { background: rgba(15, 18, 22, 0.44); backdrop-filter: blur(2px
           <div class="side-heading">工作流</div>
           <nav class="nav">
             <button type="button" data-demo="Flash"><span class="nav-icon"><svg class="sym" aria-hidden="true"><use href="#i-bolt"/></svg></span><span>Flash</span></button>
-            <button type="button" data-demo="Debug"><span class="nav-icon"><svg class="sym" aria-hidden="true"><use href="#i-bug"/></svg></span><span>Debug</span></button>
+            <button type="button" data-demo="Debug"><span class="nav-icon"><svg class="sym" aria-hidden="true"><use href="#i-debug"/></svg></span><span>Debug</span></button>
             <button type="button" data-demo="Viewer"><span class="nav-icon"><svg class="sym" aria-hidden="true"><use href="#i-viewer"/></svg></span><span>Viewer</span></button>
             <button type="button" data-demo="Trace"><span class="nav-icon"><svg class="sym" aria-hidden="true"><use href="#i-trace"/></svg></span><span>Trace</span></button>
             <button type="button" data-demo="Device"><span class="nav-icon"><svg class="sym" aria-hidden="true"><use href="#i-device"/></svg></span><span>Device</span></button>
