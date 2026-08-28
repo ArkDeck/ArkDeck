@@ -50,9 +50,9 @@ GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 ta
 | F25 | 真实 HiLog 含非 UTF-8 字节，Diagnostics 拒绝整份文本预览 | SHA-256/byteCount 完整校验后，仅 text/plain 允许显示替换字符并醒目标注；JSON 保持严格 UTF-8；原始制品不变，120k 显示上限与 2 MiB 读取上限保持 |
 | F26 | HAP App、caller 和稿件仍接受 Catalog 已不支持的 installFresh / restorePrevious | 安装策略固定 installOrReplace，清理仅 uninstall/retain；caller 先拒绝未发布值，保留 retain/running；行为测试与稿件选项对照当前 Catalog，未放宽 Runtime 准入 |
 | F27 | 真实 loaded Trace 默认显示文件信息，稿件却自动选择首个事件；两处文件信息漏译 | 稿件默认无选区并展示文件信息，显式选事件才切换检查器；无选区不生成标注；App 文件大小/Schema 指纹补齐双语，真机用例断言这些标签 |
-| F28 | 冷启动候选列表虽预热，设备名称/系统版本仍同步等待新 HDC 属性读取；实测超过 2 秒 | 工作区补显示信息预热、独立观察时间和 5 秒缓存；离线/未授权/失败及旧在途结果失效；四项回归通过。已安装 Runtime 未替换，真机时限仍未通过，不把源码修正记为硬件通过 |
-| F29 | `debug.hap@1` 已发布 additionalHapArtifactLeases，同 bundle 的 feature HAP / HSP 可一次安装，但 App 与稿件只允许一个 entry HAP | App/稿件补入口与最多 16 个附加包的选择、移除和清空；逐文件有界校验/导入后提交同一 Job，重复文件与绑定漂移拒绝；导入器与 CLI 补 HSP 文件入口。39 项设计、34 项定向 Swift 通过；CLI 与原生 App 的 entry+feature 两个新 Job 成功。HSP 选择/重复拒绝/移除/清空已手动检查；原生自动化尚未通过，HSP 真机仍待验。未替换已安装 Runtime，不用 feature 成功覆盖 HSP |
-| F30 | Apps 同时选择“保持运行”和“运行后卸载”未解释实际结果，填写后 Bundle/Ability 没有可见标签；附加包容器覆盖移除按钮的自动化标识 | App/稿件增加按真实策略显示的中英文提示，不修改已发布策略或静默改值；App 保留字段标签，将文件标识限定到文本；设计四种组合与双语回归通过，完整代码闸通过，最新原生中文提示和填写后标签已逐图核查；原生自动化继续 |
+| F28 | 冷启动候选列表虽预热，设备名称/系统版本仍同步等待新 HDC 属性读取；实测超过 2 秒 | 补显示信息预热、独立观察时间和 5 秒缓存；离线/未授权/失败及旧在途结果失效。更新至已合入的 `2f05ea02` Runtime 后，独立真机 XCUITest 实测 0.994 秒，通过原 2 秒门限；同日组合批次 3.643 秒失败仍保留，不外推为所有负载下均达标 |
+| F29 | `debug.hap@1` 已发布 additionalHapArtifactLeases，同 bundle 的 feature HAP / HSP 可一次安装，但 App 与稿件只允许一个 entry HAP | App/稿件补入口与最多 16 个附加包的选择、移除和清空；逐文件有界校验/导入后提交同一 Job，拒绝重复文件与绑定漂移。CLI/App entry+feature 已成功；2026-08-28 原生 App 的真实 entry+shared HSP 新 Job 成功，两个导入哈希、共享函数 HiLog 标记及停止/卸载/清理均核验。原生双语选择、静态文本角色、重复拒绝、禁用、移除/清空自动化通过，不以 fixture 代替安装证据 |
+| F30 | Apps 同时选择“保持运行”和“运行后卸载”未解释实际结果，填写后 Bundle/Ability 没有可见标签；附加包容器覆盖移除按钮的自动化标识 | App/稿件增加按真实策略显示的中英文提示，不修改已发布策略或静默改值；保留字段标签、文件和移除按钮独立标识。双语原生四种策略组合通过；XCTest 原生 click 命中可见 picker 上方 21pt，改用当前 frame 中心后同一用例通过，未删减断言 |
 | F31 | Trace 真机已有时刻标记的重命名、换色、删除和本机重载保留，稿件只有范围标记与保留复选框；清空选区还会隐藏所有标注 | 原型补时刻标记入口、完整范围、临时/保留标记演示、名称编辑/换色/删除；无选区仍显示注释，编辑保留检查器滚动位置。明确原型不落盘，不把演示当真实 sidecar；40 项设计测试通过，真实 Trace 中文事件/范围/标记已手动验证 |
 
 ### 关键实现入口
@@ -211,6 +211,20 @@ GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 ta
 该次统一本地闸覆盖当时生产 Swift、资源与 UI 测试代码。随后 goal 真机验证又产生 F24/F25 修复，须单独重跑；未把 compile-only 当作 XCUITest 断言通过。
 
 ### Goal 真机验证与修复（F24–F31，进行中）
+
+**2026-08-28 最新复验**：基于 `86b284d0` App 生产代码与已安装的 `2f05ea02` Runtime，
+冷启动（0.994 秒）、HAP/HSP 选择与四种策略组合（同一用例覆盖中英文）、Device stale-frame
+三项独立 XCUITest 均通过。stale-frame 完整时间窗口恰有两次截图和一次 `input.tap@1`，
+第二次点击拒绝，没有新增输入 Job；三张图逐图核对。真实 App 的 entry+shared HSP
+Job `job-b6762567bef468c88ac8dc536a06a932` 成功，导入哈希、共享函数日志、停止/卸载/暂存清理
+均核验，零 unknown / residue。原始截图、日志和签名材料仅留本机；
+[后续复验元数据](references/v1.6-goal/followup-verification-2026-08-28.json)保留失败与跳过尝试。
+ArkForge 已通过发布安装入口配置；这只解除 availability 配置缺口，**不证明 Flash 真机通过**。
+Flash 擦写仍未获执行边界所需的明确授权，未提交新的刷机 Job；goal 未完成。
+本次最终路径分类闸退出 0（SDD、49 项 catalog 测试、零漂移、App/UI bundle 编译），
+40 项设计交互测试通过；仅测试和文档改动，未选择 Swift package 车道，不用编译代替 UI 断言。
+
+以下为各次历史尝试，后续通过不删除或改写先前失败：
 
 已重新确认已安装的 signed protected-main Runtime 健康；旧 v1.5 的 Runtime 不可用记录不是当前状态。
 新的 `observe.device@1` 与包含 HiLog、UI Dump、UI tree、截图和 Trace 的 `capture.diagnostics@1`

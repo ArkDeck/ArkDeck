@@ -754,25 +754,33 @@ final class AppShellUITests: XCTestCase {
       app.buttons["debug.tab.apps"].click()
       let cleanup = app.popUpButtons["debug.apps.cleanupPolicy"]
       let postRun = app.popUpButtons["debug.apps.postRun"]
+      func openPolicyMenu(_ picker: XCUIElement) {
+        app.activate()
+        scrollIntoView(picker, in: app)
+        // On macOS 26, click() synthesized a hit point 21pt above the
+        // visible picker. Use its current frame centre; the menu labels
+        // and every policy assertion below remain unchanged.
+        picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+      }
       XCTAssertTrue(postRun.waitForExistenceFast(timeout: 15))
       let policyHint = element("debug.apps.runningCleanupHint", in: app)
       XCTAssertFalse(policyHint.exists)
-      postRun.click()
+      openPolicyMenu(postRun)
       app.menuItems[language == "(en)" ? "Leave running" : "保持运行"].click()
       XCTAssertTrue(policyHint.waitForExistenceFast(timeout: 5))
-      cleanup.click()
+      openPolicyMenu(cleanup)
       app.menuItems[language == "(en)" ? "Retain installed app" : "保留已安装应用"].click()
       XCTAssertFalse(policyHint.exists)
-      postRun.click()
+      openPolicyMenu(postRun)
       app.menuItems[language == "(en)" ? "Stop Ability" : "停止 Ability"].click()
       XCTAssertFalse(policyHint.exists)
-      postRun.click()
+      openPolicyMenu(postRun)
       app.menuItems[language == "(en)" ? "Leave running" : "保持运行"].click()
       XCTAssertFalse(policyHint.exists)
-      cleanup.click()
+      openPolicyMenu(cleanup)
       app.menuItems[language == "(en)" ? "Uninstall after run" : "运行后卸载"].click()
       XCTAssertTrue(policyHint.waitForExistenceFast(timeout: 5))
-      postRun.click()
+      openPolicyMenu(postRun)
       app.menuItems[language == "(en)" ? "Stop Ability" : "停止 Ability"].click()
       XCTAssertFalse(policyHint.exists)
       let addPackage = app.buttons["debug.apps.additional.add"]

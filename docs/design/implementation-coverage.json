@@ -180,5 +180,5 @@
     "automation.retired"
   ],
   "externalTraceRevision": "91a21d1d419c5fec8c56c8b7b742002325045861",
-  "verificationBoundary": "All 60 units are inventoried and source/design connections reviewed. Browser designs, UI fixtures, fresh observe/capture/recording/HAP/Native executions and native presentation checks are recorded separately. App entry+feature submission passed with verified artifacts; HSP selection is UI-only and HSP device installation remains unaccepted. Cold startup and remaining device workflows are not accepted; no full-goal acceptance."
+  "verificationBoundary": "All 60 units are inventoried and source/design connections reviewed; the navigation/View/preview inventory checks were rerun against 86b284d0 on 2026-08-28. Browser designs, UI fixtures and real hardware evidence remain separate. App entry+feature and entry+shared-HSP submissions passed with verified artifacts; the HSP run also emitted its shared-function marker. Three independent native follow-ups passed: bilingual picker/policy assertions, cold startup at 0.994s, and real stale-frame refusal with one input Job. Earlier failures/skips remain recorded. Flash execution is still unaccepted; ArkForge installation and plan availability do not substitute for real execution. No full-goal acceptance."
 }
