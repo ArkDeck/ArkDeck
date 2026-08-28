@@ -9,28 +9,16 @@ import SwiftUI
 struct FlashRuntimeActivityView: View {
   let presentation: RuntimeHistoryPresentation
   let plan: FlashExactPlanPresentation?
-  let onOpenHistory: () -> Void
+  let onOpenJob: (String) -> Void
 
   private var flashJobs: [RuntimeJobSummaryPresentation] {
-    presentation.jobs.filter {
-      ArkForgeFlashOperation.containsDurableRecordReference($0.operationReference)
-    }
+    presentation.flashActivityJobs
   }
 
   /// Unknown effects and human stops outrank recency. Hiding either behind a
   /// later success would make the page unsafe on a shared target bench.
   private var focusedJob: RuntimeJobSummaryPresentation? {
-    flashJobs.first(where: {
-      $0.outcomeUnknown && !$0.hasEstablishedCurrentEpoch
-    })
-      ?? flashJobs.first(where: {
-        $0.waitingForHuman && !$0.hasEstablishedCurrentEpoch
-      })
-      ?? flashJobs.first(where: { job in
-        guard let state = JobState(rawValue: job.state) else { return false }
-        return !state.isTerminal && !job.hasEstablishedCurrentEpoch
-      })
-      ?? flashJobs.first
+    presentation.focusedFlashActivity
   }
 
   var body: some View {
@@ -117,7 +105,7 @@ struct FlashRuntimeActivityView: View {
           Text(job.targetID).font(WorkspaceFont.monospacedValue)
         }
       }
-      Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
+      Button(flashText("flash.runtime.openRecord")) { onOpenJob(job.id) }
         .accessibilityIdentifier("flash.runtime.openHistory")
     }
     .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
@@ -241,7 +229,7 @@ struct FlashRuntimeActivityView: View {
       resultSummary(job)
       HStack(spacing: WorkspaceMetrics.contentGap) {
         if !job.needsAttention {
-          Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
+          Button(flashText("flash.runtime.openRecord")) { onOpenJob(job.id) }
             .accessibilityIdentifier("flash.runtime.openHistory")
         }
         Label(flashText("flash.runtime.readOnly"), systemImage: "eye")

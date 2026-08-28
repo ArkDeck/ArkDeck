@@ -36,13 +36,13 @@ function harness(search='') {
   const element = () => ({
     innerHTML: '', textContent: '', value: '', style: {}, dataset: {},
     classList: {toggle() {}, add() {}, remove() {}},
-    setAttribute() {}, focus() {},
+    setAttribute() {}, focus() {}, scrollIntoView() {this.scrolledIntoView=true;},
     querySelector() { return null; },
     querySelectorAll() { return []; },
   });
   const document = {
     addEventListener() {}, activeElement: null,
-    body: element(), documentElement: element(),
+    body: element(), documentElement: element(), scrollingElement: element(),
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, element());
       return elements.get(id);
@@ -83,6 +83,57 @@ test('Flash distinguishes a connected assessment lane from execution availabilit
   const ready=harness('?page=flash&lang=en');
   ready.run('chooseFlashImage(); runFlash()');
   assert.equal(ready.run('S.flashView'),'running');
+});
+
+test('Flash retained history focuses the latest success and opens that exact record', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=flash&flashHistory=retained&lang=${lang}`);
+    const original=h.run('JSON.stringify(HIST)');
+    assert.equal(h.run('focusedFlashActivity().id'),'S-0826-01');
+    assert.match(h.run('flashActivityHTML()'),/data-sync-id="flash.runtime.jobID">S-0826-01/);
+    assert.doesNotMatch(h.run('pFlash()'),/data-sync-id="flash.runtime.attention"/);
+    assert.equal(h.run('JSON.stringify(HIST)'),original);
+    h.document.getElementById('page').scrollTop=500;
+    h.document.scrollingElement.scrollTop=80;
+    h.run("S.hf.kind='viewer'; S.hf.query='hide flash'; openFlashRecord(focusedFlashActivity().id)");
+    assert.equal(h.run('S.nav'),'history');
+    assert.equal(h.run('S.histSel'),'S-0826-01');
+    assert.equal(h.document.getElementById('page').scrollTop,0);
+    assert.equal(h.document.scrollingElement.scrollTop,0);
+    assert.match(h.run('pHistory()'),/data-sync-id="history.detail.job">S-0826-01/);
+    assert.equal(h.run("HIST.find(h=>h.id==='job-demo-flash-alias').outcomeUnknown"),true);
+    assert.equal(h.run("HIST.find(h=>h.id==='job-demo-flash-superseded').st"),'waitingForRecovery');
+  }
+});
+
+test('Flash unresolved stops outrank later success and never offer another flash', () => {
+  for(const state of ['unknown','waiting','running']) {
+    const h=harness(`?page=flash&flashHistory=${state}&lang=en`);
+    assert.equal(h.run('focusedFlashActivity().id'),`job-demo-flash-${state}`);
+    if(state==='running')continue;
+    h.run('chooseFlashImage()');
+    const page=h.run('pFlash()');
+    assert.match(page,/data-sync-id="flash.runtime.attention"/);
+    assert.doesNotMatch(page,/<button[^>]+onclick="runFlash\(\)"/);
+    h.run('runFlash()');
+    assert.equal(h.run('S.jobs.length'),0);
+    h.run('openFlashRecord(focusedFlashActivity().id)');
+    assert.equal(h.run('S.histSel'),`job-demo-flash-${state}`);
+  }
+});
+
+test('Flash result and activity retain the submitted demo Job identity', () => {
+  const h=harness('?page=flash&lang=en');
+  h.run('chooseFlashImage(); runFlash()');
+  const id=h.run('S.flashJob.id');
+  assert.equal(h.run('focusedFlashActivity().id'),id);
+  h.run('openFlashRecord(S.flashJob.id)');
+  assert.equal(h.run('S.histSel'),id);
+  h.run("finishFlash(S.flashJob,'succeeded','Design postflight sample')");
+  assert.equal(h.run('S.lastFlash.jobID'),id);
+  assert.equal(h.run('focusedFlashActivity().id'),id);
+  assert.equal(h.run(`HIST.filter(h=>h.id==='${id}').length`),1);
+  assert.match(h.run('pFlash()'),new RegExp(`openFlashRecord\\('${id}'\\)`));
 });
 
 test('all actual navigation items and subtabs are audited', () => {
@@ -473,6 +524,8 @@ test('Trace annotations keep flag and range identity through edit, colour and re
 
 test('global inspector does not turn cancellation requests or unknown outcomes into success', () => {
   const history=harness('?lang=en');
+  assert.equal(history.run('inspectorJobs()[0].operation'),'flash.full-restore@1');
+  history.run('delete HIST[0].op');
   assert.equal(history.run('inspectorJobs()[0].operation'),null,
     'a display title or archive filename is not an operation identity');
   assert.equal(history.run('inspectorJobs()[3].operation'),'capture.diagnostics@1');

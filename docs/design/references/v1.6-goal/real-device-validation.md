@@ -162,3 +162,24 @@ stale-frame 原生用例通过（27.144 秒）：测试点来自最新锁屏空�
 - 安装 pinned ArkForge 后曾报告 28/29 个 operation available；这包含两种 Flash 入口的误报（F32）。收到指定设备/镜像的擦写授权后，`job-e9e5e3d7ae56af47ef69c94079fa6652` 实际提交一次，exit 1、failed、`executionConfirmedNotPerformed`，零 unknown / residue，ArkForge 在 startExecution 前拒绝；不是硬件通过。额外启用 HardwareCampaign 的配置审批被拒，未执行配置修改；不得把擦写确认当作该额外授权，也不重放原请求。`analyzer.summarize-hilog@1` 仍如实报告未实现。
 - 最新全量闸覆盖 F28–F30 生产代码并退出 0：Swift 调度 1,826 + 1 identity race + 5 scale = 1,832 项，所有车道成功，SDD/catalog/零漂移与 App/UI-test bundle 编译通过。F31 只改设计、测试与参考图，另行通过 40/40 设计交互和设计包构建。详见 [local-gate-verification.json](local-gate-verification.json)。
 - 本次 picker 测试修正的路径分类器最终闸退出 0：SDD 0 errors / 0 warnings、catalog 49 tests 与零漂移、App/UI-test bundle 编译通过；仅测试/文档改动，未选择 Swift package 车道。40 项设计测试也通过，日志哈希见后续元数据。Flash 尚未通过，goal 仍未完成；编译、合约与设计测试不替代真机断言。
+
+## 2026-08-28 Flash 与 F35 合入后续验
+
+上节保留的是 F31 之前的验收状态，不代表最新 Flash 结果。具名 HardwareCampaign 获得授权后，
+canonical Flash `job-8e32139af1945d755f5716b67f4f8bde` 已真实成功，三份 postflight Artifact
+独立核验通过，随后关闭 campaign。F34/F35 分别修复 canonical UI 关联与沙箱内只读探测。
+
+F35 PR #1570 合入 `f18ca0c7` 后，官方 helper 构建/签名和 Runtime 更新完成；真实中文 App
+两次重新检查均通过 Runtime 返回空 RockUSB 观察，正确显示离线或未进入 Loader，无 socket
+错误或 Loader 就绪误报。首次设备观测未找到匹配目标而失败，unknown=false / residue=0；
+随后标准 Agent Observe `job-fa633ec83c9a19986c543cdbcb4c2302` 成功，原目标与 r4 绑定不变，
+机器回读 OpenHarmony-7.0.0.37；独立终态、postflight、可信证据、Artifact 与通道五项核验通过。
+未重绑或再次刷写。前后 Job 清单只增加这两次 readOnly Observe，四条旧 unknown 逐项保持不变。
+
+F35 的真实诊断路径已复验，但发现 F36：旧已恢复 unknown 在 Flash 活动中遮住最新成功，
+记录入口未精确选择 Job。正在同一垂直修复中补齐展示、设计与回归；合入后的真实只读 App
+复验仍待完成。原生 F36 测试四次停在系统初始化，不能用设计样本或编译代替断言。
+选择性 metadata、哈希和失败记录见 [F35 验证记录](flash-device-access-verification-2026-08-28.json)。
+
+F36 最终 App 的隔离双语手动检查已通过活动选择和 exact History 跳转，旧 unknown 行保留；
+真实 Runtime Job 清单前后完全一致。该记录属于 fixture UI，不是硬件验证，亦不是 XCTest 通过。

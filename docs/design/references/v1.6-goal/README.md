@@ -1,9 +1,9 @@
 # Goal 真机修复设计参考
 
-2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F35 修正。二十三张设计样本均已查看。
+2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F36 修正。二十九张设计样本均已查看。
 真机执行与原生 App 证据另见[验证记录](real-device-validation.md)，不由这些图片证明。
 
-浏览器实际 viewport 为 1280×720；前七张使用 1180×760 reference window，后续十六张使用默认自适应窗口。截图保留原始 JPEG，
+浏览器实际 viewport 为 1280×720；前七张使用 1180×760 reference window，后续二十二张使用默认自适应窗口。截图保留原始 JPEG，
 未缩放或重绘；预览图包含滚动后的局部，不作为全窗逐像素验收。
 [manifest.json](manifest.json)记录 URL、操作、尺寸、字节数和 SHA-256。
 
@@ -32,5 +32,12 @@
 | [中文 Loader 访问](flash-device-access-available-zh-Hans.jpg) | 同上；未选择镜像时无“安全检查通过” |
 | [英文计划 effect](flash-plan-effects-en.jpg) | 选择演示镜像后显示 3/4/1/6 步阶段；包含重启的收尾阶段最高为 deviceMutation |
 | [中文计划 effect](flash-plan-effects-zh-Hans.jpg) | 同上；阶段 effect 不低于 Catalog 中任一步骤 |
+
+| [英文最新 Flash](flash-activity-retained-en.jpg) | 两条旧 unknown 已有 Runtime 恢复关系，活动卡显示更新的 canonical 成功；不改写旧记录 |
+| [中文最新 Flash](flash-activity-retained-zh-Hans.jpg) | 同上；状态、只读说明与入口同步 App |
+| [英文精确 History](flash-activity-history-en.jpg) | 从卡片打开 exact S-0826-01；清除旧筛选和滚动位置，保留旧 unknown 行 |
+| [中文精确 History](flash-activity-history-zh-Hans.jpg) | 同上；详情与选中行一致 |
+| [英文 unknown 优先](flash-activity-unknown-en.jpg) | 较旧但未解决的风险优先于较新成功；无下一次刷写入口 |
+| [中文 unknown 优先](flash-activity-unknown-zh-Hans.jpg) | 同上；按钮仅查看对应 Job，不恢复或重试 |
 
 这些操作不连接 Runtime、不读取真实敏感文本、不创建真实 Job。

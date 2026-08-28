@@ -1,0 +1,286 @@
+{
+  "date": "2026-08-28",
+  "finding": "F36",
+  "goldenJourney": "GJ-4",
+  "baseRevision": "f18ca0c7008be9b4f4c20ee90987845c35683066",
+  "evidenceKind": "host-tests-and-design-samples-not-real-device-acceptance",
+  "realReproduction": "On the reviewed F35 App/Runtime, a retained resolved unknown was the first paged record and masked the later canonical success. The History source banner named the success but Flash activity named the old alias. Open Runtime record did not carry an exact Job ID.",
+  "change": "Read-only shared Flash activity projection orders Runtime dates, with unresolved unknown/human/recovery/current activity taking precedence. Runtime facts and unknown outcomes are immutable. Flash record buttons pass the displayed Job ID to History.",
+  "focusedContractTests": {
+    "testCount": 35,
+    "exitCode": 0,
+    "log": {
+      "privateFile": "f36-focused-tests-01.log",
+      "byteCount": 125365,
+      "sha256": "01ea2268c36b5425f5f9a92a794b8879b21e95dd090ca525f4180741d1d5f580"
+    },
+    "scope": "History projection including canonical and legacy references, unresolved priority, retained unknowns, missing/tied dates; before the final newer-observe UI fixture addition."
+  },
+  "designTests": {
+    "testCount": 47,
+    "exitCode": 0,
+    "log": {
+      "privateFile": "f36-design-tests-06.log",
+      "byteCount": 4370,
+      "sha256": "29bf09eb38690bf2745d081e90f086797083be94169488f20058443d9245ef2a"
+    }
+  },
+  "designReferences": {
+    "imageCount": 6,
+    "manifest": "manifest.json",
+    "files": [
+      "flash-activity-retained-en.jpg",
+      "flash-activity-history-en.jpg",
+      "flash-activity-unknown-en.jpg",
+      "flash-activity-retained-zh-Hans.jpg",
+      "flash-activity-history-zh-Hans.jpg",
+      "flash-activity-unknown-zh-Hans.jpg"
+    ],
+    "viewed": true,
+    "evidenceKind": "browser-design-demo-not-hardware"
+  },
+  "nativeUIAttempts": [
+    {
+      "attempt": 1,
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "System authentication is running",
+      "log": {
+        "privateFile": "f36-native-tests-01.log",
+        "byteCount": 2172807,
+        "sha256": "cfd1dc366ebf6dfc2f8719758a332a856d6477a31d4e22d1f4e31f995366a2c5"
+      }
+    },
+    {
+      "attempt": 2,
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "System authentication is running",
+      "log": {
+        "privateFile": "f36-native-tests-02.log",
+        "byteCount": 149340,
+        "sha256": "1a962023a3602813c6f591df28cf72ff7e5d707107aad06e028e9893986405e7"
+      }
+    },
+    {
+      "attempt": 3,
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode",
+      "log": {
+        "privateFile": "f36-native-tests-03.log",
+        "byteCount": 146345,
+        "sha256": "f4b4d6c431bfc16f3b437ea34319661d3d2cf29858e564ec77155e476ddda247"
+      }
+    },
+    {
+      "attempt": 4,
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode",
+      "log": {
+        "privateFile": "f36-native-tests-04.log",
+        "byteCount": 240405,
+        "sha256": "6921ea09b307904cde3e586ca6e4748a629fed6041a0afd4b9921576b866082d"
+      },
+      "scope": "Final source including a newer Observe row; no XCTest assertions executed."
+    }
+  ],
+  "priorFailures": [
+    {
+      "kind": "design interaction assertion",
+      "exitCode": 1,
+      "reason": "History demo now has an explicit canonical operation; adjusted the missing-operation case to remove the explicit value before asserting no title-based inference. All 47 subsequently passed.",
+      "log": {
+        "privateFile": "f36-design-tests-01.log",
+        "byteCount": 5432,
+        "sha256": "02fcffbbc7c6e9e54dc3d53a3d4f8c51e0f39b54d5ee3d2593d33d2f14ac1ff0"
+      }
+    },
+    {
+      "kind": "full local gate",
+      "exitCode": 1,
+      "reason": "Architecture boundary assertion still required the two Views to call the classifier directly. Updated to check the shared production projection and both View consumers; no canonical/legacy policy weakened.",
+      "log": {
+        "privateFile": "f36-local-gate-01.log",
+        "byteCount": 244599,
+        "sha256": "82d8388b0769b011b4b4fe3c845a728ec4c1df24f18d0bc40c73722aeeed41d6"
+      }
+    },
+    {
+      "kind": "CI design class inventory",
+      "exitCode": 1,
+      "reason": "The final Flash warning vertical layout class was added after the initial design build and was not yet registered. Registered it as page-specific layout of the existing warnbox Callout; no component/token rule was weakened.",
+      "log": {
+        "privateFile": "f36-ci-ds-failure-01.log",
+        "byteCount": 1969,
+        "sha256": "f04b51fae6921e8b3247f49a4590c2625fa837e732db6b20a6ca12e42d83a241"
+      }
+    }
+  ],
+  "limitations": [
+    "No candidate App or Runtime connected to hardware.",
+    "F35 reviewed Runtime remains installed; HardwareCampaign remains off.",
+    "F36 XCTest assertions remain blocked by OS initialization; manual bilingual fixture checks passed. Post-merge real App read-only revisit remains required."
+  ],
+  "designBuilds": [
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f36-design-build-02.log",
+        "byteCount": 697,
+        "sha256": "87686d0a4e8610e9f10f7679620ac348bccc2ec49a606ee122388b19d38233e9"
+      }
+    },
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build:review",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f36-design-review-build-02.log",
+        "byteCount": 314,
+        "sha256": "90bff39e6f06fae3544da7c7bc3eb44b40f303f68a2fdc5298f0245d5f6d876d"
+      }
+    }
+  ],
+  "finalLocalGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "baseRevision": "f18ca0c7008be9b4f4c20ee90987845c35683066",
+    "swiftTestCount": 1839,
+    "swiftLanes": [
+      {
+        "name": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1833,
+        "durationSeconds": 291
+      },
+      {
+        "name": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1,
+        "durationSeconds": 5
+      },
+      {
+        "name": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5,
+        "durationSeconds": 5
+      }
+    ],
+    "appUITestBundleBuild": "passed",
+    "commonGates": "SDD 0 errors / 0 warnings; 49 catalog generator tests; zero generated drift",
+    "log": {
+      "privateFile": "f36-local-gate-02.log",
+      "byteCount": 508941,
+      "sha256": "0448794296b0f288ada609b7d9f4f71a9e6c2656bb3927a941864fea43839838"
+    },
+    "postGateChanges": "Only design class inventory and verification records changed after this gate; Swift/App production and test sources are unchanged."
+  },
+  "manualNativeFixtureChecks": {
+    "method": "Computer Use on the final signed App, launched with the existing isolated UI-test flags. Both instances were closed after inspection.",
+    "evidenceKind": "isolated-App-fixture-not-hardware-and-not-XCTest-pass",
+    "languages": [
+      "en",
+      "zh-Hans"
+    ],
+    "checks": [
+      "An older unknown Flash outranks a newer Observe and its button selects that exact non-first History row.",
+      "Two retained resolved unknowns do not mask the later canonical success on the activity card.",
+      "The successful activity button selects the matching Job in History; both old unknown rows remain visible.",
+      "No new Flash action was used; only fixture refresh and read-only navigation."
+    ],
+    "appExecutableSHA256": "8b9d6230678004f03cfc7bfe2f5ea0e9248dbd22f2de46d47778f3ae684384cd",
+    "screenshots": [
+      {
+        "privateFile": "f36-manual-unknown-history-en.jpg",
+        "byteCount": 153205,
+        "sha256": "ba3c133059848868de18987a9e922193d3088ef11694ec4ba961194c6ed04a1e",
+        "language": "en",
+        "state": "unknown-history",
+        "mimeType": "image/jpeg",
+        "width": 1158,
+        "height": 768,
+        "viewed": true
+      },
+      {
+        "privateFile": "f36-manual-retained-en.jpg",
+        "byteCount": 103166,
+        "sha256": "4710fe7b0d81930e62ba3e981b992d323bf1be117c758a8f692d185ab7162ca4",
+        "language": "en",
+        "state": "retained",
+        "mimeType": "image/jpeg",
+        "width": 1158,
+        "height": 768,
+        "viewed": true
+      },
+      {
+        "privateFile": "f36-manual-retained-history-en.jpg",
+        "byteCount": 146364,
+        "sha256": "08c1888d2c2206b1bead06fbf1b4ac24e2d09c93d3fbe9b22dbcdc3a21422677",
+        "language": "en",
+        "state": "retained-history",
+        "mimeType": "image/jpeg",
+        "width": 1158,
+        "height": 768,
+        "viewed": true
+      },
+      {
+        "privateFile": "f36-manual-unknown-history-zh.jpg",
+        "byteCount": 142955,
+        "sha256": "30ce0c2edf46d822ebe26a4b8a9c850c955e7c3ab2aae1797aa2de86fed88d61",
+        "language": "zh-Hans",
+        "state": "unknown-history",
+        "mimeType": "image/jpeg",
+        "width": 1158,
+        "height": 768,
+        "viewed": true
+      },
+      {
+        "privateFile": "f36-manual-retained-zh.jpg",
+        "byteCount": 92959,
+        "sha256": "74bb46630d3b1cbef436a446ff68e587048d2aca3f0f4423ef0a2b57bb72e141",
+        "language": "zh-Hans",
+        "state": "retained",
+        "mimeType": "image/jpeg",
+        "width": 1158,
+        "height": 768,
+        "viewed": true
+      },
+      {
+        "privateFile": "f36-manual-retained-history-zh.jpg",
+        "byteCount": 141052,
+        "sha256": "bca62711f28f9451e44721d827fe8b5decc30a5cc9ad942f0f7b8abafc0295d0",
+        "language": "zh-Hans",
+        "state": "retained-history",
+        "mimeType": "image/jpeg",
+        "width": 1158,
+        "height": 768,
+        "viewed": true
+      }
+    ],
+    "realRuntimeInventoryUnchanged": {
+      "beforeJobCount": 1962,
+      "afterJobCount": 1962,
+      "allRowsEqual": true,
+      "record": {
+        "privateFile": "f36-jobs-after-manual.json",
+        "byteCount": 4455515,
+        "sha256": "3e9d7db9df193c1ddf441ca82be5131981a92d52056f9000e2c7702a0e1c83b0"
+      }
+    },
+    "limitations": [
+      "The generic History detail fixture is not a postflight verifier. Only summary/card state and exact navigation were checked; synthetic evidence fields do not prove hardware success.",
+      "The running-state XCTest assertion remains unexecuted in this turn; the shared priority is covered by the full contract suite."
+    ]
+  },
+  "finalDesignTokenCheck": {
+    "exitCode": 0,
+    "result": "24 tokens x 2 themes, 16 DS-only, every prototype class accounted for",
+    "log": {
+      "privateFile": "f36-final-token-check.log",
+      "byteCount": 115,
+      "sha256": "073a797029f60a9b4beee17be5acef71ff49ed5a1eff85cffe5b7d94eca7ce5c"
+    }
+  }
+}

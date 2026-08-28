@@ -411,3 +411,33 @@ campaign 保持关闭；只有合入后的真实 App 只读回访才能关闭该
 其中 F34 activity 现滚动至可见区再截图。新增 8 张浏览器图只证明设计样本状态。
 首次 UI automation mode 初始化超时、测试 import 编译失败等尝试保留记录，未计为通过。
 完整选择性元数据见[验证记录](references/v1.6-goal/flash-device-access-verification-2026-08-28.json)。
+
+## 2026-08-28 F36：Flash 活动选择与精确历史回访
+
+GJ-4。F35 已合入 PR #1570（`f18ca0c7`），随后从该 reviewed tree 构建并更新本机 Runtime。
+真实 App 两次只读探测均正确显示空 RockUSB 观察；新 `observe.device@1` 成功且独立五项核验
+通过，原 binding r4 不变。更新后的首次目标观察失败保留；已有成功 Flash 复核通过，未再次刷写，
+HardwareCampaign 仍关闭，四条历史 unknown 完全不变。详见 F35 验证记录的 post-merge 部分。
+
+同次真实 App 回访发现：History 的分页答复会把保留的 attention 记录放在前面，Flash 卡片却以
+数组首项作为最新记录。旧 alias-resolved unknown 因而遮住 canonical 成功；从成功 History
+进入 Flash 后，来源上下文与活动卡片也指向不同 Job。“打开 Runtime 记录”只切换通用 History，
+没有携带卡片所示 Job ID。
+
+修正为共享的只读展示投影：按 Runtime 时间排序，unknown → 人工等待 → 其他恢复阻塞 → 当前
+活动 → 最新记录；已有 Runtime 恢复关系的旧 unknown 不再充当当前风险，但原状态、结果和关系
+均保留。缺失时间保持缺失，相同时间按 ID 稳定排序。Flash 主阻塞区与详情卡使用同一选择策略，
+记录按钮传 exact Job ID，结果页在已有 submission 时也打开对应 Job。没有新增设备 operation、
+Provider、profile、能力或恢复策略。
+
+稿件补活动、保留旧 unknown、未解决风险优先和精确 History 交互；浏览器实测还修正跳转继承
+Flash 滚动位置、把已选详情留在屏幕外的问题。六张双语设计参考均已查看，不是设备证据。
+35 项 History 合约和 47 项设计交互已通过；首轮完整闸发现架构测试仍要求各 View 直接筛选，
+现改为检查共享投影的 canonical/legacy 分类与 View 调用链。完整闸重跑 exit 0：Swift 1,839 项、
+App/UI-test bundle 编译、SDD、49 项 catalog generator 测试与零漂移全部通过。
+原生 UI 四次均停在系统认证或 automation mode 初始化，零断言执行，不计为通过。
+随后按相同隔离参数启动最终 App，以 Computer Use 完成双语检查：旧 unknown 精确跳转到非首行、
+旧已恢复记录不遮住最新成功、成功卡片打开对应 History，旧 unknown 行保留。六张截图逐张查看，
+只保留本机；真实 Runtime 的 1,962 条 Job 前后完全相同。此手动 fixture 检查不替代 XCTest 或真机证据。
+当前仍需原生断言与合入后真实 App 只读回访，不能将本项标为目标完成。
+各次结果与原始日志哈希见 [F36 验证记录](references/v1.6-goal/flash-history-focus-verification-2026-08-28.json)。

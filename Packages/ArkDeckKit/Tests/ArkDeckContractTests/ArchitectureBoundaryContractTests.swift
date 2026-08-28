@@ -565,11 +565,24 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     }
 
     let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
+    let historyFacade = try String(
+      contentsOf: sourceRoot.appending(path: "ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift"),
+      encoding: .utf8)
+    let flashActivityStart = try XCTUnwrap(historyFacade.range(of: "public var flashActivityJobs:"))
+    let flashActivityTail = historyFacade[flashActivityStart.lowerBound...]
+    let flashActivityEnd = try XCTUnwrap(
+      flashActivityTail.range(of: "public var focusedFlashActivity:"))
+    let flashActivitySource = String(flashActivityTail[..<flashActivityEnd.lowerBound])
+    XCTAssertTrue(
+      flashActivitySource.contains("ArkForgeFlashOperation.containsDurableRecordReference"))
+    XCTAssertFalse(flashActivitySource.contains("flash.dayu200"))
     for name in ["FlashWorkspaceView.swift", "FlashRuntimeActivityView.swift"] {
       let source = try String(
         contentsOf: repoRoot.appending(path: "ArkDeckApp/Features/Flash/\(name)"),
         encoding: .utf8)
-      XCTAssertTrue(source.contains("ArkForgeFlashOperation.containsDurableRecordReference"))
+      XCTAssertTrue(
+        source.contains(".focusedFlashActivity"),
+        "\(name) must use the shared canonical/legacy projection and attention priority")
       XCTAssertFalse(source.contains("flash.dayu200"), "\(name) must not select only the old alias")
     }
     let manualDriver = try String(

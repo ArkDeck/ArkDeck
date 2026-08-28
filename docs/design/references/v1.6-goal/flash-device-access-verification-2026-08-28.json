@@ -44,7 +44,7 @@
   "limitations": [
     "No candidate Runtime was installed or used for hardware.",
     "HardwareCampaign remains disabled; F34 records the successful real Flash separately.",
-    "Post-merge Runtime installation and real App read-only revisit remain required."
+    "F35 post-merge read-only validation is complete; F36 prevents claiming the overall design/implementation goal complete."
   ],
   "designBuilds": [
     {
@@ -231,5 +231,134 @@
     "appUITestBundleBuild": "passed",
     "commonGates": "SDD: 0 errors, 0 warnings, 121 acceptance IDs; catalog generator: 49 tests; generated catalog: no drift",
     "note": "Production and Swift UI-test code were unchanged after this gate started. Final design interaction tests and screenshot manifest checks ran separately."
+  },
+  "postMergeRealVerification": {
+    "mergeCommit": "f18ca0c7008be9b4f4c20ee90987845c35683066",
+    "mergedAtUTC": "2026-08-28T04:55:04Z",
+    "evidenceKind": "real-App-read-only-revisit-and-real-device-observation",
+    "installedDaemonSHA256": "4485dd4df343b71678a6e2b69643e5647239e144fb015b7224dd85329920e551",
+    "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+    "appSourceTree": "36f760f23ae4ed5b3f54b345199d80fc9dba9a72",
+    "appBuildProvenance": "The F35 native-test App was built before merge; its final branch tree and the reviewed merge tree are identical. No candidate Runtime was installed.",
+    "helperPackaging": "Official build-local-helpers.sh and agentd update; Developer ID signed local helpers, not a notarized distribution.",
+    "hardwareCampaignEnabled": false,
+    "appDeviceAccess": {
+      "language": "zh-Hans",
+      "before": "Old Runtime returned the fixed unavailable reason.",
+      "after": "Two explicit probes through the reviewed Runtime returned a successful empty RockUSB observation, shown as offline or not in Loader mode.",
+      "noFalseLoaderReadiness": true,
+      "screenshots": [
+        {
+          "privateFile": "f35-live-before-update-details.jpg",
+          "mimeType": "image/jpeg",
+          "width": 1158,
+          "height": 768,
+          "byteCount": 99047,
+          "sha256": "d997536a7604f01b8403902160a9900c1e7d65cc4c26e19bfda4656ccc9fd59e",
+          "viewed": true
+        },
+        {
+          "privateFile": "f35-live-device-access-after-update-zh.jpg",
+          "mimeType": "image/jpeg",
+          "width": 1158,
+          "height": 768,
+          "byteCount": 110798,
+          "sha256": "771c88a5fe98aab49afcb425b629a36dd251bef5993211ae03e21a9cc9847eb7",
+          "viewed": true
+        }
+      ]
+    },
+    "observationAttempts": [
+      {
+        "jobID": "job-3457ce606c9b1ad4bbac213577afa7eb",
+        "command": "arkdeck agentd verify --target <redacted-target> --json",
+        "exitCode": 1,
+        "state": "failed",
+        "failure": "targetConfirmationMismatch: expected exactly one matching target row, saw 0",
+        "outcomeUnknown": false,
+        "residueCount": 0,
+        "note": "Cause of the missing row is not established; preserved rather than relabeled as a pass."
+      },
+      {
+        "jobID": "job-fa633ec83c9a19986c543cdbcb4c2302",
+        "command": "arkdeck agent run --operation observe.device@1 --target <redacted-target> --execution-id f35-post-update-observe-02 --json",
+        "exitCode": 0,
+        "state": "succeeded",
+        "bindingRevision": 4,
+        "confirmationMethod": "machineReadback",
+        "firmware": "OpenHarmony-7.0.0.37",
+        "outcomeUnknown": false,
+        "residueCount": 0,
+        "humanActions": [],
+        "independentVerification": {
+          "artifactsVerified": true,
+          "runtimePostflightVerified": true,
+          "terminalStatusVerified": true,
+          "trustedEvidenceVerified": true,
+          "udsHealthVerified": true
+        },
+        "artifactMetadata": [
+          {
+            "name": "binding-snapshot.json",
+            "byteCount": 510,
+            "sha256": "9317852d4b10a468a7dbd854b63f9de4d7b6942aa0e220f69bbfa48dfef17efd"
+          },
+          {
+            "name": "device-facts.json",
+            "byteCount": 438,
+            "sha256": "eb797e9a874dbd6c339909cbe0c1087757d5610c21d043a4ebd619d8c3d0d780"
+          },
+          {
+            "name": "tool-facts.json",
+            "byteCount": 240,
+            "sha256": "6ae7e589b60fbef7900b25ce1e094d63ede28d0e56b9740f5a3da7067f7da088"
+          }
+        ]
+      }
+    ],
+    "priorFlashReopened": {
+      "jobID": "job-8e32139af1945d755f5716b67f4f8bde",
+      "checks": {
+        "artifactsVerified": true,
+        "runtimePostflightVerified": true,
+        "terminalStatusVerified": true,
+        "trustedEvidenceVerified": true,
+        "udsHealthVerified": true
+      },
+      "newFlashSubmitted": false
+    },
+    "inventoryComparison": {
+      "beforeCount": 1960,
+      "afterCount": 1962,
+      "newJobs": [
+        {
+          "jobId": "job-3457ce606c9b1ad4bbac213577afa7eb",
+          "operation": "observe.device@1",
+          "operationReference": null,
+          "state": "failed",
+          "outcomeUnknown": false,
+          "outstandingResidueCount": 0
+        },
+        {
+          "jobId": "job-fa633ec83c9a19986c543cdbcb4c2302",
+          "operation": "observe.device@1",
+          "operationReference": null,
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "outstandingResidueCount": 0
+        }
+      ],
+      "unknownCount": 4,
+      "oldUnknownRecordsUnchanged": true
+    },
+    "privateRecordHashes": {
+      "f35-runtime-update.json": "540dd3fa33232df4e470f27829236057a4706119b7dcd244f3a349fd400ed210",
+      "f35-runtime-after.json": "de265ebd0d4d8a640e0e67094a3b0cb1abeac9b2aafae8b2fdc2f75f74c7d456",
+      "f35-post-update-agent-observe.json": "8002831375898333d34490fbd831ff6c608a9d8b7b02a6cd8d56fdb38dff1f84",
+      "f35-observe-independent-verification.json": "0b0887c7f80131984b06f9bf634ac1e118c5189c309e7ae97da637a911511cc1",
+      "f35-flash-after-update.json": "c5fe33ae663366f77692e7a39510215597dc120ad81639aff55e98c2286ba1ee",
+      "f35-jobs-final.json": "3e9d7db9df193c1ddf441ca82be5131981a92d52056f9000e2c7702a0e1c83b0"
+    },
+    "remainingFinding": "F36: resolved retained unknowns mask the newest Flash on the activity card; exact-record buttons open generic History. This real App defect remains open in a separate vertical product fix."
   }
 }
