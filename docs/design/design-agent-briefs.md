@@ -482,83 +482,55 @@ rebind 区块(在 Job inspector 里,不是弹窗):粗体 `设备回连,需确认
 
 ## 5.7 History
 
-> 历史细节：当前实现以本文顶部 v1.6 索引与对应交互定义为准；不得把下文旧入口视作已发布能力。
+当前交付参考（2026-08-28，F38）。以 `RuntimeHistoryView.swift` 和
+`RuntimeHistoryApplicationFacade.swift` 为准；下列要求替换旧 Session 表、固定 manifest、
+按类型生成文件和“取消即恢复”的历史稿。
 
-> 贴进 claude.ai/design 项目的新对话。
+**外壳与选择**：八页导航；History 内为活动类型、记录、详情三栏，窄窗折叠筛选但保留选择关系。
+All / Flash / Debug / Viewer / Trace / Diagnostics / Device / Other 都要覆盖。
+类别来自明确的 workspace/operation 投影，不从标题猜；未知记录保留 Other。
+记录按已报告 finished / started / created 时间倒序，缺失日期不从展示文案推断。
+选择只能属于当前过滤结果；跨工作区的 exact Job 入口清除旧筛选并定位对应记录。
 
-用 ArkDeck 组件画 **History** 页,三栏。至少画两种选中态:`S-0711-04`(已中断 · 结果未知)与 `S-0712-02`(planned)。
+**筛选**：搜索匹配 Job、Session、operation、target、state、executionMode。
+状态含 all / active / needsAttention / succeeded / failed / interrupted / cancelled；
+模式含 execute / planned / simulated / unknown；Session 与 target 用精确 ID，不把 Job ID
+或设备显示名称当成身份。时间含过去一小时、一天、一周，未报告时间不匹配时间区间。
+保存、恢复、删除筛选，以及需要关注、最近失败和清除筛选都可达；原型保存只在页面内存中演示。
 
-**布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-最左仍是应用侧栏(`DeviceRow` × 2 + `NavItem` × 7,History 为当前页)。
-内容区按规格是**三栏 split view**:筛选栏 → Session 表 → 详情 inspector。原型把筛选画成了内容区顶部的一张卡加两行 pill,是两栏——按规格改成三栏,把两行 `FilterPills` 竖着放进最左那栏。
-详情栏自上而下按固定分组:Summary → Timeline → Parameters → Artifacts → Recovery linkage。
-底部 `JobInspector` 折叠态常驻。
+**详情**：Summary / Timeline / Correlation / Evidence / Parameters / Artifacts / Recovery linkage
+按 Runtime 提供的字段展示。operation、state、outcome certainty、actual effect、target、
+binding、Journal 条目、manifest、hash 和副作用证据均不能由类型或状态补造。
+未报告的旧记录明确显示缺失；没有 Journal 或 Artifact 清单不补默认步骤和文件。
 
-规格还要求全文搜索、时间筛选,以及「筛选器可存为 toolbar menu」。原型这三样都没有任何控件与文案——要画就只画一个空的搜索 `TextField` 和它在 toolbar 里的位置,不要编筛选器名字或时间区间。
+**参数**：所有类型都支持精确 typed inputs，不局限于 Trace / Viewer。
+未报告与明确空参数分开；只有显式 traceParameters 才画 before / after，逐项保留
+value / missing / unreadable / unknown 和 unchanged / changed / unverified。
+相等的读回值只能说明 unchanged，不能推导补偿已经执行。cancelled 不代表参数已恢复；
+failed / interrupted 与 outcomeUnknown 是不同维度。
 
-**内容** — 逐字使用,不要改写、不要翻译、不要补充:
+**Artifact**：逐项显示 name / role / origin / size / SHA-256 / privacy / status，来源是对应 Job
+的实际清单。设计样本仅采用已发布 descriptor，未提供的大小/哈希保持未报告：
+Viewer 可有 ui-dump.json / ui-tree.json / screenshot.png；Trace 可有 trace.htrace / capture.log；
+Diagnostics 可有 hilog.txt / markers.json / artifact-index.json / capture-summary.json；
+Native 可有 publish-report.json / verification-report.json；canonical Flash 可有
+post-flash-facts.json / post-flash-hilog.txt / flash-report.json。
+这些是有条件的清单示例，不是按类型自动生成的文件集合。
 
-`FilterPills` 三行,label 分别是 `状态` / `模式` / `设备`:
-- 状态:`全部` `成功` `失败` `已取消` `planned` `已中断`
-- 模式:`全部` `execute` `plan-only` `simulated`
-- 设备:`全部` `rk3568-dev` `SIM-fixture-a3`
+每个 published Artifact 单独提供导出，missing / invalid 禁用；预览必须是点击的那一项，
+展示文件名、size、privacy、SHA-256。sensitive 明示敏感导出，standard 不冒充敏感文件。
+取消不读取；确认后选择位置，App 分块读取并复算 byteCount / SHA-256，再写入本地。
+只有成功后才提供 Finder 定位。原型演示不创建文件，不是导出或设备证据。
+全局 Inspector 的标准日志入口只能来自实际 published log 行，不能推断 capture.log / flash.log。
 
-Session 表,`DataTable`,列 = Session(mono)/ 状态 / 设备(mono)/ 内容 / 时间(mono),六行:
-| S-0713-06 | dim `⊘ 已取消` | rk3568-dev | Trace · 渲染/动画 30s(用户取消) | 07-13 10:21 |
-| S-0712-01 | ok `✓ 成功` | rk3568-dev | Trace · ArkUI 深度 15s | 07-12 14:02 |
-| S-0712-02 | planned `◇ PLANNED` | rk3568-dev | Flash · rk3568-5.0-full(3 分区) | 07-12 15:40 |
-| S-0712-03 | ok `✓ 成功` + simulated `▤ SIMULATED` | SIM-fixture-a3 | Flash · 断连注入场景(reconcile 一致) | 07-12 16:11 |
-| S-0711-04 | warn `⚠ 已中断 · 结果未知` | rk3568-dev | Flash · system 分区(outcomeUnknown) | 07-11 23:47 |
-| S-0711-05 | danger `✕ 失败` | rk3568-dev | Viewer · elementTree(设备离线) | 07-11 20:15 |
-本次会话刚产生的行,Session 号后面跟一枚小标签 `本会话`。筛空时表体写 `无匹配项`。
+**结果与恢复**：unknown 保留独立标识。未解决的 unknown / waitingForHuman 或残留项进入
+“需要关注”；有 Runtime 恢复关系的旧 unknown 保持原结果，但不因旧 unknown 本身继续报警。
+没有证明的补偿不画完成；恢复关系只表达当前 target epoch 已建立，不重写原 Job 为成功。
+工作区/Diagnostics 入口只读回访，不重放、取消、重绑或重试 operation。
+planned / simulated 标识保留，不因导出生成新的 Session mode 声明。
 
-详情栏标题 `Session 详情`。未选中时:`选择左侧 Session 查看 manifest、参数 before/after、Artifact 与审计详情。planned/simulated 标识在历史与导出中永久保留。`
-
-Summary,`KeyValueList`(以 `S-0711-04` 为例):
-| 状态 | warn `⚠ 已中断 · 结果未知` |
-| executionMode | execute |
-| 设备 | rk3568-dev · binding rev 3 |
-| manifest | schema 1.0 · 9 steps · SHA e0a1…88f2 |
-| 审计 | outcomeUnknown @ flashPartition(system) · needsAttention · 未执行补偿:restoreParam×2 |
-已取消的会话,审计行改为:`用户取消 @ 安全边界;补偿动作已执行,参数已恢复`。成功与 planned 的会话没有审计行。
-
-Timeline:原型没有为已结束的会话提供时间轴文案。可以用 `PhaseTrack` 复用 Flash 任务自己声明的九个阶段 —— `Preflight` `EnterUpdater` `Re-identify` `flash boot` `flash system` `Verify` `Reboot` `Postflight` `Complete` —— 并把中断点停在 `flash system`(与审计行的 `flashPartition(system)` 对得上)。这是从任务定义推出来的,不是新编的;除此之外不要造时间戳。
-
-Parameters(只有 Trace / Viewer 会话有),`DataTable`,列 = 参数(mono)/ before / after / 状态:
-- `persist.ace.trace.build.enabled` · `false` · `false` · ok `Chip` `已恢复`
-- `persist.rosen.animationtrace.enabled` · `missing` · `missing` · dim `Chip` `未改变`
-
-Artifacts,小标题 `Artifact`,`DataTable` 列 = 文件(mono)/ role / origin / size / SHA-256(mono)/ privacy / status。所有值来自 `artifact.list`，按会话类型取生产返回行；不得使用下面的旧示例 hash 作为真实值:
-- Trace:`raw.ftrace` · raw / device · `3f9a…b1c7`;`filtered.ftrace` · derived / host · `c822…04de`;`capture.log` · log / host · `910b…77aa`
-- Viewer:`stdout.elementtree.txt` · raw / stdout · `7d1a…90ff`;`sidecar.arkui.dump` · raw / device · `e33b…12c0`;`merged.elementtree.json` · derived / host · `a1f4…77b3`
-- Flash(execute):`plan.json` · plan / host · `b7c3…e901`;`flash.log` · log / host · `44d0…a2c8`
-- Flash(plan-only):只有 `plan.json` · plan / host · `b7c3…e901`
-空表文案:`无产物(planned 会话仅含 plan artifact)`
-
-每个 `published` Artifact 行有 `导出…`；成功后同一行出现 `在 Finder 中显示`。missing / invalid 状态禁用导出并显示 status detail。
-
-`导出…` 先开系统 confirmation dialog:
-- 标题 `导出 Artifact`
-- message 逐项展示实际文件名、格式化 size、privacy 与完整 SHA-256
-- 普通 Artifact 主按钮 `选择导出位置`；sensitive Artifact 主按钮 `导出敏感 Artifact…`，明确这是显式敏感数据 opt-in
-- 取消后不产生读取；确认后再开 `NSSavePanel`
-
-导出过程中显示小型 `ProgressView`。App 分块读取并复算 byteCount / SHA-256，校验通过才落到用户选择的位置；失败在行内显示原因。设计中不画 Session zip、多选项或 connectKey 脱敏开关，因为当前生产能力的边界是单个不可变 Artifact。
-
-**必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
-
-1. **已中断 / 失败 / 已取消是三种东西,必须靠 symbol + 文案分开,不能只靠颜色。**
-   - `⊘ 已取消`(dim)——人主动停的,补偿已执行、参数已恢复,是最轻的一种;
-   - `✕ 失败`(danger)——做了、没成,但**结果是已知的**;
-   - `⚠ 已中断 · 结果未知`(warn)——不知道设备现在是什么状态。
-   直觉上「中断」像是「失败」的变体,恰恰相反:失败有结论,中断没有。文案里的 `· 结果未知` 是这一条的全部重量,不许简写成「已中断」。
-2. **unknown outcome 额外背着 needsAttention。** 详情审计行里的 `outcomeUnknown` 与 `needsAttention` 都要出现,并且要指出未执行的补偿(`未执行补偿:restoreParam×2`)——归档不等于收拾干净了。这条会话与 `RecoveryBanner` 上那条 Flash 恢复项是同一件事,详情里要能看出这层关联(Recovery linkage 分组的内容就是它;原型只给了这一行审计文案,没有跳转控件,别自己发明按钮标签)。
-3. **三栏,不是两栏。** 筛选是一栏,清单是一栏,详情是一栏;详情栏常驻(选中前显示那句空态文案),不要做成点一下才滑出来的抽屉。
-4. **详情分组顺序固定:Summary / Timeline / Parameters / Artifacts / Recovery linkage。** 每组一个小标题,不要把它们合并成一张长 KeyValueList。
-5. **导出先看精确 Artifact 元数据,再选择位置。** name / size / privacy / SHA-256 四项都要出现；sensitive 使用更明确的主按钮，不能与普通产物无差别导出。
-6. **planned / simulated 标识跟着会话进入 History。** `S-0712-02` 这类 planned 会话若没有已发布 Artifact，空表文案要如实写出来——那不是「加载失败」。单 Artifact 导出保留其既有 bytes 与 metadata，不生成新的 Session mode 声明。
-
-**不要做的事**:不要用颜色区分状态(要 symbol + 文字,高对比度模式下也得读得出来);不要把「已中断」画成「失败」的红色变体;不要发明 Session id、hash、时间戳、设备名或文件名;不要画尚不存在的 Session zip 导出或多选清单;不要给状态 chip 配 emoji——`✓ ✕ ◇ ⊘ ⚠ ▤` 是排版符号,走 `Chip` 的 `icon` 位,照抄即可。
+至少画：中英文当前记录及 typed inputs、缺失事实的旧取消记录、标准与敏感逐项导出、
+未解决与已关联恢复的 unknown、空筛选、精确 Session/target 筛选、窄栏长参数/文件名。
 
 ---
 

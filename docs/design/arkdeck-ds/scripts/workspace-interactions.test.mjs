@@ -151,6 +151,128 @@ test('Flash unresolved stops outrank later success and never offer another flash
   }
 });
 
+test('every History kind preserves missing facts and exports only its explicit inventory', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=history&lang=${lang}`);
+    for(const kind of ['flash','debug','viewer','trace','diagnostics','device','other']) {
+      const detail=h.run(`histDetail({id:'missing',kind:'${kind}',st:'cancelled',mode:'execute',dev:'DAYU200'})`);
+      assert.match(detail,/Not reported|未报告/);
+      assert.match(detail,/did not report typed parameters|未报告类型化参数/);
+      assert.doesNotMatch(detail,/9 steps|e0a1|binding rev|plan\.json|flash\.log|trace\.htrace|stdout\.elementtree|persist\.ace|compensation completed|参数已恢复|data-artifact-name=/);
+    }
+    const parameters=h.run(`historyParametersHTML({inputs:{durationSeconds:30},traceParameters:[
+      {name:'explicit.parameter',beforeState:'value',beforeValue:'false',afterState:'value',afterValue:'false',comparison:'unchanged'},
+      {name:'changed.parameter',beforeState:'value',beforeValue:'false',afterState:'value',afterValue:'true',comparison:'changed'},
+      {name:'unreadable.parameter',beforeState:'missing',afterState:'unreadable',comparison:'unverified'}]})`);
+    assert.match(parameters,/history.parameters.traceDiff/);
+    assert.match(parameters,/history.parameters"/);
+    assert.match(parameters,/Unchanged|未改变/);
+    assert.match(parameters,/Changed|已改变/);
+    assert.match(parameters,/Unverified|未验证/);
+    assert.match(parameters,/Unreadable|无法读取/);
+    assert.doesNotMatch(parameters,/Restored|已恢复/);
+    assert.match(h.run('historyParametersHTML({inputs:{}})'),/recorded no parameters|未记录参数/);
+    const original=h.run('JSON.stringify(HIST)');
+    for(const row of JSON.parse(original)) {
+      const detail=h.run(`histDetail(HIST.find(row=>row.id===${JSON.stringify(row.id)}))`);
+      assert.doesNotMatch(detail,/schema 1\.0|e0a1|9 steps|binding rev|restoreParam/);
+      for(const artifact of row.artifacts||[]) {
+        assert.ok(detail.includes(`data-artifact-name="${artifact.name}"`));
+        h.run(`exportModal(${JSON.stringify(row.id)},${JSON.stringify(artifact.name)})`);
+        const preview=h.document.getElementById('modalHost').innerHTML;
+        assert.ok(preview.includes(artifact.name));
+        assert.ok(preview.includes(artifact.privacy));
+        assert.match(preview,/Demo complete: no file written/);
+        assert.doesNotMatch(preview,/已导出并校验/);
+        if(artifact.privacy==='standard')assert.doesNotMatch(preview,/Export sensitive|导出敏感/);
+        h.document.getElementById('modalHost').innerHTML='';
+      }
+      h.run(`exportModal(${JSON.stringify(row.id)},'missing-file')`);
+      assert.equal(h.document.getElementById('modalHost').innerHTML,'');
+    }
+    h.run("exportModal('missing-job','plan.json')");
+    assert.equal(h.document.getElementById('modalHost').innerHTML,'');
+    assert.equal(h.run('JSON.stringify(HIST)'),original);
+    assert.equal(h.run('inspectorJobs()[2].standardLog'),'capture.log');
+    assert.equal(h.run('inspectorJobs()[3].standardLog'),null);
+    h.run("HIST[2].artifacts.find(a=>a.name==='capture.log').status='missing'");
+    assert.equal(h.run('inspectorJobs()[2].standardLog'),null);
+    h.run("exportModal('S-0826-03','capture.log')");
+    assert.equal(h.document.getElementById('modalHost').innerHTML,'');
+  }
+});
+
+test('History filters use exact identity, current attention facts and reported timestamps', () => {
+  const h=harness('?page=history&lang=en');
+  h.run(`HIST.splice(0,HIST.length,
+    {id:'a',kind:'trace',op:'capture.diagnostics@1',st:'succeeded',mode:'execute',target:'target-a',sessionID:'session-a',finishedAtUTC:'2026-08-26T06:00:00Z'},
+    {id:'b',kind:'trace',op:'capture.diagnostics@1',st:'running',mode:'planned',target:'target-b',sessionID:'session-a',createdAtUTC:'2026-08-25T06:00:00Z',waitingForHuman:true},
+    {id:'c',kind:'other',st:'interrupted',dev:'target-a',outcomeUnknown:true,resolvedByTargetAliasResolutionID:'relation',createdAtUTC:'2026-08-19T05:59:00Z'},
+    {id:'d',kind:'other',st:'cancelled',outstandingResidueCount:1,day:'Today'},
+    {id:'e',kind:'other',st:'interrupted'},
+    {id:'f',kind:'other',st:'waitingForRecovery',outcomeUnknown:true},
+    {id:'g',kind:'other',st:'future-state'})`);
+  const ids=()=>JSON.parse(h.run("JSON.stringify(filteredHistory(Date.parse('2026-08-26T06:30:00Z')).map(row=>row.id))"));
+  assert.deepEqual(ids(),['a','b','c','g','f','e','d']);
+  for(const [query,expected] of [['capture.diagnostics',['a','b']],['target-a',['a']],['session-a',['a','b']],['running',['b']]]) {
+    h.run(`resetHistoryFilters();S.hf.query=${JSON.stringify(query)}`);
+    assert.deepEqual(ids(),expected);
+  }
+  h.run("resetHistoryFilters();S.hf.session='session-a'");assert.deepEqual(ids(),['a','b']);
+  h.run("S.hf.session='a'");assert.deepEqual(ids(),[],'Job ID is not a Session ID');
+  h.run("resetHistoryFilters();S.hf.target='target-a'");assert.deepEqual(ids(),['a'],'display device is not an exact target');
+  h.run("resetHistoryFilters();S.hf.status='attention'");assert.deepEqual(ids(),['b','f','d']);
+  h.run("S.hf.status='active'");assert.deepEqual(ids(),['b','f']);
+  h.run("resetHistoryFilters();S.hf.mode='planOnly'");assert.deepEqual(ids(),['b']);
+  h.run("S.hf.mode='unknown'");assert.deepEqual(ids(),['c','g','f','e','d']);
+  for(const [time,expected] of [['lastHour',['a']],['lastDay',['a']],['lastWeek',['a','b']]]) {
+    h.run(`resetHistoryFilters();S.hf.time=${JSON.stringify(time)}`);assert.deepEqual(ids(),expected);
+  }
+  h.run("S.hf.query='stale';historyPreset('attention')");assert.equal(h.run('S.hf.query'),'');assert.deepEqual(ids(),['b','f','d']);
+  h.run("historyPreset('failed')");assert.equal(h.run('S.hf.time'),'lastWeek');
+  const stateSource=readFileSync(join(root,'Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift'),'utf8');
+  const states=[...stateSource.split('public enum JobState:')[1].split('public var isTerminal')[0].matchAll(/^  case (\w+)$/gm)].map(match=>match[1]);
+  const terminal=stateSource.match(/case (\.planned[^:]+):\s+true/)[1].split(',').map(value=>value.trim().slice(1));
+  assert.deepEqual(JSON.parse(h.run('JSON.stringify(HISTORY_ACTIVE_STATES)')),states.filter(state=>!terminal.includes(state)));
+});
+
+test('explicit History samples use current Catalog fields and Artifact descriptors', () => {
+  const h=harness('?page=history&lang=en');
+  const operations=new Map(files(join(root,'Catalog/operations')).filter(path=>path.endsWith('.json')).map(path=>{
+    const operation=JSON.parse(readFileSync(path,'utf8'));
+    return [`${operation.id}@${operation.version}`,operation];
+  }));
+  for(const row of JSON.parse(h.run('JSON.stringify(HIST)')).filter(row=>row.artifacts)) {
+    const operation=operations.get(row.op);
+    assert.ok(operation,`${row.id} must name an exact published operation`);
+    for(const artifact of row.artifacts) {
+      const declared=operation.artifacts.find(a=>a.name===artifact.name);
+      assert.ok(declared,`${row.id}: ${artifact.name} is not declared`);
+      assert.equal(artifact.role,declared.role);
+      assert.equal(artifact.privacy,declared.privacy);
+    }
+    for(const key of Object.keys(row.inputs||{}))assert.ok(operation.inputs.fields[key],`${row.id}: ${key} is not a typed input`);
+  }
+});
+
+test('non-Flash demo history keeps its Job identity and never infers compensation or activity from a title', () => {
+  const h=harness('?page=history&lang=en');
+  h.run(`let completed={id:'job-demo-native',kind:'debug',operation:'deploy.native-library.app-owned@1',title:'本地库',state:'cancelled',mode:'execute',log:['explicit entry'],inputs:{nested:{value:1}}};histFromJob(completed);histFromJob(completed)`);
+  assert.equal(h.run("HIST.filter(row=>row.id==='job-demo-native').length"),1);
+  assert.equal(h.run('HIST[0].kind'),'debug');
+  assert.equal(h.run('HIST[0].op'),'deploy.native-library.app-owned@1');
+  h.run("completed.inputs.nested.value=2;completed.log.push('later');openHistoryRun(completed.id)");
+  assert.equal(h.run('S.histSel'),'job-demo-native');
+  assert.equal(h.run('HIST[0].inputs.nested.value'),1);
+  assert.equal(h.run('HIST[0].timeline.length'),1);
+  h.run("histFromJob({id:'unknown',title:'Flash Debug Trace',state:'planned',log:[]})");
+  assert.equal(h.run('HIST[0].kind'),'other');
+  h.run("let stopped={id:'cancelled-demo',title:'Demo',state:'running',cancelled:true,phaseIdx:3,safeBoundary:3,log:[]};advanceJob(stopped)");
+  assert.equal(h.run('stopped.state'),'cancelled');
+  assert.match(h.run("stopped.log.join(' ')"),/no compensation or parameter readback evidence/);
+  assert.doesNotMatch(h.run('histDetail(HIST[0])'),/Restored|参数已恢复|compensation completed/);
+});
+
 test('Flash result and activity retain the submitted demo Job identity', () => {
   const h=harness('?page=flash&lang=en');
   h.run('chooseFlashImage(); runFlash()');
