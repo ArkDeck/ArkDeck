@@ -73,7 +73,7 @@ test('Flash distinguishes a connected assessment lane from execution availabilit
     assert.match(page,/hardwareGated/);
     assert.match(page,/data-sync-id="flash.execute.prerequisiteBlocker"/);
     assert.doesNotMatch(page,/<button[^>]+onclick="runFlash\(\)"/);
-    assert.doesNotMatch(page,/4 safety checks passed|4 项安全检查通过/);
+    assert.doesNotMatch(page,/3 required safety checks passed|3 项必需安全检查通过/);
     const before=h.run('S.jobs.length');
     h.run('runFlash()');
     assert.equal(h.run('S.jobs.length'),before);
@@ -112,6 +112,51 @@ test('new Flash drafts use the canonical operation and a supported archive forma
   assert.doesNotMatch(h.run('flashDetails(S.flashImage)'), /flash\.dayu200/);
   h.run('runFlash()');
   assert.match(h.run('S.flashJob.title'), /flash\.full-restore@1/);
+});
+
+test('Flash device access distinguishes an empty observation from a failed probe', () => {
+  for (const lang of ['en','zh-Hans']) {
+    for (const state of ['absent','available','unavailable']) {
+      const h=harness(`?page=flash&lang=${lang}&deviceAccess=${state}`);
+      const html=h.run('flashDetails(null)');
+      assert.match(html, /data-sync-id="flash.deviceAccess"/);
+      assert.match(html, state==='available'?/Loader device access is ready|Loader 设备访问就绪/:state==='unavailable'?/RockUSB discovery is unavailable|RockUSB 探测不可用/:/Device is offline or not in Loader mode|设备离线或未进入 Loader 模式/);
+      if (state==='unavailable') {
+        assert.match(html, /runtime_device_access_unreachable/);
+        assert.doesNotMatch(html, /Responsible party|处理责任方/);
+      } else {
+        assert.match(html, /Responsible party|处理责任方/);
+        assert.match(html, /Minimum next step|最小修复步骤/);
+        if (state==='available') assert.match(html, /1 device\(s\) · Loader|1 台设备 · Loader/);
+      }
+      assert.match(html, /does not authorize flashing|不因发现 Loader 而授予刷写权限/);
+      assert.doesNotMatch(html, /14 steps|Maximum stage effect|阶段最高 effect/);
+      assert.doesNotMatch(h.run('pFlash()'), /3 required safety checks passed|3 项必需安全检查通过/);
+      h.run('recheckFlashDeviceAccess()');
+      assert.equal(h.document.querySelector('.flash-details').open, true);
+      assert.equal(h.run('S.flashJob'), null);
+    }
+  }
+});
+
+test('Flash stage summaries never lower the published maximum effect', () => {
+  const steps=JSON.parse(read('Catalog/operations/flash.full-restore.v1.json')).steps;
+  const ranks=['hostOnly','readOnly','deviceMutation','destructive'];
+  const groups=[steps.slice(0,3),steps.slice(3,7),steps.slice(7,8),steps.slice(8)];
+  for (const lang of ['en','zh-Hans']) {
+    const html=harness(`?page=flash&lang=${lang}`).run('flashDetails({name:"dayu200.tar.gz"})');
+    const rows=[...html.matchAll(/<tr><td>.*?<\/tr>/g)].map(match=>match[0]);
+    assert.equal(rows.length,groups.length);
+    groups.forEach((group,index)=>{
+      const maximum=ranks[Math.max(...group.map(step=>ranks.indexOf(step.effect)))];
+      assert.ok(rows[index].includes(maximum), `${lang} stage ${index} must show ${maximum}`);
+    });
+  }
+  for (const name of ['DataTable','JobInspector','PhaseTrack','WindowFrame']) {
+    const source=read(`.design-sync/previews/${name}.tsx`);
+    assert.doesNotMatch(source,/\.imgpkg|4 项安全检查通过/, `${name} must mirror supported current drafts`);
+  }
+  assert.match(read('.design-sync/previews/Card.tsx'), /flash\.full-restore@1 · hardwareGated/);
 });
 
 test('every App View file and preview is covered and linked', () => {

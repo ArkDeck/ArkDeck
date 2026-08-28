@@ -81,8 +81,8 @@ export const CapabilityMatrix = () => (
           id: "rockusb",
           cells: {
             cap: "RockUSB Flash",
-            state: <Chip tone="ok">可用</Chip>,
-            evidence: "flash.dayu200 · Catalog published",
+            state: <Chip tone="warn">不可用</Chip>,
+            evidence: "flash.full-restore@1 · hardwareGated",
           },
         },
       ]}

@@ -215,6 +215,7 @@ final class AgentDaemonContractTests: XCTestCase {
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
+    rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
@@ -257,6 +258,7 @@ final class AgentDaemonContractTests: XCTestCase {
       flashPrerequisiteObserver: flashPrerequisiteObserver,
       flashLanePlanPreviewer: flashLanePlanPreviewer,
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
+      rockchipDeviceAccessObserver: rockchipDeviceAccessObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       methodObserver: nil)
     return (handler, engine)
@@ -823,6 +825,36 @@ final class AgentDaemonContractTests: XCTestCase {
       ])
     XCTAssertFalse(unknownTarget.ok)
     XCTAssertEqual(unknownTarget.error?.code, "notFound")
+  }
+
+  func testDeviceAccessDiscoveryIsReadOnlyRedactedAndRejectsCallerPaths() async throws {
+    struct Observer: RockchipDeviceAccessObserving {
+      let fails: Bool
+      func observeDeviceAccess() throws -> [RockchipDeviceMode] {
+        if fails { throw NSError(domain: "private-usb-identity", code: 1) }
+        return [.loader, .maskrom]
+      }
+    }
+    let (handler, engine) = try makeStack(rockchipDeviceAccessObserver: Observer(fails: false))
+    let response = try await request(handler, method: "flash.device-access")
+    XCTAssertTrue(response.ok)
+    XCTAssertEqual(response.result, .object([
+      "observationCount": .integer(2),
+      "observedModes": .array([.string("Loader"), .string("Maskrom")]),
+    ]))
+    let refused = try await request(
+      handler, method: "flash.device-access", params: ["socketPath": .string("/caller/path")])
+    XCTAssertFalse(refused.ok)
+    XCTAssertEqual(refused.error?.code, "invalidParams")
+    let (failing, _) = try makeStack(rockchipDeviceAccessObserver: Observer(fails: true))
+    let failure = try await request(failing, method: "flash.device-access")
+    XCTAssertFalse(failure.ok)
+    XCTAssertFalse((failure.error?.message ?? "").contains("private"))
+    let (unconfigured, _) = try makeStack()
+    let unavailable = try await request(unconfigured, method: "flash.device-access")
+    XCTAssertFalse(unavailable.ok)
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
   }
 
   func testBootloaderStatusAndClosedLoaderBindingHaveRedactedWireShapes() async throws {

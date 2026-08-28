@@ -1,9 +1,9 @@
 # Goal 真机修复设计参考
 
-2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F33 修正。十五张设计样本均已查看。
+2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F35 修正。二十三张设计样本均已查看。
 真机执行与原生 App 证据另见[验证记录](real-device-validation.md)，不由这些图片证明。
 
-浏览器实际 viewport 为 1280×720；前七张使用 1180×760 reference window，新增多包、生命周期、Trace 标记与 Flash 受阻八张使用默认自适应窗口。截图保留原始 JPEG，
+浏览器实际 viewport 为 1280×720；前七张使用 1180×760 reference window，后续十六张使用默认自适应窗口。截图保留原始 JPEG，
 未缩放或重绘；预览图包含滚动后的局部，不作为全窗逐像素验收。
 [manifest.json](manifest.json)记录 URL、操作、尺寸、字节数和 SHA-256。
 
@@ -24,5 +24,13 @@
 | [中文 Trace 标记](trace-annotations-zh-Hans.jpg) | 时刻标记 + 新临时范围 0.600–1.780 s + 已保留范围 3.800–5.050 s；截图后重载清空页面演示状态 |
 | [英文 Flash 受阻](flash-hardware-gated-en.jpg) | 已连接的 assessment-only 通道；选择镜像后以受阻原因替代擦写动作，不显示安全检查通过 |
 | [中文 Flash 受阻](flash-hardware-gated-zh-Hans.jpg) | 同上；显示硬件资格门原因，不把镜像选择或设备在线当作执行资格 |
+| [英文设备访问空观察](flash-device-access-absent-en.jpg) | 未发现 Loader；重新检查后保留展开区，不创建 Job |
+| [中文设备访问空观察](flash-device-access-absent-zh-Hans.jpg) | 同上；提供处理责任方和最小修复步骤 |
+| [英文设备访问不可用](flash-device-access-unavailable-en.jpg) | Runtime 不可达显示固定原因码，不伪装为空观察 |
+| [中文设备访问不可用](flash-device-access-unavailable-zh-Hans.jpg) | 同上；保留重新检查入口 |
+| [英文 Loader 访问](flash-device-access-available-en.jpg) | 只读观察到 1 个 Loader；不代表刷机准入，不提前展示计划 |
+| [中文 Loader 访问](flash-device-access-available-zh-Hans.jpg) | 同上；未选择镜像时无“安全检查通过” |
+| [英文计划 effect](flash-plan-effects-en.jpg) | 选择演示镜像后显示 3/4/1/6 步阶段；包含重启的收尾阶段最高为 deviceMutation |
+| [中文计划 effect](flash-plan-effects-zh-Hans.jpg) | 同上；阶段 effect 不低于 Catalog 中任一步骤 |
 
 这些操作不连接 Runtime、不读取真实敏感文本、不创建真实 Job。
