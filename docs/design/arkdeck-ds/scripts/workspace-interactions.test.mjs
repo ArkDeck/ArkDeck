@@ -249,6 +249,7 @@ test('Recovery banners keep each unresolved Job identity and the native guidance
       {id:'job-resolved',kind:'flash',op:'flash.full-restore@1',target:'target-old',st:'waitingForRecovery',outcomeUnknown:true,supersededByRecoveryEpochID:'recovery-demo'});
       S.hf.query='unrelated';S.hf.kind='viewer'`);
     const before=h.run('JSON.stringify(HIST)'),banners=h.run('recoveryHTML()');
+    assert.ok(banners.includes(catalog['jobRecovery.count'].localizations[lang].stringUnit.value.replace('%d','5')));
     const ids=['job-unknown','job-human','job-safe','job-archive','job-waiting'];
     assert.deepEqual([...banners.matchAll(/data-job-id="([^"]+)"/g)].map(match=>match[1]),ids);
     assert.ok(!banners.includes('job-resolved'));
@@ -268,6 +269,9 @@ test('Recovery banners keep each unresolved Job identity and the native guidance
       assert.equal(h.document.querySelector('.history-record.on').scrolledIntoView,true);
     }
     assert.equal(h.run('JSON.stringify(HIST)'),before);assert.equal(h.run('S.jobs.length'),0);
+    h.run("HIST.splice(1);S.nav='history'");
+    assert.ok(!h.run('recoveryHTML()').includes('jobRecovery.count'), 'one record does not need a count header');
+    h.run('HIST.splice(0)');assert.equal(h.run('recoveryHTML()'),'');
   }
 });
 
@@ -291,7 +295,7 @@ test('History query updates immediately while keeping selection and expanded fil
   assert.equal(h.run('filteredHistory().length'),0);
   assert.equal(input.focused,true);assert.deepEqual(input.restoredRange,[3,5]);
   assert.match(h.run('pHistory()'),/oninput="setHistoryQuery\(this.value\)"/);
-  assert.match(h.run('pHistory()'),/<details open ontoggle=/);
+  assert.match(h.run('pHistory()'),/<details open class="history-expanded-filters" ontoggle=/);
   h.run("setHistoryFilter('status','failed');resetHistoryFilters()");
   assert.equal(h.run('S.historyFiltersOpen'),true);
 });
@@ -307,6 +311,39 @@ test('History compact activity picker mirrors every native category and the work
   const keys=[...picker.matchAll(/<option value="([^"]+)"/g)].map(m=>m[1]);
   assert.deepEqual(keys.slice().sort(),enumCases('ArkDeckApp/Features/History/RuntimeHistoryView.swift','HistoryActivityFilter').sort());
   assert.match(picker,/<option value="device" selected>/);
+});
+
+test('History compact popovers retain filters, saved actions and focus after a filter rerender', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=history&lang=${lang}`),markup=h.run('pHistory()');
+    assert.match(markup,/id="historyCompactFiltersButton" popovertarget="historyCompactFilters"/);
+    const fields=markup.match(/id="historyCompactFilters"[\s\S]*?<\/div>\s*<div class="history-popover"/)[0];
+    assert.match(fields,/popover="auto" role="dialog" aria-label="(?:Filter history|筛选历史)"/);
+    assert.deepEqual([...fields.matchAll(/<select[^>]*data-history-filter="([^"]+)"/g)].map(m=>m[1]),['status','mode','session','target','time']);
+
+    const panel=h.document.querySelector('.history-popover:popover-open');
+    panel.id='historyCompactFilters';panel.dataset.trigger='historyCompactFiltersButton';
+    const restored=h.document.getElementById(panel.id),trigger=h.document.getElementById(panel.dataset.trigger);
+    const selected={focus(){this.focused=true;}};
+    trigger.focus=()=>{trigger.focused=true;};
+    trigger.getBoundingClientRect=()=>({right:850,bottom:300});
+    restored.getBoundingClientRect=()=>({width:360,height:290});
+    restored.dataset=panel.dataset;
+    restored.showPopover=options=>{restored.source=options.source;};
+    restored.querySelector=selector=>selector==='[data-history-filter="status"]'?selected:null;
+    h.document.documentElement.clientWidth=900;h.document.documentElement.clientHeight=650;
+    h.document.activeElement={dataset:{historyFilter:'status'}};
+    h.run("setHistoryFilter('status','failed')");
+    assert.equal(h.run('S.hf.status'),'failed');
+    assert.equal(restored.source,trigger);assert.ok(trigger.focused&&selected.focused);
+    assert.equal(restored.style.left,'490px');assert.equal(restored.style.top,'308px');
+
+    h.run("S.hf.kind='viewer';applyHistorySavedAction('save');resetHistoryFilters();applyHistorySavedAction('restore')");
+    assert.equal(h.run('S.hf.kind'),'viewer');assert.equal(h.run('S.hf.status'),'failed');
+    h.run("applyHistorySavedAction('attention')");assert.equal(h.run('S.hf.kind'),'all');assert.equal(h.run('S.hf.status'),'attention');
+    h.run("applyHistorySavedAction('failed')");assert.equal(h.run('S.hf.time'),'lastWeek');
+    h.run("applyHistorySavedAction('delete')");assert.equal(h.run('S.savedHistoryFilter'),null);
+  }
 });
 
 test('History details expose supplied correlation, evidence and artifact metadata without filling gaps', () => {

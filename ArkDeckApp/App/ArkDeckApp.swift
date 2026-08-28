@@ -502,11 +502,13 @@ private struct RuntimeHistoryJobInspector: View {
 private struct RuntimeRecoveryBanner: View {
   let model: RuntimeHistoryViewModel
   let onOpenJob: (String) -> Void
+  let availableSize: CGSize
 
   var body: some View {
     GlobalRecoveryBannerView(
       presentation: model.presentation,
-      onOpenJob: onOpenJob)
+      onOpenJob: onOpenJob,
+      availableSize: availableSize)
   }
 }
 
@@ -722,7 +724,7 @@ private struct AppShellView: View {
       .navigationTitle("app.shell.title")
     } detail: {
       GeometryReader { geometry in
-        workspaceWithRecovery
+        workspaceWithRecovery(availableSize: geometry.size)
           .frame(
             width: geometry.size.width, height: geometry.size.height,
             alignment: .topLeading)
@@ -733,9 +735,10 @@ private struct AppShellView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
-  private var workspaceWithRecovery: some View {
+  private func workspaceWithRecovery(availableSize: CGSize) -> some View {
     VStack(spacing: 0) {
-      RuntimeRecoveryBanner(model: runtimeHistory, onOpenJob: openHistoryJob)
+      RuntimeRecoveryBanner(
+        model: runtimeHistory, onOpenJob: openHistoryJob, availableSize: availableSize)
       if let draft = preparedContinuation, navigationItem(for: draft.workspaceKind) == selectedItem {
         WorkspaceContinuationCard(
           draft: draft,

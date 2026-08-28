@@ -136,12 +136,119 @@ final class AppShellUITests: XCTestCase {
     add(evidence)
   }
 
-  func testHistorySavedFilterRestoresActivityAndExposesOneFilterSet() {
-    let app = launch(
-      arguments: [
+  /// One presentation-only App instance per language, with named activities
+  /// instead of a fresh process for each History/recovery assertion group.
+  /// Fixture state changes use the existing read-only provider and normal
+  /// refresh controls; no Runtime or device operation is submitted.
+  func testHistoryAndRecoveryContinuousSessionInBothLanguages() throws {
+    for language in ["(en)", "(zh-Hans)"] {
+      try "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      let app = launch(arguments: [
         "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
-        "-AppleLanguages", "(en)",
+        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
       ])
+      defer {
+        if app.state != .notRunning {
+          if app.windows.firstMatch.exists {
+            Self.resizeRecoveryWindow(in: app, to: CGSize(width: 1180, height: 783))
+          }
+          app.terminate()
+        }
+        try? FileManager.default.removeItem(at: fixtureStateFileURL)
+      }
+      let processes = NSRunningApplication.runningApplications(
+        withBundleIdentifier: "com.arkdeck.desktop")
+      XCTAssertEqual(processes.count, 1, "the session must have exactly one App process")
+      let processID = try XCTUnwrap(processes.first?.processIdentifier)
+
+      // Exercise the previously clipped narrow-window targets first, then
+      // continue the other rounds in this very same App process.
+      runHistorySessionPhase(
+        "Five recovery states, wide and narrow", language: language, in: app, processID: processID
+      ) {
+        prepareHistorySessionPhase(in: app, recoveryFamily: true)
+        checkRecoveryFamilyKeepsWorkspaceUsable(in: app, language: language)
+      }
+
+      // These behavior-only checks formerly used three independent English
+      // launches. Keep their coverage and cleanup while sharing this session.
+      if language == "(en)" {
+        runHistorySessionPhase(
+          "Exact immutable provenance", language: language, in: app, processID: processID
+        ) {
+          prepareHistorySessionPhase(in: app)
+          checkHistoryReopensExactFixtureContextWithoutReplay(in: app)
+        }
+        runHistorySessionPhase(
+          "Wide saved filter", language: language, in: app, processID: processID
+        ) {
+          prepareHistorySessionPhase(in: app)
+          checkHistorySavedFilterRestoresActivityAndExposesOneFilterSet(in: app)
+        }
+        runHistorySessionPhase(
+          "Narrow filter and keyboard", language: language, in: app, processID: processID
+        ) {
+          prepareHistorySessionPhase(in: app)
+          checkHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter(in: app)
+        }
+      }
+      runHistorySessionPhase(
+        "Exact recovery route, two rounds", language: language, in: app, processID: processID
+      ) {
+        prepareHistorySessionPhase(in: app)
+        checkRecoveryBannerOpensExactJob(in: app, language: language)
+      }
+      runHistorySessionPhase(
+        "Canonical Flash history transitions", language: language, in: app, processID: processID
+      ) {
+        Self.resizeRecoveryWindow(in: app, to: CGSize(width: 1180, height: 783))
+        checkCanonicalFlashHistoryStates(in: app, language: language)
+      }
+    }
+  }
+
+  private func runHistorySessionPhase(
+    _ name: String, language: String, in app: XCUIApplication, processID: pid_t,
+    body: () -> Void
+  ) {
+    XCTContext.runActivity(named: "\(language) / \(name)") { activity in
+      let before = NSRunningApplication.runningApplications(
+        withBundleIdentifier: "com.arkdeck.desktop").map(\.processIdentifier)
+      guard app.state != .notRunning, before == [processID] else {
+        XCTFail("App process changed before \(name): expected \(processID), got \(before)")
+        return
+      }
+      app.activate()
+      body()
+      let after = NSRunningApplication.runningApplications(
+        withBundleIdentifier: "com.arkdeck.desktop").map(\.processIdentifier)
+      XCTAssertEqual(after, [processID], "a phase must not relaunch the App")
+      let evidence = XCTAttachment(
+        string: "language=\(language)\nphase=\(name)\nexpectedPID=\(processID)\nbefore=\(before)\nafter=\(after)")
+      evidence.name = "App instance continuity"
+      evidence.lifetime = .keepAlways
+      activity.add(evidence)
+    }
+  }
+
+  private func prepareHistorySessionPhase(in app: XCUIApplication, recoveryFamily: Bool = false) {
+    writeFixtureState(recoveryFamily ? "--ui-test-runtime-recovery-family" : "", in: app)
+    Self.resizeRecoveryWindow(in: app, to: CGSize(width: 1180, height: 783))
+    let dismissContext = app.buttons["history.context.dismiss"]
+    if dismissContext.exists { dismissContext.click() }
+    // Reset page-local filters/selection through normal navigation BETWEEN
+    // phases. Exact-route rounds deliberately stay on the same History page.
+    select("app.navigation.overview", in: app)
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
+    app.buttons["history.refresh"].click()
+    assertDisplayed(
+      app.staticTexts["history.detail.job"],
+      equals: recoveryFamily ? "job-fixture-recovery-waiting" : "job-fixture-0002")
+    XCTAssertEqual(app.textFields["history.filter.search"].value as? String, "")
+  }
+
+  private func checkHistorySavedFilterRestoresActivityAndExposesOneFilterSet(in app: XCUIApplication) {
     Self.resizeHistoryWindow(in: app, to: 1180)
     select("app.navigation.history", in: app)
     XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
@@ -190,22 +297,11 @@ final class AppShellUITests: XCTestCase {
     if delete.waitForExistenceFast(timeout: 2) { delete.click() }
   }
 
-  func testHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter() {
-    let app = launch(
-      arguments: [
-        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
-        "-AppleLanguages", "(en)",
-      ])
+  private func checkHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter(in app: XCUIApplication) {
     // macOS can preserve the last frame even with persistence disabled,
     // especially after an interrupted run. Establish the viewport we test.
     Self.resizeHistoryWindow(in: app, to: 1180)
-    addTeardownBlock {
-      await MainActor.run {
-        if app.windows.firstMatch.exists {
-          Self.resizeHistoryWindow(in: app, to: 1180)
-        }
-      }
-    }
+    defer { Self.resizeHistoryWindow(in: app, to: 1180) }
     select("app.navigation.history", in: app)
     let wideFlash = element("history.activity.flash", in: app)
     XCTAssertTrue(wideFlash.waitForExistenceFast(timeout: 10))
@@ -244,6 +340,22 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(viewerRow.waitForExistenceFast(timeout: 5))
     XCTAssertTrue(flashRow.waitForNonExistenceFast(timeout: 5))
 
+    let filters = app.buttons["history.filter.show"]
+    filters.click()
+    let status = element("history.filter.status", in: app)
+    XCTAssertTrue(status.waitForExistenceFast(timeout: 5))
+    status.click()
+    app.menuItems["Failed"].click()
+    app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
+    XCTAssertTrue(viewerRow.waitForNonExistenceFast(timeout: 5))
+    assertDisplayed(activity, equals: "Viewer and observe")
+    filters.click()
+    assertDisplayed(status, equals: "Failed")
+    status.click()
+    app.menuItems["All states"].click()
+    app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
+    XCTAssertTrue(viewerRow.waitForExistenceFast(timeout: 5))
+
     Self.resizeHistoryWindow(in: app, to: 1180)
     XCTAssertTrue(wideFlash.waitForExistenceFast(timeout: 5))
     XCTAssertFalse(activity.exists)
@@ -255,12 +367,7 @@ final class AppShellUITests: XCTestCase {
     app.menuItems["Delete saved filter"].click()
   }
 
-  func testHistoryReopensExactFixtureContextWithoutReplay() {
-    let app = launch(
-      arguments: [
-        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
-        "-AppleLanguages", "(en)",
-      ])
+  private func checkHistoryReopensExactFixtureContextWithoutReplay(in app: XCUIApplication) {
     select("app.navigation.history", in: app)
     XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 10))
     assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0002", timeout: 10)
@@ -295,42 +402,132 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
-  func testRecoveryBannerOpensExactJobInBothLanguages() {
-    for language in ["(en)", "(zh-Hans)"] {
-      let app = launch(arguments: [
-        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
-        "-AppleLanguages", language,
-      ])
-      Self.resizeHistoryWindow(in: app, to: 1180)
-      select("app.navigation.history", in: app)
-      let search = app.textFields["history.filter.search"]
-      XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
-      // Stay in History: recreating the page through another workspace would
-      // coincidentally select this fixture's newest Job and hide the bug.
-      let review = app.buttons.matching(
-        NSPredicate(format: "identifier BEGINSWITH %@", "jobRecovery.openHistory")
-      ).firstMatch
-      XCTAssertTrue(review.waitForExistenceFast(timeout: 10))
-      for _ in 0..<2 {
-        search.click()
-        search.typeText("job-fixture-0001")
-        assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
-        review.click()
-        assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0002")
-        XCTAssertEqual(search.value as? String, "", "the exact Job must escape the previous filter")
-        XCTAssertTrue(
-          element("history.row.state.job-fixture-0002", in: app).isHittable,
-          "the requested Job row must be visible, not left above the old scroll position")
+  private func checkRecoveryBannerOpensExactJob(in app: XCUIApplication, language: String) {
+    Self.resizeHistoryWindow(in: app, to: 1180)
+    select("app.navigation.history", in: app)
+    let search = app.textFields["history.filter.search"]
+    XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+    // Stay in History: recreating the page through another workspace would
+    // coincidentally select this fixture's newest Job and hide the bug.
+    let review = app.buttons.matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "jobRecovery.openHistory")
+    ).firstMatch
+    XCTAssertTrue(review.waitForExistenceFast(timeout: 10))
+    for _ in 0..<2 {
+      search.click()
+      search.typeText("job-fixture-0001")
+      assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+      review.click()
+      assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0002")
+      XCTAssertEqual(search.value as? String, "", "the exact Job must escape the previous filter")
+      XCTAssertTrue(
+        element("history.row.state.job-fixture-0002", in: app).isHittable,
+        "the requested Job row must be visible, not left above the old scroll position")
+    }
+    for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
+      XCTAssertFalse(app.buttons[forbidden].exists)
+    }
+    let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+    evidence.name = "Recovery exact History \(language)"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+  }
+
+  private func checkRecoveryFamilyKeepsWorkspaceUsable(in app: XCUIApplication, language: String) {
+    select("app.navigation.history", in: app)
+    let search = app.textFields["history.filter.search"]
+    XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+    for size in [CGSize(width: 900, height: 650), CGSize(width: 1180, height: 783)] {
+      Self.resizeRecoveryWindow(in: app, to: size)
+      let recovery = app.scrollViews["jobRecovery.list"]
+      XCTAssertTrue(recovery.waitForExistenceFast(timeout: 5))
+      recovery.scroll(byDeltaX: 0, deltaY: 2000)
+      assertDisplayed(
+        app.staticTexts["jobRecovery.count"],
+        equals: language == "(en)" ? "5 records need review" : "5 条记录待检查")
+      XCTAssertLessThanOrEqual(recovery.frame.height, size.height * 0.45)
+      let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      let actualSize = app.windows.firstMatch.frame.size
+      evidence.name = "Recovery family \(language) \(Int(actualSize.width))x\(Int(actualSize.height))"
+      evidence.lifetime = .keepAlways
+      add(evidence)
+      XCTAssertTrue(search.isHittable, "recovery records must not displace the workspace controls")
+      let table = element("history.table", in: app)
+      XCTAssertGreaterThan(table.frame.height, 180, "History must retain usable vertical space")
+      XCTAssertLessThanOrEqual(table.frame.maxY, app.windows.firstMatch.frame.maxY)
+      if size.width == 900 {
+        app.buttons["history.filter.show"].click()
+        let panel = app.popovers.firstMatch
+        guard panel.waitForExistenceFast(timeout: 5) else {
+          let hierarchy = XCTAttachment(string: app.debugDescription)
+          hierarchy.name = "History filter popover hierarchy"
+          hierarchy.lifetime = .keepAlways
+          add(hierarchy)
+          XCTFail("the native filter popover must be exposed")
+          return
+        }
+        for filter in ["status", "mode", "session", "device", "time"] {
+          let picker = element("history.filter.\(filter)", in: app)
+          XCTAssertTrue(picker.isHittable)
+          XCTAssertTrue(
+            panel.frame.contains(picker.frame),
+            "filter \(filter): \(picker.frame), popover \(panel.frame)")
+        }
+        let filters = XCTAttachment(screenshot: panel.screenshot())
+        filters.name = "Recovery History filters \(language)"
+        filters.lifetime = .keepAlways
+        add(filters)
+        app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
+        XCTAssertTrue(element("history.filter.status", in: app).waitForNonExistenceFast(timeout: 5))
+        XCTAssertTrue(search.isHittable)
+      }
+      for kind in ["unknown", "human", "waiting", "safe", "archive"] {
+        let jobID = "job-fixture-recovery-\(kind)"
+        let review = app.buttons["jobRecovery.openHistory.\(jobID)"]
+        // AppKit may report clipped scroll content as hittable. Only click
+        // after the actual button frame is inside the recovery viewport.
+        var reviewIsVisible = false
+        for attempt in 0...20 {
+          let viewport = recovery.frame
+          let buttonFrame = review.frame
+          reviewIsVisible = review.exists && viewport.contains(buttonFrame) && review.isHittable
+          if reviewIsVisible || attempt == 20 { break }
+          let step = min(180, viewport.height / 2)
+          let direction: CGFloat = buttonFrame.midY < viewport.midY ? 1 : -1
+          recovery.scroll(byDeltaX: 0, deltaY: direction * step)
+        }
+        // Reuse the final observation: each AX frame query is a round trip.
+        // Keep the same full-frame/hit-test condition and 20-scroll bound.
+        XCTAssertTrue(reviewIsVisible, "every unresolved record must remain reachable: \(kind)")
+        if reviewIsVisible {
+          search.click()
+          search.typeText("unrelated")
+          XCTAssertTrue(element("history.filter.empty", in: app).waitForExistenceFast(timeout: 5))
+          review.click()
+          assertDisplayed(app.staticTexts["history.detail.job"], equals: jobID)
+          XCTAssertEqual(search.value as? String, "")
+          let row = element("history.row.state.\(jobID)", in: app)
+          let rowIsVisible = table.frame.contains(row.frame) && row.isHittable
+          if !rowIsVisible {
+            let failure = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            failure.name = "Requested History row missing \(jobID)"
+            failure.lifetime = .keepAlways
+            add(failure)
+          }
+          XCTAssertTrue(
+            rowIsVisible,
+            "requested History row \(jobID): row \(row.frame), viewport \(table.frame)")
+        }
       }
       for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
         XCTAssertFalse(app.buttons[forbidden].exists)
       }
-      let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-      evidence.name = "Recovery exact History \(language)"
-      evidence.lifetime = .keepAlways
-      add(evidence)
-      app.terminate()
+      let selected = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      selected.name = "Recovery exact final \(language) \(Int(actualSize.width))x\(Int(actualSize.height))"
+      selected.lifetime = .keepAlways
+      add(selected)
     }
+    Self.resizeRecoveryWindow(in: app, to: CGSize(width: 1180, height: 783))
   }
 
   /// The quota query suspends before capture. It must already own the record
@@ -816,53 +1013,46 @@ final class AppShellUITests: XCTestCase {
 
   /// Canonical records must drive the same read-only activity, progress and
   /// unknown-outcome protections as retained compatibility history.
-  func testCanonicalFlashHistoryStatesInBothLanguages() throws {
+  private func checkCanonicalFlashHistoryStates(in app: XCUIApplication, language: String) {
     let canonical = "--ui-test-runtime-flash-canonical"
-    for language in ["(en)", "(zh-Hans)"] {
-      try "\(canonical)\n--ui-test-runtime-flash-newer-observe".write(
-        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
-      let app = launch(arguments: [
-        "--ui-test-flash", "--ui-test-runtime-history", "--ui-test-devices",
-        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
-      ])
-      select("app.navigation.flash", in: app)
-      XCTAssertTrue(element("flash.runtime.attention", in: app).waitForExistenceFast(timeout: 10))
-      XCTAssertFalse(element("flash.execute.submit", in: app).exists)
-      app.buttons["flash.runtime.openHistory"].click()
-      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-0002")
-      select("app.navigation.flash", in: app)
-      toggleFlashDetails(in: app, file: #filePath, line: #line)
-      assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-0002")
+    writeFixtureState("\(canonical)\n--ui-test-runtime-flash-newer-observe", in: app)
+    select("app.navigation.flash", in: app)
+    app.buttons["flash.refresh"].click()
+    XCTAssertTrue(element("flash.runtime.attention", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertFalse(element("flash.execute.submit", in: app).exists)
+    app.buttons["flash.runtime.openHistory"].click()
+    assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-0002")
+    select("app.navigation.flash", in: app)
+    toggleFlashDetails(in: app, file: #filePath, line: #line)
+    assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-0002")
 
-      writeFixtureState("\(canonical)\n--ui-test-runtime-flash-running", in: app)
-      app.buttons["flash.refresh"].click()
-      XCTAssertTrue(element("flash.workspace.progress", in: app).waitForExistenceFast(timeout: 10))
-      XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
-      assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-running")
+    writeFixtureState("\(canonical)\n--ui-test-runtime-flash-running", in: app)
+    app.buttons["flash.refresh"].click()
+    XCTAssertTrue(element("flash.workspace.progress", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
+    assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-running")
 
-      writeFixtureState(
-        "\(canonical)\n--ui-test-runtime-flash-succeeded\n--ui-test-runtime-flash-retained-history",
-        in: app)
-      app.buttons["flash.refresh"].click()
-      assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-succeeded")
-      XCTAssertFalse(element("flash.workspace.progress", in: app).exists)
-      XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
-      XCTAssertTrue(element("flash.image.choose", in: app).exists)
-      scrollIntoView(element("flash.runtime.jobID", in: app), in: app)
-      let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-      attachment.name = "canonical-flash-history-\(language)"
-      attachment.lifetime = .keepAlways
-      add(attachment)
-      let openRecord = app.buttons["flash.runtime.openHistory"]
-      scrollIntoView(openRecord, in: app)
-      openRecord.click()
-      assertDisplayed(
-        element("history.detail.job", in: app), equals: "job-fixture-flash-succeeded")
-      XCTAssertTrue(
-        element("history.row.state.job-fixture-flash-alias-resolved", in: app).exists,
-        "the old unknown must remain inspectable in History")
-      app.terminate()
-    }
+    writeFixtureState(
+      "\(canonical)\n--ui-test-runtime-flash-succeeded\n--ui-test-runtime-flash-retained-history",
+      in: app)
+    app.buttons["flash.refresh"].click()
+    assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-succeeded")
+    XCTAssertFalse(element("flash.workspace.progress", in: app).exists)
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
+    XCTAssertTrue(element("flash.image.choose", in: app).exists)
+    scrollIntoView(element("flash.runtime.jobID", in: app), in: app)
+    let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+    attachment.name = "canonical-flash-history-\(language)"
+    attachment.lifetime = .keepAlways
+    add(attachment)
+    let openRecord = app.buttons["flash.runtime.openHistory"]
+    scrollIntoView(openRecord, in: app)
+    openRecord.click()
+    assertDisplayed(
+      element("history.detail.job", in: app), equals: "job-fixture-flash-succeeded")
+    XCTAssertTrue(
+      element("history.row.state.job-fixture-flash-alias-resolved", in: app).exists,
+      "the old unknown must remain inspectable in History")
   }
 
   /// The in-process submit/run fixture never contacts Runtime or a device.
@@ -2177,6 +2367,22 @@ final class AppShellUITests: XCTestCase {
       forDuration: 0.1,
       thenDragTo: origin.withOffset(CGVector(dx: width - 1, dy: 150)))
     XCTAssertEqual(window.frame.width, width, accuracy: 2, file: file, line: line)
+  }
+
+  private static func resizeRecoveryWindow(in app: XCUIApplication, to size: CGSize) {
+    resizeHistoryWindow(in: app, to: size.width)
+    let window = app.windows.firstMatch
+    if abs(window.frame.height - size.height) > 2 {
+      // Rounded window corners are outside the resize hit region. Use the
+      // straight bottom edge, as resizeHistoryWindow does for the right edge.
+      let origin = window.coordinate(withNormalizedOffset: .zero)
+      let middle = window.frame.width / 2
+      origin.withOffset(CGVector(dx: middle, dy: window.frame.height - 1))
+        .click(forDuration: 0.1,
+          thenDragTo: origin.withOffset(CGVector(dx: middle, dy: size.height - 1)))
+    }
+    XCTAssertEqual(window.frame.width, size.width, accuracy: 2)
+    XCTAssertEqual(window.frame.height, size.height, accuracy: 2)
   }
 
   /// Lightweight visual regression for the current device detail layout. Native

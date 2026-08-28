@@ -107,6 +107,12 @@ resumeAtConfirmedSafeBoundary、userAbandonRequested；已有 Runtime current-ep
 关系的历史 unknown 仍保留原事实，但不再作为当前提醒。下列 resume/archive/human
 resolution 不是 App 现有动作。Runtime 已发布且准入的恢复能力与 App 缺失入口分开记录。
 
+主窗口恢复区最多占当前 detail 可用高度的 45%，超出后独立纵向滚动；按内容实测高度
+收缩单条短提示，不为它预留空白。该上限同时为工作区预留 400 pt；空间更小时保留至少
+96 pt 的恢复滚动视口，但仍不超过 45%。多条记录显示总数，所有记录仍可逐项检查；不能用只显示
+最高优先级一条来掩盖其他未决项。内容宽度不超过 600 时，History 动作移到说明下方，
+保留完整标签、Job/target 与说明，不能把关键动作挤出窗口。
+
 - Recovery banner 位于 detail 顶部、页面内容之前，但不覆盖 toolbar；分为 resume-safe、waiting、outcomeUnknown、archivable。
 - `outcomeUnknown` 使用 system warning symbol + 明确文字，只有 RecoveryGuide 与显式归档；不渲染看似可继续的主按钮。
 - 「结束恢复并归档为已中断」sheet 明确三个“不会”：不证明设备恢复、不停止远端任务、不回滚参数。critical child 未到安全边界时禁用并说明原因。
@@ -255,6 +261,8 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - History 是只读 Runtime 活动中心，不是第二套 Job 执行面。摘要只来自 `job.list`；选中记录后才按需加载详情与 Artifact metadata，不用 fixture 或本地推断补齐缺失事实。
 - 工作区宽度达到 890 时，三栏为活动类型导航 → 最近记录 → detail inspector；更窄时用顶部活动选择器保留记录/详情两栏，原型低于 620 时上下排列。以实际工作区宽度而非 viewport 判断；双栏/三栏内列表与详情独立滚动。活动类型按 published operation 归入 Flash、Debug、Viewer、Trace、Diagnostics 与 Device；未识别 operation 保留在「其他」和「全部记录」，不得错误映射到相似工具。
 - 支持全文搜索、status、executionMode、session、device/target 与 time 筛选；筛选可保存到 toolbar menu。「需要关注」与「最近失败」是筛选预设，不改变 Runtime state。
+- 原生与原型窄窗将次要筛选收入「筛选历史」popover，活动选择与搜索保持直接可用；列表/详情只能使用筛选栏下方的剩余高度，不得溢出窗口。原型用独立「已存筛选」入口保留保存/恢复/删除和预设，宽窗继续使用「完整筛选」展开入口。普通筛选保留原生列表载体；显式 Job 导航清除旧筛选后，以恢复的记录重建原生列表并定位整行，空匹配状态不能吞掉定位请求。
+- 双栏与三栏的记录区独立滚动，标题、搜索与活动选择不随记录滚走；原型的精确跳转同时检查目标整行位于记录视口内、搜索仍可见。popover 使用平台的非模态交互，不增加 Runtime 执行动作。键盘打开/Escape 与点击外部关闭的原型验收状态见本轮验证记录，不以按钮关闭代替。
 - 搜索和筛选使用精确 Job / Session / operation / target / state / executionMode，不把 Job ID 当 Session，也不把显示设备名当 target。active 只匹配已知非终态；needsAttention 使用未解决的 unknown / waitingForHuman 或实际残留计数，有恢复关系的历史 unknown 不因旧 unknown 本身继续报警。时间区间为过去一小时、一天、一周，按 reported finished / started / created 判断；缺失时刻不从“今天”标签推算。支持恢复、删除已存筛选和清除筛选。
 - 原型搜索即时更新并保留焦点/光标范围；完整筛选的展开状态不因改条件、清除或恢复而丢失。工具栏短标签不拆行，Inspector 长状态在列表内换行显示；切换语言或页面时，外观控件继续显示实际 system / light / dark 状态。
 - interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。plan-only / simulated badge 在记录、详情与导出中永久保留。

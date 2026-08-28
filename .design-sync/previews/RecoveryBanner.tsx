@@ -74,7 +74,9 @@ const CURRENT_RECORDS = [
 export const SessionBanner = () => {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   return <div style={col}>
-    <p style={hint}>当前实现 · 演示记录。全局 banner 位于主窗口工作区上方，独立 Settings/Trace Viewer 不显示。每个动作仅打开对应 Job 的 History，并清除遮挡它的旧筛选；没有恢复、重试或归档动作。</p>
+    <p style={hint}>当前实现 · 演示记录。恢复区最多占 detail 可用高度的 45%，同时为工作区预留 400pt；空间更小时在 45% 上限内保留 96pt 滚动视口。多条显示总数，单条按内容收缩；此独立预览以 300px 示意。独立 Settings/Trace Viewer 不显示。每个动作仅打开对应 Job 的 History 并清除旧筛选；没有恢复、重试或归档动作。</p>
+    <div role="region" aria-label="恢复记录" tabIndex={0} style={{ maxHeight: 300, overflowY: "auto", display: "grid", gap: 8 }}>
+    <p style={hint}>5 条记录待检查</p>
     {CURRENT_RECORDS.map(record => {
       const jobID = `job-demo-recovery-${record.id}`;
       return <Callout key={jobID} tone="warn">
@@ -83,6 +85,7 @@ export const SessionBanner = () => {
         <Button onClick={() => setSelectedJob(jobID)}>在历史记录中检查</Button>
       </Callout>;
     })}
+    </div>
     {selectedJob ? <Card title="精确 History 来源（仅演示）">
       <p className="ad-mono">{selectedJob}</p><p style={hint}>没有提交、恢复或改变原 Job outcome；完整双语交互见 prototype.html 的 recovery=mixed。</p>
     </Card> : null}

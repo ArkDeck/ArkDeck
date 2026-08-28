@@ -31,6 +31,7 @@ struct RuntimeHistoryView: View {
 
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
   @State private var scrollToJobID: String?
+  @State private var historyListGeneration = UUID()
   @State private var searchText = ""
   @State private var statusFilter = HistoryStatusFilter.all
   @State private var modeFilter = HistoryModeFilter.all
@@ -38,6 +39,7 @@ struct RuntimeHistoryView: View {
   @State private var targetFilter = Self.allTargets
   @State private var timeFilter = HistoryTimeFilter.anyTime
   @State private var activityFilter = HistoryActivityFilter.all
+  @State private var isCompactFilterPresented = false
   @State private var pendingExportArtifact: RuntimeArtifactPresentation?
   @State private var pendingExportJobID: String?
   @State private var isExportPreviewPresented = false
@@ -107,8 +109,13 @@ struct RuntimeHistoryView: View {
       // sorts first. This only selects immutable evidence; it never replays.
       guard let jobID, presentation.jobs.contains(where: { $0.id == jobID }) else { return }
       resetFilters()
+      isCompactFilterPresented = false
       selectedJobID = jobID
       scrollToJobID = jobID
+      // An explicit route intentionally changes the viewport. Replace both
+      // the List and its scroll proxy with the restored data; ordinary
+      // filtering, paging and row selection keep their existing identity.
+      historyListGeneration = UUID()
       // Consume the navigation request so reviewing the same Job again after
       // changing filters or selection is a new action, even on this page.
       requestedJobID = nil
@@ -217,11 +224,14 @@ struct RuntimeHistoryView: View {
           VStack(spacing: 0) {
             compactFilters
             Divider()
-            HSplitView {
-              jobTable
-                .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
-              detail
-                .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+            GeometryReader { panes in
+              HSplitView {
+                jobTable
+                  .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+                detail
+                  .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+              }
+              .frame(width: panes.size.width, height: panes.size.height)
             }
           }
           .frame(width: workspace.size.width, height: workspace.size.height)
@@ -296,25 +306,31 @@ struct RuntimeHistoryView: View {
   }
 
   private var compactFilters: some View {
-    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+    HStack(spacing: WorkspaceMetrics.contentGap) {
       Picker(historyLocalized("history.activity.title"), selection: $activityFilter) {
         ForEach(HistoryActivityFilter.allCases) { filter in
           Text(historyLocalized(filter.localizationKey)).tag(filter)
         }
       }
       .accessibilityIdentifier("history.filter.activity")
-      ViewThatFits(in: .horizontal) {
-        HStack(alignment: .center, spacing: WorkspaceMetrics.contentGap) {
-          filterPickers.labelsHidden()
-          filterResultSummary
-        }
+      Spacer(minLength: 0)
+      Button(historyLocalized("history.filter.title"), systemImage: "line.3.horizontal.decrease") {
+        isCompactFilterPresented.toggle()
+      }
+      .fixedSize()
+      .accessibilityIdentifier("history.filter.show")
+      .popover(isPresented: $isCompactFilterPresented) {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-          filterPickers.labelsHidden()
+          filterPickers
           filterResultSummary
+          Button(historyLocalized("history.filter.reset"), action: resetFilters)
         }
+        .padding(WorkspaceMetrics.blockGap)
+        .frame(width: 360)
       }
     }
-    .padding(WorkspaceMetrics.pageInsetHorizontal)
+    .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+    .padding(.vertical, WorkspaceMetrics.contentGap)
   }
 
   private var filterPickers: some View {
@@ -412,59 +428,74 @@ struct RuntimeHistoryView: View {
           .accessibilityIdentifier("history.filter.search")
       }
       .padding(WorkspaceMetrics.pageInsetHorizontal)
-      if filteredJobs.isEmpty {
-        ContentUnavailableView {
-          Label(
-            historyLocalized("history.filter.empty.title"),
-            systemImage: "line.3.horizontal.decrease.circle")
-        } description: {
-          Text(historyLocalized("history.filter.empty.description"))
-        } actions: {
-          Button(historyLocalized("history.filter.reset"), action: resetFilters)
-        }
-        .accessibilityIdentifier("history.filter.empty")
-      } else {
-        ScrollViewReader { scroll in
-          List(filteredJobs, selection: $selectedJobID) { job in
-            HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
-              Image(systemName: activityCategory(for: job).systemImage)
-                .foregroundStyle(.secondary)
-                .frame(width: 24, height: 24)
-                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
-              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-                HStack(alignment: .firstTextBaseline) {
-                  Text(displayedOperationReference(job.operationReference))
-                    .font(WorkspaceFont.label)
-                    .lineLimit(1)
-                  Spacer(minLength: 8)
-                  Text(formattedDate(historyDate(job)))
-                    .font(WorkspaceFont.tabularValue)
-                    .foregroundStyle(.secondary)
-                }
-                Text("\(job.targetID) · \(job.id)")
-                  .font(WorkspaceFont.monospacedDense)
-                  .foregroundStyle(.secondary)
+      ScrollViewReader { scroll in
+        List(filteredJobs, selection: $selectedJobID) { job in
+          HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+            Image(systemName: activityCategory(for: job).systemImage)
+              .foregroundStyle(.secondary)
+              .frame(width: 24, height: 24)
+              .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+              HStack(alignment: .firstTextBaseline) {
+                Text(displayedOperationReference(job.operationReference))
+                  .font(WorkspaceFont.label)
                   .lineLimit(1)
-                  .truncationMode(.middle)
-                HStack(spacing: WorkspaceMetrics.tightGap) {
-                  historyStateLabel(job)
-                    .accessibilityIdentifier("history.row.state.\(job.id)")
-                  if let badge = historyExecutionModeBadge(job.executionMode) { badge }
-                }
+                Spacer(minLength: 8)
+                Text(formattedDate(historyDate(job)))
+                  .font(WorkspaceFont.tabularValue)
+                  .foregroundStyle(.secondary)
+              }
+              Text("\(job.targetID) · \(job.id)")
+                .font(WorkspaceFont.monospacedDense)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+              HStack(spacing: WorkspaceMetrics.tightGap) {
+                historyStateLabel(job)
+                  .accessibilityIdentifier("history.row.state.\(job.id)")
+                if let badge = historyExecutionModeBadge(job.executionMode) { badge }
               }
             }
-            .padding(.vertical, WorkspaceMetrics.rowGap)
-            .tag(job.id)
-            .id(job.id)
           }
-          .accessibilityIdentifier("history.table")
-          .onChange(of: scrollToJobID, initial: true) { _, jobID in
-            guard let jobID else { return }
-            scroll.scrollTo(jobID, anchor: .top)
-            scrollToJobID = nil
+          .padding(.vertical, WorkspaceMetrics.rowGap)
+          .tag(job.id)
+          .id(job.id)
+        }
+        .accessibilityIdentifier("history.table")
+        // Empty matches use an overlay; ordinary filtering keeps the List
+        // mounted. Explicit routes instead receive the new generation above,
+        // after all rows have been restored.
+        .accessibilityHidden(filteredJobs.isEmpty)
+        .overlay {
+          if filteredJobs.isEmpty {
+            ContentUnavailableView {
+              Label(
+                historyLocalized("history.filter.empty.title"),
+                systemImage: "line.3.horizontal.decrease.circle")
+            } description: {
+              Text(historyLocalized("history.filter.empty.description"))
+            } actions: {
+              Button(historyLocalized("history.filter.reset"), action: resetFilters)
+            }
+            .accessibilityIdentifier("history.filter.empty")
           }
         }
+        .task(id: historyListGeneration) {
+          let generation = historyListGeneration
+          guard let jobID = scrollToJobID else { return }
+          await Task.yield()
+          // The task belongs to this reader generation. A replaced reader
+          // must not consume a new route while its rows are being installed.
+          guard !Task.isCancelled, historyListGeneration == generation,
+            scrollToJobID == jobID, selectedJobID == jobID,
+            filteredJobs.contains(where: { $0.id == jobID })
+          else { return }
+          // Anchor the complete row explicitly, rather than a descendant
+          // label or the native List's minimal-scroll estimate.
+          scroll.scrollTo(jobID, anchor: .center)
+        }
       }
+      .id(historyListGeneration)
       Divider()
       if presentation.hasOlderJobs || presentation.olderJobsLoadFailure != nil {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
