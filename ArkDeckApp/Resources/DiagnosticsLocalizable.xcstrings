@@ -1049,6 +1049,465 @@
           }
         }
       }
+    },
+    "diagnostics.hilog.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HiLog summary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HiLog 摘要"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to verify the HiLog summary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法核验 HiLog 摘要"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.failed.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to History to inspect this Job and its Artifacts. Reload to try reading the same record again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请返回 History 检查此 Job 与 Artifact；重新加载只会重读同一记录。"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.readOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read-only view of the saved summary. Opening or reloading it does not run another analysis."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只读查看已保存的摘要。打开或重新加载不会再次执行分析。"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.coverage.complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All nonblank line headers recognized"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部非空行的行首已识别"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.coverage.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some line headers unrecognized"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分行首未识别"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.coverage.unrecognized": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No line headers recognized"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有识别到行首"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.coverage.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No nonblank lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有非空行"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.coverage.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These counts describe default HiLog line headers only. They do not prove capture completeness, valid body encoding, absence of faults or device health."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些统计仅描述默认 HiLog 行首；不证明采集完整、正文编码有效、没有故障或设备健康。"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Physical lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "物理行数"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.level.D": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D · Debug"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D · 调试"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.level.I": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I · Info"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I · 信息"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.level.W": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "W · Warning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "W · 警告"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.level.E": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E · Error"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E · 错误"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.level.F": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "F · Fatal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "F · 致命"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.unrecognized": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unrecognized lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未识别行数"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.blank": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blank lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空行数"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已记录来源"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.source.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The source Artifact ID matches the Job input. The source hash and size are recorded by the analyzer; this view does not read the raw log or verify it again. Export the summary from History."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源 Artifact 标识与 Job 输入一致。来源哈希与大小来自分析器记录；此页面不会读取或重新核验原始日志。可从 History 导出摘要。"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.sourceJob": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源 Job"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.sourceArtifact": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Artifact"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源 Artifact"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.sourceBytes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded source bytes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已记录来源字节数"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.digests": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inspect recorded hashes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看已记录哈希"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.sourceDigest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded source SHA-256"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已记录来源 SHA-256"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.toolDigest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded analyzer SHA-256"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已记录分析器 SHA-256"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.outputDigest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzer output SHA-256"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分析器输出 SHA-256"
+          }
+        }
+      }
+    },
+    "diagnostics.hilog.artifactDigest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verified summary Artifact SHA-256"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已核验摘要 Artifact SHA-256"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

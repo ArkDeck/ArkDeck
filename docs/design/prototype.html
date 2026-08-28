@@ -289,6 +289,14 @@ select.inp{cursor:pointer}
 .gsec>.sechead .acc.ok{color:var(--ok)}
 .debug-cols{display:grid;grid-template-columns:minmax(260px,.82fr) minmax(300px,1.18fr);gap:20px;align-items:start}
 .debug-stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.page:has([data-sync-id="diagnostics.hilog.summary"]){overflow:hidden}
+[data-sync-id="diagnostics.hilog.workspace"]:has([data-sync-id="diagnostics.hilog.summary"]){flex:1;min-height:0}
+[data-sync-id="diagnostics.hilog.workspace"]>.device-actions{flex:none}
+[data-sync-id="diagnostics.hilog.summary"]{gap:16px;flex:1;min-height:0;overflow:auto}
+[data-sync-id="diagnostics.hilog.summary"]>*{flex:none}
+[data-sync-id="diagnostics.hilog.summary"] :is(h3,p,dl){margin:0}
+[data-sync-id="diagnostics.hilog.summary"] .kv dd{margin:0}
+[data-sync-id="diagnostics.hilog.summary"] .gsec>div,[data-sync-id="diagnostics.hilog.digests"]>div{display:flex;flex-direction:column;gap:3px}
 .debug-packages{display:flex;flex-direction:column;gap:6px;min-width:0}
 .debug-packages h3,.debug-packages p{margin:0}
 .debug-disclose>summary{cursor:pointer;list-style:none;color:var(--ink2);font-size:11.5px;font-weight:600}
@@ -969,7 +977,7 @@ const S = {
     dock:PARAMS.get("traceDock")==="bottom"?"bottom":"trailing",inspector:true,query:"",process:"",event:"render",
     range:[2.1,3.8],zoom:1,marks:[],flags:[],annotationSequence:1,editingAnnotation:null,recent:["sample-render.ftrace","missing-source.htrace"]},
   diagnostics:{view:PARAMS.get("diagnostics") === "capture" ? "capture" : "session", running:false, finishing:false,
-         reader:PARAMS.get("diagnosticsState")||"empty",preview:null,replacedInvalidUTF8:PARAMS.get("diagnosticsEncoding")==="repaired",jobID:"job-demo-diagnostics",
+         reader:PARAMS.get("diagnosticsState")||"empty",hilogSummary:null,preview:null,replacedInvalidUTF8:PARAMS.get("diagnosticsEncoding")==="repaired",jobID:"job-demo-diagnostics",
          preset:0, dur:60, session:0, cursor:13.242, rangeStart:null, selectedEvent:"render-42", selectedLog:"log-3", logWindow:100,
          elapsed:13, markers:[], timer:null, job:null,
          includeVideo:false, markerScreenshot:true, autoMarker:true,
@@ -1059,6 +1067,25 @@ const HISTORY_DETAIL_SAMPLES={
 };
 for(const [id,detail] of Object.entries(HISTORY_DETAIL_SAMPLES))Object.assign(HIST.find(h=>h.id===id),detail);
 HIST.forEach(h=>{if(!h.kind)h.kind="other";if(!h.day)h.day="更早";if(!h.icon)h.icon=h.kind==="viewer"?"dump":h.kind;if(!h.detail)h.detail=h.dev+" · "+h.id;if(!h.action)h.action=h.kind==="trace"?"打开 Trace":h.kind==="viewer"?"在 Viewer 中打开":h.kind==="flash"?"在 Flash 中打开":"打开诊断记录";});
+// Explicit synthetic summaries; no source log is read or analyzed by this draft.
+const HILOG_SUMMARY_SAMPLES=Object.fromEntries(['complete','partial','unrecognized','empty','corrupt'].map(kind=>{
+  const recognized=['complete','partial','corrupt'].includes(kind),levels={D:0,I:recognized?1:0,W:0,E:kind==='complete'||kind==='corrupt'?1:0,F:0};
+  const blank=kind==='empty'?2:kind==='partial'?1:0,unknown=['partial','unrecognized'].includes(kind)?1:0;
+  const sample={kind,jobID:`job-demo-hilog-summary-${kind}`,sourceJobID:`job-demo-hilog-source-${kind}`,sourceArtifactID:`artifact-demo-hilog-${kind}`,
+    headerCoverage:kind==='corrupt'?'complete':kind,levelCounts:levels,lineCount:Object.values(levels).reduce((a,b)=>a+b,0)+blank+unknown,
+    blankLineCount:blank,unrecognizedLineCount:unknown,sourceByteCount:kind==='empty'?4:128,
+    sourceSHA256:'a'.repeat(64),analyzerExecutableSHA256:'b'.repeat(64),analyzerOutputSHA256:'c'.repeat(64),artifactSHA256:'d'.repeat(64)};
+  return [kind,sample];
+}));
+if(HILOG_SUMMARY_SAMPLES[PARAMS.get('hilogSummary')]){
+  for(const summary of Object.values(HILOG_SUMMARY_SAMPLES))HIST.push({id:summary.jobID,kind:'diagnostics',op:'analyzer.summarize-hilog@1',st:'succeeded',mode:'execute',
+    dev:'Design sample',target:'target-demo-dayu200',actualEffect:'hostOnly',outcomeUnknown:false,
+    what:`HiLog · ${summary.kind}`,detail:'Design sample · hilog-summary.json',when:'Design sample',day:'今天',icon:'diagnostics',
+    sessionID:`session-demo-hilog-${summary.kind}`,finishedAtUTC:'2026-08-29T08:00:10Z',
+    inputs:{sourceArtifactRef:`lease-v1:${summary.sourceJobID}:${summary.sourceArtifactID}`},summary,
+    artifacts:[{id:`artifact-demo-summary-${summary.kind}`,name:'hilog-summary.json',role:'derived',privacy:'standard',status:'published',mediaType:'application/json',sourceOperation:'analyzer.summarize-hilog@1'}]});
+  S.diagnostics.hilogSummary=HILOG_SUMMARY_SAMPLES[PARAMS.get('hilogSummary')];
+}
 // Explicit design fixtures, never Runtime evidence. Keep retained unknowns
 // first to exercise the same attention-first page order as the native App.
 if(['retained','unknown','waiting','running'].includes(PARAMS.get('flashHistory'))){
@@ -2277,11 +2304,120 @@ const DIAGNOSTICS_COPY={
   "diagnostics.preview.invalidStructuredText": {
     "en": "This structured text is not valid UTF-8. Inspect or export the original Artifact from History.",
     "zh-Hans": "这份结构化文本不是有效 UTF-8。请在 History 中检查或导出原始 Artifact。"
+  },
+  "diagnostics.hilog.title": {
+    "en": "HiLog summary",
+    "zh-Hans": "HiLog 摘要"
+  },
+  "diagnostics.hilog.failed": {
+    "en": "Unable to verify the HiLog summary",
+    "zh-Hans": "无法核验 HiLog 摘要"
+  },
+  "diagnostics.hilog.failed.detail": {
+    "en": "Return to History to inspect this Job and its Artifacts. Reload to try reading the same record again.",
+    "zh-Hans": "请返回 History 检查此 Job 与 Artifact；重新加载只会重读同一记录。"
+  },
+  "diagnostics.hilog.readOnly": {
+    "en": "Read-only view of the saved summary. Opening or reloading it does not run another analysis.",
+    "zh-Hans": "只读查看已保存的摘要。打开或重新加载不会再次执行分析。"
+  },
+  "diagnostics.hilog.coverage.complete": {
+    "en": "All nonblank line headers recognized",
+    "zh-Hans": "全部非空行的行首已识别"
+  },
+  "diagnostics.hilog.coverage.partial": {
+    "en": "Some line headers unrecognized",
+    "zh-Hans": "部分行首未识别"
+  },
+  "diagnostics.hilog.coverage.unrecognized": {
+    "en": "No line headers recognized",
+    "zh-Hans": "没有识别到行首"
+  },
+  "diagnostics.hilog.coverage.empty": {
+    "en": "No nonblank lines",
+    "zh-Hans": "没有非空行"
+  },
+  "diagnostics.hilog.coverage.detail": {
+    "en": "These counts describe default HiLog line headers only. They do not prove capture completeness, valid body encoding, absence of faults or device health.",
+    "zh-Hans": "这些统计仅描述默认 HiLog 行首；不证明采集完整、正文编码有效、没有故障或设备健康。"
+  },
+  "diagnostics.hilog.lines": {
+    "en": "Physical lines",
+    "zh-Hans": "物理行数"
+  },
+  "diagnostics.hilog.level.D": {
+    "en": "D · Debug",
+    "zh-Hans": "D · 调试"
+  },
+  "diagnostics.hilog.level.I": {
+    "en": "I · Info",
+    "zh-Hans": "I · 信息"
+  },
+  "diagnostics.hilog.level.W": {
+    "en": "W · Warning",
+    "zh-Hans": "W · 警告"
+  },
+  "diagnostics.hilog.level.E": {
+    "en": "E · Error",
+    "zh-Hans": "E · 错误"
+  },
+  "diagnostics.hilog.level.F": {
+    "en": "F · Fatal",
+    "zh-Hans": "F · 致命"
+  },
+  "diagnostics.hilog.unrecognized": {
+    "en": "Unrecognized lines",
+    "zh-Hans": "未识别行数"
+  },
+  "diagnostics.hilog.blank": {
+    "en": "Blank lines",
+    "zh-Hans": "空行数"
+  },
+  "diagnostics.hilog.source": {
+    "en": "Recorded source",
+    "zh-Hans": "已记录来源"
+  },
+  "diagnostics.hilog.source.detail": {
+    "en": "The source Artifact ID matches the Job input. The source hash and size are recorded by the analyzer; this view does not read the raw log or verify it again. Export the summary from History.",
+    "zh-Hans": "来源 Artifact 标识与 Job 输入一致。来源哈希与大小来自分析器记录；此页面不会读取或重新核验原始日志。可从 History 导出摘要。"
+  },
+  "diagnostics.hilog.sourceJob": {
+    "en": "Source Job",
+    "zh-Hans": "来源 Job"
+  },
+  "diagnostics.hilog.sourceArtifact": {
+    "en": "Source Artifact",
+    "zh-Hans": "来源 Artifact"
+  },
+  "diagnostics.hilog.sourceBytes": {
+    "en": "Recorded source bytes",
+    "zh-Hans": "已记录来源字节数"
+  },
+  "diagnostics.hilog.digests": {
+    "en": "Inspect recorded hashes",
+    "zh-Hans": "查看已记录哈希"
+  },
+  "diagnostics.hilog.sourceDigest": {
+    "en": "Recorded source SHA-256",
+    "zh-Hans": "已记录来源 SHA-256"
+  },
+  "diagnostics.hilog.toolDigest": {
+    "en": "Recorded analyzer SHA-256",
+    "zh-Hans": "已记录分析器 SHA-256"
+  },
+  "diagnostics.hilog.outputDigest": {
+    "en": "Analyzer output SHA-256",
+    "zh-Hans": "分析器输出 SHA-256"
+  },
+  "diagnostics.hilog.artifactDigest": {
+    "en": "Verified summary Artifact SHA-256",
+    "zh-Hans": "已核验摘要 Artifact SHA-256"
   }
 };
 function diagnosticsCopy(key){return DIAGNOSTICS_COPY[key][S.language];}
 function pDiagnostics(){
   if(PARAMS.get('concept')==='diagnostics')return `<div class="warnbox" role="note">${lc("未来交互探索：交互式布防、追加 Marker、停止与跨时钟校准尚未接通。已发布 operation 支持有界 ringBuffered 采集及部分自动标记。以下完整会话是合成演示。","Future concept: interactive arm, append-marker, stop and cross-clock calibration are not connected. The published operation supports bounded ringBuffered capture and some automatic markers. The full session below is synthetic.")}</div>`+pDiagnosticsConcept();
+  if(S.diagnostics.hilogSummary)return hilogSummaryHTML(S.diagnostics.hilogSummary);
   return `<div class="page-lead" data-page-title="Diagnostics"></div><section class="device-section">
     <div class="device-actions"><b>Diagnostics</b><span class="spacer"></span>${['loaded','partial','trace'].includes(S.diagnostics.reader)?`<button class="btn" onclick="S.diagnostics.preview=null;renderPage()">${diagnosticsCopy('diagnostics.session.reload')}</button>`:''}<span class="chip warn" data-sync-id="diagnostics.alignment">${lc('无法对齐','Cannot align')}</span></div>
     <div class="device-actions"><button class="btn" disabled data-sync-id="diagnostics.capture.arm">${diagnosticsCopy('diagnostics.capture.arm')}</button><button class="btn" disabled data-sync-id="diagnostics.capture.mark">${diagnosticsCopy('diagnostics.capture.mark')}</button></div>
@@ -2290,10 +2426,22 @@ function pDiagnostics(){
     <p class="hint" data-sync-id="diagnostics.selection">${lc('当前仅选择了时间点','Only a time point is selected')}</p>
   </section>`;
 }
+function hilogSummaryHTML(summary){
+  const copy=key=>diagnosticsCopy('diagnostics.hilog.'+key);
+  if(summary.kind==='corrupt')return `<section class="device-section" data-page-title="Diagnostics"><h2>${copy('title')}</h2><div class="warnbox" role="alert" data-sync-id="diagnostics.session.failed"><div><b>${copy('failed')}</b><p>${copy('failed.detail')}</p><p class="mono">diagnostics_hilog_summary_integrity_mismatch</p></div><button class="btn" onclick="renderPage()">${diagnosticsCopy('diagnostics.session.retry')}</button></div></section>`;
+  const count=(key,value,id)=>`<dt>${copy(key)}</dt><dd class="mono" data-sync-id="diagnostics.hilog.count.${id}">${value}</dd>`;
+  const fact=(key,value,id)=>`<div><p class="hint">${copy(key)}</p><p class="mono" style="overflow-wrap:anywhere" data-sync-id="diagnostics.hilog.${id}">${esc(String(value))}</p></div>`;
+  return `<section class="device-section" data-sync-id="diagnostics.hilog.workspace" data-page-title="Diagnostics"><div class="device-actions"><h2>${copy('title')}</h2><span class="spacer"></span><button class="btn" data-sync-id="diagnostics.session.reload" onclick="renderPage()">${diagnosticsCopy('diagnostics.session.reload')}</button></div>
+    <div class="debug-stack" data-sync-id="diagnostics.hilog.summary"><p class="mono" data-sync-id="diagnostics.hilog.job">${esc(summary.jobID)}</p><p class="hint">${copy('readOnly')}</p>
+    <h3 data-sync-id="diagnostics.hilog.coverage">${copy('coverage.'+summary.headerCoverage)}</h3><p class="hint" data-sync-id="diagnostics.hilog.boundary">${copy('coverage.detail')}</p>
+    <dl class="kv">${count('lines',summary.lineCount,'lines')}${['D','I','W','E','F'].map(level=>count('level.'+level,summary.levelCounts[level],level)).join('')}${count('unrecognized',summary.unrecognizedLineCount,'unrecognized')}${count('blank',summary.blankLineCount,'blank')}</dl>
+    <section class="gsec"><h3>${copy('source')}</h3><p class="hint">${copy('source.detail')}</p>${fact('sourceJob',summary.sourceJobID,'sourceJob')}${fact('sourceArtifact',summary.sourceArtifactID,'sourceArtifact')}${fact('sourceBytes',summary.sourceByteCount,'sourceBytes')}</section>
+    <details data-sync-id="diagnostics.hilog.digests"><summary>${copy('digests')}</summary>${fact('sourceDigest',summary.sourceSHA256,'sourceDigest')}${fact('toolDigest',summary.analyzerExecutableSHA256,'toolDigest')}${fact('outputDigest',summary.analyzerOutputSHA256,'outputDigest')}${fact('artifactDigest',summary.artifactSHA256,'artifactDigest')}</details></div></section>`;
+}
 function diagnosticsSessionHTML(){
   const d=S.diagnostics;
   if(d.reader==='loading')return `<div class="viewer-empty" aria-busy="true" data-sync-id="diagnostics.session.loading"><p>${diagnosticsCopy('diagnostics.session.loading')}</p></div>`;
-  if(d.reader==='failed')return `<div class="warnbox" role="alert" data-sync-id="diagnostics.session.failed"><div><b>${diagnosticsCopy('diagnostics.session.failed')}</b><p class="mono">diagnostics_artifact_integrity_mismatch</p></div><button class="btn" data-sync-id="diagnostics.session.retry" onclick="S.diagnostics.reader='loaded';renderPage()">${diagnosticsCopy('diagnostics.session.retry')}</button></div>`;
+  if(d.reader==='failed')return `<div class="warnbox" role="alert" data-sync-id="diagnostics.session.failed"><div><b>${diagnosticsCopy('diagnostics.session.failed')}</b><p class="mono">${esc(d.failureCode||'diagnostics_artifact_integrity_mismatch')}</p></div><button class="btn" data-sync-id="diagnostics.session.retry" onclick="if(!S.diagnostics.failureCode)S.diagnostics.reader='loaded';renderPage()">${diagnosticsCopy('diagnostics.session.retry')}</button></div>`;
   if(!['loaded','partial','trace'].includes(d.reader))return `<div class="viewer-empty" style="min-height:260px" data-sync-id="diagnostics.session.empty"><div>${icon('diagnostics')}<strong>${diagnosticsCopy('diagnostics.session.none')}</strong><p>${diagnosticsCopy('diagnostics.session.none.detail')}</p></div></div>`;
   const artifacts=['artifact-index.json','capture-summary.json','capture.log','hilog.txt','markers.json'];
   if(d.reader==='trace')artifacts.push('trace.htrace');
@@ -2317,7 +2465,7 @@ function diagnosticPreviewText(name){
   return JSON.stringify({designSample:true,jobId:S.diagnostics.jobID,artifact:name},null,2);
 }
 function readDiagnosticPreview(name){
-  if(!['loaded','partial','trace'].includes(S.diagnostics.reader)||!['artifact-index.json','capture-summary.json','capture.log','hilog.txt','markers.json'].includes(name))return;
+  if(S.diagnostics.hilogSummary||!['loaded','partial','trace'].includes(S.diagnostics.reader)||!['artifact-index.json','capture-summary.json','capture.log','hilog.txt','markers.json'].includes(name))return;
   S.diagnostics.preview=name;renderPage();
 }
 function pDiagnosticsConcept(){
@@ -3833,6 +3981,15 @@ function setHistoryContext(h,page){
 function openHistoryDesignWorkspace(id){
   const h=HIST.find(row=>row.id===id),page=h&&historyWorkspace(h.kind);if(!h||!page)return;
   if(h.kind==='diagnostics'&&h.op==='capture.diagnostics@1'){openHistoryDesignDiagnostics(id);return;}
+  if(h.kind==='diagnostics'&&h.op==='analyzer.summarize-hilog@1'){
+    setHistoryContext(h,'diagnostics');S.diagnostics.preview=null;
+    S.diagnostics.hilogSummary=h.st==='succeeded'&&h.mode==='execute'&&h.summary?h.summary:{kind:'corrupt'};
+    go('diagnostics');$("page").scrollTop=0;return;
+  }
+  if(h.kind==='diagnostics'){
+    S.diagnostics.hilogSummary=null;S.diagnostics.preview=null;
+    S.diagnostics.reader='failed';S.diagnostics.failureCode='diagnostics_unsupported_operation';
+  }
   setHistoryContext(h,page);
   if(h.kind==='debug')S.debugTab=({'debug.hap@1':'apps','capture.diagnostics@1':'logs','port-forward.create@1':'net','port-forward.remove@1':'net'})[h.op]||'artifacts';
   go(page);$("page").scrollTop=0;
@@ -3840,7 +3997,7 @@ function openHistoryDesignWorkspace(id){
 function openHistoryDesignDiagnostics(id){
   const h=HIST.find(row=>row.id===id);if(!h||h.op!=='capture.diagnostics@1')return;
   setHistoryContext(h,'diagnostics');
-  S.diagnostics.jobID=h.id;S.diagnostics.reader=h.hasTrace?'trace':'loaded';S.diagnostics.preview=null;
+  S.diagnostics.jobID=h.id;S.diagnostics.reader=h.hasTrace?'trace':'loaded';S.diagnostics.preview=null;S.diagnostics.hilogSummary=null;S.diagnostics.failureCode=null;
   go('diagnostics');$("page").scrollTop=0;
 }
 const HISTORY_ACTIVE_STATES=['queued','preflight','running','waitingForDevice','awaitingRebindConfirmation','planning','cancelRequested','cancellingAtSafeBoundary','waitingForRecovery','reconciling','recoveringByCompleteOverwrite','resumeAtConfirmedSafeBoundary','userAbandonRequested','finalizing'];
@@ -3922,7 +4079,7 @@ function pHistory(){
       ${all.length>rows.length?`<button class="btn" onclick="S.historyLimit+=6;renderPage()">${lc('加载更早记录','Load older records')}</button>`:''}
     </div></section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon||'history',true)}</span><div><h2>${esc(sel.what??sel.op??sel.id)}</h2><p>${esc(sel.dev??lc('未报告','Not reported'))} · <span class="mono" data-sync-id="history.detail.job">${esc(sel.id)}</span></p></div></div>
       <p>${esc(sel.detail??sel.id)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignWorkspace(this.dataset.jobId)">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignDiagnostics(this.dataset.jobId)">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>
-      <p class="hint">${lc('只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。','Read-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.')}</p>
+      <p class="hint">${lc('这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。',"This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.")}</p>
       <dl class="kv history-facts"><dt>executionMode</dt><dd>${esc(sel.mode??lc('未报告','Not reported'))} ${modeBadge(sel.mode)}</dd><dt>${lc('状态','State')}</dt><dd>${esc(sel.st??lc('未报告','Not reported'))}</dd><dt>${lc('活动','Activity')}</dt><dd>${esc(sel.kind??'other')}</dd></dl>
       <details><summary>${lc('查看运行证据与 Artifact','Runtime evidence and Artifacts')}</summary><div style="margin-top:12px">${histDetail(sel)}</div></details>`:`<p class="empty">${lc('选择一条记录查看详情。','Select a record to see its details.')}</p>`}</section></div>`;
 }

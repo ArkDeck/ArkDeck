@@ -130,16 +130,28 @@ package enum HilogSummaryDerivedAnalyzer {
   /// in a supposedly standard-privacy Artifact. Source identity is checked
   /// again here, across the materialization -> subprocess read boundary.
   package static func validate(_ bytes: Data, invocation: AnalyzerInvocation) -> Bool {
+    guard invocation.analyzerRef == analyzerRef, invocation.analyzerVersion == analyzerVersion else {
+      return false
+    }
+    return validateReport(
+      bytes, sourceSHA256: invocation.sourceSHA256, sourceByteCount: invocation.sourceByteCount)
+  }
+
+  /// Shared by dispatch and the read-only App projection. The latter checks
+  /// recorded provenance, not the current contents of the raw source Artifact.
+  package static func validateReport(
+    _ bytes: Data, sourceSHA256: String, sourceByteCount: Int
+  ) -> Bool {
     guard bytes.count <= maximumOutputBytes,
       let result = try? JSONDecoder().decode(HilogSummaryAnalysis.self, from: bytes),
       (try? result.canonicalData()) == bytes,
       result.schemaVersion == "1.0.0",
-      result.analyzerRef == analyzerRef, invocation.analyzerRef == analyzerRef,
-      result.analyzerVersion == analyzerVersion, invocation.analyzerVersion == analyzerVersion,
+      result.analyzerRef == analyzerRef,
+      result.analyzerVersion == analyzerVersion,
       result.scope == "default-hilog-header-lines",
       result.redaction == "content-and-identifiers-omitted",
-      result.sourceSHA256 == invocation.sourceSHA256,
-      result.sourceByteCount == invocation.sourceByteCount,
+      result.sourceSHA256 == sourceSHA256,
+      result.sourceByteCount == sourceByteCount,
       result.sourceByteCount > 0, result.sourceByteCount <= maximumInputBytes,
       result.lineCount >= 1, result.lineCount <= result.sourceByteCount,
       result.blankLineCount >= 0, result.blankLineCount <= result.lineCount,
