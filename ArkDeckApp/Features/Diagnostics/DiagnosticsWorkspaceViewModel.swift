@@ -10,6 +10,7 @@ final class DiagnosticsWorkspaceViewModel {
   private(set) var selection = DiagnosticReaderSelection(cursorUTC: "")
   private(set) var deviceObservation = DeviceListPresentation.loading
   private(set) var session: DiagnosticSessionPresentation?
+  private(set) var hilogSummary: DiagnosticHilogSummaryPresentation?
   private(set) var isLoading = false
   private(set) var loadError: String?
   private(set) var previewText: String?
@@ -44,6 +45,10 @@ final class DiagnosticsWorkspaceViewModel {
     return context
   }
 
+  var isHilogSummaryContext: Bool {
+    context?.operationReference == "analyzer.summarize-hilog@1"
+  }
+
   func reload() {
     guard let context else { return }
     loadTask?.cancel()
@@ -52,6 +57,7 @@ final class DiagnosticsWorkspaceViewModel {
     previewGeneration = UUID()
     reading = nil
     session = nil
+    hilogSummary = nil
     loadError = nil
     previewText = nil
     previewName = nil
@@ -61,6 +67,16 @@ final class DiagnosticsWorkspaceViewModel {
     isPreviewLoading = false
     isLoading = true
     loadTask = Task { [weak self, provider] in
+      if context.operationReference == "analyzer.summarize-hilog@1" {
+        let result = await DiagnosticHilogSummaryReader(provider: provider).load(context)
+        guard let self, !Task.isCancelled, generation == ticket else { return }
+        isLoading = false
+        switch result {
+        case .loaded(let summary): hilogSummary = summary
+        case .unavailable(let reason): loadError = reason
+        }
+        return
+      }
       let result = await DiagnosticSessionApplicationReader(provider: provider).load(context)
       guard let self, !Task.isCancelled, generation == ticket else { return }
       isLoading = false

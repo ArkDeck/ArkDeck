@@ -5,7 +5,7 @@
 ## 1. 范围与判定方式
 
 覆盖 **8 个主页面、动态设备页、独立 Settings / Trace Viewer / 帮助、所有子标签与关键弹层**，
-共 **61 个检查单元、20 个 App View 文件、31 个组件预览文件**（F41 将窄窗筛选弹层单列）。文件、路由和子标签清单由
+共 **62 个检查单元、20 个 App View 文件、31 个组件预览文件**（F41 将窄窗筛选弹层、F42 将 HiLog 摘要单列）。文件、路由和子标签清单由
 [机器覆盖表](implementation-coverage.json) 与
 [交互/覆盖测试](arkdeck-ds/scripts/workspace-interactions.test.mjs) 核对。
 
@@ -169,6 +169,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | device.events | capture/input/refusal/recording/save log | 本地反馈与 Runtime 事实区分；不当硬件证据 |
 | diagnostics.capture | noSession/noTarget/adoptedTarget/disabledArm/disabledMark | F01；不会假布防或保存 Marker |
 | diagnostics.reader | partial/marks/noPicture/missing/notDerived/alignment | History → fresh correlation → index/summary/markers bounded read/hash → publish；无校准/时间不猜；PNG/JPEG 通道兼容；文本显式读取 |
+| diagnostics.hilogSummary | complete/partial/unrecognized/empty/corrupt/reload/history | F42：已发布 HiLog 摘要的独立只读回访；核对 Job/Artifact、来源 ID 与标准摘要字节，不读取原日志，不把行首统计解释为设备健康或完整采集 |
 | diagnostics.concept | 显式未来 capture/recording/finalizing/session/partial/clockGap | 有界 ringBuffered 与部分自动 Marker 已发布；交互式会话/视频/校准仍为单独概念，不混入当前默认 |
 
 ### History（GJ-1—4）
@@ -377,7 +378,7 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 1. **Diagnostics 交互式会话**：arm/append-marker/stop、会话内视频和跨时钟校准；现有 bounded ringBuffered、markers.json 和 reader 不等于该完整体验。缺失 operation/并发契约不得从 App 接 raw HDC 补洞。
 2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
 3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
-4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。2026-08-28 明确授权 HardwareCampaign 后，新 canonical Flash 实际成功并独立核验，campaign 已关闭。F36 合入后双语真实 App 只读回访已通过，活动、精确 History 与旧 unknown 保留均核验；F37 是该回访新发现的稿件摘要/Artifact 差异修正，不重复刷写来补 UI 证据。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
+4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。2026-08-28 明确授权 HardwareCampaign 后，新 canonical Flash 实际成功并独立核验，campaign 已关闭。F36 合入后双语真实 App 只读回访已通过，活动、精确 History 与旧 unknown 保留均核验；F37 是该回访新发现的稿件摘要/Artifact 差异修正，不重复刷写来补 UI 证据。HiLog 摘要已在 PR #1577 合入，维护者合入后的真实 Runtime 验证已通过；App 只读回访断点的修正与验证见 F42。远程设计库未连接，当前只同步仓库稿件与参考图。
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。
@@ -666,3 +667,53 @@ human 行状态文字被裁切，均已查看原生截图确认；另有一处�
 因此本轮不能声称真实设备验证了多提醒布局，也不制造设备异常来补图。浏览器样本、
 编译/单测与原生验收分别记录于
 [验证记录](references/v1.6-goal/recovery-bounded-layout-verification-2026-08-28.json)。
+
+## 2026-08-29 F42：HiLog 摘要成功后的只读回访
+
+对应 GJ-2：有界 HiLog 采集、分析及 History 只读回访。
+
+PR #1577 已将 `analyzer.summarize-hilog@1` 的实现合入。由干净的 reviewed main
+`7bfe2892` 构建并签名本机开发 helper，再经 `agentd update` 更新；这不是公证发行包。
+HDC、工作区、ArkTrace、ArkForge 配置与已有 Job 历史均保持不变。
+已发布 CLI 完成新的有界只读 HiLog 采集，随后同一 daemon 连续完成三条独立摘要 Job；
+PID 未变，派生字节一致，独立行首计数匹配，前后读取的原日志字节不变。
+全分页核对确认旧 Job 和 unknown 记录未改写。真实日志、标识和哈希仅保存在本机
+私有记录；不复制进本 PR。这一结果是 Runtime 真实采集/分析验收，不是 App 呈现验收。
+
+扫描发现 History 已把分析记录归入 Diagnostics，但旧 reader 只接受
+`capture.diagnostics@1`；成功的摘要回访因此得到 `diagnostics_unsupported_operation`。
+本次增加独立的 HiLog 摘要 reader 和呈现：验证 fresh Job correlation、成功的
+hostOnly 分析、来源 lease 标识、标准摘要的 size/SHA-256、闭合 canonical envelope、
+版本、计数一致性与 analyzer-output hash。只读至多 16 KiB 标准摘要，不读取原日志，
+不连接设备、不提交 Job，不把当前 daemon 的版本当作历史分析器的身份。
+
+页面区分 complete/partial/unrecognized/empty 行首识别状态；明确它们不证明采集完整、
+正文编码有效、无故障或设备健康。来源 ID 与 Job 输入一致；来源哈希/大小按已记录事实
+展示，不宣称 App 重新读取了原始文件。摘要页没有 Marker/采集/时钟对齐控件，损坏或
+相关性失败会清除旧结果。History 返回采集记录时恢复原来的 session reader。
+
+原生连续测试扩展现有 Diagnostics 用例：保留采集、敏感预览和全局日志检查，每种语言
+只启动一次，再在同一进程里经过四种摘要状态、损坏拒绝和恢复；重复加载不重启 App。
+独立的真实回访用例读取三条已完成 Runtime Job 的私有预期，只经 production XPC
+回看，不重新采集或分析。设计稿通过 `?page=diagnostics&hilogSummary=partial` 等显式
+样本呈现同样状态；样本数据不充当真实证据。
+
+验证结果：
+
+- 首轮 focused 合约 47 项通过；随后补充的元数据拒绝用例已纳入最终全量回归。
+  统一本地闸 exit 0：18 项 planner、9 项 workflow、SDD 0 error/0 warning、49 项
+  catalog 与生成物零漂移、10 项 SwiftPM wrapper、1,843 项并行 Swift 测试、1 项进程
+  身份竞态、5 项 Viewer 性能测试，以及 7 项 Xcode wrapper 与 App/UI-test bundle
+  `build-for-testing` 均通过。
+- 最终设计交互 61 项与两种设计构建通过。同一浏览器标签连续核对中英文四种覆盖状态、
+  损坏拒绝、重读及恢复；核对精确 History Job，摘要无采集、时钟对齐或原日志预览入口。
+  默认窄 viewport 下的来源信息、摘要独立滚动、哈希展开及深色外观已查看；6 张原始
+  JPEG 仅留本机。滚动时重载入口相对工作区位置不变，不声称浏览器与原生逐像素等价。
+- 原生源码和断言在四次尝试间保持不变。第 1、3、4 次在系统启用 automation mode 时
+  超时，未进入用例；第 2 次遇到系统输入法授权弹窗后中断。只读主机诊断进一步确认
+  测试服务等待 `Enable UI Automation` 的 LocalAuthentication，本轮没有代填认证或
+  改变权限。两个原生用例仍未通过，真实 App 的三条摘要回访也不能登记为通过。
+
+F41 浏览器 Escape 与外部点击关闭的复试仍未取得通过结果，整体 goal 保持开放。
+本项以草稿 PR 交付代码，原生验证明确待完成。兼容说明：TASK-AIN-021 仅用作既有
+路径护栏，不修改 accepted requirement、Catalog、准入策略或旧治理状态。

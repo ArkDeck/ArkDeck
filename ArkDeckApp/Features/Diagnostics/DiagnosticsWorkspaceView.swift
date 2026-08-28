@@ -17,21 +17,26 @@ struct DiagnosticsWorkspaceView: View {
     VStack(spacing: 0) {
       toolbar
       Divider()
-      capturePane
-      Divider()
+      if !model.isHilogSummaryContext {
+        capturePane
+        Divider()
+      }
       if model.isLoading {
         ProgressView(diagnosticsText("diagnostics.session.loading"))
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .accessibilityIdentifier("diagnostics.session.loading")
       } else if let reason = model.loadError {
         ContentUnavailableView {
-          Label(diagnosticsText("diagnostics.session.failed"), systemImage: "exclamationmark.triangle")
+          Label(diagnosticsText(model.isHilogSummaryContext ? "diagnostics.hilog.failed" : "diagnostics.session.failed"), systemImage: "exclamationmark.triangle")
         } description: {
+          if model.isHilogSummaryContext { Text(diagnosticsText("diagnostics.hilog.failed.detail")) }
           Text(reason).textSelection(.enabled)
         } actions: {
           Button(diagnosticsText("diagnostics.session.retry"), action: model.reload)
         }
         .accessibilityIdentifier("diagnostics.session.failed")
+      } else if let summary = model.hilogSummary {
+        hilogSummarySection(summary)
       } else if model.reading == nil {
         ContentUnavailableView {
           Label(diagnosticsText("diagnostics.session.none"), systemImage: "waveform.path")
@@ -58,8 +63,10 @@ struct DiagnosticsWorkspaceView: View {
           .padding(20)
         }
       }
-      Divider()
-      footer
+      if !model.isHilogSummaryContext {
+        Divider()
+        footer
+      }
     }
   }
 
@@ -114,25 +121,96 @@ struct DiagnosticsWorkspaceView: View {
 
   private var toolbar: some View {
     HStack(spacing: 12) {
-      Text(diagnosticsText("diagnostics.title"))
+      Text(diagnosticsText(model.isHilogSummaryContext ? "diagnostics.hilog.title" : "diagnostics.title"))
         .font(.system(size: 13, weight: .semibold))
         .accessibilityIdentifier("diagnostics.workspace.title")
       Spacer()
-      if model.session != nil {
+      if model.session != nil || model.hilogSummary != nil {
         Button(diagnosticsText("diagnostics.session.reload"), action: model.reload)
           .accessibilityIdentifier("diagnostics.session.reload")
       }
       // The alignment state is not decoration: it decides whether anything
       // below it can be lined up with what the device recorded.
-      Label(
+      if !model.isHilogSummaryContext { Label(
         model.alignmentTitle,
         systemImage: model.alignmentIsRefusal ? "exclamationmark.triangle.fill" : "clock")
         .font(.system(size: 11))
         .foregroundStyle(model.alignmentIsRefusal ? .orange : .secondary)
-        .accessibilityIdentifier("diagnostics.alignment")
+        .accessibilityIdentifier("diagnostics.alignment") }
     }
     .padding(.horizontal, 20)
     .padding(.vertical, 12)
+  }
+
+  private func hilogSummarySection(_ summary: DiagnosticHilogSummaryPresentation) -> some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 16) {
+        Text(summary.jobID)
+          .font(.system(size: 12, design: .monospaced))
+          .textSelection(.enabled)
+          .accessibilityIdentifier("diagnostics.hilog.job")
+        Text(diagnosticsText("diagnostics.hilog.readOnly"))
+          .font(.callout).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+          Text(diagnosticsText("diagnostics.hilog.coverage.\(summary.headerCoverage)"))
+            .font(.headline)
+            .accessibilityIdentifier("diagnostics.hilog.coverage")
+          Text(diagnosticsText("diagnostics.hilog.coverage.detail"))
+            .font(.callout).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("diagnostics.hilog.boundary")
+        }
+        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+          hilogCount("diagnostics.hilog.lines", value: summary.lineCount, id: "lines")
+          ForEach(["D", "I", "W", "E", "F"], id: \.self) { level in
+            hilogCount("diagnostics.hilog.level.\(level)", value: summary.levelCounts[level] ?? 0, id: level)
+          }
+          hilogCount("diagnostics.hilog.unrecognized", value: summary.unrecognizedLineCount, id: "unrecognized")
+          hilogCount("diagnostics.hilog.blank", value: summary.blankLineCount, id: "blank")
+        }
+        Divider()
+        Text(diagnosticsText("diagnostics.hilog.source"))
+          .font(.headline).accessibilityAddTraits(.isHeader)
+        Text(diagnosticsText("diagnostics.hilog.source.detail"))
+          .font(.callout).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 10) {
+          hilogFact("diagnostics.hilog.sourceJob", value: summary.sourceJobID, id: "sourceJob")
+          hilogFact("diagnostics.hilog.sourceArtifact", value: summary.sourceArtifactID, id: "sourceArtifact")
+          hilogFact("diagnostics.hilog.sourceBytes", value: String(summary.sourceByteCount), id: "sourceBytes")
+        }
+        DisclosureGroup(diagnosticsText("diagnostics.hilog.digests")) {
+          VStack(alignment: .leading, spacing: 10) {
+            hilogFact("diagnostics.hilog.sourceDigest", value: summary.sourceSHA256, id: "sourceDigest")
+            hilogFact("diagnostics.hilog.toolDigest", value: summary.analyzerExecutableSHA256, id: "toolDigest")
+            hilogFact("diagnostics.hilog.outputDigest", value: summary.analyzerOutputSHA256, id: "outputDigest")
+            hilogFact("diagnostics.hilog.artifactDigest", value: summary.artifact.sha256, id: "artifactDigest")
+          }
+          .padding(.top, 8)
+        }
+        .accessibilityIdentifier("diagnostics.hilog.digests")
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(20)
+    }
+    .accessibilityIdentifier("diagnostics.hilog.summary")
+  }
+
+  private func hilogCount(_ key: String, value: Int, id: String) -> some View {
+    GridRow {
+      Text(diagnosticsText(key))
+      Text(String(value)).monospacedDigit()
+        .accessibilityIdentifier("diagnostics.hilog.count.\(id)")
+    }
+  }
+
+  private func hilogFact(_ key: String, value: String, id: String) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text(diagnosticsText(key)).font(.caption).foregroundStyle(.secondary)
+      Text(value).font(.system(size: 11, design: .monospaced))
+        .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("diagnostics.hilog.\(id)")
+    }
   }
 
   private func sessionSection(_ session: DiagnosticSessionPresentation) -> some View {

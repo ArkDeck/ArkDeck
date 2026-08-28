@@ -1244,6 +1244,9 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     if jobID == DiagnosticSessionUIFixture.job.id,
       operationReference == DiagnosticSessionUIFixture.job.operationReference,
       let detail = try? DiagnosticSessionUIFixture.detail() { return detail }
+    if let variant = DiagnosticHilogSummaryUIFixture.variant(jobID: jobID),
+      operationReference == "analyzer.summarize-hilog@1",
+      let detail = try? DiagnosticHilogSummaryUIFixture.detail(variant) { return detail }
     let isFlash = ArkForgeFlashOperation.containsDurableRecordReference(
       operationReference)
     let isSubmittedFlashFixture = jobID == "job-ui-fixture-flash"
@@ -1335,6 +1338,13 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
   func readArtifact(
     jobID: String, artifact: RuntimeArtifactPresentation, maximumBytes: Int, allowSensitive: Bool
   ) async -> RuntimeArtifactReadResult {
+    if let variant = DiagnosticHilogSummaryUIFixture.variant(jobID: jobID),
+      artifact.name == "hilog-summary.json", artifact.id == "fixture-hilog-summary-\(variant)",
+      !allowSensitive, let bytes = try? DiagnosticHilogSummaryUIFixture.document(variant),
+      bytes.count <= maximumBytes
+    {
+      return .loaded(variant == "corrupt" ? Data("{}".utf8) : bytes)
+    }
     guard jobID == DiagnosticSessionUIFixture.job.id,
       let documents = try? DiagnosticSessionUIFixture.documents(), let bytes = documents[artifact.name],
       bytes.count <= maximumBytes, artifact.privacy != "sensitive" || allowSensitive,
@@ -1408,6 +1418,11 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     }
     guard !empty else {
       return RuntimeHistoryPresentation(availability: .available, jobs: [])
+    }
+    if fixtureRequests("--ui-test-hilog-summaries") {
+      return RuntimeHistoryPresentation(
+        availability: .available, jobs: [DiagnosticSessionUIFixture.job]
+          + DiagnosticHilogSummaryUIFixture.variants.map(DiagnosticHilogSummaryUIFixture.job))
     }
     if fixtureRequests("--ui-test-diagnostics-session") {
       return RuntimeHistoryPresentation(availability: .available, jobs: [DiagnosticSessionUIFixture.job])

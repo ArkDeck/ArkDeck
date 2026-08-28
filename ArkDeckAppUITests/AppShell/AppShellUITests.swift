@@ -1234,16 +1234,18 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(panel.waitForNonExistenceFast(timeout: 10))
   }
 
-  func testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment() {
+  func testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment() throws {
     for (language, alignment, missingTime) in [
       ("(en)", "Cannot align", "Time not reported"),
       ("(zh-Hans)", "无法对齐", "未记录时刻"),
     ] {
       let app = launch(arguments: [
-        "--ui-test-runtime-history", "--ui-test-diagnostics-session", "--ui-test-devices",
+        "--ui-test-runtime-history", "--ui-test-diagnostics-session", "--ui-test-hilog-summaries", "--ui-test-devices",
         "-AppleLanguages", language,
       ])
-      select("app.navigation.history", in: app)
+      let processID = try XCTUnwrap(NSRunningApplication.runningApplications(
+        withBundleIdentifier: "com.arkdeck.desktop").first?.processIdentifier)
+      openExactHistoryRecord("job-fixture-diagnostics", in: app)
       let open = app.buttons["history.openWorkspace"]
       XCTAssertTrue(open.waitForExistenceFast(timeout: 20))
       open.click()
@@ -1284,7 +1286,113 @@ final class AppShellUITests: XCTestCase {
       scrollIntoView(record, in: app)
       record.click()
       assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-diagnostics")
+      app.buttons["jobInspector.toggle"].click()
+      for variant in ["complete", "partial", "unrecognized", "empty", "corrupt", "complete"] {
+        runHistorySessionPhase("HiLog \(variant)", language: language, in: app, processID: processID) {
+          openExactHistoryRecord("job-fixture-hilog-\(variant)", in: app)
+          app.buttons["history.openWorkspace"].click()
+          if variant == "corrupt" {
+            XCTAssertTrue(element("diagnostics.session.failed", in: app).waitForExistenceFast(timeout: 15))
+            XCTAssertFalse(element("diagnostics.hilog.summary", in: app).exists,
+              "a failed read must clear the preceding successful summary")
+          } else {
+            assertDisplayed(element("diagnostics.hilog.job", in: app), equals: "job-fixture-hilog-\(variant)", timeout: 15)
+            assertDisplayed(element("diagnostics.hilog.coverage", in: app), equals: hilogCoverageTitle(variant, language: language))
+            let expectedI = variant == "complete" || variant == "partial" ? "1" : "0"
+            assertDisplayed(element("diagnostics.hilog.count.I", in: app), equals: expectedI)
+            assertDisplayed(element("diagnostics.hilog.count.E", in: app), equals: variant == "complete" ? "1" : "0")
+            XCTAssertTrue(element("diagnostics.hilog.boundary", in: app).exists)
+            XCTAssertFalse(element("diagnostics.preview.text", in: app).exists)
+            XCTAssertFalse(element("diagnostics.alignment", in: app).exists,
+              "a line-count summary has no clock alignment claim")
+            XCTAssertFalse(app.buttons["diagnostics.capture.arm"].exists)
+            app.buttons["diagnostics.session.reload"].click()
+            assertDisplayed(element("diagnostics.hilog.job", in: app), equals: "job-fixture-hilog-\(variant)", timeout: 15)
+            if variant == "partial" {
+              Self.resizeRecoveryWindow(in: app, to: CGSize(width: 900, height: 650))
+              let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+              shot.name = "HiLog partial summary narrow \(language)"
+              shot.lifetime = .keepAlways
+              add(shot)
+              Self.resizeRecoveryWindow(in: app, to: CGSize(width: 1180, height: 783))
+            }
+          }
+        }
+      }
       app.terminate()
+    }
+  }
+
+  private func openExactHistoryRecord(_ jobID: String, in app: XCUIApplication) {
+    select("app.navigation.history", in: app)
+    let search = app.textFields["history.filter.search"]
+    XCTAssertTrue(search.waitForExistenceFast(timeout: 30))
+    search.click()
+    search.typeKey("a", modifierFlags: .command)
+    search.typeText(jobID)
+    assertDisplayed(element("history.detail.job", in: app), equals: jobID, timeout: 30)
+  }
+
+  private func hilogCoverageTitle(_ coverage: String, language: String) -> String {
+    let labels = [
+      "complete": ("All nonblank line headers recognized", "全部非空行的行首已识别"),
+      "partial": ("Some line headers unrecognized", "部分行首未识别"),
+      "unrecognized": ("No line headers recognized", "没有识别到行首"),
+      "empty": ("No nonblank lines", "没有非空行"),
+    ]
+    guard let label = labels[coverage] else { return "unsupported coverage" }
+    return language == "(en)" ? label.0 : label.1
+  }
+
+  /// Three Jobs come from a previously completed headless real capture and
+  /// analysis. This UI leg only reads those exact records through production
+  /// XPC. One App launch per language covers every record and reload.
+  func testRealDeviceHilogSummariesReopenInOneSessionPerLanguage() throws {
+    struct ExpectedSummary: Decodable {
+      let jobID: String
+      let sourceArtifactID: String
+      let headerCoverage: String
+      let lineCount: Int
+      let levelCounts: [String: Int]
+    }
+    guard let path = ProcessInfo.processInfo.environment["ARKDECK_REAL_DEVICE_HILOG_EXPECTATIONS"],
+      path.hasPrefix("/")
+    else { throw XCTSkip("Supply private expectations from completed real HiLog analysis Jobs") }
+    let data = try Data(contentsOf: URL(filePath: path))
+    XCTAssertLessThan(data.count, 32 * 1024)
+    let expected = try JSONDecoder().decode([ExpectedSummary].self, from: data)
+    guard expected.count == 3, Set(expected.map(\.jobID)).count == 3,
+      expected.allSatisfy({ $0.jobID.hasPrefix("job-") && $0.sourceArtifactID.hasPrefix("ART-") })
+    else { return XCTFail("three distinct real Runtime Jobs are required") }
+    for language in ["(en)", "(zh-Hans)"] {
+      let app = XCUIApplication()
+      if app.state != .notRunning { app.terminate() }
+      app.launchArguments = [
+        "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+        "--ui-test-auto-update-idle", "--ui-test-reset-shell-selection", "-AppleLanguages", language,
+      ]
+      app.launch()
+      app.activate()
+      defer { app.terminate() }
+      let processID = try XCTUnwrap(NSRunningApplication.runningApplications(
+        withBundleIdentifier: "com.arkdeck.desktop").first?.processIdentifier)
+      for item in expected {
+        runHistorySessionPhase("Real HiLog record", language: language, in: app, processID: processID) {
+          openExactHistoryRecord(item.jobID, in: app)
+          app.buttons["history.openWorkspace"].click()
+          assertDisplayed(element("diagnostics.hilog.job", in: app), equals: item.jobID, timeout: 30)
+          assertDisplayed(element("diagnostics.hilog.coverage", in: app), equals: hilogCoverageTitle(item.headerCoverage, language: language))
+          assertDisplayed(element("diagnostics.hilog.count.lines", in: app), equals: String(item.lineCount))
+          for level in ["D", "I", "W", "E", "F"] {
+            assertDisplayed(element("diagnostics.hilog.count.\(level)", in: app), equals: String(item.levelCounts[level] ?? -1))
+          }
+          assertDisplayed(element("diagnostics.hilog.sourceArtifact", in: app), equals: item.sourceArtifactID)
+          XCTAssertFalse(element("diagnostics.preview.text", in: app).exists)
+          XCTAssertFalse(element("diagnostics.alignment", in: app).exists)
+          app.buttons["diagnostics.session.reload"].click()
+          assertDisplayed(element("diagnostics.hilog.job", in: app), equals: item.jobID, timeout: 30)
+        }
+      }
     }
   }
 

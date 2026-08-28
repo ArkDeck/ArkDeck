@@ -729,6 +729,50 @@ test('Overview selects the source record despite old History filters', () => {
   assert.equal(h.run('S.hf.query'), '');
 });
 
+test('HiLog summaries revisit exact History records across coverage and failure states without replay', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=history&hilogSummary=complete&lang=${lang}`);
+    const before=h.run('JSON.stringify(HIST)'),jobs=h.run('S.jobs.length');
+    const historyCopy=JSON.parse(read('ArkDeckApp/Resources/HistoryLocalizable.xcstrings')).strings;
+    assert.ok(h.run('pHistory()').includes(historyCopy['history.context.readOnly'].localizations[lang].stringUnit.value));
+    assert.doesNotMatch(h.run('pHistory()'),/index \/ summary \/ markers/,'summary history must not promise capture-session validation');
+    for(const state of ['complete','partial','unrecognized','empty','corrupt','complete']) {
+      h.run(`openHistoryDesignWorkspace('job-demo-hilog-summary-${state}')`);
+      assert.equal(h.run('S.nav'),'diagnostics');
+      assert.equal(h.run('S.historyContext.id'),`job-demo-hilog-summary-${state}`);
+      const markup=h.run('pDiagnostics()');
+      if(state==='corrupt') {
+        assert.match(markup,/diagnostics_hilog_summary_integrity_mismatch/);
+        assert.doesNotMatch(markup,/data-sync-id="diagnostics.hilog.summary"/);
+        assert.match(h.run('pDiagnostics()'),/diagnostics_hilog_summary_integrity_mismatch/,'retry reads the same malformed record');
+      } else {
+        assert.match(markup,/data-sync-id="diagnostics.hilog.summary"/);
+        assert.ok(markup.includes(`data-sync-id="diagnostics.hilog.job">job-demo-hilog-summary-${state}`));
+        assert.match(markup,/do not prove capture completeness|不证明采集完整/);
+        assert.match(markup,/does not read the raw log|不会读取或重新核验原始日志/);
+        assert.doesNotMatch(markup,/data-sync-id="diagnostics.alignment"|data-sync-id="diagnostics.capture.arm"|data-sync-id="diagnostics.preview.text"/);
+        for(const level of ['D','I','W','E','F'])assert.ok(markup.includes(`data-sync-id="diagnostics.hilog.count.${level}"`));
+      }
+      h.run("readDiagnosticPreview('hilog.txt')");
+      assert.equal(h.run('S.diagnostics.preview'),null);
+      assert.equal(h.run('JSON.stringify(HIST)'),before);
+      assert.equal(h.run('S.jobs.length'),jobs);
+    }
+    h.run("openHistoryDesignDiagnostics('S-0826-04')");
+    assert.equal(h.run('S.diagnostics.hilogSummary'),null);
+    assert.match(h.run('pDiagnostics()'),/data-sync-id="diagnostics.alignment"/);
+    assert.doesNotMatch(h.run('pDiagnostics()'),/data-sync-id="diagnostics.hilog.summary"/);
+    h.run("openHistoryDesignWorkspace('job-demo-hilog-summary-complete'); HIST.push({id:'unsupported-analysis',kind:'diagnostics',op:'analyzer.extract-crash-signature@1'}); openHistoryDesignWorkspace('unsupported-analysis')");
+    assert.match(h.run('pDiagnostics()'),/diagnostics_unsupported_operation/);
+    assert.doesNotMatch(h.run('pDiagnostics()'),/data-sync-id="diagnostics.hilog.summary"/);
+    const copy=JSON.parse(h.run('JSON.stringify(DIAGNOSTICS_COPY)'));
+    const native=JSON.parse(read('ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings')).strings;
+    for(const key of Object.keys(native).filter(key=>key.startsWith('diagnostics.hilog.'))) {
+      assert.equal(copy[key][lang],native[key].localizations[lang].stringUnit.value,key);
+    }
+  }
+});
+
 test('Settings exposes all seven panes and excludes raw data from App diagnostics', () => {
   const h = harness();
   const keys = JSON.parse(h.run('JSON.stringify(SETTINGS_TABS.map(([id])=>id))'));

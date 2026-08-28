@@ -71,3 +71,66 @@ enum DiagnosticSessionUIFixture {
       artifactResponse: try response(inventory))
   }
 }
+
+/// Synthetic summary records, reached only by the explicitly selected UI
+/// fixture provider. Several records share one App launch for navigation tests.
+enum DiagnosticHilogSummaryUIFixture {
+  static let variants = ["complete", "partial", "unrecognized", "empty", "corrupt"]
+
+  static func variant(jobID: String) -> String? {
+    variants.first { jobID == job($0).id }
+  }
+
+  static func job(_ variant: String) -> RuntimeJobSummaryPresentation {
+    RuntimeJobSummaryPresentation(
+      id: "job-fixture-hilog-\(variant)", operationReference: "analyzer.summarize-hilog@1",
+      targetID: "target-fixture-dayu200", state: "succeeded", waitingForHuman: false,
+      outcomeUnknown: false, outstandingResidueCount: 0, timeline: ["queued", "running", "succeeded"],
+      executionMode: "execute", sessionID: "session-fixture-hilog-\(variant)",
+      workspaceKind: .diagnostics, actualEffect: "hostOnly", finishedAtUTC: "2026-08-29T08:00:10Z")
+  }
+
+  static func document(_ variant: String) throws -> Data {
+    let header = "08-29 01:02:03.004 123 124 I C01234/Test: UI fixture only\n"
+    let raw: String = switch variant {
+    case "partial": header + "wrapped line without a header\n\n"
+    case "unrecognized": "UI fixture only: nondefault format\n"
+    case "empty": " \n\t\n"
+    default: header + "08-29 01:02:03.005 123 124 E C01234/Test: UI fixture only\n"
+    }
+    let report = try HilogSummaryDerivedAnalyzer.analyze(Data(raw.utf8))
+    let result = try JSONDecoder().decode(HilogSummaryAnalysis.self, from: report)
+    return try CanonicalJSONEncoders.canonical().encode(HilogSummaryDerivedArtifact(
+      sourceArtifactID: "fixture-hilog-source-\(variant)",
+      analyzerExecutableSHA256: String(repeating: "b", count: 64),
+      analyzerOutputSHA256: SHA256Hex.string(of: report), analyzerOutputByteCount: report.count,
+      result: result))
+  }
+
+  static func detail(_ variant: String, document supplied: Data? = nil) throws -> RuntimeJobDetailPresentation {
+    let job = job(variant)
+    let bytes = try supplied ?? document(variant)
+    func response(_ value: Any) throws -> RuntimeHistoryTransportResult {
+      .success(try JSONSerialization.data(withJSONObject: ["ok": true, "result": value], options: [.sortedKeys]))
+    }
+    return RuntimeJobDetailResponseDecoding.presentation(
+      jobID: job.id, operationReference: job.operationReference,
+      statusResponse: try response([
+        "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
+        "sessionId": job.sessionID!, "timeline": job.timeline,
+      ]),
+      evidenceResponse: try response([
+        "jobId": job.id, "operationReference": job.operationReference,
+        "catalogDigest": String(repeating: "a", count: 64), "providerId": "analyzer",
+        "executionMode": "execute", "terminalState": "succeeded", "actualEffect": "hostOnly",
+        "parameters": ["sourceArtifactRef": "lease-v1:job-fixture-hilog-source-\(variant):fixture-hilog-source-\(variant)"],
+      ]),
+      artifactResponse: try response([[
+        "jobId": job.id, "artifactId": "fixture-hilog-summary-\(variant)", "name": "hilog-summary.json",
+        "role": "derived", "mediaType": "application/json", "byteCount": bytes.count,
+        "sha256": SHA256Hex.string(of: bytes), "privacy": "standard", "status": "published",
+        "sourceOperation": job.operationReference, "createdAtUtc": "2026-08-29T08:00:10Z",
+        "redactionApplied": true,
+      ]]))
+  }
+}
