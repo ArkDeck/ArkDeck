@@ -3465,7 +3465,7 @@ function flashStages(now){
 function flashDetails(image){
   return `<details class="flash-details"><summary>${tx("flashDetails")}</summary>
     <div class="flash-detail-grid">
-      <div><small>operation / profile</small><b>flash.dayu200 / dayu200</b></div>
+      <div><small>operation / profile</small><b>flash.full-restore@1 / dayu200</b></div>
       <div><small>target / binding</small><b>TGT-958780b2ffb7 / revision 3</b></div>
       <div><small>image SHA-256</small><b>${image?"Runtime 校验后显示":"选择镜像后由 Runtime 校验"}</b></div>
       <div><small>exact plan</small><b>14 steps · 1 destructive write stage</b></div>
@@ -3485,13 +3485,13 @@ function formatBytes(bytes){
   return new Intl.NumberFormat(S.language==="en"?"en-US":"zh-CN",{maximumFractionDigits:1}).format(bytes/1e9)+" GB";
 }
 function chooseFlashImage(){
-  S.flashImage={name:"dayu200-openharmony-5.0.0.71.imgpkg",sizeBytes:6400000000};
+  S.flashImage={name:"dayu200-openharmony-5.0.0.71.tar.gz",sizeBytes:6400000000};
   S.flashView="ready";S.lastFlash=null;renderPage();
 }
 function runFlash(){
   if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashAvailabilityReason())return;
   S.flashView="running";S.flashProgress={stage:"prepare",tick:0,bytesDone:0,totalBytes:S.flashImage.sizeBytes};
-  const j={id:"J"+(S.jobSeq++),title:"Flash · flash.dayu200 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
+  const j={id:"J"+(S.jobSeq++),title:"Flash · flash.full-restore@1 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
     phases:["准备镜像","进入 Loader","写入镜像","重启并验证"],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,
     log:["→ 准备镜像","进度百分比只使用 Runtime 已确认写入字节数"],pages:["flash"],isFlash:true};
   S.jobs.push(j);S.flashJob=j;renderDrawer();renderPage();

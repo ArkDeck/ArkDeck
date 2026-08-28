@@ -70,6 +70,17 @@ availability 为 available；checking/unavailable 的原因替代主动作，不
 不点击刷写。F32 的 PR #1567 在补充验证期间已合入，F33 基于其 merge commit
 `b564e990` 单独交付产品修正，不创建状态或验收专用 PR。
 
+F34（2026-08-28，GJ-4）：授权后的真实 canonical Flash 成功，但 App 的活动/attention
+筛选和 postflight 详情请求仍硬编码旧 `flash.dayu200`，导致新记录缺席、精确详情关联失败。
+现统一使用已发布的 canonical/历史兼容引用分类器，新提交按 `flash.full-restore@1` 读取详情；
+只有成功终态、无 blocker 且固件/绑定读回匹配才显示成功。当前稿件与双语可用性文案同步，
+不改写旧历史。两项隔离双语原生回归通过，覆盖 unknown、运行中、成功及证据未验证的拒绝；
+fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验见
+[F34 验证记录](references/v1.6-goal/flash-canonical-verification-2026-08-28.json)。
+
+同次真实 App 检查发现 F35：设备访问诊断直接打开沙箱内 ArkForge Unix socket，路径超限且
+不符合 App 的 XPC 边界；该项单独修复，不能用本次刷写成功或 F34 fixture 关闭。
+
 ### 关键实现入口
 
 - [Session reader](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift)：fresh correlation、发布清单、两份索引一致性、受限读取、完整性与缺失判断。
@@ -225,9 +236,22 @@ availability 为 available；checking/unavailable 的原因替代主动作，不
 
 该次统一本地闸覆盖当时生产 Swift、资源与 UI 测试代码。随后 goal 真机验证又产生 F24/F25 修复，须单独重跑；未把 compile-only 当作 XCUITest 断言通过。
 
-### Goal 真机验证与修复（F24–F33，进行中）
+### Goal 真机验证与修复（F24–F35，进行中）
 
-**2026-08-28 F32/F33 最新复验**：F32 已合入 `b564e990`；从该干净 main 快照构建并通过
+**2026-08-28 F34 最新真机结果**：PR #1568 已合入 `59158aed`，维护者明确授权继续及
+具名 `ui-alignment-20260828` HardwareCampaign。使用已签名的 reviewed `b564e990` Runtime，
+重新核对同一镜像哈希、目标 r4、fresh plan 后，仅执行一次新 `flash.full-restore@1`：
+`job-8e32139af1945d755f5716b67f4f8bde` 于 03:21:37Z—03:24:27Z 成功，machine readback 为
+OpenHarmony-7.0.0.37 / r4，无 unknown、人工步骤或残留。独立 `agentd verify` 的五项检查与
+三份 Artifact 字节校验均通过。随后关闭 campaign，完整安装配置恢复原值；新的只读 Observe
+再次成功。四条已终止 unknown 历史未改写，先前明确未执行的 Flash 请求保留。
+这是具名硬件验收成功，不授予 ProductionVerified，也不证明未复验的 App 呈现。
+真实 App 回看暴露 F34/F35；修复后的全部真实只读 UI 回访仍待完成，goal 未完成。
+F34 两项双语原生用例共 43.803 秒、零失败；六张附件已逐图检查（活动详情在折叠区下方，
+由精确 AX 断言覆盖，截图不外推为该区像素验收）。42 项设计测试、1,832 项 Swift 测试与
+App/UI-test bundle 编译通过。首轮夹具绑定/定位错误的失败日志保留，未放宽产品判断。
+
+**2026-08-28 F32/F33 历史复验**：F32 已合入 `b564e990`；从该干净 main 快照构建并通过
 既有安装入口更新已签名的本机 Runtime。两个 Flash 引用均返回 `hardwareGated / unavailable`，
 HDC、ArkForge、workspace 与 Trace 配置及四条终止的 unknown 历史原样保留，具名 campaign 仍为空。
 随后真实只读 `observe.device@1` Job `job-fca1ec9b8ff627215b233fea2037221c` 成功，
@@ -352,7 +376,7 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 1. **Diagnostics 交互式会话**：arm/append-marker/stop、会话内视频和跨时钟校准；现有 bounded ringBuffered、markers.json 和 reader 不等于该完整体验。缺失 operation/并发契约不得从 App 接 raw HDC 补洞。
 2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
 3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
-4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；F28 Runtime 修正已合入并更新，冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。Flash 已安装 pinned bundle，收到擦写授权后的首次真实请求因 `hardwareGated` 在设备副作用前拒绝；额外启用 HardwareCampaign 尚未获批，配置未变。F32 已在更新后的 reviewed Runtime 验证默认不可用，F33 补齐 App 缓存计划动作门，均不宣称刷写通过。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
+4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。2026-08-28 明确授权 HardwareCampaign 后，新 canonical Flash 实际成功并独立核验，campaign 已关闭。F34/F35 的修复后真实 App 只读回访仍待完成，不重复刷写来补 UI 证据。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。

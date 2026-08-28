@@ -391,7 +391,7 @@ final class AppShellUITests: XCTestCase {
         attentionNone: "None",
         attentionClear: "Nothing needs attention in the current diagnostics."),
       flash: Flash(
-        availability: "AVAILABLE — Runtime can materialize flash.dayu200",
+        availability: "AVAILABLE — Runtime can materialize flash.full-restore@1",
         modeBadge: "PLANNED — no deviceMutation or destructive dispatch",
         target: "target-fixture-dayu200",
         emptyPlan: "No exact plan yet",
@@ -446,7 +446,7 @@ final class AppShellUITests: XCTestCase {
         attentionNone: "无",
         attentionClear: "当前诊断中没有需要处理的事项。"),
       flash: Flash(
-        availability: "AVAILABLE — Runtime 可生成 flash.dayu200 计划",
+        availability: "AVAILABLE — Runtime 可生成 flash.full-restore@1 计划",
         modeBadge: "PLANNED — 不派发 deviceMutation 或 destructive 步骤",
         target: "target-fixture-dayu200",
         emptyPlan: "尚未生成精确计划",
@@ -773,6 +773,78 @@ final class AppShellUITests: XCTestCase {
       XCTAssertTrue(submit.isEnabled)
       XCTAssertFalse(blocker.exists)
       app.terminate()
+    }
+  }
+
+  /// Canonical records must drive the same read-only activity, progress and
+  /// unknown-outcome protections as retained compatibility history.
+  func testCanonicalFlashHistoryStatesInBothLanguages() throws {
+    let canonical = "--ui-test-runtime-flash-canonical"
+    for language in ["(en)", "(zh-Hans)"] {
+      try canonical.write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      let app = launch(arguments: [
+        "--ui-test-flash", "--ui-test-runtime-history", "--ui-test-devices",
+        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+      ])
+      select("app.navigation.flash", in: app)
+      XCTAssertTrue(element("flash.runtime.attention", in: app).waitForExistenceFast(timeout: 10))
+      XCTAssertFalse(element("flash.execute.submit", in: app).exists)
+      toggleFlashDetails(in: app, file: #filePath, line: #line)
+      assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-0002")
+
+      writeFixtureState("\(canonical)\n--ui-test-runtime-flash-running", in: app)
+      app.buttons["flash.refresh"].click()
+      XCTAssertTrue(element("flash.workspace.progress", in: app).waitForExistenceFast(timeout: 10))
+      XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
+      assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-running")
+
+      writeFixtureState("\(canonical)\n--ui-test-runtime-flash-succeeded", in: app)
+      app.buttons["flash.refresh"].click()
+      assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-succeeded")
+      XCTAssertFalse(element("flash.workspace.progress", in: app).exists)
+      XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
+      XCTAssertTrue(element("flash.image.choose", in: app).exists)
+      let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      attachment.name = "canonical-flash-history-\(language)"
+      attachment.lifetime = .keepAlways
+      add(attachment)
+      app.terminate()
+    }
+  }
+
+  /// The in-process submit/run fixture never contacts Runtime or a device.
+  /// Its detail reader rejects the old alias exactly as production correlation
+  /// does, and unverified evidence must not turn matching fields into success.
+  func testCanonicalFlashPostflightRequiresVerifiedEvidenceInBothLanguages() throws {
+    let state = "--ui-test-flash-loader-unbound\n--ui-test-flash-plan\n--ui-test-runtime-history-empty"
+    for (language, success, stopped) in [
+      ("(en)", "Flash succeeded", "Flash stopped"),
+      ("(zh-Hans)", "刷机成功", "刷机已停止"),
+    ] {
+      for unverified in [false, true] {
+        try state.write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+        var arguments = [
+          "--ui-test-flash", "--ui-test-flash-plan", "--ui-test-runtime-history", "--ui-test-devices",
+          "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+        ]
+        if unverified { arguments.append("--ui-test-flash-postflight-unverified") }
+        let app = launch(arguments: arguments)
+        select("app.navigation.flash", in: app)
+        let submit = element("flash.execute.submit", in: app)
+        XCTAssertTrue(submit.waitForExistenceFast(timeout: 15))
+        XCTAssertTrue(submit.isEnabled)
+        submit.click()
+        let terminal = element("flash.execute.terminal", in: app)
+        assertDisplayed(terminal, equals: unverified ? stopped : success, timeout: 15)
+        assertDisplayed(element("flash.execute.jobId", in: app), equals: "job-ui-fixture-flash")
+        XCTAssertTrue(element("flash.postflight.build.match", in: app).exists)
+        XCTAssertTrue(element("flash.postflight.binding.match", in: app).exists)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "canonical-flash-postflight-\(language)-unverified-\(unverified)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.terminate()
+      }
     }
   }
 

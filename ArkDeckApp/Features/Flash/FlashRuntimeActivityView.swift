@@ -12,7 +12,9 @@ struct FlashRuntimeActivityView: View {
   let onOpenHistory: () -> Void
 
   private var flashJobs: [RuntimeJobSummaryPresentation] {
-    presentation.jobs.filter { $0.operationReference == "flash.dayu200" }
+    presentation.jobs.filter {
+      ArkForgeFlashOperation.containsDurableRecordReference($0.operationReference)
+    }
   }
 
   /// Unknown effects and human stops outrank recency. Hiding either behind a

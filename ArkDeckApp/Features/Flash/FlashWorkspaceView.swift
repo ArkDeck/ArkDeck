@@ -1,4 +1,5 @@
 import AppKit
+import ArkDeckCore
 import ArkDeckWorkflows
 import Observation
 import SwiftUI
@@ -487,7 +488,7 @@ struct FlashWorkspaceView: View {
 
   private var activeFlashJob: RuntimeJobSummaryPresentation? {
     runtimeHistory.jobs.first { job in
-      job.operationReference == "flash.dayu200"
+      ArkForgeFlashOperation.containsDurableRecordReference(job.operationReference)
         && job.isCurrentActivity
     }
   }
@@ -516,7 +517,8 @@ struct FlashWorkspaceView: View {
 
   private var attentionFlashJob: RuntimeJobSummaryPresentation? {
     runtimeHistory.jobs.first {
-      $0.operationReference == "flash.dayu200" && $0.requiresRecoveryGuidance
+      ArkForgeFlashOperation.containsDurableRecordReference($0.operationReference)
+        && $0.requiresRecoveryGuidance
     }
   }
 
@@ -1500,6 +1502,8 @@ final class FlashWorkspaceViewModel {
       submission.state == "succeeded" || submission.state == "recovered",
       let plan,
       let evidence = postflightEvidence,
+      evidence.terminalState == "succeeded" || evidence.terminalState == "recovered",
+      evidence.blockers.isEmpty,
       let plannedBindingRevision = plan.target?.bindingRevision,
       evidence.observedFirmware == plan.runtimeBuildVersion,
       evidence.observedBindingRevision == plannedBindingRevision
@@ -1829,7 +1833,7 @@ final class FlashWorkspaceViewModel {
         }
         let detail = await detailProvider.loadJobDetail(
           jobID: terminal.jobID,
-          operationReference: "flash.dayu200")
+          operationReference: ArkForgeFlashOperation.canonicalReference)
         guard self.selectedArchiveURL == archiveURL,
           self.plan == executionPlan,
           !Task.isCancelled
