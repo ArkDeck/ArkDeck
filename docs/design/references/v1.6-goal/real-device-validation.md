@@ -183,3 +183,24 @@ F35 的真实诊断路径已复验，但发现 F36：旧已恢复 unknown 在 Fl
 
 F36 最终 App 的隔离双语手动检查已通过活动选择和 exact History 跳转，旧 unknown 行保留；
 真实 Runtime Job 清单前后完全一致。该记录属于 fixture UI，不是硬件验证，亦不是 XCTest 通过。
+
+
+## 2026-08-28 F36 合入后的双语真实 App 回访
+
+PR #1571 合入 `3a9474f1` 后，原生 fixture 测试通过（45.738 秒），实际生产 XPC 回访也
+通过（93.497 秒），各 1 项、零失败。两者分别分类：前者不连接设备，后者读取 reviewed
+Runtime 的真实 Flash 与保留历史，没有设备或 History fixture，也没有再次刷写。
+
+真实回访在中英文均确认最新 canonical 成功活动、只读设备访问及重新检查、exact History
+详情和 Artifact、返回 Flash 的 exact Job 上下文，以及四条旧 unknown 保留。前后 1,962 条
+Job 全部逐项相同，已有成功 Flash 的五项独立核验仍通过，HardwareCampaign 关闭。
+八张实际 App 与两张 fixture 原始 PNG 均已查看，raw 截图/日志仅保留本机；仓库只记录哈希。
+
+临时验收方法的前三次失败/中断来自错误等待元素、布局变化后的旧点击坐标、摘要时间线
+假设和带标签的 AX 字符串匹配，已如实保存；没有改生产行为来迎合断言。验收方法完成后
+恢复原文件并确认与 reviewed main 整树一致。
+
+对照还发现 F37：稿件把摘要页没有的 Journal 与过期 plan/log 文件放到了 Flash 展示中。
+本轮将稿件改为摘要/详情分离和精确 Artifact 预览，不把设计截图当硬件证据。
+完整命令范围、二进制/截图/日志哈希与失败记录见
+[F36 post-merge 元数据](flash-history-focus-verification-2026-08-28.json)。
