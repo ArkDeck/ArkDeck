@@ -153,6 +153,17 @@
   真实设备验证(适用时)+ 最小必要文档更新 + 完成结论同车交付;PR 标题与描述必须如实
   覆盖其全部内容。**不再创建 readiness-only、status-only、done-only、verified-only、
   archive-only PR**;不为同一问题追加 readiness/verification/archive 载体。
+- **PR content and language**: Write commit messages, PR titles, and PR descriptions in
+  English. Every PR description MUST summarize the actual changes in its diff, explain
+  why they are needed, and report verification performed or explicitly not run. A Task ID,
+  branch name, or generic generated message alone is not a change summary. When updating
+  an automatically generated PR description, preserve the required `Task:` declaration.
+- **PR submission state**: Submit PRs as Open and ready for review (`isDraft: false`) by
+  default. Use WIP/Draft status, title prefixes, or labels only when the user explicitly
+  requests WIP/Draft. If automation creates a draft without that request, mark it ready
+  for review before reporting submission. Read back the published PR title, description,
+  state, and draft flag to verify that its actual changes are described in English and
+  that it is Open and not a draft, unless WIP/Draft was explicitly requested.
 - **Agent PR 声明必须在 push 前闭合**:`agent/**` 分支的最终 commit subject 必须包含
   一个 base 上已存在的完整 Task ID,例如
   `fix(TASK-DHA-001): close GJ-2 debug loop`;禁止只写 `GJ-*`/`CHG-*` 而省略
