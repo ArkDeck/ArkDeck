@@ -31,7 +31,7 @@ GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 ta
 | F06 | Trace 非法输入被改成默认值，单位/quick values 与 App 不符 | 保留输入并给出校验；单位转换和快捷值一致；unavailable/invalid submit 不启动 |
 | F07 | Debug secondary UI 与真实能力/参数边界不同 | 五页及 SSH browser/editor/plan 对齐；HAP 与 Native 分别镜像 14/11 个 Catalog 步骤；旧不支持能力仍明示 unavailable |
 | F08 | App diagnostics 设计允许带 device raw，但 exporter 始终排除 | 删除无效选项；敏感 device Artifact 在 History 单独显式导出 |
-| F09 | History 缺活动类别、筛选/保存/分页；按标题猜 Artifact | 八类、全筛选、空态/选中行关系同步；按 kind 分派，不由标题猜实际 Artifact |
+| F09 | History 缺活动类别、筛选/保存/分页；按标题猜 Artifact | 首轮补八类、筛选和选择关系；F38 继续纠正按 kind 推断的详情、精确身份与风险筛选，见文末 |
 | F10 | 默认 Diagnostics 稿展示完整 ring/视频/校准，误报 current 能力 | 默认镜像当前 reader；完整联动只在 concept URL；纠正“ring/自动 Marker 全未实现”的旧说明：bounded ringBuffered 和部分自动标记已发布 |
 | F11 | 全局 Inspector 没有设计中的日志/取消/恢复控制 | 接 exact detail、标准日志按需读取与 fresh identity 后取消请求；unknown 不重放；rebind/archive 没有 App RPC，仍是缺口 |
 | F12 | History Diagnostics 分支不读取 Session；publish 无生产调用 | 新严格 reader 读取 index/summary/markers，校验 identity/byteCount/SHA-256、required/completeness；展示 partial/notDerived/无时间/无校准；已发布 Trace 可转交原生 Viewer |
@@ -480,3 +480,37 @@ preview 的源码清单再次一致。10 张中英文浏览器图已查看（刷
 详见 [F37 验证元数据](references/v1.6-goal/flash-summary-verification-2026-08-28.json)。
 
 F37 最终路径分类闸 exit 0：仅设计/文档，未分配 Swift/App 编译车道；18 项 planner、9 项 workflow、SDD 0/0、49 项 catalog 测试与生成物零漂移全部通过。
+
+## 2026-08-28 F38：History 全类型事实与筛选对齐
+
+GJ-1—4，基线为 #1572 合入后的 `0dc61e0f`。F37 修正 Flash 分支后，继续逐字段核对发现
+非 Flash 分支仍按类型补出固定 binding / manifest / hash / 文件，并把 cancelled 解释为
+补偿已执行、参数已恢复；旧 History brief 还会要求设计者重新画回这些错误。筛选另把
+Job ID 当 Session、显示设备名当 target、“需要关注”当 interrupted，漏掉 operation 搜索。
+
+所有类型现在共用详情与逐项导出：状态、certainty、effect、target/binding、Journal、typed
+inputs 和 Artifact 均取显式字段。旧记录未报告与明确空参数分开；before/after 只接受显式
+traceParameters，unchanged / changed / unverified 不被替换成“已恢复”。当前样本的文件名、
+role、privacy 和输入字段由测试逐项对照 published Catalog；不补造 byteCount 或 SHA-256。
+只有选中且 published 的 Artifact 可打开自己的导出预览，标准日志入口也来自实际清单。
+
+筛选同步原生的 exact Job / Session / operation / target / state / mode、active、unknown mode、
+过去一小时/一天/一周和已报告时间排序；有恢复关系的旧 unknown 不因旧 unknown 本身继续
+报警，残留项仍需关注。保存/恢复/删除、两种预设与清除均可操作。Native 演示任务进入
+History 保留原 Job ID、明确 kind/operation 与字段快照，不另造 Session ID、不按标题猜类别。
+取消演示不再宣称补偿完成。同步 History brief 与交互规格，防止旧指令把差异重新引入。
+
+52 项设计交互/覆盖测试、设计包和 review 构建已通过；60 个检查单元、20 个 App View、
+31 个组件 preview 的清单仍一致。这些是源码/设计测试，不构成真机验收。
+浏览器停在被 URL policy 阻止的内部错误页，F38 的浏览器截图及窄栏视觉验收尚未完成；
+不得把 F37 的旧图或本轮原生 fixture 截图当作 F38 稿件已通过。
+已合入 main 的全页原生巡检与后续独立复测单独记录，失败不删除，不据此标记 goal 完成。
+
+五项选定原生方法均已有完整通过记录：批次中的工作区空态、Trace Cache/Licenses、
+Trace Viewer/帮助通过；中文全页独立复测 30.427 秒、英文全页独立复测 168.233 秒通过。
+初次 XCTest 初始化超时、第二批的三条断言失败、第三次 runner SIGKILL 都保留，不称为
+一次干净的五项批次。10 张原生截图已查看；App 源码始终为干净的 `0dc61e0f`，未为重试
+修改代码、超时或断言。此轮只证明 App 呈现，不新增设备验收，也不能替代 F38 的 HTML
+视觉检查。详情见 [F38 验证记录](references/v1.6-goal/history-facts-verification-2026-08-28.json)。
+
+F38 本地统一闸 exit 0：18 项 planner、9 项 workflow、SDD 0/0、49 项 catalog 及生成物零漂移通过；设计/文档差异不分配 Swift/App 编译。浏览器视觉验收仍未通过，不据此转为可合入或 goal 完成。

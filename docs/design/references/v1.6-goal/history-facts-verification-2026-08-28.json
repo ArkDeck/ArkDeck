@@ -1,0 +1,309 @@
+{
+  "date": "2026-08-28",
+  "finding": "F38",
+  "goldenJourneys": [
+    "GJ-1",
+    "GJ-2",
+    "GJ-3",
+    "GJ-4"
+  ],
+  "baseRevision": "0dc61e0f9630aa171a33d129f2791eb6d6730c25",
+  "evidenceKind": "design correction and native App regression; not new device acceptance",
+  "cause": "The non-Flash branch and its History brief still fabricated binding/manifest/hash/Artifact and restoration facts. Filters conflated Job/Session, display device/target, and interrupted/attention; live Native history replaced the Job ID and guessed kind from a localized title.",
+  "changes": [
+    "All History types share explicit summary, typed parameters, optional trace comparisons, Journal and Artifact inventory rendering; missing facts remain missing.",
+    "Per-file export previews require the exact published item and preserve its privacy. The demo does not write a file or claim verified export.",
+    "Current samples match published Catalog input names and Artifact name/role/privacy descriptors; missing sizes/hashes are not invented.",
+    "Search, exact Session/target, active/mode/attention/time filters, date sorting, saved filters and presets mirror the native rules.",
+    "Non-Flash demo records preserve the same Job ID, explicit kind/operation and immutable field snapshots; cancellation does not prove compensation.",
+    "History brief and interaction spec replace old conflicting examples; prior screenshots retain their original capture version."
+  ],
+  "designTests": {
+    "command": "npm --prefix docs/design/arkdeck-ds test",
+    "testCount": 52,
+    "exitCode": 0,
+    "log": {
+      "privateFile": "f38-design-tests-03.log",
+      "byteCount": 4881,
+      "sha256": "a8fba42602633ca9472174667da0f815a4cdff13ed3ef8891d3a1ee94febaa2c"
+    }
+  },
+  "designBuilds": [
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f38-design-build-01.log",
+        "byteCount": 696,
+        "sha256": "86d90d0e567960f31c6e856e9b04671ab7c0e2fcfafb31c896b7cc00377eb4d4"
+      }
+    },
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build:review",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f38-design-review-build-01.log",
+        "byteCount": 314,
+        "sha256": "c49a54315e2a058e210cc028d0a41266b04be9d94acebca21d7430fe2a9bd648"
+      }
+    }
+  ],
+  "coverage": {
+    "surfaceCount": 60,
+    "appViewFileCount": 20,
+    "previewFileCount": 31,
+    "inventoryCheck": "All current navigation, View and preview files still match the tracked inventory in the 52 tests."
+  },
+  "browserValidation": {
+    "completed": false,
+    "screenshotsViewed": 0,
+    "reason": "Browser Use URL policy blocks the internal data: error page created by an early connection-refused navigation. Further automation stopped; manual restoration of the local HTTP page was requested. No alternate browser or policy bypass was used.",
+    "url": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+    "remaining": [
+      "Both-language, all-kind History interactions and exact export previews in the real browser.",
+      "Narrow-inspector parameter/artifact layout and updated reference screenshots."
+    ],
+    "priorReferencesAreF38Acceptance": false
+  },
+  "reviewedMainNativeRegression": {
+    "sourceRevision": "0dc61e0f9630aa171a33d129f2791eb6d6730c25",
+    "sourceTreeCleanBeforeAndAfter": true,
+    "commandForm": "sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/AppShellUITests/<selected method>",
+    "selectedMethods": [
+      "testEnglishSweepOfEveryWorkspace",
+      "testSimplifiedChineseLocalizationSweep",
+      "testWorkspaceNamesAndEmptyStatesInBothLanguages",
+      "testTraceSettingsCacheAndLicensesAreReachableInBothLanguages",
+      "testTraceViewerAndShortcutHelpUseBothLanguages"
+    ],
+    "allSelectedMethodsHaveACompletePassingExecution": true,
+    "singleCleanFiveCaseBatch": false,
+    "attempts": [
+      {
+        "exitCode": 65,
+        "note": "XCTest automation-mode initialization timed out before assertions.",
+        "tests": [],
+        "log": {
+          "privateFile": "goal-final-ui-sweep-01.log",
+          "byteCount": 2335804,
+          "sha256": "60db1c55aa0ca2883cac2f32fe75dbbfe030dbe8532f5c7143b0c25b9ac0ea86"
+        }
+      },
+      {
+        "exitCode": 65,
+        "note": "Five-case batch: three cases passed; English Trace Checking and Chinese device-events / Trace Checking assertions failed.",
+        "tests": [
+          {
+            "name": "testEnglishSweepOfEveryWorkspace",
+            "result": "failed",
+            "durationSeconds": 177.865
+          },
+          {
+            "name": "testSimplifiedChineseLocalizationSweep",
+            "result": "failed",
+            "durationSeconds": 210.148
+          },
+          {
+            "name": "testTraceSettingsCacheAndLicensesAreReachableInBothLanguages",
+            "result": "passed",
+            "durationSeconds": 15.82
+          },
+          {
+            "name": "testTraceViewerAndShortcutHelpUseBothLanguages",
+            "result": "passed",
+            "durationSeconds": 24.495
+          },
+          {
+            "name": "testWorkspaceNamesAndEmptyStatesInBothLanguages",
+            "result": "passed",
+            "durationSeconds": 31.428
+          }
+        ],
+        "log": {
+          "privateFile": "goal-final-ui-sweep-02.log",
+          "byteCount": 299046,
+          "sha256": "41a58c6ee41f6ed36ebe380d6b0a8a72c68fce55b8378104be80c957808b8d5b"
+        }
+      },
+      {
+        "exitCode": 65,
+        "note": "English Trace assertion passed, but the test runner later exited with SIGKILL. No complete passing test result.",
+        "tests": [],
+        "log": {
+          "privateFile": "goal-final-ui-english-03.log",
+          "byteCount": 210967,
+          "sha256": "ec390fb72975dc064e2a078587515bbe1d9cfd27caa7d4d3f8235403b81f0550"
+        }
+      },
+      {
+        "exitCode": 0,
+        "note": "Isolated Chinese sweep passed without code or assertion changes.",
+        "tests": [
+          {
+            "name": "testSimplifiedChineseLocalizationSweep",
+            "result": "passed",
+            "durationSeconds": 30.427
+          }
+        ],
+        "log": {
+          "privateFile": "goal-final-ui-chinese-04.log",
+          "byteCount": 175553,
+          "sha256": "4880fe23bd9cce8d8382c067636771391322c020b4e188e114be4fbd961b1002"
+        }
+      },
+      {
+        "exitCode": 0,
+        "note": "Isolated English sweep passed without code or assertion changes.",
+        "tests": [
+          {
+            "name": "testEnglishSweepOfEveryWorkspace",
+            "result": "passed",
+            "durationSeconds": 168.233
+          }
+        ],
+        "log": {
+          "privateFile": "goal-final-ui-english-05.log",
+          "byteCount": 219727,
+          "sha256": "2055394636e0062383417d6c17555829317b2342869c3bb2af86c0597cc9999f"
+        }
+      }
+    ],
+    "captures": [
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testEnglishSweepOfEveryWorkspace()",
+        "state": "Global Job inspector fixture Runtime facts",
+        "width": 2360,
+        "height": 1566,
+        "viewed": true,
+        "privateFile": "D5ED2CCF-3157-4E99-8341-DD91C8BE633F.png",
+        "byteCount": 372174,
+        "sha256": "3bdd6b5c5064d12ed9567c01ca9f41d28b6a067eef3ca24bfd317cc7da3411ea"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages()",
+        "state": "Native Trace shortcut catalog (zh-Hans)",
+        "width": 1040,
+        "height": 1240,
+        "viewed": true,
+        "privateFile": "F11826B0-423D-4763-93E3-5B8FD9B117F3.png",
+        "byteCount": 211335,
+        "sha256": "0b2a900b015f363ebe1c212e08986b92fcf79fb6c07b4eb10f7eea3479867247"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages()",
+        "state": "Native Trace Viewer empty (zh-Hans)",
+        "width": 2560,
+        "height": 1600,
+        "viewed": true,
+        "privateFile": "15D2B5A6-36FF-43ED-ABD4-73E3E7354788.png",
+        "byteCount": 197985,
+        "sha256": "f18d657f58fbb24dee072ead60efe3de1521b61b9f345162cb11ee25541d4ea2"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages()",
+        "state": "Native Trace shortcut catalog (en)",
+        "width": 1040,
+        "height": 1240,
+        "viewed": true,
+        "privateFile": "4ADB1D55-9E54-4A0C-8223-775ED487C520.png",
+        "byteCount": 193699,
+        "sha256": "436610cfcd1c654956e8dccd0844d70d419e0dcf092cb18385580478fca736d1"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testTraceViewerAndShortcutHelpUseBothLanguages()",
+        "state": "Native Trace Viewer empty (en)",
+        "width": 2560,
+        "height": 1600,
+        "viewed": true,
+        "privateFile": "53B847E7-CB2A-4BF5-AE57-EB74ED509EAC.png",
+        "byteCount": 191902,
+        "sha256": "5c770645bd55ea90a82ba9c33da7e11e74aca09fe0d520043d8d794b4dcbf1c4"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testWorkspaceNamesAndEmptyStatesInBothLanguages()",
+        "state": "Diagnostics workspace (zh-Hans)",
+        "width": 2360,
+        "height": 1566,
+        "viewed": true,
+        "privateFile": "E723A187-527C-4CEA-B71E-2C26790F3A8B.png",
+        "byteCount": 337177,
+        "sha256": "1f96a280c32602393064497ba8f4524232e2554be0bec09e4ce7e386fdd93f9e"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testWorkspaceNamesAndEmptyStatesInBothLanguages()",
+        "state": "Device workspace (zh-Hans)",
+        "width": 2360,
+        "height": 1566,
+        "viewed": true,
+        "privateFile": "D818D189-76FB-4049-8230-E1A1E9633D85.png",
+        "byteCount": 385604,
+        "sha256": "a7924310c012c2781d16c110b325256d637da26dbae2250b208541353c8fc5f5"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testWorkspaceNamesAndEmptyStatesInBothLanguages()",
+        "state": "Diagnostics workspace (en)",
+        "width": 2360,
+        "height": 1566,
+        "viewed": true,
+        "privateFile": "A0F56291-C2B9-4E9A-BDDC-8F67F23EF7D1.png",
+        "byteCount": 323128,
+        "sha256": "cdcef4b953b1e49532f3f2a9ba63bcb80b6bdf0e62722afcecbc8c40d562771d"
+      },
+      {
+        "privateDirectory": "goal-final-ui-sweep-02-attachments",
+        "test": "AppShellUITests/testWorkspaceNamesAndEmptyStatesInBothLanguages()",
+        "state": "Device workspace (en)",
+        "width": 2360,
+        "height": 1566,
+        "viewed": true,
+        "privateFile": "CE35E977-5DBC-4A22-B352-FFB4691E0ECE.png",
+        "byteCount": 378990,
+        "sha256": "6d77d9c796b5d1cc30bd7d38a653ac6064d5343560eae6948d449af761c87027"
+      },
+      {
+        "privateDirectory": "goal-final-ui-english-05-attachments",
+        "test": "AppShellUITests/testEnglishSweepOfEveryWorkspace()",
+        "state": "Global Job inspector fixture Runtime facts",
+        "width": 2360,
+        "height": 1566,
+        "viewed": true,
+        "privateFile": "66B9144B-D355-4F9D-A15A-356299BC7449.png",
+        "byteCount": 371861,
+        "sha256": "332f794cabe494d9601512118a6d84a1fde513c9169f11cd970e4bccb3222911"
+      }
+    ],
+    "appExecutableSHA256": "13291dcfc90bd4a644bed7e31784bce618f6bb278cf579ef06737aec6021a73c",
+    "boundary": "Native App surface regression on a physical Mac. Device, History and Flash fixtures remain fixtures; no new device operation or Flash was submitted by these tests. Passing retries do not erase earlier failures and do not validate the changed HTML."
+  },
+  "priorRealDeviceEvidence": "flash-history-focus-verification-2026-08-28.json#postMergeVerification",
+  "limitations": [
+    "No App/Package production code, Runtime, Catalog, provider, device profile or admission policy changed.",
+    "Browser visual verification and maintainer review remain required. The overall goal is not complete.",
+    "Future concept capabilities retain their explicitly unimplemented status; no new operation was invented."
+  ],
+  "finalLocalGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "classification": {
+      "app": false,
+      "swift": false,
+      "baseRevision": "0dc61e0f9630aa171a33d129f2791eb6d6730c25",
+      "changedFileCount": 8
+    },
+    "commonGates": "18 planner tests, 9 workflow tests, SDD 0 errors / 0 warnings, 49 catalog generator tests, zero generated drift",
+    "log": {
+      "privateFile": "f38-local-gate-01.log",
+      "byteCount": 2794,
+      "sha256": "11b82c660104aec5afcaee7aeb0ee2673ac0cad97f077954ee786a425cf33b14"
+    },
+    "postGateChanges": "Only completed gate metadata and its audit sentence were added afterwards; browser verification remains pending."
+  }
+}

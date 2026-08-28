@@ -965,15 +965,15 @@ const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug"
 const HIST=[
   {id:"S-0826-01",kind:"flash",op:"flash.full-restore@1",st:"succeeded",mode:"execute",dev:"DAYU200",target:"target-demo-dayu200",actualEffect:"destructive",bindingRevision:7,outcomeUnknown:false,artifacts:[{name:'post-flash-facts.json',role:'raw',privacy:'sensitive',status:'published'},{name:'post-flash-hilog.txt',role:'raw',privacy:'sensitive',status:'published'},{name:'flash-report.json',role:'derived',privacy:'standard',status:'published'}],what:"OpenHarmony 5.0.0.71",detail:"dayu200-openharmony-5.0.0.71.tar.gz · flash.full-restore@1",createdAtUTC:"2026-08-26T06:29:00Z",finishedAtUTC:"2026-08-26T06:32:00Z",timeline:['queued','preflight','running','waitingForDevice','succeeded'],when:"今天 14:32",day:"今天",icon:"flash",action:"在 Flash 中打开"},
   {id:"S-0826-02",kind:"viewer",op:"capture.diagnostics@1",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页组件树",detail:"128 个节点 · /settings/display",when:"今天 13:48",day:"今天",icon:"dump",action:"在 Viewer 中打开"},
-  {id:"S-0826-03",kind:"trace",op:"capture.diagnostics@1",hasTrace:true,st:"succeeded",mode:"execute",dev:"DAYU200",what:"应用响应 · 30 秒",detail:"trace_143102.htrace · 18.4 MB",when:"今天 13:31",day:"今天",icon:"trace",action:"打开 Trace"},
+  {id:"S-0826-03",kind:"trace",op:"capture.diagnostics@1",hasTrace:true,st:"succeeded",mode:"execute",dev:"DAYU200",what:"应用响应 · 30 秒",detail:"trace.htrace · capture.diagnostics@1",when:"今天 13:31",day:"今天",icon:"trace",action:"打开 Trace"},
   {id:"S-0826-04",kind:"diagnostics",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页启动闪退",detail:"bounded HiLog + screenshot · no ring session",when:"今天 11:06",day:"今天",icon:"diagnostics",action:"打开诊断记录"},
   {id:"S-0825-01",kind:"viewer",st:"succeeded",mode:"execute",dev:"DAYU200",what:"桌面窗口结构",detail:"96 个节点 · 截图已关联",when:"昨天 17:20",day:"昨天",icon:"dump",action:"在 Viewer 中打开"},
-  {id:"S-0713-06", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
-  {id:"S-0712-01", st:"succeeded",   mode:"execute",   dev:"DAYU200", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
-  {id:"S-0712-02", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200", when:"07-12 15:40"},
-  {id:"S-0712-03", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景(reconcile 一致)", when:"07-12 16:11"},
-  {id:"S-0711-04", st:"interrupted", mode:"execute",   dev:"DAYU200", what:"Flash · flash-partitions(outcomeUnknown)", when:"07-11 23:47"},
-  {id:"S-0711-05", st:"failed",      mode:"execute",   dev:"DAYU200", what:"Viewer · elementTree(设备离线)", when:"07-11 20:15"}
+  {id:"S-0713-06", kind:"trace", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
+  {id:"S-0712-01", kind:"trace", st:"succeeded",   mode:"execute",   dev:"DAYU200", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
+  {id:"S-0712-02", kind:"flash", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200", when:"07-12 15:40"},
+  {id:"S-0712-03", kind:"flash", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景(reconcile 一致)", when:"07-12 16:11"},
+  {id:"S-0711-04", kind:"flash", st:"interrupted", mode:"execute",   dev:"DAYU200", what:"Flash · flash-partitions(outcomeUnknown)", when:"07-11 23:47"},
+  {id:"S-0711-05", kind:"viewer", st:"failed",      mode:"execute",   dev:"DAYU200", what:"Viewer · elementTree(设备离线)", when:"07-11 20:15"}
 ];
 HIST.push(
   {id:"S-0825-02",kind:"debug",st:"succeeded",mode:"execute",dev:"DAYU200",what:"Debug · libentry.so",detail:"deploy.native-library.app-owned@1",when:"08-25 16:00",day:"昨天",icon:"debug"},
@@ -984,7 +984,35 @@ Object.assign(HIST.find(h=>h.id==="S-0826-04"), {
   op:"capture.diagnostics@1",effect:"readOnly",target:"TGT-958780b2ffb7",binding:3,thread:"t-design-diagnostics",
   inputs:{durationSeconds:10,captureHilog:true,uiDump:false},detail:"bounded HiLog · markers.json · no clock calibration"
 });
-HIST.forEach(h=>{if(!h.kind)h.kind=h.what.startsWith("Trace")?"trace":h.what.includes("Viewer")?"viewer":h.what.startsWith("Flash")?"flash":"diagnostics";if(!h.day)h.day="更早";if(!h.icon)h.icon=h.kind==="viewer"?"dump":h.kind;if(!h.detail)h.detail=h.dev+" · "+h.id;if(!h.action)h.action=h.kind==="trace"?"打开 Trace":h.kind==="viewer"?"在 Viewer 中打开":h.kind==="flash"?"在 Flash 中打开":"打开诊断记录";});
+// Explicit design inventories, not files inferred from an activity kind or
+// title. Omitted fields stay unreported, including on the older sample rows.
+const HISTORY_DETAIL_SAMPLES={
+  'S-0826-02':{actualEffect:'deviceMutation',outcomeUnknown:false,inputs:{durationSeconds:1,captureHilog:false,uiDump:true,uiComponentTree:true,uiScreenshot:true},artifacts:[
+    {name:'ui-dump.json',role:'raw',privacy:'sensitive',status:'published'},
+    {name:'ui-tree.json',role:'raw',privacy:'sensitive',status:'published'},
+    {name:'screenshot.png',role:'raw',privacy:'sensitive',status:'published'},
+    {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published'},
+    {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published'}]},
+  'S-0826-03':{actualEffect:'deviceMutation',outcomeUnknown:false,inputs:{durationSeconds:30,captureHilog:false,uiDump:false,traceCategories:['app']},artifacts:[
+    {name:'trace.htrace',role:'raw',privacy:'sensitive',status:'published'},
+    {name:'capture.log',role:'log',privacy:'standard',status:'published'},
+    {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published'},
+    {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published'}]},
+  'S-0826-04':{actualEffect:'readOnly',outcomeUnknown:false,bindingRevision:3,artifacts:[
+    {name:'hilog.txt',role:'raw',privacy:'sensitive',status:'published'},
+    {name:'markers.json',role:'derived',privacy:'standard',status:'published'},
+    {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published'},
+    {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published'}]},
+  'S-0825-02':{op:'deploy.native-library.app-owned@1',actualEffect:'deviceMutation',outcomeUnknown:false,artifacts:[
+    {name:'publish-report.json',role:'derived',privacy:'standard',status:'published'},
+    {name:'verification-report.json',role:'derived',privacy:'standard',status:'published'}]},
+  'S-0825-03':{op:'capture.diagnostics@1',actualEffect:'deviceMutation',outcomeUnknown:false,inputs:{durationSeconds:1,captureHilog:false,uiDump:false,uiScreenshot:true},artifacts:[
+    {name:'screenshot.png',role:'raw',privacy:'sensitive',status:'published'},
+    {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published'},
+    {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published'}]}
+};
+for(const [id,detail] of Object.entries(HISTORY_DETAIL_SAMPLES))Object.assign(HIST.find(h=>h.id===id),detail);
+HIST.forEach(h=>{if(!h.kind)h.kind="other";if(!h.day)h.day="更早";if(!h.icon)h.icon=h.kind==="viewer"?"dump":h.kind;if(!h.detail)h.detail=h.dev+" · "+h.id;if(!h.action)h.action=h.kind==="trace"?"打开 Trace":h.kind==="viewer"?"在 Viewer 中打开":h.kind==="flash"?"在 Flash 中打开":"打开诊断记录";});
 // Explicit design fixtures, never Runtime evidence. Keep retained unknowns
 // first to exercise the same attention-first page order as the native App.
 if(['retained','unknown','waiting','running'].includes(PARAMS.get('flashHistory'))){
@@ -1120,14 +1148,14 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("pointerdown",e=>{if(!$("deviceMenu").hidden&&!$("deviceMenu").contains(e.target))closeDeviceMenu();});
 
 /* ---------- jobs ---------- */
-function addJob(j){j.id="J"+(S.jobSeq++);j.cancelled=false;S.jobs.push(j);openDrawer();renderDrawer();return j;}
+function addJob(j){j.id="J"+(S.jobSeq++);j.createdAtUTC=new Date().toISOString();j.cancelled=false;S.jobs.push(j);openDrawer();renderDrawer();return j;}
 function startJob(j){j.timer=setTimeout(()=>advanceJob(j),j.tick);return j;}
 function advanceJob(j){
   if(j.state!=="running")return;
   if(j.cancelled&&j.phaseIdx<j.safeBoundary){j.log.push("— 已请求取消:等待安全边界 —");}
-  if(j.cancelled&&j.phaseIdx>=j.safeBoundary){finishJob(j,"cancelled","在安全边界停止;补偿动作已执行,参数已恢复。");return;}
+  if(j.cancelled&&j.phaseIdx>=j.safeBoundary){finishJob(j,"cancelled",lc('演示：已在安全边界取消；未提供补偿或参数读回证据。','Demo: cancelled at a safe boundary; no compensation or parameter readback evidence was supplied.'));return;}
   j.phaseIdx++;
-  if(j.phaseIdx>=j.phases.length){finishJob(j,"succeeded",j.doneMsg||"完成:raw 产物 hash 已写入 manifest。");return;}
+  if(j.phaseIdx>=j.phases.length){finishJob(j,"succeeded",j.doneMsg||lc('演示流程结束；未提供 Artifact 校验事实。','Demo flow ended; no Artifact verification facts were supplied.'));return;}
   const ph=j.phases[j.phaseIdx];
   j.log.push("→ "+ph);
   if(j.pauseAt===ph){j.awaiting=true;j.log.push("检测到断连后回连:等待用户 rebind 确认(不静默续刷)。");
@@ -1136,7 +1164,7 @@ function advanceJob(j){
   j.timer=setTimeout(()=>advanceJob(j),j.tick);
 }
 function finishJob(j,state,msg){
-  j.state=state;j.log.push(msg);
+  j.state=state;j.finishedAtUTC=new Date().toISOString();j.log.push(msg);
   histFromJob(j);
   if(j.onDone)j.onDone(state);
   renderDrawer();renderPage();
@@ -1154,9 +1182,16 @@ function histFromJob(j){
     if(index<0)HIST.unshift(record);else HIST[index]=record;
     return;
   }
-  HIST.unshift({id:"S-live-0"+(S.histSeq++),
-    st:j.mode==="planOnly"?"planned":j.state,
-    kind:j.title.startsWith("Trace")?"trace":j.title.startsWith("Flash")?"flash":j.title.includes("Debug")?"debug":"other",icon:"history",detail:j.id,day:lc("今天","Today"),mode:j.mode,dev:j.dev||"DAYU200",what:j.title,when:lc("刚刚","Just now"),live:true});
+  const record={id:j.id,op:j.operation,st:j.state,kind:j.kind||'other',icon:j.kind||'history',
+    detail:j.id,day:lc('今天','Today'),mode:j.mode,dev:j.dev,what:j.title,when:lc('刚刚','Just now'),live:true,
+    target:j.target,bindingRevision:j.bindingRevision,sessionID:j.sessionID,thread:j.thread,
+    actualEffect:j.actualEffect,outcomeUnknown:j.outcomeUnknown,waitingForHuman:j.waitingForHuman,
+    outstandingResidueCount:j.outstandingResidueCount,createdAtUTC:j.createdAtUTC,finishedAtUTC:j.finishedAtUTC,
+    resolvedByTargetAliasResolutionID:j.resolvedByTargetAliasResolutionID,supersededByRecoveryEpochID:j.supersededByRecoveryEpochID,
+    timeline:j.log?.slice(),traceParameters:j.traceParameters?.map(parameter=>({...parameter})),inputs:j.inputs?JSON.parse(JSON.stringify(j.inputs)):undefined,
+    artifacts:j.artifacts?.map(artifact=>({...artifact}))};
+  const index=HIST.findIndex(h=>h.id===j.id);
+  if(index<0)HIST.unshift(record);else HIST[index]=record;
 }
 function renderDrawer(){
   const rows=inspectorJobs(),running=rows.filter(inspectorCanCancel);
@@ -1168,7 +1203,7 @@ function renderDrawer(){
 function inspectorJobs(){
   if(S.jobs.length)return S.jobs.slice().reverse();
   if(PARAMS.get('jobState'))return [{id:'job-demo-global',standardLog:'capture.log',title:'capture.diagnostics@1',operation:'capture.diagnostics@1',state:PARAMS.get('jobState')==='unknown'?'waitingForRecovery':PARAMS.get('jobState'),outcomeUnknown:PARAMS.get('jobState')==='unknown',mode:'execute',dev:'TGT-958780b2ffb7',log:['queued','preflight','running']}];
-  return HIST.slice(0,4).map(h=>({id:h.id,title:h.what,operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:h.kind==='flash'?null:h.kind==='diagnostics'?'capture.log':null}));
+  return HIST.slice(0,4).map(h=>({id:h.id,title:h.what,operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:(h.artifacts||[]).find(a=>a.role==='log'&&a.privacy==='standard'&&a.status==='published')?.name||null}));
 }
 function inspectorCanCancel(job){
   return !job.outcomeUnknown&&['queued','planning','preflight','running','waitingForDevice','awaitingRebindConfirmation'].includes(job.state);
@@ -2894,7 +2929,7 @@ function startDebugDeployment(){
   if(!debugInputsReady()||S.debug.stage!=="ready")return;
   closeModal();
   S.debug.stage="running";
-  startJob(addJob({title:lc("部署 app-owned 动态库 · ","Deploy app-owned library · ")+S.debug.lib+" · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
+  startJob(addJob({title:lc("部署 app-owned 动态库 · ","Deploy app-owned library · ")+S.debug.lib+" · DAYU200",kind:'debug',operation:'deploy.native-library.app-owned@1',mode:"execute",dev:"DAYU200",risk:2,state:"running",
     phases:["Preflight","LeaseArtifact","ValidateELF","BackupCurrent","AtomicPublish","RestartAbility","ReadbackMaps","Complete"],
     phaseIdx:0,safeBoundary:3,tick:460,
     log:["→ Preflight",lc("来源：","Source: ")+(S.debug.pickedFrom||lc("本地文件 · ","Local file · ")+S.debug.picked)],pages:["debug"],
@@ -3603,7 +3638,20 @@ function flashAgain(){
 }
 
 /* ---------- History ---------- */
-function flashHistoryDetailHTML(h){
+function historyParameterValue(state,value){
+  if(state==='value')return value??lc('未报告','Not reported');
+  return ({missing:lc('缺失','Missing'),unreadable:lc('无法读取','Unreadable')})[state]||lc('未知','Unknown');
+}
+function historyParametersHTML(h){
+  const comparison={unchanged:lc('✓ 未改变','✓ Unchanged'),changed:lc('⚠ 已改变','⚠ Changed'),unverified:lc('? 未验证','? Unverified')};
+  const diffs=Array.isArray(h.traceParameters)?h.traceParameters:[];
+  const table=diffs.length?`<h2>${lc('参数前后对比','Parameters before / after')}</h2><div class="tablewrap" data-sync-id="history.parameters.traceDiff"><table><thead><tr><th>${lc('参数','Parameter')}</th><th>before</th><th>after</th><th>${lc('状态','Status')}</th></tr></thead><tbody>${diffs.map(p=>`<tr><td class="mono" style="overflow-wrap:anywhere">${esc(p.name)}</td><td>${esc(historyParameterValue(p.beforeState,p.beforeValue))}</td><td>${esc(historyParameterValue(p.afterState,p.afterValue))}</td><td>${comparison[p.comparison]||comparison.unverified}</td></tr>`).join('')}</tbody></table></div>`:'';
+  if(!h.inputs)return table||`<h2>${lc('参数','Parameters')}</h2><p class="hint">${lc('此旧版 Job 未报告类型化参数。','This older Job did not report typed parameters.')}</p>`;
+  const entries=Object.entries(h.inputs);
+  if(!entries.length)return table||`<h2>${lc('参数','Parameters')}</h2><p class="hint">${lc('此 Job 未记录参数。','This Job recorded no parameters.')}</p>`;
+  return table+`<h2>${lc('请求的类型化输入','Requested typed inputs')}</h2><dl class="kv" data-sync-id="history.parameters">${entries.map(([name,value])=>`<dt class="mono" style="overflow-wrap:anywhere">${esc(name)}</dt><dd>${esc(typeof value==='string'?value:JSON.stringify(value))}</dd>`).join('')}</dl>`;
+}
+function histDetail(h){
   const missing=lc('未报告','Not reported');
   const artifacts=Array.isArray(h.artifacts)?h.artifacts:[];
   const certainty=h.outcomeUnknown===true?lc('结果未知','Outcome unknown'):h.outcomeUnknown===false?lc('已确认','Confirmed'):missing;
@@ -3617,58 +3665,26 @@ function flashHistoryDetailHTML(h){
   </dl>
   ${flashEpochEstablished(h)?`<p class="hint">${lc('原 Job 的结果仍未知；后续恢复关系只说明当前目标状态已建立。','The original Job remains unknown; the later recovery relation establishes only the current target state.')}</p>`:''}
   ${h.timeline?.length?`<h2>${lc('Journal 摘要','Journal summary')}</h2><div class="mono" data-sync-id="history.detail.timeline.entries">${h.timeline.map(entry=>`<div>${esc(entry)}</div>`).join('')}</div>`:`<p class="hint">${lc('此样本未提供 Journal 摘要。','This sample does not provide a Journal summary.')}</p>`}
+  ${historyParametersHTML(h)}
   <h2>Artifact</h2><div data-sync-id="history.artifacts" style="display:grid;gap:12px;margin-block:12px">
     ${artifacts.map(artifact=>`<article class="card" aria-label="${esc(artifact.name)}" style="min-width:0;overflow-wrap:anywhere"><b class="mono">${esc(artifact.name)}</b><span class="hint">${esc([artifact.role||missing,artifact.privacy||missing,artifact.status||missing].join(' · '))}</span><span class="hint">${lc('大小','Size')} · ${Number.isInteger(artifact.byteCount)?artifact.byteCount:missing}</span><span class="mono">SHA-256 · ${esc(artifact.sha256||missing)}</span><button class="btn" style="align-self:flex-start" ${artifact.status==='published'?'':'disabled'} data-job-id="${esc(h.id)}" data-artifact-name="${esc(artifact.name)}" onclick="exportModal(this.dataset.jobId,this.dataset.artifactName)">${lc('导出…','Export…')}</button></article>`).join('')||`<p class="hint">${lc('此样本未提供 Artifact 清单。','This sample does not provide an Artifact inventory.')}</p>`}
   </div><p class="hint">${lc('设计样本：字段未提供时保持未报告。实际大小、SHA-256 与发布状态仅取对应 Job 的 Runtime 清单，不按操作名称推断。','Design sample: omitted fields remain unreported. Actual size, SHA-256 and publication status come only from the matching Job inventory, never from the operation name.')}</p>`;
 }
-function histDetail(h){
-  if(h.kind==="flash")return flashHistoryDetailHTML(h);
-  const isTrace=h.kind==="trace",isDump=h.kind==="viewer";
-  let art="";
-  if(isTrace)art=`<tr><td class="mono">trace.htrace</td><td>raw / device · size / sensitive / published</td><td class="mono">artifact.list → SHA-256</td></tr>
-    <tr><td class="mono">capture.log</td><td>log / host · size / private / published</td><td class="mono">artifact.list → SHA-256</td></tr>`;
-  else if(isDump)art=`<tr><td class="mono">stdout.elementtree.txt</td><td>raw / stdout · size / sensitive / published</td><td class="mono">artifact.list → SHA-256</td></tr>
-    <tr><td class="mono">sidecar.arkui.dump</td><td>raw / device · size / sensitive / published</td><td class="mono">artifact.list → SHA-256</td></tr>
-    <tr><td class="mono">merged.elementtree.json</td><td>derived / host · size / private / published</td><td class="mono">artifact.list → SHA-256</td></tr>`;
-  const params=(isTrace||isDump)?`
-    <h2 style="margin-top:4px">${lc("参数 before / after","Parameters before / after")}</h2>
-    <div class="tablewrap"><table>
-      <tr><th>${lc("参数","Arguments")}</th><th>before</th><th>after</th><th></th></tr>
-      <tr><td class="mono">persist.ace.trace.build.enabled</td><td class="mono">false</td><td class="mono">false</td><td><span class="chip ok">${lc("已恢复","Restored")}</span></td></tr>
-      <tr><td class="mono">persist.rosen.animationtrace.enabled</td><td class="mono">missing</td><td class="mono">missing</td><td><span class="chip dim">${lc("未改变","Unchanged")}</span></td></tr>
-    </table></div>`:"";
-  return `<dl class="kv">
-      <dt>${lc("状态","State")}</dt><dd>${STCHIP[h.st]||""} ${modeBadge(h.mode,h.mode==="simulated"?"fixture-a3":"")}</dd>
-      <dt>executionMode</dt><dd>${h.mode}</dd>
-      <dt>${lc("设备","Device")}</dt><dd>${esc(h.dev)} · binding rev 3</dd>
-      <dt>manifest</dt><dd class="mono">schema 1.0 · 9 steps · SHA e0a1…88f2</dd>
-      ${h.st==="interrupted"?lc("<dt>审计</dt><dd>outcomeUnknown @ flashPartition(system) · needsAttention · 未执行补偿:restoreParam×2</dd>","<dt>Audit</dt><dd>outcomeUnknown @ flashPartition(system) · needsAttention · compensation not performed: restoreParam×2</dd>"):""}
-      ${h.st==="cancelled"?lc("<dt>审计</dt><dd>用户取消 @ 安全边界;补偿动作已执行,参数已恢复</dd>","<dt>Audit</dt><dd>User cancelled at a safe boundary; compensation completed and parameters restored</dd>"):""}
-    </dl>
-    ${params}
-    <h2 style="margin-top:4px">Artifact</h2>
-    <div class="tablewrap"><table><tr><th>${lc("文件","File")}</th><th>role / origin · size · privacy · status</th><th>SHA-256</th></tr>${art||lc("<tr><td colspan=\"3\" class=\"empty\">无产物(planned 会话仅含 plan artifact)</td></tr>","<tr><td colspan=\"3\" class=\"empty\">No Artifacts (planned sessions contain a plan Artifact only)</td></tr>")}</table></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn" onclick="doneBtn(this,'已在访达中显示(演示)')">${lc("在访达中显示","Reveal in Finder")}</button>
-      <button class="btn" onclick="exportModal('${h.id}')">${lc("导出 Artifact…","Export Artifact…")}</button>
-    </div>`;
-}
 function exportModal(id,artifactName){
   const h=HIST.find(x=>x.id===id);
-  const flashArtifact=h?.kind==='flash'?(h.artifacts||[]).find(a=>a.name===(artifactName||(h.artifacts||[])[0]?.name)):null;
-  if(h?.kind==='flash'&&(!flashArtifact||flashArtifact.status!=='published'))return;
-  const artifact=flashArtifact?flashArtifact.name:h&&h.kind==="trace"?"trace.htrace":h&&h.kind==="viewer"?"stdout.elementtree.txt":"plan.json";
+  const artifact=(h?.artifacts||[]).find(a=>a.name===artifactName);
+  if(!artifact||artifact.status!=='published')return;
   const missing=lc('未报告','Not reported');
-  const size=flashArtifact?(Number.isInteger(flashArtifact.byteCount)?flashArtifact.byteCount:missing):lc("选中行的 byteCount","Selected row's byteCount");
-  const privacy=flashArtifact?flashArtifact.privacy||missing:lc("选中行的 privacy","Selected row's privacy");
-  const sha=flashArtifact?flashArtifact.sha256||missing:lc("选中行的完整 SHA-256","Selected row's full SHA-256");
-  const sensitive=flashArtifact?flashArtifact.privacy==='sensitive':true;
+  const size=Number.isInteger(artifact.byteCount)?artifact.byteCount:missing;
+  const privacy=artifact.privacy||missing;
+  const sha=artifact.sha256||missing;
+  const sensitive=artifact.privacy==='sensitive';
   modal(`<div class="modal" role="dialog" aria-modal="true">
     <h3>${lc("导出 Artifact","Export Artifact")}</h3>
-    <dl class="kv"><dt>${lc("文件","File")}</dt><dd class="mono">${esc(artifact)}</dd><dt>${lc("大小","Size")}</dt><dd>${esc(size)}</dd><dt>privacy</dt><dd>${esc(privacy)}</dd><dt>SHA-256</dt><dd class="mono">${esc(sha)}</dd></dl>
+    <dl class="kv"><dt>${lc("文件","File")}</dt><dd class="mono">${esc(artifact.name)}</dd><dt>${lc("大小","Size")}</dt><dd>${esc(size)}</dd><dt>privacy</dt><dd>${esc(privacy)}</dd><dt>SHA-256</dt><dd class="mono">${esc(sha)}</dd></dl>
     <div class="warnbox">${sensitive?lc('⚠ 这是显式敏感数据导出。','⚠ Sensitive data export.'):''} ${lc("确认后由 App 分块读取、复算 byteCount / SHA-256，再写入你选择的位置；目标路径不会发送给 daemon。","The App reads chunks, checks byteCount and SHA-256, then writes to your chosen location. The destination is never sent to the daemon.")}</div>
     <div class="mfoot"><button class="btn" onclick="closeModal()">${lc("取消","Cancel")}</button>
-      <button class="btn pri" onclick="doneBtn(this,'✓ 已导出并校验(演示)')">${sensitive?lc("导出敏感 Artifact…","Export sensitive Artifact…"):lc('导出 Artifact…','Export Artifact…')}</button></div>
+      <button class="btn pri" onclick="doneBtn(this,lc('演示结束：未写入文件','Demo complete: no file written'))">${sensitive?lc("导出敏感 Artifact…","Export sensitive Artifact…"):lc('导出 Artifact…','Export Artifact…')}</button></div>
   </div>`);
 }
 function historyWorkspace(kind){return {flash:"flash",debug:"debug",viewer:"dump",trace:"trace",device:"device-control",diagnostics:"diagnostics"}[kind];}
@@ -3682,13 +3698,21 @@ function openHistoryDesignDiagnostics(id){
   S.diagnostics.jobID=h.id;S.diagnostics.reader=h.hasTrace?'trace':'loaded';S.diagnostics.preview=null;
   go('diagnostics');
 }
-function filteredHistory(){
+const HISTORY_ACTIVE_STATES=['queued','preflight','running','waitingForDevice','awaitingRebindConfirmation','planning','cancelRequested','cancellingAtSafeBoundary','waitingForRecovery','reconciling','recoveringByCompleteOverwrite','resumeAtConfirmedSafeBoundary','userAbandonRequested','finalizing'];
+function historyNeedsAttention(h){return (!flashEpochEstablished(h)&&(h.outcomeUnknown===true||h.waitingForHuman===true))||h.outstandingResidueCount>0;}
+function historyDate(h){return Date.parse(h.finishedAtUTC??h.startedAtUTC??h.createdAtUTC);}
+function historyMatchesStatus(h,status){return status==='all'||(status==='attention'?historyNeedsAttention(h):status==='active'?HISTORY_ACTIVE_STATES.includes(h.st):h.st===status);}
+function historyMatchesMode(h,mode){return mode==='all'||(mode==='unknown'?h.mode==null:mode==='planOnly'?['planOnly','planned'].includes(h.mode):h.mode===mode);}
+function historyMatchesTime(h,time,now){return time==='all'||historyDate(h)>=now-({lastHour:3600,lastDay:86400,lastWeek:604800}[time]||0)*1000;}
+function resetHistoryFilters(){S.hf={kind:'all',query:'',status:'all',mode:'all',target:'all',session:'all',time:'all'};S.historyLimit=6;}
+function historyPreset(status){resetHistoryFilters();S.hf.status=status;if(status==='failed')S.hf.time='lastWeek';renderPage();}
+function filteredHistory(now=Date.now()){
   const f=S.hf,q=(f.query||'').trim().toLowerCase();
   return HIST.filter(h=>(f.kind==='all'||h.kind===f.kind)&&
-    (!q||[h.what,h.detail,h.dev,h.id].join(' ').toLowerCase().includes(q))&&
-    (f.status==='all'||(f.status==='attention'?h.st==='interrupted':h.st===f.status))&&
-    (f.mode==='all'||h.mode===f.mode)&&(f.target==='all'||h.dev===f.target)&&
-    (f.session==='all'||h.id===f.session)&&(f.time==='all'||h.day==='今天'||h.day==='Today'));
+    (!q||[h.id,h.sessionID,h.op,h.target,h.st,h.mode].some(value=>String(value||'').toLowerCase().includes(q)))&&
+    historyMatchesStatus(h,f.status)&&historyMatchesMode(h,f.mode)&&
+    (f.target==='all'||h.target===f.target)&&(f.session==='all'||h.sessionID===f.session)&&historyMatchesTime(h,f.time,now))
+    .sort((a,b)=>{const left=historyDate(a),right=historyDate(b);return (Number.isFinite(right)?right:-Infinity)-(Number.isFinite(left)?left:-Infinity)||b.id.localeCompare(a.id);});
 }
 function setHistoryFilter(key,value){S.hf[key]=value;S.historyLimit=6;renderPage();}
 function historyFilter(key,label,values){return `<label>${label}<select class="inp" aria-label="${label}" onchange="setHistoryFilter('${key}',this.value)">${values.map(([value,text])=>`<option value="${esc(value)}" ${S.hf[key]===value?'selected':''}>${esc(text)}</option>`).join('')}</select></label>`;}
@@ -3701,13 +3725,13 @@ function pHistory(){
     <section class="history-list"><div class="history-list-head"><div><h2>${lc('最近活动','Recent activity')}</h2><span class="hint">${lc('只读 Runtime 记录','Read-only Runtime records')}</span></div></div>
       <label class="history-search">${icon('search',true)}<input aria-label="${lc('搜索历史记录','Search history')}" value="${esc(S.hf.query)}" placeholder="${lc('搜索记录、操作或目标','Search records, operations or targets')}" onchange="setHistoryFilter('query',this.value)"></label>
       <details><summary>${lc('完整筛选','All filters')}</summary><div class="history-filter-row">
-        ${historyFilter('status',lc('状态','Status'),[['all',lc('全部','All')],['succeeded','succeeded'],['failed','failed'],['cancelled','cancelled'],['interrupted','interrupted'],['planned','planned'],['attention',lc('需要关注','Needs attention')]])}
-        ${historyFilter('mode',lc('执行模式','Execution mode'),[['all',lc('全部','All')],['execute','execute'],['planOnly','planOnly'],['simulated','simulated']])}
-        ${historyFilter('target',lc('目标','Target'),[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.dev))).map(x=>[x,x])])}
-        ${historyFilter('session','Session',[['all',lc('全部','All')],...HIST.map(h=>[h.id,h.id])])}
-        ${historyFilter('time',lc('时间','Time'),[['all',lc('不限','Any time')],['today',lc('今天','Today')]])}
-      </div><div class="device-actions"><button class="btn" onclick="S.savedHistoryFilter={...S.hf};renderPage()">${lc('保存筛选','Save filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.hf={...S.savedHistoryFilter};renderPage()">${lc('恢复筛选','Restore filter')}</button></div></details>
-      ${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${h.id}" onclick="S.histSel='${h.id}';renderPage()"><span class="history-record-icon">${icon(h.icon,true)}</span><span class="history-record-main"><b>${esc(h.what)}</b><span>${esc(h.detail)}</span><span class="history-record-tags"><span class="chip dim">${h.st}</span>${modeBadge(h.mode)}</span></span><span class="history-record-time">${h.when}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p>`}
+        ${historyFilter('status',lc('状态','Status'),[['all',lc('全部','All')],['active',lc('进行中','Active')],['attention',lc('需要关注','Needs attention')],['succeeded','succeeded'],['failed','failed'],['interrupted','interrupted'],['cancelled','cancelled']])}
+        ${historyFilter('mode',lc('执行模式','Execution mode'),[['all',lc('全部','All')],['execute','execute'],['planOnly','planned'],['simulated','simulated'],['unknown',lc('未知','Unknown')]])}
+        ${historyFilter('target',lc('目标','Target'),[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.target).filter(Boolean))).sort().map(x=>[x,x])])}
+        ${historyFilter('session','Session',[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.sessionID).filter(Boolean))).sort().map(x=>[x,x])])}
+        ${historyFilter('time',lc('时间','Time'),[['all',lc('不限','Any time')],['lastHour',lc('过去一小时','Last hour')],['lastDay',lc('过去一天','Last day')],['lastWeek',lc('过去一周','Last week')]])}
+      </div><div class="device-actions"><button class="btn" onclick="S.savedHistoryFilter={...S.hf};renderPage()">${lc('保存筛选','Save filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.hf={...S.savedHistoryFilter};S.historyLimit=6;renderPage()">${lc('恢复筛选','Restore filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.savedHistoryFilter=null;renderPage()">${lc('删除已存筛选','Delete saved filter')}</button><button class="btn" onclick="historyPreset('attention')">${lc('需要关注','Needs attention')}</button><button class="btn" onclick="historyPreset('failed')">${lc('最近失败','Recent failures')}</button><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button></div></details>
+      ${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${h.id}" onclick="S.histSel='${h.id}';renderPage()"><span class="history-record-icon">${icon(h.icon,true)}</span><span class="history-record-main"><b>${esc(h.what)}</b><span>${esc(h.detail)}</span><span class="history-record-tags"><span class="chip dim">${h.st}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${h.when}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
       ${all.length>rows.length?`<button class="btn" onclick="S.historyLimit+=6;renderPage()">${lc('加载更早记录','Load older records')}</button>`:''}
     </section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon,true)}</span><div><h2>${esc(sel.what)}</h2><p>${esc(sel.dev)} · <span class="mono" data-sync-id="history.detail.job">${sel.id}</span></p></div></div>
       <p>${esc(sel.detail)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" onclick="openHistoryDesignWorkspace('${sel.id}')">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" onclick="openHistoryDesignDiagnostics('${sel.id}')">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>

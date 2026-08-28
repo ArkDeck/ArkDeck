@@ -250,10 +250,12 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - History 是只读 Runtime 活动中心，不是第二套 Job 执行面。摘要只来自 `job.list`；选中记录后才按需加载详情与 Artifact metadata，不用 fixture 或本地推断补齐缺失事实。
 - 宽屏三栏为活动类型导航 → 最近记录 → detail inspector。活动类型按 published operation 归入 Flash、Debug、Viewer、Trace、Diagnostics 与 Device；未识别 operation 保留在「其他」和「全部记录」，不得错误映射到相似工具。窄窗把完整筛选移到记录上方，并保留记录与详情的关联。
 - 支持全文搜索、status、executionMode、session、device/target 与 time 筛选；筛选可保存到 toolbar menu。「需要关注」与「最近失败」是筛选预设，不改变 Runtime state。
+- 搜索和筛选使用精确 Job / Session / operation / target / state / executionMode，不把 Job ID 当 Session，也不把显示设备名当 target。active 只匹配已知非终态；needsAttention 使用未解决的 unknown / waitingForHuman 或实际残留计数，有恢复关系的历史 unknown 不因旧 unknown 本身继续报警。时间区间为过去一小时、一天、一周，按 reported finished / started / created 判断；缺失时刻不从“今天”标签推算。支持恢复、删除已存筛选和清除筛选。
 - interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。plan-only / simulated badge 在记录、详情与导出中永久保留。
 - 对已知活动类型提供「在 Flash / Debug / Viewer / Trace / Diagnostics 中打开」，只导航并恢复可由已验证记录支持的上下文；它不重放 operation、不把历史 Artifact 当成 fresh device fact，也不绕过目标工作区的 Runtime 准入。
 - `capture.diagnostics@1` 即使归类为 Viewer / Trace，也另提供「打开诊断工具」来读取同一 Job 的多通道制品。原分类不变；Diagnostics → Trace 的只读转交继续显示 exact Job 来源，不创建或重放 Job。
 - Detail 分组为 Summary / Timeline / Correlation / Evidence / Parameters / Artifacts / Recovery linkage。Artifact 行展示 name / role / origin / size / SHA-256 / privacy / status；关联视图只表达同一 Runtime 投影中已证明的 Job、Session、operation、target 与 Artifact identity。
+- 所有 History 类型共用事实规则：未报告的 binding、manifest、hash、Journal 或 Artifact 保持缺失，不按 kind/状态填默认值。typed inputs 区分未报告与明确空参数；before / after 仅显示显式 traceParameters，保留 missing / unreadable / unknown 及 unchanged / changed / unverified。cancelled 不证明补偿或参数恢复，unchanged 也不等于执行过恢复。稿件中的样本值明确标为演示。
 - 导出以单个 Artifact 为边界：先显示文件名、size、privacy 与 SHA-256；敏感 Artifact 要求显式确认。App 以有界 chunk 读取、复算 byteCount / SHA-256 后写入用户选择的位置，目标路径不跨 daemon 边界。成功后可在 Finder 定位。
 
 ### 5.10 Settings
