@@ -408,6 +408,7 @@ for (const name of dsLight.keys()) {
     "flash-result-icon": "Flash terminal result symbol frame",
     "flash-result-copy": "Flash terminal result text layout",
     "flash-details": "native disclosure for secondary Flash facts",
+    "flash-recovery": "Flash-only vertical layout for the existing warnbox Callout",
     "flash-detail-grid": "Flash fact layout inside disclosure",
     "debug-shell": "Debug page layout",
     "debug-scope": "Debug target and binding summary row",

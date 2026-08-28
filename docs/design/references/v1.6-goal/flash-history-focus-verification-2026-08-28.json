@@ -20,9 +20,9 @@
     "testCount": 47,
     "exitCode": 0,
     "log": {
-      "privateFile": "f36-design-tests-05.log",
-      "byteCount": 4376,
-      "sha256": "8b6593d159eb63253b8583da1d9759e8467daec6eec8dce6e8d9a5d7355109a1"
+      "privateFile": "f36-design-tests-06.log",
+      "byteCount": 4370,
+      "sha256": "29bf09eb38690bf2745d081e90f086797083be94169488f20058443d9245ef2a"
     }
   },
   "designReferences": {
@@ -106,6 +106,16 @@
         "byteCount": 244599,
         "sha256": "82d8388b0769b011b4b4fe3c845a728ec4c1df24f18d0bc40c73722aeeed41d6"
       }
+    },
+    {
+      "kind": "CI design class inventory",
+      "exitCode": 1,
+      "reason": "The final Flash warning vertical layout class was added after the initial design build and was not yet registered. Registered it as page-specific layout of the existing warnbox Callout; no component/token rule was weakened.",
+      "log": {
+        "privateFile": "f36-ci-ds-failure-01.log",
+        "byteCount": 1969,
+        "sha256": "f04b51fae6921e8b3247f49a4590c2625fa837e732db6b20a6ca12e42d83a241"
+      }
     }
   ],
   "limitations": [
@@ -118,18 +128,18 @@
       "command": "npm --prefix docs/design/arkdeck-ds run build",
       "exitCode": 0,
       "log": {
-        "privateFile": "f36-design-build.log",
+        "privateFile": "f36-design-build-02.log",
         "byteCount": 697,
-        "sha256": "334b3ac24b4c3a5cc2216e91a278cc63e35b95a70c1a27dc8ec727ab7f351c85"
+        "sha256": "87686d0a4e8610e9f10f7679620ac348bccc2ec49a606ee122388b19d38233e9"
       }
     },
     {
       "command": "npm --prefix docs/design/arkdeck-ds run build:review",
       "exitCode": 0,
       "log": {
-        "privateFile": "f36-design-review-build.log",
-        "byteCount": 315,
-        "sha256": "483884b090df6cfa57569d2d9f3572af35782ffbd029a190280c1429bcd45ed5"
+        "privateFile": "f36-design-review-build-02.log",
+        "byteCount": 314,
+        "sha256": "90bff39e6f06fae3544da7c7bc3eb44b40f303f68a2fdc5298f0245d5f6d876d"
       }
     }
   ],
@@ -164,7 +174,8 @@
       "privateFile": "f36-local-gate-02.log",
       "byteCount": 508941,
       "sha256": "0448794296b0f288ada609b7d9f4f71a9e6c2656bb3927a941864fea43839838"
-    }
+    },
+    "postGateChanges": "Only design class inventory and verification records changed after this gate; Swift/App production and test sources are unchanged."
   },
   "manualNativeFixtureChecks": {
     "method": "Computer Use on the final signed App, launched with the existing isolated UI-test flags. Both instances were closed after inspection.",
@@ -262,5 +273,14 @@
       "The generic History detail fixture is not a postflight verifier. Only summary/card state and exact navigation were checked; synthetic evidence fields do not prove hardware success.",
       "The running-state XCTest assertion remains unexecuted in this turn; the shared priority is covered by the full contract suite."
     ]
+  },
+  "finalDesignTokenCheck": {
+    "exitCode": 0,
+    "result": "24 tokens x 2 themes, 16 DS-only, every prototype class accounted for",
+    "log": {
+      "privateFile": "f36-final-token-check.log",
+      "byteCount": 115,
+      "sha256": "073a797029f60a9b4beee17be5acef71ff49ed5a1eff85cffe5b7d94eca7ce5c"
+    }
   }
 }
