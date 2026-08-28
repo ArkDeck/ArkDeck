@@ -176,9 +176,9 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
-| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37 将 Flash Journal 留在详情，Artifact 只取明确清单；缺失不补默认值 |
+| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开 |
 | history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；F37 按 exact Artifact 预览，未发布禁用；与App诊断导出不同 |
-| history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | 全部六类保留精确来源；Diagnostics 加载保存 Session，可将校验过的 Trace 转交 Viewer；不重放 |
+| history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | App 全部六类保留精确来源；F39 补原型遗漏的来源信息与 Inspector 跳转字段；Diagnostics 可将校验过的 Trace 转交 Viewer；不重放，原型不读取历史文件 |
 
 ### Settings（GJ-1—4）
 
@@ -513,4 +513,53 @@ Trace Viewer/帮助通过；中文全页独立复测 30.427 秒、英文全页�
 修改代码、超时或断言。此轮只证明 App 呈现，不新增设备验收，也不能替代 F38 的 HTML
 视觉检查。详情见 [F38 验证记录](references/v1.6-goal/history-facts-verification-2026-08-28.json)。
 
-F38 本地统一闸 exit 0：18 项 planner、9 项 workflow、SDD 0/0、49 项 catalog 及生成物零漂移通过；设计/文档差异不分配 Swift/App 编译。浏览器视觉验收仍未通过，不据此转为可合入或 goal 完成。
+F38 本地统一闸 exit 0：18 项 planner、9 项 workflow、SDD 0/0、49 项 catalog 及生成物零漂移通过；设计/文档差异不分配 Swift/App 编译。当时浏览器视觉验收未完成；用户随后手动恢复预览，补验及其发现的修正见 F39，不把当时的门禁结果视为视觉通过。
+
+## 2026-08-28 F39：History 只读来源和详情投影补齐
+
+GJ-1—4。#1573 已合入 `71eb0b07`，源码与 F38 最终提交完全相同。再次逐字段检查
+`RuntimeHistoryView` / `RuntimeHistoryWorkspaceContext` / App 的路由发现：原型的工作区
+入口多数只切页，没有保留来源；全局 Inspector 的缺省跳转另造 Diagnostics 行，丢掉
+operation、unknown 与身份；详情虽不再补造值，仍少了已实现的关联与证据分组。
+
+修正：六类工作区显示可关闭的 exact Job / target / operation / state / Artifact 来源快照，
+仅在对应页面可见；Viewer/Trace 转交 Diagnostics 不改原分类。Debug 页按当前 published
+operation 选择 Apps / Artifacts / Logs / Network。Inspector 复用同一 Job 投影，保留原
+类型、unknown、identity、时间与 Journal，不创建新的默认 Diagnostics 记录。
+
+详情补齐 Session、三个时间字段、身份匹配的 Correlation 与同 Session 筛选、Evidence 的
+Provider/Catalog/binding/authority/观测/终态/mode/effect/首条证据/step/blocker，及 Artifact
+来源操作、媒体类型、状态原因。未报告清单与明确空/plan-only 清单分开，缺失恢复标志
+不默认为无需恢复。只有显式样本字段参与展示，不造 hash、authority 或固件事实。
+设计仍不读取历史文件，来源信息明确说明工作区示例不是该 Job 的真实 Artifact。
+
+新增三项回归先复现缺口（52 通过、3 失败），修正后 55 项全部通过。首次设计构建识别出
+五个尚未登记的页面布局 class；现逐项登记为组合既有组件的 History 布局，没有放宽检查。
+原有 60 个检查单元、20 个 App View、31 个 preview 清单一致；
+这只证明覆盖清单，没有将源码数量作为页面视觉一致的证据。
+
+用户手动打开本机预览后，复用该标签完成 F38/F39 浏览器走查，未绕过此前 URL policy。
+实测又修正：改条件导致完整筛选收起、搜索必须失焦才更新、按 viewport 而非工作区切栏、
+长详情带走记录列表、工具栏标签拆行、Inspector 的 `waitingForRecovery` 裁切，以及切换
+语言后深色外观误标为系统外观。现在即时搜索保留焦点/光标；筛选保持展开；890 工作区
+边界与原生一致，窄窗活动选择器、双栏独立滚动和更窄时上下排列均可用。
+
+六类工作区双语来源回访、关闭/跨页隐藏、Viewer 转交 Diagnostics、精确 Session/target、
+保存/清除/恢复/删除、时间与 planned 筛选、旧 cancelled 缺失事实、unknown 与已恢复关联
+保留、Inspector 精确跳转、深色外观和弹层 Escape 焦点返回已实际点击验证。六类共 21 个
+样本文件分别完成中英文逐项导出预览（42 次），隐私与缺失大小/哈希正确；演示确认明确
+说明未写出文件。34 张原始 JPEG 已查看、核对尺寸与 SHA-256。实际 viewport 为 842×750；
+两张宽栏 reference 为 1180×760 CSS 窗口的 fullPage 输出，保留额外画布，不作像素等价证明。
+
+浏览器记录保留 80 条通过断言及 3 次未通过尝试：一次批量清空未生效后用实际键盘清空
+复测；两次断言误要求 UI 未显示的 recovery ID / 错误 handler 名，经核对原生代码和实际
+控件身份后修正检查。没有为这些断言修改产品语义。外观标签新增回归先得到 57 通过/1
+失败，修正后最终 **58/58**；设计包和 review 构建均通过。
+
+本项没有生产 App/Runtime/Catalog 变化，不重复设备操作；既有真机和原生结果保留原记录
+范围及失败尝试。本项浏览器缺口已补验，后续仍须维护者 review/merge，不提前标记 goal
+完成。完整字段、截图与日志哈希见 [F39 验证记录](references/v1.6-goal/history-readonly-verification-2026-08-28.json)。
+
+最终统一路径闸 exit 0：18 项 planner、9 项 workflow、SDD 0 error/0 warning（121 AC）、
+49 项 catalog 与生成物零漂移通过。44 个改动均为设计/文档/参考图，Swift/App 编译车道
+均未分配；未把此闸作为新增设备验收。

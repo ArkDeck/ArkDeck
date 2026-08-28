@@ -368,6 +368,13 @@ for (const name of dsLight.keys()) {
     "settings-workspace": "native Settings scene approximation",
     "settings-tabs": "Settings scene navigation layout",
     "history-filter-row": "history filter layout",
+    "history-page": "History-only responsive container, matching the native workspace-width boundary",
+    "history-compact-activity": "History compact activity picker layout using the existing Select component",
+    "history-detail-section": "History-only section spacing around existing key/value and inventory components",
+    "history-facts": "History-only wrapping for existing KeyValueList in detail and source-context columns",
+    "history-artifacts": "History inventory layout composing the existing Card and Button components",
+    "history-linked-artifact": "History correlation row spacing around existing key/value metadata",
+    "history-context": "History destination source-context layout composing key/value facts and a dismiss button",
     // vs-* 画的是被抓取的那台设备自己的界面（占位截图），不是 ArkDeck 的界面。
     // 生产 Viewer 这里放的是 screenshot.png，所以它们永远不会变成 DS 组件。
     "vs-card": "device-screenshot stand-in", "vs-nav": "device-screenshot stand-in",

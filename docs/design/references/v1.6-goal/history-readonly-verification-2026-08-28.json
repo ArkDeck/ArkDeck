@@ -1,0 +1,651 @@
+{
+  "date": "2026-08-28",
+  "finding": "F39",
+  "goldenJourneys": [
+    "GJ-1",
+    "GJ-2",
+    "GJ-3",
+    "GJ-4"
+  ],
+  "baseRevision": "71eb0b07436cfe8eca67b7016f89c04e823ea31b",
+  "evidenceKind": "Repository design correction, browser interaction and host tests; no new device acceptance",
+  "cause": "History workspace navigation dropped exact source metadata; Inspector fallback lost kind/operation/unknown; detail groups omitted existing native fields. Browser review also exposed filter collapse, blur-only search, viewport-based columns, shared scrolling and clipped toolbar/Inspector labels.",
+  "changes": [
+    "Preserve source metadata in all six readonly workspaces and Viewer/Trace forwarding; never read sample workspace files as the historical Job.",
+    "Preserve exact Inspector record identity, operation, kind and unknown state.",
+    "Project explicit summary/correlation/evidence/artifact/recovery fields and distinguish missing facts from explicit empty facts.",
+    "Use immediate search with focus/caret preservation; keep filter disclosure expanded across changes, clear/save/restore.",
+    "Use the native 890-point workspace boundary for compact activity selection, independent list/detail scrolling, and a stacked layout below 620 points.",
+    "Keep toolbar labels on one line, wrap long Inspector state chips, and preserve actual appearance labels after locale/page rendering."
+  ],
+  "sourceHashes": {
+    "docs/design/prototype.html": "86fb494b7f25a6adc6c54ebe7eee94be2a3d4c09fb30603d129a9fb5969d381d",
+    "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs": "d556f633eed07e202817ec4a5676535c140bc1f59a232e91b25dd1fbb79b05a2",
+    "docs/design/arkdeck-ds/scripts/check-tokens.mjs": "9635e640198df577e6b41ddf95d38b533d73011307a34ca360286183aa23348d"
+  },
+  "designTests": {
+    "command": "npm --prefix docs/design/arkdeck-ds test",
+    "testCount": 58,
+    "passed": 58,
+    "failed": 0,
+    "exitCode": 0,
+    "log": {
+      "privateFile": "f39-design-tests-final-58.log",
+      "byteCount": 5544,
+      "sha256": "8d547fd7c48c1e70d0ffd835781710e2d1f40fc655958f9198779335ec5ddc92"
+    },
+    "initialRegression": {
+      "passed": 52,
+      "failed": 3,
+      "log": {
+        "privateFile": "f39-design-tests-red-01.log",
+        "byteCount": 8287,
+        "sha256": "18ee77a19a1889864c59597ef6296c92a19397c185853dbb46e6d2fcef303c77"
+      }
+    },
+    "appearanceRegression": {
+      "passed": 57,
+      "failed": 1,
+      "log": {
+        "privateFile": "f39-appearance-label-red.log",
+        "byteCount": 6559,
+        "sha256": "4365e8de3ba6fe5bed5cebe65d60208770bcf7395b8735c643504aa7ccfc7a17"
+      }
+    }
+  },
+  "designBuilds": [
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f39-design-build-final-58.log",
+        "byteCount": 696,
+        "sha256": "73492607253cb118bb213d9e8a456e3d4192fd35361485dacd63dc95947ba98b"
+      }
+    },
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build:review",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f39-design-review-build-final-58.log",
+        "byteCount": 314,
+        "sha256": "8a4c62c4b5d7c19a3a6b7060eeb075f492f4ab739435298d871c207e923ef657"
+      }
+    }
+  ],
+  "earlierBuildFailure": {
+    "reason": "Five new page layout classes were not classified. Explicit composition roles were registered without relaxing the checker.",
+    "log": {
+      "privateFile": "f39-design-build-01.log",
+      "byteCount": 2098,
+      "sha256": "5aedc326e7b027dc3ee02990f0cca433c116e344fc4208f8c91197db567003c6"
+    }
+  },
+  "coverage": {
+    "surfaceCount": 60,
+    "appViewFileCount": 20,
+    "previewFileCount": 31,
+    "boundary": "Inventory equality is not visual or behavioral equivalence. Existing all-page native and device results retain their own source revisions."
+  },
+  "browserValidation": {
+    "completed": true,
+    "restoration": "The user manually opened the allowed local HTTP preview; the existing user tab was claimed. No alternative browser or policy bypass was used.",
+    "baseURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+    "viewport": {
+      "width": 842,
+      "height": 750
+    },
+    "layoutWidths": [
+      510,
+      760,
+      1132
+    ],
+    "layoutWidthUnit": "CSS content width after padding; 842x750 viewport, sidebar shown/hidden, and the 1180x760 CSS reference window",
+    "passedAssertions": 80,
+    "nonPassingAttempts": 3,
+    "attemptExplanations": [
+      {
+        "name": "combined Session and target filters stay expanded and retain the exact record",
+        "resolution": "Query remained no-such-record after a bulk fill clear. Explicit keyboard select-all/backspace cleared it; all subsequent combined filter/save/restore/clear checks passed. Cause not attributed."
+      },
+      {
+        "name": "wide three-column retained recovery preserves unknown outcome",
+        "resolution": "Assertion incorrectly expected a recovery epoch ID in visible text. Native RuntimeHistoryView.recoverySection renders state rather than that identifier. Corrected expectation passed without a product-code change."
+      },
+      {
+        "name": "Escape closes export and returns focus to the exact Artifact control",
+        "resolution": "The assertion expected the wrong handler name. The observed button already had exact Job and Artifact attributes; a check of those DOM identities passed without product changes."
+      }
+    ],
+    "checksLog": {
+      "privateFile": "f39-browser-validation.json",
+      "byteCount": 70819,
+      "sha256": "7a5ed57c115da0fa4dda3e0f2d7aaf8bd6834ce6dcfc8e6c50c6327cb1cfff8f"
+    },
+    "checks": [
+      "All six readonly destination contexts in both languages, exact source ID, dismissal and cross-page hiding.",
+      "Viewer-to-Diagnostics handoff preserves original kind and Job.",
+      "42 exact Artifact previews: 21 explicit sample files in each language, correct privacy and unreported byte/hash fields.",
+      "Standard export confirmation explicitly says no file was written; sensitive preview and cancel remain separate.",
+      "Exact Session/target, immediate search, empty selection, time filter, planned mode, save/clear/restore/delete.",
+      "Legacy cancelled Trace does not invent typed parameters, Artifact inventory or completed recovery.",
+      "Unresolved unknown remains in attention; resolved retained unknowns keep their original unknown outcome.",
+      "Inspector-to-History keeps exact unknown Job, operation, target and kind; full state chip fits its list column.",
+      "Single/two/three-column layouts, independent pane scrolling, long values and export controls.",
+      "Both-language dark appearance, accurate appearance label after switching language, Escape closes export and returns focus to its exact Artifact button."
+    ],
+    "wideReference": {
+      "cssWidth": 1180,
+      "cssHeight": 760,
+      "captureMode": "fullPage",
+      "note": "Actual viewport remains 842×750; unmodified fullPage captures preserve the browser output, including extra canvas. No pixel-equivalence claim."
+    },
+    "screenshotsViewed": 34,
+    "screenshots": [
+      {
+        "file": "history-readonly-context-debug-en.jpg",
+        "language": "en",
+        "state": "context-debug",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 72978,
+        "sha256": "3e4c3fb9842584f3f567b20c7743c2b22e84c58092b6efc0abc53a064cd2b926",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-debug-zh.jpg",
+        "language": "zh-Hans",
+        "state": "context-debug",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 66589,
+        "sha256": "dd1dd56bdac3b646e0b4d6749a632454ef8ce5cd9b0352a6aaabe7e1fb8f1daa",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-device-en.jpg",
+        "language": "en",
+        "state": "context-device",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 63442,
+        "sha256": "7607c86e95c36366e23c14bc7ae3e83e717cec4d02c0bf29485dce5e64014c94",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-device-zh.jpg",
+        "language": "zh-Hans",
+        "state": "context-device",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 61009,
+        "sha256": "4c3523890e45f6b0452c47bd1ada41028a01684c5565ce18631cf22efc4564ce",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-diagnostics-en.jpg",
+        "language": "en",
+        "state": "context-diagnostics",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 77542,
+        "sha256": "abb73222b925fdb5030e697f381934d888f26c6c788fdd2873a972bf0134d457",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-diagnostics-zh.jpg",
+        "language": "zh-Hans",
+        "state": "context-diagnostics",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 69682,
+        "sha256": "77ae0d5367c337d66b12f802a79e7d1793759408560d7cd8064a3a23ce42b9fc",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-flash-en.jpg",
+        "language": "en",
+        "state": "context-flash",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 75148,
+        "sha256": "c598819c3d8f1b298dd7de05733d81fd73e225fbc9d894d6c7808b6d22b1f767",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-flash-zh.jpg",
+        "language": "zh-Hans",
+        "state": "context-flash",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 68550,
+        "sha256": "3c85c5dfc3715597a1b3ce6ecafee5888cbe47c143f29cc0a7c891fcf6132934",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-trace-en.jpg",
+        "language": "en",
+        "state": "context-trace",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 71715,
+        "sha256": "a6cd8a095994cbe711044a7a8c9172d14fe67e8e9cf2f549950bd4eeab423acc",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-trace-zh.jpg",
+        "language": "zh-Hans",
+        "state": "context-trace",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 65581,
+        "sha256": "10d2c7db5e8e53b93e3ac505d6c45e887b344c410b2b9beace7b9491356339ee",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-viewer-en.jpg",
+        "language": "en",
+        "state": "context-viewer",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 67716,
+        "sha256": "ee7ac1a3c9c95bc3986eb8678de61a305a336a3d47ba1536ab9410e71d7c4857",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-context-viewer-zh.jpg",
+        "language": "zh-Hans",
+        "state": "context-viewer",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 63759,
+        "sha256": "0cc3149c2227317deba431a0c7691f0cfc7a00baba465795aa52651aa1e02643",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-correlation-en.jpg",
+        "language": "en",
+        "state": "correlation",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 66274,
+        "sha256": "b7f68d780dc39b8369db3c8bbf51028b9157653fd6287746c83ad0ca8ae0b0b1",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-correlation-zh.jpg",
+        "language": "zh-Hans",
+        "state": "correlation",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 60871,
+        "sha256": "5e8002dc0029b99685811a276803d521a2380172baeba100c2ac4c50fa099c74",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-dark-en.jpg",
+        "language": "en",
+        "state": "dark",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en&appearance=dark",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 63286,
+        "sha256": "3c8ed2dad3de933fd4b1c7fe2938325be18711ce4f73fa7a6c9f5acdf6a097db",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-dark-zh.jpg",
+        "language": "zh-Hans",
+        "state": "dark",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en&appearance=dark",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 56915,
+        "sha256": "5b385a948378023f8347dbd2346f350deacf781c69dc06b3b4b470ad56f7d258",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-empty-en.jpg",
+        "language": "en",
+        "state": "empty",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 53660,
+        "sha256": "a5d3e13b65cc0270fbf403388ad2bfb2e6ce3734a82569052f6469eefb0a48f9",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-evidence-compact-en.jpg",
+        "language": "en",
+        "state": "evidence-compact",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 65260,
+        "sha256": "518ac995ed56a86264253c9ff03e28b2da1156b8ff1eab9c180d2dacff22c036",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-evidence-compact-zh.jpg",
+        "language": "zh-Hans",
+        "state": "evidence-compact",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 57960,
+        "sha256": "7e54d7b1238d323812007cdd1ef74e8c18a2b50ae9762ffb7403d428e3a4d23d",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-filters-en.jpg",
+        "language": "en",
+        "state": "filters",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 70393,
+        "sha256": "5291fd1498cbec2385b520308486bd6ad783efeaa807e02b532bca046f62bce8",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-inspector-unknown-en.jpg",
+        "language": "en",
+        "state": "inspector-unknown",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&jobState=unknown&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 66173,
+        "sha256": "9831cbe3a4325d88f7a5cacc626015531f73f82d739ed9c622144fe51ac86e25",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-inspector-unknown-zh.jpg",
+        "language": "zh-Hans",
+        "state": "inspector-unknown",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&jobState=unknown&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 60973,
+        "sha256": "1588509ad622ce7ee53c4d7a70108cfe40435ba8c01895991f354b29a8b36540",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-legacy-cancelled-en.jpg",
+        "language": "en",
+        "state": "legacy-cancelled",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 73202,
+        "sha256": "67eaf73e567b2d8a7eb54d13f8f13a0fcbb95d5beacf6e2badf8284a317df82b",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-list-en.jpg",
+        "language": "en",
+        "state": "list",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 62402,
+        "sha256": "492cafa5a1168122a2b29f5c4a568b28512b7c0e5ffb9e1ddb3a56c0d6d9ce8e",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-parameters-zh.jpg",
+        "language": "zh-Hans",
+        "state": "parameters",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 57114,
+        "sha256": "01f30383db87a68c8deefac22905416a369fe48099490398117d823611703409",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-sensitive-export-en.jpg",
+        "language": "en",
+        "state": "sensitive-export",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 37915,
+        "sha256": "f9ccf8ceb3775c32abeeb97e40e50e63fc79af89724c02b58229d52f68dc0de2",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-sensitive-export-zh.jpg",
+        "language": "zh-Hans",
+        "state": "sensitive-export",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 35677,
+        "sha256": "aaeabaf2a815960d5b6b1e43206edbadc2701349c094cdce756251ddc78e2a77",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-standard-export-en.jpg",
+        "language": "en",
+        "state": "standard-export",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 36840,
+        "sha256": "6dd52bce37d666bd17a7e4bcb894ff626f0345d065d2a2f364ee45b7639594c7",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-standard-export-zh.jpg",
+        "language": "zh-Hans",
+        "state": "standard-export",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 34282,
+        "sha256": "e92973b33172af29453220e1c38557f430a219ce354819ccab0d3e498eea4805",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-summary-en.jpg",
+        "language": "en",
+        "state": "summary",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 71358,
+        "sha256": "52794ec091685e603616817d2ea795c50d0f29ad796eb0cd42bca69f3c23e642",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-unknown-en.jpg",
+        "language": "en",
+        "state": "unknown",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&flashHistory=unknown&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 71030,
+        "sha256": "b8eda8695ba5d90103a0a4b012dd9be8363feb42efbde931365bf10ee859c491",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-unknown-zh.jpg",
+        "language": "zh-Hans",
+        "state": "unknown",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?page=history&flashHistory=unknown&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 842,
+        "height": 750,
+        "byteCount": 62141,
+        "sha256": "05360238cba8fbb82e3cb49bbcfd7240085cd57e292c103d9deed609b5dbdabe",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-wide-retained-en.jpg",
+        "language": "en",
+        "state": "wide-retained",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?reference&page=history&flashHistory=retained&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 1180,
+        "height": 760,
+        "byteCount": 33014,
+        "sha256": "fd8d456617c9365b42ad59e10b67b721319e271370354794a7982ea04c250df2",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      },
+      {
+        "file": "history-readonly-wide-retained-zh.jpg",
+        "language": "zh-Hans",
+        "state": "wide-retained",
+        "entryURL": "http://127.0.0.1:8853/prototype.html?reference&page=history&flashHistory=retained&lang=en",
+        "interaction": "Select the named History state through visible controls; Chinese captures toggle the locale in the same tab. Context captures open the selected record workspace; evidence/detail captures scroll the corresponding pane.",
+        "width": 1180,
+        "height": 760,
+        "byteCount": 30146,
+        "sha256": "264e189776492d68065361061557ce0a7f0695e71b6308c74e867966603f597e",
+        "mimeType": "image/jpeg",
+        "evidenceClass": "design-demo",
+        "visuallyInspected": true
+      }
+    ],
+    "scope": "Actual browser interaction with design samples, not App Runtime or hardware verification. Raw JPEG captures are unedited. Wide fullPage captures include extra canvas from the browser output; they are not pixel-equivalence evidence."
+  },
+  "priorEvidence": {
+    "nativeApp": "history-facts-verification-2026-08-28.json#reviewedMainNativeRegression",
+    "realDeviceAndProductionXPC": "flash-history-focus-verification-2026-08-28.json#postMergeVerification",
+    "boundary": "No App, Package, Catalog, provider, profile or admission policy changed. No new Runtime job, device mutation or real Artifact export was submitted. Failed native attempts remain in the earlier record."
+  },
+  "limitations": [
+    "Maintainer review/merge is still required; no overall goal completion is claimed.",
+    "Future concept capabilities remain explicitly unimplemented; no operation was invented.",
+    "Console errors and exact 900x600 / 200% browser viewport were not independently measured in this F39 pass; no such claim is made."
+  ],
+  "finalLocalGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "classification": {
+      "app": false,
+      "swift": false,
+      "baseRevision": "71eb0b07436cfe8eca67b7016f89c04e823ea31b",
+      "changedFileCount": 44
+    },
+    "commonGates": "18 planner tests, 9 workflow tests, SDD 0 errors / 0 warnings and 121 acceptance IDs, 49 catalog generator tests, zero generated drift",
+    "log": {
+      "privateFile": "f39-local-gate-browser-final.log",
+      "byteCount": 5565,
+      "sha256": "e10289ded0b175f77dc2c577541a9d65e23c98531872dffe2258855ee4ca85d1"
+    },
+    "postGateChanges": "Only this completed gate metadata and its audit sentence were added after the gate; tested source hashes remain unchanged."
+  }
+}

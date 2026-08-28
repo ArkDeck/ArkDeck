@@ -482,11 +482,14 @@ rebind 区块(在 Job inspector 里,不是弹窗):粗体 `设备回连,需确认
 
 ## 5.7 History
 
-当前交付参考（2026-08-28，F38）。以 `RuntimeHistoryView.swift` 和
+当前交付参考（2026-08-28，F39）。以 `RuntimeHistoryView.swift` 和
 `RuntimeHistoryApplicationFacade.swift` 为准；下列要求替换旧 Session 表、固定 manifest、
 按类型生成文件和“取消即恢复”的历史稿。
 
-**外壳与选择**：八页导航；History 内为活动类型、记录、详情三栏，窄窗折叠筛选但保留选择关系。
+**外壳与选择**：八页导航；History 工作区宽度达到 890 时为活动类型、记录、详情三栏，
+更窄时以顶部活动选择器替代类别栏，保留记录/详情两栏；原型低于 620 时上下排列。
+宽度取工作区而不是浏览器 viewport。双栏/三栏中的列表与详情独立滚动，不因展开长证据
+把记录列表一起滚出视野。工具栏短标签不拆行，Inspector 的长状态允许换到下一行。
 All / Flash / Debug / Viewer / Trace / Diagnostics / Device / Other 都要覆盖。
 类别来自明确的 workspace/operation 投影，不从标题猜；未知记录保留 Other。
 记录按已报告 finished / started / created 时间倒序，缺失日期不从展示文案推断。
@@ -497,11 +500,18 @@ All / Flash / Debug / Viewer / Trace / Diagnostics / Device / Other 都要覆盖
 模式含 execute / planned / simulated / unknown；Session 与 target 用精确 ID，不把 Job ID
 或设备显示名称当成身份。时间含过去一小时、一天、一周，未报告时间不匹配时间区间。
 保存、恢复、删除筛选，以及需要关注、最近失败和清除筛选都可达；原型保存只在页面内存中演示。
+搜索逐次输入即时生效，保留焦点和光标范围；已展开的完整筛选在改条件、清除或恢复时保持展开。
 
 **详情**：Summary / Timeline / Correlation / Evidence / Parameters / Artifacts / Recovery linkage
 按 Runtime 提供的字段展示。operation、state、outcome certainty、actual effect、target、
 binding、Journal 条目、manifest、hash 和副作用证据均不能由类型或状态补造。
 未报告的旧记录明确显示缺失；没有 Journal 或 Artifact 清单不补默认步骤和文件。
+Summary 保留精确 Session 与已报告创建/开始/结束时间。Correlation 的 Job / Session /
+operation / target 必须匹配当前记录；提供同 Session 筛选入口，不能从 Job ID 生成 Session。
+Evidence 保留 Provider、Catalog、binding、authority、观测型号/固件/通道、终态、mode/effect、
+首条证据时间、实际 step kinds 和 blocker；没有提供这些字段时不按成功状态补出证据。
+Artifact 来源操作、媒体类型和状态原因也保留。未报告清单、明确空清单和 plan-only 无采集
+产物分别表达；完整恢复标志未报告时，不默认显示“无需恢复”。
 
 **参数**：所有类型都支持精确 typed inputs，不局限于 Trace / Viewer。
 未报告与明确空参数分开；只有显式 traceParameters 才画 before / after，逐项保留
@@ -527,6 +537,12 @@ post-flash-facts.json / post-flash-hilog.txt / flash-report.json。
 “需要关注”；有 Runtime 恢复关系的旧 unknown 保持原结果，但不因旧 unknown 本身继续报警。
 没有证明的补偿不画完成；恢复关系只表达当前 target epoch 已建立，不重写原 Job 为成功。
 工作区/Diagnostics 入口只读回访，不重放、取消、重绑或重试 operation。
+六类目标工作区都显示 exact Job / target / operation / state / Artifact 来源信息，可关闭，
+切到其他工作区时不误显示；Viewer / Trace 转交 Diagnostics 保留原分类和 Job。
+Debug 按已发布 operation 选择 Apps / Artifacts / Logs / Network，不填入旧 Artifact lease。
+原型只保留来源元数据，不实际读取历史文件；工作区其他样本不可冒充该 Job 的 Artifact。
+全局 Inspector 打开记录时保留原 operation、kind、unknown、identity 与 Journal，不另造
+一条 Diagnostics 记录，也不把未知类型按标题归类。
 planned / simulated 标识保留，不因导出生成新的 Session mode 声明。
 
 至少画：中英文当前记录及 typed inputs、缺失事实的旧取消记录、标准与敏感逐项导出、
