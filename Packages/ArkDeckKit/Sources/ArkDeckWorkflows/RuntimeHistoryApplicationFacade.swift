@@ -405,7 +405,7 @@ public enum RuntimeJobDetailApplicationFacade {
       || arguments.contains("--ui-test-flash")
       || arguments.contains("--ui-test-flash-plan")
     {
-      return RuntimeJobDetailFixtureProvider()
+      return RuntimeJobDetailFixtureProvider(arguments: arguments)
     }
     return RuntimeJobDetailXPCProvider()
   }
@@ -1197,6 +1197,12 @@ enum RuntimeJobDetailResponseDecoding {
 }
 
 private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProviding {
+  private let unverifiedFlashPostflight: Bool
+
+  init(arguments: [String]) {
+    unverifiedFlashPostflight = arguments.contains("--ui-test-flash-postflight-unverified")
+  }
+
   func loadJobDetail(
     jobID: String,
     operationReference: String
@@ -1206,6 +1212,20 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
       let detail = try? DiagnosticSessionUIFixture.detail() { return detail }
     let isFlash = ArkForgeFlashOperation.containsDurableRecordReference(
       operationReference)
+    let isSubmittedFlashFixture = jobID == "job-ui-fixture-flash"
+    // Production detail loading correlates the exact submitted operation. The
+    // old fixture accepted an alias here and hid the App's postflight mismatch.
+    if isSubmittedFlashFixture,
+      operationReference != ArkForgeFlashOperation.canonicalReference
+    {
+      return RuntimeJobDetailPresentation(
+        jobID: jobID,
+        timelineAvailability: .unavailable(reason: "fixture_operation_mismatch"), timeline: [],
+        evidenceAvailability: .unavailable(reason: "fixture_operation_mismatch"), evidence: nil,
+        artifactAvailability: .unavailable(reason: "fixture_operation_mismatch"), artifacts: [],
+        correlationAvailability: .unavailable(reason: "fixture_operation_mismatch"), correlation: nil)
+    }
+    let isVerifiedFlashFixture = isSubmittedFlashFixture && !unverifiedFlashPostflight
     let isInterruptedHistoryFixture = jobID == "job-fixture-0002"
     return RuntimeJobDetailPresentation(
       jobID: jobID,
@@ -1213,19 +1233,19 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
       timeline: isInterruptedHistoryFixture
         ? ["queued", "running", "interrupted"]
         : isFlash
-          ? ["queued", "preflight", "running", "waitingForDevice"]
+          ? ["queued", "preflight", "running", isVerifiedFlashFixture ? "succeeded" : "waitingForDevice"]
           : ["queued", "running", "succeeded"],
       evidenceAvailability: .available,
       evidence: RuntimeJobEvidencePresentation(
         catalogDigest: String(repeating: "a", count: 64),
-        bindingRevision: 1,
+        bindingRevision: isSubmittedFlashFixture ? 8 : 1,
         providerID: isFlash ? CatalogProvider.arkforge.rawValue : "openharmony-hdc",
         actualEffect: isFlash ? "destructive" : "readOnly",
         executionMode: "execute",
-        terminalState: isFlash ? "outcomeUnknown" : "succeeded",
+        terminalState: isFlash && !isVerifiedFlashFixture ? "outcomeUnknown" : "succeeded",
         startedAtUTC: "2026-08-06T08:00:00Z",
         firstEvidenceStepAtUTC: "2026-08-06T08:00:01Z",
-        finishedAtUTC: isFlash ? nil : "2026-08-06T08:00:02Z",
+        finishedAtUTC: isFlash && !isVerifiedFlashFixture ? nil : "2026-08-06T08:00:02Z",
         parameters: [
           RuntimeJobParameterPresentation(name: "fixture", value: "presentation-only")
         ],
@@ -1237,10 +1257,12 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
         observedModel: "DAYU200",
         observedFirmware: isFlash ? "OpenHarmony-7.0.0.36" : "OpenHarmony fixture",
         observedTransport: isFlash ? "usb" : "fixture",
-        observedBindingRevision: isFlash ? 2 : 1,
+        // The submission fixture binds its unbound Loader from r7 to r8.
+        // Retained historical records keep their original r2 readback.
+        observedBindingRevision: isSubmittedFlashFixture ? 8 : isFlash ? 2 : 1,
         traceTags: [],
         traceParameters: [],
-        blockers: isFlash ? ["outcomeUnknown"] : []),
+        blockers: isFlash && !isVerifiedFlashFixture ? ["outcomeUnknown"] : []),
       artifactAvailability: .available,
       artifacts: isFlash
         ? [
@@ -1341,6 +1363,10 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     fixtureRequests("--ui-test-runtime-flash-resolved-recovery")
   }
   private var flashSucceeded: Bool { fixtureRequests("--ui-test-runtime-flash-succeeded") }
+  private var flashOperationReference: String {
+    fixtureRequests("--ui-test-runtime-flash-canonical")
+      ? ArkForgeFlashOperation.canonicalReference : "flash.dayu200"
+  }
 
   func refreshHistory() async -> RuntimeHistoryPresentation {
     guard !unreachable else {
@@ -1358,7 +1384,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
         jobs: [
           RuntimeJobSummaryPresentation(
             id: "job-fixture-flash-running",
-            operationReference: "flash.dayu200",
+            operationReference: flashOperationReference,
             targetID: "target-fixture-dayu200",
             state: "running",
             waitingForHuman: false,
@@ -1379,7 +1405,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
         jobs: [
           RuntimeJobSummaryPresentation(
             id: "job-fixture-flash-resolved-recovery",
-            operationReference: "flash.dayu200",
+            operationReference: flashOperationReference,
             targetID: "target-fixture-dayu200",
             state: "waitingForRecovery",
             waitingForHuman: false,
@@ -1401,7 +1427,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
         jobs: [
           RuntimeJobSummaryPresentation(
             id: "job-fixture-flash-succeeded",
-            operationReference: "flash.dayu200",
+            operationReference: flashOperationReference,
             targetID: "target-fixture-dayu200",
             state: "succeeded",
             waitingForHuman: false,
@@ -1441,7 +1467,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           finishedAtUTC: "2026-08-06T07:00:02Z"),
         RuntimeJobSummaryPresentation(
           id: "job-fixture-0002",
-          operationReference: "flash.dayu200",
+          operationReference: flashOperationReference,
           targetID: "target-fixture-b",
           state: "interrupted",
           waitingForHuman: true,

@@ -1,0 +1,295 @@
+{
+  "date": "2026-08-28",
+  "finding": "F34",
+  "goldenJourney": "GJ-4",
+  "evidenceKind": "redacted-metadata-derived-from-real-runtime-and-separate-ui-tests",
+  "baseRevision": "59158aed4fb3570b1deb4fb4939bc906fa8d6fc1",
+  "runtimeSourceRevision": "b564e9902bd7f7ede51c8092ad56ed95736065b6",
+  "runtimeExecutableSHA256": "ab2e0889fba34f8e5791d2e0a1baa9a7f98ff6959d2f477f24b73529c1a34417",
+  "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+  "authorization": {
+    "source": "explicit user continuation after merged PR, including named HardwareCampaign and specified target/archive wipe",
+    "campaign": "ui-alignment-20260828",
+    "enabledExitCode": 0,
+    "disabledExitCode": 0,
+    "campaignAfterRun": "",
+    "initialRuntimeConfigurationRestored": true,
+    "historicalClosedUnknownRecordsUnchanged": 4
+  },
+  "realFlash": {
+    "jobID": "job-8e32139af1945d755f5716b67f4f8bde",
+    "operationReference": "flash.full-restore@1",
+    "targetID": "TGT-958780b2ffb7",
+    "bindingRevision": 4,
+    "executionMode": "execute",
+    "actualEffect": "destructive",
+    "executor": "agent",
+    "terminalState": "succeeded",
+    "outcomeUnknown": false,
+    "startedAtUTC": "2026-08-28T03:21:37Z",
+    "finishedAtUTC": "2026-08-28T03:24:27Z",
+    "stepKinds": [
+      "waitForReconnect",
+      "probeDevice",
+      "flashPartition",
+      "verifyRemoteState",
+      "rebootDevice",
+      "captureRemoteStdout"
+    ],
+    "evidenceBlockers": [],
+    "humanActions": [],
+    "outstandingResidueCount": 0,
+    "archiveSHA256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+    "archiveByteCount": 730783514,
+    "freshPlanDigestSHA256": "f630c1e33de087d69dce2b343ea1d31a87ff2688989e0c232a0572914d9c6a79",
+    "evidenceObservation": {
+      "confirmationMethod": "machineReadback",
+      "confirmedAtUtc": "2026-08-28T03:24:20Z",
+      "firmware": "OpenHarmony-7.0.0.37",
+      "bindingRevision": 4,
+      "stableIdentitySha256": "94a25a89c9c214dc9f8a0cf1b2cb3703a466e132a97fa015dfdbebfc65546f42"
+    }
+  },
+  "independentVerification": {
+    "command": "arkdeck agentd verify --job job-8e32139af1945d755f5716b67f4f8bde --json",
+    "exitCode": 0,
+    "runtimeVerified": true,
+    "checks": {
+      "artifactsVerified": true,
+      "runtimePostflightVerified": true,
+      "terminalStatusVerified": true,
+      "trustedEvidenceVerified": true,
+      "udsHealthVerified": true
+    },
+    "blockers": []
+  },
+  "artifactVerification": [
+    {
+      "reference": "arkdeck-artifact://job-8e32139af1945d755f5716b67f4f8bde/ART-3181bc1092fd768dcd08ae3444a83668",
+      "byteCount": 947,
+      "sha256": "02f800f624826baade8737b0b1d9746bf4370a29e370c7bf7a0ff0f5d3a87e98",
+      "bytesVerified": true
+    },
+    {
+      "reference": "arkdeck-artifact://job-8e32139af1945d755f5716b67f4f8bde/ART-04a87cef9c5723901b869234c0b5d9ed",
+      "byteCount": 511012,
+      "sha256": "f95858ad2c4a3e4fa9ba00905a05d48eb028594e0f2db3e871d5a301cf3a1327",
+      "bytesVerified": true
+    },
+    {
+      "reference": "arkdeck-artifact://job-8e32139af1945d755f5716b67f4f8bde/ART-963a8e61bd2d4352d519ddb0d444ab9d",
+      "byteCount": 1863,
+      "sha256": "a7f7025661a5566356d6168860f1ba300be5b3868c1662adf333a8d74a0f04ab",
+      "bytesVerified": true
+    }
+  ],
+  "postCampaignObserve": {
+    "jobID": "job-7b17f20b5619f24d61145f4c4b8dec0e",
+    "operationReference": "observe.device@1",
+    "bindingRevision": 4,
+    "exitCode": 0,
+    "runtimeVerified": true,
+    "checks": {
+      "artifactsVerified": true,
+      "runtimePostflightVerified": true,
+      "terminalReceiptVerified": true,
+      "trustedEvidenceVerified": true,
+      "udsHealthVerified": true
+    },
+    "terminalState": "succeeded",
+    "finishedAtUTC": "2026-08-28T03:28:58Z"
+  },
+  "nativeRealAppInspection": {
+    "sourceRevision": "59158aed4fb3570b1deb4fb4939bc906fa8d6fc1",
+    "fixture": false,
+    "locale": "zh-Hans",
+    "scope": [
+      "exact successful Job opened from History",
+      "History to Flash retains exact context without replay",
+      "default hardwareGated restored",
+      "canonical activity omitted and App-sandbox device-access failure found"
+    ],
+    "screenshots": [
+      {
+        "file": "native-flash-history-zh.png",
+        "sha256": "decd6e344c163404f240d42472b9d004ff9ef7cc2bdfaafebd5c3b6501655782",
+        "visuallyInspected": true
+      },
+      {
+        "file": "native-flash-success-zh.png",
+        "sha256": "0d0588dc67fb0e203398d3d5cdf5d7e3d8cdacb11109cf92740d1decc013b5db",
+        "visuallyInspected": true
+      },
+      {
+        "file": "native-flash-details-before-zh.png",
+        "sha256": "2c829cce5eb6adda260f36c09f68efd3fb21334ada999571654e00060edf48d0",
+        "visuallyInspected": true
+      }
+    ]
+  },
+  "sourceFiles": [
+    {
+      "file": "runtime-before.json",
+      "sha256": "bd6170bde8417ec5d60c33c27ca9ef5bc22d386aa6975b780c6b90665d455b32"
+    },
+    {
+      "file": "campaign-enable.json",
+      "sha256": "8c43ae09d514ad56906339e85b6e25fd4ecaea66fedc23b61b7b601e360fe4d5"
+    },
+    {
+      "file": "runtime-campaign.json",
+      "sha256": "8bce5eeafa635bf78815b23acf4b14f333c09aaefcbdc65ff6702f412e819f35"
+    },
+    {
+      "file": "fresh-plan.json",
+      "sha256": "7ba80ac6d01b71aad9295c449d381c9ae08478807da529faeabff5fa938543a2"
+    },
+    {
+      "file": "execution-02.json",
+      "sha256": "a3a45094203f9e9c4ee78ef58e3cd71fcb5a8e230830503e433701b863e02d73"
+    },
+    {
+      "file": "execution-02-status-02.json",
+      "sha256": "e952ec6888fb464cab0d32e03a71af4062fff677ef17809c7742ff96859d7b96"
+    },
+    {
+      "file": "flash-runtime-verification.json",
+      "sha256": "05c18bd5ad9b3a8cdae12401c35bb678f857c5fc5d1be468b21304ebf31b6887"
+    },
+    {
+      "file": "campaign-disable.json",
+      "sha256": "9894d00ef2793e166feb6ade9334948f2de960ff6c66ab3733a8ff11253de31d"
+    },
+    {
+      "file": "runtime-after-disable.json",
+      "sha256": "bd6170bde8417ec5d60c33c27ca9ef5bc22d386aa6975b780c6b90665d455b32"
+    },
+    {
+      "file": "postflash-observe.json",
+      "sha256": "ba9148f4095ff9a0d4796bded6f094273f2be64cba4a1c60f3e25217742f6c4d"
+    }
+  ],
+  "limitations": [
+    "HardwareCampaign success is not production qualification or a notarized distribution acceptance.",
+    "Real App inspection exposed F34 and F35; fixture regression does not prove post-fix real App presentation.",
+    "The prior confirmedNotPerformed request and four closed unknown records remain unchanged; no unknown intent was replayed.",
+    "Raw screenshots, runtime facts, logs, xcresult and device identifiers remain private. No source Runtime journal or authority record was modified."
+  ],
+  "nativeFixtureRegression": {
+    "evidenceKind": "isolated-native-app-fixture-no-runtime-or-device",
+    "exitCode": 0,
+    "testCount": 2,
+    "failureCount": 0,
+    "durationSeconds": 43.803,
+    "locales": [
+      "en",
+      "zh-Hans"
+    ],
+    "scope": [
+      "canonical unknown attention and no submit",
+      "canonical running progress",
+      "canonical terminal record exact Job ID",
+      "canonical postflight detail correlation",
+      "verified success versus unverified matching fields"
+    ],
+    "logSHA256": "64fc2357c22c4d55edb008e4085a7f835c4826dfc951400bab6a90689b5cf540",
+    "screenshots": [
+      {
+        "file": "68198CB5-D9CD-4CB6-88F7-42D930FC0DBB.png",
+        "locale": "zh-Hans",
+        "scope": "history surface and canonical availability; detailed activity below fold",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 395301,
+        "sha256": "4991326c0002e3cdb60487225a2dd905a5fe792ce1b32ac329df539bff6a1e70",
+        "visuallyInspected": true
+      },
+      {
+        "file": "0E62DB06-590D-4368-9488-A5BD39524F4B.png",
+        "locale": "en",
+        "scope": "history surface and canonical availability; detailed activity below fold",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 378458,
+        "sha256": "c2bc629f44c41e562e93fd8037b315d5163a22b6195228585b593301ecc0c984",
+        "visuallyInspected": true
+      },
+      {
+        "file": "880DFCA2-9482-4822-8D0E-C28FA5CCDFAF.png",
+        "locale": "zh-Hans",
+        "scope": "unverified evidence: stopped despite matching build/binding fields",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 296627,
+        "sha256": "117405dc9ec06461754d52a9ceb4968c639efd24fd66fddcc53b36494a89f6c3",
+        "visuallyInspected": true
+      },
+      {
+        "file": "0D914770-8513-45B8-BDA5-BB6D7CF63B5B.png",
+        "locale": "zh-Hans",
+        "scope": "verified successful postflight with exact fixture Job/build/binding",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 303644,
+        "sha256": "3f3c73f463b14757c10538f767b123fc1df07f96adfe87dcee1fbc635dacb24a",
+        "visuallyInspected": true
+      },
+      {
+        "file": "55881B00-BD26-43AC-B20C-8A0BC62CF6BB.png",
+        "locale": "en",
+        "scope": "unverified evidence: stopped despite matching build/binding fields",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 293441,
+        "sha256": "0a90263c7eb6711d98500df2c6339ebe23e77b5a6d45fa6699fb4797614517c4",
+        "visuallyInspected": true
+      },
+      {
+        "file": "A8E9866F-62DF-4BB9-9173-FF19D6B0313D.png",
+        "locale": "en",
+        "scope": "verified successful postflight with exact fixture Job/build/binding",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 298754,
+        "sha256": "d12041b2ecb66cc675b6c9b55b35190671c4eb15229e620c28ce1f20b862efd5",
+        "visuallyInspected": true
+      }
+    ],
+    "priorAttempt": {
+      "exitCode": 65,
+      "historyTestPassed": true,
+      "postflightTestPassed": false,
+      "reason": "Fixture readback was r2 for a plan bound at r8; assertions queried IDs without their match suffix. Fixture and queries corrected; product binding comparison and failure assertions retained.",
+      "logSHA256": "94e30ba7b4c2736b2d4cc918ba0c3be38313df4496a3709a43315fc605c54fbb"
+    }
+  },
+  "designTests": {
+    "exitCode": 0,
+    "testCount": 42,
+    "logSHA256": "f2738f13dca61fa8d483ccb2e0a55a8583a8f3d590d5bdb4c5c46e722c8b646a"
+  },
+  "localGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "swiftTestCount": 1832,
+    "swiftLanes": [
+      {
+        "lane": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1826
+      },
+      {
+        "lane": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1
+      },
+      {
+        "lane": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5
+      }
+    ],
+    "appUITestBundle": "TEST BUILD SUCCEEDED; compilation only",
+    "logSHA256": "2172279011088535f39630a53d784b8f7321493d8e7995041054272d094ae959"
+  }
+}

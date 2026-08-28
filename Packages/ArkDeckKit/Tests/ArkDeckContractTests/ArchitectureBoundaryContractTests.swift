@@ -565,6 +565,13 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     }
 
     let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
+    for name in ["FlashWorkspaceView.swift", "FlashRuntimeActivityView.swift"] {
+      let source = try String(
+        contentsOf: repoRoot.appending(path: "ArkDeckApp/Features/Flash/\(name)"),
+        encoding: .utf8)
+      XCTAssertTrue(source.contains("ArkForgeFlashOperation.containsDurableRecordReference"))
+      XCTAssertFalse(source.contains("flash.dayu200"), "\(name) must not select only the old alias")
+    }
     let manualDriver = try String(
       contentsOf: repoRoot.appending(path: "scripts/manual_ui_flash/manual_ui_flash.swift"),
       encoding: .utf8)

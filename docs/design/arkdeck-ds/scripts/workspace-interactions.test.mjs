@@ -104,6 +104,16 @@ test('all actual navigation items and subtabs are audited', () => {
   assert.deepEqual(sections, coverage.traceSettingsSections);
 });
 
+test('new Flash drafts use the canonical operation and a supported archive format', () => {
+  const h=harness('?page=flash&lang=en');
+  h.run('chooseFlashImage()');
+  assert.match(h.run('S.flashImage.name'), /\.tar\.gz$/);
+  assert.match(h.run('flashDetails(S.flashImage)'), /flash\.full-restore@1/);
+  assert.doesNotMatch(h.run('flashDetails(S.flashImage)'), /flash\.dayu200/);
+  h.run('runFlash()');
+  assert.match(h.run('S.flashJob.title'), /flash\.full-restore@1/);
+});
+
 test('every App View file and preview is covered and linked', () => {
   const declaration = /\b(?:struct|class)\s+\w+(?:<[^{}]*>)?\s*:\s*[^\n{]*\b(?:View|NSViewRepresentable|NSView)\b/;
   const actual = files(join(root, 'ArkDeckApp'))

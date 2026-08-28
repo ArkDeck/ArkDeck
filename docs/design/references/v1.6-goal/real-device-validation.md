@@ -7,7 +7,28 @@
 2026-08-28 最新续验见[后续元数据](followup-verification-2026-08-28.json)：
 已更新 protected-main Runtime，真实 App entry+shared HSP、原生双语选择器、冷启动和
 stale-frame 均已有通过结果。随后 Flash 真实请求在设备副作用前被硬件资格门拒绝，
-见[Flash 续验](flash-hardware-gate-verification-2026-08-28.json)。下文旧批次的失败保持历史含义；不声明 goal 完成。
+见[Flash 续验](flash-hardware-gate-verification-2026-08-28.json)。随后获得明确 HardwareCampaign
+授权，新 canonical Flash 已成功，详见下节与 [F34 元数据](flash-canonical-verification-2026-08-28.json)。
+下文旧批次的失败保持历史含义；不声明 goal 完成。
+
+## 2026-08-28 授权 Flash 结果
+
+在 PR #1568 合入后，重新核对目标 `TGT-958780b2ffb7` / r4 与镜像 SHA-256
+`4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674`，通过已发布 CLI
+启用获授权的 `ui-alignment-20260828` campaign，使用 fresh exact plan 提交一次新请求。
+`job-8e32139af1945d755f5716b67f4f8bde` 于 03:21:37Z—03:24:27Z 执行成功，
+machine readback 为 OpenHarmony-7.0.0.37 / r4，unknown=false、residue=0。
+Runtime 独立验证的 terminal、trusted evidence、postflight、Artifact 与连接健康检查均通过；
+三份输出的大小与哈希保留在元数据，raw 输出不提交。
+
+随后 campaign 关闭，所有安装配置恢复启用前原值；新的 `observe.device@1`
+`job-7b17f20b5619f24d61145f4c4b8dec0e` 成功。原四条终止 unknown 与首次未执行请求不变，
+没有重放 unknown。具名硬件验收成功不等于产品生产资格或 notarized distribution 验收。
+
+真实 App 的 History/Flash 只读回访发现 F34（canonical 记录筛选与详情引用过旧）及
+F35（App 沙箱直接访问 Unix socket）；F34 的双语隔离 UI 回归已通过，F35 尚待修复。
+不把 fixture 当真实设备结果，也不为 UI 回访重复擦写。下文“剩余验证”保留此前历史快照，
+当前 Flash 硬件结论以上述新记录为准。
 
 ## Runtime 与执行边界
 
