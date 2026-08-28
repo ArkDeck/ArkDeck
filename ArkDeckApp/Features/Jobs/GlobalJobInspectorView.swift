@@ -618,14 +618,14 @@ struct GlobalJobInspectorView: View {
 }
 
 /// Recovery guidance is kept above the workspace so it remains visible after
-/// navigation. The only action opens the read-only History workspace.
+/// navigation. The only action opens this Job in the read-only History workspace.
 ///
 /// This is a banner *family*: every outstanding item renders, ordered by
 /// severity. Showing only the most severe one would hide a second,
 /// different-kind item behind the first until it clears.
 struct GlobalRecoveryBannerView: View {
   let presentation: RuntimeHistoryPresentation
-  let onOpenHistory: () -> Void
+  let onOpenJob: (String) -> Void
 
   private var recoveryJobs: [RuntimeJobSummaryPresentation] {
     presentation.jobs
@@ -671,8 +671,8 @@ struct GlobalRecoveryBannerView: View {
           .textSelection(.enabled)
       }
       Spacer(minLength: WorkspaceMetrics.contentGap)
-      Button(jobsText("jobRecovery.action.openHistory"), action: onOpenHistory)
-        .accessibilityIdentifier("jobRecovery.openHistory")
+      Button(jobsText("jobRecovery.action.openHistory")) { onOpenJob(job.id) }
+        .accessibilityIdentifier("jobRecovery.openHistory.\(job.id)")
     }
     .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
     .padding(.vertical, WorkspaceMetrics.cardPaddingVertical)

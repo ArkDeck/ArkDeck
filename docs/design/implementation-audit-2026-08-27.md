@@ -99,7 +99,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | --- | --- | --- |
 | shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役 |
 | shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面 |
-| shell.recovery | needsAttention、unknown、等待人工、History 入口 | 只导航，不确认后续刷，不在 App 归档 |
+| shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：所有主工作区逐项显示；精确 Job 跳转、清除旧筛选并定位记录行；独立窗口不显示。不确认后续刷、不在 App 归档 |
 | device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管 |
 | device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview |
 | device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
@@ -563,3 +563,40 @@ Provider/Catalog/binding/authority/观测/终态/mode/effect/首条证据/step/b
 最终统一路径闸 exit 0：18 项 planner、9 项 workflow、SDD 0 error/0 warning（121 AC）、
 49 项 catalog 与生成物零漂移通过。44 个改动均为设计/文档/参考图，Swift/App 编译车道
 均未分配；未把此闸作为新增设备验收。
+
+## 2026-08-28 F40：Recovery 精确 History 入口与记录定位
+
+GJ-1—4。#1574 已合入 `f5637703`，树与已测 `742068f4` 相同。合入后 58 项设计测试、
+3 项原生 History 用例通过；原生首次仅发生自动化初始化超时，重跑通过，保留两次日志。
+现有真机 Flash 回执由 reviewed Runtime 再次只读核验：终态、postflight、可信证据与三个
+Artifact 校验均通过，没有新刷机、重新打开 campaign 或安装候选 Runtime。
+
+本轮发现全局 Recovery 的无参 callback 丢失了横幅对应的 Job ID。已经在 History 中
+筛选/选择其他记录时，点击“在历史记录中检查”仍停在旧记录。现在该入口传递精确 ID，
+清除旧筛选；History 消费一次导航请求，确保再次点击同一 Job 也会重新定位。截图进一步
+发现 List 保留旧滚动位置、目标行可能在视口外，现用稳定 Job ID 将该行滚动到可见区域。
+
+原型移除三处页面内硬编码横幅，改为主窗口全局挂载；八个主页面、动态设备详情与信任页
+共享同一 family，独立 Settings / Trace Viewer / 帮助及退役 Automation 不显示。按显式
+History 字段投影 unknown、人工处理、安全边界、等待归档和等待恢复，文案与原生词表
+一致；已建立 current epoch 的旧 unknown 不再作为当前提醒，原事实仍保留。每项都精确
+打开并滚动到同一 Job，不提供恢复、重试、归档或授权动作。设计工具镜像的当前示例同步，
+历史概念示例仍明确标注未实现；未删除 accepted requirements。
+
+回归保留完整过程：初始跨页用例因页面重建恰好选中最新记录而通过，不能作为复现证据；
+收紧为同页旧筛选后，中英文共 4 条断言失败。修正路由后 4 项通过，但图片发现滚动缺口；
+新增行可见性断言再复现 2 条失败。最终 **5 项原生用例、0 失败、105.893 秒**，覆盖双语
+重复点击、可见目标行、History 筛选/来源和 canonical Flash 回访。8 张修正前后原生 PNG
+已查看，仅本机保存；全部属于 App fixture，不记为真机验收。
+
+设计回归先复现身份缺口，最终 **59/59**；设计包、review 与 Recovery 镜像构建通过。
+浏览器中英 **48 条断言通过**，覆盖上述十个主窗口入口、五种提示、重复跳转、独立窗口、
+旧 unknown 排除和深色模式；13 张原始 1280×720 JPEG 已查看并核对尺寸/哈希。一个包含
+既有样本 connect key 的设备详情图保留本机，不进入仓库。未做浏览器 viewport resize，
+不将这些图片称为逐像素等价或原生多 banner 布局验收。
+
+统一闸通过：18 项 planner、9 项 workflow、49 项 catalog、7 项 Xcode wrapper；
+SDD 0 error/0 warning（121 AC），生成物零漂移。按实际 App 改动编译 App/UI-test bundle；
+未改 Package，不分配 Swift Package 全量车道。详见
+[F40 验证记录](references/v1.6-goal/recovery-exact-history-verification-2026-08-28.json)。
+本项仍需维护者 review/merge；§5 未实现能力保持开放，不提前标记整体 goal 完成。

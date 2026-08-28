@@ -1,4 +1,5 @@
-import { Card, RecoveryBanner } from "@arkdeck/ds";
+import { useState } from "react";
+import { Button, Callout, Card, RecoveryBanner } from "@arkdeck/ds";
 import type { RecoveryItem } from "@arkdeck/ds";
 
 const hint = { margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ad-ink-2)" };
@@ -11,7 +12,7 @@ const col = {
   gap: 12,
 };
 
-/** 原型 recoveryHTML() 第一项,逐字照抄。 */
+/** 历史概念输入，不是当前 App 的操作或 Runtime 事实。 */
 const FLASH_DETAIL = (
   <>
     上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。设备最后处于 updater 模式。
@@ -61,22 +62,32 @@ const AUTH_BLOCKED: RecoveryItem = {
   onDone: () => {},
 };
 
-/** 原型 detail 顶部真实出现的那条 banner:一条 outcomeUnknown + 一条 waiting。 */
-export const SessionBanner = () => (
-  <div style={col}>
-    <p style={hint}>历史组件示例：当前 App banner 只打开 History，不提供 resume/archive；内置 Harness/task.* 已退役。确认不能覆盖未知 destructive outcome。</p>
-    <RecoveryBanner items={[flashUnknown(), TRACE_WAITING]} />
-    <Card title="它为什么在页面内容之前">
-      <p style={hint}>
-        Banner 落在 detail 顶部、页面内容之上、toolbar 之下:它改变页面其余部分的含义 ——
-        有未决 outcomeUnknown 的设备,未必处在页面所暗示的状态里。
-      </p>
-      <p style={hint}>
-        kind chip 由组件自己画,调用方给不了与形状矛盾的标签;每种 kind 只拿到自己允许的动作。
-      </p>
-    </Card>
-  </div>
-);
+const CURRENT_RECORDS = [
+  { id: "unknown", title: "设备影响未知", detail: "条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。" },
+  { id: "human", title: "需要人工处理", detail: "请先检查已记录的原因和证据，再通过已批准的 Runtime 路径继续。" },
+  { id: "safe", title: "已有安全恢复边界", detail: "Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。" },
+  { id: "archive", title: "恢复归档正在等待", detail: "Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。" },
+  { id: "waiting", title: "恢复正在等待", detail: "请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。" },
+];
+
+/** 当前 App surface。示例点击仅选择精确来源，不调用 Runtime 或创建设备 Job。 */
+export const SessionBanner = () => {
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  return <div style={col}>
+    <p style={hint}>当前实现 · 演示记录。全局 banner 位于主窗口工作区上方，独立 Settings/Trace Viewer 不显示。每个动作仅打开对应 Job 的 History，并清除遮挡它的旧筛选；没有恢复、重试或归档动作。</p>
+    {CURRENT_RECORDS.map(record => {
+      const jobID = `job-demo-recovery-${record.id}`;
+      return <Callout key={jobID} tone="warn">
+        <b>{record.title}</b><p>{record.detail}</p>
+        <p className="ad-mono">{jobID} · target-demo-{record.id}</p>
+        <Button onClick={() => setSelectedJob(jobID)}>在历史记录中检查</Button>
+      </Callout>;
+    })}
+    {selectedJob ? <Card title="精确 History 来源（仅演示）">
+      <p className="ad-mono">{selectedJob}</p><p style={hint}>没有提交、恢复或改变原 Job outcome；完整双语交互见 prototype.html 的 recovery=mixed。</p>
+    </Card> : null}
+  </div>;
+};
 
 /** 四种 kind 同框,按「现在就需要人」递减排列。 */
 export const AllFourKinds = () => (

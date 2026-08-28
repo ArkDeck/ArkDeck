@@ -176,8 +176,14 @@ tr.sel-row{background:var(--selection)}
 .banner header{display:flex;align-items:center;gap:8px;font-weight:650;color:var(--warn);padding:0 2px 7px}
 .ritem{display:flex;align-items:flex-start;gap:10px;background:transparent;border-top:1px solid var(--line);padding:10px 2px}
 .banner header+.ritem{border-top:none}
-.ritem .ri{flex:1}.ritem .ri b{font-size:13px}.ritem .ri p{font-size:12px;color:var(--ink2);margin-top:2px}
-.ritem .ra{display:flex;gap:8px;flex-none;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ritem .ri{flex:1;min-width:0;overflow-wrap:anywhere}.ritem .ri b{font-size:13px}.ritem .ri p{font-size:12px;color:var(--ink2);margin-top:2px}
+.ritem .ra{display:flex;gap:8px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#recoveryBanners:empty{display:none}
+#recoveryBanners{flex:none;max-height:45%;overflow-y:auto;padding:16px 22px 0;display:grid;gap:8px;container-type:inline-size;container-name:recovery}
+#recoveryBanners .ritem{border:0;padding:0}
+#recoveryBanners header{color:var(--ink)}
+#recoveryBanners header .symbol{color:var(--warn);flex:none}
+@container recovery (max-width:600px){#recoveryBanners .ritem{flex-wrap:wrap}#recoveryBanners .ri{flex-basis:100%}}
 .radio{display:flex;flex-direction:column;gap:6px}
 .radio label{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
 .radio input{margin-top:3px;accent-color:var(--accent)}
@@ -848,6 +854,11 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
     <symbol id="i-swipe" viewBox="0 0 20 20"><path d="M4 14h8a4 4 0 0 0 0-8H7"/><path d="m9 3-3 3 3 3"/></symbol>
     <symbol id="i-keyboard" viewBox="0 0 20 20"><rect x="2.5" y="4.5" width="15" height="11" rx="2"/><path d="M5 8h.01M8 8h.01M11 8h.01M14 8h.01M5 11h.01M8 11h.01M11 11h.01M14 11h.01M6 13.5h8"/></symbol>
     <symbol id="i-history" viewBox="0 0 20 20"><path d="M4.2 5.4A7 7 0 1 1 3 11"/><path d="M2.5 4.8h3.8v3.8M10 6.2v4.2l3 1.8"/></symbol>
+    <symbol id="i-recovery-unknown" viewBox="0 0 20 20"><path d="m10 2 8 8-8 8-8-8zM8 7.5a2 2 0 1 1 3 1.7c-.8.5-1 1-1 1.8M10 14h.01"/></symbol>
+    <symbol id="i-recovery-human" viewBox="0 0 20 20"><circle cx="9" cy="6" r="3"/><path d="M3 16v-2a6 6 0 0 1 10-4M16 10v3M16 16h.01"/></symbol>
+    <symbol id="i-recovery-safe" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="M6 8a4 4 0 1 1 0 4M6 5v3h3"/></symbol>
+    <symbol id="i-recovery-archive" viewBox="0 0 20 20"><rect x="2.5" y="3" width="15" height="4" rx="1"/><path d="M4 7v10h12V7M8 10h4"/></symbol>
+    <symbol id="i-recovery-waiting" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="M7 5h6v3l-6 4v3h6v-3L7 8z"/></symbol>
     <symbol id="i-automation" viewBox="0 0 20 20"><path d="m10 2 .9 3.1L14 6l-3.1.9L10 10l-.9-3.1L6 6l3.1-.9zM15.5 10l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7zM5 11l.6 2 2 .6-2 .6-.6 2-.6-2-2-.6 2-.6z"/></symbol>
     <symbol id="i-settings" viewBox="0 0 20 20"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7" fill="var(--panel-solid)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel-solid)"/><circle cx="7" cy="15" r="1.7" fill="var(--panel-solid)"/></symbol>
     <symbol id="i-jobs" viewBox="0 0 20 20"><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8"/></symbol>
@@ -910,6 +921,7 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
       </div>
     </aside>
     <div class="content">
+      <div id="recoveryBanners"></div>
       <div class="page" id="page"></div>
       <div class="drawer" id="drawer">
         <button class="bar" id="drawerToggle" onclick="toggleDrawer()" aria-expanded="false" aria-controls="drawerBody">
@@ -936,7 +948,6 @@ const S = {
   acMode:false, drawerOpen:false, sidebarOpen:true, appearance:["light","dark"].includes(PARAMS.get("appearance"))?PARAMS.get("appearance"):"system", lastChecked:null,
   deviceCompact:PARAMS.get("deviceWidth")==="compact",
   deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
-  recovery:{archived:PARAMS.get("recovery")!=="unknown"},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
   viewer:{hasCapture:PARAMS.get("viewerState")==="captured",selected:42,showBounds:false,query:"",tab:PARAMS.get("viewerTab")||"attributes",advancedQuery:"",advancedState:PARAMS.get("advancedState")||"ready",capturedAt:"2026-08-25T02:08:31Z",treeSize:60,expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
@@ -1044,6 +1055,23 @@ if(['retained','unknown','waiting','running'].includes(PARAMS.get('flashHistory'
     {...sample,id:'job-demo-flash-superseded',createdAtUTC:'2026-08-25T09:00:00Z',supersededByRecoveryEpochID:'recovery-epoch-demo'});
   const state=PARAMS.get('flashHistory');
   if(state!=='retained')HIST.push({...sample,id:`job-demo-flash-${state}`,op:'flash.full-restore@1',st:state==='unknown'?'waitingForRecovery':'running',outcomeUnknown:state==='unknown',waitingForHuman:state==='waiting',createdAtUTC:'2026-08-25T10:00:00Z'});
+}
+// Explicit review records. A banner must refer to the same History row;
+// titles and operation kinds never manufacture a recovery state or evidence.
+const RECOVERY_REVIEW_STATES={
+  unknown:{st:'interrupted',outcomeUnknown:true},
+  human:{st:'awaitingRebindConfirmation',waitingForHuman:true},
+  safe:{st:'resumeAtConfirmedSafeBoundary'},
+  archive:{st:'userAbandonRequested'},
+  waiting:{st:'waitingForRecovery'}
+};
+const recoveryReview=PARAMS.get('recovery');
+for(const [kind,facts] of Object.entries(RECOVERY_REVIEW_STATES)){
+  if(recoveryReview==='mixed'||recoveryReview===kind)HIST.push({
+    id:`job-demo-recovery-${kind}`,kind:'flash',op:'flash.full-restore@1',mode:'execute',
+    dev:'Design device',target:`target-demo-${kind}`,what:'Recovery review sample',
+    detail:'Design sample · no Runtime or device connection',icon:'flash',...facts
+  });
 }
 const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span class="chip danger">✕ 失败</span>',
   planned:'<span class="chip planned">◇ PLANNED</span>',cancelled:'<span class="chip dim">⊘ 已取消</span>',
@@ -1268,17 +1296,24 @@ function addTarget(){
 
 /* ---------- recovery banner ---------- */
 function recoveryHTML(){
-  if(S.recovery.archived)return "";
-  return `<div class="banner" data-acin>
-    <header>⚠ 存在未完成的恢复项<span class="ac">REQ-UX-003</span></header>
-    <div class="ritem">
-      <div class="ri"><b>Flash · flash.dayu200 · flash-partitions</b> <span class="chip warn">outcomeUnknown</span>
-        <p>原 Job 的设备影响保持未知。Runtime 只有在 durable facts、同一目标、不可变 Artifact 与 Provider complete-overwrite coverage 全部匹配时，才会建立独立恢复 epoch；证据缺失或漂移时零新 dispatch，用户确认不能绕过。</p></div>
-      <div class="ra">
-        <button class="btn" onclick="go('history')">在 History 查看证据</button>
-      </div>
-    </div>
-  </div>`;
+  if(['settings','trace-viewer','trace-shortcuts','automation'].includes(S.nav))return '';
+  const severity=h=>h.outcomeUnknown?0:h.waitingForHuman?1:2;
+  return HIST.filter(flashNeedsRecovery).sort((a,b)=>severity(a)-severity(b)).map(h=>{
+    const kind=h.outcomeUnknown?'outcomeUnknown':h.waitingForHuman?'humanRequired':
+      h.st==='resumeAtConfirmedSafeBoundary'?'resumeSafe':h.st==='userAbandonRequested'?'archivePending':'waiting';
+    const symbol={outcomeUnknown:'unknown',humanRequired:'human',resumeSafe:'safe',archivePending:'archive',waiting:'waiting'}[kind];
+    const copy={
+      outcomeUnknown:[lc('设备影响未知','Device effect is unknown'),lc('条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。','Keep the device unchanged when possible. Do not start another device operation until the outstanding effect is reconciled through an approved Runtime path.')],
+      humanRequired:[lc('需要人工处理','Human action is required'),lc('请先检查已记录的原因和证据，再通过已批准的 Runtime 路径继续。','Review the recorded reason and evidence before continuing through an approved Runtime path.')],
+      resumeSafe:[lc('已有安全恢复边界','A safe recovery boundary is available'),lc('Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。','Runtime recorded a confirmed safe boundary. Review the record before resuming through an approved Runtime path.')],
+      archivePending:[lc('恢复归档正在等待','Recovery archive is pending'),lc('Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。','Runtime is waiting for a safe boundary before the recovery record can finish. This App cannot force the current step to stop.')],
+      waiting:[lc('恢复正在等待','Recovery is waiting'),lc('请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。','Keep the current device state unchanged and review the Runtime record for the required recovery step.')]
+    }[kind];
+    return `<section class="banner" data-sync-id="jobRecovery.banner" aria-label="${esc(copy[0])} · ${esc(h.id)}"><div class="ritem">
+      <div class="ri"><header>${icon('recovery-'+symbol)}${esc(copy[0])}</header><p>${esc(copy[1])}</p><p class="mono">${esc(h.id)} · ${esc(h.target??lc('未报告','Not reported'))}</p></div>
+      <div class="ra"><button class="btn" data-job-id="${esc(h.id)}" onclick="openHistoryRun(this.dataset.jobId)">${lc('在历史记录中检查','Review in History')}</button></div>
+    </div></section>`;
+  }).join('');
 }
 
 /* ---------- Overview ---------- */
@@ -1287,6 +1322,7 @@ function openHistoryRun(id){
   S.historyLimit=HIST.length;S.histSel=id;go('history');
   $("page").scrollTop=0;
   if(document.scrollingElement)document.scrollingElement.scrollTop=0;
+  document.querySelector('.history-record.on')?.scrollIntoView({block:'nearest'});
 }
 function continuationReason(h){
   if(!h||h.st==='interrupted'||h.outcomeUnknown)return 'continuation_source_not_repeatable';
@@ -1322,7 +1358,7 @@ function continuationDraftHTML(){
 }
 function pOverview(){
   const latest=HIST.slice(0,4);
-  return recoveryHTML()+`<div class="overview-record" data-page-title="Overview">
+  return `<div class="overview-record" data-page-title="Overview">
     <div class="card overview-scope">
       <div data-sync-id="overview.record.device.name"><span class="hint">${lc("当前设备","Current device")}</span><h2>DAYU200</h2><span class="mono hint">TGT-958780b2ffb7 · binding 3 · USB</span></div>
       <div data-sync-id="overview.record.remoteServer"><span class="hint">${lc("编译服务器","Build server")}</span><h2>build-nightly <span class="chip ok">${lc("已绑定","Bound")}</span></h2><span class="mono hint">builder@build.example.internal:22</span></div>
@@ -3468,7 +3504,7 @@ function pDebug(){
     </div>`;
   }
 
-  return recoveryHTML()+`
+  return `
   <div class="page-lead" data-page-title="${lc("Debug 工作台","Debug Workbench")}"><span class="acin">REQ-DEBUG-*</span></div>
   <p class="hint" data-sync-id="debug.scope" style="max-width:66ch">${lc("Typed 产物部署、日志、应用生命周期、网络规则和 approved 只读工具——绝非 raw terminal。","Typed Artifact deployment, logs, app lifecycle, network rules, and approved read-only tools — never a raw terminal.")}</p>
   <div class="debug-scope" data-sync-id="debug.target"><span>${lc("目标设备","Target device")}</span>
@@ -3820,7 +3856,7 @@ function pHistory(){
   const all=filteredHistory(),rows=all.slice(0,S.historyLimit);
   const sel=rows.find(h=>h.id===S.histSel)||rows[0];S.histSel=sel?.id||null;
   const kinds=[['all','history',lc('全部记录','All records')],['flash','flash','Flash'],['debug','debug','Debug'],['viewer','dump','Viewer'],['trace','trace','Trace'],['diagnostics','diagnostics','Diagnostics'],['device','device','Device'],['other','history',lc('其他','Other')]];
-  return recoveryHTML()+`<div class="page-lead" data-page-title="History"></div><div class="history-shell">
+  return `<div class="page-lead" data-page-title="History"></div><div class="history-shell">
     <label class="history-compact-activity">${lc('活动类型','Activity')}<select class="inp" aria-label="${lc('活动类型','Activity')}" onchange="setHistoryFilter('kind',this.value)">${kinds.map(([key,i,label])=>`<option value="${key}" ${S.hf.kind===key?'selected':''}>${label}</option>`).join('')}</select></label>
     <aside class="history-rail"><div class="history-group"><span class="history-group-label">${lc('活动类型','Activity')}</span>${kinds.map(([key,i,label])=>`<button class="history-kind ${S.hf.kind===key?'on':''}" onclick="setHistoryFilter('kind','${key}')">${icon(i,true)}<span>${label}</span><span class="history-count">${key==='all'?HIST.length:HIST.filter(h=>h.kind===key).length}</span></button>`).join('')}</div></aside>
     <section class="history-list"><div class="history-list-head"><div><h2>${lc('最近活动','Recent activity')}</h2><span class="hint">${lc('只读 Runtime 记录','Read-only Runtime records')}</span></div></div>
@@ -4161,6 +4197,7 @@ function renderPage(){
   $("page").classList.toggle("diagnostic-page",S.nav==="diagnostics"&&PARAMS.get("concept")==="diagnostics"&&S.diagnostics.view!=="capture");
   $("page").classList.toggle("device-workspace-page",S.nav==="device-control");
   document.body.classList.toggle("standalone-design",["trace-viewer","trace-shortcuts","settings"].includes(S.nav));
+  $("recoveryBanners").innerHTML=recoveryHTML();
   $("page").innerHTML=historyContextHTML()+continuationDraftHTML()+(PAGES[S.nav]||pOverview)();
   const titled=$("page").querySelector("[data-page-title]");
   if(titled){document.querySelector(".titlebar .t").textContent=titled.dataset.pageTitle;$("page").setAttribute("aria-label",titled.dataset.pageTitle);}

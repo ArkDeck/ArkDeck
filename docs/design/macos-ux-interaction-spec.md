@@ -99,8 +99,13 @@ Primary Window
 
 ### 4.2 Recovery 与 HumanActionRequired（REQ-UX-003）
 
-**实现边界**：当前全局 banner 只导航 History；下列 resume/archive/human resolution 不是
-App 现有动作。Runtime 已发布且准入的恢复能力与 App 缺失入口分开记录。
+**实现边界**：当前全局 banner 只打开该项精确 Job 的 History，并清除遮挡该记录的旧
+筛选；不能只切换到 History 而沿用另一条选择。所有主窗口工作区、动态设备详情与信任
+页共享同一 banner family，独立 Settings / Trace Viewer / 帮助不显示。逐项投影尚未解决
+的 unknown、waitingForHuman、waitingForRecovery、awaitingRebindConfirmation、
+resumeAtConfirmedSafeBoundary、userAbandonRequested；已有 Runtime current-epoch
+关系的历史 unknown 仍保留原事实，但不再作为当前提醒。下列 resume/archive/human
+resolution 不是 App 现有动作。Runtime 已发布且准入的恢复能力与 App 缺失入口分开记录。
 
 - Recovery banner 位于 detail 顶部、页面内容之前，但不覆盖 toolbar；分为 resume-safe、waiting、outcomeUnknown、archivable。
 - `outcomeUnknown` 使用 system warning symbol + 明确文字，只有 RecoveryGuide 与显式归档；不渲染看似可继续的主按钮。

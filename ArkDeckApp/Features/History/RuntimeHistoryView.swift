@@ -27,9 +27,10 @@ struct RuntimeHistoryView: View {
   let onExportArtifact: ((String, RuntimeArtifactPresentation, URL, Bool) -> Void)?
   let onOpenWorkspace: ((RuntimeHistoryWorkspaceContext) -> Void)?
   var onOpenDiagnostics: ((RuntimeHistoryWorkspaceContext) -> Void)? = nil
-  let requestedJobID: String?
+  @Binding var requestedJobID: String?
 
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
+  @State private var scrollToJobID: String?
   @State private var searchText = ""
   @State private var statusFilter = HistoryStatusFilter.all
   @State private var modeFilter = HistoryModeFilter.all
@@ -107,6 +108,10 @@ struct RuntimeHistoryView: View {
       guard let jobID, presentation.jobs.contains(where: { $0.id == jobID }) else { return }
       resetFilters()
       selectedJobID = jobID
+      scrollToJobID = jobID
+      // Consume the navigation request so reviewing the same Job again after
+      // changing filters or selection is a new action, even on this page.
+      requestedJobID = nil
     }
     .onChange(of: selectedJobID, initial: true) { _, jobID in
       guard let jobID,
@@ -419,38 +424,46 @@ struct RuntimeHistoryView: View {
         }
         .accessibilityIdentifier("history.filter.empty")
       } else {
-        List(filteredJobs, selection: $selectedJobID) { job in
-          HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
-            Image(systemName: activityCategory(for: job).systemImage)
-              .foregroundStyle(.secondary)
-              .frame(width: 24, height: 24)
-              .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
-              HStack(alignment: .firstTextBaseline) {
-                Text(displayedOperationReference(job.operationReference))
-                  .font(WorkspaceFont.label)
-                  .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(formattedDate(historyDate(job)))
-                  .font(WorkspaceFont.tabularValue)
-                  .foregroundStyle(.secondary)
-              }
-              Text("\(job.targetID) · \(job.id)")
-                .font(WorkspaceFont.monospacedDense)
+        ScrollViewReader { scroll in
+          List(filteredJobs, selection: $selectedJobID) { job in
+            HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+              Image(systemName: activityCategory(for: job).systemImage)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-              HStack(spacing: WorkspaceMetrics.tightGap) {
-                historyStateLabel(job)
-                  .accessibilityIdentifier("history.row.state.\(job.id)")
-                if let badge = historyExecutionModeBadge(job.executionMode) { badge }
+                .frame(width: 24, height: 24)
+                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                HStack(alignment: .firstTextBaseline) {
+                  Text(displayedOperationReference(job.operationReference))
+                    .font(WorkspaceFont.label)
+                    .lineLimit(1)
+                  Spacer(minLength: 8)
+                  Text(formattedDate(historyDate(job)))
+                    .font(WorkspaceFont.tabularValue)
+                    .foregroundStyle(.secondary)
+                }
+                Text("\(job.targetID) · \(job.id)")
+                  .font(WorkspaceFont.monospacedDense)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(1)
+                  .truncationMode(.middle)
+                HStack(spacing: WorkspaceMetrics.tightGap) {
+                  historyStateLabel(job)
+                    .accessibilityIdentifier("history.row.state.\(job.id)")
+                  if let badge = historyExecutionModeBadge(job.executionMode) { badge }
+                }
               }
             }
+            .padding(.vertical, WorkspaceMetrics.rowGap)
+            .tag(job.id)
+            .id(job.id)
           }
-          .padding(.vertical, WorkspaceMetrics.rowGap)
-          .tag(job.id)
+          .accessibilityIdentifier("history.table")
+          .onChange(of: scrollToJobID, initial: true) { _, jobID in
+            guard let jobID else { return }
+            scroll.scrollTo(jobID, anchor: .top)
+            scrollToJobID = nil
+          }
         }
-        .accessibilityIdentifier("history.table")
       }
       Divider()
       if presentation.hasOlderJobs || presentation.olderJobsLoadFailure != nil {

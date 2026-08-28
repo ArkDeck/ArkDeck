@@ -501,12 +501,12 @@ private struct RuntimeHistoryJobInspector: View {
 /// A history refresh no longer reruns sidebar and device-detail construction.
 private struct RuntimeRecoveryBanner: View {
   let model: RuntimeHistoryViewModel
-  let onOpenHistory: () -> Void
+  let onOpenJob: (String) -> Void
 
   var body: some View {
     GlobalRecoveryBannerView(
       presentation: model.presentation,
-      onOpenHistory: onOpenHistory)
+      onOpenJob: onOpenJob)
   }
 }
 
@@ -735,7 +735,7 @@ private struct AppShellView: View {
 
   private var workspaceWithRecovery: some View {
     VStack(spacing: 0) {
-      RuntimeRecoveryBanner(model: runtimeHistory, onOpenHistory: openHistory)
+      RuntimeRecoveryBanner(model: runtimeHistory, onOpenJob: openHistoryJob)
       if let draft = preparedContinuation, navigationItem(for: draft.workspaceKind) == selectedItem {
         WorkspaceContinuationCard(
           draft: draft,
@@ -1028,7 +1028,7 @@ private struct AppShellView: View {
         onExportArtifact: runtimeHistory.exportArtifact,
         onOpenWorkspace: openHistoryWorkspace,
         onOpenDiagnostics: openHistoryDiagnostics,
-        requestedJobID: requestedHistoryJobID)
+        requestedJobID: $requestedHistoryJobID)
     case .flash:
       FlashWorkspaceView(
         model: models.flashWorkspace,
