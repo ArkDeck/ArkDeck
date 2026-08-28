@@ -1,0 +1,1656 @@
+{
+  "issue": "F41",
+  "baseRevision": "1795220c4b5633f3192f1e02b07b272c424aa9c7",
+  "classification": "UI layout correction; no device operation",
+  "goldenJourneys": [
+    "GJ-1",
+    "GJ-2",
+    "GJ-3",
+    "GJ-4"
+  ],
+  "status": "IMPLEMENTING",
+  "nativeVerification": "PASS: one continuous XCTest case completed all nine activities with zero failures in 495.750 seconds. Two App launches, one stable PID per language, all 20 recovery-family routes and original assertion groups passed. Presentation fixtures only; not real-device evidence.",
+  "designTests": {
+    "tests": 60,
+    "passed": 60,
+    "failed": 0,
+    "log": "f41-design-final-tests.log"
+  },
+  "realRuntimeReadOnly": {
+    "recordCount": 1962,
+    "oldUnknownCount": 4,
+    "currentRecoveryGuidanceCount": 0,
+    "newDeviceOperations": 0
+  },
+  "localGate": {
+    "firstAttempt": {
+      "exitCode": 1,
+      "parallelScheduledTests": 1833,
+      "failingTest": "ProcessExecutorContractTests/testTEST_AC_NFR_002_01_OneGiBSparseFixtureUsesBoundedCaptureAndMemory",
+      "failures": 3,
+      "reason": "timedOut; 615497728 of 1073741824 bytes observed",
+      "appLaneRan": false,
+      "parallelLaneDurationSeconds": 1749
+    },
+    "isolatedRecheck": {
+      "exitCode": 0,
+      "tests": 1,
+      "failures": 0,
+      "durationSeconds": 0.78,
+      "stdoutBytes": 1073741824,
+      "retainedStdoutBytes": 65536,
+      "peakRSSDeltaBytes": 1163264
+    },
+    "unmodifiedBaseControl": {
+      "revision": "1795220c4b5633f3192f1e02b07b272c424aa9c7",
+      "exitCode": 0,
+      "tests": 1,
+      "failures": 0,
+      "durationSeconds": 0.841,
+      "stdoutBytes": 1073741824,
+      "retainedStdoutBytes": 65536,
+      "peakRSSDeltaBytes": 1212416
+    },
+    "preWorkspaceReserveAttempt": {
+      "exitCode": 0,
+      "workers": 2,
+      "sameSuiteAndThresholds": true,
+      "swiftLanes": [
+        {
+          "name": "full-parallel",
+          "exitCode": 0,
+          "scheduledTests": 1833,
+          "durationSeconds": 785
+        },
+        {
+          "name": "full-process-identity-race",
+          "exitCode": 0,
+          "tests": 1,
+          "durationSeconds": 7
+        },
+        {
+          "name": "full-viewer-scale",
+          "exitCode": 0,
+          "tests": 5,
+          "durationSeconds": 7
+        }
+      ],
+      "plannerTests": 18,
+      "workflowTests": 9,
+      "catalogTests": 49,
+      "swiftPMWrapperTests": 10,
+      "xcodeWrapperTests": 7,
+      "sddErrors": 0,
+      "sddWarnings": 0,
+      "acceptanceIDs": 121,
+      "generatorZeroDrift": true,
+      "appLane": "TEST BUILD SUCCEEDED; no UI assertions executed"
+    },
+    "finalVerificationPending": false,
+    "preFilterPopoverAttempt": {
+      "log": "f41-local-gate-03.log",
+      "sourcePins": "f41-local-gate-03-source-pins.txt",
+      "exitCode": 0,
+      "workers": 2,
+      "sameSuiteAndThresholds": true,
+      "swiftLanes": [
+        {
+          "name": "full-parallel",
+          "exitCode": 0,
+          "scheduledTests": 1833,
+          "durationSeconds": 571
+        },
+        {
+          "name": "full-process-identity-race",
+          "exitCode": 0,
+          "tests": 1,
+          "durationSeconds": 8
+        },
+        {
+          "name": "full-viewer-scale",
+          "exitCode": 0,
+          "tests": 5,
+          "durationSeconds": 13
+        }
+      ],
+      "plannerTests": 18,
+      "workflowTests": 9,
+      "catalogTests": 49,
+      "swiftPMWrapperTests": 10,
+      "xcodeWrapperTests": 7,
+      "sddErrors": 0,
+      "sddWarnings": 0,
+      "acceptanceIDs": 121,
+      "generatorZeroDrift": true,
+      "appLane": "TEST BUILD SUCCEEDED; no UI assertions executed"
+    },
+    "latestCompletedAttempt": {
+      "log": "f41-local-gate-05.log",
+      "sourcePins": "f41-local-gate-05-source-pins.json",
+      "status": "passed",
+      "workers": 2,
+      "exitCode": 0,
+      "sameSuiteAndThresholds": true,
+      "swiftLanes": [
+        {
+          "name": "full-parallel",
+          "exitCode": 0,
+          "scheduledTests": 1833,
+          "durationSeconds": 1188
+        },
+        {
+          "name": "full-process-identity-race",
+          "exitCode": 0,
+          "tests": 1,
+          "durationSeconds": 18
+        },
+        {
+          "name": "full-viewer-scale",
+          "exitCode": 0,
+          "tests": 5,
+          "durationSeconds": 18
+        }
+      ],
+      "plannerTests": 18,
+      "workflowTests": 9,
+      "catalogTests": 49,
+      "swiftPMWrapperTests": 10,
+      "xcodeWrapperTests": 7,
+      "sddErrors": 0,
+      "sddWarnings": 0,
+      "acceptanceIDs": 121,
+      "generatorZeroDrift": true,
+      "appLane": "TEST BUILD SUCCEEDED; native UI assertions are recorded separately in attempt 05",
+      "sourcesUnchangedAfterNativePass": true
+    },
+    "preContinuousSessionAttempt": {
+      "log": "f41-local-gate-04.log",
+      "sourcePins": "f41-local-gate-04-source-pins.txt",
+      "status": "passed",
+      "workers": 2,
+      "exitCode": 0,
+      "sameSuiteAndThresholds": true,
+      "swiftLanes": [
+        {
+          "name": "full-parallel",
+          "exitCode": 0,
+          "scheduledTests": 1833,
+          "durationSeconds": 1016
+        },
+        {
+          "name": "full-process-identity-race",
+          "exitCode": 0,
+          "tests": 1,
+          "durationSeconds": 15
+        },
+        {
+          "name": "full-viewer-scale",
+          "exitCode": 0,
+          "tests": 5,
+          "durationSeconds": 12
+        }
+      ],
+      "plannerTests": 18,
+      "workflowTests": 9,
+      "catalogTests": 49,
+      "swiftPMWrapperTests": 10,
+      "xcodeWrapperTests": 7,
+      "sddErrors": 0,
+      "sddWarnings": 0,
+      "acceptanceIDs": 121,
+      "generatorZeroDrift": true,
+      "appLane": "TEST BUILD SUCCEEDED; no UI assertions executed"
+    },
+    "betweenGate04And05Changes": {
+      "scope": "History whole-reader generation/row positioning and continuous-session UI tests followed gate 04. Both the native run and final gate 05 passed with matching source pins.",
+      "designTests": 60,
+      "designTestExitCode": 0,
+      "designBuildExitCode": 0,
+      "reviewBuildExitCode": 0,
+      "beforePush": "Final commit preflight is required. Prototype native keyboard/outside dismissal remains unverified; no PR is pushed."
+    }
+  },
+  "nativeAttempts": [
+    {
+      "log": "f41-native-red-01.log",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode",
+      "xcresult": "Test-ArkDeck-2026.08.28_19-13-09-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-red-02.log",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode",
+      "xcresult": "Test-ArkDeck-2026.08.28_19-23-08-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-red-03.log",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode",
+      "xcresult": "Test-ArkDeck-2026.08.28_19-25-03-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-fixed-01.log",
+      "source": "fixed production layout",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode",
+      "xcresult": "Test-ArkDeck-2026.08.28_20-06-56-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-unlocked-01.log",
+      "exitCode": 65,
+      "tests": 1,
+      "failures": 2,
+      "durationSeconds": 61.003,
+      "reason": "After user unlock: empty-filter navigation left requested row offscreen; AppKit reported a clipped recovery button as hittable.",
+      "xcresult": "Test-ArkDeck-2026.08.28_21-18-39-+0800.xcresult",
+      "assertionsExecuted": true
+    },
+    {
+      "log": "f41-native-visible-hit-01.log",
+      "exitCode": 65,
+      "tests": 1,
+      "failures": 14,
+      "durationSeconds": 247.27,
+      "reason": "Eight offscreen History row assertions; four resize assertions and two cap assertions. Attempted narrow windows remained 1180x783; their requested-size screenshot labels are not evidence of a narrow window.",
+      "sourcePins": "f41-native-visible-hit-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_21-22-53-+0800.xcresult",
+      "assertionsExecuted": true
+    },
+    {
+      "log": "f41-native-history-layout-01.log",
+      "exitCode": 65,
+      "tests": 1,
+      "failures": 12,
+      "durationSeconds": 279.217,
+      "reason": "Stable List fixed wide exact navigation. Actual 900x652 windows exposed vertically stacked filters and split-view overflow: two bottom-bound checks plus ten row-visibility failures.",
+      "sourcePins": "f41-native-history-layout-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_21-28-14-+0800.xcresult",
+      "assertionsExecuted": true
+    },
+    {
+      "log": "f41-native-history-layout-02.log",
+      "exitCode": 65,
+      "tests": 1,
+      "failures": 2,
+      "durationSeconds": 344.289,
+      "reason": "Popover filters, constrained panes and workspace reserve passed all height/bounds checks. Fixed downward 180pt test scrolling missed two buttons in the shorter viewport; final test uses actual button direction and at most half-viewport increments, retaining full-frame reachability assertions.",
+      "sourcePins": "f41-native-history-layout-02-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_21-39-34-+0800.xcresult",
+      "assertionsExecuted": true
+    },
+    {
+      "log": "f41-native-regression-01.log",
+      "exitCode": 65,
+      "tests": 4,
+      "failedTests": 1,
+      "failures": 3,
+      "durationSeconds": 619.116,
+      "assertionsExecuted": true,
+      "reason": "Three existing regressions passed, including compact filter selection. Full-frame checks exposed three Chinese History targets clipped under the footer after empty-filter reset; the three failure screenshots confirm a real incomplete scroll. The deferred-scroll fix is tested separately.",
+      "sourcePins": "f41-native-regression-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_21-48-59-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-navigation-deferred-01.log",
+      "exitCode": 65,
+      "tests": 1,
+      "failures": 1,
+      "durationSeconds": 369.368,
+      "assertionsExecuted": true,
+      "reason": "Deferring the scroll with Task.yield alone did not close the issue: the English narrow archive row was still unrealized/offscreen. No pass claimed; native List identity and whole-row scrolling are tested next.",
+      "sourcePins": "f41-native-navigation-deferred-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_22-01-49-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-list-identity-01.log",
+      "exitCode": 65,
+      "tests": 1,
+      "failures": 6,
+      "durationSeconds": 321.371,
+      "assertionsExecuted": true,
+      "reason": "One English narrow archive row remained offscreen. Four assertions compared picker bounds with the accessibility content group rather than the native popover; inspected complete content screenshots show the labels, so the next test checks the native popover bounds. The final failure was an inaccessible Disabled app hierarchy after macOS locked again, confirmed by a read-only IOConsoleUsers check.",
+      "sourcePins": "f41-native-list-identity-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_22-10-54-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-list-generation-01.log",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode; read-only session checks did not report a screen-lock flag. No authentication bypass attempted.",
+      "sourcePins": "f41-native-list-generation-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_22-39-16-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-list-generation-02.log",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode; read-only session checks did not report a screen-lock flag. No authentication bypass attempted.",
+      "sourcePins": "f41-native-list-generation-01-source-pins.txt",
+      "xcresult": "Test-ArkDeck-2026.08.28_22-42-16-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-retry-reuse-before-01.log",
+      "sourcePins": "f41-native-retry-reuse-before-01-source-pins.txt",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode; App and UI-test runner compiled and signed, but no test case started.",
+      "xcresult": "Test-ArkDeck-2026.08.28_23-55-28-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-continuous-session-01.log",
+      "sourcePins": "f41-native-continuous-session-01-source-pins.txt",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode; App and UI-test runner compiled and signed, but no test case started.",
+      "xcresult": "Test-ArkDeck-2026.08.28_23-59-49-+0800.xcresult"
+    },
+    {
+      "log": "f41-native-continuous-session-02.log",
+      "sourcePins": "f41-native-continuous-session-01-source-pins.txt",
+      "exitCode": 65,
+      "assertionsExecuted": true,
+      "tests": 1,
+      "failures": 9,
+      "durationSeconds": 1565.112,
+      "xcresult": "Test-ArkDeck-2026.08.29_00-02-16-+0800.xcresult",
+      "reason": "Seven cascading narrow-filter keyboard failures; the framework reactivated the App during Return. Two actual clipped/offscreen target rows (English archive and Chinese human), confirmed by viewed screenshots. All nine activities completed with one stable PID per language. Another project started separate Xcode/Swift builds during this run; no shared DerivedData and no other task was stopped."
+    },
+    {
+      "log": "f41-native-continuous-session-03.log",
+      "sourcePins": "f41-native-continuous-session-03-source-pins.txt",
+      "sourceSnapshot": "f41-native-continuous-session-03-source/",
+      "exitCode": 65,
+      "assertionsExecuted": true,
+      "tests": 1,
+      "failures": 10,
+      "durationSeconds": 425.821,
+      "xcresult": "Test-ArkDeck-2026.08.29_00-31-47-+0800.xcresult",
+      "reason": "The direct geometry-callback positioning experiment failed ten target-row visibility checks and was withdrawn. The existing keyboard, saved-filter, exact provenance and canonical Flash assertions did not fail. Two App launches; no parallel build was observed before starting. Timings are not a controlled performance comparison with attempt 02."
+    },
+    {
+      "log": "f41-native-continuous-session-04.log",
+      "sourcePins": "f41-native-continuous-session-04-source-pins.txt",
+      "exitCode": 65,
+      "assertionsExecuted": true,
+      "tests": 1,
+      "failures": 2,
+      "durationSeconds": 510.483,
+      "xcresult": "Test-ArkDeck-2026.08.29_00-41-48-+0800.xcresult",
+      "recoveryFamilyExactRoutes": 20,
+      "recoveryFamilyAssertionFailures": 0,
+      "reason": "All recovery-family geometry and exact-target checks passed. Two Chinese default-History hit-test failures occurred under an unrelated Surge file-timeout dialog; the exported screenshot visibly confirms this occlusion. The same code is being rerun without weakening assertions. No network configuration or permissions were changed; a later read-only check found the dialog already gone."
+    },
+    {
+      "log": "f41-native-continuous-session-05.log",
+      "sourcePins": "f41-native-continuous-session-04-source-pins.txt",
+      "sameSourcesAsAttempt04": true,
+      "exitCode": 0,
+      "assertionsExecuted": true,
+      "tests": 1,
+      "failures": 0,
+      "durationSeconds": 495.75,
+      "xcresult": "Test-ArkDeck-2026.08.29_00-59-51-+0800.xcresult",
+      "recoveryFamilyExactRoutes": 20,
+      "recoveryFamilyAssertionFailures": 0,
+      "reason": "Exact same App/test code as attempt 04; all nine phases passed after the unrelated informational dialog had disappeared. Two launches verified from the log and stable PIDs from all phase attachments. No assertions weakened, credentials entered, network configuration or permissions changed."
+    }
+  ],
+  "nativeRecovery": {
+    "diagnostic": "testmanagerd waited synchronously in XAMLocalAuthenticationProvider / LAContext",
+    "action": "SIGTERM of the stalled testmanagerd after all UI tests ended; verified old PID exited",
+    "authorizationBoundary": "No credentials entered, no privacy or security settings changed. User asked to handle normal macOS authentication if shown.",
+    "result": "Automation initialization recovered after a system state change. Earlier executed failures are retained. The final unchanged-code rerun completed all nine activities with zero failures; no credentials or security settings were changed.",
+    "computerUseCheck": {
+      "action": "Read-only get_app_state for the already-running macOS AutomationModeUI",
+      "result": "Computer Use server error -10005: timeoutReached",
+      "assertionsExecuted": false,
+      "credentialsEntered": false,
+      "settingsChanged": false
+    },
+    "sessionChecks": [
+      {
+        "screenIsLocked": true,
+        "method": "read-only IOConsoleUsers / CGSSessionScreenIsLocked",
+        "settingsChanged": false,
+        "credentialsEntered": false,
+        "userAskedToUnlock": true
+      },
+      {
+        "screenLockFlagPresent": false,
+        "onConsole": true,
+        "method": "read-only IOConsoleUsers / CGSSessionScreenIsLocked; no explicit false value was returned",
+        "settingsChanged": false,
+        "credentialsEntered": false,
+        "nextAction": "Run the focused native test"
+      }
+    ]
+  },
+  "screenshots": [
+    {
+      "path": "docs/design/references/v1.6-goal/recovery-family-layout-en.jpg",
+      "sha256": "9300185f2490e23d81e1b19a5336b6db73647d0091a236dc95eca329e1677fb6",
+      "classification": "unaltered 1280x720 browser demo after fixed-search refinement; individually viewed, not native or device evidence"
+    },
+    {
+      "path": "docs/design/references/v1.6-goal/recovery-family-last-record-en.jpg",
+      "sha256": "75736973b7b21b9b48d2a92cf9c63a1494b47d5044ecc45659d86aaa66b9da52",
+      "classification": "unaltered 1280x720 browser demo after fixed-search refinement; individually viewed, not native or device evidence"
+    },
+    {
+      "path": "docs/design/references/v1.6-goal/recovery-family-layout-zh.jpg",
+      "sha256": "17908d6aab18099c494e780331f3e0663480c38532dbd188a7d716283bb4ff2e",
+      "classification": "unaltered 1280x720 browser demo after fixed-search refinement; individually viewed, not native or device evidence"
+    },
+    {
+      "path": "docs/design/references/v1.6-goal/recovery-family-last-record-zh.jpg",
+      "sha256": "b45997bc70f92a9df9b2118ec6d182961fd5e77d8ad42e25a8797df85ba8f90c",
+      "classification": "unaltered 1280x720 browser demo after fixed-search refinement; individually viewed, not native or device evidence"
+    }
+  ],
+  "sourcePins": {
+    "ArkDeckApp/App/ArkDeckApp.swift": "3ede0901833404674ecd0c601f5cf2735fb951bf7de75f6cc7df9719b374b05f",
+    "ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift": "70b51b0af0de4a471005864138022e564780cd8b31a570991338baff273bedc5",
+    "ArkDeckApp/Resources/JobsLocalizable.xcstrings": "31a4c20cad2d13f16f93f6bc0ce092375da2a4c00b2adeafbf0fab726239d62b",
+    "ArkDeckAppUITests/AppShell/AppShellUITests.swift": "85c3920a2cae4e3d58e30f0df3387a8195716aface5bf29b05e43167979e2a19",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift": "877cfbbe3f68d61579dff9b3bc3434332189df3eeac558c5dd3a97982fa94796",
+    "docs/design/prototype.html": "254b100c318d862a775d187d659476c3431ac558e7d4ae3199752a6e6ac3601b",
+    "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs": "ba821da1aa213fb8b8d7fb00be9b087e5c0579670710654b585b1fc622f293f4",
+    ".design-sync/previews/RecoveryBanner.tsx": "d7f05075b631d9a69e43b38eb4b1a40f86b001f008096f1f4d451c352457d9b8",
+    "docs/design/implementation-coverage.json": "4a69c88291313eefc95882fa5a5c1850d8a48f9ecb1ad7a559b20ce310a0488c",
+    "ArkDeckApp/Features/History/RuntimeHistoryView.swift": "a1c5e27832816cd2ff5ea4518a0bb08b8cfece50da6331d694020b6249d8a3a4",
+    "docs/design/macos-ux-interaction-spec.md": "2ed56049621e13e362f6a8ce4ce83d6b259c3cdfe61e95e3f6440c02ae4f1195",
+    "docs/design/arkdeck-ds/scripts/check-tokens.mjs": "04092283dd1d6fbd15137224203244a6b63260157115155ac700d2df65ae46d5"
+  },
+  "privateEvidenceHashes": {
+    "f41-native-red-01.log": "f1e2c0fb7a166cab7c9638362f437a05d0775a48ecd02be04eb4be6f211c24bc",
+    "f41-native-red-02.log": "8fbfdeffdbe06a240472ef2f8824364f0132d5fc18277599f5c4b31606c3b22b",
+    "f41-native-red-03.log": "00cf3a86530a3dd66e67ef2291fed42067a6a478f51b52fb3699ed12c21011aa",
+    "f41-testmanagerd-sample.txt": "5b8527bf0cd165981e42e639514587fa9d92b89d8c2593367504fc9e4b4a0565",
+    "f41-jobs-page1.json": "304babe1f3011addf5ce71120e195723d9798614389531952e9eaf044db0f70f",
+    "f41-jobs-page2.json": "a0d27f69740f8dda05c3ea0b1276b75bfb15dbc14975c4f2134682cbad193e08",
+    "f41-browser-exact-checks.json": "68171884fa695eeb2f6c3fed8a3d18dd66daafcd9bd57e1a41d0518340092c11",
+    "f41-design-tests.log": "2d758b6c802875588e8f6f43622ac8c711a91ec4040620099ba4d9d94feb4ff9",
+    "f41-design-build.log": "7a1abb449c09669390dd17edf4d8a120933a897e0a85c9760114c78b61e190e8",
+    "f41-design-review-build.log": "d558705fcacf4419486de92e381aa5c42a2db582ab7cc537a3c0a7e7bc6c1aa6",
+    "f41-local-gate-01.log": "661f2fe1c4eb210d1dbaf77d22f24c07e79d28dd5db4b0f873c418b65b2df4d0",
+    "f41-bounded-memory-isolated.log": "8679de752b2ce7f786b901b2506fc04f8454988063cd988bf97b6ede8c175205",
+    "f41-recovery-preview-build-final.log": "f0b01e3f207b457c167e7a4b7336ac1d7c665a83fdd973c54a5847d6817eb851",
+    "f41-native-fixed-01.log": "2420af51c93daac40509f9176a173092af3c74b89d7206a9cd637d3be482272c",
+    "f41-bounded-memory-base-control.log": "feb87a0926a7d6a769153b47f1cafdf8f8a1ea04937949c14e5c15398d3e7c3a",
+    "f41-local-gate-02.log": "fa71423d09cfdbb0c7d59b8cb82a5b0b1e3813d5a8e35b29ac9eecc6a5e7433e",
+    "f41-native-list-identity-01-source-pins.txt": "6b5b25d201d9d52832f127677e3da7a6427cc98ef428091f5d6b7a1f72477865",
+    "f41-browser-reserved-navigation.json": "86605d39a07ffb25e2e2f732d8848b3a4985b92720adc03dac5a2dc7ea01efdf",
+    "f41-recovery-preview-build-reserved.log": "e5397a7bc4f6484d57f4b2df653c5b61b735ae8c4ccc5344343f92215529a435",
+    "f41-design-build-reserved.log": "cff6812de5d9cfbd59220747ca3f46a21a21713367d957189b29544977e7c7b4",
+    "f41-native-navigation-deferred-01.log": "5bac1c7ce818f61635f6b8c108db8c539aff99c076d085c1a2f938de01b210f5",
+    "f41-native-visible-hit-01-source-pins.txt": "ae9dd4857426529263f0f12ee94f50a89c9949dc4de35c30c6898971a1d5a20f",
+    "f41-native-history-layout-02-source-pins.txt": "891f554a189ac53705dceb90fe9df4eff515573716369594b56bcbf515d1ad10",
+    "f41-browser-reserved-workspaces.json": "491424ea7a232b841ae788ec36d7c93c002a4a17d34394ac159b512df8f12892",
+    "f41-design-tests-reserved.log": "0465608ac7c3e5d328ec707531ddb1360f6592089200462d5175209451a26663",
+    "f41-native-visible-hit-01.log": "9802b9131203466853217d71da57ff2bc976a92fa4107eb2937739b353bcebe2",
+    "f41-design-tests-reserved-02.log": "7a84e52a7468364616b9a69f43ad2012049f3ad03d2383b43060d02fac5a324a",
+    "f41-local-gate-03-source-pins.txt": "1faacbbcf8cbfa0b42db8bcacbb77c7fa3e2c0c8cbf0a04880a952d0110727f8",
+    "f41-local-gate-03.log": "02250ab1ab0b2a23b2fd34714e9daa9126372b61bfcd1a850e64c1444b7daadb",
+    "f41-native-history-layout-02.log": "73180b96b546f8e0dbe2fe46d9a8d8fbec2840c758fda86b2102d382dda365f2",
+    "f41-native-list-identity-01.log": "e13852efd423ce7157542004af092cf35ca1146b3e8072b040bff42f3c2afdc3",
+    "f41-native-history-layout-01.log": "93c6dcae8ca14c74635af6aecca1f1048e0f9fcd5306ae32d8ae7b7bf34eb339",
+    "f41-native-regression-01-source-pins.txt": "8b01453e8e458e24dc43a4174e63c0180468622b9d82f0cc6968d30da09e66f1",
+    "f41-native-list-identity-01-export.log": "39fe96367c735760fde1ddce1ec402708743166a005c79b3b8e71a9461cbebd0",
+    "f41-native-unlocked-01.log": "77619e6703ab08ae1ccf61856cc4d5e5192b60cfc9a80770e4b81ebe7026b001",
+    "f41-native-navigation-deferred-01-export.log": "9c409ba99ead7a61936c2c09cb27609cd66c1155cb79e25e0a3e8462ec7f1d32",
+    "f41-design-review-reserved.log": "8a4c62c4b5d7c19a3a6b7060eeb075f492f4ab739435298d871c207e923ef657",
+    "f41-recovery-preview-build.log": "2ec9323687d9ee26ef4ee0d270e832065dd3dfcf35b8f216b1a80e8b716a6412",
+    "f41-native-list-generation-01-source-pins.txt": "1faacbbcf8cbfa0b42db8bcacbb77c7fa3e2c0c8cbf0a04880a952d0110727f8",
+    "f41-native-history-layout-01-source-pins.txt": "c1bdb63ee0e45744831b0c5ff16177859088c92b84d4f02e029f9de166bd7ffa",
+    "f41-native-navigation-deferred-01-source-pins.txt": "40307b576e10a6d7ed3ad4925028d6a6e6e9c55af4cf1b0977b046e880a5238c",
+    "f41-native-regression-01-export.log": "4c4bad533bb1f04f8ed37a3b810e38bd3c207e25caf7bc2e20eaf435b8dd49b5",
+    "f41-native-regression-01.log": "feaa687dd5ce5c30f19c78b3b762d3a8e7bfccf12c6a70a20e6880bb8f3966f4",
+    "f41-browser-final-navigation.json": "bff2db0f8f3e3257f3cb7079bfddd89be4e3a42974f69aa79a2f41f6adddbf18",
+    "f41-design-popover-build-02.log": "48f502912246b300775ada114b12b9f26c93c2470d7ef79f9a3d71ba070c5988",
+    "f41-design-popover-review.log": "9da3272f1006a384d52f2082522b1f317706ae317a462688dfcc918d9bdefbab",
+    "f41-native-list-generation-01.log": "258433c2fdb9bbf177b7bc9c4d69967bf28d6c86cd2c23e7a94534d49e4aaec7",
+    "f41-design-popover-tests-01.log": "a9952579b67689a0e35a190165834be8d579b80bb869f203df30cb9161fc26d6",
+    "f41-native-list-generation-02.log": "c3d5cc0fa9c97ef4394d8ba65f9219387d2023682585f400f1a6058901e50938",
+    "f41-local-gate-04-source-pins.txt": "9b1fd62aec0fb6003ba1fae12bf6412ddd679cc8b236b830aa4d6566a718940d",
+    "f41-browser-filter-popover-checks.json": "f1d98f0978e2f0804c27550a90fddcfad83feb7cd3f68bde59cc9f4b3911d1c6",
+    "f41-design-popover-build.log": "dbd73341b0ea9337508438d8fa86328a4ecf1209521f988c1410925a5b7cc6ff",
+    "f41-design-fixed-search-tests.log": "0b475b420543d4f3e2d554fdaaf6315973263964062c5351719d86926d6ac72c",
+    "f41-browser-final-workspaces.json": "345fa2f528d102a3e37cad48a447bf88adb5312213f7982809c592953782c08a",
+    "f41-browser-fixed-search-navigation.json": "e8513a86069c866d5d9bd3f70583afb449fd78d6138694f33355637e8ad1edba",
+    "f41-design-fixed-search-review.log": "d7abc7a383f8b21ffdb4d679079c1c20517dc572b8ffce580bf2898e202b815e",
+    "f41-design-fixed-search-build.log": "fcb42f34a3d3a8630c059f0dc647189fabbf5874ade4e304a895af4db7ec948f",
+    "f41-local-gate-04.log": "0884a8c9cacaf7c21a6944a19104986d837b1e717311e5e534da9e21e1a8f425",
+    "f41-design-final-build.log": "4e33c38b150d8ef4a49cbfec2da93b5b8bba901b1909aa6b78cb7cf12c6ac8b6",
+    "f41-browser-filter-popover-en.jpg": "0eafd8fc4b5a16afa77fece90ea58d28e5fa9f2d7673d9919c827cb735c8405a",
+    "f41-browser-filter-popover-zh.jpg": "a9078c05b14918e38730bde972d1d45abb4ac6d01d59753ad7cc7a62e2aa8279",
+    "f41-design-fixed-search-build-02.log": "c8144b78484e69b18bc98283b6255c9520fc21a08b869b8ffef9e01890842353",
+    "f41-design-final-tests.log": "46b430cf157315987affe3b837f38374429ea1fd436aabb6b0eb0eb4fb85ff4a",
+    "f41-design-final-review.log": "7cd4136f7f42a2541d7f06965416ea4899d59293062a738d66f812e265a8e878",
+    "f41-native-retry-reuse-before-01.log": "fd862d5bc449eb0d043d969c7e85787abf446dc851f1e47d4205ce2c8fbfc8fb",
+    "f41-native-retry-reuse-before-01-source-pins.txt": "729cfb72c1282638fd86d4b839516e995fb4fcad0812a634eac288a97202bcaa",
+    "f41-native-continuous-session-01.log": "2df98a2d20c0fd549a35d8b114f88f9cf2e03e8c9a4973c2baeeaa39dc145141",
+    "f41-native-continuous-session-01-source-pins.txt": "d084bee90706e8c16eb414bc3a3551ccab0b8423ca0cb025340e2b89fb8c7dfe",
+    "f41-continuous-session-coverage.json": "4b633d3b7a53c33841054fd9fe012235e7ba2368de919db06f7a935aaf31d67b",
+    "f41-native-continuous-session-02.log": "dfb6c318e4958bc3a813d7b2d12faf1c566789f938dd274881cccb9da1f70795",
+    "f41-native-continuous-session-02-export.log": "6fa54e12fa65df7002c79b54fd3b8921b3029ec63fcecd3cd62228d09acc12b6",
+    "f41-native-continuous-session-02-tests.json": "c822be3be8362dab89507aa7acf52ed1eca5ed34db0ab04e5093525e148b436a",
+    "f41-native-continuous-session-02-continuity.json": "811ab9a6fb248f453900c55b6157fc1f65008d2053300abf6c1c78f53cf4a46d",
+    "f41-native-continuous-session-03-source-pins.txt": "9c813967e239fbcdee449907ce624a1c1f9b388209e393b0c7b80172037e03d7",
+    "f41-native-continuous-session-03.log": "c048e5e34b48cdb268e6b177933b61b3b82972d2de609807d4ea3b9fe9fb903a",
+    "f41-native-continuous-session-04-source-pins.txt": "fd40df45ff42449740af34bc41e094d311b887832fdb22f43b5995c85efe2fe5",
+    "f41-native-continuous-session-04.log": "a6dc247d3702ce50e74a3d0a4ccc864ecee239b186b7b0c3ef792fbfcbf7df21",
+    "f41-native-continuous-session-04-export.log": "20fddaeacd85e4ccfcc07ec89cecdea5b7c81ddc438dcf4715b760ebc700334f",
+    "f41-native-continuous-session-04-continuity.json": "f6073aeeefcffc431ea8c13ce3da34656aa81923a5b0419cb5997e40a5dc55f3",
+    "f41-native-continuous-session-05.log": "bcbdd445349ecceace1e5ab82023b8127d048dc7c236d06924cd0c766da129b1",
+    "f41-native-continuous-session-05-export.log": "c4c590a74c07d2c5429cf6f9fb543207e8e755c822aad6167cff245a61497e3f",
+    "f41-native-continuous-session-05-continuity.json": "d6d7ad69b875cd34876d147680a8f98b53f2efb4361f8e9aa6fc2260f65b3a15",
+    "f41-continuous-session-final-coverage.json": "d24083654d70ad2221150583c4e698bb56a6538eef58bdd04bbb8a16084d6017",
+    "f41-local-gate-05.log": "23e893ef39cf43220a84abd80f0c8530d935723ac9cc4ae66ef6b6e8522c862f",
+    "f41-local-gate-05-source-pins.json": "ee73c7e6c5a107639fa3b24565686e6b0453607229d0861cf0418cf224e2c34c"
+  },
+  "delivery": "Prepared as a draft PR for review of the native layout fix and continuous-session test reuse. Native acceptance, final gate and source pins remain valid and unchanged. Browser keyboard/outside dismissal remains unverified; do not treat this as full F41 or overall goal acceptance. No new device operation was performed.",
+  "browserBeforeWorkspaceReserve": {
+    "classification": "design demo; not native or device acceptance",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "workspaceChecks": {
+      "passed": 20,
+      "pages": [
+        "overview",
+        "flash",
+        "debug",
+        "dump",
+        "trace",
+        "device-control",
+        "diagnostics",
+        "history",
+        "dynamic device",
+        "trust"
+      ],
+      "locales": [
+        "en",
+        "zh-Hans"
+      ],
+      "conditions": [
+        "five recovery records",
+        "content scrolls within recovery viewport",
+        "workspace visible height at least 150 CSS px"
+      ]
+    },
+    "exactNavigationChecks": [
+      {
+        "lang": "zh-Hans",
+        "kind": "unknown",
+        "query": "",
+        "scrollTop": 0,
+        "selected": "job-demo-recovery-unknown"
+      },
+      {
+        "lang": "zh-Hans",
+        "kind": "human",
+        "query": "",
+        "scrollTop": 67,
+        "selected": "job-demo-recovery-human"
+      },
+      {
+        "lang": "zh-Hans",
+        "kind": "safe",
+        "query": "",
+        "scrollTop": 187.5,
+        "selected": "job-demo-recovery-safe"
+      },
+      {
+        "lang": "zh-Hans",
+        "kind": "archive",
+        "query": "",
+        "scrollTop": 308,
+        "selected": "job-demo-recovery-archive"
+      },
+      {
+        "lang": "zh-Hans",
+        "kind": "waiting",
+        "query": "",
+        "scrollTop": 391,
+        "selected": "job-demo-recovery-waiting"
+      },
+      {
+        "lang": "en",
+        "kind": "unknown",
+        "query": "",
+        "scrollTop": 0,
+        "selected": "job-demo-recovery-unknown"
+      },
+      {
+        "lang": "en",
+        "kind": "human",
+        "query": "",
+        "scrollTop": 84.5,
+        "selected": "job-demo-recovery-human"
+      },
+      {
+        "lang": "en",
+        "kind": "safe",
+        "query": "",
+        "scrollTop": 205,
+        "selected": "job-demo-recovery-safe"
+      },
+      {
+        "lang": "en",
+        "kind": "archive",
+        "query": "",
+        "scrollTop": 325.5,
+        "selected": "job-demo-recovery-archive"
+      },
+      {
+        "lang": "en",
+        "kind": "waiting",
+        "query": "",
+        "scrollTop": 408.5,
+        "selected": "job-demo-recovery-waiting"
+      }
+    ],
+    "limitations": [
+      "No narrow browser viewport or pixel-equivalence assertion",
+      "End/PageDown key attempts did not scroll; keyboard scrolling not accepted",
+      "A Chinese trust selector used its English label; corrected from a fresh DOM snapshot",
+      "A large batch timed out and reset the connection; all ten exact navigation checks rerun in smaller persisted batches"
+    ],
+    "sourceStage": "Before the 400pt workspace-reserve refinement; superseded by browser checks above",
+    "screenshots": [
+      {
+        "privatePath": "f41-browser-before-workspace-reserve/recovery-family-layout-en.jpg",
+        "sha256": "c52fd5283817690f7bde50b474f81d9fc274d905a7dc8927ac349791509f8c14"
+      },
+      {
+        "privatePath": "f41-browser-before-workspace-reserve/recovery-family-last-record-en.jpg",
+        "sha256": "47d917f3f84ed25420650e333bf5d1dd5ec2cb298e81818aa348e2b902805e48"
+      },
+      {
+        "privatePath": "f41-browser-before-workspace-reserve/recovery-family-layout-zh.jpg",
+        "sha256": "03af23d70b9d8513afa2a11adc8414efb5dc7b1d01680c7f167f1a875aaf72be"
+      },
+      {
+        "privatePath": "f41-browser-before-workspace-reserve/recovery-family-last-record-zh.jpg",
+        "sha256": "c49e742b5ce89f161a4328bcc1a88a694082ebfefcdb83f8efdfcdb896d104c0"
+      }
+    ]
+  },
+  "designAttempts": [
+    {
+      "log": "f41-design-tests-reserved.log",
+      "exitCode": 1,
+      "reason": "Isolated worktree lacked esbuild; no product assertion failure. Reused local node_modules only after package-lock files matched."
+    },
+    {
+      "log": "f41-design-tests-reserved-02.log",
+      "exitCode": 0,
+      "tests": 59,
+      "failures": 0
+    },
+    {
+      "log": "f41-design-popover-tests-01.log",
+      "exitCode": 0,
+      "tests": 60,
+      "failures": 0
+    },
+    {
+      "log": "f41-design-popover-build.log",
+      "exitCode": 1,
+      "reason": "Two new History composition classes were not classified by the design-token roster guard; no token drift. Classified the native-popover approximation and compact toolbar as page-specific composition of existing Select and Button controls."
+    },
+    {
+      "log": "f41-design-popover-build-02.log",
+      "exitCode": 0
+    },
+    {
+      "log": "f41-design-fixed-search-tests.log",
+      "exitCode": 0,
+      "tests": 60,
+      "failures": 0
+    },
+    {
+      "log": "f41-design-fixed-search-build.log",
+      "exitCode": 1,
+      "reason": "New standalone wide-filter layout selector lacked a roster classification; classified as History-only composition, then rebuilt."
+    },
+    {
+      "log": "f41-design-fixed-search-build-02.log",
+      "exitCode": 0
+    },
+    {
+      "log": "f41-design-final-tests.log",
+      "exitCode": 0,
+      "tests": 60,
+      "failures": 0
+    }
+  ],
+  "designBuilds": {
+    "package": "passed",
+    "review": "passed",
+    "recoveryPreview": "passed",
+    "reviewLog": "f41-design-final-review.log",
+    "packageLog": "f41-design-final-build.log"
+  },
+  "browserBeforeFilterPopover": {
+    "classification": "design demo; not native or device acceptance",
+    "sourceStage": "400pt reserve, before narrow filter popovers; retained prior verification",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "workspaceChecks": {
+      "passed": 20,
+      "records": [
+        {
+          "page": "Overview",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Flash",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Debug",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Viewer",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Trace",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Device",
+          "lang": "en",
+          "available": 511,
+          "count": 5,
+          "recovery": 111.0546875,
+          "recoveryContent": 654,
+          "workspace": 400
+        },
+        {
+          "page": "Diagnostics",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "History",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "dynamic device",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "trust",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Overview",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Flash",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Debug",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Viewer",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Trace",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Device",
+          "lang": "zh-Hans",
+          "available": 511,
+          "count": 5,
+          "recovery": 111.0546875,
+          "recoveryContent": 637,
+          "workspace": 400
+        },
+        {
+          "page": "Diagnostics",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "History",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "dynamic device",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "trust",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        }
+      ],
+      "conditions": [
+        "five recovery records",
+        "scrollable content within min(45%, max(96px, available height minus 400px)) with one CSS pixel rounding tolerance",
+        "visible page height at least 150 CSS px; measured 363 CSS px excluding the design-only review note"
+      ]
+    },
+    "exactNavigationChecks": [
+      {
+        "kind": "unknown",
+        "lang": "zh-Hans",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.7265625,
+        "rowTop": 567.1640625,
+        "scrollTop": 1366.5,
+        "selected": "job-demo-recovery-unknown"
+      },
+      {
+        "kind": "human",
+        "lang": "zh-Hans",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.8515625,
+        "rowTop": 567.2890625,
+        "scrollTop": 1555.5,
+        "selected": "job-demo-recovery-human"
+      },
+      {
+        "kind": "safe",
+        "lang": "zh-Hans",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.7890625,
+        "rowTop": 567.2265625,
+        "scrollTop": 1461,
+        "selected": "job-demo-recovery-safe"
+      },
+      {
+        "kind": "archive",
+        "lang": "zh-Hans",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.9140625,
+        "rowTop": 567.3515625,
+        "scrollTop": 1650,
+        "selected": "job-demo-recovery-archive"
+      },
+      {
+        "kind": "waiting",
+        "lang": "zh-Hans",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.6640625,
+        "rowTop": 567.1015625,
+        "scrollTop": 1272,
+        "selected": "job-demo-recovery-waiting"
+      },
+      {
+        "kind": "unknown",
+        "lang": "en",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.9453125,
+        "rowTop": 541.1640625,
+        "scrollTop": 1392.5,
+        "selected": "job-demo-recovery-unknown"
+      },
+      {
+        "kind": "human",
+        "lang": "en",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.7890625,
+        "rowTop": 541.0078125,
+        "scrollTop": 1608,
+        "selected": "job-demo-recovery-human"
+      },
+      {
+        "kind": "safe",
+        "lang": "en",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 652.0078125,
+        "rowTop": 567.4453125,
+        "scrollTop": 1487,
+        "selected": "job-demo-recovery-safe"
+      },
+      {
+        "kind": "archive",
+        "lang": "en",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.8515625,
+        "rowTop": 567.2890625,
+        "scrollTop": 1702.5,
+        "selected": "job-demo-recovery-archive"
+      },
+      {
+        "kind": "waiting",
+        "lang": "en",
+        "listBottom": 652.796875,
+        "listTop": 380.796875,
+        "query": "",
+        "rowBottom": 651.6640625,
+        "rowTop": 567.1015625,
+        "scrollTop": 1272,
+        "selected": "job-demo-recovery-waiting"
+      }
+    ],
+    "limitations": [
+      "No narrow browser viewport or pixel-equivalence assertion",
+      "Keyboard scrolling was not revalidated; earlier unsuccessful key attempts remain recorded",
+      "Browser verification does not substitute for the native List regression"
+    ],
+    "screenshots": [
+      {
+        "privatePath": "f41-browser-before-filter-popover/recovery-family-layout-en.jpg",
+        "sha256": "f6c16f2be57f21ab9665c6c8e7599a459db3d185359c7118f3d997185900c7a3"
+      },
+      {
+        "privatePath": "f41-browser-before-filter-popover/recovery-family-last-record-en.jpg",
+        "sha256": "a5df69ce889c1c9fb6a8913cad98f8332186c9a38df0887710cdb51227048175"
+      },
+      {
+        "privatePath": "f41-browser-before-filter-popover/recovery-family-layout-zh.jpg",
+        "sha256": "9e00983c9683d38acbe5d4d6af847b27c66d80aff7fa457c0eb1dc32c944db5c"
+      },
+      {
+        "privatePath": "f41-browser-before-filter-popover/recovery-family-last-record-zh.jpg",
+        "sha256": "10ea374aa667fa63f7506cfa3e11d55c8ea4e18109649efb654b80f757b3c8c4"
+      }
+    ]
+  },
+  "browser": {
+    "classification": "design demo only; not native or real-device acceptance",
+    "sourceStage": "Narrow popovers and fixed History search/heading with independent record scrolling",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "status": "20 workspace and 10 strict exact-navigation checks passed; native popover keyboard and outside-click behavior remain unverified",
+    "workspaceChecks": {
+      "passed": 20,
+      "records": [
+        {
+          "page": "Overview",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Flash",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Debug",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Viewer",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Trace",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Device",
+          "lang": "zh-Hans",
+          "available": 511,
+          "count": 5,
+          "recovery": 111.0546875,
+          "recoveryContent": 637,
+          "workspace": 400
+        },
+        {
+          "page": "Diagnostics",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "History",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "dynamic device",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "trust",
+          "lang": "zh-Hans",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 637,
+          "workspace": 363
+        },
+        {
+          "page": "Overview",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Flash",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Debug",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Viewer",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Trace",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "Device",
+          "lang": "en",
+          "available": 511,
+          "count": 5,
+          "recovery": 111.0546875,
+          "recoveryContent": 654,
+          "workspace": 400
+        },
+        {
+          "page": "Diagnostics",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "History",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "dynamic device",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        },
+        {
+          "page": "trust",
+          "lang": "en",
+          "available": 545,
+          "count": 5,
+          "recovery": 145.0546875,
+          "recoveryContent": 654,
+          "workspace": 363
+        }
+      ],
+      "scope": "Recovery cap and five-record/workspace availability checked across ten workspaces in each language; History rechecked in both languages after the final record-viewport change. Other pages were unchanged."
+    },
+    "exactNavigationChecks": [
+      {
+        "kind": "unknown",
+        "lang": "en",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.9453125,
+        "rowTop": 527.1640625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-unknown"
+      },
+      {
+        "kind": "human",
+        "lang": "en",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.7890625,
+        "rowTop": 527.0078125,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-human"
+      },
+      {
+        "kind": "safe",
+        "lang": "en",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 638.0078125,
+        "rowTop": 553.4453125,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-safe"
+      },
+      {
+        "kind": "archive",
+        "lang": "en",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.8515625,
+        "rowTop": 553.2890625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-archive"
+      },
+      {
+        "kind": "waiting",
+        "lang": "en",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.6640625,
+        "rowTop": 553.1015625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-waiting"
+      },
+      {
+        "kind": "unknown",
+        "lang": "zh-Hans",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.7265625,
+        "rowTop": 553.1640625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-unknown"
+      },
+      {
+        "kind": "human",
+        "lang": "zh-Hans",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.8515625,
+        "rowTop": 553.2890625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-human"
+      },
+      {
+        "kind": "safe",
+        "lang": "zh-Hans",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.7890625,
+        "rowTop": 553.2265625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-safe"
+      },
+      {
+        "kind": "archive",
+        "lang": "zh-Hans",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.9140625,
+        "rowTop": 553.3515625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-archive"
+      },
+      {
+        "kind": "waiting",
+        "lang": "zh-Hans",
+        "listBottom": 637.796875,
+        "listTop": 505.2265625,
+        "recordViewportHeight": 132.5703125,
+        "rowBottom": 637.6640625,
+        "rowTop": 553.1015625,
+        "searchFullyVisible": true,
+        "searchValue": "",
+        "selected": "job-demo-recovery-waiting"
+      }
+    ],
+    "filterPopover": {
+      "checks": [
+        {
+          "allFieldsContained": true,
+          "fieldCount": 5,
+          "focus": "status",
+          "lang": "en",
+          "open": true,
+          "rowCount": 2,
+          "status": "failed",
+          "withinViewport": true
+        },
+        {
+          "lang": "en",
+          "savedRestore": {
+            "focus": "historySavedFiltersButton",
+            "kind": "all",
+            "rows": 2
+          }
+        },
+        {
+          "allFieldsContained": true,
+          "fieldCount": 5,
+          "focus": "status",
+          "lang": "zh-Hans",
+          "open": true,
+          "rowCount": 2,
+          "status": "failed",
+          "withinViewport": true
+        },
+        {
+          "lang": "zh-Hans",
+          "clearFilters": {
+            "focus": "reset",
+            "kind": "all",
+            "open": true,
+            "values": [
+              "all",
+              "all",
+              "all",
+              "all",
+              "all"
+            ]
+          }
+        },
+        {
+          "lang": "zh-Hans",
+          "triggerDismissal": {
+            "closed": true,
+            "focus": "historyCompactFiltersButton"
+          }
+        }
+      ],
+      "unverified": [
+        {
+          "check": "keyboard Enter activation and Escape dismissal",
+          "observed": "No native default action occurred through either locator press or CUA keypress; no keyboard pass claimed."
+        },
+        {
+          "check": "outside-click light dismissal",
+          "observed": "Both locator and CUA clicks moved focus to search but left the native auto popover open. Cause unconfirmed; no pass claimed."
+        },
+        {
+          "check": "Visible-browser keyboard recheck after host load subsided",
+          "observed": "Enter did not open the native popover; no keyboard pass claimed."
+        },
+        {
+          "check": "Post-native retry on 2026-08-29",
+          "observed": "Trigger click opened and closed the popover. Search click and Escape left it open. As a control, Enter on the ordinary EN language button focused it but also did not activate it. Cause unconfirmed; no keyboard/light-dismissal pass or product-root-cause claim. No synthetic fallback handler was added."
+        },
+        {
+          "check": "Continuation recheck after local commit b166deba",
+          "observed": "The previous tab was closed. A fresh tab in the existing browser loaded the same prototype and reused that tab for all checks. Trigger click opened the filter; Escape and outside search click left it open; Enter also failed to activate the ordinary EN button. Showing the tab in the current task returned queued. Foreground native input was not confirmed; cause remains unconfirmed."
+        }
+      ]
+    },
+    "limitations": [
+      "Keyboard Enter/Escape and outside-click native popover dismissal were not accepted; cause unconfirmed",
+      "No narrow browser viewport, pixel-equivalence or screen-reader claim",
+      "A Chinese recovery selector used an incorrect title; corrected from a fresh DOM snapshot before resuming."
+    ],
+    "interruptedRecheck": {
+      "status": "PARTIAL: browser calls repeatedly timed out during the final recheck; earlier completed records are retained separately",
+      "workspaceChecks": {
+        "observedPassedBeforeConnectionReset": 18,
+        "persistedFinalRecords": 0,
+        "scope": "Eight named workspaces in both languages plus Chinese dynamic-device and trust pages; two remaining English checks were in an interrupted batch and are not accepted."
+      },
+      "exactNavigationChecks": [
+        {
+          "kind": "unknown",
+          "lang": "en",
+          "listBottom": 652.796875,
+          "listTop": 399.640625,
+          "query": "",
+          "rowBottom": 651.9453125,
+          "rowTop": 541.1640625,
+          "scrollTop": 1382.5,
+          "selected": "job-demo-recovery-unknown"
+        },
+        {
+          "kind": "human",
+          "lang": "en",
+          "listBottom": 652.796875,
+          "listTop": 399.640625,
+          "query": "",
+          "rowBottom": 651.7890625,
+          "rowTop": 541.0078125,
+          "scrollTop": 1598,
+          "selected": "job-demo-recovery-human"
+        },
+        {
+          "kind": "safe",
+          "lang": "en",
+          "listBottom": 652.796875,
+          "listTop": 399.640625,
+          "query": "",
+          "rowBottom": 652.0078125,
+          "rowTop": 567.4453125,
+          "scrollTop": 1477,
+          "selected": "job-demo-recovery-safe"
+        },
+        {
+          "kind": "archive",
+          "lang": "en",
+          "listBottom": 652.796875,
+          "listTop": 399.640625,
+          "query": "",
+          "rowBottom": 651.8515625,
+          "rowTop": 567.2890625,
+          "scrollTop": 1692.5,
+          "selected": "job-demo-recovery-archive"
+        }
+      ],
+      "note": "Additional later interrupted batches persisted some completed checks before timeout; raw attempt records remain in private files."
+    },
+    "navigationMethod": "Bounded pointer scrolling only within the recovery region until its button is fully visible; no test-side History scrolling. Final row containment uses the record viewport and also checks the fixed search stays visible."
+  },
+  "testSessionRefactor": {
+    "date": "2026-08-29",
+    "entryPoint": "ArkDeckHDCUITests/AppShellUITests/testHistoryAndRecoveryContinuousSessionInBothLanguages",
+    "previousScheduledAppLaunches": 9,
+    "newScheduledAppLaunches": 2,
+    "classification": "Presentation fixtures; scheduled launch reduction confirmed by runtime launch log and per-phase process-continuity attachments",
+    "coverage": [
+      {
+        "oldCase": "testHistorySavedFilterRestoresActivityAndExposesOneFilterSet",
+        "sessionHelper": "checkHistorySavedFilterRestoresActivityAndExposesOneFilterSet",
+        "assertionCallsPreserved": 10
+      },
+      {
+        "oldCase": "testHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter",
+        "sessionHelper": "checkHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter",
+        "assertionCallsPreserved": 23
+      },
+      {
+        "oldCase": "testHistoryReopensExactFixtureContextWithoutReplay",
+        "sessionHelper": "checkHistoryReopensExactFixtureContextWithoutReplay",
+        "assertionCallsPreserved": 12
+      },
+      {
+        "oldCase": "testRecoveryBannerOpensExactJobInBothLanguages",
+        "sessionHelper": "checkRecoveryBannerOpensExactJob",
+        "assertionCallsPreserved": 7
+      },
+      {
+        "oldCase": "testRecoveryFamilyKeepsWorkspaceUsableInBothLanguages",
+        "sessionHelper": "checkRecoveryFamilyKeepsWorkspaceUsable",
+        "assertionCallsPreserved": 18
+      },
+      {
+        "oldCase": "testCanonicalFlashHistoryStatesInBothLanguages",
+        "sessionHelper": "checkCanonicalFlashHistoryStates",
+        "assertionCallsPreserved": 13
+      }
+    ],
+    "isolation": "One fresh App per language. Existing fixture state file and ordinary navigation/refresh reset data and page-local state between phases; exact-route rounds stay in History. Saved filters, window size and fixture file are cleaned up.",
+    "continuity": "Each named XCTest activity checks the actual App PID before and after its assertions and retains a text attachment.",
+    "unchangedBoundaries": "No Runtime/device operation, permission bypass, new fixture control surface, or weakened assertion.",
+    "observedRun": {
+      "classification": "Executed App UI presentation fixture; not real device evidence",
+      "appLaunches": 2,
+      "completedActivities": 9,
+      "stablePIDPerLanguage": true,
+      "phases": [
+        {
+          "language": "(en)",
+          "phase": "Five recovery states, wide and narrow",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(en)",
+          "phase": "Exact immutable provenance",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(en)",
+          "phase": "Wide saved filter",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(en)",
+          "phase": "Narrow filter and keyboard",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(en)",
+          "phase": "Exact recovery route, two rounds",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(en)",
+          "phase": "Canonical Flash history transitions",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(zh-Hans)",
+          "phase": "Five recovery states, wide and narrow",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(zh-Hans)",
+          "phase": "Exact recovery route, two rounds",
+          "samePIDBeforeAndAfter": true
+        },
+        {
+          "language": "(zh-Hans)",
+          "phase": "Canonical Flash history transitions",
+          "samePIDBeforeAndAfter": true
+        }
+      ],
+      "log": "f41-native-continuous-session-05.log",
+      "overallTestPassed": true
+    },
+    "followUp": "Run narrow recovery targets before other phases; activate the existing App at phase boundaries, cache each scroll observation once, and retain the same original assertion calls and maximum 20 scroll actions."
+  },
+  "nativeScreenshots": [
+    {
+      "privateFile": "f41-native-continuous-session-05-attachments/CBFCE541-29F5-4CEA-A03F-391079826EEA.png",
+      "sha256": "2079b092e465b592c94b6514050c4ce8271706c04e045c5b9a89775c82b39004",
+      "language": "zh-Hans",
+      "windowPoints": "1180x783",
+      "classification": "Unaltered native App presentation fixture screenshot; individually viewed; not device evidence"
+    },
+    {
+      "privateFile": "f41-native-continuous-session-05-attachments/76CF3808-E0A2-42CB-B59B-B1853F003A80.png",
+      "sha256": "321c3f2d563983c8906c2e14a7328523157476c8768a76cc14be234ce3184e0a",
+      "language": "zh-Hans",
+      "windowPoints": "900x652",
+      "classification": "Unaltered native App presentation fixture screenshot; individually viewed; not device evidence"
+    },
+    {
+      "privateFile": "f41-native-continuous-session-05-attachments/04634EE2-3487-4CD8-B55C-18B2A6F447DD.png",
+      "sha256": "ef77756ef1f273e5f9f8d5d26af89bf335656fd53fcecf6a1effbb255ddab7f4",
+      "language": "en",
+      "windowPoints": "1180x783",
+      "classification": "Unaltered native App presentation fixture screenshot; individually viewed; not device evidence"
+    },
+    {
+      "privateFile": "f41-native-continuous-session-05-attachments/9A49AD37-644F-4E8B-ADB1-7A933CDB5B69.png",
+      "sha256": "7bbff2130371e1e99a0648bc5c4330b1c46ccdc3cafd3367e7ba1d2251120f6a",
+      "language": "en",
+      "windowPoints": "900x652",
+      "classification": "Unaltered native App presentation fixture screenshot; individually viewed; not device evidence"
+    }
+  ]
+}

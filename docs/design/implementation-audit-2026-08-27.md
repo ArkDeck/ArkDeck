@@ -5,7 +5,7 @@
 ## 1. 范围与判定方式
 
 覆盖 **8 个主页面、动态设备页、独立 Settings / Trace Viewer / 帮助、所有子标签与关键弹层**，
-共 **60 个检查单元、20 个 App View 文件、31 个组件预览文件**。文件、路由和子标签清单由
+共 **61 个检查单元、20 个 App View 文件、31 个组件预览文件**（F41 将窄窗筛选弹层单列）。文件、路由和子标签清单由
 [机器覆盖表](implementation-coverage.json) 与
 [交互/覆盖测试](arkdeck-ds/scripts/workspace-interactions.test.mjs) 核对。
 
@@ -99,7 +99,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | --- | --- | --- |
 | shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役 |
 | shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面 |
-| shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：所有主工作区逐项显示；精确 Job 跳转、清除旧筛选并定位记录行；独立窗口不显示。不确认后续刷、不在 App 归档 |
+| shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：精确 Job 跳转、清除旧筛选并定位记录行。F41：有界滚动、多记录计数与窄窗工作区保留；原生精确行定位仍在复测，不能视为通过。所有主工作区共享；独立窗口不显示。不确认后续刷、不在 App 归档 |
 | device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管 |
 | device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview |
 | device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
@@ -176,6 +176,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
+| history.filters | 窄窗筛选与已存筛选弹层；status/mode/session/device/time/reset/Escape | F41 从纵向堆叠改为可展开入口；活动选择与搜索常显。网页稿补齐弹层；键盘与外部点击关闭尚未验收，原生与截图验证见 F41 |
 | history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开 |
 | history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；F37 按 exact Artifact 预览，未发布禁用；与App诊断导出不同 |
 | history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | App 全部六类保留精确来源；F39 补原型遗漏的来源信息与 Inspector 跳转字段；Diagnostics 可将校验过的 Trace 转交 Viewer；不重放，原型不读取历史文件 |
@@ -600,3 +601,68 @@ SDD 0 error/0 warning（121 AC），生成物零漂移。按实际 App 改动编
 未改 Package，不分配 Swift Package 全量车道。详见
 [F40 验证记录](references/v1.6-goal/recovery-exact-history-verification-2026-08-28.json)。
 本项仍需维护者 review/merge；§5 未实现能力保持开放，不提前标记整体 goal 完成。
+
+
+## 2026-08-28 F41：恢复提示不能占满工作区
+
+GJ-1—4 的全局恢复呈现。F40 后继续核对多记录状态：原型已有滚动上限，原生 App
+却使用无界 VStack；全部记录的自然高度直接挤占下方工作区。修复不超过当前 detail
+高度的 45%，并尽可能为下方工作区保留 400pt；空间不足时保留最多受比例上限约束的
+96pt 提示视口。短提示按内容收缩，超出后滚动；多条显示总数，宽度不超过 600pt 时
+动作移到说明下方。所有 Job 和 unknown 事实保持，不新增执行、归档或重试入口。
+
+复用 History fixture 增加五种恢复状态，并扩展原生回归检查两种窗口尺寸、中英文、
+全部五项的可达性、旧筛选清除及 exact History 行。夹具详情明确没有 Runtime 证据，
+不借用默认成功详情。前四次执行受系统 automation / LocalAuthentication 阻塞，均未
+进入断言。维护者解锁后，真实的 900×652 窗口暴露了纵向筛选挤占空间和分栏越界：
+窄窗改为可展开的筛选弹层，活动选择与搜索常显，列表和详情约束在剩余高度内。
+弹层筛选功能及三条既有原生回归曾通过；更严格的完整行边界检查仍发现清除空筛选后
+部分目标行没有滚到可见区。仅延后滚动和只重建 List 都不足以解决。2026-08-29
+系统自动化状态变化后，连续回归实际执行了全部阶段：英文 archive 行仍不可见，中文
+human 行状态文字被裁切，均已查看原生截图确认；另有一处键盘切换及其后续断言失败，
+日志显示 Return 期间框架重新激活 App。后续安静回合没有再出现键盘断言失败，但
+直接在尺寸回调中定位的试验仍有十处行可见性失败，已撤回。当前修正只在显式 Job
+路由时一起重建 List 和滚动定位器，明确整行 ID，并用可取消、校验代际的任务居中
+定位；普通筛选、翻页和选择保持身份。该修正的最终连续回归已通过：一个 XCTest
+入口完成九个阶段，0 失败，495.750 秒；20 次恢复精确跳转与完整行边界检查全部通过。
+前一轮二十次跳转同样通过，但两处默认 History 命中测试被其他 App 的文件超时提示
+遮挡，截图已确认；提示自行消失后用完全相同的源码重跑通过，没有放宽断言。
+此前的初始化超时与锁屏中断记录完整保留；
+未代填认证信息、未改系统权限。
+
+同轮按维护者要求合并自动化：六个既有用例的 83 处断言调用保留，改由一个连续入口
+执行。原需九次 App 启动，现在每种语言启动一次；实际九个阶段的进程附件确认
+英文、中文各自始终使用同一个 PID。阶段间经普通导航/刷新清理页面状态，清理已存
+筛选、历史上下文和窗口尺寸；同页精确跳转的轮次不离开 History。后续复测先检查窄窗
+恢复，阶段间激活已有 App，并减少重复 AX 几何查询，不放宽完整可见性或滚动次数上限。
+最终通过回合的启动日志与九份附件确认启动总数为二、每种语言 PID 不变，四张原生
+宽窄窗截图均已查看。这是 App 呈现夹具验收，不是真机操作证据；此前其他工程并发
+构建及遮挡导致的失败回合独立保留，不与最终通过回合混用。
+
+设计回归 **60/60**、设计包及镜像构建通过；窄窗筛选与已存筛选弹层已同步网页稿，
+中英文五字段边界、筛选后焦点保留、保存/恢复与清除功能有对应检查。Enter/Escape 与
+点击外部关闭没有得到成功结果，原因未确认，不声称键盘验收。原生回归结束后的
+浏览器复试同样如此；对照的普通语言按钮也未被 Enter 激活，不能据此认定是浮层
+实现的根因，也未添加仅为测试通过的事件补丁。浏览器中英文 20 项
+工作区、10 项精确跳转检查通过；中断批次与完整复测分开保留。末项截图又暴露原型
+搜索随记录滚走，已改为仅记录区滚动；新的 10 项跳转检查同时确认整行位于记录视口、
+搜索仍可见。测试只滚动恢复提示区来使按钮完整可见，不代替产品滚动 History。
+四张最终原图均已查看。首次全量 Swift 并行车道调度 1,833 项，一项 1 GiB
+有界读取测试超时；保持原阈值，在安静环境下修复分支与未改动 main 的同项对照分别
+以 0.780 秒、0.841 秒通过。最新 App/测试代码以两个 worker 完整重跑已通过：1,833 项并行测试、
+1 项 identity race、5 项 scale，三条 Swift 车道 exit 0；App/UI-test bundle 编译通过。
+18 项 planner、9 项 workflow、49 项 catalog、10 项 SwiftPM wrapper、7 项 Xcode wrapper
+及 SDD / 生成物零漂移均通过。补齐网页弹层后的统一入口也已通过，最后的搜索视口
+修改只触及网页稿与组件分类，设计测试/构建另行通过。此后本轮又调整了原生定位与
+连续回归，原生通过后再次完整执行统一入口：gate 05 退出 0，1,833 项并行车道
+（1,188 秒）、1 项 identity race、5 项 scale 均退出 0，App/UI-test bundle
+再次编译通过；通用闸全部通过，源码哈希与原生通过回合一致。
+原超时保留，未用单项结果替代全量。浏览器键盘/外部点击验收仍开放，
+后续继续时，旧浏览器标签已关闭，新标签内的复试仍未取得键盘/外部点击通过结果，
+显示到前台的请求返回排队。生产/测试源码哈希未变。整轮修正提交为草稿 PR 供审查，
+网页未验收项继续保留，不提前声称整项或整体 goal 完成。
+
+已发布 Runtime 的只读全分页查询返回 1,962 条历史、4 条旧 unknown、0 条当前恢复提醒。
+因此本轮不能声称真实设备验证了多提醒布局，也不制造设备异常来补图。浏览器样本、
+编译/单测与原生验收分别记录于
+[验证记录](references/v1.6-goal/recovery-bounded-layout-verification-2026-08-28.json)。

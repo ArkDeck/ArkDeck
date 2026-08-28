@@ -106,3 +106,24 @@ connect key 的设计图仅保留本机。原生最终五项用例通过，属�
 | 等待归档不提供归档动作 | [English](recovery-archive-en.jpg) | [简体中文](recovery-archive-zh-Hans.jpg) |
 | 深色 unknown | [English](recovery-dark-en.jpg) | [简体中文](recovery-dark-zh-Hans.jpg) |
 | 深色精确详情展开 | [English](recovery-dark-detail-en.jpg) | — |
+
+
+### F41 · 有界恢复区（2026-08-28）
+
+五类未决记录按总数和滚动区域呈现，History 保留操作空间；窄窗筛选可展开，搜索不随记录滚动。以下四张均为 1280×720
+浏览器演示原图，已逐张查看，不是真机或原生 App 截图：
+
+- [英文列表起始](recovery-family-layout-en.jpg)、[英文末项的精确 History](recovery-family-last-record-en.jpg)
+- [中文列表起始](recovery-family-layout-zh.jpg)、[中文末项的精确 History](recovery-family-last-record-zh.jpg)
+
+[验证记录](recovery-bounded-layout-verification-2026-08-28.json)分别记录浏览器、全量闸和
+原生尝试；系统 automation 初始化失败不计为断言通过。2026-08-29 的最终原生回归
+通过九个连续阶段，中英文各启动一次 App，保留原六个用例的断言与每阶段 PID 证据。
+它使用呈现夹具，不证明真机执行；原型键盘及外部点击关闭仍未验收。
+
+重复本组回归只需运行这个入口，不再逐一启动旧用例：
+
+```bash
+sh scripts/ci/run-ui-tests.sh \
+  -only-testing:ArkDeckHDCUITests/AppShellUITests/testHistoryAndRecoveryContinuousSessionInBothLanguages
+```

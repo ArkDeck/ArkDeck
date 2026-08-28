@@ -93,8 +93,19 @@ body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:
 .history-filter-row select{display:block;max-width:160px}
 .history-page{container-type:inline-size;container-name:history}
 .history-page .history-shell{flex:1;min-height:0;grid-template-rows:minmax(0,1fr)}
-.history-page .history-rail,.history-page .history-list,.history-page .history-inspector{overflow-y:auto}
-.history-compact-activity{display:none;grid-column:1/-1}
+.history-page .history-rail,.history-page .history-inspector{overflow-y:auto}
+.history-page .history-list{overflow:hidden}
+.history-list> :not(.history-records){flex-shrink:0}
+.history-records{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.history-records>*{flex-shrink:0}
+.history-expanded-filters{max-height:40%;overflow-y:auto}
+.history-compact-controls{display:none;grid-column:1/-1;gap:10px;align-items:end}
+.history-compact-activity{flex:1;min-width:0}.history-compact-activity select{width:100%}
+.history-popover{position:fixed;inset:auto;margin:0;width:360px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);color:var(--ink);box-shadow:var(--control-shadow)}
+.history-popover h3{margin:0 0 12px}.history-popover .history-filter-row{display:grid;gap:10px}
+.history-popover .history-filter-row label{display:grid;grid-template-columns:100px minmax(0,1fr);align-items:center;gap:8px}
+.history-popover .history-filter-row select{width:100%;max-width:none;min-width:0}
+.history-popover .device-actions{align-items:stretch;flex-direction:column}
 .history-detail-section{margin-block:14px;min-width:0;overflow-wrap:anywhere}
 .history-facts.kv{grid-template-columns:minmax(0,120px) minmax(0,1fr)}
 .history-facts dt,.history-facts dd{min-width:0;overflow-wrap:anywhere}
@@ -179,10 +190,12 @@ tr.sel-row{background:var(--selection)}
 .ritem .ri{flex:1;min-width:0;overflow-wrap:anywhere}.ritem .ri b{font-size:13px}.ritem .ri p{font-size:12px;color:var(--ink2);margin-top:2px}
 .ritem .ra{display:flex;gap:8px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 #recoveryBanners:empty{display:none}
-#recoveryBanners{flex:none;max-height:45%;overflow-y:auto;padding:16px 22px 0;display:grid;gap:8px;container-type:inline-size;container-name:recovery}
+#recoveryBanners{flex:none;max-height:min(45%,max(96px,calc(100% - 400px)));overflow-y:auto;padding:16px 22px 0;display:grid;gap:8px;container-type:inline-size;container-name:recovery}
 #recoveryBanners .ritem{border:0;padding:0}
 #recoveryBanners header{color:var(--ink)}
 #recoveryBanners header .symbol{color:var(--warn);flex:none}
+#recoveryBanners .recovery-count{margin:0;color:var(--ink2);font-size:12px}
+#recoveryBanners:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @container recovery (max-width:600px){#recoveryBanners .ritem{flex-wrap:wrap}#recoveryBanners .ri{flex-basis:100%}}
 .radio{display:flex;flex-direction:column;gap:6px}
 .radio label{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
@@ -710,7 +723,7 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
 .history-rail{display:flex;flex-direction:column;gap:18px}.history-group{display:flex;flex-direction:column;gap:4px}.history-group-label{padding:0 8px 5px;color:var(--ink2);font-size:10.5px;font-weight:650;text-transform:uppercase;letter-spacing:.05em}.history-kind{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 8px;border:0;border-radius:7px;background:transparent;color:var(--ink);text-align:start;cursor:pointer}.history-kind:hover{background:var(--panel2)}.history-kind.on{background:var(--accent-weak);color:var(--accent);font-weight:650}.history-kind .symbol{width:15px;height:15px}.history-count{margin-inline-start:auto;color:var(--ink2);font-size:10.5px;font-variant-numeric:tabular-nums}
 .history-list{display:flex;flex-direction:column;gap:10px}.history-list-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.history-search{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink2)}.history-search input{min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--ink);font:inherit}.history-search .symbol{width:14px;height:14px}.history-day{padding:7px 3px 0;color:var(--ink2);font-size:10.5px;font-weight:650}.history-record{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:9px;align-items:start;width:100%;padding:10px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--ink);text-align:start;cursor:pointer}.history-record:hover{background:var(--panel2)}.history-record.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-weak)}.history-record-icon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:var(--panel2);color:var(--ink2)}.history-record.on .history-record-icon{background:var(--panel-solid);color:var(--accent)}.history-record-main{display:flex;flex-direction:column;gap:2px;min-width:0}.history-record-main b,.history-record-main span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-record-main b{font-size:12.5px}.history-record-main span,.history-record-time{color:var(--ink2);font-size:10.5px}.history-record-tags{display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap}
 .history-inspector{display:flex;flex-direction:column;gap:14px}.history-inspector-head{display:flex;align-items:flex-start;gap:11px}.history-inspector-head>div{min-width:0;flex:1}.history-inspector-head h2{font-size:17px;margin:0 0 3px}.history-inspector-head p{margin:0;color:var(--ink2);font-size:11.5px}.history-preview{min-height:124px;padding:14px;border-radius:10px;background:linear-gradient(145deg,var(--panel2),color-mix(in srgb,var(--panel2) 72%,var(--accent-weak)));display:flex;flex-direction:column;justify-content:flex-end;gap:4px;overflow:hidden}.history-preview.trace{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,var(--panel2)),var(--panel2))}.history-preview-line{height:34px;color:var(--accent);opacity:.72}.history-preview b{font-size:12px}.history-preview span{font-size:10.5px;color:var(--ink2)}.history-primary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.history-primary .pri{flex:1}.history-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.history-meta div{padding:9px 10px;border-radius:8px;background:var(--panel2);min-width:0}.history-meta small{display:block;color:var(--ink2);font-size:10px}.history-meta b{display:block;margin-top:2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-inspector details{border-top:1px solid var(--line);padding-top:10px}.history-inspector summary{color:var(--ink2);font-size:11.5px;cursor:pointer}
-@container history (max-width:889px){.history-page .history-shell{grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);grid-template-rows:auto minmax(0,1fr)}.history-rail{display:none}.history-compact-activity{display:block}}
+@container history (max-width:889px){.history-page .history-shell{grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);grid-template-rows:auto minmax(0,1fr)}.history-rail,.history-expanded-filters{display:none}.history-compact-controls{display:flex}}
 @container history (max-width:619px){.history-page .history-shell{display:block;flex:none}.history-page .history-list,.history-page .history-inspector{margin-top:14px;overflow:visible}}
 @media(max-width:760px){
   .trace-form{grid-template-columns:1fr;gap:8px}.trace-label{padding-top:0}
@@ -1298,7 +1311,9 @@ function addTarget(){
 function recoveryHTML(){
   if(['settings','trace-viewer','trace-shortcuts','automation'].includes(S.nav))return '';
   const severity=h=>h.outcomeUnknown?0:h.waitingForHuman?1:2;
-  return HIST.filter(flashNeedsRecovery).sort((a,b)=>severity(a)-severity(b)).map(h=>{
+  const jobs=HIST.filter(flashNeedsRecovery).sort((a,b)=>severity(a)-severity(b));
+  const count=jobs.length>1?`<p class="recovery-count" data-sync-id="jobRecovery.count">${lc(`${jobs.length} 条记录待检查`,`${jobs.length} records need review`)}</p>`:'';
+  return count+jobs.map(h=>{
     const kind=h.outcomeUnknown?'outcomeUnknown':h.waitingForHuman?'humanRequired':
       h.st==='resumeAtConfirmedSafeBoundary'?'resumeSafe':h.st==='userAbandonRequested'?'archivePending':'waiting';
     const symbol={outcomeUnknown:'unknown',humanRequired:'human',resumeSafe:'safe',archivePending:'archive',waiting:'waiting'}[kind];
@@ -3844,33 +3859,68 @@ function filteredHistory(now=Date.now()){
     (f.target==='all'||h.target===f.target)&&(f.session==='all'||h.sessionID===f.session)&&historyMatchesTime(h,f.time,now))
     .sort((a,b)=>{const left=historyDate(a),right=historyDate(b);return (Number.isFinite(right)?right:-Infinity)-(Number.isFinite(left)?left:-Infinity)||b.id.localeCompare(a.id);});
 }
-function setHistoryFilter(key,value){S.hf[key]=value;S.historyLimit=6;renderPage();}
+function positionHistoryPopover(panel){
+  const trigger=$(panel.dataset.trigger);if(!trigger)return;
+  const rect=trigger.getBoundingClientRect(),size=panel.getBoundingClientRect();
+  panel.style.left=Math.max(12,Math.min(rect.right-size.width,document.documentElement.clientWidth-size.width-12))+'px';
+  panel.style.top=Math.max(12,Math.min(rect.bottom+8,document.documentElement.clientHeight-size.height-12))+'px';
+}
+function setHistoryFilter(key,value){
+  const open=document.querySelector('.history-popover:popover-open');
+  const focusKey=document.activeElement?.dataset?.historyFilter;
+  S.hf[key]=value;S.historyLimit=6;renderPage();
+  if(open?.id){
+    const panel=$(open.id),trigger=$(open.dataset.trigger);if(!panel||!trigger)return;
+    // A filter change replaces the draft DOM. Reattach its native popover to
+    // the new trigger so Escape still returns focus after a selection.
+    trigger.focus({preventScroll:true});panel.showPopover({source:trigger});
+    positionHistoryPopover(panel);
+    if(focusKey)panel.querySelector(`[data-history-filter="${focusKey}"]`)?.focus({preventScroll:true});
+  }
+}
 function setHistoryQuery(value){
   const input=document.querySelector('.history-search input'),start=input?.selectionStart,end=input?.selectionEnd;
   setHistoryFilter('query',value);
   const next=document.querySelector('.history-search input');next?.focus({preventScroll:true});
   if(Number.isInteger(start)&&Number.isInteger(end))next?.setSelectionRange(start,end);
 }
-function historyFilter(key,label,values){return `<label>${label}<select class="inp" aria-label="${label}" onchange="setHistoryFilter('${key}',this.value)">${values.map(([value,text])=>`<option value="${esc(value)}" ${S.hf[key]===value?'selected':''}>${esc(text)}</option>`).join('')}</select></label>`;}
+function historyFilter(key,label,values){return `<label>${label}<select class="inp" data-history-filter="${key}" aria-label="${label}" onchange="setHistoryFilter('${key}',this.value)">${values.map(([value,text])=>`<option value="${esc(value)}" ${S.hf[key]===value?'selected':''}>${esc(text)}</option>`).join('')}</select></label>`;}
+function historyFilterFields(){return `<div class="history-filter-row">
+  ${historyFilter('status',lc('状态','Status'),[['all',lc('全部','All')],['active',lc('进行中','Active')],['attention',lc('需要关注','Needs attention')],['succeeded','succeeded'],['failed','failed'],['interrupted','interrupted'],['cancelled','cancelled']])}
+  ${historyFilter('mode',lc('执行模式','Execution mode'),[['all',lc('全部','All')],['execute','execute'],['planOnly','planned'],['simulated','simulated'],['unknown',lc('未知','Unknown')]])}
+  ${historyFilter('session','Session',[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.sessionID).filter(Boolean))).sort().map(x=>[x,x])])}
+  ${historyFilter('target',lc('目标','Target'),[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.target).filter(Boolean))).sort().map(x=>[x,x])])}
+  ${historyFilter('time',lc('时间','Time'),[['all',lc('不限','Any time')],['lastHour',lc('过去一小时','Last hour')],['lastDay',lc('过去一天','Last day')],['lastWeek',lc('过去一周','Last week')]])}
+</div>`;}
+function applyHistorySavedAction(action){
+  const focusSelector=document.querySelector('.history-popover:popover-open')?.id==='historySavedFilters'?'#historySavedFiltersButton':'.history-expanded-filters summary';
+  if(action==='save')S.savedHistoryFilter={...S.hf};
+  else if(action==='restore'&&S.savedHistoryFilter){S.hf={...S.savedHistoryFilter};S.historyLimit=6;}
+  else if(action==='delete')S.savedHistoryFilter=null;
+  else if(action==='attention'||action==='failed'){resetHistoryFilters();S.hf.status=action;if(action==='failed')S.hf.time='lastWeek';}
+  renderPage();document.querySelector(focusSelector)?.focus({preventScroll:true});
+}
+function historySavedActions(){return `<div class="device-actions"><button class="btn" onclick="applyHistorySavedAction('save')">${lc('保存筛选','Save filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="applyHistorySavedAction('restore')">${lc('恢复筛选','Restore filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="applyHistorySavedAction('delete')">${lc('删除已存筛选','Delete saved filter')}</button><button class="btn" onclick="applyHistorySavedAction('attention')">${lc('需要关注','Needs attention')}</button><button class="btn" onclick="applyHistorySavedAction('failed')">${lc('最近失败','Recent failures')}</button></div>`;}
 function pHistory(){
   const all=filteredHistory(),rows=all.slice(0,S.historyLimit);
   const sel=rows.find(h=>h.id===S.histSel)||rows[0];S.histSel=sel?.id||null;
   const kinds=[['all','history',lc('全部记录','All records')],['flash','flash','Flash'],['debug','debug','Debug'],['viewer','dump','Viewer'],['trace','trace','Trace'],['diagnostics','diagnostics','Diagnostics'],['device','device','Device'],['other','history',lc('其他','Other')]];
   return `<div class="page-lead" data-page-title="History"></div><div class="history-shell">
-    <label class="history-compact-activity">${lc('活动类型','Activity')}<select class="inp" aria-label="${lc('活动类型','Activity')}" onchange="setHistoryFilter('kind',this.value)">${kinds.map(([key,i,label])=>`<option value="${key}" ${S.hf.kind===key?'selected':''}>${label}</option>`).join('')}</select></label>
+    <div class="history-compact-controls"><label class="history-compact-activity">${lc('活动类型','Activity')}<select class="inp" aria-label="${lc('活动类型','Activity')}" onchange="setHistoryFilter('kind',this.value)">${kinds.map(([key,i,label])=>`<option value="${key}" ${S.hf.kind===key?'selected':''}>${label}</option>`).join('')}</select></label>
+      <button class="btn" id="historySavedFiltersButton" popovertarget="historySavedFilters">${lc('已存筛选','Saved filters')}</button>
+      <button class="btn" id="historyCompactFiltersButton" popovertarget="historyCompactFilters">${lc('筛选历史','Filter history')}</button></div>
+    <div class="history-popover" id="historyCompactFilters" popover="auto" role="dialog" aria-label="${lc('筛选历史','Filter history')}" data-trigger="historyCompactFiltersButton" ontoggle="if(event.newState==='open')positionHistoryPopover(this)">
+      <h3>${lc('筛选历史','Filter history')}</h3>${historyFilterFields()}<p class="hint">${lc(`${all.length} / ${HIST.length} 条记录`,`${all.length} of ${HIST.length} records`)}</p>
+      <button class="btn" data-history-filter="reset" onclick="resetHistoryFilters();setHistoryFilter('kind','all')">${lc('清除筛选','Clear filters')}</button>
+    </div>
+    <div class="history-popover" id="historySavedFilters" popover="auto" role="dialog" aria-label="${lc('已存筛选','Saved filters')}" data-trigger="historySavedFiltersButton" ontoggle="if(event.newState==='open')positionHistoryPopover(this)"><h3>${lc('已存筛选','Saved filters')}</h3>${historySavedActions()}</div>
     <aside class="history-rail"><div class="history-group"><span class="history-group-label">${lc('活动类型','Activity')}</span>${kinds.map(([key,i,label])=>`<button class="history-kind ${S.hf.kind===key?'on':''}" onclick="setHistoryFilter('kind','${key}')">${icon(i,true)}<span>${label}</span><span class="history-count">${key==='all'?HIST.length:HIST.filter(h=>h.kind===key).length}</span></button>`).join('')}</div></aside>
     <section class="history-list"><div class="history-list-head"><div><h2>${lc('最近活动','Recent activity')}</h2><span class="hint">${lc('只读 Runtime 记录','Read-only Runtime records')}</span></div></div>
       <label class="history-search">${icon('search',true)}<input aria-label="${lc('搜索历史记录','Search history')}" value="${esc(S.hf.query)}" placeholder="${lc('搜索记录、操作或目标','Search records, operations or targets')}" oninput="setHistoryQuery(this.value)"></label>
-      <details ${S.historyFiltersOpen?'open':''} ontoggle="if(this.isConnected)S.historyFiltersOpen=this.open"><summary>${lc('完整筛选','All filters')}</summary><div class="history-filter-row">
-        ${historyFilter('status',lc('状态','Status'),[['all',lc('全部','All')],['active',lc('进行中','Active')],['attention',lc('需要关注','Needs attention')],['succeeded','succeeded'],['failed','failed'],['interrupted','interrupted'],['cancelled','cancelled']])}
-        ${historyFilter('mode',lc('执行模式','Execution mode'),[['all',lc('全部','All')],['execute','execute'],['planOnly','planned'],['simulated','simulated'],['unknown',lc('未知','Unknown')]])}
-        ${historyFilter('target',lc('目标','Target'),[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.target).filter(Boolean))).sort().map(x=>[x,x])])}
-        ${historyFilter('session','Session',[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.sessionID).filter(Boolean))).sort().map(x=>[x,x])])}
-        ${historyFilter('time',lc('时间','Time'),[['all',lc('不限','Any time')],['lastHour',lc('过去一小时','Last hour')],['lastDay',lc('过去一天','Last day')],['lastWeek',lc('过去一周','Last week')]])}
-      </div><div class="device-actions"><button class="btn" onclick="S.savedHistoryFilter={...S.hf};renderPage()">${lc('保存筛选','Save filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.hf={...S.savedHistoryFilter};S.historyLimit=6;renderPage()">${lc('恢复筛选','Restore filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.savedHistoryFilter=null;renderPage()">${lc('删除已存筛选','Delete saved filter')}</button><button class="btn" onclick="historyPreset('attention')">${lc('需要关注','Needs attention')}</button><button class="btn" onclick="historyPreset('failed')">${lc('最近失败','Recent failures')}</button><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button></div></details>
-      ${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${esc(h.id)}" onclick="S.histSel=this.dataset.historyId;renderPage()"><span class="history-record-icon">${icon(h.icon||'history',true)}</span><span class="history-record-main"><b>${esc(h.what??h.op??h.id)}</b><span>${esc(h.detail??h.id)}</span><span class="history-record-tags"><span class="chip dim">${esc(h.st??lc('未报告','Not reported'))}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${esc(h.when??lc('未报告','Not reported'))}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
+      <details ${S.historyFiltersOpen?'open':''} class="history-expanded-filters" ontoggle="if(this.isConnected)S.historyFiltersOpen=this.open"><summary>${lc('完整筛选','All filters')}</summary>${historyFilterFields()}${historySavedActions()}<button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button></details>
+      <div class="history-records">${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${esc(h.id)}" onclick="S.histSel=this.dataset.historyId;renderPage()"><span class="history-record-icon">${icon(h.icon||'history',true)}</span><span class="history-record-main"><b>${esc(h.what??h.op??h.id)}</b><span>${esc(h.detail??h.id)}</span><span class="history-record-tags"><span class="chip dim">${esc(h.st??lc('未报告','Not reported'))}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${esc(h.when??lc('未报告','Not reported'))}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
       ${all.length>rows.length?`<button class="btn" onclick="S.historyLimit+=6;renderPage()">${lc('加载更早记录','Load older records')}</button>`:''}
-    </section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon||'history',true)}</span><div><h2>${esc(sel.what??sel.op??sel.id)}</h2><p>${esc(sel.dev??lc('未报告','Not reported'))} · <span class="mono" data-sync-id="history.detail.job">${esc(sel.id)}</span></p></div></div>
+    </div></section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon||'history',true)}</span><div><h2>${esc(sel.what??sel.op??sel.id)}</h2><p>${esc(sel.dev??lc('未报告','Not reported'))} · <span class="mono" data-sync-id="history.detail.job">${esc(sel.id)}</span></p></div></div>
       <p>${esc(sel.detail??sel.id)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignWorkspace(this.dataset.jobId)">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignDiagnostics(this.dataset.jobId)">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>
       <p class="hint">${lc('只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。','Read-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.')}</p>
       <dl class="kv history-facts"><dt>executionMode</dt><dd>${esc(sel.mode??lc('未报告','Not reported'))} ${modeBadge(sel.mode)}</dd><dt>${lc('状态','State')}</dt><dd>${esc(sel.st??lc('未报告','Not reported'))}</dd><dt>${lc('活动','Activity')}</dt><dd>${esc(sel.kind??'other')}</dd></dl>
@@ -4198,6 +4248,9 @@ function renderPage(){
   $("page").classList.toggle("device-workspace-page",S.nav==="device-control");
   document.body.classList.toggle("standalone-design",["trace-viewer","trace-shortcuts","settings"].includes(S.nav));
   $("recoveryBanners").innerHTML=recoveryHTML();
+  $("recoveryBanners").setAttribute('role','region');
+  $("recoveryBanners").setAttribute('aria-label',lc('恢复记录','Recovery records'));
+  $("recoveryBanners").setAttribute('tabindex',$("recoveryBanners").innerHTML?'0':'-1');
   $("page").innerHTML=historyContextHTML()+continuationDraftHTML()+(PAGES[S.nav]||pOverview)();
   const titled=$("page").querySelector("[data-page-title]");
   if(titled){document.querySelector(".titlebar .t").textContent=titled.dataset.pageTitle;$("page").setAttribute("aria-label",titled.dataset.pageTitle);}

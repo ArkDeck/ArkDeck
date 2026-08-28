@@ -626,6 +626,9 @@ struct GlobalJobInspectorView: View {
 struct GlobalRecoveryBannerView: View {
   let presentation: RuntimeHistoryPresentation
   let onOpenJob: (String) -> Void
+  let availableSize: CGSize
+
+  @State private var contentHeight: CGFloat?
 
   private var recoveryJobs: [RuntimeJobSummaryPresentation] {
     presentation.jobs
@@ -641,19 +644,48 @@ struct GlobalRecoveryBannerView: View {
 
   var body: some View {
     let jobs = recoveryJobs
+    // Leave room for workspace controls and records at the minimum window
+    // height. Even with the inspector expanded, keep a scrollable warning
+    // viewport without exceeding the proportional cap.
+    let maximumHeight = max(0, min(availableSize.height * 0.45, max(96, availableSize.height - 400)))
     if !jobs.isEmpty {
-      VStack(spacing: WorkspaceMetrics.tightGap) {
-        ForEach(jobs) { job in
-          banner(job)
+      ScrollView {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+          if jobs.count > 1 {
+            Text(
+              String(localized: LocalizedStringResource.JobsLocalizable.jobRecoveryCount(
+                Int32(clamping: jobs.count))))
+              .font(WorkspaceFont.caption)
+              .foregroundStyle(.secondary)
+              .accessibilityIdentifier("jobRecovery.count")
+          }
+          ForEach(jobs) { job in
+            banner(job)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
+        .padding(.top, WorkspaceMetrics.pageInsetTop)
+        .padding(.bottom, 1) // Keep the last card's border inside the scroll clip.
+        .onGeometryChange(for: CGFloat.self) { proxy in
+          proxy.size.height
+        } action: { height in
+          contentHeight = height
         }
       }
-      .padding(.horizontal, WorkspaceMetrics.pageInsetHorizontal)
-      .padding(.top, WorkspaceMetrics.pageInsetTop)
+      // Measure the naturally wrapped content, not a fixed card height. A
+      // single short item stays compact; a family cannot consume the workspace.
+      .frame(height: min(contentHeight ?? maximumHeight, maximumHeight))
+      .scrollIndicators(.visible)
+      .scrollBounceBehavior(.basedOnSize)
+      .accessibilityLabel(jobsText("jobRecovery.list"))
+      .accessibilityIdentifier("jobRecovery.list")
     }
   }
 
   private func banner(_ job: RuntimeJobSummaryPresentation) -> some View {
     let tone = recoveryTone(job)
+    let compact = availableSize.width - 2 * WorkspaceMetrics.pageInsetHorizontal <= 600
     return HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
       Image(systemName: recoverySymbol(job))
         .font(.title3)
@@ -669,10 +701,13 @@ struct GlobalRecoveryBannerView: View {
           .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
+          .fixedSize(horizontal: false, vertical: true)
+        if compact { reviewButton(job) }
       }
-      Spacer(minLength: WorkspaceMetrics.contentGap)
-      Button(jobsText("jobRecovery.action.openHistory")) { onOpenJob(job.id) }
-        .accessibilityIdentifier("jobRecovery.openHistory.\(job.id)")
+      if !compact {
+        Spacer(minLength: WorkspaceMetrics.contentGap)
+        reviewButton(job)
+      }
     }
     .padding(.horizontal, WorkspaceMetrics.cardPaddingHorizontal)
     .padding(.vertical, WorkspaceMetrics.cardPaddingVertical)
@@ -686,6 +721,12 @@ struct GlobalRecoveryBannerView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobRecovery.banner")
+  }
+
+  private func reviewButton(_ job: RuntimeJobSummaryPresentation) -> some View {
+    Button(jobsText("jobRecovery.action.openHistory")) { onOpenJob(job.id) }
+      .fixedSize()
+      .accessibilityIdentifier("jobRecovery.openHistory.\(job.id)")
   }
 
   private func recoveryTitle(_ job: RuntimeJobSummaryPresentation) -> String {

@@ -1231,6 +1231,16 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
+    if jobID.hasPrefix("job-fixture-recovery-") {
+      // Layout fixtures have no Runtime evidence or Artifacts. Never reuse
+      // the successful/default fixture detail for an unresolved record.
+      return RuntimeJobDetailPresentation(
+        jobID: jobID,
+        timelineAvailability: .unavailable(reason: "presentation-only fixture"), timeline: [],
+        evidenceAvailability: .unavailable(reason: "presentation-only fixture"), evidence: nil,
+        artifactAvailability: .unavailable(reason: "presentation-only fixture"), artifacts: [],
+        correlationAvailability: .unavailable(reason: "presentation-only fixture"), correlation: nil)
+    }
     if jobID == DiagnosticSessionUIFixture.job.id,
       operationReference == DiagnosticSessionUIFixture.job.operationReference,
       let detail = try? DiagnosticSessionUIFixture.detail() { return detail }
@@ -1401,6 +1411,29 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     }
     if fixtureRequests("--ui-test-diagnostics-session") {
       return RuntimeHistoryPresentation(availability: .available, jobs: [DiagnosticSessionUIFixture.job])
+    }
+    if fixtureRequests("--ui-test-runtime-recovery-family") {
+      // Five distinct unresolved records, deliberately not severity-ordered.
+      // These presentation values cannot contact Runtime or a device.
+      let states = [
+        ("waiting", "waitingForRecovery"),
+        ("safe", "resumeAtConfirmedSafeBoundary"),
+        ("human", "awaitingRebindConfirmation"),
+        ("archive", "userAbandonRequested"),
+        ("unknown", "interrupted"),
+      ]
+      return RuntimeHistoryPresentation(
+        availability: .available,
+        jobs: states.map { kind, state in
+          RuntimeJobSummaryPresentation(
+            id: "job-fixture-recovery-\(kind)",
+            operationReference: ArkForgeFlashOperation.canonicalReference,
+            targetID: "target-fixture-recovery-\(kind)", state: state,
+            waitingForHuman: kind == "human", outcomeUnknown: kind == "unknown",
+            outstandingResidueCount: 0, timeline: [state],
+            executionMode: "execute", workspaceKind: .flash, actualEffect: "destructive",
+            createdAtUTC: "2026-08-06T08:00:00Z")
+        })
     }
     if flashRunning {
       return RuntimeHistoryPresentation(
