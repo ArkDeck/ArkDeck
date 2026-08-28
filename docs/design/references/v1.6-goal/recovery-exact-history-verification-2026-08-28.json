@@ -1,0 +1,1294 @@
+{
+  "date": "2026-08-28",
+  "issue": "F40",
+  "task": "TASK-AIN-021",
+  "goldenJourneys": [
+    "GJ-1",
+    "GJ-2",
+    "GJ-3",
+    "GJ-4"
+  ],
+  "baseline": "f56377037123c66b1923f215e1dffe1797be3143",
+  "baselinePR": {
+    "number": 1574,
+    "state": "MERGED",
+    "mergedAt": "2026-08-28T10:06:56Z",
+    "treeEqualsPreviouslyTestedHead": "742068f4ad23bdfb484bd8b0eea99907feb1a983"
+  },
+  "scope": "Recovery banner → exact readonly History identity, fresh request consumption, cleared stale filters and visible selected row; global bilingual design projection and component mirror.",
+  "sourceFiles": [
+    {
+      "path": "ArkDeckApp/App/ArkDeckApp.swift",
+      "sha256": "0e9bf8971291f5f04d3f96a1521fc308ddedcd01857a9a5d74591f98eac4f608"
+    },
+    {
+      "path": "ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift",
+      "sha256": "8674d36c471c2848beaa14661bde4f8d8bfdf9a38955b0d2c32c7e0ce8e126ba"
+    },
+    {
+      "path": "ArkDeckApp/Features/History/RuntimeHistoryView.swift",
+      "sha256": "9011975f40107fee13f4cfc9909b43df5e64a697b47f174c7bf2e03ef3d060b6"
+    },
+    {
+      "path": "ArkDeckAppUITests/AppShell/AppShellUITests.swift",
+      "sha256": "bd5fcfcd750e7a248f0f36913484502b19420d01b7a792017e67b7994a1ccd26"
+    },
+    {
+      "path": "docs/design/prototype.html",
+      "sha256": "b65a88cf98c9e6b309b6fdf0ea7572cd96981697fe89fb6beecf82dd66950b4a"
+    },
+    {
+      "path": "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs",
+      "sha256": "673e1ebab339b5aa73f003044937b821e0b01fc94e2861c0c14b21236550706e"
+    },
+    {
+      "path": ".design-sync/previews/RecoveryBanner.tsx",
+      "sha256": "2beae8c41ed9b72d34571c311c4138d305aea320d644880f8119947e7c0ed5cd"
+    },
+    {
+      "path": "docs/design/macos-ux-interaction-spec.md",
+      "sha256": "ac968ff466f6f5976cfa0cd798ec8175d45c14b4b8bfc56f27a2d5e13b8c9ec8"
+    },
+    {
+      "path": "docs/design/design-agent-briefs.md",
+      "sha256": "74fde85db117dac91d0cb7deb9411d5fa3166afe99a91b1d7ba623dc2351975b"
+    }
+  ],
+  "baselinePostmergeChecks": [
+    {
+      "result": "designTestsPass",
+      "tests": 58,
+      "exitCode": 0,
+      "privateFile": "f39-postmerge-design-tests-f5637703.log",
+      "sha256": "b7e9997f02b483241d995167dbfbae1ad890f61d6e44a7864ca5fcc430beecfc",
+      "byteCount": 5544
+    },
+    {
+      "result": "automationInitializationTimeout",
+      "exitCode": 65,
+      "privateFile": "f39-postmerge-native-history-01.log",
+      "sha256": "da21bf11b8f92cee3a5be6e1ddf6faac579995dbf5931ece3cbaf09a43a849fb",
+      "byteCount": 150744
+    },
+    {
+      "result": "nativeFixturePass",
+      "tests": 3,
+      "failures": 0,
+      "seconds": 46.924,
+      "exitCode": 0,
+      "privateFile": "f39-postmerge-native-history-02.log",
+      "sha256": "9e958aebe9063aa852105922bddec16e8d14a0bacc940d290f62ad656bce434b",
+      "byteCount": 180525
+    }
+  ],
+  "nativeUI": {
+    "classification": "NATIVE_APP_UI_FIXTURE",
+    "realDeviceAcceptance": false,
+    "runner": "sh scripts/ci/run-ui-tests.sh",
+    "tests": [
+      "AppShellUITests/testRecoveryBannerOpensExactJobInBothLanguages",
+      "AppShellUITests/testHistorySavedFilterRestoresActivityAndExposesOneFilterSet",
+      "AppShellUITests/testHistoryActivityFilterSurvivesNarrowWindowAndSavedFilter",
+      "AppShellUITests/testHistoryReopensExactFixtureContextWithoutReplay",
+      "AppShellUITests/testCanonicalFlashHistoryStatesInBothLanguages"
+    ],
+    "attempts": [
+      {
+        "exitCode": 65,
+        "result": "automationInitializationTimeout",
+        "tests": null,
+        "failures": null,
+        "note": "Initial cross-workspace test did not reach assertions.",
+        "privateFile": "f40-native-red-01.log",
+        "sha256": "bd02e60c2986fe01ee83e7fe6f6ad0c520e46ffd1d6e035165b48c5bcc0a14ae",
+        "byteCount": 2217062
+      },
+      {
+        "exitCode": 0,
+        "result": "initialTestDidNotIsolateDefect",
+        "tests": 1,
+        "failures": 0,
+        "note": "Cross-workspace recreation coincidentally selected the newest fixture Job; not red proof. 24.198 seconds.",
+        "privateFile": "f40-native-red-02.log",
+        "sha256": "91de89b7fefc339cdf67ef5927dcf38f9f21184647fd57ea510edc138cb0c82f",
+        "byteCount": 162400
+      },
+      {
+        "exitCode": 65,
+        "result": "nativeFixtureRegressionReproduced",
+        "tests": 1,
+        "failures": 4,
+        "note": "On unchanged App code, same-page stale selection/query persisted in both languages. 35.185 seconds.",
+        "privateFile": "f40-native-red-03.log",
+        "sha256": "351feea64d28fd3e6a4f6e0cb18c78600891b92c55362f114e336042b24a4a42",
+        "byteCount": 190606
+      },
+      {
+        "exitCode": 0,
+        "result": "intermediateNativeFixturePass",
+        "tests": 4,
+        "failures": 0,
+        "note": "Exact/repeated routing and History regressions passed. Screenshots still exposed an offscreen selected row. 68.252 seconds.",
+        "privateFile": "f40-native-green-01.log",
+        "sha256": "4c13062fa664655e417269b93037300d1eb82054d0db11fbbf2388c4ec706936",
+        "byteCount": 281704
+      },
+      {
+        "exitCode": 0,
+        "result": "intermediateNativeFixturePass",
+        "tests": 1,
+        "failures": 0,
+        "note": "Existing canonical Flash navigation passed before the scroll repair. 38.673 seconds.",
+        "privateFile": "f40-native-flash-regression.log",
+        "sha256": "bf5150a41b3b8be027042c10b33f863bd8a82310c8611afc2ff42c48c0c92b90",
+        "byteCount": 179166
+      },
+      {
+        "exitCode": 65,
+        "result": "nativeFixtureScrollRegressionReproduced",
+        "tests": 1,
+        "failures": 2,
+        "note": "Added visible-row assertion reproduced retained old list scroll position in both languages. 24.745 seconds.",
+        "privateFile": "f40-native-scroll-red.log",
+        "sha256": "99bfae6c4814f9bbb9173bbe62ad4156adee0cae3b9125fd423ec722a53480ae",
+        "byteCount": 179756
+      },
+      {
+        "exitCode": 0,
+        "result": "nativeFixtureFinalPass",
+        "tests": 5,
+        "failures": 0,
+        "note": "Exact route, repeated request consumption and visible selected row; existing History and canonical Flash regressions. 105.893 seconds.",
+        "privateFile": "f40-native-final-01.log",
+        "sha256": "77105243aaf002fae4f4ceaea4be0472ffc8f57d23619627adb5bbc70d739b7f",
+        "byteCount": 295079
+      }
+    ],
+    "finalResultBundle": "Test-ArkDeck-2026.08.28_18-39-11-+0800.xcresult",
+    "images": [
+      {
+        "privateFile": "f40-native-red-attachments/90828A87-5641-4905-BCEC-F6E4DFF6E7FB.png",
+        "name": "Recovery exact History (zh-Hans)_0_9BE9BCAF-6C3B-4283-B359-982EB2C62868.png",
+        "sha256": "d4aed7bc5269a256e2bac944993c29fdcd1e79d967f4cfcba61aa9adfec94c27",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-red-attachments/A53FAB4C-E310-4F44-B470-E7B7F8DA7F0D.png",
+        "name": "Recovery exact History (en)_0_E010B324-30DF-4AA9-9B59-1F89EB878A28.png",
+        "sha256": "02700a7a0d933af5b8a70c13ea2e19ee48474dfb2af603f8c5318226417d4f09",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-green-attachments/BECB53C6-3B6D-41F6-80A9-E5A8D4EE27BC.png",
+        "name": "Recovery exact History (zh-Hans)_0_01697FD8-5D49-430E-AE3D-2B2BB7EE1C18.png",
+        "sha256": "e8bb8a6a63ff73b4120d6b2184902d9a62e0ba1e203177400ef1e2e0e8bc2a5a",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-green-attachments/315C59F9-67DD-47DC-A637-EE498EC2F45F.png",
+        "name": "Recovery exact History (en)_0_FF5C7F92-7D1E-477A-90CE-2A46D406C1E8.png",
+        "sha256": "6eaca25b0860b1475e70e8ee9b1eeeb5f9d6a97f832c39c2b40557f6b521e317",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-final-attachments/E8226C51-2123-4FFE-B514-2E0E8BD05245.png",
+        "name": "canonical-flash-history-(zh-Hans)_0_84CE1CCF-03A8-4213-A6E6-0213FA55DCAF.png",
+        "sha256": "cbdecb08c9494c9fbeab61dded32713964f3f6ce444550d369d4310acf2d7765",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-final-attachments/4CBD9898-FC99-4534-949B-CEDFBBED3F40.png",
+        "name": "canonical-flash-history-(en)_0_96746C16-E69E-4104-8FAA-743AE8E29771.png",
+        "sha256": "c323d1c8d1b28a3ba4ac29200c688128411659e3854f1dcc9ffc9cbbab66b295",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-final-attachments/4710F1CA-40AE-421F-B1B9-FAA8C977F2B2.png",
+        "name": "Recovery exact History (zh-Hans)_0_2C752FC4-ACF0-41BC-9C7F-0DA2C365EB3B.png",
+        "sha256": "04e25919a90a69c97c465b1b69dd2ea1bccfb62a8cd9790194edf282694fa546",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      },
+      {
+        "privateFile": "f40-native-final-attachments/C8E0A29B-4D54-4E56-8A72-A0B2B9E8BEA9.png",
+        "name": "Recovery exact History (en)_0_BA751A20-41F2-4843-BDA5-C1BD29AD7385.png",
+        "sha256": "9727870c051326fe02df665a054aee0b891d35e2c700a96fc6945a89267c87d0",
+        "format": "png",
+        "pixelWidth": 2360,
+        "pixelHeight": 1566,
+        "visuallyInspected": true
+      }
+    ]
+  },
+  "browser": {
+    "classification": "BROWSER_DESIGN_DEMO",
+    "runtimeOrDeviceConnection": false,
+    "viewport": [
+      1280,
+      720
+    ],
+    "checks": [
+      {
+        "check": "English exact unknown from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-unknown\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\ninterrupted\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-unknown"
+        }
+      },
+      {
+        "check": "English exact human from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-human\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\nawaitingRebindConfirmation\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-human"
+        }
+      },
+      {
+        "check": "English exact safe from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-safe\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\nresumeAtConfirmedSafeBoundary\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-safe"
+        }
+      },
+      {
+        "check": "English exact archive from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-archive\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\nuserAbandonRequested\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-archive"
+        }
+      },
+      {
+        "check": "English exact waiting from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-waiting\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\nwaitingForRecovery\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-waiting"
+        }
+      },
+      {
+        "check": "English exact unknown from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-unknown\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\ninterrupted\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-unknown"
+        }
+      },
+      {
+        "check": "English main page Overview",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Overview",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page Flash",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Flash",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page Debug",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Debug Workbench",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page Viewer",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Viewer",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page Trace",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Trace",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page Device",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Device",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page Diagnostics",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Diagnostics",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English main page History",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "History",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English dynamic device detail",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "DAYU200",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "English device trust",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Unknown tablet",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese exact unknown from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-unknown\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\ninterrupted\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-unknown"
+        }
+      },
+      {
+        "check": "Chinese exact human from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-human\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\nawaitingRebindConfirmation\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-human"
+        }
+      },
+      {
+        "check": "Chinese exact safe from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-safe\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\nresumeAtConfirmedSafeBoundary\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-safe"
+        }
+      },
+      {
+        "check": "Chinese exact archive from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-archive\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\nuserAbandonRequested\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-archive"
+        }
+      },
+      {
+        "check": "Chinese exact waiting from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-waiting\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\nwaitingForRecovery\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-waiting"
+        }
+      },
+      {
+        "check": "Chinese exact unknown from stale search",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-unknown\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\ninterrupted\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-unknown"
+        }
+      },
+      {
+        "check": "Chinese main page Overview",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Overview",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page Flash",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "刷机",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page Debug",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Debug 工作台",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page Viewer",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Viewer",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page Trace",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Trace",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page Device",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Device",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page Diagnostics",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "Diagnostics",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese main page History",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "History",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese dynamic device detail",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "DAYU200",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "Chinese device trust",
+        "passed": true,
+        "details": {
+          "ids": [
+            "job-demo-recovery-unknown",
+            "job-demo-recovery-human",
+            "job-demo-recovery-safe",
+            "job-demo-recovery-archive",
+            "job-demo-recovery-waiting"
+          ],
+          "mountedOutsidePage": true,
+          "title": "待授权设备",
+          "viewport": 1280,
+          "width": 1280
+        }
+      },
+      {
+        "check": "en separate scene settings",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Settings"
+        }
+      },
+      {
+        "check": "en separate scene trace-viewer",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Trace Viewer"
+        }
+      },
+      {
+        "check": "en separate scene trace-shortcuts",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Trace Keyboard Shortcuts"
+        }
+      },
+      {
+        "check": "en separate scene automation",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Automation · Retired"
+        }
+      },
+      {
+        "check": "en resolved historical unknown does not alert",
+        "passed": true,
+        "details": {
+          "bannerCount": 0
+        }
+      },
+      {
+        "check": "zh-Hans separate scene settings",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "设置"
+        }
+      },
+      {
+        "check": "zh-Hans separate scene trace-viewer",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Trace Viewer"
+        }
+      },
+      {
+        "check": "zh-Hans separate scene trace-shortcuts",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Trace 键盘快捷键"
+        }
+      },
+      {
+        "check": "zh-Hans separate scene automation",
+        "passed": true,
+        "details": {
+          "bannerCount": 0,
+          "hidden": true,
+          "title": "Automation · Retired"
+        }
+      },
+      {
+        "check": "zh-Hans resolved historical unknown does not alert",
+        "passed": true,
+        "details": {
+          "bannerCount": 0
+        }
+      },
+      {
+        "check": "English dark exact unknown",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-unknown\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\ninterrupted\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-unknown"
+        }
+      },
+      {
+        "check": "en single safe exact readonly record",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-safe"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-safe\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\nresumeAtConfirmedSafeBoundary\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-safe"
+        }
+      },
+      {
+        "check": "en single archive exact readonly record",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-archive"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-archive\n\nDesign sample · no Runtime or device connection\n\nOpen workspace\n\nRead-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.\n\nexecutionMode\nexecute\nState\nuserAbandonRequested\nActivity\nflash\nRuntime evidence and Artifacts",
+          "jobs": "No running jobs",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-archive"
+        }
+      },
+      {
+        "check": "zh-Hans single safe exact readonly record",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-safe"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-safe\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\nresumeAtConfirmedSafeBoundary\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-safe"
+        }
+      },
+      {
+        "check": "zh-Hans single archive exact readonly record",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-archive"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-archive\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\nuserAbandonRequested\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-archive"
+        }
+      },
+      {
+        "check": "Chinese dark exact unknown",
+        "passed": true,
+        "details": {
+          "bannerIDs": [
+            "job-demo-recovery-unknown"
+          ],
+          "detail": "Recovery review sample\n\nDesign device · job-demo-recovery-unknown\n\nDesign sample · no Runtime or device connection\n\n打开对应工作区\n\n只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。\n\nexecutionMode\nexecute\n状态\ninterrupted\n活动\nflash\n查看运行证据与 Artifact",
+          "jobs": "没有运行中的任务",
+          "query": "",
+          "rowVisible": true,
+          "selected": "job-demo-recovery-unknown"
+        }
+      }
+    ],
+    "passed": 48,
+    "failed": 0,
+    "references": [
+      {
+        "file": "recovery-family-en.jpg",
+        "scope": "Five explicit design recovery records, initial History, light appearance",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=mixed&lang=en",
+        "width": 1280,
+        "byteCount": 89149,
+        "sha256": "1963312b765c353de920a55b89506c6f7c11e2203d464d3a9e9c5e96b25870e5",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-exact-history-en.jpg",
+        "scope": "Unknown banner clears stale S-0826-01 search, selects exact Job, scrolls the selected row into view",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=mixed&lang=en",
+        "width": 1280,
+        "byteCount": 92625,
+        "sha256": "ca2a551ddaf25cd0d113780369b4922f1fc16d2d77e77d930a7db4b5ad3944cc",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-family-zh-Hans.jpg",
+        "scope": "Five explicit design recovery records, Chinese History, light appearance",
+        "height": 720,
+        "lang": "zh-CN",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=mixed&lang=zh-Hans",
+        "width": 1280,
+        "byteCount": 81133,
+        "sha256": "d73a84b724029626d7ec9978ff076ece75004f1974f33775ac8231dee42c5f20",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-exact-history-zh-Hans.jpg",
+        "scope": "Chinese unknown banner selects the exact Job with cleared query and visible selected row",
+        "height": 720,
+        "lang": "zh-CN",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=mixed&lang=zh-Hans",
+        "width": 1280,
+        "byteCount": 87680,
+        "sha256": "7c0c4af8783b2d6dcc8053d4cd4fe822a2849dfad7d5564e1cf8cb5ba666a593",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-dark-en.jpg",
+        "scope": "Single unknown in dark appearance; read-only exact History action",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=unknown&lang=en&appearance=dark",
+        "width": 1280,
+        "byteCount": 85476,
+        "sha256": "14767ce544dcc6e8adc43fca4cb1c54467e56e7f495ffa279e714a46c3897411",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-dark-detail-en.jpg",
+        "scope": "Dark exact unknown detail retains original outcome and unreported evidence",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=unknown&lang=en&appearance=dark",
+        "width": 1280,
+        "byteCount": 87263,
+        "sha256": "128ecd2af0c26665b48204c0039116b87cb7ae28323d48240ea19fe0ba580b5b",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-safe-en.jpg",
+        "scope": "Single safe guidance and exact History; no resume/archive action",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=safe&lang=en",
+        "width": 1280,
+        "byteCount": 90449,
+        "sha256": "e299235399e5532e6045c6bd23eae9bb163e5901e25451e07a4d7265f828311e",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-archive-en.jpg",
+        "scope": "Single archive guidance and exact History; no resume/archive action",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=archive&lang=en",
+        "width": 1280,
+        "byteCount": 89790,
+        "sha256": "1b9142439c329d839e2a355dac61168f415de713a90705925c352f32fe15ce8c",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-safe-zh-Hans.jpg",
+        "scope": "Single safe guidance and exact History; no resume/archive action",
+        "height": 720,
+        "lang": "zh-CN",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=safe&lang=zh-Hans",
+        "width": 1280,
+        "byteCount": 85193,
+        "sha256": "84e2e0596d0518ec2b1f3d41349ccb5319d6a4b0045a7a50f8492c5620485a2a",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-archive-zh-Hans.jpg",
+        "scope": "Single archive guidance and exact History; no resume/archive action",
+        "height": 720,
+        "lang": "zh-CN",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=archive&lang=zh-Hans",
+        "width": 1280,
+        "byteCount": 84743,
+        "sha256": "6af82cf1341fbd57643e25c318863f8b6b003fe484765223cb80d5adc4ce7477",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-dark-zh-Hans.jpg",
+        "scope": "Chinese dark exact unknown; state and record identity retained",
+        "height": 720,
+        "lang": "zh-CN",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=unknown&lang=zh-Hans&appearance=dark",
+        "width": 1280,
+        "byteCount": 83667,
+        "sha256": "28d01ab430ae1ddd4f6f65a53c5b3679b65e70ccb132716bee0efdbf094c293c",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-family-lower-en.jpg",
+        "scope": "Scrolled global family exposes archive-pending and waiting guidance; earlier items remain in the same scroll region.",
+        "height": 720,
+        "lang": "en",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=mixed&lang=en",
+        "width": 1280,
+        "byteCount": 88446,
+        "sha256": "4d36e0c02cd5ca40dac45fc3dec4bc839fc5ad895483848a05fbf6f29b763421",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      },
+      {
+        "file": "recovery-family-lower-zh-Hans.jpg",
+        "scope": "Scrolled global family exposes archive-pending and waiting guidance; earlier items remain in the same scroll region.",
+        "height": 720,
+        "lang": "zh-CN",
+        "url": "http://127.0.0.1:8853/prototype.html?page=history&recovery=mixed&lang=zh-Hans",
+        "width": 1280,
+        "byteCount": 84778,
+        "sha256": "519c1ff55f9f67c013f9518e603b362c87f3400fce8b9881462ec0f82cb7a0c4",
+        "format": "jpeg",
+        "pixelWidth": 1280,
+        "pixelHeight": 720,
+        "visuallyInspected": true
+      }
+    ],
+    "coverage": "Eight main pages plus dynamic adopted-device detail and trust in both languages; five recovery guidance states; same-Job repeated visits; Settings/Trace Viewer/shortcuts and retired Automation excluded; established old unknowns do not alert; light/dark.",
+    "setup": "Previous tab 3 was closed; both owned/user tab inventories empty; created tab 4 in the same browser binding. No policy bypass.",
+    "privacy": "One design device-detail screenshot contains an existing sample connect key and remains private. All native attachments and raw Runtime output remain private.",
+    "limits": "No Figma connection, browser viewport-resize test or pixel-equivalence claim. These samples do not prove native multiple-banner layout or real-device execution."
+  },
+  "designTests": [
+    {
+      "result": "missingTemporaryDependencyLink",
+      "exitCode": 1,
+      "privateFile": "f40-design-red.log",
+      "sha256": "d97fb5b6c60647f4ba6d680cb0bce6ddc1f709725d86a077b12a91d6493b7bd5",
+      "byteCount": 1472
+    },
+    {
+      "result": "regressionReproduced",
+      "exitCode": 1,
+      "tests": 1,
+      "failures": 1,
+      "privateFile": "f40-design-red-02.log",
+      "sha256": "a678122c0c4c74319b2d387000b0da623712cddd12e68b9fec8bdbe00fb0a6fd",
+      "byteCount": 1115
+    },
+    {
+      "result": "finalPass",
+      "exitCode": 0,
+      "tests": 59,
+      "failures": 0,
+      "privateFile": "f40-design-tests-final.log",
+      "sha256": "3489356184b766ba485df4553554a5065870070b92d76682814329d7b4419d7d",
+      "byteCount": 5650
+    }
+  ],
+  "designBuilds": [
+    {
+      "exitCode": 0,
+      "privateFile": "f40-design-build.log",
+      "sha256": "48f502912246b300775ada114b12b9f26c93c2470d7ef79f9a3d71ba070c5988",
+      "byteCount": 696
+    },
+    {
+      "exitCode": 0,
+      "privateFile": "f40-design-review-build.log",
+      "sha256": "2e99bb4a1e2f425a304c84fdd4fc52e3c0ce9190b292c08cc54230787bdf47b7",
+      "byteCount": 314
+    },
+    {
+      "exitCode": 0,
+      "privateFile": "f40-recovery-preview-build.log",
+      "sha256": "ddb9d591db9f80f8d2d2cb803440eb2adb2a324f8fe80f2de7bf78ef1810c582",
+      "byteCount": 88
+    }
+  ],
+  "localGate": {
+    "exitCode": 0,
+    "plannerTests": 18,
+    "workflowTests": 9,
+    "catalogTests": 49,
+    "xcodeWrapperTests": 7,
+    "sddErrors": 0,
+    "sddWarnings": 0,
+    "acceptanceIDs": 121,
+    "generatorDrift": false,
+    "lanes": {
+      "appBuildForTesting": true,
+      "swiftPackageTests": false
+    },
+    "privateFile": "f40-local-gate-final.log",
+    "sha256": "ad0c7dcfd674a498d4682c8dca9a8233e398fe2ef731e054a78656c1a777c7ab",
+    "byteCount": 51891,
+    "changedFileCount": 25
+  },
+  "existingRealDeviceReceiptRecheck": {
+    "classification": "persistedRuntimeReceipt",
+    "command": "arkdeck agentd verify --job job-8e32139af1945d755f5716b67f4f8bde --json",
+    "exitCode": 0,
+    "runtimeVerified": true,
+    "checks": {
+      "artifactsVerified": true,
+      "runtimePostflightVerified": true,
+      "terminalStatusVerified": true,
+      "trustedEvidenceVerified": true,
+      "udsHealthVerified": true
+    },
+    "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+    "status": {
+      "jobId": "job-8e32139af1945d755f5716b67f4f8bde",
+      "operationReference": "flash.full-restore@1",
+      "state": "succeeded",
+      "outcomeUnknown": false,
+      "outstandingResidueCount": 0,
+      "startedAtUtc": "2026-08-28T03:21:37Z",
+      "finishedAtUtc": "2026-08-28T03:24:27Z"
+    },
+    "artifacts": [
+      {
+        "artifactId": "ART-04a87cef9c5723901b869234c0b5d9ed",
+        "name": "post-flash-hilog.txt",
+        "sha256": "f95858ad2c4a3e4fa9ba00905a05d48eb028594e0f2db3e871d5a301cf3a1327",
+        "byteCount": 511012,
+        "status": "published"
+      },
+      {
+        "artifactId": "ART-3181bc1092fd768dcd08ae3444a83668",
+        "name": "post-flash-facts.json",
+        "sha256": "02f800f624826baade8737b0b1d9746bf4370a29e370c7bf7a0ff0f5d3a87e98",
+        "byteCount": 947,
+        "status": "published"
+      },
+      {
+        "artifactId": "ART-963a8e61bd2d4352d519ddb0d444ab9d",
+        "name": "flash-report.json",
+        "sha256": "a7f7025661a5566356d6168860f1ba300be5b3868c1662adf333a8d74a0f04ab",
+        "byteCount": 1863,
+        "status": "published"
+      }
+    ],
+    "reviewedRuntimeSource": "f18ca0c7008be9b4f4c20ee90987845c35683066",
+    "newDeviceOperationDispatched": false,
+    "campaignReopened": false,
+    "note": "Read-only re-verification of the already accepted real Flash receipt, not a new Flash or F40 hardware pass.",
+    "privateFile": "f39-postmerge-flash-verification.json",
+    "sha256": "c5fe33ae663366f77692e7a39510215597dc120ad81639aff55e98c2286ba1ee",
+    "byteCount": 8608
+  },
+  "boundaries": [
+    "No Runtime, Catalog, admission, capability, effect, rebind/archive RPC or device execution changes.",
+    "Original unknown outcomes and established-epoch relations stay unchanged; readonly navigation is not authorization.",
+    "Existing real-device evidence retains its original scope; fixture and browser results are not REAL_DEVICE_PASS.",
+    "Unimplemented product capabilities in implementation-audit §5 remain open; goal is not marked complete."
+  ]
+}

@@ -625,4 +625,9 @@ Diagnostics 使用 `diagnostic-mode-design.md`：当前页面禁用 arm/mark，�
 
 Trace Viewer、Trace Keyboard Shortcuts 与 Settings 都是独立 scene；七个 Settings 标签和
 Cache/Licenses 都要评审。详见本文顶部全入口表和全页覆盖清单。
-Job Inspector 当前只读；恢复 banner 只去 History；这些 UI 缺口不能推断为 Runtime 缺失。
+恢复 banner 在所有主工作区和动态设备页共享；每项显示原 Job / target、对应的中英文
+指引，并精确打开该 Job 的 History，清除旧筛选。不得沿用另一条记录、补造 unknown、
+隐藏同批其他待处理项，或给已建立 current epoch 关系的旧记录继续报警。独立窗口不
+显示主窗口 banner；原型使用 `recovery=unknown|human|safe|archive|waiting|mixed` 显式
+演示数据。设计镜像 `RecoveryBanner.SessionBanner` 表达当前只读动作，其他历史概念
+示例的 resume/archive 仍未接 App RPC，不能推断为 Runtime 缺失或功能已实现。

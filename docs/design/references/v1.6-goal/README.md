@@ -87,3 +87,22 @@ unknown 使用 `flashHistory=unknown`；Inspector 使用 `jobState=unknown`；�
 | 摘要字段 | [English](history-readonly-summary-en.jpg) | — |
 | 未解决 unknown | [English](history-readonly-unknown-en.jpg) | [简体中文](history-readonly-unknown-zh.jpg) |
 | 宽三栏保留原 unknown | [English](history-readonly-wide-retained-en.jpg) | [简体中文](history-readonly-wide-retained-zh.jpg) |
+
+## F40 Recovery 精确 History 与全局入口
+
+13 张原始 JPEG，实际 viewport 1280×720，均已逐张查看并核对尺寸/哈希。
+中英 48 条浏览器断言覆盖八个主页面、动态设备详情与信任、独立窗口排除、五种提示及
+精确/重复跳转；原型数据不连接 Runtime/设备。8 张原生修正前后 PNG 与一张含既有样本
+connect key 的设计图仅保留本机。原生最终五项用例通过，属于 fixture；现有真机 Flash
+只读复核单独分类，不新增设备执行。完整过程见
+[F40 验证记录](recovery-exact-history-verification-2026-08-28.json)。
+
+| 状态 | English | 简体中文 |
+| --- | --- | --- |
+| 全局 unknown / 人工处理 | [English](recovery-family-en.jpg) | [简体中文](recovery-family-zh-Hans.jpg) |
+| 同一列表内的等待归档 / 等待恢复 | [English](recovery-family-lower-en.jpg) | [简体中文](recovery-family-lower-zh-Hans.jpg) |
+| 清除旧筛选并定位精确 Job | [English](recovery-exact-history-en.jpg) | [简体中文](recovery-exact-history-zh-Hans.jpg) |
+| 安全边界仍只读回访 | [English](recovery-safe-en.jpg) | [简体中文](recovery-safe-zh-Hans.jpg) |
+| 等待归档不提供归档动作 | [English](recovery-archive-en.jpg) | [简体中文](recovery-archive-zh-Hans.jpg) |
+| 深色 unknown | [English](recovery-dark-en.jpg) | [简体中文](recovery-dark-zh-Hans.jpg) |
+| 深色精确详情展开 | [English](recovery-dark-detail-en.jpg) | — |

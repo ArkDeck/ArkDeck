@@ -236,6 +236,41 @@ test('History filters use exact identity, current attention facts and reported t
   assert.deepEqual(JSON.parse(h.run('JSON.stringify(HISTORY_ACTIVE_STATES)')),states.filter(state=>!terminal.includes(state)));
 });
 
+test('Recovery banners keep each unresolved Job identity and the native guidance without replay', () => {
+  const catalog=JSON.parse(read('ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=debug&lang=${lang}`);
+    h.run(`HIST.splice(0,HIST.length,
+      {id:'job-unknown',kind:'flash',op:'flash.full-restore@1',target:'target-one',st:'interrupted',outcomeUnknown:true},
+      {id:'job-human',kind:'flash',op:'flash.full-restore@1',target:'target-two',st:'awaitingRebindConfirmation',waitingForHuman:true},
+      {id:'job-safe',kind:'flash',op:'flash.full-restore@1',target:'target-three',st:'resumeAtConfirmedSafeBoundary'},
+      {id:'job-archive',kind:'flash',op:'flash.full-restore@1',target:'target-four',st:'userAbandonRequested'},
+      {id:'job-waiting',kind:'flash',op:'flash.full-restore@1',target:'target-five',st:'waitingForRecovery'},
+      {id:'job-resolved',kind:'flash',op:'flash.full-restore@1',target:'target-old',st:'waitingForRecovery',outcomeUnknown:true,supersededByRecoveryEpochID:'recovery-demo'});
+      S.hf.query='unrelated';S.hf.kind='viewer'`);
+    const before=h.run('JSON.stringify(HIST)'),banners=h.run('recoveryHTML()');
+    const ids=['job-unknown','job-human','job-safe','job-archive','job-waiting'];
+    assert.deepEqual([...banners.matchAll(/data-job-id="([^"]+)"/g)].map(match=>match[1]),ids);
+    assert.ok(!banners.includes('job-resolved'));
+    for(const kind of ['outcomeUnknown','humanRequired','resumeSafe','archivePending','waiting']) {
+      for(const field of ['title','guidance'])assert.ok(banners.includes(catalog[`jobRecovery.${kind}.${field}`].localizations[lang].stringUnit.value));
+    }
+    assert.match(banners,/onclick="openHistoryRun\(this.dataset.jobId\)"/);
+    for(const page of ['overview','flash','debug','dump','trace','device-control','diagnostics','history','device','auth']) {
+      h.run(`S.nav=${JSON.stringify(page)}`);assert.equal(h.run('recoveryHTML()'),banners,`${page} retains all outstanding items`);
+    }
+    for(const page of ['settings','trace-viewer','trace-shortcuts','automation']) {
+      h.run(`S.nav=${JSON.stringify(page)}`);assert.equal(h.run('recoveryHTML()'),'');
+    }
+    for(const id of ids) {
+      h.run(`S.hf.query='unrelated';S.hf.kind='viewer';openHistoryRun(${JSON.stringify(id)})`);
+      assert.equal(h.run('S.histSel'),id);assert.equal(h.run('S.hf.query'),'');assert.equal(h.run('S.hf.kind'),'all');
+      assert.equal(h.document.querySelector('.history-record.on').scrolledIntoView,true);
+    }
+    assert.equal(h.run('JSON.stringify(HIST)'),before);assert.equal(h.run('S.jobs.length'),0);
+  }
+});
+
 test('Review appearance keeps its actual mode label across language and page rendering', () => {
   const h=harness('?page=history&lang=en&appearance=dark');
   h.document.getElementById('addTargetButton').querySelector=()=>({textContent:''});

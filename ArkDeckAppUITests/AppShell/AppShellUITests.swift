@@ -295,6 +295,44 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
+  func testRecoveryBannerOpensExactJobInBothLanguages() {
+    for language in ["(en)", "(zh-Hans)"] {
+      let app = launch(arguments: [
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "-AppleLanguages", language,
+      ])
+      Self.resizeHistoryWindow(in: app, to: 1180)
+      select("app.navigation.history", in: app)
+      let search = app.textFields["history.filter.search"]
+      XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+      // Stay in History: recreating the page through another workspace would
+      // coincidentally select this fixture's newest Job and hide the bug.
+      let review = app.buttons.matching(
+        NSPredicate(format: "identifier BEGINSWITH %@", "jobRecovery.openHistory")
+      ).firstMatch
+      XCTAssertTrue(review.waitForExistenceFast(timeout: 10))
+      for _ in 0..<2 {
+        search.click()
+        search.typeText("job-fixture-0001")
+        assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+        review.click()
+        assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0002")
+        XCTAssertEqual(search.value as? String, "", "the exact Job must escape the previous filter")
+        XCTAssertTrue(
+          element("history.row.state.job-fixture-0002", in: app).isHittable,
+          "the requested Job row must be visible, not left above the old scroll position")
+      }
+      for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
+        XCTAssertFalse(app.buttons[forbidden].exists)
+      }
+      let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      evidence.name = "Recovery exact History \(language)"
+      evidence.lifetime = .keepAlways
+      add(evidence)
+      app.terminate()
+    }
+  }
+
   /// The quota query suspends before capture. It must already own the record
   /// controls during that await, not leave a second request or new frame count
   /// available. No archive is read: the fixture refuses before capture.
