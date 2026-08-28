@@ -63,7 +63,7 @@
     "testCount": 41,
     "failures": 0,
     "exitCode": 0,
-    "logSHA256": "aa2165dc7220a12f0fc38b2ec1067bca985690f6eb67ba53cffe0666efec2c5b"
+    "logSHA256": "df7e6527c3e3299867580644772fee57d4163adfe535a295ccc1c2307a6cd765"
   },
   "realDevicePass": false,
   "browserReview": {
@@ -78,30 +78,31 @@
       {
         "file": "flash-hardware-gated-en.jpg",
         "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=en",
-        "action": "Choose the demo image; observe the hardware qualification reason and disabled Flash button.",
+        "action": "Choose the demo image; observe the hardware qualification reason and a blocker replacing the Flash action. Status labels localize; Runtime reason remains verbatim in both locales.",
         "mimeType": "image/jpeg",
         "width": 1280,
         "height": 720,
         "referenceMode": false,
-        "byteCount": 83465,
-        "sha256": "058d95ef5124752db040275b1cb75b665a53f5bb8ba5493d400ffe57b6709160",
+        "byteCount": 89260,
+        "sha256": "c4b5ed7c3977c97f78e44b60d7dcc94ef766bf68234ae59225b79b6bf80f44d8",
         "viewed": true
       },
       {
         "file": "flash-hardware-gated-zh-Hans.jpg",
         "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=zh-Hans",
-        "action": "Switch the same selected-image state to Chinese; observe the qualification reason, disabled Flash button and no running Job.",
+        "action": "Switch the same selected-image state to Chinese; observe the qualification reason, a blocker replacing the Flash action and no running Job. Status labels localize; Runtime reason remains verbatim in both locales.",
         "mimeType": "image/jpeg",
         "width": 1280,
         "height": 720,
         "referenceMode": false,
-        "byteCount": 77694,
-        "sha256": "6cfc8fd34820b0e985b4467ad0cb717aa3038b97d8ef637a562db43f091666a0",
+        "byteCount": 87952,
+        "sha256": "636f538d2cbbe78f2559170fa4bca79c4d263606396e64fb7cf6e94196085f0c",
         "viewed": true
       }
-    ]
+    ],
+    "blockedActionPresentation": "Runtime reason replaces the destructive control, including after image selection."
   },
-  "finalLocalGate": {
+  "initialLocalGate": {
     "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
     "exitCode": 0,
     "swiftLanes": [
@@ -154,6 +155,222 @@
       "reason": "classified-changed-files-and-worktree",
       "swift": true
     },
-    "boundary": "Production and test sources did not change after the gate. Subsequent edits only added checked design reference images, manifest entries and verification metadata; final selection still requires the same two compiled lanes."
+    "boundary": "Passed for initial 98ef90ba; later cached-plan App guard and UI fixture test require a new final gate."
+  },
+  "runtimeAvailabilityPR": {
+    "number": 1567,
+    "state": "MERGED",
+    "mergedAtUtc": "2026-08-28T02:23:00Z",
+    "mergeCommit": "b564e9902bd7f7ede51c8092ad56ed95736065b6"
+  },
+  "cachedPlanUI": {
+    "finding": "F33",
+    "baseRevision": "b564e9902bd7f7ede51c8092ad56ed95736065b6",
+    "evidenceKind": "native-ui-presentation-fixtures",
+    "test": "AppShellUITests/testFlashAvailabilityRefreshBlocksACachedPlanInBothLanguages",
+    "testCount": 1,
+    "failures": 0,
+    "exitCode": 0,
+    "durationSeconds": 20.142,
+    "logSHA256": "cad728679795d471f03717bc53fb399241d625a49c3e2774a85eeab3a9435c6e",
+    "screenshots": [
+      {
+        "language": "en",
+        "byteCount": 394579,
+        "width": 2360,
+        "height": 1566,
+        "sha256": "ab51683a33f3958cc0a34067d93471f529563f6ba956356dcf1f1b5b7593df33",
+        "viewed": true,
+        "storedPrivately": true
+      },
+      {
+        "language": "zh-Hans",
+        "byteCount": 414127,
+        "width": 2360,
+        "height": 1566,
+        "sha256": "cc6e4c06de5bda853fd44bdcd28e68f71832123e193d764486177a6de3995b39",
+        "viewed": true,
+        "storedPrivately": true
+      }
+    ],
+    "states": [
+      "available-with-prepared-plan",
+      "hardwareGated-with-same-plan",
+      "available-with-same-plan"
+    ],
+    "imagesRetained": true,
+    "destructiveControlReplacedByReason": true,
+    "submitNeverClicked": true,
+    "earlierAttempts": [
+      {
+        "attempt": 1,
+        "result": "passed; not the final fully isolated fixture run",
+        "boundary": "Flash path was a presentation fixture, but device-access/history fixture flags were incomplete. Device-access read-only discovery failed before connection due to socket path length. No device mutation or Flash submission."
+      },
+      {
+        "attempt": 2,
+        "result": "failed",
+        "boundary": "Fixture state file overrode the launch-time empty-history flag; default unknown history replaced the Flash action. Corrected only fixture setup, keeping all product assertions."
+      }
+    ],
+    "boundary": "Final run uses Flash, device-access, device and empty-history fixtures in both languages. No production Runtime/device operation and no Flash acceptance claim. Raw xcresult/attachments remain private."
+  },
+  "finalLocalGate": {
+    "baseRevision": "b564e9902bd7f7ede51c8092ad56ed95736065b6",
+    "exitCode": 0,
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "swiftLanes": [
+      {
+        "name": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1826,
+        "durationSeconds": 262
+      },
+      {
+        "name": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1,
+        "durationSeconds": 18
+      },
+      {
+        "name": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5,
+        "durationSeconds": 14
+      }
+    ],
+    "swiftTestCount": 1832,
+    "catalogGeneratorTestCount": 49,
+    "catalogZeroDrift": true,
+    "sddErrors": 0,
+    "sddWarnings": 0,
+    "appUITestBundle": "TEST BUILD SUCCEEDED",
+    "logSHA256": "9316c894735b0b58965f987fde6db50f4f4193ade24b5c1d34a9c8e1948822dd",
+    "finalPathSelection": {
+      "app": true,
+      "baseKind": "explicit-merge-base",
+      "baseRevision": "b564e9902bd7f7ede51c8092ad56ed95736065b6",
+      "changedFileCount": 11,
+      "changedFiles": [
+        "ArkDeckApp/Features/Flash/FlashWorkspaceView.swift",
+        "ArkDeckAppUITests/AppShell/AppShellUITests.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/FlashApplicationFacade.swift",
+        "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs",
+        "docs/design/implementation-audit-2026-08-27.md",
+        "docs/design/prototype.html",
+        "docs/design/references/v1.6-goal/README.md",
+        "docs/design/references/v1.6-goal/flash-hardware-gate-verification-2026-08-28.json",
+        "docs/design/references/v1.6-goal/flash-hardware-gated-en.jpg",
+        "docs/design/references/v1.6-goal/flash-hardware-gated-zh-Hans.jpg",
+        "docs/design/references/v1.6-goal/manifest.json"
+      ],
+      "headRevision": "b564e9902bd7f7ede51c8092ad56ed95736065b6",
+      "reason": "classified-changed-files-and-worktree",
+      "swift": true
+    },
+    "boundary": "Final full gate against merged main with F33 production/test changes. Native UI assertions were run separately and are recorded under cachedPlanUI. Subsequent updates only finalize design reference and verification metadata."
+  },
+  "reviewedRuntimeFollowup": {
+    "sourceRevision": "b564e9902bd7f7ede51c8092ad56ed95736065b6",
+    "sourceState": "clean detached worktree at reviewed main merge commit",
+    "buildKind": "signed local development helper; not a notarized distribution",
+    "buildScript": "Packages/ArkDeckKit/Distribution/macOS/build-local-helpers.sh",
+    "buildExitCode": 0,
+    "buildLogSHA256": "e3e05a9c8f9b003a1af356656f10f4385adfc0bc5a97380afa2b77d08413adfe",
+    "updateCommand": "arkdeck agentd update --daemon <reviewed-main-signed-helper> --json",
+    "updateExitCode": 0,
+    "updateReceiptSHA256": "5032b87d5b019ca190cc93cb9e738de12e0fcb54fea7503ae8dca793ec77773d",
+    "daemonSHA256": "ab2e0889fba34f8e5791d2e0a1baa9a7f98ff6959d2f477f24b73529c1a34417",
+    "daemonHealthy": true,
+    "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+    "configurationPreserved": true,
+    "hardwareCampaign": "",
+    "closedUnknownJobCountPreserved": 4,
+    "currentJobFactsPreservedExactly": true,
+    "latestJobUnchangedDuringUpdate": true,
+    "runtimeStatusSHA256": "bd6170bde8417ec5d60c33c27ca9ef5bc22d386aa6975b780c6b90665d455b32",
+    "operationListSHA256": "99445c581b02301cffaac4b3f04d1343df957b700db69b24af057a6d66d7cbb4",
+    "operationAvailability": [
+      {
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ],
+        "reasonOrigins": [
+          "host_configuration"
+        ],
+        "reasons": [
+          "ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."
+        ],
+        "reference": "flash.dayu200"
+      },
+      {
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ],
+        "reasonOrigins": [
+          "host_configuration"
+        ],
+        "reasons": [
+          "ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."
+        ],
+        "reference": "flash.full-restore@1"
+      }
+    ],
+    "realReadOnlyObservation": {
+      "evidenceKind": "real-device-read-only",
+      "exitCode": 0,
+      "jobId": "job-fca1ec9b8ff627215b233fea2037221c",
+      "operation": "observe.device@1",
+      "targetId": "TGT-958780b2ffb7",
+      "bindingRevision": 4,
+      "executionMode": "execute",
+      "actualEffect": "readOnly",
+      "startedAtUtc": "2026-08-28T02:47:10Z",
+      "finishedAtUtc": "2026-08-28T02:47:12Z",
+      "state": "succeeded",
+      "outcomeUnknown": false,
+      "outstandingResidueCount": 0,
+      "checks": {
+        "artifactsVerified": true,
+        "runtimePostflightVerified": true,
+        "terminalReceiptVerified": true,
+        "trustedEvidenceVerified": true,
+        "udsHealthVerified": true
+      },
+      "stepKinds": [
+        "probeHostTool",
+        "probeHDCServer",
+        "probeDevice",
+        "runApprovedRemoteRead"
+      ],
+      "artifacts": [
+        {
+          "artifactId": "ART-2574cb9b786779a0c10aec772f72d2ff",
+          "name": "tool-facts.json",
+          "sha256": "dd54bd773b41013fed285a00df7969b2e006e490f9e7420198b0efdd5e248ebb",
+          "byteCount": 240,
+          "status": "published"
+        },
+        {
+          "artifactId": "ART-5e549245cd28c368abbcf25a8e6a7e22",
+          "name": "binding-snapshot.json",
+          "sha256": "909e1a1e2631d5c3b6f26bf533d08d0de12798fcd9cfba4335ee3d08369c0db9",
+          "byteCount": 510,
+          "status": "published"
+        },
+        {
+          "artifactId": "ART-b113360b8e47354fa00f63dd43e88dde",
+          "name": "device-facts.json",
+          "sha256": "9be842c17facd46295762072606df85ddeea9eb8ffae5da84318098073195163",
+          "byteCount": 438,
+          "status": "published"
+        }
+      ],
+      "verificationSHA256": "60048a5e2f094cf5470548f8fce0497b572b1f8a23866122a77c80562a40479b",
+      "jobStatusSHA256": "ffe760d9fa604eb20e30dc77434bd930d54e07c8f36380177cbd64fce72f5376"
+    },
+    "boundary": "Reviewed Runtime was updated without enabling a hardware campaign. Both Flash references are unavailable; no new Flash Job was submitted. The new successful device Job is read-only observe.device@1 and does not prove Flash success or production qualification. Raw logs remain private."
   }
 }

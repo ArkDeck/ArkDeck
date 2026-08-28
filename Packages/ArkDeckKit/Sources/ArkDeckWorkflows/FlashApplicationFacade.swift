@@ -1081,7 +1081,9 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
       } ?? ""
     let loaderIsUnbound = fixtureState.contains("--ui-test-flash-loader-unbound")
     return FlashWorkspacePresentation(
-      availability: .available,
+      availability: fixtureState.contains("--ui-test-flash-hardware-gated")
+        ? .unavailable(reasons: ["hardwareGated: fixture assessment-only lane"])
+        : .available,
       targets: [
         FlashTargetPresentation(
           id: "target-fixture-dayu200",

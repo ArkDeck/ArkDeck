@@ -471,6 +471,12 @@ struct FlashWorkspaceView: View {
   }
 
   private func flashBlockerText(_ plan: FlashExactPlanPresentation) -> String {
+    switch model.workspace.availability {
+    case .checking: return flashText("flash.availability.checking")
+    case .unavailable(let reasons):
+      return reasons.first ?? flashText("flash.availability.unavailable")
+    case .available: break
+    }
     if !plan.blockingRequiredPrerequisites.isEmpty {
       return String(
         localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceActionBlocked(
@@ -1478,7 +1484,8 @@ final class FlashWorkspaceViewModel {
   }
 
   var canSubmit: Bool {
-    guard mode == .execute, !isSubmitting,
+    guard case .available = workspace.availability,
+      mode == .execute, !isSubmitting,
       let archive = selectedArchiveURL,
       let plan
     else { return false }

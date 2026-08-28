@@ -736,6 +736,46 @@ final class AppShellUITests: XCTestCase {
     assertDefaultWindowGeometry(in: app)
   }
 
+  /// Presentation fixture only. A prepared plan does not keep execution
+  /// available after the Runtime reports a closed hardware qualification gate.
+  func testFlashAvailabilityRefreshBlocksACachedPlanInBothLanguages() throws {
+    let emptyHistory = "--ui-test-runtime-history-empty"
+    for language in ["(en)", "(zh-Hans)"] {
+      try emptyHistory.write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      let app = launch(arguments: [
+        "--ui-test-flash", "--ui-test-flash-plan",
+        "--ui-test-runtime-history", "--ui-test-runtime-history-empty", "--ui-test-devices",
+        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+      ])
+      select("app.navigation.flash", in: app)
+      let submit = element("flash.execute.submit", in: app)
+      XCTAssertTrue(submit.waitForExistenceFast(timeout: 15))
+      XCTAssertTrue(submit.isEnabled)
+      let image = element("flash.image.value", in: app)
+      let selectedImage = displayedText(for: image)
+      toggleFlashDetails(in: app, file: #filePath, line: #line)
+      writeFixtureState("\(emptyHistory)\n--ui-test-flash-hardware-gated", in: app)
+      app.buttons["flash.refresh"].click()
+      let blocker = element("flash.execute.prerequisiteBlocker", in: app)
+      XCTAssertTrue(blocker.waitForExistenceFast(timeout: 10))
+      XCTAssertFalse(submit.exists, "the cached plan must not retain its destructive action")
+      XCTAssertTrue(displayedText(for: blocker).contains("hardwareGated"))
+      XCTAssertEqual(displayedText(for: image), selectedImage)
+      XCTAssertFalse(element("flash.execute.terminal", in: app).exists)
+      let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      attachment.name = "flash-hardware-gated-cached-plan-\(language)"
+      attachment.lifetime = .keepAlways
+      add(attachment)
+
+      writeFixtureState(emptyHistory, in: app)
+      app.buttons["flash.refresh"].click()
+      XCTAssertTrue(submit.waitForExistenceFast(timeout: 10))
+      XCTAssertTrue(submit.isEnabled)
+      XCTAssertFalse(blocker.exists)
+      app.terminate()
+    }
+  }
+
   /// File-picker UI only: these are deliberately not installable packages and
   /// the test never presses Import and run. Device execution has separate evidence.
   func testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages() throws {

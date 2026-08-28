@@ -1,6 +1,6 @@
 # Goal 真机修复设计参考
 
-2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F32 修正。十五张设计样本均已查看。
+2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F33 修正。十五张设计样本均已查看。
 真机执行与原生 App 证据另见[验证记录](real-device-validation.md)，不由这些图片证明。
 
 浏览器实际 viewport 为 1280×720；前七张使用 1180×760 reference window，新增多包、生命周期、Trace 标记与 Flash 受阻八张使用默认自适应窗口。截图保留原始 JPEG，
@@ -22,7 +22,7 @@
 | [中文生命周期提示](hap-running-cleanup-zh-Hans.jpg) | 同上；切换到保留后提示消失，不改动已发布请求规则 |
 | [英文 Trace 标记](trace-annotations-en.jpg) | 先按中文操作，再切换 EN；临时 Mark 替换后只保留新范围，已保留 Mark 不变，时间线同步显示范围色带 |
 | [中文 Trace 标记](trace-annotations-zh-Hans.jpg) | 时刻标记 + 新临时范围 0.600–1.780 s + 已保留范围 3.800–5.050 s；截图后重载清空页面演示状态 |
-| [英文 Flash 受阻](flash-hardware-gated-en.jpg) | 已连接的 assessment-only 通道；选择镜像后仍禁用擦写，不显示安全检查通过 |
+| [英文 Flash 受阻](flash-hardware-gated-en.jpg) | 已连接的 assessment-only 通道；选择镜像后以受阻原因替代擦写动作，不显示安全检查通过 |
 | [中文 Flash 受阻](flash-hardware-gated-zh-Hans.jpg) | 同上；显示硬件资格门原因，不把镜像选择或设备在线当作执行资格 |
 
 这些操作不连接 Runtime、不读取真实敏感文本、不创建真实 Job。

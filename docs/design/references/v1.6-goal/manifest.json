@@ -161,25 +161,25 @@
     {
       "file": "flash-hardware-gated-en.jpg",
       "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=en",
-      "action": "Choose the demo image; observe the hardware qualification reason and disabled Flash button.",
+      "action": "Choose the demo image; observe the hardware qualification reason and a blocker replacing the Flash action. Status labels localize; Runtime reason remains verbatim in both locales.",
       "mimeType": "image/jpeg",
       "width": 1280,
       "height": 720,
       "referenceMode": false,
-      "byteCount": 83465,
-      "sha256": "058d95ef5124752db040275b1cb75b665a53f5bb8ba5493d400ffe57b6709160",
+      "byteCount": 89260,
+      "sha256": "c4b5ed7c3977c97f78e44b60d7dcc94ef766bf68234ae59225b79b6bf80f44d8",
       "viewed": true
     },
     {
       "file": "flash-hardware-gated-zh-Hans.jpg",
       "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=zh-Hans",
-      "action": "Switch the same selected-image state to Chinese; observe the qualification reason, disabled Flash button and no running Job.",
+      "action": "Switch the same selected-image state to Chinese; observe the qualification reason, a blocker replacing the Flash action and no running Job. Status labels localize; Runtime reason remains verbatim in both locales.",
       "mimeType": "image/jpeg",
       "width": 1280,
       "height": 720,
       "referenceMode": false,
-      "byteCount": 77694,
-      "sha256": "6cfc8fd34820b0e985b4467ad0cb717aa3038b97d8ef637a562db43f091666a0",
+      "byteCount": 87952,
+      "sha256": "636f538d2cbbe78f2559170fa4bca79c4d263606396e64fb7cf6e94196085f0c",
       "viewed": true
     }
   ]

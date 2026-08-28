@@ -71,7 +71,8 @@ test('Flash distinguishes a connected assessment lane from execution availabilit
     const page=h.run('pFlash()');
     assert.match(page,/data-sync-id="flash.availability"/);
     assert.match(page,/hardwareGated/);
-    assert.match(page,/<button[^>]+onclick="runFlash\(\)"[^>]+disabled/);
+    assert.match(page,/data-sync-id="flash.execute.prerequisiteBlocker"/);
+    assert.doesNotMatch(page,/<button[^>]+onclick="runFlash\(\)"/);
     assert.doesNotMatch(page,/4 safety checks passed|4 项安全检查通过/);
     const before=h.run('S.jobs.length');
     h.run('runFlash()');

@@ -63,6 +63,13 @@ mechanics/authority seals 与 Runtime 安全门不变。原型增加
 `?page=flash&flashState=hardwareGated&lang=en`（或 `zh-Hans`）的受阻状态。
 见[本次验证记录](references/v1.6-goal/flash-hardware-gate-verification-2026-08-28.json)。
 
+F33（2026-08-28，GJ-4）：继续检查发现 App 的 `canSubmit` 只检查已有计划和前置条件，
+Runtime 刷新为 unavailable 后，同一目标的缓存计划仍可保留刷写按钮。现要求当前
+availability 为 available；checking/unavailable 的原因替代主动作，不删除只读计划。
+原型同步动作替换语义，原生中英文测试覆盖 available → hardwareGated → available，
+不点击刷写。F32 的 PR #1567 在补充验证期间已合入，F33 基于其 merge commit
+`b564e990` 单独交付产品修正，不创建状态或验收专用 PR。
+
 ### 关键实现入口
 
 - [Session reader](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift)：fresh correlation、发布清单、两份索引一致性、受限读取、完整性与缺失判断。
@@ -99,7 +106,7 @@ mechanics/authority seals 与 Runtime 安全门不变。原型增加
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 将已连接但仅可评估的 lane 显示为执行不可用 |
+| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated；缓存计划可用性刷新 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 修 Runtime 投影，F33 让缓存计划随当前可用性撤下/恢复动作 |
 | flash.plan | 计划/前置条件 disclosure；target/hash/partitions/Loader/missing | Loader 激活属于执行前身份关联；历史目标缺失明确占位；测试显式选择当前目标后才 materialize exact plan，不静默换目标 |
 | flash.runtime | prepare/write/reboot/verify/failed/cancelled/unknown | bytes比例不是成功；postflight后才成功；unknown不重放 |
 
@@ -218,17 +225,29 @@ mechanics/authority seals 与 Runtime 安全门不变。原型增加
 
 该次统一本地闸覆盖当时生产 Swift、资源与 UI 测试代码。随后 goal 真机验证又产生 F24/F25 修复，须单独重跑；未把 compile-only 当作 XCUITest 断言通过。
 
-### Goal 真机验证与修复（F24–F31，进行中）
+### Goal 真机验证与修复（F24–F33，进行中）
 
-**2026-08-28 最新复验**：基于 `86b284d0` App 生产代码与已安装的 `2f05ea02` Runtime，
+**2026-08-28 F32/F33 最新复验**：F32 已合入 `b564e990`；从该干净 main 快照构建并通过
+既有安装入口更新已签名的本机 Runtime。两个 Flash 引用均返回 `hardwareGated / unavailable`，
+HDC、ArkForge、workspace 与 Trace 配置及四条终止的 unknown 历史原样保留，具名 campaign 仍为空。
+随后真实只读 `observe.device@1` Job `job-fca1ec9b8ff627215b233fea2037221c` 成功，
+receipt、trusted evidence、postflight 与三个 Artifact 核验通过，无 unknown / residue。
+这只证明 Runtime 受阻投影与只读设备链路，不证明 Flash 成功。此前获擦写授权后的一次 Flash
+请求明确未执行；额外 HardwareCampaign 授权仍未获得，没有再次请求刷写。
+F33 的完整隔离原生 fixture 中英文用例通过（20.142 秒），当前可用性变化会撤下/恢复缓存计划的
+动作并保留镜像；41 项设计测试、1,832 项 Swift 测试及 App/UI-test bundle 编译均通过。
+原生 fixture、设计样本、真实只读观测和未执行的 Flash 请求分别记于
+[本次验证记录](references/v1.6-goal/flash-hardware-gate-verification-2026-08-28.json)。
+
+**2026-08-28 F24–F31 验证快照**：基于 `86b284d0` App 生产代码与已安装的 `2f05ea02` Runtime，
 冷启动（0.994 秒）、HAP/HSP 选择与四种策略组合（同一用例覆盖中英文）、Device stale-frame
 三项独立 XCUITest 均通过。stale-frame 完整时间窗口恰有两次截图和一次 `input.tap@1`，
 第二次点击拒绝，没有新增输入 Job；三张图逐图核对。真实 App 的 entry+shared HSP
 Job `job-b6762567bef468c88ac8dc536a06a932` 成功，导入哈希、共享函数日志、停止/卸载/暂存清理
 均核验，零 unknown / residue。原始截图、日志和签名材料仅留本机；
 [后续复验元数据](references/v1.6-goal/followup-verification-2026-08-28.json)保留失败与跳过尝试。
-ArkForge 已通过发布安装入口配置；这只解除 availability 配置缺口，**不证明 Flash 真机通过**。
-Flash 擦写仍未获执行边界所需的明确授权，未提交新的刷机 Job；goal 未完成。
+当时 ArkForge 已通过发布安装入口配置，未提交新的刷机 Job；该快照不证明 Flash 真机通过。
+随后擦写授权、hardwareGated 拒绝与可用性修正以上方 F32/F33 记录为准，goal 未完成。
 本次最终路径分类闸退出 0（SDD、49 项 catalog 测试、零漂移、App/UI bundle 编译），
 40 项设计交互测试通过；仅测试和文档改动，未选择 Swift package 车道，不用编译代替 UI 断言。
 
@@ -333,7 +352,7 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 1. **Diagnostics 交互式会话**：arm/append-marker/stop、会话内视频和跨时钟校准；现有 bounded ringBuffered、markers.json 和 reader 不等于该完整体验。缺失 operation/并发契约不得从 App 接 raw HDC 补洞。
 2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
 3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
-4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；F28 Runtime 修正已合入并更新，冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。Flash 已安装 pinned bundle，收到擦写授权后的首次真实请求因 `hardwareGated` 在设备副作用前拒绝；额外启用 HardwareCampaign 尚未获批，配置未变。F32 修正可用状态误报，不宣称刷写通过。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
+4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；F28 Runtime 修正已合入并更新，冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。Flash 已安装 pinned bundle，收到擦写授权后的首次真实请求因 `hardwareGated` 在设备副作用前拒绝；额外启用 HardwareCampaign 尚未获批，配置未变。F32 已在更新后的 reviewed Runtime 验证默认不可用，F33 补齐 App 缓存计划动作门，均不宣称刷写通过。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。
