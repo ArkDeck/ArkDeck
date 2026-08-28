@@ -10,8 +10,8 @@
 // version, from which bytes. Every assertion below is about making that
 // answerable.
 
-import XCTest
 import Darwin
+import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckRuntime
@@ -185,7 +185,10 @@ final class AnalyzerProviderContractTests: XCTestCase {
 
   func testAnUnconfiguredAnalyzerIsUnavailableRatherThanImprovised() throws {
     let bare = AnalyzerProvider()
-    for reference in [AnalyzerProvider.crashSignature, AnalyzerProvider.traceSummary] {
+    for reference in [
+      AnalyzerProvider.crashSignature, AnalyzerProvider.hilogSummary,
+      AnalyzerProvider.traceSummary, AnalyzerProvider.traceAnalysis,
+    ] {
       let operation = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
       guard case .unavailable(let code, let reason) = bare.runtimeAvailability(for: operation)
       else {
@@ -202,20 +205,31 @@ final class AnalyzerProviderContractTests: XCTestCase {
     }
   }
 
-  /// `hilog-summary@1` is declared by the catalog and produced by nothing.
-  /// It used to answer with the same code as an analyzer that is one setting
-  /// away, which sent an operator looking for a setting that does not exist.
-  func testAnAnalyzerNothingSuppliesIsNotReportedAsUnconfigured() throws {
-    let bare = AnalyzerProvider()
+  func testHilogProfileRequiresTheCurrentDaemonAndUsesOnlyTheClosedMode() throws {
+    let executable = ResolvedExecutable(path: "/bin/cat", sha256: try toolDigest())
+    XCTAssertNil(
+      HilogSummaryDerivedAnalyzer.profile(
+        executable: executable,
+        currentDaemon: ResolvedExecutable(
+          path: "/other-build", sha256: String(repeating: "a", count: 64))))
+    let profile = try XCTUnwrap(
+      HilogSummaryDerivedAnalyzer.profile(
+        executable: executable, currentDaemon: executable))
+    let provider = try AnalyzerProvider(profiles: [profile])
+    let artifact = try sourceArtifact(
+      contents: "08-29 01:02:03.004 123 124 I C01234/Test: opaque\n")
     let operation = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.hilogSummary))
-    guard case .unavailable(let code, let reason) = bare.runtimeAvailability(for: operation)
-    else {
-      return XCTFail("summarize-hilog must be unavailable")
+    XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
+    let action = try provider.action(
+      for: operation.steps[0], operation: operation, inputs: [:], context: context(artifact))
+    let plan = try provider.lower(action: action, context: context(artifact))
+    guard case .process(let digest, let arguments, let timeout) = plan.kind else {
+      return XCTFail("HiLog must use the descriptor-bound external process")
     }
-    XCTAssertEqual(code, .operationNotSupported)
-    XCTAssertEqual(reason, "analyzer.notImplemented")
-    XCTAssertEqual(code.origin, .productBuild)
+    XCTAssertEqual(digest, executable.sha256)
+    XCTAssertEqual(arguments, ["--summarize-hilog", artifact.fileURL.path])
+    XCTAssertEqual(timeout, 120)
   }
 
   /// Stated over the catalog rather than over today's list, so declaring a new
@@ -227,7 +241,7 @@ final class AnalyzerProviderContractTests: XCTestCase {
       AnalyzerProvider.hostSuppliableAnalyzers.isSubset(of: declared),
       "a suppliable analyzer that no operation names is dead vocabulary")
     XCTAssertEqual(
-      declared.subtracting(AnalyzerProvider.hostSuppliableAnalyzers), ["hilog-summary@1"],
+      declared.subtracting(AnalyzerProvider.hostSuppliableAnalyzers), [],
       "a newly declared analyzer must be added to hostSuppliableAnalyzers, or listed here "
         + "as one this build does not implement")
   }
@@ -429,6 +443,151 @@ final class AnalyzerProviderContractTests: XCTestCase {
     XCTAssertEqual(envelope.sourceArtifactID, source.artifactID)
     XCTAssertEqual(envelope.sourceSHA256, source.sha256)
     XCTAssertEqual(envelope.result.status, .answered)
+  }
+
+  // MARK: - HiLog summary
+
+  func testHilogCountsDefaultHeadersDeterministicallyWithoutExportingContent() throws {
+    let sensitiveMarker = "private-fixture-content"
+    let body = "08-29 01:02:03.004 123 124 I C01234/\(sensitiveMarker): secret=\(sensitiveMarker)"
+    let rows = [
+      body,
+      "08-29 01:02:03.004 123 124 D 01234/Test: debug",
+      "08-29 01:02:03.004123 123 124 W A01234/OHOS::RS: warning",
+      "08-29 01:02:03.004123456 123 124 E I01234/Test: error",
+      "08-29 01:02:03.004 123 124 F C01234/Test: fatal",
+      "unprefixed continuation with secret=\(sensitiveMarker)",
+      " \t",
+    ]
+    let source = Data((rows.joined(separator: "\r\n") + "\r\n").utf8)
+    let bytes = try HilogSummaryDerivedAnalyzer.analyze(source)
+    XCTAssertEqual(bytes, try HilogSummaryDerivedAnalyzer.analyze(source))
+    let result = try JSONDecoder().decode(HilogSummaryAnalysis.self, from: bytes)
+    XCTAssertEqual(result.headerCoverage, .partial)
+    XCTAssertEqual(result.lineCount, 7)
+    XCTAssertEqual(result.blankLineCount, 1)
+    XCTAssertEqual(result.unrecognizedLineCount, 1)
+    XCTAssertEqual(result.levelCounts, ["D": 1, "I": 1, "W": 1, "E": 1, "F": 1])
+    XCTAssertEqual(result.sourceSHA256, AnalyzerProvider.sha256(source))
+    XCTAssertEqual(result.sourceByteCount, source.count)
+    let text = String(decoding: bytes, as: UTF8.self)
+    for omitted in [sensitiveMarker, "secret=", "OHOS::RS", "08-29", "healthy"] {
+      XCTAssertFalse(text.contains(omitted), omitted)
+    }
+  }
+
+  func testHilogUnknownFormatsAndBlankInputAreNotSuccessfulHealthFindings() throws {
+    for (source, coverage, unknown) in [
+      (Data(), HilogSummaryAnalysis.Coverage.empty, 0),
+      (Data("\n \t\r\n".utf8), .empty, 0),
+      (Data("1700000000.123 123 124 E C01234/Test: epoch\n".utf8), .unrecognized, 1),
+      (Data("08-29 25:02:03.004 123 124 E C01234/Test: bad time\n".utf8), .unrecognized, 1),
+      (Data([0xFF, 0x00, 0x80]), .unrecognized, 1),
+      (Data("08-29 01:02:03.004 123 124 I C01234/Test: opaque".utf8), .complete, 0),
+    ] {
+      let output = try HilogSummaryDerivedAnalyzer.analyze(source)
+      let result = try JSONDecoder().decode(HilogSummaryAnalysis.self, from: output)
+      XCTAssertEqual(result.headerCoverage, coverage)
+      XCTAssertEqual(result.unrecognizedLineCount, unknown)
+      XCTAssertEqual(result.levelCounts["E"], 0)
+    }
+    // A body cannot allocate an unbounded line buffer or become report text.
+    let longLine = Data(
+      ("08-29 01:02:03.004 123 124 I C01234/Test: " + String(repeating: "x", count: 1_000_000)).utf8
+    )
+    let output = try HilogSummaryDerivedAnalyzer.analyze(longLine)
+    XCTAssertLessThan(output.count, HilogSummaryDerivedAnalyzer.maximumOutputBytes)
+    XCTAssertEqual(
+      try JSONDecoder().decode(HilogSummaryAnalysis.self, from: output).levelCounts["I"], 1)
+  }
+
+  func testHilogFileReaderRejectsSymlinksAndNonRegularFiles() throws {
+    let artifact = try sourceArtifact(contents: "unrecognized fixture\n")
+    let output = try HilogSummaryDerivedAnalyzer.analyzeFile(at: artifact.fileURL.path)
+    XCTAssertEqual(
+      output, try HilogSummaryDerivedAnalyzer.analyze(Data("unrecognized fixture\n".utf8)))
+    let link = root.appending(path: "symlink-hilog.txt")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: artifact.fileURL)
+    XCTAssertThrowsError(try HilogSummaryDerivedAnalyzer.analyzeFile(at: link.path))
+    XCTAssertThrowsError(try HilogSummaryDerivedAnalyzer.analyzeFile(at: root.path))
+    let fifo = root.appending(path: "fifo-hilog")
+    XCTAssertEqual(mkfifo(fifo.path, 0o600), 0)
+    XCTAssertThrowsError(try HilogSummaryDerivedAnalyzer.analyzeFile(at: fifo.path))
+    var metadata = stat()
+    XCTAssertEqual(stat(artifact.fileURL.path, &metadata), 0)
+    let alias = "/.vol/\(UInt32(bitPattern: metadata.st_dev))/\(metadata.st_ino)"
+    XCTAssertEqual(try HilogSummaryDerivedAnalyzer.analyzeFile(at: alias), output)
+    // Other profile readers do not opt into the kernel namespace.
+    XCTAssertThrowsError(try ArkTraceProfileFileReader.read(path: alias, maximumByteCount: 1024))
+    for invalid in ["/.vol/1/../2", "\(alias)/extra", "/.vol/0/not-an-inode"] {
+      XCTAssertThrowsError(try HilogSummaryDerivedAnalyzer.analyzeFile(at: invalid))
+    }
+    let oversized = root.appending(path: "oversized-hilog.txt")
+    XCTAssertTrue(FileManager.default.createFile(atPath: oversized.path, contents: Data()))
+    let handle = try FileHandle(forWritingTo: oversized)
+    try handle.truncate(atOffset: UInt64(HilogSummaryDerivedAnalyzer.maximumInputBytes) + 1)
+    try handle.close()
+    XCTAssertThrowsError(try HilogSummaryDerivedAnalyzer.analyzeFile(at: oversized.path))
+  }
+
+  func testHilogVerifierRejectsSourceDriftExtraFieldsAndInvalidCounts() throws {
+    let profile = try executableProfile(
+      analyzerRef: HilogSummaryDerivedAnalyzer.analyzerRef, path: "/bin/cat")
+    let provider = try AnalyzerProvider(profiles: [profile])
+    let source = "08-29 01:02:03.004 123 124 E C01234/Test: private-fixture\n"
+    let artifact = try sourceArtifact(contents: source)
+    let operation = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.hilogSummary))
+    let action = try provider.action(
+      for: operation.steps[0], operation: operation, inputs: [:], context: context(artifact))
+    let output = try HilogSummaryDerivedAnalyzer.analyze(Data(source.utf8))
+    guard
+      case .verified(let provenance) = try provider.verify(
+        receipt: receipt(exitStatus: 0, stdout: output), action: action, context: context(artifact))
+    else { return XCTFail("valid summary must be verified") }
+    XCTAssertEqual(provenance["sourceArtifactId"], artifact.artifactID)
+    XCTAssertEqual(provenance["toolSha256"], profile.executableSHA256)
+
+    let original = try JSONDecoder().decode([String: JSONValue].self, from: output)
+    var invalid: [Data] = [try HilogSummaryDerivedAnalyzer.analyze(Data("other bytes\n".utf8))]
+    for (key, value): (String, JSONValue) in [
+      ("rawText", .string("private-fixture")),
+      ("sourceSHA256", .string(String(repeating: "0", count: 64))),
+      ("analyzerVersion", .string("0.0.0")),
+      ("redaction", .string("none")),
+      ("lineCount", .integer(Int64.max)),
+      ("unrecognizedLineCount", .integer(-1)),
+      ("headerCoverage", .string("empty")),
+      ("levelCounts", .object(["E": .integer(1)])),
+    ] {
+      var changed = original
+      changed[key] = value
+      invalid.append(try CanonicalJSONEncoders.canonical().encode(changed))
+    }
+    // Duplicate keys must not smuggle content that JSONDecoder ignores.
+    invalid.append(
+      Data(
+        ("{\"scope\":\"private-fixture\"," + String(decoding: output.dropFirst(), as: UTF8.self))
+          .utf8))
+    for bytes in invalid {
+      guard
+        case .failed(let code, _) = try provider.verify(
+          receipt: receipt(exitStatus: 0, stdout: bytes), action: action, context: context(artifact)
+        )
+      else {
+        XCTFail("invalid summary must be refused")
+        continue
+      }
+      XCTAssertEqual(code, "analyzer.schemaMismatch")
+    }
+    let noisy = ProviderProcessReceipt(
+      exitStatus: 0, stdout: output, stderr: Data("unexpected text".utf8),
+      stdoutTruncated: false, durationSeconds: 0.001)
+    guard
+      case .failed(let code, _) = try provider.verify(
+        receipt: noisy, action: action, context: context(artifact))
+    else { return XCTFail("unexpected analyzer stderr must fail closed") }
+    XCTAssertEqual(code, "analyzer.schemaMismatch")
   }
 
   // MARK: - Helpers

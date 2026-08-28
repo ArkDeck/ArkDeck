@@ -1008,10 +1008,12 @@ package enum ArkTraceProfileFileReader {
     }
   }
 
-  package static func read(path: String, maximumByteCount: Int) throws -> Snapshot {
+  package static func read(
+    path: String, maximumByteCount: Int, allowKernelInodeAlias: Bool = false
+  ) throws -> Snapshot {
     guard maximumByteCount > 0 else { throw ReaderError.physicalPath }
     let descriptor = try openPhysicalAbsolutePath(
-      path, flags: O_RDONLY | O_NONBLOCK)
+      path, flags: O_RDONLY | O_NONBLOCK, allowKernelInodeAlias: allowKernelInodeAlias)
     defer { Darwin.close(descriptor) }
     var initial = stat()
     guard fstat(descriptor, &initial) == 0,
@@ -1042,7 +1044,8 @@ package enum ArkTraceProfileFileReader {
       initial.st_mtimespec.tv_sec == final.st_mtimespec.tv_sec,
       initial.st_mtimespec.tv_nsec == final.st_mtimespec.tv_nsec
     else { throw ReaderError.finalIdentity }
-    let current = try openPhysicalAbsolutePath(path, flags: O_RDONLY | O_NONBLOCK)
+    let current = try openPhysicalAbsolutePath(
+      path, flags: O_RDONLY | O_NONBLOCK, allowKernelInodeAlias: allowKernelInodeAlias)
     defer { Darwin.close(current) }
     var linked = stat()
     guard fstat(current, &linked) == 0,
@@ -1220,10 +1223,37 @@ package enum ArkTraceProfileFileReader {
 
   private static func openPhysicalAbsolutePath(
     _ path: String,
-    flags: Int32
+    flags: Int32,
+    allowKernelInodeAlias: Bool = false
   ) throws -> Int32 {
     guard path.hasPrefix("/") else {
       throw ReaderError.physicalPath
+    }
+    if allowKernelInodeAlias, path.hasPrefix("/.vol/") {
+      // Darwin resolves the complete kernel inode alias, but its virtual
+      // volume component cannot be opened as an ordinary directory. Keep the
+      // dispatcher's retained inode identity instead of resolving it back to
+      // a mutable pathname. This opt-in is used only by the HiLog child mode;
+      // tool/profile reads keep their existing physical-component walk.
+      let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+      guard parts.count == 4,
+        let device = UInt32(parts[2]), let inode = UInt64(parts[3]),
+        inode > 0, String(device) == parts[2], String(inode) == parts[3]
+      else { throw ReaderError.physicalPath }
+      let descriptor = path.withCString {
+        Darwin.open($0, flags | O_CLOEXEC | O_NOFOLLOW)
+      }
+      guard descriptor >= 0 else { throw ReaderError.open }
+      var metadata = stat()
+      guard fstat(descriptor, &metadata) == 0,
+        UInt32(bitPattern: metadata.st_dev) == device,
+        UInt64(metadata.st_ino) == inode,
+        metadata.st_mode & S_IFMT == S_IFREG
+      else {
+        Darwin.close(descriptor)
+        throw ReaderError.initialMetadata
+      }
+      return descriptor
     }
     let components = path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
     guard !components.isEmpty,

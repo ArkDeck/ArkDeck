@@ -13,6 +13,23 @@ import ArkDeckWorkflows
 import Darwin
 import Foundation
 
+/// Closed host-only HiLog analyzer mode. Never enters daemon startup, touches
+/// transport, or prints an input path/body in an error.
+if CommandLine.arguments.dropFirst().first == "--summarize-hilog" {
+  let values = Array(CommandLine.arguments.dropFirst(2))
+  guard values.count == 1, values[0].hasPrefix("/") else {
+    FileHandle.standardError.write(Data("analyzer.hilogInvalidArguments\n".utf8))
+    exit(64)
+  }
+  do {
+    FileHandle.standardOutput.write(try HilogSummaryDerivedAnalyzer.analyzeFile(at: values[0]))
+    exit(0)
+  } catch {
+    FileHandle.standardError.write(Data("analyzer.hilogReadFailed\n".utf8))
+    exit(1)
+  }
+}
+
 /// The analyzer is the same signed executable in a closed, one-shot mode.
 /// It accepts exactly one engine-resolved artifact path and writes exactly
 /// one deterministic JSON document to stdout; normal daemon startup is never
@@ -570,6 +587,18 @@ Task.detached {
           executablePath: executable.path,
           executableSHA256: executable.sha256,
           fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: 30))
+      if let ownURL = Bundle.main.executableURL,
+        let ownResolver = try? FixedExecutableResolver.hashing(
+          path: ownURL.path, providerID: "analyzer"),
+        let ownExecutable = try? ownResolver.resolveExecutable(providerID: "analyzer"),
+        let profile = HilogSummaryDerivedAnalyzer.profile(
+          executable: executable, currentDaemon: ownExecutable)
+      {
+        analyzerProfiles.append(profile)
+      } else {
+        analyzerUnavailableReasons[HilogSummaryDerivedAnalyzer.analyzerRef] =
+          HilogSummaryDerivedAnalyzer.incompatibleExecutableReason
+      }
     }
     if let descriptorPath = ProcessInfo.processInfo.environment[
       "ARKDECK_ARKTRACE_DESCRIPTOR"]
