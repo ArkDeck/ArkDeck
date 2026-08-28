@@ -3,8 +3,8 @@
 2026-08-27—28 · 基线 `e1d52e68` + 后续 F24–F37 修正。三十三张设计样本均已查看。
 真机执行与原生 App 证据另见[验证记录](real-device-validation.md)，不由这些图片证明。
 
-F38 正在修正 History 全类型详情和筛选；这些图片保留原采集版本，尚未刷新为 F38。
-本轮浏览器被 URL policy 挡在内部错误页，视觉检查待恢复；不要把旧图当作 F38 验收。
+下表保留 F24–F37 的原采集版本，不作为 F38/F39 验收。用户手动恢复预览后，
+F38/F39 的新截图与验证已补齐，见文末「F39 History 回访与交互修正」。
 
 浏览器实际 viewport 为 1280×720；前七张使用 1180×760 reference window，后续二十六张使用默认自适应窗口。截图保留原始 JPEG，
 未缩放或重绘；预览图包含滚动后的局部，不作为全窗逐像素验收。
@@ -47,3 +47,43 @@ F38 正在修正 History 全类型详情和筛选；这些图片保留原采集�
 | [中文精确导出预览](flash-history-export-zh-Hans.jpg) | 同上；标准 flash-report.json 另按 standard 预览，不误报为敏感文件 |
 
 这些操作不连接 Runtime、不读取真实敏感文本、不创建真实 Job。
+
+
+## F39 History 回访与交互修正
+
+2026-08-28 · 基线 `71eb0b07`。用户手动打开本机 HTTP 预览后，在同一标签完成
+中英文实际点击；未切换浏览器或绕过 URL policy。下列 **34 张原始 JPEG** 均已查看。
+实际 viewport 为 842×750；侧栏开/关分别检查约 510/760 CSS px 的 History 内容区。
+宽栏图使用 `?reference&page=history&flashHistory=retained&lang=en` 的 1180×760 CSS
+窗口并隐藏侧栏；fullPage 输出保留额外画布，不是重绘或逐像素 App 对齐证据。
+其他图从 `?page=history&lang=en` 开始，按图示选择活动、打开详情/来源/导出并切换语言。
+unknown 使用 `flashHistory=unknown`；Inspector 使用 `jobState=unknown`；深色使用
+`appearance=dark`。参数都是设计样本，不触发 Runtime。
+
+六类共 21 个样本 Artifact 完成双语逐项预览（42 次）；确认只显示演示结束、未写入文件。
+三个未通过检查尝试及后续复测均保留，不称为零失败的一次批次。
+[完整验证与图片哈希](history-readonly-verification-2026-08-28.json)同时记录字段检查、
+来源边界、构建结果和旧真机/原生证据链接。
+
+| 状态 | English | 简体中文 |
+| --- | --- | --- |
+| Debug 来源 | [English](history-readonly-context-debug-en.jpg) | [简体中文](history-readonly-context-debug-zh.jpg) |
+| Device 来源 | [English](history-readonly-context-device-en.jpg) | [简体中文](history-readonly-context-device-zh.jpg) |
+| Diagnostics 来源 | [English](history-readonly-context-diagnostics-en.jpg) | [简体中文](history-readonly-context-diagnostics-zh.jpg) |
+| Flash 来源 | [English](history-readonly-context-flash-en.jpg) | [简体中文](history-readonly-context-flash-zh.jpg) |
+| Trace 来源 | [English](history-readonly-context-trace-en.jpg) | [简体中文](history-readonly-context-trace-zh.jpg) |
+| Viewer 来源 | [English](history-readonly-context-viewer-en.jpg) | [简体中文](history-readonly-context-viewer-zh.jpg) |
+| 精确 Correlation / Session | [English](history-readonly-correlation-en.jpg) | [简体中文](history-readonly-correlation-zh.jpg) |
+| 深色证据与外观标签 | [English](history-readonly-dark-en.jpg) | [简体中文](history-readonly-dark-zh.jpg) |
+| 即时搜索空态 | [English](history-readonly-empty-en.jpg) | — |
+| 窄栏证据独立滚动 | [English](history-readonly-evidence-compact-en.jpg) | [简体中文](history-readonly-evidence-compact-zh.jpg) |
+| 展开的精确筛选 | [English](history-readonly-filters-en.jpg) | — |
+| Inspector unknown 身份与完整状态 | [English](history-readonly-inspector-unknown-en.jpg) | [简体中文](history-readonly-inspector-unknown-zh.jpg) |
+| 旧取消记录不补造事实 | [English](history-readonly-legacy-cancelled-en.jpg) | — |
+| 侧栏展开的单栏列表 | [English](history-readonly-list-en.jpg) | — |
+| 类型化输入 | — | [简体中文](history-readonly-parameters-zh.jpg) |
+| 精确敏感导出预览 | [English](history-readonly-sensitive-export-en.jpg) | [简体中文](history-readonly-sensitive-export-zh.jpg) |
+| 标准导出演示未写文件 | [English](history-readonly-standard-export-en.jpg) | [简体中文](history-readonly-standard-export-zh.jpg) |
+| 摘要字段 | [English](history-readonly-summary-en.jpg) | — |
+| 未解决 unknown | [English](history-readonly-unknown-en.jpg) | [简体中文](history-readonly-unknown-zh.jpg) |
+| 宽三栏保留原 unknown | [English](history-readonly-wide-retained-en.jpg) | [简体中文](history-readonly-wide-retained-zh.jpg) |

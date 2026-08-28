@@ -236,6 +236,123 @@ test('History filters use exact identity, current attention facts and reported t
   assert.deepEqual(JSON.parse(h.run('JSON.stringify(HISTORY_ACTIVE_STATES)')),states.filter(state=>!terminal.includes(state)));
 });
 
+test('Review appearance keeps its actual mode label across language and page rendering', () => {
+  const h=harness('?page=history&lang=en&appearance=dark');
+  h.document.getElementById('addTargetButton').querySelector=()=>({textContent:''});
+  for(const [mode,en,zh] of [['dark','Dark','深色外观'],['light','Light','浅色外观'],['system','System appearance','系统外观']]) {
+    for(const [lang,label] of [['en',en],['zh-Hans',zh]]) {
+      h.run(`S.appearance=${JSON.stringify(mode)};S.language=${JSON.stringify(lang)};renderShellText()`);
+      assert.equal(h.document.getElementById('themeToggle').textContent,label);
+    }
+  }
+});
+
+test('History query updates immediately while keeping selection and expanded filter controls', () => {
+  const h=harness('?page=history&lang=en');
+  const input=h.document.querySelector('.history-search input');
+  input.selectionStart=3;input.selectionEnd=5;input.focus=()=>{input.focused=true;};
+  input.setSelectionRange=(start,end)=>{input.restoredRange=[start,end];};
+  h.run("S.historyFiltersOpen=true;setHistoryQuery('no-such-record')");
+  assert.equal(h.run('filteredHistory().length'),0);
+  assert.equal(input.focused,true);assert.deepEqual(input.restoredRange,[3,5]);
+  assert.match(h.run('pHistory()'),/oninput="setHistoryQuery\(this.value\)"/);
+  assert.match(h.run('pHistory()'),/<details open ontoggle=/);
+  h.run("setHistoryFilter('status','failed');resetHistoryFilters()");
+  assert.equal(h.run('S.historyFiltersOpen'),true);
+});
+
+test('History compact activity picker mirrors every native category and the workspace-width boundary', () => {
+  const native=read('ArkDeckApp/Features/History/RuntimeHistoryView.swift');
+  const boundary=Number(native.match(/workspace\.size\.width >= (\d+)/)[1]);
+  assert.ok(html.includes(`@container history (max-width:${boundary-1}px)`));
+  assert.match(html,/classList\.toggle\("history-page",S\.nav==="history"\)/);
+  const h=harness('?page=history&lang=en');
+  h.run("setHistoryFilter('kind','device')");
+  const picker=h.run('pHistory()').match(/<label class="history-compact-activity">[\s\S]*?<\/label>/)[0];
+  const keys=[...picker.matchAll(/<option value="([^"]+)"/g)].map(m=>m[1]);
+  assert.deepEqual(keys.slice().sort(),enumCases('ArkDeckApp/Features/History/RuntimeHistoryView.swift','HistoryActivityFilter').sort());
+  assert.match(picker,/<option value="device" selected>/);
+});
+
+test('History details expose supplied correlation, evidence and artifact metadata without filling gaps', () => {
+  for (const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=history&lang=${lang}`);
+    h.run(`const rich={id:'job-explicit',kind:'trace',op:'capture.diagnostics@1',st:'failed',mode:'execute',
+      sessionID:'session-explicit',target:'target-explicit',createdAtUTC:'2026-08-26T01:00:00Z',startedAtUTC:'2026-08-26T01:00:01Z',finishedAtUTC:'2026-08-26T01:00:02Z',
+      outcomeUnknown:false,waitingForHuman:true,outstandingResidueCount:2,
+      correlation:{jobID:'job-explicit',sessionID:'session-explicit',operationReference:'capture.diagnostics@1',targetID:'target-explicit',artifacts:[{id:'artifact-explicit',name:'capture.log',role:'log',sha256:'fixture-hash'}]},
+      evidence:{providerID:'hdc',catalogDigest:'fixture-catalog',bindingRevision:0,authorityKind:'fixture-authority',authorityReference:'fixture-reference',observedModel:'fixture-model',observedFirmware:'fixture-firmware',observedTransport:'USB',terminalState:'failed',executionMode:'execute',actualEffect:'deviceMutation',firstEvidenceStepAtUTC:'2026-08-26T01:00:01Z',actualStepKinds:['captureTrace'],blockers:['<not markup>']},
+      artifacts:[{name:'capture.log',role:'log',privacy:'standard',status:'invalid',sourceOperation:'capture.diagnostics@1',mediaType:'text/plain',statusDetail:'fixture hash mismatch'}]};HIST.unshift(rich)`);
+    const detail=h.run('histDetail(rich)');
+    for(const id of ['summary','correlation','evidence','recovery'])assert.ok(detail.includes(`data-sync-id="history.detail.${id}"`));
+    for(const value of ['session-explicit','2026-08-26T01:00:00Z','2026-08-26T01:00:02Z','fixture-catalog','fixture-reference','fixture-model','fixture-firmware','artifact-explicit','fixture-hash','captureTrace','text/plain','fixture hash mismatch'])assert.ok(detail.includes(value),value);
+    assert.match(detail,/&lt;not markup&gt;/);assert.doesNotMatch(detail,/<not markup>/);
+    assert.match(detail,/Awaiting human action|等待人工操作/);
+    h.run("S.hf.kind='flash';showHistorySession('job-explicit')");
+    assert.equal(h.run('S.hf.session'),'session-explicit');
+    h.run("rich.correlation.jobID='foreign-job'");
+    assert.doesNotMatch(h.run('histDetail(rich)'),/artifact-explicit|fixture-hash/,'foreign correlation is not projected into this Job');
+    for(const record of [{id:'missing',st:'cancelled'},{id:'unknown',st:'interrupted',outcomeUnknown:true,supersededByRecoveryEpochID:'recovery-demo'}]) {
+      const missing=h.run(`histDetail(${JSON.stringify(record)})`);
+      assert.match(missing,/Not reported|未报告/);
+      assert.doesNotMatch(missing,/fixture-hash|fixture-catalog|No recovery needed|无需恢复/);
+    }
+    assert.match(h.run("histDetail({id:'known',st:'succeeded',outcomeUnknown:false,waitingForHuman:false,outstandingResidueCount:0})"),/No recovery needed|无需恢复/);
+    assert.match(h.run("histDetail({id:'planned',mode:'planOnly',artifacts:[]})"),/plan-only|仅计划/);
+    h.run("resetHistoryFilters();HIST.splice(0,HIST.length,{id:'missing',kind:'other'});S.histSel='missing'");
+    assert.doesNotMatch(h.run('pHistory()'),/>undefined</);
+  }
+});
+
+test('History workspace revisits retain exact read-only source context across all six destinations', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=history&lang=${lang}`);
+    for(const [kind,page] of Object.entries({flash:'flash',debug:'debug',viewer:'dump',trace:'trace',device:'device-control',diagnostics:'diagnostics'})) {
+      h.run(`HIST.unshift({id:'source-${kind}',kind:'${kind}',op:'capture.diagnostics@1',st:'interrupted',mode:'simulated',target:'original-target',sessionID:'original-session',artifacts:[{name:'explicit.txt',status:'published'}]})`);
+      const before=h.run('JSON.stringify({jobs:S.jobs,continuation:S.continuation,devices:DEVICES})');
+      h.run(`openHistoryDesignWorkspace('source-${kind}')`);
+      assert.equal(h.run('S.nav'),page);
+      const context=h.run('historyContextHTML()');
+      for(const value of [`source-${kind}`,'original-target','capture.diagnostics@1','interrupted','explicit.txt'])assert.ok(context.includes(value));
+      assert.match(context,/history.context.dismiss/);
+      assert.equal(h.run('S.historyContext.kind'),kind);
+      h.run(`HIST.find(row=>row.id==='source-${kind}').artifacts[0].name='later-change.txt'`);
+      assert.match(h.run('historyContextHTML()'),/explicit.txt/,'context is a snapshot');
+      assert.equal(h.run('JSON.stringify({jobs:S.jobs,continuation:S.continuation,devices:DEVICES})'),before);
+      h.run("go('settings')");assert.equal(h.run('historyContextHTML()'),'');
+      h.run(`go('${page}');dismissHistoryContext()`);assert.equal(h.run('historyContextHTML()'),'');
+    }
+    h.run("openHistoryDesignDiagnostics('source-viewer')");
+    assert.equal(h.run('S.historyContext.kind'),'viewer','forwarding does not relabel the source workspace');
+    assert.equal(h.run('S.nav'),'diagnostics');
+    assert.match(h.run('historyContextHTML()'),/source-viewer/);
+    h.run("openHistoryRun('source-viewer')");assert.equal(h.run('S.histSel'),'source-viewer');
+    const before=h.run('JSON.stringify(S.historyContext)');
+    h.run("openHistoryDesignWorkspace('missing');openHistoryDesignWorkspace('S-0825-04')");
+    assert.equal(h.run('JSON.stringify(S.historyContext)'),before);
+    const debugSource=read('Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DebugApplicationFacade.swift');
+    for(const [constant,tab] of [['debugHAPReference','apps'],['nativeLibraryReference','artifacts'],['captureDiagnosticsReference','logs'],['createPortForwardReference','net'],['removePortForwardReference','net']]) {
+      const operation=debugSource.match(new RegExp(`static let ${constant} = "([^"]+)"`))[1];
+      h.run(`HIST.unshift({id:'source-${constant}',kind:'debug',op:${JSON.stringify(operation)},st:'succeeded'});openHistoryDesignWorkspace('source-${constant}')`);
+      assert.equal(h.run('S.debugTab'),tab);
+    }
+    assert.match(html,/historyContextHTML\(\)\+continuationDraftHTML\(\)/);
+  }
+});
+
+test('Inspector record navigation preserves exact unknown facts rather than manufacturing a Diagnostics row', () => {
+  const h=harness('?page=history&lang=en');
+  h.run("S.jobs.push({id:'inspector-source',kind:'debug',operation:'debug.hap@1',state:'waitingForRecovery',outcomeUnknown:true,target:'original-target',sessionID:'original-session',mode:'execute',log:['explicit journal']});openInspectorRecord('inspector-source')");
+  const record=JSON.parse(h.run("JSON.stringify(HIST.find(row=>row.id==='inspector-source'))"));
+  assert.equal(record.kind,'debug');assert.equal(record.op,'debug.hap@1');
+  assert.equal(record.outcomeUnknown,true);assert.equal(record.target,'original-target');
+  assert.equal(record.sessionID,'original-session');assert.deepEqual(record.timeline,['explicit journal']);
+  const before=h.run('JSON.stringify(HIST)');h.run("openInspectorRecord('inspector-source')");
+  assert.equal(h.run('JSON.stringify(HIST)'),before);
+  const unknown=harness('?jobState=unknown&lang=en');unknown.run("openInspectorRecord('job-demo-global')");
+  assert.equal(unknown.run("HIST.find(row=>row.id==='job-demo-global').outcomeUnknown"),true);
+});
+
 test('explicit History samples use current Catalog fields and Artifact descriptors', () => {
   const h=harness('?page=history&lang=en');
   const operations=new Map(files(join(root,'Catalog/operations')).filter(path=>path.endsWith('.json')).map(path=>{
@@ -245,11 +362,14 @@ test('explicit History samples use current Catalog fields and Artifact descripto
   for(const row of JSON.parse(h.run('JSON.stringify(HIST)')).filter(row=>row.artifacts)) {
     const operation=operations.get(row.op);
     assert.ok(operation,`${row.id} must name an exact published operation`);
+    if(row.evidence)assert.equal(row.evidence.providerID,operation.provider);
     for(const artifact of row.artifacts) {
       const declared=operation.artifacts.find(a=>a.name===artifact.name);
       assert.ok(declared,`${row.id}: ${artifact.name} is not declared`);
       assert.equal(artifact.role,declared.role);
       assert.equal(artifact.privacy,declared.privacy);
+      if(artifact.mediaType)assert.equal(artifact.mediaType,declared.mediaType);
+      if(artifact.sourceOperation)assert.equal(artifact.sourceOperation,row.op);
     }
     for(const key of Object.keys(row.inputs||{}))assert.ok(operation.inputs.fields[key],`${row.id}: ${key} is not a typed input`);
   }

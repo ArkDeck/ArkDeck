@@ -63,7 +63,8 @@
       "Both-language, all-kind History interactions and exact export previews in the real browser.",
       "Narrow-inspector parameter/artifact layout and updated reference screenshots."
     ],
-    "priorReferencesAreF38Acceptance": false
+    "priorReferencesAreF38Acceptance": false,
+    "followup": "The user restored the HTTP preview. F38/F39 browser checks and actual layout/interaction fixes are recorded in history-readonly-verification-2026-08-28.json; this F38 record preserves its original blocked attempt."
   },
   "reviewedMainNativeRegression": {
     "sourceRevision": "0dc61e0f9630aa171a33d129f2791eb6d6730c25",

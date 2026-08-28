@@ -61,7 +61,7 @@ button{color:inherit}
 body.reference{padding:0;gap:0;justify-content:flex-start;min-width:1180px;min-height:760px}
 body.reference .note{display:none}
 body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:0;border:none;box-shadow:none}
-.titlebar{height:52px;display:grid;grid-template-columns:minmax(210px,1fr) auto minmax(210px,1fr);align-items:center;
+.titlebar{height:52px;display:grid;grid-template-columns:minmax(92px,1fr) minmax(0,auto) minmax(max-content,1fr);align-items:center;
   gap:10px;background:var(--chrome);border-bottom:1px solid var(--line);padding:0 12px;flex:none;
   -webkit-backdrop-filter:blur(28px) saturate(1.35);backdrop-filter:blur(28px) saturate(1.35)}
 .titlebar .leading,.titlebar .trailing{display:flex;align-items:center;gap:8px;min-width:0}
@@ -70,6 +70,7 @@ body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:
 .lights i:nth-child(1){background:#FF5F57}.lights i:nth-child(2){background:#FEBC2E}.lights i:nth-child(3){background:#28C840}
 .titlebar .t{text-align:center;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .toolbar-btn,.acbtn{min-width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  white-space:nowrap;flex-shrink:0;
   font-size:11px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel-solid) 78%,transparent);
   color:var(--ink2);border-radius:7px;padding:0 9px;cursor:pointer;box-shadow:var(--control-shadow)}
 .toolbar-btn.icon-only{width:28px;padding:0}
@@ -90,6 +91,18 @@ body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:
 .history-filter-row{display:flex;gap:8px;flex-wrap:wrap;padding:8px 0}
 .history-filter-row label{font-size:11px;color:var(--ink2)}
 .history-filter-row select{display:block;max-width:160px}
+.history-page{container-type:inline-size;container-name:history}
+.history-page .history-shell{flex:1;min-height:0;grid-template-rows:minmax(0,1fr)}
+.history-page .history-rail,.history-page .history-list,.history-page .history-inspector{overflow-y:auto}
+.history-compact-activity{display:none;grid-column:1/-1}
+.history-detail-section{margin-block:14px;min-width:0;overflow-wrap:anywhere}
+.history-facts.kv{grid-template-columns:minmax(0,120px) minmax(0,1fr)}
+.history-facts dt,.history-facts dd{min-width:0;overflow-wrap:anywhere}
+.history-artifacts{display:grid;gap:12px;margin-block:12px}
+.history-artifacts>.card,.history-linked-artifact{min-width:0;overflow-wrap:anywhere}
+.history-linked-artifact{margin-block:12px}
+.history-context{flex:none;padding:12px 16px;background:var(--accent-weak);border-radius:8px;overflow-wrap:anywhere}
+.device-workspace-page:has(.history-context){overflow-y:auto}
 body.standalone-design .sidebar,body.standalone-design #drawer,body.standalone-design #sidebarToggle,body.standalone-design #jobsToggle{display:none}
 @media(max-width:980px){.overview-record .overview-scope{grid-template-columns:1fr}.overview-scope>div+div{border-left:0;border-top:1px solid var(--line);padding:12px 0 0}.overview-run{flex-wrap:wrap}.overview-run>div{flex-basis:65%}}
 .main{flex:1;display:flex;min-height:0}
@@ -691,7 +704,8 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
 .history-rail{display:flex;flex-direction:column;gap:18px}.history-group{display:flex;flex-direction:column;gap:4px}.history-group-label{padding:0 8px 5px;color:var(--ink2);font-size:10.5px;font-weight:650;text-transform:uppercase;letter-spacing:.05em}.history-kind{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 8px;border:0;border-radius:7px;background:transparent;color:var(--ink);text-align:start;cursor:pointer}.history-kind:hover{background:var(--panel2)}.history-kind.on{background:var(--accent-weak);color:var(--accent);font-weight:650}.history-kind .symbol{width:15px;height:15px}.history-count{margin-inline-start:auto;color:var(--ink2);font-size:10.5px;font-variant-numeric:tabular-nums}
 .history-list{display:flex;flex-direction:column;gap:10px}.history-list-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.history-search{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink2)}.history-search input{min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--ink);font:inherit}.history-search .symbol{width:14px;height:14px}.history-day{padding:7px 3px 0;color:var(--ink2);font-size:10.5px;font-weight:650}.history-record{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:9px;align-items:start;width:100%;padding:10px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--ink);text-align:start;cursor:pointer}.history-record:hover{background:var(--panel2)}.history-record.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-weak)}.history-record-icon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:var(--panel2);color:var(--ink2)}.history-record.on .history-record-icon{background:var(--panel-solid);color:var(--accent)}.history-record-main{display:flex;flex-direction:column;gap:2px;min-width:0}.history-record-main b,.history-record-main span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-record-main b{font-size:12.5px}.history-record-main span,.history-record-time{color:var(--ink2);font-size:10.5px}.history-record-tags{display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap}
 .history-inspector{display:flex;flex-direction:column;gap:14px}.history-inspector-head{display:flex;align-items:flex-start;gap:11px}.history-inspector-head>div{min-width:0;flex:1}.history-inspector-head h2{font-size:17px;margin:0 0 3px}.history-inspector-head p{margin:0;color:var(--ink2);font-size:11.5px}.history-preview{min-height:124px;padding:14px;border-radius:10px;background:linear-gradient(145deg,var(--panel2),color-mix(in srgb,var(--panel2) 72%,var(--accent-weak)));display:flex;flex-direction:column;justify-content:flex-end;gap:4px;overflow:hidden}.history-preview.trace{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,var(--panel2)),var(--panel2))}.history-preview-line{height:34px;color:var(--accent);opacity:.72}.history-preview b{font-size:12px}.history-preview span{font-size:10.5px;color:var(--ink2)}.history-primary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.history-primary .pri{flex:1}.history-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.history-meta div{padding:9px 10px;border-radius:8px;background:var(--panel2);min-width:0}.history-meta small{display:block;color:var(--ink2);font-size:10px}.history-meta b{display:block;margin-top:2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-inspector details{border-top:1px solid var(--line);padding-top:10px}.history-inspector summary{color:var(--ink2);font-size:11.5px;cursor:pointer}
-@media(max-width:1050px){.history-shell{grid-template-columns:160px minmax(280px,1fr)}.history-inspector{grid-column:1/-1}}@media(max-width:760px){.history-shell{grid-template-columns:1fr}.history-rail{flex-direction:row;overflow-x:auto}.history-group{min-width:170px}.history-inspector{grid-column:auto}}
+@container history (max-width:889px){.history-page .history-shell{grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);grid-template-rows:auto minmax(0,1fr)}.history-rail{display:none}.history-compact-activity{display:block}}
+@container history (max-width:619px){.history-page .history-shell{display:block;flex:none}.history-page .history-list,.history-page .history-inspector{margin-top:14px;overflow:visible}}
 @media(max-width:760px){
   .trace-form{grid-template-columns:1fr;gap:8px}.trace-label{padding-top:0}
   .trace-section-foot,.trace-viewer-entry{align-items:flex-start;flex-direction:column}
@@ -782,6 +796,8 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
 @media(max-width:760px){.tv-layout{grid-template-columns:minmax(0,1fr)}.tv-sidebar{border-inline-end:0}.tv-reading{grid-template-columns:minmax(0,1fr)}.tv-inspector{border-inline-start:0;border-block-start:1px solid var(--line)}}
 .inspector-split{display:grid;grid-template-columns:minmax(220px,.65fr) minmax(340px,1.35fr);gap:16px;min-height:220px}
 .inspector-list,.inspector-detail{overflow:auto;min-width:0;max-height:290px}
+.inspector-list .debug-entry{flex-wrap:wrap}
+.inspector-list .nm{min-width:0;overflow-wrap:anywhere}
 .inspector-detail{display:flex;flex-direction:column;gap:10px;padding-inline-end:8px}
 .inspector-detail>*{flex-shrink:0}
 .inspector-list small{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
@@ -950,9 +966,9 @@ const S = {
   settingsTab:PARAMS.get("settingsTab")||"general", traceSettingsTab:PARAMS.get("traceSettingsTab")||"cache",
   debug:{sourceKind:"local",server:"build-nightly",picked:null,pickedFrom:null,
     bundle:"",lib:"",stage:"idle",jobID:null,browsePath:"",browseSel:null,serverDraftRevision:0,serverProbeRevision:null},
-  continuation:null, inspectorSelection:null, inspectorLog:null, inspectorCancellation:null,
+  continuation:null, historyContext:null, inspectorSelection:null, inspectorLog:null, inspectorCancellation:null,
   hap:{available:PARAMS.get("hapState")!=="unavailable",file:null,additional:[],bundle:"",ability:"",install:"installOrReplace",cleanup:"uninstall",postRun:"stopped",diagnostics:true,seconds:"30"},
-  hf:{kind:"all",query:"",status:"all",mode:"all",target:"all",session:"all",time:"all"}, histSel:"S-0826-01", histSeq:1, historyLimit:6, savedHistoryFilter:null,
+  hf:{kind:"all",query:"",status:"all",mode:"all",target:"all",session:"all",time:"all"}, histSel:"S-0826-01", histSeq:1, historyLimit:6, savedHistoryFilter:null, historyFiltersOpen:false,
   hdcSel:"deveco",
   jobs:[], jobSeq:1
 };
@@ -998,11 +1014,17 @@ const HISTORY_DETAIL_SAMPLES={
     {name:'capture.log',role:'log',privacy:'standard',status:'published'},
     {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published'},
     {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published'}]},
-  'S-0826-04':{actualEffect:'readOnly',outcomeUnknown:false,bindingRevision:3,artifacts:[
-    {name:'hilog.txt',role:'raw',privacy:'sensitive',status:'published'},
-    {name:'markers.json',role:'derived',privacy:'standard',status:'published'},
-    {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published'},
-    {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published'}]},
+  'S-0826-04':{actualEffect:'readOnly',outcomeUnknown:false,waitingForHuman:false,outstandingResidueCount:0,bindingRevision:3,
+    sessionID:'session-design-diagnostics',createdAtUTC:'2026-08-26T03:05:50Z',startedAtUTC:'2026-08-26T03:05:51Z',finishedAtUTC:'2026-08-26T03:06:01Z',
+    // Partial design metadata only: no invented catalog digest, Artifact hash,
+    // authority reference or firmware. These omissions remain visible.
+    evidence:{providerID:'hdc',bindingRevision:3,terminalState:'succeeded',executionMode:'execute',actualEffect:'readOnly'},
+    correlation:{jobID:'S-0826-04',sessionID:'session-design-diagnostics',operationReference:'capture.diagnostics@1',targetID:'TGT-958780b2ffb7'},
+    artifacts:[
+    {name:'hilog.txt',role:'raw',privacy:'sensitive',status:'published',sourceOperation:'capture.diagnostics@1',mediaType:'text/plain'},
+    {name:'markers.json',role:'derived',privacy:'standard',status:'published',sourceOperation:'capture.diagnostics@1',mediaType:'application/json'},
+    {name:'artifact-index.json',role:'derived',privacy:'standard',status:'published',sourceOperation:'capture.diagnostics@1',mediaType:'application/json'},
+    {name:'capture-summary.json',role:'derived',privacy:'standard',status:'published',sourceOperation:'capture.diagnostics@1',mediaType:'application/json'}]},
   'S-0825-02':{op:'deploy.native-library.app-owned@1',actualEffect:'deviceMutation',outcomeUnknown:false,artifacts:[
     {name:'publish-report.json',role:'derived',privacy:'standard',status:'published'},
     {name:'verification-report.json',role:'derived',privacy:'standard',status:'published'}]},
@@ -1080,12 +1102,12 @@ function toggleDrawer(){
 }
 function toggleSidebar(){S.sidebarOpen=!S.sidebarOpen;$("sidebar").classList.toggle("hidden",!S.sidebarOpen);}
 function toggleLanguage(){S.language=S.language==="zh-Hans"?"en":"zh-Hans";render();}
+function themeLabel(){return S.appearance==="system"?tx("appearance"):S.appearance==="light"?lc("浅色外观","Light"):lc("深色外观","Dark");}
 function toggleTheme(){
   S.appearance=S.appearance==="system"?"light":S.appearance==="light"?"dark":"system";
   if(S.appearance==="system")document.documentElement.removeAttribute("data-theme");
   else document.documentElement.dataset.theme=S.appearance;
-  $("themeToggle").textContent=S.appearance==="system"?tx("appearance")
-    :S.appearance==="light"?(S.language==="en"?"Light":"浅色外观"):(S.language==="en"?"Dark":"深色外观");
+  $("themeToggle").textContent=themeLabel();
 }
 function openDrawer(){if(!S.drawerOpen)toggleDrawer();}
 function go(nav){S.nav=nav;render();}
@@ -1186,9 +1208,11 @@ function histFromJob(j){
     detail:j.id,day:lc('今天','Today'),mode:j.mode,dev:j.dev,what:j.title,when:lc('刚刚','Just now'),live:true,
     target:j.target,bindingRevision:j.bindingRevision,sessionID:j.sessionID,thread:j.thread,
     actualEffect:j.actualEffect,outcomeUnknown:j.outcomeUnknown,waitingForHuman:j.waitingForHuman,
-    outstandingResidueCount:j.outstandingResidueCount,createdAtUTC:j.createdAtUTC,finishedAtUTC:j.finishedAtUTC,
+    outstandingResidueCount:j.outstandingResidueCount,createdAtUTC:j.createdAtUTC,startedAtUTC:j.startedAtUTC,finishedAtUTC:j.finishedAtUTC,
     resolvedByTargetAliasResolutionID:j.resolvedByTargetAliasResolutionID,supersededByRecoveryEpochID:j.supersededByRecoveryEpochID,
     timeline:j.log?.slice(),traceParameters:j.traceParameters?.map(parameter=>({...parameter})),inputs:j.inputs?JSON.parse(JSON.stringify(j.inputs)):undefined,
+    evidence:j.evidence?JSON.parse(JSON.stringify(j.evidence)):undefined,
+    correlation:j.correlation?JSON.parse(JSON.stringify(j.correlation)):undefined,
     artifacts:j.artifacts?.map(artifact=>({...artifact}))};
   const index=HIST.findIndex(h=>h.id===j.id);
   if(index<0)HIST.unshift(record);else HIST[index]=record;
@@ -1202,7 +1226,7 @@ function renderDrawer(){
 }
 function inspectorJobs(){
   if(S.jobs.length)return S.jobs.slice().reverse();
-  if(PARAMS.get('jobState'))return [{id:'job-demo-global',standardLog:'capture.log',title:'capture.diagnostics@1',operation:'capture.diagnostics@1',state:PARAMS.get('jobState')==='unknown'?'waitingForRecovery':PARAMS.get('jobState'),outcomeUnknown:PARAMS.get('jobState')==='unknown',mode:'execute',dev:'TGT-958780b2ffb7',log:['queued','preflight','running']}];
+  if(PARAMS.get('jobState'))return [{id:'job-demo-global',kind:'diagnostics',standardLog:'capture.log',title:'capture.diagnostics@1',operation:'capture.diagnostics@1',state:PARAMS.get('jobState')==='unknown'?'waitingForRecovery':PARAMS.get('jobState'),outcomeUnknown:PARAMS.get('jobState')==='unknown',mode:'execute',target:'TGT-958780b2ffb7',dev:'TGT-958780b2ffb7',log:['queued','preflight','running']}];
   return HIST.slice(0,4).map(h=>({id:h.id,title:h.what,operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:(h.artifacts||[]).find(a=>a.role==='log'&&a.privacy==='standard'&&a.status==='published')?.name||null}));
 }
 function inspectorCanCancel(job){
@@ -1215,7 +1239,7 @@ function requestInspectorCancellation(id){
 function openInspectorRecord(id){
   if(!HIST.some(h=>h.id===id)){
     const j=inspectorJobs().find(j=>j.id===id);if(!j)return;
-    HIST.unshift({id:j.id,kind:'diagnostics',st:j.state,mode:j.mode,dev:j.dev,what:j.title,detail:j.operation||j.title,day:lc('今天','Today'),when:lc('设计样本','Design sample'),icon:'diagnostics'});
+    histFromJob(j);
   }
   openHistoryRun(id);
 }
@@ -3651,24 +3675,78 @@ function historyParametersHTML(h){
   if(!entries.length)return table||`<h2>${lc('参数','Parameters')}</h2><p class="hint">${lc('此 Job 未记录参数。','This Job recorded no parameters.')}</p>`;
   return table+`<h2>${lc('请求的类型化输入','Requested typed inputs')}</h2><dl class="kv" data-sync-id="history.parameters">${entries.map(([name,value])=>`<dt class="mono" style="overflow-wrap:anywhere">${esc(name)}</dt><dd>${esc(typeof value==='string'?value:JSON.stringify(value))}</dd>`).join('')}</dl>`;
 }
-function histDetail(h){
+function historyFact(label,value,id){
+  return `<dt>${esc(label)}</dt><dd${id?` data-sync-id="${id}"`:''}>${esc(value??lc('未报告','Not reported'))}</dd>`;
+}
+function historySection(title,id,body){
+  return `<section class="history-detail-section" data-sync-id="history.detail.${id}"><h2>${title}</h2>${body}</section>`;
+}
+function historyCorrelation(h){
+  const c=h.correlation;
+  return c&&c.jobID===h.id&&c.operationReference===h.op&&c.targetID===h.target&&c.sessionID===h.sessionID?c:null;
+}
+function showHistorySession(id){
+  const h=HIST.find(row=>row.id===id),c=h&&historyCorrelation(h);
+  if(!c?.sessionID)return;
+  S.hf.session=c.sessionID;renderPage();
+}
+function historyCorrelationHTML(h){
+  const c=historyCorrelation(h);
+  const content=!c?`<p class="hint">${lc('此样本未提供匹配当前 Job 的关联清单。','This sample does not provide correlation matching this Job.')}</p>`:
+    `<dl class="kv history-facts">${historyFact('Job',c.jobID)}${historyFact('Session',c.sessionID)}${historyFact(lc('操作','Operation'),c.operationReference)}${historyFact(lc('目标','Target'),c.targetID)}</dl>
+    <button class="btn" data-job-id="${esc(h.id)}" onclick="showHistorySession(this.dataset.jobId)">${lc('显示同一 Session 的记录','Show records in this Session')}</button>
+    ${(c.artifacts||[]).map(a=>`<article class="history-linked-artifact"><b>${esc(a.name)}</b><dl class="kv history-facts">${historyFact('Artifact ID',a.id)}${historyFact(lc('角色','Role'),a.role)}${historyFact('SHA-256',a.sha256)}</dl></article>`).join('')||`<p class="hint">${Array.isArray(c.artifacts)?lc('关联清单没有 Artifact。','The correlation inventory contains no Artifacts.'):lc('此样本未提供关联 Artifact 清单。','This sample does not provide a correlated Artifact inventory.')}</p>`}`;
+  return historySection(lc('关联','Correlation'),'correlation',content);
+}
+function historyEvidenceHTML(h){
+  const e=h.evidence;
+  if(!e)return historySection(lc('运行证据','Evidence'),'evidence',`<p class="hint">${lc('此样本未提供运行证据。未报告的字段不从操作或状态推断。','This sample does not provide execution evidence. Missing fields are not inferred from its operation or state.')}</p>`);
+  const fields=[['providerID','Provider','Provider'],['catalogDigest','Catalog 摘要','Catalog digest'],['bindingRevision','绑定修订号','Binding revision'],
+    ['authorityKind','准入类型','Authority kind'],['authorityReference','准入引用','Authority reference'],['observedModel','观测型号','Observed model'],
+    ['observedFirmware','观测固件','Observed firmware'],['observedTransport','观测通道','Observed transport'],['terminalState','终态','Terminal state'],
+    ['executionMode','执行模式','Execution mode'],['actualEffect','实际 effect','Actual effect'],['firstEvidenceStepAtUTC','首条证据时间','First evidence time']];
+  return historySection(lc('运行证据','Evidence'),'evidence',`<dl class="kv history-facts">${fields.map(([key,zh,en])=>historyFact(lc(zh,en),e[key],`history.evidence.${key}`)).join('')}</dl>
+    ${e.actualStepKinds?.length?`<p class="mono" data-sync-id="history.evidence.steps">${e.actualStepKinds.map(esc).join(' · ')}</p>`:''}
+    ${(e.blockers||[]).map(blocker=>`<p class="warnbox">${esc(blocker)}</p>`).join('')}`);
+}
+function historyRecoveryHTML(h){
+  const status=h.outcomeUnknown===true?lc('原操作的结果未知。','The original operation outcome is unknown.'):
+    h.waitingForHuman===true?lc('等待人工操作。','Awaiting human action.'):
+    h.outstandingResidueCount>0?lc('存在待处理残留项。','Outstanding residue requires attention.'):
+    h.outcomeUnknown===false&&h.waitingForHuman===false&&h.outstandingResidueCount===0?lc('无需恢复。','No recovery needed.'):
+    lc('未报告完整恢复状态。','The complete recovery state was not reported.');
+  return historySection(lc('恢复状态','Recovery'),'recovery',`<p>${status}</p>${Number.isInteger(h.outstandingResidueCount)?`<p>${lc('待处理残留项','Outstanding residue')} · ${h.outstandingResidueCount}</p>`:''}
+    ${flashEpochEstablished(h)?`<p class="hint">${lc('原 Job 的结果仍未知；后续恢复关系只说明当前目标状态已建立。','The original Job remains unknown; the later recovery relation establishes only the current target state.')}</p>`:''}
+    <p class="hint">${lc('只读展示 Runtime 状态；这里不能重放、重绑、归档或批准恢复。','Read-only Runtime state; this view cannot replay, rebind, archive or authorize recovery.')}</p>`);
+}
+function historyArtifactsHTML(h){
   const missing=lc('未报告','Not reported');
   const artifacts=Array.isArray(h.artifacts)?h.artifacts:[];
+  const empty=!Array.isArray(h.artifacts)?lc('此样本未提供 Artifact 清单。','This sample does not provide an Artifact inventory.'):
+    ['planOnly','planned'].includes(h.mode)?lc('仅计划记录没有采集产物。','A plan-only record has no captured Artifacts.'):lc('此 Job 没有 Artifact。','This Job has no Artifacts.');
+  return `<h2>Artifact</h2><div data-sync-id="history.artifacts" class="history-artifacts">
+    ${artifacts.map(artifact=>`<article class="card" aria-label="${esc(artifact.name)}"><b class="mono">${esc(artifact.name)}</b><span class="hint">${esc([artifact.role||missing,artifact.privacy||missing,artifact.status||missing].join(' · '))}</span>
+      <span class="hint">${lc('来源操作','Source operation')} · ${esc(artifact.sourceOperation??missing)}</span><span class="hint">${lc('媒体类型','Media type')} · ${esc(artifact.mediaType??missing)}</span>
+      <span class="hint">${lc('大小','Size')} · ${Number.isInteger(artifact.byteCount)?artifact.byteCount:missing}</span><span class="mono">SHA-256 · ${esc(artifact.sha256||missing)}</span>
+      ${artifact.statusDetail?`<p class="warnbox">${esc(artifact.statusDetail)}</p>`:''}
+      <button class="btn" style="align-self:flex-start" ${artifact.status==='published'?'':'disabled'} data-job-id="${esc(h.id)}" data-artifact-name="${esc(artifact.name)}" onclick="exportModal(this.dataset.jobId,this.dataset.artifactName)">${lc('导出…','Export…')}</button></article>`).join('')||`<p class="hint">${empty}</p>`}
+    </div><p class="hint">${lc('设计样本：字段未提供时保持未报告。实际大小、SHA-256 与发布状态仅取对应 Job 的 Runtime 清单，不按操作名称推断。','Design sample: omitted fields remain unreported. Actual size, SHA-256 and publication status come only from the matching Job inventory, never from the operation name.')}</p>`;
+}
+function histDetail(h){
+  const missing=lc('未报告','Not reported');
   const certainty=h.outcomeUnknown===true?lc('结果未知','Outcome unknown'):h.outcomeUnknown===false?lc('已确认','Confirmed'):missing;
-  return `<dl class="kv">
+  return historySection(lc('摘要','Summary'),'summary',`<dl class="kv history-facts">
+    ${historyFact('Job',h.id,'history.summary.job')}${historyFact('Session',h.sessionID,'history.detail.session')}
     <dt>${lc('操作','Operation')}</dt><dd class="mono" data-sync-id="history.detail.operation">${esc(h.op||missing)}</dd>
-    <dt>${lc('状态','State')}</dt><dd>${esc(h.st)} ${modeBadge(h.mode)}</dd>
+    <dt>${lc('状态','State')}</dt><dd>${esc(h.st??missing)} ${modeBadge(h.mode)}</dd>
+    ${historyFact(lc('执行模式','Execution mode'),h.mode)}
     <dt>${lc('结果确定性','Outcome certainty')}</dt><dd>${certainty}</dd>
     <dt>${lc('实际 effect','Actual effect')}</dt><dd>${esc(h.actualEffect||missing)}</dd>
     <dt>${lc('精确目标','Exact target')}</dt><dd class="mono">${esc(h.target||missing)}</dd>
     <dt>${lc('绑定修订号','Binding revision')}</dt><dd>${Number.isInteger(h.bindingRevision)?h.bindingRevision:missing}</dd>
-  </dl>
-  ${flashEpochEstablished(h)?`<p class="hint">${lc('原 Job 的结果仍未知；后续恢复关系只说明当前目标状态已建立。','The original Job remains unknown; the later recovery relation establishes only the current target state.')}</p>`:''}
-  ${h.timeline?.length?`<h2>${lc('Journal 摘要','Journal summary')}</h2><div class="mono" data-sync-id="history.detail.timeline.entries">${h.timeline.map(entry=>`<div>${esc(entry)}</div>`).join('')}</div>`:`<p class="hint">${lc('此样本未提供 Journal 摘要。','This sample does not provide a Journal summary.')}</p>`}
-  ${historyParametersHTML(h)}
-  <h2>Artifact</h2><div data-sync-id="history.artifacts" style="display:grid;gap:12px;margin-block:12px">
-    ${artifacts.map(artifact=>`<article class="card" aria-label="${esc(artifact.name)}" style="min-width:0;overflow-wrap:anywhere"><b class="mono">${esc(artifact.name)}</b><span class="hint">${esc([artifact.role||missing,artifact.privacy||missing,artifact.status||missing].join(' · '))}</span><span class="hint">${lc('大小','Size')} · ${Number.isInteger(artifact.byteCount)?artifact.byteCount:missing}</span><span class="mono">SHA-256 · ${esc(artifact.sha256||missing)}</span><button class="btn" style="align-self:flex-start" ${artifact.status==='published'?'':'disabled'} data-job-id="${esc(h.id)}" data-artifact-name="${esc(artifact.name)}" onclick="exportModal(this.dataset.jobId,this.dataset.artifactName)">${lc('导出…','Export…')}</button></article>`).join('')||`<p class="hint">${lc('此样本未提供 Artifact 清单。','This sample does not provide an Artifact inventory.')}</p>`}
-  </div><p class="hint">${lc('设计样本：字段未提供时保持未报告。实际大小、SHA-256 与发布状态仅取对应 Job 的 Runtime 清单，不按操作名称推断。','Design sample: omitted fields remain unreported. Actual size, SHA-256 and publication status come only from the matching Job inventory, never from the operation name.')}</p>`;
+    ${historyFact(lc('创建时间','Created'),h.createdAtUTC)}${historyFact(lc('开始时间','Started'),h.startedAtUTC)}${historyFact(lc('结束时间','Finished'),h.finishedAtUTC)}
+  </dl>`)+historySection(lc('Journal 摘要','Journal summary'),'timeline',h.timeline?.length?`<div class="mono" data-sync-id="history.detail.timeline.entries">${h.timeline.map(entry=>`<div>${esc(entry)}</div>`).join('')}</div>`:`<p class="hint">${lc('此样本未提供 Journal 摘要。','This sample does not provide a Journal summary.')}</p>`)
+    +historyCorrelationHTML(h)+historyEvidenceHTML(h)+historyParametersHTML(h)+historyArtifactsHTML(h)+historyRecoveryHTML(h);
 }
 function exportModal(id,artifactName){
   const h=HIST.find(x=>x.id===id);
@@ -3688,15 +3766,31 @@ function exportModal(id,artifactName){
   </div>`);
 }
 function historyWorkspace(kind){return {flash:"flash",debug:"debug",viewer:"dump",trace:"trace",device:"device-control",diagnostics:"diagnostics"}[kind];}
+function historyContextHTML(){
+  const c=S.historyContext;if(!c||c.page!==S.nav)return '';
+  return `<section class="history-context" data-sync-id="history.context"><div class="device-actions"><b>${lc('正在查看历史记录','Viewing a History record')}</b><span class="spacer"></span><button class="btn" data-sync-id="history.context.dismiss" onclick="dismissHistoryContext()">${lc('关闭来源信息','Dismiss source context')}</button></div>
+    <p class="hint">${lc('只读回访，不会提交新 Job 或复制过去的准入凭证。','Read-only revisit; no new Job is submitted and no past authority is copied.')}</p>
+    <dl class="kv history-facts">${historyFact('Job',c.id,'history.context.job')}${historyFact(lc('目标','Target'),c.target,'history.context.target')}${historyFact(lc('操作','Operation'),c.op,'history.context.operation')}${historyFact(lc('状态','State'),c.st,'history.context.state')}</dl>
+    ${c.artifacts?.length?`<p class="mono" data-sync-id="history.context.artifacts">${c.artifacts.map(a=>esc(a.name)).join(', ')}</p>`:''}
+    <p class="hint">${lc('设计演示只保留来源元数据，不读取这些 Artifact，也不把当前工作区的示例画面当成历史文件。','This design demo retains source metadata only. It does not read these Artifacts or treat the workspace sample as a historical file.')}</p></section>`;
+}
+function dismissHistoryContext(){S.historyContext=null;renderPage();}
+function setHistoryContext(h,page){
+  S.historyContext={id:h.id,kind:h.kind,page,op:h.op,target:h.target,st:h.st,mode:h.mode,sessionID:h.sessionID,
+    artifacts:h.artifacts?.map(a=>({...a}))};
+}
 function openHistoryDesignWorkspace(id){
-  const h=HIST.find(row=>row.id===id);if(!h)return;
+  const h=HIST.find(row=>row.id===id),page=h&&historyWorkspace(h.kind);if(!h||!page)return;
   if(h.kind==='diagnostics'&&h.op==='capture.diagnostics@1'){openHistoryDesignDiagnostics(id);return;}
-  go(historyWorkspace(h.kind)||'history');
+  setHistoryContext(h,page);
+  if(h.kind==='debug')S.debugTab=({'debug.hap@1':'apps','capture.diagnostics@1':'logs','port-forward.create@1':'net','port-forward.remove@1':'net'})[h.op]||'artifacts';
+  go(page);$("page").scrollTop=0;
 }
 function openHistoryDesignDiagnostics(id){
   const h=HIST.find(row=>row.id===id);if(!h||h.op!=='capture.diagnostics@1')return;
+  setHistoryContext(h,'diagnostics');
   S.diagnostics.jobID=h.id;S.diagnostics.reader=h.hasTrace?'trace':'loaded';S.diagnostics.preview=null;
-  go('diagnostics');
+  go('diagnostics');$("page").scrollTop=0;
 }
 const HISTORY_ACTIVE_STATES=['queued','preflight','running','waitingForDevice','awaitingRebindConfirmation','planning','cancelRequested','cancellingAtSafeBoundary','waitingForRecovery','reconciling','recoveringByCompleteOverwrite','resumeAtConfirmedSafeBoundary','userAbandonRequested','finalizing'];
 function historyNeedsAttention(h){return (!flashEpochEstablished(h)&&(h.outcomeUnknown===true||h.waitingForHuman===true))||h.outstandingResidueCount>0;}
@@ -3715,28 +3809,35 @@ function filteredHistory(now=Date.now()){
     .sort((a,b)=>{const left=historyDate(a),right=historyDate(b);return (Number.isFinite(right)?right:-Infinity)-(Number.isFinite(left)?left:-Infinity)||b.id.localeCompare(a.id);});
 }
 function setHistoryFilter(key,value){S.hf[key]=value;S.historyLimit=6;renderPage();}
+function setHistoryQuery(value){
+  const input=document.querySelector('.history-search input'),start=input?.selectionStart,end=input?.selectionEnd;
+  setHistoryFilter('query',value);
+  const next=document.querySelector('.history-search input');next?.focus({preventScroll:true});
+  if(Number.isInteger(start)&&Number.isInteger(end))next?.setSelectionRange(start,end);
+}
 function historyFilter(key,label,values){return `<label>${label}<select class="inp" aria-label="${label}" onchange="setHistoryFilter('${key}',this.value)">${values.map(([value,text])=>`<option value="${esc(value)}" ${S.hf[key]===value?'selected':''}>${esc(text)}</option>`).join('')}</select></label>`;}
 function pHistory(){
   const all=filteredHistory(),rows=all.slice(0,S.historyLimit);
   const sel=rows.find(h=>h.id===S.histSel)||rows[0];S.histSel=sel?.id||null;
   const kinds=[['all','history',lc('全部记录','All records')],['flash','flash','Flash'],['debug','debug','Debug'],['viewer','dump','Viewer'],['trace','trace','Trace'],['diagnostics','diagnostics','Diagnostics'],['device','device','Device'],['other','history',lc('其他','Other')]];
   return recoveryHTML()+`<div class="page-lead" data-page-title="History"></div><div class="history-shell">
+    <label class="history-compact-activity">${lc('活动类型','Activity')}<select class="inp" aria-label="${lc('活动类型','Activity')}" onchange="setHistoryFilter('kind',this.value)">${kinds.map(([key,i,label])=>`<option value="${key}" ${S.hf.kind===key?'selected':''}>${label}</option>`).join('')}</select></label>
     <aside class="history-rail"><div class="history-group"><span class="history-group-label">${lc('活动类型','Activity')}</span>${kinds.map(([key,i,label])=>`<button class="history-kind ${S.hf.kind===key?'on':''}" onclick="setHistoryFilter('kind','${key}')">${icon(i,true)}<span>${label}</span><span class="history-count">${key==='all'?HIST.length:HIST.filter(h=>h.kind===key).length}</span></button>`).join('')}</div></aside>
     <section class="history-list"><div class="history-list-head"><div><h2>${lc('最近活动','Recent activity')}</h2><span class="hint">${lc('只读 Runtime 记录','Read-only Runtime records')}</span></div></div>
-      <label class="history-search">${icon('search',true)}<input aria-label="${lc('搜索历史记录','Search history')}" value="${esc(S.hf.query)}" placeholder="${lc('搜索记录、操作或目标','Search records, operations or targets')}" onchange="setHistoryFilter('query',this.value)"></label>
-      <details><summary>${lc('完整筛选','All filters')}</summary><div class="history-filter-row">
+      <label class="history-search">${icon('search',true)}<input aria-label="${lc('搜索历史记录','Search history')}" value="${esc(S.hf.query)}" placeholder="${lc('搜索记录、操作或目标','Search records, operations or targets')}" oninput="setHistoryQuery(this.value)"></label>
+      <details ${S.historyFiltersOpen?'open':''} ontoggle="if(this.isConnected)S.historyFiltersOpen=this.open"><summary>${lc('完整筛选','All filters')}</summary><div class="history-filter-row">
         ${historyFilter('status',lc('状态','Status'),[['all',lc('全部','All')],['active',lc('进行中','Active')],['attention',lc('需要关注','Needs attention')],['succeeded','succeeded'],['failed','failed'],['interrupted','interrupted'],['cancelled','cancelled']])}
         ${historyFilter('mode',lc('执行模式','Execution mode'),[['all',lc('全部','All')],['execute','execute'],['planOnly','planned'],['simulated','simulated'],['unknown',lc('未知','Unknown')]])}
         ${historyFilter('target',lc('目标','Target'),[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.target).filter(Boolean))).sort().map(x=>[x,x])])}
         ${historyFilter('session','Session',[['all',lc('全部','All')],...Array.from(new Set(HIST.map(h=>h.sessionID).filter(Boolean))).sort().map(x=>[x,x])])}
         ${historyFilter('time',lc('时间','Time'),[['all',lc('不限','Any time')],['lastHour',lc('过去一小时','Last hour')],['lastDay',lc('过去一天','Last day')],['lastWeek',lc('过去一周','Last week')]])}
       </div><div class="device-actions"><button class="btn" onclick="S.savedHistoryFilter={...S.hf};renderPage()">${lc('保存筛选','Save filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.hf={...S.savedHistoryFilter};S.historyLimit=6;renderPage()">${lc('恢复筛选','Restore filter')}</button><button class="btn" ${S.savedHistoryFilter?'':'disabled'} onclick="S.savedHistoryFilter=null;renderPage()">${lc('删除已存筛选','Delete saved filter')}</button><button class="btn" onclick="historyPreset('attention')">${lc('需要关注','Needs attention')}</button><button class="btn" onclick="historyPreset('failed')">${lc('最近失败','Recent failures')}</button><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button></div></details>
-      ${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${h.id}" onclick="S.histSel='${h.id}';renderPage()"><span class="history-record-icon">${icon(h.icon,true)}</span><span class="history-record-main"><b>${esc(h.what)}</b><span>${esc(h.detail)}</span><span class="history-record-tags"><span class="chip dim">${h.st}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${h.when}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
+      ${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${esc(h.id)}" onclick="S.histSel=this.dataset.historyId;renderPage()"><span class="history-record-icon">${icon(h.icon||'history',true)}</span><span class="history-record-main"><b>${esc(h.what??h.op??h.id)}</b><span>${esc(h.detail??h.id)}</span><span class="history-record-tags"><span class="chip dim">${esc(h.st??lc('未报告','Not reported'))}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${esc(h.when??lc('未报告','Not reported'))}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
       ${all.length>rows.length?`<button class="btn" onclick="S.historyLimit+=6;renderPage()">${lc('加载更早记录','Load older records')}</button>`:''}
-    </section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon,true)}</span><div><h2>${esc(sel.what)}</h2><p>${esc(sel.dev)} · <span class="mono" data-sync-id="history.detail.job">${sel.id}</span></p></div></div>
-      <p>${esc(sel.detail)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" onclick="openHistoryDesignWorkspace('${sel.id}')">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" onclick="openHistoryDesignDiagnostics('${sel.id}')">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>
+    </section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon||'history',true)}</span><div><h2>${esc(sel.what??sel.op??sel.id)}</h2><p>${esc(sel.dev??lc('未报告','Not reported'))} · <span class="mono" data-sync-id="history.detail.job">${esc(sel.id)}</span></p></div></div>
+      <p>${esc(sel.detail??sel.id)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignWorkspace(this.dataset.jobId)">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignDiagnostics(this.dataset.jobId)">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>
       <p class="hint">${lc('只读回访所选 Job；Diagnostics 校验 index / summary / markers 与 Artifact 字节。不会重放操作。','Read-only revisit of the selected Job. Diagnostics verifies index / summary / markers and Artifact bytes. No operation is replayed.')}</p>
-      <dl class="kv"><dt>executionMode</dt><dd>${sel.mode} ${modeBadge(sel.mode)}</dd><dt>${lc('状态','State')}</dt><dd>${sel.st}</dd><dt>${lc('活动','Activity')}</dt><dd>${sel.kind}</dd></dl>
+      <dl class="kv history-facts"><dt>executionMode</dt><dd>${esc(sel.mode??lc('未报告','Not reported'))} ${modeBadge(sel.mode)}</dd><dt>${lc('状态','State')}</dt><dd>${esc(sel.st??lc('未报告','Not reported'))}</dd><dt>${lc('活动','Activity')}</dt><dd>${esc(sel.kind??'other')}</dd></dl>
       <details><summary>${lc('查看运行证据与 Artifact','Runtime evidence and Artifacts')}</summary><div style="margin-top:12px">${histDetail(sel)}</div></details>`:`<p class="empty">${lc('选择一条记录查看详情。','Select a record to see its details.')}</p>`}</section></div>`;
 }
 
@@ -4056,10 +4157,11 @@ function renderPage(){
   document.body.classList.toggle("device-native",S.nav==="device-control");
   document.body.classList.toggle("device-compact",S.nav==="device-control"&&S.deviceCompact);
   $("page").classList.toggle("viewer-page",S.nav==="dump");
+  $("page").classList.toggle("history-page",S.nav==="history");
   $("page").classList.toggle("diagnostic-page",S.nav==="diagnostics"&&PARAMS.get("concept")==="diagnostics"&&S.diagnostics.view!=="capture");
   $("page").classList.toggle("device-workspace-page",S.nav==="device-control");
   document.body.classList.toggle("standalone-design",["trace-viewer","trace-shortcuts","settings"].includes(S.nav));
-  $("page").innerHTML=continuationDraftHTML()+(PAGES[S.nav]||pOverview)();
+  $("page").innerHTML=historyContextHTML()+continuationDraftHTML()+(PAGES[S.nav]||pOverview)();
   const titled=$("page").querySelector("[data-page-title]");
   if(titled){document.querySelector(".titlebar .t").textContent=titled.dataset.pageTitle;$("page").setAttribute("aria-label",titled.dataset.pageTitle);}
   if(deviceFocus)$("page").querySelector(`[data-sync-id="${deviceFocus}"]`)?.focus({preventScroll:true});
@@ -4078,7 +4180,7 @@ function renderShellText(){
   $("devicesSectionLabel").textContent=tx("devices");$("workflowsSectionLabel").textContent=tx("workflows");
   $("addTargetButton").querySelector("span").textContent=tx("addTarget");$("jobsLabel").textContent=tx("jobs");$("drawerLabel").textContent=tx("jobs");
   $("drawerSt").textContent=tx("emptyJobs");$("languageToggle").textContent=S.language==="en"?"中文":"EN";
-  $("acToggle").textContent=tx("ac");$("themeToggle").textContent=tx("appearance");
+  $("acToggle").textContent=tx("ac");$("themeToggle").textContent=themeLabel();
 }
 function render(){renderShellText();renderDevs();renderNav();renderPage();renderDrawer();renderDeviceReview();if(S.nav==="device-control"){$("workflowsSectionLabel").textContent=deviceLocale("工作流","Workflows");$("drawerLabel").textContent=deviceLocale("Job 检查器","Job inspector");}}
 render();
