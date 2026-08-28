@@ -1,0 +1,95 @@
+{
+  "date": "2026-08-28",
+  "finding": "F37",
+  "goldenJourney": "GJ-4",
+  "baseRevision": "3a9474f1457094317c5fd09dd819f030ac27e452",
+  "evidenceKind": "design-draft-correction; no production or device change",
+  "cause": "Real App revisit and production facade show includeTimeline=false on newest-first summary pages. The draft copied the full sample timeline into Flash activity and fabricated generic legacy plan/log/binding metadata in History and the global inspector.",
+  "changes": [
+    "Activity shows summary facts; Journal summary belongs to exact History detail.",
+    "Flash detail uses only explicit operation, certainty, target/binding and Artifact fields. Missing metadata is unreported.",
+    "Canonical sample lists actual published descriptor names, roles and privacy as design data; no actual byteCount or hash is invented.",
+    "Artifact cards fit the narrow History inspector; exact per-file previews distinguish sensitive and standard exports. Unpublished or absent artifacts cannot open an export preview.",
+    "Global inspector preserves supplied unknown/timeline facts and no longer invents flash.log for canonical or retained Flash records."
+  ],
+  "designTests": {
+    "command": "npm --prefix docs/design/arkdeck-ds test",
+    "testCount": 48,
+    "exitCode": 0,
+    "log": {
+      "privateFile": "f37-design-tests-04.log",
+      "byteCount": 4483,
+      "sha256": "3c169823b3333448a174bdef7567662d53a7d230f4e17e805a43da3e71a54494"
+    }
+  },
+  "designBuilds": [
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f37-design-build-01.log",
+        "byteCount": 697,
+        "sha256": "87686d0a4e8610e9f10f7679620ac348bccc2ec49a606ee122388b19d38233e9"
+      }
+    },
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build:review",
+      "exitCode": 0,
+      "log": {
+        "privateFile": "f37-design-review-build-01.log",
+        "byteCount": 314,
+        "sha256": "fe6b2a0f26f4c59b91af0a9012169c9cb019204b3a585e8629411049a5a4d082"
+      }
+    }
+  ],
+  "browserChecks": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "languages": [
+      "en",
+      "zh-Hans"
+    ],
+    "screenshotsViewed": 10,
+    "refreshedReferences": 6,
+    "newReferences": 4,
+    "manifest": "manifest.json",
+    "consoleErrors": 0,
+    "checks": [
+      "Latest success / retained unknown / unresolved priority and exact History routing.",
+      "Journal summary in History only; Artifact cards do not clip the Export action.",
+      "Sensitive HiLog and standard report preview preserve exact filename and privacy.",
+      "Unknown detail has no fabricated Artifact inventory or export button."
+    ],
+    "boundary": "Browser demo only; no Runtime connection, new Job or actual export."
+  },
+  "reviewedAppEvidence": "flash-history-focus-verification-2026-08-28.json#postMergeVerification",
+  "coverage": {
+    "surfaceCount": 60,
+    "appViewFileCount": 20,
+    "previewFileCount": 31,
+    "inventoryCheck": "Existing tests compare navigation, all App View declarations, preview files, report IDs and design inputs against current code. Passed within the 48 tests."
+  },
+  "limitations": [
+    "No production source, Runtime, Catalog, provider, admission or operation was changed.",
+    "This draft correction does not implement future capabilities explicitly marked unimplemented in the audit."
+  ],
+  "finalLocalGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "classification": {
+      "app": false,
+      "swift": false,
+      "reason": "classified-changed-files-and-worktree",
+      "baseRevision": "3a9474f1457094317c5fd09dd819f030ac27e452"
+    },
+    "commonGates": "18 planner tests, 9 workflow tests, SDD 0 errors / 0 warnings, 49 catalog generator tests, zero generated drift",
+    "log": {
+      "privateFile": "f37-local-gate-02.log",
+      "byteCount": 3639,
+      "sha256": "9c34c36cf36b0e6840038cb978bfdf60ff067b415deac0cb32bc278a85c5785c"
+    },
+    "postGateChanges": "Only this completed gate metadata and its audit sentence were added afterwards."
+  }
+}

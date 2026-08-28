@@ -176,8 +176,8 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
-| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；不补默认值 |
-| history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；与App诊断导出不同 |
+| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37 将 Flash Journal 留在详情，Artifact 只取明确清单；缺失不补默认值 |
+| history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；F37 按 exact Artifact 预览，未发布禁用；与App诊断导出不同 |
 | history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | 全部六类保留精确来源；Diagnostics 加载保存 Session，可将校验过的 Trace 转交 Viewer；不重放 |
 
 ### Settings（GJ-1—4）
@@ -376,7 +376,7 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 1. **Diagnostics 交互式会话**：arm/append-marker/stop、会话内视频和跨时钟校准；现有 bounded ringBuffered、markers.json 和 reader 不等于该完整体验。缺失 operation/并发契约不得从 App 接 raw HDC 补洞。
 2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
 3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
-4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。2026-08-28 明确授权 HardwareCampaign 后，新 canonical Flash 实际成功并独立核验，campaign 已关闭。F34/F35 的修复后真实 App 只读回访仍待完成，不重复刷写来补 UI 证据。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
+4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。2026-08-28 明确授权 HardwareCampaign 后，新 canonical Flash 实际成功并独立核验，campaign 已关闭。F36 合入后双语真实 App 只读回访已通过，活动、精确 History 与旧 unknown 保留均核验；F37 是该回访新发现的稿件摘要/Artifact 差异修正，不重复刷写来补 UI 证据。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。
@@ -441,3 +441,42 @@ App/UI-test bundle 编译、SDD、49 项 catalog generator 测试与零漂移全
 只保留本机；真实 Runtime 的 1,962 条 Job 前后完全相同。此手动 fixture 检查不替代 XCTest 或真机证据。
 当前仍需原生断言与合入后真实 App 只读回访，不能将本项标为目标完成。
 各次结果与原始日志哈希见 [F36 验证记录](references/v1.6-goal/flash-history-focus-verification-2026-08-28.json)。
+
+
+### F36 合入后的真实验证（2026-08-28）
+
+PR #1571 已合入 `3a9474f1`。相同生产源码先通过原生双语 fixture 回归
+（1 项、45.738 秒、零失败），随后通过真实 App 双语只读回访（1 项、93.497 秒、零失败）。
+后者没有设备/History fixture：通过生产 XPC 读取已安装的 reviewed Runtime，检查 canonical
+成功活动、设备访问空观察及重新检查、精确 History 跳转、返回工作区与四条旧 unknown 保留。
+临时本机验收方法仅加入既有测试文件，完成后恢复原字节；整棵源码再次与 reviewed main 相同。
+三次本机测试方法修正前的失败/中断保留，不混入通过计数。
+
+八张真实 App PNG 与两张 fixture PNG 均已逐图查看，只保留私有目录。前后 **1,962 条 Job
+完全相同**；没有新设备操作或重复刷写。已有真实 Flash 再次通过终态、postflight、可信证据、
+Artifact 和通道五项独立核验；HardwareCampaign 保持关闭。App 的 204 条已加载记录不等于
+完整库存数量。详见 [F36 post-merge 元数据](references/v1.6-goal/flash-history-focus-verification-2026-08-28.json)。
+
+## 2026-08-28 F37：Flash 摘要、详情与 Artifact 稿件对齐
+
+GJ-4。真实回访及 `RuntimeHistoryApplicationFacade` 确认：App 摘要分页使用
+`includeTimeline=false`，打开 exact History 后才加载完整详情。原型却在活动卡复用了样本
+时间线，并在详情/全局 Inspector 按 Flash 类型补出过期 `plan.json` / `flash.log`、固定
+binding rev 3、9 steps 和假示例哈希。
+
+原型现保持摘要/详情边界：活动卡不含时间线，History 的 Journal 摘要只显示该记录提供的
+条目；状态确定性、effect、目标/绑定及 Artifact 只取显式字段。canonical 样本明确列出
+`post-flash-facts.json`、`post-flash-hilog.txt` 和 `flash-report.json`，没有提供的大小/哈希
+显示未报告。unknown 样本无 Artifact 清单时不推断文件，也不提供导出。
+
+Artifact 按原生详情改为逐项卡片，修正窄栏表格截断导出按钮；预览准确选择该文件并区分
+sensitive / standard，非 published 项禁用。全局 Inspector 保留原 unknown/时间线字段，
+不再把不存在的 `flash.log` 当成可读取标准日志。所有数据仍标为设计样本，不连接 Runtime。
+
+48 项设计交互/覆盖测试、设计包与 review 构建已通过；60 个单元、20 个 View 与 31 个
+preview 的源码清单再次一致。10 张中英文浏览器图已查看（刷新 6 张、新增 4 张），
+其中包括摘要、精确 History、Journal/Artifact、导出预览和 unknown 优先；无浏览器错误。
+本项只修改设计与必要验证记录，未改 App/Package/Catalog 或安全策略。
+详见 [F37 验证元数据](references/v1.6-goal/flash-summary-verification-2026-08-28.json)。
+
+F37 最终路径分类闸 exit 0：仅设计/文档，未分配 Swift/App 编译车道；18 项 planner、9 项 workflow、SDD 0/0、49 项 catalog 测试与生成物零漂移全部通过。

@@ -3,7 +3,7 @@
   "finding": "F36",
   "goldenJourney": "GJ-4",
   "baseRevision": "f18ca0c7008be9b4f4c20ee90987845c35683066",
-  "evidenceKind": "host-tests-and-design-samples-not-real-device-acceptance",
+  "evidenceKind": "host-tests-design-samples-and-reviewed-App-real-record-revisit; scopes recorded separately",
   "realReproduction": "On the reviewed F35 App/Runtime, a retained resolved unknown was the first paged record and masked the later canonical success. The History source banner named the success but Flash activity named the old alias. Open Runtime record did not carry an exact Job ID.",
   "change": "Read-only shared Flash activity projection orders Runtime dates, with unresolved unknown/human/recovery/current activity taking precedence. Runtime facts and unknown outcomes are immutable. Flash record buttons pass the displayed Job ID to History.",
   "focusedContractTests": {
@@ -119,9 +119,9 @@
     }
   ],
   "limitations": [
-    "No candidate App or Runtime connected to hardware.",
-    "F35 reviewed Runtime remains installed; HardwareCampaign remains off.",
-    "F36 XCTest assertions remain blocked by OS initialization; manual bilingual fixture checks passed. Post-merge real App read-only revisit remains required."
+    "Pre-merge tests/manual fixtures are not hardware evidence. Their failed OS initialization attempts are retained above.",
+    "The reviewed F35 Runtime remains installed; HardwareCampaign is off. The post-merge revisit below submits no device operation.",
+    "This record closes F36 App routing/focus verification, not all product capabilities. F37 corrects the draft-only summary/Artifact differences found during the real revisit."
   ],
   "designBuilds": [
     {
@@ -282,5 +282,261 @@
       "byteCount": 115,
       "sha256": "073a797029f60a9b4beee17be5acef71ff49ed5a1eff85cffe5b7d94eca7ce5c"
     }
+  },
+  "postMergeVerification": {
+    "mergedPR": 1571,
+    "mergeRevision": "3a9474f1457094317c5fd09dd819f030ac27e452",
+    "mergedAtUTC": "2026-08-28T06:10:41Z",
+    "appSource": "F36 branch tree equals reviewed merge tree; git diff --exit-code origin/main passed before and after the local harness was removed.",
+    "appExecutableSHA256": "a59fa27eb6b7df1cec178a872dece4f5c89ac8688d57693f808e85dbe148096c",
+    "runtimeRevision": "f18ca0c7008be9b4f4c20ee90987845c35683066",
+    "runtimeExecutableSHA256": "4485dd4df343b71678a6e2b69643e5647239e144fb015b7224dd85329920e551",
+    "hardwareCampaign": "off",
+    "nativeFixture": {
+      "command": "sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/AppShellUITests/testCanonicalFlashHistoryStatesInBothLanguages",
+      "exitCode": 0,
+      "testCount": 1,
+      "failureCount": 0,
+      "durationSeconds": 45.738,
+      "evidenceKind": "isolated-native-App-fixture-not-hardware",
+      "log": {
+        "privateFile": "f36-postmerge-native-01.log",
+        "byteCount": 588335,
+        "sha256": "417516913a98aabd699c387e51aa625cc0e7daab4ac73b7ea5f1bd7973dfdf6e"
+      },
+      "screenshots": [
+        {
+          "privateFile": "f36-postmerge-native-01-attachments/7F95B4C2-3CC7-4806-A34C-2FC9E43C4CD2.png",
+          "byteCount": 401619,
+          "sha256": "9b75f9ef2dd129e7858990eec5e9b713345962e6def0e0d2572551a2ffff7a63",
+          "label": "canonical-flash-history-(zh-Hans)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-native-01-attachments/B7944DF1-CC75-487D-8BAC-8CA4096DB36C.png",
+          "byteCount": 386260,
+          "sha256": "d57e937b0fb0559af4bf2174fa7b84b6c087899013dcddf01c7386361550ec0c",
+          "label": "canonical-flash-history-(en)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        }
+      ]
+    },
+    "realAppRevisit": {
+      "command": "TEST_RUNNER_ARKDECK_REAL_FLASH_REVISIT_JOB_ID=<existing-success-job> TEST_RUNNER_ARKDECK_REAL_FLASH_RETAINED_JOB_IDS=<four-existing-unknown-jobs> sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/AppShellUITests/testLocalReviewedFlashHistoryRevisitInBothLanguages",
+      "exitCode": 0,
+      "testCount": 1,
+      "failureCount": 0,
+      "durationSeconds": 93.497,
+      "evidenceKind": "reviewed-App-production-XPC-real-Runtime-records-read-only-revisit",
+      "languages": [
+        "en",
+        "zh-Hans"
+      ],
+      "jobID": "job-8e32139af1945d755f5716b67f4f8bde",
+      "operation": "flash.full-restore@1",
+      "retainedUnknownJobIDs": [
+        "job-363528f0c681a39c9fd0571b2ec1552e",
+        "job-ac68ec140752da12ce8cf1fec92221e0",
+        "job-be448cb20f06aae340e1ccfe5275be81",
+        "job-c63388f93234e2ca4fb294901b7105e4"
+      ],
+      "appLaunchArguments": [
+        "-ApplePersistenceIgnoreState",
+        "YES",
+        "-NSQuitAlwaysKeepsWindows",
+        "NO",
+        "--ui-test-auto-update-idle",
+        "--ui-test-reset-shell-selection",
+        "-AppleLanguages",
+        "(en) or (zh-Hans)"
+      ],
+      "noDeviceOrHistoryFixtures": true,
+      "noNewFlashOrDeviceOperation": true,
+      "checks": [
+        "Latest activity is the exact succeeded canonical Flash; no attention/residue/new submit action.",
+        "Runtime-backed device-access check and explicit re-check both show successful empty RockUSB observation, not Loader readiness.",
+        "The activity page summary has no timeline; detail retrieval in History is separate.",
+        "Open Runtime record selects the exact Job, reports succeeded / canonical operation and loads its Artifacts.",
+        "All four prior unknown records remain inspectable.",
+        "Open workspace returns the exact Job context to Flash; the activity still selects the same success."
+      ],
+      "log": {
+        "privateFile": "f36-postmerge-real-native-04.log",
+        "byteCount": 201790,
+        "sha256": "22e33b8c0745c8ffd06e214def82bea4a0c7f95d56049eec5ef543538f8d5543"
+      },
+      "screenshots": [
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/A3E8704C-5B2D-4534-8A46-08AE832169B0.png",
+          "byteCount": 629254,
+          "sha256": "d01aee45fe30c94a2c5fe6f51ecd4b1ee10f44e537c70a8f7fd12040d299117d",
+          "label": "Real reviewed exact Flash History (zh-Hans)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/49C524A5-BD49-45F4-BEA2-59741AC28521.png",
+          "byteCount": 395781,
+          "sha256": "15ee92c3eda8a7c8c3566efaab1deb82e742188368a0adb21e794e7fd28b252f",
+          "label": "Real reviewed latest Flash activity (zh-Hans)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/E1BB02D0-309D-4686-86A5-3148F0844F65.png",
+          "byteCount": 400825,
+          "sha256": "a4a0f66af68429f1d5aaefe3bd362a371fa278454198feeaaad5895128b2a16b",
+          "label": "Real reviewed Flash device access (zh-Hans)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/72058DCA-EB7C-4528-8B66-6AD008FA4F21.png",
+          "byteCount": 275577,
+          "sha256": "28eb7d5c104eea876411442c86abe10a8fa713809108867973e738bae24a051a",
+          "label": "Real reviewed Flash before disclosure (zh-Hans)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/4B9052AD-ACED-4774-BA56-B5B475788A49.png",
+          "byteCount": 620727,
+          "sha256": "b53be2349507dc3e9c8b6a0d400093171734ddb18cbac0a0fb2d6f96ba5f3235",
+          "label": "Real reviewed exact Flash History (en)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/4DE7F5FF-2F3F-47E2-9CBD-F3256E93659A.png",
+          "byteCount": 393123,
+          "sha256": "03db205fc8e4bcdce20523a9b44f60e597d36b349e258b83d2aef0c1eb638151",
+          "label": "Real reviewed latest Flash activity (en)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/200F92E2-1854-496E-8381-5F858D250591.png",
+          "byteCount": 372576,
+          "sha256": "261167e94a2da14c76b57394c07ff714ccd31298858a3d105813c549b0e87cbc",
+          "label": "Real reviewed Flash device access (en)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        },
+        {
+          "privateFile": "f36-postmerge-real-native-04-attachments/30A056B8-9C09-4946-8B61-A231F6D8AC63.png",
+          "byteCount": 272799,
+          "sha256": "9a5b33d9c92052e07e30f8be2f5b2ac5ab427e13ce02edfeee4bd15e8bb53068",
+          "label": "Real reviewed Flash before disclosure (en)",
+          "mimeType": "image/png",
+          "width": 2360,
+          "height": 1566,
+          "viewed": true
+        }
+      ],
+      "temporaryHarness": {
+        "scope": "Local acceptance method in the existing AppShellUITests file only; production sources unchanged. Archived privately, then exact original bytes restored and whole tree equality with reviewed main rechecked.",
+        "patch": {
+          "privateFile": "f36-local-real-revisit-harness-04.patch",
+          "byteCount": 5964,
+          "sha256": "3f9f3652a0f55a8896828e30d7095af24294a82b2f98897c6ed60263f0945cc3"
+        },
+        "finalTestSource": {
+          "privateFile": "f36-local-real-revisit-harness-final.swift",
+          "byteCount": 132940,
+          "sha256": "152015244d493dc8610c01e3952d09f4a9f12b86460a6c08cf10de85e5d31097"
+        },
+        "originalSource": {
+          "privateFile": "f36-real-revisit-test-original.swift",
+          "byteCount": 127705,
+          "sha256": "cf97a383824d60791a0a03f38394710ecb1a9591537b2ee551212c4efaa1cc64"
+        }
+      },
+      "failedLocalHarnessAttempts": [
+        {
+          "attempt": 1,
+          "exitCode": 65,
+          "reason": "Click occurred during readiness layout movement (58pt stale vertical position). Test now waits for actual readiness and clicks current frame center. No product change.",
+          "log": {
+            "privateFile": "f36-postmerge-real-native-01.log",
+            "byteCount": 201430,
+            "sha256": "4dd1e53b38c4174ac19879d91860b48e65a35372fe8218b98f362cbf6e3f51e1"
+          }
+        },
+        {
+          "attempt": 2,
+          "exitCode": 75,
+          "interrupted": true,
+          "reason": "Incorrect readiness element, assumption that summary paging includes timeline, and padded header scroll helper. Interrupted after identifying invalid harness assumptions; not a passed test.",
+          "log": {
+            "privateFile": "f36-postmerge-real-native-02.log",
+            "byteCount": 345299,
+            "sha256": "738db4029c7d93902b76476d432417eaa78ec2c2c05e4ed4253f5a37ed4e7e39"
+          }
+        },
+        {
+          "attempt": 3,
+          "exitCode": 65,
+          "reason": "History context AX value includes the Job label; strict raw string equality was invalid. Match contains exact full Job ID, as existing tests do; exact activity and selected History ID checks retained.",
+          "log": {
+            "privateFile": "f36-postmerge-real-native-03.log",
+            "byteCount": 223959,
+            "sha256": "2596a197c93b5fb4569804ae98aaa767415f6022ac31fd780ba47ce8fff5e1ce"
+          }
+        }
+      ]
+    },
+    "independentFlashReverification": {
+      "exitCode": 0,
+      "checks": {
+        "artifactsVerified": true,
+        "runtimePostflightVerified": true,
+        "terminalStatusVerified": true,
+        "trustedEvidenceVerified": true,
+        "udsHealthVerified": true
+      },
+      "runtimeVerified": true,
+      "record": {
+        "privateFile": "f36-postmerge-flash-independent-verification.json",
+        "byteCount": 8608,
+        "sha256": "c5fe33ae663366f77692e7a39510215597dc120ad81639aff55e98c2286ba1ee"
+      },
+      "scope": "Existing completed real Flash only; no re-execution."
+    },
+    "inventoryComparison": {
+      "beforeJobCount": 1962,
+      "afterJobCount": 1962,
+      "allRowsEqual": true,
+      "before": {
+        "privateFile": "f36-postmerge-jobs-before.json",
+        "byteCount": 4455515,
+        "sha256": "3e9d7db9df193c1ddf441ca82be5131981a92d52056f9000e2c7702a0e1c83b0"
+      },
+      "after": {
+        "privateFile": "f36-postmerge-jobs-after.json",
+        "byteCount": 4455515,
+        "sha256": "3e9d7db9df193c1ddf441ca82be5131981a92d52056f9000e2c7702a0e1c83b0"
+      }
+    },
+    "scopeBoundary": "Eight real App screenshots and two fixture screenshots were viewed; raw PNGs, xcresults and logs remain private. Visible App list is a loaded subset (204), not the full 1962-Job inventory. No Runtime install or new device Job occurred during this revisit."
   }
 }

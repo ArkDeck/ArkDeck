@@ -91,6 +91,7 @@ test('Flash retained history focuses the latest success and opens that exact rec
     const original=h.run('JSON.stringify(HIST)');
     assert.equal(h.run('focusedFlashActivity().id'),'S-0826-01');
     assert.match(h.run('flashActivityHTML()'),/data-sync-id="flash.runtime.jobID">S-0826-01/);
+    assert.doesNotMatch(h.run('flashActivityHTML()'),/Observed Runtime timeline|Runtime 观测时间线|waitingForDevice/);
     assert.doesNotMatch(h.run('pFlash()'),/data-sync-id="flash.runtime.attention"/);
     assert.equal(h.run('JSON.stringify(HIST)'),original);
     h.document.getElementById('page').scrollTop=500;
@@ -103,6 +104,34 @@ test('Flash retained history focuses the latest success and opens that exact rec
     assert.match(h.run('pHistory()'),/data-sync-id="history.detail.job">S-0826-01/);
     assert.equal(h.run("HIST.find(h=>h.id==='job-demo-flash-alias').outcomeUnknown"),true);
     assert.equal(h.run("HIST.find(h=>h.id==='job-demo-flash-superseded').st"),'waitingForRecovery');
+  }
+});
+
+test('Flash History uses detail timeline and reported artifacts without inventing legacy metadata', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=flash&flashHistory=retained&lang=${lang}`);
+    const original=h.run('JSON.stringify(HIST)');
+    const detail=h.run('histDetail(focusedFlashActivity())');
+    assert.match(detail,/data-sync-id="history.detail.timeline.entries"/);
+    assert.match(detail,/Journal summary|Journal 摘要/);
+    assert.match(detail,/waitingForDevice/);
+    assert.match(detail,/flash.full-restore@1/);
+    for(const name of ['post-flash-facts.json','post-flash-hilog.txt','flash-report.json']) {
+      assert.ok(detail.includes(`data-artifact-name="${name}"`));
+    }
+    assert.doesNotMatch(detail,/plan\.json|flash\.log|9 steps|e0a1|binding rev 3/);
+    const retained=h.run("histDetail(HIST.find(row=>row.id==='job-demo-flash-alias'))");
+    assert.match(retained,/Outcome unknown|结果未知/);
+    assert.doesNotMatch(retained,/data-artifact-name=|post-flash-facts|9 steps|e0a1/);
+    h.run("exportModal('S-0826-01','post-flash-hilog.txt')");
+    assert.match(h.document.getElementById('modalHost').innerHTML,/post-flash-hilog\.txt/);
+    assert.doesNotMatch(h.document.getElementById('modalHost').innerHTML,/post-flash-facts\.json|plan\.json/);
+    h.document.getElementById('modalHost').innerHTML='';
+    h.run("exportModal('S-0826-01','missing-artifact'); exportModal('job-demo-flash-alias')");
+    assert.equal(h.document.getElementById('modalHost').innerHTML,'');
+    assert.equal(h.run('JSON.stringify(HIST)'),original);
+    h.run("HIST.find(row=>row.id==='S-0826-01').artifacts[1].status='missing'; exportModal('S-0826-01','post-flash-hilog.txt')");
+    assert.equal(h.document.getElementById('modalHost').innerHTML,'');
   }
 });
 
@@ -529,6 +558,11 @@ test('global inspector does not turn cancellation requests or unknown outcomes i
   assert.equal(history.run('inspectorJobs()[0].operation'),null,
     'a display title or archive filename is not an operation identity');
   assert.equal(history.run('inspectorJobs()[3].operation'),'capture.diagnostics@1');
+  assert.equal(history.run('inspectorJobs()[0].standardLog'),null,
+    'canonical Flash has no standard log Artifact; its sensitive raw HiLog belongs in History');
+  const retained=harness('?flashHistory=retained&lang=en');
+  assert.equal(retained.run('inspectorJobs()[0].outcomeUnknown'),true);
+  assert.equal(retained.run('inspectorCanCancel(inspectorJobs()[0])'),false);
   const h=harness('?jobState=running&lang=en');
   assert.equal(h.run('inspectorCanCancel(inspectorJobs()[0])'),true);
   h.run('requestInspectorCancellation("job-demo-global")');
