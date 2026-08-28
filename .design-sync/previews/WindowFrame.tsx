@@ -78,7 +78,7 @@ export const FlashWorkspaceWriting = () => (
           USB · OpenHarmony 5.0.0.71
         </span>
         <Chip tone="ok">✓ 设备已就绪</Chip>
-        <span style={{ color: "var(--ad-ink-2)", fontSize: 12 }}>4 项安全检查通过</span>
+        <span style={{ color: "var(--ad-ink-2)", fontSize: 12 }}>3 项必需安全检查通过</span>
       </div>
       <Card title="正在写入镜像">
         <p style={{ margin: 0, color: "var(--ad-ink-2)", fontSize: 12 }}>
@@ -97,7 +97,7 @@ export const FlashWorkspaceWriting = () => (
         </div>
       </Card>
       <div style={{ color: "var(--ad-ink-2)", fontSize: 12 }}>
-        <b style={{ color: "var(--ad-ink)" }}>dayu200-openharmony-5.0.0.71.imgpkg</b> · 6.4 GB
+        <b style={{ color: "var(--ad-ink)" }}>dayu200-openharmony-5.0.0.71.tar.gz</b> · 6.4 GB
       </div>
       <details style={{ borderTop: "1px solid var(--ad-line)", paddingTop: 10 }}>
         <summary style={{ cursor: "pointer", color: "var(--ad-ink-2)", fontSize: 12 }}>

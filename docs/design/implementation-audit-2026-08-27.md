@@ -380,3 +380,34 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。
+
+
+## 2026-08-28 F35：Flash 只读设备诊断的沙箱边界
+
+GJ-4。真实 Flash 完成后的 App 回访发现：设备访问 facade 直接以 App 的 Application Support
+拼接 ArkForge Unix socket。沙箱内路径为 124 bytes，超过 Unix socket 上限；更根本的问题是
+App 不应直连该 socket。不能缩短路径或用 IOKit USB 存在替代 ArkForge 的真实访问探测。
+
+现把同一 public `discoverDevices` 调用迁至 Runtime 的已配置 ArkForge 目录；App 仅发无参数的
+`flash.device-access` 只读 XPC。返回闭集只有模式与数量，不导出原始设备身份、路径、诊断文本，
+不接受调用方 socket/target/authority，不创建 Job、binding、capability 或设备副作用。这里新增的是
+App 只读查询适配，不是 Catalog operation/provider/profile，destructive 准入保持不变。
+
+App 区分成功的空 RockUSB 观察、Maskrom、Runtime 不可达、探测失败与格式错误；失败不变成
+“未发现设备”，HDC-normal 不变成 Loader 就绪。稿件补三种设备访问状态与双语重新检查，
+重新检查保留展开区；未选择镜像时只显示设备已选择，不再提前显示完整计划或安全检查通过，镜像样本
+的必需检查数同步原生三项。阶段表按 Catalog 计算最高 effect，包含重启的收尾阶段
+不再错误标成 readOnly；未降低任何实际 operation 的 effect。五个组件预览同步受支持的
+.tar.gz 示例、三项检查与 canonical 引用；能力卡用 hardwareGated 不可用样本，不再仅凭
+Catalog published 标成可用。
+
+本项在 `agent/flash-device-access-xpc-20260828` 独立交付。生产 Runtime 未安装候选代码，
+campaign 保持关闭；只有合入后的真实 App 只读回访才能关闭该差异。F34 的真实 Flash
+与独立核验另随 PR #1569 提交，不以本项 fixture 或设计样本替代。
+
+验证：最终本地闸 exit 0（Swift 1,836 项、App/UI-test bundle build-for-testing、SDD、
+49 项 catalog generator 测试与零漂移）；设计交互 44 项、DS/build:review 与 31 个独立
+组件预览打包通过。三项双语原生测试通过，共 72.062 秒，10 张原始 PNG 已逐张查看；
+其中 F34 activity 现滚动至可见区再截图。新增 8 张浏览器图只证明设计样本状态。
+首次 UI automation mode 初始化超时、测试 import 编译失败等尝试保留记录，未计为通过。
+完整选择性元数据见[验证记录](references/v1.6-goal/flash-device-access-verification-2026-08-28.json)。

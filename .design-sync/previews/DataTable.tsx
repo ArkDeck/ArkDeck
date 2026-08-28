@@ -97,7 +97,7 @@ export const SelectedFlashImage = () => (
       {
         id: "dayu200-image",
         cells: {
-          img: "dayu200-openharmony-5.0.0.71.imgpkg",
+          img: "dayu200-openharmony-5.0.0.71.tar.gz",
           size: "6.4 GB",
           build: "OpenHarmony 5.0.0.71",
         },
@@ -143,7 +143,7 @@ export const HistorySessions = () => (
             </Chip>
           ),
           dev: "DAYU200",
-          what: "Flash · dayu200-openharmony-5.0.0.71.imgpkg",
+          what: "Flash · dayu200-openharmony-5.0.0.71.tar.gz",
           when: "07-12 15:40",
         },
       },

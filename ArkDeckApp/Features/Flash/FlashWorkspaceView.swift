@@ -994,6 +994,7 @@ struct FlashWorkspaceView: View {
           systemImage: "wrench.and.screwdriver.fill"
         )
         .foregroundStyle(.orange)
+        .accessibilityIdentifier("flash.deviceAccess.unavailable")
         Text(reason)
           .font(WorkspaceFont.monospacedValue)
           .textSelection(.enabled)
@@ -1005,6 +1006,7 @@ struct FlashWorkspaceView: View {
           )
           .foregroundStyle(deviceAccessColor(advice.verdict))
           .font(WorkspaceFont.body.weight(.semibold))
+          .accessibilityIdentifier("flash.deviceAccess.verdict")
           Grid(
             alignment: .leading,
             horizontalSpacing: WorkspaceMetrics.keyColumnGap,

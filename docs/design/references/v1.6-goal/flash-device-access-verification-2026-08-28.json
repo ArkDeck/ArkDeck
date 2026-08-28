@@ -1,0 +1,235 @@
+{
+  "date": "2026-08-28",
+  "finding": "F35",
+  "goldenJourney": "GJ-4",
+  "baseRevision": "9c844476e9a0ef4cdcf247e4e910e95f336f5751",
+  "evidenceKind": "host-tests-and-design-samples-not-real-device-acceptance",
+  "rootCause": "App resolved Application Support inside its sandbox and attempted a direct ArkForge Unix socket connection; the 124-byte path exceeded the socket limit and bypassed the intended App XPC boundary.",
+  "change": "Runtime performs the existing ArkForge public discovery; the App requests only flash.device-access over XPC, without parameters. Only typed modes and their count are returned. No raw identity, socket path, authority, binding mutation or Job creation.",
+  "focusedTests": {
+    "exitCode": 0,
+    "testCount": 17,
+    "durationSeconds": 47,
+    "logSHA256": "17404604be91a2b5db450f46fd60c255373f869e4c4177d7a15e594bec8d0a24",
+    "baseRevision": "59158aed4fb3570b1deb4fb4939bc906fa8d6fc1"
+  },
+  "designTests": {
+    "exitCode": 0,
+    "testCount": 44,
+    "baseRevision": "9c844476e9a0ef4cdcf247e4e910e95f336f5751",
+    "logSHA256": "ae7fefa12164353240dd00cd349e73733c370d0dc64d9a75df816e3be5cc5e84"
+  },
+  "priorAttempts": [
+    {
+      "kind": "Swift test compilation",
+      "exitCode": 1,
+      "assertionsExecuted": false,
+      "reason": "Fixture used an internal ArkForge memberwise initializer without the established @testable import; fixed in test only.",
+      "logSHA256": "b3d9c9dc8874efc99ebd7a71335c8e2ef7a7d64f7305061ca988f70f63c2a1c4"
+    },
+    {
+      "kind": "Design test environment",
+      "exitCode": 1,
+      "reason": "Isolated worktree lacked esbuild dependency. Reused local node_modules only after verifying package-lock equality; subsequent tests passed.",
+      "logSHA256": "04358ab9d86ce56c21c0dba45d1be5152d17fbc8ea0929dc92f9cb2abf1530c6"
+    },
+    {
+      "kind": "Native UI initialization",
+      "exitCode": 65,
+      "assertionsExecuted": false,
+      "reason": "Timed out while enabling automation mode; no test case started.",
+      "logSHA256": "45a9862ea318b6aa3142f99959bc7d46603d82723b77927eba264fb898776b87"
+    }
+  ],
+  "limitations": [
+    "No candidate Runtime was installed or used for hardware.",
+    "HardwareCampaign remains disabled; F34 records the successful real Flash separately.",
+    "Post-merge Runtime installation and real App read-only revisit remain required."
+  ],
+  "designBuilds": [
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build",
+      "exitCode": 0,
+      "logSHA256": "87686d0a4e8610e9f10f7679620ac348bccc2ec49a606ee122388b19d38233e9"
+    },
+    {
+      "command": "npm --prefix docs/design/arkdeck-ds run build:review",
+      "exitCode": 0,
+      "logSHA256": "1266454ccf5030c345b15d8bdd7894c5a4d56250e596fb9c7d44427ac98993fe"
+    }
+  ],
+  "componentPreviewBuild": {
+    "exitCode": 0,
+    "previewCount": 31,
+    "method": "Each .design-sync/previews/*.tsx was independently bundled with the existing esbuild dependency and @arkdeck/ds source alias; temporary outputs are outside the repository."
+  },
+  "nativeUITests": {
+    "exitCode": 0,
+    "testCount": 3,
+    "durationSeconds": 72.062,
+    "baseRevision": "9c844476e9a0ef4cdcf247e4e910e95f336f5751",
+    "evidenceKind": "isolated-fixture-not-hardware",
+    "logSHA256": "3be4830a6825513e11bac11c5949b64157252e39d0ccf77731be1463f6ad8812",
+    "command": "sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/AppShellUITests/testCanonicalFlashHistoryStatesInBothLanguages -only-testing:ArkDeckHDCUITests/AppShellUITests/testCanonicalFlashPostflightRequiresVerifiedEvidenceInBothLanguages -only-testing:ArkDeckHDCUITests/AppShellUITests/testFlashDeviceAccessAbsentAndUnavailableInBothLanguages",
+    "screenshots": [
+      {
+        "attachmentID": "82FD8A57-2961-410C-94A2-A2CDFCCF57DE",
+        "language": "zh-Hans",
+        "state": "canonical-history",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 385476,
+        "sha256": "dd0bfce0fde2000973453686668f5e524ce6f39ca97049d80e7fa44970443ba9",
+        "viewed": true
+      },
+      {
+        "attachmentID": "97222477-561F-4EDD-B2AB-FBD0459B69D3",
+        "language": "en",
+        "state": "canonical-history",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 374883,
+        "sha256": "f8b5623f925364b36ad52c73fb62da62689dff79169c32d4cbe36020f848f52e",
+        "viewed": true
+      },
+      {
+        "attachmentID": "55A34EB9-6EB8-4D8B-8A70-F9A29E2E24C4",
+        "language": "zh-Hans",
+        "state": "canonical-postflight-unverified",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 296691,
+        "sha256": "a06efc868f1521c6b1289a950aa4c5e317df49a6d071107045120603b9b69c62",
+        "viewed": true
+      },
+      {
+        "attachmentID": "F6BE83FC-63CB-42F2-84A4-BBC4AED1C62D",
+        "language": "zh-Hans",
+        "state": "canonical-postflight-verified",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 303170,
+        "sha256": "fff8e17762aa20923714ae088c7c092aa711d4d488a94204caa88a279ab202e2",
+        "viewed": true
+      },
+      {
+        "attachmentID": "17B9C6AB-4CD7-4A8B-AD15-72369874F192",
+        "language": "en",
+        "state": "canonical-postflight-unverified",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 293490,
+        "sha256": "b7bdb7a3affe5424e498ce20e2c854a54dc40e7ec36f283d4a749e6695890856",
+        "viewed": true
+      },
+      {
+        "attachmentID": "3A30BDC5-9332-49AB-9E26-0AFFCE57A453",
+        "language": "en",
+        "state": "canonical-postflight-verified",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 298809,
+        "sha256": "42872e843adbb90e5c5efbef1389694ccb93ce439bb3189abf1f97a15bff0c0c",
+        "viewed": true
+      },
+      {
+        "attachmentID": "4B2B4ABC-6069-4561-A249-9FD82F6B9638",
+        "language": "zh-Hans",
+        "state": "device-access-unavailable",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 388750,
+        "sha256": "13765ee1855af9958216563d43c9cd40030157d404a7d98a64c72db789225361",
+        "viewed": true
+      },
+      {
+        "attachmentID": "096C2FE1-C610-48C6-949D-C4F723C73E52",
+        "language": "zh-Hans",
+        "state": "device-access-absent",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 396202,
+        "sha256": "a7165b3f0c3e4db3ecaa8441679514ec2aeee667a2a193358801c9a67a0efb93",
+        "viewed": true
+      },
+      {
+        "attachmentID": "99DC12AE-FC31-4330-83F1-8AC851C48FD2",
+        "language": "en",
+        "state": "device-access-unavailable",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 368435,
+        "sha256": "0d418ad692cb84d5bfdbb6d2563db14d71093689ab4d9f527a25e7f4a47b071c",
+        "viewed": true
+      },
+      {
+        "attachmentID": "F0A065BC-7B3E-4935-AB2D-725BC3D490C3",
+        "language": "en",
+        "state": "device-access-absent",
+        "mimeType": "image/png",
+        "width": 2360,
+        "height": 1566,
+        "byteCount": 363852,
+        "sha256": "5dfd1b39af365edadffe7b51625b2ea78eda1d46b75057e1a71147408723d626",
+        "viewed": true
+      }
+    ],
+    "screenshotScope": "All ten original PNG attachments were viewed. History captures now scroll to the canonical activity section. No raw xcresult or native screenshot is committed; these remain private host artifacts."
+  },
+  "designReferences": {
+    "imageCount": 8,
+    "files": [
+      "flash-device-access-absent-en.jpg",
+      "flash-device-access-available-en.jpg",
+      "flash-device-access-unavailable-en.jpg",
+      "flash-plan-effects-en.jpg",
+      "flash-device-access-absent-zh-Hans.jpg",
+      "flash-device-access-available-zh-Hans.jpg",
+      "flash-device-access-unavailable-zh-Hans.jpg",
+      "flash-plan-effects-zh-Hans.jpg"
+    ],
+    "manifest": "manifest.json",
+    "evidenceKind": "browser-design-demo-not-hardware",
+    "viewed": true,
+    "scope": "1280x720 viewport with adaptive reference window; scrolled details, not pixel alignment evidence."
+  },
+  "finalLocalGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "baseRevision": "9c844476e9a0ef4cdcf247e4e910e95f336f5751",
+    "logSHA256": "e05964dbaba09626f54ac45d290f4eec2e80a1c96dd1f9d968b8a798a1397808",
+    "swiftTestCount": 1836,
+    "swiftLanes": [
+      {
+        "name": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1830,
+        "durationSeconds": 431
+      },
+      {
+        "name": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1,
+        "durationSeconds": 8
+      },
+      {
+        "name": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5,
+        "durationSeconds": 7
+      }
+    ],
+    "appUITestBundleBuild": "passed",
+    "commonGates": "SDD: 0 errors, 0 warnings, 121 acceptance IDs; catalog generator: 49 tests; generated catalog: no drift",
+    "note": "Production and Swift UI-test code were unchanged after this gate started. Final design interaction tests and screenshot manifest checks ran separately."
+  }
+}

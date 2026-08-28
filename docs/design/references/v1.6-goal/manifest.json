@@ -181,6 +181,102 @@
       "byteCount": 87952,
       "sha256": "636f538d2cbbe78f2559170fa4bca79c4d263606396e64fb7cf6e94196085f0c",
       "viewed": true
+    },
+    {
+      "file": "flash-device-access-absent-en.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=en&deviceAccess=absent",
+      "action": "Expand Flash details; press Re-check device access. The details stay open and no Job starts. No image is selected, so no exact plan or passed safety checks are shown. The screenshot is scrolled to device access.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 82124,
+      "sha256": "4e26c1c54f0425c19f9a04f00abd9d5a4a67c12859f35d12c888b9c6b4b768fa",
+      "viewed": true
+    },
+    {
+      "file": "flash-device-access-available-en.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=en&deviceAccess=available",
+      "action": "Expand Flash details; press Re-check device access. The details stay open and no Job starts. No image is selected, so no exact plan or passed safety checks are shown. The screenshot is scrolled to device access.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 79156,
+      "sha256": "1c2966e52e2a32ccfc6699b78640c724ced2f59fc91b463daf75b8d55606c2c8",
+      "viewed": true
+    },
+    {
+      "file": "flash-device-access-unavailable-en.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=en&deviceAccess=unavailable",
+      "action": "Expand Flash details; press Re-check device access. The details stay open and no Job starts. No image is selected, so no exact plan or passed safety checks are shown. The screenshot is scrolled to device access.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 80429,
+      "sha256": "7321b3d9fe65b6def7a48e5fddf89e366eafde10776757b68e1691c01ba78ed0",
+      "viewed": true
+    },
+    {
+      "file": "flash-plan-effects-en.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=en&deviceAccess=available",
+      "action": "Choose a demo image; expand details; scroll to the final plan stage. The four groups contain 3/4/1/6 steps, with maximum effects hostOnly/deviceMutation/destructive/deviceMutation. Never press the Flash action.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 85319,
+      "sha256": "fe26e18143bdd86f32d2beef3ec5d7dcfd35afe9058fa2f56cb7c74ecac68330",
+      "viewed": true
+    },
+    {
+      "file": "flash-device-access-absent-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=zh-Hans&deviceAccess=absent",
+      "action": "Expand Flash details; press Re-check device access. The details stay open and no Job starts. No image is selected, so no exact plan or passed safety checks are shown. The screenshot is scrolled to device access.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 75501,
+      "sha256": "3b00df1e2ad5c1198fbb1e3d7d6bd5f20ec06154416da351d84161f62c45c9b3",
+      "viewed": true
+    },
+    {
+      "file": "flash-device-access-available-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=zh-Hans&deviceAccess=available",
+      "action": "Expand Flash details; press Re-check device access. The details stay open and no Job starts. No image is selected, so no exact plan or passed safety checks are shown. The screenshot is scrolled to device access.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 73319,
+      "sha256": "b4a486cf6b244bc377cf6b6f41b2b0e88e08fbd0688ff77d54ae9f2392b901e7",
+      "viewed": true
+    },
+    {
+      "file": "flash-device-access-unavailable-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=zh-Hans&deviceAccess=unavailable",
+      "action": "Expand Flash details; press Re-check device access. The details stay open and no Job starts. No image is selected, so no exact plan or passed safety checks are shown. The screenshot is scrolled to device access.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 73873,
+      "sha256": "e0b2a550a48a106aa6b9cc3d85b5a995412e107b6e68c5f18aeaff2bb4931320",
+      "viewed": true
+    },
+    {
+      "file": "flash-plan-effects-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8850/prototype.html?page=flash&lang=zh-Hans&deviceAccess=available",
+      "action": "Choose a demo image; expand details; scroll to the final plan stage. The four groups contain 3/4/1/6 steps, with maximum effects hostOnly/deviceMutation/destructive/deviceMutation. Never press the Flash action.",
+      "mimeType": "image/jpeg",
+      "referenceMode": false,
+      "width": 1280,
+      "height": 720,
+      "byteCount": 77794,
+      "sha256": "7b78c6651db75ae130b5e4c396d7e51c5cffeb205cd288df56f6237c0478bbfb",
+      "viewed": true
     }
   ]
 }

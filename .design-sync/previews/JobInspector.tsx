@@ -59,7 +59,7 @@ const SIM_PHASES = [
 
 const flashRunning = (over: Partial<Job> = {}): Job => ({
   id: "J4",
-  title: "Flash · dayu200-openharmony-5.0.0.71.imgpkg · DAYU200",
+  title: "Flash · dayu200-openharmony-5.0.0.71.tar.gz · DAYU200",
   state: "running",
   mode: "execute",
   risk: 3,
@@ -84,7 +84,7 @@ const DUMP_DONE: Job = {
 
 const PLAN_ONLY: Job = {
   id: "J1",
-  title: "Flash(plan-only)· dayu200-openharmony-5.0.0.71.imgpkg",
+  title: "Flash(plan-only)· dayu200-openharmony-5.0.0.71.tar.gz",
   state: "planned",
   mode: "planOnly",
   risk: 1,
@@ -127,7 +127,7 @@ export const CollapsedFlashRunning = () => (
   <div style={col}>
     <Dock
       above={
-        <Card title="Flash · dayu200-openharmony-5.0.0.71.imgpkg">
+        <Card title="Flash · dayu200-openharmony-5.0.0.71.tar.gz">
           <p style={hint}>
             正在写入镜像。任务在页间不中断，离开本页去看 History 时，下方这条依然在。
           </p>
@@ -138,7 +138,7 @@ export const CollapsedFlashRunning = () => (
     </Dock>
     <Card title="摘要由组件自己算,给不进来">
       <p style={hint}>
-        「1 个运行中 — Flash · dayu200-openharmony-5.0.0.71.imgpkg · DAYU200:写入镜像(3/4)」:运行中数量 +
+        「1 个运行中 — Flash · dayu200-openharmony-5.0.0.71.tar.gz · DAYU200:写入镜像(3/4)」:运行中数量 +
         risk 最高那个任务的当前阶段 i/n。摘要若能与下面的列表打架,还不如不给。
       </p>
       <p style={hint}>

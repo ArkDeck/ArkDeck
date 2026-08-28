@@ -104,6 +104,7 @@ package enum ArkDeckAgentXPC {
     "debug.probe",
     "debug.template.run",
     "flash.bootloader-status",
+    "flash.device-access",
     "flash.lanePlanPreview",
     "flash.prerequisites",
     "job.evidence",

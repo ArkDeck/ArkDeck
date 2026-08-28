@@ -869,6 +869,8 @@ Task.detached {
       flashLanePlanPreviewer: lanePlanPreviewer,
       rockchipBootloaderStatusObserver: ProductRockchipBootloaderStatusObserver(
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
+      rockchipDeviceAccessObserver: ProductRockchipDeviceAccessObserver(
+        runtimeDirectory: arkForgeRuntimeDirectory),
       rockchipLoaderBindingCoordinator: ProductRockchipLoaderBindingCoordinator(
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       traceRuntimeProbe: traceRuntimeProbe,

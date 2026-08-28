@@ -942,6 +942,7 @@ const S = {
   cmd:{val:"device.packageInventory", hist:[]},
   flashPrerequisitesReady:true, loaderBound:true, flashJob:null, flashImage:null, flashView:"idle",
   flashAvailability:PARAMS.get("flashState")==="hardwareGated"?"hardwareGated":"available",
+  flashDeviceAccess:["available","unavailable"].includes(PARAMS.get("deviceAccess"))?PARAMS.get("deviceAccess"):"absent",
   flashProgress:{stage:"idle",tick:0,bytesDone:0,totalBytes:0},lastFlash:null,
   debugTab:PARAMS.get("debugTab")||"artifacts",
   settingsTab:PARAMS.get("settingsTab")||"general", traceSettingsTab:PARAMS.get("traceSettingsTab")||"cache",
@@ -993,7 +994,7 @@ const COPY={
     needsTrust:"需要信任 — 点击处理",ready:"已接管",rename:"重命名…",recheck:"重新检测",renameTitle:"重命名设备",cancel:"取消",save:"保存",
     statusActions:"当前状态与操作",facts:"Runtime 事实",readyNotice:"已接管且已连接——设备就绪。",recheckNote:"重新检测只读取最新候选列表，不会向设备发送任何内容。",
     connectKey:"Connect key",reported:"报告状态",target:"已接管目标",revision:"Binding revision",model:"观测机型",firmware:"观测固件",transport:"观测传输",confirmed:"确认时间",lastChecked:"刚刚重新读取候选列表",
-    flashTitle:"刷机",flashSubtitle:"选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。",flashReady:"设备已就绪",flashChecks:"4 项安全检查通过",
+    flashTitle:"刷机",flashSubtitle:"选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。",flashReady:"设备已就绪",flashChecks:"3 项必需安全检查通过",
     chooseImage:"选择镜像…",changeImage:"更换镜像…",chooseImageTitle:"选择要刷入的镜像",chooseImageHelp:"支持 Runtime 已发布的 DAYU200 镜像包",
     startFlash:"擦除数据并开始刷机",flashImpact:"将擦除 DAYU200 上的用户数据。请保持设备连接和稳定供电。",flashDetails:"查看刷机详情",
     preparing:"正在准备镜像",enteringLoader:"正在进入 Loader",writing:"正在写入镜像",verifying:"写入完成，正在重启并验证",estimatedProgress:"镜像写入估算",confirmedBytes:"已确认写入",
@@ -1009,7 +1010,7 @@ const COPY={
     needsTrust:"Needs trust — click to resolve",ready:"Adopted",rename:"Rename…",recheck:"Re-check",renameTitle:"Rename device",cancel:"Cancel",save:"Save",
     statusActions:"Status and actions",facts:"Runtime facts",readyNotice:"Adopted and connected — device ready.",recheckNote:"Re-check only reloads the current candidate list; it sends nothing to the device.",
     connectKey:"Connect key",reported:"Reported state",target:"Adopted target",revision:"Binding revision",model:"Observed model",firmware:"Observed firmware",transport:"Observed transport",confirmed:"Confirmed at",lastChecked:"Candidate list reloaded just now",
-    flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"4 safety checks passed",
+    flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"3 required safety checks passed",
     chooseImage:"Choose image…",changeImage:"Change image…",chooseImageTitle:"Choose an image to flash",chooseImageHelp:"Supports DAYU200 image bundles published by Runtime",
     startFlash:"Erase data and start flashing",flashImpact:"This erases user data on DAYU200. Keep the device connected to stable power.",flashDetails:"Show flash details",
     preparing:"Preparing image",enteringLoader:"Entering Loader",writing:"Writing image",verifying:"Write complete — rebooting and verifying",estimatedProgress:"Estimated image write",confirmedBytes:"Confirmed written",
@@ -3451,7 +3452,7 @@ function pFlash(){
   return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
     <div class="flash-lead" data-page-title="${esc(tx("flashTitle"))}"><p>${tx("flashSubtitle")}</p></div>
     <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
-      ${blocked?`<span class="chip warn">${lc("刷机已阻断","Flash blocked")}</span>`:`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`}</div>
+      ${blocked?`<span class="chip warn">${lc("刷机已阻断","Flash blocked")}</span>`:image?`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`:`<span class="chip">${lc("设备已选择","Device selected")}</span><span class="hint">${lc("选择镜像后执行精确安全检查","Choose an image to run the exact safety checks")}</span>`}</div>
     ${main}
     ${running?`<div class="hint"><b>${esc(image.name)}</b> · ${formatBytes(image.sizeBytes)}</div>`:""}
     ${flashDetails(image)}
@@ -3462,21 +3463,35 @@ function flashStages(now){
     ${[tx("stagePrepare"),tx("stageWrite"),tx("stageVerify")].map((label,i)=>`<div class="flash-stage ${i<now?"done":i===now?"now":""}"><i aria-hidden="true"></i><span>${label}</span></div>`).join("")}
   </div>`;
 }
+function recheckFlashDeviceAccess(){
+  renderPage();
+  const details=document.querySelector(".flash-details");
+  if(details)details.open=true;
+}
 function flashDetails(image){
   return `<details class="flash-details"><summary>${tx("flashDetails")}</summary>
+    <section data-sync-id="flash.deviceAccess"><h3>${lc("Rockchip 设备访问","Rockchip device access")}</h3>
+      <p role="status">${S.flashDeviceAccess==="unavailable"?lc("ArkForge RockUSB 探测不可用","ArkForge RockUSB discovery is unavailable"):S.flashDeviceAccess==="available"?lc("Loader 设备访问就绪","Loader device access is ready"):lc("设备离线或未进入 Loader 模式","Device is offline or not in Loader mode")}</p>
+      ${S.flashDeviceAccess==="unavailable"?`<p class="mono">runtime_device_access_unreachable</p>`:`
+      <p><span class="hint">${lc("处理责任方","Responsible party")}</span> · ${lc("设备操作员","Device operator")}</p>
+      <p><span class="hint">${lc("最小修复步骤","Minimum next step")}</span> · ${S.flashDeviceAccess==="available"?lc("选择上方受支持的 DAYU200 Loader 设备，然后重新检查。","Use the supported DAYU200 Loader device shown above, then re-check."):lc("重新连接开发板或让其进入 Loader 模式，然后重新检查。","Reconnect the board or put it into Loader mode, then re-check.")}</p>
+      ${S.flashDeviceAccess==="available"?`<p><span class="hint">${lc("已发现","Observed")}</span> · ${lc("1 台设备 · Loader","1 device(s) · Loader")}</p>`:""}`}
+      <button class="btn" onclick="recheckFlashDeviceAccess()">${lc("重新检查设备访问","Re-check device access")}</button>
+      <p class="hint">${lc("只读探测的设计样本；本页不连接 Runtime，也不因发现 Loader 而授予刷写权限。","Read-only discovery sample; this page does not connect to Runtime, and finding a Loader does not authorize flashing.")}</p>
+    </section>
     <div class="flash-detail-grid">
       <div><small>operation / profile</small><b>flash.full-restore@1 / dayu200</b></div>
       <div><small>target / binding</small><b>TGT-958780b2ffb7 / revision 3</b></div>
-      <div><small>image SHA-256</small><b>${image?"Runtime 校验后显示":"选择镜像后由 Runtime 校验"}</b></div>
-      <div><small>exact plan</small><b>14 steps · 1 destructive write stage</b></div>
+      <div><small>image SHA-256</small><b>${image?lc("Runtime 校验后显示","Shown after Runtime verification"):lc("选择镜像后由 Runtime 校验","Verified by Runtime after choosing an image")}</b></div>
+      ${image?`<div><small>exact plan</small><b>14 steps · 1 destructive write stage</b></div>`:""}
     </div>
-    <div class="tablewrap" style="margin-top:10px"><table>
-      <tr><th>${S.language==="en"?"Plan stage":"计划阶段"}</th><th>${S.language==="en"?"Steps":"步骤数"}</th><th>effect</th></tr>
+    ${image?`<div class="tablewrap" style="margin-top:10px"><table>
+      <tr><th>${S.language==="en"?"Plan stage":"计划阶段"}</th><th>${S.language==="en"?"Steps":"步骤数"}</th><th>${lc("阶段最高 effect","Maximum stage effect")}</th></tr>
       <tr><td>${S.language==="en"?"Prepare and validate":"准备与校验"}</td><td>3</td><td>${effectBadge("host","hostOnly")}</td></tr>
       <tr><td>${S.language==="en"?"Enter Loader and bind identity":"进入 Loader 与身份绑定"}</td><td>4</td><td>${effectBadge("mut","deviceMutation")}</td></tr>
       <tr><td>${S.language==="en"?"Write partitions":"写入分区"}</td><td>1</td><td>${effectBadge("destr","destructive")}</td></tr>
-      <tr><td>${S.language==="en"?"Read back, reboot, and verify":"回读、重启与验证"}</td><td>6</td><td>${effectBadge("read","readOnly")}</td></tr>
-    </table></div>
+      <tr><td>${S.language==="en"?"Read back, reboot, and verify":"回读、重启与验证"}</td><td>6</td><td>${effectBadge("mut","deviceMutation")}</td></tr>
+    </table></div>`:""}
     <p class="hint">${S.language==="en"?"These facts come from Runtime. The app does not invent target identity, image hashes, or safety admission.":"这些事实均来自 Runtime；App 不补造目标身份、镜像哈希或安全准入结论。"}</p>
   </details>`;
 }

@@ -109,7 +109,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         // flash.lanePlanPreview is read-only by contract (CHG-2026-068
         // LPP-AC-1): exactly inspect/discover/materialize on the daemon,
         // no import, no permit, nothing durable.
-        "device.candidates", "flash.bootloader-status", "flash.lanePlanPreview",
+        "device.candidates", "flash.bootloader-status", "flash.device-access", "flash.lanePlanPreview",
         "flash.prerequisites",
         "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
         "runtime.hdc-status", "target.list", "trace.probe",

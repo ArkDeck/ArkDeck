@@ -804,6 +804,7 @@ final class AppShellUITests: XCTestCase {
       XCTAssertFalse(element("flash.workspace.progress", in: app).exists)
       XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
       XCTAssertTrue(element("flash.image.choose", in: app).exists)
+      scrollIntoView(element("flash.runtime.jobID", in: app), in: app)
       let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
       attachment.name = "canonical-flash-history-\(language)"
       attachment.lifetime = .keepAlways
@@ -841,6 +842,40 @@ final class AppShellUITests: XCTestCase {
         XCTAssertTrue(element("flash.postflight.binding.match", in: app).exists)
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "canonical-flash-postflight-\(language)-unverified-\(unverified)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.terminate()
+      }
+    }
+  }
+
+  /// Read-only presentation fixtures: a successful empty RockUSB discovery
+  /// must remain distinct from an unreachable Runtime. No device is contacted.
+  func testFlashDeviceAccessAbsentAndUnavailableInBothLanguages() throws {
+    for (language, absent, unavailable, ready) in [
+      ("(en)", "Device is offline or not in Loader mode", "ArkForge RockUSB discovery is unavailable", "Loader device access is ready"),
+      ("(zh-Hans)", "设备离线或未进入 Loader 模式", "ArkForge RockUSB 探测不可用", "Loader 设备访问就绪"),
+    ] {
+      for failed in [false, true] {
+        let flag = failed ? "--ui-test-flash-device-access-unavailable" : "--ui-test-flash-device-access-absent"
+        try "--ui-test-runtime-history-empty\n\(flag)".write(
+          to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+        let app = launch(arguments: [
+          "--ui-test-flash", "--ui-test-runtime-history", "--ui-test-devices", flag,
+          "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+        ])
+        select("app.navigation.flash", in: app)
+        toggleFlashDetails(in: app)
+        let status = element(failed ? "flash.deviceAccess.unavailable" : "flash.deviceAccess.verdict", in: app)
+        assertDisplayed(status, equals: failed ? unavailable : absent, timeout: 10)
+        XCTAssertFalse(app.staticTexts[ready].exists)
+        let reprobe = element("flash.deviceAccess.reprobe", in: app)
+        scrollIntoView(reprobe, in: app)
+        reprobe.click()
+        assertDisplayed(status, equals: failed ? unavailable : absent, timeout: 10)
+        scrollIntoView(status, in: app)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "flash-device-access-\(language)-unavailable-\(failed)"
         attachment.lifetime = .keepAlways
         add(attachment)
         app.terminate()

@@ -72,6 +72,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
+  private let rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)?
   private let rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   private let debugRuntimeProbe: (any DebugRuntimeProbing)?
@@ -97,6 +98,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
+    rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
@@ -114,6 +116,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       flashPrerequisiteObserver: flashPrerequisiteObserver,
       flashLanePlanPreviewer: flashLanePlanPreviewer,
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
+      rockchipDeviceAccessObserver: rockchipDeviceAccessObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
@@ -135,6 +138,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
+    rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
@@ -152,6 +156,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.flashLanePlanPreviewer = flashLanePlanPreviewer
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
+    self.rockchipDeviceAccessObserver = rockchipDeviceAccessObserver
     self.rockchipLoaderBindingCoordinator = rockchipLoaderBindingCoordinator
     self.traceRuntimeProbe = traceRuntimeProbe
     self.debugRuntimeProbe = debugRuntimeProbe
@@ -398,6 +403,32 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(
           id: request.id, code: .rejected,
           message: "Flash prerequisites could not be observed: \(error)")
+      }
+
+    case "flash.device-access":
+      guard request.params?.isEmpty != false else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "Device access discovery does not accept parameters")
+      }
+      guard let rockchipDeviceAccessObserver else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Rockchip device access observation is not configured")
+      }
+      do {
+        let modes = try rockchipDeviceAccessObserver.observeDeviceAccess()
+        return success(
+          id: request.id,
+          result: .object([
+            "observationCount": .integer(Int64(modes.count)),
+            "observedModes": .array(modes.map { .string($0.rawValue) }),
+          ]))
+      } catch {
+        // Do not export socket paths, provider diagnostics or USB identities.
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Rockchip device access observation failed")
       }
 
     case "flash.bootloader-status":

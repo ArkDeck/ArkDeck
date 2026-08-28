@@ -1080,6 +1080,7 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
         try? String(contentsOf: $0, encoding: .utf8)
       } ?? ""
     let loaderIsUnbound = fixtureState.contains("--ui-test-flash-loader-unbound")
+    let deviceAccessAbsent = fixtureState.contains("--ui-test-flash-device-access-absent")
     return FlashWorkspacePresentation(
       availability: fixtureState.contains("--ui-test-flash-hardware-gated")
         ? .unavailable(reasons: ["hardwareGated: fixture assessment-only lane"])
@@ -1094,7 +1095,7 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
       bootloaderStatus: RockchipBootloaderStatus(
         disposition: loaderIsUnbound ? .unbound : .exactBoundTarget,
         observationCount: 1,
-        mode: "loader",
+        mode: deviceAccessAbsent ? "hdcNormal" : "loader",
         targetID: loaderIsUnbound ? nil : "target-fixture-dayu200",
         bindingRevision: loaderIsUnbound ? nil : 7))
   }

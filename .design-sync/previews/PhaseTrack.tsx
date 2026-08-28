@@ -21,7 +21,7 @@ const jobHead = (title: string, badge: ReactNode) => (
 
 export const FlashRunning = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 700 }}>
-    {jobHead("Flash · dayu200-openharmony-5.0.0.71.imgpkg · DAYU200", <Chip tone="warn">运行中</Chip>)}
+    {jobHead("Flash · dayu200-openharmony-5.0.0.71.tar.gz · DAYU200", <Chip tone="warn">运行中</Chip>)}
     <PhaseTrack
       phases={[
         "准备镜像",
