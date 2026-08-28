@@ -161,6 +161,30 @@ public struct RuntimeHistoryPresentation: Sendable, Equatable {
   public static let loading = RuntimeHistoryPresentation(
     availability: .loading, jobs: [])
 
+  /// A paged response may prepend retained attention history. Its array order
+  /// is not recency and must not let a resolved old epoch mask a newer Flash.
+  /// Only presentation order changes; the original unknown records survive.
+  public var flashActivityJobs: [RuntimeJobSummaryPresentation] {
+    jobs.filter {
+      ArkForgeFlashOperation.containsDurableRecordReference($0.operationReference)
+    }.sorted {
+      let left = $0.activityDate ?? .distantPast
+      let right = $1.activityDate ?? .distantPast
+      return left == right ? $0.id < $1.id : left > right
+    }
+  }
+
+  /// Unresolved uncertainty and human stops always outrank recency. Runtime
+  /// resolution relations remove only current attention, never old outcomes.
+  public var focusedFlashActivity: RuntimeJobSummaryPresentation? {
+    let flashJobs = flashActivityJobs
+    return flashJobs.first(where: { $0.outcomeUnknown && !$0.hasEstablishedCurrentEpoch })
+      ?? flashJobs.first(where: { $0.waitingForHuman && !$0.hasEstablishedCurrentEpoch })
+      ?? flashJobs.first(where: \.requiresRecoveryGuidance)
+      ?? flashJobs.first(where: \.isCurrentActivity)
+      ?? flashJobs.first
+  }
+
   static func unavailable(_ reason: String) -> RuntimeHistoryPresentation {
     RuntimeHistoryPresentation(availability: .unavailable(reason: reason), jobs: [])
   }
@@ -1424,7 +1448,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     if flashSucceeded {
       return RuntimeHistoryPresentation(
         availability: .available,
-        jobs: [
+        jobs: retainedFlashHistory + [
           RuntimeJobSummaryPresentation(
             id: "job-fixture-flash-succeeded",
             operationReference: flashOperationReference,
@@ -1443,6 +1467,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             finishedAtUTC: "2026-08-06T08:03:00Z")
         ])
     }
+    let observeHour = fixtureRequests("--ui-test-runtime-flash-newer-observe") ? "09" : "07"
     return RuntimeHistoryPresentation(
       availability: .available,
       jobs: [
@@ -1462,9 +1487,9 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           threadID: "t-fixture0001",
           workspaceKind: .viewer,
           actualEffect: "readOnly",
-          createdAtUTC: "2026-08-06T07:00:00Z",
-          startedAtUTC: "2026-08-06T07:00:01Z",
-          finishedAtUTC: "2026-08-06T07:00:02Z"),
+          createdAtUTC: "2026-08-06T\(observeHour):00:00Z",
+          startedAtUTC: "2026-08-06T\(observeHour):00:01Z",
+          finishedAtUTC: "2026-08-06T\(observeHour):00:02Z"),
         RuntimeJobSummaryPresentation(
           id: "job-fixture-0002",
           operationReference: flashOperationReference,
@@ -1482,5 +1507,29 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           startedAtUTC: "2026-08-06T08:00:01Z",
           finishedAtUTC: "2026-08-06T08:02:00Z"),
       ])
+  }
+
+  /// Reproduce attention-first pagination: old resolved unknowns can arrive
+  /// before the newest success. These values never contact Runtime.
+  private var retainedFlashHistory: [RuntimeJobSummaryPresentation] {
+    guard fixtureRequests("--ui-test-runtime-flash-retained-history") else { return [] }
+    return [
+      RuntimeJobSummaryPresentation(
+        id: "job-fixture-flash-alias-resolved", operationReference: "flash.dayu200",
+        targetID: "target-fixture-old-alias", state: "waitingForRecovery",
+        waitingForHuman: false, outcomeUnknown: true, outstandingResidueCount: 0,
+        timeline: ["running", "waitingForRecovery"], executionMode: "execute",
+        workspaceKind: .flash, actualEffect: "destructive",
+        createdAtUTC: "2026-08-05T08:00:00Z",
+        resolvedByTargetAliasResolutionID: "target-alias-resolution-fixture"),
+      RuntimeJobSummaryPresentation(
+        id: "job-fixture-flash-superseded", operationReference: "flash.dayu200",
+        targetID: "target-fixture-dayu200", state: "waitingForRecovery",
+        waitingForHuman: false, outcomeUnknown: true, outstandingResidueCount: 0,
+        timeline: ["running", "waitingForRecovery"], executionMode: "execute",
+        workspaceKind: .flash, actualEffect: "destructive",
+        createdAtUTC: "2026-08-05T09:00:00Z",
+        supersededByRecoveryEpochID: "recovery-epoch-fixture"),
+    ]
   }
 }

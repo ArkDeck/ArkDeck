@@ -1035,7 +1035,8 @@ private struct AppShellView: View {
         runtimeHistory: runtimeHistory.presentation,
         isRuntimeHistoryRefreshing: runtimeHistory.isRefreshInFlight,
         onRefreshRuntimeHistory: runtimeHistory.refresh,
-        onOpenHistory: openHistory)
+        onOpenHistory: openHistory,
+        onOpenJob: openHistoryJob)
     case .debug:
       DebugWorkspaceView(
         model: models.debugWorkspace,

@@ -573,6 +573,88 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "resolved History stays inspectable without remaining a global operator action")
   }
 
+  func testFlashActivityUsesRecencyAfterResolvedUnknownsWithoutRewritingHistory() throws {
+    let presentation = decode(
+      """
+      {"ok":true,"id":"x","result":[
+        {"jobId":"old-alias","operation":"flash.dayu200","targetId":"t-alias",
+         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
+         "outstandingResidueCount":0,"timeline":["waitingForRecovery"],
+         "createdAtUtc":"2026-08-05T08:00:00Z",
+         "resolvedByTargetAliasResolutionId":"target-alias-resolution-fixture"},
+        {"jobId":"old-superseded","operation":"flash.dayu200","targetId":"t-1",
+         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
+         "outstandingResidueCount":0,"timeline":["waitingForRecovery"],
+         "createdAtUtc":"2026-08-05T09:00:00Z",
+         "supersededByRecoveryEpochId":"recovery-epoch-fixture"},
+        {"jobId":"latest-observe","operation":"observe.device@1","targetId":"t-1",
+         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
+         "outstandingResidueCount":0,"timeline":["succeeded"],
+         "createdAtUtc":"2026-08-06T10:00:00Z"},
+        {"jobId":"latest-flash","operation":"flash.full-restore@1","targetId":"t-1",
+         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
+         "outstandingResidueCount":0,"timeline":["succeeded"],
+         "createdAtUtc":"2026-08-06T08:00:00Z","finishedAtUtc":"2026-08-06T08:03:00Z"}]}
+      """)
+    let originalJobs = presentation.jobs
+    XCTAssertEqual(presentation.focusedFlashActivity?.id, "latest-flash")
+    XCTAssertEqual(
+      presentation.flashActivityJobs.map(\.id), ["latest-flash", "old-superseded", "old-alias"])
+    XCTAssertEqual(presentation.jobs, originalJobs, "the paged Runtime history remains untouched")
+    XCTAssertTrue(presentation.jobs[0].outcomeUnknown)
+    XCTAssertTrue(presentation.jobs[1].outcomeUnknown)
+    XCTAssertEqual(presentation.jobs[0].state, "waitingForRecovery")
+    XCTAssertEqual(presentation.jobs[1].state, "waitingForRecovery")
+  }
+
+  func testFlashActivityUnresolvedStopsOutrankNewerSuccessAndRunningJobs() {
+    func job(_ id: String, state: String, unknown: Bool = false, waiting: Bool = false)
+      -> RuntimeJobSummaryPresentation
+    {
+      RuntimeJobSummaryPresentation(
+        id: id, operationReference: "flash.full-restore@1", targetID: "t-1",
+        state: state, waitingForHuman: waiting, outcomeUnknown: unknown,
+        outstandingResidueCount: 0, timeline: [],
+        createdAtUTC: id == "success" ? "2026-08-06T10:00:00Z" : nil)
+    }
+    let success = job("success", state: "succeeded")
+    let running = job("running", state: "running")
+    let recovery = job("recovery", state: "awaitingRebindConfirmation")
+    let waiting = job("waiting", state: "running", waiting: true)
+    let unknown = job("unknown", state: "interrupted", unknown: true)
+    for (jobs, expected) in [
+      ([success, running, recovery, waiting, unknown], "unknown"),
+      ([success, running, recovery, waiting], "waiting"),
+      ([success, running, recovery], "recovery"),
+      ([success, running], "running"),
+    ] {
+      XCTAssertEqual(
+        RuntimeHistoryPresentation(availability: .available, jobs: jobs).focusedFlashActivity?.id,
+        expected)
+    }
+  }
+
+  func testFlashActivityMissingDatesAndEqualDatesHaveStableOrder() {
+    let jobs = ["b", "a"].map { id in
+      RuntimeJobSummaryPresentation(
+        id: id, operationReference: "flash.dayu200", targetID: "t-1", state: "planned",
+        waitingForHuman: false, outcomeUnknown: false, outstandingResidueCount: 0, timeline: [])
+    }
+    let missing = RuntimeHistoryPresentation(availability: .available, jobs: jobs)
+    XCTAssertEqual(missing.flashActivityJobs.map(\.id), ["a", "b"])
+    XCTAssertTrue(missing.flashActivityJobs.allSatisfy { $0.activityDate == nil })
+    let dated = jobs.map { job in
+      RuntimeJobSummaryPresentation(
+        id: job.id, operationReference: job.operationReference, targetID: job.targetID,
+        state: job.state, waitingForHuman: false, outcomeUnknown: false,
+        outstandingResidueCount: 0, timeline: [], createdAtUTC: "2026-08-06T08:00:00Z")
+    }
+    XCTAssertEqual(
+      RuntimeHistoryPresentation(availability: .available, jobs: dated).flashActivityJobs.map(\.id),
+      ["a", "b"])
+    XCTAssertNil(RuntimeHistoryPresentation(availability: .available, jobs: []).focusedFlashActivity)
+  }
+
   func testCompleteEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {
     let status = try response([
       "jobId": "job-1",

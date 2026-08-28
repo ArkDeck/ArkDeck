@@ -80,6 +80,7 @@ struct FlashWorkspaceView: View {
   let isRuntimeHistoryRefreshing: Bool
   let onRefreshRuntimeHistory: () -> Void
   let onOpenHistory: () -> Void
+  let onOpenJob: (String) -> Void
   @State private var isDetailsExpanded = false
 
   var body: some View {
@@ -516,10 +517,10 @@ struct FlashWorkspaceView: View {
   }
 
   private var attentionFlashJob: RuntimeJobSummaryPresentation? {
-    runtimeHistory.jobs.first {
-      ArkForgeFlashOperation.containsDurableRecordReference($0.operationReference)
-        && $0.requiresRecoveryGuidance
+    guard let job = runtimeHistory.focusedFlashActivity, job.requiresRecoveryGuidance else {
+      return nil
     }
+    return job
   }
 
   private func recoveryBlockerSurface(
@@ -545,7 +546,7 @@ struct FlashWorkspaceView: View {
         LabeledContent(flashText("flash.runtime.job")) {
           Text(job.id).font(WorkspaceFont.monospacedValue)
         }
-        Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
+        Button(flashText("flash.runtime.openRecord")) { onOpenJob(job.id) }
           .accessibilityIdentifier("flash.runtime.openHistory")
       }
     }
@@ -764,7 +765,13 @@ struct FlashWorkspaceView: View {
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("flash.workspace.result.again")
-            Button(flashText("flash.workspace.result.history"), action: onOpenHistory)
+            Button(flashText("flash.workspace.result.history")) {
+              if let submission = model.submission {
+                onOpenJob(submission.jobID)
+              } else {
+                onOpenHistory()
+              }
+            }
               .accessibilityIdentifier("flash.runtime.openHistory")
           }
         }
@@ -812,7 +819,7 @@ struct FlashWorkspaceView: View {
           FlashRuntimeActivityView(
             presentation: runtimeHistory,
             plan: model.plan,
-            onOpenHistory: onOpenHistory)
+            onOpenJob: onOpenJob)
         }
         .padding(.top, WorkspaceMetrics.blockGap)
       }

@@ -733,6 +733,8 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
 .flash-result-icon.warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
 .flash-result-copy{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}.flash-result-copy h2{font-size:17px}.flash-result-copy p{margin:0;color:var(--ink2);font-size:12.5px}
 .flash-details{border-top:1px solid var(--line);padding-top:11px}
+.flash-recovery{flex-direction:column;gap:12px;padding:20px}
+.flash-recovery h2{font-size:17px;margin:0}.flash-recovery p{margin:0}
 .flash-details summary{width:max-content;max-width:100%;color:var(--ink2);font-size:12px;cursor:pointer;list-style-position:outside;padding:3px 2px}
 .flash-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px;margin-top:11px;padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
 .flash-detail-grid div{min-width:0}.flash-detail-grid small{display:block;color:var(--ink2);font-size:10.5px}.flash-detail-grid b{display:block;margin-top:2px;font-family:var(--mono);font-size:11.5px;word-break:break-word}
@@ -961,7 +963,7 @@ const DEVICES=[
 const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug","debug","Debug"],
   ["dump","dump","Viewer"],["trace","trace","Trace"],["device-control","device","Device"],["diagnostics","diagnostics","Diagnostics"],["history","history","History"]];
 const HIST=[
-  {id:"S-0826-01",kind:"flash",st:"succeeded",mode:"execute",dev:"DAYU200",what:"OpenHarmony 5.0.0.71",detail:"rk3568_release_20260825.zip · 已验证",when:"今天 14:32",day:"今天",icon:"flash",action:"在 Flash 中打开"},
+  {id:"S-0826-01",kind:"flash",op:"flash.full-restore@1",st:"succeeded",mode:"execute",dev:"DAYU200",target:"target-demo-dayu200",what:"OpenHarmony 5.0.0.71",detail:"dayu200-openharmony-5.0.0.71.tar.gz · flash.full-restore@1",createdAtUTC:"2026-08-26T06:29:00Z",finishedAtUTC:"2026-08-26T06:32:00Z",timeline:['queued','preflight','running','waitingForDevice','succeeded'],when:"今天 14:32",day:"今天",icon:"flash",action:"在 Flash 中打开"},
   {id:"S-0826-02",kind:"viewer",op:"capture.diagnostics@1",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页组件树",detail:"128 个节点 · /settings/display",when:"今天 13:48",day:"今天",icon:"dump",action:"在 Viewer 中打开"},
   {id:"S-0826-03",kind:"trace",op:"capture.diagnostics@1",hasTrace:true,st:"succeeded",mode:"execute",dev:"DAYU200",what:"应用响应 · 30 秒",detail:"trace_143102.htrace · 18.4 MB",when:"今天 13:31",day:"今天",icon:"trace",action:"打开 Trace"},
   {id:"S-0826-04",kind:"diagnostics",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页启动闪退",detail:"bounded HiLog + screenshot · no ring session",when:"今天 11:06",day:"今天",icon:"diagnostics",action:"打开诊断记录"},
@@ -983,6 +985,16 @@ Object.assign(HIST.find(h=>h.id==="S-0826-04"), {
   inputs:{durationSeconds:10,captureHilog:true,uiDump:false},detail:"bounded HiLog · markers.json · no clock calibration"
 });
 HIST.forEach(h=>{if(!h.kind)h.kind=h.what.startsWith("Trace")?"trace":h.what.includes("Viewer")?"viewer":h.what.startsWith("Flash")?"flash":"diagnostics";if(!h.day)h.day="更早";if(!h.icon)h.icon=h.kind==="viewer"?"dump":h.kind;if(!h.detail)h.detail=h.dev+" · "+h.id;if(!h.action)h.action=h.kind==="trace"?"打开 Trace":h.kind==="viewer"?"在 Viewer 中打开":h.kind==="flash"?"在 Flash 中打开":"打开诊断记录";});
+// Explicit design fixtures, never Runtime evidence. Keep retained unknowns
+// first to exercise the same attention-first page order as the native App.
+if(['retained','unknown','waiting','running'].includes(PARAMS.get('flashHistory'))){
+  const sample={kind:'flash',op:'flash.dayu200',st:'waitingForRecovery',mode:'execute',dev:'DAYU200',target:'target-demo-dayu200',what:'Flash · retained unknown',detail:'Design sample · original outcome remains unknown',when:'Design sample',day:'今天',icon:'flash',outcomeUnknown:true,timeline:['queued','running','waitingForRecovery']};
+  HIST.unshift(
+    {...sample,id:'job-demo-flash-alias',createdAtUTC:'2026-08-25T08:00:00Z',resolvedByTargetAliasResolutionID:'alias-resolution-demo'},
+    {...sample,id:'job-demo-flash-superseded',createdAtUTC:'2026-08-25T09:00:00Z',supersededByRecoveryEpochID:'recovery-epoch-demo'});
+  const state=PARAMS.get('flashHistory');
+  if(state!=='retained')HIST.push({...sample,id:`job-demo-flash-${state}`,op:'flash.full-restore@1',st:state==='unknown'?'waitingForRecovery':'running',outcomeUnknown:state==='unknown',waitingForHuman:state==='waiting',createdAtUTC:'2026-08-25T10:00:00Z'});
+}
 const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span class="chip danger">✕ 失败</span>',
   planned:'<span class="chip planned">◇ PLANNED</span>',cancelled:'<span class="chip dim">⊘ 已取消</span>',
   interrupted:'<span class="chip warn">⚠ 已中断 · 结果未知</span>'};
@@ -1137,6 +1149,11 @@ function rebindOk(id){const j=S.jobs.find(x=>x.id===id);if(!j||!j.awaiting)retur
 function rebindAbort(id){const j=S.jobs.find(x=>x.id===id);if(!j||!j.awaiting)return;j.awaiting=false;
   finishJob(j,"cancelled","用户中止 rebind:剩余步骤不执行;该结论写入审计。");}
 function histFromJob(j){
+  if(j.isFlash){
+    const record=flashHistoryRecord(j),index=HIST.findIndex(h=>h.id===j.id);
+    if(index<0)HIST.unshift(record);else HIST[index]=record;
+    return;
+  }
   HIST.unshift({id:"S-live-0"+(S.histSeq++),
     st:j.mode==="planOnly"?"planned":j.state,
     kind:j.title.startsWith("Trace")?"trace":j.title.startsWith("Flash")?"flash":j.title.includes("Debug")?"debug":"other",icon:"history",detail:j.id,day:lc("今天","Today"),mode:j.mode,dev:j.dev||"DAYU200",what:j.title,when:lc("刚刚","Just now"),live:true});
@@ -1209,6 +1226,8 @@ function recoveryHTML(){
 function openHistoryRun(id){
   S.hf={kind:"all",query:"",status:"all",mode:"all",target:"all",session:"all",time:"all"};
   S.historyLimit=HIST.length;S.histSel=id;go('history');
+  $("page").scrollTop=0;
+  if(document.scrollingElement)document.scrollingElement.scrollTop=0;
 }
 function continuationReason(h){
   if(!h||h.st==='interrupted'||h.outcomeUnknown)return 'continuation_source_not_repeatable';
@@ -3401,12 +3420,54 @@ function pDebug(){
 }
 
 /* ---------- Flash ---------- */
+function flashHistoryRecord(j){
+  return {id:j.id,kind:'flash',op:'flash.full-restore@1',st:j.state,mode:j.mode,dev:j.dev,target:'target-demo-dayu200',
+    what:j.title,detail:'Design sample · flash.full-restore@1',icon:'flash',when:lc('刚刚','Just now'),day:lc('今天','Today'),
+    createdAtUTC:j.createdAtUTC,finishedAtUTC:j.finishedAtUTC,timeline:j.log};
+}
+function flashActivityJobs(){
+  const rows=HIST.filter(h=>['flash.full-restore@1','flash.dayu200','flash.dayu200@1'].includes(h.op));
+  if(S.flashJob){const index=rows.findIndex(h=>h.id===S.flashJob.id),record=flashHistoryRecord(S.flashJob);if(index<0)rows.push(record);else rows[index]=record;}
+  const date=h=>{const value=Date.parse(h.finishedAtUTC||h.startedAtUTC||h.createdAtUTC);return Number.isFinite(value)?value:-Infinity;};
+  return rows.sort((a,b)=>date(a)===date(b)?(a.id<b.id?-1:a.id>b.id?1:0):date(b)-date(a));
+}
+function flashEpochEstablished(h){return !!(h?.supersededByRecoveryEpochID||h?.resolvedByTargetAliasResolutionID);}
+function flashNeedsRecovery(h){
+  return !!h&&!flashEpochEstablished(h)&&(h.outcomeUnknown||h.waitingForHuman||['waitingForRecovery','awaitingRebindConfirmation','resumeAtConfirmedSafeBoundary','userAbandonRequested'].includes(h.st));
+}
+function focusedFlashActivity(){
+  const rows=flashActivityJobs();
+  return rows.find(h=>h.outcomeUnknown&&!flashEpochEstablished(h))||rows.find(h=>h.waitingForHuman&&!flashEpochEstablished(h))||rows.find(flashNeedsRecovery)||rows.find(h=>!flashEpochEstablished(h)&&['queued','preflight','running','waitingForDevice','planning','cancelRequested','cancellingAtSafeBoundary','reconciling','recoveringByCompleteOverwrite','finalizing'].includes(h.st))||rows[0];
+}
+function openFlashRecord(id){
+  if(S.flashJob?.id===id)histFromJob(S.flashJob);
+  if(HIST.some(h=>h.id===id))openHistoryRun(id);
+}
+function flashRecoveryNotice(job){
+  return `<div class="warnbox flash-recovery" data-sync-id="flash.runtime.attention"><h2>${lc('Runtime 刷机 Job 需要处理','A Runtime Flash job needs attention')}</h2><p>${job.outcomeUnknown?lc('设备影响未知。不要把此 Job 视为完成，也不要开始下一次刷机。','Device effect is unknown. Do not treat this Job as finished or start another flash.'):lc('Runtime 已停在不可绕过的安全阻塞处。此页面不能补足缺失的设备状态证明。','Runtime stopped at a non-overridable safety blocker. This page cannot supply missing device-state proof.')}</p><p class="mono">${esc(job.id)}</p><button class="btn" onclick="openFlashRecord('${job.id}')">${lc('打开 Runtime 记录','Open Runtime record')}</button></div>`;
+}
+function flashActivityHTML(){
+  const job=focusedFlashActivity();
+  if(!job)return `<section><h3>${lc('Runtime 刷机活动','Runtime Flash activity')}</h3><p>${lc('尚无刷机记录','No Flash jobs yet')}</p></section>`;
+  const stateLabel={succeeded:lc('成功','Succeeded'),running:lc('正在执行','Running'),waitingForRecovery:lc('等待恢复','Waiting for recovery')}[job.st]||job.st;
+  const tone=flashEpochEstablished(job)||job.st==='succeeded'?'ok':flashNeedsRecovery(job)?'warn':job.st==='failed'?'danger':'dim';
+  return `<section data-sync-id="flash.runtime.activity"><h3>${lc('Runtime 刷机活动','Runtime Flash activity')}</h3>
+    <div class="device-actions"><b class="chip ${tone}" data-sync-id="flash.runtime.state">${esc(stateLabel)}</b><span class="hint">${flashActivityJobs().length} ${lc('条刷机记录','Flash jobs')}</span></div>
+    <dl class="kv"><dt>Job</dt><dd class="mono" data-sync-id="flash.runtime.jobID">${esc(job.id)}</dd><dt>${lc('目标','Target')}</dt><dd class="mono">${esc(job.target||job.dev)}</dd></dl>
+    ${job.timeline?.length?`<h4>${lc('Runtime 观测时间线','Observed Runtime timeline')}</h4><div class="mono">${job.timeline.map(entry=>`<div>${esc(entry)}</div>`).join('')}</div>`:''}
+    <p role="status">${flashEpochEstablished(job)?lc('此 Job 的结果仍未知；后续已确认的恢复建立了当前目标状态。','This Job remains unknown; a later confirmed recovery established the current target state.'):job.outcomeUnknown?lc('设备影响未知；不要开始下一次刷机。','Device effect is unknown; do not start another flash.'):job.st==='succeeded'?lc('Runtime 报告刷机及 postflight 检查成功。','Runtime reports success after the Flash and postflight checks.'):lc('请从 Job 记录查看真实阶段和恢复证据。','Inspect the Job record for reported stages and recovery evidence.')}</p>
+    <button class="btn" data-sync-id="flash.runtime.openHistory" onclick="openFlashRecord('${job.id}')">${lc('打开 Runtime 记录','Open Runtime record')}</button>
+    <p class="hint">${lc('只读：此卡片不能取消、重试、核对或恢复执行。','Read only: this card cannot cancel, retry, reconcile, or resume.')}</p>
+    <p class="hint">${lc('设计样本：未解决风险优先，否则显示最新活动；旧 unknown 记录保持不变。此页不连接 Runtime。','Design sample: unresolved risks take priority; otherwise show the latest activity. Old unknown records remain unchanged. This page does not connect to Runtime.')}</p>
+  </section>`;
+}
 function flashAvailabilityReason(){
   // The App keeps Runtime reasons verbatim; only its own status labels localize.
   return S.flashAvailability==="hardwareGated"?"ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign.":"";
 }
 function pFlash(){
   const image=S.flashImage,p=S.flashProgress;
+  const activity=focusedFlashActivity();
   const blocked=flashAvailabilityReason();
   const pct=p.totalBytes?Math.min(100,Math.round(p.bytesDone/p.totalBytes*100)):0;
   const running=S.flashView==="running";
@@ -3422,7 +3483,9 @@ function pFlash(){
       <button class="btn pri" onclick="chooseFlashImage()">${tx("chooseImage")}</button>
     </div>`;
   let main;
-  if(running){
+  if(flashNeedsRecovery(activity)){
+    main=flashRecoveryNotice(activity);
+  } else if(running){
     const hasByteProgress=p.stage==="write"||p.stage==="verify";
     main=`<div class="flash-progress-card" aria-live="polite">
       <div class="flash-progress-head"><div><h2>${stageText}</h2><p class="hint">${tx("keepConnected")}</p></div>
@@ -3437,7 +3500,7 @@ function pFlash(){
       <div class="flash-result-icon" aria-hidden="true">✓</div>
       <div class="flash-result-copy"><h2>${tx("flashSuccess")}</h2><p>${tx("flashSuccessBody")}</p>
         <div class="flash-progress-meta"><span>${tx("elapsed")}</span><span class="mono">OpenHarmony 5.0.0.71</span></div>
-        <div class="device-actions"><button class="btn pri" onclick="flashAgain()">${tx("flashAgain")}</button><button class="btn" onclick="go('history')">${tx("openHistory")}</button></div>
+        <div class="device-actions"><button class="btn pri" onclick="flashAgain()">${tx("flashAgain")}</button><button class="btn" onclick="openFlashRecord('${S.lastFlash?.jobID}')">${tx("openHistory")}</button></div>
       </div></div>`;
   } else if(S.flashView==="stopped"){
     main=`<div class="flash-result" role="status"><div class="flash-result-icon warn" aria-hidden="true">!</div>
@@ -3479,6 +3542,7 @@ function flashDetails(image){
       <button class="btn" onclick="recheckFlashDeviceAccess()">${lc("重新检查设备访问","Re-check device access")}</button>
       <p class="hint">${lc("只读探测的设计样本；本页不连接 Runtime，也不因发现 Loader 而授予刷写权限。","Read-only discovery sample; this page does not connect to Runtime, and finding a Loader does not authorize flashing.")}</p>
     </section>
+    ${flashActivityHTML()}
     <div class="flash-detail-grid">
       <div><small>operation / profile</small><b>flash.full-restore@1 / dayu200</b></div>
       <div><small>target / binding</small><b>TGT-958780b2ffb7 / revision 3</b></div>
@@ -3504,11 +3568,11 @@ function chooseFlashImage(){
   S.flashView="ready";S.lastFlash=null;renderPage();
 }
 function runFlash(){
-  if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashAvailabilityReason())return;
+  if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashAvailabilityReason()||flashNeedsRecovery(focusedFlashActivity()))return;
   S.flashView="running";S.flashProgress={stage:"prepare",tick:0,bytesDone:0,totalBytes:S.flashImage.sizeBytes};
   const j={id:"J"+(S.jobSeq++),title:"Flash · flash.full-restore@1 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
     phases:["准备镜像","进入 Loader","写入镜像","重启并验证"],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,
-    log:["→ 准备镜像","进度百分比只使用 Runtime 已确认写入字节数"],pages:["flash"],isFlash:true};
+    log:["→ 准备镜像","进度百分比只使用 Runtime 已确认写入字节数"],pages:["flash"],isFlash:true,createdAtUTC:new Date().toISOString()};
   S.jobs.push(j);S.flashJob=j;renderDrawer();renderPage();
   j.timer=setTimeout(()=>advanceFlash(j),j.tick);
 }
@@ -3526,9 +3590,9 @@ function advanceFlash(j){
   renderDrawer();renderPageIf(["flash"]);j.timer=setTimeout(()=>advanceFlash(j),j.tick);
 }
 function finishFlash(j,state,msg){
-  clearTimeout(j.timer);j.state=state;j.log.push(msg);histFromJob(j);S.flashJob=null;
+  clearTimeout(j.timer);j.state=state;j.finishedAtUTC=new Date().toISOString();j.log.push(msg);histFromJob(j);S.flashJob=null;
   if(state==="succeeded"){
-    S.flashView="success";S.lastFlash={build:"OpenHarmony 5.0.0.71",binding:"3 → 3"};
+    S.flashView="success";S.lastFlash={jobID:j.id,build:"OpenHarmony 5.0.0.71",binding:"3 → 3"};
     DEVICES[0].build="OpenHarmony 5.0.0.71 · USB";renderDevs();
   }else S.flashView="stopped";
   renderDrawer();renderPageIf(["flash"]);

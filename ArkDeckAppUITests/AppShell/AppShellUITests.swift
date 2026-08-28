@@ -781,7 +781,8 @@ final class AppShellUITests: XCTestCase {
   func testCanonicalFlashHistoryStatesInBothLanguages() throws {
     let canonical = "--ui-test-runtime-flash-canonical"
     for language in ["(en)", "(zh-Hans)"] {
-      try canonical.write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      try "\(canonical)\n--ui-test-runtime-flash-newer-observe".write(
+        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
       let app = launch(arguments: [
         "--ui-test-flash", "--ui-test-runtime-history", "--ui-test-devices",
         "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
@@ -789,6 +790,9 @@ final class AppShellUITests: XCTestCase {
       select("app.navigation.flash", in: app)
       XCTAssertTrue(element("flash.runtime.attention", in: app).waitForExistenceFast(timeout: 10))
       XCTAssertFalse(element("flash.execute.submit", in: app).exists)
+      app.buttons["flash.runtime.openHistory"].click()
+      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-0002")
+      select("app.navigation.flash", in: app)
       toggleFlashDetails(in: app, file: #filePath, line: #line)
       assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-0002")
 
@@ -798,7 +802,9 @@ final class AppShellUITests: XCTestCase {
       XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
       assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-running")
 
-      writeFixtureState("\(canonical)\n--ui-test-runtime-flash-succeeded", in: app)
+      writeFixtureState(
+        "\(canonical)\n--ui-test-runtime-flash-succeeded\n--ui-test-runtime-flash-retained-history",
+        in: app)
       app.buttons["flash.refresh"].click()
       assertDisplayed(element("flash.runtime.jobID", in: app), equals: "job-fixture-flash-succeeded")
       XCTAssertFalse(element("flash.workspace.progress", in: app).exists)
@@ -809,6 +815,14 @@ final class AppShellUITests: XCTestCase {
       attachment.name = "canonical-flash-history-\(language)"
       attachment.lifetime = .keepAlways
       add(attachment)
+      let openRecord = app.buttons["flash.runtime.openHistory"]
+      scrollIntoView(openRecord, in: app)
+      openRecord.click()
+      assertDisplayed(
+        element("history.detail.job", in: app), equals: "job-fixture-flash-succeeded")
+      XCTAssertTrue(
+        element("history.row.state.job-fixture-flash-alias-resolved", in: app).exists,
+        "the old unknown must remain inspectable in History")
       app.terminate()
     }
   }

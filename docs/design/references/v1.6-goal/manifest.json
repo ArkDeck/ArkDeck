@@ -277,6 +277,72 @@
       "byteCount": 77794,
       "sha256": "7b78c6651db75ae130b5e4c396d7e51c5cffeb205cd288df56f6237c0478bbfb",
       "viewed": true
+    },
+    {
+      "file": "flash-activity-retained-en.jpg",
+      "url": "http://127.0.0.1:8851/prototype.html?reference=1&page=flash&flashHistory=retained&lang=en&flashState=hardwareGated",
+      "action": "Expand details and view the latest success despite two retained resolved unknowns.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 63825,
+      "sha256": "6e0ba5a1e0efc94dcde8a95d528e85f13a46dade5c26d956eedbe3d6d9f42cef",
+      "viewed": true
+    },
+    {
+      "file": "flash-activity-history-en.jpg",
+      "url": "http://127.0.0.1:8851/prototype.html?reference=1&page=flash&flashHistory=retained&lang=en&flashState=hardwareGated",
+      "action": "Click Open Runtime record; exact S-0826-01 selected and details scrolled into view, old unknowns remain.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 82142,
+      "sha256": "db9656c88987de1f7547a72a8c3bb5379f3a1e0a2a91b10faf8b683db6b28f18",
+      "viewed": true
+    },
+    {
+      "file": "flash-activity-unknown-en.jpg",
+      "url": "http://127.0.0.1:8851/prototype.html?reference=1&page=flash&flashHistory=unknown&lang=en",
+      "action": "Unresolved older unknown outranks later success; no new Flash action is offered.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 53643,
+      "sha256": "7446e4a5afab9961c238c7036aeba456995ebe890e448864be18fd7e27e953e3",
+      "viewed": true
+    },
+    {
+      "file": "flash-activity-retained-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8851/prototype.html?reference=1&page=flash&flashHistory=retained&lang=zh-Hans&flashState=hardwareGated",
+      "action": "Expand details and view the latest success despite two retained resolved unknowns.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 58127,
+      "sha256": "65682a5f439745c295763854f09956eac86810d1796f6507e55ec60b56f717c4",
+      "viewed": true
+    },
+    {
+      "file": "flash-activity-history-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8851/prototype.html?reference=1&page=flash&flashHistory=retained&lang=zh-Hans&flashState=hardwareGated",
+      "action": "Click Open Runtime record; exact S-0826-01 selected and details scrolled into view, old unknowns remain.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 77003,
+      "sha256": "f13b608c16ff33b2f9fd9fc4901083b4555e966eda4b932de53cbded777e1060",
+      "viewed": true
+    },
+    {
+      "file": "flash-activity-unknown-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8851/prototype.html?reference=1&page=flash&flashHistory=unknown&lang=zh-Hans",
+      "action": "Unresolved older unknown outranks later success; no new Flash action is offered.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "byteCount": 47331,
+      "sha256": "5c941b9abe7191a43d3420c889189d31d54795f0d417be788530e6e1b2fd9a32",
+      "viewed": true
     }
   ]
 }
