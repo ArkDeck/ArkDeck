@@ -4,9 +4,13 @@
 原始 receipt、状态、敏感 Artifact 和原生截图留在本机 `/private/tmp/arkdeck-ui-goal-real-20260827/`，
 不写入仓库。可提交的选择性元数据见 [real-device-metadata.json](real-device-metadata.json)。
 
+2026-08-28 最新续验见[后续元数据](followup-verification-2026-08-28.json)：
+已更新 protected-main Runtime，真实 App entry+shared HSP、原生双语选择器、冷启动和
+stale-frame 均已有通过结果。下文旧批次的失败保持历史含义；Flash 尚未实际执行，不声明 goal 完成。
+
 ## Runtime 与执行边界
 
-- 使用已安装、签名的 protected-main `09c44c16` Runtime；当前 `e1d52e68` 基线相对它仅增加 Diagnostics UI 命名修正。本轮未替换 Runtime。
+- 首批使用已安装、签名的 protected-main `09c44c16` Runtime；当时 `e1d52e68` 基线相对它仅增加 Diagnostics UI 命名修正。后续已通过发布安装入口更新到合入的 `2f05ea02`，哈希及四条历史 unknown 记录不变核对见后续元数据。
 - 新请求通过已发布 typed CLI；设备身份、fresh binding、plan 与 capability 均由 Runtime 验证。没有 raw HDC、外部 shell、authority 注入或 unknown replay。
 - Runtime 与工作区 Catalog digest 一致：`b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce`。
 - 同一 USB 设备；binding revision 4；设备只保留 stable identity 的 SHA-256，不记录原始序列号或 connectKey。
@@ -100,11 +104,37 @@ hilogd（PID/TID 198）、开始 570.566 ms、时长 8 µs；拖选 413.904 ms�
 重命名后重载同一 Trace 仍保留；随后删除本次测试标记。四张截图均已查看，未发起设备操作。
 这证明这些 UI 状态与真实来源的接线，不替代对全部分析指标的独立数学验证。
 
+## 2026-08-28 原生与 HSP 续验
+
+App 生产代码基线 `86b284d0`，Runtime `2f05ea02`，Catalog digest 不变。系统认证恢复后，
+首轮两项测试实际运行并失败：中文菜单点击落在可见 picker 上方 21pt；冷启动为 3.643 秒。
+只修正测试点击方式为激活窗口、滚动至控件、使用当前 frame 中心，未改策略或删减断言。
+同一双语选择器用例随后通过（416.121 秒），覆盖四种生命周期组合、入口文件名及 staticText
+角色、HSP 添加、重复拒绝、提交禁用、移除和清空。两张原生附件已查看；该用例仍是 fixture
+选择测试，不是 HSP 安装证据。冷启动独立重跑通过，实际设备行显示耗时 **0.994 秒**，
+测试总时长 3.906 秒不是启动指标；2 秒要求不变。组合批次失败保留，不声称性能普遍达标。
+
+另用现有官方 SDK 测试签名材料在私有目录为真实 entry + shared HSP 生成同 bundle 的签名，
+未改全局签名预设、Keychain 或 Runtime 信任事实。App 实际选择两个包并提交一次新 Job：
+`job-b6762567bef468c88ac8dc536a06a932`，01:24:13Z—01:24:28Z，succeeded。
+Runtime 导入的两个完整 SHA-256 与本地签名产物一致；install/process readback 成功，
+HiLog 含由 shared 模块函数输出的唯一标记 `ArkDeck HSP acceptance 20260828`。
+停止、卸载、暂存清理均 confirmed，unknown=false、residue=0；三份 Artifact 大小及哈希核验通过。
+安装报告不枚举模块名，所以共享模块运行证明另取其真实函数日志。先前两次错误 profile 的失败不改写。
+最近 Job 列表经截图核对与 Runtime 一致，AX 文本相邻行合并不误记为状态错误。
+
+stale-frame 原生用例通过（27.144 秒）：测试点来自最新锁屏空白画面，归一化坐标 (0.5, 0.73)。
+首次点击 confirmed 后出现过期标记，第二次点击拒绝，等待后无新输入结果，重新截图清除标记。
+完整时间窗口内恰有 `capture.diagnostics@1`、`input.tap@1`、`capture.diagnostics@1` 三个新 Job，
+均 succeeded / 零 unknown / 零 residue；唯一输入为 `job-3cd710c28da0892be31b861603732c4a`。
+三张附件逐图查看且仅留本机。首轮未加 `TEST_RUNNER_` 导致 opt-in 未传入 runner，测试跳过，
+没有设备动作；按仓库既有方式重跑才是本次通过结果。未更改系统安全设置。
+
 ## 剩余验证
 
-- 真实 HiLog 编码提示及 App entry+feature 一次提交已有实测；HSP 真机安装尚未验证。F29/F30 原生自动化与最新构建手动复查继续。
+- HAP/HSP 实际安装、共享代码运行和原生双语选择器均已有通过结果；未把历史错误签名尝试或 fixture 算作硬件通过。
 - Trace timeline/search 与双语入口已通过；中文事件/范围/缩放/本地标记流程已补手动核查，其他未记录状态不外推为通过。
-- 冷启动 2 秒要求仍未通过；Viewer capture、40 帧录屏及独立视频解码已通过，继续其余适用设备流程。
-- 29 个 operation 当前有 26 个 available；`analyzer.summarize-hilog@1` 报未实现；两种 Flash operation 缺 ArkForge bundle 配置。不可将 unavailable 的稿件演示当成真实执行。
+- 冷启动独立复测达到 2 秒要求；Viewer capture、40 帧录屏、独立视频解码及 stale-frame 原生交互已通过。各次运行范围单列，不声称所有用例在同一批次全绿。
+- 安装 pinned ArkForge 后 29 个 operation 有 28 个 available；`analyzer.summarize-hilog@1` 仍如实报告未实现。Flash 的配置缺口已解除，但擦写授权尚未明确，未提交新 Flash Job；availability / plan-only 不是真机执行。
 - 最新全量闸覆盖 F28–F30 生产代码并退出 0：Swift 调度 1,826 + 1 identity race + 5 scale = 1,832 项，所有车道成功，SDD/catalog/零漂移与 App/UI-test bundle 编译通过。F31 只改设计、测试与参考图，另行通过 40/40 设计交互和设计包构建。详见 [local-gate-verification.json](local-gate-verification.json)。
-- 原生文件选择和 Device stale-frame 尚未通过；五项真机 UI 批次也不是全绿。编译、合约与设计测试均不替代这些断言，不调低验收要求，goal 仍未完成。
+- 本次 picker 测试修正的路径分类器最终闸退出 0：SDD 0 errors / 0 warnings、catalog 49 tests 与零漂移、App/UI-test bundle 编译通过；仅测试/文档改动，未选择 Swift package 车道。40 项设计测试也通过，日志哈希见后续元数据。Flash 尚未通过，goal 仍未完成；编译、合约与设计测试不替代真机断言。

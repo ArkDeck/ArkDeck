@@ -1,0 +1,276 @@
+{
+  "date": "2026-08-28",
+  "appBaseRevision": "86b284d0cbae8c052c888addb14cd808828723b7",
+  "appProductionSourcesChangedInThisFollowup": false,
+  "runtimeSourceRevision": "2f05ea02add62343b2bdcbe8932e87bfa28a7197",
+  "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+  "targetId": "TGT-958780b2ffb7",
+  "bindingRevision": 4,
+  "runtimeUpdate": {
+    "sourceCommit": "2f05ea02add62343b2bdcbe8932e87bfa28a7197",
+    "reviewPR": "https://github.com/ArkDeck/ArkDeck/pull/1564",
+    "buildKind": "local provisioned Developer ID helper; not a notarized distribution",
+    "beforeDaemonSHA256": "56b380198dfbaf749beef7218e0a41a6285a82d981328c00342dd4e433ba3a7d",
+    "afterDaemonSHA256": "aabb94b496e3b887c90653cb89f277c538a36d6524c9b9c744b6cb6d09a6dd34",
+    "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+    "preservedConfigurationFields": [
+      "daemonPath",
+      "hdcPath",
+      "hdcSHA256",
+      "workspaceProjectPath",
+      "devecoSDKPath",
+      "arkTraceDescriptor",
+      "socketPath"
+    ],
+    "currentJobRecordsUnchanged": true,
+    "closedUnknownJobIDs": [
+      "job-363528f0c681a39c9fd0571b2ec1552e",
+      "job-ac68ec140752da12ce8cf1fec92221e0",
+      "job-be448cb20f06aae340e1ccfe5275be81",
+      "job-c63388f93234e2ca4fb294901b7105e4"
+    ],
+    "blockingJobCountBeforeAndAfter": 0,
+    "boundary": "Host Runtime update and read-only verification only; no device operation acceptance is implied."
+  },
+  "arkForgeInstall": {
+    "sourceCommit": "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92",
+    "bundleManifestSHA256": "e5b893b22cd4d0cc744d6b115b924cc02e05cb07ddae2624a588aa65f13984af",
+    "configuredThroughPublishedInstaller": true,
+    "currentJobRecordsUnchanged": true,
+    "boundary": "Host bundle build, signature/member verification, and Runtime configuration only. No Flash or device acceptance is implied."
+  },
+  "hspAppExecution": {
+    "evidenceKind": "real-device-manual-app",
+    "result": "pass",
+    "jobId": "job-b6762567bef468c88ac8dc536a06a932",
+    "operation": "debug.hap@1",
+    "createdAtUtc": "2026-08-28T01:24:13Z",
+    "finishedAtUtc": "2026-08-28T01:24:28Z",
+    "state": "succeeded",
+    "outcomeUnknown": false,
+    "outstandingResidueCount": 0,
+    "materializedPlanDigest": "67feff4bedb71c1491aa60193d0b433bac8b876ddb375ed7c385d4555b451917",
+    "requestClient": "ArkDeckApp.DebugWorkspace.Apps",
+    "inputPackages": [
+      {
+        "name": "entry-default-signed.hap",
+        "artifactId": "ART-cc1ca48036e68ff231073bafb45f2966",
+        "mediaType": "application/vnd.openharmony.hap",
+        "byteCount": 1421543,
+        "sha256": "1c60ec2881e65586f1392ed67d02f7af5950d249bc037aa836c79c346653631f",
+        "moduleType": "entry"
+      },
+      {
+        "name": "shared-default-signed.hsp",
+        "artifactId": "ART-73c396da8e0853a631de7bfaa6c67e92",
+        "mediaType": "application/vnd.openharmony.hsp",
+        "byteCount": 136224,
+        "sha256": "a4d0b5de9f3895d47c34baef105e336f13c314764eb7957b9824fd4a29b44b17",
+        "moduleType": "shared"
+      }
+    ],
+    "lifecycle": {
+      "bundleName": "com.example.waterflowdemo",
+      "abilityName": "EntryAbility",
+      "installPolicy": "installOrReplace",
+      "cleanupPolicy": "uninstall",
+      "postRunAbilityState": "stopped",
+      "captureDiagnostics": true,
+      "diagnosticsDurationSeconds": 30
+    },
+    "artifacts": [
+      {
+        "artifactId": "ART-fb3cceeacca4c16506fdbe9c7ee63982",
+        "name": "install-readback.json",
+        "byteCount": 658,
+        "sha256": "c3f30319f4b1b4e0ef7eb22d5b109f374aab092efcb38765149d39fdebabc0e6",
+        "privacy": "standard",
+        "bytesAndHashVerified": true
+      },
+      {
+        "artifactId": "ART-8fe60e417bab5605b8ee4cb22dfd8e2d",
+        "name": "process-readback.json",
+        "byteCount": 469,
+        "sha256": "19d5fd372a42c7f325ba5d257a7b4de6611672349f6db5fb600832dd17ed0826",
+        "privacy": "standard",
+        "bytesAndHashVerified": true
+      },
+      {
+        "artifactId": "ART-e6e05405794a7b40d6ffa781e0129535",
+        "name": "debug-hilog.txt",
+        "byteCount": 877464,
+        "sha256": "59619ef3b5d9379e360ac3dc9bb995ce376337f19f8e65906630c1b5aa23366a",
+        "privacy": "sensitive",
+        "bytesAndHashVerified": true
+      }
+    ],
+    "sharedModuleExecution": {
+      "marker": "ArkDeck HSP acceptance 20260828",
+      "markerOccurrencesInCapturedHiLog": 1,
+      "entryImportsSharedFunction": true
+    },
+    "completedJobRecordSHA256": "e77b532fec48cc25a5139e53d9788d13dc55736b6408a81e8337a2025e3ea9ef",
+    "inputPreparationSHA256": "31963d42dc945cab9dd303d84fe43e8e9ab09e844dc02261ae4c20578ed9afa9",
+    "existingSigningPresetUnchanged": true,
+    "appJobListScreenshotSHA256": "09491880f60346d44a4d2adfe88fb57daf7ac3c2a1ba4a16321f464314bd7e54",
+    "appJobListScreenshotViewed": true,
+    "boundary": "Real compiled entry HAP plus shared HSP, signed with installed official SDK test material. Both App-imported artifact hashes match. One new App request; install/process, shared function log, stop/uninstall/staging cleanup verified. Install report itself does not enumerate module names. Requested diagnostic duration is a bound, not measured stream duration. Raw artifacts, screenshots and signing material remain private. Earlier wrong-profile failed jobs are unchanged."
+  },
+  "pickerXCTest": {
+    "evidenceKind": "native-ui-fixture-with-system-file-picker",
+    "test": "AppShellUITests/testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages",
+    "exitCode": 0,
+    "testCount": 1,
+    "failures": 0,
+    "skipped": 0,
+    "durationSeconds": 416.121,
+    "logSHA256": "b688d475380890abd34ffe8d82ce333848e7596e24cbbaa76b58497d260819c6",
+    "captures": [
+      {
+        "name": "HAP HSP selection and duplicate refusal (zh-Hans)",
+        "privateFile": "88E8E3C5-5579-4FC5-9874-C0FC1B520552.png",
+        "sha256": "70a8048a750c2204b7a8dff91a903f9b18e0a1133fa29a5ad0c3d69ab642f1fa",
+        "viewed": true
+      },
+      {
+        "name": "HAP HSP selection and duplicate refusal (en)",
+        "privateFile": "59660707-3B9B-484D-8CE0-2AFB8F9CD941.png",
+        "sha256": "80e681f1b753601e9777f1a40c475f7f3ff8e0cf68752754859c94cf1bf6a05a",
+        "viewed": true
+      }
+    ],
+    "fix": "Use activated, visible picker frame centre after native click() landed 21pt above it. No label, policy assertion or safety condition changed.",
+    "assertions": [
+      "English and Simplified Chinese",
+      "all four lifecycle combinations",
+      "entry filename exact text and staticText role",
+      "add real local HSP selection sample",
+      "duplicate rejection",
+      "run disabled after invalid selection",
+      "remove clears error",
+      "clear selection"
+    ],
+    "boundary": "Native UI/file-picker acceptance only; fixture packages are never device-install evidence."
+  },
+  "coldStartXCTest": {
+    "evidenceKind": "real-device-native-ui",
+    "test": "AppShellUITests/testRealDeviceColdStartShowsConnectedDeviceWithinTwoSeconds",
+    "exitCode": 0,
+    "testCount": 1,
+    "failures": 0,
+    "skipped": 0,
+    "testDurationSeconds": 3.906,
+    "connectedDeviceVisibleAfterSeconds": 0.994,
+    "unchangedRequirementSeconds": 2,
+    "logSHA256": "7b982f429a73cdf65b0f63af749ed90067a9db9363a8186496f907ff6d930441",
+    "timingAttachmentSHA256": "75a4ac7d349ce74d7244bbdcbf6453daae7e0b5c5147c3e546529988e7f6d66a",
+    "boundary": "One standalone cold-start pass on the updated Runtime. Prior 3.643-second combined-batch failure is retained; no percentile or universal latency guarantee is inferred."
+  },
+  "staleFrameXCTest": {
+    "evidenceKind": "real-device-native-ui",
+    "test": "DeviceStaleFrameUITests/testASecondPressOnASpentPictureIsRefusedAndNotSent",
+    "exitCode": 0,
+    "testCount": 1,
+    "failures": 0,
+    "skipped": 0,
+    "durationSeconds": 27.144,
+    "logSHA256": "d20989c33f909008380d2e82dcb8a478101f4e9f6b2f5a644eeabba8910b9107",
+    "captures": [
+      {
+        "name": "Real device recapture clears stale state",
+        "privateFile": "0C4590E1-B381-4D28-97AA-E0588F3B9EC2.png",
+        "sha256": "553eaed62f988714f88397f7c4d0304894ab92eb60d49deb18918cfd85b5e464",
+        "viewed": true
+      },
+      {
+        "name": "Real device confirmed gesture marks picture stale",
+        "privateFile": "EBF28C40-C34B-4F80-BC24-FDF6E8BC9639.png",
+        "sha256": "72b27b934c789d41e8c21ce90a800cd0e12d2dd9c89df6fde345027d899d6ece",
+        "viewed": true
+      },
+      {
+        "name": "Real device fresh picture",
+        "privateFile": "4799A759-5888-4BFB-BD30-73D197CEC0F4.png",
+        "sha256": "2ca1fea8d781238c92200b25b66b365dc5751f7080fefce89689dccb1759586c",
+        "viewed": true
+      }
+    ],
+    "observedSafePoint": {
+      "screen": "lock-screen blank wallpaper",
+      "normalizedX": 0.5,
+      "normalizedY": 0.73,
+      "deviceX": 359,
+      "deviceY": 934
+    },
+    "newJobs": [
+      {
+        "jobId": "job-67e964496bab8237824a31f1f2469b0b",
+        "operation": "capture.diagnostics@1",
+        "state": "succeeded",
+        "createdAtUtc": "2026-08-28T01:30:23Z",
+        "finishedAtUtc": "2026-08-28T01:30:25Z",
+        "outcomeUnknown": false,
+        "outstandingResidueCount": 0
+      },
+      {
+        "jobId": "job-3cd710c28da0892be31b861603732c4a",
+        "operation": "input.tap@1",
+        "state": "succeeded",
+        "createdAtUtc": "2026-08-28T01:30:27Z",
+        "finishedAtUtc": "2026-08-28T01:30:28Z",
+        "outcomeUnknown": false,
+        "outstandingResidueCount": 0
+      },
+      {
+        "jobId": "job-cd572b5332a2487b592a94a4ee9920fc",
+        "operation": "capture.diagnostics@1",
+        "state": "succeeded",
+        "createdAtUtc": "2026-08-28T01:30:40Z",
+        "finishedAtUtc": "2026-08-28T01:30:41Z",
+        "outcomeUnknown": false,
+        "outstandingResidueCount": 0
+      }
+    ],
+    "inputJobCount": 1,
+    "currentClosedUnknownRecordsUnchanged": true,
+    "jobInventorySHA256": "0240df8a32bc58ccbd9658b2f12ad58ac6990d81e0f3e3c09f8285427cce22cb",
+    "boundary": "One first tap confirmed, second tap refused, no second input Job in the complete time window, fresh capture clears stale state. Existing unknown outcomes remain unchanged. Raw screenshots include unrelated desktop content and remain private."
+  },
+  "retainedAttempts": [
+    {
+      "log": "native-ui-confirmed-20260828-1.log",
+      "exitCode": 65,
+      "tests": 2,
+      "failures": 2,
+      "reason": "Chinese policy menu click missed its visible frame; combined-batch cold start measured 3.6433675s.",
+      "logSHA256": "ba706192eb90718a04666dd3922a598d2a266317f9d73788bb794b1cc3974522"
+    },
+    {
+      "log": "native-stale-confirmed-20260828-1.log",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 1,
+      "reason": "Unprefixed opt-in variable did not reach XCTest; no device action. Re-run uses TEST_RUNNER_ as documented.",
+      "logSHA256": "ffb00ebf56e8ff5c24bf548f2f1c6284ab11bc350c71da1c6fdf691a885ae0c3"
+    }
+  ],
+  "remainingBoundary": "Flash end-to-end is not accepted. Installing ArkForge and materializing a plan are not hardware evidence. Erase authorization is still required by the execution approval boundary; Runtime safety proofs cannot be overridden. No full-goal acceptance is claimed.",
+  "finalLocalChecks": {
+    "classifierExitCode": 0,
+    "appBuildForTesting": true,
+    "swiftPackageLaneSelected": false,
+    "sddErrors": 0,
+    "sddWarnings": 0,
+    "acceptanceIDs": 121,
+    "catalogGeneratorTests": 49,
+    "zeroDrift": true,
+    "classifierTests": 18,
+    "agentWorkflowTests": 9,
+    "xcodebuildWrapperTests": 7,
+    "designTests": 40,
+    "designFailures": 0,
+    "gateLogSHA256": "745bfe57b047e47931a703870f46cbe08256e2bead30c943382982daadb70cf4",
+    "designLogSHA256": "a4146642991548f2696b7da9b48646664d895e090bf06ad38f7264ab96fe7dd9",
+    "boundary": "Only test code and documentation changed; classifier selected App build-for-testing, not Swift package tests. These checks do not replace the three actual XCTest runs or HSP hardware evidence."
+  }
+}
