@@ -6,7 +6,8 @@
 
 2026-08-28 最新续验见[后续元数据](followup-verification-2026-08-28.json)：
 已更新 protected-main Runtime，真实 App entry+shared HSP、原生双语选择器、冷启动和
-stale-frame 均已有通过结果。下文旧批次的失败保持历史含义；Flash 尚未实际执行，不声明 goal 完成。
+stale-frame 均已有通过结果。随后 Flash 真实请求在设备副作用前被硬件资格门拒绝，
+见[Flash 续验](flash-hardware-gate-verification-2026-08-28.json)。下文旧批次的失败保持历史含义；不声明 goal 完成。
 
 ## Runtime 与执行边界
 
@@ -135,6 +136,6 @@ stale-frame 原生用例通过（27.144 秒）：测试点来自最新锁屏空�
 - HAP/HSP 实际安装、共享代码运行和原生双语选择器均已有通过结果；未把历史错误签名尝试或 fixture 算作硬件通过。
 - Trace timeline/search 与双语入口已通过；中文事件/范围/缩放/本地标记流程已补手动核查，其他未记录状态不外推为通过。
 - 冷启动独立复测达到 2 秒要求；Viewer capture、40 帧录屏、独立视频解码及 stale-frame 原生交互已通过。各次运行范围单列，不声称所有用例在同一批次全绿。
-- 安装 pinned ArkForge 后 29 个 operation 有 28 个 available；`analyzer.summarize-hilog@1` 仍如实报告未实现。Flash 的配置缺口已解除，但擦写授权尚未明确，未提交新 Flash Job；availability / plan-only 不是真机执行。
+- 安装 pinned ArkForge 后曾报告 28/29 个 operation available；这包含两种 Flash 入口的误报（F32）。收到指定设备/镜像的擦写授权后，`job-e9e5e3d7ae56af47ef69c94079fa6652` 实际提交一次，exit 1、failed、`executionConfirmedNotPerformed`，零 unknown / residue，ArkForge 在 startExecution 前拒绝；不是硬件通过。额外启用 HardwareCampaign 的配置审批被拒，未执行配置修改；不得把擦写确认当作该额外授权，也不重放原请求。`analyzer.summarize-hilog@1` 仍如实报告未实现。
 - 最新全量闸覆盖 F28–F30 生产代码并退出 0：Swift 调度 1,826 + 1 identity race + 5 scale = 1,832 项，所有车道成功，SDD/catalog/零漂移与 App/UI-test bundle 编译通过。F31 只改设计、测试与参考图，另行通过 40/40 设计交互和设计包构建。详见 [local-gate-verification.json](local-gate-verification.json)。
 - 本次 picker 测试修正的路径分类器最终闸退出 0：SDD 0 errors / 0 warnings、catalog 49 tests 与零漂移、App/UI-test bundle 编译通过；仅测试/文档改动，未选择 Swift package 车道。40 项设计测试也通过，日志哈希见后续元数据。Flash 尚未通过，goal 仍未完成；编译、合约与设计测试不替代真机断言。

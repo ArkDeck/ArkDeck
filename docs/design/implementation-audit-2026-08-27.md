@@ -55,6 +55,14 @@ GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 ta
 | F30 | Apps 同时选择“保持运行”和“运行后卸载”未解释实际结果，填写后 Bundle/Ability 没有可见标签；附加包容器覆盖移除按钮的自动化标识 | App/稿件增加按真实策略显示的中英文提示，不修改已发布策略或静默改值；保留字段标签、文件和移除按钮独立标识。双语原生四种策略组合通过；XCTest 原生 click 命中可见 picker 上方 21pt，改用当前 frame 中心后同一用例通过，未删减断言 |
 | F31 | Trace 真机已有时刻标记的重命名、换色、删除和本机重载保留，稿件只有范围标记与保留复选框；清空选区还会隐藏所有标注 | 原型补时刻标记入口、完整范围、临时/保留标记演示、名称编辑/换色/删除；无选区仍显示注释，编辑保留检查器滚动位置。明确原型不落盘，不把演示当真实 sidecar；40 项设计测试通过，真实 Trace 中文事件/范围/标记已手动验证 |
 
+F32（2026-08-28，GJ-4）：ArkForge 通道连接成功被直接投影为 Flash 可用，默认
+`hardwareGated` 却只能生成 assessment。真实请求在外层 capability 已消费后才被拒绝，
+没有设备副作用。现改为从同一次 composition 传递执行可用性，保留只读 lane；标准和兼容
+入口均在 Job/capability 创建前拒绝。具名硬件验收配置不改为生产资格，逐计划的
+mechanics/authority seals 与 Runtime 安全门不变。原型增加
+`?page=flash&flashState=hardwareGated&lang=en`（或 `zh-Hans`）的受阻状态。
+见[本次验证记录](references/v1.6-goal/flash-hardware-gate-verification-2026-08-28.json)。
+
 ### 关键实现入口
 
 - [Session reader](../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift)：fresh correlation、发布清单、两份索引一致性、受限读取、完整性与缺失判断。
@@ -91,7 +99,7 @@ GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 ta
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框 |
+| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 将已连接但仅可评估的 lane 显示为执行不可用 |
 | flash.plan | 计划/前置条件 disclosure；target/hash/partitions/Loader/missing | Loader 激活属于执行前身份关联；历史目标缺失明确占位；测试显式选择当前目标后才 materialize exact plan，不静默换目标 |
 | flash.runtime | prepare/write/reboot/verify/failed/cancelled/unknown | bytes比例不是成功；postflight后才成功；unknown不重放 |
 
@@ -325,7 +333,7 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 1. **Diagnostics 交互式会话**：arm/append-marker/stop、会话内视频和跨时钟校准；现有 bounded ringBuffered、markers.json 和 reader 不等于该完整体验。缺失 operation/并发契约不得从 App 接 raw HDC 补洞。
 2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
 3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
-4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动仍超时，F28 Runtime 修正须先回归并经维护者 review/merge，才能更新受保护运行时复验。其余适用流程继续验证；两种 Flash 操作当前缺少 ArkForge bundle 配置，HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
+4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；F28 Runtime 修正已合入并更新，冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。Flash 已安装 pinned bundle，收到擦写授权后的首次真实请求因 `hardwareGated` 在设备副作用前拒绝；额外启用 HardwareCampaign 尚未获批，配置未变。F32 修正可用状态误报，不宣称刷写通过。HiLog 摘要操作仍报告未实现。远程设计库未连接，当前只同步仓库稿件与参考图。
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。
