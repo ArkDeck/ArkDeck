@@ -695,10 +695,13 @@ Task.detached {
     case .success(let composed):
       arkForgeLane = composed.lane
       arkForgeDeviceProfileID = composed.deviceProfileID
-      arkForgeAvailability = .available
+      arkForgeAvailability = composed.operationAvailability
       startedArkForgeDaemon = composed.daemonLifecycle
       FileHandle.standardError.write(
         Data("arkforge lane: composed for \(composed.deviceProfileID)\n".utf8))
+      if case .unavailable(_, let reason) = arkForgeAvailability {
+        FileHandle.standardError.write(Data("arkforge Flash: \(reason)\n".utf8))
+      }
     case .failure(let absence):
       arkForgeLane = nil
       arkForgeDeviceProfileID = nil
@@ -709,10 +712,9 @@ Task.detached {
     }
 
     // Catalog presence is not runtime availability. The native daemon and its
-    // controller lane are one startup composition; if that composition fails,
-    // publishing Flash as available would admit work into a route that cannot
-    // execute it. Both the canonical operation and its compatibility alias use
-    // this same provider fact.
+    // controller lane are one startup composition. Both a failed composition
+    // and a connected but hardware-gated lane must refuse before admission.
+    // The canonical operation and its compatibility alias use this same fact.
     let arkForgeProvider = ArkForgeFlashProviderAdapter(
       factsPort: rockchipFactsPort, availability: arkForgeAvailability)
     let providers = DeviceProviderRegistry(providers: [

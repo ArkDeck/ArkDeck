@@ -941,6 +941,7 @@ const S = {
   fwd:[], forwardDirection:"forward",
   cmd:{val:"device.packageInventory", hist:[]},
   flashPrerequisitesReady:true, loaderBound:true, flashJob:null, flashImage:null, flashView:"idle",
+  flashAvailability:PARAMS.get("flashState")==="hardwareGated"?"hardwareGated":"available",
   flashProgress:{stage:"idle",tick:0,bytesDone:0,totalBytes:0},lastFlash:null,
   debugTab:PARAMS.get("debugTab")||"artifacts",
   settingsTab:PARAMS.get("settingsTab")||"general", traceSettingsTab:PARAMS.get("traceSettingsTab")||"cache",
@@ -3399,8 +3400,12 @@ function pDebug(){
 }
 
 /* ---------- Flash ---------- */
+function flashAvailabilityReason(){
+  return S.flashAvailability==="hardwareGated"?lc("ArkForge 已连接，仅可评估（hardwareGated）。当前配置没有已审查的生产支持记录，也未配置具名硬件验收，暂不可刷写。","ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."):"";
+}
 function pFlash(){
   const image=S.flashImage,p=S.flashProgress;
+  const blocked=flashAvailabilityReason();
   const pct=p.totalBytes?Math.min(100,Math.round(p.bytesDone/p.totalBytes*100)):0;
   const running=S.flashView==="running";
   const stageIndex=p.stage==="prepare"||p.stage==="loader"?0:p.stage==="write"?1:p.stage==="verify"||S.flashView==="success"?2:-1;
@@ -3437,15 +3442,15 @@ function pFlash(){
       <div class="flash-result-copy"><h2>${S.language==="en"?"Flash stopped":"刷机已停止"}</h2><p>${S.language==="en"?"Runtime stopped at a safe boundary. The device result is not shown as successful.":"Runtime 已在安全边界停止；设备结果不会显示为成功。"}</p>
       <button class="btn" onclick="flashAgain()">${tx("flashAgain")}</button></div></div>`;
   } else {
-    main=`<div class="card">${imageBox}
+    main=`${blocked?`<div class="warnbox" role="status" data-sync-id="flash.availability">${esc(blocked)}</div>`:""}<div class="card">${imageBox}
       <div class="flash-actions"><p class="flash-impact">${tx("flashImpact")}</p>
-        <button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady?"":"disabled"}>${tx("startFlash")}</button></div>
+        <button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady&&!blocked?"":"disabled"}>${tx("startFlash")}</button></div>
     </div>`;
   }
   return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
     <div class="flash-lead" data-page-title="${esc(tx("flashTitle"))}"><p>${tx("flashSubtitle")}</p></div>
     <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
-      <span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span></div>
+      ${blocked?`<span class="chip warn">${lc("刷写不可用","Flash unavailable")}</span>`:`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`}</div>
     ${main}
     ${running?`<div class="hint"><b>${esc(image.name)}</b> · ${formatBytes(image.sizeBytes)}</div>`:""}
     ${flashDetails(image)}
@@ -3483,7 +3488,7 @@ function chooseFlashImage(){
   S.flashView="ready";S.lastFlash=null;renderPage();
 }
 function runFlash(){
-  if(!S.flashImage||S.flashJob)return;
+  if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashAvailabilityReason())return;
   S.flashView="running";S.flashProgress={stage:"prepare",tick:0,bytesDone:0,totalBytes:S.flashImage.sizeBytes};
   const j={id:"J"+(S.jobSeq++),title:"Flash · flash.dayu200 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
     phases:["准备镜像","进入 Loader","写入镜像","重启并验证"],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,

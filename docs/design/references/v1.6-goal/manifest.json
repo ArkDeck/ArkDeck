@@ -157,6 +157,30 @@
       "byteCount": 89080,
       "sha256": "699b9fc7c8544c9d2a8e0957d9034752745ff8fe1656fbdf34e8d2a1b699e564",
       "viewed": true
+    },
+    {
+      "file": "flash-hardware-gated-en.jpg",
+      "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=en",
+      "action": "Choose the demo image; observe the hardware qualification reason and disabled Flash button.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "referenceMode": false,
+      "byteCount": 83465,
+      "sha256": "058d95ef5124752db040275b1cb75b665a53f5bb8ba5493d400ffe57b6709160",
+      "viewed": true
+    },
+    {
+      "file": "flash-hardware-gated-zh-Hans.jpg",
+      "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=zh-Hans",
+      "action": "Switch the same selected-image state to Chinese; observe the qualification reason, disabled Flash button and no running Job.",
+      "mimeType": "image/jpeg",
+      "width": 1280,
+      "height": 720,
+      "referenceMode": false,
+      "byteCount": 77694,
+      "sha256": "6cfc8fd34820b0e985b4467ad0cb717aa3038b97d8ef637a562db43f091666a0",
+      "viewed": true
     }
   ]
 }

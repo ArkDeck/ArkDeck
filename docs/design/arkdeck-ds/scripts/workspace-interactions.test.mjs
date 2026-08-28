@@ -64,6 +64,26 @@ function harness(search='') {
   return {run, document, flushTimers(){const queued=timers.splice(0);for(const callback of queued)callback?.();}};
 }
 
+test('Flash distinguishes a connected assessment lane from execution availability', () => {
+  for(const lang of ['en','zh-Hans']) {
+    const h=harness(`?page=flash&flashState=hardwareGated&lang=${lang}`);
+    h.run('chooseFlashImage()');
+    const page=h.run('pFlash()');
+    assert.match(page,/data-sync-id="flash.availability"/);
+    assert.match(page,/hardwareGated/);
+    assert.match(page,/<button[^>]+onclick="runFlash\(\)"[^>]+disabled/);
+    assert.doesNotMatch(page,/4 safety checks passed|4 项安全检查通过/);
+    const before=h.run('S.jobs.length');
+    h.run('runFlash()');
+    assert.equal(h.run('S.jobs.length'),before);
+    assert.equal(h.run('S.flashView'),'ready');
+    assert.equal(h.run('S.flashJob'),null);
+  }
+  const ready=harness('?page=flash&lang=en');
+  ready.run('chooseFlashImage(); runFlash()');
+  assert.equal(ready.run('S.flashView'),'running');
+});
+
 test('all actual navigation items and subtabs are audited', () => {
   assert.deepEqual(enumCases('ArkDeckApp/App/ArkDeckApp.swift', 'ArkDeckNavigationItem'), coverage.navigation);
   assert.deepEqual(enumCases('ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'DebugWorkspaceTab'), coverage.debugTabs);

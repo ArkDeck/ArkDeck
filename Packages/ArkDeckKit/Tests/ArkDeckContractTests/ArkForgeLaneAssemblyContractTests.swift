@@ -3,6 +3,8 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckProcess
+@testable import ArkDeckRuntime
+@testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 @testable import ArkForgeClient
 @testable import ArkForgeProtocol
@@ -94,8 +96,7 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     }
   }
 
-  func testAConfiguredDaemonActuallyComesOutWithALane() async {
-    // The whole point. Not "the parts exist" — a lane, out the other end.
+  func testConfiguredAssessmentLaneRefusesFlashBeforeJobOrCapabilityCreation() async throws {
     let daemonDigest = fixture.daemonSHA256
     let result = await ArkForgeLaneComposition.compose(
       environment: environment, runtimeDirectory: URL(filePath: "/tmp/rt"),
@@ -108,6 +109,79 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       return XCTFail("a fully configured daemon must produce a lane, got \(result)")
     }
     XCTAssertEqual(composed.deviceProfileID, "org.openharmony.dayu200@1.0.0")
+    guard case .unavailable(let code, let reason) = composed.operationAvailability else {
+      return XCTFail("a connected lane without a campaign must remain hardwareGated")
+    }
+    XCTAssertEqual(code, .providerToolUnavailable)
+    XCTAssertTrue(reason.contains("assessment only (hardwareGated)"))
+
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: bundleRoot.appending(path: "capabilities"))
+    let artifacts = try RuntimeArtifactStore(
+      rootURL: bundleRoot.appending(path: "artifacts"),
+      nowUTC: { "2026-08-28T00:00:00Z" })
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: bundleRoot.appending(path: "engine"),
+        arkForgeLane: composed.lane, arkForgeDeviceProfileID: composed.deviceProfileID),
+      providers: DeviceProviderRegistry(providers: [
+        ArkForgeFlashProviderAdapter(availability: composed.operationAvailability)
+      ]),
+      dispatcher: UnexpectedDispatcher(), capabilityStore: capabilities,
+      artifactStore: artifacts, nowUTC: { "2026-08-28T00:00:00Z" })
+    let availability = await engine.operationAvailability()
+    let profile = try XCTUnwrap(RockchipFlashProfile.profile(reference: "dayu200"))
+    let requests: [(String, String, [String: JSONValue])] = [
+      (
+        "flash.full-restore", "flash.full-restore@1",
+        [
+          "artifactLease": .string("lease-v1:input-gated:ART-gated"),
+          "deviceProfileRef": .string("dayu200"), "intent": .string("fullRestore"),
+          "verification": .string("full"),
+        ]
+      ),
+      (
+        "flash.dayu200", "flash.dayu200",
+        [
+          "imageBundleLease": .string("lease-v1:input-gated:ART-gated"),
+          "deviceProfile": .string("dayu200"),
+          "partitionPlan": .array(profile.mappedPartitions.map { .string($0.partitionName) }),
+          "postFlashVerification": .string("full"),
+        ]
+      ),
+    ]
+    for (index, (id, reference, inputs)) in requests.enumerated() {
+      let operation = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
+      let row = try XCTUnwrap(availability.first { $0.reference == reference })
+      XCTAssertEqual(row.state, .unavailable, reference)
+      XCTAssertEqual(row.reasons, [reason], reference)
+      XCTAssertEqual(row.reasonCodes, [.providerToolUnavailable], reference)
+      let request = try RuntimeOperationRequest(
+        requestID: "request-hardware-gated-\(index)",
+        idempotencyKey: "execution-hardware-gated-\(index)",
+        target: DurableTargetReference(targetID: "TGT-test", expectedBindingRevision: 1),
+        operation: RuntimeOperationReference(id: id, version: operation.version), inputs: inputs)
+      do {
+        _ = try await engine.submit(try JSONEncoder().encode(request))
+        XCTFail("\(reference) must refuse before admission")
+      } catch let error as RuntimeJobEngineError {
+        guard case .rejected(.invalidInput, let message) = error else {
+          return XCTFail("expected availability refusal, got \(error)")
+        }
+        XCTAssertTrue(message.contains(reason), message)
+      }
+    }
+    let jobs = try await engine.listJobs()
+    let issuedCapabilities = try await capabilities.list()
+    XCTAssertTrue(jobs.isEmpty, "the standing hardware gate must not create a failed Job")
+    XCTAssertTrue(issuedCapabilities.isEmpty, "the standing gate must not issue a capability")
+  }
+
+  private struct UnexpectedDispatcher: RuntimeProcessDispatching {
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      XCTFail("a hardware-gated lane must not dispatch a process")
+      throw DeviceProviderError.unsupportedAction("unexpected process dispatch")
+    }
   }
 
   func testMissingAuthorityOrHDCDigestRefusesBeforeDaemonLaunch() async {
@@ -216,6 +290,12 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       composed.toolchain,
       .init(id: "arkforged-native-rockusb", sha256: daemonDigest))
     XCTAssertEqual(composed.lane.toolchainSHA256, daemonDigest)
+    XCTAssertEqual(composed.operationAvailability, .available)
+    let provider = ArkForgeFlashProviderAdapter(availability: composed.operationAvailability)
+    for reference in ["flash.full-restore@1", "flash.dayu200"] {
+      let operation = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
+      XCTAssertEqual(provider.runtimeAvailability(for: operation), .available, reference)
+    }
     let configuration = RuntimeJobEngine.Configuration(
       stateDirectory: URL(filePath: "/tmp/arkdeck-native-plan-test"),
       arkForgeLane: composed.lane)
@@ -432,6 +512,9 @@ final class ArkForgeCompositionRootContractTests: XCTestCase {
     XCTAssertTrue(
       source.contains("arkForgeLane: arkForgeLane"),
       "the composed lane must be handed to the engine's configuration")
+    XCTAssertTrue(
+      source.contains("arkForgeAvailability = composed.operationAvailability"),
+      "Flash availability must include the composed lane's hardware qualification gate")
   }
 
   func testAbsenceIsReportedRatherThanSilent() throws {

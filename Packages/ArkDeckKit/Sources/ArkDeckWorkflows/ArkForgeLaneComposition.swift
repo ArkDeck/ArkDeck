@@ -283,15 +283,19 @@ package enum ArkForgeLaneComposition {
     package let deviceProfileID: String
     package let toolchain: ToolchainIdentity
     package let lane: ArkForgeLaneHost
+    /// A connected assessment lane need not permit Flash execution.
+    package let operationAvailability: ProviderOperationAvailability
     package let daemonLifecycle: DaemonLifecycle
 
     package init(
       deviceProfileID: String, toolchain: ToolchainIdentity,
-      lane: ArkForgeLaneHost, daemonLifecycle: DaemonLifecycle
+      lane: ArkForgeLaneHost, operationAvailability: ProviderOperationAvailability,
+      daemonLifecycle: DaemonLifecycle
     ) {
       self.deviceProfileID = deviceProfileID
       self.toolchain = toolchain
       self.lane = lane
+      self.operationAvailability = operationAvailability
       self.daemonLifecycle = daemonLifecycle
     }
   }
@@ -441,6 +445,20 @@ package enum ArkForgeLaneComposition {
     let providerIdentity = dependencies.providerIdentity
     let loaderObserver = ProductArkForgeLoaderObserver(
       runtimeDirectory: runtimeDirectory)
+    // The current authority support policy returns hardwareGated without a
+    // named campaign. A successful hello proves connectivity, not qualification:
+    // publish this standing blocker before a Job or capability can be created.
+    // Keep the lane for read-only assessments. With a campaign, the exact
+    // mechanics/authority seals and Runtime admission still gate each plan.
+    let operationAvailability: ProviderOperationAvailability =
+      inputs.campaign.isEmpty
+      ? .unavailable(
+        code: .providerToolUnavailable,
+        reason:
+          "ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: "
+          + "this configuration has no reviewed production support record or named hardware "
+          + "acceptance campaign.")
+      : .available
     return .success(
       Composed(
         deviceProfileID: profile.exactReference,
@@ -495,7 +513,7 @@ package enum ArkForgeLaneComposition {
               secret: ArkForgePairingSecret(
                 secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
           }),
-        daemonLifecycle: daemonLifecycle))
+        operationAvailability: operationAvailability, daemonLifecycle: daemonLifecycle))
   }
 
   /// What `main.swift` calls: composes the lane from the process environment,

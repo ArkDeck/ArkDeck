@@ -1,0 +1,159 @@
+{
+  "date": "2026-08-28",
+  "finding": "F32",
+  "goldenJourney": "GJ-4",
+  "worktreeBaseRevision": "e0ad85de7e44c57eb7533c642dd9b65f1e0eeb00",
+  "runtimeSourceRevision": "2f05ea02add62343b2bdcbe8932e87bfa28a7197",
+  "runtimeExecutableSHA256": "aabb94b496e3b887c90653cb89f277c538a36d6524c9b9c744b6cb6d09a6dd34",
+  "arkForgeSourceRevision": "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92",
+  "catalogDigest": "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce",
+  "realRequest": {
+    "evidenceKind": "real-runtime-request-refused-before-device-effects",
+    "operation": "flash.full-restore@1",
+    "jobId": "job-e9e5e3d7ae56af47ef69c94079fa6652",
+    "executionId": "ui-alignment-flash-20260828-01",
+    "targetId": "TGT-958780b2ffb7",
+    "bindingRevision": 4,
+    "startedAtUtc": "2026-08-28T01:51:32Z",
+    "finishedAtUtc": "2026-08-28T01:51:33Z",
+    "exitCode": 1,
+    "state": "failed",
+    "outcomeUnknown": false,
+    "outstandingResidueCount": 0,
+    "failure": {
+      "category": "externalTool",
+      "code": "executionConfirmedNotPerformed",
+      "recovery": "submitNewTypedRequestAfterRuntimeProof",
+      "retryability": "runtimeDecisionRequired",
+      "schemaVersion": "1.0.0"
+    },
+    "planDigest": "f630c1e33de087d69dce2b343ea1d31a87ff2688989e0c232a0572914d9c6a79",
+    "archiveSHA256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+    "intendedBuild": "OpenHarmony 7.0.0.37",
+    "receiptSHA256": "0d330a0205795ad305ff0fbc4ef119f13928899996eed163cbcc0323d478f34c",
+    "jobStatusSHA256": "bc35a992013de8b897a51a82744da764cc0ded5e2a6d35d2912393315e5a5eeb",
+    "freshPlanSHA256": "2ccb307e1222bba20222305601f2241ac3577b0cd6c1a2e534d64bb55c59d5b5",
+    "runtimeCapabilityConsumedBeforeRefusal": true,
+    "deviceEffectsDispatched": false,
+    "publishedArtifactCount": 0,
+    "blocker": "ArkForge materialized an assessment, not an executable plan; mechanics maturity hardwareGated.",
+    "boundary": "One actual request through the reviewed Runtime; confirmedNotPerformed before startExecution. No Flash pass, no production qualification, no replay. Raw logs remain private."
+  },
+  "additionalConfiguration": {
+    "requestedCampaign": "ui-alignment-20260828",
+    "approval": "denied-pending-explicit-additional-user-authorization",
+    "configurationChanged": false,
+    "boundary": "The requested wipe authorization does not authorize enabling the separately gated HardwareCampaign configuration. No alternative entry point was used."
+  },
+  "focusedTests": {
+    "kind": "host-contract-tests",
+    "testCount": 41,
+    "failures": 0,
+    "exitCode": 0,
+    "logSHA256": "4614fc8fc834223f64f588fab20b918233b630ff2ab07a6b539f7cb457a2fdd9",
+    "earlierAttempts": [
+      "missing Runtime import",
+      "missing Storage import",
+      "test request incorrectly versioned the unversioned compatibility alias"
+    ],
+    "boundary": "Both Flash references are unavailable without a campaign, submit creates no Job or capability, and no dispatcher runs. Named campaign fixture retains availability; exact per-plan gates are unchanged."
+  },
+  "designTests": {
+    "kind": "design-prototype-tests",
+    "testCount": 41,
+    "failures": 0,
+    "exitCode": 0,
+    "logSHA256": "aa2165dc7220a12f0fc38b2ec1067bca985690f6eb67ba53cffe0666efec2c5b"
+  },
+  "realDevicePass": false,
+  "browserReview": {
+    "evidenceKind": "design-demo-not-real-device",
+    "languages": [
+      "en",
+      "zh-Hans"
+    ],
+    "selectedImageStillBlocked": true,
+    "screenshotsViewed": true,
+    "screenshots": [
+      {
+        "file": "flash-hardware-gated-en.jpg",
+        "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=en",
+        "action": "Choose the demo image; observe the hardware qualification reason and disabled Flash button.",
+        "mimeType": "image/jpeg",
+        "width": 1280,
+        "height": 720,
+        "referenceMode": false,
+        "byteCount": 83465,
+        "sha256": "058d95ef5124752db040275b1cb75b665a53f5bb8ba5493d400ffe57b6709160",
+        "viewed": true
+      },
+      {
+        "file": "flash-hardware-gated-zh-Hans.jpg",
+        "url": "http://127.0.0.1:8846/prototype.html?page=flash&flashState=hardwareGated&lang=zh-Hans",
+        "action": "Switch the same selected-image state to Chinese; observe the qualification reason, disabled Flash button and no running Job.",
+        "mimeType": "image/jpeg",
+        "width": 1280,
+        "height": 720,
+        "referenceMode": false,
+        "byteCount": 77694,
+        "sha256": "6cfc8fd34820b0e985b4467ad0cb717aa3038b97d8ef637a562db43f091666a0",
+        "viewed": true
+      }
+    ]
+  },
+  "finalLocalGate": {
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "exitCode": 0,
+    "swiftLanes": [
+      {
+        "name": "full-parallel",
+        "exitCode": 0,
+        "testCount": 1826,
+        "durationSeconds": 250
+      },
+      {
+        "name": "full-process-identity-race",
+        "exitCode": 0,
+        "testCount": 1,
+        "durationSeconds": 9
+      },
+      {
+        "name": "full-viewer-scale",
+        "exitCode": 0,
+        "testCount": 5,
+        "durationSeconds": 16
+      }
+    ],
+    "swiftTestCount": 1832,
+    "catalogGeneratorTestCount": 49,
+    "catalogZeroDrift": true,
+    "sddErrors": 0,
+    "sddWarnings": 0,
+    "appUITestBundle": "TEST BUILD SUCCEEDED; compilation only, no native UI assertions in this run",
+    "logSHA256": "e578d2bdaf2e1ec444e3866070fe61de497ec4f3cfb969e4ecb9da069a3fbe98",
+    "finalPathSelection": {
+      "app": true,
+      "baseKind": "explicit-merge-base",
+      "baseRevision": "e0ad85de7e44c57eb7533c642dd9b65f1e0eeb00",
+      "changedFileCount": 12,
+      "changedFiles": [
+        "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeLaneComposition.swift",
+        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkForgeLaneAssemblyContractTests.swift",
+        "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs",
+        "docs/design/implementation-audit-2026-08-27.md",
+        "docs/design/prototype.html",
+        "docs/design/references/v1.6-goal/README.md",
+        "docs/design/references/v1.6-goal/flash-hardware-gate-verification-2026-08-28.json",
+        "docs/design/references/v1.6-goal/flash-hardware-gated-en.jpg",
+        "docs/design/references/v1.6-goal/flash-hardware-gated-zh-Hans.jpg",
+        "docs/design/references/v1.6-goal/manifest.json",
+        "docs/design/references/v1.6-goal/real-device-validation.md"
+      ],
+      "headRevision": "e0ad85de7e44c57eb7533c642dd9b65f1e0eeb00",
+      "reason": "classified-changed-files-and-worktree",
+      "swift": true
+    },
+    "boundary": "Production and test sources did not change after the gate. Subsequent edits only added checked design reference images, manifest entries and verification metadata; final selection still requires the same two compiled lanes."
+  }
+}
