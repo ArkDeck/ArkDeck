@@ -1900,6 +1900,125 @@ final class AgentDaemonContractTests: XCTestCase {
       "missing SDK must be a startup availability blocker: \(build.reasons)")
   }
 
+  /// One real daemon, three sequential host-only jobs. The source is a test
+  /// fixture, not hardware evidence; the analyzer subprocess and publication
+  /// path are the production ones. No device transport is configured.
+  func testHilogAnalyzerRunsMultipleJobsInOneDaemonSession() async throws {
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
+    XCTAssertTrue(FileManager.default.isExecutableFile(atPath: binary.path))
+    let shortState = URL(filePath: "/private/tmp/arkdeck-hilog-\(UUID().uuidString.prefix(12))")
+    defer { try? FileManager.default.removeItem(at: shortState) }
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: shortState.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { ISO8601Timestamps.string(from: Date()) })
+    let raw = Data(
+      "08-29 01:02:03.004 123 124 I C01234/Test: private-fixture\n08-29 01:02:03.005 123 124 E C01234/Test: private-fixture\n"
+        .utf8)
+    let source = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "JOB-HILOG-FIXTURE", sessionID: "session-hilog-fixture",
+        stepID: "capture-hilog", name: "hilog.txt", mediaType: "text/plain",
+        privacy: .sensitive, retentionClass: .pinnedUntilVerified,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-HILOG-FIXTURE", bindingRevision: 7,
+          stableIdentitySHA256: String(repeating: "c", count: 64)), contents: raw))
+    let lease = try await artifactStore.leaseReference(
+      jobID: source.jobID, artifactID: source.artifactID)
+    let process = try launchProductionDaemon(
+      binary: binary, stateDirectory: shortState,
+      extraEnvironment: ["ARKDECK_ANALYZER_PATH": binary.path])
+    defer { if process.isRunning { process.terminate() } }
+    let pid = process.processIdentifier
+    let socket = shortState.appending(path: "agentd.sock").path
+    let client = AgentClient(socketPath: socket)
+    let operations = try listOperations(socketPath: socket)
+    let availability = try XCTUnwrap(operations[AnalyzerProvider.hilogSummary])
+    XCTAssertEqual(availability.availability, "available", "\(availability.reasons)")
+
+    var firstResult: Data?
+    var jobIDs = Set<String>()
+    for round in 1...3 {
+      let request = try RuntimeOperationRequest(
+        requestID: "req-hilog-round-\(round)", idempotencyKey: "idem-hilog-round-\(round)",
+        target: DurableTargetReference(targetID: "TGT-HILOG-FIXTURE", expectedBindingRevision: nil),
+        operation: RuntimeOperationReference(id: "analyzer.summarize-hilog", version: 1),
+        inputs: ["sourceArtifactRef": .string(lease)])
+      let requestJSON = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
+      guard
+        case .object(let accepted) = try client.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]),
+        case .string(let jobID)? = accepted["jobId"]
+      else { return XCTFail("round \(round) did not submit") }
+      XCTAssertTrue(jobIDs.insert(jobID).inserted)
+      guard
+        case .object(let finished) = try client.request(
+          method: "job.run", params: ["jobId": .string(jobID)])
+      else { return XCTFail("round \(round) did not return status") }
+      XCTAssertEqual(finished["state"], .string("succeeded"), "\(finished)")
+      XCTAssertEqual(finished["actualEffect"], .string("hostOnly"))
+      guard case .array(let listed) = try client.request(
+        method: "artifact.list", params: ["jobId": .string(jobID)])
+      else { return XCTFail("artifact.list must return its wire array") }
+      let entries = listed.compactMap { entry -> [String: JSONValue]? in
+        guard case .object(let fields) = entry else { return nil }
+        return fields
+      }
+      let derived = try XCTUnwrap(entries.first { $0["name"] == .string("hilog-summary.json") })
+      guard case .string(let artifactID)? = derived["artifactId"] else {
+        return XCTFail("published wire Artifact must expose artifactId")
+      }
+      XCTAssertEqual(derived["privacy"], .string("standard"))
+      XCTAssertEqual(derived["bindingRevision"], .null)
+      guard case .object(let read) = try client.request(
+        method: "artifact.read", params: ["jobId": .string(jobID), "artifactId": .string(artifactID)]),
+        case .string(let base64)? = read["base64"], let output = Data(base64Encoded: base64)
+      else { return XCTFail("published summary must be readable without sensitive opt-in") }
+      XCTAssertEqual(read["eof"], .bool(true))
+      XCTAssertEqual(derived["sha256"], .string(AnalyzerProvider.sha256(output)))
+      let result = try JSONDecoder().decode(HilogSummaryDerivedArtifact.self, from: output)
+      XCTAssertEqual(result.sourceArtifactID, source.artifactID)
+      XCTAssertEqual(result.result.sourceSHA256, source.sha256)
+      XCTAssertEqual(result.result.sourceByteCount, raw.count)
+      XCTAssertEqual(result.result.levelCounts["I"], 1)
+      XCTAssertEqual(result.result.levelCounts["E"], 1)
+      XCTAssertEqual(result.result.headerCoverage, .complete)
+      XCTAssertEqual(
+        result.analyzerOutputSHA256, AnalyzerProvider.sha256(try result.result.canonicalData()))
+      XCTAssertFalse(String(decoding: output, as: UTF8.self).contains("private-fixture"))
+      if let firstResult { XCTAssertEqual(output, firstResult) } else { firstResult = output }
+      XCTAssertTrue(process.isRunning)
+      XCTAssertEqual(process.processIdentifier, pid)
+      guard case .object(let health) = try client.request(method: "health") else {
+        return XCTFail("daemon must remain responsive between rounds")
+      }
+      XCTAssertEqual(health["status"], .string("ok"))
+      print("HILOG_CONTINUITY round=\(round) daemonPID=\(pid) launchedDaemons=1")
+    }
+    let unchanged = try await artifactStore.read(
+      jobID: source.jobID, artifactID: source.artifactID, allowSensitive: true)
+    XCTAssertEqual(unchanged, raw)
+  }
+
+  func testHilogAnalyzerDoesNotAdvertiseAnArbitraryConfiguredExecutable() throws {
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
+    XCTAssertTrue(FileManager.default.isExecutableFile(atPath: binary.path))
+    let shortState = URL(filePath: "/private/tmp/arkdeck-hilog-pin-\(UUID().uuidString.prefix(12))")
+    defer { try? FileManager.default.removeItem(at: shortState) }
+    let process = try launchProductionDaemon(
+      binary: binary, stateDirectory: shortState,
+      extraEnvironment: ["ARKDECK_ANALYZER_PATH": "/bin/cat"])
+    defer { if process.isRunning { process.terminate() } }
+    let operations = try listOperations(socketPath: shortState.appending(path: "agentd.sock").path)
+    let availability = try XCTUnwrap(operations[AnalyzerProvider.hilogSummary])
+    XCTAssertEqual(availability.availability, "unavailable")
+    XCTAssertTrue(
+      availability.reasons.contains(HilogSummaryDerivedAnalyzer.incompatibleExecutableReason))
+    XCTAssertTrue(
+      availability.reasonCodes.contains(
+        RuntimeAvailabilityReasonCode.providerToolUnavailable.rawValue))
+  }
+
   /// The two blockers the production Rockchip composition can publish with no
   /// HDC configured. Which one answers depends on whether the native ArkForge
   /// lane environment is complete: the resolver refuses first when it is not;

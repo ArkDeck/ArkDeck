@@ -336,13 +336,12 @@ package struct AnalyzerProvider: DeviceProvider {
   ///
   /// The catalog above declares which analyzer an operation may name; it does
   /// not promise anything can supply it. `crash-signature@1` arrives when
-  /// `ARKDECK_ANALYZER_PATH` is set, and the two ArkTrace analyzers when the
-  /// distribution descriptor is installed — all three are a host away. Nothing
-  /// in this build produces `hilog-summary@1`, so no configuration reaches it,
-  /// and reporting the two cases identically sent an operator looking for a
-  /// setting that does not exist.
+  /// `ARKDECK_ANALYZER_PATH` is set; `hilog-summary@1` additionally requires
+  /// that executable to match this daemon build. The two ArkTrace analyzers
+  /// arrive when their distribution descriptor is installed. Keep missing
+  /// implementations distinct from a missing host configuration.
   package static let hostSuppliableAnalyzers: Set<String> = [
-    "crash-signature@1", "trace-summary@1", "trace-analysis@1",
+    "crash-signature@1", "hilog-summary@1", "trace-summary@1", "trace-analysis@1",
   ]
 
   /// The artifact each analyzer publishes. One table, used by both the
@@ -581,6 +580,14 @@ package struct AnalyzerProvider: DeviceProvider {
           code: "analyzer.schemaMismatch",
           detail: "\(invocation.analyzerRef) produced JSON outside its versioned schema")
       }
+    } else if invocation.analyzerRef == HilogSummaryDerivedAnalyzer.analyzerRef {
+      guard receipt.stderr.isEmpty,
+        HilogSummaryDerivedAnalyzer.validate(receipt.stdout, invocation: invocation)
+      else {
+        return .failed(
+          code: "analyzer.schemaMismatch",
+          detail: "hilog-summary@1 produced an invalid or source-mismatched summary")
+      }
     } else if invocation.analyzerRef == "trace-summary@1" {
       guard receipt.stderr.isEmpty,
         ArkTraceSummaryEnvelopeValidator.validate(
@@ -613,6 +620,9 @@ package struct AnalyzerProvider: DeviceProvider {
       "derivedByteCount": String(receipt.stdout.count),
       "truncated": receipt.stdoutTruncated ? "true" : "false",
     ]
+    if invocation.analyzerRef == HilogSummaryDerivedAnalyzer.analyzerRef {
+      summary["toolSha256"] = invocation.executableSHA256
+    }
     if let contract = invocation.arkTraceSummaryContract {
       summary["toolSha256"] = invocation.executableSHA256
       summary["parserSha256"] = contract.parserSHA256

@@ -633,6 +633,21 @@ enum RuntimeArtifactService {
         analyzerOutputByteCount: outputByteCount, result: result)
       let encoder = CanonicalJSONEncoders.canonical()
       return (try? encoder.encode(envelope)) ?? Data("{}".utf8)
+    case "hilog-summary.json"
+    where descriptor.reference == AnalyzerProvider.hilogSummary:
+      guard
+        let result = try? JSONDecoder().decode(
+          HilogSummaryAnalysis.self, from: receipt.stdout),
+        let sourceArtifactID = summary["sourceArtifactId"],
+        let toolSHA256 = summary["toolSha256"],
+        let outputSHA256 = summary["derivedSha256"],
+        let outputByteCount = summary["derivedByteCount"].flatMap(Int.init)
+      else { return Data("{}".utf8) }
+      let envelope = HilogSummaryDerivedArtifact(
+        sourceArtifactID: sourceArtifactID, analyzerExecutableSHA256: toolSHA256,
+        analyzerOutputSHA256: outputSHA256, analyzerOutputByteCount: outputByteCount,
+        result: result)
+      return (try? CanonicalJSONEncoders.canonical().encode(envelope)) ?? Data("{}".utf8)
     case "trace-summary.json"
     where descriptor.reference == AnalyzerProvider.traceSummary:
       // ArkTrace's validated machine envelope is already deterministic and
