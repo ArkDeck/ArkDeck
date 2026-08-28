@@ -3401,7 +3401,8 @@ function pDebug(){
 
 /* ---------- Flash ---------- */
 function flashAvailabilityReason(){
-  return S.flashAvailability==="hardwareGated"?lc("ArkForge 已连接，仅可评估（hardwareGated）。当前配置没有已审查的生产支持记录，也未配置具名硬件验收，暂不可刷写。","ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."):"";
+  // The App keeps Runtime reasons verbatim; only its own status labels localize.
+  return S.flashAvailability==="hardwareGated"?"ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign.":"";
 }
 function pFlash(){
   const image=S.flashImage,p=S.flashProgress;
@@ -3444,13 +3445,13 @@ function pFlash(){
   } else {
     main=`${blocked?`<div class="warnbox" role="status" data-sync-id="flash.availability">${esc(blocked)}</div>`:""}<div class="card">${imageBox}
       <div class="flash-actions"><p class="flash-impact">${tx("flashImpact")}</p>
-        <button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady&&!blocked?"":"disabled"}>${tx("startFlash")}</button></div>
+        ${blocked?`<p class="hint" style="color:var(--warn)" role="status" data-sync-id="flash.execute.prerequisiteBlocker">${esc(blocked)}</p>`:`<button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady?"":"disabled"}>${tx("startFlash")}</button>`}</div>
     </div>`;
   }
   return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
     <div class="flash-lead" data-page-title="${esc(tx("flashTitle"))}"><p>${tx("flashSubtitle")}</p></div>
     <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
-      ${blocked?`<span class="chip warn">${lc("刷写不可用","Flash unavailable")}</span>`:`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`}</div>
+      ${blocked?`<span class="chip warn">${lc("刷机已阻断","Flash blocked")}</span>`:`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`}</div>
     ${main}
     ${running?`<div class="hint"><b>${esc(image.name)}</b> · ${formatBytes(image.sizeBytes)}</div>`:""}
     ${flashDetails(image)}
