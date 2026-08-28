@@ -26,7 +26,9 @@ Runtime 独立验证的 terminal、trusted evidence、postflight、Artifact 与�
 没有重放 unknown。具名硬件验收成功不等于产品生产资格或 notarized distribution 验收。
 
 真实 App 的 History/Flash 只读回访发现 F34（canonical 记录筛选与详情引用过旧）及
-F35（App 沙箱直接访问 Unix socket）；F34 的双语隔离 UI 回归已通过，F35 尚待修复。
+F35（App 沙箱直接访问 Unix socket）。F34 已随 #1569 合入；F35 在 #1570 将只读探测移到
+Runtime XPC，完整本地闸、44 项设计测试与三项双语原生 fixture 回归通过。
+两项修复后的真实 App 只读回访仍未完成，详见 [F35 元数据](flash-device-access-verification-2026-08-28.json)。
 不把 fixture 当真实设备结果，也不为 UI 回访重复擦写。下文“剩余验证”保留此前历史快照，
 当前 Flash 硬件结论以上述新记录为准。
 
