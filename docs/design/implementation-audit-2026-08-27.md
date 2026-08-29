@@ -109,8 +109,8 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| overview.main | scope、SSH source、下一步、调试线；empty/ready/多目标/离线/未绑定/stale | 已接线；只列当前在线观察，真实 target→source，不取第一台服务器 |
-| overview.environment | collapsed/expanded、healthy/mismatch/unknown/permissionDenied | HDC/tool/hash/endpoint/channel/能力完整保留 |
+| overview.main | scope、SSH source、下一步、调试线；empty/ready/多目标/离线/未绑定/stale | 已接线；只列当前在线观察，真实 target→source，不取第一台服务器。F53 补齐设备三态、来源五态、记录四态、按调试线分组与「显示另外 N 次」、需要处理的下一步与四种拒绝原因，并补 ⌘R |
+| overview.environment | collapsed/expanded、healthy/mismatch/unknown/permissionDenied | HDC/tool/hash/endpoint/channel/能力完整保留；F53 把披露标题对回 `overview.environment.title`。稿件仍是两张概览卡，缺 Selected Device/Binding 与 Needs Attention 分组（F53 登记） |
 | overview.resume | 来源检查 sheet、loading/无参数/target/binding漂移/unknown | F02/F03/F20；精确记录；导航与准备分开；仅安全只读输入复制至新草稿，原始 thread 保留，不复制 authority/session |
 | overview.hdcImpact | impact sheet、generation漂移、确认/拒绝 | 已接线；无 proof 不可执行，不自动重启 external server |
 
@@ -118,7 +118,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated；缓存计划可用性刷新 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 修 Runtime 投影，F33 让缓存计划随当前可用性撤下/恢复动作。F46 让演示 Job 的阶段与终态文案双语；原型仍缺 checking/noDevice/importing/invalid 与 failed 结果态（F52 登记） |
+| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated；缓存计划可用性刷新 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 修 Runtime 投影，F33 让缓存计划随当前可用性撤下/恢复动作。F46 让演示 Job 的阶段与终态文案双语；F53 补齐 checking / noDevice / importing / invalid 与失败终态，并让每种阻断都不派发演示 Job |
 | flash.plan | 计划/前置条件 disclosure；target/hash/partitions/Loader/missing | Loader 激活属于执行前身份关联；历史目标缺失明确占位；测试显式选择当前目标后才 materialize exact plan，不静默换目标 |
 | flash.runtime | prepare/write/reboot/verify/failed/cancelled/unknown | bytes比例不是成功；postflight后才成功；unknown不重放 |
 
@@ -150,9 +150,9 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| trace.capture | checking/unavailable/ready/invalid/unitChange/quick | 5/10/15/30秒、1/2/3分钟；原型 F06 已修正 |
-| trace.runtime | submitting/active/cancel/terminal/unknown/blocked | Runtime 状态，typed cancel；原型不证明设备结果 |
-| trace.artifact | empty/published/loading/hashMismatch/retry/open | 唯一 raw trace.htrace 校验后打开，不替换失败文档 |
+| trace.capture | checking/unavailable/ready/invalid/unitChange/quick | 5/10/15/30秒、1/2/3分钟；原型 F06 已修正。F53 补 checking 可用性、无已接管目标与刷新入口，阻断状态零提交 |
+| trace.runtime | submitting/active/cancel/terminal/unknown/blocked | Runtime 状态，typed cancel；原型不证明设备结果。F53 补 Job ID + 取消入口与三种终态（完成 / 结果未知 / 无可查看 Trace） |
+| trace.artifact | empty/published/loading/hashMismatch/retry/open | 唯一 raw trace.htrace 校验后打开，不替换失败文档。F53 补已就绪文件名、准备中与校验失败＋重试三态 |
 | traceViewer.recent | 独立窗口 empty/recent/missing/open/remove/reveal | 已实现；原型覆盖 empty/recent/missing/open/remove 和合成 loaded 样本 |
 | traceViewer.timeline | loaded/noTimedEvents/filter/search/lane/zoom/focus | ArkTrace canvas/query 已接线；真实 event identity |
 | traceViewer.event | Event Inspector/rightDock/bottomDock/hidden | 已接线；合成稿覆盖 event/range、hidden/rightDock/bottomDock；不替代原生 parser 验证 |
@@ -188,11 +188,11 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | settings.general | General；keycap/waveform/build/localOnly | 已接线，版本取bundle |
-| settings.toolchains | Toolchains；loading/choose/probe/missing/activeJobs | 已接线；只影响新Job；来源/hash/ownership保留 |
+| settings.toolchains | Toolchains；loading/choose/probe/missing/activeJobs | 已接线；只影响新Job；来源/hash/ownership保留。F53 补运行中任务时的不同说明与共享的加载/失败/成功行 |
 | settings.servers | Servers；empty/list/refresh/add/edit/remove | 已接线，只读SSH来源，不是四connector |
 | settings.serverEditor | password/key/defaultKey/probe/fingerprint/root/drift/save/refused | 未验证不能保存；秘密仅Keychain；次级原型已补中英文，修改输入使 demo 验证失效 |
 | settings.serverDelete | 移除确认/cancel/bindingStale | 只移本地来源，不删远端文件 |
-| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned |
+| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字 |
 | settings.traceCache | Trace→Cache；loading/inventory/refresh/purge/activeEntries | 已接线，仅 inactive derived；普通文案双语 |
 | settings.traceLicenses | Trace→Licenses；lazy/loading/notice/missing/reveal | 已接线，14 reviewed components；许可证原文保留 |
 | settings.updates | idle/checking/current/available/download/verify/consent/error/reveal | 独立Settings，签名校验，显式Finder handoff，不静默安装 |
@@ -930,3 +930,69 @@ preview，也不被任何 preview 引用——59 个受控导出里唯一的一�
 - 统一本地闸按实际 diff 分类为纯设计/文档车道，不分配 Swift / App 编译车道。
 - 本轮没有浏览器像素走查，也没有原生或真机验证；上述结论只证明稿与代码的一致性范围，
   不构成 App 呈现验收或硬件验收。
+
+## 2026-08-29 F53：原型状态补齐（Overview → Flash → Trace → Settings）
+
+首轮全量核对（F46–F52）的第二批，基线 `98bedbbe`（PR #1586 合入后的 `main`）。范围是
+F52 第 1 条登记的「实现有、稿不可达」在这四个工作区上的部分；逐行结论见
+[2026-08-29 批次二台账](references/ui-consistency/2026-08-29-states-ledger.md)。本批只改设计侧，
+不修改 App、Runtime、Catalog 或准入策略，不执行设备操作。
+
+所有新增状态都由显式 URL token 到达，文案逐字取自 App 的本地化目录，并由新增的四项回归
+直接与 `.xcstrings` 比对——任一侧改名即失败。
+
+**Overview**（`overviewDevice` / `overviewServer` / `overviewRecords` / `overviewEvidence`）。
+设备域此前只有一台已绑定设备：现补「多目标 picker + 选择一台设备…」与「暂无在线设备」。
+编译来源此前只有已绑定：现补正在读取、未绑定、绑定需要处理与无法读取，各带 App 的说明句。
+记录区此前只有一份可用列表：现补正在读取、无法读取（含 reason code）与空态。记录本身此前是
+四条扁平行：现按 `OverviewRunRecordProjection` 的规则分组为调试线——needsAttention 置顶、
+每线一条 featured run、其余收进有界的「显示另外 N 次」，并给样本数据补了一条两次运行的
+Viewer 调试线。每行的「再来一次」改为 `resumeDisposition` 的完整六分支：可重复、需要重新
+授权、未读取证据（禁用）、不可重放、仍在运行、未记录效果分级、未上报 typed inputs——后四种
+显示拒绝原因而不是按钮。下一步区补「需要处理」形态与空态。补 `⌘R`，且和 App 一样只在
+Overview 可见时生效；环境披露标题对回 `overview.environment.title`。
+
+**Flash**（`flashState` 扩为 `checking|hardwareGated|noDevice|importing|invalid|failed`）。
+补正在检查 Runtime 可用性、需要设备、正在导入镜像、镜像无效（含重新校验）与失败终态。
+`flashBlocker()` 按 App 的顺序（可用性 → 目标 → 镜像导入与校验）返回第一条阻断原因，
+主动作被原因取代，`runFlash()` 在任一阻断下零派发——回归对四种阻断都断言选完镜像后仍
+不创建 Job。失败终态显示「刷机已停止」＋Runtime 失败说明＋未提供完整刷写后证明，
+不出现成功标题。镜像选择帮助文案与成功说明对回 App（旧稿说「支持 Runtime 已发布的镜像包」，
+App 说的是受支持的三种压缩格式）。
+
+**Trace**（`traceState` 扩出 `checking|noTarget`，新增 `traceCapture` 与 `traceArtifact`）。
+可用性补「正在检查…」第三态；无已接管目标时设备行显示 `trace.target.empty` 并以
+`trace.blocker.target` 阻断提交。采集页脚按 App 的单一可行动行渲染：进行中、提交失败、
+三种终态（抓取完成 / 结果未知 / 抓取已结束但没有可查看的 Trace）、首个阻断、本地保存说明。
+进行中时开始按钮替换为 Job ID ＋取消。「查看 Trace」区补已就绪文件名、正在校验并打开、
+校验失败＋重试打开三态——**终态成功与「有可查看的 Trace」是两件事**，稿件现在分开表达。
+补刷新入口。
+
+**Settings**（`settingsState` / `settingsJobs` / `settingsStorage`）。七个面板共用的加载、
+失败与成功三行此前完全不可达，现按 App 的共享行补齐并对每个面板断言。工具链在有运行中
+任务时改用 `settings.toolchains.futureJobsActive` 的不同说明。存储补校验失败、未分类字节
+与用量不可用三态；用量不可用时不再显示任何用量数字。
+
+同批还关闭了 F52 第 2 条的 History 样本一半：`when` 与四条 `what` / `detail` 改为语言对，
+经新的 `histText()` 解析，Overview 与 History 两处渲染同步；设备原文不受影响。
+
+### 本批未覆盖
+
+- Job 检查器的 Runtime 不可用、残留计数、临界写入提示与 established-current-epoch 关系
+  （F52-1 剩余部分）。
+- Viewer 的 loading / geometryUnavailable / failed 与 footer「未测量」（F52-1 剩余部分）。
+- Overview 环境披露的 Selected Device/Binding 与 Needs Attention 分组、能力矩阵三列。
+- Diagnostics 概念页正文与时间轴 AX 名称的单语（F52-2 剩余部分）。
+- 信任页缺 Runtime 事实栏（F52-3）；App 侧 C-DUP 与 Viewer 检查器本地化（F52-4/5）；
+  资源残留、退役 Automation 样式、preview 构建守护、`Select` 映射（F52-6~9）。
+- F52 的三条待裁决项保持开放。
+
+### 验证
+
+- `npm test` **69 项通过**（新增 4 项：Overview 状态与调试线分组、Flash 四种阻断零派发与
+  失败终态、Trace 可用性/终态/产物三组分离、Settings 七面板三行状态）。四项都直接读取
+  `Localizable` / `FlashLocalizable` / `TraceLocalizable` / `SettingsLocalizable`，用 App 的
+  字符串断言，不复制第二份词表。
+- `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
+- 统一本地闸退出 0，按实际 diff 分类为纯设计/文档，不分配 Swift / App 编译车道。
+- 未做浏览器逐页走查、未跑原生 XCUITest、未执行设备操作；本批只证明稿与代码一致。

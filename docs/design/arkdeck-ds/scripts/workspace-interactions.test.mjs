@@ -1190,3 +1190,178 @@ test('Viewer accessibility names and the node footer follow the App locale', () 
     if (language === 'en') assert.doesNotMatch(chrome, /选择组件|完整 UI 树|个节点/);
   }
 });
+
+test('Overview reaches every device, build-source and record state the App renders', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  for (const language of ['zh-Hans', 'en']) {
+    // Device scope: one bound target, a picker for several, and an honest empty.
+    const none = harness(`?page=overview&lang=${language}&overviewDevice=none`);
+    assert.ok(none.run('pOverview()').includes(value('overview.record.device.none', language)));
+    assert.ok(none.run('pOverview()').includes(value('overview.record.device.noneDetail', language)));
+    const multi = harness(`?page=overview&lang=${language}&overviewDevice=multi`);
+    assert.match(multi.run('pOverview()'), /data-sync-id="overview.record.device.picker"/);
+    assert.ok(multi.run('pOverview()').includes(value('overview.record.device.choose', language)));
+
+    // Build source: five states, each with the App's own wording.
+    for (const [state, key] of [['loading', 'loading'], ['unbound', 'unbound'], ['stale', 'stale'], ['unavailable', 'unavailable']]) {
+      const h = harness(`?page=overview&lang=${language}&overviewServer=${state}`);
+      assert.ok(
+        h.run('pOverview()').includes(value(`overview.record.remoteServer.${key}`, language)),
+        `${state} build source must use the App's wording`);
+    }
+
+    // Records: loading, unreadable and empty are distinct from "no attention".
+    assert.match(
+      harness(`?page=overview&lang=${language}&overviewRecords=loading`).run('pOverview()'),
+      /data-sync-id="overview.record.recent.loading"/);
+    const unreadable = harness(`?page=overview&lang=${language}&overviewRecords=unavailable`);
+    assert.ok(unreadable.run('pOverview()').includes(value('overview.record.recent.unavailable.title', language)));
+    const empty = harness(`?page=overview&lang=${language}&overviewRecords=empty`);
+    assert.ok(empty.run('pOverview()').includes(value('overview.record.recent.empty', language)));
+    assert.ok(empty.run('pOverview()').includes(value('overview.record.next.empty.title', language)));
+
+    // An unresolved run is pinned first and is never offered as repeatable.
+    const attention = harness(`?page=overview&lang=${language}&flashHistory=unknown`);
+    const page = attention.run('pOverview()');
+    assert.ok(page.includes(value('overview.record.next.attention', language)));
+    assert.ok(page.includes(value('overview.record.next.unknownDetail', language)));
+    assert.ok(page.includes(value('overview.record.refusal.neverReplayed', language)));
+    assert.equal(attention.run('overviewThreads()[0].needsAttention'), true);
+    assert.doesNotMatch(page, /overview\.record\.run\.job-demo-flash-unknown\.again/);
+
+    // A line keeps its bounded disclosure instead of flattening into one list.
+    const grouped = harness(`?page=overview&lang=${language}`);
+    assert.match(grouped.run('pOverview()'), /data-sync-id="overview.record.thread.thread:t-design-viewer.more"/);
+    assert.equal(grouped.run("overviewThreads().find(t=>t.id==='thread:t-design-viewer').runs.length"), 2);
+
+    // Evidence that has not been read yet is neither offered nor refused.
+    const pending = harness(`?page=overview&lang=${language}&overviewEvidence=pending`);
+    assert.equal(pending.run("overviewDisposition(HIST.find(h=>h.id==='S-0826-04')).kind"), 'detailNotLoaded');
+    assert.match(pending.run('pOverview()'), /data-sync-id="overview.record.run.S-0826-04.again"[^>]*disabled|disabled[^>]*data-sync-id="overview.record.run.S-0826-04.again"/);
+  }
+  // ⌘R belongs to Overview only, matching the App's page-scoped shortcut.
+  const shortcut = harness('?page=overview&lang=en');
+  assert.match(html, /S\.nav==="overview"&&\(e\.metaKey\|\|e\.ctrlKey\)&&!e\.shiftKey&&e\.key\.toLowerCase\(\)==="r"/);
+  assert.match(shortcut.run('pOverview()'), /data-sync-id="hdc.devices.refresh"/);
+});
+
+test('Flash reaches checking, missing device, image import and a failed result', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/FlashLocalizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  const enabledRun = markup => /<button(?![^>]*disabled)[^>]*onclick="runFlash\(\)"/.test(markup);
+  for (const language of ['zh-Hans', 'en']) {
+    const expectations = [
+      ['checking', 'flash.workspace.readiness.checking', 'flash.availability.checking'],
+      ['noDevice', 'flash.workspace.readiness.noDevice', 'flash.workspace.readiness.noDeviceDetail'],
+      ['importing', 'flash.workspace.readiness.checking', 'flash.workspace.image.validating'],
+      ['invalid', 'flash.workspace.readiness.blocked', 'flash.error.invalid'],
+    ];
+    for (const [scenario, titleKey, detailKey] of expectations) {
+      const h = harness(`?page=flash&lang=${language}&flashState=${scenario}`);
+      const page = h.run('pFlash()');
+      assert.ok(page.includes(value(titleKey, language)), `${scenario} readiness title`);
+      assert.ok(page.includes(value(detailKey, language)), `${scenario} readiness detail`);
+      // None of these may dispatch, even after an image is chosen.
+      h.run('chooseFlashImage(); runFlash()');
+      assert.equal(h.run('S.jobs.length'), 0, `${scenario} must not create a Job`);
+      assert.equal(h.run('S.flashJob'), null);
+      assert.ok(!enabledRun(h.run('pFlash()')), `${scenario} must not offer an enabled flash button`);
+    }
+    // A non-successful terminal result never reads as success.
+    const failed = harness(`?page=flash&lang=${language}&flashState=failed`);
+    const result = failed.run('pFlash()');
+    assert.ok(result.includes(value('flash.workspace.result.stopped', language)));
+    assert.ok(result.includes(value('flash.runtime.result.failed', language)));
+    assert.ok(result.includes(value('flash.workspace.result.unverified', language)));
+    // The refusal sentence quotes the words "flash succeeded", so check the
+    // heading rather than the page text: no success heading may be rendered.
+    assert.ok(result.includes(`<h2>${value('flash.workspace.result.stopped', language)}</h2>`));
+    assert.ok(!result.includes(`<h2>${value('flash.workspace.result.success', language)}</h2>`));
+    // Choosing an image on an available workspace still starts the demo run.
+    const ready = harness(`?page=flash&lang=${language}`);
+    ready.run('chooseFlashImage()');
+    assert.ok(enabledRun(ready.run('pFlash()')));
+    ready.run('runFlash()');
+    assert.equal(ready.run('S.flashView'), 'running');
+  }
+});
+
+test('Trace separates availability, capture outcome and the viewable artifact', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/TraceLocalizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  for (const language of ['zh-Hans', 'en']) {
+    const checking = harness(`?page=trace&lang=${language}&traceState=checking`);
+    assert.ok(checking.run('pTrace()').includes(value('trace.availability.checking', language)));
+    checking.run('startTrace()');
+    assert.equal(checking.run('S.trace.running'), false, 'checking must not start a capture');
+
+    const noTarget = harness(`?page=trace&lang=${language}&traceState=noTarget`);
+    assert.ok(noTarget.run('pTrace()').includes(value('trace.target.empty', language)));
+    assert.ok(noTarget.run('pTrace()').includes(value('trace.blocker.target', language)));
+    noTarget.run('startTrace()');
+    assert.equal(noTarget.run('S.trace.running'), false);
+
+    // A finished Job and a readable trace are two separate facts.
+    for (const [token, key] of [['succeeded', 'trace.capture.finished'],
+      ['outcomeUnknown', 'trace.capture.outcomeUnknown'], ['notCompleted', 'trace.capture.notCompleted']]) {
+      const h = harness(`?page=trace&lang=${language}&traceState=ready&traceCapture=${token}`);
+      assert.ok(h.run('pTrace()').includes(value(key, language)), `${token} capture outcome`);
+    }
+    for (const [token, key] of [['preparing', 'trace.viewer.preparing'], ['latest', 'trace.viewer.latest'],
+      ['failure', 'trace.viewer.artifactInvalid']]) {
+      const h = harness(`?page=trace&lang=${language}&traceState=ready&traceArtifact=${token}`);
+      assert.ok(h.run('pTrace()').includes(value(key, language)), `${token} viewer artifact`);
+    }
+    const retry = harness(`?page=trace&lang=${language}&traceState=ready&traceArtifact=failure`);
+    assert.ok(retry.run('pTrace()').includes(value('trace.viewer.tryAgain', language)));
+
+    // An active capture replaces the start button with the Job and a cancel.
+    const ready = harness(`?page=trace&lang=${language}&traceState=ready`);
+    ready.run('startTrace()');
+    assert.match(ready.run('pTrace()'), /data-sync-id="trace.cancel"/);
+    assert.ok(ready.run('pTrace()').includes(value('trace.action.refresh', language)));
+  }
+});
+
+test('Settings panes expose the shared loading, error and success rows', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  const tabs = ['general', 'toolchains', 'servers', 'storage', 'trace', 'updates', 'diagnostics'];
+  for (const language of ['zh-Hans', 'en']) {
+    for (const [state, key, id] of [
+      ['loading', 'settings.common.loading', 'settings.common.loading'],
+      ['error', 'settings.error.refresh', 'settings.error.refresh'],
+      ['success', 'settings.diagnostics.exported', 'settings.success'],
+    ]) {
+      for (const tab of tabs) {
+        const h = harness(`?page=settings&lang=${language}&settingsState=${state}`);
+        h.run(`S.settingsTab=${JSON.stringify(tab)}`);
+        const pane = h.run('pSettings()');
+        assert.ok(pane.includes(`data-sync-id="${id}"`), `${tab}/${state} row`);
+        assert.ok(pane.includes(value(key, language)), `${tab}/${state} wording`);
+      }
+    }
+    // Toolchain switching says something different while Jobs are running.
+    const idle = harness(`?page=settings&lang=${language}`);
+    idle.run("S.settingsTab='toolchains'");
+    assert.ok(idle.run('pSettings()').includes(value('settings.toolchains.futureJobs', language)));
+    const active = harness(`?page=settings&lang=${language}&settingsJobs=active`);
+    active.run("S.settingsTab='toolchains'");
+    assert.ok(active.run('pSettings()').includes(value('settings.toolchains.futureJobsActive', language)));
+
+    // Storage keeps an invalid policy, unclassified bytes and an unreadable
+    // measurement apart instead of collapsing them into one number.
+    for (const [token, key] of [['invalid', 'settings.storage.validationError'],
+      ['unknownPressure', 'settings.storage.unknownPressure'],
+      ['measurementUnavailable', 'settings.storage.measurementUnavailable']]) {
+      const h = harness(`?page=settings&lang=${language}&settingsStorage=${token}`);
+      h.run("S.settingsTab='storage'");
+      assert.ok(h.run('pSettings()').includes(value(key, language)), `${token} storage state`);
+    }
+    const unavailable = harness(`?page=settings&lang=${language}&settingsStorage=measurementUnavailable`);
+    unavailable.run("S.settingsTab='storage'");
+    assert.doesNotMatch(unavailable.run('pSettings()'), /data-sync-id="settings.storage.usage"/,
+      'an unavailable measurement must not show a usage number');
+  }
+});
