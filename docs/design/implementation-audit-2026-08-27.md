@@ -25,7 +25,7 @@ GJ-5 的 external Agent 边界用于识别已退役 Automation，不重启旧 ta
 | --- | --- | --- |
 | F01 | Diagnostics 按钮只改变本地状态，却显示已布防/已标记 | 删除假状态；arm/mark 保持禁用并说明缺少会话接口 |
 | F02 | Overview 查看记录只打开 History，丢失 Job ID | 传递 exact Job；清除旧筛选后选择该记录；原生回归覆盖 |
-| F03 | “再次运行”承诺预填，但没有 typed inputs 传递 | 保存原始 JSON；仅校验过的只读 observe/capture 可生成新草稿；显示 thread；明确另行启动新 Job；变更操作/旧 Marker/漂移/unknown 拒绝 |
+| F03 | “再次运行”承诺预填，但没有 typed inputs 传递 | 保存原始 JSON；仅校验过的只读 observe/capture 可生成新草稿；显示 thread；明确另行启动新 Job；变更操作/旧 Marker/漂移/unknown 拒绝；F44 清除旧 History 来源上下文并将新草稿滚入视口 |
 | F04 | 导航和旧稿仍把 Automation/task.* 画成当前功能 | 八页导航同步；旧链接只说明 CHG-2026-064 退役，历史组件不算产品能力 |
 | F05 | Settings 混入主导航，子页不完整 | 独立七标签及 Trace Cache/Licenses；App 内重复更新设置不再作为现行稿 |
 | F06 | Trace 非法输入被改成默认值，单位/quick values 与 App 不符 | 保留输入并给出校验；单位转换和快捷值一致；unavailable/invalid submit 不启动 |
@@ -237,6 +237,19 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | 真实设备 | 未运行；两个原生真机用例因未显式开启而跳过；没有新 HDC/Flash/capture 验收，不登记 REAL_DEVICE_PASS |
 
 该次统一本地闸覆盖当时生产 Swift、资源与 UI 测试代码。随后 goal 真机验证又产生 F24/F25 修复，须单独重跑；未把 compile-only 当作 XCUITest 断言通过。
+
+**2026-08-29 F44 继续任务草稿焦点复核**：原生 App 准备新草稿时会清除旧的 History
+来源上下文，网页稿仍保留旧上下文和工作区滚动位置；从较低位置点击“准备参数”后，
+新草稿可能完全位于视口上方。网页稿现在先清除旧来源、切换到目标工作区，再将工作区
+及文档滚动位置归零；不清除底层只读 reader，也不提交 Job。既有交互测试加入旧来源与
+非零滚动断言，最终 61/61 通过。
+
+同一浏览器标签完成中英文两轮普通交互。中文轮从 HiLog complete History 样本打开旧
+摘要上下文，再为 `S-0826-04` 准备草稿；英文轮在关闭草稿后复用同一 HiLog reader。
+两轮准备前工作区滚动均为 454.5px、文档滚动为 35px，准备后均归零；草稿顶部位于
+工作区顶部下方 20px，旧来源不存在，HiLog 摘要仍保留，任务检查器均为无运行中 Job。
+关闭草稿后 reader 仍可见。两张截图和结构化测量只留本机；这些是设计样本验证，不是
+原生 App 或真机证据。本项不修改 App、Runtime、Catalog、准入或历史记录。
 
 ### Goal 真机验证与修复（F24–F35，进行中）
 

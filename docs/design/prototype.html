@@ -1394,7 +1394,11 @@ function overviewResume(id){
 function prepareContinuation(id){
   const h=HIST.find(row=>row.id===id);if(continuationReason(h))return;
   S.continuation={source:id,page:historyWorkspace(h.kind),inputs:JSON.parse(JSON.stringify(h.inputs)),thread:h.thread,attempted:false};
-  closeModal();go(S.continuation.page);
+  const page=S.continuation.page;
+  S.historyContext=null;
+  closeModal();go(page);
+  $("page").scrollTop=0;
+  document.scrollingElement.scrollTop=0;
 }
 function submitContinuationPreview(){
   if(!S.continuation||S.continuation.attempted)return;
