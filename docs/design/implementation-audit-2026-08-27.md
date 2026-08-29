@@ -99,10 +99,10 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役。F48 将侧栏分组与 Job 检查器词表对回 App，并补 ⌘⇧J；F49 让 Debug/Flash 的窗口标题等于 App 的裸页面名 |
-| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；F54 补 Runtime 不可用 / 正在刷新 / 空档案三态，以及残留计数、临界写入提示与 established-current-epoch 关系 |
+| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；F54 补 Runtime 不可用 / 正在刷新 / 空档案三态，以及残留计数、临界写入提示与 established-current-epoch 关系；F56 把两个 Feature 共用的执行模式徽章移入 `DesignSystem/` |
 | shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：精确 Job 跳转、清除旧筛选并定位记录行。F41：有界滚动、多记录计数与窄窗工作区保留；原生精确行定位仍在复测，不能视为通过。所有主工作区共享；独立窗口不显示。不确认后续刷、不在 App 归档 |
 | device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管。F50 用 `?page=device&deviceDetail=…` 补齐五种候选状态、`stateObservedAt`、CLI 接管说明，并把字段标签与两条说明对回 `Localizable.xcstrings` |
-| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；F55 把信任页改为与设备详情同构的两栏（状态与操作 + Runtime 事实，缺失字段不补值），补 `device.wait.unavailable` 第四态，并修好使 polling 态整页渲染失败的缺失倒计时格式化函数 |
+| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；F55 把信任页改为与设备详情同构的两栏（状态与操作 + Runtime 事实，缺失字段不补值），补 `device.wait.unavailable` 第四态，并修好使 polling 态整页渲染失败的缺失倒计时格式化函数；F56 把七处自写通知换成共享 `WorkspaceNotice`，八种信任/等待状态共用同一语义色、符号与边框 |
 | device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
 
 ### Overview（GJ-1/2/4）
@@ -179,7 +179,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | --- | --- | --- |
 | history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
 | history.filters | 窄窗筛选与已存筛选弹层；status/mode/session/device/time/reset/Escape | F41 从纵向堆叠改为可展开入口；活动选择与搜索常显。F45 补显式 Escape/外部 pointer 关闭并完成双语浏览器验证；原生与截图验证见 F41/F45 |
-| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开 |
+| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开；F56 起执行模式徽章由 `DesignSystem/RuntimeExecutionModeBadge.swift` 提供，History 与 Job 检查器同源 |
 | history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；F37 按 exact Artifact 预览，未发布禁用；与App诊断导出不同 |
 | history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | App 全部六类保留精确来源；F39 补原型遗漏的来源信息与 Inspector 跳转字段；Diagnostics 可将校验过的 Trace 转交 Viewer；不重放，原型不读取历史文件 |
 
@@ -187,31 +187,31 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| settings.general | General；keycap/waveform/build/localOnly | 已接线，版本取bundle |
-| settings.toolchains | Toolchains；loading/choose/probe/missing/activeJobs | 已接线；只影响新Job；来源/hash/ownership保留。F53 补运行中任务时的不同说明与共享的加载/失败/成功行 |
-| settings.servers | Servers；empty/list/refresh/add/edit/remove | 已接线，只读SSH来源，不是四connector |
-| settings.serverEditor | password/key/defaultKey/probe/fingerprint/root/drift/save/refused | 未验证不能保存；秘密仅Keychain；次级原型已补中英文，修改输入使 demo 验证失效 |
+| settings.general | General；keycap/waveform/build/localOnly | 已接线，版本取bundle。F56 起面板骨架、说明行与构建事实列表走 `WorkspacePage` / `WorkspaceHeaderBar` / `WorkspaceFactGrid` |
+| settings.toolchains | Toolchains；loading/choose/probe/missing/activeJobs | 已接线；只影响新Job；来源/hash/ownership保留。F53 补运行中任务时的不同说明与共享的加载/失败/成功行；F56 事实列表改用共享行，路径与 hash 的单行中段省略、悬停全值与可选中由 `WorkspaceFactRow` 承载 |
+| settings.servers | Servers；empty/list/refresh/add/edit/remove | 已接线，只读SSH来源，不是四connector。F56 失败横幅换成共享 warn 通知 |
+| settings.serverEditor | password/key/defaultKey/probe/fingerprint/root/drift/save/refused | 未验证不能保存；秘密仅Keychain；次级原型已补中英文，修改输入使 demo 验证失效。F56 编辑器内两处失败提示同样换成共享通知 |
 | settings.serverDelete | 移除确认/cancel/bindingStale | 只移本地来源，不删远端文件 |
-| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字 |
+| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字；F56 位置与用量两张事实列表走共享行，存储策略表单因是三列可编辑输入而保留自写 `Grid` |
 | settings.traceCache | Trace→Cache；loading/inventory/refresh/purge/activeEntries | 已接线，仅 inactive derived；普通文案双语 |
 | settings.traceLicenses | Trace→Licenses；lazy/loading/notice/missing/reveal | 已接线，14 reviewed components；许可证原文保留 |
-| settings.updates | idle/checking/current/available/download/verify/consent/error/reveal | 独立Settings，签名校验，显式Finder handoff，不静默安装 |
-| settings.diagnostics | destination/preview/scope/hash/estimatedBytes/export/error | 始终排除device raw；本地显式导出，无上传 |
+| settings.updates | idle/checking/current/available/download/verify/consent/error/reveal | 独立Settings，签名校验，显式Finder handoff，不静默安装。F56 面板骨架走 `WorkspacePage` |
+| settings.diagnostics | destination/preview/scope/hash/estimatedBytes/export/error | 始终排除device raw；本地显式导出，无上传。F56 预览事实列表走共享行，成功/失败提示换成共享通知的 ok/warn 两态 |
 
 ### 系统面与设计镜像
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | system.panels | Flash镜像、入口 HAP / 附加 HAP/HSP / .so / HDC / key / root / Trace 导入；日志/Artifact/诊断包保存；Finder | 系统panel已纳入所属流程；不计为新业务页；HTML不真实读写 |
-| design.components | Workspace chrome；32预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；SessionSurfaces 与 F51 新增的 ViewerSurfaces 覆盖两组组合式组件；ArkTrace canvas 属上游插图，远程库未同步。BudgetMeters/OperationList/StageTrack/StatusStrip 按 spec §5.11 保留为退役 Automation 资料，原型已无消费方 |
+| design.components | Workspace chrome；32预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；SessionSurfaces 与 F51 新增的 ViewerSurfaces 覆盖两组组合式组件；ArkTrace canvas 属上游插图，远程库未同步。BudgetMeters/OperationList/StageTrack/StatusStrip 按 spec §5.11 保留为退役 Automation 资料，原型已无消费方。F56 收敛 App 侧六份重复实现，`WorkspaceFactRow` 扩出四个可选行为承载它们，共享词表由交互测试守护 |
 | automation.retired | 旧Automation/HTASK稿 | CHG-2026-064已移除；旧URL只解释退役，不是待办 |
 
-### 生产 View 文件索引（20/20）
+### 生产 View 文件索引（21/21）
 
 以下每个文件都由上表中的对应页面/子面覆盖，包含同文件的私有 View；ViewModel/facade/资源随交互追到调用点。
 
 - [App / scenes / navigation](../../ArkDeckApp/App/ArkDeckApp.swift)
-- [Workspace chrome](../../ArkDeckApp/DesignSystem/WorkspaceChrome.swift)
+- [Workspace chrome](../../ArkDeckApp/DesignSystem/WorkspaceChrome.swift)、[执行模式徽章](../../ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift)
 - [Device detail / trust](../../ArkDeckApp/Features/Devices/DeviceWorkspace.swift)
 - [Overview record](../../ArkDeckApp/Features/Overview/OverviewRecordView.swift)、[Resume sheet](../../ArkDeckApp/Features/Overview/OverviewResumeSheet.swift)、[HDC / impact](../../ArkDeckApp/Features/HDC/HDCStatusView.swift)
 - [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)
@@ -1097,3 +1097,93 @@ mm:ss 的格式化实现，并由回归断言倒计时确实渲染。
 - `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
 - 统一本地闸退出 0，纯设计/文档车道，不分配 Swift / App 编译车道。
 - 未做浏览器逐页走查、未跑原生 XCUITest、未执行设备操作。
+
+## 2026-08-30 F56：App 侧共享件收敛（C-DUP，第一批）
+
+首轮全量核对的第五批，基线 `9e80901f`（PR #1589 合入后的 `main`）。范围是 F52 第 4 条
+登记的 App 侧重复实现里**成套重写共享件的那一半**：设备详情自写的通知、Settings 自写的
+面板骨架/说明行/事实列表/成功失败横幅，以及两个 Feature 共用却放在 History 里的执行模式
+徽章。逐行结论见
+[2026-08-30 台账](references/ui-consistency/2026-08-30-shared-chrome-ledger.md)。
+本批**触碰 App 代码**，因此跑了原生 XCUITest 全套作为回归；不改 Runtime、Catalog 或准入
+策略，不执行设备操作，也不新增任何产品能力。
+
+**先更正一处登记时的计数。** F52 第 4 条写 `deviceNotice(...)` 「调用 8 次」，实测是
+**7 处调用 + 1 处定义**；第 4 条还写这两个工作区的 `.font(.system(size:…))` 「占全 App 此类
+写法的全部」，实测 73 处里有 4 处在 `UIDumpWorkspaceView` 与 `FlashWorkspaceView`。两处都
+不影响该条的结论，但台账按实测数记。
+
+**设备详情的通知。** `DeviceWorkspace.swift` 在同一文件已经使用 `WorkspaceNotice`
+（有界等待的 polling 态）的情况下，另写了一份 `deviceNotice(_:systemImage:color:identifier:)`
+并调用 7 次。两者的内边距、圆角与描边透明度逐字相同，差别只在：自写版用 `Label`、把
+12pt 字号也套在图标上、`.secondary` 态直接用 `Color.secondary.opacity(0.08)` 而不是共享的
+`quaternaryLabelColor` 中性底，且不做 `accessibilityElement(children: .combine)`。现在七处
+全部改用 `WorkspaceNotice`，语义色按既有取值映射（orange→`.warning`、green→`.ok`、
+red→`.danger`、secondary→`.neutral`），符号逐个原样传入，标识符不变。**可见变化**：两处
+中性态（`device.trust.offline`、`device.trust.unknownState`）的底色与描边改为 App 其余中性
+通知的取值，图标由 12pt 回到 13pt，八处通知都成为一个合并的可访问性元素。
+
+**Settings 的五份副本。** `SettingsPaneContainer` 重写 `WorkspacePage`、`SettingsPaneHeader`
+重写 `WorkspaceHeaderBar`、`SettingsValueGrid` + `SettingsValueRow` 重写
+`WorkspaceFactGrid` + `WorkspaceFactRow`、`SettingsErrorBanner` / `SettingsSuccessBanner`
+重写 `WorkspaceNotice`。六个类型全部删除，六处面板、五张事实列表与七处横幅改走共享件。
+按 F52 的判断，事实列表**扩展共享件而不是保留副本**：`WorkspaceFactRow` 增加四个默认关闭的
+可选行为——`usesTabularDigits`（非等宽值仍保持数字列对齐）、`usesMonospacedName`（键本身
+是值，例如 Runtime 参数名）、`isSelectable`、`elidedValue`（单行中段省略 + 悬停全值 +
+VoiceOver 读全值）。**可见变化**：面板上下内边距由 24/24 改为共享的 20/28；说明行不再被
+620pt 的行宽夹住；失败与成功横幅从「整行橙/绿字 + 中性描边」变为共享通知的「语义色符号与
+描边 + 浅底 + 常规字色」，即颜色不再是唯一载体（spec §2、§4.4）。
+
+**执行模式徽章的归属。** `RuntimeExecutionModeBadge` 由 History 与 Job 检查器两个 Feature
+渲染，却定义在 `Features/History/RuntimeHistoryView.swift`。现移入
+`ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift`，实现逐字不变，只补一段说明它
+为何不属于 History。`appViewFiles` 随之为 21 个，§3 的生产 View 索引同步。
+
+### 本批未覆盖
+
+- F52 第 4 条的另一半：9 个 Feature 文件里 19 处手写 `Grid(` 键值列表（其中 15 处是事实
+  列表、4 处是三列表格或可编辑表单），以及 73 处 `.font(.system(size:…))` 绕过
+  `WorkspaceFont` / `WorkspaceMetrics`。两者都会改变实际字号与行距，单独成批更好复核。
+- `ViewerInspectorCopy` 硬编码英文（F52-5）——等待第 2 条裁决。
+- 资源里的已移除路径键、退役 Automation 样式、preview 构建守护、`Select` 映射（F52-6~9）。
+- F52 的三条待裁决项保持开放；本批只收敛「共享件已存在且语义等价」的重复，不替维护者
+  决定第 1、2 条。
+
+### 本批发现但未修的原生失败（新登记）
+
+原生 XCUITest 全套在**未改动的 `main`** 上就是红的，本批没有把它变绿，也不声称它绿。
+三条失败在同一台机器上跑了三次（改前全套、改后全套、clean `main` 定向）逐条归因；
+完整对照表见台账第 6 节。其中一条是环境前置，已修；另两条登记如下。
+
+1. **`AppShellUITests.testDebugHAPSelectionAddsHSPRejectsDuplicatesAndClearsInBothLanguages`
+   顺序/负载相关不稳定。** 全套跑两次都失败在 `AppShellUITests.swift:1154`
+   （`app.popUpButtons["debug.apps.postRun"]` 15 秒内不存在），**单独跑通过**。该 Picker 在
+   `DebugWorkspaceView.lifecycleSection` 中无条件渲染，本批未触碰 Debug 工作区。是产品缺陷
+   还是测试对全套环境的依赖，**本轮未定根因**，不臆断。
+2. **`AppShellUITests.testHistoryAndRecoveryContinuousSessionInBothLanguages` 的精确行定位
+   断言在 `main` 上失败。** clean `main` 单独跑复现同一断言、同一 viewport
+   `(483.0, 448.5, 342.0, 189.5)`。测量事实：表格 viewport 高 189.5pt（底边 638），被要求
+   完整可见的记录行在 y=626 / y=696，20 次滚动后仍未进入视口。这与 §3 `shell.recovery`
+   行里既有的「原生精确行定位仍在复测，不能视为通过」是同一条，本条补上可复现的几何数字。
+   **根因未定**，本批不改 History。
+
+第三条 `HDCStatusUITests.testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe` 是
+环境前置缺失——`Packages/ArkDeckKit/.build/debug/ArkDeckFakeHDCFixture` 在本工作副本里
+从未构建。补齐后改后运行即通过（失败 3→2、通过 45→46）。这是本批对原生结果的唯一正向影响，
+与共享件收敛无关。
+
+### 验证
+
+- **原生 XCUITest 全套跑了三次**：改前基线（`9e80901f`，未改动）**45 通过 / 3 失败 /
+  11 跳过**；改后 **46 通过 / 2 失败 / 11 跳过**；另在 clean `main` 上定向重跑两条失败用例
+  归因。**两次全套都是红的**，逐条归因见上一节与台账第 6 节；本批没有引入新的失败，
+  唯一的正向变化来自补齐 HDC fixture 前置。macOS UI 套件是本地门禁，不在 CI。
+- 原生断言覆盖到设备信任/等待八处通知与各 Settings 面板的可达性；**没有**覆盖 Settings
+  的失败/成功横幅（App 无可确定性触发 Settings 错误的 fixture 参数，本批不为凑断言新增
+  测试专用产品路径），也没有测量内边距、行宽与通知底色这类纯呈现变化。
+- `npm test` **75 项通过**（新增 1 项结构回归：副本确已消失、共享行带齐四个可选行为、
+  八处设备通知仍可按标识符寻址、徽章声明在 `DesignSystem/` 而不在 History）。
+- `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
+- 统一本地闸 退出 0；本轮首次分配 App 编译车道（分类为 `app: true` / `swift: false`，`build-for-testing` 通过），SDD、catalog 与设计车道同跑通过。
+- 未做浏览器逐页走查，未执行设备操作。**绿的部分只证明这些断言覆盖到的行为未回归，
+  不构成 App 呈现验收，不构成真机验收，不翻转任何 Golden Journey 状态。**

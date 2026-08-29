@@ -67,7 +67,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
         .tabItem {
           Label(settingsText("settings.tab.trace"), systemImage: "waveform.path.ecg")
         }
-      SettingsPaneContainer {
+      WorkspacePage {
         updatesContent
       }
       .tabItem {
@@ -92,21 +92,20 @@ private struct GeneralSettingsPane: View {
   private var applicationIconChoice = ApplicationIconChoice.defaultChoice.rawValue
 
   var body: some View {
-    SettingsPaneContainer {
-      SettingsPaneHeader(
-        subtitle: settingsText("settings.general.subtitle"))
+    WorkspacePage {
+      WorkspaceHeaderBar(summary: Text(settingsText("settings.general.subtitle")))
       GroupBox(settingsText("settings.general.appIcon")) {
         ApplicationIconPicker(selection: $applicationIconChoice)
       }
       if let general = model.presentation?.general {
         GroupBox(settingsText("settings.general.build")) {
-          SettingsValueGrid(rows: [
-            .init(settingsText("settings.general.app"), general.appName),
-            .init(settingsText("settings.general.version"), general.appVersion),
-            .init(settingsText("settings.general.buildNumber"), general.buildVersion),
-            .init(settingsText("settings.general.platform"), general.platform),
-            .init(settingsText("settings.general.architecture"), general.architecture),
-          ])
+          WorkspaceFactGrid {
+            settingsFact("settings.general.app", general.appName)
+            settingsFact("settings.general.version", general.appVersion)
+            settingsFact("settings.general.buildNumber", general.buildVersion)
+            settingsFact("settings.general.platform", general.platform)
+            settingsFact("settings.general.architecture", general.architecture)
+          }
         }
       } else {
         SettingsLoadingRow()
@@ -134,8 +133,8 @@ private struct RemoteBuildSourcesSettingsPane: View {
   @State private var pendingRemoval: RemoteBuildSourcePresentation?
 
   var body: some View {
-    SettingsPaneContainer {
-      SettingsPaneHeader(subtitle: settingsText("settings.remoteSources.subtitle"))
+    WorkspacePage {
+      WorkspaceHeaderBar(summary: Text(settingsText("settings.remoteSources.subtitle")))
       GroupBox(settingsText("settings.remoteSources.title")) {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           if model.remoteSources.isEmpty && model.isRemoteSourcesBusy {
@@ -195,7 +194,7 @@ private struct RemoteBuildSourcesSettingsPane: View {
         .padding(WorkspaceMetrics.contentGap)
       }
       if let error = model.remoteSourceError {
-        SettingsErrorBanner(message: error)
+        settingsErrorNotice(error)
       }
     }
     .sheet(isPresented: $isEditorPresented, onDismiss: model.clearRemoteSourceProbe) {
@@ -413,7 +412,7 @@ private struct RemoteBuildSourceEditor: View {
             SecureField(settingsText("settings.remoteSources.field.passphrase"), text: $passphrase)
               .accessibilityIdentifier("settings.remoteSources.field.passphrase")
           }
-          if let importerError { SettingsErrorBanner(message: importerError) }
+          if let importerError { settingsErrorNotice(importerError) }
           if source != nil && credentialInput == nil {
             Label(
               settingsText("settings.remoteSources.usingStoredCredential"),
@@ -451,7 +450,7 @@ private struct RemoteBuildSourceEditor: View {
               }
             }
           }
-          if let error = model.remoteSourceError { SettingsErrorBanner(message: error) }
+          if let error = model.remoteSourceError { settingsErrorNotice(error) }
         }
       }
       .formStyle(.grouped)
@@ -676,9 +675,8 @@ private struct ToolchainsSettingsPane: View {
   @State private var importerError: String?
 
   var body: some View {
-    SettingsPaneContainer {
-      SettingsPaneHeader(
-        subtitle: settingsText("settings.toolchains.subtitle"))
+    WorkspacePage {
+      WorkspaceHeaderBar(summary: Text(settingsText("settings.toolchains.subtitle")))
       GroupBox(settingsText("settings.toolchains.hdc")) {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           HStack(spacing: WorkspaceMetrics.tightGap) {
@@ -694,27 +692,17 @@ private struct ToolchainsSettingsPane: View {
                 .accessibilityLabel(settingsText("settings.common.refreshing"))
             }
           }
-          SettingsValueGrid(
-            rows: [
-              .init(settingsText("settings.toolchains.path"), presentation.absolutePath),
-              .init(settingsText("settings.toolchains.source"), presentation.source),
-              .init(settingsText("settings.toolchains.sha256"), presentation.hash),
-              .init(settingsText("settings.toolchains.trust"), presentation.platformTrust),
-              .init(
-                settingsText("settings.toolchains.clientVersion"),
-                presentation.clientVersion),
-              .init(
-                settingsText("settings.toolchains.serverVersion"),
-                presentation.serverVersion),
-              .init(
-                settingsText("settings.toolchains.daemonVersion"),
-                presentation.daemonVersion),
-              .init(settingsText("settings.toolchains.endpoint"), presentation.endpoint),
-            ],
-            monospacedValueLabels: [
-              settingsText("settings.toolchains.path"),
-              settingsText("settings.toolchains.sha256"),
-            ])
+          WorkspaceFactGrid {
+            settingsFact(
+              "settings.toolchains.path", presentation.absolutePath, isMonospaced: true)
+            settingsFact("settings.toolchains.source", presentation.source)
+            settingsFact("settings.toolchains.sha256", presentation.hash, isMonospaced: true)
+            settingsFact("settings.toolchains.trust", presentation.platformTrust)
+            settingsFact("settings.toolchains.clientVersion", presentation.clientVersion)
+            settingsFact("settings.toolchains.serverVersion", presentation.serverVersion)
+            settingsFact("settings.toolchains.daemonVersion", presentation.daemonVersion)
+            settingsFact("settings.toolchains.endpoint", presentation.endpoint)
+          }
           Divider()
           HStack {
             if !presentation.isRuntimeManaged {
@@ -760,7 +748,7 @@ private struct ToolchainsSettingsPane: View {
         ?? (configurationError == nil
           ? nil : settingsText("settings.toolchains.selectionError"))
       {
-        SettingsErrorBanner(message: error)
+        settingsErrorNotice(error)
       }
     }
     .fileImporter(
@@ -817,23 +805,20 @@ private struct StorageSettingsPane: View {
   @State private var isSelectingRoot = false
 
   var body: some View {
-    SettingsPaneContainer {
-      SettingsPaneHeader(
-        subtitle: settingsText("settings.storage.subtitle"))
+    WorkspacePage {
+      WorkspaceHeaderBar(summary: Text(settingsText("settings.storage.subtitle")))
       if let storage = model.presentation?.storage {
         GroupBox(settingsText("settings.storage.location")) {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-            SettingsValueGrid(
-              rows: [
-                .init(settingsText("settings.storage.root"), storage.rootPath),
-                .init(
-                  settingsText("settings.storage.rootSource"),
-                  settingsText(
-                    storage.usesCustomRoot
-                      ? "settings.storage.rootSource.custom"
-                      : "settings.storage.rootSource.default")),
-              ],
-              monospacedValueLabels: [settingsText("settings.storage.root")])
+            WorkspaceFactGrid {
+              settingsFact("settings.storage.root", storage.rootPath, isMonospaced: true)
+              settingsFact(
+                "settings.storage.rootSource",
+                settingsText(
+                  storage.usesCustomRoot
+                    ? "settings.storage.rootSource.custom"
+                    : "settings.storage.rootSource.default"))
+            }
             HStack {
               Button(settingsText("settings.storage.chooseRoot")) {
                 isSelectingRoot = true
@@ -893,10 +878,10 @@ private struct StorageSettingsPane: View {
         SettingsLoadingRow()
       }
       if let validationMessage {
-        SettingsErrorBanner(message: validationMessage)
+        settingsErrorNotice(validationMessage)
       }
       if let error = model.storageError {
-        SettingsErrorBanner(message: error)
+        settingsErrorNotice(error)
       }
     }
     .onAppear(perform: synchronizeDrafts)
@@ -947,21 +932,19 @@ private struct StorageSettingsPane: View {
         .accessibilityValue(
           "\(ByteCountFormatter.string(fromByteCount: Int64(clamping: currentBytes), countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: Int64(clamping: storage.totalQuotaBytes), countStyle: .file))"
         )
-        SettingsValueGrid(rows: [
-          .init(
-            settingsText("settings.storage.currentUsage"),
+        WorkspaceFactGrid {
+          settingsFact(
+            "settings.storage.currentUsage",
             ByteCountFormatter.string(
-              fromByteCount: Int64(clamping: currentBytes), countStyle: .file)),
-          .init(
-            settingsText("settings.storage.pinned"),
-            pinnedSummary(storage)),
-          .init(
-            settingsText("settings.storage.admission"),
+              fromByteCount: Int64(clamping: currentBytes), countStyle: .file))
+          settingsFact("settings.storage.pinned", pinnedSummary(storage))
+          settingsFact(
+            "settings.storage.admission",
             settingsText(
               storage.blocksNewHeavyWriters == true
                 ? "settings.storage.admission.blocked"
-                : "settings.storage.admission.ready")),
-        ])
+                : "settings.storage.admission.ready"))
+        }
         if storage.unknownPressure == true {
           Label(
             settingsText("settings.storage.unknownPressure"),
@@ -1022,9 +1005,8 @@ private struct DiagnosticsSettingsPane: View {
   var model: SettingsWorkspaceViewModel
 
   var body: some View {
-    SettingsPaneContainer {
-      SettingsPaneHeader(
-        subtitle: settingsText("settings.diagnostics.subtitle"))
+    WorkspacePage {
+      WorkspaceHeaderBar(summary: Text(settingsText("settings.diagnostics.subtitle")))
       GroupBox(settingsText("settings.diagnostics.defaultScope")) {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
           SettingsAssuranceRow(
@@ -1057,26 +1039,23 @@ private struct DiagnosticsSettingsPane: View {
             let preview = model.diagnosticPreview
           {
             Divider()
-            SettingsValueGrid(
-              rows: [
-                .init(settingsText("settings.diagnostics.destination"), destination.path),
-                .init(
-                  settingsText("settings.diagnostics.size"),
-                  ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: preview.estimatedBytes),
-                    countStyle: .file)),
-                .init(settingsText("settings.diagnostics.scopeHash"), preview.scopeSHA256),
-                .init(
-                  settingsText("settings.diagnostics.deviceRaw"),
-                  settingsText(
-                    preview.deviceRawExcluded
-                      ? "settings.diagnostics.excluded"
-                      : "settings.diagnostics.notExcluded")),
-              ],
-              monospacedValueLabels: [
-                settingsText("settings.diagnostics.destination"),
-                settingsText("settings.diagnostics.scopeHash"),
-              ])
+            WorkspaceFactGrid {
+              settingsFact(
+                "settings.diagnostics.destination", destination.path, isMonospaced: true)
+              settingsFact(
+                "settings.diagnostics.size",
+                ByteCountFormatter.string(
+                  fromByteCount: Int64(clamping: preview.estimatedBytes),
+                  countStyle: .file))
+              settingsFact(
+                "settings.diagnostics.scopeHash", preview.scopeSHA256, isMonospaced: true)
+              settingsFact(
+                "settings.diagnostics.deviceRaw",
+                settingsText(
+                  preview.deviceRawExcluded
+                    ? "settings.diagnostics.excluded"
+                    : "settings.diagnostics.notExcluded"))
+            }
             VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
               Text(settingsText("settings.diagnostics.entries"))
                 .font(WorkspaceFont.label)
@@ -1115,9 +1094,9 @@ private struct DiagnosticsSettingsPane: View {
       }
       if let message = model.diagnosticsMessage {
         if model.exportedDiagnosticURL != nil {
-          SettingsSuccessBanner(message: message)
+          WorkspaceNotice(tone: .ok, symbol: "checkmark.circle.fill") { Text(message) }
         } else {
-          SettingsErrorBanner(message: message)
+          settingsErrorNotice(message)
         }
       }
     }
@@ -1344,77 +1323,19 @@ final class SettingsWorkspaceViewModel {
   }
 }
 
-private struct SettingsPaneContainer<Content: View>: View {
-  let content: Content
-
-  init(@ViewBuilder content: () -> Content) {
-    self.content = content()
-  }
-
-  var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: WorkspaceMetrics.sectionGap) { content }
-        .padding(WorkspaceMetrics.pageInsetHorizontal)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-  }
-}
-
-private struct SettingsPaneHeader: View {
-  let subtitle: String
-
-  var body: some View {
-    Text(subtitle)
-      .font(WorkspaceFont.secondary)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-      .frame(maxWidth: WorkspaceMetrics.proseMaxWidth, alignment: .leading)
-  }
-}
-
-private struct SettingsValueRow: Identifiable {
-  let label: String
-  let value: String
-  var id: String { label }
-
-  init(_ label: String, _ value: String) {
-    self.label = label
-    self.value = value
-  }
-}
-
-private struct SettingsValueGrid: View {
-  let rows: [SettingsValueRow]
-  var monospacedValueLabels: Set<String> = []
-
-  var body: some View {
-    Grid(
-      alignment: .leadingFirstTextBaseline,
-      horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-      verticalSpacing: WorkspaceMetrics.rowGap
-    ) {
-      ForEach(rows) { row in
-        let isMonospaced = monospacedValueLabels.contains(row.label)
-        GridRow {
-          Text(row.label)
-            .font(WorkspaceFont.secondary)
-            .foregroundStyle(.secondary)
-          // A path or a hash stays on one line with the middle elided and the
-          // complete value one hover (or one selection) away, rather than
-          // wrapping to three lines of unreadable fragments.
-          Text(row.value)
-            .font(isMonospaced ? WorkspaceFont.monospacedValue : WorkspaceFont.body)
-            .monospacedDigit()
-            .lineLimit(isMonospaced ? 1 : nil)
-            .truncationMode(isMonospaced ? .middle : .tail)
-            .help(isMonospaced ? row.value : "")
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
+/// One row of a Settings key/value list. A path or a hash keeps the single-line
+/// middle elision the pane has always used; everything else keeps its tabular
+/// digits, and both stay selectable.
+private func settingsFact(
+  _ key: String, _ value: String, isMonospaced: Bool = false
+) -> WorkspaceFactRow {
+  WorkspaceFactRow(
+    name: Text(settingsText(key)),
+    value: Text(value),
+    isMonospaced: isMonospaced,
+    usesTabularDigits: !isMonospaced,
+    isSelectable: true,
+    elidedValue: isMonospaced ? value : nil)
 }
 
 private struct SettingsAssuranceRow: View {
@@ -1450,33 +1371,12 @@ private struct SettingsLoadingRow: View {
   }
 }
 
-private struct SettingsErrorBanner: View {
-  let message: String
-
-  var body: some View {
-    Label(message, systemImage: "exclamationmark.triangle.fill")
-      .foregroundStyle(.orange)
-      .padding(WorkspaceMetrics.contentGap)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .overlay(
-        RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-          .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-      .accessibilityElement(children: .combine)
-  }
-}
-
-private struct SettingsSuccessBanner: View {
-  let message: String
-
-  var body: some View {
-    Label(message, systemImage: "checkmark.circle.fill")
-      .foregroundStyle(.green)
-      .padding(WorkspaceMetrics.contentGap)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .overlay(
-        RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-          .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-      .accessibilityElement(children: .combine)
+/// Settings' failures are the App's warn notice, not a bordered line of orange
+/// text: the tone's symbol, border and wash carry the state together, so colour
+/// is never the only carrier (spec §2, §4.4).
+private func settingsErrorNotice(_ message: String) -> some View {
+  WorkspaceNotice(tone: .warning, symbol: "exclamationmark.triangle.fill") {
+    Text(message)
   }
 }
 

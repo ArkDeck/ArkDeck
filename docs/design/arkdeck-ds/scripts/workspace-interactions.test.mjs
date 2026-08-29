@@ -1598,3 +1598,52 @@ test('the trust page shows the same Runtime facts column and every wait answer',
     assert.doesNotMatch(trustedPage, /data-sync-id="device.trust.steps"/);
   }
 });
+
+test('the shared workspace chrome has no App-side copies', () => {
+  // F52 item 4: five workspaces had written their own notice, page, header and
+  // key/value list beside the shared ones. The row now carries what those
+  // copies added, so the next caller extends it instead of writing a sixth.
+  const chrome = read('ArkDeckApp/DesignSystem/WorkspaceChrome.swift');
+  for (const option of ['usesTabularDigits', 'usesMonospacedName', 'isSelectable', 'elidedValue']) {
+    assert.match(chrome, new RegExp(`var ${option}`), `WorkspaceFactRow must carry ${option}`);
+  }
+
+  const device = read('ArkDeckApp/Features/Devices/DeviceWorkspace.swift');
+  assert.doesNotMatch(device, /func deviceNotice\(/, 'device detail must not define a second notice');
+  assert.equal(
+    (device.match(/WorkspaceNotice\(/g) ?? []).length, 8,
+    'every trust and wait state reads through the shared notice');
+  for (const identifier of [
+    'device.trust.needsRecheck', 'device.trust.waiting', 'device.trust.offline',
+    'device.trust.ready', 'device.trust.unknownState',
+    'device.wait.polling', 'device.wait.timedOut', 'device.wait.unavailable',
+  ]) {
+    assert.ok(
+      device.includes(`identifier: "${identifier}"`),
+      `${identifier} must stay addressable after the convergence`);
+  }
+
+  const settings = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
+  for (const copy of [
+    'SettingsPaneContainer', 'SettingsPaneHeader', 'SettingsValueGrid', 'SettingsValueRow',
+    'SettingsErrorBanner', 'SettingsSuccessBanner',
+  ]) {
+    assert.doesNotMatch(
+      settings, new RegExp(`struct ${copy}\\b`), `${copy} duplicates the shared chrome`);
+  }
+  for (const idiom of ['WorkspacePage {', 'WorkspaceHeaderBar(', 'WorkspaceFactGrid {', 'WorkspaceNotice(']) {
+    assert.ok(settings.includes(idiom), `Settings must render through ${idiom}`);
+  }
+
+  // A component two features already render is shared vocabulary, not the
+  // private detail of whichever workspace happened to need it first.
+  assert.match(
+    read('ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift'),
+    /struct RuntimeExecutionModeBadge: View/);
+  assert.doesNotMatch(
+    read('ArkDeckApp/Features/History/RuntimeHistoryView.swift'),
+    /struct RuntimeExecutionModeBadge/);
+  assert.ok(
+    read('ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift').includes('RuntimeExecutionModeBadge('),
+    'the job inspector still renders the shared badge');
+});

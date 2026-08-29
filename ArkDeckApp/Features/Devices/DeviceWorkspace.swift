@@ -467,38 +467,44 @@ struct DeviceDetailView: View {
   @ViewBuilder
   private var stateBlock: some View {
     if candidate.stateObservationHealth == .stale {
-      deviceNotice(
-        deviceString("device.state.needsRecheck"),
-        systemImage: "arrow.clockwise.circle",
-        color: .orange,
-        identifier: "device.trust.needsRecheck")
+      WorkspaceNotice(
+        tone: .warning, symbol: "arrow.clockwise.circle",
+        identifier: "device.trust.needsRecheck"
+      ) {
+        Text(deviceString("device.state.needsRecheck"))
+      }
     } else {
       switch candidate.state {
       case "Unauthorized":
-        deviceNotice(
-          deviceString("device.trust.waiting"),
-          systemImage: "exclamationmark.triangle.fill",
-          color: .orange,
-          identifier: "device.trust.waiting")
+        WorkspaceNotice(
+          tone: .warning, symbol: "exclamationmark.triangle.fill",
+          identifier: "device.trust.waiting"
+        ) {
+          Text(deviceString("device.trust.waiting"))
+        }
       case "Offline":
-        deviceNotice(
-          deviceString("device.trust.offline"),
-          systemImage: "circle.dashed",
-          color: .secondary,
-          identifier: "device.trust.offline")
+        WorkspaceNotice(
+          tone: .neutral, symbol: "circle.dashed",
+          identifier: "device.trust.offline"
+        ) {
+          Text(deviceString("device.trust.offline"))
+        }
       case "Connected":
-        deviceNotice(
-          deviceString(
-            candidate.isAdopted ? "device.trust.ready" : "device.trust.authorizedUnadopted"),
-          systemImage: "checkmark.circle.fill",
-          color: .green,
-          identifier: "device.trust.ready")
+        WorkspaceNotice(
+          tone: .ok, symbol: "checkmark.circle.fill",
+          identifier: "device.trust.ready"
+        ) {
+          Text(
+            deviceString(
+              candidate.isAdopted ? "device.trust.ready" : "device.trust.authorizedUnadopted"))
+        }
       default:
-        deviceNotice(
-          String(localized: .deviceTrustUnknownState(candidate.state)),
-          systemImage: "questionmark.circle",
-          color: .secondary,
-          identifier: "device.trust.unknownState")
+        WorkspaceNotice(
+          tone: .neutral, symbol: "questionmark.circle",
+          identifier: "device.trust.unknownState"
+        ) {
+          Text(String(localized: .deviceTrustUnknownState(candidate.state)))
+        }
       }
     }
   }
@@ -522,11 +528,12 @@ struct DeviceDetailView: View {
       }
     case .timedOut:
       VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-        deviceNotice(
-          deviceString("device.wait.timedOut"),
-          systemImage: "exclamationmark.triangle.fill",
-          color: .orange,
-          identifier: "device.wait.timedOut")
+        WorkspaceNotice(
+          tone: .warning, symbol: "exclamationmark.triangle.fill",
+          identifier: "device.wait.timedOut"
+        ) {
+          Text(deviceString("device.wait.timedOut"))
+        }
         // Restarting the shared HDC server is never the default fix: it is a
         // separate, explicitly confirmed flow that lives on Overview, and it
         // affects DevEco and every connected device. This button only leads
@@ -535,11 +542,12 @@ struct DeviceDetailView: View {
           .accessibilityIdentifier("device.wait.openOverviewRecovery")
       }
     case .unavailable(_, let reason):
-      deviceNotice(
-        String(localized: .deviceWaitUnavailable(reason)),
-        systemImage: "xmark.octagon.fill",
-        color: .red,
-        identifier: "device.wait.unavailable")
+      WorkspaceNotice(
+        tone: .danger, symbol: "xmark.octagon.fill",
+        identifier: "device.wait.unavailable"
+      ) {
+        Text(String(localized: .deviceWaitUnavailable(reason)))
+      }
     }
   }
 
@@ -677,32 +685,6 @@ struct DeviceDetailView: View {
       }
     }
   }
-}
-
-func deviceNotice(
-  _ text: String,
-  systemImage: String,
-  color: Color,
-  identifier: String
-) -> some View {
-  Label {
-    Text(text).fixedSize(horizontal: false, vertical: true)
-  } icon: {
-    Image(systemName: systemImage).foregroundStyle(color)
-  }
-  .font(WorkspaceFont.secondary)
-  .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
-  .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
-  .frame(maxWidth: .infinity, alignment: .leading)
-  .background(
-    color.opacity(0.08),
-    in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-  )
-  .overlay {
-    RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-      .stroke(color.opacity(0.38), lineWidth: 1)
-  }
-  .accessibilityIdentifier(identifier)
 }
 
 func deviceString(_ key: String) -> String {

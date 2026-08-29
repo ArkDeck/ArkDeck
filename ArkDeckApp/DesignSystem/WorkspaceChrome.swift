@@ -508,22 +508,80 @@ struct WorkspaceChip: View {
 
 /// One row of a key/value list. Values default to mono because the list exists
 /// for the things spec §2 says must be comparable character by character.
+///
+/// The options below are the behaviours the workspaces used to get by writing
+/// their own row: Settings' elided paths and selectable values, Flash's elided
+/// digests, and History's parameter list, whose *key* is itself a mono value.
+/// Each defaults to what this row already did, so adopting one is opt-in.
 struct WorkspaceFactRow: View {
   let name: Text
   let value: Text
   var isMonospaced = true
+  /// Digits that change in place line up column-wise even when the value is
+  /// not a mono field — byte counts, versions, durations.
+  var usesTabularDigits = false
+  /// A key that is itself a value, e.g. a runtime parameter's name. It reads as
+  /// mono primary text rather than a secondary label.
+  var usesMonospacedName = false
+  var isSelectable = false
+  /// The complete value, when it must stay on one line. The middle is elided so
+  /// a path or a hash does not wrap into unreadable fragments; the whole value
+  /// stays one hover away, and VoiceOver still reads all of it.
+  var elidedValue: String?
   var identifier: String?
 
   var body: some View {
     GridRow(alignment: .firstTextBaseline) {
-      name
-        .font(WorkspaceFont.secondary)
-        .foregroundStyle(.secondary)
-        .gridColumnAlignment(.leading)
+      nameText
+      valueText
+    }
+  }
+
+  private var nameText: some View {
+    name
+      .font(usesMonospacedName ? WorkspaceFont.monospacedValue : WorkspaceFont.secondary)
+      .foregroundStyle(usesMonospacedName ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+      .gridColumnAlignment(.leading)
+  }
+
+  private var valueFont: Font {
+    if isMonospaced { return WorkspaceFont.monospacedValue }
+    return usesTabularDigits ? WorkspaceFont.tabularValue : WorkspaceFont.body
+  }
+
+  @ViewBuilder
+  private var valueText: some View {
+    if let elidedValue {
       value
-        .font(isMonospaced ? WorkspaceFont.monospacedValue : WorkspaceFont.body)
-        .fixedSize(horizontal: false, vertical: true)
+        .font(valueFont)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .help(elidedValue)
+        .accessibilityLabel(elidedValue)
+        .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier(identifier ?? "")
+    } else {
+      value
+        .font(valueFont)
+        .fixedSize(horizontal: false, vertical: true)
+        .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
+        .accessibilityIdentifier(identifier ?? "")
+    }
+  }
+}
+
+/// `.textSelection(.enabled)` and `.textSelection(.disabled)` are different
+/// types, so the choice cannot be a ternary.
+private struct WorkspaceSelectableValue: ViewModifier {
+  let isEnabled: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.textSelection(.enabled)
+    } else {
+      content
     }
   }
 }
