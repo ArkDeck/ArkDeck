@@ -60,6 +60,7 @@
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
 		A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E9 /* OverviewRecordUITests.swift */; };
 		E10000000000000000000001 /* WorkspaceChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* WorkspaceChrome.swift */; };
+		E10000000000000000000004 /* RuntimeExecutionModeBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000005 /* RuntimeExecutionModeBadge.swift */; };
 		F20000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -114,6 +115,7 @@
 		A10000000000000000000F21 /* DeviceRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 		E10000000000000000000002 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
+		E10000000000000000000005 /* RuntimeExecutionModeBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeExecutionModeBadge.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -206,6 +208,7 @@
 			isa = PBXGroup;
 			children = (
 				E10000000000000000000002 /* WorkspaceChrome.swift */,
+				E10000000000000000000005 /* RuntimeExecutionModeBadge.swift */,
 			);
 			path = DesignSystem;
 			sourceTree = "<group>";
@@ -557,6 +560,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E10000000000000000000001 /* WorkspaceChrome.swift in Sources */,
+				E10000000000000000000004 /* RuntimeExecutionModeBadge.swift in Sources */,
 				A10000000000000000000010 /* ArkDeckApp.swift in Sources */,
 				A10000000000000000000013 /* HDCStatusView.swift in Sources */,
 				A100000000000000000000E6 /* OverviewRecordView.swift in Sources */,
