@@ -338,6 +338,20 @@ test('History compact popovers retain filters, saved actions and focus after a f
     assert.equal(restored.source,trigger);assert.ok(trigger.focused&&selected.focused);
     assert.equal(restored.style.left,'490px');assert.equal(restored.style.top,'308px');
 
+    h.run(`let dismissPanel=document.querySelector('.history-popover:popover-open'),dismissTrigger=$(dismissPanel.dataset.trigger),insideTarget={},outsideTarget={};
+      dismissPanel.contains=target=>target===insideTarget;
+      dismissTrigger.contains=target=>target===dismissTrigger;
+      dismissPanel.hidePopover=()=>dismissPanel.hidden=(dismissPanel.hidden||0)+1;
+      let escapeEvent={key:'Escape',preventDefault(){this.prevented=true}};`);
+    assert.equal(h.run('dismissHistoryPopoverOnEscape({key:"Enter"})'),false);
+    assert.equal(h.run('dismissHistoryPopoverOnEscape(escapeEvent)'),true);
+    assert.equal(h.run('escapeEvent.prevented'),true);
+    assert.equal(h.run('dismissPanel.hidden'),1);
+    assert.equal(h.run('dismissHistoryPopoverOnPointerDown({target:insideTarget})'),false);
+    assert.equal(h.run('dismissHistoryPopoverOnPointerDown({target:dismissTrigger})'),false);
+    assert.equal(h.run('dismissHistoryPopoverOnPointerDown({target:outsideTarget})'),true);
+    assert.equal(h.run('dismissPanel.hidden'),2);
+
     h.run("S.hf.kind='viewer';applyHistorySavedAction('save');resetHistoryFilters();applyHistorySavedAction('restore')");
     assert.equal(h.run('S.hf.kind'),'viewer');assert.equal(h.run('S.hf.status'),'failed');
     h.run("applyHistorySavedAction('attention')");assert.equal(h.run('S.hf.kind'),'all');assert.equal(h.run('S.hf.status'),'attention');

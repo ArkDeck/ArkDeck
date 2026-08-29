@@ -177,7 +177,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
-| history.filters | 窄窗筛选与已存筛选弹层；status/mode/session/device/time/reset/Escape | F41 从纵向堆叠改为可展开入口；活动选择与搜索常显。网页稿补齐弹层；键盘与外部点击关闭尚未验收，原生与截图验证见 F41 |
+| history.filters | 窄窗筛选与已存筛选弹层；status/mode/session/device/time/reset/Escape | F41 从纵向堆叠改为可展开入口；活动选择与搜索常显。F45 补显式 Escape/外部 pointer 关闭并完成双语浏览器验证；原生与截图验证见 F41/F45 |
 | history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开 |
 | history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；F37 按 exact Artifact 预览，未发布禁用；与App诊断导出不同 |
 | history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | App 全部六类保留精确来源；F39 补原型遗漏的来源信息与 Inspector 跳转字段；Diagnostics 可将校验过的 Trace 转交 Viewer；不重放，原型不读取历史文件 |
@@ -747,3 +747,24 @@ SDD、49 项 catalog 与生成物零漂移通过；路径分类为纯设计/文�
 Computer Use 连接中断也未完成真实摘要回访。原工作区补充的同实例往返/重试断言
 已通过完整本地闸的编译，但未执行，不包含在此布局 PR 中。F41 的网页 Escape/外部
 关闭及整体 goal 仍未完成。
+
+## 2026-08-29 F45：History 窄窗筛选弹层显式关闭
+
+对应 GJ-1—4 的 History 交互。F41 已把窄窗筛选改为原生 `popover="auto"`，但完全依赖
+浏览器的隐式 light-dismiss。最新稿件在同一浏览器标签重新加载后可稳定复现：弹层已在
+top layer，Escape 后仍为 open；点击搜索区域会被弹层遮挡；点击位于弹层外的全局外观
+按钮时按钮动作正常完成，弹层仍悬浮。因此先前失败不再只归因于坐标或焦点不确定性。
+
+网页稿现在为当前打开的 History popover 增加显式兼容处理。Escape 关闭弹层并把焦点
+交还对应触发按钮；外部 pointer down 先关闭弹层，但不阻止目标控件继续处理点击。
+弹层内部与自身触发按钮被排除，保留表单交互和触发按钮的原生切换；从“筛选历史”
+切换到“已存筛选”时只保留后者。已有筛选变更后的 DOM 重建、弹层重挂和字段焦点
+恢复保持不变。模态框 Escape 仍优先处理，不改变独立 modal 的焦点圈。
+
+交互测试在中英文既有 popover 用例中加入 Escape、内部 pointer、触发按钮与外部 pointer
+分支，最终 61/61 通过。同一浏览器标签完成中英文普通交互：两种弹层均可由 Escape 和
+外部工具栏点击关闭，Escape 返回精确触发按钮，外观切换仍执行；筛选变更后弹层保持
+打开且英文 Status 恢复焦点，触发按钮再次点击可关闭，两个触发按钮之间切换正确。
+修正前状态、两张修正后截图与结构化测量只留本机。这里验证的是设计样本，不是原生
+App 或真机证据；本项不修改 App、Runtime、Catalog 或设备状态。F42 原生 HiLog reader
+回归仍等待本机 automation 身份认证，整体 goal 继续保持开放。

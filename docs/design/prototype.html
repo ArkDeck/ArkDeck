@@ -1230,6 +1230,7 @@ document.addEventListener("keydown",e=>{
     if(disclosure){e.preventDefault();disclosure.open=!disclosure.open;}return;
   }
   if(e.key==="Escape"&&host.firstElementChild){e.preventDefault();closeModal();return;}
+  if(dismissHistoryPopoverOnEscape(e))return;
   if(e.key!=="Tab"||!host.firstElementChild)return;
   const focusable=[...host.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')];
   if(!focusable.length)return;
@@ -1237,7 +1238,10 @@ document.addEventListener("keydown",e=>{
   if(e.shiftKey&&(document.activeElement===first||document.activeElement===heading)){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
-document.addEventListener("pointerdown",e=>{if(!$("deviceMenu").hidden&&!$("deviceMenu").contains(e.target))closeDeviceMenu();});
+document.addEventListener("pointerdown",e=>{
+  if(!$("deviceMenu").hidden&&!$("deviceMenu").contains(e.target))closeDeviceMenu();
+  dismissHistoryPopoverOnPointerDown(e);
+});
 
 /* ---------- jobs ---------- */
 function addJob(j){j.id="J"+(S.jobSeq++);j.createdAtUTC=new Date().toISOString();j.cancelled=false;S.jobs.push(j);openDrawer();renderDrawer();return j;}
@@ -4023,6 +4027,19 @@ function positionHistoryPopover(panel){
   const rect=trigger.getBoundingClientRect(),size=panel.getBoundingClientRect();
   panel.style.left=Math.max(12,Math.min(rect.right-size.width,document.documentElement.clientWidth-size.width-12))+'px';
   panel.style.top=Math.max(12,Math.min(rect.bottom+8,document.documentElement.clientHeight-size.height-12))+'px';
+}
+function dismissHistoryPopoverOnEscape(event){
+  if(event.key!=="Escape")return false;
+  const panel=document.querySelector('.history-popover:popover-open');if(!panel)return false;
+  const trigger=$(panel.dataset.trigger);
+  event.preventDefault();panel.hidePopover();trigger?.focus({preventScroll:true});
+  return true;
+}
+function dismissHistoryPopoverOnPointerDown(event){
+  const panel=document.querySelector('.history-popover:popover-open');if(!panel)return false;
+  const trigger=$(panel.dataset.trigger);
+  if(panel.contains(event.target)||trigger?.contains(event.target))return false;
+  panel.hidePopover();return true;
 }
 function setHistoryFilter(key,value){
   const open=document.querySelector('.history-popover:popover-open');
