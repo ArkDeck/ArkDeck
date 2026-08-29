@@ -102,7 +102,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；F54 补 Runtime 不可用 / 正在刷新 / 空档案三态，以及残留计数、临界写入提示与 established-current-epoch 关系 |
 | shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：精确 Job 跳转、清除旧筛选并定位记录行。F41：有界滚动、多记录计数与窄窗工作区保留；原生精确行定位仍在复测，不能视为通过。所有主工作区共享；独立窗口不显示。不确认后续刷、不在 App 归档 |
 | device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管。F50 用 `?page=device&deviceDetail=…` 补齐五种候选状态、`stateObservedAt`、CLI 接管说明，并把字段标签与两条说明对回 `Localizable.xcstrings` |
-| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；`device.wait.unavailable` 与信任页缺少的 Runtime 事实栏由 F52 登记 |
+| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；F55 把信任页改为与设备详情同构的两栏（状态与操作 + Runtime 事实，缺失字段不补值），补 `device.wait.unavailable` 第四态，并修好使 polling 态整页渲染失败的缺失倒计时格式化函数 |
 | device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
 
 ### Overview（GJ-1/2/4）
@@ -171,7 +171,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | diagnostics.capture | noSession/noTarget/adoptedTarget/disabledArm/disabledMark | F01；不会假布防或保存 Marker |
 | diagnostics.reader | partial/marks/noPicture/missing/notDerived/alignment | History → fresh correlation → index/summary/markers bounded read/hash → publish；无校准/时间不猜；PNG/JPEG 通道兼容；文本显式读取 |
 | diagnostics.hilogSummary | complete/partial/unrecognized/empty/corrupt/reload/history | F42：已发布 HiLog 摘要的独立只读回访；核对 Job/Artifact、来源 ID 与标准摘要字节，不读取原日志，不把行首统计解释为设备健康或完整采集 |
-| diagnostics.concept | 显式未来 capture/recording/finalizing/session/partial/clockGap | 有界 ringBuffered 与部分自动 Marker 已发布；交互式会话/视频/校准仍为单独概念，不混入当前默认。F46 补齐概念页窗口标题与静态 AX 名称；正文与时间轴 AX 名称仍为中文单语（F52 登记） |
+| diagnostics.concept | 显式未来 capture/recording/finalizing/session/partial/clockGap | 有界 ringBuffered 与部分自动 Marker 已发布；交互式会话/视频/校准仍为单独概念，不混入当前默认。F46 补齐概念页窗口标题与静态 AX 名称；F55 把正文、三个演示 Session 的数据、时间轴上按事实生成的 AX 名称、对齐与原始日志弹层全部改为语言对，设备画面占位仍保留设备原文 |
 
 ### History（GJ-1—4）
 
@@ -1040,6 +1040,60 @@ noMetrics|failed`，新增 `viewerEmpty`）。空态此前只有一种说明，�
 - `npm test` **72 项通过**（新增 3 项：Job 检查器三态与逐 Job 事实、Viewer 六态与无匹配
   搜索、Overview 环境五组与矩阵三态）。三项都直接读取 `JobsLocalizable` /
   `UIDumpLocalizable` / `Localizable`，用 App 的字符串断言。
+- `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
+- 统一本地闸退出 0，纯设计/文档车道，不分配 Swift / App 编译车道。
+- 未做浏览器逐页走查、未跑原生 XCUITest、未执行设备操作。
+
+## 2026-08-29 F55：Diagnostics 概念页双语与信任页 Runtime 事实栏
+
+首轮全量核对的第四批，基线 `e914beed`（PR #1588 合入后的 `main`）。范围是 F52 第 2 条剩余
+部分与第 3 条；逐行结论见
+[2026-08-29 批次四台账](references/ui-consistency/2026-08-29-concept-ledger.md)。
+只改设计侧，不修改 App、Runtime、Catalog 或准入策略，不执行设备操作。
+
+**先更正一处上一批的过头结论。** F54 的记述写了「F52 第 1 条至此全部闭合」，但该条列举的
+`device.wait.unavailable` 当时并未实现，批次三也没有触碰信任页。正确说法是：F52 第 1 条在
+批次二、三闭合了 Overview / Flash / Trace / Settings / Job 检查器 / Viewer 六处，
+`device.wait.unavailable` 直到本批才补上。原记述保留，不改写，以本段为准。
+
+**Diagnostics 概念页双语。** 概念页的正文此前几乎全部只有中文：当前画面与三种缺画面说明、
+选中事件与光标离开事件的说明、邻近日志与无法对齐说明、时间轴标题与所有按事实生成的 AX
+名称（录屏 Frame、Marker 截图、Trace event、日志点、Marker、时间光标）、新建诊断页的
+preset、通道、高级设置与边界说明、录制页与生成结果页的全部文案、Marker 状态行，以及时间
+对齐弹层与原始顺序日志弹层。三个演示 Session 的 `label` / `alignChip` / `alignRows` /
+`alignNote` / `partialReasons` / marker 标签，以及演示采集结束后生成的新 Session，也都是
+稿件自己写的文案，现在统一存为语言对，由通用的 `bi()` 解析（原 `histText()` 泛化并保留为
+别名）。被抓设备自身的界面占位（设置 / 搜索设置项 / WLAN 已连接等）与 HiLog 正文、
+Trace event 名保持原文不译——它们是设备输出，不是 ArkDeck 文案。
+
+**信任页 Runtime 事实栏。** spec §5.2 要求未授权设备的接管引导位于同一设备详情中，
+`DeviceDetailView` 对每种状态都渲染「当前状态与操作」和「Runtime 事实」两栏；稿件的
+`auth` 页此前是一张独立卡片，没有事实栏。现改为与设备详情同构的 `device-layout` 两栏，
+文案逐字取自 `Localizable.xcstrings`（`device.trust.waiting` / `stepsTitle` / `step1–3`、
+`device.detail.statusTitle` / `factsTitle` / `recheckNote`、`device.action.beginWait` /
+`retryWait` / `recheck`）。事实栏只列未授权候选真正报告的三项——connect key（脱敏）、
+报告状态、状态观测时间——**不为 target、binding revision、机型、系统版本补演示值**，回归
+直接断言这些行不存在。有界等待补齐第四态 `device.wait.unavailable`（「无法检查设备授权」
+＋ reason code），与超时区分开：不可检查不是已知拒绝。信任成功后按 App 的语义显示
+「已授权。该设备尚未被接管为持久目标。」并给出 CLI 接管说明，而不是把信任当成接管。
+
+**顺带修好一处稿件缺陷。** `fmtLeft()` 被信任页的倒计时和轮询 tick 引用了两处，却从未定义。
+结果是：只要进入 polling 态，`pAuth()` 抛 `ReferenceError`，整页停止渲染——点击「开始等待
+授权」在浏览器里是坏的。这在合入的 `main` 上可复现，属于既有缺陷而非本轮引入。现补上
+mm:ss 的格式化实现，并由回归断言倒计时确实渲染。
+
+### 本批未覆盖
+
+- App 侧共享件收敛与 `ViewerInspectorCopy` 硬编码英文（F52-4/5）——需要 App 改动与原生回归。
+- 资源里的已移除路径键、退役 Automation 样式、preview 构建守护、`Select` 映射（F52-6~9）。
+- F52 的三条待裁决项保持开放。
+
+### 验证
+
+- `npm test` **74 项通过**（新增 2 项：概念页四个视图与三个 Session 在英文下无中文回落且
+  弹层同样覆盖；信任页两栏结构、缺失字段不补值、四种等待答复与倒计时渲染）。两项都直接
+  读取 `Localizable.xcstrings` 或按设备输入白名单排除设备原文。
+- 全页英文扫描：20 组页面/状态组合中，除设备画面占位与设备日志正文外，**不再有中文回落**。
 - `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
 - 统一本地闸退出 0，纯设计/文档车道，不分配 Swift / App 编译车道。
 - 未做浏览器逐页走查、未跑原生 XCUITest、未执行设备操作。

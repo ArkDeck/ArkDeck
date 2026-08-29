@@ -1518,3 +1518,83 @@ test('Overview environment keeps the App five groups and its capability matrix s
     assert.doesNotMatch(page, /data-sync-id="hdc.lifecycle.dispatch"/);
   }
 });
+
+test('the Diagnostics concept pages read in both languages', () => {
+  // The captured device's own screen is device output and stays untranslated;
+  // everything this draft authored is a language pair.
+  const deviceScreen = /设置|搜索设置项|小艺|华为账号|已连接|蓝牙|已开启|移动网络/;
+  const chinese = markup => [...new Set(
+    [...markup.matchAll(/[^<>"]*[一-鿿][^<>"]*/g)].map(match => match[0].trim()))]
+    .filter(text => !deviceScreen.test(text) && !text.includes("lc("));
+  for (const view of ['session', 'capture', 'recording', 'finalizing']) {
+    const h = harness('?page=diagnostics&concept=diagnostics&lang=en');
+    if (view !== 'session') h.run(`S.diagnostics.view=${JSON.stringify(view)}`);
+    if (view === 'recording' || view === 'finalizing') {
+      h.run('S.diagnostics.markers=[{time:13.2,label:{zh:"问题出现",en:"Problem appeared"},kind:"manual",shotState:"saved",shotAfterMs:512}]');
+    }
+    assert.deepEqual(chinese(h.run('pDiagnostics()')), [], `${view} must not fall back to Chinese`);
+  }
+  for (const session of [0, 1, 2]) {
+    const h = harness('?page=diagnostics&concept=diagnostics&lang=en');
+    h.run(`chooseDiagSession(${session})`);
+    assert.deepEqual(chinese(h.run('pDiagnostics()')), [], `session ${session} must not fall back to Chinese`);
+    // The alignment and raw-log sheets are part of the same page.
+    h.run('modal=html=>{globalThis.__modal=html;}');
+    h.run('showDiagAlignment()');
+    assert.deepEqual(chinese(h.run('__modal')), [], `session ${session} alignment sheet`);
+  }
+  const raw = harness('?page=diagnostics&concept=diagnostics&lang=en');
+  raw.run('modal=html=>{globalThis.__modal=html;}');
+  raw.run('showDiagRawLogs()');
+  assert.deepEqual(chinese(raw.run('__modal')), []);
+  assert.equal(harness('?page=diagnostics&concept=diagnostics&lang=en').run('diagMarkerStatusText()'), 'No marker yet');
+  // Both languages still render, and the Chinese one is still Chinese.
+  const zh = harness('?page=diagnostics&concept=diagnostics&lang=zh-Hans');
+  assert.match(zh.run('pDiagnostics()'), /当前画面/);
+});
+
+test('the trust page shows the same Runtime facts column and every wait answer', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  for (const language of ['zh-Hans', 'en']) {
+    const idle = harness(`?page=auth&lang=${language}`);
+    const page = idle.run('pAuth()');
+    // Spec §5.2: the trust guidance lives inside the same device detail, so the
+    // Runtime facts column is present here too.
+    assert.match(page, /class="device-layout"/);
+    assert.ok(page.includes(value('device.detail.statusTitle', language)));
+    assert.ok(page.includes(value('device.detail.factsTitle', language)));
+    assert.ok(page.includes(value('device.trust.waiting', language)));
+    assert.ok(page.includes(value('device.trust.stepsTitle', language)));
+    for (const step of ['device.trust.step1', 'device.trust.step2', 'device.trust.step3']) {
+      assert.ok(page.includes(value(step, language)), `${step} must use the App's wording`);
+    }
+    // An unauthorized candidate has no target, binding, model or firmware, so
+    // no such row is drawn rather than filled with a demo value.
+    assert.ok(page.includes(value('device.fact.connectKey', language)));
+    assert.ok(page.includes(value('device.fact.state', language)));
+    assert.ok(!page.includes(value('device.fact.target', language)));
+    assert.ok(!page.includes(value('device.fact.bindingRevision', language)));
+    assert.ok(!page.includes(value('device.fact.firmware', language)));
+
+    // Four wait answers; "cannot check" is not "denied".
+    const polling = harness(`?page=auth&lang=${language}&authState=polling`);
+    assert.ok(polling.run('pAuth()').includes(value('device.wait.polling', language)));
+    assert.match(polling.run('pAuth()'), /id="authcd">\d\d:\d\d</, 'the bounded wait must render its countdown');
+    assert.equal(polling.run('fmtLeft(180)'), '03:00');
+    const timedOut = harness(`?page=auth&lang=${language}&authState=timedOut`);
+    assert.ok(timedOut.run('pAuth()').includes(value('device.wait.timedOut', language)));
+    assert.ok(timedOut.run('pAuth()').includes(value('device.wait.openOverviewRecovery', language)));
+    assert.ok(timedOut.run('pAuth()').includes(value('device.action.retryWait', language)));
+    const unavailable = harness(`?page=auth&lang=${language}&authState=unavailable`);
+    assert.match(unavailable.run('pAuth()'), /data-sync-id="device.wait.unavailable"/);
+    assert.ok(unavailable.run('pAuth()').includes(value('device.wait.unavailable', language).replace('%@', '').trim()));
+
+    // Trusting is not adopting: the App says who performs adoption instead.
+    const trusted = harness(`?page=auth&lang=${language}&authState=ready`);
+    const trustedPage = trusted.run('pAuth()');
+    assert.ok(trustedPage.includes(value('device.trust.authorizedUnadopted', language)));
+    assert.ok(trustedPage.includes(value('device.detail.adoptViaCLI', language)));
+    assert.doesNotMatch(trustedPage, /data-sync-id="device.trust.steps"/);
+  }
+});

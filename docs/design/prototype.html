@@ -974,7 +974,9 @@ const S = {
     expanded:new Set(),
     target:"TGT-958780b2ffb7"},
   deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
-  auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
+  // The bounded authorization wait has four answers in the App, and
+  // "cannot check" is not the same as "denied".
+  auth:{phase:["polling","timedOut","unavailable","ready"].includes(PARAMS.get("authState"))?PARAMS.get("authState"):"idle", left:180, t:null},
   permDemo:false,
   viewer:{hasCapture:["captured","geometryUnavailable","screenshotUnavailable","noMetrics"].includes(PARAMS.get("viewerState")),
     // Loading a historical capture, an unverifiable coordinate space, an
@@ -1166,6 +1168,14 @@ const COPY={
     "deviceNotice.ready":"已授权且已接管——设备就绪。","deviceNotice.authorizedUnadopted":"已授权。该设备尚未被接管为持久目标。",
     "deviceNotice.offline":"设备报告离线。请检查 USB 连接后重新检测。","deviceNotice.needsRecheck":"状态待重新确认",
     "deviceNotice.unknownState":"工具报告了未识别的状态：Recovery。按原文展示，不做解读。",
+    "deviceNotice.needsTrust":"设备报告未授权：尚未信任本机。",
+    trustStepsTitle:"在设备上",trustStep1:"解锁设备屏幕；",
+    trustStep2:"在设备弹出的「是否信任此计算机？」中选择 信任 或 始终信任；",
+    trustStep3:"ArkDeck 将自动检测授权结果：有界等待重复读取设备状态，不反复弹通知。",
+    waitPolling:"等待设备端确认…",
+    waitTimedOut:"设备授权已超时。请检查设备的 USB 调试开关后重试。若重试无效，重启共享 HDC server 是独立且需显式确认的一步——会影响 DevEco 与所有已连接设备。",
+    waitUnavailable:"无法检查设备授权。",waitOpenOverview:"前往 Overview 重启共享 HDC server…",
+    beginWait:"开始等待授权",retryWait:"重试：开始等待授权",
     adoptViaCLI:"接管（建立持久绑定）由 CLI 执行：arkdeck device adopt。本 App 不提交接管操作。",
     flashTitle:"刷机",flashSubtitle:"选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。",flashReady:"设备已就绪",flashChecks:"3 项必需安全检查通过",
     flashRefresh:"刷新刷机状态",flashChecking:"正在检查设备",flashCheckingDetail:"Runtime 正在校验所选镜像与设备事实",
@@ -1197,6 +1207,14 @@ const COPY={
     "deviceNotice.ready":"Authorized and adopted — this device is ready.","deviceNotice.authorizedUnadopted":"Authorized. The device is not adopted as a durable target yet.",
     "deviceNotice.offline":"The device reports Offline. Check the USB connection, then re-check.","deviceNotice.needsRecheck":"Status needs re-check",
     "deviceNotice.unknownState":"The tool reports an unrecognized state: Recovery. Shown as-is, not interpreted.",
+    "deviceNotice.needsTrust":"The device reports Unauthorized: it has not trusted this computer yet.",
+    trustStepsTitle:"On the device",trustStep1:"Unlock the device screen.",
+    trustStep2:'In the device\'s "Trust this computer?" prompt, choose Trust or Always Trust.',
+    trustStep3:"ArkDeck detects the authorization result automatically: a bounded wait re-reads the device state, with no repeated notifications.",
+    waitPolling:"Waiting for on-device confirmation…",
+    waitTimedOut:"Authorization timed out. Check the device's USB debugging switch, then retry. If retrying does not help, restarting the shared HDC server is a separate, explicitly confirmed step — it affects DevEco and every connected device.",
+    waitUnavailable:"Unable to check authorization. ",waitOpenOverview:"Open Overview to restart the shared HDC server…",
+    beginWait:"Start waiting for authorization",retryWait:"Retry: start waiting for authorization",
     adoptViaCLI:"Adoption (durable binding) is performed from the CLI: arkdeck device adopt. This App does not submit adoption.",
     flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"3 required safety check(s) passed",
     flashRefresh:"Refresh Flash facts",flashChecking:"Checking device",flashCheckingDetail:"Runtime is validating the selected image and device facts",
@@ -1222,13 +1240,14 @@ const COPY={
     traceProfileCPU:"CPU scheduling",traceProfileCPUDetail:"Best for thread scheduling, contention and IPC investigations.",traceProfileIO:"I/O",traceProfileIODetail:"Best for file, storage and work-queue investigations.",traceProfileSystem:"System overview",traceProfileSystemDetail:"Captures the broadest system activity and produces the largest trace."}
 };
 function tx(key){return COPY[S.language][key]||key;}
-/** History sample rows carry record-summary copy, not device output, so their
- *  visible fields are language pairs. Strings (IDs, timestamps already in a
- *  neutral form, Runtime-reported values) pass through unchanged. */
-function histText(value){
+/** Sample copy this draft authored — record summaries, session labels, preset
+ *  names — is stored as a language pair. Plain strings (IDs, timestamps in a
+ *  neutral form, device output and Runtime-reported values) pass through. */
+function bi(value){
   if(value&&typeof value==="object"&&!Array.isArray(value))return S.language==="en"?value.en:value.zh;
   return value;
 }
+const histText=bi;
 function lc(zh,en){return S.language==="en"?en:zh;}
 
 /* ---------- helpers ---------- */
@@ -1876,6 +1895,13 @@ function overviewHDCImpact(){
   modal(`<div class="modal" role="dialog" aria-modal="true"><h3>${lc("HDC 恢复影响","HDC recovery impact")}</h3><p>${lc("实际 App 会展示 Runtime 返回的 exact generation、受影响设备、Jobs 和其他客户端。此演示没有 Runtime 快照，不能执行恢复。","The App shows Runtime's exact generation, affected devices, Jobs and other clients. This demo has no Runtime snapshot and cannot perform recovery.")}</p><div class="mfoot"><button class="btn" onclick="closeModal()">${tx("cancel")}</button><button class="btn danger" disabled>${lc("无 Runtime 影响证明","No Runtime impact proof")}</button></div></div>`);
 }
 
+/** The bounded wait's remaining time, mm:ss. It was referenced by the trust
+ *  page and the countdown tick but never defined, so entering the polling
+ *  phase threw and the page stopped rendering. */
+function fmtLeft(seconds){
+  const total=Math.max(0,Math.round(seconds));
+  return String(Math.floor(total/60)).padStart(2,"0")+":"+String(total%60).padStart(2,"0");
+}
 function startAuthPoll(){
   S.auth.phase="polling";S.auth.left=180;
   clearInterval(S.auth.t);
@@ -1907,44 +1933,63 @@ function pDevice(){
       <p class="hint">${tx("recheckNote")}</p>
       ${S.deviceDetail==="authorizedUnadopted"?`<p class="hint" data-sync-id="device.detail.adoptViaCLI">${tx("adoptViaCLI")}</p>`:""}
     </section>
-    <section class="device-section">
-      <h2>${tx("facts")}</h2>
-      <dl class="kv">
-        <dt>${tx("connectKey")}</dt><dd>150100469346864</dd>
-        <dt>${tx("reported")}</dt><dd>Connected</dd>
-        <dt>${tx("stateObservedAt")}</dt><dd>2026-08-12T07:04:11Z</dd>
-        <dt>${tx("target")}</dt><dd>${esc(d.key)}</dd>
-        <dt>${tx("revision")}</dt><dd>3</dd>
-        <dt>${tx("model")}</dt><dd>ohos</dd>
-        <dt>${tx("firmware")}</dt><dd>OpenHarmony 5.0.0.71</dd>
-        <dt>${tx("transport")}</dt><dd>usb</dd>
-        <dt>${tx("confirmed")}</dt><dd>2026-08-12T07:04:17Z</dd>
-      </dl>
-      <p class="hint">${tx("observedProvenance")}</p>
-    </section>
+    ${deviceFactsSectionHTML([
+      ["connectKey","150100469346864"],["reported","Connected"],["stateObservedAt","2026-08-12T07:04:11Z"],
+      ["target",d.key],["revision","3"],["model","ohos"],["firmware","OpenHarmony 5.0.0.71"],
+      ["transport","usb"],["confirmed","2026-08-12T07:04:17Z"]
+    ],tx("observedProvenance"))}
   </div>`;
 }
-function pAuth(){
+function deviceFactsSectionHTML(rows,note){
+  // Missing facts stay missing: the App renders no row it was not given.
+  return `<section class="device-section">
+      <h2>${tx("facts")}</h2>
+      <dl class="kv">${rows.map(([key,value])=>`<dt>${tx(key)}</dt><dd>${esc(value)}</dd>`).join("")}</dl>
+      ${note?`<p class="hint">${note}</p>`:""}
+    </section>`;
+}
+function authWaitHTML(){
   const ph=S.auth.phase;
-  const name=S.deviceNames[S.device]||"Unknown tablet";
-  return `
-  <div data-page-title="${esc(name)}">
-  <div class="card" style="max-width:680px" data-acin><span class="ac">AC-HDC-007-01/02</span>
-    <h2>${lc("此设备尚未信任本机(E000002)","This device has not trusted this Mac (E000002)")}</h2>
-    <ol style="margin-left:20px;font-size:13.5px;display:flex;flex-direction:column;gap:6px">
-      <li>${lc("解锁设备屏幕;","Unlock the device;")}</li>
-      <li>${lc("在设备弹出的「是否信任此计算机?」中选择","In the device's trust prompt, choose")} <b>${lc("信任","Trust")}</b> ${lc("或","or")} <b>${lc("始终信任","Always trust")}</b>;</li>
-      <li>${lc("ArkDeck 将自动检测授权结果(有界轮询,不反复弹通知)。","ArkDeck checks for trust with bounded polling and no repeated notifications.")}</li>
-    </ol>
-    ${ph==="polling"?lc("<div class=\"chip warn pulse\">等待设备端确认… <span id=\"authcd\">","<div class=\"chip warn pulse\">Waiting for on-device confirmation… <span id=\"authcd\">")+fmtLeft(S.auth.left)+'</span></div>':""}
-    ${ph==="timedOut"?lc("<div class=\"warnbox\">⚠ 等待设备授权超时(E000003 · timedOut)。这是由当前 durable binding 的生产刷新返回，不等同于已知 denied。请解锁设备、检查 USB 调试与信任弹窗后重试。</div>","<div class=\"warnbox\">⚠ Trust timed out (E000003 · timedOut). A timeout is not a known denial. Unlock the device, check USB debugging and the trust prompt, then try again.</div>"):""}
-    ${ph==="ready"?lc("<div class=\"okbox\">✓ 已授权,设备 Ready——列表与 Overview 已更新。</div>","<div class=\"okbox\">✓ Trust detected. The device list and Overview have refreshed.</div>"):""}
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn pri" onclick="startAuthPoll()" ${ph==="polling"?"disabled":""}>${ph==="timedOut"?lc("重试:开始等待授权","Try waiting for trust again"):lc("开始等待授权","Start waiting for authorization")}</button>
-      ${ph==="timedOut"?`<button class="btn" onclick="go('overview')">${lc("在 Overview 处理 HDC…","Manage HDC in Overview…")}</button>`
-                     :lc("<button class=\"btn\" onclick=\"simTimeout()\">模拟:授权超时(E000003)</button>","<button class=\"btn\" onclick=\"simTimeout()\">Demo: trust timeout (E000003)</button>")}
-    </div>
-  </div></div>`;
+  if(ph==="polling")
+    return `<div class="chip warn pulse" data-sync-id="device.wait.polling">${tx("waitPolling")} <span id="authcd">${fmtLeft(S.auth.left)}</span></div>`;
+  if(ph==="timedOut")
+    return `<div class="warnbox" data-sync-id="device.wait.timedOut"><div>${icon("warning",true)} ${tx("waitTimedOut")}</div>
+      <button class="btn" data-sync-id="device.wait.openOverviewRecovery" onclick="go('overview')">${tx("waitOpenOverview")}</button></div>`;
+  if(ph==="unavailable")
+    return `<div class="warnbox" role="alert" data-sync-id="device.wait.unavailable"><div>${tx("waitUnavailable")}<span class="mono">device_candidates_unreadable</span></div></div>`;
+  return "";
+}
+function pAuth(){
+  const ph=S.auth.phase,d=DEVICES.find(x=>x.id===S.device)||DEVICES[1];
+  const name=S.deviceNames[S.device]||d.name;
+  const trusted=ph==="ready";
+  // Trusting is not adopting: a freshly trusted device is Connected but has no
+  // durable binding yet, so the App shows the authorized-unadopted notice.
+  const notice=trusted
+    ?`<div class="okbox" data-sync-id="device.trust.authorizedUnadopted">${icon("overview",true)}<span>${tx("deviceNotice.authorizedUnadopted")}</span></div>`
+    :`<div class="warnbox" data-sync-id="device.trust.waiting"><div>${icon("warning",true)} ${tx("deviceNotice.needsTrust")}</div></div>`;
+  const facts=[["connectKey",lc("connect key 已脱敏","connect key redacted")],
+    ["reported",trusted?"Connected":"Unauthorized"],
+    ["stateObservedAt","2026-08-12T07:03:52Z"]];
+  return `<div class="device-layout" data-page-title="${esc(name)}" data-acin><span class="ac">AC-HDC-007-01/02</span>
+    <section class="device-section">
+      <h2>${tx("statusActions")}</h2>
+      ${notice}
+      ${trusted?"":`<div data-sync-id="device.trust.steps"><p class="hint">${tx("trustStepsTitle")}</p>
+        <ol style="margin-left:20px;display:flex;flex-direction:column;gap:6px">
+          <li>${tx("trustStep1")}</li><li>${tx("trustStep2")}</li><li>${tx("trustStep3")}</li>
+        </ol></div>
+      ${authWaitHTML()}`}
+      <div class="device-actions">
+        ${trusted?"":`<button class="btn pri" data-sync-id="device.action.beginWait" onclick="startAuthPoll()" ${ph==="polling"?"disabled":""}>${ph==="timedOut"||ph==="unavailable"?tx("retryWait"):tx("beginWait")}</button>`}
+        <button class="btn" data-sync-id="device.action.recheck" onclick="recheckDevice('${d.id}')" ${ph==="polling"?"disabled":""}>${tx("recheck")}</button>
+        ${ph==="polling"||trusted?"":`<button class="btn" onclick="simTimeout()">${lc("模拟：授权超时（E000003）","Demo: trust timeout (E000003)")}</button>`}
+      </div>
+      <p class="hint">${tx("recheckNote")}</p>
+      ${trusted?`<p class="hint" data-sync-id="device.detail.adoptViaCLI">${tx("adoptViaCLI")}</p>`:""}
+    </section>
+    ${deviceFactsSectionHTML(facts,tx("observedProvenance"))}
+  </div>`;
 }
 
 /* ---------- Viewer ---------- */
@@ -2469,8 +2514,12 @@ function startTrace(){
 const TRACE_TAGS_OK=["ace","app","ability","graphic","ohos","sched","freq","sync","binder","disk","workq"];
 const TRACE_TAGS_NO=["distributeddata","mmc"];
 const DIAG_PRESETS=[
-  {name:"低干扰诊断",duration:60,description:"默认不持续录屏；Trace 与 HiLog 以环形缓冲回溯保存，适合卡顿、闪退和偶现问题。",channels:"Trace · HiLog · Marker · 自动 Marker",tags:["ace","app","ability","graphic","ohos","sched","freq","sync"]},
-  {name:"图形诊断",duration:30,description:"增加 frame/display、window/layer/input 事实；录屏仍需显式开启。",channels:"低干扰诊断 + 图形 Track",tags:["graphic","ace","app","sched","freq","sync"]}
+  {name:{zh:"低干扰诊断",en:"Low-impact diagnostics"},duration:60,
+   description:{zh:"默认不持续录屏；Trace 与 HiLog 以环形缓冲回溯保存，适合卡顿、闪退和偶现问题。",en:"No continuous screen recording by default. Trace and HiLog are kept in ring buffers and written back, which suits jank, crashes and intermittent problems."},
+   channels:{zh:"Trace · HiLog · Marker · 自动 Marker",en:"Trace · HiLog · Marker · automatic markers"},tags:["ace","app","ability","graphic","ohos","sched","freq","sync"]},
+  {name:{zh:"图形诊断",en:"Graphics diagnostics"},duration:30,
+   description:{zh:"增加 frame/display、window/layer/input 事实；录屏仍需显式开启。",en:"Adds frame/display, window/layer and input facts. Screen recording still has to be enabled explicitly."},
+   channels:{zh:"低干扰诊断 + 图形 Track",en:"Low-impact diagnostics + graphics tracks"},tags:["graphic","ace","app","sched","freq","sync"]}
 ];
 const DIAG_START=10,DIAG_END=18;
 const DIAG_FRAMES=[
@@ -2496,37 +2545,39 @@ const DIAG_LOGS=[
 /* 三个演示 Session：默认即第一版默认形态（无录屏、Marker 截图事后拍摄）；
    第二个演示显式录屏与断流缺口；第三个演示 Partial 与 HiLog 无法对齐。 */
 const DIAG_SESSIONS=[
-  {label:"今天 11:02 · 低干扰诊断 · 无录屏 · Ready",status:"ready",video:false,gap:null,
-   alignChip:"已校准 ±8 ms",alignTone:"warn",logsAligned:true,partialReasons:[],
+  {label:{zh:"今天 11:02 · 低干扰诊断 · 无录屏 · Ready",en:"Today 11:02 · Low-impact diagnostics · no recording · Ready"},status:"ready",video:false,gap:null,
+   alignChip:{zh:"已校准 ±8 ms",en:"Calibrated ±8 ms"},alignTone:"warn",logsAligned:true,partialReasons:[],
    markers:[
-     {time:13.242,label:"自动 · frame deadline missed",kind:"auto",shot:null,shotFailed:null},
-     {time:14.930,label:"问题出现",kind:"manual",shot:{time:15.442,afterMs:512},shotFailed:null}
+     {time:13.242,label:{zh:"自动 · frame deadline missed",en:"Automatic · frame deadline missed"},kind:"auto",shot:null,shotFailed:null},
+     {time:14.930,label:{zh:"问题出现",en:"Problem appeared"},kind:"manual",shot:{time:15.442,afterMs:512},shotFailed:null}
    ],
    alignRows:[
-     ["Trace","device monotonic",'<span class="chip ok">同一时钟</span>',"00:10.000–00:18.000"],
-     ["Marker / 截图","host monotonic",'<span class="chip warn">已校准 ±20 ms</span>',"截图仅适用拍摄时刻 00:15.442"],
-     ["HiLog","device realtime",'<span class="chip warn">已校准 ±8 ms</span>',"00:10.014–00:17.984"]
+     ["Trace","device monotonic",{zh:'<span class="chip ok">同一时钟</span>',en:'<span class="chip ok">One clock</span>'},"00:10.000–00:18.000"],
+     [{zh:"Marker / 截图",en:"Marker / screenshot"},"host monotonic",{zh:'<span class="chip warn">已校准 ±20 ms</span>',en:'<span class="chip warn">Calibrated ±20 ms</span>'},{zh:"截图仅适用拍摄时刻 00:15.442",en:"The screenshot applies only to 00:15.442, when it was taken"}],
+     ["HiLog","device realtime",{zh:'<span class="chip warn">已校准 ±8 ms</span>',en:'<span class="chip warn">Calibrated ±8 ms</span>'},"00:10.014–00:17.984"]
    ],
-   alignNote:"本会话未持续录屏：截图只在拍摄时刻参与联动，其余时间显示无画面证据。注意自动 Marker（00:13.242）与手动 Marker（00:14.930）相差 1.7 s——人工反应通常晚于问题本身，回溯窗口负责补齐问题前的现场。"},
-  {label:"今天 09:41 · 图形诊断 · 含录屏 · Ready",status:"ready",video:true,gap:[15.45,16.0],
-   alignChip:"已校准 ±12 ms",alignTone:"warn",logsAligned:true,partialReasons:[],
-   markers:[{time:13.242,label:"问题出现",kind:"manual",shot:null,shotFailed:null}],
+   alignNote:{zh:"本会话未持续录屏：截图只在拍摄时刻参与联动，其余时间显示无画面证据。注意自动 Marker（00:13.242）与手动 Marker（00:14.930）相差 1.7 s——人工反应通常晚于问题本身，回溯窗口负责补齐问题前的现场。",en:"This session did not record continuously: a screenshot participates only at the instant it was taken, and every other time shows no picture evidence. Note the 1.7 s between the automatic marker (00:13.242) and the manual one (00:14.930) — a person reacts after the problem, and the look-back window is what covers the run-up."}},
+  {label:{zh:"今天 09:41 · 图形诊断 · 含录屏 · Ready",en:"Today 09:41 · Graphics diagnostics · with recording · Ready"},status:"ready",video:true,gap:[15.45,16.0],
+   alignChip:{zh:"已校准 ±12 ms",en:"Calibrated ±12 ms"},alignTone:"warn",logsAligned:true,partialReasons:[],
+   markers:[{time:13.242,label:{zh:"问题出现",en:"Problem appeared"},kind:"manual",shot:null,shotFailed:null}],
    alignRows:[
-     ["Trace","device monotonic",'<span class="chip ok">同一时钟</span>',"00:10.000–00:18.000"],
-     ["Screen","video PTS",'<span class="chip warn">已校准 ±12 ms</span>',"00:10.000–00:15.450<br>00:16.000–00:18.000"],
-     ["HiLog","device realtime",'<span class="chip warn">已校准 ±8 ms</span>',"00:10.014–00:17.984"]
+     ["Trace","device monotonic",{zh:'<span class="chip ok">同一时钟</span>',en:'<span class="chip ok">One clock</span>'},"00:10.000–00:18.000"],
+     ["Screen","video PTS",{zh:'<span class="chip warn">已校准 ±12 ms</span>',en:'<span class="chip warn">Calibrated ±12 ms</span>'},"00:10.000–00:15.450<br>00:16.000–00:18.000"],
+     ["HiLog","device realtime",{zh:'<span class="chip warn">已校准 ±8 ms</span>',en:'<span class="chip warn">Calibrated ±8 ms</span>'},"00:10.014–00:17.984"]
    ],
-   alignNote:"录屏在 00:15.450–00:16.000 断流。光标位于该区间时，当前画面显示缺口，不沿用上一帧。"},
-  {label:"昨天 18:12 · 低干扰诊断 · 无录屏 · Partial",status:"partial",video:false,gap:null,
-   alignChip:"部分无法对齐",alignTone:"danger",logsAligned:false,
-   partialReasons:["HiLog 时间无法对齐：采集中检测到设备时间被修改（timestamp 回退）","Marker 1 截图失败：设备存储不足"],
-   markers:[{time:13.242,label:"问题出现",kind:"manual",shot:null,shotFailed:"设备存储不足，截图未保存"}],
+   alignNote:{zh:"录屏在 00:15.450–00:16.000 断流。光标位于该区间时，当前画面显示缺口，不沿用上一帧。",en:"The recording stalled between 00:15.450 and 00:16.000. While the cursor is inside that range the current picture shows the gap instead of reusing the previous frame."}},
+  {label:{zh:"昨天 18:12 · 低干扰诊断 · 无录屏 · Partial",en:"Yesterday 18:12 · Low-impact diagnostics · no recording · Partial"},status:"partial",video:false,gap:null,
+   alignChip:{zh:"部分无法对齐",en:"Partly cannot align"},alignTone:"danger",logsAligned:false,
+   partialReasons:[
+     {zh:"HiLog 时间无法对齐：采集中检测到设备时间被修改（timestamp 回退）",en:"HiLog time cannot be aligned: the device clock was changed during capture (timestamps went backwards)"},
+     {zh:"Marker 1 截图失败：设备存储不足",en:"Marker 1 screenshot failed: not enough storage on the device"}],
+   markers:[{time:13.242,label:{zh:"问题出现",en:"Problem appeared"},kind:"manual",shot:null,shotFailed:{zh:"设备存储不足，截图未保存",en:"Not enough storage on the device; the screenshot was not saved"}}],
    alignRows:[
-     ["Trace","device monotonic",'<span class="chip ok">同一时钟</span>',"00:10.000–00:18.000"],
-     ["Marker / 截图","host monotonic",'<span class="chip danger">截图缺失</span>',"无适用时刻"],
-     ["HiLog","device realtime",'<span class="chip danger">无法对齐</span>',"映射被 timestamp 回退切断"]
+     ["Trace","device monotonic",{zh:'<span class="chip ok">同一时钟</span>',en:'<span class="chip ok">One clock</span>'},"00:10.000–00:18.000"],
+     [{zh:"Marker / 截图",en:"Marker / screenshot"},"host monotonic",{zh:'<span class="chip danger">截图缺失</span>',en:'<span class="chip danger">Screenshot missing</span>'},{zh:"无适用时刻",en:"No instant it applies to"}],
+     ["HiLog","device realtime",{zh:'<span class="chip danger">无法对齐</span>',en:'<span class="chip danger">Cannot align</span>'},{zh:"映射被 timestamp 回退切断",en:"The mapping was cut by the backwards timestamp"}]
    ],
-   alignNote:"HiLog 只能按原始顺序独立查看，不参与光标联动；界面不会按时间接近猜测日志关系。"}
+   alignNote:{zh:"HiLog 只能按原始顺序独立查看，不参与光标联动；界面不会按时间接近猜测日志关系。",en:"HiLog can only be read separately, in recorded order. It does not follow the cursor, and the interface never guesses a relationship from time proximity."}}
 ];
 function activeDiagSession(){return DIAG_SESSIONS[S.diagnostics.session]||DIAG_SESSIONS[0];}
 function chooseDiagSession(i){
@@ -2538,7 +2589,7 @@ function chooseDiagPreset(i){
   const p=DIAG_PRESETS[i]||DIAG_PRESETS[0];S.diagnostics.preset=i;S.diagnostics.dur=p.duration;S.diagnostics.tags=new Set(p.tags);renderPage();
 }
 function toggleDiagTag(t){const g=S.diagnostics.tags;if(g.has(t)){if(g.size>1)g.delete(t);}else g.add(t);renderPage();}
-function diagnosticTitle(){return DIAG_PRESETS[S.diagnostics.preset]?.name||DIAG_PRESETS[0].name;}
+function diagnosticTitle(){return bi(DIAG_PRESETS[S.diagnostics.preset]?.name||DIAG_PRESETS[0].name);}
 function diagPercent(time){return Math.max(0,Math.min(100,(time-DIAG_START)/(DIAG_END-DIAG_START)*100));}
 function diagTime(time){return "00:"+Number(time).toFixed(3).padStart(6,"0");}
 function diagDelta(delta){const ms=Math.round(delta*1000);return (ms>0?"+":"")+ms+" ms";}
@@ -2577,24 +2628,24 @@ function diagSliderKey(event){
 function setDiagLogWindow(ms){S.diagnostics.logWindow=ms;renderPage();requestAnimationFrame(()=>document.querySelector(`[data-log-window="${ms}"]`)?.focus());}
 function showDiagAlignment(){
   const s=activeDiagSession();
-  modal(`<div class="modal" style="max-width:720px"><h3>时间对齐 · ${esc(s.alignChip)}</h3>
-    <p class="hint">每个来源只在自己的 calibration segment 内参与联动。误差是上界，不是装饰性的健康分。第一版只承诺「同一时钟 / 无法对齐」两态；「已校准 ±N ms」在 ground-truth 实验量化误差后才启用，本演示中的数值均为演示值。</p>
-    <div class="tablewrap"><table><tr><th>来源</th><th>时间域</th><th>映射</th><th>适用区间</th></tr>
-      ${s.alignRows.map(r=>`<tr><td>${r[0]}</td><td class="mono">${r[1]}</td><td>${r[2]}</td><td class="mono">${r[3]}</td></tr>`).join("")}
+  modal(`<div class="modal" style="max-width:720px"><h3>${lc("时间对齐","Time alignment")} · ${esc(bi(s.alignChip))}</h3>
+    <p class="hint">${lc("每个来源只在自己的 calibration segment 内参与联动。误差是上界，不是装饰性的健康分。第一版只承诺「同一时钟 / 无法对齐」两态；「已校准 ±N ms」在 ground-truth 实验量化误差后才启用，本演示中的数值均为演示值。","Each source participates only inside its own calibration segment. The error is an upper bound, not a decorative health score. The first version commits to two states only — one clock, or cannot align. Calibrated ±N ms is enabled once a ground-truth experiment quantifies the error; every number in this demo is a demo value.")}</p>
+    <div class="tablewrap"><table><tr><th>${lc("来源","Source")}</th><th>${lc("时间域","Time domain")}</th><th>${lc("映射","Mapping")}</th><th>${lc("适用区间","Applies to")}</th></tr>
+      ${s.alignRows.map(r=>`<tr><td>${esc(bi(r[0]))}</td><td class="mono">${r[1]}</td><td>${bi(r[2])}</td><td class="mono">${esc(bi(r[3]))}</td></tr>`).join("")}
     </table></div>
-    <div class="warnbox">${icon("warning",true)} ${esc(s.alignNote)}</div>
-    <div class="mfoot"><button class="btn pri" onclick="closeModal()">完成</button></div></div>`);
+    <div class="warnbox">${icon("warning",true)} ${esc(bi(s.alignNote))}</div>
+    <div class="mfoot"><button class="btn pri" onclick="closeModal()">${lc("完成","Done")}</button></div></div>`);
 }
 function showDiagRawLogs(){
-  modal(`<div class="modal" style="max-width:680px"><h3>HiLog · 原始顺序查看</h3>
-    <p class="hint">时间映射被切断（timestamp 回退），以下时间为设备原始时间戳，不映射到 Session 时间轴，也不参与光标联动。</p>
+  modal(`<div class="modal" style="max-width:680px"><h3>${lc("HiLog · 原始顺序查看","HiLog · recorded order")}</h3>
+    <p class="hint">${lc("时间映射被切断（timestamp 回退），以下时间为设备原始时间戳，不映射到 Session 时间轴，也不参与光标联动。","The time mapping was cut (timestamps went backwards). The times below are the device's own timestamps: they are not mapped onto the Session timeline and do not follow the cursor.")}</p>
     <div class="diag-log-list" style="max-height:300px">${DIAG_LOGS.map(l=>`<div class="diag-log-row" style="cursor:default"><span class="delta mono">18:12:${(l.time-10+3).toFixed(3).padStart(6,"0")}</span><span class="level ${l.level==="E"?"error":l.level==="W"?"warn":""}">${l.level}</span><span class="tagname">${esc(l.tag)}</span><span>${esc(l.message)}</span></div>`).join("")}</div>
-    <div class="mfoot"><button class="btn pri" onclick="closeModal()">完成</button></div></div>`);
+    <div class="mfoot"><button class="btn pri" onclick="closeModal()">${lc("完成","Done")}</button></div></div>`);
 }
 function diagDeviceFrameHTML(kindLabel,timeLabel,emptyHTML){
   if(emptyHTML)return `<div class="diag-device-stage"><div class="empty">${emptyHTML}</div></div>`;
   const stalled=S.diagnostics.cursor>=13.2&&S.diagnostics.cursor<13.65;
-  return `<div class="diag-device-stage"><div class="diag-device-frame" role="img" aria-label="设置应用在 ${timeLabel} 的${kindLabel}">
+  return `<div class="diag-device-stage"><div class="diag-device-frame" role="img" aria-label="${lc(`${timeLabel} 的${kindLabel}（设备画面）`,`${kindLabel} at ${timeLabel} (device picture)`)}">
     <div class="diag-device-status"><span>11:02</span><span>5G  ▰</span></div><div class="diag-device-title">设置</div>
     <div class="diag-device-search">搜索设置项</div>
     <div class="diag-device-card"><i></i><span>小艺<small>华为账号、云空间与服务</small></span></div>
@@ -2611,56 +2662,59 @@ function diagFramePaneHTML(){
     const frame=diagFrameAt(cursor);
     if(frame){
       const delta=frame.time-cursor;
-      stage=diagDeviceFrameHTML("录屏帧",diagTime(frame.time),null);
-      meta=`<b>Frame #${frame.index}</b><div class="diag-frame-time">${diagTime(frame.time)} · 画面 ${diagDelta(delta)}</div>
-        <span class="chip warn">${esc(s.alignChip)}</span><p>按视频 PTS 解码；画面时间不等同于 Trace event start。</p>`;
+      stage=diagDeviceFrameHTML(lc("录屏帧","Recorded frame"),diagTime(frame.time),null);
+      meta=`<b>Frame #${frame.index}</b><div class="diag-frame-time">${diagTime(frame.time)} · ${lc("画面","picture")} ${diagDelta(delta)}</div>
+        <span class="chip warn">${esc(bi(s.alignChip))}</span><p>${lc("按视频 PTS 解码；画面时间不等同于 Trace event start。","Decoded by video PTS. A picture time is not a Trace event start.")}</p>`;
     }else{
-      stage=diagDeviceFrameHTML(null,null,`<b>这一时刻没有可证明对应的画面</b><br>录屏在 00:15.450–00:16.000 断流。`);
-      meta=`<b>录屏缺口</b><span class="chip warn">无法关联画面</span><p>Trace 与日志仍可查看，但这里不会保留上一帧制造连续假象。</p>`;
+      stage=diagDeviceFrameHTML(null,null,`<b>${lc("这一时刻没有可证明对应的画面","No picture can be proven for this instant")}</b><br>${lc("录屏在 00:15.450–00:16.000 断流。","The recording stalled between 00:15.450 and 00:16.000.")}`);
+      meta=`<b>${lc("录屏缺口","Recording gap")}</b><span class="chip warn">${lc("无法关联画面","No picture to link")}</span><p>${lc("Trace 与日志仍可查看，但这里不会保留上一帧制造连续假象。","Trace and logs remain readable, but the previous frame is not held here to fake continuity.")}</p>`;
     }
   }else{
     const hit=diagShotAt(cursor);
     if(hit){
       const m=hit.marker,delta=m.shot.time-cursor;
-      stage=diagDeviceFrameHTML("Marker 截图",diagTime(m.shot.time),null);
-      meta=`<b>Marker ${hit.index} 截图</b><div class="diag-frame-time">${diagTime(m.shot.time)} · 画面 ${diagDelta(delta)}</div>
-        <span class="chip warn">拍摄于 Marker 后 +${m.shot.afterMs} ms</span><p>截图只代表拍摄时刻，不代表 Marker 时刻的画面；问题瞬间可能已经过去。</p>`;
+      stage=diagDeviceFrameHTML(lc("Marker 截图","Marker screenshot"),diagTime(m.shot.time),null);
+      meta=`<b>${lc(`Marker ${hit.index} 截图`,`Marker ${hit.index} screenshot`)}</b><div class="diag-frame-time">${diagTime(m.shot.time)} · ${lc("画面","picture")} ${diagDelta(delta)}</div>
+        <span class="chip warn">${lc(`拍摄于 Marker 后 +${m.shot.afterMs} ms`,`Taken +${m.shot.afterMs} ms after the marker`)}</span><p>${lc("截图只代表拍摄时刻，不代表 Marker 时刻的画面；问题瞬间可能已经过去。","A screenshot shows the instant it was taken, not the instant of the marker; the moment of the problem may already have passed.")}</p>`;
     }else{
       const failed=s.markers.find(m=>m.shotFailed);
-      const shots=s.markers.filter(m=>m.shot).map(m=>diagTime(m.shot.time)).join("、");
-      stage=diagDeviceFrameHTML(null,null,failed?`<b>Marker 截图失败</b><br>${esc(failed.shotFailed)}。`:`<b>这一时刻没有画面证据</b><br>本次会话未持续录屏。`);
-      meta=failed?`<b>截图缺失</b><span class="chip danger">失败</span><p>Marker 时间点保留；失败原因随 Session 保存，不用旧画面或占位图补齐。</p>`
-        :`<b>未持续录屏</b><span class="chip dim">Marker 截图</span><p>${shots?`截图仅在拍摄时刻可见：${shots}。`:"本次会话没有保存任何截图。"}画面证据缺失时如实显示，不做连续假象。</p>`;
+      const shots=s.markers.filter(m=>m.shot).map(m=>diagTime(m.shot.time)).join(lc("、",", "));
+      stage=diagDeviceFrameHTML(null,null,failed
+        ?`<b>${lc("Marker 截图失败","The marker screenshot failed")}</b><br>${esc(bi(failed.shotFailed))}。`
+        :`<b>${lc("这一时刻没有画面证据","No picture evidence for this instant")}</b><br>${lc("本次会话未持续录屏。","This session did not record continuously.")}`);
+      meta=failed
+        ?`<b>${lc("截图缺失","Screenshot missing")}</b><span class="chip danger">${lc("失败","Failed")}</span><p>${lc("Marker 时间点保留；失败原因随 Session 保存，不用旧画面或占位图补齐。","The marker instant is kept and the failure reason is saved with the Session. Neither an old picture nor a placeholder fills the gap.")}</p>`
+        :`<b>${lc("未持续录屏","No continuous recording")}</b><span class="chip dim">${lc("Marker 截图","Marker screenshot")}</span><p>${shots?lc(`截图仅在拍摄时刻可见：${shots}。`,`Screenshots are visible only at the instant they were taken: ${shots}.`):lc("本次会话没有保存任何截图。","This session saved no screenshot.")}${lc("画面证据缺失时如实显示，不做连续假象。","Missing picture evidence is shown as missing; continuity is never faked.")}</p>`;
     }
   }
   return `<section class="diag-frame-pane" aria-labelledby="diagFrameTitle">
-    <div class="diag-pane-head"><h2 id="diagFrameTitle">当前画面</h2><span class="trailing">Screen track</span></div>
+    <div class="diag-pane-head"><h2 id="diagFrameTitle">${lc("当前画面","Current picture")}</h2><span class="trailing">Screen track</span></div>
     <div class="diag-frame-body">${stage}<div class="diag-frame-meta">${meta}</div></div></section>`;
 }
 function diagEventHTML(){
   const event=diagEvent();
-  if(!event)return `<div class="diag-context-block"><h2>当前时间点</h2><p class="hint">当前光标来自画面、日志或 Timeline slider，没有选中 Trace event。</p>
+  if(!event)return `<div class="diag-context-block"><h2>${lc("当前时间点","Current instant")}</h2><p class="hint">${lc("当前光标来自画面、日志或 Timeline slider，没有选中 Trace event。","The cursor came from a picture, a log line or the timeline slider. No Trace event is selected.")}</p>
     <div class="diag-time">${diagTime(S.diagnostics.cursor)}</div></div>`;
   const away=S.diagnostics.cursor<event.start-.0005||S.diagnostics.cursor>event.start+event.duration+.0005;
-  return `<div class="diag-context-block"><h2>选中事件</h2><dl class="diag-event-summary">
+  return `<div class="diag-context-block"><h2>${lc("选中事件","Selected event")}</h2><dl class="diag-event-summary">
     <dt>Event</dt><dd>${esc(event.name)}</dd><dt>Process / thread</dt><dd>${esc(event.thread)}</dd>
     <dt>Start / duration</dt><dd>${diagTime(event.start)} / ${diagDuration(event.duration)}</dd><dt>Category</dt><dd>${esc(event.category)}</dd>
-  </dl>${away?`<p class="hint">光标已离开该事件（相对 start ${diagDelta(S.diagnostics.cursor-event.start)}）。事件详情保留；选择其他 Trace event 可更换。</p>`:""}</div>`;
+  </dl>${away?`<p class="hint">${lc(`光标已离开该事件（相对 start ${diagDelta(S.diagnostics.cursor-event.start)}）。事件详情保留；选择其他 Trace event 可更换。`,`The cursor has left this event (${diagDelta(S.diagnostics.cursor-event.start)} from its start). Its details stay; choose another Trace event to replace them.`)}</p>`:""}</div>`;
 }
 function diagLogsHTML(){
   const s=activeDiagSession();
-  if(!s.logsAligned)return `<div class="diag-context-block" style="flex:1"><h2>邻近日志</h2>
-    <p class="hint">HiLog 无法对齐此时间轴：采集中检测到设备时间被修改（timestamp 回退），映射被切断。日志不参与光标联动，界面不按时间接近猜测对应关系。</p>
-    <button class="btn" onclick="showDiagRawLogs()">按原始顺序查看日志</button></div>`;
+  if(!s.logsAligned)return `<div class="diag-context-block" style="flex:1"><h2>${lc("邻近日志","Nearby logs")}</h2>
+    <p class="hint">${lc("HiLog 无法对齐此时间轴：采集中检测到设备时间被修改（timestamp 回退），映射被切断。日志不参与光标联动，界面不按时间接近猜测对应关系。","HiLog cannot be aligned to this timeline: the device clock was changed during capture (timestamps went backwards) and the mapping was cut. Logs do not follow the cursor, and the interface never guesses a relationship from time proximity.")}</p>
+    <button class="btn" onclick="showDiagRawLogs()">${lc("按原始顺序查看日志","Read logs in recorded order")}</button></div>`;
   const radius=S.diagnostics.logWindow/1000,rows=DIAG_LOGS.filter(l=>Math.abs(l.time-S.diagnostics.cursor)<=radius+.0001);
-  return `<div class="diag-context-block" style="flex:1"><div class="diag-log-controls"><h2>邻近日志</h2><span class="label">窗口</span>
+  return `<div class="diag-context-block" style="flex:1"><div class="diag-log-controls"><h2>${lc("邻近日志","Nearby logs")}</h2><span class="label">${lc("窗口","Window")}</span>
     <span class="seg mini">${[20,100,500].map(ms=>`<button data-log-window="${ms}" class="${S.diagnostics.logWindow===ms?"on":""}" onclick="setDiagLogWindow(${ms})">±${ms} ms</button>`).join("")}</span></div>
     <div class="diag-log-list" aria-label="${lc('当前时间附近的 HiLog','HiLog near the current time')}">${rows.length?rows.map(l=>`<button class="diag-log-row ${l.id===S.diagnostics.selectedLog?"on":""}" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="${esc(l.level+" "+l.tag+" "+l.message)}">
       <span class="delta">${diagDelta(l.time-S.diagnostics.cursor)}</span><span class="level ${l.level==="E"?"error":l.level==="W"?"warn":""}">${l.level}</span><span class="tagname">${esc(l.tag)}</span><span>${esc(l.message)}</span></button>`).join("")
-      :'<p class="empty">当前时间窗内没有日志。可扩大窗口或选择其他时间。</p>'}</div></div>`;
+      :`<p class="empty">${lc("当前时间窗内没有日志。可扩大窗口或选择其他时间。","No logs inside the current window. Widen the window or choose another time.")}</p>`}</div></div>`;
 }
 function diagContextPaneHTML(){
-  return `<section class="diag-context-pane" aria-label="${lc('当前时间上下文','Current time context')}"><div class="diag-pane-head"><h2>当前时间上下文</h2><span class="trailing diag-time">${diagTime(S.diagnostics.cursor)}</span></div>
+  return `<section class="diag-context-pane" aria-label="${lc('当前时间上下文','Current time context')}"><div class="diag-pane-head"><h2>${lc("当前时间上下文","Current time context")}</h2><span class="trailing diag-time">${diagTime(S.diagnostics.cursor)}</span></div>
     <div class="diag-context-scroll">${diagEventHTML()}${diagLogsHTML()}</div></section>`;
 }
 function diagTimelineHTML(){
@@ -2671,22 +2725,23 @@ function diagTimelineHTML(){
   const range=S.diagnostics.rangeStart==null?"":`<span class="diag-range" style="left:${Math.min(cursor,diagPercent(S.diagnostics.rangeStart))}%;width:${Math.abs(cursor-diagPercent(S.diagnostics.rangeStart))}%" aria-hidden="true"></span>`;
   let screen="",screenExtra="";
   if(s.video){
-    screen=DIAG_FRAMES.map(f=>`<button class="diag-thumb ${frame?.index===f.index?"on":""}" style="left:${diagPercent(f.time)}%" onclick="setDiagCursor(${f.time})" aria-label="选择录屏 Frame ${f.index}，${diagTime(f.time)}"></button>`).join("");
+    screen=DIAG_FRAMES.map(f=>`<button class="diag-thumb ${frame?.index===f.index?"on":""}" style="left:${diagPercent(f.time)}%" onclick="setDiagCursor(${f.time})" aria-label="${lc(`选择录屏 Frame ${f.index}，${diagTime(f.time)}`,`Select recorded frame ${f.index}, ${diagTime(f.time)}`)}"></button>`).join("");
     if(s.gap)screenExtra=`<span class="diag-gap" style="left:${diagPercent(s.gap[0])}%;width:${diagPercent(s.gap[1])-diagPercent(s.gap[0])}%" title="${lc('录屏断流','Screen recording gap')}"></span>`;
   }else{
-    screen=s.markers.map((m,i)=>m.shot?`<button class="diag-shot ${shotHit&&shotHit.marker===m?"on":""}" style="left:${diagPercent(m.shot.time)}%" onclick="setDiagCursor(${m.shot.time})" aria-label="选择 Marker ${i+1} 截图，拍摄于 ${diagTime(m.shot.time)}（Marker 后 +${m.shot.afterMs} ms）"></button>`
-      :m.shotFailed?`<span class="diag-shot failed" style="left:${diagPercent(m.time)}%" title="截图失败：${esc(m.shotFailed)}" aria-hidden="true"></span>`:"").join("");
-    screenExtra=`<span class="hint" style="position:absolute;inset-inline-end:8px;inset-block-start:8px;font-size:9.5px">未持续录屏 · 仅 Marker 截图</span>`;
+    screen=s.markers.map((m,i)=>m.shot?`<button class="diag-shot ${shotHit&&shotHit.marker===m?"on":""}" style="left:${diagPercent(m.shot.time)}%" onclick="setDiagCursor(${m.shot.time})" aria-label="${lc(`选择 Marker ${i+1} 截图，拍摄于 ${diagTime(m.shot.time)}（Marker 后 +${m.shot.afterMs} ms）`,`Select the Marker ${i+1} screenshot, taken at ${diagTime(m.shot.time)} (+${m.shot.afterMs} ms after the marker)`)}"></button>`
+      :m.shotFailed?`<span class="diag-shot failed" style="left:${diagPercent(m.time)}%" title="${lc("截图失败：","Screenshot failed: ")}${esc(bi(m.shotFailed))}" aria-hidden="true"></span>`:"").join("");
+    screenExtra=`<span class="hint" style="position:absolute;inset-inline-end:8px;inset-block-start:8px;font-size:9.5px">${lc("未持续录屏 · 仅 Marker 截图","No continuous recording · marker screenshots only")}</span>`;
   }
-  const events=DIAG_EVENTS.map((e,i)=>`<button class="diag-event ${i%2?"alt":""} ${S.diagnostics.selectedEvent===e.id?"on":""}" style="left:${diagPercent(e.start)}%;width:${Math.max(2,e.duration/(DIAG_END-DIAG_START)*100)}%" onclick="setDiagCursor(${e.start},'${e.id}')" aria-label="选择 Trace event ${esc(e.name)}，${diagTime(e.start)}">${esc(e.name)}</button>`).join("");
-  const logs=s.logsAligned?DIAG_LOGS.map(l=>`<button class="diag-log-dot ${l.level==="E"?"error":""} ${S.diagnostics.selectedLog===l.id?"on":""}" style="left:${diagPercent(l.time)}%" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="选择 ${l.level} 日志，${diagTime(l.time)}，${esc(l.message)}"></button>`).join("")
-    :`<button class="diag-track-flat" onclick="showDiagRawLogs()" aria-label="${lc('HiLog 无法对齐，按原始顺序查看','HiLog cannot be aligned; shown in recorded order')}">无法对齐 · 不参与联动 · 按原始顺序查看</button>`;
-  const markers=s.markers.map((m,i)=>`<button class="diag-marker ${m.kind==="auto"?"auto":""}" style="left:${diagPercent(m.time)}%" onclick="setDiagCursor(${m.time})" aria-label="选择 Marker ${i+1}（${m.kind==="auto"?"自动":"手动"}），${esc(m.label)}，${diagTime(m.time)}" title="${m.kind==="auto"?"自动":"手动"} · ${esc(m.label)}"></button>`).join("");
+  const events=DIAG_EVENTS.map((e,i)=>`<button class="diag-event ${i%2?"alt":""} ${S.diagnostics.selectedEvent===e.id?"on":""}" style="left:${diagPercent(e.start)}%;width:${Math.max(2,e.duration/(DIAG_END-DIAG_START)*100)}%" onclick="setDiagCursor(${e.start},'${e.id}')" aria-label="${lc(`选择 Trace event ${esc(e.name)}，${diagTime(e.start)}`,`Select Trace event ${esc(e.name)}, ${diagTime(e.start)}`)}">${esc(e.name)}</button>`).join("");
+  const logs=s.logsAligned?DIAG_LOGS.map(l=>`<button class="diag-log-dot ${l.level==="E"?"error":""} ${S.diagnostics.selectedLog===l.id?"on":""}" style="left:${diagPercent(l.time)}%" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="${lc(`选择 ${l.level} 日志，${diagTime(l.time)}，${esc(l.message)}`,`Select ${l.level} log, ${diagTime(l.time)}, ${esc(l.message)}`)}"></button>`).join("")
+    :`<button class="diag-track-flat" onclick="showDiagRawLogs()" aria-label="${lc('HiLog 无法对齐，按原始顺序查看','HiLog cannot be aligned; shown in recorded order')}">${lc("无法对齐 · 不参与联动 · 按原始顺序查看","Cannot align · not linked to the cursor · read in recorded order")}</button>`;
+  const kindWord=m=>m.kind==="auto"?lc("自动","automatic"):lc("手动","manual");
+  const markers=s.markers.map((m,i)=>`<button class="diag-marker ${m.kind==="auto"?"auto":""}" style="left:${diagPercent(m.time)}%" onclick="setDiagCursor(${m.time})" aria-label="${lc(`选择 Marker ${i+1}（${kindWord(m)}），${esc(bi(m.label))}，${diagTime(m.time)}`,`Select Marker ${i+1} (${kindWord(m)}), ${esc(bi(m.label))}, ${diagTime(m.time)}`)}" title="${kindWord(m)} · ${esc(bi(m.label))}"></button>`).join("");
   const body=(content,extra="")=>`<div class="diag-track-body">${range}${cursorLine}${content}${extra}</div>`;
-  return `<section class="diag-timeline" aria-labelledby="diagTimelineTitle"><div class="diag-timeline-head"><h2 id="diagTimelineTitle">Trace 时间轴</h2>
-    <span class="diag-time">${diagTime(S.diagnostics.cursor)}</span><span class="chip dim">8.000 s 窗口</span><span style="flex:1"></span><span class="hint">← → 移动 · ⌘+/− 缩放</span></div>
+  return `<section class="diag-timeline" aria-labelledby="diagTimelineTitle"><div class="diag-timeline-head"><h2 id="diagTimelineTitle">${lc("Trace 时间轴","Trace timeline")}</h2>
+    <span class="diag-time">${diagTime(S.diagnostics.cursor)}</span><span class="chip dim">${lc("8.000 s 窗口","8.000 s window")}</span><span style="flex:1"></span><span class="hint">${lc("← → 移动 · ⌘+/− 缩放","← → move · ⌘+/− zoom")}</span></div>
     <div class="diag-timeline-scroll">
-      <div class="diag-track diag-ruler"><div class="diag-track-label">Session time</div>${body(ticks,`<input class="diag-scrubber" type="range" min="${DIAG_START}" max="${DIAG_END}" step="0.001" value="${S.diagnostics.cursor}" aria-label="诊断时间光标，当前 ${diagTime(S.diagnostics.cursor)}" onkeydown="diagSliderKey(event)" oninput="setDiagCursor(this.value,null,null,true)">`)}</div>
+      <div class="diag-track diag-ruler"><div class="diag-track-label">Session time</div>${body(ticks,`<input class="diag-scrubber" type="range" min="${DIAG_START}" max="${DIAG_END}" step="0.001" value="${S.diagnostics.cursor}" aria-label="${lc(`诊断时间光标，当前 ${diagTime(S.diagnostics.cursor)}`,`Diagnostic time cursor, currently ${diagTime(S.diagnostics.cursor)}`)}" onkeydown="diagSliderKey(event)" oninput="setDiagCursor(this.value,null,null,true)">`)}</div>
       <div class="diag-track"><div class="diag-track-label">Marker</div>${body(markers)}</div>
       <div class="diag-track"><div class="diag-track-label">Screen</div>${body(screen,screenExtra)}</div>
       <div class="diag-track"><div class="diag-track-label">Frame / Display</div>${body(`<button class="diag-event on" style="left:${diagPercent(13.2)}%;width:3.3%" onclick="setDiagCursor(13.242,'render-42')">missed frame · 34 ms</button><button class="diag-event" style="left:${diagPercent(16.28)}%;width:2.2%" onclick="setDiagCursor(16.28,'render-77')">recovered</button>`)}</div>
@@ -2697,57 +2752,57 @@ function diagTimelineHTML(){
 function pDiagnosticSession(){
   const s=activeDiagSession();
   return `<div class="diag-shell" data-page-title="Diagnostics · Session" data-acin><span class="ac">DIAGNOSTIC-LINKED-TIME</span>
-    <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='capture';renderPage()">新建诊断</button>
-      <select class="inp" aria-label="${lc('选择 Diagnostic Session','Choose a diagnostic session')}" onchange="chooseDiagSession(this.selectedIndex)">${DIAG_SESSIONS.map((x,i)=>`<option ${i===S.diagnostics.session?"selected":""}>${esc(x.label)}</option>`).join("")}</select>
+    <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='capture';renderPage()">${lc("新建诊断","New capture")}</button>
+      <select class="inp" aria-label="${lc('选择 Diagnostic Session','Choose a diagnostic session')}" onchange="chooseDiagSession(this.selectedIndex)">${DIAG_SESSIONS.map((x,i)=>`<option ${i===S.diagnostics.session?"selected":""}>${esc(bi(x.label))}</option>`).join("")}</select>
       <span class="diag-target"><span class="dot ok"></span><b>DAYU200</b><span class="mono">TGT-9587… · binding r3</span></span><span class="spacer"></span>
-      <button class="diag-align" ${s.alignTone==="danger"?'style="border-color:var(--danger);color:var(--danger)"':""} onclick="showDiagAlignment()">${icon("warning",true)} ${esc(s.alignChip)}</button>
-      <button class="btn" onclick="doneBtn(this,'已准备导出预览')">导出…</button></div>
-    ${s.partialReasons.length?`<div class="diag-partial">${icon("warning",true)}<span><b>部分诊断数据不可用。</b><ul>${s.partialReasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></span></div>`:""}
+      <button class="diag-align" ${s.alignTone==="danger"?'style="border-color:var(--danger);color:var(--danger)"':""} onclick="showDiagAlignment()">${icon("warning",true)} ${esc(bi(s.alignChip))}</button>
+      <button class="btn" onclick="doneBtn(this,lc('已准备导出预览','Export preview prepared'))">${lc("导出…","Export…")}</button></div>
+    ${s.partialReasons.length?`<div class="diag-partial">${icon("warning",true)}<span><b>${lc("部分诊断数据不可用。","Some diagnostic data is unavailable.")}</b><ul>${s.partialReasons.map(r=>`<li>${esc(bi(r))}</li>`).join("")}</ul></span></div>`:""}
     <div class="diag-overview">${diagFramePaneHTML()}${diagContextPaneHTML()}</div>
     ${diagTimelineHTML()}
-    <div class="diag-boundary">${icon("warning",true)} <span><b>目标设计 · 演示数据。</b> 默认示例即第一版默认形态：无持续录屏、Marker 截图按实际拍摄时刻标注；第二个示例演示显式录屏与断流缺口，第三个演示 Partial 与无法对齐。当前发布的 <span class="mono">capture.diagnostics@1</span> 已有有界 ringBuffered 采集及部分自动 Marker。交互式 arm / append-marker / stop、会话内视频和跨时钟校准尚未接通；此概念稿不能作为已实现证明。</span></div>
+    <div class="diag-boundary">${icon("warning",true)} <span><b>${lc("目标设计 · 演示数据。","Target design · demo data.")}</b> ${lc("默认示例即第一版默认形态：无持续录屏、Marker 截图按实际拍摄时刻标注；第二个示例演示显式录屏与断流缺口，第三个演示 Partial 与无法对齐。当前发布的","The default sample is the first version's default shape: no continuous recording, and marker screenshots labelled with the instant they were taken. The second sample shows explicit recording with a stall gap, the third shows Partial and an unalignable clock. The published")} <span class="mono">capture.diagnostics@1</span> ${lc("已有有界 ringBuffered 采集及部分自动 Marker。交互式 arm / append-marker / stop、会话内视频和跨时钟校准尚未接通；此概念稿不能作为已实现证明。","already provides bounded ringBuffered capture and some automatic markers. Interactive arm / append-marker / stop, in-session video and cross-clock calibration are not connected; this concept draft is not evidence that they are implemented.")}</span></div>
   </div>`;
 }
 function pDiagnosticCapture(){
   const t=S.diagnostics,p=DIAG_PRESETS[t.preset];
   return `<div class="diag-capture" data-page-title="${lc('Diagnostics · 新建诊断','Diagnostics · New capture')}">
-    <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='session';renderPage()">返回 Session</button><span class="hint">DAYU200 · TGT-9587… · binding r3</span></div>
-    <section><h2>选择诊断方式</h2><p class="hint">开始后，等所有必需通道就绪，再到设备上复现问题。</p></section>
+    <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='session';renderPage()">${lc("返回 Session","Back to session")}</button><span class="hint">DAYU200 · TGT-9587… · binding r3</span></div>
+    <section><h2>${lc("选择诊断方式","Choose how to diagnose")}</h2><p class="hint">${lc("开始后，等所有必需通道就绪，再到设备上复现问题。","After starting, wait until every required channel is ready, then reproduce the problem on the device.")}</p></section>
     <div class="diag-preset-grid">
-      ${DIAG_PRESETS.map((item,i)=>`<button class="diag-preset ${t.preset===i?"on":""}" onclick="chooseDiagPreset(${i})" aria-pressed="${t.preset===i}"><b>${item.name}</b><p>${item.description}</p><span class="meta">${item.duration}s · ${item.channels}</span></button>`).join("")}
+      ${DIAG_PRESETS.map((item,i)=>`<button class="diag-preset ${t.preset===i?"on":""}" onclick="chooseDiagPreset(${i})" aria-pressed="${t.preset===i}"><b>${esc(bi(item.name))}</b><p>${esc(bi(item.description))}</p><span class="meta">${item.duration}s · ${esc(bi(item.channels))}</span></button>`).join("")}
     </div>
-    <section class="card"><h2>采集通道 <span class="chip dim" style="margin-left:auto">上限 ${p.duration} 秒</span></h2><div class="diag-channel-list">
-      <div class="diag-channel"><b>✓ Trace</b><span>required · 环形缓冲 · Marker/停止时回溯保存</span></div>
-      <div class="diag-channel"><b>✓ HiLog</b><span>required · 缓冲区回溯 + 有界窗口</span></div>
-      <div class="diag-channel"><b>✓ Marker 截图</b><span>标记后按需拍摄 · 按实际拍摄时刻标注</span></div>
-      <label class="diag-channel"><b><input type="checkbox" ${t.autoMarker?"checked":""} onchange="S.diagnostics.autoMarker=this.checked;renderPage()"> 自动 Marker</b><span>${t.autoMarker?"frame deadline missed / crash 时自动标记":"关闭 · 仅手动标记"}</span></label>
-      <label class="diag-channel"><b><input type="checkbox" ${t.includeVideo?"checked":""} onchange="S.diagnostics.includeVideo=this.checked;renderPage()"> 屏幕录制</b><span>${t.includeVideo?"已开启 · 可能影响性能":"optional · 默认关闭"}</span></label>
+    <section class="card"><h2>${lc("采集通道","Capture channels")} <span class="chip dim" style="margin-left:auto">${lc(`上限 ${p.duration} 秒`,`Limit ${p.duration} s`)}</span></h2><div class="diag-channel-list">
+      <div class="diag-channel"><b>✓ Trace</b><span>${lc("required · 环形缓冲 · Marker/停止时回溯保存","required · ring buffer · written back on marker or stop")}</span></div>
+      <div class="diag-channel"><b>✓ HiLog</b><span>${lc("required · 缓冲区回溯 + 有界窗口","required · buffer look-back + bounded window")}</span></div>
+      <div class="diag-channel"><b>✓ ${lc("Marker 截图","Marker screenshot")}</b><span>${lc("标记后按需拍摄 · 按实际拍摄时刻标注","taken on demand after a marker · labelled with the instant it was taken")}</span></div>
+      <label class="diag-channel"><b><input type="checkbox" ${t.autoMarker?"checked":""} onchange="S.diagnostics.autoMarker=this.checked;renderPage()"> ${lc("自动 Marker","Automatic markers")}</b><span>${t.autoMarker?lc("frame deadline missed / crash 时自动标记","marks automatically on a missed frame deadline or a crash"):lc("关闭 · 仅手动标记","off · manual markers only")}</span></label>
+      <label class="diag-channel"><b><input type="checkbox" ${t.includeVideo?"checked":""} onchange="S.diagnostics.includeVideo=this.checked;renderPage()"> ${lc("屏幕录制","Screen recording")}</b><span>${t.includeVideo?lc("已开启 · 可能影响性能","on · may affect performance"):lc("optional · 默认关闭","optional · off by default")}</span></label>
     </div>
-    <details class="flash-details"><summary>高级设置</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+    <details class="flash-details"><summary>${lc("高级设置","Advanced settings")}</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
       <div><span class="hint">Trace categories</span><div class="tagpick">${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleDiagTag('${x}')">${x}</button>`).join("")}${TRACE_TAGS_NO.map(x=>`<button disabled title="${lc('设备未报告支持该 tag','The device does not report support for this tag')}">${x}</button>`).join("")}</div></div>
-      <p class="hint">HiLog filter：warning+ · Artifact byte budget：128 MB · redaction：standard。这里只组合 typed inputs，不暴露 raw argv 或设备路径。</p>
+      <p class="hint">${lc("HiLog filter：warning+ · Artifact byte budget：128 MB · redaction：standard。这里只组合 typed inputs，不暴露 raw argv 或设备路径。","HiLog filter: warning+ · Artifact byte budget: 128 MB · redaction: standard. This only composes typed inputs; it exposes no raw argv and no device path.")}</p>
     </div></details></section>
-    <div class="diag-boundary">${icon("warning",true)} <span>Diagnostics 默认只在 Marker 时按需截图，且截图是「标记后拍摄」——问题瞬间的现场由环形缓冲回溯补齐，不由截图假装。已发布的有界 ringBuffered 与部分自动 Marker 不等同于本稿的交互式布防、追加标记和停止。缺失的会话操作与跨时钟校准保持不可用，App 不执行 raw HDC 兜底。</span></div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn pri" onclick="startDiagnostic()">开始诊断</button><span class="hint">预计上限 128 MB · 全部 Artifact 默认保存在本地</span></div>
+    <div class="diag-boundary">${icon("warning",true)} <span>${lc("Diagnostics 默认只在 Marker 时按需截图，且截图是「标记后拍摄」——问题瞬间的现场由环形缓冲回溯补齐，不由截图假装。已发布的有界 ringBuffered 与部分自动 Marker 不等同于本稿的交互式布防、追加标记和停止。缺失的会话操作与跨时钟校准保持不可用，App 不执行 raw HDC 兜底。","By default Diagnostics only takes a screenshot on a marker, and that screenshot is taken after the marker — the run-up to the problem is covered by the ring buffer's look-back, not faked by a picture. The published bounded ringBuffered capture and its automatic markers are not the interactive arming, appending and stopping this draft shows. The missing session controls and cross-clock calibration stay unavailable, and the App runs no raw HDC fallback.")}</span></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn pri" onclick="startDiagnostic()">${lc("开始诊断","Start diagnosing")}</button><span class="hint">${lc("预计上限 128 MB · 全部 Artifact 默认保存在本地","Estimated limit 128 MB · every artifact stays local by default")}</span></div>
   </div>`;
 }
 function formatDiagElapsed(seconds){return String(Math.floor(seconds/60)).padStart(2,"0")+":"+String(seconds%60).padStart(2,"0");}
 function pDiagnosticRecording(){
   const t=S.diagnostics;
   return `<div class="diag-shell" data-page-title="${lc('Diagnostics · 正在诊断','Diagnostics · Recording')}"><div class="diag-recording">
-    <div class="diag-recording-status"><span class="dot" style="background:var(--danger)"></span><div><h2>采集已开始，现在开始复现</h2><p>在问题出现时选择“标记并截图”。采集将在 ${t.dur} 秒后自动结束。</p></div></div>
-    <div class="diag-recording-time" aria-label="已采集 ${formatDiagElapsed(t.elapsed)}">${formatDiagElapsed(t.elapsed)}</div>
-    <div class="diag-channel-list"><div class="diag-channel"><b>● Trace</b><span>recording · 环形缓冲 · 同一时钟</span></div><div class="diag-channel"><b>● HiLog</b><span>recording · 缓冲区回溯</span></div><div class="diag-channel"><b>${t.autoMarker?"●":"○"} 自动 Marker</b><span>${t.autoMarker?"监测 frame deadline / crash":"关闭"}</span></div><div class="diag-channel"><b>${t.includeVideo?"●":"○"} 屏幕录制</b><span>${t.includeVideo?"recording · 可能影响性能":"off · 无持续取帧"}</span></div></div>
-    <div class="diag-recording-actions"><button class="btn pri" onclick="addDiagMarker()">标记并截图 <span class="mono">⌘M</span></button><button class="btn" onclick="stopDiagnostic()">停止并生成结果</button><span class="hint" role="status" aria-live="polite" id="diagCaptureStatus">${diagMarkerStatusText()}</span></div>
-    <div class="diag-marker-list">${t.markers.map((m,i)=>`<span class="chip ${m.kind==="auto"?"warn":"dim"}">Marker ${i+1} · ${diagTime(m.time)} · ${esc(m.label)}${m.kind==="manual"?(m.shotState==="pending"?" · 正在截图…":` · 截图 +${m.shotAfterMs} ms`):""}</span>`).join("")}</div>
-    <p class="hint">Marker 只记录时间点；问题前的现场由环形缓冲在停止时回溯保存。截图在标记后拍摄，按实际拍摄时刻标注，不假装是标记瞬间的画面。</p>
-    <div class="diag-boundary">${icon("warning",true)} <span>目标设计演示：Runtime authority、精确 target、Artifact budget 与安全边界不会由这个按钮创建或放宽。</span></div>
+    <div class="diag-recording-status"><span class="dot" style="background:var(--danger)"></span><div><h2>${lc("采集已开始，现在开始复现","Capture has started — reproduce the problem now")}</h2><p>${lc(`在问题出现时选择“标记并截图”。采集将在 ${t.dur} 秒后自动结束。`,`Choose "Mark and screenshot" when the problem appears. The capture ends automatically after ${t.dur} s.`)}</p></div></div>
+    <div class="diag-recording-time" aria-label="${lc(`已采集 ${formatDiagElapsed(t.elapsed)}`,`Captured for ${formatDiagElapsed(t.elapsed)}`)}">${formatDiagElapsed(t.elapsed)}</div>
+    <div class="diag-channel-list"><div class="diag-channel"><b>● Trace</b><span>${lc("recording · 环形缓冲 · 同一时钟","recording · ring buffer · one clock")}</span></div><div class="diag-channel"><b>● HiLog</b><span>${lc("recording · 缓冲区回溯","recording · buffer look-back")}</span></div><div class="diag-channel"><b>${t.autoMarker?"●":"○"} ${lc("自动 Marker","Automatic markers")}</b><span>${t.autoMarker?lc("监测 frame deadline / crash","watching for missed frame deadlines and crashes"):lc("关闭","off")}</span></div><div class="diag-channel"><b>${t.includeVideo?"●":"○"} ${lc("屏幕录制","Screen recording")}</b><span>${t.includeVideo?lc("recording · 可能影响性能","recording · may affect performance"):lc("off · 无持续取帧","off · no continuous frames")}</span></div></div>
+    <div class="diag-recording-actions"><button class="btn pri" onclick="addDiagMarker()">${lc("标记并截图","Mark and screenshot")} <span class="mono">⌘M</span></button><button class="btn" onclick="stopDiagnostic()">${lc("停止并生成结果","Stop and produce the result")}</button><span class="hint" role="status" aria-live="polite" id="diagCaptureStatus">${diagMarkerStatusText()}</span></div>
+    <div class="diag-marker-list">${t.markers.map((m,i)=>`<span class="chip ${m.kind==="auto"?"warn":"dim"}">Marker ${i+1} · ${diagTime(m.time)} · ${esc(bi(m.label))}${m.kind==="manual"?(m.shotState==="pending"?lc(" · 正在截图…"," · taking a screenshot…"):lc(` · 截图 +${m.shotAfterMs} ms`,` · screenshot +${m.shotAfterMs} ms`)):""}</span>`).join("")}</div>
+    <p class="hint">${lc("Marker 只记录时间点；问题前的现场由环形缓冲在停止时回溯保存。截图在标记后拍摄，按实际拍摄时刻标注，不假装是标记瞬间的画面。","A marker records only an instant; the run-up is written back from the ring buffer when the capture stops. A screenshot is taken after the marker and labelled with the instant it was taken — it never pretends to be the picture at the marker.")}</p>
+    <div class="diag-boundary">${icon("warning",true)} <span>${lc("目标设计演示：Runtime authority、精确 target、Artifact budget 与安全边界不会由这个按钮创建或放宽。","Target-design demo: Runtime authority, the exact target, the artifact budget and the safety boundary are never created or relaxed by this button.")}</span></div>
   </div></div>`;
 }
 function pDiagnosticFinalizing(){
   return `<div class="diag-shell" data-page-title="${lc('Diagnostics · 正在生成结果','Diagnostics · Finalizing')}"><div class="diag-recording">
-    <div class="diag-recording-status"><span class="ibar" style="display:block;min-width:120px;margin-top:8px"></span><div><h2>正在生成诊断结果</h2><p>正在接收、校验并建立时间索引。没有可靠总量，因此不显示百分比。</p></div></div>
-    <div class="phases"><span class="ph done">停止采集</span><span class="ph run">回溯保存缓冲</span><span class="ph">校验 Artifact</span><span class="ph">时间映射</span><span class="ph">建立索引</span></div>
+    <div class="diag-recording-status"><span class="ibar" style="display:block;min-width:120px;margin-top:8px"></span><div><h2>${lc("正在生成诊断结果","Producing the diagnostic result")}</h2><p>${lc("正在接收、校验并建立时间索引。没有可靠总量，因此不显示百分比。","Receiving, verifying and building the time index. There is no reliable total, so no percentage is shown.")}</p></div></div>
+    <div class="phases"><span class="ph done">${lc("停止采集","Stop capture")}</span><span class="ph run">${lc("回溯保存缓冲","Write back buffers")}</span><span class="ph">${lc("校验 Artifact","Verify artifacts")}</span><span class="ph">${lc("时间映射","Time mapping")}</span><span class="ph">${lc("建立索引","Build index")}</span></div>
   </div></div>`;
 }
 const DIAGNOSTICS_COPY={
@@ -3038,15 +3093,15 @@ function pDiagnosticsConcept(){
 }
 function diagMarkerStatusText(){
   const t=S.diagnostics,last=t.markers[t.markers.length-1];
-  if(!last)return "尚未添加 Marker";
-  const n=t.markers.length;
-  if(last.kind==="auto")return `自动 Marker ${n}：${diagTime(last.time)} · ${last.label}`;
-  if(last.shotState==="pending")return `Marker ${n} 已记录：${diagTime(last.time)} · 正在截图…（事后拍摄）`;
-  return `Marker ${n}：${diagTime(last.time)} · 截图已保存，拍摄于标记后 +${last.shotAfterMs} ms`;
+  if(!last)return lc("尚未添加 Marker","No marker yet");
+  const n=t.markers.length,label=esc(bi(last.label));
+  if(last.kind==="auto")return lc(`自动 Marker ${n}：${diagTime(last.time)} · ${label}`,`Automatic marker ${n}: ${diagTime(last.time)} · ${label}`);
+  if(last.shotState==="pending")return lc(`Marker ${n} 已记录：${diagTime(last.time)} · 正在截图…（事后拍摄）`,`Marker ${n} recorded: ${diagTime(last.time)} · taking a screenshot… (afterwards)`);
+  return lc(`Marker ${n}：${diagTime(last.time)} · 截图已保存，拍摄于标记后 +${last.shotAfterMs} ms`,`Marker ${n}: ${diagTime(last.time)} · screenshot saved, taken +${last.shotAfterMs} ms after the marker`);
 }
 function startDiagnostic(){
   if(S.diagnostics.running)return;clearInterval(S.diagnostics.timer);S.diagnostics.running=true;S.diagnostics.finishing=false;S.diagnostics.elapsed=0;S.diagnostics.markers=[];S.diagnostics.view="recording";
-  const j={id:"J"+(S.jobSeq++),title:"诊断采集 · "+diagnosticTitle()+" · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
+  const j={id:"J"+(S.jobSeq++),title:lc("诊断采集","Diagnostic capture")+" · "+diagnosticTitle()+" · DAYU200",mode:"execute",dev:"DAYU200",risk:2,state:"running",
     phases:["Preflight","Arming","Recording","Finalizing"],phaseIdx:2,safeBoundary:2,log:["→ Preflight","→ Arming","required channels ready（ring buffers armed）",S.diagnostics.includeVideo?"→ Recording · screen video enabled":"→ Recording · continuous screen video off"],pages:["diagnostics"],cancelled:false};
   S.jobs.push(j);S.diagnostics.job=j;renderDrawer();renderPage();
   S.diagnostics.timer=setInterval(()=>{if(!S.diagnostics.running)return;if(j.cancelled){stopDiagnostic("cancelled");return;}S.diagnostics.elapsed++;
@@ -3057,11 +3112,11 @@ function addDiagMarker(kind="manual"){
   if(!S.diagnostics.running)return;const time=DIAG_START+Math.min(7.8,S.diagnostics.elapsed/Math.max(1,S.diagnostics.dur)*8);
   const n=S.diagnostics.markers.length+1;
   if(kind==="auto"){
-    S.diagnostics.markers.push({time,label:"自动 · frame deadline missed（演示）",kind:"auto",shotState:"none",shotAfterMs:0});
+    S.diagnostics.markers.push({time,label:{zh:"自动 · frame deadline missed（演示）",en:"Automatic · frame deadline missed (demo)"},kind:"auto",shotState:"none",shotAfterMs:0});
     S.diagnostics.job?.log.push(`Auto marker ${n} @ ${diagTime(time)} · frame deadline missed`);renderDrawer();renderPageIf(["diagnostics"]);return;
   }
-  const m={time,label:"问题出现",kind:"manual",shotState:"pending",shotAfterMs:0};
-  S.diagnostics.markers.push(m);S.diagnostics.job?.log.push(`Marker ${n} @ ${diagTime(time)} · 截图拍摄中（事后）`);renderDrawer();renderPage();
+  const m={time,label:{zh:"问题出现",en:"Problem appeared"},kind:"manual",shotState:"pending",shotAfterMs:0};
+  S.diagnostics.markers.push(m);S.diagnostics.job?.log.push(`Marker ${n} @ ${diagTime(time)} · `+lc("截图拍摄中（事后）","screenshot being taken (afterwards)"));renderDrawer();renderPage();
   setTimeout(()=>{if(m.shotState!=="pending")return;m.shotState="saved";m.shotAfterMs=512;
     S.diagnostics.job?.log.push(`Marker ${n} screenshot captured @ +512 ms`);renderDrawer();renderPageIf(["diagnostics"]);},900);
 }
@@ -3074,17 +3129,18 @@ function stopDiagnostic(result="succeeded"){
     const captured=S.diagnostics.markers.map(m=>({time:m.time,label:m.label,kind:m.kind,
       shot:m.kind==="manual"&&m.shotState==="saved"?{time:Math.min(DIAG_END,m.time+.512),afterMs:512}:null,shotFailed:null}));
     const partial=result==="cancelled";
-    const sess={label:"刚刚 · "+diagnosticTitle()+" · "+(S.diagnostics.includeVideo?"含录屏":"无录屏")+" · "+(partial?"Partial":"Ready"),
+    const label=lc("刚刚","Just now")+" · "+diagnosticTitle()+" · "+(S.diagnostics.includeVideo?lc("含录屏","with recording"):lc("无录屏","no recording"))+" · "+(partial?"Partial":"Ready");
+    const sess={label,
       status:partial?"partial":"ready",video:S.diagnostics.includeVideo,gap:S.diagnostics.includeVideo?[15.45,16.0]:null,
-      alignChip:"已校准 ±8 ms",alignTone:"warn",logsAligned:true,
-      partialReasons:partial?["用户在安全边界停止；已校验的 Artifact 以 Partial 打开"]:[],
+      alignChip:{zh:"已校准 ±8 ms",en:"Calibrated ±8 ms"},alignTone:"warn",logsAligned:true,
+      partialReasons:partial?[{zh:"用户在安全边界停止；已校验的 Artifact 以 Partial 打开",en:"Stopped by the operator at a safe boundary; the verified artifacts open as Partial"}]:[],
       markers:captured,
       alignRows:[
-        ["Trace","device monotonic",'<span class="chip ok">同一时钟</span>',"00:10.000–00:18.000（回溯窗口）"],
-        ["Marker / 截图","host monotonic",'<span class="chip warn">已校准 ±20 ms</span>',captured.some(m=>m.shot)?"截图仅适用拍摄时刻":"无截图"],
-        ["HiLog","device realtime",'<span class="chip warn">已校准 ±8 ms</span>',"00:10.014–00:17.984"]
-      ].concat(S.diagnostics.includeVideo?[["Screen","video PTS",'<span class="chip warn">已校准 ±12 ms</span>',"00:10.000–00:15.450<br>00:16.000–00:18.000"]]:[]),
-      alignNote:"演示 Session：时间数据复用演示 trace。生产实现中，环形缓冲的回溯窗口与各来源映射均以 Runtime 事实为准。"};
+        ["Trace","device monotonic",{zh:'<span class="chip ok">同一时钟</span>',en:'<span class="chip ok">One clock</span>'},{zh:"00:10.000–00:18.000（回溯窗口）",en:"00:10.000–00:18.000 (look-back window)"}],
+        [{zh:"Marker / 截图",en:"Marker / screenshot"},"host monotonic",{zh:'<span class="chip warn">已校准 ±20 ms</span>',en:'<span class="chip warn">Calibrated ±20 ms</span>'},captured.some(m=>m.shot)?{zh:"截图仅适用拍摄时刻",en:"A screenshot applies only to the instant it was taken"}:{zh:"无截图",en:"No screenshot"}],
+        ["HiLog","device realtime",{zh:'<span class="chip warn">已校准 ±8 ms</span>',en:'<span class="chip warn">Calibrated ±8 ms</span>'},"00:10.014–00:17.984"]
+      ].concat(S.diagnostics.includeVideo?[["Screen","video PTS",{zh:'<span class="chip warn">已校准 ±12 ms</span>',en:'<span class="chip warn">Calibrated ±12 ms</span>'},"00:10.000–00:15.450<br>00:16.000–00:18.000"]]:[]),
+      alignNote:{zh:"演示 Session：时间数据复用演示 trace。生产实现中，环形缓冲的回溯窗口与各来源映射均以 Runtime 事实为准。",en:"Demo Session: its time data reuses the demo trace. In the production implementation, the ring buffer's look-back window and every source mapping come from Runtime facts."}};
     DIAG_SESSIONS.unshift(sess);S.diagnostics.session=0;
     S.diagnostics.cursor=captured[0]?.time||13.242;S.diagnostics.rangeStart=null;S.diagnostics.selectedEvent=null;S.diagnostics.selectedLog=nearestDiagLogID(S.diagnostics.cursor);
     if(j){j.state=result;j.log.push(partial
