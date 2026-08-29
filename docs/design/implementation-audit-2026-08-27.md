@@ -91,17 +91,18 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 ## 3. 全入口矩阵
 
-以下 **60 个检查单元**均已纳入并完成首轮源码、设计和接线核对；真机与字段级复查继续记录新差异（如 F29）。“已接线”不等于本轮硬件通过。浏览器/App fixture 验证范围见 §4。
+以下 **62 个检查单元**均已纳入并完成首轮源码、设计和接线核对；真机与字段级复查继续记录新差异（如 F29）。“已接线”不等于本轮硬件通过。浏览器/App fixture 验证范围见 §4。
+2026-08-29 起，每轮逐行核对结论另存 [UI 一致性台账](references/ui-consistency/)；本表只保留每个单元的现行结论。
 
 ### 主窗口、全局层、动态设备（GJ-1—4）
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役 |
-| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面 |
+| shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役。F48 将侧栏分组与 Job 检查器词表对回 App，并补 ⌘⇧J；F49 让 Debug/Flash 的窗口标题等于 App 的裸页面名 |
+| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；原型仍缺 Runtime 不可用态与残留/临界写入提示（F52 登记） |
 | shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：精确 Job 跳转、清除旧筛选并定位记录行。F41：有界滚动、多记录计数与窄窗工作区保留；原生精确行定位仍在复测，不能视为通过。所有主工作区共享；独立窗口不显示。不确认后续刷、不在 App 归档 |
-| device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管 |
-| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview |
+| device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管。F50 用 `?page=device&deviceDetail=…` 补齐五种候选状态、`stateObservedAt`、CLI 接管说明，并把字段标签与两条说明对回 `Localizable.xcstrings` |
+| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；`device.wait.unavailable` 与信任页缺少的 Runtime 事实栏由 F52 登记 |
 | device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
 
 ### Overview（GJ-1/2/4）
@@ -117,7 +118,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated；缓存计划可用性刷新 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 修 Runtime 投影，F33 让缓存计划随当前可用性撤下/恢复动作 |
+| flash.main | 镜像 empty/importing/invalid/ready/blocked；主动作；hardwareGated；缓存计划可用性刷新 | 导入和 exact plan 已接线；同页说明影响，不恢复第二确认框；F32 修 Runtime 投影，F33 让缓存计划随当前可用性撤下/恢复动作。F46 让演示 Job 的阶段与终态文案双语；原型仍缺 checking/noDevice/importing/invalid 与 failed 结果态（F52 登记） |
 | flash.plan | 计划/前置条件 disclosure；target/hash/partitions/Loader/missing | Loader 激活属于执行前身份关联；历史目标缺失明确占位；测试显式选择当前目标后才 materialize exact plan，不静默换目标 |
 | flash.runtime | prepare/write/reboot/verify/failed/cancelled/unknown | bytes比例不是成功；postflight后才成功；unknown不重放 |
 
@@ -138,7 +139,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| viewer.main | empty/loading/captured/search/selection/geometryUnavailable/failed | explicit target、同 Job screenshot/tree/hash；不默认伪造 capture |
+| viewer.main | empty/loading/captured/search/selection/geometryUnavailable/failed | explicit target、同 Job screenshot/tree/hash；不默认伪造 capture。F46 让树、分隔条、搜索导航的 AX 名称与节点计数双语；loading/geometryUnavailable/failed 在原型仍不可达（F52 登记） |
 | viewer.properties | Properties；identity/state/geometry/paint/missing | 已接线；Provider 技术词表保留英文 |
 | viewer.layout | Layout；bounds/root/geometryUnavailable | 无 geometry 不编造命中区域 |
 | viewer.accessibility | Accessibility；semantics/focus/missing | 只读观测字段，不把缺值解释成通过 |
@@ -170,7 +171,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | diagnostics.capture | noSession/noTarget/adoptedTarget/disabledArm/disabledMark | F01；不会假布防或保存 Marker |
 | diagnostics.reader | partial/marks/noPicture/missing/notDerived/alignment | History → fresh correlation → index/summary/markers bounded read/hash → publish；无校准/时间不猜；PNG/JPEG 通道兼容；文本显式读取 |
 | diagnostics.hilogSummary | complete/partial/unrecognized/empty/corrupt/reload/history | F42：已发布 HiLog 摘要的独立只读回访；核对 Job/Artifact、来源 ID 与标准摘要字节，不读取原日志，不把行首统计解释为设备健康或完整采集 |
-| diagnostics.concept | 显式未来 capture/recording/finalizing/session/partial/clockGap | 有界 ringBuffered 与部分自动 Marker 已发布；交互式会话/视频/校准仍为单独概念，不混入当前默认 |
+| diagnostics.concept | 显式未来 capture/recording/finalizing/session/partial/clockGap | 有界 ringBuffered 与部分自动 Marker 已发布；交互式会话/视频/校准仍为单独概念，不混入当前默认。F46 补齐概念页窗口标题与静态 AX 名称；正文与时间轴 AX 名称仍为中文单语（F52 登记） |
 
 ### History（GJ-1—4）
 
@@ -202,7 +203,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | system.panels | Flash镜像、入口 HAP / 附加 HAP/HSP / .so / HDC / key / root / Trace 导入；日志/Artifact/诊断包保存；Finder | 系统panel已纳入所属流程；不计为新业务页；HTML不真实读写 |
-| design.components | Workspace chrome；31预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；新增 SessionSurfaces 双语画廊；ArkTrace canvas 属上游插图，远程库未同步 |
+| design.components | Workspace chrome；32预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；SessionSurfaces 与 F51 新增的 ViewerSurfaces 覆盖两组组合式组件；ArkTrace canvas 属上游插图，远程库未同步。BudgetMeters/OperationList/StageTrack/StatusStrip 按 spec §5.11 保留为退役 Automation 资料，原型已无消费方 |
 | automation.retired | 旧Automation/HTASK稿 | CHG-2026-064已移除；旧URL只解释退役，不是待办 |
 
 ### 生产 View 文件索引（20/20）
@@ -392,6 +393,10 @@ UI 测试必须与其他构建串行执行。真实设备用例没有显式环�
 2. **全局恢复操作**：Runtime 已有保守恢复语义，但 App 没有可直接接线的 rebind/archive RPC；保持只读证据/History，不把用户确认变成 authority，也不重放 unknown intent。
 3. **变更操作的参数复用**：当前延续闭集仅安全只读观测；Flash/Native/HAP/含变更 Trace 不带旧 lease/authority 复跑。未来交互须独立设计 fresh import/plan/admission。
 4. **剩余真机验收与远程设计库**：GJ-1 的新观测、多通道诊断、原生 Diagnostics/Trace/History/Viewer 与录屏已有实测结果；冷启动、原生 stale-frame 和实际 entry+shared HSP 均已有通过记录。2026-08-28 明确授权 HardwareCampaign 后，新 canonical Flash 实际成功并独立核验，campaign 已关闭。F36 合入后双语真实 App 只读回访已通过，活动、精确 History 与旧 unknown 保留均核验；F37 是该回访新发现的稿件摘要/Artifact 差异修正，不重复刷写来补 UI 证据。HiLog 摘要已在 PR #1577 合入，维护者合入后的真实 Runtime 验证已通过；App 只读回访断点的修正与验证见 F42。远程设计库未连接，当前只同步仓库稿件与参考图。
+
+5. **UI 一致性核对的未闭合项**：2026-08-29 首轮全量核对登记的九类差异见文末 F52，
+   其中稿件状态补齐属设计工作，App 侧共享件收敛与 Viewer 检查器本地化需要 App 改动与
+   对应原生回归；三条待裁决项同处该节。它们不阻塞上述四项能力，也不因登记而被视为已修。
 
 这些边界不通过删除 accepted requirements 或将 fake/simulation 标成真实结果来关闭。
 不创建 readiness/status-only 载体；确需新 operation/provider/profile 或安全策略变化时按现有治理处理。
@@ -788,3 +793,140 @@ top layer，Escape 后仍为 open；点击搜索区域会被弹层遮挡；点�
 修正前状态、两张修正后截图与结构化测量只留本机。这里验证的是设计样本，不是原生
 App 或真机证据；本项不修改 App、Runtime、Catalog 或设备状态。F42 原生 HiLog reader
 回归仍等待本机 automation 身份认证，整体 goal 继续保持开放。
+
+## 2026-08-29 F46–F52：首轮全量 UI 一致性核对
+
+按 [UI 稿与实现一致性核对任务](ui-consistency-audit-task.md) 执行的**首轮全量**回合，
+基线 `17a309720954be9d2a2395b538fff029e0b5a2e6`。范围是覆盖表全部 62 个 surfaceID 的六项
+协议，加上 `arkdeck-ds/src/index.ts` 的 59 个受控导出与 App 侧重复模式横扫。逐行结论、
+证据与 verdict 见 [2026-08-29 台账](references/ui-consistency/2026-08-29-ledger.md)；本节只记
+本轮登记的差异。本轮不修改 App、Runtime、Catalog 或准入策略，不执行设备操作，也不翻转
+任何 Golden Journey 状态。
+
+**F46（GJ-1—4）设计稿的双语与无障碍名称回落中文。** 英文界面下，原型外框（窗口、工具栏、
+侧栏、Job 检查器面板）、Viewer（完整 UI 树、树行「选择组件…」、树/属性分隔条及其
+`aria-valuetext`、上一个/下一个搜索结果、检查器标签列表、页脚节点计数）以及 Flash 与
+Diagnostics 演示 Job 写入 timeline 的阶段名和终态说明，全部只有中文；这些字符串会出现在
+Job 检查器和 History 里。现按 `UIDumpLocalizable.xcstrings` 的既有键值成对补齐，Viewer 复用
+App 的 `viewer.tree.label` / `viewer.separator.label` / `viewer.search.previous` /
+`viewer.search.next` 措辞，节点计数使用 `viewer.footer.nodes` 的形式。被抓设备自身的界面
+文本（节点 text、日志正文）仍保留原文，不翻译。新增两项回归分别断言英文 Flash timeline
+不含中文、Viewer 的四个 AX 名称与 App 目录逐字相同。
+
+**F47（GJ-1—4）稿件保留了已退役路径。** 侧栏的「添加 TCP / UART 目标…」入口虽然 `hidden`，
+但连同 `addTargetModal()` / `addTarget()`、`.addlink` 样式与本地化键一起留在稿中；
+「重启共享 HDC server」危险 sheet（`restartSrvModal`）已被 Overview 的影响预览取代却仍在；
+`advanceJob` 的 `pauseAt` 分支与 `rebindOk` / `rebindAbort` 保留了 rebind 确认/中止路径，而
+spec §5.8 明确要求当前已发布的 USB / RockUSB Flash 不绘制该控件；`cancelJob` 无调用方；
+`historyPreset` 与工具栏实际调用的 `applyHistorySavedAction` 重复实现同一预设逻辑，且当时
+只有测试在调用它——测试因此覆盖的是界面从不执行的那条路径。以上函数、样式（`.job`、
+`.rebind`、`.addlink`）与对应的 `CLASS_TO_COMPONENT` 条目一并移除，预设测试改为调用工具栏
+真正使用的入口。新增回归断言这些标识符不再出现在稿中。
+
+**F48（GJ-1—4）壳层词表与键盘路径与 App 不一致。** 侧栏分组在中文下是「功能」，而 App 的
+`app.navigation.section.workflows` 是「工作流」；Job 检查器在中文下是「任务」，而 App 的
+`jobInspector.action.show/hide` 用「Job 检查器」——稿件自身也自相矛盾：只有 Device 页在
+`render()` 里把这两个标签改写成正确值。现统一到 App 词表并删除该页面特例。检查器的动作
+文案对回 `打开此记录` / `请求取消` / `刷新 Job` / `在本机读取日志`，并补上 App 折叠条里有、
+稿中缺失的「打开历史记录」。spec §1 要求的 `⌘⇧J` 展开 Job 检查器此前只在 App 里存在，
+现已在稿中绑定（`⌘⇧D` 早已存在）。
+
+**F49（GJ-1—4）窗口标题与 App 的 `navigationTitle` 不同。** Debug 页把标题栏写成
+「Debug 工作台 / Debug Workbench」，Flash 页在中文下写成「刷机」；App 两页的
+`navigationTitle` 都是裸页面名 `Debug` / `Flash`（`app.navigation.*` 在两种语言中均为英文）。
+现改为裸页面名，并由回归断言标题集合中不再出现「工作台 / Workbench / 刷机」。
+
+**F50（GJ-1）设备详情只有一种状态，字段标签也已过期。** `DeviceDetailView` 按候选状态渲染
+ready / authorized-unadopted / offline / needs-recheck / unknown 五种说明，并在已授权未接管时
+说明接管由 CLI 执行；稿件固定渲染一条「已接管且已连接」提示，其余状态不可达。事实栏
+缺少 `device.fact.stateObservedAt`，`model` / `firmware` / `transport` 仍用旧的
+「观测机型 / 观测固件 / 观测传输」，重新检测说明与来源说明也停留在旧文案。现补
+`?page=device&deviceDetail=ready|authorizedUnadopted|offline|needsRecheck|unknownState`
+五种状态，文案逐字取自 `Localizable.xcstrings` 的 `device.trust.*` / `device.state.*` /
+`device.fact.*` / `device.detail.*`，CLI 接管说明只在 authorized-unadopted 出现。回归覆盖
+五状态 × 中英文，并直接与 App 的本地化目录比对，任何一侧改名都会失败。
+
+**F51（GJ-1）五个受控 Viewer 组件没有 preview。** `ViewerWorkspace`、
+`ViewerInspectorStack`、`ViewerScreenshot`、`ComponentTree`、`DumpInspector` 有
+`CLASS_TO_COMPONENT` 映射和 App 对应物（`UIDumpWorkspaceView.swift`），却既没有自己的
+preview，也不被任何 preview 引用——59 个受控导出里唯一的一组缺口（其余 24 个 session 组件
+由 `SessionSurfaces.tsx` 覆盖）。新增 `.design-sync/previews/ViewerSurfaces.tsx`，按这五个
+组件真实的组合形态给出联动选择与默认隐藏边界两个样本；截图是内联绘制的示意图，明确
+声明为设计样本，不冒充 capture。`implementation-coverage.json` 的 `previewFiles` 随之为
+32 个，32 个 preview 均可独立打包。
+
+**F52（GJ-1—4）本轮登记但未在本 PR 修正的项。** 以下差异已逐条核实并写入台账，修正需要
+另一轮设计工作或触碰 App 代码与原生回归，本轮不静默放过、也不冒充已修：
+
+1. **原型缺少已实现的状态**（实现有、稿不可达）。Overview 的多目标选择、未绑定/stale/
+   不可用的编译来源、记录区 loading/unavailable/empty、下一步的 attention/empty 与四种
+   拒绝原因、按调试线分组与「此前 N 次」展开；Flash 的 checking / noDevice / importing /
+   invalid / failed；Viewer 的 loading / geometryUnavailable / failed 与 footer「未测量」；
+   Trace 的 checking 可用性、无已接管目标、刷新入口，以及「查看 Trace」的已发布文件名 /
+   准备中 / 校验失败与重试；Trace 运行态的 terminal 与 outcomeUnknown；Job 检查器的
+   Runtime 不可用、残留计数、临界写入提示与 established-current-epoch 关系；
+   Settings 七个面板的 loading / error / success；`device.wait.unavailable`。
+2. **概念页与样本数据单语**。Diagnostics 概念页的窗口标题与静态 AX 名称已在 F46 补齐，
+   但该页可见正文与时间轴上按事实生成的 AX 名称（Marker、截图、Trace event、日志点、
+   时间光标）仍只有中文。History 样本记录的 `when` / `day`（「今天 14:32」「昨天」）与
+   四条 `what` / `detail`（「设置页组件树」「应用响应 · 30 秒」「设置页启动闪退」
+   「128 个节点 · /settings/display」）在英文 Overview 与 History 中原样显示；它们是记录
+   摘要文案而不是设备原文，应当成对。改法需要把 `HIST` 的展示字段与语言解耦，
+   影响面大于本轮批次，故登记。
+3. **信任页缺 Runtime 事实栏**。App 对每种状态都渲染「当前状态与操作 + Runtime 事实」
+   两栏；稿件的 `auth` 页是独立卡片，没有事实栏（spec §5.2 要求接管引导在同一详情中）。
+4. **App 侧共享件未被复用**（C-DUP，需 App 改动与原生回归）：
+   `DeviceWorkspace.swift` 的 `deviceNotice(...)` 在同一文件已经使用 `WorkspaceNotice`
+   的情况下另写了一份等价实现并调用 8 次；`SettingsRootView.swift` 的
+   `SettingsErrorBanner` / `SettingsSuccessBanner` 重复 `WorkspaceNotice`、
+   `SettingsPaneContainer` 重复 `WorkspacePage`、`SettingsPaneHeader` 重复
+   `WorkspaceHeaderBar`、`SettingsValueGrid` 重复 `WorkspaceFactGrid` + `WorkspaceFactRow`
+   （后者额外需要单行中段省略，收敛时应扩展共享件而不是保留副本）；
+   `DiagnosticsWorkspaceView.swift`（39 处）与 `DeviceWorkspaceView.swift`（30 处）用
+   `.font(.system(size:…))` 和字面间距绕过 `WorkspaceFont` / `WorkspaceMetrics`，占全 App
+   此类写法的全部；九个 Feature 文件里 19 处手写 `Grid(` 键值列表未使用
+   `WorkspaceFactGrid`；跨 Feature 共用的 `RuntimeExecutionModeBadge` 定义在
+   `Features/History/RuntimeHistoryView.swift` 而不是 `DesignSystem/`。
+5. **App 普通 UI 绕过本地化目录**。`UIDumpWorkspaceView.swift` 的 `ViewerInspectorCopy`
+   把「选择一个组件」「原始字段不可用」「重试」「搜索字段或值」「清除搜索」「没有匹配的
+   字段或值」等普通文案硬编码为英文，而 `UIDumpLocalizable.xcstrings` 里这些键都有中文
+   译文且无人引用。spec §5.3 只把 `Properties / Layout / Accessibility / Raw dump /
+   Advanced Dump` 等 Provider 技术词表列为保留英文，空态提示与搜索控件是否属于该豁免
+   需要维护者裁决——见下方待裁决清单。
+6. **资源里的已移除路径残留**：`debug.apps.install.fresh`、`debug.apps.cleanup.restore`
+   （F26 后策略固定，不再渲染）等 11 个 Debug 键、13 个 Diagnostics 交互式会话键、
+   29 个 Flash 旧审阅页键、6 个 History 表列键与 4 个 Settings 标题键当前无引用。
+7. **退役 Automation 的稿件样式残留**：`.op-list`、`.budget-grid`/`.metric`/`.meter`、
+   `.stage-line`/`.stage-node`、`.summary-strip`/`.summary-cell` 仍有 CSS 与组件映射，
+   但原型已无任何标记使用它们。spec §5.11 要求把 OperationList / BudgetMeters /
+   StageTrack / StatusStrip 保留为历史组件资料，因此本轮不删，只登记。
+8. **preview 无构建守护**：`tsconfig.json` 只包含 `src/**`，`npm run build:review` 只打包
+   `session-review.tsx`，因此 32 个 preview 既不被类型检查也不被 npm 脚本打包；本轮的
+   逐个打包是手工执行的。
+9. **`Select` 没有原型 class 映射**：稿件用 `<select class="inp">`，`.inp` 已映射到
+   `TextField`，而 `CLASS_TO_COMPONENT` 是 class→component 单向检查，因此该导出永远不会
+   被守护。语义等价存在，故记 exception。
+
+### 待维护者裁决
+
+1. **内容区是否允许重复工具栏页面标题。** spec §8 明确「任何工作区的内容区都不再画与
+   toolbar 同名的主标题」，但 `DiagnosticsWorkspaceView` 的自绘工具条渲染
+   `diagnostics.title`（两种语言都是 `Diagnostics`），与 `navigationTitle` 完全同名；
+   原型的 Diagnostics 页同样在内容区显示 `<b>Diagnostics</b>`。两侧一致而与 spec 冲突，
+   按纪律不静默改任一侧。建议：删除两侧的重复标题，把重新加载与对齐状态留在同一行。
+2. **Viewer 检查器的英文保留范围。** 上述第 5 条需要一条边界：哪些是 spec §5.3 所指的
+   Provider 技术词表（保留英文），哪些是应走目录的普通 UI。建议按「字段名与分类保留英文、
+   空态/动作/搜索控件走目录」裁决，并据此清理无人引用的中文键。
+3. **App 侧 C-DUP 的收敛取舍。** 第 4 条列出的重复实现是否收敛为共享件、以何种顺序收敛，
+   属产品判断；收敛会改变实际呈现（例如 `WorkspaceNotice` 会给 Settings 的成功/失败横幅
+   加上语义色边框与浅底），需要对应的原生回归窗口。
+
+### 验证
+
+- 设计侧：`npm test` **65 项通过**（本轮新增 4 项回归：设备详情五状态双语、退役路径无
+  残留与窗口标题、壳层词表与演示 timeline 双语、Viewer AX 名称与节点计数）；
+  `npm run build` 与 `npm run build:review` 通过；`check:tokens` 报告每个原型 class 均已
+  分类；32 个 preview 逐个独立打包通过。
+- 统一本地闸按实际 diff 分类为纯设计/文档车道，不分配 Swift / App 编译车道。
+- 本轮没有浏览器像素走查，也没有原生或真机验证；上述结论只证明稿与代码的一致性范围，
+  不构成 App 呈现验收或硬件验收。

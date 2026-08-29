@@ -313,7 +313,7 @@ for (const name of dsLight.keys()) {
     symbol: "Symbol",
     "toolbar-btn": "ToolbarButton", acbtn: "ToolbarButton",
     banner: "RecoveryBanner", ritem: "RecoveryBanner",
-    drawer: "JobInspector", job: "JobInspector", rebind: "JobInspector",
+    drawer: "JobInspector",
     inp: "TextField", radio: "RadioGroup", tagpick: "TagPicker",
     "viewer-page": "ViewerWorkspace", "viewer-lead": "ViewerWorkspace",
     "viewer-toolbar": "ViewerWorkspace", "viewer-status": "ViewerWorkspace",
@@ -538,7 +538,7 @@ for (const name of dsLight.keys()) {
     sec: "sidebar section heading",
     hint: "text utility", note: "text utility", empty: "empty-state text utility",
     mono: "type utility", "visually-hidden": "accessibility utility", livetag: "inline marker in a History row",
-    pulse: "animation utility", addlink: "a plain text link",
+    pulse: "animation utility",
   };
 
   /** Should be a component; isn't yet. Reported on every run, never silent.

@@ -130,8 +130,6 @@ body.standalone-design .sidebar,body.standalone-design #drawer,body.standalone-d
 .dev .dn{flex:1;min-width:0}.dev .dn b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dev .dn span{font-size:11px;color:var(--ink2)}
 .tag{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink2);flex:none}
-.addlink{min-height:28px;font-size:12px;color:var(--accent);padding:3px 8px;cursor:pointer;background:none;border:none;
-  text-align:start;display:flex;align-items:center;gap:7px}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav button{min-height:32px;display:flex;align-items:center;gap:9px;padding:5px 9px;border-radius:8px;border:none;
   background:none;color:var(--ink);font-size:13px;cursor:pointer;text-align:start;width:100%}
@@ -169,7 +167,7 @@ h2{font-size:13px;line-height:1.3;font-weight:600;color:var(--ink);display:flex;
 .btn.pri:hover{opacity:.9}
 .btn.danger{background:var(--danger-fill);border-color:var(--danger-fill);color:#fff}
 .btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
-.btn:focus-visible,.nav button:focus-visible,.dev:focus-visible,.addlink:focus-visible,.toolbar-btn:focus-visible,
+.btn:focus-visible,.nav button:focus-visible,.dev:focus-visible,.toolbar-btn:focus-visible,
 .acbtn:focus-visible,.drawer .bar:focus-visible,.tabs button:focus-visible,.filters button:focus-visible,
 .tagpick button:focus-visible,.flash-details summary:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){
@@ -215,10 +213,6 @@ tr.sel-row{background:var(--selection)}
 @media (prefers-reduced-motion:no-preference){.drawer .body{transition-property:max-height;transition-duration:180ms;transition-timing-function:cubic-bezier(.2,0,0,1)}}
 @media (prefers-reduced-motion:reduce){.drawer .body{transition:none}.pulse{animation:none}
   .ibar::after{animation:none;left:0;width:100%;opacity:.35}}
-.job{display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--panel-solid) 76%,transparent)}
-.job:first-child{border-top:none}
-.job .jh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.job .jh b{font-size:13px}
 .phases{display:flex;gap:4px;flex-wrap:wrap;font-size:11px}
 .ph{padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--ink2)}
 .ph.done{border-color:var(--ok);color:var(--ok)}
@@ -233,8 +227,6 @@ tr.sel-row{background:var(--selection)}
 .logtail{font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink2);background:color-mix(in srgb,var(--ground) 82%,var(--panel-solid));
   border:1px solid var(--line);border-radius:7px;padding:8px 10px;max-height:110px;overflow-y:auto;white-space:pre-wrap;font-variant-numeric:tabular-nums}
 .stream{max-height:220px;color:var(--ink)}
-.rebind{border:1px solid var(--accent);background:var(--accent-weak);border-radius:8px;padding:8px 12px;
-  font-size:12.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:relative}
 .inp{min-height:29px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel-solid);color:var(--ink);font:inherit;font-size:13px;box-shadow:var(--control-shadow)}
 .inp.mono{font-family:var(--mono);font-size:12px}
 .inp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -685,7 +677,7 @@ body.reference.device-native .window{height:min(760px,100vh);min-height:600px}
 body.reference.device-native{min-height:0;height:100vh;overflow:hidden}
 body.device-native.device-compact .window{width:min(960px,100%)}
 body.device-native .titlebar .leading{justify-content:space-between}body.device-native .titlebar .t{text-align:start;padding-inline-start:8px;font-size:15px}
-body.device-native #languageToggle,body.device-native #themeToggle,body.device-native #jobsToggle,body.device-native #acToggle,body.device-native #addTargetButton{display:none}
+body.device-native #languageToggle,body.device-native #themeToggle,body.device-native #jobsToggle,body.device-native #acToggle{display:none}
 body.device-native .sidebar{border:1px solid var(--line);border-radius:18px;margin:0 8px 8px;width:242px;padding:8px;gap:18px;background:var(--panel2)}
 body.device-native .main{padding-bottom:34px}body.device-native .drawer{position:absolute;inset-inline:0;bottom:0}
 body.device-native .nav button{min-height:40px;font-weight:500}body.device-native .nav button.on{background:var(--accent-fill);color:var(--accent-ink)}
@@ -910,7 +902,7 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
 
 <div class="device-review" id="deviceReview" hidden></div>
 <div class="window" id="win" aria-label="ArkDeck 设计原型窗口">
-  <div class="titlebar" role="toolbar" aria-label="窗口工具栏">
+  <div class="titlebar" role="toolbar" id="windowToolbar" aria-label="窗口工具栏">
     <div class="leading">
       <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
       <button class="toolbar-btn icon-only" id="sidebarToggle" onclick="toggleSidebar()" aria-label="显示或隐藏边栏" title="显示或隐藏边栏">
@@ -924,22 +916,21 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
       </button>
       <button class="toolbar-btn" id="languageToggle" onclick="toggleLanguage()" title="仅原型评审使用">EN</button>
       <button class="toolbar-btn" id="themeToggle" onclick="toggleTheme()" title="仅原型评审使用">系统外观</button>
-      <button class="toolbar-btn" id="jobsToggle" onclick="toggleDrawer()" aria-label="显示或隐藏任务检查器">
-        <svg class="symbol sm"><use href="#i-jobs"></use></svg><span id="jobsLabel">任务</span>
+      <button class="toolbar-btn" id="jobsToggle" onclick="toggleDrawer()" aria-label="显示或隐藏 Job 检查器">
+        <svg class="symbol sm"><use href="#i-jobs"></use></svg><span id="jobsLabel">Job 检查器</span>
       </button>
       <button class="acbtn" id="acToggle" onclick="toggleAC()">AC 标注</button>
     </div>
   </div>
   <div class="prototype-disclosure" id="prototypeDisclosure" role="note"></div>
   <div class="main">
-    <aside class="sidebar" id="sidebar" aria-label="设备与功能导航">
+    <aside class="sidebar" id="sidebar" aria-label="设备与工作流导航">
       <div>
         <div class="sec" id="devicesSectionLabel">设备</div>
         <div id="devlist"></div>
-        <button class="addlink" id="addTargetButton" onclick="addTargetModal()" hidden><svg class="symbol sm"><use href="#i-plus"></use></svg><span>添加 TCP / UART 目标…</span></button>
       </div>
       <div>
-        <div class="sec" id="workflowsSectionLabel">功能</div>
+        <div class="sec" id="workflowsSectionLabel">工作流</div>
         <nav class="nav" id="nav"></nav>
       </div>
     </aside>
@@ -948,12 +939,12 @@ body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidde
       <div class="page" id="page"></div>
       <div class="drawer" id="drawer">
         <button class="bar" id="drawerToggle" onclick="toggleDrawer()" aria-expanded="false" aria-controls="drawerBody">
-          <span id="drawerArrow">▸</span><b id="drawerLabel">任务</b>
-          <span class="st" id="drawerSt" style="flex:1" role="status" aria-live="polite">没有运行中的任务</span>
+          <span id="drawerArrow">▸</span><b id="drawerLabel">Job 检查器</b>
+          <span class="st" id="drawerSt" style="flex:1" role="status" aria-live="polite">没有运行中的 Job</span>
           <span class="ibar" id="drawerIbar" style="display:none"></span>
           <span class="ac">AC-UX-001-01</span>
         </button>
-        <div class="body" id="drawerBody" aria-label="任务检查器" aria-hidden="true" inert></div>
+        <div class="body" id="drawerBody" aria-label="Job 检查器" aria-hidden="true" inert></div>
       </div>
     </div>
   </div>
@@ -970,6 +961,7 @@ const S = {
   nav:(PARAMS.get("page")==="tools"?"device-control":PARAMS.get("page"))||(PARAMS.has("reference")?"device":"overview"), device:PARAMS.get("page")==="auth"?"tab01":"dayu200", language:PARAMS.get("lang")==="en"?"en":"zh-Hans",
   acMode:false, drawerOpen:false, sidebarOpen:true, appearance:["light","dark"].includes(PARAMS.get("appearance"))?PARAMS.get("appearance"):"system", lastChecked:null,
   deviceCompact:PARAMS.get("deviceWidth")==="compact",
+  deviceDetail:["ready","authorizedUnadopted","offline","needsRecheck","unknownState"].includes(PARAMS.get("deviceDetail"))?PARAMS.get("deviceDetail"):"ready",
   deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
@@ -1122,10 +1114,15 @@ function modeBadge(m,fx){return m==="planOnly"?'<span class="chip planned">◇ P
   :m==="simulated"?'<span class="chip sim">▤ SIMULATED'+(fx?" · "+fx:"")+'</span>':"";}
 
 const COPY={
-  "zh-Hans":{devices:"设备",workflows:"功能",addTarget:"添加 TCP / UART 目标…",jobs:"任务",emptyJobs:"没有运行中的任务",appearance:"系统外观",ac:"AC 标注",
+  "zh-Hans":{devices:"设备",workflows:"工作流",jobs:"Job 检查器",emptyJobs:"没有运行中的 Job",appearance:"系统外观",ac:"AC 标注",
     needsTrust:"需要信任 — 点击处理",ready:"已接管",rename:"重命名…",recheck:"重新检测",renameTitle:"重命名设备",cancel:"取消",save:"保存",
-    statusActions:"当前状态与操作",facts:"Runtime 事实",readyNotice:"已接管且已连接——设备就绪。",recheckNote:"重新检测只读取最新候选列表，不会向设备发送任何内容。",
-    connectKey:"Connect key",reported:"报告状态",target:"已接管目标",revision:"Binding revision",model:"观测机型",firmware:"观测固件",transport:"观测传输",confirmed:"确认时间",lastChecked:"刚刚重新读取候选列表",
+    statusActions:"当前状态与操作",facts:"Runtime 事实",recheckNote:"等待与重新检测会刷新带时间的最新 HDC 观测；不向设备发送任何内容，可随时重复。",
+    connectKey:"Connect key",reported:"报告状态",stateObservedAt:"状态观测时间",target:"已接管目标",revision:"Binding revision",model:"设备名称 / 机型",firmware:"系统版本",transport:"传输方式",confirmed:"确认时间",lastChecked:"刚刚重新读取候选列表",
+    observedProvenance:"观测事实来自最近一次成功的 observe.device@1 Job——是历史证据，不是设备此刻的实时状态。",
+    "deviceNotice.ready":"已授权且已接管——设备就绪。","deviceNotice.authorizedUnadopted":"已授权。该设备尚未被接管为持久目标。",
+    "deviceNotice.offline":"设备报告离线。请检查 USB 连接后重新检测。","deviceNotice.needsRecheck":"状态待重新确认",
+    "deviceNotice.unknownState":"工具报告了未识别的状态：Recovery。按原文展示，不做解读。",
+    adoptViaCLI:"接管（建立持久绑定）由 CLI 执行：arkdeck device adopt。本 App 不提交接管操作。",
     flashTitle:"刷机",flashSubtitle:"选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。",flashReady:"设备已就绪",flashChecks:"3 项必需安全检查通过",
     chooseImage:"选择镜像…",changeImage:"更换镜像…",chooseImageTitle:"选择要刷入的镜像",chooseImageHelp:"支持 Runtime 已发布的 DAYU200 镜像包",
     startFlash:"擦除数据并开始刷机",flashImpact:"将擦除 DAYU200 上的用户数据。请保持设备连接和稳定供电。",flashDetails:"查看刷机详情",
@@ -1138,10 +1135,15 @@ const COPY={
     traceRunning:"正在抓取…",traceCancel:"取消抓取",traceStart:"开始抓取",traceViewerTitle:"查看 Trace",traceViewerDescription:"在查看器中打开本地 Trace，或继续查看最近的 Trace。",traceOpenViewer:"打开 Trace 查看器",
     traceProfileApp:"应用响应",traceProfileAppDetail:"适合分析交互迟缓、布局耗时和 ArkUI 卡顿。",traceProfileRender:"渲染与动画",traceProfileRenderDetail:"适合分析出帧、图形和动画问题。",
     traceProfileCPU:"CPU 调度",traceProfileCPUDetail:"适合分析线程调度、资源争用和 IPC 问题。",traceProfileIO:"I/O",traceProfileIODetail:"适合分析文件、存储和工作队列问题。",traceProfileSystem:"系统概览",traceProfileSystemDetail:"覆盖最广的系统活动，生成的 Trace 也最大。"},
-  en:{devices:"Devices",workflows:"Workflows",addTarget:"Add TCP / UART target…",jobs:"Jobs",emptyJobs:"No running jobs",appearance:"System appearance",ac:"AC labels",
+  en:{devices:"Devices",workflows:"Workflows",jobs:"Job inspector",emptyJobs:"No running jobs",appearance:"System appearance",ac:"AC labels",
     needsTrust:"Needs trust — click to resolve",ready:"Adopted",rename:"Rename…",recheck:"Re-check",renameTitle:"Rename device",cancel:"Cancel",save:"Save",
-    statusActions:"Status and actions",facts:"Runtime facts",readyNotice:"Adopted and connected — device ready.",recheckNote:"Re-check only reloads the current candidate list; it sends nothing to the device.",
-    connectKey:"Connect key",reported:"Reported state",target:"Adopted target",revision:"Binding revision",model:"Observed model",firmware:"Observed firmware",transport:"Observed transport",confirmed:"Confirmed at",lastChecked:"Candidate list reloaded just now",
+    statusActions:"Status and actions",facts:"Runtime facts",recheckNote:"Waiting and re-checking refresh the latest timestamped HDC observation. They send nothing to the device and can be repeated freely.",
+    connectKey:"Connect key",reported:"Reported state",stateObservedAt:"State observed at",target:"Adopted target",revision:"Binding revision",model:"Device name / model",firmware:"System version",transport:"Transport",confirmed:"Confirmed at",lastChecked:"Candidate list reloaded just now",
+    observedProvenance:"Observed facts come from the most recent succeeded observe.device@1 job — historical evidence, not the device's live state.",
+    "deviceNotice.ready":"Authorized and adopted — this device is ready.","deviceNotice.authorizedUnadopted":"Authorized. The device is not adopted as a durable target yet.",
+    "deviceNotice.offline":"The device reports Offline. Check the USB connection, then re-check.","deviceNotice.needsRecheck":"Status needs re-check",
+    "deviceNotice.unknownState":"The tool reports an unrecognized state: Recovery. Shown as-is, not interpreted.",
+    adoptViaCLI:"Adoption (durable binding) is performed from the CLI: arkdeck device adopt. This App does not submit adoption.",
     flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"3 required safety checks passed",
     chooseImage:"Choose image…",changeImage:"Change image…",chooseImageTitle:"Choose an image to flash",chooseImageHelp:"Supports DAYU200 image bundles published by Runtime",
     startFlash:"Erase data and start flashing",flashImpact:"This erases user data on DAYU200. Keep the device connected to stable power.",flashDetails:"Show flash details",
@@ -1229,6 +1231,7 @@ document.addEventListener("keydown",e=>{
     const disclosure=document.querySelector('[data-sync-id="overview.environment"]');
     if(disclosure){e.preventDefault();disclosure.open=!disclosure.open;}return;
   }
+  if(!host.firstElementChild&&(e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==="j"){e.preventDefault();toggleDrawer();return;}
   if(e.key==="Escape"&&host.firstElementChild){e.preventDefault();closeModal();return;}
   if(dismissHistoryPopoverOnEscape(e))return;
   if(e.key!=="Tab"||!host.firstElementChild)return;
@@ -1248,14 +1251,11 @@ function addJob(j){j.id="J"+(S.jobSeq++);j.createdAtUTC=new Date().toISOString()
 function startJob(j){j.timer=setTimeout(()=>advanceJob(j),j.tick);return j;}
 function advanceJob(j){
   if(j.state!=="running")return;
-  if(j.cancelled&&j.phaseIdx<j.safeBoundary){j.log.push("— 已请求取消:等待安全边界 —");}
+  if(j.cancelled&&j.phaseIdx<j.safeBoundary){j.log.push(lc("— 已请求取消：等待安全边界 —","— Cancellation requested: waiting for a safe boundary —"));}
   if(j.cancelled&&j.phaseIdx>=j.safeBoundary){finishJob(j,"cancelled",lc('演示：已在安全边界取消；未提供补偿或参数读回证据。','Demo: cancelled at a safe boundary; no compensation or parameter readback evidence was supplied.'));return;}
   j.phaseIdx++;
   if(j.phaseIdx>=j.phases.length){finishJob(j,"succeeded",j.doneMsg||lc('演示流程结束；未提供 Artifact 校验事实。','Demo flow ended; no Artifact verification facts were supplied.'));return;}
-  const ph=j.phases[j.phaseIdx];
-  j.log.push("→ "+ph);
-  if(j.pauseAt===ph){j.awaiting=true;j.log.push("检测到断连后回连:等待用户 rebind 确认(不静默续刷)。");
-    renderDrawer();renderPageIf(j.pages||[]);return;}
+  j.log.push("→ "+j.phases[j.phaseIdx]);
   renderDrawer();renderPageIf(j.pages||[]);
   j.timer=setTimeout(()=>advanceJob(j),j.tick);
 }
@@ -1265,13 +1265,6 @@ function finishJob(j,state,msg){
   if(j.onDone)j.onDone(state);
   renderDrawer();renderPage();
 }
-function cancelJob(id){const j=S.jobs.find(x=>x.id===id);if(!j||j.state!=="running"||j.awaiting)return;
-  j.cancelled=true;j.log.push("用户请求取消(策略:atSafeBoundary)");renderDrawer();}
-function rebindOk(id){const j=S.jobs.find(x=>x.id===id);if(!j||!j.awaiting)return;j.awaiting=false;
-  j.log.push("用户确认 rebind:同一 serial · binding revision 3→4;继续执行。");
-  j.timer=setTimeout(()=>advanceJob(j),j.tick);renderDrawer();}
-function rebindAbort(id){const j=S.jobs.find(x=>x.id===id);if(!j||!j.awaiting)return;j.awaiting=false;
-  finishJob(j,"cancelled","用户中止 rebind:剩余步骤不执行;该结论写入审计。");}
 function histFromJob(j){
   if(j.isFlash){
     const record=flashHistoryRecord(j),index=HIST.findIndex(h=>h.id===j.id);
@@ -1296,7 +1289,7 @@ function renderDrawer(){
   $("drawerSt").textContent=running.length?lc(`${running.length} 个运行中`,`${running.length} running`):tx("emptyJobs");
   $("drawerIbar").style.display=running.length?"block":"none";
   const selected=rows.find(j=>j.id===S.inspectorSelection)||rows[0];
-  $("drawerBody").innerHTML=selected?`<div class="inspector-split"><div class="inspector-list" role="listbox" aria-label="${lc('任务','Jobs')}">${rows.map(j=>`<button class="debug-entry ${j.id===selected.id?'on':''}" role="option" aria-selected="${j.id===selected.id}" onclick="S.inspectorSelection='${j.id}';S.inspectorLog=null;S.inspectorCancellation=null;renderDrawer()"><span class="nm">${esc(j.title)}<small class="mono">${esc(j.id)}</small></span><span class="chip ${j.outcomeUnknown?'warn':'dim'}">${esc(j.state)}</span></button>`).join('')}</div><div class="inspector-detail" data-sync-id="jobInspector.detail"><div class="device-actions"><b>${esc(selected.state)}</b>${modeBadge(selected.mode)}<span class="spacer"></span><span class="hint">${lc('Runtime 事实','Runtime facts')}</span></div><div class="device-actions"><button class="btn" onclick="openInspectorRecord('${selected.id}')">${lc('打开这条记录','Open This Record')}</button>${inspectorCanCancel(selected)?`<button class="btn" data-sync-id="jobInspector.cancel" onclick="requestInspectorCancellation('${selected.id}')">${lc('请求取消','Request Cancellation')}</button>`:''}<button class="btn" onclick="S.inspectorLog=null;renderDrawer()">${lc('刷新','Refresh')}</button></div>${S.inspectorCancellation===selected.id?`<p class="hint" role="status">${lc('演示：取消未确认。任务状态不变，请刷新记录；不会重发未知操作。','Demo: cancellation is not confirmed. The Job state is unchanged; refresh the record. Unknown operations are never replayed.')}</p>`:''}<dl class="kv"><dt>Job</dt><dd class="mono">${esc(selected.id)}</dd><dt>${lc('操作','Operation')}</dt><dd class="mono">${esc(selected.operation||'—')}</dd><dt>${lc('目标','Target')}</dt><dd class="mono">${esc(selected.dev||'—')}</dd></dl>${selected.outcomeUnknown?`<div class="warnbox">${lc('原操作的结果未知。只查看 Runtime 恢复证据；没有重试、归档或确认绕过。','The original outcome is unknown. Inspect Runtime recovery evidence; no retry, archive or confirmation override is offered.')}</div>`:''}<details open><summary>${lc('阶段与时间线','Stages and timeline')}</summary><pre class="logtail">${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre></details>${selected.standardLog?`<button class="btn" onclick="S.inspectorLog='${selected.id}';renderDrawer()">${lc('读取日志','Read Log')} · ${esc(selected.standardLog)}</button>`:''}${S.inspectorLog===selected.id?`<pre class="logtail" data-sync-id="jobInspector.log.text">UI fixture only\n${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre>`:''}<p class="hint">${lc('仅在选择后读取标准日志，最多 2 MiB、展示末 200 行。敏感产物在 History 显式处理。','Standard logs are read only on request: at most 2 MiB, showing the last 200 lines. Handle sensitive Artifacts explicitly in History.')}</p></div></div>`:`<div class="empty">${lc("尚无任务。","No jobs yet.")}</div>`;
+  $("drawerBody").innerHTML=selected?`<div class="inspector-split"><div class="inspector-list" role="listbox" aria-label="${lc('任务','Jobs')}">${rows.map(j=>`<button class="debug-entry ${j.id===selected.id?'on':''}" role="option" aria-selected="${j.id===selected.id}" onclick="S.inspectorSelection='${j.id}';S.inspectorLog=null;S.inspectorCancellation=null;renderDrawer()"><span class="nm">${esc(j.title)}<small class="mono">${esc(j.id)}</small></span><span class="chip ${j.outcomeUnknown?'warn':'dim'}">${esc(j.state)}</span></button>`).join('')}</div><div class="inspector-detail" data-sync-id="jobInspector.detail"><div class="device-actions"><b>${esc(selected.state)}</b>${modeBadge(selected.mode)}<span class="spacer"></span><span class="hint">${lc('Runtime 事实','Runtime facts')}</span></div><div class="device-actions"><button class="btn" onclick="openInspectorRecord('${selected.id}')">${lc('打开此记录','Open this record')}</button>${inspectorCanCancel(selected)?`<button class="btn" data-sync-id="jobInspector.cancel" onclick="requestInspectorCancellation('${selected.id}')">${lc('请求取消','Request cancellation')}</button>`:''}<button class="btn" onclick="S.inspectorLog=null;renderDrawer()">${lc('刷新 Job','Refresh jobs')}</button><button class="btn" onclick="go('history')">${lc('打开历史记录','Open History')}</button></div>${S.inspectorCancellation===selected.id?`<p class="hint" role="status">${lc('演示：取消未确认。任务状态不变，请刷新记录；不会重发未知操作。','Demo: cancellation is not confirmed. The Job state is unchanged; refresh the record. Unknown operations are never replayed.')}</p>`:''}<dl class="kv"><dt>Job</dt><dd class="mono">${esc(selected.id)}</dd><dt>${lc('操作','Operation')}</dt><dd class="mono">${esc(selected.operation||'—')}</dd><dt>${lc('目标','Target')}</dt><dd class="mono">${esc(selected.dev||'—')}</dd></dl>${selected.outcomeUnknown?`<div class="warnbox">${lc('原操作的结果未知。只查看 Runtime 恢复证据；没有重试、归档或确认绕过。','The original outcome is unknown. Inspect Runtime recovery evidence; no retry, archive or confirmation override is offered.')}</div>`:''}<details open><summary>${lc('阶段与时间线','Stages and timeline')}</summary><pre class="logtail">${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre></details>${selected.standardLog?`<button class="btn" onclick="S.inspectorLog='${selected.id}';renderDrawer()">${lc('在本机读取日志','Read log locally')} · ${esc(selected.standardLog)}</button>`:''}${S.inspectorLog===selected.id?`<pre class="logtail" data-sync-id="jobInspector.log.text">UI fixture only\n${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre>`:''}<p class="hint">${lc('仅在选择后读取标准日志，最多 2 MiB、展示末 200 行。敏感产物在 History 显式处理。','Standard logs are read only on request: at most 2 MiB, showing the last 200 lines. Handle sensitive Artifacts explicitly in History.')}</p></div></div>`:`<div class="empty">${lc("尚无任务。","No jobs yet.")}</div>`;
 }
 function inspectorJobs(){
   if(S.jobs.length)return S.jobs.slice().reverse();
@@ -1319,26 +1312,6 @@ function openInspectorRecord(id){
 }
 
 function renderPageIf(navs){if(navs.includes(S.nav))renderPage();}
-
-/* ---------- sidebar: add target ---------- */
-function addTargetModal(){
-  modal(`<div class="modal" role="dialog" aria-modal="true">
-    <h3>添加 TCP / UART 目标 <span class="acin">REQ-DEV-004/005</span></h3>
-    <p class="hint">ArkDeck 不扫描网络,目标只能由你显式添加;断线后需按规格 §5.1 重新确认身份,不做静默重绑。</p>
-    <div style="display:flex;gap:8px;align-items:center">
-      <select class="inp" id="tgtType"><option>TCP</option><option>UART</option></select>
-      <input class="inp mono" id="tgtAddr" placeholder="192.168.1.30:8710 或 /dev/tty.usbserial-1420" style="flex:1">
-    </div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="addTarget()">添加目标</button></div>
-  </div>`);
-}
-function addTarget(){
-  const v=$("tgtAddr").value.trim()||"192.168.1.30:8710";
-  const tp=$("tgtType").value;
-  DEVICES.push({id:"t"+(S.jobSeq++)+""+DEVICES.length,name:v,tp,state:"off",build:"未连接 — 等待首次确认",key:"—"});
-  closeModal();renderDevs();
-}
 
 /* ---------- recovery banner ---------- */
 function recoveryHTML(){
@@ -1444,36 +1417,32 @@ function startAuthPoll(){
   renderPage();
 }
 function simTimeout(){clearInterval(S.auth.t);S.auth.phase="timedOut";renderPage();}
-function restartSrvModal(){
-  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
-    <h3>⚠ 重启共享 HDC server?</h3>
-    <div class="impact"><b>影响范围</b><ul>
-      <li>该 server 由 DevEco Studio 启动(ownership: external),重启将断开其与<b>所有已连接设备</b>的会话</li>
-      <li>其他工具正在进行的传输/调试会失败</li>
-      <li>ArkDeck 从不静默执行此操作</li></ul></div>
-    <div class="checks"><label><input type="checkbox" onchange="ckGate('goSrv',1)"> 我了解会影响 DevEco 与其他设备会话</label></div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn danger" id="goSrv" disabled onclick="closeModal();S.auth.phase='idle';renderPage()">重启共享 HDC server</button></div>
-  </div>`);
+function deviceDetailNotice(){
+  const state=S.deviceDetail;
+  const box=state==="ready"?"okbox":"warnbox";
+  const symbol=state==="ready"?"overview":"warning";
+  return `<div class="${box}" data-sync-id="device.trust.${state}">${icon(symbol,true)}<span>${tx("deviceNotice."+state)}</span></div>`;
 }
 function pDevice(){
   const d=DEVICES.find(x=>x.id===S.device)||DEVICES[0],name=S.deviceNames[d.id]||d.name;
   return `<div class="device-layout" data-page-title="${esc(name)}" data-acin><span class="ac">REQ-HDC-007</span>
     <section class="device-section">
       <h2>${tx("statusActions")}</h2>
-      <div class="okbox">${icon("overview",true)}<span>${tx("readyNotice")}</span></div>
+      ${deviceDetailNotice()}
       <div class="device-actions">
         <button class="btn" onclick="renameDeviceModal('${d.id}')">${tx("rename")}</button>
         <button class="btn" onclick="recheckDevice('${d.id}')">${tx("recheck")}</button>
       </div>
       ${S.lastChecked===d.id?`<div class="hint" role="status">✓ ${tx("lastChecked")}</div>`:""}
       <p class="hint">${tx("recheckNote")}</p>
+      ${S.deviceDetail==="authorizedUnadopted"?`<p class="hint" data-sync-id="device.detail.adoptViaCLI">${tx("adoptViaCLI")}</p>`:""}
     </section>
     <section class="device-section">
       <h2>${tx("facts")}</h2>
       <dl class="kv">
         <dt>${tx("connectKey")}</dt><dd>150100469346864</dd>
         <dt>${tx("reported")}</dt><dd>Connected</dd>
+        <dt>${tx("stateObservedAt")}</dt><dd>2026-08-12T07:04:11Z</dd>
         <dt>${tx("target")}</dt><dd>${esc(d.key)}</dd>
         <dt>${tx("revision")}</dt><dd>3</dd>
         <dt>${tx("model")}</dt><dd>ohos</dd>
@@ -1481,7 +1450,7 @@ function pDevice(){
         <dt>${tx("transport")}</dt><dd>usb</dd>
         <dt>${tx("confirmed")}</dt><dd>2026-08-12T07:04:17Z</dd>
       </dl>
-      <p class="hint">${S.language==="en"?"Observation facts come from the latest successful Runtime read; they are not invented live state.":"观测事实来自 Runtime 最近一次成功读取，不是 App 补齐的实时状态。"}</p>
+      <p class="hint">${tx("observedProvenance")}</p>
     </section>
   </div>`;
 }
@@ -1622,8 +1591,44 @@ const VIEWER_COPY={
   "viewer.pane.tree": {
     "en": "UI tree",
     "zh-Hans": "UI 树"
+  },
+  "viewer.pane.inspector": {
+    "en": "Current node properties",
+    "zh-Hans": "当前节点属性"
+  },
+  "viewer.pane.inspectorTabs": {
+    "en": "Component dump information",
+    "zh-Hans": "组件 dump 信息"
+  },
+  "viewer.tree.label": {
+    "en": "Complete UI tree",
+    "zh-Hans": "完整 UI 树"
+  },
+  "viewer.tree.select": {
+    "en": "Select component",
+    "zh-Hans": "选择组件"
+  },
+  "viewer.search.previous": {
+    "en": "Previous search result",
+    "zh-Hans": "上一个搜索结果"
+  },
+  "viewer.search.next": {
+    "en": "Next search result",
+    "zh-Hans": "下一个搜索结果"
+  },
+  "viewer.separator.label": {
+    "en": "Resize UI tree and node properties",
+    "zh-Hans": "调整 UI 树和节点属性的高度"
+  },
+  "viewer.footer.nodes": {
+    "en": "nodes",
+    "zh-Hans": "个节点"
   }
 };
+/** Mirrors the App's `viewer.separator.value` string, which reports the split as a percentage. */
+function viewerSeparatorValue(size){
+  return S.language==="en"?`UI tree uses ${size} percent of the inspector`:`UI 树占检查器高度 ${size}%`;
+}
 function viewerCopy(key){return VIEWER_COPY[key][S.language];}
 const VIEWER_TABS=[['attributes','Properties'],['layout','Layout'],['accessibility','Accessibility'],['raw','Raw dump'],['advanced','Advanced Dump']];
 function setViewerTab(tab){if(!VIEWER_TABS.some(([id])=>id===tab))return;S.viewer.tab=tab;renderPage();requestAnimationFrame(()=>document.querySelector(`[data-viewer-tab="${tab}"]`)?.focus());}
@@ -1652,7 +1657,7 @@ function setViewerTreeSize(value,host=document.querySelector(".viewer-devtools")
   host?.style.setProperty("--viewer-tree-size",S.viewer.treeSize+"%");
   const splitter=host?.querySelector(".viewer-splitter");
   splitter?.setAttribute("aria-valuenow",String(S.viewer.treeSize));
-  splitter?.setAttribute("aria-valuetext",`UI 树占右侧工作区 ${S.viewer.treeSize}%`);
+  splitter?.setAttribute("aria-valuetext",viewerSeparatorValue(S.viewer.treeSize));
 }
 function resizeViewerStart(event){
   event.preventDefault();
@@ -1748,7 +1753,7 @@ function viewerHitsHTML(){
     const outline=S.viewer.showBounds&&!(r.w>98&&r.h>98);
     const cls=["viewer-hit",outline?"show":"",sel?"on":"",r.y<3?"label-inside":"",r.x+r.w/2>55?"label-end":""].filter(Boolean).join(" ");
     return `<button type="button" class="${cls}" style="${viewerRectStyle(n)}" data-viewer-hit="${n.id}"
-      data-label="#${n.id} ${esc(n.type)}" aria-pressed="${sel}" aria-label="选择组件 ${esc(n.type)} #${n.id}"
+      data-label="#${n.id} ${esc(n.type)}" aria-pressed="${sel}" aria-label="${viewerCopy("viewer.tree.select")} ${esc(n.type)} #${n.id}"
       onclick="selectViewerNode(${n.id})"></button>`;
   }).join("");
 }
@@ -1801,7 +1806,7 @@ function viewerInspectorHTML(node){
       <svg class="viewer-node-icon" aria-hidden="true"><use href="#i-${viewerNodeIcon(node.type)}"></use></svg>
       <strong>${esc(node.type)}</strong><span class="chip dim">#${node.id}</span>${node.interactive?'<span class="chip dim">Interactive</span>':""}<span class="chip dim">Visible</span></div>
     <div class="viewer-breadcrumb" title="${esc(viewerPath(node))}">${esc(viewerPath(node))}</div></div>
-    <div class="tabs" role="tablist" aria-label="组件 dump 信息">${tabs.map(([id,label])=>`<button id="viewerTab-${id}" role="tab" aria-selected="${S.viewer.tab===id}" aria-controls="viewerTabPanel" tabindex="${S.viewer.tab===id?0:-1}" class="${S.viewer.tab===id?"on":""}" data-viewer-tab="${id}" onclick="setViewerTab('${id}')" onkeydown="viewerTabKey(event,'${id}')">${label}</button>`).join("")}</div>
+    <div class="tabs" role="tablist" aria-label="${viewerCopy("viewer.pane.inspectorTabs")}">${tabs.map(([id,label])=>`<button id="viewerTab-${id}" role="tab" aria-selected="${S.viewer.tab===id}" aria-controls="viewerTabPanel" tabindex="${S.viewer.tab===id?0:-1}" class="${S.viewer.tab===id?"on":""}" data-viewer-tab="${id}" onclick="setViewerTab('${id}')" onkeydown="viewerTabKey(event,'${id}')">${label}</button>`).join("")}</div>
     <div class="viewer-inspector-body" id="viewerTabPanel" role="tabpanel" aria-labelledby="viewerTab-${S.viewer.tab}" tabindex="0">${body}</div>`;
 }
 function pViewer(){
@@ -1814,7 +1819,7 @@ function pViewer(){
       <span class="spacer"></span>
       <input class="inp" type="search" aria-label="${viewerCopy("viewer.toolbar.search")}" data-sync-id="viewer.search" placeholder="${viewerCopy("viewer.toolbar.search")}" value="${esc(S.viewer.query)}" oninput="setViewerQuery(this)">
       ${S.viewer.query?`<span class="viewer-search-nav" data-sync-id="viewer.search.matchCount">${visible.length} / ${VIEWER_NODES.length}
-        <button class="btn" type="button" aria-label="上一个搜索结果">↑</button><button class="btn" type="button" aria-label="下一个搜索结果">↓</button></span>`:""}
+        <button class="btn" type="button" aria-label="${viewerCopy("viewer.search.previous")}">↑</button><button class="btn" type="button" aria-label="${viewerCopy("viewer.search.next")}">↓</button></span>`:""}
       <button class="btn pri" data-sync-id="viewer.recapture" onclick="recaptureViewer()">${viewerCopy(S.viewer.hasCapture?"viewer.toolbar.recapture":"viewer.toolbar.capture")}</button>
     </div></div>
     ${!S.viewer.hasCapture?`<div class="viewer-empty"><div>
@@ -1831,13 +1836,13 @@ function pViewer(){
         <section class="viewer-tree-pane" aria-labelledby="viewerTreeTitle">
           <div class="viewer-pane-head"><h2 id="viewerTreeTitle">${viewerCopy("viewer.pane.tree")}</h2>
             <span class="trailing mono" id="viewerNodeCount">${visible.length} / ${VIEWER_NODES.length}</span></div>
-          <div class="viewer-tree" id="viewerTree" role="tree" aria-label="完整 UI 树">${viewerTreeHTML()}</div>
+          <div class="viewer-tree" id="viewerTree" role="tree" aria-label="${viewerCopy("viewer.tree.label")}">${viewerTreeHTML()}</div>
         </section>
-        <div class="viewer-splitter" role="separator" tabindex="0" aria-label="调整 UI 树和节点属性的高度" aria-orientation="horizontal" aria-valuemin="35" aria-valuemax="68" aria-valuenow="${S.viewer.treeSize}" aria-valuetext="UI 树占右侧工作区 ${S.viewer.treeSize}%" onpointerdown="resizeViewerStart(event)" onkeydown="resizeViewerKey(event)"></div>
-        <section class="viewer-inspector" aria-label="当前节点属性">${viewerInspectorHTML(node)}</section>
+        <div class="viewer-splitter" role="separator" tabindex="0" aria-label="${viewerCopy("viewer.separator.label")}" aria-orientation="horizontal" aria-valuemin="35" aria-valuemax="68" aria-valuenow="${S.viewer.treeSize}" aria-valuetext="${esc(viewerSeparatorValue(S.viewer.treeSize))}" onpointerdown="resizeViewerStart(event)" onkeydown="resizeViewerKey(event)"></div>
+        <section class="viewer-inspector" aria-label="${viewerCopy("viewer.pane.inspector")}">${viewerInspectorHTML(node)}</section>
       </div>
     </div>
-    <div class="viewer-footer" data-sync-id="viewer.footer" role="status" aria-live="polite">${VIEWER_NODES.length} 个节点 · submit 112ms · run 1.84s · list 38ms · read 428KB/91ms (4.6 MB/s) · parse 24ms · Σ 2.11s</div>`}`;
+    <div class="viewer-footer" data-sync-id="viewer.footer" role="status" aria-live="polite">${VIEWER_NODES.length} ${viewerCopy("viewer.footer.nodes")} · submit 112ms · run 1.84s · list 38ms · read 428KB/91ms (4.6 MB/s) · parse 24ms · Σ 2.11s</div>`}`;
 }
 
 /* ---------- Trace ---------- */
@@ -2103,12 +2108,12 @@ function diagLogsHTML(){
   const radius=S.diagnostics.logWindow/1000,rows=DIAG_LOGS.filter(l=>Math.abs(l.time-S.diagnostics.cursor)<=radius+.0001);
   return `<div class="diag-context-block" style="flex:1"><div class="diag-log-controls"><h2>邻近日志</h2><span class="label">窗口</span>
     <span class="seg mini">${[20,100,500].map(ms=>`<button data-log-window="${ms}" class="${S.diagnostics.logWindow===ms?"on":""}" onclick="setDiagLogWindow(${ms})">±${ms} ms</button>`).join("")}</span></div>
-    <div class="diag-log-list" aria-label="当前时间附近的 HiLog">${rows.length?rows.map(l=>`<button class="diag-log-row ${l.id===S.diagnostics.selectedLog?"on":""}" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="${esc(l.level+" "+l.tag+" "+l.message)}">
+    <div class="diag-log-list" aria-label="${lc('当前时间附近的 HiLog','HiLog near the current time')}">${rows.length?rows.map(l=>`<button class="diag-log-row ${l.id===S.diagnostics.selectedLog?"on":""}" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="${esc(l.level+" "+l.tag+" "+l.message)}">
       <span class="delta">${diagDelta(l.time-S.diagnostics.cursor)}</span><span class="level ${l.level==="E"?"error":l.level==="W"?"warn":""}">${l.level}</span><span class="tagname">${esc(l.tag)}</span><span>${esc(l.message)}</span></button>`).join("")
       :'<p class="empty">当前时间窗内没有日志。可扩大窗口或选择其他时间。</p>'}</div></div>`;
 }
 function diagContextPaneHTML(){
-  return `<section class="diag-context-pane" aria-label="当前时间上下文"><div class="diag-pane-head"><h2>当前时间上下文</h2><span class="trailing diag-time">${diagTime(S.diagnostics.cursor)}</span></div>
+  return `<section class="diag-context-pane" aria-label="${lc('当前时间上下文','Current time context')}"><div class="diag-pane-head"><h2>当前时间上下文</h2><span class="trailing diag-time">${diagTime(S.diagnostics.cursor)}</span></div>
     <div class="diag-context-scroll">${diagEventHTML()}${diagLogsHTML()}</div></section>`;
 }
 function diagTimelineHTML(){
@@ -2120,7 +2125,7 @@ function diagTimelineHTML(){
   let screen="",screenExtra="";
   if(s.video){
     screen=DIAG_FRAMES.map(f=>`<button class="diag-thumb ${frame?.index===f.index?"on":""}" style="left:${diagPercent(f.time)}%" onclick="setDiagCursor(${f.time})" aria-label="选择录屏 Frame ${f.index}，${diagTime(f.time)}"></button>`).join("");
-    if(s.gap)screenExtra=`<span class="diag-gap" style="left:${diagPercent(s.gap[0])}%;width:${diagPercent(s.gap[1])-diagPercent(s.gap[0])}%" title="录屏断流"></span>`;
+    if(s.gap)screenExtra=`<span class="diag-gap" style="left:${diagPercent(s.gap[0])}%;width:${diagPercent(s.gap[1])-diagPercent(s.gap[0])}%" title="${lc('录屏断流','Screen recording gap')}"></span>`;
   }else{
     screen=s.markers.map((m,i)=>m.shot?`<button class="diag-shot ${shotHit&&shotHit.marker===m?"on":""}" style="left:${diagPercent(m.shot.time)}%" onclick="setDiagCursor(${m.shot.time})" aria-label="选择 Marker ${i+1} 截图，拍摄于 ${diagTime(m.shot.time)}（Marker 后 +${m.shot.afterMs} ms）"></button>`
       :m.shotFailed?`<span class="diag-shot failed" style="left:${diagPercent(m.time)}%" title="截图失败：${esc(m.shotFailed)}" aria-hidden="true"></span>`:"").join("");
@@ -2128,7 +2133,7 @@ function diagTimelineHTML(){
   }
   const events=DIAG_EVENTS.map((e,i)=>`<button class="diag-event ${i%2?"alt":""} ${S.diagnostics.selectedEvent===e.id?"on":""}" style="left:${diagPercent(e.start)}%;width:${Math.max(2,e.duration/(DIAG_END-DIAG_START)*100)}%" onclick="setDiagCursor(${e.start},'${e.id}')" aria-label="选择 Trace event ${esc(e.name)}，${diagTime(e.start)}">${esc(e.name)}</button>`).join("");
   const logs=s.logsAligned?DIAG_LOGS.map(l=>`<button class="diag-log-dot ${l.level==="E"?"error":""} ${S.diagnostics.selectedLog===l.id?"on":""}" style="left:${diagPercent(l.time)}%" onclick="setDiagCursor(${l.time},null,'${l.id}')" aria-label="选择 ${l.level} 日志，${diagTime(l.time)}，${esc(l.message)}"></button>`).join("")
-    :`<button class="diag-track-flat" onclick="showDiagRawLogs()" aria-label="HiLog 无法对齐，按原始顺序查看">无法对齐 · 不参与联动 · 按原始顺序查看</button>`;
+    :`<button class="diag-track-flat" onclick="showDiagRawLogs()" aria-label="${lc('HiLog 无法对齐，按原始顺序查看','HiLog cannot be aligned; shown in recorded order')}">无法对齐 · 不参与联动 · 按原始顺序查看</button>`;
   const markers=s.markers.map((m,i)=>`<button class="diag-marker ${m.kind==="auto"?"auto":""}" style="left:${diagPercent(m.time)}%" onclick="setDiagCursor(${m.time})" aria-label="选择 Marker ${i+1}（${m.kind==="auto"?"自动":"手动"}），${esc(m.label)}，${diagTime(m.time)}" title="${m.kind==="auto"?"自动":"手动"} · ${esc(m.label)}"></button>`).join("");
   const body=(content,extra="")=>`<div class="diag-track-body">${range}${cursorLine}${content}${extra}</div>`;
   return `<section class="diag-timeline" aria-labelledby="diagTimelineTitle"><div class="diag-timeline-head"><h2 id="diagTimelineTitle">Trace 时间轴</h2>
@@ -2146,7 +2151,7 @@ function pDiagnosticSession(){
   const s=activeDiagSession();
   return `<div class="diag-shell" data-page-title="Diagnostics · Session" data-acin><span class="ac">DIAGNOSTIC-LINKED-TIME</span>
     <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='capture';renderPage()">新建诊断</button>
-      <select class="inp" aria-label="选择 Diagnostic Session" onchange="chooseDiagSession(this.selectedIndex)">${DIAG_SESSIONS.map((x,i)=>`<option ${i===S.diagnostics.session?"selected":""}>${esc(x.label)}</option>`).join("")}</select>
+      <select class="inp" aria-label="${lc('选择 Diagnostic Session','Choose a diagnostic session')}" onchange="chooseDiagSession(this.selectedIndex)">${DIAG_SESSIONS.map((x,i)=>`<option ${i===S.diagnostics.session?"selected":""}>${esc(x.label)}</option>`).join("")}</select>
       <span class="diag-target"><span class="dot ok"></span><b>DAYU200</b><span class="mono">TGT-9587… · binding r3</span></span><span class="spacer"></span>
       <button class="diag-align" ${s.alignTone==="danger"?'style="border-color:var(--danger);color:var(--danger)"':""} onclick="showDiagAlignment()">${icon("warning",true)} ${esc(s.alignChip)}</button>
       <button class="btn" onclick="doneBtn(this,'已准备导出预览')">导出…</button></div>
@@ -2158,7 +2163,7 @@ function pDiagnosticSession(){
 }
 function pDiagnosticCapture(){
   const t=S.diagnostics,p=DIAG_PRESETS[t.preset];
-  return `<div class="diag-capture" data-page-title="Diagnostics · 新建诊断">
+  return `<div class="diag-capture" data-page-title="${lc('Diagnostics · 新建诊断','Diagnostics · New capture')}">
     <div class="diag-toolbar"><button class="btn" onclick="S.diagnostics.view='session';renderPage()">返回 Session</button><span class="hint">DAYU200 · TGT-9587… · binding r3</span></div>
     <section><h2>选择诊断方式</h2><p class="hint">开始后，等所有必需通道就绪，再到设备上复现问题。</p></section>
     <div class="diag-preset-grid">
@@ -2172,7 +2177,7 @@ function pDiagnosticCapture(){
       <label class="diag-channel"><b><input type="checkbox" ${t.includeVideo?"checked":""} onchange="S.diagnostics.includeVideo=this.checked;renderPage()"> 屏幕录制</b><span>${t.includeVideo?"已开启 · 可能影响性能":"optional · 默认关闭"}</span></label>
     </div>
     <details class="flash-details"><summary>高级设置</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
-      <div><span class="hint">Trace categories</span><div class="tagpick">${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleDiagTag('${x}')">${x}</button>`).join("")}${TRACE_TAGS_NO.map(x=>`<button disabled title="设备未报告支持该 tag">${x}</button>`).join("")}</div></div>
+      <div><span class="hint">Trace categories</span><div class="tagpick">${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleDiagTag('${x}')">${x}</button>`).join("")}${TRACE_TAGS_NO.map(x=>`<button disabled title="${lc('设备未报告支持该 tag','The device does not report support for this tag')}">${x}</button>`).join("")}</div></div>
       <p class="hint">HiLog filter：warning+ · Artifact byte budget：128 MB · redaction：standard。这里只组合 typed inputs，不暴露 raw argv 或设备路径。</p>
     </div></details></section>
     <div class="diag-boundary">${icon("warning",true)} <span>Diagnostics 默认只在 Marker 时按需截图，且截图是「标记后拍摄」——问题瞬间的现场由环形缓冲回溯补齐，不由截图假装。已发布的有界 ringBuffered 与部分自动 Marker 不等同于本稿的交互式布防、追加标记和停止。缺失的会话操作与跨时钟校准保持不可用，App 不执行 raw HDC 兜底。</span></div>
@@ -2182,7 +2187,7 @@ function pDiagnosticCapture(){
 function formatDiagElapsed(seconds){return String(Math.floor(seconds/60)).padStart(2,"0")+":"+String(seconds%60).padStart(2,"0");}
 function pDiagnosticRecording(){
   const t=S.diagnostics;
-  return `<div class="diag-shell" data-page-title="Diagnostics · 正在诊断"><div class="diag-recording">
+  return `<div class="diag-shell" data-page-title="${lc('Diagnostics · 正在诊断','Diagnostics · Recording')}"><div class="diag-recording">
     <div class="diag-recording-status"><span class="dot" style="background:var(--danger)"></span><div><h2>采集已开始，现在开始复现</h2><p>在问题出现时选择“标记并截图”。采集将在 ${t.dur} 秒后自动结束。</p></div></div>
     <div class="diag-recording-time" aria-label="已采集 ${formatDiagElapsed(t.elapsed)}">${formatDiagElapsed(t.elapsed)}</div>
     <div class="diag-channel-list"><div class="diag-channel"><b>● Trace</b><span>recording · 环形缓冲 · 同一时钟</span></div><div class="diag-channel"><b>● HiLog</b><span>recording · 缓冲区回溯</span></div><div class="diag-channel"><b>${t.autoMarker?"●":"○"} 自动 Marker</b><span>${t.autoMarker?"监测 frame deadline / crash":"关闭"}</span></div><div class="diag-channel"><b>${t.includeVideo?"●":"○"} 屏幕录制</b><span>${t.includeVideo?"recording · 可能影响性能":"off · 无持续取帧"}</span></div></div>
@@ -2193,7 +2198,7 @@ function pDiagnosticRecording(){
   </div></div>`;
 }
 function pDiagnosticFinalizing(){
-  return `<div class="diag-shell" data-page-title="Diagnostics · 正在生成结果"><div class="diag-recording">
+  return `<div class="diag-shell" data-page-title="${lc('Diagnostics · 正在生成结果','Diagnostics · Finalizing')}"><div class="diag-recording">
     <div class="diag-recording-status"><span class="ibar" style="display:block;min-width:120px;margin-top:8px"></span><div><h2>正在生成诊断结果</h2><p>正在接收、校验并建立时间索引。没有可靠总量，因此不显示百分比。</p></div></div>
     <div class="phases"><span class="ph done">停止采集</span><span class="ph run">回溯保存缓冲</span><span class="ph">校验 Artifact</span><span class="ph">时间映射</span><span class="ph">建立索引</span></div>
   </div></div>`;
@@ -2515,7 +2520,7 @@ function addDiagMarker(kind="manual"){
 }
 function stopDiagnostic(result="succeeded"){
   if(!S.diagnostics.running||S.diagnostics.finishing)return;clearInterval(S.diagnostics.timer);S.diagnostics.finishing=true;S.diagnostics.view="finalizing";
-  const j=S.diagnostics.job;if(j){j.phaseIdx=3;j.log.push("→ Finalizing · 回溯保存环形缓冲");}renderDrawer();renderPage();
+  const j=S.diagnostics.job;if(j){j.phaseIdx=3;j.log.push("→ Finalizing · "+lc("回溯保存环形缓冲","ring buffers written back"));}renderDrawer();renderPage();
   setTimeout(()=>{
     S.diagnostics.running=false;S.diagnostics.finishing=false;S.diagnostics.view="session";
     S.diagnostics.markers.forEach(m=>{if(m.shotState==="pending"){m.shotState="saved";m.shotAfterMs=512;}});
@@ -2535,7 +2540,9 @@ function stopDiagnostic(result="succeeded"){
       alignNote:"演示 Session：时间数据复用演示 trace。生产实现中，环形缓冲的回溯窗口与各来源映射均以 Runtime 事实为准。"};
     DIAG_SESSIONS.unshift(sess);S.diagnostics.session=0;
     S.diagnostics.cursor=captured[0]?.time||13.242;S.diagnostics.rangeStart=null;S.diagnostics.selectedEvent=null;S.diagnostics.selectedLog=nearestDiagLogID(S.diagnostics.cursor);
-    if(j){j.state=result;j.log.push(partial?"已在安全边界停止；现有 Artifact 以 Partial 打开。":"完成：环形缓冲已回溯保存，Artifact 已校验，时间索引已建立（演示）。");histFromJob(j);}
+    if(j){j.state=result;j.log.push(partial
+      ?lc("已在安全边界停止；现有 Artifact 以 Partial 打开。","Stopped at a safe boundary; the existing Artifacts open as Partial.")
+      :lc("完成：环形缓冲已回溯保存，Artifact 已校验，时间索引已建立（演示）。","Complete: ring buffers written back, Artifacts verified and a time index built (demo)."));histFromJob(j);}
     renderDrawer();renderPage();},900);
 }
 document.addEventListener("keydown",e=>{
@@ -3678,7 +3685,7 @@ function pDebug(){
   }
 
   return `
-  <div class="page-lead" data-page-title="${lc("Debug 工作台","Debug Workbench")}"><span class="acin">REQ-DEBUG-*</span></div>
+  <div class="page-lead" data-page-title="Debug"><span class="acin">REQ-DEBUG-*</span></div>
   <p class="hint" data-sync-id="debug.scope" style="max-width:66ch">${lc("Typed 产物部署、日志、应用生命周期、网络规则和 approved 只读工具——绝非 raw terminal。","Typed Artifact deployment, logs, app lifecycle, network rules, and approved read-only tools — never a raw terminal.")}</p>
   <div class="debug-scope" data-sync-id="debug.target"><span>${lc("目标设备","Target device")}</span>
     <select class="inp mono" style="width:230px" aria-label="${lc("目标设备","Target device")}"><option>TGT-9587…</option><option>${lc("没有已接管目标设备","No adopted target")}</option></select>
@@ -3782,7 +3789,7 @@ function pFlash(){
     </div>`;
   }
   return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
-    <div class="flash-lead" data-page-title="${esc(tx("flashTitle"))}"><p>${tx("flashSubtitle")}</p></div>
+    <div class="flash-lead" data-page-title="Flash"><p>${tx("flashSubtitle")}</p></div>
     <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
       ${blocked?`<span class="chip warn">${lc("刷机已阻断","Flash blocked")}</span>`:image?`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`:`<span class="chip">${lc("设备已选择","Device selected")}</span><span class="hint">${lc("选择镜像后执行精确安全检查","Choose an image to run the exact safety checks")}</span>`}</div>
     ${main}
@@ -3840,21 +3847,22 @@ function runFlash(){
   if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashAvailabilityReason()||flashNeedsRecovery(focusedFlashActivity()))return;
   S.flashView="running";S.flashProgress={stage:"prepare",tick:0,bytesDone:0,totalBytes:S.flashImage.sizeBytes};
   const j={id:"J"+(S.jobSeq++),title:"Flash · flash.full-restore@1 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
-    phases:["准备镜像","进入 Loader","写入镜像","重启并验证"],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,
-    log:["→ 准备镜像","进度百分比只使用 Runtime 已确认写入字节数"],pages:["flash"],isFlash:true,createdAtUTC:new Date().toISOString()};
+    phases:[tx("preparing"),tx("enteringLoader"),tx("writing"),tx("verifying")],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,
+    log:["→ "+tx("preparing"),lc("进度百分比只使用 Runtime 已确认写入的字节数。","Percentages use only Runtime-confirmed written bytes.")],
+    pages:["flash"],isFlash:true,createdAtUTC:new Date().toISOString()};
   S.jobs.push(j);S.flashJob=j;renderDrawer();renderPage();
   j.timer=setTimeout(()=>advanceFlash(j),j.tick);
 }
 function advanceFlash(j){
   if(j.state!=="running")return;
   const p=S.flashProgress,previous=p.stage;p.tick++;
-  if(j.cancelled&&p.stage!=="write"){finishFlash(j,"cancelled","已在安全边界停止，未显示成功结果。");return;}
+  if(j.cancelled&&p.stage!=="write"){finishFlash(j,"cancelled",lc("已在安全边界停止，未显示成功结果。","Stopped at a safe boundary; no successful result is shown."));return;}
   if(p.tick<=2){p.stage="prepare";j.phaseIdx=0;}
   else if(p.tick<=4){p.stage="loader";j.phaseIdx=1;}
   else if(p.tick<=17){p.stage="write";j.phaseIdx=2;p.bytesDone=Math.min(p.totalBytes,p.totalBytes*(p.tick-4)/13);}
-  else if(j.cancelled){finishFlash(j,"cancelled","当前分区写入完成后，剩余步骤已停止。");return;}
+  else if(j.cancelled){finishFlash(j,"cancelled",lc("当前分区写入完成后，剩余步骤已停止。","The current partition write finished; the remaining steps stopped."));return;}
   else if(p.tick<=20){p.stage="verify";j.phaseIdx=3;p.bytesDone=p.totalBytes;}
-  else {finishFlash(j,"succeeded","完成：设备回报 build 与所选镜像一致。");return;}
+  else {finishFlash(j,"succeeded",lc("完成：设备回报 build 与所选镜像一致。","Complete: the device reported a build matching the selected image."));return;}
   if(previous!==p.stage)j.log.push("→ "+j.phases[j.phaseIdx]);
   renderDrawer();renderPageIf(["flash"]);j.timer=setTimeout(()=>advanceFlash(j),j.tick);
 }
@@ -4017,7 +4025,6 @@ function historyMatchesStatus(h,status){return status==='all'||(status==='attent
 function historyMatchesMode(h,mode){return mode==='all'||(mode==='unknown'?h.mode==null:mode==='planOnly'?['planOnly','planned'].includes(h.mode):h.mode===mode);}
 function historyMatchesTime(h,time,now){return time==='all'||historyDate(h)>=now-({lastHour:3600,lastDay:86400,lastWeek:604800}[time]||0)*1000;}
 function resetHistoryFilters(){S.hf={kind:'all',query:'',status:'all',mode:'all',target:'all',session:'all',time:'all'};S.historyLimit=6;}
-function historyPreset(status){resetHistoryFilters();S.hf.status=status;if(status==='failed')S.hf.time='lastWeek';renderPage();}
 function filteredHistory(now=Date.now()){
   const f=S.hf,q=(f.query||'').trim().toLowerCase();
   return HIST.filter(h=>(f.kind==='all'||h.kind===f.kind)&&
@@ -4442,17 +4449,24 @@ function renderPage(){
 function renderShellText(){
   document.documentElement.lang=S.language==="en"?"en":"zh-CN";
   $("prototypeDisclosure").textContent=lc("设计评审 · 演示数据 · 不连接 Runtime 或设备；概念页面不代表功能已实现", "Design review · Demo data · No Runtime or device connection; concept pages are not implemented features");
+  $("win").setAttribute("aria-label",lc("ArkDeck 设计原型窗口","ArkDeck design prototype window"));
+  $("windowToolbar").setAttribute("aria-label",lc("窗口工具栏","Window toolbar"));
+  $("sidebar").setAttribute("aria-label",lc("设备与工作流导航","Devices and workflows navigation"));
+  $("drawerBody").setAttribute("aria-label",tx("jobs"));
   $("settingsToggle").setAttribute("aria-label",lc("打开设置","Open Settings"));
+  $("settingsToggle").setAttribute("title",lc("设置（原型中内嵌展示）","Settings (shown inline in this prototype)"));
   $("sidebarToggle").setAttribute("aria-label",lc("显示或隐藏边栏","Toggle sidebar"));
-  $("jobsToggle").setAttribute("aria-label",lc("显示或隐藏任务检查器","Toggle job inspector"));
+  $("sidebarToggle").setAttribute("title",lc("显示或隐藏边栏","Toggle sidebar"));
+  for(const id of ["languageToggle","themeToggle"])$(id).setAttribute("title",lc("仅原型评审使用","Prototype review control only"));
+  $("jobsToggle").setAttribute("aria-label",lc("显示或隐藏 Job 检查器","Toggle job inspector"));
   if(S.appearance!=="system")document.documentElement.dataset.theme=S.appearance;
   document.body.classList.toggle("reference",PARAMS.has("reference"));
   $("devicesSectionLabel").textContent=tx("devices");$("workflowsSectionLabel").textContent=tx("workflows");
-  $("addTargetButton").querySelector("span").textContent=tx("addTarget");$("jobsLabel").textContent=tx("jobs");$("drawerLabel").textContent=tx("jobs");
+  $("jobsLabel").textContent=tx("jobs");$("drawerLabel").textContent=tx("jobs");
   $("drawerSt").textContent=tx("emptyJobs");$("languageToggle").textContent=S.language==="en"?"中文":"EN";
   $("acToggle").textContent=tx("ac");$("themeToggle").textContent=themeLabel();
 }
-function render(){renderShellText();renderDevs();renderNav();renderPage();renderDrawer();renderDeviceReview();if(S.nav==="device-control"){$("workflowsSectionLabel").textContent=deviceLocale("工作流","Workflows");$("drawerLabel").textContent=deviceLocale("Job 检查器","Job inspector");}}
+function render(){renderShellText();renderDevs();renderNav();renderPage();renderDrawer();renderDeviceReview();}
 render();
 </script>
 </body>

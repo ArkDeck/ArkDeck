@@ -228,8 +228,9 @@ test('History filters use exact identity, current attention facts and reported t
   for(const [time,expected] of [['lastHour',['a']],['lastDay',['a']],['lastWeek',['a','b']]]) {
     h.run(`resetHistoryFilters();S.hf.time=${JSON.stringify(time)}`);assert.deepEqual(ids(),expected);
   }
-  h.run("S.hf.query='stale';historyPreset('attention')");assert.equal(h.run('S.hf.query'),'');assert.deepEqual(ids(),['b','f','d']);
-  h.run("historyPreset('failed')");assert.equal(h.run('S.hf.time'),'lastWeek');
+  // The presets the toolbar actually invokes; there is no second preset entry point.
+  h.run("S.hf.query='stale';applyHistorySavedAction('attention')");assert.equal(h.run('S.hf.query'),'');assert.deepEqual(ids(),['b','f','d']);
+  h.run("applyHistorySavedAction('failed')");assert.equal(h.run('S.hf.time'),'lastWeek');
   const stateSource=readFileSync(join(root,'Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift'),'utf8');
   const states=[...stateSource.split('public enum JobState:')[1].split('public var isTerminal')[0].matchAll(/^  case (\w+)$/gm)].map(match=>match[1]);
   const terminal=stateSource.match(/case (\.planned[^:]+):\s+true/)[1].split(',').map(value=>value.trim().slice(1));
@@ -277,7 +278,6 @@ test('Recovery banners keep each unresolved Job identity and the native guidance
 
 test('Review appearance keeps its actual mode label across language and page rendering', () => {
   const h=harness('?page=history&lang=en&appearance=dark');
-  h.document.getElementById('addTargetButton').querySelector=()=>({textContent:''});
   for(const [mode,en,zh] of [['dark','Dark','深色外观'],['light','Light','浅色外观'],['system','System appearance','系统外观']]) {
     for(const [lang,label] of [['en',en],['zh-Hans',zh]]) {
       h.run(`S.appearance=${JSON.stringify(mode)};S.language=${JSON.stringify(lang)};renderShellText()`);
@@ -1091,4 +1091,102 @@ test('HAP optional packages form one bounded selection without creating a Job', 
   assert.equal(h.run('S.hap.additional.length'), 0);
   assert.equal(h.run('debugHAPReady()'), false);
   assert.equal(h.run('S.jobs.length'), 0);
+});
+
+test('device detail reaches every candidate state the App renders, in both languages', () => {
+  const notices = {
+    ready: ['已授权且已接管——设备就绪。', 'Authorized and adopted — this device is ready.'],
+    authorizedUnadopted: [
+      '已授权。该设备尚未被接管为持久目标。',
+      'Authorized. The device is not adopted as a durable target yet.',
+    ],
+    offline: [
+      '设备报告离线。请检查 USB 连接后重新检测。',
+      'The device reports Offline. Check the USB connection, then re-check.',
+    ],
+    needsRecheck: ['状态待重新确认', 'Status needs re-check'],
+    unknownState: [
+      '工具报告了未识别的状态：Recovery。按原文展示，不做解读。',
+      'The tool reports an unrecognized state: Recovery. Shown as-is, not interpreted.',
+    ],
+  };
+  // Every string above is copied from Localizable.xcstrings device.trust.* / device.state.*,
+  // so a rename on either side breaks this instead of drifting silently.
+  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const appValue = (key, language) =>
+    app[key].localizations[language].stringUnit.value;
+  for (const [state, [zh, en]] of Object.entries(notices)) {
+    for (const [language, expected] of [['zh-Hans', zh], ['en', en]]) {
+      const h = harness(`?page=device&deviceDetail=${state}&lang=${language}`);
+      const page = h.run('pDevice()');
+      assert.ok(page.includes(`data-sync-id="device.trust.${state}"`), `${state} notice is missing`);
+      assert.ok(page.includes(expected), `${state}/${language} must use the App's wording`);
+      // Adoption is a CLI action; say so only where the App does.
+      assert.equal(
+        page.includes('data-sync-id="device.detail.adoptViaCLI"'),
+        state === 'authorizedUnadopted');
+      assert.ok(page.includes(appValue('device.fact.stateObservedAt', language)));
+      assert.ok(page.includes(appValue('device.fact.firmware', language)));
+      assert.ok(page.includes(appValue('device.detail.recheckNote', language)));
+    }
+  }
+  const adopted = harness('?page=device&deviceDetail=authorizedUnadopted&lang=en');
+  assert.ok(adopted.run('pDevice()').includes(appValue('device.detail.adoptViaCLI', 'en')));
+});
+
+test('retired draft paths leave no residue and window titles equal the App page names', () => {
+  const source = html;
+  for (const removed of ['addTargetModal', 'restartSrvModal', 'rebindOk', 'rebindAbort', 'historyPreset']) {
+    assert.doesNotMatch(source, new RegExp(`function ${removed}\\b`), `${removed} is a retired path`);
+  }
+  // Spec §5.8: the published USB Flash path exposes no rebind confirm/abort control.
+  assert.doesNotMatch(source, /pauseAt/);
+  assert.doesNotMatch(source, /addTargetButton/);
+  const titles = [...source.matchAll(/data-page-title="([^"]*)"/g)].map(match => match[1]);
+  assert.ok(titles.includes('Debug'), 'Debug window title must equal the App navigation name');
+  assert.ok(titles.includes('Flash'), 'Flash window title must equal the App navigation name');
+  assert.ok(!titles.some(title => /工作台|Workbench|刷机/.test(title)));
+});
+
+test('shell chrome and demo job timelines are bilingual', () => {
+  const shellText = {
+    'zh-Hans': ['工作流', 'Job 检查器', '没有运行中的 Job'],
+    en: ['Workflows', 'Job inspector', 'No running jobs'],
+  };
+  for (const [language, expected] of Object.entries(shellText)) {
+    const h = harness(`?page=overview&lang=${language}`);
+    h.run(`S.language=${JSON.stringify(language)};renderShellText()`);
+    assert.equal(h.document.getElementById('workflowsSectionLabel').textContent, expected[0]);
+    assert.equal(h.document.getElementById('jobsLabel').textContent, expected[1]);
+    assert.equal(h.document.getElementById('drawerSt').textContent, expected[2]);
+  }
+  // The Flash and Diagnostics demo jobs write their own timeline entries, which
+  // the Job inspector and History both render. They used to be Chinese only.
+  const en = harness('?page=flash&lang=en');
+  en.run('chooseFlashImage(); runFlash()');
+  for (let tick = 0; tick < 24; tick += 1) en.flushTimers();
+  const log = en.run('JSON.stringify(S.jobs[0].log)') + en.run('JSON.stringify(S.jobs[0].phases)');
+  assert.doesNotMatch(log, /[一-鿿]/, 'the English Flash timeline must not fall back to Chinese');
+  const zh = harness('?page=flash&lang=zh-Hans');
+  zh.run('chooseFlashImage(); runFlash()');
+  assert.match(zh.run('JSON.stringify(S.jobs[0].phases)'), /[一-鿿]/);
+});
+
+test('Viewer accessibility names and the node footer follow the App locale', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  for (const language of ['zh-Hans', 'en']) {
+    const h = harness(`?page=dump&viewerState=captured&lang=${language}`);
+    // Match navigation only renders while a query is active, so set one.
+    h.run("S.viewer.query='Toggle'");
+    const page = h.run('pViewer()');
+    for (const key of ['viewer.tree.label', 'viewer.separator.label', 'viewer.search.previous', 'viewer.search.next']) {
+      assert.ok(
+        page.includes(app[key].localizations[language].stringUnit.value),
+        `${key} must use the App's ${language} wording`);
+    }
+    assert.match(page, language === 'en' ? /\d+ nodes ·/ : /\d+ 个节点 ·/);
+    // Node text is device content and stays untranslated; the chrome around it does not.
+    const chrome = page.replace(/aria-label="[^"]*"/g, '').replace(/<span class="vs-[^"]*"[^>]*>[^<]*</g, '<');
+    if (language === 'en') assert.doesNotMatch(chrome, /选择组件|完整 UI 树|个节点/);
+  }
 });
