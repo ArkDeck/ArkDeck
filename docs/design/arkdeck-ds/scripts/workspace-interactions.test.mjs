@@ -813,8 +813,14 @@ test('saved Diagnostics sessions expose actual gaps and require an explicit raw 
 
 test('Overview copies typed input and thread into a new draft without a Job or authority', () => {
   const h=harness('?lang=en');
+  h.run('S.historyContext={source:"analyzer.summarize-hilog@1",jobID:"job-demo-hilog-summary-complete"}');
+  h.document.getElementById('page').scrollTop=500;
+  h.document.scrollingElement.scrollTop=80;
   h.run('prepareContinuation("S-0826-04")');
   assert.equal(h.run('S.nav'),'diagnostics');
+  assert.equal(h.run('S.historyContext'),null,'the new draft must replace the previous History source context');
+  assert.equal(h.document.getElementById('page').scrollTop,0,'the workspace must reveal the prepared draft');
+  assert.equal(h.document.scrollingElement.scrollTop,0,'document scroll must not hide the prepared draft');
   assert.equal(h.run('S.jobs.length'),0);
   assert.equal(h.run('S.continuation.thread'),h.run('HIST.find(x=>x.id==="S-0826-04").thread'));
   h.run('S.continuation.inputs.durationSeconds=20');
