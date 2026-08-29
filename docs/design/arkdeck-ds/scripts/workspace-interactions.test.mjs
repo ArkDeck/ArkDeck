@@ -1365,3 +1365,156 @@ test('Settings panes expose the shared loading, error and success rows', () => {
       'an unavailable measurement must not show a usage number');
   }
 });
+
+test('the Job inspector separates an unreachable Runtime from an empty archive', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  for (const language of ['zh-Hans', 'en']) {
+    const loading = harness(`?page=overview&lang=${language}&inspectorState=loading`);
+    assert.match(loading.run('inspectorBodyHTML(inspectorJobs())'), /data-sync-id="jobInspector.loading"/);
+    assert.equal(
+      loading.run('inspectorCompactStatus(inspectorJobs(),[])'),
+      value('jobInspector.refreshing', language));
+
+    const unavailable = harness(`?page=overview&lang=${language}&inspectorState=unavailable`);
+    const unavailableBody = unavailable.run('inspectorBodyHTML(inspectorJobs())');
+    assert.ok(unavailableBody.includes(value('jobInspector.unavailable.title', language)));
+    assert.ok(unavailableBody.includes(value('jobInspector.unavailable.guidance', language)));
+    assert.equal(
+      unavailable.run('inspectorCompactStatus(inspectorJobs(),[])'),
+      value('jobInspector.compact.unavailable', language));
+
+    const empty = harness(`?page=overview&lang=${language}&inspectorState=empty`);
+    const emptyBody = empty.run('inspectorBodyHTML(inspectorJobs())');
+    assert.ok(emptyBody.includes(value('jobInspector.empty.title', language)));
+    assert.ok(emptyBody.includes(value('jobInspector.empty.description', language)));
+    assert.equal(
+      empty.run('inspectorCompactStatus(inspectorJobs(),[])'),
+      value('jobInspector.compact.empty', language));
+
+    // Residue and a critical write are facts about a running Job, not states.
+    const residue = harness(`?page=overview&lang=${language}&jobState=running&jobFacts=residue`);
+    assert.match(residue.run('inspectorBodyHTML(inspectorJobs())'), /data-sync-id="jobInspector.residue"/);
+    const critical = harness(`?page=overview&lang=${language}&jobState=running&jobFacts=criticalWrite`);
+    assert.ok(critical.run('inspectorBodyHTML(inspectorJobs())').includes(value('jobInspector.criticalWrite', language)));
+
+    // An established current epoch replaces the state label and the warning,
+    // while the originally recorded state stays visible.
+    for (const [fact, key] of [['supersededByRecovery', 'jobInspector.result.supersededByRecovery'],
+      ['targetAliasResolved', 'jobInspector.result.targetAliasResolved']]) {
+      const h = harness(`?page=overview&lang=${language}&jobState=waitingForRecovery&jobFacts=${fact}`);
+      const body = h.run('inspectorBodyHTML(inspectorJobs())');
+      assert.ok(body.includes(value(key, language)), `${fact} relation`);
+      assert.ok(body.includes(value('jobInspector.state.currentEpochEstablished', language)));
+      assert.ok(body.includes(value('jobInspector.fact.recordedState', language)));
+      assert.doesNotMatch(body, /data-sync-id="jobInspector.attention"/);
+      assert.doesNotMatch(body, /data-sync-id="jobInspector.cancel"/);
+    }
+
+    // An unknown outcome keeps its warning and is never cancellable.
+    const unknown = harness(`?page=overview&lang=${language}&jobState=unknown`);
+    const unknownBody = unknown.run('inspectorBodyHTML(inspectorJobs())');
+    assert.ok(unknownBody.includes(value('jobInspector.result.outcomeUnknown', language)));
+    assert.doesNotMatch(unknownBody, /data-sync-id="jobInspector.cancel"/);
+
+    const human = harness(`?page=overview&lang=${language}&jobState=waitingForDevice&jobFacts=waitingForHuman`);
+    assert.ok(human.run('inspectorBodyHTML(inspectorJobs())').includes(value('jobInspector.result.waitingForHuman', language)));
+
+    // The collapsed bar counts what is actually running.
+    const running = harness(`?page=overview&lang=${language}&jobState=running`);
+    assert.match(
+      running.run('inspectorCompactStatus(inspectorJobs(),inspectorJobs().filter(inspectorCanCancel))'),
+      language === 'en' ? /1 active/ : /1 个进行中/);
+  }
+});
+
+test('Viewer refuses to map a screenshot it cannot place, and says when nothing was measured', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  for (const language of ['zh-Hans', 'en']) {
+    // Empty has three different explanations; a failure is shown, not hidden.
+    const explain = harness(`?page=dump&lang=${language}`);
+    assert.ok(explain.run('pViewer()').includes(value('viewer.empty.explain', language)));
+    const select = harness(`?page=dump&lang=${language}&viewerEmpty=selectTarget`);
+    assert.ok(select.run('pViewer()').includes(value('viewer.empty.selectTarget', language)));
+    const blocked = harness(`?page=dump&lang=${language}&viewerEmpty=targetBlocked`);
+    assert.match(blocked.run('pViewer()'), /TGT-1a62a0dbedd6/);
+    const failed = harness(`?page=dump&lang=${language}&viewerState=failed`);
+    assert.match(failed.run('pViewer()'), /data-sync-id="viewer.captureFailure"/);
+
+    // Opening a historical capture is its own state, not an empty workspace.
+    const loading = harness(`?page=dump&lang=${language}&viewerState=loading`);
+    assert.match(loading.run('pViewer()'), /data-sync-id="viewer.history.loading"/);
+    assert.doesNotMatch(loading.run('pViewer()'), /data-sync-id="viewer.empty"/);
+
+    // Without a provable coordinate space there is no clickable map at all.
+    const geometry = harness(`?page=dump&lang=${language}&viewerState=geometryUnavailable`);
+    const geometryPage = geometry.run('pViewer()');
+    assert.ok(geometryPage.includes(value('viewer.pane.coordinatesUnverified', language)));
+    assert.ok(geometryPage.includes(value('viewer.screenshot.unverifiedDetail', language)));
+    assert.doesNotMatch(geometryPage, /viewer-hit/, 'unverified coordinates must not offer hit regions');
+    assert.match(geometryPage, /data-sync-id="viewer.footer"/, 'the tree and raw dump stay readable');
+
+    const missingImage = harness(`?page=dump&lang=${language}&viewerState=screenshotUnavailable`);
+    assert.ok(missingImage.run('pViewer()').includes(value('viewer.screenshot.unavailable', language)));
+
+    // Unmeasured metrics say so instead of showing numbers from another run.
+    const unmeasured = harness(`?page=dump&lang=${language}&viewerState=noMetrics`);
+    const footer = unmeasured.run('pViewer()').match(/data-sync-id="viewer\.footer"[^>]*>([^<]*)</)[1];
+    assert.ok(footer.includes(value('viewer.footer.notMeasured', language)));
+    assert.doesNotMatch(footer, /submit|Σ/);
+
+    // A search that matches nothing says so and keeps the selection.
+    const search = harness(`?page=dump&lang=${language}&viewerState=captured`);
+    const before = search.run('S.viewer.selected');
+    search.run("S.viewer.query='zzz-no-such-node'");
+    assert.ok(search.run('pViewer()').includes(value('viewer.tree.noMatches', language)));
+    assert.equal(search.run('S.viewer.selected'), before);
+  }
+});
+
+test('Overview environment keeps the App five groups and its capability matrix states', () => {
+  const app = JSON.parse(read('ArkDeckApp/Resources/Localizable.xcstrings')).strings;
+  const value = (key, language) => app[key].localizations[language].stringUnit.value;
+  for (const language of ['zh-Hans', 'en']) {
+    const h = harness(`?page=overview&lang=${language}`);
+    const page = h.run('pOverview()');
+    for (const key of ['overview.section.serverToolchain', 'overview.section.capabilities',
+      'overview.section.deviceChannel', 'overview.section.needsAttention', 'overview.section.advanced']) {
+      assert.match(page, new RegExp(`data-sync-id="${key}"`), `${key} group`);
+      assert.ok(page.includes(value(key, language)), `${key} wording`);
+    }
+    // Server & Toolchain keeps the named fields, not a single summary line.
+    for (const key of ['overview.field.serverHealth', 'overview.field.source', 'overview.field.path',
+      'overview.field.hash', 'overview.field.platformTrust', 'overview.field.clientVersion',
+      'overview.field.serverVersion', 'overview.field.daemonVersion', 'overview.field.endpoint']) {
+      assert.ok(page.includes(value(key, language)), `${key} field`);
+    }
+    // The matrix is three columns with a named state per capability.
+    for (const key of ['overview.capabilities.column.capability', 'overview.capabilities.column.state',
+      'overview.capabilities.column.evidence']) {
+      assert.ok(page.includes(value(key, language)), `${key} column`);
+    }
+    for (const state of ['available', 'limited', 'unknown']) {
+      assert.ok(page.includes(value(`overview.capabilities.state.${state}`, language)), `${state} state`);
+    }
+    // Probing and an unreadable probe are distinct from an empty matrix.
+    const loading = harness(`?page=overview&lang=${language}&overviewCapabilities=loading`);
+    assert.ok(loading.run('pOverview()').includes(value('overview.capabilities.loading', language)));
+    const failure = harness(`?page=overview&lang=${language}&overviewCapabilities=failure`);
+    assert.match(failure.run('pOverview()'), /data-sync-id="overview.capabilities.failure"/);
+    assert.doesNotMatch(failure.run('pOverview()'), /data-sync-id="overview.capabilities.hidumper.state"/);
+
+    // Needs Attention says nothing is outstanding rather than staying blank.
+    assert.ok(page.includes(value('overview.attention.clear', language)));
+    const items = harness(`?page=overview&lang=${language}&overviewAttention=items`);
+    const itemsPage = items.run('pOverview()');
+    assert.ok(itemsPage.includes(value('overview.attention.trust', language)));
+    assert.ok(itemsPage.includes(value('overview.attention.nextStep.refresh', language)));
+    assert.ok(itemsPage.includes(value('overview.attention.channel', language)));
+    assert.ok(!itemsPage.includes(value('overview.attention.clear', language)));
+    // Recovery stays a preview-first flow with no direct dispatch button.
+    assert.ok(page.includes(value('overview.recovery.previewImpact', language)));
+    assert.doesNotMatch(page, /data-sync-id="hdc.lifecycle.dispatch"/);
+  }
+});

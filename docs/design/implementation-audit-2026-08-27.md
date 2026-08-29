@@ -99,7 +99,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役。F48 将侧栏分组与 Job 检查器词表对回 App，并补 ⌘⇧J；F49 让 Debug/Flash 的窗口标题等于 App 的裸页面名 |
-| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；原型仍缺 Runtime 不可用态与残留/临界写入提示（F52 登记） |
+| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；F54 补 Runtime 不可用 / 正在刷新 / 空档案三态，以及残留计数、临界写入提示与 established-current-epoch 关系 |
 | shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：精确 Job 跳转、清除旧筛选并定位记录行。F41：有界滚动、多记录计数与窄窗工作区保留；原生精确行定位仍在复测，不能视为通过。所有主工作区共享；独立窗口不显示。不确认后续刷、不在 App 归档 |
 | device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管。F50 用 `?page=device&deviceDetail=…` 补齐五种候选状态、`stateObservedAt`、CLI 接管说明，并把字段标签与两条说明对回 `Localizable.xcstrings` |
 | device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；`device.wait.unavailable` 与信任页缺少的 Runtime 事实栏由 F52 登记 |
@@ -110,7 +110,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | overview.main | scope、SSH source、下一步、调试线；empty/ready/多目标/离线/未绑定/stale | 已接线；只列当前在线观察，真实 target→source，不取第一台服务器。F53 补齐设备三态、来源五态、记录四态、按调试线分组与「显示另外 N 次」、需要处理的下一步与四种拒绝原因，并补 ⌘R |
-| overview.environment | collapsed/expanded、healthy/mismatch/unknown/permissionDenied | HDC/tool/hash/endpoint/channel/能力完整保留；F53 把披露标题对回 `overview.environment.title`。稿件仍是两张概览卡，缺 Selected Device/Binding 与 Needs Attention 分组（F53 登记） |
+| overview.environment | collapsed/expanded、healthy/mismatch/unknown/permissionDenied | HDC/tool/hash/endpoint/channel/能力完整保留；F53 把披露标题对回 `overview.environment.title`；F54 按 App 重建为服务器与工具链 / 能力 / 所选设备与通道 / 需处理事项四组加高级诊断，能力矩阵为三列并含探测中与探测失败两态 |
 | overview.resume | 来源检查 sheet、loading/无参数/target/binding漂移/unknown | F02/F03/F20；精确记录；导航与准备分开；仅安全只读输入复制至新草稿，原始 thread 保留，不复制 authority/session |
 | overview.hdcImpact | impact sheet、generation漂移、确认/拒绝 | 已接线；无 proof 不可执行，不自动重启 external server |
 
@@ -139,7 +139,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
-| viewer.main | empty/loading/captured/search/selection/geometryUnavailable/failed | explicit target、同 Job screenshot/tree/hash；不默认伪造 capture。F46 让树、分隔条、搜索导航的 AX 名称与节点计数双语；loading/geometryUnavailable/failed 在原型仍不可达（F52 登记） |
+| viewer.main | empty/loading/captured/search/selection/geometryUnavailable/failed | explicit target、同 Job screenshot/tree/hash；不默认伪造 capture。F46 让树、分隔条、搜索导航的 AX 名称与节点计数双语；F54 补历史加载、两种空态原因、抓取失败、坐标不可证明（并撤下命中区）、截图不可用、搜索无匹配与「未测量」页脚 |
 | viewer.properties | Properties；identity/state/geometry/paint/missing | 已接线；Provider 技术词表保留英文 |
 | viewer.layout | Layout；bounds/root/geometryUnavailable | 无 geometry 不编造命中区域 |
 | viewer.accessibility | Accessibility；semantics/focus/missing | 只读观测字段，不把缺值解释成通过 |
@@ -996,3 +996,50 @@ App 说的是受支持的三种压缩格式）。
 - `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
 - 统一本地闸退出 0，按实际 diff 分类为纯设计/文档，不分配 Swift / App 编译车道。
 - 未做浏览器逐页走查、未跑原生 XCUITest、未执行设备操作；本批只证明稿与代码一致。
+
+## 2026-08-29 F54：原型状态补齐（Job 检查器 + Viewer + Overview 环境披露）
+
+首轮全量核对的第三批，基线 `93b24ae3`（PR #1587 合入后的 `main`）。范围是 F52 第 1 条在
+这三处的剩余部分；逐行结论见
+[2026-08-29 批次三台账](references/ui-consistency/2026-08-29-inspector-ledger.md)。
+只改设计侧，不修改 App、Runtime、Catalog 或准入策略，不执行设备操作。
+
+**Job 检查器**（`inspectorState` / `jobFacts`）。此前 `job.list` 的可用性根本不进稿：无论
+Runtime 是否可达都直接渲染一份列表。现按 App 分出正在刷新、Runtime 不可用（含 reason code
+与「启动或重新连接 ArkDeck Runtime」指引）与「Runtime 可访问但尚无 Job」三态，折叠条同步
+显示对应摘要。逐 Job 的事实补齐：残留计数（列表用紧凑徽标、详情用整句）、临界写入提示、
+以及 established-current-epoch 关系——后者把状态标签换成「当前状态已建立」、显示恢复关系
+ID 与**原始记录状态**，并撤下未知结果警告与取消入口，与 App 的 `hasEstablishedCurrentEpoch`
+分支一致。折叠条补进行中计数与已运行时间。
+
+**Viewer**（`viewerState` 扩为 `loading|captured|geometryUnavailable|screenshotUnavailable|
+noMetrics|failed`，新增 `viewerEmpty`）。空态此前只有一种说明，现分出「先选择一个绑定完整的
+已纳管目标」与目标不可抓取两种原因，并在抓取失败时显示失败原因而不是沉默。打开历史 capture
+是独立的加载态，不再被当成「还没有 capture」。坐标系无法证明时，页头标注、页脚说明齐备，
+**并且不再渲染任何截图命中区**——树与 Raw dump 仍可读，这正是 App 的做法。截图无法解码时
+显示「截图不可用」。页脚在没有采集 metrics 时显示「未测量」，不再总是打印同一组数字。
+树搜索无匹配时说明「没有匹配的组件。当前选中项未改变。」，选中项确实不变。
+
+**Overview 环境披露**（`overviewCapabilities` / `overviewAttention`）。此前是两张概括卡
+（HDC、能力与需要处理的事项）。现按 `HDCStatusView` 重建为 spec §5.1 要求的四组加高级诊断：
+服务器与工具链（健康、来源、绝对路径、哈希、平台信任、三个版本、端点 + 选择 HDC）、
+能力（归属、子服务器能力、服务器恢复 + 三列能力矩阵）、所选设备与通道（授权、通道保护、
+近期设备事件）、需处理事项（无事项说明或逐条事项＋原因＋最小下一步），以及只保留影响预览的
+高级诊断。能力矩阵补探测中与探测不可读两态；探测失败时不显示任何能力行。
+
+### 本批未覆盖
+
+- Diagnostics 概念页正文与时间轴 AX 名称的单语（F52-2 剩余）。
+- 信任页缺 Runtime 事实栏（F52-3）。
+- App 侧共享件收敛与 Viewer 检查器硬编码英文（F52-4/5）——需要 App 改动与原生回归。
+- 资源里的已移除路径键、退役 Automation 样式、preview 构建守护、`Select` 映射（F52-6~9）。
+- F52 的三条待裁决项保持开放。
+
+### 验证
+
+- `npm test` **72 项通过**（新增 3 项：Job 检查器三态与逐 Job 事实、Viewer 六态与无匹配
+  搜索、Overview 环境五组与矩阵三态）。三项都直接读取 `JobsLocalizable` /
+  `UIDumpLocalizable` / `Localizable`，用 App 的字符串断言。
+- `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
+- 统一本地闸退出 0，纯设计/文档车道，不分配 Swift / App 编译车道。
+- 未做浏览器逐页走查、未跑原生 XCUITest、未执行设备操作。

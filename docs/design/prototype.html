@@ -964,6 +964,8 @@ const S = {
   deviceDetail:["ready","authorizedUnadopted","offline","needsRecheck","unknownState"].includes(PARAMS.get("deviceDetail"))?PARAMS.get("deviceDetail"):"ready",
   overview:{
     device:["bound","multi","none"].includes(PARAMS.get("overviewDevice"))?PARAMS.get("overviewDevice"):"bound",
+    capabilities:["loading","failure"].includes(PARAMS.get("overviewCapabilities"))?PARAMS.get("overviewCapabilities"):"ready",
+    attention:PARAMS.get("overviewAttention")==="items"?"items":"clear",
     server:["bound","loading","unbound","stale","unavailable"].includes(PARAMS.get("overviewServer"))?PARAMS.get("overviewServer"):"bound",
     records:["available","loading","unavailable","empty"].includes(PARAMS.get("overviewRecords"))?PARAMS.get("overviewRecords"):"available",
     // `detailNotLoaded` is a real disposition: the run's evidence has not been
@@ -974,7 +976,16 @@ const S = {
   deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
-  viewer:{hasCapture:PARAMS.get("viewerState")==="captured",selected:42,showBounds:false,query:"",tab:PARAMS.get("viewerTab")||"attributes",advancedQuery:"",advancedState:PARAMS.get("advancedState")||"ready",capturedAt:"2026-08-25T02:08:31Z",treeSize:60,expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
+  viewer:{hasCapture:["captured","geometryUnavailable","screenshotUnavailable","noMetrics"].includes(PARAMS.get("viewerState")),
+    // Loading a historical capture, an unverifiable coordinate space, an
+    // undecodable screenshot, an unmeasured capture and a failed capture are
+    // five separate answers in the App; none of them is "no capture yet".
+    loading:PARAMS.get("viewerState")==="loading",
+    coordinatesVerified:PARAMS.get("viewerState")!=="geometryUnavailable",
+    screenshotAvailable:PARAMS.get("viewerState")!=="screenshotUnavailable",
+    metrics:PARAMS.get("viewerState")!=="noMetrics",
+    failure:PARAMS.get("viewerState")==="failed"?"viewer_capture_refused_target_not_connected":null,
+    emptyReason:["selectTarget","targetBlocked"].includes(PARAMS.get("viewerEmpty"))?PARAMS.get("viewerEmpty"):null,selected:42,showBounds:false,query:"",tab:PARAMS.get("viewerTab")||"attributes",advancedQuery:"",advancedState:PARAMS.get("advancedState")||"ready",capturedAt:"2026-08-25T02:08:31Z",treeSize:60,expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
   trace:{running:false,duration:10,unit:"seconds",profile:"arkuiDeep",
     availability:PARAMS.get("traceState")==="ready"?"available":PARAMS.get("traceState")==="checking"?"checking":"unavailable",
     hasTarget:PARAMS.get("traceState")!=="noTarget",
@@ -1016,6 +1027,12 @@ const S = {
   hap:{available:PARAMS.get("hapState")!=="unavailable",file:null,additional:[],bundle:"",ability:"",install:"installOrReplace",cleanup:"uninstall",postRun:"stopped",diagnostics:true,seconds:"30"},
   hf:{kind:"all",query:"",status:"all",mode:"all",target:"all",session:"all",time:"all"}, histSel:"S-0826-01", histSeq:1, historyLimit:6, savedHistoryFilter:null, historyFiltersOpen:false,
   hdcSel:"deveco",
+  // The inspector projects `job.list` availability, not just a job list: an
+  // unreachable Runtime and an empty archive are different answers.
+  inspector:{
+    availability:["loading","unavailable"].includes(PARAMS.get("inspectorState"))?PARAMS.get("inspectorState"):"available",
+    empty:PARAMS.get("inspectorState")==="empty",
+    facts:["residue","criticalWrite","supersededByRecovery","targetAliasResolved","waitingForHuman"].includes(PARAMS.get("jobFacts"))?PARAMS.get("jobFacts"):null},
   // Settings panes read on demand, so every pane has the same three row states
   // plus its own domain branches; the App renders them from one shared row.
   settings:{
@@ -1339,17 +1356,106 @@ function histFromJob(j){
   const index=HIST.findIndex(h=>h.id===j.id);
   if(index<0)HIST.unshift(record);else HIST[index]=record;
 }
+/** Mirrors `JobsLocalizable`; the App's own wording for every inspector state. */
+const INSPECTOR_COPY={
+  "jobInspector.refreshing":["正在刷新 Job","Refreshing jobs"],
+  "jobInspector.unavailable.title":["Runtime 状态不可用","Runtime status unavailable"],
+  "jobInspector.unavailable.guidance":["启动或重新连接 ArkDeck Runtime，然后刷新 Job。","Start or reconnect ArkDeck Runtime, then refresh jobs."],
+  "jobInspector.compact.unavailable":["Runtime 状态不可用","Runtime status unavailable"],
+  "jobInspector.compact.empty":["没有 Runtime Job","No Runtime jobs"],
+  "jobInspector.empty.title":["尚无 Job","No jobs yet"],
+  "jobInspector.empty.description":["Runtime 可访问，但尚未记录任何 Job。","Runtime is reachable and has no recorded jobs."],
+  "jobInspector.runtimeFacts":["Runtime 事实","Runtime facts"],
+  "jobInspector.action.openRecord":["打开此记录","Open this record"],
+  "jobInspector.action.cancel":["请求取消","Request cancellation"],
+  "jobInspector.action.refresh":["刷新 Job","Refresh jobs"],
+  "jobInspector.action.openHistory":["打开历史记录","Open History"],
+  "jobInspector.action.readLog":["在本机读取日志","Read log locally"],
+  "jobInspector.fact.recordedState":["原始记录状态","Recorded state"],
+  "jobInspector.fact.recoveryRelation":["恢复关系","Recovery relation"],
+  "jobInspector.state.currentEpochEstablished":["当前状态已建立","Current state established"],
+  "jobInspector.result.outcomeUnknown":["设备影响未知。不要把此 Job 视为已经完成。","The device effect is unknown. Do not treat this Job as finished."],
+  "jobInspector.result.waitingForHuman":["Runtime 已停在需要人工处理的边界。","Runtime stopped at a human-required boundary."],
+  "jobInspector.result.supersededByRecovery":["此 Job 的结果仍未知，但后续已确认的完整覆写恢复已建立当前目标状态。","This Job's outcome remains unknown, but a later confirmed complete-overwrite recovery established the current target state."],
+  "jobInspector.result.targetAliasResolved":["此 Job 的结果仍未知，但后续已确认的完整刷机证明其目标是别名，并建立了当前设备状态。","This Job's outcome remains unknown, but a later confirmed full Flash proved its target was an alias and established the current device state."],
+  "jobInspector.criticalWrite":["正在写入分区——临界区不可中断；停止只会阻止后续步骤。请勿合盖、手动睡眠、断电或拔线。","Writing a partition — this critical step cannot be interrupted. Stopping only prevents later steps. Do not close the lid, sleep the Mac, disconnect power, or unplug the device."],
+  "jobInspector.elapsed":["已运行时间","Elapsed since start"],
+  "jobInspector.select":["选择一个 Job","Select a Job"]
+};
+function inspectorCopy(key){const pair=INSPECTOR_COPY[key];return pair?(S.language==="en"?pair[1]:pair[0]):key;}
+function inspectorCount(key,count){
+  const en=S.language==="en";
+  if(key==="activeCount")return en?`${count} active`:`${count} 个进行中`;
+  if(key==="residueCompact")return en?`${count} residue`:`${count} 个残留`;
+  if(key==="residue")return en?`${count} cleanup items remain on the device.`:`设备上仍有 ${count} 个清理项。`;
+  return String(count);
+}
+function inspectorEstablishedEpoch(job){
+  if(job.supersededByRecoveryEpochID)return {id:job.supersededByRecoveryEpochID,key:"jobInspector.result.supersededByRecovery"};
+  if(job.resolvedByTargetAliasResolutionID)return {id:job.resolvedByTargetAliasResolutionID,key:"jobInspector.result.targetAliasResolved"};
+  return null;
+}
+function inspectorStateLabel(job){
+  return inspectorEstablishedEpoch(job)?inspectorCopy("jobInspector.state.currentEpochEstablished"):esc(job.state);
+}
+function inspectorCompactStatus(rows,running){
+  if(S.inspector.availability==="loading")return inspectorCopy("jobInspector.refreshing");
+  if(S.inspector.availability==="unavailable")return inspectorCopy("jobInspector.compact.unavailable");
+  const focused=rows[0];
+  if(!focused)return inspectorCopy("jobInspector.compact.empty");
+  const parts=[inspectorStateLabel(focused),esc(focused.operation||focused.title||focused.id)];
+  if(running.length)parts.push(inspectorCount("activeCount",running.length));
+  if(running.includes(focused))parts.push(`${inspectorCopy("jobInspector.elapsed")} 00:41`);
+  return parts.join(" · ");
+}
+function inspectorDetailHTML(selected){
+  const epoch=inspectorEstablishedEpoch(selected);
+  const attention=selected.outcomeUnknown||selected.waitingForHuman;
+  return `<div class="inspector-detail" data-sync-id="jobInspector.detail">
+    <div class="device-actions"><b>${inspectorStateLabel(selected)}</b>${modeBadge(selected.mode)}<span class="spacer"></span><span class="hint" data-sync-id="jobInspector.runtimeFacts">${inspectorCopy("jobInspector.runtimeFacts")}</span></div>
+    <div class="device-actions"><button class="btn" data-sync-id="jobInspector.openRecord" onclick="openInspectorRecord('${selected.id}')">${inspectorCopy("jobInspector.action.openRecord")}</button>${inspectorCanCancel(selected)?`<button class="btn" data-sync-id="jobInspector.cancel" onclick="requestInspectorCancellation('${selected.id}')">${inspectorCopy("jobInspector.action.cancel")}</button>`:''}<button class="btn" data-sync-id="jobInspector.refresh" onclick="S.inspectorLog=null;renderDrawer()">${inspectorCopy("jobInspector.action.refresh")}</button><button class="btn" data-sync-id="jobInspector.openHistory" onclick="go('history')">${inspectorCopy("jobInspector.action.openHistory")}</button></div>
+    ${S.inspectorCancellation===selected.id?`<p class="hint" role="status">${lc('演示：取消未确认。任务状态不变，请刷新记录；不会重发未知操作。','Demo: cancellation is not confirmed. The Job state is unchanged; refresh the record. Unknown operations are never replayed.')}</p>`:''}
+    ${selected.criticalWrite?`<div class="warnbox" data-sync-id="jobInspector.criticalWrite"><div>${inspectorCopy("jobInspector.criticalWrite")}</div></div>`:''}
+    <dl class="kv"><dt>Job</dt><dd class="mono">${esc(selected.id)}</dd><dt>${lc('操作','Operation')}</dt><dd class="mono">${esc(selected.operation||'—')}</dd><dt>${lc('目标','Target')}</dt><dd class="mono">${esc(selected.dev||'—')}</dd>${epoch?`<dt>${inspectorCopy("jobInspector.fact.recordedState")}</dt><dd class="mono">${esc(selected.state)}</dd>`:''}</dl>
+    ${epoch?`<div class="okbox" data-sync-id="jobInspector.establishedCurrentEpoch"><div><p>${inspectorCopy(epoch.key)}</p><dl class="kv"><dt>${inspectorCopy("jobInspector.fact.recoveryRelation")}</dt><dd class="mono">${esc(epoch.id)}</dd></dl></div></div>`:''}
+    ${attention&&!epoch?`<div class="warnbox" data-sync-id="jobInspector.attention"><div>${inspectorCopy(selected.outcomeUnknown?"jobInspector.result.outcomeUnknown":"jobInspector.result.waitingForHuman")}</div></div>`:''}
+    ${selected.outstandingResidueCount>0?`<p class="hint" data-sync-id="jobInspector.residue">${inspectorCount("residue",selected.outstandingResidueCount)}</p>`:''}
+    <details open><summary>${lc('阶段与时间线','Stages and timeline')}</summary><pre class="logtail" data-sync-id="jobInspector.timeline.entries">${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre></details>
+    ${selected.standardLog?`<button class="btn" onclick="S.inspectorLog='${selected.id}';renderDrawer()">${inspectorCopy("jobInspector.action.readLog")} · ${esc(selected.standardLog)}</button>`:''}
+    ${S.inspectorLog===selected.id?`<pre class="logtail" data-sync-id="jobInspector.log.text">UI fixture only\n${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre>`:''}
+    <p class="hint">${lc('仅在选择后读取标准日志，最多 2 MiB、展示末 200 行。敏感产物在 History 显式处理。','Standard logs are read only on request: at most 2 MiB, showing the last 200 lines. Handle sensitive Artifacts explicitly in History.')}</p></div>`;
+}
+function inspectorBodyHTML(rows){
+  if(S.inspector.availability==="loading")
+    return `<div class="empty" role="status" aria-busy="true" data-sync-id="jobInspector.loading">${inspectorCopy("jobInspector.refreshing")}</div>`;
+  if(S.inspector.availability==="unavailable")
+    return `<div class="warnbox" role="alert" data-sync-id="jobInspector.unavailable"><div><b>${inspectorCopy("jobInspector.unavailable.title")}</b><p class="mono">runtime_status_unavailable</p><p>${inspectorCopy("jobInspector.unavailable.guidance")}</p></div></div>`;
+  if(!rows.length)
+    return `<div class="empty" data-sync-id="jobInspector.empty"><b>${inspectorCopy("jobInspector.empty.title")}</b><p>${inspectorCopy("jobInspector.empty.description")}</p></div>`;
+  const selected=rows.find(j=>j.id===S.inspectorSelection)||rows[0];
+  return `<div class="inspector-split"><div class="inspector-list" role="listbox" aria-label="${lc('任务','Jobs')}" data-sync-id="jobInspector.list">${rows.map(j=>`<button class="debug-entry ${j.id===selected.id?'on':''}" role="option" aria-selected="${j.id===selected.id}" data-sync-id="jobInspector.row.${esc(j.id)}" onclick="S.inspectorSelection='${j.id}';S.inspectorLog=null;S.inspectorCancellation=null;renderDrawer()"><span class="nm">${esc(j.title)}<small class="mono">${esc(j.id)}</small></span>${j.outstandingResidueCount>0?`<span class="chip warn">${inspectorCount("residueCompact",j.outstandingResidueCount)}</span>`:''}<span class="chip ${j.outcomeUnknown?'warn':'dim'}">${inspectorStateLabel(j)}</span></button>`).join('')}</div>${inspectorDetailHTML(selected)}</div>`;
+}
 function renderDrawer(){
   const rows=inspectorJobs(),running=rows.filter(inspectorCanCancel);
-  $("drawerSt").textContent=running.length?lc(`${running.length} 个运行中`,`${running.length} running`):tx("emptyJobs");
-  $("drawerIbar").style.display=running.length?"block":"none";
-  const selected=rows.find(j=>j.id===S.inspectorSelection)||rows[0];
-  $("drawerBody").innerHTML=selected?`<div class="inspector-split"><div class="inspector-list" role="listbox" aria-label="${lc('任务','Jobs')}">${rows.map(j=>`<button class="debug-entry ${j.id===selected.id?'on':''}" role="option" aria-selected="${j.id===selected.id}" onclick="S.inspectorSelection='${j.id}';S.inspectorLog=null;S.inspectorCancellation=null;renderDrawer()"><span class="nm">${esc(j.title)}<small class="mono">${esc(j.id)}</small></span><span class="chip ${j.outcomeUnknown?'warn':'dim'}">${esc(j.state)}</span></button>`).join('')}</div><div class="inspector-detail" data-sync-id="jobInspector.detail"><div class="device-actions"><b>${esc(selected.state)}</b>${modeBadge(selected.mode)}<span class="spacer"></span><span class="hint">${lc('Runtime 事实','Runtime facts')}</span></div><div class="device-actions"><button class="btn" onclick="openInspectorRecord('${selected.id}')">${lc('打开此记录','Open this record')}</button>${inspectorCanCancel(selected)?`<button class="btn" data-sync-id="jobInspector.cancel" onclick="requestInspectorCancellation('${selected.id}')">${lc('请求取消','Request cancellation')}</button>`:''}<button class="btn" onclick="S.inspectorLog=null;renderDrawer()">${lc('刷新 Job','Refresh jobs')}</button><button class="btn" onclick="go('history')">${lc('打开历史记录','Open History')}</button></div>${S.inspectorCancellation===selected.id?`<p class="hint" role="status">${lc('演示：取消未确认。任务状态不变，请刷新记录；不会重发未知操作。','Demo: cancellation is not confirmed. The Job state is unchanged; refresh the record. Unknown operations are never replayed.')}</p>`:''}<dl class="kv"><dt>Job</dt><dd class="mono">${esc(selected.id)}</dd><dt>${lc('操作','Operation')}</dt><dd class="mono">${esc(selected.operation||'—')}</dd><dt>${lc('目标','Target')}</dt><dd class="mono">${esc(selected.dev||'—')}</dd></dl>${selected.outcomeUnknown?`<div class="warnbox">${lc('原操作的结果未知。只查看 Runtime 恢复证据；没有重试、归档或确认绕过。','The original outcome is unknown. Inspect Runtime recovery evidence; no retry, archive or confirmation override is offered.')}</div>`:''}<details open><summary>${lc('阶段与时间线','Stages and timeline')}</summary><pre class="logtail">${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre></details>${selected.standardLog?`<button class="btn" onclick="S.inspectorLog='${selected.id}';renderDrawer()">${lc('在本机读取日志','Read log locally')} · ${esc(selected.standardLog)}</button>`:''}${S.inspectorLog===selected.id?`<pre class="logtail" data-sync-id="jobInspector.log.text">UI fixture only\n${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre>`:''}<p class="hint">${lc('仅在选择后读取标准日志，最多 2 MiB、展示末 200 行。敏感产物在 History 显式处理。','Standard logs are read only on request: at most 2 MiB, showing the last 200 lines. Handle sensitive Artifacts explicitly in History.')}</p></div></div>`:`<div class="empty">${lc("尚无任务。","No jobs yet.")}</div>`;
+  $("drawerSt").textContent=inspectorCompactStatus(rows,running);
+  $("drawerIbar").style.display=running.length&&S.inspector.availability==="available"?"block":"none";
+  $("drawerBody").innerHTML=inspectorBodyHTML(rows);
 }
 function inspectorJobs(){
+  if(S.inspector.availability!=="available"||S.inspector.empty)return [];
   if(S.jobs.length)return S.jobs.slice().reverse();
-  if(PARAMS.get('jobState'))return [{id:'job-demo-global',kind:'diagnostics',standardLog:'capture.log',title:'capture.diagnostics@1',operation:'capture.diagnostics@1',state:PARAMS.get('jobState')==='unknown'?'waitingForRecovery':PARAMS.get('jobState'),outcomeUnknown:PARAMS.get('jobState')==='unknown',mode:'execute',target:'TGT-958780b2ffb7',dev:'TGT-958780b2ffb7',log:['queued','preflight','running']}];
-  return HIST.slice(0,4).map(h=>({id:h.id,title:histText(h.what),operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:(h.artifacts||[]).find(a=>a.role==='log'&&a.privacy==='standard'&&a.status==='published')?.name||null}));
+  if(PARAMS.get('jobState')){
+    const state=PARAMS.get('jobState'),facts=S.inspector.facts;
+    return [{id:'job-demo-global',kind:'diagnostics',standardLog:'capture.log',title:'capture.diagnostics@1',operation:'capture.diagnostics@1',
+      state:state==='unknown'?'waitingForRecovery':state,outcomeUnknown:state==='unknown',
+      waitingForHuman:facts==='waitingForHuman',
+      outstandingResidueCount:facts==='residue'?2:0,
+      criticalWrite:facts==='criticalWrite',
+      supersededByRecoveryEpochID:facts==='supersededByRecovery'?'recovery-epoch-demo':null,
+      resolvedByTargetAliasResolutionID:facts==='targetAliasResolved'?'alias-resolution-demo':null,
+      mode:'execute',target:'TGT-958780b2ffb7',dev:'TGT-958780b2ffb7',log:['queued','preflight','running']}];
+  }
+  return HIST.slice(0,4).map(h=>({id:h.id,title:histText(h.what),operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,waitingForHuman:h.waitingForHuman,outstandingResidueCount:h.outstandingResidueCount||0,supersededByRecoveryEpochID:h.supersededByRecoveryEpochID,resolvedByTargetAliasResolutionID:h.resolvedByTargetAliasResolutionID,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:(h.artifacts||[]).find(a=>a.role==='log'&&a.privacy==='standard'&&a.status==='published')?.name||null}));
 }
 function inspectorCanCancel(job){
   return !job.outcomeUnknown&&['queued','planning','preflight','running','waitingForDevice','awaitingRebindConfirmation'].includes(job.state);
@@ -1452,6 +1558,41 @@ const OVERVIEW_COPY={
   "overview.record.remoteServer.staleDetail":["已绑定的服务器已被删除，请在 Debug 中重新选择远端产物。","The bound server was removed. Choose another remote artifact in Debug."],
   "overview.record.remoteServer.unavailable":["无法读取绑定","Binding unavailable"],
   "overview.environment.title":["运行环境","Environment"],
+  "overview.section.serverToolchain":["服务器与工具链","Server & Toolchain"],
+  "overview.section.capabilities":["能力","Capabilities"],
+  "overview.section.deviceChannel":["所选设备与通道","Selected Device & Channel"],
+  "overview.section.needsAttention":["需处理事项","Needs Attention"],
+  "overview.section.advanced":["高级诊断","Advanced Diagnostics"],
+  "overview.field.serverHealth":["服务器健康状态","Server health"],
+  "overview.field.source":["HDC 来源","HDC source"],
+  "overview.field.path":["绝对路径","Absolute path"],
+  "overview.field.hash":["哈希","Hash"],
+  "overview.field.platformTrust":["平台信任","Platform trust"],
+  "overview.field.clientVersion":["客户端版本","Client version"],
+  "overview.field.serverVersion":["服务器版本","Server version"],
+  "overview.field.daemonVersion":["守护进程版本","Daemon version"],
+  "overview.field.endpoint":["端点","Endpoint"],
+  "overview.field.ownership":["归属","Ownership"],
+  "overview.field.subserver":["子服务器能力","Subserver capability"],
+  "overview.field.lifecycleAvailability":["服务器恢复","Server recovery"],
+  "overview.field.authorization":["授权","Authorization"],
+  "overview.field.channelProtection":["通道保护","Channel protection"],
+  "overview.field.deviceEvents":["近期设备事件","Recent device events"],
+  "overview.capabilities.title.noTarget":["设备能力矩阵","Device capability matrix"],
+  "overview.capabilities.column.capability":["能力","Capability"],
+  "overview.capabilities.column.state":["状态","State"],
+  "overview.capabilities.column.evidence":["探测证据","Probe evidence"],
+  "overview.capabilities.loading":["正在探测设备能力…","Probing device capabilities…"],
+  "overview.capabilities.state.available":["可用","Available"],
+  "overview.capabilities.state.limited":["受限","Limited"],
+  "overview.capabilities.state.unavailable":["不可用","Unavailable"],
+  "overview.capabilities.state.unknown":["无法确认","Unknown"],
+  "overview.attention.clear":["当前诊断中没有需要处理的事项。","Nothing needs attention in the current diagnostics."],
+  "overview.attention.trust":["设备信任未就绪","Device trust is not ready"],
+  "overview.attention.nextStep.refresh":["请解锁并在设备上确认信任，然后刷新概览以重新读取当前状态。","Unlock and trust the device, then refresh the overview to re-read the current state."],
+  "overview.attention.channel":["通道保护未验证","Channel protection is unverified"],
+  "overview.attention.nextStep.isolatedNetwork":["仅在受信任的隔离网络中使用该端点。","Use this endpoint only on a trusted, isolated network."],
+  "overview.recovery.previewImpact":["预览服务器恢复影响","Preview Server Recovery Impact"],
   "overview.environment.expanded":["已展开","Expanded"],
   "overview.environment.collapsed":["已收起","Collapsed"],
   "overview.status.refreshing":["正在刷新……","Refreshing…"],
@@ -1639,6 +1780,59 @@ function overviewThreadHTML(thread){
     ${others.length?`<details ${expanded?"open":""} data-sync-id="overview.record.thread.${esc(thread.id)}.more" ontoggle="if(this.isConnected&&this.open!==${expanded})toggleOverviewThread('${thread.id}')"><summary>${overviewCount("threadMore",others.length)}</summary>${others.map(overviewRunRowHTML).join("")}</details>`:""}
   </div>`;
 }
+function overviewFactRowsHTML(rows){
+  return `<dl class="kv">${rows.map(([key,value])=>`<dt>${overviewCopy(key)}</dt><dd class="mono">${esc(value)}</dd>`).join("")}</dl>`;
+}
+const OVERVIEW_CAPABILITIES=[
+  ["hdc.shell","available","hdc shell echo · exit 0"],
+  ["hidumper","available","hidumper -s WindowManagerService · 12 KiB"],
+  ["hitrace","limited","hitrace --list_categories · 部分类别缺失|hitrace --list_categories · some categories missing"],
+  ["rockusb.flash","unknown","arkforged discoverDevices · 未探测|arkforged discoverDevices · not probed"]
+];
+function overviewCapabilitiesHTML(){
+  if(S.overview.capabilities==="failure")
+    return `<p class="hint" data-sync-id="overview.capabilities.failure">overview_capability_probe_unreachable</p>`;
+  if(S.overview.capabilities==="loading")
+    return `<p class="hint" role="status" aria-busy="true">${overviewCopy("overview.capabilities.loading")}</p>`;
+  return `<div class="tablewrap"><table>
+    <tr><th>${overviewCopy("overview.capabilities.column.capability")}</th><th>${overviewCopy("overview.capabilities.column.state")}</th><th>${overviewCopy("overview.capabilities.column.evidence")}</th></tr>
+    ${OVERVIEW_CAPABILITIES.map(([name,state,evidence])=>`<tr><td class="mono">${esc(name)}</td><td data-sync-id="overview.capabilities.${esc(name)}.state">${overviewCopy("overview.capabilities.state."+state)}</td><td class="mono" data-sync-id="overview.capabilities.${esc(name)}.evidence">${esc(evidence.includes("|")?lc(evidence.split("|")[0],evidence.split("|")[1]):evidence)}</td></tr>`).join("")}
+  </table></div>`;
+}
+function overviewAttentionHTML(){
+  if(S.overview.attention!=="items")
+    return `<p class="hint" data-sync-id="overview.attention.clear">${overviewCopy("overview.attention.clear")}</p>`;
+  const items=[
+    ["overview.attention.trust","device_trust_pending","overview.attention.nextStep.refresh"],
+    ["overview.attention.channel","hdc_channel_encryption_unverified","overview.attention.nextStep.isolatedNetwork"]
+  ];
+  return items.map(([title,reason,next])=>`<div class="warnbox" data-sync-id="${esc(title)}"><div><b>${overviewCopy(title)}</b><p class="mono">${esc(reason)}</p><p class="hint">${overviewCopy(next)}</p></div></div>`).join("");
+}
+function overviewEnvironmentHTML(){
+  return `<div class="grid2" style="margin-top:12px">
+    <section class="card" data-sync-id="overview.section.serverToolchain"><h2>${overviewCopy("overview.section.serverToolchain")}</h2>
+      ${overviewFactRowsHTML([["overview.field.serverHealth","healthy"],["overview.field.source","security-scoped executable"],
+        ["overview.field.path","/opt/ohos/sdk/toolchains/hdc"],["overview.field.hash","9c1d7ae4…f0b2"],
+        ["overview.field.platformTrust","notarized"],["overview.field.clientVersion","3.2.0f"],
+        ["overview.field.serverVersion","3.2.0f"],["overview.field.daemonVersion","3.2.0f"],
+        ["overview.field.endpoint","127.0.0.1:8710"]])}
+      <button class="btn" onclick="doneBtn(this,lc('演示：打开文件选择器','Demo: open file picker'))">${lc("选择 HDC…","Choose HDC…")}</button></section>
+    <section class="card" data-sync-id="overview.section.capabilities"><h2>${overviewCopy("overview.section.capabilities")}</h2>
+      ${overviewFactRowsHTML([["overview.field.ownership","external · DevEco Studio"],["overview.field.subserver","supported"],["overview.field.lifecycleAvailability","available"]])}
+      <p class="hint" data-sync-id="overview.capabilities.matrixTitle">${overviewCopy("overview.capabilities.title.noTarget")}</p>
+      ${overviewCapabilitiesHTML()}</section>
+    <section class="card" data-sync-id="overview.section.deviceChannel"><h2>${overviewCopy("overview.section.deviceChannel")}</h2>
+      ${overviewFactRowsHTML([["overview.field.authorization","authorized"],["overview.field.channelProtection",lc("加密未验证","Encryption unverified")]])}
+      <p class="hint">${overviewCopy("overview.field.deviceEvents")}</p>
+      <pre class="logtail">2026-08-26T06:29:00Z Connected TGT-958780b2ffb7
+2026-08-26T06:12:41Z Unauthorized (unknown tablet)</pre></section>
+    <section class="card" data-sync-id="overview.section.needsAttention"><h2>${overviewCopy("overview.section.needsAttention")}</h2>
+      ${overviewAttentionHTML()}</section>
+  </div>
+  <section class="card" style="margin-top:12px" data-sync-id="overview.section.advanced"><h2>${overviewCopy("overview.section.advanced")}</h2>
+    <p class="hint">${lc("unknown 与 unavailable 保持区分。HDC 恢复需先预览影响并精确匹配 generation；权限问题不自动提权。","Keep unknown separate from unavailable. HDC recovery requires an impact preview and exact generation; permission issues never trigger elevation.")}</p>
+    <button class="btn" data-sync-id="hdc.lifecycle.requestImpactPreview" onclick="overviewHDCImpact()">${overviewCopy("overview.recovery.previewImpact")}</button></section>`;
+}
 function overviewNextStepHTML(){
   const threads=overviewThreads();
   if(!threads.length)
@@ -1674,8 +1868,7 @@ function pOverview(){
       ${overviewRecordsHTML()}
     </section>
     <details data-sync-id="overview.environment" aria-label="${overviewCopy("overview.environment.title")}"><summary>${overviewCopy("overview.environment.title")}</summary>
-      <div class="grid2" style="margin-top:12px"><section class="card"><h2>HDC</h2><dl class="kv"><dt>${lc("来源","Source")}</dt><dd>security-scoped HDC</dd><dt>client / server / daemon</dt><dd>${lc("同一刷新快照","Same refresh snapshot")}</dd><dt>endpoint / SHA-256</dt><dd>${lc("完整值来自 Runtime","Full values come from Runtime")}</dd><dt>${lc("通道保护","Channel protection")}</dt><dd>${lc("加密未验证","Encryption unverified")}</dd></dl></section>
-      <section class="card"><h2>${lc("能力与需要处理的事项","Capabilities and attention")}</h2><p>hidumper · hitrace · bytrace · RockUSB Flash</p><p class="hint">${lc("unknown 与 unavailable 保持区分。HDC 恢复需先预览影响并精确匹配 generation；权限问题不自动提权。","Keep unknown separate from unavailable. HDC recovery requires an impact preview and exact generation; permission issues never trigger elevation.")}</p><button class="btn" onclick="overviewHDCImpact()">${lc("预览 HDC 恢复影响…","Preview HDC recovery impact…")}</button></section></div>
+      ${overviewEnvironmentHTML()}
     </details>
   </div>`;
 }
@@ -1900,6 +2093,38 @@ const VIEWER_COPY={
   "viewer.footer.nodes": {
     "en": "nodes",
     "zh-Hans": "个节点"
+  },
+  "viewer.footer.notMeasured": {
+    "en": "not measured",
+    "zh-Hans": "未测量"
+  },
+  "viewer.empty.selectTarget": {
+    "en": "Select an adopted target with a complete binding, then capture the view.",
+    "zh-Hans": "先选择一个绑定完整的已纳管目标，再抓取视图。"
+  },
+  "viewer.empty.targetBlocked": {
+    "en": "TGT-1a62a0dbedd6 cannot capture a view: the device reports Unauthorized. Select a Connected target.",
+    "zh-Hans": "TGT-1a62a0dbedd6 无法抓取视图：设备报告未授权。请选择一个「已连接」的目标。"
+  },
+  "viewer.pane.coordinatesUnverified": {
+    "en": "Coordinates cannot be verified",
+    "zh-Hans": "坐标系无法证明"
+  },
+  "viewer.screenshot.unverifiedDetail": {
+    "en": "The tree bounds do not prove this screenshot's coordinate space. Tree and Raw dump remain available, but screenshot selection is disabled.",
+    "zh-Hans": "树的 bounds 无法证明这张截图的坐标系。树和 Raw dump 仍然可读，但截图选择已禁用。"
+  },
+  "viewer.screenshot.unavailable": {
+    "en": "Screenshot is unavailable",
+    "zh-Hans": "截图不可用"
+  },
+  "viewer.tree.noMatches": {
+    "en": "No matching components. The current selection is unchanged.",
+    "zh-Hans": "没有匹配的组件。当前选中项未改变。"
+  },
+  "viewer.history.loading": {
+    "en": "Loading Runtime history",
+    "zh-Hans": "正在加载 Runtime 历史"
   }
 };
 /** Mirrors the App's `viewer.separator.value` string, which reports the split as a percentage. */
@@ -1954,6 +2179,8 @@ function viewerVisibleNodes(){
   return VIEWER_NODES.filter(n=>(!q||`${n.type} ${n.text} ${n.id} ${n.inspectorId||""}`.toLowerCase().includes(q))&&(q||viewerAncestorsExpanded(n)));
 }
 function viewerTreeHTML(){
+  if(!viewerVisibleNodes().length)
+    return `<p class="empty" data-sync-id="viewer.tree.noMatches">${viewerCopy("viewer.tree.noMatches")}</p>`;
   const rows=viewerVisibleNodes(),selectedVisible=rows.some(n=>n.id===S.viewer.selected),tabId=selectedVisible?S.viewer.selected:rows[0]?.id;
   if(!rows.length)return '<p class="empty" style="padding:12px">没有匹配的组件。请调整或清除搜索内容。</p>';
   return rows.map(n=>{const hasChildren=viewerChildren(n.id).length>0;return `
@@ -2034,7 +2261,11 @@ function viewerHitsHTML(){
       onclick="selectViewerNode(${n.id})"></button>`;
   }).join("");
 }
-function viewerScreenshotHTML(){return `<div class="viewer-screen">${viewerPaintHTML()}${viewerHitsHTML()}</div>`;}
+function viewerScreenshotHTML(){
+  // Without a provable coordinate space the App draws no clickable map at all;
+  // the tree stays the only way to select.
+  return `<div class="viewer-screen">${viewerPaintHTML()}${S.viewer.coordinatesVerified?viewerHitsHTML():""}</div>`;
+}
 /* ---- 检查器:分组 + 固定 key 列,不再是一张 13 行的平铺 dump ---- */
 function viewerNodeIcon(type){
   if(/^(Text|Search|Span)$/.test(type))return "n-text";
@@ -2099,15 +2330,22 @@ function pViewer(){
         <button class="btn" type="button" aria-label="${viewerCopy("viewer.search.previous")}">↑</button><button class="btn" type="button" aria-label="${viewerCopy("viewer.search.next")}">↓</button></span>`:""}
       <button class="btn pri" data-sync-id="viewer.recapture" onclick="recaptureViewer()">${viewerCopy(S.viewer.hasCapture?"viewer.toolbar.recapture":"viewer.toolbar.capture")}</button>
     </div></div>
-    ${!S.viewer.hasCapture?`<div class="viewer-empty"><div>
+    ${S.viewer.loading?`<div class="viewer-empty" role="status" aria-busy="true" data-sync-id="viewer.history.loading"><div>
+      <p>${viewerCopy("viewer.history.loading")}</p>
+    </div></div>`:!S.viewer.hasCapture?`<div class="viewer-empty" data-sync-id="viewer.empty"><div>
       ${icon("dump")}<strong>${viewerCopy("viewer.empty.title")}</strong>
-      <p>${viewerCopy("viewer.empty.explain")}</p>
+      <p>${viewerCopy(S.viewer.emptyReason?"viewer.empty."+S.viewer.emptyReason:"viewer.empty.explain")}</p>
+      ${S.viewer.failure?`<p class="hint" style="color:var(--warn)" data-sync-id="viewer.captureFailure">${esc(S.viewer.failure)}</p>`:""}
     </div></div>`:`
     <div class="viewer-workspace">
       <section class="viewer-pane" aria-labelledby="viewerScreenshotTitle">
         <div class="viewer-pane-head"><h2 id="viewerScreenshotTitle">${viewerCopy("viewer.pane.screenshot")}</h2>
+          ${S.viewer.coordinatesVerified?"":`<span class="hint" data-sync-id="viewer.pane.coordinatesUnverified">${viewerCopy("viewer.pane.coordinatesUnverified")}</span>`}
           <label class="trailing"><input type="checkbox" data-sync-id="viewer.showBounds" ${S.viewer.showBounds?"checked":""} onchange="toggleViewerBounds()"> ${viewerCopy("viewer.pane.showBounds")}</label></div>
-        <div class="viewer-screen-canvas">${viewerScreenshotHTML()}</div>
+        <div class="viewer-screen-canvas">${S.viewer.screenshotAvailable
+          ?viewerScreenshotHTML()
+          :`<p class="empty" data-sync-id="viewer.screenshot.unavailable">${viewerCopy("viewer.screenshot.unavailable")}</p>`}</div>
+        ${S.viewer.coordinatesVerified?"":`<p class="hint" style="color:var(--warn)" data-sync-id="viewer.screenshot.unverifiedDetail">${viewerCopy("viewer.screenshot.unverifiedDetail")}</p>`}
       </section>
       <div class="viewer-devtools" style="--viewer-tree-size:${S.viewer.treeSize}%">
         <section class="viewer-tree-pane" aria-labelledby="viewerTreeTitle">
@@ -2119,7 +2357,9 @@ function pViewer(){
         <section class="viewer-inspector" aria-label="${viewerCopy("viewer.pane.inspector")}">${viewerInspectorHTML(node)}</section>
       </div>
     </div>
-    <div class="viewer-footer" data-sync-id="viewer.footer" role="status" aria-live="polite">${VIEWER_NODES.length} ${viewerCopy("viewer.footer.nodes")} · submit 112ms · run 1.84s · list 38ms · read 428KB/91ms (4.6 MB/s) · parse 24ms · Σ 2.11s</div>`}`;
+    <div class="viewer-footer" data-sync-id="viewer.footer" role="status" aria-live="polite">${VIEWER_NODES.length} ${viewerCopy("viewer.footer.nodes")}${S.viewer.metrics
+      ?" · submit 112ms · run 1.84s · list 38ms · read 428KB/91ms (4.6 MB/s) · parse 24ms · Σ 2.11s"
+      :` · ${viewerCopy("viewer.footer.notMeasured")}`}</div>`}`;
 }
 
 /* ---------- Trace ---------- */
