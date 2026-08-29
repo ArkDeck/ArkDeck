@@ -128,8 +128,9 @@ read them before styling anything. Per-component API and examples:
 const { WindowFrame, Card, Button, Chip, DeterminateProgress } = window.ArkDeckDS;
 
 <div className="ad-root" style={{ padding: 24 }}>
-  <WindowFrame title="ArkDeck — 刷机" toolbar={<Button>AC 标注</Button>}>
-    <h1 style={{ margin: 0 }}>刷机</h1>
+  <WindowFrame title="ArkDeck — Flash" toolbar={<Button>AC 标注</Button>}>
+    {/* No page heading here: the window frame already carries the page name,
+        and spec §3/§6/§8 allow one perceivable main title per detail pane. */}
     <p style={{ margin: 0, color: "var(--ad-ink-2)" }}>
       选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。
     </p>
