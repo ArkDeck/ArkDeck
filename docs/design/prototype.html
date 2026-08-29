@@ -962,11 +962,27 @@ const S = {
   acMode:false, drawerOpen:false, sidebarOpen:true, appearance:["light","dark"].includes(PARAMS.get("appearance"))?PARAMS.get("appearance"):"system", lastChecked:null,
   deviceCompact:PARAMS.get("deviceWidth")==="compact",
   deviceDetail:["ready","authorizedUnadopted","offline","needsRecheck","unknownState"].includes(PARAMS.get("deviceDetail"))?PARAMS.get("deviceDetail"):"ready",
+  overview:{
+    device:["bound","multi","none"].includes(PARAMS.get("overviewDevice"))?PARAMS.get("overviewDevice"):"bound",
+    server:["bound","loading","unbound","stale","unavailable"].includes(PARAMS.get("overviewServer"))?PARAMS.get("overviewServer"):"bound",
+    records:["available","loading","unavailable","empty"].includes(PARAMS.get("overviewRecords"))?PARAMS.get("overviewRecords"):"available",
+    // `detailNotLoaded` is a real disposition: the run's evidence has not been
+    // read yet, so "run it again" is neither offered nor refused.
+    evidence:PARAMS.get("overviewEvidence")==="pending"?"pending":"loaded",
+    expanded:new Set(),
+    target:"TGT-958780b2ffb7"},
   deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
   viewer:{hasCapture:PARAMS.get("viewerState")==="captured",selected:42,showBounds:false,query:"",tab:PARAMS.get("viewerTab")||"attributes",advancedQuery:"",advancedState:PARAMS.get("advancedState")||"ready",capturedAt:"2026-08-25T02:08:31Z",treeSize:60,expanded:new Set([1,3,8,18,21,22,23,24,25,26,31,40,50])},
-  trace:{running:false,duration:10,unit:"seconds",profile:"arkuiDeep",availability:PARAMS.get("traceState")==="ready"?"available":"unavailable"},
+  trace:{running:false,duration:10,unit:"seconds",profile:"arkuiDeep",
+    availability:PARAMS.get("traceState")==="ready"?"available":PARAMS.get("traceState")==="checking"?"checking":"unavailable",
+    hasTarget:PARAMS.get("traceState")!=="noTarget",
+    // Terminal capture outcomes and the viewer artifact are separate facts in
+    // the App: a finished Job does not imply a readable trace.
+    terminal:["succeeded","outcomeUnknown","notCompleted"].includes(PARAMS.get("traceCapture"))?PARAMS.get("traceCapture"):null,
+    artifact:["preparing","latest","failure"].includes(PARAMS.get("traceArtifact"))?PARAMS.get("traceArtifact"):"empty",
+    submissionFailure:null},
   traceViewer:{state:PARAMS.get("traceViewerState")||"empty",selection:PARAMS.get("traceSelection")||"none",
     dock:PARAMS.get("traceDock")==="bottom"?"bottom":"trailing",inspector:true,query:"",process:"",event:"render",
     range:[2.1,3.8],zoom:1,marks:[],flags:[],annotationSequence:1,editingAnnotation:null,recent:["sample-render.ftrace","missing-source.htrace"]},
@@ -985,7 +1001,11 @@ const S = {
   fwd:[], forwardDirection:"forward",
   cmd:{val:"device.packageInventory", hist:[]},
   flashPrerequisitesReady:true, loaderBound:true, flashJob:null, flashImage:null, flashView:"idle",
-  flashAvailability:PARAMS.get("flashState")==="hardwareGated"?"hardwareGated":"available",
+  // One closed scenario token drives the states the App reaches from real
+  // Runtime facts: availability, whether a target exists, image import and
+  // validation, and a non-successful terminal result.
+  flashScenario:["checking","hardwareGated","noDevice","importing","invalid","failed"].includes(PARAMS.get("flashState"))?PARAMS.get("flashState"):"available",
+  flashAvailability:PARAMS.get("flashState")==="hardwareGated"?"hardwareGated":PARAMS.get("flashState")==="checking"?"checking":"available",
   flashDeviceAccess:["available","unavailable"].includes(PARAMS.get("deviceAccess"))?PARAMS.get("deviceAccess"):"absent",
   flashProgress:{stage:"idle",tick:0,bytesDone:0,totalBytes:0},lastFlash:null,
   debugTab:PARAMS.get("debugTab")||"artifacts",
@@ -996,6 +1016,12 @@ const S = {
   hap:{available:PARAMS.get("hapState")!=="unavailable",file:null,additional:[],bundle:"",ability:"",install:"installOrReplace",cleanup:"uninstall",postRun:"stopped",diagnostics:true,seconds:"30"},
   hf:{kind:"all",query:"",status:"all",mode:"all",target:"all",session:"all",time:"all"}, histSel:"S-0826-01", histSeq:1, historyLimit:6, savedHistoryFilter:null, historyFiltersOpen:false,
   hdcSel:"deveco",
+  // Settings panes read on demand, so every pane has the same three row states
+  // plus its own domain branches; the App renders them from one shared row.
+  settings:{
+    state:["loading","error","success"].includes(PARAMS.get("settingsState"))?PARAMS.get("settingsState"):"ready",
+    storage:["invalid","unknownPressure","measurementUnavailable"].includes(PARAMS.get("settingsStorage"))?PARAMS.get("settingsStorage"):"ok",
+    activeJobs:PARAMS.get("settingsJobs")==="active"},
   jobs:[], jobSeq:1
 };
 const DEVICES=[
@@ -1005,17 +1031,17 @@ const DEVICES=[
 const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug","debug","Debug"],
   ["dump","dump","Viewer"],["trace","trace","Trace"],["device-control","device","Device"],["diagnostics","diagnostics","Diagnostics"],["history","history","History"]];
 const HIST=[
-  {id:"S-0826-01",kind:"flash",op:"flash.full-restore@1",st:"succeeded",mode:"execute",dev:"DAYU200",target:"target-demo-dayu200",actualEffect:"destructive",bindingRevision:7,outcomeUnknown:false,artifacts:[{name:'post-flash-facts.json',role:'raw',privacy:'sensitive',status:'published'},{name:'post-flash-hilog.txt',role:'raw',privacy:'sensitive',status:'published'},{name:'flash-report.json',role:'derived',privacy:'standard',status:'published'}],what:"OpenHarmony 5.0.0.71",detail:"dayu200-openharmony-5.0.0.71.tar.gz · flash.full-restore@1",createdAtUTC:"2026-08-26T06:29:00Z",finishedAtUTC:"2026-08-26T06:32:00Z",timeline:['queued','preflight','running','waitingForDevice','succeeded'],when:"今天 14:32",day:"今天",icon:"flash",action:"在 Flash 中打开"},
-  {id:"S-0826-02",kind:"viewer",op:"capture.diagnostics@1",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页组件树",detail:"128 个节点 · /settings/display",when:"今天 13:48",day:"今天",icon:"dump",action:"在 Viewer 中打开"},
-  {id:"S-0826-03",kind:"trace",op:"capture.diagnostics@1",hasTrace:true,st:"succeeded",mode:"execute",dev:"DAYU200",what:"应用响应 · 30 秒",detail:"trace.htrace · capture.diagnostics@1",when:"今天 13:31",day:"今天",icon:"trace",action:"打开 Trace"},
-  {id:"S-0826-04",kind:"diagnostics",st:"succeeded",mode:"execute",dev:"DAYU200",what:"设置页启动闪退",detail:"bounded HiLog + screenshot · no ring session",when:"今天 11:06",day:"今天",icon:"diagnostics",action:"打开诊断记录"},
-  {id:"S-0825-01",kind:"viewer",st:"succeeded",mode:"execute",dev:"DAYU200",what:"桌面窗口结构",detail:"96 个节点 · 截图已关联",when:"昨天 17:20",day:"昨天",icon:"dump",action:"在 Viewer 中打开"},
-  {id:"S-0713-06", kind:"trace", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
-  {id:"S-0712-01", kind:"trace", st:"succeeded",   mode:"execute",   dev:"DAYU200", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
+  {id:"S-0826-01",kind:"flash",op:"flash.full-restore@1",st:"succeeded",mode:"execute",dev:"DAYU200",target:"target-demo-dayu200",actualEffect:"destructive",bindingRevision:7,outcomeUnknown:false,artifacts:[{name:'post-flash-facts.json',role:'raw',privacy:'sensitive',status:'published'},{name:'post-flash-hilog.txt',role:'raw',privacy:'sensitive',status:'published'},{name:'flash-report.json',role:'derived',privacy:'standard',status:'published'}],what:"OpenHarmony 5.0.0.71",detail:"dayu200-openharmony-5.0.0.71.tar.gz · flash.full-restore@1",createdAtUTC:"2026-08-26T06:29:00Z",finishedAtUTC:"2026-08-26T06:32:00Z",timeline:['queued','preflight','running','waitingForDevice','succeeded'],when:{zh:"今天 14:32",en:"Today 14:32"},day:"今天",icon:"flash",action:"在 Flash 中打开"},
+  {id:"S-0826-02",kind:"viewer",op:"capture.diagnostics@1",st:"succeeded",mode:"execute",dev:"DAYU200",thread:"t-design-viewer",what:{zh:"设置页组件树",en:"Settings page component tree"},detail:{zh:"128 个节点 · /settings/display",en:"128 nodes · /settings/display"},when:{zh:"今天 13:48",en:"Today 13:48"},day:"今天",icon:"dump",action:"在 Viewer 中打开"},
+  {id:"S-0826-03",kind:"trace",op:"capture.diagnostics@1",hasTrace:true,st:"succeeded",mode:"execute",dev:"DAYU200",what:{zh:"应用响应 · 30 秒",en:"App responsiveness · 30 s"},detail:"trace.htrace · capture.diagnostics@1",when:{zh:"今天 13:31",en:"Today 13:31"},day:"今天",icon:"trace",action:"打开 Trace"},
+  {id:"S-0826-04",kind:"diagnostics",st:"succeeded",mode:"execute",dev:"DAYU200",what:{zh:"设置页启动闪退",en:"Settings page crashes on launch"},detail:"bounded HiLog + screenshot · no ring session",when:{zh:"今天 11:06",en:"Today 11:06"},day:"今天",icon:"diagnostics",action:"打开诊断记录"},
+  {id:"S-0825-01",kind:"viewer",st:"succeeded",mode:"execute",dev:"DAYU200",thread:"t-design-viewer",what:{zh:"桌面窗口结构",en:"Home screen window structure"},detail:{zh:"96 个节点 · 截图已关联",en:"96 nodes · screenshot linked"},when:{zh:"昨天 17:20",en:"Yesterday 17:20"},day:"昨天",icon:"dump",action:"在 Viewer 中打开"},
+  {id:"S-0713-06", kind:"trace", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:{zh:"Trace · 渲染/动画 30s（用户取消）",en:"Trace · rendering/animation 30s (cancelled by user)"}, when:"07-13 10:21"},
+  {id:"S-0712-01", kind:"trace", st:"succeeded",   mode:"execute",   dev:"DAYU200", what:{zh:"Trace · ArkUI 深度 15s",en:"Trace · ArkUI depth 15s"}, when:"07-12 14:02"},
   {id:"S-0712-02", kind:"flash", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200", when:"07-12 15:40"},
-  {id:"S-0712-03", kind:"flash", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景(reconcile 一致)", when:"07-12 16:11"},
+  {id:"S-0712-03", kind:"flash", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:{zh:"Flash · 断连注入场景（reconcile 一致）",en:"Flash · disconnect-injection fixture (reconcile agrees)"}, when:"07-12 16:11"},
   {id:"S-0711-04", kind:"flash", st:"interrupted", mode:"execute",   dev:"DAYU200", what:"Flash · flash-partitions(outcomeUnknown)", when:"07-11 23:47"},
-  {id:"S-0711-05", kind:"viewer", st:"failed",      mode:"execute",   dev:"DAYU200", what:"Viewer · elementTree(设备离线)", when:"07-11 20:15"}
+  {id:"S-0711-05", kind:"viewer", st:"failed",      mode:"execute",   dev:"DAYU200", what:{zh:"Viewer · elementTree（设备离线）",en:"Viewer · elementTree (device offline)"}, when:"07-11 20:15"}
 ];
 HIST.push(
   {id:"S-0825-02",kind:"debug",st:"succeeded",mode:"execute",dev:"DAYU200",what:"Debug · libentry.so",detail:"deploy.native-library.app-owned@1",when:"08-25 16:00",day:"昨天",icon:"debug"},
@@ -1082,6 +1108,7 @@ if(HILOG_SUMMARY_SAMPLES[PARAMS.get('hilogSummary')]){
 }
 // Explicit design fixtures, never Runtime evidence. Keep retained unknowns
 // first to exercise the same attention-first page order as the native App.
+if(S.flashScenario==="failed"){S.flashImage={name:"dayu200-openharmony-5.0.0.71.tar.gz",sizeBytes:6400000000};S.flashView="stopped";}
 if(['retained','unknown','waiting','running'].includes(PARAMS.get('flashHistory'))){
   const sample={kind:'flash',op:'flash.dayu200',st:'waitingForRecovery',mode:'execute',dev:'DAYU200',target:'target-demo-dayu200',what:'Flash · retained unknown',detail:'Design sample · original outcome remains unknown',when:'Design sample',day:'今天',icon:'flash',outcomeUnknown:true,timeline:['queued','running','waitingForRecovery']};
   HIST.unshift(
@@ -1124,15 +1151,25 @@ const COPY={
     "deviceNotice.unknownState":"工具报告了未识别的状态：Recovery。按原文展示，不做解读。",
     adoptViaCLI:"接管（建立持久绑定）由 CLI 执行：arkdeck device adopt。本 App 不提交接管操作。",
     flashTitle:"刷机",flashSubtitle:"选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。",flashReady:"设备已就绪",flashChecks:"3 项必需安全检查通过",
-    chooseImage:"选择镜像…",changeImage:"更换镜像…",chooseImageTitle:"选择要刷入的镜像",chooseImageHelp:"支持 Runtime 已发布的 DAYU200 镜像包",
+    flashRefresh:"刷新刷机状态",flashChecking:"正在检查设备",flashCheckingDetail:"Runtime 正在校验所选镜像与设备事实",
+    flashAvailabilityChecking:"正在检查 Runtime 可用性",flashNoDevice:"需要设备",flashNoDeviceDetail:"请连接并接管一台 DAYU200 目标",
+    flashDeviceNone:"没有当前设备",flashTargetGuidance:"请先在 ArkDeck Runtime 中连接并接管 DAYU200，然后刷新此工作区。",
+    flashImporting:"正在导入镜像",flashValidating:"正在校验镜像并生成精确计划…",flashInvalid:"请选择完整且有效的 DAYU200 镜像压缩包。",flashImageRetry:"重新校验镜像",
+    flashChooseImage:"选择镜像后执行精确安全检查",flashStopped:"刷机已停止",flashResultFailed:"Runtime 报告失败。开始恢复前，请从 Job 记录确认最后完成的阶段。",
+    flashResultUnverified:"Runtime 未提供完整的刷写后证明；设备不会显示为刷机成功。",
+    chooseImage:"选择镜像…",changeImage:"更换镜像…",chooseImageTitle:"选择要刷入的镜像",chooseImageHelp:"请选择 .tar.gz、.zip 或 .7z 格式的 DAYU200 镜像压缩包",
     startFlash:"擦除数据并开始刷机",flashImpact:"将擦除 DAYU200 上的用户数据。请保持设备连接和稳定供电。",flashDetails:"查看刷机详情",
     preparing:"正在准备镜像",enteringLoader:"正在进入 Loader",writing:"正在写入镜像",verifying:"写入完成，正在重启并验证",estimatedProgress:"镜像写入估算",confirmedBytes:"已确认写入",
     stagePrepare:"准备",stageWrite:"写入镜像",stageVerify:"重启与验证",keepConnected:"刷机过程中请勿拔线、断电或合盖。当前分区写入不会被强制中断。",
-    flashSuccess:"刷机成功",flashSuccessBody:"设备已重新连接，回报版本与所选镜像一致。",flashAgain:"再次刷机",openHistory:"打开历史记录",elapsed:"用时 3 分 18 秒",
+    flashSuccess:"刷机成功",flashSuccessBody:"设备已重新连接，回报构建版本与绑定均与所选镜像及精确计划一致。",flashAgain:"再次刷机",openHistory:"打开历史记录",elapsed:"用时 3 分 18 秒",
     traceWorkspaceSummary:"从已接管的 OpenHarmony 设备抓取 Trace，然后在内置查看器中分析。",traceCaptureTitle:"抓取 Trace",traceAvailable:"可以抓取",traceUnavailable:"暂时无法抓取",
     traceDevice:"设备",traceProfile:"抓取场景",traceDuration:"时长",traceSeconds:"秒",traceMinutes:"分钟",traceQuick:"快捷时长",
     traceLocalOnly:"Trace 只保存在这台 Mac，并会在完成后自动打开。",traceAdapterUnsupported:"当前 ArkDeck 版本尚未支持此设备的 hitrace 分类列表。请更新 ArkDeck 或使用已支持的设备。",
     traceRunning:"正在抓取…",traceCancel:"取消抓取",traceStart:"开始抓取",traceViewerTitle:"查看 Trace",traceViewerDescription:"在查看器中打开本地 Trace，或继续查看最近的 Trace。",traceOpenViewer:"打开 Trace 查看器",
+    traceChecking:"正在检查…",traceRefresh:"刷新设备",traceTargetEmpty:"没有已接管的设备。请连接并接管设备，然后刷新。",traceBlockerTarget:"请选择已接管的设备。",
+    traceFinished:"抓取完成。",traceNotCompleted:"抓取已结束，但没有可查看的 Trace。请打开历史记录了解详情。",traceOutcomeUnknown:"抓取结果未知。再次抓取前请先查看历史记录。",
+    traceViewerLatest:"最新抓取的 Trace 已就绪",traceViewerPreparing:"正在校验并打开抓取的 Trace…",traceViewerTryAgain:"重试打开 Trace",
+    traceViewerArtifactInvalid:"抓取已完成，但没有发布有效的原始 Trace。请打开历史记录检查任务。",
     traceProfileApp:"应用响应",traceProfileAppDetail:"适合分析交互迟缓、布局耗时和 ArkUI 卡顿。",traceProfileRender:"渲染与动画",traceProfileRenderDetail:"适合分析出帧、图形和动画问题。",
     traceProfileCPU:"CPU 调度",traceProfileCPUDetail:"适合分析线程调度、资源争用和 IPC 问题。",traceProfileIO:"I/O",traceProfileIODetail:"适合分析文件、存储和工作队列问题。",traceProfileSystem:"系统概览",traceProfileSystemDetail:"覆盖最广的系统活动，生成的 Trace 也最大。"},
   en:{devices:"Devices",workflows:"Workflows",jobs:"Job inspector",emptyJobs:"No running jobs",appearance:"System appearance",ac:"AC labels",
@@ -1144,20 +1181,37 @@ const COPY={
     "deviceNotice.offline":"The device reports Offline. Check the USB connection, then re-check.","deviceNotice.needsRecheck":"Status needs re-check",
     "deviceNotice.unknownState":"The tool reports an unrecognized state: Recovery. Shown as-is, not interpreted.",
     adoptViaCLI:"Adoption (durable binding) is performed from the CLI: arkdeck device adopt. This App does not submit adoption.",
-    flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"3 required safety checks passed",
-    chooseImage:"Choose image…",changeImage:"Change image…",chooseImageTitle:"Choose an image to flash",chooseImageHelp:"Supports DAYU200 image bundles published by Runtime",
+    flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"3 required safety check(s) passed",
+    flashRefresh:"Refresh Flash facts",flashChecking:"Checking device",flashCheckingDetail:"Runtime is validating the selected image and device facts",
+    flashAvailabilityChecking:"Checking Runtime availability",flashNoDevice:"Device required",flashNoDeviceDetail:"Connect and adopt one DAYU200 target",
+    flashDeviceNone:"No current device",flashTargetGuidance:"Connect and adopt a DAYU200 in ArkDeck Runtime, then refresh this workspace.",
+    flashImporting:"Importing image",flashValidating:"Validating the image and materializing the exact plan…",flashInvalid:"Choose a complete, valid DAYU200 image archive.",flashImageRetry:"Retry image validation",
+    flashChooseImage:"Choose an image to run the exact safety checks",flashStopped:"Flash stopped",flashResultFailed:"Runtime reports failure. Use the Job record to find the last confirmed stage before recovery.",
+    flashResultUnverified:"Runtime did not provide complete postflight proof. The device is not shown as successfully flashed.",
+    chooseImage:"Choose image…",changeImage:"Change image…",chooseImageTitle:"Choose an image to flash",chooseImageHelp:"Choose a .tar.gz, .zip, or .7z DAYU200 image archive",
     startFlash:"Erase data and start flashing",flashImpact:"This erases user data on DAYU200. Keep the device connected to stable power.",flashDetails:"Show flash details",
     preparing:"Preparing image",enteringLoader:"Entering Loader",writing:"Writing image",verifying:"Write complete — rebooting and verifying",estimatedProgress:"Estimated image write",confirmedBytes:"Confirmed written",
     stagePrepare:"Prepare",stageWrite:"Write image",stageVerify:"Reboot & verify",keepConnected:"Do not unplug, power off, or close the Mac during flashing. The current partition write will not be force-stopped.",
-    flashSuccess:"Flash succeeded",flashSuccessBody:"The device reconnected and its reported build matches the selected image.",flashAgain:"Flash again",openHistory:"Open History",elapsed:"3 min 18 sec",
+    flashSuccess:"Flash succeeded",flashSuccessBody:"The device reconnected and its reported build and binding match the selected image and exact plan.",flashAgain:"Flash again",openHistory:"Open History",elapsed:"3 min 18 sec",
     traceWorkspaceSummary:"Capture a trace from an adopted OpenHarmony device, then inspect it in the built-in viewer.",traceCaptureTitle:"Capture trace",traceAvailable:"Ready",traceUnavailable:"Unavailable",
     traceDevice:"Device",traceProfile:"Profile",traceDuration:"Duration",traceSeconds:"Seconds",traceMinutes:"Minutes",traceQuick:"Quick duration",
     traceLocalOnly:"The trace stays on this Mac and opens automatically.",traceAdapterUnsupported:"This device's hitrace category list is not supported by this ArkDeck version. Update ArkDeck or use a supported device.",
     traceRunning:"Capturing…",traceCancel:"Cancel capture",traceStart:"Start capture",traceViewerTitle:"View traces",traceViewerDescription:"Open a local trace or choose a recent trace in the viewer.",traceOpenViewer:"Open trace viewer",
+    traceChecking:"Checking…",traceRefresh:"Refresh devices",traceTargetEmpty:"No adopted devices. Connect and adopt a device, then refresh.",traceBlockerTarget:"Select an adopted device.",
+    traceFinished:"Capture complete.",traceNotCompleted:"Capture ended without a viewable trace. Open History for details.",traceOutcomeUnknown:"Capture outcome is unknown. Check History before starting another capture.",
+    traceViewerLatest:"Latest captured trace is ready",traceViewerPreparing:"Verifying and opening the captured trace…",traceViewerTryAgain:"Try opening trace again",
+    traceViewerArtifactInvalid:"Capture completed, but no valid raw trace was published. Open History to inspect the job.",
     traceProfileApp:"App responsiveness",traceProfileAppDetail:"Best for slow interactions, layout work and ArkUI jank.",traceProfileRender:"Rendering and animation",traceProfileRenderDetail:"Best for frame production, graphics and animation issues.",
     traceProfileCPU:"CPU scheduling",traceProfileCPUDetail:"Best for thread scheduling, contention and IPC investigations.",traceProfileIO:"I/O",traceProfileIODetail:"Best for file, storage and work-queue investigations.",traceProfileSystem:"System overview",traceProfileSystemDetail:"Captures the broadest system activity and produces the largest trace."}
 };
 function tx(key){return COPY[S.language][key]||key;}
+/** History sample rows carry record-summary copy, not device output, so their
+ *  visible fields are language pairs. Strings (IDs, timestamps already in a
+ *  neutral form, Runtime-reported values) pass through unchanged. */
+function histText(value){
+  if(value&&typeof value==="object"&&!Array.isArray(value))return S.language==="en"?value.en:value.zh;
+  return value;
+}
 function lc(zh,en){return S.language==="en"?en:zh;}
 
 /* ---------- helpers ---------- */
@@ -1232,6 +1286,7 @@ document.addEventListener("keydown",e=>{
     if(disclosure){e.preventDefault();disclosure.open=!disclosure.open;}return;
   }
   if(!host.firstElementChild&&(e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==="j"){e.preventDefault();toggleDrawer();return;}
+  if(!host.firstElementChild&&S.nav==="overview"&&(e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key.toLowerCase()==="r"){e.preventDefault();refreshOverview();return;}
   if(e.key==="Escape"&&host.firstElementChild){e.preventDefault();closeModal();return;}
   if(dismissHistoryPopoverOnEscape(e))return;
   if(e.key!=="Tab"||!host.firstElementChild)return;
@@ -1294,7 +1349,7 @@ function renderDrawer(){
 function inspectorJobs(){
   if(S.jobs.length)return S.jobs.slice().reverse();
   if(PARAMS.get('jobState'))return [{id:'job-demo-global',kind:'diagnostics',standardLog:'capture.log',title:'capture.diagnostics@1',operation:'capture.diagnostics@1',state:PARAMS.get('jobState')==='unknown'?'waitingForRecovery':PARAMS.get('jobState'),outcomeUnknown:PARAMS.get('jobState')==='unknown',mode:'execute',target:'TGT-958780b2ffb7',dev:'TGT-958780b2ffb7',log:['queued','preflight','running']}];
-  return HIST.slice(0,4).map(h=>({id:h.id,title:h.what,operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:(h.artifacts||[]).find(a=>a.role==='log'&&a.privacy==='standard'&&a.status==='published')?.name||null}));
+  return HIST.slice(0,4).map(h=>({id:h.id,title:histText(h.what),operation:h.op||null,state:h.st,outcomeUnknown:h.outcomeUnknown,mode:h.mode,dev:h.target||h.dev,log:h.timeline,standardLog:(h.artifacts||[]).find(a=>a.role==='log'&&a.privacy==='standard'&&a.status==='published')?.name||null}));
 }
 function inspectorCanCancel(job){
   return !job.outcomeUnknown&&['queued','planning','preflight','running','waitingForDevice','awaitingRebindConfirmation'].includes(job.state);
@@ -1381,22 +1436,244 @@ function continuationDraftHTML(){
   const c=S.continuation;if(!c||c.page!==S.nav)return '';
   return `<section class="card" data-sync-id="overview.continuation"><div class="device-actions"><b>${lc('来自历史记录的新草稿','New draft from history')}</b><span class="mono">${esc(c.source)}</span><span class="spacer"></span><button class="btn" onclick="S.continuation=null;renderPage()">${lc('关闭草稿','Close draft')}</button></div><p class="hint">${lc('仅复制 typed inputs 和 调试线来源。不会带入旧授权、Artifact lease 或 Runtime Session 身份。','Copies typed inputs and thread provenance only. Past authority, Artifact leases and Runtime Session identities are not carried over.')}</p><details open><summary>${lc('原始输入与调试线','Original inputs and thread')}</summary><pre class="logtail">${esc(JSON.stringify(c.inputs,null,2))}</pre><p class="hint mono">${esc(c.thread||'—')}</p></details><div class="device-actions"><button class="btn pri" ${c.attempted?'disabled':''} onclick="submitContinuationPreview()">${lc('启动新的只读 Job','Start New Read-Only Job')}</button>${c.attempted?`<span class="hint" role="status">${lc('设计演示未派发，也未创建 Job。实际 App 在提交前重新核对设备与来源记录。','No Job is dispatched or created in this design demo. The App checks fresh target and source facts before submitting.')}</span>`:''}</div></section>`;
 }
+/** Mirrors `Localizable.xcstrings` overview.record.* — the App's own wording,
+ *  so a rename on either side is visible in the design tests. */
+const OVERVIEW_COPY={
+  "overview.record.device.label":["本页描述的设备","Device this page describes"],
+  "overview.record.device.choose":["选择一台设备…","Choose a device…"],
+  "overview.record.device.none":["暂无在线设备","No online device"],
+  "overview.record.device.noneDetail":["请连接一台已接管的设备后刷新。","Connect an adopted device, then refresh."],
+  "overview.record.remoteServer.label":["远端构建服务器","Remote build server"],
+  "overview.record.remoteServer.loading":["正在读取绑定…","Checking binding…"],
+  "overview.record.remoteServer.bound":["已绑定","Bound"],
+  "overview.record.remoteServer.unbound":["未绑定","Not bound"],
+  "overview.record.remoteServer.unboundDetail":["在 Debug 中选择远端产物后，会把已验证服务器绑定到当前目标。","Choose a remote artifact in Debug to bind a verified server to this target."],
+  "overview.record.remoteServer.stale":["绑定需要处理","Binding needs attention"],
+  "overview.record.remoteServer.staleDetail":["已绑定的服务器已被删除，请在 Debug 中重新选择远端产物。","The bound server was removed. Choose another remote artifact in Debug."],
+  "overview.record.remoteServer.unavailable":["无法读取绑定","Binding unavailable"],
+  "overview.environment.title":["运行环境","Environment"],
+  "overview.environment.expanded":["已展开","Expanded"],
+  "overview.environment.collapsed":["已收起","Collapsed"],
+  "overview.status.refreshing":["正在刷新……","Refreshing…"],
+  "hdc.devices.refresh":["刷新设备","Refresh Devices"],
+  "overview.record.next.title":["下一步","Next step"],
+  "overview.record.next.attention":["需要处理","Needs attention"],
+  "overview.record.next.empty.title":["从左侧工作流开始","Start from a workflow in the sidebar"],
+  "overview.record.next.empty.detail":["Viewer、Trace、Debug、Flash 和 Device 已经是最短入口；新的运行与产物会自动出现在这里。","Viewer, Trace, Debug, Flash and Device already provide the shortest route. New runs and artifacts will appear here automatically."],
+  "overview.record.next.unknownDetail":["外部效果未知，原请求不会重放；请到 History 查看持久化恢复证据。","The external effect is unknown. The original request will not be replayed; inspect durable recovery evidence in History."],
+  "overview.record.next.waitingDetail":["Runtime 正在等待必要的人工动作，请打开 Job 从已记录边界继续。","Runtime is waiting for a required human action. Open the Job to continue from the recorded boundary."],
+  "overview.record.recent.title":["最近的工作","Recent Work"],
+  "overview.record.recent.all":["全部记录 ›","All records ›"],
+  "overview.record.recent.empty":["还没有最近运行，请从左侧工作流开始。","No recent runs yet. Start from a workflow in the sidebar."],
+  "overview.record.recent.unavailable.title":["无法读取 Runtime 记录","Runtime history could not be read"],
+  "overview.record.thread.needsAttention":["需要你处理","Needs you"],
+  "overview.record.thread.ungrouped":["未分组的运行","ungrouped run"],
+  "overview.record.run.open":["在 History 中查看","View in History"],
+  "overview.record.run.again":["再来一次","Run it again"],
+  "overview.record.run.againGated":["再来一次…","Run it again…"],
+  "overview.record.run.outcomeUnknown":["外部效果未知","external effect unknown"],
+  "overview.record.refusal.neverReplayed":["不可重放","never replayed"],
+  "overview.record.refusal.notTerminal":["仍在运行","still running"],
+  "overview.record.refusal.effectUnknown":["未记录效果分级","effect grade unrecorded"],
+  "overview.record.refusal.parametersNotReported":["未上报 typed inputs","typed inputs unreported"],
+  "overview.record.state.succeeded":["已成功","Succeeded"],
+  "overview.record.state.failed":["已失败","Failed"],
+  "overview.record.state.cancelled":["已取消","Cancelled"],
+  "overview.record.state.interrupted":["已中断","Interrupted"],
+  "overview.record.state.inProgress":["进行中","In progress"],
+  "overview.record.workspace.viewer":["Viewer 界面检查","Viewer inspection"],
+  "overview.record.workspace.trace":["Trace 抓取","Trace capture"],
+  "overview.record.workspace.debug":["HAP 调试","HAP debugging"],
+  "overview.record.workspace.flash":["设备刷机","Device flash"],
+  "overview.record.workspace.device":["真机操作","Device control"]
+};
+function overviewCopy(key){const pair=OVERVIEW_COPY[key];return pair?(S.language==="en"?pair[1]:pair[0]):key;}
+/** `overview.record.binding` / `runCount` / `thread.more` / `residue` / `next.*Detail` carry counts. */
+function overviewCount(key,count,extra){
+  const en=S.language==="en";
+  switch(key){
+    case "binding":return `binding ${count}`;
+    case "runCount":return en?`runs × ${count}`:`${count} 次运行`;
+    case "threadMore":return en?`Show ${count} more runs`:`显示另外 ${count} 次`;
+    case "residue":return en?`residue × ${count}`:`残留 × ${count}`;
+    case "residueDetail":return en
+      ?`This run has ${count} outstanding device effects. Review the Job before changing the target.`
+      :`这次运行还有 ${count} 项设备残留，修改目标前请先查看 Job。`;
+    case "recentDetail":return en
+      ?`Latest result in a line of ${count} runs: ${extra}`
+      :`这条调试线共 ${count} 次运行，最近结果：${extra}`;
+    default:return String(count);
+  }
+}
+
+/* Projection helpers mirroring `OverviewRunRecordProjection`. Grouping, the
+   featured run, the bounded disclosure window and the resume disposition are
+   the same rules the App applies; nothing here reads a Runtime. */
+function overviewRuns(){
+  return S.overview.records==="available"?HIST.slice():[];
+}
+function overviewRunDate(h){const value=Date.parse(h.finishedAtUTC??h.startedAtUTC??h.createdAtUTC);return Number.isFinite(value)?value:null;}
+function overviewNeedsAttention(h){return historyNeedsAttention(h);}
+function overviewThreads(limit=4){
+  const order=[],grouped=new Map();
+  for(const run of overviewRuns()){
+    const key=run.thread?`thread:${run.thread}`:`run:${run.id}`;
+    if(!grouped.has(key)){grouped.set(key,[]);order.push(key);}
+    grouped.get(key).push(run);
+  }
+  const threads=order.map((key,offset)=>{
+    const runs=grouped.get(key);
+    const stamps=runs.map(overviewRunDate).filter(value=>value!==null);
+    return {id:key,threadID:runs[0].thread||null,target:runs[0].target||runs[0].dev,runs,offset,
+      needsAttention:runs.some(run=>overviewNeedsAttention(run)),
+      sortKey:stamps.length?Math.max(...stamps):null};
+  });
+  threads.sort((a,b)=>{
+    if(a.needsAttention!==b.needsAttention)return a.needsAttention?-1:1;
+    if(a.sortKey!==null&&b.sortKey!==null&&a.sortKey!==b.sortKey)return b.sortKey-a.sortKey;
+    if(a.sortKey===null&&b.sortKey!==null)return 1;
+    if(a.sortKey!==null&&b.sortKey===null)return -1;
+    return a.offset-b.offset;
+  });
+  return limit>=0?threads.slice(0,limit):threads;
+}
+function overviewFeaturedRun(thread){
+  return thread.runs.slice().reverse().find(overviewNeedsAttention)||thread.runs[thread.runs.length-1];
+}
+function overviewAdditionalRuns(thread,featured,limit=3){
+  return thread.runs.filter(run=>run.id!==featured.id).slice(-limit).reverse();
+}
+/** Exactly `OverviewRunRecordProjection.resumeDisposition`, in the same order. */
+function overviewDisposition(h){
+  if(h.outcomeUnknown&&!flashEpochEstablished(h))return {kind:"neverReplayed"};
+  if(!["succeeded","failed","cancelled","interrupted","planned"].includes(h.st))return {kind:"notTerminal"};
+  const effect=h.actualEffect||h.effect;
+  if(!effect)return {kind:"effectUnknown"};
+  if(!["readOnly","hostOnly"].includes(effect))return {kind:"requiresAuthorization",effect};
+  if(S.overview.evidence==="pending")return {kind:"detailNotLoaded"};
+  if(!h.inputs)return {kind:"parametersNotReported"};
+  return {kind:"resumable"};
+}
+function overviewWorkspaceTitle(h){
+  const key={viewer:"viewer",trace:"trace",debug:"debug",flash:"flash",device:"device"}[h.kind];
+  return key?overviewCopy("overview.record.workspace."+key):(h.op||h.id).split("@")[0];
+}
+function overviewStateLabel(h){
+  const key={succeeded:"succeeded",failed:"failed",cancelled:"cancelled",interrupted:"interrupted"}[h.st]||"inProgress";
+  return overviewCopy("overview.record.state."+key);
+}
+function overviewStateTone(h){
+  if(overviewNeedsAttention(h))return "warn";
+  return h.st==="succeeded"?"ok":h.st==="failed"?"danger":h.st==="interrupted"?"warn":"dim";
+}
+function overviewRunOutcome(h){
+  const parts=[h.st??lc("未报告","Not reported")];
+  if(h.outcomeUnknown&&!flashEpochEstablished(h))parts.push(overviewCopy("overview.record.run.outcomeUnknown"));
+  if(h.outstandingResidueCount>0)parts.push(overviewCount("residue",h.outstandingResidueCount));
+  const when=h.finishedAtUTC??h.startedAtUTC??h.createdAtUTC??histText(h.when);
+  if(when)parts.push(when);
+  return parts.join(" · ");
+}
+function overviewNextDetail(thread,run){
+  if(run.outcomeUnknown&&!flashEpochEstablished(run))return overviewCopy("overview.record.next.unknownDetail");
+  if(run.waitingForHuman)return overviewCopy("overview.record.next.waitingDetail");
+  if(run.outstandingResidueCount>0)return overviewCount("residueDetail",run.outstandingResidueCount);
+  return overviewCount("recentDetail",thread.runs.length,overviewRunOutcome(run));
+}
+function toggleOverviewThread(id){
+  if(S.overview.expanded.has(id))S.overview.expanded.delete(id);else S.overview.expanded.add(id);
+  renderPage();
+}
+function refreshOverview(){S.lastChecked=null;renderPage();}
+
+function overviewDeviceScopeHTML(){
+  const label=`<span class="hint">${overviewCopy("overview.record.device.label")}</span>`;
+  if(S.overview.device==="none")
+    return `<div data-sync-id="overview.record.device.name">${label}<h2>${overviewCopy("overview.record.device.none")}</h2><span class="hint">${overviewCopy("overview.record.device.noneDetail")}</span></div>`;
+  if(S.overview.device==="multi")
+    return `<div data-sync-id="overview.record.device.picker">${label}<select class="inp" aria-label="${overviewCopy("overview.record.device.label")}"><option value="">${overviewCopy("overview.record.device.choose")}</option><option selected>DAYU200 · TGT-958780b2ffb7</option><option>DAYU200-b · TGT-4c19f0a77d21</option></select><span class="mono hint">TGT-958780b2ffb7 · ${overviewCount("binding",3)} · USB</span></div>`;
+  return `<div data-sync-id="overview.record.device.name">${label}<h2>DAYU200</h2><span class="mono hint">TGT-958780b2ffb7 · ${overviewCount("binding",3)} · USB</span></div>`;
+}
+function overviewServerScopeHTML(){
+  const label=`<span class="hint">${overviewCopy("overview.record.remoteServer.label")}</span>`;
+  const state=S.overview.server;
+  const body=state==="loading"
+    ?`<p class="hint" role="status">${overviewCopy("overview.record.remoteServer.loading")}</p>`
+    :state==="unbound"
+    ?`<h2>${overviewCopy("overview.record.remoteServer.unbound")}</h2><span class="hint">${overviewCopy("overview.record.remoteServer.unboundDetail")}</span>`
+    :state==="stale"
+    ?`<h2>${overviewCopy("overview.record.remoteServer.stale")}</h2><span class="hint">${overviewCopy("overview.record.remoteServer.staleDetail")}</span>`
+    :state==="unavailable"
+    ?`<h2>${overviewCopy("overview.record.remoteServer.unavailable")}</h2><span class="mono hint">remote_build_source_binding_unreadable</span>`
+    :`<h2>build-nightly <span class="chip ok">${overviewCopy("overview.record.remoteServer.bound")}</span></h2><span class="mono hint" data-sync-id="overview.record.remoteServer.endpoint">builder@build.example.internal:22</span>`;
+  return `<div data-sync-id="overview.record.remoteServer">${label}${body}</div>`;
+}
+function overviewResumeControlHTML(h){
+  const disposition=overviewDisposition(h);
+  if(disposition.kind==="resumable"||disposition.kind==="detailNotLoaded")
+    return `<button class="btn" ${disposition.kind==="detailNotLoaded"?"disabled":""} data-sync-id="overview.record.run.${esc(h.id)}.again" onclick="overviewResume('${h.id}')">${overviewCopy("overview.record.run.again")}</button>`;
+  if(disposition.kind==="requiresAuthorization")
+    return `<button class="btn" data-sync-id="overview.record.run.${esc(h.id)}.again" onclick="overviewResume('${h.id}')">${overviewCopy("overview.record.run.againGated")}</button>`;
+  return `<span class="hint" data-sync-id="overview.record.run.${esc(h.id)}.refusal">${overviewCopy("overview.record.refusal."+disposition.kind)}</span>`;
+}
+function overviewRunRowHTML(h){
+  return `<div class="overview-run" data-sync-id="overview.record.run.${esc(h.id)}">
+    <span class="chip ${overviewStateTone(h)}">${esc(overviewStateLabel(h))}</span>
+    <div><b class="mono">${esc(h.id)}</b>${h.actualEffect||h.effect?` ${effectBadge({readOnly:"host",hostOnly:"host",deviceMutation:"mut",destructive:"destr"}[h.actualEffect||h.effect]||"host",esc(h.actualEffect||h.effect))}`:""}
+      <p class="hint" data-sync-id="overview.record.run.${esc(h.id)}.outcome">${esc(overviewRunOutcome(h))}</p></div>
+    ${overviewResumeControlHTML(h)}
+    <button class="btn" data-sync-id="overview.record.run.${esc(h.id)}.open" onclick="openHistoryRun('${h.id}')">${overviewCopy("overview.record.run.open")}</button>
+  </div>`;
+}
+function overviewThreadHTML(thread){
+  const featured=overviewFeaturedRun(thread);
+  const others=overviewAdditionalRuns(thread,featured);
+  const expanded=S.overview.expanded.has(thread.id);
+  const subtitle=[thread.target||overviewCopy("overview.record.thread.ungrouped"),overviewCount("runCount",thread.runs.length)].join(" · ");
+  return `<div class="card overview-thread ${thread.needsAttention?"attention":""}" data-sync-id="overview.record.thread.${esc(thread.id)}">
+    <div class="device-actions"><span>${icon(featured.icon||"history")}</span>
+      <div><b>${esc(overviewWorkspaceTitle(featured))}</b><p class="hint">${esc(subtitle)}</p></div>
+      <span class="spacer"></span>
+      ${thread.needsAttention?`<span class="chip warn" data-sync-id="overview.record.thread.${esc(thread.id)}.needsAttention">${overviewCopy("overview.record.thread.needsAttention")}</span>`:""}</div>
+    ${overviewRunRowHTML(featured)}
+    ${others.length?`<details ${expanded?"open":""} data-sync-id="overview.record.thread.${esc(thread.id)}.more" ontoggle="if(this.isConnected&&this.open!==${expanded})toggleOverviewThread('${thread.id}')"><summary>${overviewCount("threadMore",others.length)}</summary>${others.map(overviewRunRowHTML).join("")}</details>`:""}
+  </div>`;
+}
+function overviewNextStepHTML(){
+  const threads=overviewThreads();
+  if(!threads.length)
+    return `<div class="card" data-sync-id="overview.record.next.empty"><b>${overviewCopy("overview.record.next.empty.title")}</b><p class="hint">${overviewCopy("overview.record.next.empty.detail")}</p></div>`;
+  const thread=threads[0],run=overviewFeaturedRun(thread);
+  const attention=overviewNeedsAttention(run);
+  return `<div class="card" data-sync-id="overview.record.next.${esc(run.id)}">
+    <div class="device-actions">${icon(attention?"warning":"history")}
+      <div>${attention?`<b>${overviewCopy("overview.record.next.attention")}</b><p><b>${esc(overviewWorkspaceTitle(run))}</b></p>`
+        :`<b>${esc(overviewWorkspaceTitle(run))}</b> <span class="chip ${overviewStateTone(run)}">${esc(overviewStateLabel(run))}</span>`}
+        <p class="hint">${esc(overviewNextDetail(thread,run))}</p>
+        <p class="mono hint">${esc(run.target||run.dev||"—")} · ${esc((run.op||"—").split("@")[0])}</p></div>
+      <span class="spacer"></span></div>
+    <div class="device-actions"><button class="btn" data-sync-id="overview.record.next.open" onclick="openHistoryRun('${run.id}')">${overviewCopy("overview.record.run.open")}</button>${overviewResumeControlHTML(run)}</div>
+  </div>`;
+}
+function overviewRecordsHTML(){
+  if(S.overview.records==="loading")
+    return `<p class="hint" role="status" data-sync-id="overview.record.recent.loading">${lc("正在读取 Runtime 记录…","Reading Runtime records…")}</p>`;
+  if(S.overview.records==="unavailable")
+    return `<div class="warnbox" role="status" data-sync-id="overview.record.recent.unavailable"><div><b>${overviewCopy("overview.record.recent.unavailable.title")}</b><p class="mono">runtime_history_unreachable</p></div></div>`;
+  const threads=overviewThreads();
+  if(!threads.length)
+    return `<p class="hint" data-sync-id="overview.record.empty">${overviewCopy("overview.record.recent.empty")}</p>`;
+  return threads.map(overviewThreadHTML).join("");
+}
 function pOverview(){
-  const latest=HIST.slice(0,4);
   return `<div class="overview-record" data-page-title="Overview">
-    <div class="card overview-scope">
-      <div data-sync-id="overview.record.device.name"><span class="hint">${lc("当前设备","Current device")}</span><h2>DAYU200</h2><span class="mono hint">TGT-958780b2ffb7 · binding 3 · USB</span></div>
-      <div data-sync-id="overview.record.remoteServer"><span class="hint">${lc("编译服务器","Build server")}</span><h2>build-nightly <span class="chip ok">${lc("已绑定","Bound")}</span></h2><span class="mono hint">builder@build.example.internal:22</span></div>
-    </div>
-    <section data-sync-id="overview.record.next"><h2>${lc("下一步","Next step")}</h2><div class="card">
-      <b>${lc("查看最近一次运行","Review the latest run")}</b><p class="hint">${lc("保留原始 Job 身份打开 History；不会重放操作。","Open the original Job in History. No operation is replayed.")}</p>
-      <div><button class="btn pri" onclick="openHistoryRun('${latest[0].id}')">${lc("查看这次运行","View this run")}</button></div>
-    </div></section>
-    <section data-sync-id="overview.record.threads"><h2>${lc("最近工作","Recent work")}</h2>
-      ${latest.map(h=>`<div class="overview-run"><span>${icon(h.icon)}</span><div><b>${esc(h.what)}</b><p class="hint">${esc(h.detail)} · <span class="mono">${h.id}</span></p></div><button class="btn" onclick="openHistoryRun('${h.id}')">${lc("查看这次运行","View this run")}</button><button class="btn" onclick="overviewResume('${h.id}')">${lc("继续…","Continue…")}</button></div>`).join('')}
-      <button class="btn" onclick="go('history')">${lc("全部历史记录","All history")}</button>
+    <div class="device-actions"><span class="spacer"></span><button class="btn" data-sync-id="hdc.devices.refresh" title="⌘R" onclick="refreshOverview()">${overviewCopy("hdc.devices.refresh")}</button></div>
+    <div class="card overview-scope">${overviewDeviceScopeHTML()}${overviewServerScopeHTML()}</div>
+    <section data-sync-id="overview.record.next"><h2>${overviewCopy("overview.record.next.title")}</h2>${overviewNextStepHTML()}</section>
+    <section data-sync-id="overview.record.recent"><div class="device-actions"><h2>${overviewCopy("overview.record.recent.title")}</h2><span class="spacer"></span><button class="btn" data-sync-id="overview.record.recent.all" onclick="go('history')">${overviewCopy("overview.record.recent.all")}</button></div>
+      ${overviewRecordsHTML()}
     </section>
-    <details data-sync-id="overview.environment"><summary>${lc("环境与连接详情","Environment and connection details")}</summary>
+    <details data-sync-id="overview.environment" aria-label="${overviewCopy("overview.environment.title")}"><summary>${overviewCopy("overview.environment.title")}</summary>
       <div class="grid2" style="margin-top:12px"><section class="card"><h2>HDC</h2><dl class="kv"><dt>${lc("来源","Source")}</dt><dd>security-scoped HDC</dd><dt>client / server / daemon</dt><dd>${lc("同一刷新快照","Same refresh snapshot")}</dd><dt>endpoint / SHA-256</dt><dd>${lc("完整值来自 Runtime","Full values come from Runtime")}</dd><dt>${lc("通道保护","Channel protection")}</dt><dd>${lc("加密未验证","Encryption unverified")}</dd></dl></section>
       <section class="card"><h2>${lc("能力与需要处理的事项","Capabilities and attention")}</h2><p>hidumper · hitrace · bytrace · RockUSB Flash</p><p class="hint">${lc("unknown 与 unavailable 保持区分。HDC 恢复需先预览影响并精确匹配 generation；权限问题不自动提权。","Keep unknown separate from unavailable. HDC recovery requires an impact preview and exact generation; permission issues never trigger elevation.")}</p><button class="btn" onclick="overviewHDCImpact()">${lc("预览 HDC 恢复影响…","Preview HDC recovery impact…")}</button></section></div>
     </details>
@@ -1856,9 +2133,34 @@ const TRACE_PROFILES={
 function setTraceDuration(value){S.trace.duration=value;S.trace.submissionFailure=null;renderPage();}
 function traceDurationValid(){const text=String(S.trace.duration).trim();return /^[0-9]+$/.test(text)&&Number(text)>=1&&Number(text)*(S.trace.unit==="minutes"?60:1)<=600;}
 function traceBlocker(){
+  if(!S.trace.hasTarget)return tx("traceBlockerTarget");
+  if(S.trace.availability==="checking")return tx("traceChecking");
   if(S.trace.availability!=="available")return lc("Trace 抓取暂不可用，请刷新后重试。","Trace capture is unavailable. Refresh and try again.");
   if(!traceDurationValid())return lc("请输入允许范围内的时长。","Enter a duration inside the allowed range.");
   return null;
+}
+function traceAvailabilityLabel(){
+  return S.trace.availability==="checking"?tx("traceChecking"):S.trace.availability==="available"?tx("traceAvailable"):tx("traceUnavailable");
+}
+/** The App shows exactly one actionable line: submitting, submission failure,
+ *  the terminal outcome, the first blocker, or the local-only note. */
+function traceCaptureStatusHTML(){
+  if(S.trace.running)return `<span data-sync-id="trace.capture.running">${tx("traceRunning")}</span>`;
+  if(S.trace.submissionFailure)return `<span data-sync-id="trace.submission.failure">${esc(S.trace.submissionFailure)}</span>`;
+  if(S.trace.terminal==="succeeded")return `<span data-sync-id="trace.capture.terminal">${tx("traceFinished")}</span>`;
+  if(S.trace.terminal==="outcomeUnknown")return `<span data-sync-id="trace.capture.terminal">${tx("traceOutcomeUnknown")}</span>`;
+  if(S.trace.terminal==="notCompleted")return `<span data-sync-id="trace.capture.terminal">${tx("traceNotCompleted")}</span>`;
+  return `<span>${traceBlocker()||tx("traceLocalOnly")}</span>`;
+}
+function traceViewerEntryHTML(){
+  const state=S.trace.artifact;
+  if(state==="preparing")
+    return `<p data-sync-id="trace.viewer.preparing" role="status" aria-busy="true">${tx("traceViewerPreparing")}</p>`;
+  if(state==="failure")
+    return `<div data-sync-id="trace.viewer.failure"><p>${tx("traceViewerArtifactInvalid")}</p><button class="btn" data-sync-id="trace.viewer.tryAgain" onclick="S.trace.artifact='latest';renderPage()">${tx("traceViewerTryAgain")}</button></div>`;
+  if(state==="latest")
+    return `<div data-sync-id="trace.viewer.latest"><p>✓ ${tx("traceViewerLatest")}</p><p class="mono">trace.htrace</p></div>`;
+  return `<p data-sync-id="trace.viewer.empty">${tx("traceViewerDescription")}</p>`;
 }
 function setTraceDurationInput(input){
   S.trace.duration=input.value;S.trace.submissionFailure=null;
@@ -1884,11 +2186,14 @@ function pTrace(){
     <p class="trace-summary" data-sync-id="trace.workspace.summary">${tx("traceWorkspaceSummary")}</p>
     <section class="trace-section" aria-labelledby="traceCaptureTitle" data-sync-id="trace.capture.section">
       <div class="trace-section-head"><h2 id="traceCaptureTitle">${tx("traceCaptureTitle")}</h2>
-        <span class="trace-availability ${blocked?"unavailable":"available"}" data-sync-id="trace.availability.status">${blocked?tx("traceUnavailable"):tx("traceAvailable")}</span></div>
+        <span class="trace-availability ${t.availability==="available"?"available":"unavailable"}" data-sync-id="trace.availability.status">${traceAvailabilityLabel()}</span>
+        <span class="spacer"></span><button class="btn" data-sync-id="trace.refresh" onclick="renderPage()">${tx("traceRefresh")}</button></div>
       <div class="trace-form">
         <label class="trace-label" for="traceDevice">${tx("traceDevice")}</label><div class="trace-control">
-          <select id="traceDevice" class="inp" data-sync-id="trace.target.picker"><option>TGT-1a62a0dbedd6</option></select>
-          <span class="trace-device-note" data-sync-id="trace.target.deviceSummary">5SM0…00252</span></div>
+          ${t.hasTarget
+            ?`<select id="traceDevice" class="inp" data-sync-id="trace.target.picker"><option>TGT-1a62a0dbedd6</option></select>
+          <span class="trace-device-note" data-sync-id="trace.target.deviceSummary">5SM0…00252</span>`
+            :`<p class="hint" data-sync-id="trace.target.empty">${tx("traceTargetEmpty")}</p>`}</div>
         <label class="trace-label" for="traceProfile">${tx("traceProfile")}</label><div class="trace-control">
           <select id="traceProfile" class="inp" data-sync-id="trace.profile.picker" onchange="S.trace.profile=this.value;renderPage()">${Object.entries(TRACE_PROFILES).map(([value,profile])=>`<option value="${value}" ${t.profile===value?"selected":""}>${tx(profile.label)}</option>`).join("")}</select>
           <span class="trace-profile-note">${tx(TRACE_PROFILES[t.profile].detail)}</span></div>
@@ -1900,12 +2205,14 @@ function pTrace(){
         </div>
       </div>
       <p class="hint" style="color:var(--danger)" data-sync-id="trace.duration.validation" ${traceDurationValid()?"hidden":""}>${lc("请输入范围内的十进制整数：秒 1–600；分钟 1–10。","Enter a decimal integer in range: seconds 1–600; minutes 1–10.")}</p>
-      <div class="trace-section-foot"><div class="trace-message ${t.submissionFailure?"error":blocked?"warn":""}" data-trace-status role="status" data-sync-id="trace.capture.status">${t.running?tx("traceRunning"):t.submissionFailure?`<span data-sync-id="trace.submission.failure">${esc(t.submissionFailure)}</span>`:traceBlocker()||tx("traceLocalOnly")}</div>
-        <button class="btn pri" data-sync-id="trace.start" onclick="startTrace()">${t.running?tx("traceCancel"):tx("traceStart")}</button></div>
+      <div class="trace-section-foot"><div class="trace-message ${t.submissionFailure?"error":blocked?"warn":""}" data-trace-status role="status" data-sync-id="trace.capture.status">${traceCaptureStatusHTML()}</div>
+        ${t.running
+          ?`<span class="mono hint">job-demo-trace</span><button class="btn" data-sync-id="trace.cancel" onclick="startTrace()">${tx("traceCancel")}</button>`
+          :`<button class="btn pri" data-sync-id="trace.start" onclick="startTrace()">${tx("traceStart")}</button>`}</div>
     </section>
     <section class="trace-section" aria-labelledby="traceViewerTitle" data-sync-id="trace.viewer.section">
       <div class="trace-section-head"><h2 id="traceViewerTitle">${tx("traceViewerTitle")}</h2></div>
-      <div class="trace-viewer-entry"><p data-sync-id="trace.viewer.empty">${tx("traceViewerDescription")}</p>
+      <div class="trace-viewer-entry">${traceViewerEntryHTML()}
         <button class="btn" data-sync-id="trace.openViewer" onclick="go('trace-viewer')">${icon("trace",true)} ${tx("traceOpenViewer")}</button></div>
     </section>
   </div>`;
@@ -3741,23 +4048,60 @@ function flashAvailabilityReason(){
   // The App keeps Runtime reasons verbatim; only its own status labels localize.
   return S.flashAvailability==="hardwareGated"?"ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign.":"";
 }
+function flashHasTarget(){return S.flashScenario!=="noDevice";}
+/** The first reason the page cannot start a Flash, in the App's own order:
+ *  availability, then the target, then image import and validation. An empty
+ *  string means only the image choice is still missing. */
+function flashBlocker(){
+  if(S.flashAvailability==="hardwareGated")return flashAvailabilityReason();
+  if(S.flashAvailability==="checking")return tx("flashAvailabilityChecking");
+  if(!flashHasTarget())return tx("flashNoDeviceDetail");
+  if(S.flashScenario==="importing")return tx("flashValidating");
+  if(S.flashScenario==="invalid")return tx("flashInvalid");
+  return "";
+}
+/** Mirrors `FlashWorkspaceView.readinessTitleKey`: availability first, then the
+ *  target, then plan preparation, then the image. */
+function flashReadiness(){
+  if(S.flashAvailability==="checking")return {title:tx("flashChecking"),detail:tx("flashAvailabilityChecking"),tone:"dim"};
+  if(S.flashAvailability==="hardwareGated")return {title:lc("刷机已阻断","Flash blocked"),detail:flashAvailabilityReason(),tone:"warn"};
+  if(!flashHasTarget())return {title:tx("flashNoDevice"),detail:tx("flashNoDeviceDetail"),tone:"warn"};
+  if(S.flashScenario==="importing")return {title:tx("flashChecking"),detail:tx("flashCheckingDetail"),tone:"dim"};
+  if(S.flashScenario==="invalid")return {title:lc("刷机已阻断","Flash blocked"),detail:tx("flashInvalid"),tone:"warn"};
+  if(!S.flashImage)return {title:lc("设备已选择","Device selected"),detail:tx("flashChooseImage"),tone:"dim"};
+  return {title:tx("flashReady"),detail:tx("flashChecks"),tone:"ok"};
+}
+function flashImageBoxHTML(running){
+  if(S.flashScenario==="importing")
+    return `<div class="flash-image" data-sync-id="flash.workspace.image.importing" aria-busy="true">
+      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
+      <div class="flash-image-copy"><b>${tx("flashImporting")}</b><span>${tx("flashValidating")}</span></div>
+      <div class="ibar" style="max-width:160px"></div></div>`;
+  if(S.flashScenario==="invalid")
+    return `<div class="flash-image" data-sync-id="flash.workspace.image.invalid">
+      <div class="flash-file-icon" aria-hidden="true">${icon("warning")}</div>
+      <div class="flash-image-copy"><b>${tx("flashInvalid")}</b><span class="mono">dayu200-truncated.tar.gz</span></div>
+      <button class="btn" onclick="chooseFlashImage()">${tx("flashImageRetry")}</button></div>`;
+  if(S.flashImage)
+    return `<div class="flash-image has-file">
+      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
+      <div class="flash-image-copy"><b>${esc(S.flashImage.name)}</b><span>${formatBytes(S.flashImage.sizeBytes)} · OpenHarmony 5.0.0.71</span></div>
+      ${running?"":`<button class="btn" onclick="chooseFlashImage()">${tx("changeImage")}</button>`}</div>`;
+  return `<div class="flash-image">
+      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
+      <div class="flash-image-copy"><b>${tx("chooseImageTitle")}</b><span>${tx("chooseImageHelp")}</span></div>
+      <button class="btn pri" ${flashHasTarget()?"":"disabled"} onclick="chooseFlashImage()">${tx("chooseImage")}</button>
+    </div>`;
+}
 function pFlash(){
   const image=S.flashImage,p=S.flashProgress;
   const activity=focusedFlashActivity();
-  const blocked=flashAvailabilityReason();
+  const blocked=flashBlocker();
   const pct=p.totalBytes?Math.min(100,Math.round(p.bytesDone/p.totalBytes*100)):0;
   const running=S.flashView==="running";
   const stageIndex=p.stage==="prepare"||p.stage==="loader"?0:p.stage==="write"?1:p.stage==="verify"||S.flashView==="success"?2:-1;
   const stageText=p.stage==="prepare"?tx("preparing"):p.stage==="loader"?tx("enteringLoader"):p.stage==="write"?tx("writing"):tx("verifying");
-  const imageBox=image?`<div class="flash-image has-file">
-      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
-      <div class="flash-image-copy"><b>${esc(image.name)}</b><span>${formatBytes(image.sizeBytes)} · OpenHarmony 5.0.0.71</span></div>
-      ${running?"":`<button class="btn" onclick="chooseFlashImage()">${tx("changeImage")}</button>`}
-    </div>`:`<div class="flash-image">
-      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
-      <div class="flash-image-copy"><b>${tx("chooseImageTitle")}</b><span>${tx("chooseImageHelp")}</span></div>
-      <button class="btn pri" onclick="chooseFlashImage()">${tx("chooseImage")}</button>
-    </div>`;
+  const imageBox=flashImageBoxHTML(running);
   let main;
   if(flashNeedsRecovery(activity)){
     main=flashRecoveryNotice(activity);
@@ -3778,20 +4122,26 @@ function pFlash(){
         <div class="flash-progress-meta"><span>${tx("elapsed")}</span><span class="mono">OpenHarmony 5.0.0.71</span></div>
         <div class="device-actions"><button class="btn pri" onclick="flashAgain()">${tx("flashAgain")}</button><button class="btn" onclick="openFlashRecord('${S.lastFlash?.jobID}')">${tx("openHistory")}</button></div>
       </div></div>`;
-  } else if(S.flashView==="stopped"){
-    main=`<div class="flash-result" role="status"><div class="flash-result-icon warn" aria-hidden="true">!</div>
-      <div class="flash-result-copy"><h2>${S.language==="en"?"Flash stopped":"刷机已停止"}</h2><p>${S.language==="en"?"Runtime stopped at a safe boundary. The device result is not shown as successful.":"Runtime 已在安全边界停止；设备结果不会显示为成功。"}</p>
-      <button class="btn" onclick="flashAgain()">${tx("flashAgain")}</button></div></div>`;
+  } else if(S.flashView==="stopped"||S.flashScenario==="failed"){
+    main=`<div class="flash-result" role="status" data-sync-id="flash.workspace.result.stopped"><div class="flash-result-icon warn" aria-hidden="true">!</div>
+      <div class="flash-result-copy"><h2>${tx("flashStopped")}</h2><p>${S.flashScenario==="failed"?tx("flashResultFailed"):lc("Runtime 已在安全边界停止；设备结果不会显示为成功。","Runtime stopped at a safe boundary. The device result is not shown as successful.")}</p>
+      <p class="hint">${tx("flashResultUnverified")}</p>
+      <div class="device-actions"><button class="btn" onclick="flashAgain()">${tx("flashAgain")}</button><button class="btn" onclick="go('history')">${tx("openHistory")}</button></div></div></div>`;
   } else {
     main=`${blocked?`<div class="warnbox" role="status" data-sync-id="flash.availability">${esc(blocked)}</div>`:""}<div class="card">${imageBox}
       <div class="flash-actions"><p class="flash-impact">${tx("flashImpact")}</p>
         ${blocked?`<p class="hint" style="color:var(--warn)" role="status" data-sync-id="flash.execute.prerequisiteBlocker">${esc(blocked)}</p>`:`<button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady?"":"disabled"}>${tx("startFlash")}</button>`}</div>
     </div>`;
   }
+  const readiness=flashReadiness();
   return `<div class="flash-shell" data-acin><span class="ac">Flash · real execution only</span>
     <div class="flash-lead" data-page-title="Flash"><p>${tx("flashSubtitle")}</p></div>
-    <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
-      ${blocked?`<span class="chip warn">${lc("刷机已阻断","Flash blocked")}</span>`:image?`<span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span>`:`<span class="chip">${lc("设备已选择","Device selected")}</span><span class="hint">${lc("选择镜像后执行精确安全检查","Choose an image to run the exact safety checks")}</span>`}</div>
+    <div class="device-actions"><span class="spacer"></span><button class="btn" data-sync-id="flash.refresh" onclick="renderPage()">${tx("flashRefresh")}</button></div>
+    <div class="flash-target" data-sync-id="flash.workspace.currentDevice"><span class="dot ${flashHasTarget()?"ok":"off"}" aria-hidden="true"></span>
+      <div class="flash-target-main">${flashHasTarget()
+        ?`<b>DAYU200</b><span>TGT-958780b2ffb7 · ${lc("绑定修订号 3","binding revision 3")} · USB</span>`
+        :`<b>${tx("flashDeviceNone")}</b><span>${tx("flashTargetGuidance")}</span>`}</div>
+      <span class="chip ${readiness.tone}" data-sync-id="flash.workspace.readiness">${esc(readiness.title)}</span><span class="hint">${esc(readiness.detail)}</span></div>
     ${main}
     ${running?`<div class="hint"><b>${esc(image.name)}</b> · ${formatBytes(image.sizeBytes)}</div>`:""}
     ${flashDetails(image)}
@@ -3844,7 +4194,7 @@ function chooseFlashImage(){
   S.flashView="ready";S.lastFlash=null;renderPage();
 }
 function runFlash(){
-  if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashAvailabilityReason()||flashNeedsRecovery(focusedFlashActivity()))return;
+  if(!S.flashImage||S.flashJob||!S.flashPrerequisitesReady||flashBlocker()||flashNeedsRecovery(focusedFlashActivity()))return;
   S.flashView="running";S.flashProgress={stage:"prepare",tick:0,bytesDone:0,totalBytes:S.flashImage.sizeBytes};
   const j={id:"J"+(S.jobSeq++),title:"Flash · flash.full-restore@1 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
     phases:[tx("preparing"),tx("enteringLoader"),tx("writing"),tx("verifying")],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,
@@ -3875,6 +4225,7 @@ function finishFlash(j,state,msg){
   renderDrawer();renderPageIf(["flash"]);
 }
 function flashAgain(){
+  if(S.flashScenario==="failed")S.flashScenario="available";
   S.flashView=S.flashImage?"ready":"idle";S.flashProgress={stage:"idle",tick:0,bytesDone:0,totalBytes:S.flashImage?.sizeBytes||0};S.lastFlash=null;renderPage();
 }
 
@@ -4105,10 +4456,10 @@ function pHistory(){
     <section class="history-list"><div class="history-list-head"><div><h2>${lc('最近活动','Recent activity')}</h2><span class="hint">${lc('只读 Runtime 记录','Read-only Runtime records')}</span></div></div>
       <label class="history-search">${icon('search',true)}<input aria-label="${lc('搜索历史记录','Search history')}" value="${esc(S.hf.query)}" placeholder="${lc('搜索记录、操作或目标','Search records, operations or targets')}" oninput="setHistoryQuery(this.value)"></label>
       <details ${S.historyFiltersOpen?'open':''} class="history-expanded-filters" ontoggle="if(this.isConnected)S.historyFiltersOpen=this.open"><summary>${lc('完整筛选','All filters')}</summary>${historyFilterFields()}${historySavedActions()}<button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button></details>
-      <div class="history-records">${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${esc(h.id)}" onclick="S.histSel=this.dataset.historyId;renderPage()"><span class="history-record-icon">${icon(h.icon||'history',true)}</span><span class="history-record-main"><b>${esc(h.what??h.op??h.id)}</b><span>${esc(h.detail??h.id)}</span><span class="history-record-tags"><span class="chip dim">${esc(h.st??lc('未报告','Not reported'))}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${esc(h.when??lc('未报告','Not reported'))}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
+      <div class="history-records">${rows.map(h=>`<button class="history-record ${sel?.id===h.id?'on':''}" data-history-id="${esc(h.id)}" onclick="S.histSel=this.dataset.historyId;renderPage()"><span class="history-record-icon">${icon(h.icon||'history',true)}</span><span class="history-record-main"><b>${esc(histText(h.what)??h.op??h.id)}</b><span>${esc(histText(h.detail)??h.id)}</span><span class="history-record-tags"><span class="chip dim">${esc(h.st??lc('未报告','Not reported'))}</span>${h.outcomeUnknown?`<span class="chip warn">${lc('? 结果未知','? Outcome unknown')}</span>`:''}${historyNeedsAttention(h)?`<span class="chip warn">${lc('⚠ 需要关注','⚠ Needs attention')}</span>`:''}${modeBadge(h.mode)}</span></span><span class="history-record-time">${esc(histText(h.when)??lc('未报告','Not reported'))}</span></button>`).join('')||`<p class="empty">${lc('没有匹配的记录。请清除筛选或选择其他类型。','No matching records. Clear filters or choose another type.')}</p><button class="btn" onclick="resetHistoryFilters();renderPage()">${lc('清除筛选','Clear filters')}</button>`}
       ${all.length>rows.length?`<button class="btn" onclick="S.historyLimit+=6;renderPage()">${lc('加载更早记录','Load older records')}</button>`:''}
-    </div></section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon||'history',true)}</span><div><h2>${esc(sel.what??sel.op??sel.id)}</h2><p>${esc(sel.dev??lc('未报告','Not reported'))} · <span class="mono" data-sync-id="history.detail.job">${esc(sel.id)}</span></p></div></div>
-      <p>${esc(sel.detail??sel.id)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignWorkspace(this.dataset.jobId)">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignDiagnostics(this.dataset.jobId)">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>
+    </div></section><section class="history-inspector">${sel?`<div class="history-inspector-head"><span class="history-record-icon">${icon(sel.icon||'history',true)}</span><div><h2>${esc(histText(sel.what)??sel.op??sel.id)}</h2><p>${esc(sel.dev??lc('未报告','Not reported'))} · <span class="mono" data-sync-id="history.detail.job">${esc(sel.id)}</span></p></div></div>
+      <p>${esc(histText(sel.detail)??sel.id)}</p><div class="history-primary">${historyWorkspace(sel.kind)?`<button class="btn pri" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignWorkspace(this.dataset.jobId)">${lc('打开对应工作区','Open workspace')}</button>`:''}${sel.op==='capture.diagnostics@1'&&sel.kind!=='diagnostics'?`<button class="btn" data-sync-id="history.openDiagnostics" data-job-id="${esc(sel.id)}" onclick="openHistoryDesignDiagnostics(this.dataset.jobId)">${lc('打开诊断工具','Open Diagnostics')}</button>`:''}</div>
       <p class="hint">${lc('这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。',"This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.")}</p>
       <dl class="kv history-facts"><dt>executionMode</dt><dd>${esc(sel.mode??lc('未报告','Not reported'))} ${modeBadge(sel.mode)}</dd><dt>${lc('状态','State')}</dt><dd>${esc(sel.st??lc('未报告','Not reported'))}</dd><dt>${lc('活动','Activity')}</dt><dd>${esc(sel.kind??'other')}</dd></dl>
       <details><summary>${lc('查看运行证据与 Artifact','Runtime evidence and Artifacts')}</summary><div style="margin-top:12px">${histDetail(sel)}</div></details>`:`<p class="empty">${lc('选择一条记录查看详情。','Select a record to see its details.')}</p>`}</section></div>`;
@@ -4126,12 +4477,37 @@ function pSettings(){
   return `<div class="settings-workspace" data-page-title="${lc('设置','Settings')}"><p class="hint">${lc('实际 App 使用独立 macOS Settings 窗口；这里在原型窗口内评审。','The App uses a separate macOS Settings window; this prototype reviews it in the current frame.')}</p>
     <nav class="settings-tabs" aria-label="${lc('设置分类','Settings categories')}">${SETTINGS_TABS.map(([id,zh,en])=>`<button class="btn ${tab===id?'on':''}" aria-current="${tab===id?'page':'false'}" onclick="S.settingsTab='${id}';renderPage()">${lc(zh,en)}</button>`).join('')}</nav>${settingsPane(tab)}</div>`;
 }
+/** `settings.common.loading` / `settings.error.refresh` / the diagnostics
+ *  success message — the same three rows the App shares across every pane. */
+function settingsStateRowHTML(){
+  if(S.settings.state==="loading")
+    return `<p class="hint" role="status" aria-busy="true" data-sync-id="settings.common.loading">${lc("正在加载设置……","Loading settings…")}</p>`;
+  if(S.settings.state==="error")
+    return `<div class="warnbox" role="alert" data-sync-id="settings.error.refresh"><div><b>${lc("无法加载设置，请尝试刷新。","Settings could not be loaded. Try refreshing.")}</b></div><button class="btn" onclick="renderPage()">${lc("刷新","Refresh")}</button></div>`;
+  if(S.settings.state==="success")
+    return `<div class="okbox" role="status" data-sync-id="settings.success"><span>${lc("已将确认过的诊断包导出到本地。","The approved diagnostic bundle was exported locally.")}</span></div>`;
+  return "";
+}
 function settingsPane(tab){
+  const row=settingsStateRowHTML();
+  if(S.settings.state!=="ready")return row+settingsPaneBody(tab);
+  return settingsPaneBody(tab);
+}
+function settingsPaneBody(tab){
   switch(tab){
   case 'general':return `<section class="card"><h2>${lc('应用图标','App icon')}</h2><div class="radio"><label><input type="radio" name="appIcon" checked> ${lc('键帽','Keycap')}</label><label><input type="radio" name="appIcon"> ${lc('波形','Waveform')}</label></div></section><section class="card"><h2>${lc('构建信息','Build information')}</h2><dl class="kv"><dt>App</dt><dd>ArkDeck</dd><dt>${lc('版本 / build','Version / build')}</dt><dd>${lc('来自实际 App bundle','From the actual App bundle')}</dd><dt>${lc('平台','Platform')}</dt><dd>macOS · arm64</dd></dl><p class="hint">${lc('默认只在本机处理，无自动上传。','Local processing by default; no automatic upload.')}</p></section>`;
-  case 'toolchains':return `<section class="card"><h2>HDC</h2><dl class="kv"><dt>${lc('来源','Source')}</dt><dd>security-scoped executable</dd><dt>${lc('路径 / 版本 / SHA-256','Path / version / SHA-256')}</dt><dd>${lc('由 Runtime 探测提供','Provided by Runtime probes')}</dd><dt>server / endpoint</dt><dd>${lc('身份与归属分别展示','Identity and ownership shown separately')}</dd></dl><div class="device-actions"><button class="btn" onclick="doneBtn(this,lc('演示：打开文件选择器','Demo: open file picker'))">${lc('选择 HDC…','Choose HDC…')}</button><button class="btn" onclick="doneBtn(this,lc('演示：重新探测','Demo: re-probe'))">${lc('重新探测','Re-probe')}</button></div><p class="hint">${lc('工具在 Job 创建时固化；切换只影响新 Job，不会替换运行中任务的工具。','Tools are pinned when a Job is created. Changes affect new Jobs only.')}</p></section>`;
+  case 'toolchains':return `<section class="card"><h2>HDC</h2><dl class="kv"><dt>${lc('来源','Source')}</dt><dd>security-scoped executable</dd><dt>${lc('路径 / 版本 / SHA-256','Path / version / SHA-256')}</dt><dd>${lc('由 Runtime 探测提供','Provided by Runtime probes')}</dd><dt>server / endpoint</dt><dd>${lc('身份与归属分别展示','Identity and ownership shown separately')}</dd></dl><div class="device-actions"><button class="btn" onclick="doneBtn(this,lc('演示：打开文件选择器','Demo: open file picker'))">${lc('选择 HDC…','Choose HDC…')}</button><button class="btn" onclick="doneBtn(this,lc('演示：重新探测','Demo: re-probe'))">${lc('重新探测','Re-probe')}</button></div>${S.settings.activeJobs
+      ?`<div class="warnbox" data-sync-id="settings.toolchains.futureJobsActive"><div>${lc('有任务正在运行：切换不影响运行中的 Job——工具在 Job 创建时固化，仅新任务使用新选择。','Jobs are running now: switching does not affect them — the toolchain is pinned when a Job is created, and only new Jobs use the new selection.')}</div></div>`
+      :`<p class="hint" data-sync-id="settings.toolchains.futureJobs">${lc('更换 HDC 只影响新任务；运行中和已完成的任务继续保留其固定工具链快照。','Changing HDC affects only new Jobs. Running and completed Jobs keep their pinned toolchain snapshot.')}</p>`}</section>`;
   case 'servers':return `<section class="card"><h2>${lc('远端编译来源','Remote build sources')}</h2><p class="hint">${lc('只读 SSH / SFTP，固定主机密钥和已验证根目录；凭据存入 Keychain。','Read-only SSH / SFTP with pinned host keys and verified roots. Credentials stay in Keychain.')}</p>${DEBUG_SERVERS.map(server=>`<div class="overview-run"><div><b>${esc(server.name)}</b><p class="mono hint">${esc(server.username)}@${esc(server.host)}:${esc(server.port)}<br>${esc(server.root)}</p></div><button class="btn" onclick="openDebugServerEditor('${server.id}')">${lc('编辑…','Edit…')}</button><button class="btn" onclick="deleteDebugServerModal('${server.id}')">${lc('移除…','Remove…')}</button></div>`).join('')}<div><button class="btn pri" onclick="openDebugServerEditor('')">${lc('添加 SSH 服务器…','Add SSH server…')}</button></div><p class="hint">${lc('SMB / WSL / 本机目录来源管理尚未实现；本地单文件导入已实现。','SMB / WSL / local-directory source management is not implemented. Local single-file import is implemented.')}</p></section>`;
-  case 'storage':return `<section class="card"><h2>${lc('产物与历史保留','Artifacts and retention')}</h2><p class="mono">~/Library/Application Support/ArkDeck</p><button class="btn" onclick="doneBtn(this,lc('演示：选择输出目录','Demo: choose output directory'))">${lc('选择输出目录…','Choose output root…')}</button><p class="hint">${lc('目录变更仅影响新 Job；历史记录与已有产物保留原位置。','Root changes affect new Jobs only; existing records and artifacts keep their original locations.')}</p><label class="debug-field">${lc('配额（GiB）','Quota (GiB)')}<input class="inp" type="number" min="1" value="20"></label><label class="debug-field">${lc('安全余量（GiB）','Safety margin (GiB)')}<input class="inp" type="number" min="1" value="2"></label><label class="debug-field">${lc('保留天数','Retention days')}<input class="inp" type="number" min="1" value="90"></label><p class="hint">${lc('使用量、pinned 与空闲空间以真实 inventory 为准；当前演示不读取磁盘。','Usage, pinned sessions and free space come from the real inventory. This demo does not inspect disk.')}</p><button class="btn" onclick="doneBtn(this,lc('演示：校验并保存策略','Demo: validate and save policy'))">${lc('保存策略','Save policy')}</button></section>`;
+  case 'storage':return `<section class="card"><h2>${lc('产物与历史保留','Artifacts and retention')}</h2><p class="mono">~/Library/Application Support/ArkDeck</p><button class="btn" onclick="doneBtn(this,lc('演示：选择输出目录','Demo: choose output directory'))">${lc('选择输出目录…','Choose output root…')}</button><p class="hint">${lc('目录变更仅影响新 Job；历史记录与已有产物保留原位置。','Root changes affect new Jobs only; existing records and artifacts keep their original locations.')}</p><label class="debug-field">${lc('配额（GiB）','Quota (GiB)')}<input class="inp" type="number" min="1" value="20"></label><label class="debug-field">${lc('安全余量（GiB）','Safety margin (GiB)')}<input class="inp" type="number" min="1" value="2"></label><label class="debug-field">${lc('保留天数','Retention days')}<input class="inp" type="number" min="1" value="90"></label>${S.settings.storage==="invalid"
+      ?`<p class="hint" style="color:var(--danger)" role="alert" data-sync-id="settings.storage.validationError">${lc('请输入大于零的整数，并确保总配额大于安全余量。','Enter whole numbers greater than zero, with a total quota larger than the safety margin.')}</p>`:""}
+    ${S.settings.storage==="measurementUnavailable"
+      ?`<p class="hint" data-sync-id="settings.storage.measurementUnavailable">${lc('当前用量不可用；已保存的配额与保留策略仍显示在上方。','Current usage is unavailable. The saved quota and retention policy remain visible above.')}</p>`
+      :`<dl class="kv"><dt>${lc('当前用量','Current usage')}</dt><dd data-sync-id="settings.storage.usage">18.4 GiB / 20 GiB</dd><dt>${lc('已固定 Session','Pinned Sessions')}</dt><dd data-sync-id="settings.storage.pinned">3 ${lc('个 Session','Sessions')} · 2.1 GiB</dd></dl>`}
+    ${S.settings.storage==="unknownPressure"
+      ?`<p class="hint" data-sync-id="settings.storage.unknownPressure">${lc('存在未分类字节，清理策略将保持保守。','Unclassified bytes are present; cleanup remains conservative.')}</p>`:""}
+    <p class="hint" data-sync-id="settings.storage.pinGuarantee">${lc('保留策略清理绝不会删除已固定的 Session。','Retention cleanup never deletes pinned Sessions.')}</p><button class="btn" onclick="doneBtn(this,lc('演示：校验并保存策略','Demo: validate and save policy'))">${lc('保存策略','Save policy')}</button></section>`;
   case 'trace':return `<div class="seg"><button class="${S.traceSettingsTab==='cache'?'on':''}" onclick="S.traceSettingsTab='cache';renderPage()">${lc("缓存","Cache")}</button><button class="${S.traceSettingsTab==='licenses'?'on':''}" onclick="S.traceSettingsTab='licenses';renderPage()">${lc("许可证","Licenses")}</button></div>${S.traceSettingsTab==='cache'?`<section class="card"><h2>${lc("按内容寻址的缓存","Content-addressed Cache")}</h2><dl class="kv"><dt>${lc("大小","Size")}</dt><dd>—</dd><dt>${lc("条目","Entries")}</dt><dd>—</dd><dt>${lc("使用中","In use")}</dt><dd>—</dd></dl><div class="device-actions"><button class="btn" onclick="doneBtn(this,'Demo: refresh inventory')">${lc("刷新","Refresh")}</button><button class="btn" onclick="doneBtn(this,'Demo: purge inactive derived entries')">${lc("清理未使用条目","Purge Unused Entries")}</button></div><p class="hint">${lc("ArkTrace 仅清理未使用的派生数据库，不会删除原始 Trace 文件。","ArkTrace only purges inactive derived databases. Original trace files are never cache targets.")}</p></section>`:`<section class="card"><h2>${lc("开源许可证","Open Source Licenses")}</h2><p>${lc("ArkTrace 包含固定版本的 TraceStreamer 构建及已审查的源码依赖。","ArkTrace includes a pinned TraceStreamer build and its reviewed source closure.")}</p><h3>${lc("ArkTrace — MIT 许可证","ArkTrace \u2014 MIT License")}</h3><p class="hint">${lc('实际窗口按需读取随包 LICENSE / THIRD_PARTY_NOTICES。此原型不复制许可证正文。','The App lazily reads bundled LICENSE / THIRD_PARTY_NOTICES. This prototype does not copy their full text.')}</p><h3>${lc("第三方声明","Third-Party Notices")}</h3><div><button class="btn" onclick="doneBtn(this,'Demo: reveal bundled license files')">${lc("在 Finder 中显示许可证文件","Show License Files in Finder")}</button></div><span class="hint">${lc("14 个已审查组件","14 reviewed components")}</span></section>`}`;
   case 'updates':return `<section class="card"><h2>${lc('应用更新','App updates')}</h2><label><input type="checkbox" checked> ${lc('自动检查已签名更新','Automatically check signed updates')}</label><p class="hint">${lc('检查签名 feed → 下载 → 校验身份与完整性 → 在 Finder 显示安装包。不会静默安装，也不修改 Runtime 准入规则。','Signed feed → download → identity and integrity checks → reveal installer in Finder. No silent installation or Runtime admission changes.')}</p><div class="device-actions"><button class="btn" onclick="doneBtn(this,lc('演示：检查更新','Demo: check for updates'))">${lc('检查更新','Check for updates')}</button><button class="btn" disabled>${lc('下载并校验','Download and verify')}</button></div></section>`;
   case 'diagnostics':return `<section class="card"><h2>${lc('导出 App 诊断包','Export App diagnostics')}</h2><p>${lc('先选择目的地，再预览清单与估算大小，最后显式导出。仅本机保存。','Choose a destination, review the manifest and estimated size, then explicitly export. Local files only.')}</p><p class="hint">${lc('当前 App 诊断导出始终排除设备 raw。敏感设备 Artifact 在 History 中逐件确认导出。','App diagnostics always exclude device raw data. Export sensitive device Artifacts individually from History.')}</p><div><button class="btn pri" onclick="diagModal()">${lc('预览诊断包…','Preview diagnostics…')}</button></div></section>`;
