@@ -1295,6 +1295,10 @@ final class AppShellUITests: XCTestCase {
             XCTAssertTrue(element("diagnostics.session.failed", in: app).waitForExistenceFast(timeout: 15))
             XCTAssertFalse(element("diagnostics.hilog.summary", in: app).exists,
               "a failed read must clear the preceding successful summary")
+            app.buttons[language == "(en)" ? "Retry reading" : "重新读取"].click()
+            XCTAssertTrue(element("diagnostics.session.failed", in: app).waitForExistenceFast(timeout: 15))
+            XCTAssertFalse(element("diagnostics.hilog.summary", in: app).exists,
+              "retrying corrupt bytes must not restore an earlier summary")
           } else {
             assertDisplayed(element("diagnostics.hilog.job", in: app), equals: "job-fixture-hilog-\(variant)", timeout: 15)
             assertDisplayed(element("diagnostics.hilog.coverage", in: app), equals: hilogCoverageTitle(variant, language: language))
@@ -1318,6 +1322,20 @@ final class AppShellUITests: XCTestCase {
             }
           }
         }
+      }
+      runHistorySessionPhase("Return to captured session", language: language, in: app, processID: processID) {
+        openExactHistoryRecord("job-fixture-diagnostics", in: app)
+        app.buttons["history.openWorkspace"].click()
+        assertDisplayed(element("diagnostics.session.job", in: app), equals: "job-fixture-diagnostics", timeout: 15)
+        assertDisplayed(element("diagnostics.alignment", in: app), equals: alignment)
+        assertDisplayed(element("diagnostics.mark.time.1", in: app), equals: missingTime)
+        XCTAssertFalse(element("diagnostics.hilog.summary", in: app).exists,
+          "returning to capture must replace the summary reader")
+        XCTAssertFalse(element("diagnostics.preview.text", in: app).exists,
+          "returning to capture must not restore an earlier sensitive preview")
+        XCTAssertTrue(app.buttons["diagnostics.artifact.read.hilog.txt"].exists)
+        XCTAssertFalse(app.buttons["diagnostics.capture.arm"].isEnabled)
+        XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
       }
       app.terminate()
     }
@@ -1376,7 +1394,7 @@ final class AppShellUITests: XCTestCase {
       defer { app.terminate() }
       let processID = try XCTUnwrap(NSRunningApplication.runningApplications(
         withBundleIdentifier: "com.arkdeck.desktop").first?.processIdentifier)
-      for item in expected {
+      for (index, item) in expected.enumerated() {
         runHistorySessionPhase("Real HiLog record", language: language, in: app, processID: processID) {
           openExactHistoryRecord(item.jobID, in: app)
           app.buttons["history.openWorkspace"].click()
@@ -1391,6 +1409,10 @@ final class AppShellUITests: XCTestCase {
           XCTAssertFalse(element("diagnostics.alignment", in: app).exists)
           app.buttons["diagnostics.session.reload"].click()
           assertDisplayed(element("diagnostics.hilog.job", in: app), equals: item.jobID, timeout: 30)
+          let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+          screenshot.name = "Real HiLog summary \(language) record \(index + 1)"
+          screenshot.lifetime = .keepAlways
+          add(screenshot)
         }
       }
     }
