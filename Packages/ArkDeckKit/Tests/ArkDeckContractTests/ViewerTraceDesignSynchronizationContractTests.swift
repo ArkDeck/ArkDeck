@@ -190,8 +190,13 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
     let durationSource = try source(
       "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceApplicationFacade.swift")
 
+    // The Viewer prototype grew partial-unavailability states alongside
+    // "captured" (#1588); a capture is present in all four, so hasCapture is
+    // membership in that closed set rather than the old two-value check.
     XCTAssertTrue(
-      prototype.contains(#"hasCapture:PARAMS.get("viewerState")==="captured""#))
+      prototype.contains(
+        #"hasCapture:["captured","geometryUnavailable","screenshotUnavailable","noMetrics"].includes(PARAMS.get("viewerState"))"#
+      ))
     XCTAssertTrue(prototype.contains("showBounds:false"))
     XCTAssertTrue(viewerDesignSystem.contains("showBounds = false"))
     XCTAssertFalse(viewerDesignSystem.contains("<h1"))
