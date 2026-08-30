@@ -1271,3 +1271,65 @@ Debug 上。没有直接归因为噪声，而是补跑到五次全套逐条比�
 - `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
 - 统一本地闸退出 0；App 编译车道（`app: true` / `swift: false`）`build-for-testing` 通过。
 - 未做浏览器逐页走查，未执行设备操作；不构成 App 呈现验收或真机验收。
+
+## 2026-08-30 F58：稳定原生门禁（F56/F57 欠账的第一批）
+
+第七批，基线 `373edb9b`。范围是 F56 登记的两条既有原生失败与 F57 登记的「套件在相同代码上
+结果不稳定」。**本批只动测试侧**；同族的产品侧修复（History / Viewer reveal 竞态）由维护者
+指派的另一会话执行（chip task_3c640d76，分支 `agent/scroll-reveal-settlement`），本批不重复做，
+见下文「与并行会话的分工」。逐行结论见
+[2026-08-30 批次七台账](references/ui-consistency/2026-08-30-native-gate-ledger.md)。
+
+**一个贯穿四处的模式：异步状态变化之后只采样一次。** 四处失败根因不同，形状相同——驱动一个
+异步动作，然后立刻读一次结果，读到的是动作生效之前的状态。
+
+1. **Debug tab 切换用了裸 `.click()`。** `testDebugHAPSelection…` 里
+   `app.buttons["debug.tab.apps"].click()` 之后直接等 `debug.apps.postRun` 15 秒。失败运行导出的
+   AX hierarchy 显示 App 仍停在 **Artifacts**（Debug 的默认页，可见 `debug.artifacts.bundle` /
+   `debug.artifacts.logicalName`），也就是这一 click 根本没落地，而它等的控件只在 Apps 页存在。
+   本套件其余每一处 Debug 分页切换都走 `clickCorrectingNavigationSplitAXOffset`（该 helper 的存在
+   本身就是因为 macOS 会发布带偏移的 AX 代理），唯独这里没有。现改为走同一 helper，最多重试
+   三次，并在继续之前断言切换确实生效。
+2. **`chooseDebugPackage` 可能把路径打进错的输入框。** ⌘⇧G 之后取
+   `panel.textFields.firstMatch`，而 open panel 本身就带有自己的文本框，于是可能选中一个**本来
+   就存在**的字段、把路径打进去、什么也没选中，症状是 `package was not selected`。现改为优先
+   定位 Go to Folder 那张 sheet 自己的输入框；并把键盘布局 pin **移到第一次合成按键之前**
+   （原来在 ⌘⇧G 之后，而 ⌘⇧G 本身就需要布局已 pin 才能生效）；失败时附上 panel hierarchy，
+   让下一次失败自带诊断而不是又一条裸消息。
+3. **Environment 披露靠固定次数滚动 + 单次 click。** `expandAdvancedDiagnostics` 点丢了就静默
+   不展开，而它被 `walkEveryDiagnosticState` 共用，于是失败被记在**恰好调用它的那个测试**头上——
+   这正是同一条断言在两次运行里落在两个不同测试上的原因。现改用 ⌘⇧D（该披露自己的快捷键，
+   不需要命中测试），并用按钮自己发布的 `accessibilityValue` 判断按键是否生效，因而不依赖
+   界面语言；顺带删除随之失去消费方的 `overviewScrollView`。
+4. **`applyFixtureState` 在上一次刷新还在飞时就打下一个 fixture。** Refresh 控件在刷新期间自我
+   禁用，5 秒不总是够，症状是**下一条**断言读到上一个状态的值（期待 `timed out` 读到 `denied`）。
+   超时提到 20 秒，等 App 空闲再驱动。
+
+`waitUntil(timeout:_:)` 收进 `KeyboardInputSourcePin.swift`（该文件已是共享测试工具的所在地），
+不在两个测试类里各写一份。
+
+### 与并行会话的分工（避免两份产品修复打架）
+
+F56 的 History 精确行定位，本会话先做的是测试侧 10 秒轮询——**结果证明轮询修不好：行永远不进
+viewport**（实测落在下方 12–58pt，有一次是 `(0, 956, 0, 0)`，即尚未布局）。据此判定为产品侧
+缺陷：显式路由会换掉 List 的 identity，行在 `.task` 起来之后才装上，`scrollTo` 对尚未注册的行
+**静默 no-op**。本会话据此写过一版「几个 runloop turn 内重复 anchor」的产品修复，**已撤回**：
+并行会话持有该 chip，且其机制更好——把重锚挂在 `onScrollGeometryChange(contentSize)` 上，
+即行安装/量行的**真实完成条件**，无定时器、无次数上限，符合仓规「等真实完成条件，别靠负载
+统计」。本会话的三条实证（12–58pt、未布局帧、10 秒轮询无效）移交对方 commit 归档。
+main 上现有的 `XCTWaiter` 5 秒 settled-state 等待保留不动。
+
+### 本批实测到的跑道运维事实（登记，脚本不在本 Task 的 Allowed paths 内，不改）
+
+- **`scripts/ci/run-ui-tests.sh` 默认 DerivedData 是全机固定路径**，跨 checkout / worktree 共用一个
+  `build.db`，并发即 `database is locked`。本批改用 `ARKDECK_UI_TEST_DERIVED_DATA` 独立路径。
+- **该脚本开头的两行 `pkill` 按进程名全局杀**，任何会话调用都会打死其他会话在飞的 runner；
+  受害方看到的是 `Test crashed with signal term while preparing to run tests`，很容易被误读成
+  自己的回归。本批被误伤两次。
+- **UI 跑道全机唯一，必须跨会话串行**：系统只有一个 `testmanagerd`、只有一个前台焦点，
+  后启动的一方拿到 `Timed out while enabling automation mode`，互撞还会把 testmanagerd 搅坏。
+- **换新 DerivedData 路径的首跑必然吃一次 automation-mode 超时**（脚本头注释已载明）。
+- **一次 run 是否有效，先看有没有** `Failed to activate application` / `database is locked` /
+  `enabling automation mode` / `signal term` **四类信号**；有就是无效 run，不能当红、更不能当
+  回归证据。**F57 的 A–E 方差表因此作废**：当时无从得知另一会话正在同一台机器上跑同一套件，
+  那组数字不能证明套件「在相同代码上不稳定」，相关结论以本批重新测量为准。

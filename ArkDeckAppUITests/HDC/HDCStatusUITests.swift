@@ -424,7 +424,12 @@ final class HDCStatusUITests: XCTestCase {
     guard writeFixtureState(faults, file: file, line: line) else { return }
     let refresh = app.buttons["hdc.devices.refresh"]
     XCTAssertTrue(refresh.waitForExistenceFast(timeout: 10), file: file, line: line)
-    assertEnabled(refresh, equals: true, file: file, line: line)
+    // The control disables itself while a refresh is in flight, so applying
+    // two fixture states back to back can arrive while the previous one is
+    // still running. Five seconds was not always enough and the sweep then
+    // failed on the *next* assertion, reading the previous state's value
+    // (audit F57). Wait for the App to be idle before driving it again.
+    assertEnabled(refresh, equals: true, timeout: 20, file: file, line: line)
     refresh.click()
   }
 
@@ -498,30 +503,37 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertTrue(
       toggle.waitForExistenceFast(timeout: 15),
       "Overview must expose the Environment disclosure", file: file, line: line)
-    guard !element("hdc.toolchain.path", in: app).exists else { return }
-    let workspace = overviewScrollView(in: app)
-    for _ in 0..<6 where !toggle.isHittable {
-      workspace?.scroll(byDeltaX: 0, deltaY: -320)
-    }
-    toggle.click()
     let path = element("hdc.toolchain.path", in: app)
-    for _ in 0..<6 where !path.exists {
-      workspace?.scroll(byDeltaX: 0, deltaY: -420)
-    }
-    XCTAssertTrue(
-      path.waitForExistenceFast(timeout: 5),
-      "expanding Environment must reveal the raw toolchain facts",
-      file: file, line: line)
-  }
+    guard !path.exists else { return }
 
-  /// The Overview owns the widest ScrollView in the window; the narrow one is
-  /// the sidebar. Bringing the disclosure into that viewport avoids asking
-  /// XCUITest to click the off-screen AX proxy SwiftUI still publishes.
-  private func overviewScrollView(in app: XCUIApplication) -> XCUIElement? {
-    let window = app.windows.firstMatch.frame
-    return app.scrollViews.allElementsBoundByIndex
-      .filter { $0.frame.width > window.width * 0.5 }
-      .max(by: { $0.frame.width < $1.frame.width })
+    // This used to scroll a fixed number of times, click once and wait. A
+    // click that landed on the off-screen AX proxy SwiftUI still publishes
+    // silently left the disclosure closed, and every later assertion in
+    // whichever test happened to call this failed instead — which is how one
+    // assertion came to be recorded against two different tests on two runs
+    // of the same code (audit F57).
+    //
+    // ⌘⇧D is the disclosure's own shortcut, so it needs no hit-testing, and
+    // the button publishes its state as an accessibility value, so a press
+    // that registered is distinguishable from one that did not without
+    // knowing which language the value is in.
+    for _ in 0..<3 {
+      let before = toggle.value as? String
+      app.activate()
+      app.typeKey("d", modifierFlags: [.command, .shift])
+      let registered = waitUntil(timeout: 3) { (toggle.value as? String) != before }
+      if registered {
+        // The state did change, so this is now the product's problem, not a
+        // lost keystroke: give it the full wait and report if it never shows.
+        XCTAssertTrue(
+          path.waitForExistenceFast(timeout: 10),
+          "expanding Environment must reveal the raw toolchain facts",
+          file: file, line: line)
+        return
+      }
+    }
+    XCTFail(
+      "the Environment disclosure never acknowledged ⌘⇧D", file: file, line: line)
   }
 
   private func displayedText(for element: XCUIElement) -> String {
