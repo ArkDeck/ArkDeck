@@ -1,6 +1,6 @@
 // Runtime client commands (CHG-2026-048, T09/T11).
 //
-// `arkdeck doctor`, `arkdeck operation list`, `arkdeck device list|adopt|show` and
+// `arkdeck doctor`, `arkdeck operation list`, `arkdeck target list|show` and
 // `arkdeck job submit|status` are thin daemon clients: they construct a
 // typed request or a control-plane call and print the response. No HDC,
 // no argv, no executor lives here - the CLI cannot execute a device
@@ -2371,6 +2371,12 @@ params))
   /// `--request-file` stays for a caller that wants to control the document
   /// byte for byte; it is still passed through verbatim so the daemon, not
   /// this CLI, remains the validator.
+  /// True when the caller left the identity to be generated, so a submit
+  /// cannot be retried safely. Reported once, to stderr, in human mode.
+  static func generatesItsOwnIdempotencyKey(_ rest: [String]) -> Bool {
+    !rest.contains("--idempotency-key") && !rest.contains("--request-file")
+  }
+
   private static func operationRequestJSON(
     _ rest: [String], subcommand: String
   ) throws -> String {
@@ -2458,8 +2464,13 @@ params))
         operationID: String(parts[0]),
         version: version,
         inputs: inputs,
-        requestID: "cli-\(UUID().uuidString.prefix(8).lowercased())",
-        idempotencyKey: "cli-\(UUID().uuidString.lowercased())")
+        // §5.3: a caller that wants to be able to retry fixes these. The
+        // generated pair stays the interactive default, but it is exactly what
+        // makes an unattended retry create a second job instead of returning
+        // the first, so it can no longer be the only behaviour available.
+        requestID: value("--request-id") ?? "cli-\(UUID().uuidString.prefix(8).lowercased())",
+        idempotencyKey: value("--idempotency-key")
+          ?? "cli-\(UUID().uuidString.lowercased())")
     } catch let rejection as RuntimeOperationRequestRejection {
       throw CLIError(exitCode: EX_USAGE, message: rejection.message)
     }
@@ -2484,29 +2495,26 @@ params))
       let planJSON = try operationRequestJSON(rest, subcommand: "job plan")
       session.emit(try session.request("job.plan", ["requestJson": .string(planJSON)]))
     case "list":
-      let pageSize: Int?
-      if let index = rest.firstIndex(of: "--page-size"), index + 1 < rest.count {
-        guard let value = Int(rest[index + 1]), (1...1_000).contains(value) else {
-          throw CLIError(exitCode: EX_USAGE, message: "--page-size must be 1...1000")
-        }
-        pageSize = value
-      } else {
-        pageSize = nil
+      // One shape, always. This used to call `job.list` (a bare array) when no
+      // flags were given and `job.list-page` (a page object) when any were, so
+      // the reply a script had to parse changed with the arguments it happened
+      // to pass — §13.2 records it as a defect, and a caller cannot write one
+      // parser against two shapes.
+      var params: [String: JSONValue] = [:]
+      if let index = rest.firstIndex(of: "--page-size"), index + 1 < rest.count,
+        let pageSize = Int64(rest[index + 1])
+      {
+        params["pageSize"] = .integer(pageSize)
       }
-      let cursor = rest.firstIndex(of: "--cursor").flatMap { index in
-        index + 1 < rest.count ? rest[index + 1] : nil
+      if let index = rest.firstIndex(of: "--cursor"), index + 1 < rest.count {
+        params["cursor"] = .string(rest[index + 1])
       }
-      if rest.contains("--cursor"), cursor == nil {
-        throw CLIError(exitCode: EX_USAGE, message: "--cursor requires a value")
+      if let index = rest.firstIndex(of: "--order"), index + 1 < rest.count {
+        params["order"] = .string(rest[index + 1])
       }
-      if pageSize != nil || cursor != nil {
-        var params: [String: JSONValue] = [:]
-        if let pageSize { params["pageSize"] = .integer(Int64(pageSize)) }
-        if let cursor { params["cursor"] = .string(cursor) }
-        session.emit(try session.request("job.list-page", params))
-      } else {
-        session.emit(try session.request("job.list"))
-      }
+      if rest.contains("--include-current") { params["includeCurrent"] = .bool(true) }
+      if rest.contains("--include-timeline") { params["includeTimeline"] = .bool(true) }
+      session.emit(try session.request("job.list-page", params))
     case "status":
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job status requires --job <id>")
@@ -2572,6 +2580,11 @@ params))
       }
       session.emit(try session.request("job.reconcile", ["jobId": .string(rest[index + 1])]))
     case "submit":
+      if generatesItsOwnIdempotencyKey(rest) {
+        session.progress(
+          "note: no --idempotency-key was given, so this submit generated one and cannot be "
+            + "retried safely; pass one to make a repeat return the same job")
+      }
       let requestJSON = try operationRequestJSON(rest, subcommand: "job submit")
       let submitted = try session.request("job.submit", ["requestJson": .string(requestJSON)])
       // §8.1 allows exactly one document on machine stdout. This compound used

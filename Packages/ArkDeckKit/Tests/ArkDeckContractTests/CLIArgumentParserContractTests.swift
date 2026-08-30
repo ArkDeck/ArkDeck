@@ -707,6 +707,64 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertFalse(JobState.waitingForRecovery.isTerminal)
   }
 
+  // MARK: Retryable identity and stable pages (§5.3, §7.3, CLI-REQ-008)
+
+  /// §13.2: the flag form generated a fresh random identity per invocation, so
+  /// a retried submit created a second job instead of returning the first —
+  /// the one thing an unattended caller cannot afford to get wrong.
+  func testTheFlagFormLetsACallerFixItsRequestIdentity() {
+    guard case .dispatch? = success([
+      "job", "submit", "--target", "T-1", "--operation", "observe.device@1",
+      "--request-id", "run-7", "--idempotency-key", "run-7",
+    ]) else {
+      return XCTFail("a caller must be able to fix both identities")
+    }
+    guard case .dispatch? = success([
+      "job", "plan", "--target", "T-1", "--operation", "observe.device@1",
+      "--request-id", "run-7",
+    ]) else {
+      return XCTFail("plan takes the same identity flags")
+    }
+    // §5.3: the document form carries them itself, so the two are exclusive.
+    for flag in [["--request-id", "r"], ["--idempotency-key", "k"]] {
+      XCTAssertEqual(
+        failure(["job", "submit", "--request-file", "r.json"] + flag)?.code, .invalidOption,
+        flag.joined(separator: " "))
+    }
+  }
+
+  func testTheCallerIsToldWhenAnIdentityWasGeneratedForIt() {
+    XCTAssertTrue(
+      RuntimeCLI.generatesItsOwnIdempotencyKey([
+        "--target", "T-1", "--operation", "observe.device@1",
+      ]))
+    XCTAssertFalse(
+      RuntimeCLI.generatesItsOwnIdempotencyKey(["--idempotency-key", "k"]))
+    // A request document carries its own identity, so there is nothing to warn
+    // about — warning there would tell a caller who did the right thing that
+    // they did not.
+    XCTAssertFalse(RuntimeCLI.generatesItsOwnIdempotencyKey(["--request-file", "r.json"]))
+  }
+
+  /// §13.2: the reply a script had to parse changed with the arguments it
+  /// happened to pass — a bare array without flags, a page object with them.
+  /// One parser cannot be written against two shapes.
+  func testJobListPublishesOneShapeAndItsPageOptions() {
+    for argv in [
+      ["job", "list"],
+      ["job", "list", "--page-size", "10"],
+      ["job", "list", "--order", "newestFirst"],
+      ["job", "list", "--include-current", "--include-timeline"],
+      ["job", "list", "--cursor", "12", "--order", "oldestFirst"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["job", "list", "--order", "bogus"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["job", "list", "--order"])?.code, .invalidOption)
+  }
+
   // MARK: Operation discovery (§6.1)
 
   func testTheOperationSurfaceCoversExampleAndValidate() {

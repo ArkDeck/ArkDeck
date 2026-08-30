@@ -46,7 +46,7 @@ target/binding 事实，不会由 Trace Viewer 另行执行 HDC 探测。
 ```bash
 arkdeck agentd status
 arkdeck doctor
-arkdeck device list --json
+arkdeck target list --json
 arkdeck operation describe --operation capture.diagnostics@1 --json
 ```
 

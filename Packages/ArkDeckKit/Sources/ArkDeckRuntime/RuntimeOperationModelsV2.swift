@@ -335,7 +335,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
         path: "$.target.expectedBindingRevision",
         message:
           "\(reference) is device-bound: pass --expected-binding-revision <n> "
-          + "(the revision `arkdeck device list` reports for this target)")
+          + "(the revision `arkdeck target list` reports for this target)")
     }
     if descriptor?.binding == WorkflowBindingRequirement.none, expectedBindingRevision != nil {
       throw RuntimeOperationRequestRejection(

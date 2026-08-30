@@ -554,6 +554,26 @@ enum CLICommandRegistry {
       name: "--expected-binding-revision",
       form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
       summary: "binding revision the caller expects; a drift fails closed"),
+    // §5.3: the flag form has to let a caller fix these. Without them the CLI
+    // generated a fresh random pair per invocation, so a retried submit created
+    // a second job instead of returning the first — which is the one thing an
+    // unattended caller cannot afford to get wrong.
+    CLIOptionSpec(
+      name: "--request-id",
+      form: .value(placeholder: "id", grammar: .opaque),
+      summary: "caller-stable request identity; omitted, one is generated per invocation"),
+    CLIOptionSpec(
+      name: "--idempotency-key",
+      form: .value(placeholder: "key", grammar: .opaque),
+      summary: "caller-stable idempotency key; the same key returns the same job"),
+  ]
+
+  /// `--request-file` carries the whole document, so every flag-form field is
+  /// exclusive with it (§5.3).
+  private static let requestFileExclusions: [[String]] = [
+    ["--request-file", "--target"], ["--request-file", "--operation"],
+    ["--request-file", "--inputs-file"], ["--request-file", "--expected-binding-revision"],
+    ["--request-file", "--request-id"], ["--request-file", "--idempotency-key"],
   ]
 
   private static let jobNode = CLINodeSpec(
@@ -565,11 +585,7 @@ enum CLICommandRegistry {
         canonicalCommand: "job.plan",
         summary: "materialize the exact plan without dispatching it",
         options: runtimeClientOptions(jobRequestOptions),
-        mutuallyExclusive: [
-          ["--request-file", "--target"], ["--request-file", "--operation"],
-          ["--request-file", "--inputs-file"],
-          ["--request-file", "--expected-binding-revision"],
-        ],
+        mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
       CLILeafSpec(
         token: "submit",
@@ -582,11 +598,7 @@ enum CLICommandRegistry {
               form: .flag,
               summary: "poll the submitted job until it settles")
           ]),
-        mutuallyExclusive: [
-          ["--request-file", "--target"], ["--request-file", "--operation"],
-          ["--request-file", "--inputs-file"],
-          ["--request-file", "--expected-binding-revision"],
-        ],
+        mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
       CLILeafSpec(
         token: "status",
@@ -607,6 +619,20 @@ enum CLICommandRegistry {
             name: "--cursor",
             form: .value(placeholder: "token", grammar: .opaque),
             summary: "opaque continuation cursor from a previous page"),
+          CLIOptionSpec(
+            name: "--order",
+            form: .value(
+              placeholder: "oldestFirst|newestFirst",
+              grammar: .enumeration(["oldestFirst", "newestFirst"])),
+            summary: "page order; the Runtime default is oldestFirst"),
+          CLIOptionSpec(
+            name: "--include-current",
+            form: .flag,
+            summary: "also return the jobs the Runtime currently considers active"),
+          CLIOptionSpec(
+            name: "--include-timeline",
+            form: .flag,
+            summary: "include each job's timeline entries"),
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
