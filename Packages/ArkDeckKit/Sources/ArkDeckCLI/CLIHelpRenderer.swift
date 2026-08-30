@@ -309,6 +309,11 @@ enum CLIRegistryProjection {
       ]
       if range.upperBound != Int.max { fields["maximum"] = .integer(Int64(range.upperBound)) }
       return .object(fields)
+    case .controlRequestID:
+      return .object([
+        "kind": .string("pattern"),
+        "pattern": .string("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
+      ])
     case .enumeration(let allowed):
       return .object([
         "kind": .string("enumeration"),

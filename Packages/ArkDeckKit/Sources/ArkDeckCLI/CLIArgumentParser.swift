@@ -47,6 +47,23 @@ enum CLIArgumentParser {
     return mode
   }
 
+  /// §8.1: the correlation identity used for this invocation, chosen before
+  /// the parse so an argv failure still carries one.
+  ///
+  /// Exactly one syntactically valid value is echoed. A missing, repeated or
+  /// malformed one produces a fresh bounded identity rather than putting
+  /// unvalidated caller bytes into machine output.
+  static func bootstrapControlRequestID(_ argv: [String]) -> String {
+    let positions = argv.indices.filter { argv[$0] == CLICommandRegistry.controlRequestIDOption.name
+    }
+    guard positions.count == 1, let position = positions.first, position + 1 < argv.count,
+      CLIControlRequestID.isValid(argv[position + 1])
+    else {
+      return CLIControlRequestID.generated()
+    }
+    return argv[position + 1]
+  }
+
   // MARK: Parse
 
   static func parse(_ argv: [String]) -> Result<CLIInvocation, CLIRegistryError> {
@@ -479,6 +496,18 @@ enum CLIArgumentParser {
           details: [
             "command": .string(leaf.canonicalCommand), "option": .string(label),
             "value": .string(value),
+          ],
+          command: leaf.canonicalCommand)
+      }
+      return nil
+    case .controlRequestID:
+      guard CLIControlRequestID.isValid(value) else {
+        return CLIRegistryError(
+          code: .invalidOption,
+          message:
+            "`\(name)` \(label) must match ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          details: [
+            "command": .string(leaf.canonicalCommand), "option": .string(label),
           ],
           command: leaf.canonicalCommand)
       }

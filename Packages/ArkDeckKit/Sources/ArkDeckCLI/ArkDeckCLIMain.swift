@@ -92,14 +92,29 @@ struct ArkDeckCommandLine {
   }
 
   private static func emitRegistryFailure(_ error: CLIRegistryError, mode: CLIOutputMode) {
-    switch mode {
+    emitRegistryFailure(error, rendering: mode == .human ? .human : .envelope)
+  }
+
+  /// One failure, rendered in the shape the caller asked for.
+  ///
+  /// A failure raised after the parse carries its own rendering, because the
+  /// alternative — deciding here from a mode this function cannot see — is how
+  /// a caller who asked for JSON gets prose on stderr and an exit status it has
+  /// to guess from.
+  private static func emitRegistryFailure(
+    _ error: CLIRegistryError, rendering: CLIRendering
+  ) {
+    switch rendering {
     case .human:
       FileHandle.standardError.write(Data("arkdeck: \(error.message)\n".utf8))
-    case .json, .jsonl:
+    case .legacyJSON:
+      FileHandle.standardOutput.write(
+        Data(CLIRuntimeSession.legacyDocument(CLIResultEnvelope.legacyFailure(error)).utf8))
+    case .envelope:
       let envelope = CLIResultEnvelope.failure(
         command: error.command ?? CLIResultEnvelope.parsePhaseCommand,
         error: error,
-        controlRequestID: newControlRequestID())
+        controlRequestID: error.controlRequestID ?? newControlRequestID())
       FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
     }
   }
@@ -155,6 +170,12 @@ struct ArkDeckCommandLine {
           mode: .human)
         exit(CLIErrorCode.internalError.exitCode)
       }
+    } catch let error as CLIRegistryError {
+      // A registry error already knows its code, its exit status and the shape
+      // the caller asked for. Letting it fall through to the generic catch
+      // below is what used to turn an unknown outcome into a bare exit 1.
+      emitRegistryFailure(error, rendering: error.rendering)
+      exit(error.exitCode)
     } catch let error as CLIError {
       FileHandle.standardError.write(Data("arkdeck \(command): \(error.message)\n".utf8))
       exit(error.exitCode)

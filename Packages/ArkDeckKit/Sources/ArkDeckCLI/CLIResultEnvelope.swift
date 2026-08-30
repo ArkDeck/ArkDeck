@@ -42,8 +42,8 @@ enum CLIResultEnvelope {
     var errorFields: [String: JSONValue] = [
       "code": .string(error.code.rawValue),
       "message": .string(error.message),
-      "controlRequestRetryable": .bool(false),
-      "attentionRequired": .bool(false),
+      "controlRequestRetryable": .bool(error.code.isControlRequestRetryable),
+      "attentionRequired": .bool(error.code.requiresAttention),
     ]
     if !error.details.isEmpty { errorFields["details"] = .object(error.details) }
     return .object([
@@ -55,6 +55,38 @@ enum CLIResultEnvelope {
         "controlRequestId": .string(controlRequestID),
         "cliVersion": .string(CLIProductVersion.product),
       ]),
+    ])
+  }
+
+  /// §12: a leaf that is not the current published shape says so in
+  /// `meta.lifecycle`, so a machine caller can tell it is driving a
+  /// compatibility surface. The human-mode warning goes to stderr instead;
+  /// machine stdout stays exactly one parseable document.
+  static func withLifecycle(_ envelope: JSONValue, _ status: CLILifecycleStatus) -> JSONValue {
+    guard status != .current, case .object(var fields) = envelope,
+      case .object(var meta)? = fields["meta"]
+    else { return envelope }
+    meta["lifecycle"] = .object([
+      "status": .string(status.rawValue),
+      "replacementArgvPattern": .null,
+      "removalVersion": .null,
+    ])
+    fields["meta"] = .object(meta)
+    return .object(fields)
+  }
+
+  /// The legacy-json rendering of a failure.
+  ///
+  /// §12 lists "errors are not JSON" among the defects `--json` must have fixed
+  /// while keeping its shape, so a failure in this mode is a small JSON object
+  /// rather than prose on stderr. It is deliberately not the envelope: that is
+  /// what `--output json` is for.
+  static func legacyFailure(_ error: CLIRegistryError) -> JSONValue {
+    .object([
+      "error": .object([
+        "code": .string(error.code.rawValue),
+        "message": .string(error.message),
+      ])
     ])
   }
 
@@ -75,27 +107,6 @@ enum CLIResultEnvelope {
   }
 }
 
-/// The subset of the §8.4 error registry this release can produce.
-///
-/// The registry is a branching contract, so the codes are spelled once and
-/// carry their own exit status: a code whose exit status is decided at the
-/// throw site is a code whose meaning drifts per call site.
-enum CLIErrorCode: String {
-  case invalidCommand
-  case invalidOption
-  case commandRemoved
-  case invalidInput
-  case internalError
-
-  var exitCode: Int32 {
-    switch self {
-    case .invalidCommand, .invalidOption, .commandRemoved: return 64
-    case .invalidInput: return 65
-    case .internalError: return 70
-    }
-  }
-}
-
 struct CLIRegistryError: Error {
   let code: CLIErrorCode
   let message: String
@@ -103,6 +114,14 @@ struct CLIRegistryError: Error {
   /// The canonical command this failure belongs to, or `nil` before the path
   /// was resolved.
   var command: String?
+  /// How this failure must be rendered.
+  ///
+  /// A failure raised after the parse knows which mode the caller asked for,
+  /// and carrying it here is what stops the answer arriving as prose on stderr
+  /// when the caller asked for JSON — the shape §8.1 exists to guarantee.
+  var rendering: CLIRendering = .human
+  /// The correlation identity of the invocation that produced it.
+  var controlRequestID: String?
 
   var exitCode: Int32 { code.exitCode }
 }
@@ -135,12 +154,12 @@ enum CLIProductVersion {
   static let machineContract = "arkdeck.cli.contracts/1"
   static let resultSchema: String? = CLIResultEnvelope.schemaVersion
   /// Not published by this build: the page envelope, the JSONL event stream,
-  /// the `nextAction` union, the versioned error registry and the canonical
-  /// JSON profile all arrive with the leaves that need them.
+  /// the `nextAction` union and the canonical JSON profile all arrive with the
+  /// leaves that need them.
   static let pageSchema: String? = nil
   static let eventSchema: String? = nil
   static let nextActionSchema: String? = nil
-  static let errorRegistry: String? = nil
+  static let errorRegistry: String? = CLIErrorRegistryVersion.current
   static let canonicalJson: String? = nil
 }
 

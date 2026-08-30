@@ -135,9 +135,122 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(success(["operation", "list", "--socket", "/tmp/s"]))
   }
 
-  func testOutputIsRefusedByLeavesThatDoNotYetRenderIt() {
-    XCTAssertEqual(failure(["doctor", "--output", "json"])?.code, .invalidOption)
-    XCTAssertEqual(failure(["job", "list", "--output", "json"])?.code, .invalidOption)
+  func testOutputIsAcceptedByEveryLeafThatDeclaresItAndRefusedByTheRest() {
+    XCTAssertNotNil(success(["doctor", "--output", "json"]))
+    XCTAssertNotNil(success(["job", "list", "--output", "json"]))
+    XCTAssertNotNil(success(["agentd", "status", "--output", "json"]))
+
+    // The prose-only maintainer and legacy-archive leaves have no structured
+    // result yet, so they refuse the option rather than wrap a sentence in an
+    // envelope and call it machine output.
+    XCTAssertEqual(
+      failure(["flash", "status", "--campaign-id", "E-1", "--output", "json"])?.code,
+      .invalidOption)
+  }
+
+  /// §8.1 scopes `jsonl` to the durable event stream. No leaf publishes one,
+  /// so accepting the mode would promise a stream that cannot be produced.
+  func testJsonlIsRefusedUntilADurableEventStreamExists() {
+    for argv in [["job", "list"], ["doctor"], ["commands"]] {
+      let error = failure(argv + ["--output", "jsonl"])
+      XCTAssertEqual(error?.code, .invalidOption, argv.joined(separator: " "))
+    }
+  }
+
+  /// §12: `--json` keeps the shape it has always had and `--output json` is the
+  /// new contract, so one invocation cannot ask for both.
+  func testTheTwoMachineOutputSpellingsExcludeEachOther() {
+    let error = failure(["operation", "list", "--output", "json", "--json"])
+    XCTAssertEqual(error?.code, .invalidOption)
+    XCTAssertTrue(error?.message.contains("only one of") == true)
+  }
+
+  func testTheCorrelationIdentityIsValidatedAndEchoedOnlyWhenItIsSound() {
+    XCTAssertNotNil(
+      success(["job", "status", "--job", "J-1", "--control-request-id", "my.run:1-a_b"]))
+    for rejected in ["", "-leading", ".dot", "has space", "emoji-🙂", String(repeating: "a", count: 129)]
+    {
+      XCTAssertEqual(
+        failure(["job", "status", "--job", "J-1", "--control-request-id", rejected])?.code,
+        .invalidOption,
+        "control request id \(rejected.debugDescription) must be refused")
+    }
+    XCTAssertNotNil(success(["job", "status", "--job", "J-1", "--control-request-id",
+      String(repeating: "a", count: 128)]))
+
+    // §8.1: exactly one sound value is echoed; anything else gets a fresh
+    // bounded identity rather than putting unvalidated bytes in machine output.
+    XCTAssertEqual(
+      CLIArgumentParser.bootstrapControlRequestID(["--control-request-id", "ok-1"]), "ok-1")
+    for unusable in [
+      ["--control-request-id"], ["--control-request-id", "bad id"],
+      ["--control-request-id", "a", "--control-request-id", "b"], [],
+    ] {
+      let generated = CLIArgumentParser.bootstrapControlRequestID(unusable)
+      XCTAssertTrue(generated.hasPrefix("ctl-"), "\(unusable)")
+      XCTAssertTrue(CLIControlRequestID.isValid(generated))
+    }
+  }
+
+  /// §12: an explicit legacy-compatibility leaf has to say so in machine
+  /// output, because the caller cannot otherwise tell it is driving the frozen
+  /// 1.x surface rather than the target one.
+  func testLegacyLeavesAreMarkedInTheRegistryAndInTheEnvelope() {
+    for path in [["device", "list"], ["debug", "status"], ["artifact", "import-hap"]] {
+      let leaf = CLICommandRegistry.allLeaves()
+        .first { $0.path == path }?.leaf
+      XCTAssertEqual(leaf?.lifecycle, .legacy, path.joined(separator: " "))
+    }
+    XCTAssertEqual(
+      CLICommandRegistry.allLeaves().first { $0.path == ["job", "status"] }?.leaf.lifecycle,
+      .current)
+
+    let envelope = CLIResultEnvelope.withLifecycle(
+      CLIResultEnvelope.success(
+        command: "device.list", result: .array([]), controlRequestID: "ctl-test"),
+      .legacy)
+    guard case .object(let fields) = envelope, case .object(let meta)? = fields["meta"],
+      case .object(let lifecycle)? = meta["lifecycle"]
+    else {
+      return XCTFail("a legacy leaf must carry meta.lifecycle")
+    }
+    XCTAssertEqual(lifecycle["status"], .string("legacy"))
+    XCTAssertEqual(lifecycle["replacementArgvPattern"], .null)
+    XCTAssertEqual(lifecycle["removalVersion"], .null)
+
+    // A current leaf carries no lifecycle at all rather than a "current" one.
+    let current = CLIResultEnvelope.withLifecycle(
+      CLIResultEnvelope.success(
+        command: "job.status", result: .object([:]), controlRequestID: "ctl-test"),
+      .current)
+    guard case .object(let plain) = current, case .object(let plainMeta)? = plain["meta"] else {
+      return XCTFail("meta is required")
+    }
+    XCTAssertNil(plainMeta["lifecycle"])
+  }
+
+  /// §12 lists "errors are not JSON" as a `--json` defect to fix while keeping
+  /// its shape. It is not the envelope: that is what `--output json` is for.
+  func testLegacyJsonAnswersFailuresAsJsonWithoutTheEnvelope() {
+    let error = CLIRegistryError(
+      code: .resourceNotFound, message: "unknown job J-1", command: "job.status")
+    guard case .object(let fields) = CLIResultEnvelope.legacyFailure(error) else {
+      return XCTFail("legacy-json failures must still be JSON")
+    }
+    XCTAssertNil(fields["schemaVersion"], "legacy-json is not the versioned envelope")
+    XCTAssertNil(fields["meta"])
+    guard case .object(let body)? = fields["error"] else { return XCTFail("error is required") }
+    XCTAssertEqual(body["code"], .string("resourceNotFound"))
+  }
+
+  /// The old renderer fell back to the human layout when encoding failed,
+  /// handing a machine caller prose where it expected JSON (§8.1 forbids it).
+  func testLegacyJsonNeverFallsBackToProse() {
+    let unencodable = JSONValue.number(.nan)
+    let rendered = CLIRuntimeSession.legacyDocument(unencodable)
+    XCTAssertTrue(rendered.hasPrefix("{"), "the fallback must still be JSON: \(rendered)")
+    XCTAssertTrue(rendered.contains("internalError"))
+    XCTAssertTrue(rendered.hasSuffix("\n"))
   }
 
   func testOutputIsAcceptedInEitherGlobalPositionButNotTwice() {

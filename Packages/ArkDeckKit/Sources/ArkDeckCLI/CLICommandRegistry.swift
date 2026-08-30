@@ -45,6 +45,8 @@ enum CLIValueGrammar: Equatable {
   case positiveInteger(ClosedRange<Int>)
   /// One of a closed set of tokens, compared byte for byte.
   case enumeration([String])
+  /// §8.1's correlation identity: `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`.
+  case controlRequestID
 }
 
 /// Why an option exists on this leaf, which decides whether help publishes it.
@@ -146,6 +148,10 @@ struct CLILeafSpec {
   /// Output modes this leaf can render. §8.1 requires the registry, not the
   /// renderer, to decide this.
   var outputModes: [CLIOutputMode] = [.human]
+  /// §12 lifecycle. `legacy` marks an explicit compatibility leaf: it works,
+  /// but its request, response and effect are the frozen 1.x ones, so it does
+  /// not count as target conformance.
+  var lifecycle: CLILifecycleStatus = .current
 }
 
 struct CLIPositionalSpec: Equatable {
@@ -187,10 +193,9 @@ enum CLICommandRegistry {
   static let helpOptionNames: Set<String> = ["--help", "-h"]
   static let versionOptionName = "--version"
 
-  /// `--output`, scoped in this release to the registry meta-commands and
-  /// `--version`. The Runtime leaves still publish `--json`; migrating them to
-  /// the versioned envelope is its own vertical change, and declaring the
-  /// option before it is honoured would advertise a mode that does not work.
+  /// `--output`. §8.1 requires every portable leaf to support at least `human`
+  /// and `json`; `jsonl` belongs to the durable event stream, which no leaf
+  /// publishes yet, so it is not in the accepted set.
   static let outputOption = CLIOptionSpec(
     name: "--output",
     form: .value(
@@ -198,11 +203,21 @@ enum CLICommandRegistry {
       grammar: .enumeration([CLIOutputMode.human.rawValue, CLIOutputMode.json.rawValue])),
     summary: "output mode; machine modes emit one arkdeck.cli.result/1 document")
 
-  /// The legacy machine-output flag on Runtime leaves.
+  /// §12 keeps `--json` exactly as it was: the daemon reply, pretty-printed,
+  /// with no envelope. Changing what an existing flag prints is a breaking
+  /// change that belongs to the next CLI major, so `--output json` is the new
+  /// contract and this one is the compatibility mode beside it.
   static let jsonOption = CLIOptionSpec(
     name: "--json",
     form: .flag,
-    summary: "emit the reply as JSON instead of the human layout")
+    summary: "legacy: print the raw reply as JSON, without the result envelope")
+
+  /// §8.1/§8.2: a caller-supplied correlation identity for one invocation. It
+  /// is not a Runtime idempotency key and nothing is derived from it.
+  static let controlRequestIDOption = CLIOptionSpec(
+    name: "--control-request-id",
+    form: .value(placeholder: "id", grammar: .controlRequestID),
+    summary: "correlate this control-plane call; not a Job or request identity")
 
   /// §11.1: recognised on macOS, never advertised, never a business parameter.
   static let socketOption = CLIOptionSpec(
@@ -212,8 +227,12 @@ enum CLICommandRegistry {
     stability: .macosCompatibilityOnly)
 
   private static func runtimeClientOptions(_ own: [CLIOptionSpec]) -> [CLIOptionSpec] {
-    own + [jsonOption, socketOption]
+    own + [outputOption, jsonOption, controlRequestIDOption, socketOption]
   }
+
+  /// The two machine-output spellings are exclusive: one invocation prints one
+  /// document, in one shape.
+  static let outputAndJSONAreExclusive = ["--output", "--json"]
 
   // MARK: Meta commands
 
@@ -248,11 +267,53 @@ enum CLICommandRegistry {
     ])
 
   /// Meta-commands are leaves at the root, not a resource namespace (§5.1).
-  static let rootLeaves: [CLILeafSpec] = [helpLeaf, commandsLeaf, completionLeaf]
+  static let rootLeaves: [CLILeafSpec] = [helpLeaf, commandsLeaf, completionLeaf].map(normalized)
 
   // MARK: Product commands
 
-  static let nodes: [CLINodeSpec] = [
+  static let nodes: [CLINodeSpec] = declaredNodes.map { node in
+    var normalizedNode = node
+    normalizedNode.leaves = node.leaves.map(normalized)
+    return normalizedNode
+  }
+
+  /// Facts that follow from a leaf's own declaration, applied once rather than
+  /// repeated on every leaf. A leaf that takes `--output` renders `json` by
+  /// definition, and the two machine-output spellings exclude each other by
+  /// definition; writing both out per leaf is how one of them gets forgotten.
+  /// §12's migration table names these as explicit legacy-compatibility
+  /// leaves for the current major: they keep the frozen 1.x request, response
+  /// and effect, and the target spellings (`target list/show/adopt`,
+  /// `recovery flash-invocation ...`, `artifact import <kind>`,
+  /// `legacy flash ...`) arrive on the negotiated 2.x control protocol.
+  ///
+  /// Marking them is not cosmetic: §12 forbids counting a legacy leaf as
+  /// target conformance, and a machine caller has to be able to see which
+  /// surface it is driving without reading this file.
+  private static let legacyCompatibilityCommands: Set<String> = [
+    "device.list", "device.show", "device.adopt",
+    "debug.start", "debug.evaluate", "debug.status",
+    "artifact.import-hap", "artifact.import-workspace-patch",
+    "artifact.import-flash-bundle", "artifact.import-native-library",
+    "flash.install-binding", "flash.status", "flash.reconcile",
+  ]
+
+  private static func normalized(_ leaf: CLILeafSpec) -> CLILeafSpec {
+    var normalized = leaf
+    if legacyCompatibilityCommands.contains(leaf.canonicalCommand) {
+      normalized.lifecycle = .legacy
+    }
+    guard leaf.options.contains(where: { $0.name == outputOption.name }) else { return normalized }
+    if !normalized.outputModes.contains(.json) { normalized.outputModes.append(.json) }
+    if leaf.options.contains(where: { $0.name == jsonOption.name }),
+      !normalized.mutuallyExclusive.contains(outputAndJSONAreExclusive)
+    {
+      normalized.mutuallyExclusive.append(outputAndJSONAreExclusive)
+    }
+    return normalized
+  }
+
+  private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, operationNode, deviceNode, targetlessTraceNode, jobNode, artifactNode,
     agentNode, capabilityNode, cleanupDebtNode, debugNode, flashNode, agentdNode,
     signingNode, updateFeedNode,
@@ -884,22 +945,22 @@ enum CLICommandRegistry {
         token: "install",
         canonicalCommand: "agentd.install",
         summary: "install the daemon as a user-domain service",
-        options: agentdInstallOptions + [jsonOption]),
+        options: agentdInstallOptions + [outputOption, jsonOption]),
       CLILeafSpec(
         token: "update",
         canonicalCommand: "agentd.update",
         summary: "update the installed daemon and its pinned host tools",
-        options: agentdInstallOptions + [jsonOption]),
+        options: agentdInstallOptions + [outputOption, jsonOption]),
       CLILeafSpec(
         token: "restart",
         canonicalCommand: "agentd.restart",
         summary: "restart the installed daemon",
-        options: [maximumWaitSecondsOption, jsonOption]),
+        options: [maximumWaitSecondsOption, outputOption, jsonOption]),
       CLILeafSpec(
         token: "status",
         canonicalCommand: "agentd.status",
         summary: "service and daemon health",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "verify",
         canonicalCommand: "agentd.verify",
@@ -918,7 +979,7 @@ enum CLICommandRegistry {
             name: "--job",
             form: .value(placeholder: "job-id", grammar: .opaque),
             summary: "read an existing profiled job instead of running one"),
-          jsonOption,
+          outputOption, jsonOption,
         ],
         mutuallyExclusive: [
           ["--job", "--target"], ["--job", "--maximum-wait-seconds"],
@@ -928,7 +989,7 @@ enum CLICommandRegistry {
         token: "uninstall",
         canonicalCommand: "agentd.uninstall",
         summary: "remove the installed daemon service",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
     ])
 
   private static let signingNode = CLINodeSpec(
@@ -955,7 +1016,7 @@ enum CLICommandRegistry {
             form: .value(placeholder: "bundle-name", grammar: .opaque),
             summary: "application bundle name the preset signs for",
             isRequired: true),
-          projectRefOption, jsonOption,
+          projectRefOption, outputOption, jsonOption,
         ]),
       CLILeafSpec(
         token: "install",
@@ -992,13 +1053,13 @@ enum CLICommandRegistry {
             form: .value(placeholder: "alias", grammar: .opaque),
             summary: "key alias inside the keystore",
             isRequired: true),
-          projectRefOption, jsonOption,
+          projectRefOption, outputOption, jsonOption,
         ]),
       CLILeafSpec(
         token: "normalize",
         canonicalCommand: "signing.normalize",
         summary: "normalize an installed preset in place",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "migrate-deveco",
         canonicalCommand: "signing.migrate-deveco",
@@ -1018,18 +1079,18 @@ enum CLICommandRegistry {
             name: "--key-alias",
             form: .value(placeholder: "alias", grammar: .opaque),
             summary: "key alias inside the keystore"),
-          jsonOption,
+          outputOption, jsonOption,
         ]),
       CLILeafSpec(
         token: "status",
         canonicalCommand: "signing.status",
         summary: "installed preset status",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "remove",
         canonicalCommand: "signing.remove",
         summary: "remove the installed preset",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
     ])
 
   private static let projectRefOption = CLIOptionSpec(
