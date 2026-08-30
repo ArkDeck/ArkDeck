@@ -532,6 +532,20 @@ enum CLIArgumentParser {
           command: leaf.canonicalCommand)
       }
       return nil
+    case .hexDigest(let length):
+      let isLowercaseHex =
+        value.count == length
+        && value.allSatisfy { $0.isHexDigit && !$0.isUppercase }
+      guard isLowercaseHex else {
+        return CLIRegistryError(
+          code: .invalidOption,
+          message: "`\(name)` \(label) must be \(length) lowercase hex digits",
+          details: [
+            "command": .string(leaf.canonicalCommand), "option": .string(label),
+          ],
+          command: leaf.canonicalCommand)
+      }
+      return nil
     case .enumeration(let allowed):
       guard allowed.contains(value) else {
         return CLIRegistryError(

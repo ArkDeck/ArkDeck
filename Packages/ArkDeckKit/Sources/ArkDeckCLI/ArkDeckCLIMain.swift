@@ -207,6 +207,8 @@ struct ArkDeckCommandLine {
       try runCampaignStatus(Array(arguments.dropFirst()))
     case "reconcile":
       try runFlashReconcile(Array(arguments.dropFirst()))
+    case "device-access", "bootloader-status", "prerequisites", "lane-preview", "bind-loader":
+      try RuntimeCLI.runFlashObservation(subcommand, Array(arguments.dropFirst()))
     default:
       // The retired verbs (plan, preview, execute, continue, postflight) are
       // registry tombstones now, answered before dispatch with an exact

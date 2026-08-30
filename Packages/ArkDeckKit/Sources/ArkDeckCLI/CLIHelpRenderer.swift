@@ -320,6 +320,12 @@ enum CLIRegistryProjection {
         "kind": .string("pattern"),
         "pattern": .string("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
       ])
+    case .hexDigest(let length):
+      return .object([
+        "kind": .string("hexDigest"),
+        "length": .integer(Int64(length)),
+        "case": .string("lowercase"),
+      ])
     case .enumeration(let allowed):
       return .object([
         "kind": .string("enumeration"),

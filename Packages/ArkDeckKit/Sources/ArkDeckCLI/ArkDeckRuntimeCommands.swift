@@ -1285,6 +1285,75 @@ enum RuntimeCLI {
     }
   }
 
+  /// `arkdeck flash <observation>` — the five Flash methods §13.2 lists as
+  /// daemon-ready with no CLI leaf.
+  ///
+  /// Four of them observe and report: whether this host can reach the board at
+  /// all, what the bootloader looks like, what still has to hold before a
+  /// restore could be admitted, and which lane plan an already-imported archive
+  /// would anchor. Until now they were reachable only from the App, so a
+  /// headless caller could discover that a flash was impossible only by
+  /// attempting one.
+  ///
+  /// `bind-loader` is the exception and is a mutation: it binds the attached
+  /// Loader to the target, which is why it takes the expected binding revision
+  /// and fails closed on a drift rather than rebinding whatever is plugged in.
+  static func runFlashObservation(_ subcommand: String, _ arguments: [String]) throws {
+    // `arguments` is already past the subcommand token: dropping again here
+    // would silently swallow the caller's first option.
+    var rest = arguments
+    let session = runtimeSession(&rest, command: "flash.\(subcommand)")
+
+    func required(_ flag: String) throws -> String {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "flash \(subcommand) requires \(flag)")
+      }
+      return rest[index + 1]
+    }
+
+    switch subcommand {
+    case "device-access":
+      session.emit(try session.request("flash.device-access"))
+    case "bootloader-status":
+      session.emit(try session.request("flash.bootloader-status"))
+    case "prerequisites":
+      session.emit(
+        try session.request(
+          "flash.prerequisites",
+          [
+            "targetId": .string(try required("--target")),
+            "profileReference": .string(try required("--device-profile")),
+          ]))
+    case "lane-preview":
+      // The wire spelling stays `flash.lanePlanPreview`: §12 freezes the 1.x
+      // method tokens byte for byte, so the kebab-case command name is a
+      // registry mapping rather than a rename anyone may push down the wire.
+      session.emit(
+        try session.request(
+          "flash.lanePlanPreview",
+          [
+            "targetId": .string(try required("--target")),
+            "profileReference": .string(try required("--device-profile")),
+            "archiveSha256": .string(try required("--archive-sha256")),
+          ]))
+    case "bind-loader":
+      guard let revision = Int64(try required("--expected-binding-revision")) else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "flash bind-loader --expected-binding-revision must be a number")
+      }
+      session.emit(
+        try session.request(
+          "flash.bind-current-loader",
+          [
+            "targetId": .string(try required("--target")),
+            "expectedBindingRevision": .integer(revision),
+          ]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
+    }
+  }
+
   /// `arkdeck runtime ...` — the local Runtime service and its host tools.
   ///
   /// `health` has had a daemon method since the control plane landed, but no

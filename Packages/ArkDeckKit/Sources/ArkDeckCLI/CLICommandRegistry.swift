@@ -48,6 +48,9 @@ enum CLIValueGrammar: Equatable {
   case nonNegativeInteger(ClosedRange<Int>)
   /// One of a closed set of tokens, compared byte for byte.
   case enumeration([String])
+  /// Exactly `length` lowercase hex digits. §11.3 fixes digests as lowercase
+  /// hex, and accepting both cases would make the same digest two tokens.
+  case hexDigest(length: Int)
   /// §8.1's correlation identity: `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`.
   case controlRequestID
 }
@@ -789,6 +792,18 @@ enum CLICommandRegistry {
         connectsToRuntime: true),
     ])
 
+  private static let targetIDOption = CLIOptionSpec(
+    name: "--target",
+    form: .value(placeholder: "target-id", grammar: .opaque),
+    summary: "durable target identity",
+    isRequired: true)
+
+  private static let deviceProfileOption = CLIOptionSpec(
+    name: "--device-profile",
+    form: .value(placeholder: "dayu200", grammar: .opaque),
+    summary: "published device profile reference",
+    isRequired: true)
+
   private static let requiredArtifactIDOption = CLIOptionSpec(
     name: "--artifact",
     form: .value(placeholder: "artifact-id", grammar: .opaque),
@@ -1014,6 +1029,50 @@ enum CLICommandRegistry {
           outputOption,
         ]),
       CLILeafSpec(
+        token: "device-access",
+        canonicalCommand: "flash.device-access",
+        summary: "host permission and driver access facts for Rockchip flashing",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "bootloader-status",
+        canonicalCommand: "flash.bootloader-status",
+        summary: "observed bootloader disposition of the attached board",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "prerequisites",
+        canonicalCommand: "flash.prerequisites",
+        summary: "everything that must hold before a restore can be admitted",
+        options: runtimeClientOptions([targetIDOption, deviceProfileOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "lane-preview",
+        canonicalCommand: "flash.lane-preview",
+        summary: "read-only preview of the lane plan an archive would anchor",
+        options: runtimeClientOptions([
+          targetIDOption, deviceProfileOption,
+          CLIOptionSpec(
+            name: "--archive-sha256",
+            form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+            summary: "digest of the imported firmware archive",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "bind-loader",
+        canonicalCommand: "flash.bind-loader",
+        summary: "bind the currently attached Loader to this target, CAS on its revision",
+        options: runtimeClientOptions([
+          targetIDOption,
+          CLIOptionSpec(
+            name: "--expected-binding-revision",
+            form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
+            summary: "revision the caller expects; a drift fails closed",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "plan",
         canonicalCommand: "flash.plan",
         summary: "retired: the Runtime materializes flash plans",
@@ -1022,8 +1081,9 @@ enum CLICommandRegistry {
         token: "preview",
         canonicalCommand: "flash.preview",
         summary: "retired: the Runtime owns Flash admission",
-        kind: .tombstone(
-          .noReplacement(reason: "Runtime admission replaced campaign preview"))),
+        // Now that `flash lane-preview` exists, the tombstone names the exact
+        // argv pattern instead of only saying what went away.
+        kind: .tombstone(.replacedBy("arkdeck flash lane-preview --target <id> ..."))),
       CLILeafSpec(
         token: "execute",
         canonicalCommand: "flash.execute",

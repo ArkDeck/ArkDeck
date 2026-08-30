@@ -445,8 +445,11 @@ final class CLIArgumentParserContractTests: XCTestCase {
       error?.details["replacementArgvPattern"], .string("arkdeck job evidence --job <id>"))
   }
 
+  /// `flash continue` is the example precisely because nothing replaces it:
+  /// historical campaigns are decode-only, so there is no argv pattern to give
+  /// and the reason has to carry the answer instead.
   func testARetiredCommandWithNoReplacementSaysSoRatherThanNamingOne() {
-    let error = failure(["flash", "preview"])
+    let error = failure(["flash", "continue"])
     XCTAssertEqual(error?.code, .commandRemoved)
     XCTAssertEqual(error?.details["replacementArgvPattern"], .null)
     XCTAssertNotNil(error?.details["reason"])
@@ -791,6 +794,78 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(
       failure(["operation", "validate", "--operation", "observe.device@1"])?.code,
       .invalidOption)
+  }
+
+  // MARK: Flash observations (§6.2, §13.2)
+
+  /// Five daemon methods §13.2 lists as ready with no CLI leaf. Four observe —
+  /// a headless caller could previously discover that a flash was impossible
+  /// only by attempting one — and `bind-loader` mutates, which is why it takes
+  /// the revision it expects.
+  func testTheFlashObservationSurfaceIsReachable() {
+    let digest = String(repeating: "a", count: 64)
+    for argv in [
+      ["flash", "device-access"],
+      ["flash", "bootloader-status"],
+      ["flash", "prerequisites", "--target", "T-1", "--device-profile", "dayu200"],
+      [
+        "flash", "lane-preview", "--target", "T-1", "--device-profile", "dayu200",
+        "--archive-sha256", digest,
+      ],
+      ["flash", "bind-loader", "--target", "T-1", "--expected-binding-revision", "3"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    // Each required option is required.
+    XCTAssertEqual(failure(["flash", "prerequisites", "--target", "T-1"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["flash", "bind-loader", "--target", "T-1"])?.code, .invalidOption)
+  }
+
+  /// §11.3 fixes digests as lowercase hex. Accepting both cases would make one
+  /// digest two tokens, and the daemon's own check is case-insensitive — so
+  /// the narrower rule has to live here.
+  func testAnArchiveDigestMustBeSixtyFourLowercaseHexDigits() {
+    let base = ["flash", "lane-preview", "--target", "T-1", "--device-profile", "dayu200"]
+    XCTAssertNotNil(success(base + ["--archive-sha256", String(repeating: "a", count: 64)]))
+    for rejected in [
+      String(repeating: "A", count: 64),
+      String(repeating: "a", count: 63),
+      String(repeating: "a", count: 65),
+      String(repeating: "z", count: 64),
+      "",
+    ] {
+      XCTAssertEqual(
+        failure(base + ["--archive-sha256", rejected])?.code, .invalidOption,
+        "digest \(rejected.prefix(4))… must be refused")
+    }
+  }
+
+  /// §12 freezes the 1.x method tokens byte for byte. The kebab-case command
+  /// name is a registry mapping, and the camelCase wire spelling must survive
+  /// it — "unifying" the two is exactly what §12 forbids a port from doing.
+  func testTheKebabCaseCommandDoesNotRenameTheCamelCaseWireMethod() throws {
+    let source = try String(
+      contentsOf: URL(filePath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appending(path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(
+      source.contains("\"flash.lanePlanPreview\""),
+      "the frozen 1.x wire token must still be what goes on the wire")
+    let leaf = CLICommandRegistry.allLeaves().first { $0.path == ["flash", "lane-preview"] }
+    XCTAssertEqual(leaf?.leaf.canonicalCommand, "flash.lane-preview")
+  }
+
+  /// The pattern form returns as soon as its leaf exists, which is what the
+  /// resolve-to-a-real-leaf guard makes safe to do automatically.
+  func testTheRetiredFlashPreviewNamesLanePreviewNowThatItExists() {
+    let error = failure(["flash", "preview"])
+    XCTAssertEqual(error?.code, .commandRemoved)
+    XCTAssertEqual(
+      error?.details["replacementArgvPattern"],
+      .string("arkdeck flash lane-preview --target <id> ..."))
   }
 
   // MARK: The surface itself
