@@ -191,11 +191,7 @@ struct FlashRuntimeActivityView: View {
         }
       }
 
-      Grid(
-        alignment: .leading,
-        horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-        verticalSpacing: WorkspaceMetrics.rowGap
-      ) {
+      WorkspaceFactGrid {
         factRow("flash.runtime.job", job.id, identifier: "flash.runtime.jobID")
         factRow("flash.runtime.target", job.targetID, identifier: "flash.runtime.targetID")
       }
@@ -255,14 +251,12 @@ struct FlashRuntimeActivityView: View {
     _ key: String,
     _ value: String,
     identifier: String
-  ) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(flashText(key)).foregroundStyle(.secondary)
-      Text(value)
-        .font(.body.monospaced())
-        .textSelection(.enabled)
-        .accessibilityIdentifier(identifier)
-    }
+  ) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(flashText(key)),
+      value: Text(value),
+      isSelectable: true,
+      identifier: identifier)
   }
 
   private func timelineRow(

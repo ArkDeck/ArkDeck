@@ -612,78 +612,51 @@ struct DeviceDetailView: View {
   }
 
   private var factsGrid: some View {
-    Grid(
-      alignment: .leading,
-      horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-      verticalSpacing: WorkspaceMetrics.tightGap
-    ) {
-      GridRow(alignment: .firstTextBaseline) {
-        Text(deviceString("device.fact.connectKey")).foregroundStyle(.secondary)
-        Text(candidate.connectKey)
-          .font(WorkspaceFont.monospacedValue)
-          .textSelection(.enabled)
-      }
-      GridRow(alignment: .firstTextBaseline) {
-        Text(deviceString("device.fact.state")).foregroundStyle(.secondary)
-        Text(candidate.state)
-          .font(WorkspaceFont.monospacedValue)
-          .accessibilityIdentifier("device.fact.state")
-      }
+    WorkspaceFactGrid {
+      deviceFact("device.fact.connectKey", candidate.connectKey, isSelectable: true)
+      deviceFact("device.fact.state", candidate.state, identifier: "device.fact.state")
       if let stateObservedAtUTC = candidate.stateObservedAtUTC {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.stateObservedAt")).foregroundStyle(.secondary)
-          Text(stateObservedAtUTC).font(WorkspaceFont.monospacedValue)
-        }
+        deviceFact("device.fact.stateObservedAt", stateObservedAtUTC)
       }
       if let targetID = candidate.adoptedTargetID {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.target")).foregroundStyle(.secondary)
-          Text(targetID)
-            .font(WorkspaceFont.monospacedValue)
-            .textSelection(.enabled)
-        }
+        deviceFact("device.fact.target", targetID, isSelectable: true)
       }
       if let revision = candidate.bindingRevision {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.bindingRevision")).foregroundStyle(.secondary)
-          Text(String(revision))
-            .font(WorkspaceFont.tabularSecondary)
-        }
+        deviceFact("device.fact.bindingRevision", String(revision))
       }
       if let model = candidate.deviceInformation?.name ?? candidate.observedFacts?.model {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.model")).foregroundStyle(.secondary)
-          Text(model).font(WorkspaceFont.monospacedValue).textSelection(.enabled)
-        }
+        deviceFact("device.fact.model", model, isSelectable: true)
       }
       if let firmware =
         candidate.deviceInformation?.systemVersion ?? candidate.observedFacts?.firmware
       {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.firmware")).foregroundStyle(.secondary)
-          Text(firmware)
-            .font(WorkspaceFont.monospacedValue)
-            .textSelection(.enabled)
-            .accessibilityIdentifier("device.fact.firmware")
-        }
+        deviceFact(
+          "device.fact.firmware", firmware, isSelectable: true,
+          identifier: "device.fact.firmware")
       }
       if let transport =
         candidate.deviceInformation?.transport ?? candidate.observedFacts?.transport
       {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.transport")).foregroundStyle(.secondary)
-          Text(transport).font(WorkspaceFont.monospacedValue)
-        }
+        deviceFact("device.fact.transport", transport)
       }
       if candidate.deviceInformation == nil,
         let confirmedAt = candidate.observedFacts?.confirmedAtUTC
       {
-        GridRow(alignment: .firstTextBaseline) {
-          Text(deviceString("device.fact.observedAt")).foregroundStyle(.secondary)
-          Text(confirmedAt).font(WorkspaceFont.monospacedValue)
-        }
+        deviceFact("device.fact.observedAt", confirmedAt)
       }
     }
+  }
+
+  /// Every device fact is a mono value: these are the strings a person compares
+  /// against `hdc list targets` character by character.
+  private func deviceFact(
+    _ key: String, _ value: String, isSelectable: Bool = false, identifier: String? = nil
+  ) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(deviceString(key)),
+      value: Text(value),
+      isSelectable: isSelectable,
+      identifier: identifier)
   }
 }
 

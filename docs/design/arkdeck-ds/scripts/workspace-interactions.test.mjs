@@ -1647,3 +1647,58 @@ test('the shared workspace chrome has no App-side copies', () => {
     read('ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift').includes('RuntimeExecutionModeBadge('),
     'the job inspector still renders the shared badge');
 });
+
+test('every key/value list in the App is the shared fact grid', () => {
+  // F52 item 4, second half: 19 hand-written Grid( sites, of which 15 were
+  // key/value lists. What is left must be a genuine table or form, and must
+  // say so, so the next reader does not "converge" a header row into a fact
+  // list.
+  const rawGrid = /(?<!Workspace(?:Fact)?)\bGrid\(/;
+  const exempt = new Map([
+    ['ArkDeckApp/Features/Settings/SettingsRootView.swift', 'three columns of editable'],
+    ['ArkDeckApp/Features/Flash/FlashWorkspaceView.swift', 'three-column table with its own header row'],
+    ['ArkDeckApp/Features/HDC/HDCStatusView.swift', 'three-column matrix with a header row'],
+  ]);
+  const offenders = [];
+  for (const path of coverage.appViewFiles) {
+    if (path.startsWith('ArkDeckApp/DesignSystem/')) continue;
+    const source = read(path);
+    const lines = source.split('\n');
+    lines.forEach((line, index) => {
+      if (!rawGrid.test(line)) return;
+      // A hand-written Grid is allowed only where the two lines above it say
+      // why it is not a key/value list.
+      const preamble = lines.slice(Math.max(0, index - 4), index).join(' ');
+      if (/not a WorkspaceFactGrid/i.test(preamble)) return;
+      offenders.push(`${path}:${index + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], 'these key/value lists must use WorkspaceFactGrid');
+  for (const [path, reason] of exempt) {
+    assert.ok(read(path).includes(reason), `${path} must keep its recorded exception`);
+  }
+
+  // The rows the workspaces used to hand-roll now come from the shared row.
+  for (const [path, symbol] of [
+    ['ArkDeckApp/Features/History/RuntimeHistoryView.swift', 'private func row('],
+    ['ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift', 'private func factRow('],
+    ['ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift', 'private func factRow('],
+    ['ArkDeckApp/Features/Flash/FlashWorkspaceView.swift', 'private func summaryRow('],
+    ['ArkDeckApp/Features/HDC/HDCStatusView.swift', 'private func field('],
+    ['ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'private func planFact('],
+    ['ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift', 'private func hilogCount('],
+    ['ArkDeckApp/Features/Devices/DeviceWorkspace.swift', 'private func deviceFact('],
+  ]) {
+    const source = read(path);
+    const start = source.indexOf(symbol);
+    assert.notEqual(start, -1, `${symbol} was renamed in ${path}`);
+    const body = source.slice(start, start + 700);
+    assert.match(body, /-> WorkspaceFactRow/, `${symbol} in ${path} must return the shared row`);
+  }
+
+  // HDC's diagnostics fields stay unselectable on purpose: selection changes
+  // the accessibility representation UI automation reads.
+  const hdc = read('ArkDeckApp/Features/HDC/HDCStatusView.swift');
+  assert.match(hdc, /isSelectable` and `elidedValue` at their defaults/);
+  assert.doesNotMatch(hdc, /struct FieldTextStyle/, 'the local font modifier is now the row option');
+});

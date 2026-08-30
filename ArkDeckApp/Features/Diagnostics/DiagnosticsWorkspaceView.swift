@@ -160,7 +160,7 @@ struct DiagnosticsWorkspaceView: View {
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("diagnostics.hilog.boundary")
         }
-        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+        WorkspaceFactGrid {
           hilogCount("diagnostics.hilog.lines", value: summary.lineCount, id: "lines")
           ForEach(["D", "I", "W", "E", "F"], id: \.self) { level in
             hilogCount("diagnostics.hilog.level.\(level)", value: summary.levelCounts[level] ?? 0, id: level)
@@ -196,12 +196,13 @@ struct DiagnosticsWorkspaceView: View {
     .accessibilityIdentifier("diagnostics.hilog.summary")
   }
 
-  private func hilogCount(_ key: String, value: Int, id: String) -> some View {
-    GridRow {
-      Text(diagnosticsText(key))
-      Text(String(value)).monospacedDigit()
-        .accessibilityIdentifier("diagnostics.hilog.count.\(id)")
-    }
+  private func hilogCount(_ key: String, value: Int, id: String) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(diagnosticsText(key)),
+      value: Text(String(value)),
+      isMonospaced: false,
+      usesTabularDigits: true,
+      identifier: "diagnostics.hilog.count.\(id)")
   }
 
   private func hilogFact(_ key: String, value: String, id: String) -> some View {

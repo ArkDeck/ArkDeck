@@ -274,11 +274,7 @@ struct GlobalJobInspectorView: View {
               .accessibilityIdentifier("jobInspector.cancel.result")
           }
 
-          Grid(
-            alignment: .leading,
-            horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-            verticalSpacing: WorkspaceMetrics.rowGap
-          ) {
+          WorkspaceFactGrid {
             factRow("jobInspector.fact.job", job.id)
             factRow(
               "jobInspector.fact.operation",
@@ -303,7 +299,7 @@ struct GlobalJobInspectorView: View {
               )
               .foregroundStyle(.green)
               .fixedSize(horizontal: false, vertical: true)
-              Grid(alignment: .leading, horizontalSpacing: 16) {
+              WorkspaceFactGrid {
                 factRow("jobInspector.fact.recoveryRelation", relation.id)
               }
             }
@@ -500,23 +496,15 @@ struct GlobalJobInspectorView: View {
     return try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(startedAtUTC)
   }
 
-  private func factRow(_ key: String, _ value: String) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(jobsText(key)).foregroundStyle(.secondary)
-      Text(value)
-        .font(.body.monospaced())
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-    }
+  private func factRow(_ key: String, _ value: String) -> WorkspaceFactRow {
+    WorkspaceFactRow(name: Text(jobsText(key)), value: Text(value), isSelectable: true)
   }
 
-  private func recordedStateFactRow(_ rawState: String) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(jobsText("jobInspector.fact.recordedState")).foregroundStyle(.secondary)
-      stateText(rawState)
-        .font(.body.monospaced())
-        .textSelection(.enabled)
-    }
+  private func recordedStateFactRow(_ rawState: String) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(jobsText("jobInspector.fact.recordedState")),
+      value: stateText(rawState),
+      isSelectable: true)
   }
 
   private func establishedCurrentEpochRelation(

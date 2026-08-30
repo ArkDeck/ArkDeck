@@ -637,7 +637,7 @@ struct RuntimeHistoryView: View {
           unavailableSection(reason)
         case .available:
           if let correlation = detail.correlation {
-            Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
+            WorkspaceFactGrid {
               row(
                 "history.detail.job", correlation.jobID,
                 id: "history.correlation.job", monospaced: true)
@@ -698,7 +698,7 @@ struct RuntimeHistoryView: View {
 
   private func summarySection(_ job: RuntimeJobSummaryPresentation) -> some View {
     historySection("history.detail.summary") {
-      Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
+      WorkspaceFactGrid {
         row("history.detail.job", job.id, id: "history.detail.job", monospaced: true)
         row(
           "history.detail.session", job.sessionID ?? historyLocalized("history.value.notReported"),
@@ -816,7 +816,7 @@ struct RuntimeHistoryView: View {
         unavailableSection(reason)
       case .available:
         if let evidence = detail.evidence {
-          Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
+          WorkspaceFactGrid {
             row(
               "history.evidence.provider", evidence.providerID, id: "history.evidence.provider",
               monospaced: true)
@@ -935,15 +935,15 @@ struct RuntimeHistoryView: View {
   private func typedParameterGrid(
     _ parameters: [RuntimeJobParameterPresentation]
   ) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.tightGap) {
+    WorkspaceFactGrid {
       ForEach(parameters) { parameter in
-        GridRow(alignment: .firstTextBaseline) {
-          Text(parameter.name).font(WorkspaceFont.monospacedValue)
-          Text(parameter.value)
-            .font(WorkspaceFont.monospacedValue)
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
-        }
+        // The key is itself a runtime value here, so it reads as mono primary
+        // text rather than a secondary label.
+        WorkspaceFactRow(
+          name: Text(parameter.name),
+          value: Text(parameter.value),
+          usesMonospacedName: true,
+          isSelectable: true)
       }
     }
     .accessibilityIdentifier("history.parameters")
@@ -1192,17 +1192,13 @@ struct RuntimeHistoryView: View {
     _ value: String,
     id: String,
     monospaced: Bool = false
-  ) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(historyLocalized(titleKey))
-        .foregroundStyle(.secondary)
-        .gridColumnAlignment(.leading)
-      Text(value)
-        .font(monospaced ? .body.monospaced() : .body)
-        .accessibilityIdentifier(id)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-    }
+  ) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(historyLocalized(titleKey)),
+      value: Text(value),
+      isMonospaced: monospaced,
+      isSelectable: true,
+      identifier: id)
   }
 
   private func matchesFilters(_ job: RuntimeJobSummaryPresentation) -> Bool {

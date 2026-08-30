@@ -99,10 +99,10 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | shell.navigation | 主窗口、菜单、八项导航、空设备、恢复窗口、更新提示 | 八页完整；Settings/Trace Viewer/帮助独立 scene；Automation 退役。F48 将侧栏分组与 Job 检查器词表对回 App，并补 ⌘⇧J；F49 让 Debug/Flash 的窗口标题等于 App 的裸页面名 |
-| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；F54 补 Runtime 不可用 / 正在刷新 / 空档案三态，以及残留计数、临界写入提示与 established-current-epoch 关系；F56 把两个 Feature 共用的执行模式徽章移入 `DesignSystem/` |
+| shell.inspector | 折叠/展开、loading/empty/failed/active/terminal、mode/identity | 精确详情、标准日志显式读取、活动 Job 取消请求已接通；取消先核对 fresh identity；恢复操作不混入控制面。F46 让演示 timeline 双语，F48 补「打开历史记录」并对齐动作文案；F54 补 Runtime 不可用 / 正在刷新 / 空档案三态，以及残留计数、临界写入提示与 established-current-epoch 关系；F56 把两个 Feature 共用的执行模式徽章移入 `DesignSystem/`；F57 把 Job 事实与恢复关系两张表收敛到共享事实网格 |
 | shell.recovery | needsAttention、unknown、等待人工、安全边界、等待归档、History 入口 | F40：精确 Job 跳转、清除旧筛选并定位记录行。F41：有界滚动、多记录计数与窄窗工作区保留；原生精确行定位仍在复测，不能视为通过。所有主工作区共享；独立窗口不显示。不确认后续刷、不在 App 归档 |
 | device.details | adopted、offline、gone、authorized-unadopted、unknown | 设备行不是隐式 scope；已授权不等于接管。F50 用 `?page=device&deviceDetail=…` 补齐五种候选状态、`stateObservedAt`、CLI 接管说明，并把字段标签与两条说明对回 `Localizable.xcstrings` |
-| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；F55 把信任页改为与设备详情同构的两栏（状态与操作 + Runtime 事实，缺失字段不补值），补 `device.wait.unavailable` 第四态，并修好使 polling 态整页渲染失败的缺失倒计时格式化函数；F56 把七处自写通知换成共享 `WorkspaceNotice`，八种信任/等待状态共用同一语义色、符号与边框 |
+| device.trust | idle/polling/E000002/timedOut/E000003/ready | 有界等待；超时不当 denied；HDC 去 Overview。F47 移除原型残留的「重启共享 HDC server」危险 sheet；F55 把信任页改为与设备详情同构的两栏（状态与操作 + Runtime 事实，缺失字段不补值），补 `device.wait.unavailable` 第四态，并修好使 polling 态整页渲染失败的缺失倒计时格式化函数；F56 把七处自写通知换成共享 `WorkspaceNotice`，八种信任/等待状态共用同一语义色、符号与边框；F57 事实栏九行改用共享行，行距 6→4 |
 | device.rename | 右键 rename/re-check、空名称/取消、显示别名 | 不改 binding，重新检测只读候选 |
 
 ### Overview（GJ-1/2/4）
@@ -179,7 +179,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | --- | --- | --- |
 | history.list | 八类、search/status/mode/session/target/time/saved/loadOlder/empty | App已实现；原型补筛选，空列表不留无关详情 |
 | history.filters | 窄窗筛选与已存筛选弹层；status/mode/session/device/time/reset/Escape | F41 从纵向堆叠改为可展开入口；活动选择与搜索常显。F45 补显式 Escape/外部 pointer 关闭并完成双语浏览器验证；原生与截图验证见 F41/F45 |
-| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开；F56 起执行模式徽章由 `DesignSystem/RuntimeExecutionModeBadge.swift` 提供，History 与 Job 检查器同源 |
+| history.detail | Summary/Timeline/Correlation/Evidence/Parameters/Artifacts/Recovery；loading/failed/missing/partial | job与Artifact按需加载；F37/F38 不再补造事实；F39 补全 Summary、Correlation、Evidence 与恢复状态的已实现字段，缺失与明确空清单分开；F56 起执行模式徽章由 `DesignSystem/RuntimeExecutionModeBadge.swift` 提供，History 与 Job 检查器同源；F57 把 Summary / Correlation / Evidence / Parameters 四张表与 `row(...)` 收敛到共享事实网格，等宽值 13→12pt |
 | history.export | sensitive preview/cancel/chunk/hashMismatch/save/reveal | 目的地不传daemon；byteCount/hash复算；F37 按 exact Artifact 预览，未发布禁用；与App诊断导出不同 |
 | history.context | 在 Flash/Debug/Viewer/Trace/Device/Diagnostics 打开 | App 全部六类保留精确来源；F39 补原型遗漏的来源信息与 Inspector 跳转字段；Diagnostics 可将校验过的 Trace 转交 Viewer；不重放，原型不读取历史文件 |
 
@@ -203,7 +203,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | ID | 页面 / 状态 | 对比结论 |
 | --- | --- | --- |
 | system.panels | Flash镜像、入口 HAP / 附加 HAP/HSP / .so / HDC / key / root / Trace 导入；日志/Artifact/诊断包保存；Finder | 系统panel已纳入所属流程；不计为新业务页；HTML不真实读写 |
-| design.components | Workspace chrome；32预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；SessionSurfaces 与 F51 新增的 ViewerSurfaces 覆盖两组组合式组件；ArkTrace canvas 属上游插图，远程库未同步。BudgetMeters/OperationList/StageTrack/StatusStrip 按 spec §5.11 保留为退役 Automation 资料，原型已无消费方。F56 收敛 App 侧六份重复实现，`WorkspaceFactRow` 扩出四个可选行为承载它们，共享词表由交互测试守护 |
+| design.components | Workspace chrome；32预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；SessionSurfaces 与 F51 新增的 ViewerSurfaces 覆盖两组组合式组件；ArkTrace canvas 属上游插图，远程库未同步。BudgetMeters/OperationList/StageTrack/StatusStrip 按 spec §5.11 保留为退役 Automation 资料，原型已无消费方。F56 收敛 App 侧六份重复实现，`WorkspaceFactRow` 扩出四个可选行为承载它们；F57 把 14 处手写键值列表与 8 个行辅助函数收敛到 `WorkspaceFactGrid` / `WorkspaceFactRow`，余下 4 处三列表格/表单记 exception 并由回归强制写明理由 |
 | automation.retired | 旧Automation/HTASK稿 | CHG-2026-064已移除；旧URL只解释退役，不是待办 |
 
 ### 生产 View 文件索引（21/21）
@@ -1187,3 +1187,87 @@ VoiceOver 读全值）。**可见变化**：面板上下内边距由 24/24 改�
 - 统一本地闸 退出 0；本轮首次分配 App 编译车道（分类为 `app: true` / `swift: false`，`build-for-testing` 通过），SDD、catalog 与设计车道同跑通过。
 - 未做浏览器逐页走查，未执行设备操作。**绿的部分只证明这些断言覆盖到的行为未回归，
   不构成 App 呈现验收，不构成真机验收，不翻转任何 Golden Journey 状态。**
+
+## 2026-08-30 F57：键值列表全部走共享事实网格（C-DUP，第二批）
+
+首轮全量核对的第六批，基线 `fb6e5993`（PR #1590 合入后的 `main`）。范围是 F52 第 4 条剩下的
+两半里的第一半：9 个 Feature 文件里 19 处手写 `Grid(` 中**属于键值事实列表的 14 处**
+（第 15 处 `SettingsValueGrid` 已在 F56 收敛）。逐行结论见
+[2026-08-30 批次六台账](references/ui-consistency/2026-08-30-fact-grid-ledger.md)。
+
+**14 处列表与 8 个行辅助函数。** 每个工作区都自己写了一份「`GridRow` + 次要色键 + 带字体的
+值」：History 的 `row(...)`、Job 检查器的 `factRow` / `recordedStateFactRow`、Flash 的
+`summaryRow`、Flash 运行态的 `factRow`、HDC 的 `field(...)`、Debug 的 `planFact`、Diagnostics 的
+`hilogCount`，以及设备详情里逐行展开的九个 `GridRow`。八个辅助函数现在一律返回
+`WorkspaceFactRow`，设备详情新增同名的 `deviceFact` 收口；容器一律 `WorkspaceFactGrid`。
+`HDCStatusView.FieldTextStyle` 随之删除——它的 plain / monospaced / digits 三态正好就是共享行的
+`isMonospaced` 与 `usesTabularDigits` 两个选项。
+
+**可见变化（两类，都是被修的缺陷本身，不是顺带）：**
+
+1. **等宽值 13pt → 12pt。** History、Job 检查器、Flash 计划摘要与 Flash 运行态此前用
+   `.body.monospaced()`（13pt），共享行用 `WorkspaceFont.monospacedValue`（12pt）。spec §2 的
+   「路径、hash、版本、序列号、设备与 Job ID = 12 mono」只有一个尺寸，收敛即对齐。
+2. **行距 6pt → 4pt。** History 三张表与设备详情事实栏此前用 `WorkspaceMetrics.tightGap`(6)，
+   共享网格用 `rowGap`(4)，即原型 `.kv{gap:4px 14px}`。Flash 计划摘要的字面 12/6、
+   Diagnostics 计数表的字面 24/8、Debug 的 `blockGap` 横向间距同样归一到 14/4。
+
+**保留自写 `Grid(` 的四处，逐条写明理由（记 exception）。** Settings 存储策略是「标签 + 输入框
+ + 单位」三列可编辑表单，行内是控件而非只读值，需要更大的行距；`FlashWorkspaceView`
+的计划阶段摘要、`HDCStatusView` 的能力矩阵与设备事件表都是带表头行与分隔线的三列表格。
+理由写进代码注释，并由回归强制——任何 App View 文件里出现裸 `Grid(` 而上方两行没有写
+「not a WorkspaceFactGrid」，测试即失败。
+
+**HDC 诊断字段刻意不可选中，这条约束被显式保留。** 原注释记着：macOS 上开启文本选中会改变
+可访问性表示，使只读值对 UI 自动化不可见，所以该处值是换行而非截断、也不可选中。收敛后
+`field(...)` 让 `isSelectable` 与 `elidedValue` 保持默认关闭，注释改写为解释这一点，并由回归断言。
+
+### 本批未覆盖
+
+- F52 第 4 条的另一半：73 处 `.font(.system(size:…))` 绕过 `WorkspaceFont` / `WorkspaceMetrics`
+  （Diagnostics 39、Device 30、UIDump 2、Flash 2）。其中 10pt、12pt-medium、11pt-medium 在
+  `WorkspaceFont` 里没有等值角色，必然改变实际字号，下一批单独做。
+- `ViewerInspectorCopy` 硬编码英文（F52-5）——等待第 2 条裁决。
+- 资源里的已移除路径键、preview 构建守护（F52-6、F52-8）。
+- 退役 Automation 样式（F52-7）与 `Select` 映射（F52-9）保持 exception。
+- F56 登记的两条既有原生失败保持开放。
+
+### 本批实测：原生 XCUITest 套件在相同代码上结果不稳定（新登记，优先级高）
+
+本批第一次全套跑出 44/4，比批次五的 46/2 差，且两条新失败正好落在本批改过的 HDC 与
+Debug 上。没有直接归因为噪声，而是补跑到五次全套逐条比对：
+
+| 运行 | 代码 | 结果 | 失败集合 |
+| --- | --- | --- | --- |
+| A | `main`（本机并行有构建） | 45/3 | DebugHAP、History（signal kill）、Sandbox（fixture 未构建） |
+| B | 批次五 | 46/2 | DebugHAP、History |
+| C | 批次六 | 44/4 | DebugHAP、History、EnglishFixtureSweep、zhLocalizationSweep |
+| D | `main`（空载） | 45/3 | DebugHAP、History、Sandbox（Environment 断言） |
+| E | 批次六（与 D 同条件，代码与 C 逐字相同） | **47/1** | UserPickerPersistsBookmark（同一条 Environment 断言） |
+
+**C 与 E 是同一个提交、同样空载，失败数 4 与 1；D 与 E 里同一条断言打在两个不同的测试上。**
+五次运行里共有 6 个不同的用例至少失败过一次。批次六最好的一次（47/1）优于 `main` 最好的
+一次（45/3）。C 的两条新失败在同一分支上单独重跑通过。故 C 的 44/4 判为套件方差，不是回归。
+
+**方差的一个已定位来源**：`ArkDeckAppUITests/HDC/HDCStatusUITests.swift:494` 的
+`expandAdvancedDiagnostics` 用「固定次数滚动 + 单次 click + 5 秒等待」找
+`hdc.toolchain.path`，没有重试；它被 `walkEveryDiagnosticState` 共用，因此失败会记在恰好
+抽到不利布局/时序的那个测试上，而不是记在这个 helper 上。F56 登记的
+`testDebugHAPSelection…` 在三次运行里失败在三个不同的行（1154 / 1227 / 1180），是同一类。
+
+**影响**：macOS UI 套件作为本地门禁，目前**无法在 1–4 条失败的粒度上区分回归与噪声**。
+后续批次（尤其是要大改 Diagnostics 与 Device 字号的下一批）如果只跑一次全套，结论不可靠。
+建议在下一批之前单起一批专门稳定原生门禁；本批不顺手改，避免把收敛与测试稳定性混在
+同一个 PR 里。**在此之前，本审计对原生结果的所有陈述都以「多次运行的失败集合」为准，
+不以单次运行的通过/失败为准。**
+
+### F57 验证
+
+- App 编译 `** BUILD SUCCEEDED **`，0 error。
+- 原生 XCUITest 全套在本提交上跑了两次：44/4 与 **47/1**；第一次的两条新失败在同一分支单独
+  重跑通过。上面的方差表是这一结论的依据；**不以单次运行判定**。
+- `npm test` **76 项通过**（新增 1 项：裸 `Grid(` 扫描与四处 exception 的理由、8 个行辅助
+  函数返回共享行、HDC 字段刻意不可选中）。
+- `npm run build`、`npm run build:review` 通过；`check:tokens` 每个原型 class 均已分类。
+- 统一本地闸退出 0；App 编译车道（`app: true` / `swift: false`）`build-for-testing` 通过。
+- 未做浏览器逐页走查，未执行设备操作；不构成 App 呈现验收或真机验收。
