@@ -207,6 +207,73 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  /// §13.2: `target show` is not an alias of `target.list`.
+  ///
+  /// A caller deciding whether it can drive a device needs the binding it will
+  /// pin, the identity that binding is against, and the last facts the Runtime
+  /// confirmed. `target.list` publishes none of the last two, so the only way
+  /// to learn them was to adopt and see.
+  func testTargetShowReturnsTheBindingIdentityAndFactsThatTargetListOmits() async throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-show", directoryHint: .isDirectory))
+    let identity = String(repeating: "b", count: 64)
+    let target = try targets.adopt(
+      stableIdentitySHA256: identity,
+      connectKey: "fixture-connect-key", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    let response = try await request(
+      handler, method: "target.show", params: ["targetId": .string(target.targetID)])
+    guard case .object(let result)? = response.result else {
+      return XCTFail("target.show must return a bound object")
+    }
+    XCTAssertTrue(response.ok)
+    XCTAssertEqual(result["targetId"], .string(target.targetID))
+    XCTAssertEqual(result["bindingRevision"], .integer(Int64(target.bindingRevision)))
+    XCTAssertEqual(result["toolVersion"], .string("3.2.0f"))
+    XCTAssertEqual(result["adoptedAtUtc"], .string("2026-08-08T00:00:00Z"))
+    // The three fields `target.list` does not publish.
+    XCTAssertEqual(result["connectKey"], .string("fixture-connect-key"))
+    XCTAssertEqual(result["stablePhysicalIdentitySha256"], .string(identity))
+    XCTAssertNotNil(result["observedFacts"], "the key is present even with no facts yet")
+    // No bootstrap is configured in this stack, so live state is absent rather
+    // than invented: an unobserved device must not read as offline.
+    XCTAssertEqual(result["live"], .null)
+
+    let listed = try await request(handler, method: "target.list")
+    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first else {
+      return XCTFail("target.list must still return its compact array")
+    }
+    XCTAssertNil(
+      row["connectKey"],
+      "target.list stays the compact projection; widening it would be the breaking change §12 "
+        + "defers to 2.x")
+  }
+
+  func testTargetShowFailsClosedOnAnUnknownOrMissingTarget() async throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-show-missing", directoryHint: .isDirectory))
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    let unknown = try await request(
+      handler, method: "target.show", params: ["targetId": .string("target-missing")])
+    XCTAssertFalse(unknown.ok)
+    XCTAssertEqual(unknown.error?.code, "notFound")
+
+    let missing = try await request(handler, method: "target.show")
+    XCTAssertFalse(missing.ok)
+    XCTAssertEqual(missing.error?.code, "invalidParams")
+
+    let empty = try await request(
+      handler, method: "target.show", params: ["targetId": .string("")])
+    XCTAssertFalse(empty.ok)
+    XCTAssertEqual(empty.error?.code, "invalidParams")
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,

@@ -141,6 +141,10 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runOperation(arguments)
       case "device":
         try RuntimeCLI.runDevice(arguments)
+      case "runtime":
+        try RuntimeCLI.runRuntime(arguments)
+      case "target":
+        try RuntimeCLI.runTarget(arguments)
       case "trace":
         try RuntimeCLI.runTrace(arguments)
       case "job":

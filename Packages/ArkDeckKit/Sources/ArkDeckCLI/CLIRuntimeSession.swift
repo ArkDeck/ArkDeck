@@ -20,8 +20,13 @@ enum CLIRendering: Equatable {
 
 /// §12 lifecycle metadata for a leaf, reported in machine output so a caller
 /// can see it is driving a compatibility surface rather than the target one.
+/// It answers one question only: is there a newer spelling of this command?
+/// Whether a leaf meets the *target contract* is separate — `device candidates`
+/// is the target spelling (§6.1) and therefore `current`, while its 1.x
+/// response still lacks the snapshot generation §13.2 wants. Overloading one
+/// field with both would make `legacy` mean two different things to a caller.
 enum CLILifecycleStatus: String, Equatable {
-  /// The current, published shape of this command.
+  /// The current, published spelling of this command.
   case current
   /// An explicit legacy-compatibility leaf. It works, but its request,
   /// response and effect are the frozen 1.x ones, so it does not count as

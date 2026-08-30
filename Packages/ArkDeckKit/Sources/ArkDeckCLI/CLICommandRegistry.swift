@@ -171,10 +171,35 @@ enum CLIOutputMode: String, Equatable, CaseIterable {
 }
 
 /// A group of commands, e.g. `job`.
+///
+/// Groups nest: §6.3's platform surface is three tokens deep (`runtime hdc
+/// status`, `runtime tool register`), so a two-level tree would have forced
+/// those into hyphenated leaf names that disagree with the published command
+/// tree.
 struct CLINodeSpec {
   let token: String
   let summary: String
   var leaves: [CLILeafSpec] = []
+  var groups: [CLINodeSpec] = []
+
+  /// Everything reachable from this node, as `(pathSuffix, leaf)`.
+  func reachableLeaves() -> [(path: [String], leaf: CLILeafSpec)] {
+    var found: [(path: [String], leaf: CLILeafSpec)] = []
+    for leaf in leaves {
+      found.append((leaf.token.isEmpty ? [token] : [token, leaf.token], leaf))
+    }
+    for group in groups {
+      for reachable in group.reachableLeaves() {
+        found.append(([token] + reachable.path, reachable.leaf))
+      }
+    }
+    return found
+  }
+
+  /// The child tokens a caller may type next, in declaration order.
+  var childTokens: [String] {
+    leaves.map(\.token).filter { !$0.isEmpty } + groups.map(\.token)
+  }
 }
 
 // MARK: - Registry
@@ -271,9 +296,12 @@ enum CLICommandRegistry {
 
   // MARK: Product commands
 
-  static let nodes: [CLINodeSpec] = declaredNodes.map { node in
+  static let nodes: [CLINodeSpec] = declaredNodes.map(normalized(node:))
+
+  private static func normalized(node: CLINodeSpec) -> CLINodeSpec {
     var normalizedNode = node
     normalizedNode.leaves = node.leaves.map(normalized)
+    normalizedNode.groups = node.groups.map(normalized(node:))
     return normalizedNode
   }
 
@@ -314,10 +342,65 @@ enum CLICommandRegistry {
   }
 
   private static let declaredNodes: [CLINodeSpec] = [
-    doctorNode, operationNode, deviceNode, targetlessTraceNode, jobNode, artifactNode,
-    agentNode, capabilityNode, cleanupDebtNode, debugNode, flashNode, agentdNode,
-    signingNode, updateFeedNode,
+    doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
+    jobNode, artifactNode, agentNode, capabilityNode, cleanupDebtNode, debugNode, flashNode,
+    agentdNode, signingNode, updateFeedNode,
   ]
+
+  /// §6.3's platform surface. Only the two read-only observations exist today;
+  /// `service`, `tool`, `bundle`, `signing`, `storage`, `support-bundle` and
+  /// `update` join this node as they are resourced, which is why it is a group
+  /// rather than a pair of hyphenated leaves.
+  private static let runtimeNode = CLINodeSpec(
+    token: "runtime",
+    summary: "the local Runtime service, its tools and its health",
+    leaves: [
+      CLILeafSpec(
+        token: "health",
+        canonicalCommand: "runtime.health",
+        summary: "control protocol, catalog digest and provider health",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true)
+    ],
+    groups: [
+      CLINodeSpec(
+        token: "hdc",
+        summary: "the HDC server the Runtime manages",
+        leaves: [
+          CLILeafSpec(
+            token: "status",
+            canonicalCommand: "runtime.hdc.status",
+            summary: "exact tool and server facts for the managed HDC runtime",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true)
+        ])
+    ])
+
+  /// §6.1's durable target surface. `device list/show/adopt` stay as the
+  /// frozen 1.x legacy spellings beside it (§12).
+  private static let targetNode = CLINodeSpec(
+    token: "target",
+    summary: "durable device targets and their bindings",
+    leaves: [
+      CLILeafSpec(
+        token: "list",
+        canonicalCommand: "target.list",
+        summary: "list durable targets and their binding revisions",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "show",
+        canonicalCommand: "target.show",
+        summary: "one target: binding, physical identity, last confirmed facts and live state",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--target",
+            form: .value(placeholder: "target-id", grammar: .opaque),
+            summary: "durable target identity",
+            isRequired: true)
+        ]),
+        connectsToRuntime: true),
+    ])
 
   // `doctor` is a leaf, but the tree is uniform: a one-leaf node whose token
   // equals the leaf token renders as `arkdeck doctor`.
@@ -372,6 +455,17 @@ enum CLICommandRegistry {
         canonicalCommand: "device.show",
         summary: "list durable targets and their binding revisions",
         options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "candidates",
+        canonicalCommand: "device.candidates",
+        summary: "live HDC candidates, their authorization state and any adopted target",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--use-warm-snapshot",
+            form: .flag,
+            summary: "read the Runtime's warm snapshot instead of forcing a fresh device read")
+        ]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "adopt",
@@ -1196,11 +1290,7 @@ enum CLICommandRegistry {
   static func allLeaves() -> [(path: [String], leaf: CLILeafSpec)] {
     var found: [(path: [String], leaf: CLILeafSpec)] = []
     for leaf in rootLeaves { found.append(([leaf.token], leaf)) }
-    for node in nodes {
-      for leaf in node.leaves {
-        found.append((leaf.token.isEmpty ? [node.token] : [node.token, leaf.token], leaf))
-      }
-    }
+    for node in nodes { found.append(contentsOf: node.reachableLeaves()) }
     return found
   }
 }

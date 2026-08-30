@@ -100,7 +100,7 @@ enum CLIArgumentParser {
     let resolution = resolvePath(argv, from: &index, state: &state)
     switch resolution {
     case .failure(let error): return .failure(error)
-    case .success(.node(let node)):
+    case .success(.node(let path, let node)):
       // A node is not a command. `--help` makes it a help request; anything
       // else is an incomplete command path.
       if state.sawHelp {
@@ -111,9 +111,9 @@ enum CLIArgumentParser {
         CLIRegistryError(
           code: .invalidCommand,
           message:
-            "`\(node.token)` needs a subcommand: "
-            + node.leaves.map(\.token).filter { !$0.isEmpty }.joined(separator: "|"),
-          details: ["command": .string(node.token)]))
+            "`\(path.joined(separator: " "))` needs a subcommand: "
+            + node.childTokens.joined(separator: "|"),
+          details: ["command": .string(path.joined(separator: "."))]))
     case .success(.leaf(let path, let leaf)):
       return parseLeaf(
         argv, path: path, leaf: leaf, from: index, pathStart: pathStart, state: state)
@@ -164,7 +164,9 @@ enum CLIArgumentParser {
   }
 
   private enum PathTarget {
-    case node(CLINodeSpec)
+    /// A group, with the tokens that reached it — an incomplete path has to be
+    /// reported as the caller typed it, not as the last token alone.
+    case node(path: [String], node: CLINodeSpec)
     case leaf(path: [String], leaf: CLILeafSpec)
   }
 
@@ -177,7 +179,7 @@ enum CLIArgumentParser {
     if let leaf = CLICommandRegistry.rootLeaf(first) {
       return .success(.leaf(path: [first], leaf: leaf))
     }
-    guard let node = CLICommandRegistry.node(first) else {
+    guard var node = CLICommandRegistry.node(first) else {
       return .failure(
         CLIRegistryError(
           code: .invalidCommand,
@@ -185,42 +187,57 @@ enum CLIArgumentParser {
             "unknown command `\(first)`; run `arkdeck commands` to list the published surface",
           details: ["command": .string(first)]))
     }
-    // A node whose single leaf has an empty token *is* the command (`doctor`).
-    if node.leaves.count == 1, let only = node.leaves.first, only.token.isEmpty {
-      return .success(.leaf(path: [node.token], leaf: only))
-    }
-    guard index < argv.count else { return .success(.node(node)) }
 
-    let next = argv[index]
-    if next.hasPrefix("-") {
-      // §5.1: global options never sit between path tokens. `--help` is the
-      // one token that can complete the request here, because a node with no
-      // subcommand is exactly when a caller needs to be shown the subcommands.
-      if CLICommandRegistry.helpOptionNames.contains(next) {
-        if state.sawHelp { return .failure(duplicate(next)) }
-        state.sawHelp = true
-        index += 1
-        return .success(.node(node))
+    // Groups nest, so walk down until a leaf token matches or the path runs
+    // out. `doctor` is the degenerate case: a node whose single leaf has an
+    // empty token *is* the command.
+    var path = [first]
+    while true {
+      if node.leaves.count == 1, let only = node.leaves.first, only.token.isEmpty {
+        return .success(.leaf(path: path, leaf: only))
       }
-      return .failure(
-        CLIRegistryError(
-          code: .invalidOption,
-          message:
-            "`\(node.token)` needs a subcommand before any option: "
-            + node.leaves.map(\.token).filter { !$0.isEmpty }.joined(separator: "|"),
-          details: ["command": .string(node.token), "option": .string(next)]))
+      guard index < argv.count else { return .success(.node(path: path, node: node)) }
+
+      let next = argv[index]
+      if next.hasPrefix("-") {
+        // §5.1: global options never sit between path tokens. `--help` is the
+        // one token that can complete the request here, because a node with no
+        // subcommand is exactly when a caller needs to be shown its children.
+        if CLICommandRegistry.helpOptionNames.contains(next) {
+          if state.sawHelp { return .failure(duplicate(next)) }
+          state.sawHelp = true
+          index += 1
+          return .success(.node(path: path, node: node))
+        }
+        return .failure(
+          CLIRegistryError(
+            code: .invalidOption,
+            message:
+              "`\(path.joined(separator: " "))` needs a subcommand before any option: "
+              + node.childTokens.joined(separator: "|"),
+            details: [
+              "command": .string(path.joined(separator: ".")), "option": .string(next),
+            ]))
+      }
+      index += 1
+      path.append(next)
+      if let leaf = node.leaves.first(where: { $0.token == next }) {
+        return .success(.leaf(path: path, leaf: leaf))
+      }
+      guard let group = node.groups.first(where: { $0.token == next }) else {
+        return .failure(
+          CLIRegistryError(
+            code: .invalidCommand,
+            message:
+              "unknown `\(path.dropLast().joined(separator: " "))` subcommand `\(next)`: "
+              + node.childTokens.joined(separator: "|"),
+            details: [
+              "command": .string(path.dropLast().joined(separator: ".")),
+              "subcommand": .string(next),
+            ]))
+      }
+      node = group
     }
-    index += 1
-    guard let leaf = node.leaves.first(where: { $0.token == next }) else {
-      return .failure(
-        CLIRegistryError(
-          code: .invalidCommand,
-          message:
-            "unknown `\(node.token)` subcommand `\(next)`: "
-            + node.leaves.map(\.token).filter { !$0.isEmpty }.joined(separator: "|"),
-          details: ["command": .string(node.token), "subcommand": .string(next)]))
-    }
-    return .success(.leaf(path: [node.token, next], leaf: leaf))
   }
 
   private static func parseLeaf(
@@ -377,15 +394,23 @@ enum CLIArgumentParser {
       return .success(.leafHelp(path: [node.token], leaf: only))
     }
     if path.count == 1 { return .success(.nodeHelp(node)) }
-    guard path.count == 2, let leaf = node.leaves.first(where: { $0.token == path[1] }) else {
-      return .failure(
-        CLIRegistryError(
-          code: .invalidCommand,
-          message: "unknown command path `\(path.joined(separator: " "))`",
-          details: ["command": .string(path.joined(separator: " "))],
-          command: "help"))
+    var walked = node
+    for (offset, token) in path.dropFirst().enumerated() {
+      if let leaf = walked.leaves.first(where: { $0.token == token }),
+        offset == path.count - 2
+      {
+        return .success(.leafHelp(path: path, leaf: leaf))
+      }
+      guard let group = walked.groups.first(where: { $0.token == token }) else { break }
+      walked = group
+      if offset == path.count - 2 { return .success(.nodeHelp(walked)) }
     }
-    return .success(.leafHelp(path: path, leaf: leaf))
+    return .failure(
+      CLIRegistryError(
+        code: .invalidCommand,
+        message: "unknown command path `\(path.joined(separator: " "))`",
+        details: ["command": .string(path.joined(separator: " "))],
+        command: "help"))
   }
 
   private static func validate(

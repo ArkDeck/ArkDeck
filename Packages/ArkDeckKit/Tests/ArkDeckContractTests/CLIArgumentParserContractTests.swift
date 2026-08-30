@@ -502,6 +502,88 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(CLIErrorCode.internalError.exitCode, 70)
   }
 
+  // MARK: Nested groups (§6.3)
+
+  /// §6.3's platform surface is three tokens deep. A two-level tree would have
+  /// forced `runtime hdc status` into a hyphenated leaf name that disagrees
+  /// with the published command tree, so groups nest.
+  func testAThreeTokenPathResolvesAndReportsItsOwnPathWhenIncomplete() {
+    guard case .dispatch(let path, let leaf, _)? = success(["runtime", "hdc", "status"]) else {
+      return XCTFail("a nested group must resolve to its leaf")
+    }
+    XCTAssertEqual(path, ["runtime", "hdc", "status"])
+    XCTAssertEqual(leaf.canonicalCommand, "runtime.hdc.status")
+
+    // An incomplete path is reported as the caller typed it, not as its last
+    // token alone — `hdc needs a subcommand` names nothing a caller can find.
+    let incomplete = failure(["runtime", "hdc"])
+    XCTAssertEqual(incomplete?.code, .invalidCommand)
+    XCTAssertTrue(incomplete?.message.contains("`runtime hdc`") == true, incomplete?.message ?? "")
+    XCTAssertEqual(failure(["runtime"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["runtime", "bogus"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["runtime", "hdc", "bogus"])?.code, .invalidCommand)
+  }
+
+  func testHelpAndCompletionFollowTheNestedTree() throws {
+    guard case .leafHelp(let path, _)? = success(["help", "runtime", "hdc", "status"]) else {
+      return XCTFail("help must walk to a nested leaf")
+    }
+    XCTAssertEqual(path, ["runtime", "hdc", "status"])
+    guard case .nodeHelp(let group)? = success(["help", "runtime", "hdc"]) else {
+      return XCTFail("help must stop at a nested group")
+    }
+    XCTAssertEqual(group.token, "hdc")
+
+    // The completion table is keyed by joined prefix, so it is depth-agnostic
+    // by construction rather than by a hard-coded two levels.
+    let keys = Set(CLICompletionScripts.table().map(\.key))
+    XCTAssertTrue(keys.contains("runtime"))
+    XCTAssertTrue(keys.contains("runtime hdc"))
+    XCTAssertTrue(keys.contains("runtime hdc status"))
+    let hdcRow = try XCTUnwrap(
+      CLICompletionScripts.table().first { $0.key == "runtime hdc" })
+    XCTAssertEqual(hdcRow.next, ["status"])
+  }
+
+  // MARK: Discovery and health leaves (§6.1, §13.2)
+
+  /// These four daemon methods have existed since the control plane landed and
+  /// had no caller-facing leaf, so an external Agent could not ask whether the
+  /// Runtime was there, what was plugged in, or what a target was bound to.
+  func testTheDaemonReadyDiscoverySurfaceIsReachable() {
+    for argv in [
+      ["runtime", "health"],
+      ["runtime", "hdc", "status"],
+      ["device", "candidates"],
+      ["device", "candidates", "--use-warm-snapshot"],
+      ["target", "list"],
+      ["target", "show", "--target", "T-1"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["target", "show"])?.code, .invalidOption)
+  }
+
+  /// §7.1 separates a live observation from a durable binding, and §12 keeps
+  /// the old spelling working as frozen legacy compatibility rather than
+  /// silently repointing it.
+  func testTheTargetSpellingIsCurrentWhileTheDeviceSpellingStaysLegacy() {
+    let leaves = CLICommandRegistry.allLeaves()
+    XCTAssertEqual(leaves.first { $0.path == ["target", "list"] }?.leaf.lifecycle, .current)
+    XCTAssertEqual(leaves.first { $0.path == ["target", "show"] }?.leaf.lifecycle, .current)
+    XCTAssertEqual(leaves.first { $0.path == ["device", "list"] }?.leaf.lifecycle, .legacy)
+    XCTAssertEqual(leaves.first { $0.path == ["device", "show"] }?.leaf.lifecycle, .legacy)
+    // `device candidates` is the target spelling (§6.1), so it is `current`
+    // even though its 1.x response still lacks the snapshot generation the
+    // target contract wants. Lifecycle answers "is there a newer spelling?";
+    // whether a leaf meets the target contract is a coverage question, and
+    // overloading one field with both would make `legacy` mean two things.
+    XCTAssertEqual(
+      leaves.first { $0.path == ["device", "candidates"] }?.leaf.lifecycle, .current)
+  }
+
   // MARK: The surface itself
 
   /// Every command the previous hand-written dispatcher accepted still parses.

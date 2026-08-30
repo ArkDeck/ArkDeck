@@ -1797,6 +1797,71 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "target.show":
+      // §13.2 is explicit that this is not an alias of `target.list`. A caller
+      // deciding whether it can drive this device needs the binding revision it
+      // will pin, the physical identity that binding is against, the last facts
+      // the Runtime actually confirmed, and whether the device is visible right
+      // now. `target.list` publishes none of the last three, so a caller had to
+      // adopt-and-see instead of look.
+      //
+      // Additive and read-only: it creates nothing, and the field vocabulary is
+      // shared with `device.candidates` so the two projections cannot describe
+      // the same device in two spellings.
+      guard let targetStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "target store is not configured")
+      }
+      guard case .string(let requestedTargetID)? = request.params?["targetId"],
+        !requestedTargetID.isEmpty
+      else {
+        return failure(id: request.id, code: .invalidParams, message: "targetId is required")
+      }
+      do {
+        guard let record = try targetStore.find(targetID: requestedTargetID) else {
+          return failure(
+            id: request.id, code: .notFound,
+            message: "no durable target \(requestedTargetID)")
+        }
+        let observation =
+          (try? await engine.latestSucceededDeviceObservations())?[record.targetID]
+        // The warm snapshot only. Forcing a candidate refresh here would turn a
+        // record lookup into a device round trip; the freshness of what is
+        // reported is published instead of implied, so a caller that needs a
+        // current reading knows to ask for one.
+        var live: JSONValue = .null
+        if let bootstrap, let snapshot = try? await bootstrap.candidateSnapshotForPresentation() {
+          let match = snapshot.candidates.first { $0.connectKey == record.connectKey }
+          live = .object([
+            "state": match.map { .string($0.state) } ?? .string("Absent"),
+            "observedAtUtc": .string(snapshot.observedAtUTC),
+            "observationHealth": .string(snapshot.health.rawValue),
+          ])
+        }
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(record.targetID),
+            "bindingRevision": .integer(Int64(record.bindingRevision)),
+            "toolVersion": .string(record.toolVersion),
+            "adoptedAtUtc": .string(record.adoptedAtUTC),
+            "connectKey": .string(record.connectKey),
+            "stablePhysicalIdentitySha256": .string(record.stablePhysicalIdentitySHA256),
+            "live": live,
+            "observedFacts": observation.map {
+              .object([
+                "targetId": $0.targetID.map(JSONValue.string) ?? .null,
+                "model": $0.model.map(JSONValue.string) ?? .null,
+                "firmware": $0.firmware.map(JSONValue.string) ?? .null,
+                "transport": $0.transport.map(JSONValue.string) ?? .null,
+                "confirmedAtUtc": $0.confirmedAtUTC.map(JSONValue.string) ?? .null,
+              ])
+            } ?? .null,
+          ]))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "device.candidates":
       // Read-only discovery: the one enumeration the App's device list needs.
       // It calls the bootstrap's candidate read directly — never `advance`,

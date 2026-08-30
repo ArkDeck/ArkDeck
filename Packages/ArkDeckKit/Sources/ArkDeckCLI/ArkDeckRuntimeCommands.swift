@@ -1118,6 +1118,13 @@ enum RuntimeCLI {
     let session = runtimeSession(&rest, command: "device.\(subcommand)")
     session.warnIfLegacy(replacement: nil)
     switch subcommand {
+    case "candidates":
+      // The one read an external Agent starts from: what is plugged in, whether
+      // it is authorized, and whether it is already adopted. It observes and
+      // never adopts — the Runtime's adopt path is a separate, explicit call.
+      var params: [String: JSONValue] = [:]
+      if rest.contains("--use-warm-snapshot") { params["useWarmSnapshot"] = .bool(true) }
+      session.emit(try session.request("device.candidates", params.isEmpty ? nil : params))
     case "list", "show":
       session.emit(try session.request("target.list"))
     case "adopt":
@@ -1128,6 +1135,59 @@ enum RuntimeCLI {
       session.emit(try session.request("target.adopt", params))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported device subcommand")
+    }
+  }
+
+  /// `arkdeck runtime ...` — the local Runtime service and its host tools.
+  ///
+  /// `health` has had a daemon method since the control plane landed, but no
+  /// caller-facing leaf: the App and `agent run` called it internally while an
+  /// external Agent had no way to ask whether the Runtime it was about to drive
+  /// was there, which catalog digest it was pinned to, or which providers it
+  /// had (§13.2).
+  static func runRuntime(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing runtime subcommand (health|hdc)")
+    }
+    var rest = Array(arguments.dropFirst())
+    switch subcommand {
+    case "health":
+      let session = runtimeSession(&rest, command: "runtime.health")
+      session.emit(try session.request("health"))
+    case "hdc":
+      guard rest.first == "status" else {
+        throw CLIError(exitCode: EX_USAGE, message: "missing runtime hdc subcommand (status)")
+      }
+      var hdcRest = Array(rest.dropFirst())
+      let session = runtimeSession(&hdcRest, command: "runtime.hdc.status")
+      session.emit(try session.request("runtime.hdc-status"))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported runtime subcommand")
+    }
+  }
+
+  /// `arkdeck target ...` — the durable target surface.
+  ///
+  /// `device list/show` answered from `target.list` under a name that says
+  /// "device", which is the confusion §7.1 separates: a live device is an
+  /// observation, a target is a durable binding. Those spellings stay as frozen
+  /// legacy compatibility (§12); this is where the durable resource lives.
+  static func runTarget(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing target subcommand (list|show)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let session = runtimeSession(&rest, command: "target.\(subcommand)")
+    switch subcommand {
+    case "list":
+      session.emit(try session.request("target.list"))
+    case "show":
+      guard let index = rest.firstIndex(of: "--target"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "target show requires --target <id>")
+      }
+      session.emit(try session.request("target.show", ["targetId": .string(rest[index + 1])]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported target subcommand")
     }
   }
 

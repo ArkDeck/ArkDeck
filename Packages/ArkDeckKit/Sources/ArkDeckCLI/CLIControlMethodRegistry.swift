@@ -45,6 +45,7 @@ enum CLIControlMethodRegistry {
     "operation.describe",
     "device.candidates",
     "target.list",
+    "target.show",
     "trace.probe",
     "debug.probe",
     "debug.status",
