@@ -31,6 +31,14 @@ struct RuntimeHistoryView: View {
 
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
   @State private var scrollToJobID: String?
+  /// The row ids the pending reveal was computed against, or nil when no
+  /// reveal is pending. The regenerated List installs and measures its rows
+  /// across several layout passes, and each pass can move the revealed row —
+  /// so the scroll geometry callback below re-anchors the requested row on
+  /// every content-size change for exactly as long as the row set still
+  /// matches this snapshot. A user gesture, a moved selection, or any change
+  /// to the row set retires the reveal instead of being fought.
+  @State private var revealRowIDs: [String]?
   @State private var historyListGeneration = UUID()
   @State private var searchText = ""
   @State private var statusFilter = HistoryStatusFilter.all
@@ -101,6 +109,13 @@ struct RuntimeHistoryView: View {
       }
     }
     .onChange(of: filteredJobs.map(\.id), initial: true) { _, visibleIDs in
+      // A reveal is only meaningful for the row set it was computed against.
+      // Filtering, refreshing, or paging replaces that set, and re-anchoring
+      // into the new one would hijack whatever the person is doing.
+      if let expected = revealRowIDs, visibleIDs != expected {
+        revealRowIDs = nil
+        scrollToJobID = nil
+      }
       if let selectedJobID, visibleIDs.contains(selectedJobID) { return }
       selectedJobID = visibleIDs.first
     }
@@ -112,6 +127,7 @@ struct RuntimeHistoryView: View {
       isCompactFilterPresented = false
       selectedJobID = jobID
       scrollToJobID = jobID
+      revealRowIDs = filteredJobs.map(\.id)
       // An explicit route intentionally changes the viewport. Replace both
       // the List and its scroll proxy with the restored data; ordinary
       // filtering, paging and row selection keep their existing identity.
@@ -121,6 +137,12 @@ struct RuntimeHistoryView: View {
       requestedJobID = nil
     }
     .onChange(of: selectedJobID, initial: true) { _, jobID in
+      if let pending = scrollToJobID, pending != jobID {
+        // The person selected another row; the reveal no longer owns the
+        // viewport.
+        revealRowIDs = nil
+        scrollToJobID = nil
+      }
       guard let jobID,
         let job = presentation.jobs.first(where: { $0.id == jobID })
       else { return }
@@ -493,6 +515,28 @@ struct RuntimeHistoryView: View {
           // Anchor the complete row explicitly, rather than a descendant
           // label or the native List's minimal-scroll estimate.
           scroll.scrollTo(jobID, anchor: .center)
+        }
+        .onScrollGeometryChange(for: CGSize.self, of: { $0.contentSize }) { _, _ in
+          // The one yielded anchor above races the regenerated List: rows
+          // install and measure across several passes, each pass can move
+          // the revealed row, and AppKit's own minimal selection scroll
+          // competes with the centered anchor. Content size only changes
+          // while layout is still settling — a person scrolling moves the
+          // offset, never the content size — so re-anchoring here converges
+          // on the finished layout without ever fighting a gesture.
+          guard let jobID = scrollToJobID, let expected = revealRowIDs,
+            selectedJobID == jobID, filteredJobs.map(\.id) == expected
+          else { return }
+          scroll.scrollTo(jobID, anchor: .center)
+        }
+        .onScrollPhaseChange { _, newPhase in
+          // The person owns the viewport the moment they scroll it.
+          if newPhase == .tracking || newPhase == .interacting
+            || newPhase == .decelerating
+          {
+            revealRowIDs = nil
+            scrollToJobID = nil
+          }
         }
       }
       .id(historyListGeneration)

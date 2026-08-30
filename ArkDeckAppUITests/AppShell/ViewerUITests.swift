@@ -439,8 +439,17 @@ final class ViewerUITests: XCTestCase {
 
   /// A different fixture, so a different launch: the 367-node stress dump is
   /// selected by its own launch argument.
+  ///
+  /// The frame is not the product default on purpose. At 1180x783 the tree
+  /// viewport is ~388pt and the reveal's yielded second scroll used to lose
+  /// deterministically to the id request, resting the row at the viewport's
+  /// lower edge (539 vs 361 on main, identical across four runs). The reveal
+  /// now converges through the scroll geometry callback, and this test pins
+  /// it at exactly the geometry that used to defeat it.
   func testSelectingADeepWideRowCentersItInBothTreeAxes() {
-    let app = launchCapturedViewer(extra: ["--ui-test-viewer-stress-367"])
+    let app = launchCapturedViewer(
+      extra: ["--ui-test-viewer-stress-367"],
+      windowSize: CGSize(width: 1180, height: 783))
     let row = revealNode("367", in: app)
     clearSearch(in: app)
     XCTAssertTrue(row.waitForExistenceFast(timeout: 5))
@@ -598,7 +607,9 @@ final class ViewerUITests: XCTestCase {
   /// centering geometry these tests assert would depend on desktop history.
   private static let establishedWindowSize = CGSize(width: 1180, height: 760)
 
-  private func launchViewer(extra: [String] = []) -> XCUIApplication {
+  private func launchViewer(
+    extra: [String] = [], windowSize: CGSize = ViewerUITests.establishedWindowSize
+  ) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning { app.terminate() }
     app.launchArguments = [
@@ -607,7 +618,7 @@ final class ViewerUITests: XCTestCase {
       // Scene storage survives `-ApplePersistenceIgnoreState`, so without this
       // the window opens on whichever workspace the previous run left behind.
       "--ui-test-reset-shell-selection",
-      "--ui-test-window-frame=\(Int(Self.establishedWindowSize.width))x\(Int(Self.establishedWindowSize.height))",
+      "--ui-test-window-frame=\(Int(windowSize.width))x\(Int(windowSize.height))",
     ] + extra
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
@@ -624,8 +635,8 @@ final class ViewerUITests: XCTestCase {
         "ArkDeck must open a window, and did not reopen one either")
     }
     XCTAssertTrue(
-      app.windows.firstMatch.waitForFrameSize(Self.establishedWindowSize, timeout: 5),
-      "the launch must establish the declared \(Self.establishedWindowSize) frame, "
+      app.windows.firstMatch.waitForFrameSize(windowSize, timeout: 5),
+      "the launch must establish the declared \(windowSize) frame, "
         + "got \(app.windows.firstMatch.frame)")
     openViewer(in: app)
     return app
@@ -634,8 +645,10 @@ final class ViewerUITests: XCTestCase {
   /// Viewer opens with no capture by design — a workspace must not submit on
   /// launch. The fixture capture arrives through the same Recapture action a
   /// person uses, so the test drives the product's own path.
-  private func launchCapturedViewer(extra: [String] = []) -> XCUIApplication {
-    let app = launchViewer(extra: extra)
+  private func launchCapturedViewer(
+    extra: [String] = [], windowSize: CGSize = ViewerUITests.establishedWindowSize
+  ) -> XCUIApplication {
+    let app = launchViewer(extra: extra, windowSize: windowSize)
     let recapture = app.buttons["viewer.recapture"]
     XCTAssertTrue(recapture.waitForExistenceFast(timeout: 10), "Recapture must be offered")
     XCTAssertTrue(
