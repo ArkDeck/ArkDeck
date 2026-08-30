@@ -24,19 +24,31 @@
 #
 # That timeout can still happen on the first run against a DerivedData path the
 # system has not seen before: automation has to be granted to a runner nobody
-# has answered a prompt for yet. Running the same command again succeeds.
+# has answered a prompt for yet. Running the same command again succeeds. If it
+# persists across a reboot, `pkill -f testmanagerd` resets the daemon that
+# brokers automation mode; launchd restarts it on demand.
 
 set -eu
 
 usage() {
   cat <<'EOF'
-usage: sh scripts/ci/run-ui-tests.sh [xcodebuild arguments...]
+usage: sh scripts/ci/run-ui-tests.sh [--build-once | --no-build] [xcodebuild arguments...]
 
 Runs the ArkDeckHDCUITests target against the App. Extra arguments are passed
 to xcodebuild, so a single suite or case is selected the usual way:
 
   sh scripts/ci/run-ui-tests.sh \
     -only-testing:ArkDeckHDCUITests/OverviewRecordUITests
+
+Iteration mode. `test` pays a full build check and a runner relink on every
+invocation. When only test selection changes between runs, build once and
+then run without building:
+
+  sh scripts/ci/run-ui-tests.sh --build-once      # build-for-testing only
+  sh scripts/ci/run-ui-tests.sh --no-build ...    # test-without-building
+
+`--no-build` also skips the stale-runner removal: nothing relinks, so the
+"can't write output file" failure that removal works around cannot happen.
 
 Default DerivedData:
   ~/Library/Caches/com.arkdeck.ArkDeck/Xcode/UITests
@@ -55,10 +67,19 @@ fail() {
   exit "${2:-1}"
 }
 
+action=test
 case ${1:-} in
   -h|--help)
     usage
     exit 0
+    ;;
+  --build-once)
+    action=build-for-testing
+    shift
+    ;;
+  --no-build)
+    action=test-without-building
+    shift
     ;;
 esac
 
@@ -84,9 +105,15 @@ mkdir -p "$derived_data" || fail "cannot create DerivedData at $derived_data"
 pkill -f 'ArkDeckHDCUITests-Runner' 2>/dev/null || true
 pkill -f 'ArkDeck.app/Contents/MacOS/ArkDeck' 2>/dev/null || true
 
-runner_bundle="$derived_data/Build/Products/Debug/ArkDeckHDCUITests-Runner.app"
-if [ -e "$runner_bundle" ]; then
-  rm -rf "$runner_bundle" || fail "cannot remove the stale runner at $runner_bundle"
+# A runner binary that has already executed cannot be relinked in place, so
+# remove it before any action that builds. test-without-building never links,
+# which is exactly why the removal must not run there: it would delete the
+# products this mode exists to reuse.
+if [ "$action" != test-without-building ]; then
+  runner_bundle="$derived_data/Build/Products/Debug/ArkDeckHDCUITests-Runner.app"
+  if [ -e "$runner_bundle" ]; then
+    rm -rf "$runner_bundle" || fail "cannot remove the stale runner at $runner_bundle"
+  fi
 fi
 
 # xcodebuild unions every -only-testing it is given, so the whole-target
@@ -98,7 +125,7 @@ for argument in "$@"; do
     -only-testing*) selection_given=1 ;;
   esac
 done
-if [ "$selection_given" -eq 0 ]; then
+if [ "$selection_given" -eq 0 ] && [ "$action" != build-for-testing ]; then
   set -- "$@" -only-testing:ArkDeckHDCUITests
 fi
 
@@ -115,4 +142,4 @@ exec "$xcodebuild_executable" \
   CODE_SIGNING_REQUIRED=YES \
   CODE_SIGNING_ALLOWED=YES \
   "$@" \
-  test
+  "$action"
