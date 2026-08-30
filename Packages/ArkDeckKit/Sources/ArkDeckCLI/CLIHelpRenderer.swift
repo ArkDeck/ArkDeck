@@ -301,6 +301,13 @@ enum CLIRegistryProjection {
     switch grammar {
     case .opaque:
       return .object(["kind": .string("opaque")])
+    case .nonNegativeInteger(let range):
+      var fields: [String: JSONValue] = [
+        "kind": .string("nonNegativeInteger"),
+        "minimum": .integer(Int64(range.lowerBound)),
+      ]
+      if range.upperBound != Int.max { fields["maximum"] = .integer(Int64(range.upperBound)) }
+      return .object(fields)
     case .positiveInteger(let range):
       var fields: [String: JSONValue] = [
         "kind": .string("positiveInteger"),

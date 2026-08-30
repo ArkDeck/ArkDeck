@@ -1585,6 +1585,12 @@ enum RuntimeCLI {
       session.emit(result)
       return
     }
+    if subcommand == "quota" {
+      // Store headroom belongs to the store, not to a job: a caller asks it
+      // before it starts work, when it has no job to name yet.
+      session.emit(try session.request("artifact.quota"))
+      return
+    }
     guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count else {
       throw CLIError(exitCode: EX_USAGE, message: "artifact commands require --job <id>")
     }
@@ -1595,20 +1601,44 @@ enum RuntimeCLI {
     if rest.contains("--allow-sensitive") { params["allowSensitive"] = .bool(true) }
     switch subcommand {
     case "list":
-      session.emit(try session.request("artifact.list",
-params))
+      session.emit(try session.request("artifact.list", params))
     case "inspect":
       guard params["artifactId"] != nil else {
         throw CLIError(exitCode: EX_USAGE, message: "artifact inspect requires --artifact <id>")
       }
-      session.emit(try session.request("artifact.inspect",
-params))
+      session.emit(try session.request("artifact.inspect", params))
     case "read":
       guard params["artifactId"] != nil else {
         throw CLIError(exitCode: EX_USAGE, message: "artifact read requires --artifact <id>")
       }
-      session.emit(try session.request("artifact.read",
-params))
+      // The registry has already refused an out-of-range `--max-bytes`, so the
+      // daemon's silent clamp cannot rewrite this caller's intent into a short
+      // read they would be unable to tell from the end of the artifact.
+      if let index = rest.firstIndex(of: "--offset"), index + 1 < rest.count,
+        let offset = Int64(rest[index + 1])
+      {
+        params["offset"] = .integer(offset)
+      }
+      if let index = rest.firstIndex(of: "--max-bytes"), index + 1 < rest.count,
+        let maximum = Int64(rest[index + 1])
+      {
+        params["maxBytes"] = .integer(maximum)
+      }
+      let read = try session.request("artifact.read", params)
+      guard rest.contains("--raw") else {
+        session.emit(read)
+        return
+      }
+      // §8.1: raw is bytes and nothing else — no envelope, and no trailing
+      // newline that would corrupt a binary artifact reassembled from several
+      // range reads.
+      guard case .object(let fields) = read, case .string(let base64)? = fields["base64"],
+        let bytes = Data(base64Encoded: base64)
+      else {
+        throw session.fail(
+          .recordUnreadable, "the Runtime returned no readable bytes for this range")
+      }
+      FileHandle.standardOutput.write(bytes)
     case "export":
       guard params["artifactId"] != nil else {
         throw CLIError(exitCode: EX_USAGE, message: "artifact export requires --artifact <id>")
@@ -2085,6 +2115,106 @@ params))
     }
   }
 
+  /// `job result` — the read an external Agent ends on (§6.1).
+  ///
+  /// It is a composition rather than a new daemon method: the status, the
+  /// verified evidence, the artifact inventory and the cleanup residue are four
+  /// existing reads, and §8.2 already expects a composite leaf to make several
+  /// unary requests. What it adds is the one thing a caller cannot assemble
+  /// safely by hand — a single exit status that distinguishes "still running"
+  /// from "finished badly" from "nobody knows what happened".
+  static func emitJobResult(jobID: String, session: CLIRuntimeSession) throws {
+    let status = try session.request("job.status", ["jobId": .string(jobID)])
+    guard case .object(let statusFields) = status else {
+      throw session.fail(.recordUnreadable, "job \(jobID) returned no readable status")
+    }
+    guard case .string(let rawState)? = statusFields["state"],
+      let state = JobState(rawValue: rawState)
+    else {
+      throw session.fail(
+        .recordUnreadable, "job \(jobID) reported no state this build understands")
+    }
+    // §6.1: a non-terminal job is not a failure of the query, it is a result
+    // that does not exist yet. `job status` stays a successful read of the same
+    // job; only `result` refuses, because a caller asking for a result would
+    // otherwise get a half-finished one.
+    guard state.isTerminal else {
+      throw session.fail(
+        .resultNotReady, "job \(jobID) is \(rawState) and has no result yet",
+        details: ["jobId": .string(jobID), "state": .string(rawState)])
+    }
+
+    let evidence = try session.request("job.evidence", ["jobId": .string(jobID)])
+    let artifacts = try session.request("artifact.list", ["jobId": .string(jobID)])
+    let cleanup = cleanupResidue(for: jobID, session: session)
+    let outcomeUnknown = statusFields["outcomeUnknown"] == .bool(true)
+    let integrityFailure = evidenceIntegrityExit(evidence)
+
+    session.emit(
+      .object([
+        "job": status,
+        "terminal": .bool(true),
+        "outcomeUnknown": .bool(outcomeUnknown),
+        "evidence": annotatedEvidence(evidence, blocked: integrityFailure != nil),
+        "artifacts": artifacts,
+        "cleanup": cleanup,
+        // The typed next-action union is not published by this build, so the
+        // field is present and null rather than guessed at.
+        "nextAction": .null,
+      ]))
+
+    // An unknown outcome outranks a failed state: the job may have reached a
+    // terminal state while the effect it dispatched stays undetermined, and
+    // POL-RECOVERY-001 forbids replaying it either way.
+    if outcomeUnknown {
+      throw session.fail(
+        .outcomeUnknown,
+        "job \(jobID) outcome is unknown: reconcile it; the original effect is never replayed")
+    }
+    if let integrityFailure {
+      throw session.fail(.artifactIntegrityFailed, integrityFailure)
+    }
+    if let terminal = terminalJobExit(status) {
+      throw CLIError(exitCode: terminal.code, message: terminal.reason)
+    }
+  }
+
+  /// The cleanup residue recorded for one job.
+  ///
+  /// Residue is decoration on a result: a store that cannot answer must not
+  /// hide the terminal status the caller came for, so this reports an empty
+  /// list rather than failing the whole read.
+  private static func cleanupResidue(for jobID: String, session: CLIRuntimeSession) -> JSONValue {
+    guard case .array(let rows)? = try? session.request("cleanupDebt.list") else {
+      return .array([])
+    }
+    return .array(
+      rows.filter { row in
+        guard case .object(let fields) = row else { return false }
+        return fields["jobId"] == .string(jobID)
+      })
+  }
+
+  /// §8.2 asks for a stable reason on the evidence projection itself, not only
+  /// in the exit status.
+  private static func annotatedEvidence(_ evidence: JSONValue, blocked: Bool) -> JSONValue {
+    guard case .object(var fields) = evidence else { return evidence }
+    fields["status"] = .string(blocked ? "blocked" : "verified")
+    return .object(fields)
+  }
+
+  /// A non-empty blocker list means required evidence could not be verified.
+  static func evidenceIntegrityExit(_ evidence: JSONValue) -> String? {
+    guard case .object(let fields) = evidence,
+      case .array(let blockers)? = fields["blockers"], !blockers.isEmpty
+    else { return nil }
+    let named = blockers.compactMap { value -> String? in
+      if case .string(let text) = value { return text }
+      return nil
+    }
+    return "required evidence could not be verified: " + named.joined(separator: ", ")
+  }
+
   /// Builds the typed v2 request document `job plan` and `job submit` send.
   ///
   /// Both used to demand a hand-written document the moment an operation had
@@ -2265,6 +2395,26 @@ params))
         throw CLIError(exitCode: EX_USAGE, message: "job cancel requires --job <id>")
       }
       session.emit(try session.request("job.cancel", ["jobId": .string(rest[index + 1])]))
+    case "evidence":
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job evidence requires --job <id>")
+      }
+      let evidence = try session.request(
+        "job.evidence", ["jobId": .string(rest[index + 1])])
+      session.emit(evidence)
+      // §9: an evidence integrity failure keeps the projection and changes the
+      // exit status. Rewriting it into an error would drop the very evidence
+      // the caller needs to see why it could not be trusted.
+      if let blocked = evidenceIntegrityExit(evidence) {
+        throw session.fail(.artifactIntegrityFailed, blocked)
+      }
+
+    case "result":
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job result requires --job <id>")
+      }
+      try emitJobResult(jobID: rest[index + 1], session: session)
+
     case "reconcile":
       // The daemon has owned `job.reconcile` since MU-4; the CLI did not
       // expose it, so a job left in `waitingForRecovery` had no operator

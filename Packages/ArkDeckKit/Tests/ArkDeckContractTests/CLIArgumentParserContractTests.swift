@@ -426,6 +426,16 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(error?.details["removalVersion"], "the field is required even when unknown")
   }
 
+  /// The pattern form comes back the moment its leaf exists — the guard that
+  /// refuses a replacement pointing at a missing command is what makes that
+  /// safe to do automatically rather than from memory.
+  func testTheRetiredPostflightNamesJobEvidenceNowThatItExists() {
+    let error = failure(["flash", "postflight"])
+    XCTAssertEqual(error?.code, .commandRemoved)
+    XCTAssertEqual(
+      error?.details["replacementArgvPattern"], .string("arkdeck job evidence --job <id>"))
+  }
+
   func testARetiredCommandWithNoReplacementSaysSoRatherThanNamingOne() {
     let error = failure(["flash", "preview"])
     XCTAssertEqual(error?.code, .commandRemoved)
@@ -582,6 +592,94 @@ final class CLIArgumentParserContractTests: XCTestCase {
     // overloading one field with both would make `legacy` mean two things.
     XCTAssertEqual(
       leaves.first { $0.path == ["device", "candidates"] }?.leaf.lifecycle, .current)
+  }
+
+  // MARK: Evidence, result and bounded reads (§6.1, §7.6, §9)
+
+  func testTheResultAndEvidenceSurfaceIsReachable() {
+    for argv in [
+      ["job", "evidence", "--job", "J-1"],
+      ["job", "result", "--job", "J-1"],
+      ["artifact", "quota"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["job", "result"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["job", "evidence"])?.code, .invalidOption)
+  }
+
+  /// §13.2: the daemon silently clamps `maxBytes` to 4 MiB, which rewrites the
+  /// caller's intent into a short read they cannot tell from end-of-artifact.
+  /// §7.6's target contract refuses, so the parser refuses and the clamp
+  /// becomes unreachable from this CLI.
+  func testAnOutOfRangeReadIsRefusedRatherThanSilentlyClamped() {
+    XCTAssertEqual(
+      failure(["artifact", "read", "--job", "J", "--artifact", "A", "--max-bytes", "4194305"])?
+        .code,
+      .invalidOption)
+    XCTAssertEqual(
+      failure(["artifact", "read", "--job", "J", "--artifact", "A", "--max-bytes", "0"])?.code,
+      .invalidOption)
+    XCTAssertNotNil(
+      success(["artifact", "read", "--job", "J", "--artifact", "A", "--max-bytes", "4194304"]))
+  }
+
+  /// A byte offset starts at zero, so it cannot use the positive-integer
+  /// grammar — that would refuse the first read of every artifact.
+  func testAByteOffsetAcceptsZeroButStillRefusesPaddingAndSigns() {
+    XCTAssertNotNil(
+      success(["artifact", "read", "--job", "J", "--artifact", "A", "--offset", "0"]))
+    for rejected in ["-1", "007", "+0", "", " 0"] {
+      XCTAssertEqual(
+        failure(["artifact", "read", "--job", "J", "--artifact", "A", "--offset", rejected])?
+          .code,
+        .invalidOption,
+        "offset \(rejected.debugDescription) must be refused")
+    }
+    // An open-ended bound has to read as a lower bound: "must be 0" would say
+    // the only accepted offset is zero.
+    let message = failure(
+      ["artifact", "read", "--job", "J", "--artifact", "A", "--offset", "-1"])?.message
+    XCTAssertEqual(message?.contains("0 or greater"), true, message ?? "")
+  }
+
+  /// §8.1: raw is bytes and nothing else, so it cannot be combined with a mode
+  /// that wraps them.
+  func testRawBytesExcludeEveryMachineEnvelope() {
+    for mode in [["--output", "json"], ["--json"]] {
+      XCTAssertEqual(
+        failure(["artifact", "read", "--job", "J", "--artifact", "A", "--raw"] + mode)?.code,
+        .invalidOption)
+    }
+    XCTAssertNotNil(
+      success(["artifact", "read", "--job", "J", "--artifact", "A", "--raw"]))
+  }
+
+  /// §9 keeps a failed verification as a result with a different exit status,
+  /// not as an error that drops the evidence the caller needs to see.
+  func testEvidenceIntegrityIsDetectedFromBlockersRatherThanFromAMessage() {
+    XCTAssertNil(
+      RuntimeCLI.evidenceIntegrityExit(.object(["blockers": .array([])])),
+      "an empty blocker list is a verified projection")
+    XCTAssertNil(RuntimeCLI.evidenceIntegrityExit(.object([:])))
+    let blocked = RuntimeCLI.evidenceIntegrityExit(
+      .object(["blockers": .array([.string("artifactVerification:digestMismatch")])]))
+    XCTAssertEqual(blocked?.contains("digestMismatch"), true, blocked ?? "")
+  }
+
+  /// The terminal set comes from `JobState.isTerminal`, which is the state
+  /// machine's own answer. Re-deriving a list here is how `job result` would
+  /// start disagreeing with the engine about whether a job is finished —
+  /// `planned` is terminal for a plan-only job and reads like it is not.
+  func testTerminalityComesFromTheStateMachineRatherThanALocalList() {
+    XCTAssertTrue(JobState.planned.isTerminal)
+    XCTAssertTrue(JobState.succeeded.isTerminal)
+    XCTAssertTrue(JobState.recovered.isTerminal)
+    XCTAssertTrue(JobState.failed.isTerminal)
+    XCTAssertFalse(JobState.running.isTerminal)
+    XCTAssertFalse(JobState.waitingForRecovery.isTerminal)
   }
 
   // MARK: The surface itself

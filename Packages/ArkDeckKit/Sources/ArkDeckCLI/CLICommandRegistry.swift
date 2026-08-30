@@ -43,6 +43,9 @@ enum CLIValueGrammar: Equatable {
   case opaque
   /// `^[1-9][0-9]*$` inside the closed range, no leading zero or sign.
   case positiveInteger(ClosedRange<Int>)
+  /// The same, plus a bare `0`. A byte offset starts at zero, and reusing the
+  /// positive grammar for it would refuse the first read of every artifact.
+  case nonNegativeInteger(ClosedRange<Int>)
   /// One of a closed set of tokens, compared byte for byte.
   case enumeration([String])
   /// §8.1's correlation identity: `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`.
@@ -590,6 +593,18 @@ enum CLICommandRegistry {
         options: runtimeClientOptions([jobIDOption]),
         connectsToRuntime: true),
       CLILeafSpec(
+        token: "evidence",
+        canonicalCommand: "job.evidence",
+        summary: "verify and return trusted result evidence; creates no new facts",
+        options: runtimeClientOptions([jobIDOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "result",
+        canonicalCommand: "job.result",
+        summary: "terminal status, verified evidence, artifact inventory and cleanup residue",
+        options: runtimeClientOptions([jobIDOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "reconcile",
         canonicalCommand: "job.reconcile",
         summary: "settle an unknown outcome by readback; never replays the effect",
@@ -661,6 +676,12 @@ enum CLICommandRegistry {
         options: runtimeClientOptions(artifactImportOptions),
         connectsToRuntime: true),
       CLILeafSpec(
+        token: "quota",
+        canonicalCommand: "artifact.quota",
+        summary: "store total, used and remaining bytes; the store refuses rather than evicts",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "list",
         canonicalCommand: "artifact.list",
         summary: "list the artifacts a job owns",
@@ -677,10 +698,26 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "read",
         canonicalCommand: "artifact.read",
-        summary: "bounded read of artifact content",
+        summary: "bounded range read of artifact content",
         options: runtimeClientOptions([
           jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+          CLIOptionSpec(
+            name: "--offset",
+            form: .value(
+              placeholder: "byte-offset", grammar: .nonNegativeInteger(0...Int.max)),
+            summary: "first byte to read; 0 is the start of the artifact"),
+          CLIOptionSpec(
+            name: "--max-bytes",
+            form: .value(
+              placeholder: "1...4194304",
+              grammar: .positiveInteger(1...artifactReadMaximumBytes)),
+            summary: "upper bound on the bytes returned by this read"),
+          CLIOptionSpec(
+            name: "--raw",
+            form: .flag,
+            summary: "write the decoded bytes to stdout and nothing else"),
         ]),
+        mutuallyExclusive: [["--raw", "--output"], ["--raw", "--json"]],
         connectsToRuntime: true),
       CLILeafSpec(
         token: "export",
@@ -944,15 +981,9 @@ enum CLICommandRegistry {
         token: "postflight",
         canonicalCommand: "flash.postflight",
         summary: "retired: use Runtime job evidence",
-        // §12 names `job evidence --job <id>` as the replacement, but this
-        // build does not publish that leaf yet. A machine-readable pattern
-        // pointing at a command that answers `invalidCommand` is worse than an
-        // explicit "nothing yet", so the target is named in prose until the
-        // leaf exists — `testANamedReplacementResolvesToALeafThatExists`
-        // refuses the pattern form until then.
-        kind: .tombstone(
-          .noReplacement(
-            reason: "Runtime job evidence replaces it; this build publishes no `job evidence`"))),
+        // Now that `job evidence` exists, the tombstone can name the exact
+        // argv pattern §12 asks for instead of describing it in prose.
+        kind: .tombstone(.replacedBy("arkdeck job evidence --job <id>"))),
     ])
 
   private static let agentdInstallOptions: [CLIOptionSpec] = [
@@ -1271,6 +1302,15 @@ enum CLICommandRegistry {
     ])
 
   // MARK: Lookup
+
+  /// The daemon's own ceiling for one `artifact.read` (§13.2).
+  ///
+  /// It silently clamps a larger request to this, which rewrites the caller's
+  /// intent into a short read they cannot distinguish from the end of the
+  /// artifact. §7.6's target contract refuses instead, so the parser refuses
+  /// here — the wire request is unchanged, and the clamp simply becomes
+  /// unreachable from this CLI.
+  static let artifactReadMaximumBytes = 4 * 1024 * 1024
 
   /// The Golden Journey order root help leads with (§10).
   static let rootHelpHighlights: [String] = [

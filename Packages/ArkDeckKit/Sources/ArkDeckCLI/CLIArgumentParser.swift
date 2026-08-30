@@ -506,6 +506,9 @@ enum CLIArgumentParser {
       // not the parser's. Re-deriving a Runtime rule here is how two validators
       // start disagreeing about the same input.
       return nil
+    case .nonNegativeInteger(let range):
+      if value == "0" { return range.contains(0) ? nil : outOfRange(range, value, label, leaf, name) }
+      return check(.positiveInteger(range), value: value, label: label, leaf: leaf, name: name)
     case .positiveInteger(let range):
       // No sign, no leading zero, no whitespace: `Int(_:)` alone accepts `+7`
       // and `007`, which are two more spellings of the same value than a
@@ -514,15 +517,7 @@ enum CLIArgumentParser {
         !value.isEmpty && value.allSatisfy(\.isASCII) && value.allSatisfy(\.isNumber)
         && value.first != "0"
       guard isPlainDigits, let parsed = Int(value), range.contains(parsed) else {
-        let upper = range.upperBound == Int.max ? "" : "...\(range.upperBound)"
-        return CLIRegistryError(
-          code: .invalidOption,
-          message: "`\(name)` \(label) must be \(range.lowerBound)\(upper)",
-          details: [
-            "command": .string(leaf.canonicalCommand), "option": .string(label),
-            "value": .string(value),
-          ],
-          command: leaf.canonicalCommand)
+        return outOfRange(range, value, label, leaf, name)
       }
       return nil
     case .controlRequestID:
@@ -555,6 +550,25 @@ enum CLIArgumentParser {
   /// §12 fixes the shape of a removed token's answer: a lifecycle status, the
   /// exact argv pattern that replaces it (or an explicit `null`), and the
   /// version that removed it. "Retired" alone would leave an agent guessing.
+  private static func outOfRange(
+    _ range: ClosedRange<Int>, _ value: String, _ label: String, _ leaf: CLILeafSpec,
+    _ name: String
+  ) -> CLIRegistryError {
+    // An open-ended range has to read as a lower bound. "must be 0" would tell
+    // a caller the only accepted offset is zero.
+    let bound =
+      range.upperBound == Int.max
+      ? "\(range.lowerBound) or greater" : "\(range.lowerBound)...\(range.upperBound)"
+    return CLIRegistryError(
+      code: .invalidOption,
+      message: "`\(name)` \(label) must be \(bound)",
+      details: [
+        "command": .string(leaf.canonicalCommand), "option": .string(label),
+        "value": .string(value),
+      ],
+      command: leaf.canonicalCommand)
+  }
+
   private static func removedError(
     path: [String], leaf: CLILeafSpec, tombstone: CLITombstone
   ) -> CLIRegistryError {
