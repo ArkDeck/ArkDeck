@@ -117,6 +117,7 @@ class RunSwiftPMTests(unittest.TestCase):
         )
         self.assertTrue((cache_root / "build.lock").is_file())
         self.assertIn(f"ArkDeck SwiftPM cache: {canonical_cache_root}", result.stderr)
+        self.assertIn("ArkDeck API-baseline scratch: ", result.stderr)
 
     def test_test_arguments_and_swift_exit_status_are_preserved(self) -> None:
         result, _ = self.invoke(
