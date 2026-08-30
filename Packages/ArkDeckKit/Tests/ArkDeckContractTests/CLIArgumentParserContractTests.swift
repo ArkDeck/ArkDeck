@@ -227,10 +227,38 @@ final class CLIArgumentParserContractTests: XCTestCase {
     }
     for key in [
       "cliProductVersion", "commandRegistrySchemaVersion", "preferredControlProtocolVersion",
-      "machineContractBundleVersion",
+      "supportedControlProtocolExactVersions", "machineContractVersion", "resultSchemaVersion",
+      "pageSchemaVersion", "eventSchemaVersion", "nextActionSchemaVersion",
+      "errorRegistryVersion", "canonicalJsonVersion", "buildIdentity",
     ] {
       XCTAssertNotNil(fields[key], "§12 requires \(key) to be reported separately")
     }
+    // A component this build cannot produce is `null`, never a version copied
+    // out of the spec: `--version` describes this client, not the document.
+    XCTAssertEqual(fields["pageSchemaVersion"], .null)
+    XCTAssertEqual(fields["eventSchemaVersion"], .null)
+    guard case .array(let supported)? = fields["supportedControlProtocolExactVersions"] else {
+      return XCTFail("the supported set must be a list")
+    }
+    XCTAssertTrue(
+      supported.contains(fields["preferredControlProtocolVersion"] ?? .null),
+      "§12 requires the preferred version to be one of the supported ones")
+
+    // Human mode lists the same set rather than a build banner.
+    let human = CLIHelpRenderer.versionHuman()
+    for name in ["command registry schema", "control protocol supported", "build identity"] {
+      XCTAssertTrue(human.contains(name), "human --version must list \(name)")
+    }
+  }
+
+  /// A build identity that somebody has to remember to bump is not one. This
+  /// is the digest of the bytes that answered.
+  func testTheBuildIdentityIsDerivedFromTheRunningBinary() throws {
+    let identity = try XCTUnwrap(CLIBuildIdentity.current())
+    XCTAssertTrue(identity.hasPrefix("sha256:"))
+    XCTAssertEqual(identity.dropFirst("sha256:".count).count, 64)
+    XCTAssertEqual(
+      identity, CLIBuildIdentity.current(), "the same binary must hash the same way twice")
   }
 
   func testTheRegistryProjectionNamesEveryLeafAndItsKind() {
@@ -276,15 +304,19 @@ final class CLIArgumentParserContractTests: XCTestCase {
     let error = failure(["flash", "execute"])
     XCTAssertEqual(error?.code, .commandRemoved)
     XCTAssertEqual(error?.exitCode, 64)
-    XCTAssertEqual(error?.details["removalLifecycle"], .string("removed"))
+    // §12 fixes these key names: an agent branches on `lifecycleStatus` and
+    // runs `replacementArgvPattern`.
+    XCTAssertEqual(error?.details["lifecycleStatus"], .string("removed"))
     XCTAssertEqual(
-      error?.details["replacement"], .string("agent run --operation flash.full-restore@1"))
+      error?.details["replacementArgvPattern"],
+      .string("arkdeck agent run --operation flash.full-restore@1 ..."))
+    XCTAssertNotNil(error?.details["removalVersion"], "the field is required even when unknown")
   }
 
   func testARetiredCommandWithNoReplacementSaysSoRatherThanNamingOne() {
     let error = failure(["flash", "preview"])
     XCTAssertEqual(error?.code, .commandRemoved)
-    XCTAssertEqual(error?.details["replacement"], .null)
+    XCTAssertEqual(error?.details["replacementArgvPattern"], .null)
     XCTAssertNotNil(error?.details["reason"])
   }
 

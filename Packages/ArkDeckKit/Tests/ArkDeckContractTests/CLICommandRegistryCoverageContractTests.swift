@@ -140,10 +140,12 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
   func testTheRetiredFlashExecutorNamesTheHeadlessReplacement() throws {
     let leaf = try XCTUnwrap(
       CLICommandRegistry.node("flash")?.leaves.first { $0.token == "execute" })
-    guard case .tombstone(.command(let replacement)) = leaf.kind else {
+    guard case .tombstone(let tombstone) = leaf.kind else {
       return XCTFail("flash execute must stay a tombstone with an exact replacement")
     }
-    XCTAssertEqual(replacement, "agent run --operation flash.full-restore@1")
+    XCTAssertEqual(
+      tombstone.replacementArgvPattern,
+      "arkdeck agent run --operation flash.full-restore@1 ...")
   }
 
   // MARK: Registry hygiene
@@ -185,6 +187,47 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
           option?.stability, .macosCompatibilityOnly,
           "--socket must stay marked so a native port inherits the refusal")
       }
+    }
+  }
+
+  /// §12: a removed token's replacement is an argv pattern a caller can run.
+  /// Naming a command this build does not publish would send an agent from a
+  /// `commandRemoved` straight into an `invalidCommand`, so a pattern is only
+  /// allowed once its leaf exists — otherwise the tombstone says there is no
+  /// replacement yet and names the target in prose.
+  func testANamedReplacementResolvesToALeafThatExists() {
+    let executablePaths = Set(
+      CLICommandRegistry.allLeaves()
+        .filter { if case .executable = $0.leaf.kind { return true } else { return false } }
+        .map { $0.path.joined(separator: " ") })
+
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      guard case .tombstone(let tombstone) = leaf.kind,
+        let pattern = tombstone.replacementArgvPattern
+      else { continue }
+      let name = path.joined(separator: " ")
+      XCTAssertTrue(
+        pattern.hasPrefix("arkdeck "),
+        "\(name): a replacement must be a runnable argv pattern, got `\(pattern)`")
+      let tokens = pattern.dropFirst("arkdeck ".count)
+        .split(separator: " ").map(String.init)
+        .prefix { !$0.hasPrefix("-") && !$0.hasPrefix("<") }
+      let target = tokens.joined(separator: " ")
+      XCTAssertTrue(
+        executablePaths.contains(target),
+        "\(name) names `\(target)`, which is not an executable leaf in this build")
+    }
+  }
+
+  func testATombstoneWithoutAReplacementSaysWhy() {
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      guard case .tombstone(let tombstone) = leaf.kind,
+        tombstone.replacementArgvPattern == nil
+      else { continue }
+      XCTAssertNotNil(
+        tombstone.reason,
+        "\(path.joined(separator: " ")) has no replacement and no reason, which leaves an "
+          + "agent with nothing to act on")
     }
   }
 

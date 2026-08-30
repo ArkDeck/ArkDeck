@@ -65,11 +65,15 @@ enum CLIHelpRenderer {
     var lines: [String] = ["arkdeck \(name) — \(leaf.summary)"]
 
     switch leaf.kind {
-    case .tombstone(let replacement):
+    case .tombstone(let tombstone):
       lines.append("")
-      switch replacement {
-      case .command(let exact): lines.append("retired. use `arkdeck \(exact)`.")
-      case .none(let reason): lines.append("retired. \(reason).")
+      if let pattern = tombstone.replacementArgvPattern {
+        lines.append("retired. use `\(pattern)`.")
+      } else {
+        lines.append("retired. \(tombstone.reason ?? "nothing replaces it").")
+      }
+      if let removedIn = tombstone.removalVersion {
+        lines.append("removed in \(removedIn).")
       }
       lines.append("recognised so the old spelling gets a stable answer; it cannot dispatch.")
       return lines.joined(separator: "\n")
@@ -132,26 +136,54 @@ enum CLIHelpRenderer {
 
   // MARK: Version
 
+  /// §12: every independently versioned contract, reported separately, and a
+  /// build identity. These are this client's own capabilities — nothing here
+  /// connects to a daemon, so none of it is a negotiated protocol version.
   static func versionResult() -> JSONValue {
-    .object([
+    var fields: [String: JSONValue] = [
       "cliProductVersion": .string(CLIProductVersion.product),
       "commandRegistrySchemaVersion": .string(CLIProductVersion.commandRegistrySchema),
       "preferredControlProtocolVersion": .string(CLIProductVersion.preferredControlProtocol),
-      "machineContractBundleVersion": .string(CLIProductVersion.machineContractBundle),
-      "machineContractComponents": .object([
-        "result": .string(CLIProductVersion.resultSchema)
-      ]),
-    ])
+      "supportedControlProtocolExactVersions": .array(
+        CLIProductVersion.supportedControlProtocolExactVersions.map(JSONValue.string)),
+      "machineContractVersion": .string(CLIProductVersion.machineContract),
+      "buildIdentity": CLIBuildIdentity.current().map(JSONValue.string) ?? .null,
+    ]
+    for (key, value) in versionComponents {
+      fields[key] = value.map(JSONValue.string) ?? .null
+    }
+    return .object(fields)
   }
 
-  static func versionHuman() -> String {
+  /// The individually pinned components, in the order §12 lists them. A `nil`
+  /// is a component this build does not publish, not an omission.
+  private static var versionComponents: [(String, String?)] {
     [
+      ("resultSchemaVersion", CLIProductVersion.resultSchema),
+      ("pageSchemaVersion", CLIProductVersion.pageSchema),
+      ("eventSchemaVersion", CLIProductVersion.eventSchema),
+      ("nextActionSchemaVersion", CLIProductVersion.nextActionSchema),
+      ("errorRegistryVersion", CLIProductVersion.errorRegistry),
+      ("canonicalJsonVersion", CLIProductVersion.canonicalJson),
+    ]
+  }
+
+  /// §12 requires human mode to list the same set, not just a build banner.
+  static func versionHuman() -> String {
+    var lines = [
       "arkdeck \(CLIProductVersion.product)",
-      "command registry schema  \(CLIProductVersion.commandRegistrySchema)",
-      "control protocol         \(CLIProductVersion.preferredControlProtocol)",
-      "machine contract bundle  \(CLIProductVersion.machineContractBundle)",
-      "  result                 \(CLIProductVersion.resultSchema)",
-    ].joined(separator: "\n")
+      pad("  command registry schema", 34)
+        + CLIProductVersion.commandRegistrySchema,
+      pad("  control protocol preferred", 34) + CLIProductVersion.preferredControlProtocol,
+      pad("  control protocol supported", 34)
+        + CLIProductVersion.supportedControlProtocolExactVersions.joined(separator: ", "),
+      pad("  machine contract", 34) + CLIProductVersion.machineContract,
+    ]
+    for (key, value) in versionComponents {
+      lines.append(pad("    " + key, 34) + (value ?? "not published by this build"))
+    }
+    lines.append(pad("  build identity", 34) + (CLIBuildIdentity.current() ?? "unavailable"))
+    return lines.joined(separator: "\n")
   }
 
   // MARK: Helpers
@@ -219,14 +251,13 @@ enum CLIRegistryProjection {
     switch leaf.kind {
     case .executable:
       fields["kind"] = .string("executable")
-    case .tombstone(let replacement):
+    case .tombstone(let tombstone):
       fields["kind"] = .string("tombstone")
-      switch replacement {
-      case .command(let exact): fields["replacement"] = .string(exact)
-      case .none(let reason):
-        fields["replacement"] = .null
-        fields["replacementReason"] = .string(reason)
-      }
+      fields["lifecycleStatus"] = .string("removed")
+      fields["replacementArgvPattern"] =
+        tombstone.replacementArgvPattern.map(JSONValue.string) ?? .null
+      fields["removalVersion"] = tombstone.removalVersion.map(JSONValue.string) ?? .null
+      if let reason = tombstone.reason { fields["replacementReason"] = .string(reason) }
     case .refused(let reason):
       fields["kind"] = .string("refused")
       fields["refusalReason"] = .string(reason)

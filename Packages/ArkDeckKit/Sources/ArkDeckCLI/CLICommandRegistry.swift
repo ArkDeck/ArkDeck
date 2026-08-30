@@ -90,18 +90,37 @@ enum CLILeafKind: Equatable {
   /// §5.1 forbids a tombstone from holding a Runtime method or operation
   /// mapping: it exists to name the replacement, not to keep the old path
   /// alive behind a rename.
-  case tombstone(replacement: CLIReplacement)
+  case tombstone(CLITombstone)
   /// Recognised and permanently refused — the capability is Runtime-owned and
   /// is not going to gain a caller-facing form.
   case refused(reason: String)
 }
 
-/// The machine half of a tombstone answer.
-enum CLIReplacement: Equatable {
-  /// The exact command path that does this now.
-  case command(String)
-  /// Nothing replaces it, and this says why.
-  case none(reason: String)
+/// The machine half of a tombstone answer (§12).
+///
+/// A removed token answers with a lifecycle status, the exact argv pattern that
+/// replaces it, and the version that removed it. "Retired" on its own leaves an
+/// agent guessing, which is the failure mode the contract exists to prevent.
+struct CLITombstone: Equatable {
+  /// The exact argv pattern that does this now, or `nil` when nothing does.
+  let replacementArgvPattern: String?
+  /// Why there is no replacement. Only meaningful when the pattern is `nil`.
+  var reason: String?
+  /// The CLI product version that removed the token.
+  ///
+  /// `nil` for verbs retired before the command registry existed: §12 forbids
+  /// guessing a version, and inventing one here would put a fabricated fact in
+  /// a machine contract. Every tombstone added from now on carries its exact
+  /// removal version.
+  var removalVersion: String?
+
+  static func replacedBy(_ pattern: String) -> CLITombstone {
+    CLITombstone(replacementArgvPattern: pattern)
+  }
+
+  static func noReplacement(reason: String) -> CLITombstone {
+    CLITombstone(replacementArgvPattern: nil, reason: reason)
+  }
 }
 
 /// One executable (or deliberately non-executable) command.
@@ -581,7 +600,7 @@ enum CLICommandRegistry {
         token: "chat",
         canonicalCommand: "agent.chat",
         summary: "retired: ArkDeck holds no model of its own",
-        kind: .tombstone(replacement: .command("agent run"))),
+        kind: .tombstone(.replacedBy("arkdeck agent run"))),
     ])
 
   private static let capabilityNode = CLINodeSpec(
@@ -748,29 +767,37 @@ enum CLICommandRegistry {
         token: "plan",
         canonicalCommand: "flash.plan",
         summary: "retired: the Runtime materializes flash plans",
-        kind: .tombstone(replacement: .command("job plan --operation flash.full-restore@1"))),
+        kind: .tombstone(.replacedBy("arkdeck job plan --operation flash.full-restore@1 ..."))),
       CLILeafSpec(
         token: "preview",
         canonicalCommand: "flash.preview",
         summary: "retired: the Runtime owns Flash admission",
         kind: .tombstone(
-          replacement: .none(reason: "Runtime admission replaced campaign preview"))),
+          .noReplacement(reason: "Runtime admission replaced campaign preview"))),
       CLILeafSpec(
         token: "execute",
         canonicalCommand: "flash.execute",
         summary: "retired: the legacy host executor no longer exists",
-        kind: .tombstone(replacement: .command("agent run --operation flash.full-restore@1"))),
+        kind: .tombstone(.replacedBy("arkdeck agent run --operation flash.full-restore@1 ..."))),
       CLILeafSpec(
         token: "continue",
         canonicalCommand: "flash.continue",
         summary: "retired: historical campaign continuation cannot dispatch",
         kind: .tombstone(
-          replacement: .none(reason: "historical campaigns are decode-only"))),
+          .noReplacement(reason: "historical campaigns are decode-only"))),
       CLILeafSpec(
         token: "postflight",
         canonicalCommand: "flash.postflight",
         summary: "retired: use Runtime job evidence",
-        kind: .tombstone(replacement: .command("job status"))),
+        // §12 names `job evidence --job <id>` as the replacement, but this
+        // build does not publish that leaf yet. A machine-readable pattern
+        // pointing at a command that answers `invalidCommand` is worse than an
+        // explicit "nothing yet", so the target is named in prose until the
+        // leaf exists — `testANamedReplacementResolvesToALeafThatExists`
+        // refuses the pattern form until then.
+        kind: .tombstone(
+          .noReplacement(
+            reason: "Runtime job evidence replaces it; this build publishes no `job evidence`"))),
     ])
 
   private static let agentdInstallOptions: [CLIOptionSpec] = [

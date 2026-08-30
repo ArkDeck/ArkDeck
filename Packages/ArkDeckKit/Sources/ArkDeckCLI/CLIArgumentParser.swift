@@ -229,8 +229,8 @@ enum CLIArgumentParser {
         return .success(.leafHelp(path: path, leaf: leaf))
       }
       switch leaf.kind {
-      case .tombstone(let replacement):
-        return .failure(removedError(path: path, leaf: leaf, replacement: replacement))
+      case .tombstone(let tombstone):
+        return .failure(removedError(path: path, leaf: leaf, tombstone: tombstone))
       case .refused(let reason):
         return .failure(
           CLIRegistryError(
@@ -498,20 +498,23 @@ enum CLIArgumentParser {
     }
   }
 
+  /// §12 fixes the shape of a removed token's answer: a lifecycle status, the
+  /// exact argv pattern that replaces it (or an explicit `null`), and the
+  /// version that removed it. "Retired" alone would leave an agent guessing.
   private static func removedError(
-    path: [String], leaf: CLILeafSpec, replacement: CLIReplacement
+    path: [String], leaf: CLILeafSpec, tombstone: CLITombstone
   ) -> CLIRegistryError {
     var details: [String: JSONValue] = [
       "command": .string(leaf.canonicalCommand),
-      "removalLifecycle": .string("removed"),
+      "lifecycleStatus": .string("removed"),
+      "replacementArgvPattern": tombstone.replacementArgvPattern.map(JSONValue.string) ?? .null,
+      "removalVersion": tombstone.removalVersion.map(JSONValue.string) ?? .null,
     ]
     let sentence: String
-    switch replacement {
-    case .command(let exact):
-      details["replacement"] = .string(exact)
-      sentence = "use `arkdeck \(exact)`"
-    case .none(let reason):
-      details["replacement"] = .null
+    if let pattern = tombstone.replacementArgvPattern {
+      sentence = "use `\(pattern)`"
+    } else {
+      let reason = tombstone.reason ?? "nothing replaces it"
       details["reason"] = .string(reason)
       sentence = reason
     }
