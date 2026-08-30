@@ -97,10 +97,10 @@ struct DiagnosticsWorkspaceView: View {
         Label(
           diagnosticsText("diagnostics.capture.unavailable"),
           systemImage: "exclamationmark.triangle")
-          .font(.system(size: 12, weight: .medium))
+          .font(WorkspaceFont.secondary)
           .foregroundStyle(.orange)
         Text(diagnosticsText("diagnostics.capture.unavailable.detail"))
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
         Text(model.captureUnavailableReasonCode)
@@ -122,7 +122,7 @@ struct DiagnosticsWorkspaceView: View {
   private var toolbar: some View {
     HStack(spacing: 12) {
       Text(diagnosticsText(model.isHilogSummaryContext ? "diagnostics.hilog.title" : "diagnostics.title"))
-        .font(.system(size: 13, weight: .semibold))
+        .font(WorkspaceFont.sectionTitle)
         .accessibilityIdentifier("diagnostics.workspace.title")
       Spacer()
       if model.session != nil || model.hilogSummary != nil {
@@ -134,7 +134,7 @@ struct DiagnosticsWorkspaceView: View {
       if !model.isHilogSummaryContext { Label(
         model.alignmentTitle,
         systemImage: model.alignmentIsRefusal ? "exclamationmark.triangle.fill" : "clock")
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(model.alignmentIsRefusal ? .orange : .secondary)
         .accessibilityIdentifier("diagnostics.alignment") }
     }
@@ -146,7 +146,7 @@ struct DiagnosticsWorkspaceView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
         Text(summary.jobID)
-          .font(.system(size: 12, design: .monospaced))
+          .font(WorkspaceFont.monospacedValue)
           .textSelection(.enabled)
           .accessibilityIdentifier("diagnostics.hilog.job")
         Text(diagnosticsText("diagnostics.hilog.readOnly"))
@@ -208,7 +208,7 @@ struct DiagnosticsWorkspaceView: View {
   private func hilogFact(_ key: String, value: String, id: String) -> some View {
     VStack(alignment: .leading, spacing: 3) {
       Text(diagnosticsText(key)).font(.caption).foregroundStyle(.secondary)
-      Text(value).font(.system(size: 11, design: .monospaced))
+      Text(value).font(WorkspaceFont.monospacedDense)
         .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("diagnostics.hilog.\(id)")
     }
@@ -216,15 +216,15 @@ struct DiagnosticsWorkspaceView: View {
 
   private func sessionSection(_ session: DiagnosticSessionPresentation) -> some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text(session.reading.jobID).font(.system(size: 12, design: .monospaced))
+      Text(session.reading.jobID).font(WorkspaceFont.monospacedValue)
         .textSelection(.enabled).accessibilityIdentifier("diagnostics.session.job")
       Text(diagnosticsText("diagnostics.session.readOnly"))
-        .font(.system(size: 11)).foregroundStyle(.secondary)
+        .font(WorkspaceFont.caption).foregroundStyle(.secondary)
       if let covered = session.ringHeldAnchor {
         Label(
           diagnosticsText(covered ? "diagnostics.ring.covered" : "diagnostics.ring.lost"),
           systemImage: covered ? "checkmark.circle" : "exclamationmark.triangle")
-          .font(.system(size: 11)).foregroundStyle(covered ? Color.secondary : Color.orange)
+          .font(WorkspaceFont.caption).foregroundStyle(covered ? Color.secondary : Color.orange)
       }
       DisclosureGroup(diagnosticsText("diagnostics.session.timeline")) {
         Text(session.timeline.joined(separator: "\n"))
@@ -236,9 +236,9 @@ struct DiagnosticsWorkspaceView: View {
 
   private func artifactsSection(_ artifacts: [RuntimeArtifactPresentation]) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(diagnosticsText("diagnostics.artifacts.title")).font(.system(size: 13, weight: .semibold))
+      Text(diagnosticsText("diagnostics.artifacts.title")).font(WorkspaceFont.sectionTitle)
       Text(diagnosticsText("diagnostics.artifacts.privacy"))
-        .font(.system(size: 11)).foregroundStyle(.secondary)
+        .font(WorkspaceFont.caption).foregroundStyle(.secondary)
       if let context = model.traceContext {
         Button(diagnosticsText("diagnostics.artifacts.openTrace")) { onOpenTrace(context) }
           .help(diagnosticsText("diagnostics.artifacts.openTrace.privacy"))
@@ -247,7 +247,7 @@ struct DiagnosticsWorkspaceView: View {
       ForEach(artifacts) { artifact in
         HStack(alignment: .firstTextBaseline) {
           VStack(alignment: .leading, spacing: 2) {
-            Text(artifact.name).font(.system(size: 11, design: .monospaced))
+            Text(artifact.name).font(WorkspaceFont.monospacedDense)
             Text("\(artifact.status) · \(artifact.byteCount) B · \(artifact.privacy)")
               .font(.system(size: 10)).foregroundStyle(.secondary)
           }
@@ -265,7 +265,7 @@ struct DiagnosticsWorkspaceView: View {
         }
       }
       Text(diagnosticsText("diagnostics.artifacts.openElsewhere"))
-        .font(.system(size: 11)).foregroundStyle(.secondary)
+        .font(WorkspaceFont.caption).foregroundStyle(.secondary)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("diagnostics.artifacts")
@@ -274,18 +274,18 @@ struct DiagnosticsWorkspaceView: View {
   @ViewBuilder private var previewSection: some View {
     if let name = model.previewName {
       VStack(alignment: .leading, spacing: 6) {
-        Text(name).font(.system(size: 12, weight: .medium))
+        Text(name).font(WorkspaceFont.secondary)
         if model.isPreviewLoading { ProgressView() }
         if let error = model.previewError {
-          Text(error).font(.system(size: 11)).foregroundStyle(.orange)
+          Text(error).font(WorkspaceFont.caption).foregroundStyle(.orange)
             .accessibilityIdentifier("diagnostics.preview.failed")
         }
         if model.previewWasClipped {
-          Text(diagnosticsText("diagnostics.preview.clipped")).font(.system(size: 11)).foregroundStyle(.secondary)
+          Text(diagnosticsText("diagnostics.preview.clipped")).font(WorkspaceFont.caption).foregroundStyle(.secondary)
         }
         if model.previewReplacedInvalidUTF8 {
           Label(diagnosticsText("diagnostics.preview.replacedInvalidUTF8"), systemImage: "exclamationmark.triangle")
-            .font(.system(size: 11)).foregroundStyle(.orange)
+            .font(WorkspaceFont.caption).foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("diagnostics.preview.encodingWarning")
         }
@@ -301,10 +301,10 @@ struct DiagnosticsWorkspaceView: View {
   private var partialNotice: some View {
     VStack(alignment: .leading, spacing: 4) {
       Label(diagnosticsText("diagnostics.partial"), systemImage: "exclamationmark.circle")
-        .font(.system(size: 12, weight: .medium))
+        .font(WorkspaceFont.secondary)
         .foregroundStyle(.orange)
       Text(diagnosticsText("diagnostics.partial.detail"))
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -316,10 +316,10 @@ struct DiagnosticsWorkspaceView: View {
   private var marksSection: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text(diagnosticsText("diagnostics.marks.title"))
-        .font(.system(size: 13, weight: .semibold))
+        .font(WorkspaceFont.sectionTitle)
       if model.marks.isEmpty {
         Text(diagnosticsText("diagnostics.marks.empty"))
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
       } else {
         ForEach(model.marks, id: \.ordinal) { mark in markRow(mark) }
@@ -335,7 +335,7 @@ struct DiagnosticsWorkspaceView: View {
         Image(systemName: mark.isAutomatic ? "sparkle" : "bookmark.fill")
           .foregroundStyle(mark.isAutomatic ? .purple : .accentColor)
           .accessibilityHidden(true)
-        Text(model.markTitle(mark)).font(.system(size: 12, weight: .medium))
+        Text(model.markTitle(mark)).font(WorkspaceFont.secondary)
         Spacer()
         Text(mark.atHostUTC.isEmpty ? diagnosticsText("diagnostics.mark.timeMissing") : mark.atHostUTC)
           .font(.system(size: 10))
@@ -345,7 +345,7 @@ struct DiagnosticsWorkspaceView: View {
       }
       if let caption = model.screenshotCaption(mark) {
         VStack(alignment: .leading, spacing: 2) {
-          Text(caption).font(.system(size: 11)).foregroundStyle(.secondary)
+          Text(caption).font(WorkspaceFont.caption).foregroundStyle(.secondary)
           Text(diagnosticsText("diagnostics.shot.standsFor"))
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
@@ -353,7 +353,7 @@ struct DiagnosticsWorkspaceView: View {
         .accessibilityIdentifier("diagnostics.mark.screenshot")
       } else if let title = model.absenceTitle(mark) {
         VStack(alignment: .leading, spacing: 2) {
-          Text(title).font(.system(size: 11)).foregroundStyle(.orange)
+          Text(title).font(WorkspaceFont.caption).foregroundStyle(.orange)
           if let detail = model.absenceDetail(mark) {
             Text(detail).font(.system(size: 10)).foregroundStyle(.secondary)
           }
@@ -374,9 +374,9 @@ struct DiagnosticsWorkspaceView: View {
   private func notDerivedSection(_ kinds: [String]) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(diagnosticsText("diagnostics.notDerived.title"))
-        .font(.system(size: 12, weight: .medium))
+        .font(WorkspaceFont.secondary)
       Text(diagnosticsText("diagnostics.notDerived.detail"))
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
       Text(kinds.joined(separator: " · "))
         .font(.system(size: 10))
@@ -392,10 +392,10 @@ struct DiagnosticsWorkspaceView: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(diagnosticsText("diagnostics.missing.title"))
-        .font(.system(size: 12, weight: .medium))
+        .font(WorkspaceFont.secondary)
       ForEach(products, id: \.name) { product in
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-          Text(product.name).font(.system(size: 11)).monospaced()
+          Text(product.name).font(WorkspaceFont.caption).monospaced()
           Text(product.reason).font(.system(size: 10)).foregroundStyle(.secondary)
         }
       }
@@ -409,7 +409,7 @@ struct DiagnosticsWorkspaceView: View {
   private var footer: some View {
     HStack(spacing: 12) {
       Text(model.selectionSummary)
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("diagnostics.selection")
       Spacer()

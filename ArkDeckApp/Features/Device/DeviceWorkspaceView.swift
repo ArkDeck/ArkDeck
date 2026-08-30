@@ -42,9 +42,9 @@ struct DeviceWorkspaceView: View {
     HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text(model.targetName)
-          .font(.system(size: 13, weight: .semibold))
+          .font(WorkspaceFont.sectionTitle)
         Text(model.targetDetail)
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
           .monospaced()
       }
@@ -135,7 +135,7 @@ struct DeviceWorkspaceView: View {
     VStack {
       HStack {
         Label(deviceText("device.stale.badge"), systemImage: "clock.badge.exclamationmark")
-          .font(.system(size: 11, weight: .medium))
+          .font(WorkspaceFont.label)
           .padding(.horizontal, 8)
           .padding(.vertical, 4)
           .background(.orange.opacity(0.85))
@@ -175,7 +175,7 @@ struct DeviceWorkspaceView: View {
     VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 8) {
         Text(deviceText("device.gestures.title"))
-          .font(.system(size: 13, weight: .semibold))
+          .font(WorkspaceFont.sectionTitle)
         gestureRow("device.gestures.tap")
         gestureRow("device.gestures.longPress")
         gestureRow("device.gestures.swipe")
@@ -187,10 +187,10 @@ struct DeviceWorkspaceView: View {
       Divider()
       VStack(alignment: .leading, spacing: 8) {
         Text(deviceText("device.log.title"))
-          .font(.system(size: 13, weight: .semibold))
+          .font(WorkspaceFont.sectionTitle)
         if model.log.isEmpty {
           Text(deviceText("device.log.empty"))
-            .font(.system(size: 11))
+            .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
         } else {
           ScrollView {
@@ -219,12 +219,12 @@ struct DeviceWorkspaceView: View {
   private var performanceNotice: some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       Image(systemName: "gauge.with.dots.needle.33percent")
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(deviceText("device.performance.title"))
-          .font(.system(size: 11, weight: .medium))
+          .font(WorkspaceFont.label)
         Text(deviceText("device.performance.detail"))
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
@@ -239,7 +239,7 @@ struct DeviceWorkspaceView: View {
 
   private func gestureRow(_ key: String) -> some View {
     Text(deviceText(key))
-      .font(.system(size: 11))
+      .font(WorkspaceFont.caption)
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
   }
@@ -250,7 +250,7 @@ struct DeviceWorkspaceView: View {
         .foregroundStyle(entry.tint)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
-        Text(entry.title).font(.system(size: 11, weight: .medium))
+        Text(entry.title).font(WorkspaceFont.label)
         Text(entry.detail)
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
@@ -270,12 +270,12 @@ struct DeviceWorkspaceView: View {
   private var footer: some View {
     HStack(spacing: 12) {
       Label(model.frameAgeSummary, systemImage: "clock")
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("device.frame.age")
       Spacer()
       Text(deviceText("device.boundary"))
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("device.boundary")
     }
@@ -293,7 +293,7 @@ struct DeviceWorkspaceView: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
         Text(deviceText("device.record.title"))
-          .font(.system(size: 13, weight: .semibold))
+          .font(WorkspaceFont.sectionTitle)
         Spacer()
         if recording.isBusy { ProgressView().controlSize(.small) }
       }
@@ -306,7 +306,7 @@ struct DeviceWorkspaceView: View {
           in: 2...300, step: 10
         ) {
           Text("\(recording.frameCount) \(deviceText("device.record.frames"))")
-            .font(.system(size: 11))
+            .font(WorkspaceFont.caption)
             .monospacedDigit()
         }
         .disabled(recording.isBusy)
@@ -339,14 +339,14 @@ struct DeviceWorkspaceView: View {
       switch recording.stage {
       case .preflighting, .capturing, .assembling, .validating:
         Text(recording.stageTitle)
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("device.record.stage")
       case .ready(let ready):
         readyBar(ready)
       case .failed(let reason):
         Text(reason)
-          .font(.system(size: 11))
+          .font(WorkspaceFont.caption)
           .foregroundStyle(.orange)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("device.record.failed")
@@ -385,9 +385,9 @@ struct DeviceWorkspaceView: View {
           Text(
             "\(refusal.framesThatWouldFit) \(deviceText("device.record.frames")) "
               + deviceText("device.record.wouldFit"))
-            .font(.system(size: 11))
+            .font(WorkspaceFont.caption)
         }
-        .font(.system(size: 11))
+        .font(WorkspaceFont.caption)
         .buttonStyle(.link)
         .accessibilityIdentifier("device.record.shrink")
       }
@@ -403,7 +403,7 @@ struct DeviceWorkspaceView: View {
     VStack(alignment: .leading, spacing: 6) {
       Label(
         deviceText("device.record.noRoom"), systemImage: "externaldrive.badge.exclamationmark")
-        .font(.system(size: 11, weight: .medium))
+        .font(WorkspaceFont.label)
         .foregroundStyle(.orange)
       Text(Self.headroomSummary(refusal))
         .font(.system(size: 10))
@@ -430,7 +430,7 @@ struct DeviceWorkspaceView: View {
             + ready.framesPerSecond.formatted(
               .number.precision(.fractionLength(2))) + " fps "
             + deviceText("device.record.rate"))
-          .font(.system(size: 11, weight: .medium))
+          .font(WorkspaceFont.label)
           .monospacedDigit()
       }
       // One result is one thing, so it reads as one element rather than as an
@@ -470,7 +470,7 @@ struct DeviceWorkspaceView: View {
         Button(deviceText("device.record.again")) { recording.reset() }
           .accessibilityIdentifier("device.record.again")
       }
-      .font(.system(size: 11))
+      .font(WorkspaceFont.caption)
       .buttonStyle(.link)
     }
   }

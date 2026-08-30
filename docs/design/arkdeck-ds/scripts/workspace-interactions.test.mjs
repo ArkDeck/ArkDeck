@@ -1702,3 +1702,54 @@ test('every key/value list in the App is the shared fact grid', () => {
   assert.match(hdc, /isSelectable` and `elidedValue` at their defaults/);
   assert.doesNotMatch(hdc, /struct FieldTextStyle/, 'the local font modifier is now the row option');
 });
+
+test('App type sizes that have a shared role use it', () => {
+  // F52 item 4, final part. Only the four writings with an exact WorkspaceFont
+  // equivalent were converged; the rest change rendered size or weight and are
+  // product decisions, so this guards the converged four and pins what is
+  // deliberately left behind.
+  const exact = [
+    [/\.font\(\.system\(size: 13, weight: \.semibold\)\)/, 'WorkspaceFont.sectionTitle'],
+    [/\.font\(\.system\(size: 12, design: \.monospaced\)\)/, 'WorkspaceFont.monospacedValue'],
+    [/\.font\(\.system\(size: 11, design: \.monospaced\)\)/, 'WorkspaceFont.monospacedDense'],
+    [/\.font\(\.system\(size: 11\)\)/, 'WorkspaceFont.caption'],
+    // Ruled by the maintainer: converge these to the nearest role. 12pt has
+    // only `secondary`, so the weight goes medium -> regular; the 11pt sites
+    // are badges and titles, which is what `label` is for, so medium ->
+    // semibold. Both keep their size, so only the weight shifts.
+    [/\.font\(\.system\(size: 12, weight: \.medium\)\)/, 'WorkspaceFont.secondary'],
+    [/\.font\(\.system\(size: 11, weight: \.medium\)\)/, 'WorkspaceFont.label'],
+  ];
+  const offenders = [];
+  for (const path of coverage.appViewFiles) {
+    const source = read(path);
+    for (const [pattern, role] of exact) {
+      if (pattern.test(source)) offenders.push(`${path} → ${role}`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'these sizes have an exact shared role');
+
+  // What stays off the scale, and why. 10pt is a maintainer ruling: spec §2's
+  // smallest non-mono role is 12 and this table adds 11, so 10 sits below both;
+  // promoting it would change the density of the surfaces that use it.
+  const remaining = coverage.appViewFiles
+    .flatMap(path => [...read(path).matchAll(/\.font\(\.system\(size: ([0-9]+)(, weight: \.(\w+))?/g)]
+      .map(m => ({path, size: Number(m[1]), weight: m[3]})));
+  const tiers = new Map();
+  for (const site of remaining) {
+    const key = site.weight ? `${site.size}/${site.weight}` : `${site.size}`;
+    tiers.set(key, (tiers.get(key) ?? 0) + 1);
+  }
+  // Every surviving site is one of: the retained 10pt tier, a medium weight the
+  // scale has no role for, or an outlier glyph size. A new bare size outside
+  // these fails here rather than drifting in unnoticed.
+  const allowed = new Set(['10', '10/semibold', '9/semibold', '36', '28/semibold']);
+  const unexpected = [...tiers.keys()].filter(key => !allowed.has(key));
+  assert.deepEqual(unexpected, [], 'a new off-scale type size appeared');
+  assert.equal(tiers.get('10') ?? 0, 19, 'the retained 10pt tier changed size');
+
+  assert.match(
+    read('ArkDeckApp/DesignSystem/WorkspaceChrome.swift'),
+    /There is deliberately no 10pt role/,
+    'the shared table must record why 10pt stays off the scale');
+});
