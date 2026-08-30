@@ -51,6 +51,9 @@ struct RuntimeHistoryView: View {
   @State private var pendingExportArtifact: RuntimeArtifactPresentation?
   @State private var pendingExportJobID: String?
   @State private var isExportPreviewPresented = false
+  @State private var workspaceWidth: CGFloat = 0
+  @State private var cachedFilterProjectionInput: FilterProjectionInput?
+  @State private var cachedFilteredJobs: [RuntimeJobSummaryPresentation] = []
 
   @AppStorage("history.savedFilter.exists") private var hasSavedFilter = false
   @AppStorage("history.savedFilter.search") private var savedSearchText = ""
@@ -66,6 +69,17 @@ struct RuntimeHistoryView: View {
   private static let allTargets = "__all_targets__"
   private static let allSessions = "__all_sessions__"
 
+  private struct FilterProjectionInput: Equatable {
+    let jobs: [RuntimeJobSummaryPresentation]
+    let searchText: String
+    let status: HistoryStatusFilter
+    let mode: HistoryModeFilter
+    let session: String
+    let target: String
+    let time: HistoryTimeFilter
+    let activity: HistoryActivityFilter
+  }
+
   private var selectedJob: RuntimeJobSummaryPresentation? {
     presentation.jobs.first { $0.id == selectedJobID }
   }
@@ -78,13 +92,35 @@ struct RuntimeHistoryView: View {
     Array(Set(presentation.jobs.compactMap(\.sessionID))).sorted()
   }
 
+  private var filterProjectionInput: FilterProjectionInput {
+    FilterProjectionInput(
+      jobs: presentation.jobs,
+      searchText: searchText,
+      status: statusFilter,
+      mode: modeFilter,
+      session: sessionFilter,
+      target: targetFilter,
+      time: timeFilter,
+      activity: activityFilter)
+  }
+
   private var filteredJobs: [RuntimeJobSummaryPresentation] {
-    presentation.jobs.filter(matchesFilters).sorted { lhs, rhs in
-      let left = historyDate(lhs)
-      let right = historyDate(rhs)
-      if left != right { return (left ?? .distantPast) > (right ?? .distantPast) }
-      return lhs.id > rhs.id
-    }
+    let input = filterProjectionInput
+    if cachedFilterProjectionInput == input { return cachedFilteredJobs }
+    return makeFilteredJobs()
+  }
+
+  private func makeFilteredJobs() -> [RuntimeJobSummaryPresentation] {
+    let matching = presentation.jobs.filter(matchesFilters)
+    return matching
+      .map { (job: $0, date: historyDate($0)) }
+      .sorted { lhs, rhs in
+        if lhs.date != rhs.date {
+          return (lhs.date ?? .distantPast) > (rhs.date ?? .distantPast)
+        }
+        return lhs.job.id > rhs.job.id
+      }
+      .map(\.job)
   }
 
   var body: some View {
@@ -107,6 +143,10 @@ struct RuntimeHistoryView: View {
             .disabled(isRefreshInFlight)
         }
       }
+    }
+    .onChange(of: filterProjectionInput, initial: true) { _, input in
+      cachedFilteredJobs = makeFilteredJobs()
+      cachedFilterProjectionInput = input
     }
     .onChange(of: filteredJobs.map(\.id), initial: true) { _, visibleIDs in
       // A reveal is only meaningful for the row set it was computed against.
@@ -158,29 +198,6 @@ struct RuntimeHistoryView: View {
       guard !isRefreshing, let job = selectedJob, detailsByJobID[job.id] == nil else { return }
       onLoadDetail?(job.id, job.operationReference)
     }
-    .confirmationDialog(
-      historyLocalized("history.artifacts.exportPreview.title"),
-      isPresented: $isExportPreviewPresented,
-      presenting: pendingExportArtifact
-    ) { artifact in
-      Button(
-        historyLocalized(
-          artifact.privacy == "sensitive"
-            ? "history.artifacts.exportSensitive" : "history.artifacts.exportConfirm")
-      ) {
-        chooseExportDestination(for: artifact)
-      }
-      Button(historyLocalized("history.artifacts.exportCancel"), role: .cancel) {}
-    } message: { artifact in
-      Text(
-        String(
-          localized: LocalizedStringResource.HistoryLocalizable
-            .historyArtifactsExportPreviewMessage(
-              artifact.name,
-              ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file),
-              artifact.privacy,
-              artifact.sha256)))
-    }
   }
 
   private var loading: some View {
@@ -231,8 +248,8 @@ struct RuntimeHistoryView: View {
           .accessibilityIdentifier("history.empty.description")
       }
     } else {
-      GeometryReader { workspace in
-        if workspace.size.width >= 890 {
+      Group {
+        if workspaceWidth >= 890 {
           HSplitView {
             filterSidebar
               .frame(minWidth: 200, idealWidth: 230, maxWidth: 280, maxHeight: .infinity)
@@ -241,24 +258,21 @@ struct RuntimeHistoryView: View {
             detail
               .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
           }
-          .frame(width: workspace.size.width, height: workspace.size.height)
         } else {
           VStack(spacing: 0) {
             compactFilters
             Divider()
-            GeometryReader { panes in
-              HSplitView {
-                jobTable
-                  .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
-                detail
-                  .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-              }
-              .frame(width: panes.size.width, height: panes.size.height)
+            HSplitView {
+              jobTable
+                .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+              detail
+                .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
             }
           }
-          .frame(width: workspace.size.width, height: workspace.size.height)
         }
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { workspaceWidth = $0 }
     }
   }
 
@@ -285,10 +299,10 @@ struct RuntimeHistoryView: View {
               .frame(maxWidth: .infinity, alignment: .leading)
               .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)
               .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
-              .contentShape(Rectangle())
+              .contentShape(.rect)
               .background(
                 activityFilter == filter ? Color.accentColor.opacity(0.12) : .clear,
-                in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+                in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
               )
             }
             .buttonStyle(.plain)
@@ -817,7 +831,7 @@ struct RuntimeHistoryView: View {
     if !timeline.isEmpty {
       historySection("history.detail.timeline") {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-          ForEach(Array(timeline.enumerated()), id: \.offset) { index, entry in
+          ForEach(timeline.enumerated(), id: \.offset) { index, entry in
             HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
               Image(
                 systemName: index == timeline.count - 1 ? stateSymbol(job) : "checkmark.circle"
@@ -1108,6 +1122,30 @@ struct RuntimeHistoryView: View {
             || exportStatesByArtifactID[artifact.id] == .exporting
         )
         .accessibilityIdentifier("history.artifact.export.\(artifact.id)")
+        .confirmationDialog(
+          historyLocalized("history.artifacts.exportPreview.title"),
+          isPresented: exportDialogPresented(for: artifact.id),
+          presenting: pendingExportArtifact
+        ) { pendingArtifact in
+          Button(
+            historyLocalized(
+              pendingArtifact.privacy == "sensitive"
+                ? "history.artifacts.exportSensitive" : "history.artifacts.exportConfirm")
+          ) {
+            chooseExportDestination(for: pendingArtifact)
+          }
+          Button(historyLocalized("history.artifacts.exportCancel"), role: .cancel) {}
+        } message: { pendingArtifact in
+          Text(
+            String(
+              localized: LocalizedStringResource.HistoryLocalizable
+                .historyArtifactsExportPreviewMessage(
+                  pendingArtifact.name,
+                  ByteCountFormatter.string(
+                    fromByteCount: pendingArtifact.byteCount, countStyle: .file),
+                  pendingArtifact.privacy,
+                  pendingArtifact.sha256)))
+        }
         if case .completed(let url) = exportStatesByArtifactID[artifact.id] {
           Button(historyLocalized("history.artifacts.showInFinder")) {
             NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -1132,7 +1170,7 @@ struct RuntimeHistoryView: View {
     .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
     .background(
       .quaternary.opacity(0.35),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
     )
     .accessibilityIdentifier("history.artifact.\(artifact.id)")
   }
@@ -1150,11 +1188,17 @@ struct RuntimeHistoryView: View {
     }
   }
 
+  private func exportDialogPresented(for artifactID: String) -> Binding<Bool> {
+    Binding(
+      get: { isExportPreviewPresented && pendingExportArtifact?.id == artifactID },
+      set: { if !$0 { isExportPreviewPresented = false } })
+  }
+
   private func safeExportName(_ value: String) -> String {
     let sanitized =
       value
-      .replacingOccurrences(of: "/", with: "_")
-      .replacingOccurrences(of: ":", with: "_")
+      .replacing("/", with: "_")
+      .replacing(":", with: "_")
     return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
   }
 
@@ -1247,13 +1291,13 @@ struct RuntimeHistoryView: View {
 
   private func matchesFilters(_ job: RuntimeJobSummaryPresentation) -> Bool {
     if activityFilter != .all, activityFilter != activityCategory(for: job) { return false }
-    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     if !query.isEmpty,
       ![
         job.id, job.sessionID ?? "", job.operationReference, job.targetID, job.state,
         job.executionMode ?? "",
       ]
-      .contains(where: { $0.lowercased().contains(query) })
+      .contains(where: { $0.localizedStandardContains(query) })
     {
       return false
     }
@@ -1594,7 +1638,7 @@ private enum HistoryTimeFilter: String, CaseIterable, Identifiable {
     case .lastDay: interval = 24 * 60 * 60
     case .lastWeek: interval = 7 * 24 * 60 * 60
     }
-    return date >= Date().addingTimeInterval(-interval)
+    return date >= Date.now.addingTimeInterval(-interval)
   }
 }
 

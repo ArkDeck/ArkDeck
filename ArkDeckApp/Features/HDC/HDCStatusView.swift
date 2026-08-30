@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 /// remains in the HDC use-case layer; this view can only render a supplied
 /// presentation value and send explicit preview, confirmation, and dispatch
 /// requests back to that use case.
-struct HDCStatusView: View {
+struct HDCStatusView<Header: View>: View {
   let presentation: HDCDiagnosticsPresentation
   let capabilityMatrix: OverviewCapabilityMatrixPresentation
   let onRefresh: (() -> Void)?
@@ -19,11 +19,12 @@ struct HDCStatusView: View {
   /// Content rendered above the diagnostics, inside the same scrolling page.
   /// The Overview's record lives here rather than in a second scroll view, so
   /// one workspace keeps one scroll position and one toolbar.
-  let header: AnyView?
+  @ViewBuilder let header: Header
   @State private var isSelectingExecutable = false
   @State private var importerError: String?
   @State private var isEnvironmentExpanded = false
   @State private var isImpactReviewRequested = false
+  @State private var impactSheetItem: HDCImpactSheetItem?
 
   init(
     presentation: HDCDiagnosticsPresentation,
@@ -35,7 +36,7 @@ struct HDCStatusView: View {
     onDispatchConfirmedRecovery: (() -> Void)? = nil,
     onSelectUserConfiguredExecutable: ((URL) -> Void)? = nil,
     configurationError: String? = nil,
-    header: AnyView? = nil
+    @ViewBuilder header: () -> Header
   ) {
     self.presentation = presentation
     self.capabilityMatrix = capabilityMatrix
@@ -46,12 +47,12 @@ struct HDCStatusView: View {
     self.onDispatchConfirmedRecovery = onDispatchConfirmedRecovery
     self.onSelectUserConfiguredExecutable = onSelectUserConfiguredExecutable
     self.configurationError = configurationError
-    self.header = header
+    self.header = header()
   }
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
-      if let header { header }
+      header
       environmentSection
     }
     // The refresh control renders in the window's unified toolbar but is
@@ -67,16 +68,24 @@ struct HDCStatusView: View {
         }
       }
     }
-    .sheet(isPresented: impactReviewBinding) {
+    .sheet(item: $impactSheetItem) { item in
       HDCRecoveryImpactSheet(
-        presentation: presentation,
+        presentation: item.presentation,
         onConfirm: onConfirmRecoveryImpactPreview.map { confirm in
           {
             confirm()
             isImpactReviewRequested = false
+            impactSheetItem = nil
           }
         },
-        onCancel: { isImpactReviewRequested = false })
+        onCancel: {
+          isImpactReviewRequested = false
+          impactSheetItem = nil
+        })
+    }
+    .onChange(of: presentation.lifecycleImpactPreview) { _, snapshot in
+      impactSheetItem = isImpactReviewRequested && snapshot != nil
+        ? HDCImpactSheetItem(presentation: presentation) : nil
     }
     .fileImporter(
       isPresented: $isSelectingExecutable,
@@ -118,7 +127,7 @@ struct HDCStatusView: View {
               .rotationEffect(.degrees(isEnvironmentExpanded ? 90 : 0))
               .accessibilityHidden(true)
           }
-          .contentShape(Rectangle())
+          .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .keyboardShortcut("d", modifiers: [.command, .shift])
@@ -449,18 +458,10 @@ struct HDCStatusView: View {
       Button("overview.recovery.previewImpact") {
         isImpactReviewRequested = true
         onRequestRecoveryImpactPreview()
+        impactSheetItem = HDCImpactSheetItem(presentation: presentation)
       }
       .accessibilityIdentifier("hdc.lifecycle.requestImpactPreview")
     }
-  }
-
-  /// The review sheet opens only once a real impact snapshot exists. A request
-  /// that resolves to blocked or unavailable therefore never produces a modal
-  /// that looks like it could still continue.
-  private var impactReviewBinding: Binding<Bool> {
-    Binding(
-      get: { isImpactReviewRequested && presentation.lifecycleImpactPreview != nil },
-      set: { isImpactReviewRequested = $0 })
   }
 
   // MARK: - Building blocks
@@ -522,7 +523,7 @@ struct HDCStatusView: View {
           horizontalSpacing: WorkspaceMetrics.keyColumnGap,
           verticalSpacing: WorkspaceMetrics.rowGap
         ) {
-          ForEach(Array(presentation.deviceEvents.enumerated()), id: \.offset) { _, event in
+          ForEach(presentation.deviceEvents.enumerated(), id: \.offset) { _, event in
             GridRow(alignment: .firstTextBaseline) {
               Text(event.timestamp)
                 .font(WorkspaceFont.monospacedDense.monospacedDigit())
@@ -748,6 +749,17 @@ struct HDCStatusView: View {
 
 /// Host-wide recovery impact, reviewed before any confirmation exists. The
 /// sheet can only confirm the exact snapshot it displays; it never dispatches.
+private struct HDCImpactSheetItem: Identifiable {
+  let id: Int
+  let presentation: HDCDiagnosticsPresentation
+
+  init?(presentation: HDCDiagnosticsPresentation) {
+    guard let snapshot = presentation.lifecycleImpactPreview else { return nil }
+    id = snapshot.generation
+    self.presentation = presentation
+  }
+}
+
 private struct HDCRecoveryImpactSheet: View {
   let presentation: HDCDiagnosticsPresentation
   let onConfirm: (() -> Void)?

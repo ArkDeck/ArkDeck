@@ -19,43 +19,47 @@ struct UIDumpWorkspaceView: View {
   /// this target until the observed offset actually reaches it; a user
   /// gesture or a changed row set retires it instead.
   @State private var pendingTreeRevealOffsetY: CGFloat?
+  @State private var workspaceWidth: CGFloat = 0
+  @State private var screenshotAvailableSize = CGSize.zero
+  @State private var inspectorAvailableHeight: CGFloat = 0
+  @State private var treeViewportSize = CGSize.zero
+  @State private var didRevealInitialTreeSelection = false
 
   var body: some View {
-    GeometryReader { geometry in
-      VStack(spacing: 0) {
-        toolbar
-        Divider()
-        if model.isOpeningHistoryCapture {
-          ProgressView {
-            Text("history.loading", tableName: "HistoryLocalizable")
-          }
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .accessibilityIdentifier("viewer.history.loading")
-        } else if let capture = model.capture {
-          if geometry.size.width >= 880 {
-            HStack(spacing: 0) {
-              screenshot(capture)
-              Divider()
-              inspector(capture)
-            }
-          } else {
-            ScrollView {
-              VStack(spacing: 0) {
-                screenshot(capture).frame(minHeight: 420)
-                Divider()
-                inspector(capture).frame(minHeight: 520)
-              }
-            }
+    VStack(spacing: 0) {
+      toolbar
+      Divider()
+      if model.isOpeningHistoryCapture {
+        ProgressView {
+          Text("history.loading", tableName: "HistoryLocalizable")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("viewer.history.loading")
+      } else if let capture = model.capture {
+        if workspaceWidth >= 880 {
+          HStack(spacing: 0) {
+            screenshot(capture)
+            Divider()
+            inspector(capture)
           }
         } else {
-          emptyState
+          ScrollView {
+            VStack(spacing: 0) {
+              screenshot(capture).frame(minHeight: 420)
+              Divider()
+              inspector(capture).frame(minHeight: 520)
+            }
+          }
         }
-        if let capture = model.capture {
-          Divider()
-          footer(capture)
-        }
+      } else {
+        emptyState
+      }
+      if let capture = model.capture {
+        Divider()
+        footer(capture)
       }
     }
+    .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { workspaceWidth = $0 }
     .task { model.refresh() }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
@@ -172,36 +176,35 @@ struct UIDumpWorkspaceView: View {
           .font(WorkspaceFont.caption)
           .accessibilityIdentifier("viewer.showBounds")
       }
-      GeometryReader { proxy in
-        ZStack {
-          Color(nsColor: .windowBackgroundColor)
-          if let image = NSImage(data: capture.screenshotData) {
-            let content = fittedSize(
-              container: proxy.size,
-              aspect: CGFloat(capture.screenshotWidth) / CGFloat(capture.screenshotHeight))
-            ZStack {
-              Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-              if capture.coordinatesAreVerified {
-                ForEach(model.screenshotNodes(capture)) { node in
-                  screenshotRegion(node, in: capture, content: content)
-                }
-                screenshotHitTest(capture, content: content)
-                screenshotSelectionAnnotation(capture, content: content)
+      ZStack {
+        Color(nsColor: .windowBackgroundColor)
+        if let image = NSImage(data: capture.screenshotData) {
+          let content = fittedSize(
+            container: screenshotAvailableSize,
+            aspect: CGFloat(capture.screenshotWidth) / CGFloat(capture.screenshotHeight))
+          ZStack {
+            Image(nsImage: image)
+              .resizable()
+              .interpolation(.high)
+              .scaledToFit()
+            if capture.coordinatesAreVerified {
+              ForEach(model.screenshotNodes(capture)) { node in
+                screenshotRegion(node, in: capture, content: content)
               }
+              screenshotHitTest(capture, content: content)
+              screenshotSelectionAnnotation(capture, content: content)
             }
-            .frame(width: content.width, height: content.height)
-            // Selection annotations may sit just outside a small component,
-            // but they still belong to the screenshot and never escape it.
-            .clipped()
-          } else {
-            ContentUnavailableView(viewerText("viewer.screenshot.unavailable"), systemImage: "photo")
           }
+          .frame(width: content.width, height: content.height)
+          // Selection annotations may sit just outside a small component,
+          // but they still belong to the screenshot and never escape it.
+          .clipped()
+        } else {
+          ContentUnavailableView(viewerText("viewer.screenshot.unavailable"), systemImage: "photo")
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .onGeometryChange(for: CGSize.self, of: { $0.size }) { screenshotAvailableSize = $0 }
       if !capture.coordinatesAreVerified {
         Label(viewerText("viewer.screenshot.unverifiedDetail"), systemImage: "exclamationmark.triangle")
           .font(WorkspaceFont.secondary)
@@ -302,7 +305,7 @@ struct UIDumpWorkspaceView: View {
   /// whether visual bounds are currently shown.
   private func screenshotHitTest(_ capture: ViewerCapture, content: CGSize) -> some View {
     Color.clear
-      .contentShape(Rectangle())
+      .contentShape(.rect)
       .gesture(SpatialTapGesture().onEnded { value in
         model.select(in: capture, at: value.location, renderedSize: content)
       })
@@ -312,15 +315,16 @@ struct UIDumpWorkspaceView: View {
   }
 
   private func inspector(_ capture: ViewerCapture) -> some View {
-    GeometryReader { proxy in
-      let treeHeight = max(150, proxy.size.height * model.inspectorTreePercent / 100)
-      VStack(spacing: 0) {
-        tree(capture).frame(height: treeHeight)
-        resizeHandle
-        properties(capture).frame(maxHeight: .infinity)
-      }
+    let treeHeight = max(150, inspectorAvailableHeight * model.inspectorTreePercent / 100)
+    return VStack(spacing: 0) {
+      tree(capture).frame(height: treeHeight)
+      resizeHandle
+      properties(capture).frame(maxHeight: .infinity)
     }
     .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) {
+      inspectorAvailableHeight = $0
+    }
   }
 
   private func tree(_ capture: ViewerCapture) -> some View {
@@ -336,68 +340,68 @@ struct UIDumpWorkspaceView: View {
       // it must size to its own content and only borrow the viewport width as
       // a floor. Asking for `maxWidth: .infinity` here made every row claim the
       // scroll content width in turn and cascaded the tree diagonally.
-      GeometryReader { proxy in
-        ScrollView([.horizontal, .vertical]) {
-          LazyVStack(alignment: .leading, spacing: Self.treeRowSpacing) {
-            ForEach(rows) { node in
-              treeRow(
-                node,
-                visualDepth: max(0, node.depth - minimumDepth),
-                maximumVisualDepth: max(0, maximumDepth - minimumDepth),
-                viewportWidth: proxy.size.width)
-                .id(node.identity)
-            }
-            if rows.isEmpty {
-              Text(viewerText("viewer.tree.noMatches"))
-                .foregroundStyle(.secondary).padding(12)
-            }
-            Color.clear
-              .frame(height: max(0, proxy.size.height / 2))
-              .id("viewer.tree.trailingSpacer")
-              .accessibilityHidden(true)
+      ScrollView([.horizontal, .vertical]) {
+        LazyVStack(alignment: .leading, spacing: Self.treeRowSpacing) {
+          ForEach(rows) { node in
+            treeRow(
+              node,
+              visualDepth: max(0, node.depth - minimumDepth),
+              maximumVisualDepth: max(0, maximumDepth - minimumDepth),
+              viewportWidth: treeViewportSize.width)
+              .id(node.identity)
           }
-          .scrollTargetLayout()
-          .padding(.vertical, Self.treeVerticalPadding)
-        }
-        .scrollPosition($treeScrollPosition)
-        .scrollIndicators(.visible, axes: [.horizontal, .vertical])
-        .accessibilityIdentifier("viewer.tree.scroll")
-        .onAppear { revealTreeSelection(viewportHeight: proxy.size.height) }
-        .onChange(of: model.selectionRevealGeneration) { _, _ in
-          // Selection and search navigation are high-frequency inspection
-          // actions. Reveal immediately so rapid result changes never queue
-          // or fight an in-flight scrolling animation.
-          revealTreeSelection(viewportHeight: proxy.size.height)
-        }
-        .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
-          // The reveal's completion condition is the observed offset, not a
-          // fixed number of transactions: whichever of the two reveal
-          // requests resolves last — and any late row realisation that moves
-          // content afterwards — the target is re-asserted until the scroll
-          // actually rests on it. Re-asserting an unreachable target moves
-          // nothing, produces no further callback, and so ends the loop.
-          guard let target = pendingTreeRevealOffsetY else { return }
-          if abs(offset.y - target) <= 0.5 {
-            pendingTreeRevealOffsetY = nil
-          } else {
-            treeScrollPosition.scrollTo(y: target)
+          if rows.isEmpty {
+            Text(viewerText("viewer.tree.noMatches"))
+              .foregroundStyle(.secondary).padding(12)
           }
+          Color.clear
+            .frame(height: max(0, treeViewportSize.height / 2))
+            .id("viewer.tree.trailingSpacer")
+            .accessibilityHidden(true)
         }
-        .onScrollPhaseChange { _, newPhase in
-          // The person owns the viewport the moment they scroll it; a
-          // pending reveal must never fight a gesture.
-          if newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating {
-            pendingTreeRevealOffsetY = nil
-          }
+        .scrollTargetLayout()
+        .padding(.vertical, Self.treeVerticalPadding)
+      }
+      .scrollPosition($treeScrollPosition)
+      .scrollIndicators(.visible, axes: [.horizontal, .vertical])
+      .accessibilityIdentifier("viewer.tree.scroll")
+      .onGeometryChange(for: CGSize.self, of: { $0.size }) { treeViewportSize = $0 }
+      .onAppear { revealInitialTreeSelectionIfReady() }
+      .onChange(of: model.selectionRevealGeneration) { _, _ in
+        // Selection and search navigation are high-frequency inspection
+        // actions. Reveal immediately so rapid result changes never queue
+        // or fight an in-flight scrolling animation.
+        revealTreeSelection(viewportHeight: treeViewportSize.height)
+      }
+      .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
+        // The reveal's completion condition is the observed offset, not a
+        // fixed number of transactions: whichever of the two reveal
+        // requests resolves last — and any late row realisation that moves
+        // content afterwards — the target is re-asserted until the scroll
+        // actually rests on it. Re-asserting an unreachable target moves
+        // nothing, produces no further callback, and so ends the loop.
+        guard let target = pendingTreeRevealOffsetY else { return }
+        if abs(offset.y - target) <= 0.5 {
+          pendingTreeRevealOffsetY = nil
+        } else {
+          treeScrollPosition.scrollTo(y: target)
         }
-        .onChange(of: model.visibleNodes.map(\.identity)) { _, _ in
-          // The target was computed against the previous row set; a new set
-          // re-reveals through its own generation bump when it means to.
+      }
+      .onScrollPhaseChange { _, newPhase in
+        // The person owns the viewport the moment they scroll it; a
+        // pending reveal must never fight a gesture.
+        if newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating {
           pendingTreeRevealOffsetY = nil
         }
-        .onChange(of: proxy.size) { _, _ in
-          pendingTreeRevealOffsetY = nil
-        }
+      }
+      .onChange(of: model.visibleNodes.map(\.identity)) { _, _ in
+        // The target was computed against the previous row set; a new set
+        // re-reveals through its own generation bump when it means to.
+        pendingTreeRevealOffsetY = nil
+      }
+      .onChange(of: treeViewportSize) { _, _ in
+        pendingTreeRevealOffsetY = nil
+        revealInitialTreeSelectionIfReady()
       }
       // The outline keyboard model lives on the scrolling row set, not on each
       // row: rows are recycled by LazyVStack, so per-row key handlers would
@@ -411,6 +415,12 @@ struct UIDumpWorkspaceView: View {
       .onKeyPress(.end) { model.moveSelectionToEdge(first: false); return .handled }
       .accessibilityLabel(viewerText("viewer.tree.label"))
     }
+  }
+
+  private func revealInitialTreeSelectionIfReady() {
+    guard !didRevealInitialTreeSelection, treeViewportSize.height > 0 else { return }
+    didRevealInitialTreeSelection = true
+    revealTreeSelection(viewportHeight: treeViewportSize.height)
   }
 
   private func revealTreeSelection(viewportHeight: CGFloat) {
@@ -450,13 +460,13 @@ struct UIDumpWorkspaceView: View {
     }
   }
 
-  /// One row, one button, sized to its own content.
+  /// One row with separate disclosure and selection controls.
   ///
   /// The selection fill is an inset capsule rather than a full-bleed band, and
-  /// the disclosure chevron lives inside the row's hit area so the row never
-  /// needs two competing controls. `#id` trails the label inline: a deep tree
-  /// scrolls horizontally, so there is no fixed right edge to align a column
-  /// to, and the node's own name must never be truncated to make one.
+  /// the disclosure chevron is a real button, so keyboard and VoiceOver users
+  /// can expand without changing selection. `#id` trails the label inline: a
+  /// deep tree scrolls horizontally, so there is no fixed right edge to align
+  /// a column to, and the node's own name must never be truncated to make one.
   private func treeRow(
     _ node: ViewerNode,
     visualDepth: Int,
@@ -465,45 +475,53 @@ struct UIDumpWorkspaceView: View {
   ) -> some View {
     let selected = node.identity == model.selectedNodeIdentity
     let expanded = model.expandedNodeIdentities.contains(node.identity)
-    return Button { model.select(node.identity) } label: {
-      HStack(spacing: 6) {
-        Group {
-          if node.children.isEmpty {
-            Color.clear
-          } else {
-            Image(systemName: "chevron.right")
-              .font(.system(size: 9, weight: .semibold))
-              .rotationEffect(.degrees(expanded ? 90 : 0))
-          }
+    return HStack(spacing: 6) {
+      if node.children.isEmpty {
+        Color.clear.frame(width: 16, height: 16)
+      } else {
+        Button(
+          viewerText(expanded ? "viewer.tree.collapse" : "viewer.tree.expand"),
+          systemImage: "chevron.right"
+        ) {
+          model.toggleExpansion(node.identity)
         }
+        .font(.caption2.bold())
+        .rotationEffect(.degrees(expanded ? 90 : 0))
+        .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
         .frame(width: 16, height: 16)
-        .contentShape(Rectangle())
-        .onTapGesture { model.toggleExpansion(node.identity) }
+      }
+      Button { model.select(node.identity) } label: {
+        HStack(spacing: 6) {
+          Image(systemName: Self.symbol(for: node.type))
+            .font(WorkspaceFont.caption)
+            .frame(width: 16, height: 16)
+            .opacity(selected ? 0.95 : 0.65)
+            .accessibilityHidden(true)
 
-        Image(systemName: Self.symbol(for: node.type))
-          .font(WorkspaceFont.caption)
-          .frame(width: 16, height: 16)
-          .opacity(selected ? 0.95 : 0.65)
-
-        Text(node.type)
-          .font(WorkspaceFont.secondary)
-          .lineLimit(1)
-          .fixedSize()
-        if let text = node.text, !text.isEmpty {
-          Text(text)
+          Text(node.type)
             .font(WorkspaceFont.secondary)
-            .opacity(selected ? 0.85 : 0.62)
             .lineLimit(1)
             .fixedSize()
-        }
-        if let id = node.deviceID {
-          Text("#\(id)")
-            .font(WorkspaceFont.monospacedDense)
-            .monospacedDigit()
-            .opacity(selected ? 0.85 : 0.55)
-            .fixedSize()
+          if let text = node.text, !text.isEmpty {
+            Text(text)
+              .font(WorkspaceFont.secondary)
+              .opacity(selected ? 0.85 : 0.62)
+              .lineLimit(1)
+              .fixedSize()
+          }
+          if let id = node.deviceID {
+            Text("#\(id)")
+              .font(WorkspaceFont.monospacedDense)
+              .monospacedDigit()
+              .opacity(selected ? 0.85 : 0.55)
+              .fixedSize()
+          }
         }
       }
+      .buttonStyle(.plain)
+      .accessibilityValue(
+        selected ? viewerText("viewer.tree.selected") : viewerText("viewer.tree.notSelected"))
       // Real merged dumps can exceed fifty levels. Preserve indentation while
       // reserving enough of the current viewport for the node's actual label;
       // otherwise auto-reveal shows a blue selection band with every glyph
@@ -520,14 +538,11 @@ struct UIDumpWorkspaceView: View {
       // The floor keeps the selection capsule spanning the visible pane; the
       // content decides the real width so nothing is truncated or wrapped.
       .frame(minWidth: max(0, viewportWidth - 12), alignment: .leading)
-      .contentShape(Rectangle())
-      .foregroundStyle(selected ? Color.white : Color.primary)
-      .background(selected ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 6))
     }
-    .buttonStyle(.plain)
+    .contentShape(.rect)
+    .foregroundStyle(selected ? Color.white : Color.primary)
+    .background(selected ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 6))
     .padding(.horizontal, 6)
-    .accessibilityValue(
-      selected ? viewerText("viewer.tree.selected") : viewerText("viewer.tree.notSelected"))
     .accessibilityIdentifier("viewer.tree.node.\(node.identity)")
   }
 
@@ -560,7 +575,7 @@ struct UIDumpWorkspaceView: View {
           .fill(separatorFocused ? Color.accentColor : Color(nsColor: .separatorColor))
           .frame(height: 1)
       }
-      .contentShape(Rectangle())
+      .contentShape(.rect)
       .gesture(DragGesture(minimumDistance: 0).onChanged { value in
         model.adjustInspectorTree(by: value.translation.height)
       })
@@ -700,7 +715,9 @@ struct UIDumpWorkspaceView: View {
       .font(WorkspaceFont.monospacedDense)
       .foregroundStyle(.secondary)
       .padding(.horizontal, 6).padding(.vertical, 1)
-      .overlay(Capsule().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+      .overlay {
+        Capsule().stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+      }
   }
 
   /// Grouped, because a flat run of a dozen identical rows reads as a dump
@@ -808,9 +825,9 @@ struct UIDumpWorkspaceView: View {
       }
     } label: {
       Image(systemName: systemImage)
-        .font(.system(size: 10, weight: .semibold))
+        .font(.caption2.bold())
         .frame(width: 24, height: 24)
-        .contentShape(Rectangle())
+        .contentShape(.rect)
     }
     .buttonStyle(.borderless)
     .disabled(!model.canNavigateSearchMatches)
@@ -832,7 +849,7 @@ struct UIDumpWorkspaceView: View {
             .fill(active ? Color.accentColor : .clear)
             .frame(height: 2)
         }
-        .contentShape(Rectangle())
+        .contentShape(.rect)
     }
     .buttonStyle(.plain)
     // Before the padding, not after: a later modifier would attach the
@@ -939,7 +956,7 @@ private struct AdvancedDumpInspectorView: View {
       Button { searchFocusRequestID &+= 1 } label: {
         Image(systemName: "magnifyingglass")
           .frame(width: 24, height: 24)
-          .contentShape(Rectangle())
+          .contentShape(.rect)
       }
       .buttonStyle(.borderless)
       .keyboardShortcut("f", modifiers: [.command])
@@ -974,7 +991,7 @@ private struct AdvancedDumpInspectorView: View {
           Image(systemName: "xmark.circle.fill")
             .foregroundStyle(.secondary)
             .frame(width: 24, height: 24)
-            .contentShape(Rectangle())
+            .contentShape(.rect)
         }
         .buttonStyle(.borderless)
         .help(ViewerInspectorCopy.advancedSearchClear)
@@ -1060,8 +1077,8 @@ private struct AdvancedDumpInspectorView: View {
     let indexedFields = fields.enumerated().map { IndexedField(id: $0.offset, field: $0.element) }
     guard !query.isEmpty else { return indexedFields }
     return indexedFields.filter { match in
-      match.field.key.localizedCaseInsensitiveContains(query)
-        || match.field.value.localizedCaseInsensitiveContains(query)
+      match.field.key.localizedStandardContains(query)
+        || match.field.value.localizedStandardContains(query)
     }
   }
 
@@ -1159,7 +1176,8 @@ private struct ViewerSearchTextField: NSViewRepresentable {
     func focusIfAsked(_ field: NSTextField, id: UInt64) {
       guard id != 0, lastFocusRequestID != id else { return }
       lastFocusRequestID = id
-      DispatchQueue.main.async { [weak field] in
+      Task { @MainActor [weak field] in
+        await Task.yield()
         guard let field, let window = unsafe field.window else { return }
         window.makeFirstResponder(field)
       }
@@ -1236,6 +1254,7 @@ final class UIDumpWorkspaceViewModel {
   private(set) var searchMatchIdentities: [String] = []
   private(set) var selectedSearchMatchIndex: Int?
   private(set) var selectionRevealGeneration = 0
+  private(set) var visibleNodes: [ViewerNode] = []
   private(set) var showBounds = false
   private(set) var inspectorTreePercent: Double = 60
   private(set) var inspectorTab: ViewerInspectorTab = .properties
@@ -1307,13 +1326,6 @@ final class UIDumpWorkspaceViewModel {
     if case .available = workspace.operation.availability { return true }
     return false
   }
-  var visibleNodes: [ViewerNode] {
-    guard let capture else { return [] }
-    return capture.visibleTreeNodes(
-      rootIdentity: selectedRootIdentity,
-      query: searchQuery,
-      expandedNodeIdentities: expandedNodeIdentities)
-  }
   func screenshotNodes(_ capture: ViewerCapture) -> [ViewerNode] {
     capture.subtreeNodes(rootIdentity: selectedRootIdentity).filter { node in
       node.bounds != nil && node.visible
@@ -1379,6 +1391,7 @@ final class UIDumpWorkspaceViewModel {
     // A previous record must not appear under the newly selected Job banner.
     capture = nil
     selectedNodeIdentity = nil
+    updateVisibleNodes()
     guard let bindingRevision = context.bindingRevision else {
       captureFailure = "Historical Viewer context has no binding revision"
       return
@@ -1412,6 +1425,7 @@ final class UIDumpWorkspaceViewModel {
     searchMatchIdentities = []
     selectedSearchMatchIndex = nil
     expandedNodeIdentities = next.node(identity: root)?.children.isEmpty == false ? [root] : []
+    updateVisibleNodes()
     select(root)
   }
   func setTargetID(_ value: String) {
@@ -1431,17 +1445,24 @@ final class UIDumpWorkspaceViewModel {
     } else {
       select(root.identity)
     }
+    updateVisibleNodes()
   }
   func setSearchQuery(_ value: String) {
     searchQuery = value
     updateSearchMatches(selectFirst: true)
+    updateVisibleNodes()
   }
   func setShowBounds(_ value: Bool) { showBounds = value }
   func setInspectorTab(_ value: ViewerInspectorTab) {
     inspectorTab = value
     if value == .advancedDump { loadAdvancedDumpIfNeeded() }
   }
-  func toggleExpansion(_ identity: String) { if !expandedNodeIdentities.insert(identity).inserted { expandedNodeIdentities.remove(identity) } }
+  func toggleExpansion(_ identity: String) {
+    if !expandedNodeIdentities.insert(identity).inserted {
+      expandedNodeIdentities.remove(identity)
+    }
+    updateVisibleNodes()
+  }
   func adjustInspectorTree(by delta: Double) { setInspectorTree(percent: inspectorTreePercent - delta / 8) }
   /// Resizing is presentation only. It must never touch `selectedNodeIdentity`,
   /// or dragging the separator would silently move the inspected node.
@@ -1463,6 +1484,7 @@ final class UIDumpWorkspaceViewModel {
     if selectedNodeIdentity != node.identity { resetAdvancedDump() }
     selectedNodeIdentity = node.identity
     expandedNodeIdentities.formUnion(capture.ancestors(of: node.identity))
+    updateVisibleNodes()
     if let index = searchMatchIdentities.firstIndex(of: node.identity) {
       selectedSearchMatchIndex = index
     }
@@ -1540,6 +1562,17 @@ final class UIDumpWorkspaceViewModel {
     }
   }
 
+  private func updateVisibleNodes() {
+    guard let capture else {
+      visibleNodes = []
+      return
+    }
+    visibleNodes = capture.visibleTreeNodes(
+      rootIdentity: selectedRootIdentity,
+      query: searchQuery,
+      expandedNodeIdentities: expandedNodeIdentities)
+  }
+
   func selectPreviousSearchMatch() { moveSearchMatch(by: -1) }
   func selectNextSearchMatch() { moveSearchMatch(by: 1) }
 
@@ -1582,6 +1615,7 @@ final class UIDumpWorkspaceViewModel {
     guard let identity = selectedNodeIdentity, let node = capture?.node(identity: identity) else { return }
     if !node.children.isEmpty, expandedNodeIdentities.contains(identity) {
       expandedNodeIdentities.remove(identity)
+      updateVisibleNodes()
       return
     }
     if let parent = node.parentIdentity { select(parent) }
@@ -1594,6 +1628,7 @@ final class UIDumpWorkspaceViewModel {
     else { return }
     if !expandedNodeIdentities.contains(identity) {
       expandedNodeIdentities.insert(identity)
+      updateVisibleNodes()
       return
     }
     if let child = node.children.first { select(child) }

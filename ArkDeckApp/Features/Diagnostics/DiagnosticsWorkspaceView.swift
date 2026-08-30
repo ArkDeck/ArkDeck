@@ -364,7 +364,7 @@ struct DiagnosticsWorkspaceView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(10)
     .background(Color(nsColor: .windowBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 6))
+    .clipShape(.rect(cornerRadius: 6))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("diagnostics.mark")
   }

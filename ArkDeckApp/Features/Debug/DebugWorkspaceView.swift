@@ -169,7 +169,7 @@ struct DebugWorkspaceView: View {
             .background(
               selectedTab == tab ? Color.accentColor.opacity(0.14) : Color.clear,
               in: RoundedRectangle(
-                cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+                cornerRadius: WorkspaceMetrics.controlRadius)
             )
         }
         .buttonStyle(.plain)
@@ -179,7 +179,7 @@ struct DebugWorkspaceView: View {
         .overlay {
           if focusedTab == tab && showsTabKeyboardFocus {
             RoundedRectangle(
-              cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous
+              cornerRadius: WorkspaceMetrics.controlRadius
             )
             .strokeBorder(Color.accentColor, lineWidth: 2)
           }
@@ -197,12 +197,12 @@ struct DebugWorkspaceView: View {
     .background(
       Color(nsColor: .controlBackgroundColor),
       in: RoundedRectangle(
-        cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+        cornerRadius: WorkspaceMetrics.insetRadius)
     )
-    .overlay(
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-    )
+    }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(DebugL10n.text("debug.tabs.label"))
     .accessibilityIdentifier("debug.tabs")
@@ -653,7 +653,7 @@ private struct DebugRemoteBuildEntryRow: View {
           .accessibilityHidden(true)
       }
     }
-    .contentShape(Rectangle())
+    .contentShape(.rect)
   }
 }
 
@@ -671,7 +671,7 @@ private struct DebugArtifactsWorkspace: View {
   let onOpenLogs: () -> Void
 
   @State private var isImporterPresented = false
-  @State private var isPlanPresented = false
+  @State private var presentedPreparation: DebugNativeLibraryPreparation?
   @State private var isRemoteBrowserPresented = false
   @State private var buildSourceKind = BuildSourceKind.local
   @State private var selectedLibraryURL: URL?
@@ -778,10 +778,8 @@ private struct DebugArtifactsWorkspace: View {
       allowsMultipleSelection: false,
       onCompletion: handleLibrarySelection
     )
-    .sheet(isPresented: $isPlanPresented) {
-      if let preparation = currentPreparation {
-        DebugNativeLibraryPlanSheet(model: model, preparation: preparation)
-      }
+    .sheet(item: $presentedPreparation) {
+      DebugNativeLibraryPlanSheet(model: model, preparation: $0)
     }
     .sheet(isPresented: $isRemoteBrowserPresented) {
       DebugRemoteBuildBrowserSheet(model: remoteBrowserModel) { selection in
@@ -992,7 +990,7 @@ private struct DebugArtifactsWorkspace: View {
         WorkspaceNotice(tone: .ok, identifier: "debug.artifacts.planReady") {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(DebugL10n.text("debug.artifacts.planReady"))
-              .fontWeight(.semibold)
+              .bold()
             DebugCodeRow(
               label: "ELF",
               value:
@@ -1015,7 +1013,7 @@ private struct DebugArtifactsWorkspace: View {
         WorkspaceNotice(tone: .accent, identifier: "debug.artifacts.running") {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(DebugL10n.text("debug.artifacts.running"))
-              .fontWeight(.semibold)
+              .bold()
             Text(
               model.workspace.jobs.first(where: {
                 $0.id == model.activeNativeLibraryJobID
@@ -1036,7 +1034,7 @@ private struct DebugArtifactsWorkspace: View {
                 ? DebugL10n.text("debug.artifacts.verified")
                 : DebugL10n.text("debug.artifacts.notVerified")
             )
-            .fontWeight(.semibold)
+            .bold()
             if let latest = terminal.timeline.last {
               Text(latest)
                 .font(WorkspaceFont.monospacedDense)
@@ -1067,7 +1065,7 @@ private struct DebugArtifactsWorkspace: View {
               : DebugL10n.text("debug.artifacts.reopenPlan")
           ) {
             if currentPreparation != nil {
-              isPlanPresented = true
+              presentedPreparation = currentPreparation
             } else {
               preparePlan()
             }
@@ -1141,7 +1139,7 @@ private struct DebugArtifactsWorkspace: View {
           verificationProfile: verificationProfile,
           rollbackPolicy: rollbackPolicy)
       }
-      if prepared { isPlanPresented = true }
+      if prepared { presentedPreparation = currentPreparation }
     }
   }
 
@@ -1194,7 +1192,7 @@ private struct DebugNativeLibraryPlanSheet: View {
         .accessibilityAddTraits(.isHeader)
       ScrollView {
         VStack(spacing: WorkspaceMetrics.tightGap) {
-          ForEach(Array(preparation.steps.enumerated()), id: \.element.id) { index, step in
+          ForEach(preparation.steps.enumerated(), id: \.element.id) { index, step in
             HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
               Text("\(index + 1)")
                 .font(WorkspaceFont.tabularSecondary)
@@ -1312,29 +1310,6 @@ private struct DebugLogsWorkspace: View {
       }
       shardsSection
       DebugRecentJobsSection(model: model, jobs: relatedJobs)
-    }
-    .confirmationDialog(
-      DebugL10n.text("debug.logs.exportPreview.title"),
-      isPresented: $isExportPreviewPresented,
-      presenting: pendingExport
-    ) { row in
-      Button(
-        DebugL10n.text(
-          row.artifact.privacy == "sensitive"
-            ? "debug.logs.exportSensitive" : "debug.logs.exportConfirm")
-      ) {
-        chooseExportDestination(for: row)
-      }
-      Button(DebugL10n.text("debug.logs.exportCancel"), role: .cancel) {}
-    } message: { row in
-      Text(
-        String(
-          localized: LocalizedStringResource.DebugLocalizable.debugLogsExportPreviewMessage(
-            row.artifact.name,
-            ByteCountFormatter.string(
-              fromByteCount: row.artifact.byteCount, countStyle: .file),
-            row.artifact.privacy,
-            row.artifact.sha256)))
     }
   }
 
@@ -1548,13 +1523,13 @@ private struct DebugLogsWorkspace: View {
 
   private var viewport: some View {
     ZStack(alignment: .topLeading) {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
         .fill(Color(nsColor: .textBackgroundColor))
       if let terminal = scopedTerminal, !terminal.timeline.isEmpty {
         // A bounded window of entries, so the box grows to what it holds
         // instead of nesting a second scroll view inside the page.
         VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap / 2) {
-          ForEach(Array(terminal.timeline.suffix(12).enumerated()), id: \.offset) {
+          ForEach(terminal.timeline.suffix(12).enumerated(), id: \.offset) {
             _, entry in
             Text(entry)
               .font(WorkspaceFont.monospacedDense)
@@ -1582,7 +1557,7 @@ private struct DebugLogsWorkspace: View {
     }
     .frame(minHeight: 320)
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
         .stroke(.separator, lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
@@ -1670,6 +1645,30 @@ private struct DebugLogsWorkspace: View {
               || model.exportStatesByArtifactID[artifact.id] == .exporting
           )
           .accessibilityIdentifier("debug.logs.export.\(artifact.id)")
+          .confirmationDialog(
+            DebugL10n.text("debug.logs.exportPreview.title"),
+            isPresented: exportDialogPresented(for: artifact.id),
+            presenting: pendingExport
+          ) { pendingRow in
+            Button(
+              DebugL10n.text(
+                pendingRow.artifact.privacy == "sensitive"
+                  ? "debug.logs.exportSensitive" : "debug.logs.exportConfirm")
+            ) {
+              chooseExportDestination(for: pendingRow)
+            }
+            Button(DebugL10n.text("debug.logs.exportCancel"), role: .cancel) {}
+          } message: { pendingRow in
+            Text(
+              String(
+                localized: LocalizedStringResource.DebugLocalizable
+                  .debugLogsExportPreviewMessage(
+                    pendingRow.artifact.name,
+                    ByteCountFormatter.string(
+                      fromByteCount: pendingRow.artifact.byteCount, countStyle: .file),
+                    pendingRow.artifact.privacy,
+                    pendingRow.artifact.sha256)))
+          }
           if model.exportStatesByArtifactID[artifact.id] == .exporting {
             ProgressView()
               .controlSize(.small)
@@ -1712,11 +1711,17 @@ private struct DebugLogsWorkspace: View {
     }
   }
 
+  private func exportDialogPresented(for artifactID: String) -> Binding<Bool> {
+    Binding(
+      get: { isExportPreviewPresented && pendingExport?.artifact.id == artifactID },
+      set: { if !$0 { isExportPreviewPresented = false } })
+  }
+
   private func safeExportName(_ value: String) -> String {
     let sanitized =
       value
-      .replacingOccurrences(of: "/", with: "_")
-      .replacingOccurrences(of: ":", with: "_")
+      .replacing("/", with: "_")
+      .replacing(":", with: "_")
     return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
   }
 
@@ -1874,7 +1879,7 @@ private struct DebugAppsWorkspace: View {
         .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
-      ForEach(Array(additionalHAPURLs.enumerated()), id: \.element) { index, url in
+      ForEach(additionalHAPURLs.enumerated(), id: \.element) { index, url in
         HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
           Text(url.lastPathComponent)
             .font(WorkspaceFont.monospacedValue)
@@ -2062,7 +2067,7 @@ private struct DebugAppsWorkspace: View {
             .font(WorkspaceFont.caption)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(.quaternary, in: Capsule())
+            .background(.quaternary, in: .capsule)
         }
       }
       if !isLast { Divider() }
@@ -2480,7 +2485,7 @@ private struct DebugNetworkWorkspace: View {
       .foregroundStyle(.secondary)
       Divider()
       if let currentRuntimeProbe, !currentRuntimeProbe.portRules.isEmpty {
-        ForEach(Array(currentRuntimeProbe.portRules.enumerated()), id: \.offset) { _, rule in
+        ForEach(currentRuntimeProbe.portRules.enumerated(), id: \.offset) { _, rule in
           ruleRow(rule)
         }
       } else {
@@ -2748,15 +2753,15 @@ private struct DebugCommandTemplateRow: View {
     .padding(.horizontal, WorkspaceMetrics.contentGap)
     .padding(.vertical, WorkspaceMetrics.tightGap)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(Rectangle())
+    .contentShape(.rect)
     // An accent wash rather than the system selection fill: the row keeps its
     // own effect colour, which white-on-blue would swallow.
     .background(
       isSelected ? Color.accentColor.opacity(0.14) : Color.clear,
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius)
         .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
@@ -2801,7 +2806,7 @@ private struct DebugAvailabilityNotice: View {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
             Text(DebugL10n.text("debug.availability.unavailable"))
               .font(WorkspaceFont.secondary.weight(.medium))
-            ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
+            ForEach(reasons.enumerated(), id: \.offset) { _, reason in
               Text(reason)
                 .font(WorkspaceFont.monospacedDense)
                 .textSelection(.enabled)

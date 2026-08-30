@@ -110,10 +110,10 @@ final class DeviceWorkspaceViewModel {
   /// it for them.
   var frameAgeSummary: String {
     guard let frame else { return deviceText("device.frame.none") }
-    guard let captured = ISO8601DateFormatter().date(from: frame.capturedAtUTC) else {
+    guard let captured = try? Date(frame.capturedAtUTC, strategy: .iso8601) else {
       return deviceText("device.frame.unknownAge")
     }
-    let seconds = Int(Date().timeIntervalSince(captured))
+    let seconds = Int(Date.now.timeIntervalSince(captured))
     let measured = seconds < 0 ? 0 : seconds
     return "\(deviceText("device.frame.age")) \(measured)s · \(frame.width)×\(frame.height)"
   }
@@ -207,7 +207,7 @@ final class DeviceWorkspaceViewModel {
   // MARK: - Gestures
 
   func pointerMoved(to location: CGPoint, rendered: CGSize) {
-    if pressStartedAt == nil { pressStartedAt = Date() }
+    if pressStartedAt == nil { pressStartedAt = .now }
     guard rendered.width > 0, rendered.height > 0 else { return }
     pendingMarker = Marker(
       unitX: min(max(location.x / rendered.width, 0), 1),
@@ -217,7 +217,7 @@ final class DeviceWorkspaceViewModel {
   func pointerEnded(
     start: CGPoint, end: CGPoint, rendered: CGSize, frame: DeviceScreenFrame
   ) async {
-    let heldFor = pressStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+    let heldFor = pressStartedAt.map { Date.now.timeIntervalSince($0) } ?? 0
     pressStartedAt = nil
     guard rendered.width > 0, rendered.height > 0, !isSendingGesture else {
       pendingMarker = nil

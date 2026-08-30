@@ -13,27 +13,36 @@ import UniformTypeIdentifiers
 /// way for the sake of a tidier list.
 struct DeviceWorkspaceView: View {
   var model: DeviceWorkspaceViewModel
-  var recording: DeviceRecordingViewModel
+  @Bindable var recording: DeviceRecordingViewModel
+  @State private var isSaveErrorPresented = false
+  @State private var saveErrorMessage = ""
+  @State private var workspaceWidth: CGFloat = 0
+  @State private var screenAvailableSize = CGSize.zero
 
   var body: some View {
-    GeometryReader { geometry in
-      VStack(spacing: 0) {
-        toolbar
-        Divider()
-        if geometry.size.width >= 880 {
-          HStack(spacing: 0) {
-            screenPane
-            Divider()
-            inspector.frame(width: 320)
-          }
-        } else {
-          ScrollView { VStack(spacing: 0) { screenPane.frame(height: 420); inspector } }
+    VStack(spacing: 0) {
+      toolbar
+      Divider()
+      if workspaceWidth >= 880 {
+        HStack(spacing: 0) {
+          screenPane
+          Divider()
+          inspector.frame(width: 320)
         }
-        Divider()
-        footer
+      } else {
+        ScrollView { VStack(spacing: 0) { screenPane.frame(height: 420); inspector } }
       }
+      Divider()
+      footer
     }
+    .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { workspaceWidth = $0 }
     .task { await model.refresh() }
+    .alert(
+      deviceText("device.record.saveFailed"),
+      isPresented: $isSaveErrorPresented
+    ) {} message: {
+      Text(saveErrorMessage)
+    }
   }
 
   // MARK: - Toolbar
@@ -67,53 +76,52 @@ struct DeviceWorkspaceView: View {
   // MARK: - Screen
 
   private var screenPane: some View {
-    GeometryReader { proxy in
-      ZStack {
-        Color(nsColor: .windowBackgroundColor)
-        if model.isOpeningHistoryScreen {
-          ProgressView {
-            Text("history.loading", tableName: "HistoryLocalizable")
-          }
-          .accessibilityIdentifier("device.history.loading")
-        } else if let frame = model.frame, let image = NSImage(data: frame.imageData) {
-          let rendered = Self.fittedSize(
-            container: proxy.size,
-            aspect: CGFloat(frame.width) / CGFloat(frame.height))
-          ZStack {
-            Image(nsImage: image)
-              .resizable()
-              .interpolation(.high)
-              .scaledToFit()
-              .accessibilityLabel(deviceText("device.screen.picture"))
-              .accessibilityIdentifier("device.screen.image")
-            gestureSurface(frame: frame, rendered: rendered)
-            if model.frameIsStale { staleOverlay }
-            if let marker = model.pendingMarker {
-              touchMarker(marker, rendered: rendered, pending: true)
-            } else if let marker = model.lastMarker {
-              touchMarker(marker, rendered: rendered, pending: false)
-            }
-          }
-          .frame(width: rendered.width, height: rendered.height)
-          .clipped()
-        } else {
-          ContentUnavailableView {
-            Label(deviceText("device.screen.empty.title"), systemImage: "iphone")
-          } description: {
-            Text(model.emptyMessage)
-          }
-          .accessibilityIdentifier("device.screen.empty")
+    ZStack {
+      Color(nsColor: .windowBackgroundColor)
+      if model.isOpeningHistoryScreen {
+        ProgressView {
+          Text("history.loading", tableName: "HistoryLocalizable")
         }
+        .accessibilityIdentifier("device.history.loading")
+      } else if let frame = model.frame, let image = NSImage(data: frame.imageData) {
+        let rendered = Self.fittedSize(
+          container: screenAvailableSize,
+          aspect: CGFloat(frame.width) / CGFloat(frame.height))
+        ZStack {
+          Image(nsImage: image)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .accessibilityLabel(deviceText("device.screen.picture"))
+            .accessibilityIdentifier("device.screen.image")
+          gestureSurface(frame: frame, rendered: rendered)
+          if model.frameIsStale { staleOverlay }
+          if let marker = model.pendingMarker {
+            touchMarker(marker, rendered: rendered, pending: true)
+          } else if let marker = model.lastMarker {
+            touchMarker(marker, rendered: rendered, pending: false)
+          }
+        }
+        .frame(width: rendered.width, height: rendered.height)
+        .clipped()
+      } else {
+        ContentUnavailableView {
+          Label(deviceText("device.screen.empty.title"), systemImage: "iphone")
+        } description: {
+          Text(model.emptyMessage)
+        }
+        .accessibilityIdentifier("device.screen.empty")
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .onGeometryChange(for: CGSize.self, of: { $0.size }) { screenAvailableSize = $0 }
   }
 
   /// One transparent layer owns every pointer event. Stacked full-size
   /// containers otherwise swallow the clicks that were meant for the picture.
   private func gestureSurface(frame: DeviceScreenFrame, rendered: CGSize) -> some View {
     Color.clear
-      .contentShape(Rectangle())
+      .contentShape(.rect)
       .accessibilityIdentifier("device.screen.surface")
       .gesture(
         DragGesture(minimumDistance: 0)
@@ -140,7 +148,7 @@ struct DeviceWorkspaceView: View {
           .padding(.vertical, 4)
           .background(.orange.opacity(0.85))
           .foregroundStyle(.white)
-          .clipShape(Capsule())
+          .clipShape(.capsule)
           .padding(8)
         Spacer()
       }
@@ -302,7 +310,7 @@ struct DeviceWorkspaceView: View {
       // cannot be asked for, so the only honest control is how many stills.
       HStack(spacing: 8) {
         Stepper(
-          value: Binding(get: { recording.frameCount }, set: { recording.frameCount = $0 }),
+          value: $recording.frameCount,
           in: 2...300, step: 10
         ) {
           Text("\(recording.frameCount) \(deviceText("device.record.frames"))")
@@ -481,9 +489,23 @@ struct DeviceWorkspaceView: View {
     let panel = NSSavePanel()
     panel.nameFieldStringValue = ready.url.lastPathComponent
     panel.allowedContentTypes = [.quickTimeMovie]
-    guard panel.runModal() == .OK, let destination = panel.url else { return }
-    try? FileManager.default.removeItem(at: destination)
-    try? FileManager.default.copyItem(at: ready.url, to: destination)
+    Task { @MainActor in
+      guard await panel.begin() == .OK, let destination = panel.url else { return }
+      let temporary = destination.deletingLastPathComponent().appending(
+        path: ".arkdeck-\(UUID().uuidString)-\(destination.lastPathComponent)")
+      defer { try? FileManager.default.removeItem(at: temporary) }
+      do {
+        try FileManager.default.copyItem(at: ready.url, to: temporary)
+        if FileManager.default.fileExists(atPath: destination.path) {
+          _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
+        } else {
+          try FileManager.default.moveItem(at: temporary, to: destination)
+        }
+      } catch {
+        saveErrorMessage = error.localizedDescription
+        isSaveErrorPresented = true
+      }
+    }
   }
 
   /// The image is framed at exactly this size, so the gesture layer's

@@ -40,43 +40,38 @@ struct SettingsRootView<UpdatesContent: View>: View {
 
   var body: some View {
     TabView {
-      GeneralSettingsPane(model: model)
-        .tabItem {
-          Label(settingsText("settings.tab.general"), systemImage: "gearshape")
-        }
-      ToolchainsSettingsPane(
-        presentation: hdcPresentation,
-        isRefreshInFlight: isHDCRefreshInFlight,
-        configurationError: hdcConfigurationError,
-        hasActiveRuntimeJobs: hasActiveRuntimeJobs,
-        onRefresh: onHDCRefresh,
-        onSelectExecutable: onSelectHDC
-      )
-      .tabItem {
-        Label(settingsText("settings.tab.toolchains"), systemImage: "wrench.and.screwdriver")
+      Tab(settingsText("settings.tab.general"), systemImage: "gearshape") {
+        GeneralSettingsPane(model: model)
       }
-      RemoteBuildSourcesSettingsPane(model: model)
-        .tabItem {
-          Label(settingsText("settings.tab.remoteSources"), systemImage: "server.rack")
-        }
-      StorageSettingsPane(model: model)
-        .tabItem {
-          Label(settingsText("settings.tab.storage"), systemImage: "externaldrive")
-        }
-      TraceSettingsPane(controller: traceController)
-        .tabItem {
-          Label(settingsText("settings.tab.trace"), systemImage: "waveform.path.ecg")
-        }
-      WorkspacePage {
-        updatesContent
+      Tab(
+        settingsText("settings.tab.toolchains"),
+        systemImage: "wrench.and.screwdriver"
+      ) {
+        ToolchainsSettingsPane(
+          presentation: hdcPresentation,
+          isRefreshInFlight: isHDCRefreshInFlight,
+          configurationError: hdcConfigurationError,
+          hasActiveRuntimeJobs: hasActiveRuntimeJobs,
+          onRefresh: onHDCRefresh,
+          onSelectExecutable: onSelectHDC)
       }
-      .tabItem {
-        Label(settingsText("settings.tab.updates"), systemImage: "arrow.triangle.2.circlepath")
+      Tab(settingsText("settings.tab.remoteSources"), systemImage: "server.rack") {
+        RemoteBuildSourcesSettingsPane(model: model)
       }
-      DiagnosticsSettingsPane(model: model)
-        .tabItem {
-          Label(settingsText("settings.tab.diagnostics"), systemImage: "stethoscope")
+      Tab(settingsText("settings.tab.storage"), systemImage: "externaldrive") {
+        StorageSettingsPane(model: model)
+      }
+      Tab(settingsText("settings.tab.trace"), systemImage: "waveform.path.ecg") {
+        TraceSettingsPane(controller: traceController)
+      }
+      Tab(settingsText("settings.tab.updates"), systemImage: "arrow.triangle.2.circlepath") {
+        WorkspacePage {
+          updatesContent
         }
+      }
+      Tab(settingsText("settings.tab.diagnostics"), systemImage: "stethoscope") {
+        DiagnosticsSettingsPane(model: model)
+      }
     }
     .frame(minWidth: 760, idealWidth: 820, minHeight: 560, idealHeight: 620)
     .task {
@@ -130,7 +125,6 @@ private struct RemoteBuildSourcesSettingsPane: View {
   var model: SettingsWorkspaceViewModel
   @State private var editorSource: RemoteBuildSourcePresentation?
   @State private var isEditorPresented = false
-  @State private var pendingRemoval: RemoteBuildSourcePresentation?
 
   var body: some View {
     WorkspacePage {
@@ -153,7 +147,7 @@ private struct RemoteBuildSourcesSettingsPane: View {
                   editorSource = source
                   isEditorPresented = true
                 },
-                onRemove: { pendingRemoval = source })
+                onRemove: { Task { await model.removeRemoteSource(source.id) } })
               if source.id != model.remoteSources.last?.id { Divider() }
             }
           }
@@ -200,25 +194,6 @@ private struct RemoteBuildSourcesSettingsPane: View {
     .sheet(isPresented: $isEditorPresented, onDismiss: model.clearRemoteSourceProbe) {
       RemoteBuildSourceEditor(model: model, source: editorSource)
     }
-    .confirmationDialog(
-      settingsText("settings.remoteSources.remove.title"),
-      isPresented: Binding(
-        get: { pendingRemoval != nil },
-        set: { if !$0 { pendingRemoval = nil } }),
-      titleVisibility: .visible
-    ) {
-      if let source = pendingRemoval {
-        Button(settingsText("settings.remoteSources.remove"), role: .destructive) {
-          pendingRemoval = nil
-          Task { await model.removeRemoteSource(source.id) }
-        }
-      }
-      Button(settingsText("settings.common.cancel"), role: .cancel) {
-        pendingRemoval = nil
-      }
-    } message: {
-      Text(settingsText("settings.remoteSources.remove.detail"))
-    }
   }
 }
 
@@ -226,6 +201,7 @@ private struct RemoteBuildSourceSettingsRow: View {
   let source: RemoteBuildSourcePresentation
   let onEdit: () -> Void
   let onRemove: () -> Void
+  @State private var isRemovalConfirmationPresented = false
 
   var body: some View {
     HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
@@ -264,10 +240,22 @@ private struct RemoteBuildSourceSettingsRow: View {
       }
       Spacer(minLength: WorkspaceMetrics.contentGap)
       Button(settingsText("settings.remoteSources.edit"), action: onEdit)
-      Button(role: .destructive, action: onRemove) {
+      Button(role: .destructive) {
+        isRemovalConfirmationPresented = true
+      } label: {
         Image(systemName: "trash")
       }
       .accessibilityLabel(settingsText("settings.remoteSources.remove"))
+      .confirmationDialog(
+        settingsText("settings.remoteSources.remove.title"),
+        isPresented: $isRemovalConfirmationPresented,
+        titleVisibility: .visible
+      ) {
+        Button(settingsText("settings.remoteSources.remove"), role: .destructive, action: onRemove)
+        Button(settingsText("settings.common.cancel"), role: .cancel) {}
+      } message: {
+        Text(settingsText("settings.remoteSources.remove.detail"))
+      }
     }
     .accessibilityElement(children: .contain)
   }
@@ -438,7 +426,7 @@ private struct RemoteBuildSourceEditor: View {
             WorkspaceNotice(tone: .ok, symbol: "checkmark.shield") {
               VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
                 Text(settingsText("settings.remoteSources.verified"))
-                  .fontWeight(.semibold)
+                  .bold()
                 Text(probe.endpoint).font(WorkspaceFont.monospacedValue)
                 Text(probe.canonicalRootPath).font(WorkspaceFont.monospacedDense)
                 Text(probe.hostKeyFingerprint).font(WorkspaceFont.monospacedDense)
@@ -584,7 +572,7 @@ private struct ApplicationIconPicker: View {
   private func option(_ choice: ApplicationIconChoice) -> some View {
     let isSelected = choice == selectedChoice
     let shape = RoundedRectangle(
-      cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      cornerRadius: WorkspaceMetrics.insetRadius)
 
     return Button {
       selection = choice.rawValue
@@ -609,11 +597,11 @@ private struct ApplicationIconPicker: View {
       .padding(WorkspaceMetrics.contentGap)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(Color(nsColor: .controlBackgroundColor), in: shape)
-      .overlay(
+      .overlay {
         shape.strokeBorder(
           isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
           lineWidth: isSelected ? 2 : 1)
-      )
+      }
       .contentShape(shape)
     }
     .buttonStyle(.plain)
@@ -654,12 +642,12 @@ private struct ApplicationIconPreview: View {
     .frame(width: 40, height: 40)
     .background(
       Color(nsColor: .windowBackgroundColor),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius)
     )
-    .overlay(
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius, style: .continuous)
+    .overlay {
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.controlRadius)
         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-    )
+    }
     .accessibilityHidden(true)
   }
 }
@@ -732,9 +720,10 @@ private struct ToolchainsSettingsPane: View {
             .font(.callout)
             .padding(WorkspaceMetrics.contentGap)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(
-              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+            .overlay {
+              RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
             .accessibilityIdentifier("settings.toolchains.activeJobsCallout")
           } else {
             Text(settingsText("settings.toolchains.futureJobs"))
@@ -1112,8 +1101,8 @@ private struct DiagnosticsSettingsPane: View {
     panel.nameFieldStringValue = "ArkDeck-Diagnostics"
     panel.canCreateDirectories = true
     panel.isExtensionHidden = false
-    panel.begin { response in
-      guard response == .OK, let url = panel.url else { return }
+    Task { @MainActor in
+      guard await panel.begin() == .OK, let url = panel.url else { return }
       model.previewDiagnostics(at: url)
     }
   }

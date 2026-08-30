@@ -27,7 +27,7 @@ struct FlashPlanDetailsView: View {
           )
           .font(WorkspaceFont.body.weight(.semibold))
         }
-        .contentShape(Rectangle())
+        .contentShape(.rect)
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("flash.plan.partitions.disclosure")
@@ -88,7 +88,7 @@ struct FlashPlanDetailsView: View {
     .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
     .background(
       .quaternary.opacity(0.45),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous))
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius))
     .accessibilityIdentifier("flash.plan.partition.\(partition.partitionName)")
   }
 
@@ -136,7 +136,7 @@ struct FlashPrerequisitesList: View {
     .padding(.vertical, WorkspaceMetrics.noticePaddingVertical)
     .background(
       .quaternary.opacity(0.45),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous))
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius))
   }
 
   private func prerequisiteName(

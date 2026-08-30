@@ -685,10 +685,10 @@ func traceNotice(
   .frame(maxWidth: .infinity, alignment: .leading)
   .background(
     color.opacity(0.08),
-    in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+    in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
   )
   .overlay {
-    RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+    RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
       .stroke(color.opacity(0.38), lineWidth: 1)
   }
   .accessibilityIdentifier(identifier)

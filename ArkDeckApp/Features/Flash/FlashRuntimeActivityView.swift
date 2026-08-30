@@ -63,10 +63,10 @@ struct FlashRuntimeActivityView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       WorkspaceTone.warning.wash,
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
         .stroke(WorkspaceTone.warning.line, lineWidth: 1)
     }
     .accessibilityIdentifier("flash.runtime.criticalWrite")
@@ -112,10 +112,10 @@ struct FlashRuntimeActivityView: View {
     .padding(.vertical, WorkspaceMetrics.cardPaddingVertical)
     .background(
       WorkspaceTone.warning.wash,
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
         .stroke(WorkspaceTone.warning.line, lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
@@ -214,7 +214,7 @@ struct FlashRuntimeActivityView: View {
           .foregroundStyle(.secondary)
           .accessibilityAddTraits(.isHeader)
         VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-          ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
+          ForEach(job.timeline.enumerated(), id: \.offset) { index, entry in
             timelineRow(entry, index: index, job: job)
           }
         }

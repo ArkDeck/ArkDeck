@@ -367,10 +367,10 @@ struct WorkspaceCard<Content: View>: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       Color(nsColor: .controlBackgroundColor),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
     }
   }
@@ -467,10 +467,10 @@ struct WorkspaceNotice<Content: View>: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       tone.wash,
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
         .stroke(tone.line, lineWidth: 1)
     }
     .accessibilityElement(children: .combine)

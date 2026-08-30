@@ -228,7 +228,7 @@ struct GlobalJobInspectorView: View {
             identifier: "jobInspector.criticalWrite"
           ) {
             Text(jobsText("jobInspector.criticalWrite"))
-              .fontWeight(.semibold)
+              .bold()
           }
         }
       }
@@ -384,7 +384,7 @@ struct GlobalJobInspectorView: View {
 
   private func timelineEntries(_ job: RuntimeJobSummaryPresentation) -> some View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
-      ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
+      ForEach(job.timeline.enumerated(), id: \.offset) { index, entry in
                 HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.tightGap) {
                   Image(
                     systemName: index == job.timeline.count - 1
@@ -701,10 +701,10 @@ struct GlobalRecoveryBannerView: View {
     .padding(.vertical, WorkspaceMetrics.cardPaddingVertical)
     .background(
       tone.wash,
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
         .stroke(tone.line, lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
