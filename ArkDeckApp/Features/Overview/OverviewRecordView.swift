@@ -449,7 +449,7 @@ struct OverviewRecordView: View {
             isExpanded: expandedBinding(for: thread.id)
           ) {
             VStack(alignment: .leading, spacing: 0) {
-              ForEach(Array(otherRuns.enumerated()), id: \.element.id) { index, run in
+              ForEach(otherRuns.enumerated(), id: \.element.id) { index, run in
                 if index > 0 { Divider() }
                 runRow(run)
               }
@@ -466,10 +466,10 @@ struct OverviewRecordView: View {
       }
       .background(
         Color(nsColor: .controlBackgroundColor),
-        in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+        in: RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
       )
       .overlay {
-        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius, style: .continuous)
+        RoundedRectangle(cornerRadius: WorkspaceMetrics.cardRadius)
           .stroke(
             thread.needsAttention ? WorkspaceTone.warning.color : Color(nsColor: .separatorColor),
             lineWidth: 1)

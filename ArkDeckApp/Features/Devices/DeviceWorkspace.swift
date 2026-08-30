@@ -216,7 +216,7 @@ final class DeviceListViewModel {
   /// never decides whether the result is timed out, denied, or ready.
   func beginAuthorizationWait(forConnectKey connectKey: String) {
     waitTask?.cancel()
-    let deadline = Date().addingTimeInterval(waitWindow)
+    let deadline = Date.now.addingTimeInterval(waitWindow)
     authorizationWait = .polling(connectKey: connectKey, deadline: deadline)
     let provider = provider
     waitTask = Task { [weak self] in
@@ -320,7 +320,7 @@ struct DeviceSidebarRow: View {
         .foregroundStyle(stateColor)
     }
     .frame(maxWidth: .infinity, minHeight: WorkspaceMetrics.navigationRowHeight, alignment: .leading)
-    .contentShape(Rectangle())
+    .contentShape(.rect)
     .accessibilityElement(children: .combine)
     .accessibilityValue(
       startupEvidenceSeconds.map { "startup-seconds:\($0)" } ?? stateText)

@@ -693,6 +693,23 @@
         }
       }
     },
+    "device.record.saveFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t save recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存录屏"
+          }
+        }
+      }
+    },
     "device.record.again": {
       "extractionState": "manual",
       "localizations": {

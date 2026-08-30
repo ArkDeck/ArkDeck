@@ -1032,7 +1032,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(view.contains("filterSidebar"))
     XCTAssertTrue(view.contains("compactFilters"))
     XCTAssertTrue(view.contains("filterPickers"))
-    XCTAssertTrue(view.contains(".contentShape(Rectangle())"))
+    XCTAssertTrue(view.contains(".contentShape(.rect)"))
 
     XCTAssertTrue(view.contains("history.savedFilter.activity"))
     XCTAssertTrue(view.contains("savedActivity = activityFilter.rawValue"))

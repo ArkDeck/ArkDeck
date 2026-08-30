@@ -16,7 +16,7 @@ private final class FlashImageArchiveOpenPanelDelegate: NSObject, NSOpenSavePane
 
 @MainActor
 private enum FlashImageArchiveOpenPanel {
-  static func choose() -> URL? {
+  static func choose() async -> URL? {
     let panel = NSOpenPanel()
     let exactFilenameDelegate = FlashImageArchiveOpenPanelDelegate()
     panel.delegate = exactFilenameDelegate
@@ -29,7 +29,7 @@ private enum FlashImageArchiveOpenPanel {
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
     panel.allowsMultipleSelection = false
-    return panel.runModal() == .OK ? panel.url : nil
+    return await panel.begin() == .OK ? panel.url : nil
   }
 }
 
@@ -366,8 +366,10 @@ struct FlashWorkspaceView: View {
       Spacer(minLength: WorkspaceMetrics.contentGap)
       if model.selectedArchiveURL == nil {
         Button(flashText("flash.workspace.image.choose")) {
-          if let url = FlashImageArchiveOpenPanel.choose() {
-            model.selectArchive(url)
+          Task {
+            if let url = await FlashImageArchiveOpenPanel.choose() {
+              model.selectArchive(url)
+            }
           }
         }
         .buttonStyle(.borderedProminent)
@@ -375,8 +377,10 @@ struct FlashWorkspaceView: View {
         .accessibilityIdentifier("flash.image.choose")
       } else {
         Button(flashText("flash.workspace.image.change")) {
-          if let url = FlashImageArchiveOpenPanel.choose() {
-            model.selectArchive(url)
+          Task {
+            if let url = await FlashImageArchiveOpenPanel.choose() {
+              model.selectArchive(url)
+            }
           }
         }
         .buttonStyle(.bordered)
@@ -387,10 +391,10 @@ struct FlashWorkspaceView: View {
     .padding(WorkspaceMetrics.cardPaddingHorizontal)
     .background(
       Color(nsColor: .windowBackgroundColor).opacity(0.55),
-      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
         .stroke(
           Color(nsColor: .separatorColor),
           style: StrokeStyle(
@@ -582,7 +586,7 @@ struct FlashWorkspaceView: View {
             // `.flash-percent` in the prototype: the run's one focal number,
             // tabular so it does not jitter as the digits change.
             Text("\(percent)%")
-              .font(.system(size: 28, weight: .semibold).monospacedDigit())
+              .font(.title.bold().monospacedDigit())
               .foregroundStyle(Color.accentColor)
               .accessibilityIdentifier("flash.runtime.progress.percent")
           } else {
@@ -626,10 +630,10 @@ struct FlashWorkspaceView: View {
           .background(
             WorkspaceTone.warning.wash,
             in: RoundedRectangle(
-              cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+              cornerRadius: WorkspaceMetrics.insetRadius)
           )
           .overlay {
-            RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius)
               .stroke(WorkspaceTone.warning.line, lineWidth: 1)
           }
           .accessibilityIdentifier("flash.runtime.criticalWrite")
@@ -732,7 +736,7 @@ struct FlashWorkspaceView: View {
     return WorkspaceCard(spacing: WorkspaceMetrics.blockGap) {
       HStack(alignment: .top, spacing: WorkspaceMetrics.blockGap) {
         Image(systemName: succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-          .font(.system(size: 36))
+          .font(.largeTitle)
           .foregroundStyle(succeeded ? .green : .orange)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
@@ -803,7 +807,7 @@ struct FlashWorkspaceView: View {
         .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
         .frame(minHeight: 28, alignment: .leading)
-        .contentShape(Rectangle())
+        .contentShape(.rect)
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("flash.workspace.details")
@@ -975,7 +979,7 @@ struct FlashWorkspaceView: View {
         Label(flashText("flash.availability.unavailable"), systemImage: "xmark.octagon.fill")
           .foregroundStyle(.red)
           .accessibilityIdentifier("flash.availability.status")
-        ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
+        ForEach(reasons.enumerated(), id: \.offset) { _, reason in
           Text(reason)
             .font(WorkspaceFont.monospacedValue)
             .textSelection(.enabled)
@@ -1339,7 +1343,7 @@ struct FlashWorkspaceView: View {
     }
     .padding(WorkspaceMetrics.contentGap)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius, style: .continuous))
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: WorkspaceMetrics.insetRadius))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.postflight")
   }

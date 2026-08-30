@@ -13,7 +13,7 @@ nonisolated func traceViewerText(_ key: String) -> String {
 
 private nonisolated func traceViewerText(_ key: String, values: [String: String]) -> String {
     values.reduce(traceViewerText(key)) { text, value in
-        text.replacingOccurrences(of: "{" + value.key + "}", with: value.value)
+        text.replacing("{" + value.key + "}", with: value.value)
     }
 }
 
@@ -88,6 +88,7 @@ struct TraceViewerRootView: View {
     @State private var inspectorVisibilityGeneration: UInt64 = 0
     @State private var inspectorHideFocusRequestID: UInt64?
     @State private var inspectorWasAutoCollapsed = false
+    @State private var detailSize = CGSize.zero
 
     var body: some View {
         NavigationSplitView {
@@ -96,79 +97,78 @@ struct TraceViewerRootView: View {
                 .focused($focusRegion, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 210, ideal: 270, max: 360)
         } detail: {
-            GeometryReader { geometry in
-                ZStack(alignment: .topTrailing) {
-                    // One canvas, one pane, two arrangements. The reading and
-                    // focus order is the same either way -- Timeline then
-                    // Inspector -- so only the axis changes (AT-APP-003).
-                    switch inspectorDock {
-                    case .trailing:
-                        HSplitView {
-                            timelinePane.frame(minWidth: 420)
-                            if showInspector {
-                                inspectorPane
-                                    .frame(minWidth: 250, idealWidth: 310, maxWidth: 430)
-                            }
+            ZStack(alignment: .topTrailing) {
+                // One canvas, one pane, two arrangements. The reading and
+                // focus order is the same either way -- Timeline then
+                // Inspector -- so only the axis changes (AT-APP-003).
+                switch inspectorDock {
+                case .trailing:
+                    HSplitView {
+                        timelinePane.frame(minWidth: 420)
+                        if showInspector {
+                            inspectorPane
+                                .frame(minWidth: 250, idealWidth: 310, maxWidth: 430)
                         }
-                    case .bottom:
-                        VSplitView {
-                            // The canvas keeps the priority it has in the other
-                            // dock: the pane under it is a drawer, so slack
-                            // goes to the timeline until the user drags the
-                            // divider.
-                            timelinePane.frame(minHeight: 240).layoutPriority(1)
-                            if showInspector {
-                                inspectorPane
-                                    .frame(minHeight: 160, idealHeight: 220, maxHeight: 320)
-                            }
+                    }
+                case .bottom:
+                    VSplitView {
+                        // The canvas keeps the priority it has in the other
+                        // dock: the pane under it is a drawer, so slack
+                        // goes to the timeline until the user drags the
+                        // divider.
+                        timelinePane.frame(minHeight: 240).layoutPriority(1)
+                        if showInspector {
+                            inspectorPane
+                                .frame(minHeight: 160, idealHeight: 220, maxHeight: 320)
                         }
                     }
                 }
-                // A gutter between the sidebar and the canvas. The sidebar is
-                // a translucent panel and the detail area begins exactly at
-                // its edge, so the leftmost slices -- the start of the trace --
-                // were blurred through the glass and read as being tucked
-                // under it. The margin is the whole fix: nothing of the trace
-                // touches the glass any more.
-                .safeAreaPadding(.leading, Self.canvasGutter)
-                .task(id: LayoutProbe(size: geometry.size, dock: inspectorDock)) {
-                    let initialVisibilityGeneration = inspectorVisibilityGeneration
-                    do {
-                        // Persisted window frames and live resize publish transient widths.
-                        // Only the last stable geometry may change pane visibility.
-                        try await Task.sleep(for: .milliseconds(150))
-                        try Task.checkCancellation()
-                    } catch {
-                        return
-                    }
-                    guard inspectorVisibilityGeneration == initialVisibilityGeneration else {
-                        return
-                    }
-                    switch TraceViewerLayoutPolicy.inspectorAction(
-                        detailWidth: Double(geometry.size.width),
-                        detailHeight: Double(geometry.size.height),
-                        dock: inspectorDock,
-                        inspectorVisible: showInspector,
-                        inspectorWasAutoCollapsed: inspectorWasAutoCollapsed
-                    ) {
-                    case .none:
-                        return
-                    case .collapseAutomatically:
-                        inspectorWasAutoCollapsed = true
-                        collapseInspector(
-                            movesFocusOut: focusRegion == .inspector,
-                            initiatedByLayout: true
-                        )
-                    case .expandAutomatically:
-                        inspectorWasAutoCollapsed = false
-                        expandInspector(
-                            // The layout is giving the pane back, not asking
-                            // for attention: whatever the reader is typing in
-                            // keeps the keyboard.
-                            restoringInspectorFocus: false,
-                            initiatedByLayout: true
-                        )
-                    }
+            }
+            // A gutter between the sidebar and the canvas. The sidebar is
+            // a translucent panel and the detail area begins exactly at
+            // its edge, so the leftmost slices -- the start of the trace --
+            // were blurred through the glass and read as being tucked
+            // under it. The margin is the whole fix: nothing of the trace
+            // touches the glass any more.
+            .safeAreaPadding(.leading, Self.canvasGutter)
+            .onGeometryChange(for: CGSize.self, of: { $0.size }) { detailSize = $0 }
+            .task(id: LayoutProbe(size: detailSize, dock: inspectorDock)) {
+                let initialVisibilityGeneration = inspectorVisibilityGeneration
+                do {
+                    // Persisted window frames and live resize publish transient widths.
+                    // Only the last stable geometry may change pane visibility.
+                    try await Task.sleep(for: .milliseconds(150))
+                    try Task.checkCancellation()
+                } catch {
+                    return
+                }
+                guard inspectorVisibilityGeneration == initialVisibilityGeneration else {
+                    return
+                }
+                switch TraceViewerLayoutPolicy.inspectorAction(
+                    detailWidth: Double(detailSize.width),
+                    detailHeight: Double(detailSize.height),
+                    dock: inspectorDock,
+                    inspectorVisible: showInspector,
+                    inspectorWasAutoCollapsed: inspectorWasAutoCollapsed
+                ) {
+                case .none:
+                    return
+                case .collapseAutomatically:
+                    inspectorWasAutoCollapsed = true
+                    collapseInspector(
+                        movesFocusOut: focusRegion == .inspector,
+                        initiatedByLayout: true
+                    )
+                case .expandAutomatically:
+                    inspectorWasAutoCollapsed = false
+                    expandInspector(
+                        // The layout is giving the pane back, not asking
+                        // for attention: whatever the reader is typing in
+                        // keeps the keyboard.
+                        restoringInspectorFocus: false,
+                        initiatedByLayout: true
+                    )
                 }
             }
         }
@@ -343,7 +343,10 @@ struct TraceViewerRootView: View {
         // SPEC 2.3: the extension is only a picker/Finder hint; the parser and
         // schema validation decide whether a file is actually supported.
         panel.allowedContentTypes = ArkDeckTraceConfiguration.supportedTraceContentTypes
-        if panel.runModal() == .OK, let url = panel.url { controller.open(url) }
+        Task { @MainActor in
+            guard await panel.begin() == .OK, let url = panel.url else { return }
+            controller.open(url)
+        }
     }
 }
 
@@ -584,7 +587,8 @@ private struct FocusableTextField: NSViewRepresentable {
             // trace would open with the caret in the search box instead of on
             // the timeline (AT-APP-009).
             guard id != 0 else { return }
-            DispatchQueue.main.async { [weak field] in
+            Task { @MainActor [weak field] in
+                await Task.yield()
                 guard let field, let window = unsafe field.window else { return }
                 window.makeFirstResponder(field)
             }
@@ -745,7 +749,7 @@ private struct TraceViewerSidebar: View {
                                     .multilineTextAlignment(.leading)
                                 Spacer(minLength: 0)
                             }
-                            .contentShape(Rectangle())
+                            .contentShape(.rect)
                         }
                         .buttonStyle(.plain)
                         .help(traceViewerText("Show these lanes in the timeline"))
@@ -792,7 +796,7 @@ private struct SearchResultsSection: View {
                 Text(traceViewerText("No matches"))
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(controller.searchResults.items.enumerated()), id: \.offset) {
+                ForEach(controller.searchResults.items.enumerated(), id: \.offset) {
                     index, result in
                     Button {
                         controller.selectSearchResult(at: index)
@@ -1093,6 +1097,7 @@ private struct TraceLoadingPane: View {
     /// wonder about; before that it is a counter ticking 0, 1 for no reason.
     private static let elapsedThresholdSeconds = 2
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isVisible = false
     @State private var elapsedSeconds = 0
 
@@ -1150,7 +1155,7 @@ private struct TraceLoadingPane: View {
         .padding(30)
         .frame(maxWidth: 460)
         .opacity(isVisible ? 1 : 0)
-        .animation(.easeOut(duration: 0.18), value: isVisible)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: isVisible)
         .task {
             try? await Task.sleep(for: Self.appearanceDelay)
             isVisible = true
@@ -1344,8 +1349,9 @@ private struct TraceAnnouncementBridge: View {
     private func postAccessibilityAnnouncement(
         _ announcement: TraceAccessibilityAnnouncement
     ) {
+        guard let application = NSApp else { return }
         unsafe NSAccessibility.post(
-            element: NSApp!,
+            element: application,
             notification: .announcementRequested,
             userInfo:
             [
@@ -1498,17 +1504,20 @@ private struct FlagTagEditor: View {
         }
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(
+        .overlay {
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
+        }
         .shadow(radius: 10, y: 3)
         .onExitCommand(perform: dismiss)
         .onAppear {
             text = flag.label
             // A hop, because the field is asking for focus in the same pass
             // that builds it; AppKit hands it over on the next one.
-            DispatchQueue.main.async { fieldIsFocused = true }
+            Task { @MainActor in
+                await Task.yield()
+                fieldIsFocused = true
+            }
         }
         // Whatever was typed is the tag, whether it was committed with Return
         // or the editor was simply put away.
@@ -1648,7 +1657,8 @@ private struct InspectorFocusButton: NSViewRepresentable {
         }
         coordinator.lastFocusRequestID = focusRequestID
         let expectedRequestID = focusRequestID
-        DispatchQueue.main.async { [weak button, weak coordinator] in
+        Task { @MainActor [weak button, weak coordinator] in
+            await Task.yield()
             guard let button,
                   let coordinator,
                   unsafe button.window != nil,
@@ -1865,7 +1875,7 @@ private struct EventInspectorView: View {
             if !arguments.isEmpty {
                 Divider()
                 Text(traceViewerText("Arguments")).font(.subheadline.weight(.semibold))
-                ForEach(Array(arguments.enumerated()), id: \.offset) { _, argument in
+                ForEach(arguments.enumerated(), id: \.offset) { _, argument in
                     LabeledContent(argument.key, value: argument.value)
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(argument.key)
@@ -1914,6 +1924,11 @@ private struct RangeInspectorView: View {
     var onRevealSlice: (TraceSliceNameAggregate) -> Void = { _ in }
 
     @State private var sliceSort: SliceAggregateSort = .total
+    @State private var cachedStateAnalysis: TraceRangeAnalysis?
+    @State private var cachedStateRows: [StateRow] = []
+    @State private var cachedSliceAnalysis: TraceRangeAnalysis?
+    @State private var cachedSliceSort: SliceAggregateSort?
+    @State private var cachedSliceRows: [TraceSliceNameAggregate] = []
 
     /// The distribution has one row per thread × state pair, which on a
     /// many-threaded trace is far more than an Inspector pane can usefully
@@ -1927,6 +1942,11 @@ private struct RangeInspectorView: View {
     }
 
     private var stateRows: [StateRow] {
+        guard cachedStateAnalysis != analysis else { return cachedStateRows }
+        return makeStateRows()
+    }
+
+    private func makeStateRows() -> [StateRow] {
         guard let analysis else { return [] }
         return analysis.threadStateDistribution.sorted {
             if $0.durationNs != $1.durationNs { return $0.durationNs > $1.durationNs }
@@ -2013,6 +2033,13 @@ private struct RangeInspectorView: View {
     private static let displayedSliceRowLimit = 50
 
     private var sliceRows: [TraceSliceNameAggregate] {
+        guard cachedSliceAnalysis != analysis || cachedSliceSort != sliceSort else {
+            return cachedSliceRows
+        }
+        return makeSliceRows()
+    }
+
+    private func makeSliceRows() -> [TraceSliceNameAggregate] {
         guard let analysis else { return [] }
         let sorted: [TraceSliceNameAggregate]
         switch sliceSort {
@@ -2195,6 +2222,18 @@ private struct RangeInspectorView: View {
             }
         }
         .textSelection(.enabled)
+        .onChange(of: analysis, initial: true) { _, nextAnalysis in
+            cachedStateRows = makeStateRows()
+            cachedStateAnalysis = nextAnalysis
+            cachedSliceRows = makeSliceRows()
+            cachedSliceAnalysis = nextAnalysis
+            cachedSliceSort = sliceSort
+        }
+        .onChange(of: sliceSort, initial: true) { _, nextSort in
+            cachedSliceRows = makeSliceRows()
+            cachedSliceAnalysis = analysis
+            cachedSliceSort = nextSort
+        }
     }
 }
 
@@ -2213,8 +2252,8 @@ struct ShortcutHelpView: View {
         guard usesSimplifiedChinese, let chinese = shortcut.keysMarkdownSimplifiedChinese else {
             return shortcut.keys
         }
-        return chinese.replacingOccurrences(of: "<kbd>", with: "")
-            .replacingOccurrences(of: "</kbd>", with: "")
+        return chinese.replacing("<kbd>", with: "")
+            .replacing("</kbd>", with: "")
     }
 
     var body: some View {
@@ -2479,7 +2518,7 @@ private extension View {
             minWidth: TimelineAccessibilityLayout.primaryToolbarTargetPoints,
             minHeight: TimelineAccessibilityLayout.primaryToolbarTargetPoints
         )
-        .contentShape(Rectangle())
+        .contentShape(.rect)
     }
 }
 

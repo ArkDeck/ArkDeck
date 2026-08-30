@@ -222,8 +222,10 @@ struct ArkDeckApp: App {
     panel.canChooseDirectories = false
     panel.allowsMultipleSelection = false
     panel.allowedContentTypes = ArkDeckTraceConfiguration.supportedTraceContentTypes
-    guard panel.runModal() == .OK, let url = panel.url else { return }
-    openTrace(url)
+    Task { @MainActor in
+      guard await panel.begin() == .OK, let url = panel.url else { return }
+      openTrace(url)
+    }
   }
 
   @MainActor
@@ -275,8 +277,9 @@ private struct WindowGeometryEvidence: NSViewRepresentable {
     }
 
     func publish() {
-      DispatchQueue.main.async { [weak self] in
-        guard let self, let window = self.window else { return }
+      Task { @MainActor [weak self] in
+        await Task.yield()
+        guard let self, let window = unsafe self.window else { return }
         let frame = window.frame
         let content = window.contentRect(forFrameRect: frame)
         let layout = window.contentLayoutRect
@@ -343,12 +346,13 @@ private struct WindowFrameEstablisher: NSViewRepresentable {
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
-      guard window != nil, !established else { return }
+      guard unsafe window != nil, !established else { return }
       established = true
       // One turn later, so this wins over the autosaved-frame restore that
       // runs while the window is still being set up.
-      DispatchQueue.main.async { [weak self] in
-        guard let self, let window = self.window else { return }
+      Task { @MainActor [weak self] in
+        await Task.yield()
+        guard let self, let window = unsafe self.window else { return }
         guard let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
         window.setFrame(
           NSRect(
@@ -478,7 +482,7 @@ private struct OverviewWorkspaceView: View {
       onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
       onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
       configurationError: hdcDiagnostics.configurationError,
-      header: AnyView(record))
+      header: { record })
       .sheet(item: $resumingRun) { run in
         OverviewResumeSheet(
           run: run,
@@ -632,6 +636,7 @@ private struct AppShellView: View {
   @State private var isJobInspectorExpanded = false
   @State private var renamingDeviceConnectKey: String?
   @State private var pendingDeviceName = ""
+  @State private var workspaceSize = CGSize.zero
   private let models: ArkDeckAppModelStore
   private let autoUpdate: AutoUpdateViewModel
   private let runtimeHistory: RuntimeHistoryViewModel
@@ -797,12 +802,9 @@ private struct AppShellView: View {
       .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
       .navigationTitle("app.shell.title")
     } detail: {
-      GeometryReader { geometry in
-        workspaceWithRecovery(availableSize: geometry.size)
-          .frame(
-            width: geometry.size.width, height: geometry.size.height,
-            alignment: .topLeading)
-      }
+      workspaceWithRecovery(availableSize: workspaceSize)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onGeometryChange(for: CGSize.self, of: { $0.size }) { workspaceSize = $0 }
       .navigationTitle(detailTitle)
       .toolbar { UpdateAttentionToolbarContent(model: autoUpdate) }
     }
@@ -1152,14 +1154,14 @@ private struct AppShellView: View {
           .frame(width: 22, height: 22)
       }
       .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-      .contentShape(Rectangle())
+      .contentShape(.rect)
     }
     // NavigationLink is the native selectable element for a split-view
     // sidebar. It keeps the visible label, stable identifier, selected state
     // and activation action together instead of flattening them into an
     // identifier-less AXRow.
     .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-    .contentShape(Rectangle())
+    .contentShape(.rect)
     .accessibilityIdentifier(item.accessibilityIdentifier)
   }
 
