@@ -168,6 +168,12 @@ api_baseline=$stable_package/APIBaseline
 if [ -d "$api_baseline" ]; then
   mkdir -p "$cache_root/api-baseline-build"
   ln -sfn "$cache_root/api-baseline-build" "$api_baseline/.build"
+  # Cache effectiveness is observable, not assumed: a warm gate resolves to
+  # a populated stable scratch, while ~0MB here means the previous run's
+  # products never reached the cache and the gate cold-builds again.
+  printf 'ArkDeck API-baseline scratch: %s (%sMB)\n' \
+    "$(readlink "$api_baseline/.build")" \
+    "$(du -sm "$cache_root/api-baseline-build" | cut -f1)" >&2
 fi
 
 # lockf owns the lock while this inner runner and SwiftPM execute. Keeping the
