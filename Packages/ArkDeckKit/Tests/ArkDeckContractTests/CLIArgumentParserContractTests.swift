@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckAgentClient
 @testable import ArkDeckCLI
 @testable import ArkDeckCore
 
@@ -667,6 +668,30 @@ final class CLIArgumentParserContractTests: XCTestCase {
     let blocked = RuntimeCLI.evidenceIntegrityExit(
       .object(["blockers": .array([.string("artifactVerification:digestMismatch")])]))
     XCTAssertEqual(blocked?.contains("digestMismatch"), true, blocked ?? "")
+  }
+
+  /// §8.1 allows exactly one document per machine invocation, and §8.2 makes
+  /// `job result` and `operation validate` emit a result and *then* exit
+  /// non-zero. The obvious way to write that emits an error envelope after the
+  /// result, handing a parser two documents where it expects one — so the
+  /// session tracks whether it has emitted and downgrades a later failure to
+  /// its exit status and a stderr diagnostic.
+  func testAFailureAfterAResultDoesNotBecomeASecondDocument() {
+    let session = CLIRuntimeSession(
+      client: AgentClient(socketPath: "/nonexistent"), command: "job.result",
+      rendering: .envelope, controlRequestID: "ctl-test", lifecycle: .current)
+
+    let beforeEmitting = session.fail(.outcomeUnknown, "unknown")
+    XCTAssertFalse(
+      beforeEmitting.suppressesMachineRendering,
+      "a failure with no result before it is still a machine document")
+
+    session.emit(.object([:]))
+    let afterEmitting = session.fail(.outcomeUnknown, "unknown")
+    XCTAssertTrue(afterEmitting.suppressesMachineRendering)
+    // The code and the exit status survive: only the second frame is dropped.
+    XCTAssertEqual(afterEmitting.code, .outcomeUnknown)
+    XCTAssertEqual(afterEmitting.exitCode, 75)
   }
 
   /// The terminal set comes from `JobState.isTerminal`, which is the state

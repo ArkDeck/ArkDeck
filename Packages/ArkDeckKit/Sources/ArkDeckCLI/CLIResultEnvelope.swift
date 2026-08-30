@@ -122,6 +122,10 @@ struct CLIRegistryError: Error {
   var rendering: CLIRendering = .human
   /// The correlation identity of the invocation that produced it.
   var controlRequestID: String?
+  /// Set when a result document has already been written. The failure still
+  /// carries its code and exit status, but rendering it as a second machine
+  /// frame would break §8.1's one-document rule.
+  var suppressesMachineRendering = false
 
   var exitCode: Int32 { code.exitCode }
 }

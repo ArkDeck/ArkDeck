@@ -2163,6 +2163,11 @@ params))
         "nextAction": .null,
       ]))
 
+    // The result is already on stdout, so everything below reports its outcome
+    // through the exit status and a stderr diagnostic — §8.2 is explicit that
+    // these cases stay `ok: true` with a full result, and the session enforces
+    // the one-document rule rather than leaving it to be remembered.
+    //
     // An unknown outcome outranks a failed state: the job may have reached a
     // terminal state while the effect it dispatched stays undetermined, and
     // POL-RECOVERY-001 forbids replaying it either way.
@@ -2404,7 +2409,9 @@ params))
       session.emit(evidence)
       // §9: an evidence integrity failure keeps the projection and changes the
       // exit status. Rewriting it into an error would drop the very evidence
-      // the caller needs to see why it could not be trusted.
+      // the caller needs to see why it could not be trusted. The session has
+      // already emitted, so `fail` reports through the exit status and stderr
+      // rather than a second stdout document.
       if let blocked = evidenceIntegrityExit(evidence) {
         throw session.fail(.artifactIntegrityFailed, blocked)
       }

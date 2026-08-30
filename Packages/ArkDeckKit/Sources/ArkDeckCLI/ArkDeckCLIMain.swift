@@ -104,6 +104,13 @@ struct ArkDeckCommandLine {
   private static func emitRegistryFailure(
     _ error: CLIRegistryError, rendering: CLIRendering
   ) {
+    // The result is already on stdout and §8.1 allows exactly one document
+    // there, so this failure reports itself through the exit status and a
+    // stderr diagnostic — which every mode permits.
+    guard !error.suppressesMachineRendering else {
+      FileHandle.standardError.write(Data("arkdeck: \(error.message)\n".utf8))
+      return
+    }
     switch rendering {
     case .human:
       FileHandle.standardError.write(Data("arkdeck: \(error.message)\n".utf8))

@@ -45,12 +45,26 @@ enum CLILifecycleStatus: String, Equatable {
 /// `client.request(method:)` and let the error propagate to a generic `catch`
 /// that exited 1 — which reported an unknown outcome as a plain failure.
 struct CLIRuntimeSession {
+  /// Whether this invocation has already put its one document on stdout.
+  ///
+  /// A reference so that copies of the session share it: §8.1 allows exactly
+  /// one document per machine invocation, and the rule is worth enforcing
+  /// mechanically rather than by remembering. `job result` and
+  /// `operation validate` both emit a result and *then* exit non-zero, which
+  /// is what §8.2 asks for — and the obvious way to write that emits an error
+  /// envelope after the result, giving a parser two documents where it expects
+  /// one.
+  final class OutputState {
+    var hasEmitted = false
+  }
+
   let client: AgentClient
   /// The canonical dotted command, e.g. `job.status`.
   let command: String
   let rendering: CLIRendering
   let controlRequestID: String
   let lifecycle: CLILifecycleStatus
+  let outputState = OutputState()
 
   var isMachineOutput: Bool { rendering != .human }
 
@@ -73,11 +87,18 @@ struct CLIRuntimeSession {
   }
 
   /// Raises a domain failure of this command in the caller's shape.
+  ///
+  /// After a result has been emitted the failure keeps its code and its exit
+  /// status but stops being a machine document: §8.2 makes those cases
+  /// `ok: true` with a full result, so the outcome travels in the exit status
+  /// and a stderr diagnostic instead of a second frame on stdout.
   func fail(_ code: CLIErrorCode, _ message: String, details: [String: JSONValue] = [:])
     -> CLIRegistryError
   {
-    stamped(
+    var error = stamped(
       CLIRegistryError(code: code, message: message, details: details, command: command))
+    error.suppressesMachineRendering = outputState.hasEmitted
+    return error
   }
 
   static func mapped(_ error: AgentClientError, method: String, command: String)
@@ -128,6 +149,7 @@ struct CLIRuntimeSession {
 
   /// The one result document for this invocation.
   func emit(_ value: JSONValue) {
+    outputState.hasEmitted = true
     switch rendering {
     case .human:
       print(RuntimeCLI.humanRendering(of: value))
