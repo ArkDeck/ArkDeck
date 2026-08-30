@@ -1166,19 +1166,8 @@ enum RuntimeCLI {
   /// persisted resume token keeps physical assistance inside the same
   /// execution instead of asking a maintainer to restart host commands.
   static func runAgent(_ arguments: [String]) async throws {
-    if arguments.first == "chat" {
-      // A tombstone rather than "unsupported subcommand", the same shape the
-      // retired `flash` verbs use: muscle memory gets a real answer and the
-      // replacement is named. ArkDeck no longer runs a conversation of its
-      // own — the decisions come from whichever agent the operator already
-      // has, through the published operation surface.
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "agent chat is retired: ArkDeck holds no model. Drive it from your own "
-          + "agent through the published surface — `arkdeck operation describe` to "
-          + "learn an operation, `arkdeck agent run` to execute one")
-    }
+    // `agent chat` is a registry tombstone, answered before dispatch with its
+    // exact replacement; it is not re-spelled here.
     guard let subcommand = arguments.first, subcommand == "run" || subcommand == "resume" else {
       throw CLIError(
         exitCode: EX_USAGE,
@@ -1315,11 +1304,9 @@ enum RuntimeCLI {
           method: "capability.inspect",
           params: ["capabilityId": .string(rest[index + 1])]),
         json: json)
-    case "draft", "install", "revoke":
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "capability administration is Runtime-owned and is not Agent-facing")
     default:
+      // draft/install/revoke are permanent registry refusals, answered before
+      // dispatch. They are not re-spelled here.
       throw CLIError(exitCode: EX_USAGE, message: "unsupported capability subcommand")
     }
   }

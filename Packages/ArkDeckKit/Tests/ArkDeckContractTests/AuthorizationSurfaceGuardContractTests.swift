@@ -58,12 +58,27 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
     let cli = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
       encoding: .utf8)
-    XCTAssertTrue(cli.contains("Runtime owns Flash admission"))
-    XCTAssertTrue(cli.contains("historical campaign continuation is retired"))
-    XCTAssertTrue(cli.contains("legacy observation-file postflight is retired"))
     XCTAssertFalse(cli.contains("runExecute("))
     XCTAssertFalse(cli.contains("runPostflight("))
     XCTAssertFalse(cli.contains("RockchipFlashExecutionHost"))
+
+    // The retired Flash verbs are declared once, in the command registry, and
+    // answered before dispatch. This used to read the prose out of the CLI's
+    // usage literal; the literal is gone because help is generated, so the
+    // tripwire follows the tombstones to the file that now owns them.
+    let registry = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/CLICommandRegistry.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(registry.contains("Runtime owns Flash admission"))
+    XCTAssertTrue(registry.contains("historical campaigns are decode-only"))
+    for retired in ["\"plan\"", "\"preview\"", "\"execute\"", "\"continue\"", "\"postflight\""] {
+      XCTAssertTrue(
+        registry.contains("token: \(retired)"),
+        "the retired flash verb \(retired) must stay a named tombstone")
+    }
+    XCTAssertTrue(
+      registry.contains("agent run --operation flash.full-restore@1"),
+      "the retired executor must keep naming the Runtime-owned replacement")
 
     let composition = try String(
       contentsOf: packageRoot.appending(
