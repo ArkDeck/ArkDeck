@@ -1239,13 +1239,22 @@ enum RuntimeCLI {
         .inputTooLarge,
         "typed inputs are \(data.count) bytes; the limit is \(maximumBytes)")
     }
-    guard !data.starts(with: [0xEF, 0xBB, 0xBF]) else {
+    // Strict rather than `JSONDecoder` alone: a repeated key would otherwise be
+    // resolved silently, and which of the two values survived would depend on
+    // the decoder rather than on the document the caller wrote.
+    do {
+      return try CLIStrictJSON.decode(data)
+    } catch CLIStrictJSON.Failure.byteOrderMark {
       throw session.fail(.invalidInput, "typed inputs must be UTF-8 without a byte order mark")
-    }
-    guard let decoded = try? JSONDecoder().decode(JSONValue.self, from: data) else {
+    } catch CLIStrictJSON.Failure.notUTF8 {
+      throw session.fail(.invalidInput, "typed inputs must be UTF-8")
+    } catch CLIStrictJSON.Failure.duplicateKey(let key) {
+      throw session.fail(
+        .invalidInput,
+        "typed inputs repeat the key \(key); one of the two values would be lost silently")
+    } catch {
       throw session.fail(.invalidInput, "typed inputs are not one valid JSON document")
     }
-    return decoded
   }
 
   static func runDevice(_ arguments: [String]) throws {

@@ -91,19 +91,37 @@ enum CLIResultEnvelope {
   }
 
   /// One JSON document, no BOM, terminated by exactly one LF (§8.1).
+  ///
+  /// Rendered through `arkdeck.cli.canonical-json/1` so that this CLI and a
+  /// native port produce the same bytes for the same value — Foundation's
+  /// `.sortedKeys` orders keys by Unicode scalar where JCS orders by UTF-16
+  /// code unit, and the two disagree exactly when a key stops being ASCII.
   static func render(_ value: JSONValue) -> String {
-    let encoder = CanonicalJSONEncoders.canonical()
-    guard let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8)
-    else {
-      // §8.1 forbids falling back to the human renderer when JSON encoding
-      // fails, so this stays a machine document — one the caller can still
-      // branch on — rather than prose on stdout.
+    do {
+      return try CLICanonicalJSON.canonicalString(value) + "\n"
+    } catch {
+      // §8.1 forbids falling back to the human renderer when encoding fails,
+      // so this stays a machine document the caller can branch on. The reason
+      // is named: an integer past the exactly-representable range is a real
+      // possibility, and "could not be encoded" would send a reader looking
+      // for a bug that is actually a schema decision (§8.2 wants such a field
+      // carried as a decimal string).
+      let reason: String
+      switch error {
+      case CLICanonicalJSON.Failure.integerBeyondExactRange(let rendered):
+        reason = "the result carries \(rendered), which no JSON number can hold exactly"
+      case CLICanonicalJSON.Failure.nonFiniteNumber:
+        reason = "the result carries a non-finite number, which JSON cannot represent"
+      case CLICanonicalJSON.Failure.unpairedSurrogate:
+        reason = "the result carries an unpaired surrogate, which UTF-8 cannot encode"
+      default:
+        reason = "the result could not be encoded"
+      }
       return
         "{\"schemaVersion\":\"\(schemaVersion)\",\"command\":\"\(parsePhaseCommand)\","
         + "\"ok\":false,\"error\":{\"code\":\"internalError\","
-        + "\"message\":\"the result could not be encoded\"}}\n"
+        + "\"message\":\"\(reason)\"}}\n"
     }
-    return text + "\n"
   }
 }
 
@@ -157,14 +175,13 @@ enum CLIProductVersion {
   /// The bundle version. Its components are pinned separately below.
   static let machineContract = "arkdeck.cli.contracts/1"
   static let resultSchema: String? = CLIResultEnvelope.schemaVersion
-  /// Not published by this build: the page envelope, the JSONL event stream,
-  /// the `nextAction` union and the canonical JSON profile all arrive with the
-  /// leaves that need them.
+  /// Not published by this build: the page envelope, the JSONL event stream
+  /// and the `nextAction` union arrive with the leaves that need them.
   static let pageSchema: String? = nil
   static let eventSchema: String? = nil
   static let nextActionSchema: String? = nil
   static let errorRegistry: String? = CLIErrorRegistryVersion.current
-  static let canonicalJson: String? = nil
+  static let canonicalJson: String? = CLICanonicalJSON.version
 }
 
 /// The identity of the binary that answered, computed from the binary itself.
