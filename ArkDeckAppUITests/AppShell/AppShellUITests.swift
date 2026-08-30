@@ -141,21 +141,31 @@ final class AppShellUITests: XCTestCase {
   /// Fixture state changes use the existing read-only provider and normal
   /// refresh controls; no Runtime or device operation is submitted.
   func testHistoryAndRecoveryContinuousSessionInBothLanguages() throws {
+    try Self.requireDisplay(fitting: Self.recoveryReferenceSize)
     for language in ["(en)", "(zh-Hans)"] {
       try "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
       let app = launch(arguments: [
         "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
         "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+        // Establish the reference viewport at launch: the frame autosave
+        // survives `-ApplePersistenceIgnoreState`, and a frame inherited from
+        // an earlier desktop or display arrangement can sit too low for the
+        // interactive resizes below to ever reach 783pt.
+        "--ui-test-window-frame=\(Int(Self.recoveryReferenceSize.width))x\(Int(Self.recoveryReferenceSize.height))",
       ])
       defer {
         if app.state != .notRunning {
           if app.windows.firstMatch.exists {
-            Self.resizeRecoveryWindow(in: app, to: CGSize(width: 1180, height: 783))
+            Self.resizeRecoveryWindow(in: app, to: Self.recoveryReferenceSize)
           }
           app.terminate()
         }
         try? FileManager.default.removeItem(at: fixtureStateFileURL)
       }
+      XCTAssertTrue(
+        app.windows.firstMatch.waitForFrameSize(Self.recoveryReferenceSize, timeout: 5),
+        "the launch must establish the declared \(Self.recoveryReferenceSize) frame, "
+          + "got \(app.windows.firstMatch.frame)")
       let processes = NSRunningApplication.runningApplications(
         withBundleIdentifier: "com.arkdeck.desktop")
       XCTAssertEqual(processes.count, 1, "the session must have exactly one App process")
@@ -507,6 +517,16 @@ final class AppShellUITests: XCTestCase {
           assertDisplayed(app.staticTexts["history.detail.job"], equals: jobID)
           XCTAssertEqual(search.value as? String, "")
           let row = element("history.row.state.\(jobID)", in: app)
+          // The click scrolls History to the requested row. The detail pane
+          // updates before that reveal settles, and in the 190pt-tall narrow
+          // viewport the lazy row may not even be realised yet — so wait for
+          // the settled state instead of sampling the animation. This
+          // tolerates only timing: a reveal that never fits still fails.
+          let rowSettled = NSPredicate { _, _ in
+            table.frame.contains(row.frame) && row.isHittable
+          }
+          _ = XCTWaiter.wait(
+            for: [XCTNSPredicateExpectation(predicate: rowSettled, object: nil)], timeout: 5)
           let rowIsVisible = table.frame.contains(row.frame) && row.isHittable
           if !rowIsVisible {
             let failure = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -2485,12 +2505,65 @@ final class AppShellUITests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch
   }
 
+  private static let recoveryReferenceSize = CGSize(width: 1180, height: 783)
+
+  /// The reference viewport must actually fit on this host's display. An
+  /// interactive edge drag can only reach the visible area's boundary, so on
+  /// a too-small display every window size in the test is silently capped and
+  /// the failures surface later, as viewport assertions about unrelated
+  /// content. A small display is a host condition, not a product one.
+  private static func requireDisplay(fitting size: CGSize) throws {
+    guard let visible = NSScreen.screens.first?.visibleFrame else { return }
+    if visible.width < size.width || visible.height < size.height {
+      throw XCTSkip(
+        "display visible area \(Int(visible.width))x\(Int(visible.height)) cannot present "
+          + "the \(Int(size.width))x\(Int(size.height)) reference viewport")
+    }
+  }
+
+  /// An interactive edge drag stops at the screen's visible boundary: the
+  /// pointer cannot push a window edge past the Dock or the display edge, so
+  /// a window that inherited a low or far-right position caps short of the
+  /// requested size — observed as 744pt for a 783pt request after a display
+  /// change — and the failure then surfaces as viewport assertions about
+  /// unrelated content. Name the real limit before dragging.
+  ///
+  /// XCUIElement frames are top-left based on the primary display; NSScreen
+  /// is bottom-left based. Like `assertDefaultWindowGeometry`, this reads the
+  /// primary display, which is where these tests place their windows.
+  private static func assertInteractiveResizeCanReach(
+    width: CGFloat? = nil, height: CGFloat? = nil, from frame: CGRect,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    guard let primary = NSScreen.screens.first else { return }
+    let visible = primary.visibleFrame
+    if let width {
+      let reachable = visible.maxX - frame.minX
+      XCTAssertGreaterThanOrEqual(
+        reachable, width - 2,
+        "window left edge x=\(Int(frame.minX)) leaves \(Int(reachable))pt of visible width "
+          + "for a \(Int(width))pt resize; establish the frame with --ui-test-window-frame",
+        file: file, line: line)
+    }
+    if let height {
+      let visibleBottom = primary.frame.maxY - visible.minY
+      let reachable = visibleBottom - frame.minY
+      XCTAssertGreaterThanOrEqual(
+        reachable, height - 2,
+        "window top edge y=\(Int(frame.minY)) leaves \(Int(reachable))pt above the Dock "
+          + "boundary y=\(Int(visibleBottom)) for a \(Int(height))pt resize; establish the "
+          + "frame with --ui-test-window-frame",
+        file: file, line: line)
+    }
+  }
+
   private static func resizeHistoryWindow(
     in app: XCUIApplication, to width: CGFloat,
     file: StaticString = #filePath, line: UInt = #line
   ) {
     let window = app.windows.firstMatch
     if abs(window.frame.width - width) <= 2 { return }
+    assertInteractiveResizeCanReach(width: width, from: window.frame, file: file, line: line)
     let origin = window.coordinate(withNormalizedOffset: .zero)
     let edge = origin.withOffset(CGVector(dx: window.frame.width - 1, dy: 150))
     edge.click(
@@ -2503,6 +2576,7 @@ final class AppShellUITests: XCTestCase {
     resizeHistoryWindow(in: app, to: size.width)
     let window = app.windows.firstMatch
     if abs(window.frame.height - size.height) > 2 {
+      assertInteractiveResizeCanReach(height: size.height, from: window.frame)
       // Rounded window corners are outside the resize hit region. Use the
       // straight bottom edge, as resizeHistoryWindow does for the right edge.
       let origin = window.coordinate(withNormalizedOffset: .zero)

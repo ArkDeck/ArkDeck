@@ -166,6 +166,12 @@ struct ArkDeckApp: App {
               .frame(width: 1, height: 1)
           }
         }
+        .overlay(alignment: .bottomTrailing) {
+          if let size = WindowFrameEstablisher.requestedSize {
+            WindowFrameEstablisher(size: size)
+              .frame(width: 1, height: 1)
+          }
+        }
     }
     .defaultSize(width: 1180, height: 760)
     .commands {
@@ -281,6 +287,74 @@ private struct WindowGeometryEvidence: NSViewRepresentable {
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: facts) else { return }
         self.setAccessibilityValue(String(decoding: data, as: UTF8.self))
+      }
+    }
+  }
+}
+
+/// Opt-in UI-test establishment of the window frame at launch.
+///
+/// `-ApplePersistenceIgnoreState` does not cover AppKit's window frame
+/// autosave, so an ordinary test launch opens at whatever frame the previous
+/// App process left behind — any earlier test, possibly saved against a
+/// display arrangement that no longer exists. A geometry assertion made
+/// against such a window measures desktop history instead of the product.
+/// This hook gives a test run a declared frame: the requested outer size,
+/// anchored to the top-left of the screen's visible area so later interactive
+/// resizes have the whole visible height below them. It applies exactly once
+/// per window; a test remains free to resize afterwards through the normal
+/// AppKit paths, and an ordinary launch never reaches it.
+private struct WindowFrameEstablisher: NSViewRepresentable {
+  /// `--ui-test-window-frame=<width>x<height>`, or nil for every ordinary
+  /// launch. A malformed value is nil on purpose: the adopting test asserts
+  /// the frame it requested, so a typo fails there with the actual frame in
+  /// evidence instead of crashing the App before it can publish anything.
+  static let requestedSize: CGSize? = {
+    let prefix = "--ui-test-window-frame="
+    guard
+      let flag = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
+    else { return nil }
+    let parts = flag.dropFirst(prefix.count).split(separator: "x")
+    guard
+      parts.count == 2, let width = Double(parts[0]), let height = Double(parts[1]),
+      width > 0, height > 0
+    else { return nil }
+    return CGSize(width: width, height: height)
+  }()
+
+  let size: CGSize
+
+  func makeNSView(context: Context) -> Establisher {
+    Establisher(size: size)
+  }
+
+  func updateNSView(_ view: Establisher, context: Context) {}
+
+  final class Establisher: NSView {
+    private let size: CGSize
+    private var established = false
+
+    init(size: CGSize) {
+      self.size = size
+      super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      guard window != nil, !established else { return }
+      established = true
+      // One turn later, so this wins over the autosaved-frame restore that
+      // runs while the window is still being set up.
+      DispatchQueue.main.async { [weak self] in
+        guard let self, let window = self.window else { return }
+        guard let visible = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
+        window.setFrame(
+          NSRect(
+            x: visible.minX, y: visible.maxY - self.size.height,
+            width: self.size.width, height: self.size.height),
+          display: true)
       }
     }
   }
