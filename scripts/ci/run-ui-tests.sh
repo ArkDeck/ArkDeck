@@ -19,8 +19,10 @@
 #
 # It also uses its own DerivedData so a UI run and the build lanes in
 # `run-xcodebuild.sh` do not fight over one Products directory, and it clears
-# leftover runner processes, which otherwise make the next launch time out
-# "while enabling automation mode".
+# leftover runner processes from that same DerivedData, which otherwise make
+# the next launch time out "while enabling automation mode". Only that
+# DerivedData: a live runner under another path is another session's run in
+# progress, not a leftover.
 #
 # That timeout can still happen on the first run against a DerivedData path the
 # system has not seen before: automation has to be granted to a runner nobody
@@ -58,7 +60,9 @@ Environment overrides:
   ARKDECK_XCODEBUILD_EXECUTABLE  Absolute xcodebuild executable path.
 
 These tests drive the real App: they open windows and take over the keyboard
-while they run. They are not part of any merge gate.
+while they run. They are not part of any merge gate. The UI stack is
+host-global, so concurrent sessions must take turns; give each worktree its
+own ARKDECK_UI_TEST_DERIVED_DATA so cleanup and build state stay separate.
 EOF
 }
 
@@ -101,9 +105,28 @@ esac
 mkdir -p "$derived_data" || fail "cannot create DerivedData at $derived_data"
 
 # A runner or App left behind by an interrupted run holds automation and makes
-# the next launch time out. Neither is a service; killing them loses nothing.
-pkill -f 'ArkDeckHDCUITests-Runner' 2>/dev/null || true
-pkill -f 'ArkDeck.app/Contents/MacOS/ArkDeck' 2>/dev/null || true
+# the next launch time out. Neither is a service; killing them loses nothing —
+# when they are ours. Killing by bare process name was how one session's
+# invocation tore down another session's run mid-flight on the same host
+# ("Test crashed with signal term while preparing to run tests" on the
+# victim's side), so the sweep is scoped to this DerivedData: what another
+# session has in the air is its run, not our leftover. The path is escaped
+# so pkill's regex reads it literally.
+derived_data_pattern=$(printf '%s' "$derived_data" | sed 's/[][\.*^$+?(){}|]/\\&/g')
+pkill -f "$derived_data_pattern/Build/Products/Debug/ArkDeckHDCUITests-Runner\.app" 2>/dev/null || true
+pkill -f "$derived_data_pattern/Build/Products/Debug/ArkDeck\.app/Contents/MacOS/ArkDeck" 2>/dev/null || true
+
+# Scoping the sweep does not make concurrent runs work: the UI stack is
+# host-global (one testmanagerd, one foreground), and a second run times out
+# enabling automation mode for both sides. A runner still alive after our own
+# sweep is almost certainly another session mid-run — say so up front. A
+# stale foreign runner looks the same from here, which is why this warns
+# instead of failing.
+foreign_runner=$(pgrep -f 'ArkDeckHDCUITests-Runner\.app/Contents/MacOS/ArkDeckHDCUITests-Runner' | head -1 || true)
+if [ -n "$foreign_runner" ]; then
+  printf 'run-ui-tests: WARNING: a runner outside this DerivedData is alive (pid %s) — another session is likely mid-run. The UI stack is host-global; coordinate a window or expect "Timed out while enabling automation mode" on both sides.\n' \
+    "$foreign_runner" >&2
+fi
 
 # A runner binary that has already executed cannot be relinked in place, so
 # remove it before any action that builds. test-without-building never links,
