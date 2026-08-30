@@ -12,6 +12,24 @@ extension XCUIElement {
   func waitForNonExistenceFast(timeout: TimeInterval) -> Bool {
     !exists || waitForNonExistence(timeout: timeout)
   }
+
+  /// Waits until this element's frame reaches the given outer size.
+  ///
+  /// `--ui-test-window-frame` establishes the declared window frame one
+  /// main-queue turn after the window appears, so a frame assertion made
+  /// immediately after launch races that establishment. The 2pt tolerance is
+  /// the same one the interactive resize helpers accept.
+  func waitForFrameSize(_ size: CGSize, timeout: TimeInterval) -> Bool {
+    let matches = NSPredicate { object, _ in
+      guard let element = object as? XCUIElement else { return false }
+      let frame = element.frame
+      return abs(frame.width - size.width) <= 2 && abs(frame.height - size.height) <= 2
+    }
+    if matches.evaluate(with: self) { return true }
+    return XCTWaiter.wait(
+      for: [XCTNSPredicateExpectation(predicate: matches, object: self)], timeout: timeout
+    ) == .completed
+  }
 }
 
 /// Pins a plain keyboard layout for the duration of a UI test run.

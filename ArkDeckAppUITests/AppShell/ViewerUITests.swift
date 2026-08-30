@@ -449,6 +449,16 @@ final class ViewerUITests: XCTestCase {
     XCTAssertTrue(row.waitForExistenceFast(timeout: 5))
     let treeScroll = app.descendants(matching: .any)["viewer.tree.scroll"]
     XCTAssertTrue(treeScroll.waitForExistenceFast(timeout: 5))
+    // The reveal resolves over more than one scroll transaction, so give the
+    // scroll a bounded window to finish instead of measuring it in flight.
+    // This tolerates only timing: if the reveal never centers the row, the
+    // wait expires and the assertions below fail with the real geometry.
+    let centered = NSPredicate { _, _ in
+      abs(row.frame.midX - treeScroll.frame.midX) <= 32
+        && abs(row.frame.midY - treeScroll.frame.midY) <= 32
+    }
+    _ = XCTWaiter.wait(
+      for: [XCTNSPredicateExpectation(predicate: centered, object: nil)], timeout: 5)
     XCTAssertEqual(
       row.frame.midX, treeScroll.frame.midX, accuracy: 32,
       "selection reveal must center a wide component horizontally")
@@ -581,6 +591,13 @@ final class ViewerUITests: XCTestCase {
 
   // MARK: - Helpers
 
+  /// The product's default window size, established explicitly. The frame
+  /// autosave survives `-ApplePersistenceIgnoreState`, so without this every
+  /// launch opens at whatever frame the previous test — possibly a different
+  /// suite resizing to its own reference viewport — left behind, and the
+  /// centering geometry these tests assert would depend on desktop history.
+  private static let establishedWindowSize = CGSize(width: 1180, height: 760)
+
   private func launchViewer(extra: [String] = []) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning { app.terminate() }
@@ -590,6 +607,7 @@ final class ViewerUITests: XCTestCase {
       // Scene storage survives `-ApplePersistenceIgnoreState`, so without this
       // the window opens on whichever workspace the previous run left behind.
       "--ui-test-reset-shell-selection",
+      "--ui-test-window-frame=\(Int(Self.establishedWindowSize.width))x\(Int(Self.establishedWindowSize.height))",
     ] + extra
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
@@ -605,6 +623,10 @@ final class ViewerUITests: XCTestCase {
         app.windows.firstMatch.waitForExistenceFast(timeout: 10),
         "ArkDeck must open a window, and did not reopen one either")
     }
+    XCTAssertTrue(
+      app.windows.firstMatch.waitForFrameSize(Self.establishedWindowSize, timeout: 5),
+      "the launch must establish the declared \(Self.establishedWindowSize) frame, "
+        + "got \(app.windows.firstMatch.frame)")
     openViewer(in: app)
     return app
   }
