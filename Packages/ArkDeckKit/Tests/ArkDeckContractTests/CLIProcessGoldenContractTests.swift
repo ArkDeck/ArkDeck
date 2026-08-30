@@ -280,6 +280,64 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     XCTAssertEqual(error["code"] as? String, "runtimeUnavailable")
   }
 
+  /// §18 requires JSON conformance across the surface, and these leaves used
+  /// to answer only in prose — so `--output json` had to be refused on them,
+  /// which is a hole in the contract rather than a property of the commands.
+  func testTheFlashArchiveLeavesAnswerInMachineForm() throws {
+    let result = try run(["flash", "reconcile", "--output", "json"])
+    XCTAssertEqual(result.exitCode, 0)
+    XCTAssertEqual(jsonDocumentCount(result.stdout), 1)
+    let payload = try XCTUnwrap(try decoded(result.stdout)["result"] as? [String: Any])
+    // The same shape whether or not there is anything to report: a caller that
+    // has to branch on "did it print the empty sentence" is parsing prose.
+    XCTAssertNotNil(payload["findings"])
+    XCTAssertNotNil(payload["orphanedReservations"])
+    XCTAssertNotNil(payload["requiresAttention"])
+
+    // §12 marks these as legacy compatibility leaves, and a caller has to be
+    // able to see that without reading the source.
+    let meta = try XCTUnwrap(try decoded(result.stdout)["meta"] as? [String: Any])
+    let lifecycle = try XCTUnwrap(meta["lifecycle"] as? [String: Any])
+    XCTAssertEqual(lifecycle["status"] as? String, "legacy")
+  }
+
+  /// A leaf whose success is JSON and whose failure is prose on stderr is only
+  /// half migrated. The archive publishes exactly three failures, so all three
+  /// carry a §8.4 code.
+  func testAMissingCampaignFailsInTheShapeTheCallerAskedFor() throws {
+    let result = try run([
+      "flash", "status", "--campaign-id", "ECAMP-does-not-exist", "--output", "json",
+    ])
+    XCTAssertEqual(result.exitCode, 65)
+    XCTAssertEqual(jsonDocumentCount(result.stdout), 1)
+    let error = try XCTUnwrap(try decoded(result.stdout)["error"] as? [String: Any])
+    XCTAssertEqual(error["code"] as? String, "resourceNotFound")
+
+    let human = try run(["flash", "status", "--campaign-id", "ECAMP-does-not-exist"])
+    XCTAssertEqual(human.exitCode, 65)
+    XCTAssertTrue(human.stdout.isEmpty)
+    XCTAssertFalse(human.stderr.isEmpty)
+  }
+
+  /// Only the two surfaces §8.1 exempts may refuse a machine mode: help is
+  /// prose and a completion script is script bytes. Anything else refusing it
+  /// is a gap, and this is what makes the remaining ones visible.
+  func testOnlyHelpAndCompletionRefuseAMachineMode() throws {
+    let result = try run(["commands", "--output", "json"])
+    let payload = try XCTUnwrap(try decoded(result.stdout)["result"] as? [String: Any])
+    let commands = try XCTUnwrap(payload["commands"] as? [[String: Any]])
+    let withoutJSON = commands
+      .filter { ($0["kind"] as? String) == "executable" }
+      .filter { !(($0["outputModes"] as? [String] ?? []).contains("json")) }
+      .map { ($0["path"] as? [String] ?? []).joined(separator: " ") }
+      .sorted()
+    XCTAssertEqual(
+      withoutJSON,
+      ["completion", "help", "update-feed assemble", "update-feed prepare"],
+      "a leaf that cannot answer in JSON is a §18 conformance gap; `update-feed` is the "
+        + "remaining one and needs a structured result before it can be closed")
+  }
+
   func testTheTwoMachineSpellingsCannotBeCombined() throws {
     let result = try run(["operation", "list", "--output", "json", "--json"])
     XCTAssertEqual(result.exitCode, 64)

@@ -231,13 +231,24 @@ struct ArkDeckCommandLine {
   /// report work it never did, so it is gone rather than kept as a no-op.
   /// Exit 4 while anything stays unresolved, so scripts still observe the debt.
   static func runFlashReconcile(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
+    var rest = arguments
+    let session = RuntimeCLI.runtimeSession(&rest, command: "flash.reconcile")
+    let options = try CLIOptions(rest)
     try options.validateAllowed(["--session"])
     let reconciler = try RockchipLegacyFlashJournalReconciler.production()
 
     if let sessionID = options.value("--session") {
       let finding = try reconciler.inspect(sessionID: sessionID)
-      printFlashFinding(finding)
+      if session.rendering == .human {
+        printFlashFinding(finding)
+      } else {
+        session.emit(
+          .object([
+            "findings": .array([flashFindingJSON(finding)]),
+            "orphanedReservations": .array([]),
+            "requiresAttention": .bool(finding.requiresAttention),
+          ]))
+      }
       guard !finding.requiresAttention else {
         throw CLIError(exitCode: 4, message: "unresolved flash session \(sessionID)")
       }
@@ -246,15 +257,117 @@ struct ArkDeckCommandLine {
 
     let findings = try reconciler.scan()
     let orphans = try reconciler.orphanedReservations()
-    guard !findings.isEmpty || !orphans.isEmpty else {
+    let unresolved = findings.count + orphans.count
+    if session.rendering != .human {
+      // Always the same shape, including when there is nothing to report: a
+      // caller that has to branch on "did it print the empty sentence" is
+      // parsing prose again.
+      session.emit(
+        .object([
+          "findings": .array(findings.map(flashFindingJSON)),
+          "orphanedReservations": .array(orphans.map(flashOrphanJSON)),
+          "requiresAttention": .bool(unresolved > 0),
+        ]))
+      guard unresolved == 0 else {
+        throw CLIError(exitCode: 4, message: "\(unresolved) unresolved flash item(s)")
+      }
+      return
+    }
+    guard unresolved > 0 else {
       print("no unresolved flash sessions")
       return
     }
     for finding in findings { printFlashFinding(finding) }
     for orphan in orphans { printFlashOrphan(orphan) }
-    throw CLIError(
-      exitCode: 4,
-      message: "\(findings.count + orphans.count) unresolved flash item(s)")
+    throw CLIError(exitCode: 4, message: "\(unresolved) unresolved flash item(s)")
+  }
+
+  /// The machine form of what `printFlashFinding` lays out for a person.
+  ///
+  /// One projection, not a second description: every field here is the same
+  /// fact the human line carries, which is what stops the two from drifting
+  /// into disagreeing about the same session.
+  static func flashFindingJSON(_ finding: RockchipFlashSessionFinding) -> JSONValue {
+    var fields: [String: JSONValue] = [
+      "sessionId": .string(finding.sessionID),
+      "jobId": finding.jobID.map(JSONValue.string) ?? .null,
+      "state": finding.currentState.map { .string($0.rawValue) } ?? .null,
+      "finalized": .bool(finding.finalized),
+      "hasTornTail": .bool(finding.hasTornTail),
+      "live": .bool(finding.isLive),
+      "requiresAttention": .bool(finding.requiresAttention),
+      "journalError": finding.journalError.map { .string("\($0)") } ?? .null,
+      "lastConfirmedStepId": finding.lastConfirmedStepID.map(JSONValue.string) ?? .null,
+      "campaignId": finding.campaignID.map(JSONValue.string) ?? .null,
+    ]
+    fields["outstandingIntents"] = .array(
+      finding.outstandingIntents.map {
+        .object([
+          "eventId": .string($0.eventID),
+          "stepId": .string($0.stepID),
+          "attempt": .integer(Int64($0.attempt)),
+          "effect": .string($0.effect.rawValue),
+        ])
+      })
+    fields["unknownOutcomes"] = .array(
+      finding.unknownOutcomes.map {
+        .object([
+          "correlatedIntentEventId": .string($0.correlatedIntentEventID),
+          "stepId": .string($0.stepID),
+          "effect": .string($0.effect.rawValue),
+        ])
+      })
+    switch finding.ledgerState {
+    case .openAgentReservation(let reservationID):
+      fields["authority"] = .object([
+        "reservationId": .string(reservationID), "state": .string("open"),
+      ])
+    case .closed(let reservationID):
+      fields["authority"] = .object([
+        "reservationId": .string(reservationID), "state": .string("closed"),
+      ])
+    case .missing(let reservationID):
+      fields["authority"] = .object([
+        "reservationId": .string(reservationID), "state": .string("missingFromLedger"),
+      ])
+    case .none:
+      fields["authority"] = .null
+    }
+    return .object(fields)
+  }
+
+  static func flashOrphanJSON(_ orphan: RockchipFlashOrphanedReservation) -> JSONValue {
+    .object([
+      "reservationId": .string(orphan.reservationID),
+      "jobId": .string(orphan.jobID),
+      "reservedAt": .string(orphan.reservedAt),
+      "campaignId": orphan.campaignID.map(JSONValue.string) ?? .null,
+    ])
+  }
+
+  /// The machine form of a historical campaign document. Decode-only, like the
+  /// human rendering: nothing here can admit or dispatch anything.
+  static func campaignStatusJSON(_ document: HistoricalEvolutionCampaignDocument) -> JSONValue {
+    .object([
+      "campaignId": .string(document.campaignID),
+      "terminal": .bool(document.isTerminal),
+      "reservedAttemptCount": .integer(Int64(document.reservedAttemptCount)),
+      "maximumAttempts": .integer(Int64(document.assertion.maxAttempts)),
+      "events": .array(
+        document.events.map { event in
+          .object([
+            "sequence": .integer(Int64(event.sequence)),
+            "kind": .string(event.kind.rawValue),
+            "at": .string(event.at),
+            "ordinal": event.ordinal.map { .integer(Int64($0)) } ?? .null,
+            "candidateId": event.candidate.map { .string($0.candidateID) } ?? .null,
+            "reviewId": event.review.map { .string($0.reviewID) } ?? .null,
+            "disposition": event.disposition.map { .string($0.rawValue) } ?? .null,
+            "reasonCode": event.reasonCode.map(JSONValue.string) ?? .null,
+            "detail": event.detail.map(JSONValue.string) ?? .null,
+          ])
+        }),
+    ])
   }
 
   private static func printFlashOrphan(_ orphan: RockchipFlashOrphanedReservation) {
@@ -318,11 +431,21 @@ struct ArkDeckCommandLine {
     // Stripped before parsing because it carries no value, the same shape as
     // `--json`.
     var rest = arguments
+    let session = RuntimeCLI.runtimeSession(&rest, command: "flash.install-binding")
     let rebind = rest.contains("--rebind")
     rest.removeAll { $0 == "--rebind" }
     let options = try CLIOptions(rest)
     try options.validateAllowed([])
     let receipt = try RockchipDeviceBindingInstallation.installCurrentTarget(rebind: rebind)
+    guard session.rendering == .human else {
+      session.emit(
+        .object([
+          "created": .bool(receipt.created),
+          "bindingRevision": .integer(Int64(receipt.revision)),
+          "usbTopology": .string(receipt.usbTopology),
+        ]))
+      return
+    }
     print(
       receipt.created
         ? "durable DAYU200 cross-mode binding installed"
@@ -334,12 +457,34 @@ struct ArkDeckCommandLine {
   }
 
   static func runCampaignStatus(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
+    var rest = arguments
+    let session = RuntimeCLI.runtimeSession(&rest, command: "flash.status")
+    let options = try CLIOptions(rest)
     try options.validateAllowed(["--campaign-id"])
     guard let campaignID = options.value("--campaign-id") else {
       throw CLIError(exitCode: EX_USAGE, message: "status requires --campaign-id")
     }
-    let document = try HistoricalEvolutionCampaignArchive.production().load(campaignID)
+    // Mapped exhaustively, not partially: the archive publishes exactly three
+    // failures, so each gets its §8.4 code and a caller that asked for JSON
+    // gets the failure in JSON too. A half-mapped enum would answer some
+    // failures in the caller's shape and others in prose on stderr, which is
+    // worse than answering none of them.
+    let document: HistoricalEvolutionCampaignDocument
+    do {
+      document = try HistoricalEvolutionCampaignArchive.production().load(campaignID)
+    } catch HistoricalEvolutionCampaignArchiveError.campaignNotFound(let missing) {
+      throw session.fail(
+        .resourceNotFound, "no historical campaign \(missing)",
+        details: ["campaignId": .string(missing)])
+    } catch HistoricalEvolutionCampaignArchiveError.invalidRoot {
+      throw session.fail(.recordUnreadable, "the historical campaign archive root is invalid")
+    } catch HistoricalEvolutionCampaignArchiveError.unreadable(let reason) {
+      throw session.fail(.recordUnreadable, "the historical campaign record is unreadable: \(reason)")
+    }
+    guard session.rendering == .human else {
+      session.emit(campaignStatusJSON(document))
+      return
+    }
     print("campaign: \(document.campaignID)")
     print("terminal: \(document.isTerminal)")
     print("reserved attempts: \(document.reservedAttemptCount)/\(document.assertion.maxAttempts)")

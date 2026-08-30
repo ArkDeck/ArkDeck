@@ -141,11 +141,19 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(success(["job", "list", "--output", "json"]))
     XCTAssertNotNil(success(["agentd", "status", "--output", "json"]))
 
-    // The prose-only maintainer and legacy-archive leaves have no structured
-    // result yet, so they refuse the option rather than wrap a sentence in an
-    // envelope and call it machine output.
+    // The legacy archive leaves gained structured results, so they answer too.
+    XCTAssertNotNil(
+      success(["flash", "status", "--campaign-id", "E-1", "--output", "json"]))
+    XCTAssertNotNil(success(["flash", "reconcile", "--output", "json"]))
+
+    // The maintainer feed tooling is the one family still without a structured
+    // result, so it refuses the option rather than wrap a sentence in an
+    // envelope and call that machine output.
     XCTAssertEqual(
-      failure(["flash", "status", "--campaign-id", "E-1", "--output", "json"])?.code,
+      failure([
+        "update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o",
+        "--output", "json",
+      ])?.code,
       .invalidOption)
   }
 

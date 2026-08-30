@@ -987,7 +987,8 @@ enum CLICommandRegistry {
           CLIOptionSpec(
             name: "--rebind",
             form: .flag,
-            summary: "replace an existing binding instead of leaving it unchanged")
+            summary: "replace an existing binding instead of leaving it unchanged"),
+          outputOption,
         ]),
       CLILeafSpec(
         token: "status",
@@ -998,7 +999,8 @@ enum CLICommandRegistry {
             name: "--campaign-id",
             form: .value(placeholder: "ECAMP-id", grammar: .opaque),
             summary: "historical campaign identity",
-            isRequired: true)
+            isRequired: true),
+          outputOption,
         ]),
       CLILeafSpec(
         token: "reconcile",
@@ -1008,7 +1010,8 @@ enum CLICommandRegistry {
           CLIOptionSpec(
             name: "--session",
             form: .value(placeholder: "session-id", grammar: .opaque),
-            summary: "inspect one session instead of every unresolved one")
+            summary: "inspect one session instead of every unresolved one"),
+          outputOption,
         ]),
       CLILeafSpec(
         token: "plan",
