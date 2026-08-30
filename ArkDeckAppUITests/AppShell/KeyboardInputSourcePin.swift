@@ -32,6 +32,22 @@ extension XCUIElement {
   }
 }
 
+extension XCTestCase {
+  /// Poll a condition XCTest cannot express as an expectation. Element frames
+  /// and accessibility values are read through one-shot AX round trips, so a
+  /// single sample races whatever scroll or disclosure is still settling — the
+  /// difference between a product defect and a test that looked once too early
+  /// (audit F56/F57).
+  func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+      if condition() { return true }
+      usleep(150_000)
+    }
+    return condition()
+  }
+}
+
 /// Pins a plain keyboard layout for the duration of a UI test run.
 ///
 /// The runner has to synthesize keyboard events — `⌘R`, `Esc`, `⌘,` are the

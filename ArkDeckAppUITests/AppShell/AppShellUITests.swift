@@ -1160,9 +1160,20 @@ final class AppShellUITests: XCTestCase {
     for language in ["(en)", "(zh-Hans)"] {
       let app = launch(arguments: ["--ui-test-devices", "-AppleLanguages", language])
       select("app.navigation.debug", in: app)
-      app.buttons["debug.tab.apps"].click()
+      // A bare click here was the whole of audit F56's "Debug HAP" flake: on a
+      // failing run the App was still on Artifacts, Debug's default tab, and
+      // the 15s wait below was waiting for a control that only exists on Apps.
+      // Every other Debug tab switch in this suite goes through the corrected
+      // click; this one did not. Switch, then confirm the switch took.
+      let appsTab = element("debug.tab.apps", in: app)
+      XCTAssertTrue(appsTab.waitForExistenceFast(timeout: 10))
       let cleanup = app.popUpButtons["debug.apps.cleanupPolicy"]
       let postRun = app.popUpButtons["debug.apps.postRun"]
+      for _ in 0..<3 where !postRun.exists {
+        clickCorrectingNavigationSplitAXOffset(appsTab, in: app)
+        _ = postRun.waitForExistenceFast(timeout: 5)
+      }
+      XCTAssertTrue(postRun.exists, "the Debug Apps tab never became active")
       func openPolicyMenu(_ picker: XCUIElement) {
         app.activate()
         scrollIntoView(picker, in: app)
@@ -1235,16 +1246,36 @@ final class AppShellUITests: XCTestCase {
   private func chooseDebugPackage(_ file: URL, in app: XCUIApplication) {
     let panel = app.sheets.firstMatch
     guard panel.waitForExistenceFast(timeout: 10) else { return XCTFail("file picker did not open") }
-    app.typeKey("g", modifierFlags: [.command, .shift])
-    let path = panel.textFields.firstMatch
-    guard path.waitForExistenceFast(timeout: 10) else { return XCTFail("Go to Folder did not open") }
+    // Pin the layout before the first synthesized keystroke, not after it:
+    // ⌘⇧G itself has to register for Go to Folder to open at all.
     KeyboardInputSourcePin.pinPlainKeyboardLayout()
+    app.typeKey("g", modifierFlags: [.command, .shift])
+    // The open panel publishes text fields of its own, so binding to
+    // `panel.textFields.firstMatch` can grab one that already existed and type
+    // the path into it — the panel then selects nothing and the failure reads
+    // "package was not selected" (audit F56). Go to Folder is a sheet on the
+    // panel, so prefer its own field and only fall back if that is not how
+    // this macOS build exposes it.
+    let goToFolder = panel.sheets.firstMatch
+    let path =
+      goToFolder.waitForExistenceFast(timeout: 5)
+      ? goToFolder.textFields.firstMatch : panel.textFields.firstMatch
+    guard path.waitForExistenceFast(timeout: 10) else { return XCTFail("Go to Folder did not open") }
     path.typeKey("a", modifierFlags: .command)
     path.typeText(file.path)
     path.typeKey(.return, modifierFlags: [])
     let selected = panel.textFields.matching(
       NSPredicate(format: "value == %@", file.lastPathComponent)).firstMatch
-    guard selected.waitForExistenceFast(timeout: 10) else { return XCTFail("package was not selected") }
+    guard selected.waitForExistenceFast(timeout: 10) else {
+      // Leave evidence rather than another bare failure: this path has now
+      // failed three different ways across runs and the panel's own structure
+      // is the thing nobody has looked at.
+      let hierarchy = XCTAttachment(string: app.debugDescription)
+      hierarchy.name = "Open panel hierarchy when \(file.lastPathComponent) was not selected"
+      hierarchy.lifetime = .keepAlways
+      add(hierarchy)
+      return XCTFail("package was not selected")
+    }
     selected.click()
     let open = panel.buttons["OKButton"]
     guard open.waitForExistenceFast(timeout: 5), open.isEnabled else {
