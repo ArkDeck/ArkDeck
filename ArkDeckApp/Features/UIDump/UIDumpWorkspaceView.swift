@@ -13,6 +13,12 @@ struct UIDumpWorkspaceView: View {
   var model: UIDumpWorkspaceViewModel
   @FocusState private var separatorFocused: Bool
   @State private var treeScrollPosition = ScrollPosition()
+  /// The vertical offset the in-flight selection reveal must end on, or nil
+  /// when no reveal is pending. The reveal's two scroll requests race row
+  /// realisation, so the scroll geometry callback below keeps re-asserting
+  /// this target until the observed offset actually reaches it; a user
+  /// gesture or a changed row set retires it instead.
+  @State private var pendingTreeRevealOffsetY: CGFloat?
 
   var body: some View {
     GeometryReader { geometry in
@@ -363,6 +369,35 @@ struct UIDumpWorkspaceView: View {
           // or fight an in-flight scrolling animation.
           revealTreeSelection(viewportHeight: proxy.size.height)
         }
+        .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
+          // The reveal's completion condition is the observed offset, not a
+          // fixed number of transactions: whichever of the two reveal
+          // requests resolves last — and any late row realisation that moves
+          // content afterwards — the target is re-asserted until the scroll
+          // actually rests on it. Re-asserting an unreachable target moves
+          // nothing, produces no further callback, and so ends the loop.
+          guard let target = pendingTreeRevealOffsetY else { return }
+          if abs(offset.y - target) <= 0.5 {
+            pendingTreeRevealOffsetY = nil
+          } else {
+            treeScrollPosition.scrollTo(y: target)
+          }
+        }
+        .onScrollPhaseChange { _, newPhase in
+          // The person owns the viewport the moment they scroll it; a
+          // pending reveal must never fight a gesture.
+          if newPhase == .tracking || newPhase == .interacting || newPhase == .decelerating {
+            pendingTreeRevealOffsetY = nil
+          }
+        }
+        .onChange(of: model.visibleNodes.map(\.identity)) { _, _ in
+          // The target was computed against the previous row set; a new set
+          // re-reveals through its own generation bump when it means to.
+          pendingTreeRevealOffsetY = nil
+        }
+        .onChange(of: proxy.size) { _, _ in
+          pendingTreeRevealOffsetY = nil
+        }
       }
       // The outline keyboard model lives on the scrolling row set, not on each
       // row: rows are recycled by LazyVStack, so per-row key handlers would
@@ -389,17 +424,28 @@ struct UIDumpWorkspaceView: View {
     treeScrollPosition = position
     guard
       let rowIndex = model.visibleNodes.firstIndex(where: { $0.identity == identity })
-    else { return }
+    else {
+      pendingTreeRevealOffsetY = nil
+      return
+    }
     let rowCenter = Self.treeVerticalPadding
       + CGFloat(rowIndex) * (Self.treeRowHeight + Self.treeRowSpacing)
       + Self.treeRowHeight / 2
     let verticalOffset = max(0, rowCenter - viewportHeight / 2)
+    // The deterministic row offset is the reveal's real destination. One
+    // yielded transaction is only the first impulse: at some viewport
+    // heights the id request resolves after it and re-lands the row at the
+    // viewport's lower edge (the macOS combined-axis bug), so the scroll
+    // geometry callback on the tree keeps re-asserting this target until
+    // the offset is observed to rest on it.
+    pendingTreeRevealOffsetY = verticalOffset
     Task { @MainActor in
       // The id request resolves the row's variable horizontal geometry. Apply
       // the deterministic row offset on the next transaction; `scrollTo(y:)`
       // preserves that horizontal position while avoiding the macOS combined-
       // axis bug that otherwise leaves the row at the lower edge.
       await Task.yield()
+      guard pendingTreeRevealOffsetY == verticalOffset else { return }
       treeScrollPosition.scrollTo(y: verticalOffset)
     }
   }
