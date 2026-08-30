@@ -1399,3 +1399,55 @@ Viewer 检查器英文保留范围）与它们各自堵着的项。
 **没有任何「宿主本身必须可命中」的判据**，于是高度为 0 的容器与屏外的容器都会被选中。
 根因指向该 helper 的选择判据而不是被测产品，但本批不改它：动共享 helper 会影响其八处调用点，
 需要独立一批与足够的重复运行。已登记。
+
+## 2026-08-31 F60：清掉已移除路径的本地化键（F52 第 6 条）
+
+第九批，基线 `b056126d`。范围是 F52 第 6 条：本地化目录里已无任何渲染路径的键。
+逐行结论见[2026-08-31 台账](references/ui-consistency/2026-08-31-retired-keys-ledger.md)。
+
+**先修正登记时的一个数字，并说明为什么之前那个数字不可信。** 批次六期间我曾粗扫得到 224 条
+「无引用键」，与 F52-6 登记的 63 条相差悬殊。本批做了严谨测量后确认：**63 条是对的**，
+224 是我那次粗扫的误报上界。差别在于判据——静态可达性单独**不足以判死一个键**：
+
+- App 有大量**变量查表**：`Text(LocalizedStringKey(serverHealthKey))`、
+  `field(_ titleKey: String, …)`、`Text(LocalizedStringKey(item.nextStepKey))` 等 20 余处；
+- 还有**插值构造**：`"debug.tab.\(tabID)"`、`"job.state.\(state.rawValue)"`。
+
+因此判据是三条并集：键以**字面量**出现在任一 Swift 源文件里；或其**生成的 camelCase 访问器**
+被使用；或源码中任一**插值前缀**是该键的前缀。按此测得每个目录的无引用数与 F52-6 登记
+**逐一吻合**：Debug 11、Diagnostics 13、Flash 29、History 6、Settings 4 = 63。
+
+**本批删 59 条，保留 4 条。** Debug 11 + Diagnostics 13 + Flash 29 + History 6 已删除；
+`settings.general.title` / `settings.storage.title` / `settings.toolchains.title` /
+`settings.diagnostics.title` 四条**不删**——它们是面板标题键，而**待裁决第 1 条正是「内容区
+是否允许重复工具栏页面标题」**；若裁决为允许，这四条正是要复用的键。绑定裁决，不静默清掉。
+
+**删除方式**：按文本块精确删除，不重写 JSON。首次尝试用 `json.dumps` 重写导致 9970 行插入
+（键序与缩进被改），已回退；四个目录里 Debug / Flash / History 是紧凑单行格式、Diagnostics 是
+展开格式，文本块删除对两者都只产生纯删除 diff（合计 267 行，零插入），删后逐个校验仍是合法
+JSON 且目标键确已不在。
+
+### 本轮新发现、未处理的 26 条（登记）
+
+F52-6 登记时未列，本批也**不删**——它们没有经过首轮那样的逐条核实：
+
+| 目录 | 键 | 处数 |
+| --- | --- | --- |
+| `Localizable` | `overview.record.action.*`（5）、`overview.record.availability.*`（4）、`overview.record.empty.*`（5）、`overview.status.*`（4）、`history.column.*`（3）、`app.unavailable.*`（2）、`overview.record.recent.rules` | 24 |
+| `JobsLocalizable` | `jobInspector.readOnly` | 1 |
+| `DeviceLocalizable` | `device.record.stop` | 1 |
+
+其中 `overview.status.server` 一类尤其需要人工确认再动：它与 UI 测试用的**可访问性标识符**
+`overview.status.server.value` 同名前缀，但标签文字实际来自 `overview.serverHealth.*`
+（`HDCStatusView.serverHealthKey` 的 switch 返回值）。**同名前缀不等于同一用途**，这类键必须
+追到消费方再判，不能只看扫描结果。
+
+### `UIDumpLocalizable` 的 25 条仍与 F52-5 绑定
+
+`viewer.tab.*` / `viewer.group.*` / `viewer.field.*` / `viewer.value.*` /
+`viewer.properties.*` 共 25 条无引用，正是 F52 第 5 条所指——`ViewerInspectorCopy` 把这些
+文案硬编码成英文，而目录里的译文无人引用。**待裁决第 2 条（Viewer 检查器英文保留范围）没有
+结论之前不能删**：若裁决为「空态/动作/搜索控件走目录」，这些正是要接上的键。
+
+交互测试同时守三处：四个已清理目录不得再出现无引用键；`UIDumpLocalizable` 的 25 条与
+`SettingsLocalizable` 的 4 条按数量钉住，清理与裁决都不能悄悄漂移。
