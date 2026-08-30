@@ -14,47 +14,146 @@ import Foundation
 
 @main
 struct ArkDeckCommandLine {
+  /// argv is judged by `CLICommandRegistry` before anything is dispatched.
+  ///
+  /// Nothing below re-reads a flag the registry has not already accepted, so
+  /// an unknown, repeated, valueless or inapplicable argument can no longer be
+  /// silently dropped on its way to a handler that scans for the one flag it
+  /// wants (CLI-REQ-005). Help, the machine registry projection and the
+  /// completion scripts come from the same description, so the surface cannot
+  /// be documented and parsed differently.
   static func main() async {
     let arguments = Array(CommandLine.arguments.dropFirst())
-    guard let command = arguments.first else {
-      printUsage()
-      exit(EX_USAGE)
+    // §8.1: the renderer for an argv-level failure is chosen before the parse,
+    // because a caller that asked for JSON needs the refusal in JSON even when
+    // the command path never resolved.
+    let bootstrapMode = CLIArgumentParser.bootstrapOutputMode(arguments)
+
+    switch CLIArgumentParser.parse(arguments) {
+    case .failure(let error):
+      emitRegistryFailure(error, mode: bootstrapMode)
+      exit(error.exitCode)
+    case .success(let invocation):
+      await run(invocation)
     }
+  }
+
+  private static func run(_ invocation: CLIInvocation) async {
+    switch invocation {
+    case .rootHelp:
+      print(CLIHelpRenderer.root())
+      exit(0)
+    case .nodeHelp(let node):
+      print(CLIHelpRenderer.node(node))
+      exit(0)
+    case .leafHelp(let path, let leaf):
+      print(CLIHelpRenderer.leaf(path: path, leaf: leaf))
+      exit(0)
+    case .version(let mode):
+      emit(
+        command: "version", result: CLIHelpRenderer.versionResult(),
+        human: CLIHelpRenderer.versionHuman(), mode: mode)
+      exit(0)
+    case .commands(let mode):
+      emit(
+        command: "commands", result: CLIRegistryProjection.result(),
+        human: CLIRegistryProjection.human(), mode: mode)
+      exit(0)
+    case .completion(let shell):
+      guard let script = CLICompletionScripts.script(for: shell) else {
+        // The registry enumerates the shells, so reaching this means the
+        // registry and the generator disagree — a defect, not a user error.
+        emitRegistryFailure(
+          CLIRegistryError(
+            code: .internalError,
+            message: "no completion generator for \(shell)",
+            command: "completion"),
+          mode: .human)
+        exit(CLIErrorCode.internalError.exitCode)
+      }
+      FileHandle.standardOutput.write(Data(script.utf8))
+      exit(0)
+    case .dispatch(let path, _, let handlerArguments):
+      await dispatch(path: path, arguments: Array(handlerArguments.dropFirst()))
+    }
+  }
+
+  private static func emit(
+    command: String, result: JSONValue, human: String, mode: CLIOutputMode
+  ) {
+    switch mode {
+    case .human:
+      print(human)
+    case .json, .jsonl:
+      let envelope = CLIResultEnvelope.success(
+        command: command, result: result, controlRequestID: newControlRequestID())
+      FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
+    }
+  }
+
+  private static func emitRegistryFailure(_ error: CLIRegistryError, mode: CLIOutputMode) {
+    switch mode {
+    case .human:
+      FileHandle.standardError.write(Data("arkdeck: \(error.message)\n".utf8))
+    case .json, .jsonl:
+      let envelope = CLIResultEnvelope.failure(
+        command: error.command ?? CLIResultEnvelope.parsePhaseCommand,
+        error: error,
+        controlRequestID: newControlRequestID())
+      FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
+    }
+  }
+
+  /// A bounded correlation identity for one CLI invocation (§8.2). It is not a
+  /// Runtime idempotency key and nothing is derived from it.
+  private static func newControlRequestID() -> String {
+    "ctl-" + UUID().uuidString.lowercased()
+  }
+
+  private static func dispatch(path: [String], arguments: [String]) async {
+    let command = path[0]
     do {
       switch command {
       case "flash":
-        try await runFlash(Array(arguments.dropFirst()))
+        try await runFlash(arguments)
       case "update-feed":
-        try runUpdateFeed(Array(arguments.dropFirst()))
+        try runUpdateFeed(arguments)
       case "doctor":
-        try RuntimeCLI.runDoctor(Array(arguments.dropFirst()))
+        try RuntimeCLI.runDoctor(arguments)
       case "debug":
-        try RuntimeCLI.runDebug(Array(arguments.dropFirst()))
+        try RuntimeCLI.runDebug(arguments)
       case "operation":
-        try RuntimeCLI.runOperation(Array(arguments.dropFirst()))
+        try RuntimeCLI.runOperation(arguments)
       case "device":
-        try RuntimeCLI.runDevice(Array(arguments.dropFirst()))
+        try RuntimeCLI.runDevice(arguments)
       case "trace":
-        try RuntimeCLI.runTrace(Array(arguments.dropFirst()))
+        try RuntimeCLI.runTrace(arguments)
       case "job":
-        try RuntimeCLI.runJob(Array(arguments.dropFirst()))
+        try RuntimeCLI.runJob(arguments)
       case "cleanup-debt":
-        try RuntimeCLI.runCleanupDebt(Array(arguments.dropFirst()))
+        try RuntimeCLI.runCleanupDebt(arguments)
       case "agent":
-        try await RuntimeCLI.runAgent(Array(arguments.dropFirst()))
+        try await RuntimeCLI.runAgent(arguments)
       case "agentd":
         try RuntimeCLI.runAgentDaemon(
-          Array(arguments.dropFirst()),
+          arguments,
           beforeBootstrap: RuntimeCLI.refreshSigningAccessIfInstalled)
       case "signing":
-        try await RuntimeCLI.runSigningAsync(Array(arguments.dropFirst()))
+        try await RuntimeCLI.runSigningAsync(arguments)
       case "capability":
-        try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
+        try RuntimeCLI.runCapability(arguments)
       case "artifact":
-        try RuntimeCLI.runArtifact(Array(arguments.dropFirst()))
+        try RuntimeCLI.runArtifact(arguments)
       default:
-        printUsage()
-        exit(EX_USAGE)
+        // The registry resolved this path, so a missing handler is a defect in
+        // the wiring between the two rather than anything the caller typed.
+        emitRegistryFailure(
+          CLIRegistryError(
+            code: .internalError,
+            message: "no handler is wired for the registered command `\(command)`",
+            command: command),
+          mode: .human)
+        exit(CLIErrorCode.internalError.exitCode)
       }
     } catch let error as CLIError {
       FileHandle.standardError.write(Data("arkdeck \(command): \(error.message)\n".utf8))
@@ -72,35 +171,18 @@ struct ArkDeckCommandLine {
     switch subcommand {
     case "install-binding":
       try runInstallBinding(Array(arguments.dropFirst()))
-    case "plan":
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "legacy command handoff is retired; use Runtime plan-only for flash.full-restore@1")
-    case "preview":
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "historical campaign preview is retired; Runtime owns Flash admission")
-    case "execute":
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "the legacy flash executor is retired; for headless real-device validation use "
-          + "`arkdeck agent run --operation flash.full-restore@1` with its typed inputs, "
-          + "or use the ArkDeck Flash UI only when validating the App surface")
-    case "continue":
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "historical campaign continuation is retired and cannot dispatch")
     case "status":
       try runCampaignStatus(Array(arguments.dropFirst()))
-    case "postflight":
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "legacy observation-file postflight is retired; use Runtime job evidence")
     case "reconcile":
       try runFlashReconcile(Array(arguments.dropFirst()))
     default:
-      throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
+      // The retired verbs (plan, preview, execute, continue, postflight) are
+      // registry tombstones now, answered before dispatch with an exact
+      // machine replacement contract. Reaching here means the registry and
+      // this switch disagree.
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "no handler is wired for the registered flash subcommand \(subcommand)")
     }
   }
 
@@ -396,103 +478,6 @@ struct ArkDeckCommandLine {
     return (measured, digest)
   }
 
-  static func printUsage() {
-    let usage = """
-      usage:
-        arkdeck flash install-binding [--rebind]
-        arkdeck flash status --campaign-id <ECAMP-id>
-        arkdeck flash reconcile [--session <id>]
-        arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
-      --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> \
-      --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <dir>
-        arkdeck update-feed assemble --payload <payload.json> --signature <signature.bin> \
-      --out <feed.json>
-        arkdeck doctor [--socket <path>] [--json]
-        arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] \
-      [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
-      [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
-      [--arkforge-bundle <absolute-ArkForge.bundle|none> [--arkforge-campaign <id>]]
-        arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
-      [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
-      [--arktrace-descriptor <absolute-descriptor-path|none>] [--json]
-      [--arkforge-bundle <absolute-ArkForge.bundle|none> [--arkforge-campaign <id>]]
-        legacy ArkForge options are rejected with migration guidance: \
-      --arkforged --arkforged-sha256 --arkforge-profile
-        arkdeck agentd restart [--maximum-wait-seconds <1...300>] [--json]
-        arkdeck agentd status [--json]
-        arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] \
-      [--execution-id <id>] [--json]
-        arkdeck agentd verify --job <existing-profiled-job-id> [--json]
-        arkdeck agentd uninstall [--json]
-        arkdeck signing install-sdk-release --sdk <absolute-openharmony-sdk-path> \
-      --java <absolute-java-path> --bundle-name <application-bundle-name> \
-      [--project-ref <demo-app>] [--json]
-        arkdeck signing install --java <absolute-java-path> --jar <absolute-hapsigntool-jar> \
-      --keystore <absolute-p12-or-jks> --certificate <absolute-pem-or-cer> \
-      --profile <absolute-p7b> --key-alias <alias> [--project-ref <demo-app>] [--json]
-        arkdeck signing normalize [--json]
-        arkdeck signing migrate-deveco --build-profile <absolute-build-profile.json5> \
-      --daemon <absolute-agentd-path> [--key-alias <alias>] [--json]
-        arkdeck signing status [--json]
-        arkdeck signing remove [--json]
-        arkdeck operation list [--socket <path>] [--json]
-        arkdeck operation describe --operation <reference> [--socket <path>] [--json]
-        arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
-        arkdeck trace probe --target <id> [--socket <path>] [--json]
-        arkdeck job plan --target <id> --operation <reference> \
-      [--inputs-file <typed-inputs.json>] [--expected-binding-revision <n>] \
-      [--socket <path>] [--json]
-        arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
-        arkdeck job submit --target <id> --operation <reference> \
-      [--inputs-file <typed-inputs.json>] [--expected-binding-revision <n>] \
-      [--wait] [--json]
-        arkdeck job status --job <id> [--json]
-        arkdeck job list [--page-size <1...1000>] [--cursor <token>] [--json]
-        arkdeck job run|cancel|reconcile --job <id> [--json]
-        arkdeck debug start --request-file <destructive-flash-request.json> [--json]
-        arkdeck debug evaluate --invocation <id> --action-file <effect-action.json> \
-      --source-sha256 <sha256> --build-sha256 <sha256> [--json]
-        arkdeck debug status --invocation <id> [--json]
-        arkdeck cleanup-debt list [--json]
-        arkdeck cleanup-debt continue --job <id> (--remote-path <path> | --bundle <name>) [--json]
-        arkdeck job submit --request-file <request.json> [--wait] [--json]
-        arkdeck capability list [--json]
-        arkdeck capability inspect --capability <id> [--json]
-        arkdeck artifact import-hap --target <id> --file <package.hap|package.hsp> [--json]
-        arkdeck artifact import-workspace-patch --target <id> --file <change.patch> [--json]
-        arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
-      [--device-profile <dayu200>] [--json]
-        arkdeck artifact import-native-library --target <id> \
-      --file <libname.so|ART-id-libname.so> [--json]
-        arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
-      [--destination <directory>] [--allow-sensitive]
-        arkdeck agent run --operation <reference> [--target <id>] [--inputs-file <path>] \
-      [--capability <CAP-RT-...>] [--execution-id <id>] [--json]
-        arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
-
-      doctor/operation/device/trace/job/debug talk only to arkdeck-agentd over its user-private socket:
-      this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
-
-      ArkDeck runs no model of its own. Decisions come from whichever agent you already use;
-      it reaches ArkDeck through this same published surface, and every side effect it causes
-      passes the admission every other caller passes. `operation describe` publishes an
-      operation's typed inputs and an example request.
-
-      Real-device validation defaults to `arkdeck agent run`; use the App only when the acceptance
-      criterion is specifically about its UI. Flash execution uses flash.full-restore@1 through
-      that headless Agent/typed Job surface or through the App; UI acknowledgement is never a
-      prerequisite or authority for headless execution. The historical campaign records exposed
-      by `flash status` and
-      `flash reconcile` are decode/export-only and cannot admit or dispatch a new operation.
-      Caller-provided authorization files, fact/context documents, executables, argv and storage
-      roots are rejected.
-
-      update-feed never accepts or reads a private key. `prepare` emits deterministic public
-      payload and signature-input files; an isolated maintainer signs the latter with local
-      OpenSSL, then `assemble` verifies the raw 64-byte signature against the pinned public key.
-      """
-    print(usage)
-  }
 }
 
 struct CLIError: Error {
