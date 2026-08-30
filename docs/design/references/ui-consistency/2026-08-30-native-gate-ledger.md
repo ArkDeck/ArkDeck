@@ -66,7 +66,7 @@ F57 用一张 A–E 五次运行的方差表论证「套件在逐字相同的代
 
 `Failed to activate application` / `database is locked` / `Timed out while enabling automation mode` /
 `signal term`（或 `BUILD INTERRUPTED`）/ **`Not authorized for performing UI testing actions`** /
-**`Lost connection to the application`**。
+**`Lost connection to the application`** / **`The test runner hung before establishing connection`**（含同族的 `crashed ... before establishing connection`，脚本头注释已载明属 runner 启动面）。
 
 后两条尤其容易被误读成产品缺陷：它们报在具体测试头上、措辞像断言失败，但实为 UI 自动化授权
 在运行中丢失。实测一次：未锁屏、`testmanagerd` 存活、无其他会话占用跑道，仅有一个 Relay 性能

@@ -101,6 +101,14 @@ enum WorkspaceFont {
   static let label = Font.subheadline.weight(.semibold)
   /// The smallest supporting label, e.g. a status-strip caption — 11/regular.
   static let caption = Font.subheadline
+  // There is deliberately no 10pt role. Spec §2's smallest non-mono role is
+  // secondary at 12, and this table adds 11 for labels and captions; 10pt sits
+  // below both. Diagnostics and the device workspace still write `.system(size:
+  // 10)` directly in a few dense places (the capture timeline, the HiLog
+  // strips). The maintainer's ruling is to keep that tier as it is rather than
+  // promote it to 11, because promoting it changes the density those surfaces
+  // were laid out for — so those sites stay off this scale on purpose, and the
+  // interaction regression allows them by name (audit F59).
   /// Paths, hashes, versions, serials, device and Job IDs — 12 mono.
   static let monospacedValue = Font.callout.monospaced()
   /// Log lines and other dense mono blocks — 11 mono.

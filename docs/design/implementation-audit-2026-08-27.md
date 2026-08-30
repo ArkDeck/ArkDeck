@@ -1333,3 +1333,69 @@ main 上现有的 `XCTWaiter` 5 秒 settled-state 等待保留不动。
   `enabling automation mode` / `signal term` **四类信号**；有就是无效 run，不能当红、更不能当
   回归证据。**F57 的 A–E 方差表因此作废**：当时无从得知另一会话正在同一台机器上跑同一套件，
   那组数字不能证明套件「在相同代码上不稳定」，相关结论以本批重新测量为准。
+
+## 2026-08-30 F59：字号回到共享刻度（C-DUP 第三批，收尾 F52 第 4 条）
+
+第八批，基线 `5fa29c0b`。范围是 F52 第 4 条最后剩下的一半：73 处 `.font(.system(size:…))`
+绕过 `WorkspaceFont`。逐行结论见
+[2026-08-30 批次八台账](references/ui-consistency/2026-08-30-type-scale-ledger.md)。
+
+**只收敛有精确等值的 39 处，其余 34 处按裁决保留或继续待裁决。** 收敛不是「全部换成最近的
+角色」——那会改变实际字号与字重，属产品判断。按 spec §2 的角色表（body 13/regular、
+secondary 12/regular、section title 13/semibold、monospace 11–12）与 `WorkspaceFont` 交叉，
+只有四种写法是逐字等值：
+
+| 现写法 | 共享角色 | 处数 |
+| --- | --- | --- |
+| `.system(size: 11)` | `WorkspaceFont.caption`（11/regular） | 28 |
+| `.system(size: 13, weight: .semibold)` | `WorkspaceFont.sectionTitle` | 7 |
+| `.system(size: 12, design: .monospaced)` | `WorkspaceFont.monospacedValue` | 2 |
+| `.system(size: 11, design: .monospaced)` | `WorkspaceFont.monospacedDense` | 2 |
+
+分布：`DiagnosticsWorkspaceView` 23 处、`DeviceWorkspaceView` 16 处。**零视觉变化**——
+这批不改变任何一处的渲染尺寸或字重，只是让它们经由共享词表表达。
+
+**10pt 一档：维护者裁决保留（20 处）。** spec §2 最小的非 mono 角色是 secondary 12，
+`WorkspaceFont` 另补了 label / caption 两个 11 的角色，10pt 在两者之下，**共享刻度里没有
+这一档**。把它提到 11 会改变采集时间轴、HiLog 条这些密集表面的布局密度，因此裁决为保留现状。
+理由写在 `WorkspaceFont` 的文档注释里（一处覆盖全部调用点），并由交互测试按名单锁住这一档
+的规模（19 处 bare + mono、1 处 semibold）。
+
+**medium 字重 11 处：维护者裁决收敛到最近角色。** 判法是**尺寸就近优先**——保持字号不变、
+只动字重，对布局的影响最小；字重再按语义定：
+
+| 现写法 | 收敛到 | 字重变化 | 处数 | 判据 |
+| --- | --- | --- | --- | --- |
+| `.system(size: 12, weight: .medium)` | `WorkspaceFont.secondary` | medium → regular（**变细**） | 6 | 12pt 只有 `secondary` 一个角色 |
+| `.system(size: 11, weight: .medium)` | `WorkspaceFont.label` | medium → semibold（**变粗**） | 5 | 11pt 有 `label`(semibold) 与 `caption`(regular) 两个角色，medium 到两者字重等距；这 5 处全是徽章与「标题 + 10pt 说明」结构，正是 `label`（列头、chip 与装饰）的定位 |
+
+**可见变化**：Diagnostics 的六处强调标题（采集不可用、预览名、partial 警告、Marker 标题、
+notDerived / missing 标题）变细；Device 的五处徽章与标题（stale 徽章、性能标题、条目标题、
+无空间警告、帧率读数）变粗。字号一律不变，因此不影响这两个工作区的布局密度。
+
+### 仍未收敛（3 处，记 exception）
+
+`.system(size: 9, weight: .semibold)`、`.system(size: 36)`、`.system(size: 28, weight: .semibold)`
+各一处，是空态与大字形的离群值，不属于正文刻度的任何角色，逐个搬到共享刻度既无对应角色也
+无收益，记 exception 保留。加上裁决保留的 10pt 一档 20 处，共 23 处仍写 `.system(size:)`，
+全部由交互测试按名单锁住，新的脱离字号出现即失败。
+
+**至此 F52 第 4 条全部完成**：通知与 Settings 副本（F56）、键值列表（F57）、字号刻度（本批
+50 处，39 处零渲染变化 + 11 处按裁决改字重）。F52 只剩两条待裁决（内容区重复工具栏标题、
+Viewer 检查器英文保留范围）与它们各自堵着的项。
+
+### 本批发现的一条既有失败（登记，非本批引入）
+
+`AppShellUITests.testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment`
+在 `c222fc69` 上失败于 `Unable to find hit point for ScrollView, {{252.0, 441.0}, {648.0, 0.0}}`，
+**在未改动的 `main` 同一 commit 上以完全相同的消息与完全相同的几何复现**，两次运行的七条
+有效性信号均为 0。因此与本批字号改动无关——这也反过来印证了本批 39 处等值替换确实零渲染变化。
+
+**该宿主的高度是 0**（`{648.0, 0.0}`）。与 F58 记录的另一处同族：批次七尝试给
+`debug.apps.entry.choose` 加 `scrollIntoView` 时，失败是
+`Unable to find hit point for ScrollView, {{1647.0, 200.0}, {245.0, 318.0}}`，那个宿主在屏外。
+两者共同点是 **`scrollIntoView` 选中了一个无法命中的滚动宿主**——helper 目前只按「宽度非零
+且横向包含目标 x」挑最小面积的宿主（`AppShellUITests.swift` 的 `scrollIntoView`），
+**没有任何「宿主本身必须可命中」的判据**，于是高度为 0 的容器与屏外的容器都会被选中。
+根因指向该 helper 的选择判据而不是被测产品，但本批不改它：动共享 helper 会影响其八处调用点，
+需要独立一批与足够的重复运行。已登记。
