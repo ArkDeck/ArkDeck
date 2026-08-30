@@ -1451,3 +1451,54 @@ F52-6 登记时未列，本批也**不删**——它们没有经过首轮那样�
 
 交互测试同时守三处：四个已清理目录不得再出现无引用键；`UIDumpLocalizable` 的 25 条与
 `SettingsLocalizable` 的 4 条按数量钉住，清理与裁决都不能悄悄漂移。
+
+## 2026-08-31 F61：preview 纳入构建守护（F52 第 8 条）
+
+第十批，基线 `99b244f6`。范围是 F52 第 8 条：`.design-sync/previews` 下的 32 个 preview
+既不被类型检查也不被任何 npm 脚本打包。逐行结论见
+[2026-08-31 台账](references/ui-consistency/2026-08-31-preview-guard-ledger.md)。
+
+**先说清被修的是什么。** `tsconfig.json` 的 `include` 只有 `src/**`，`build:review` 只打包
+`scripts/session-review.tsx`。因此审计记录里那句「32 个 preview 逐个独立打包通过」是**手工
+执行的循环**，不是脚本产物——换个人、换台机器都无法复现。本批把它变成 `npm run build` 的一部分。
+
+**三步排除的两层假象。** 单纯把 previews 加进 `include` 会报 38 个
+`Cannot find module 'react'`；改成把 `react` 映射到 `./node_modules/react` 会变成 71 个
+`Could not find a declaration file`。两次都不是 preview 代码的问题：前者是 preview 位于仓库根的
+`.design-sync/` 下、模块解析走不到本包的 `node_modules`；后者是映射指到了实现文件而非类型声明。
+把 `react` 与 `react/jsx-runtime` 映射到 `@types` 并设 `typeRoots` 后，**32 个 preview 零类型
+错误**。若在第一步就下结论，会得出「preview 有 38 处类型问题」这种完全错误的判断——**preview
+代码本身一直是干净的，缺的只是配置**。
+
+**落地三件：**
+
+1. `docs/design/arkdeck-ds/tsconfig.previews.json`——把 previews 纳入类型检查，
+   两条 `paths` 映射与 `typeRoots` 都是承重的，配置里写明了原因；
+2. `scripts/build-previews.mjs`——**逐个** preview 一个 entry point 打包。合并成单一入口会让
+   「某个 preview 只因兄弟文件替它引入了依赖才编译得过」这种情况蒙混过关；任一失败即
+   `exit 1`；
+3. `package.json`：新增 `check:previews` 与 `build:previews`，并接进 `npm run build` 链。
+
+**守护做了负向验证，不是套套逻辑。** 往 `Chip.tsx` 注入一个不存在的 prop，
+`check:previews` **退出码 2** 并精确报出 `error TS2322`；还原后退出码 0。
+
+交互测试固定这套接线：两个脚本的定义、它们必须出现在 `build` 链里、tsconfig 必须伸到
+`.design-sync/previews` 且经 `@types` 解析 React、打包器必须逐个入口且失败即非零退出，
+以及它走的 preview 集合等于覆盖表的 `previewFiles`。
+
+**至此 F52 九条里可执行的部分全部完成**，剩余全部是两条待裁决及其直接堵住的项。
+
+### F61 顺车修复与一个覆盖缺口（登记）
+
+rebase 到 `bec43c53`（#1606 *modernize SwiftUI surfaces*）之后，`npm test` 在**干净 `main`**
+上就是 76 通过 / 2 失败：`History compact activity picker…` 与
+`all actual navigation items and subtabs are audited`。两者都因为测试正则锚在 SwiftUI 的**写法**
+上——`workspace.size.width >= 890` 改成了 `onGeometryChange` + `workspaceWidth >= 890`，
+`Label(settingsText(…))` 换成了 `Tab(settingsText(…))`——而被审计的事实（890 阈值、七个 Settings
+面板及顺序）一个都没变。已在本批顺车改为锚定事实：阈值正则接受两种拼写，面板正则只认
+`settingsText("settings.tab.X")`，不再关心外层容器。
+
+**缺口**：CI **不跑** `npm test`（PR 检查只有 `ds-tokens` 等），因此把交互测试改红也能合入，
+而这套测试正是本审计「矩阵行 ID 必须等于 `surfaceIDs`」等不变量的唯一守护。
+`.github/**` 不在 TASK-AIN-021 的 Allowed paths 内，本批只登记，不改 CI。
+建议由维护者决定是否把 `npm --prefix docs/design/arkdeck-ds test` 加入 PR 检查。

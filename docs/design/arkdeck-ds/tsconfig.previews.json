@@ -1,0 +1,28 @@
+{
+  // The 32 design previews live outside this package, in `.design-sync/previews`,
+  // so nothing here type-checked them: `tsconfig.json` only includes `src/**`,
+  // and `build:review` only bundles `session-review.tsx`. The audit's claim that
+  // every preview bundles on its own was a hand-run loop, not a script (F52-8).
+  //
+  // Two module-resolution facts make this config necessary rather than a matter
+  // of widening `include`. A preview resolves `react` from its own directory,
+  // which never reaches this package's `node_modules`; and mapping `react` at
+  // the implementation path finds `react/jsx-runtime.js` with no declarations.
+  // Both mappings therefore point at `@types`, which is where the declarations
+  // actually are.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "emitDeclarationOnly": false,
+    "baseUrl": ".",
+    "typeRoots": ["./node_modules/@types"],
+    "paths": {
+      "@arkdeck/ds": ["./src/index.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../../.design-sync/previews/**/*.tsx"]
+}

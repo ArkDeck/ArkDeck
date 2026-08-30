@@ -316,7 +316,11 @@ test('History query updates immediately while keeping selection and expanded fil
 
 test('History compact activity picker mirrors every native category and the workspace-width boundary', () => {
   const native=read('ArkDeckApp/Features/History/RuntimeHistoryView.swift');
-  const boundary=Number(native.match(/workspace\.size\.width >= (\d+)/)[1]);
+  // Match the threshold, not the container idiom around it: #1606 moved this
+  // from `workspace.size.width >= 890` to onGeometryChange plus a stored
+  // `workspaceWidth`, and a pattern tied to the old spelling broke while the
+  // boundary itself never changed.
+  const boundary=Number(native.match(/(?:workspaceWidth|workspace\.size\.width)\s*>=\s*(\d+)/)[1]);
   assert.ok(html.includes(`@container history (max-width:${boundary-1}px)`));
   assert.match(html,/classList\.toggle\("history-page",S\.nav==="history"\)/);
   const h=harness('?page=history&lang=en');
@@ -512,7 +516,10 @@ test('all actual navigation items and subtabs are audited', () => {
   assert.deepEqual(enumCases('ArkDeckApp/Features/Debug/DebugWorkspaceView.swift', 'DebugWorkspaceTab'), coverage.debugTabs);
   assert.deepEqual(enumCases('ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift', 'ViewerInspectorTab'), coverage.viewerTabs);
   const settings = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
-  const tabs = [...settings.matchAll(/Label\(settingsText\("settings\.tab\.(\w+)"\)/g)].map(match => match[1]);
+  // Same reason: #1606 replaced `Label(settingsText(...))` with SwiftUI's
+  // `Tab(settingsText(...))`. Anchor on the localization call, which is the
+  // fact under audit, rather than on whichever container wraps it.
+  const tabs = [...settings.matchAll(/settingsText\("settings\.tab\.(\w+)"\)/g)].map(match => match[1]);
   assert.deepEqual(tabs, coverage.settingsTabs);
   const settingsCopy = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
   const draftTabs = JSON.parse(harness().run('JSON.stringify(SETTINGS_TABS)'));
@@ -1804,4 +1811,37 @@ test('localization catalogs carry no keys for paths the App no longer renders', 
   assert.equal(
     unreferenced('SettingsLocalizable').length, 4,
     'the Settings pane titles are held for the duplicate-page-title decision');
+});
+
+test('every design preview is type-checked and bundled by a script', () => {
+  // F52 item 8. `tsconfig.json` includes only `src/**` and `build:review`
+  // bundles a single entry, so the previews were checked by nobody; the audit's
+  // "all previews bundle independently" was a hand-run loop. This pins the
+  // wiring that makes it a script, so it cannot quietly come back out.
+  const manifest = JSON.parse(read('docs/design/arkdeck-ds/package.json'));
+  const scripts = manifest.scripts;
+  assert.equal(scripts['check:previews'], 'tsc -p tsconfig.previews.json');
+  assert.equal(scripts['build:previews'], 'node scripts/build-previews.mjs');
+  for (const step of ['check:previews', 'build:previews']) {
+    assert.match(scripts.build, new RegExp(`npm run ${step.replace(':', ':')}`),
+      `${step} must run as part of \`npm run build\``);
+  }
+
+  // The type-check config has to reach outside the package and resolve React
+  // through @types; both are load-bearing, so state them rather than trust them.
+  const previewConfig = read('docs/design/arkdeck-ds/tsconfig.previews.json');
+  assert.match(previewConfig, /\.design-sync\/previews/);
+  assert.match(previewConfig, /"react":\s*\["\.\/node_modules\/@types\/react"\]/);
+  assert.match(previewConfig, /"react\/jsx-runtime":\s*\["\.\/node_modules\/@types\/react\/jsx-runtime"\]/);
+
+  // One entry point per preview: a combined bundle would still pass even if a
+  // preview only compiled because a sibling pulled in what it needed.
+  const bundler = read('docs/design/arkdeck-ds/scripts/build-previews.mjs');
+  assert.match(bundler, /entryPoints: \[join\(previewDir, entry\)\]/);
+  assert.match(bundler, /process\.exit\(1\)/, 'a failed preview must fail the script');
+
+  // And the set it walks is the audited set.
+  const previews = files(join(root, '.design-sync/previews'))
+    .filter(path => path.endsWith('.tsx'));
+  assert.equal(previews.length, coverage.previewFiles.length);
 });
