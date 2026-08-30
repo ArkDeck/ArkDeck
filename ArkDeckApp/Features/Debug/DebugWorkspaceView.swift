@@ -1173,7 +1173,7 @@ private struct DebugNativeLibraryPlanSheet: View {
       WorkspaceNotice(tone: .warning) {
         Text(DebugL10n.text("debug.artifacts.sheet.warning"))
       }
-      Grid(alignment: .leading, horizontalSpacing: WorkspaceMetrics.blockGap) {
+      WorkspaceFactGrid {
         planFact(
           DebugL10n.text("debug.artifacts.sheet.target"),
           "\(preparation.targetID) · binding r\(preparation.bindingRevision)")
@@ -1233,15 +1233,8 @@ private struct DebugNativeLibraryPlanSheet: View {
     .frame(minWidth: 700, minHeight: 620)
   }
 
-  private func planFact(_ name: String, _ value: String) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(name)
-        .font(WorkspaceFont.secondary)
-        .foregroundStyle(.secondary)
-      Text(value)
-        .font(WorkspaceFont.monospacedValue)
-        .textSelection(.enabled)
-    }
+  private func planFact(_ name: String, _ value: String) -> WorkspaceFactRow {
+    WorkspaceFactRow(name: Text(name), value: Text(value), isSelectable: true)
   }
 }
 

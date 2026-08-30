@@ -837,6 +837,9 @@ private struct StorageSettingsPane: View {
 
         GroupBox(settingsText("settings.storage.policy")) {
           VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+            // Not a WorkspaceFactGrid: these are three columns of editable
+            // input (label, field, unit), not a read-only key/value list, and
+            // rows of controls need the larger content gap to stay tappable.
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: WorkspaceMetrics.keyColumnGap, verticalSpacing: WorkspaceMetrics.contentGap) {
               storageField(
                 label: settingsText("settings.storage.quota"),

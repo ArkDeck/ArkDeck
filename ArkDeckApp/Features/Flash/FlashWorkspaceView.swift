@@ -871,6 +871,8 @@ struct FlashWorkspaceView: View {
   }
 
   private func planStageSummary(_ plan: FlashExactPlanPresentation) -> some View {
+    // Not a WorkspaceFactGrid: a three-column table with its own header row
+    // and rule, not a key/value list.
     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
       GridRow {
         Text(flashText("flash.workspace.plan.stage"))
@@ -1014,34 +1016,25 @@ struct FlashWorkspaceView: View {
           .foregroundStyle(deviceAccessColor(advice.verdict))
           .font(WorkspaceFont.body.weight(.semibold))
           .accessibilityIdentifier("flash.deviceAccess.verdict")
-          Grid(
-            alignment: .leading,
-            horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-            verticalSpacing: WorkspaceMetrics.rowGap
-          ) {
-            GridRow {
-              Text(flashText("flash.deviceAccess.responsibility"))
-                .foregroundStyle(.secondary)
-              Text(flashText(deviceAccessResponsibilityKey(advice.responsibility)))
-            }
-            GridRow {
-              Text(flashText("flash.deviceAccess.nextStep"))
-                .foregroundStyle(.secondary)
-              Text(flashText(deviceAccessRemediationKey(advice.remediation)))
-                .fixedSize(horizontal: false, vertical: true)
-            }
+          WorkspaceFactGrid {
+            WorkspaceFactRow(
+              name: Text(flashText("flash.deviceAccess.responsibility")),
+              value: Text(flashText(deviceAccessResponsibilityKey(advice.responsibility))),
+              isMonospaced: false)
+            WorkspaceFactRow(
+              name: Text(flashText("flash.deviceAccess.nextStep")),
+              value: Text(flashText(deviceAccessRemediationKey(advice.remediation))),
+              isMonospaced: false)
             if model.deviceAccess.observationCount > 0 {
-              GridRow {
-                Text(flashText("flash.deviceAccess.observations"))
-                  .foregroundStyle(.secondary)
-                Text(
+              WorkspaceFactRow(
+                name: Text(flashText("flash.deviceAccess.observations")),
+                value: Text(
                   String(
                     localized: LocalizedStringResource.FlashLocalizable
                       .flashDeviceAccessObservationValue(
                         Int32(clamping: model.deviceAccess.observationCount),
-                        model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", ")))
-                )
-              }
+                        model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", ")))),
+                isMonospaced: false)
             }
           }
         }
@@ -1226,7 +1219,7 @@ struct FlashWorkspaceView: View {
   }
 
   private func planSummary(_ plan: FlashExactPlanPresentation) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+    WorkspaceFactGrid {
       summaryRow("flash.plan.build", plan.runtimeBuildVersion)
       summaryRow(
         "flash.plan.size",
@@ -1278,17 +1271,13 @@ struct FlashWorkspaceView: View {
 
   private func summaryRow(
     _ key: String, _ value: String, monospaced: Bool = false
-  ) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(flashText(key)).foregroundStyle(.secondary)
-      Text(value)
-        .font(monospaced ? .body.monospaced() : .body)
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .help(value)
-        .accessibilityLabel(value)
-        .textSelection(.enabled)
-    }
+  ) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(flashText(key)),
+      value: Text(value),
+      isMonospaced: monospaced,
+      isSelectable: true,
+      elidedValue: value)
   }
 
   private func effectLabel(_ effect: FlashPlanEffect) -> some View {

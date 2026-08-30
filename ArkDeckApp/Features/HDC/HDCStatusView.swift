@@ -181,7 +181,7 @@ struct HDCStatusView: View {
 
   private var serverAndToolchainSection: some View {
     section("overview.section.serverToolchain", id: "overview.section.serverToolchain") {
-      diagnosticsGrid {
+      WorkspaceFactGrid {
         field("overview.field.serverHealth", presentation.serverHealth.rawValue, id: "hdc.health")
         field("overview.field.endpoint", presentation.endpoint, id: "hdc.endpoint")
         field(
@@ -207,7 +207,7 @@ struct HDCStatusView: View {
 
   private var deviceAndChannelSection: some View {
     section("overview.section.deviceChannel", id: "overview.section.deviceChannel") {
-      diagnosticsGrid {
+      WorkspaceFactGrid {
         field("overview.field.authorization", authorizationText, id: "hdc.authorization")
         field("overview.field.channelProtection", protectionText, id: "hdc.channelProtection")
       }
@@ -223,7 +223,7 @@ struct HDCStatusView: View {
 
   private var capabilitiesSection: some View {
     section("overview.section.capabilities", id: "overview.section.capabilities") {
-      diagnosticsGrid {
+      WorkspaceFactGrid {
         field("overview.field.ownership", presentation.ownership.rawValue, id: "hdc.ownership")
         field("overview.field.subserver", subserverText, id: "hdc.subserver")
         field(
@@ -249,6 +249,8 @@ struct HDCStatusView: View {
               .foregroundStyle(.secondary)
           }
         } else {
+          // Not a WorkspaceFactGrid: a three-column matrix with a header row
+          // and a rule, not a key/value list.
           Grid(
             alignment: .leading,
             horizontalSpacing: WorkspaceMetrics.keyColumnGap,
@@ -363,7 +365,7 @@ struct HDCStatusView: View {
           .accessibilityAddTraits(.isHeader)
         Divider()
       }
-      diagnosticsGrid {
+      WorkspaceFactGrid {
         field(
           "overview.field.path", presentation.absolutePath, id: "hdc.toolchain.path",
           style: .monospaced)
@@ -473,18 +475,9 @@ struct HDCStatusView: View {
     }
   }
 
-  private func diagnosticsGrid<Content: View>(
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    Grid(
-      alignment: .leading,
-      horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-      verticalSpacing: WorkspaceMetrics.rowGap
-    ) {
-      content()
-    }
-  }
-
+  /// Paths, hashes and generations are compared character by character, so
+  /// they take the one mono size the rest of the App uses (spec §2); counters
+  /// take tabular digits. Both are options on the shared fact row.
   private enum FieldStyle {
     case plain
     case monospaced
@@ -492,39 +485,23 @@ struct HDCStatusView: View {
   }
 
   @ViewBuilder
+  // Keep diagnostics exposed as a stable static-text accessibility value.
+  // On macOS, text selection changes the accessibility representation and
+  // makes the read-only value unavailable to UI automation, so the full value
+  // is wrapped rather than truncated or made selectable — which is why this
+  // row leaves `isSelectable` and `elidedValue` at their defaults.
   private func field(
     _ titleKey: String,
     _ value: String,
     id: String,
     style: FieldStyle = .plain
-  ) -> some View {
-    GridRow(alignment: .firstTextBaseline) {
-      Text(LocalizedStringKey(titleKey))
-        .foregroundStyle(.secondary)
-        .gridColumnAlignment(.leading)
-      // Keep diagnostics exposed as a stable static-text accessibility value.
-      // On macOS, text selection changes the accessibility representation and
-      // makes the read-only value unavailable to UI automation, so the full
-      // value is wrapped instead of truncated or made selectable.
-      Text(value)
-        .modifier(FieldTextStyle(style: style))
-        .accessibilityIdentifier(id)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-
-  private struct FieldTextStyle: ViewModifier {
-    let style: FieldStyle
-
-    func body(content: Content) -> some View {
-      switch style {
-      case .plain: content.font(WorkspaceFont.body)
-      // Paths, hashes and generations are compared character by character, so
-      // they share the one mono size the rest of the App uses (spec §2).
-      case .monospaced: content.font(WorkspaceFont.monospacedValue)
-      case .digits: content.font(WorkspaceFont.tabularValue)
-      }
-    }
+  ) -> WorkspaceFactRow {
+    WorkspaceFactRow(
+      name: Text(LocalizedStringKey(titleKey)),
+      value: Text(value),
+      isMonospaced: style == .monospaced,
+      usesTabularDigits: style == .digits,
+      identifier: id)
   }
 
   /// Bounded, per-event rows for reading, plus one combined accessibility
@@ -538,7 +515,8 @@ struct HDCStatusView: View {
           .foregroundStyle(.secondary)
       } else {
         // A Grid, not free HStacks: timestamp, kind and identifier are columns
-        // and have to line up down the list.
+        // and have to line up down the list. Three columns of one event, so
+        // not a WorkspaceFactGrid either.
         Grid(
           alignment: .leading,
           horizontalSpacing: WorkspaceMetrics.keyColumnGap,
@@ -787,11 +765,7 @@ private struct HDCRecoveryImpactSheet: View {
           .font(WorkspaceFont.secondary)
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("hdc.lifecycle.impactPreview")
-        Grid(
-          alignment: .leading,
-          horizontalSpacing: WorkspaceMetrics.keyColumnGap,
-          verticalSpacing: WorkspaceMetrics.rowGap
-        ) {
+        WorkspaceFactGrid {
           row("overview.impact.action", snapshot.action.rawValue, id: "hdc.lifecycle.action")
           row("overview.impact.endpoint", snapshot.endpoint.rawValue, id: "hdc.lifecycle.endpoint")
           row(
