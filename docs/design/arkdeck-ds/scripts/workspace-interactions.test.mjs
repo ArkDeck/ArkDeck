@@ -20,6 +20,20 @@ const files = dir => readdirSync(dir, {withFileTypes:true}).flatMap(entry => {
   return entry.isDirectory() ? files(path) : [path];
 });
 
+let swiftSourceCache;
+function swiftSources() {
+  if (swiftSourceCache === undefined) {
+    const roots = ['ArkDeckApp', 'ArkDeckAppUITests', 'Packages'].map(dir => join(root, dir));
+    swiftSourceCache = roots
+      .filter(dir => { try { readdirSync(dir); return true; } catch { return false; } })
+      .flatMap(dir => files(dir))
+      .filter(path => path.endsWith('.swift'))
+      .map(path => readFileSync(path, 'utf8'))
+      .join('\n');
+  }
+  return swiftSourceCache;
+}
+
 function enumCases(path, name) {
   const source=read(path), start=source.indexOf(`enum ${name}:`);
   assert.notEqual(start,-1,`${name} was renamed; update the audit inventory`);
@@ -1752,4 +1766,42 @@ test('App type sizes that have a shared role use it', () => {
     read('ArkDeckApp/DesignSystem/WorkspaceChrome.swift'),
     /There is deliberately no 10pt role/,
     'the shared table must record why 10pt stays off the scale');
+});
+
+test('localization catalogs carry no keys for paths the App no longer renders', () => {
+  // F52 item 6. Static reachability alone cannot condemn a key: the App looks
+  // several up through variables (`Text(LocalizedStringKey(serverHealthKey))`,
+  // `field(_ titleKey:)`) and builds others by interpolation
+  // (`"debug.tab.\(tabID)"`). A key counts as referenced if it appears as a
+  // literal anywhere in Swift, if its generated camelCase accessor is used, or
+  // if any interpolated prefix in the source is a prefix of it.
+  const swift = swiftSources();
+  const literals = new Set([...swift.matchAll(/"([^"\\\n]*)"/g)].map(m => m[1]));
+  const identifiers = new Set(swift.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []);
+  const interpolated = [...swift.matchAll(/"([a-zA-Z0-9_.]*?)\\\(/g)].map(m => m[1]).filter(Boolean);
+  const camel = key => {
+    const parts = key.split(/[._]/);
+    return parts[0] + parts.slice(1).map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join('');
+  };
+  const unreferenced = name => {
+    const keys = Object.keys(JSON.parse(read(`ArkDeckApp/Resources/${name}.xcstrings`)).strings);
+    return keys.filter(key =>
+      !literals.has(key)
+      && !identifiers.has(camel(key))
+      && !interpolated.some(prefix => key.startsWith(prefix)));
+  };
+
+  // Swept in this batch: these catalogs must stay clean.
+  for (const name of ['DebugLocalizable', 'DiagnosticsLocalizable', 'FlashLocalizable', 'HistoryLocalizable']) {
+    assert.deepEqual(unreferenced(name), [], `${name} regained keys nothing renders`);
+  }
+
+  // Held back on purpose, each tied to an open maintainer decision. Pinned by
+  // count so neither the cleanup nor the decision can drift silently.
+  assert.equal(
+    unreferenced('UIDumpLocalizable').length, 25,
+    'the Viewer inspector keys are held for the English-retention decision (F52-5)');
+  assert.equal(
+    unreferenced('SettingsLocalizable').length, 4,
+    'the Settings pane titles are held for the duplicate-page-title decision');
 });
