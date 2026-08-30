@@ -158,6 +158,18 @@ stable_package=$workspace_path/Packages/ArkDeckKit
 # the real scratch directory remains outside every source worktree.
 ln -sfn "$scratch_path" "$stable_package/.build"
 
+# The API-baseline gate compiles an out-of-package consumer with its own
+# SwiftPM scratch. Inside the mirror that scratch is a Git-ignored name, so
+# the next sync's --delete-excluded would erase it and the gate would
+# cold-build its entire dependency graph — the whole package again, through
+# the path dependency — on every run. Give it the package's own treatment:
+# a stable scratch outside every worktree, recreated after each sync.
+api_baseline=$stable_package/APIBaseline
+if [ -d "$api_baseline" ]; then
+  mkdir -p "$cache_root/api-baseline-build"
+  ln -sfn "$cache_root/api-baseline-build" "$api_baseline/.build"
+fi
+
 # lockf owns the lock while this inner runner and SwiftPM execute. Keeping the
 # lock descriptor out of the test process prevents a detached child from
 # accidentally retaining the cache lock after SwiftPM exits.

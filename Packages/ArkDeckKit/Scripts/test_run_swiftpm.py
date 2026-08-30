@@ -34,6 +34,9 @@ class RunSwiftPMTests(unittest.TestCase):
         (root / "Packages/ArkDeckKit/Package.swift").write_text(
             "// swift-tools-version: 6.0\n", encoding="utf-8"
         )
+        baseline = root / "Packages/ArkDeckKit/APIBaseline/Package.swift"
+        baseline.parent.mkdir(parents=True)
+        baseline.write_text("// swift-tools-version: 6.0\n", encoding="utf-8")
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(
             ["git", "-C", str(root), "add", "Packages/ArkDeckKit"], check=True
@@ -97,6 +100,14 @@ class RunSwiftPMTests(unittest.TestCase):
                 cache_root / "workspace/Packages/ArkDeckKit/.build"
             ).resolve(),
             (cache_root / "build").resolve(),
+        )
+        self.assertEqual(
+            (
+                cache_root / "workspace/Packages/ArkDeckKit/APIBaseline/.build"
+            ).resolve(),
+            (cache_root / "api-baseline-build").resolve(),
+            "the API-baseline gate must keep its scratch outside the mirror, "
+            "or every sync cold-builds the whole dependency graph again",
         )
         self.assertEqual(
             (cache_root / "workspace/Packages/ArkDeckKit/Package.swift").read_text(
