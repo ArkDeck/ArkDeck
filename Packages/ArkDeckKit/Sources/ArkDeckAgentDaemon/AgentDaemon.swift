@@ -246,8 +246,17 @@ public struct RuntimeControlPlaneHandler: Sendable {
         id: request.id,
         result: .array(
           availability.map { item in
-            .object([
+            // §6.1 asks the list to carry alias lineage, effect, binding and
+            // profile alongside availability, so an Agent can narrow the
+            // catalog without one describe call per operation.
+            let descriptor = RuntimeOperationCatalog.descriptor(reference: item.reference)
+            return .object([
               "reference": .string(item.reference),
+              "canonicalReference": .string(descriptor?.reference ?? item.reference),
+              "aliasFor": descriptor?.aliasFor.map(JSONValue.string) ?? .null,
+              "minimumEffect": descriptor.map { .string($0.minimumEffect.rawValue) } ?? .null,
+              "binding": descriptor.map { .string($0.binding.rawValue) } ?? .null,
+              "profiles": .array((descriptor?.profiles ?? []).map(JSONValue.string)),
               "availability": .string(item.state.rawValue),
               "reasons": .array(item.reasons.map(JSONValue.string)),
               // PRODUCT-LOOP §8: the machine-readable half, positionally
@@ -272,32 +281,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         .first { $0.reference == descriptor.reference }
       return success(
         id: request.id,
-        result: .object([
-          "reference": .string(descriptor.reference),
-          "title": .string(descriptor.title),
-          "provider": .string(descriptor.provider.rawValue),
-          "minimumEffect": .string(descriptor.minimumEffect.rawValue),
-          "binding": .string(descriptor.binding.rawValue),
-          "timeoutSeconds": .integer(Int64(descriptor.timeoutSeconds)),
-          "stepCount": .integer(Int64(descriptor.steps.count)),
-          "availability": .string(availability?.state.rawValue ?? "unavailable"),
-          "availabilityReasons": .array(
-            (availability?.reasons ?? ["runtime availability could not be resolved"])
-              .map(JSONValue.string)),
-          "availabilityReasonCodes": .array(
-            (availability?.reasonCodes ?? [.providerNotRegistered])
-              .map { .string($0.rawValue) }),
-          "availabilityReasonOrigins": .array(
-            (availability?.reasonCodes ?? [.providerNotRegistered])
-              .map { .string($0.origin.rawValue) }),
-          // The input contract, which this reply carried none of. A caller
-          // could learn a field's name only by being refused for omitting it,
-          // and its meaning only by reading the catalog source — which is not
-          // a surface anything talking to an installed daemon has.
-          "inputs": .array(descriptor.inputs.map(Self.encodeCatalogField)),
-          "outputs": .array(descriptor.outputs.map(Self.encodeCatalogField)),
-          "exampleRequest": RuntimeRequestEnvelope.exampleRequestJSON(for: descriptor) ?? .null,
-        ]))
+        result: Self.encodeOperationDescriptor(descriptor, availability: availability))
 
     case "flash.lanePlanPreview":
       // Read-only preview of the arkforged plan the permits would anchor
@@ -2062,6 +2046,111 @@ public struct RuntimeControlPlaneHandler: Sendable {
   /// Absent constraints stay absent rather than becoming nulls a caller has to
   /// tell apart from "unconstrained": every key present here is a rule that
   /// applies.
+  /// The full descriptor an Agent needs before it decides to submit.
+  ///
+  /// Built in steps rather than as one literal: the compiler cannot type-check
+  /// a dictionary this size in reasonable time, and splitting it also keeps the
+  /// decision fields readable as groups.
+  static func encodeOperationDescriptor(
+    _ descriptor: CatalogOperationDescriptor,
+    availability: RuntimeOperationAvailability?
+  ) -> JSONValue {
+    let reasonCodes = availability?.reasonCodes ?? [.providerNotRegistered]
+    var projected: [String: JSONValue] = [
+      "reference": .string(descriptor.reference),
+      "title": .string(descriptor.title),
+      "provider": .string(descriptor.provider.rawValue),
+      "minimumEffect": .string(descriptor.minimumEffect.rawValue),
+      "binding": .string(descriptor.binding.rawValue),
+      "timeoutSeconds": .integer(Int64(descriptor.timeoutSeconds)),
+      "stepCount": .integer(Int64(descriptor.steps.count)),
+    ]
+    projected["availability"] = .string(availability?.state.rawValue ?? "unavailable")
+    projected["availabilityReasons"] = .array(
+      (availability?.reasons ?? ["runtime availability could not be resolved"])
+        .map(JSONValue.string))
+    projected["availabilityReasonCodes"] = .array(reasonCodes.map { .string($0.rawValue) })
+    projected["availabilityReasonOrigins"] = .array(
+      reasonCodes.map { .string($0.origin.rawValue) })
+
+    // The input contract, which this reply carried none of before CHG-2026-064.
+    // A caller could learn a field's name only by being refused for omitting
+    // it, and its meaning only by reading the catalog source — which is not a
+    // surface anything talking to an installed daemon has.
+    projected["inputs"] = .array(descriptor.inputs.map(encodeCatalogField))
+    projected["outputs"] = .array(descriptor.outputs.map(encodeCatalogField))
+    projected["exampleRequest"] =
+      RuntimeRequestEnvelope.exampleRequestJSON(for: descriptor) ?? .null
+
+    // The decision fields §13.2 records as missing. An Agent choosing whether
+    // to submit needs to know which effects this operation may reach and what
+    // authorises each of them, what the plan will do step by step and whether
+    // any of it compensates, what it will produce and how private that is, and
+    // whether a complete-overwrite recovery contract exists.
+    projected["aliasFor"] = descriptor.aliasFor.map(JSONValue.string) ?? .null
+    projected["permittedEffects"] = .array(
+      descriptor.permittedEffects.map { .string($0.rawValue) })
+    projected["authorization"] = .object(
+      Dictionary(
+        uniqueKeysWithValues: descriptor.authorization.map {
+          ($0.key.rawValue, JSONValue.string($0.value.rawValue))
+        }))
+    projected["defaultPolicyIssuanceEnabled"] = .bool(descriptor.defaultPolicyIssuanceEnabled)
+    projected["concurrencyKey"] = .string(descriptor.concurrencyKey.rawValue)
+    projected["outputByteBudget"] = .integer(Int64(descriptor.outputByteBudget))
+    projected["preflightAttempts"] = .integer(Int64(descriptor.preflightAttempts))
+    projected["profiles"] = .array(descriptor.profiles.map(JSONValue.string))
+    projected["steps"] = .array(descriptor.steps.map(encodeCatalogStep))
+    projected["artifacts"] = .array(descriptor.artifacts.map(encodeCatalogArtifact))
+    projected["completeOverwriteRecovery"] =
+      descriptor.completeOverwriteRecovery.map { recovery in
+        .object([
+          "contractVersion": .string(recovery.contractVersion),
+          "overwriteStepId": .string(recovery.overwriteStepID),
+          "verificationStepIds": .array(recovery.verificationStepIDs.map(JSONValue.string)),
+          "profiles": .array(
+            recovery.profiles.map {
+              .object([
+                "reference": .string($0.reference),
+                "coveredEffects": .array($0.coveredEffects.map(JSONValue.string)),
+              ])
+            }),
+        ])
+      } ?? .null
+    return .object(projected)
+  }
+
+  /// One plan step, as an Agent needs to reason about it: what it does, what
+  /// effect it may reach, whether it can be cancelled, and what undoes it.
+  private static func encodeCatalogStep(_ step: CatalogStepDescriptor) -> JSONValue {
+    .object([
+      "stepId": .string(step.stepID),
+      "kind": .string(step.kind.rawValue),
+      "effect": .string(step.effect.rawValue),
+      "cancellation": .string(step.cancellation.rawValue),
+      "binding": .string(step.binding.rawValue),
+      "optional": .bool(step.isOptional),
+      "compensation": .string(step.compensation.rawValue),
+      "action": step.actionReference.map {
+        .object(["catalogId": .string($0.catalogID), "actionId": .string($0.actionID)])
+      } ?? .null,
+    ])
+  }
+
+  /// What the operation declares it will produce, and how private it is. The
+  /// privacy class is what decides whether reading or exporting it needs an
+  /// explicit opt-in, so a caller has to be able to see it before it starts.
+  private static func encodeCatalogArtifact(_ artifact: CatalogArtifactDescriptor) -> JSONValue {
+    .object([
+      "name": .string(artifact.name),
+      "role": .string(artifact.role.rawValue),
+      "mediaType": .string(artifact.mediaType),
+      "privacy": .string(artifact.privacy.rawValue),
+      "required": .bool(artifact.isRequired),
+      "retentionClass": .string(artifact.retentionClass.rawValue),
+    ])
+  }
+
   private static func encodeCatalogField(_ field: CatalogFieldDescriptor) -> JSONValue {
     var projected: [String: JSONValue] = [
       "name": .string(field.name),

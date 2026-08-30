@@ -430,6 +430,35 @@ enum CLICommandRegistry {
         options: runtimeClientOptions([]),
         connectsToRuntime: true),
       CLILeafSpec(
+        token: "example",
+        canonicalCommand: "operation.example",
+        summary: "print a submittable request for this operation; dispatches nothing",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--operation",
+            form: .value(placeholder: "id@version", grammar: .opaque),
+            summary: "exact published operation reference",
+            isRequired: true)
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "validate",
+        canonicalCommand: "operation.validate",
+        summary: "check typed inputs against the descriptor; touches no device",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--operation",
+            form: .value(placeholder: "id@version", grammar: .opaque),
+            summary: "exact published operation reference",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--inputs-file",
+            form: .value(placeholder: "path|-", grammar: .opaque),
+            summary: "typed inputs to check; `-` reads one JSON document from stdin",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "describe",
         canonicalCommand: "operation.describe",
         summary: "print one operation descriptor, its typed inputs and an example request",

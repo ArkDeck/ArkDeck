@@ -1013,7 +1013,9 @@ enum RuntimeCLI {
   }
 
   static func runOperation(_ arguments: [String]) throws {
-    guard let subcommand = arguments.first, ["list", "describe"].contains(subcommand) else {
+    guard let subcommand = arguments.first,
+      ["list", "describe", "example", "validate"].contains(subcommand)
+    else {
       throw CLIError(
         exitCode: EX_USAGE,
         message:
@@ -1027,14 +1029,41 @@ enum RuntimeCLI {
       session.emit(try session.request("operation.list"))
       return
     }
-
-    guard let index = rest.firstIndex(of: "--operation"), index + 1 < rest.count else {
+    guard let referenceIndex = rest.firstIndex(of: "--operation"),
+      referenceIndex + 1 < rest.count
+    else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "operation describe requires --operation <reference>")
+        message: "operation \(subcommand) requires --operation <reference>")
     }
+    let reference = rest[referenceIndex + 1]
+
+    if subcommand == "example" || subcommand == "validate" {
+      // Both read the descriptor the *daemon* published rather than the copy
+      // compiled into this binary: a CLI and a daemon can be different builds,
+      // and answering from the local catalog would describe an operation the
+      // running Runtime may not have.
+      let descriptor = try session.request(
+        "operation.describe", ["reference": .string(reference)])
+      if subcommand == "example" {
+        guard case .object(let fields) = descriptor, let example = fields["exampleRequest"],
+          example != .null
+        else {
+          throw session.fail(
+            .blockedByProductDefect,
+            "the Runtime publishes no example request for \(reference)",
+            details: ["operation": .string(reference)])
+        }
+        session.emit(example)
+        return
+      }
+      try emitOperationValidation(
+        reference: reference, descriptor: descriptor, arguments: rest, session: session)
+      return
+    }
+
     let described = try session.request(
-      "operation.describe", ["reference": .string(rest[index + 1])])
+      "operation.describe", ["reference": .string(reference)])
     // One fact source, three shapes. A machine mode is the same reply rendered
     // for a parser; without one it is laid out for a person. None of them is a
     // second description of the operation.
@@ -1068,6 +1097,44 @@ enum RuntimeCLI {
             + (origin == "host_configuration"
               ? "configuring this host" : "a different build of ArkDeck"))
       }
+    }
+    // The decision half. A person reading this is deciding whether to run the
+    // operation, and "what will it be allowed to do, what will it produce, and
+    // how private is that" is the part they cannot get anywhere else.
+    if case .array(let permitted)? = fields["permittedEffects"], !permitted.isEmpty {
+      print("  may reach: " + permitted.map(render).joined(separator: ", "))
+    }
+    if case .object(let authorization)? = fields["authorization"], !authorization.isEmpty {
+      let rendered = authorization.keys.sorted().map { effect in
+        "\(effect)=\(render(authorization[effect] ?? .null))"
+      }
+      print("  authorized by: " + rendered.joined(separator: ", "))
+    }
+    if case .array(let steps)? = fields["steps"], !steps.isEmpty {
+      print("  plan (\(steps.count) steps):")
+      for case .object(let step) in steps {
+        var line = "    " + render(step["stepId"] ?? .null)
+        line += "  effect \(render(step["effect"] ?? .null))"
+        line += "  cancel \(render(step["cancellation"] ?? .null))"
+        if step["optional"] == .bool(true) { line += "  (optional)" }
+        if let compensation = step["compensation"], compensation != .string("none") {
+          line += "  compensates \(render(compensation))"
+        }
+        print(line)
+      }
+    }
+    if case .array(let artifacts)? = fields["artifacts"], !artifacts.isEmpty {
+      print("  artifacts:")
+      for case .object(let artifact) in artifacts {
+        var line = "    " + render(artifact["name"] ?? .null)
+        line += "  \(render(artifact["mediaType"] ?? .null))"
+        line += "  privacy \(render(artifact["privacy"] ?? .null))"
+        if artifact["required"] == .bool(true) { line += "  (required)" }
+        print(line)
+      }
+    }
+    if let recovery = fields["completeOverwriteRecovery"], recovery != .null {
+      print("  complete-overwrite recovery is published for this operation")
     }
     for (label, key) in [("inputs", "inputs"), ("outputs", "outputs")] {
       guard case .array(let rows)? = fields[key], !rows.isEmpty else { continue }
@@ -1108,6 +1175,77 @@ enum RuntimeCLI {
     case .null: return "null"
     case .array, .object: return "…"
     }
+  }
+
+  /// `operation validate` — the local half of "will this be accepted".
+  ///
+  /// It answers the one question the descriptor fully describes, names the
+  /// catalog digest that judged it, and says plainly that passing is not
+  /// admission. Claiming more would be worse than claiming nothing: a caller
+  /// who reads "valid" as "will run" learns otherwise only after dispatch.
+  static func emitOperationValidation(
+    reference: String, descriptor: JSONValue, arguments: [String], session: CLIRuntimeSession
+  ) throws {
+    guard let index = arguments.firstIndex(of: "--inputs-file"), index + 1 < arguments.count
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "operation validate requires --inputs-file <path|->")
+    }
+    let document = try boundedInputDocument(at: arguments[index + 1], session: session)
+    guard case .object(let fields) = descriptor, case .array(let inputs)? = fields["inputs"]
+    else {
+      throw session.fail(
+        .recordUnreadable, "the Runtime published no input contract for \(reference)")
+    }
+    let findings = CLIOperationInputValidation.findings(for: document, against: inputs)
+    let digest = (try? session.request("health")).flatMap { health -> JSONValue? in
+      guard case .object(let healthFields) = health else { return nil }
+      return healthFields["catalogDigest"]
+    }
+    session.emit(
+      .object([
+        "reference": .string(reference),
+        "structurallyValid": .bool(findings.isEmpty),
+        "findings": .array(findings.map(\.json)),
+        "checkedAgainst": .object([
+          "runtimeCatalogDigest": digest ?? .null,
+          "scope": .string("publishedInputContract"),
+        ]),
+      ]))
+    if !findings.isEmpty {
+      throw session.fail(
+        .invalidInput,
+        "\(findings.count) input problem\(findings.count == 1 ? "" : "s") for \(reference)")
+    }
+  }
+
+  /// §5.3: one UTF-8 JSON document, from a file or from stdin, refused before
+  /// the connection if it is over the bound.
+  static func boundedInputDocument(at path: String, session: CLIRuntimeSession) throws
+    -> JSONValue
+  {
+    let maximumBytes = 3 * 1024 * 1024
+    let data: Data
+    if path == "-" {
+      data = FileHandle.standardInput.readDataToEndOfFile()
+    } else {
+      guard let contents = FileManager.default.contents(atPath: path) else {
+        throw session.fail(.ioFailure, "cannot read typed inputs from \(path)")
+      }
+      data = contents
+    }
+    guard data.count <= maximumBytes else {
+      throw session.fail(
+        .inputTooLarge,
+        "typed inputs are \(data.count) bytes; the limit is \(maximumBytes)")
+    }
+    guard !data.starts(with: [0xEF, 0xBB, 0xBF]) else {
+      throw session.fail(.invalidInput, "typed inputs must be UTF-8 without a byte order mark")
+    }
+    guard let decoded = try? JSONDecoder().decode(JSONValue.self, from: data) else {
+      throw session.fail(.invalidInput, "typed inputs are not one valid JSON document")
+    }
+    return decoded
   }
 
   static func runDevice(_ arguments: [String]) throws {

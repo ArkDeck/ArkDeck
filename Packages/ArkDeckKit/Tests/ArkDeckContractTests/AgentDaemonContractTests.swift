@@ -207,6 +207,68 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  /// §13.2: `operation describe` carried none of the fields an Agent needs to
+  /// decide *whether* to submit — only enough to build the request.
+  ///
+  /// Which effects the operation may reach and what authorises each of them,
+  /// what the plan does step by step and whether any of it compensates, what it
+  /// will produce and how private that is: all of it was in the catalog and
+  /// none of it was reachable from an installed daemon.
+  func testOperationDescribeCarriesTheDecisionFieldsNotJustTheInputContract() async throws {
+    let (handler, _) = try makeStack()
+    let response = try await request(
+      handler, method: "operation.describe",
+      params: ["reference": .string("capture.diagnostics@1")])
+    guard case .object(let result)? = response.result else {
+      return XCTFail("describe must return a bound object")
+    }
+    XCTAssertTrue(response.ok)
+
+    for key in [
+      "permittedEffects", "authorization", "defaultPolicyIssuanceEnabled", "concurrencyKey",
+      "outputByteBudget", "preflightAttempts", "profiles", "steps", "artifacts",
+      "completeOverwriteRecovery", "aliasFor",
+    ] {
+      XCTAssertNotNil(result[key], "describe must publish \(key)")
+    }
+    // The fields it already had must survive: this is additive.
+    for key in ["reference", "title", "inputs", "outputs", "exampleRequest", "availability"] {
+      XCTAssertNotNil(result[key], "\(key) must not have been dropped")
+    }
+
+    guard case .array(let steps)? = result["steps"], case .object(let step)? = steps.first
+    else { return XCTFail("a diagnostics capture declares steps") }
+    for key in ["stepId", "kind", "effect", "cancellation", "binding", "optional", "compensation"]
+    {
+      XCTAssertNotNil(step[key], "a projected step must carry \(key)")
+    }
+
+    guard case .array(let artifacts)? = result["artifacts"],
+      case .object(let artifact)? = artifacts.first
+    else { return XCTFail("a diagnostics capture declares artifacts") }
+    // Privacy decides whether reading or exporting needs an explicit opt-in, so
+    // a caller has to be able to see it before it starts the work.
+    XCTAssertNotNil(artifact["privacy"])
+    XCTAssertNotNil(artifact["role"])
+    XCTAssertNotNil(artifact["retentionClass"])
+  }
+
+  /// §6.1 asks the list to carry alias lineage, effect, binding and profile, so
+  /// an Agent can narrow the catalog without one describe call per operation.
+  func testOperationListCarriesEnoughToNarrowTheCatalog() async throws {
+    let (handler, _) = try makeStack()
+    let response = try await request(handler, method: "operation.list")
+    guard case .array(let rows)? = response.result, case .object(let row)? = rows.first else {
+      return XCTFail("operation.list must return an array of objects")
+    }
+    for key in [
+      "reference", "canonicalReference", "aliasFor", "minimumEffect", "binding", "profiles",
+      "availability", "reasons", "reasonCodes", "reasonOrigins",
+    ] {
+      XCTAssertNotNil(row[key], "operation.list must publish \(key)")
+    }
+  }
+
   /// §13.2: `target show` is not an alias of `target.list`.
   ///
   /// A caller deciding whether it can drive a device needs the binding it will

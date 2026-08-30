@@ -707,6 +707,26 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertFalse(JobState.waitingForRecovery.isTerminal)
   }
 
+  // MARK: Operation discovery (§6.1)
+
+  func testTheOperationSurfaceCoversExampleAndValidate() {
+    for argv in [
+      ["operation", "list"],
+      ["operation", "describe", "--operation", "observe.device@1"],
+      ["operation", "example", "--operation", "observe.device@1"],
+      ["operation", "validate", "--operation", "observe.device@1", "--inputs-file", "i.json"],
+      ["operation", "validate", "--operation", "observe.device@1", "--inputs-file", "-"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["operation", "example"])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure(["operation", "validate", "--operation", "observe.device@1"])?.code,
+      .invalidOption)
+  }
+
   // MARK: The surface itself
 
   /// Every command the previous hand-written dispatcher accepted still parses.
