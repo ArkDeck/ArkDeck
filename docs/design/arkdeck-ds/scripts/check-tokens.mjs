@@ -326,6 +326,7 @@ for (const name of dsLight.keys()) {
     "viewer-hit": "ViewerScreenshot",
     "viewer-tree": "ComponentTree", "viewer-tree-row": "ComponentTree",
     "viewer-tree-id": "ComponentTree", "viewer-chevron": "ComponentTree",
+    "viewer-tree-select": "ComponentTree",
     "viewer-node-icon": "ComponentTree",
     "viewer-inspector": "DumpInspector", "viewer-inspector-head": "DumpInspector",
     "viewer-inspector-title": "DumpInspector", "viewer-breadcrumb": "DumpInspector",

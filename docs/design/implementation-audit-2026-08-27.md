@@ -1502,3 +1502,45 @@ rebase 到 `bec43c53`（#1606 *modernize SwiftUI surfaces*）之后，`npm test`
 而这套测试正是本审计「矩阵行 ID 必须等于 `surfaceIDs`」等不变量的唯一守护。
 `.github/**` 不在 TASK-AIN-021 的 Allowed paths 内，本批只登记，不改 CI。
 建议由维护者决定是否把 `npm --prefix docs/design/arkdeck-ds test` 加入 PR 检查。
+
+## 2026-08-31 F62：#1606 引入的表面漂移增量核对
+
+第十一批，基线 `e4218110`。**不是新一轮全量**，而是 brief §10 规定的增量轮：
+`bec43c53`（#1606 *modernize SwiftUI surfaces*）实质改动了 App 表面，触发对受影响行的重核。
+逐行结论见[2026-08-31 增量台账](references/ui-consistency/2026-08-31-modernization-drift-ledger.md)。
+
+**先界定漂移面，避免把 API 现代化当成漂移。** #1606 改了 21 个文件、771 增 568 删，但逐项测量后
+真正的新增呈现只有三条：
+
+- **可访问性标识符增删完全对称**（各 5 个：`device.history.loading`、`device.screen.empty`、
+  `device.screen.image`、`viewer.history.loading`、`viewer.tree.scroll`），即代码位置移动，
+  可达性面未变；
+- **新增本地化键三条**，稿件侧此前**零对应**：`viewer.tree.expand`、`viewer.tree.collapse`
+  （`UIDumpLocalizable` +34 行）、`device.record.saveFailed`（`DeviceLocalizable` +17 行）。
+
+按 §6 分类，三条都是 **P-DRIFT**（实现有、稿无），本批同车补齐稿件。
+
+**组件树的展开/折叠必须是有名字的控件。** App 现在把它渲染成 `HStack` 里**两个并列的
+Button**——一个带 `viewer.tree.expand/collapse` 名称的 chevron 按钮，一个包住图标与标签的选择
+按钮。稿件此前是**一个 button 包住整行**，chevron 只是 `aria-hidden` 的装饰、靠事件委派区分
+点击区域：指针可达，**按名称不可达**。现改为同构的两个控件——行降为 `role="treeitem"` 容器，
+chevron 成为带 `aria-label` 与 `aria-expanded` 的按钮，其余内容成为 `.viewer-tree-select` 按钮
+（新 class 已加入 `CLASS_TO_COMPONENT` 映射到 `ComponentTree`），键盘导航改在选择按钮上找同辈。
+
+**保存失败是与采集失败不同的一态。** `device.record.saveFailed` 发生在帧已采集之后、写盘失败时，
+App 以 alert 呈现（标题为该键，正文是写入器自己的原因）。稿件新增 `recordStage="saveFailed"`
+与 `recordingSaveFailed` scenario（URL token `?deviceState=recordingSaveFailed`），与既有
+`failed`（采集失败）分开。**呈现形态差异如实记录**：App 是模态 alert，稿件是内联提示——稿件的
+`modal()` 已映射到 `DangerConfirmDialog`（危险确认语义），拿它装信息 alert 会制造新的组件映射
+错误，故不硬凑形态；两侧状态可达、文案同源，形态差异登记为已知差异。
+
+### 本批自己引入又修掉的一个缺陷
+
+补 saveFailed 的样本原因时，最初在 `deviceDraftState()` 里调用了 `deviceLocale()`。
+该函数**在 `S` 初始化之前**就被顶层调用，于是 `?deviceState=recordingSaveFailed` 一经命中即
+`ReferenceError: Cannot access 'S' before initialization`，**整页停止渲染**。由 harness 直接渲染
+抓到（肉眼与静态检查都看不出）。改为存 `{zh,en}` 语言对、渲染期用 `bi()` 解析，并由回归断言
+`deviceDraftState` 内不得出现 `deviceLocale(`。
+
+同时复犯了一次批次四的老错：手打英文文案，把 App 原文里的 curly apostrophe（`Couldn’t`，
+U+2019）写成直引号。现改为从 `.xcstrings` 逐字取值。两条教训已记入共享 memory。
