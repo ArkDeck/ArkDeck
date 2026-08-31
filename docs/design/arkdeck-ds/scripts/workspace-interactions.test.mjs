@@ -1969,3 +1969,60 @@ test('the prototype reaches the Viewer states the App renders', () => {
       /viewer-advanced-clear/, 'the clear control appears only with a query, as in the App');
   }
 });
+
+// brief section 10, incremental round for #1644 (Settings storage rework).
+// It split one unlabelled usage figure into two stores, which the prototype
+// mirrored. Checking that mirror surfaced two gaps it did not cover: every
+// pane summary the App has ever rendered was missing, and the new
+// unaccounted-Sessions warning had no state at all. Both are P-DRIFT.
+test('every Settings pane summary and the unaccounted warning are mirrored', () => {
+  const settingsCopy = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
+  const value = (key, lang) => settingsCopy[key].localizations[lang].stringUnit.value;
+  const view = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
+
+  // The pane list is derived from the App, not hard-coded here: a new pane
+  // with a summary must be mirrored, and this fails until it is.
+  const summaryKeys = [...view.matchAll(
+    /WorkspaceHeaderBar\(summary: Text\(settingsText\("([^"]+)"\)\)\)/g)].map(m => m[1]);
+  assert.ok(summaryKeys.length >= 5, 'the App renders a summary for each Settings pane');
+  const tabForKey = {
+    'settings.general.subtitle': 'general',
+    'settings.toolchains.subtitle': 'toolchains',
+    'settings.remoteSources.subtitle': 'servers',
+    'settings.storage.subtitle': 'storage',
+    'settings.diagnostics.subtitle': 'diagnostics',
+  };
+
+  for (const language of ['zh', 'en']) {
+    const lang = language === 'zh' ? 'zh-Hans' : 'en';
+    for (const key of summaryKeys) {
+      const tab = tabForKey[key];
+      assert.ok(tab, `${key} needs a prototype tab; add it to this map when the App gains a pane`);
+      const pane = harness(`?page=settings&settingsTab=${tab}&lang=${language}`).run('pSettings()');
+      assert.ok(
+        pane.includes(value(key, lang)),
+        `${key} must carry its App summary word for word in ${language}`);
+      assert.ok(pane.includes(`data-sync-id="${key}"`), `${key} must be anchored`);
+    }
+
+    // The App shows this whenever Sessions cannot be identified; the
+    // prototype could not reach that state before this round.
+    const plain = harness(`?page=settings&settingsTab=storage&lang=${language}`).run('pSettings()');
+    assert.doesNotMatch(plain, /settings\.storage\.unaccountedFormat/);
+    const flagged = harness(
+      `?page=settings&settingsTab=storage&settingsStorage=unaccounted&lang=${language}`
+    ).run('pSettings()');
+    assert.match(flagged, /data-sync-id="settings\.storage\.unaccountedFormat"/);
+    // The App's string is a count format; the prototype states its sample.
+    const [prefix] = value('settings.storage.unaccountedFormat', lang).split('%lld');
+    const [, suffix] = value('settings.storage.unaccountedFormat', lang).split('%lld');
+    assert.ok(flagged.includes(prefix.trim()) || flagged.includes(suffix.trim()));
+
+    // #1644 added these two labels without anchors; the copy was there and
+    // unreachable by identifier, which is what the mirror is for.
+    for (const key of ['settings.storage.runtimeTotal', 'settings.storage.remaining']) {
+      assert.ok(plain.includes(`data-sync-id="${key}"`), `${key} must be anchored`);
+      assert.ok(plain.includes(value(key, lang)), `${key} must carry its App label in ${language}`);
+    }
+  }
+});
