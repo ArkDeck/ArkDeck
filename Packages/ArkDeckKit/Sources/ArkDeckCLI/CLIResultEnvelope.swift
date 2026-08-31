@@ -186,10 +186,14 @@ enum CLIProductVersion {
   /// The bundle version. Its components are pinned separately below.
   static let machineContract = "arkdeck.cli.contracts/1"
   static let resultSchema: String? = CLIResultEnvelope.schemaVersion
-  /// Not published by this build: the page envelope, the JSONL event stream
-  /// and the `nextAction` union arrive with the leaves that need them.
+  /// Not published by this build: the page envelope and the `nextAction`
+  /// union arrive with the leaves that need them.
   static let pageSchema: String? = nil
-  static let eventSchema: String? = nil
+  /// Published: `job watch --output jsonl` emits it. The Runtime event source
+  /// it streams from does not exist yet, so today every such stream is one
+  /// terminal event saying so — but the schema a consumer must parse is real
+  /// and fixed, which is what this field is for.
+  static let eventSchema: String? = CLIEventEnvelope.schemaVersion
   static let nextActionSchema: String? = nil
   static let errorRegistry: String? = CLIErrorRegistryVersion.current
   static let canonicalJson: String? = CLICanonicalJSON.version
@@ -217,5 +221,74 @@ enum CLIBuildIdentity {
   private static func executablePathFromArgv() -> URL? {
     guard let first = CommandLine.arguments.first, first.hasPrefix("/") else { return nil }
     return URL(filePath: first)
+  }
+}
+
+/// §8.3's JSONL event line.
+///
+/// Only the `terminal` event exists in this build, and that is not a shortcut:
+/// §8.3 requires exactly one terminal event per JSONL invocation, and the
+/// non-terminal ones are Runtime events with durable identity, position and
+/// cursor — none of which exists until the daemon publishes `job.events`. A
+/// stream that ends on its first line is a complete stream when there is
+/// nothing to stream, and it says so in the shape a consumer already parses,
+/// rather than in prose on stderr.
+enum CLIEventEnvelope {
+  static let schemaVersion = "arkdeck.cli.event/1"
+
+  /// A stream that ended without ever reaching the Runtime event source.
+  ///
+  /// `lastCursor` is null because §8.3 says so when this call saw no Runtime
+  /// event: a cursor is a resume point, and inventing one would tell a caller
+  /// it can continue from somewhere it never was.
+  static func terminalFailure(
+    command: String, sequence: Int, error: CLIRegistryError, controlRequestID: String
+  ) -> String {
+    var errorFields: [String: JSONValue] = [
+      "code": .string(error.code.rawValue),
+      "message": .string(error.message),
+      "controlRequestRetryable": .bool(error.code.isControlRequestRetryable),
+      "attentionRequired": .bool(error.code.requiresAttention),
+    ]
+    if !error.details.isEmpty { errorFields["details"] = .object(error.details) }
+    return line([
+      "schemaVersion": .string(schemaVersion),
+      "sequence": .integer(Int64(sequence)),
+      "type": .string("terminal"),
+      "command": .string(command),
+      "controlRequestId": .string(controlRequestID),
+      "lastCursor": .null,
+      "ok": .bool(false),
+      "exitCode": .integer(Int64(error.exitCode)),
+      "error": .object(errorFields),
+    ])
+  }
+
+  static func terminalSuccess(
+    command: String, sequence: Int, result: JSONValue, controlRequestID: String
+  ) -> String {
+    line([
+      "schemaVersion": .string(schemaVersion),
+      "sequence": .integer(Int64(sequence)),
+      "type": .string("terminal"),
+      "command": .string(command),
+      "controlRequestId": .string(controlRequestID),
+      "lastCursor": .null,
+      "ok": .bool(true),
+      "exitCode": .integer(0),
+      "result": result,
+    ])
+  }
+
+  /// One canonical document plus the newline that delimits it. §8.2's
+  /// canonical form has no trailing newline of its own, because the delimiter
+  /// is a property of the stream rather than of the value.
+  private static func line(_ fields: [String: JSONValue]) -> String {
+    guard let rendered = try? CLICanonicalJSON.canonicalString(.object(fields)) else {
+      return #"{"schemaVersion":"arkdeck.cli.event/1","type":"terminal","ok":false,"#
+        + #""exitCode":70,"error":{"code":"internalError",""#
+        + #"message":"the event could not be encoded"}}"# + "\n"
+    }
+    return rendered + "\n"
   }
 }

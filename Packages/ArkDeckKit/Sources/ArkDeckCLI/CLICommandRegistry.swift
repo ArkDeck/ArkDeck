@@ -53,6 +53,51 @@ enum CLIValueGrammar: Equatable {
   case hexDigest(length: Int)
   /// §8.1's correlation identity: `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`.
   case controlRequestID
+  /// §5.2's duration: `^[1-9][0-9]*(ms|s|m|h)$`, no larger than the ceiling.
+  ///
+  /// The unit is part of the value rather than a convention, because a bare
+  /// integer means different things to different commands and the difference
+  /// between 30 seconds and 30 minutes is not something to infer. Zero,
+  /// negatives, decimals, compound units and whitespace are all refused: each
+  /// of them is a caller meaning something the receiving contract cannot
+  /// represent, and accepting any of them would round it silently.
+  ///
+  /// The ceiling is in milliseconds and is declared per option, because a
+  /// wait budget's sane maximum belongs to the command that waits.
+  case duration(maximumMilliseconds: Int)
+}
+
+/// One parsed §5.2 duration.
+///
+/// Kept as milliseconds because that is the smallest unit the grammar admits,
+/// so every legal value is an exact integer here and no conversion rounds.
+struct CLIDuration: Equatable {
+  let milliseconds: Int
+
+  var seconds: Double { Double(milliseconds) / 1000 }
+
+  /// Parses §5.2's grammar, refusing anything that would overflow the ceiling
+  /// rather than clamping to it. A caller who asked for a week and got an hour
+  /// would be told nothing, and would blame the wrong thing when the wait
+  /// ended early.
+  static func parse(_ text: String, maximumMilliseconds: Int) -> CLIDuration? {
+    let units: [(suffix: String, scale: Int)] = [
+      ("ms", 1), ("s", 1000), ("m", 60_000), ("h", 3_600_000),
+    ]
+    // Longest suffix first: `ms` also ends in `s`, and matching `s` would read
+    // `500ms` as 500 000 ms.
+    guard let unit = units.first(where: { text.hasSuffix($0.suffix) }) else { return nil }
+    let digits = String(text.dropLast(unit.suffix.count))
+    guard !digits.isEmpty, digits.first != "0",
+      digits.allSatisfy({ $0.isASCII && $0.isNumber }),
+      let magnitude = Int(digits)
+    else { return nil }
+    // Checked before multiplying: the product of a legal-looking magnitude and
+    // an hour is exactly where a duration overflows into a negative wait.
+    let (milliseconds, overflowed) = magnitude.multipliedReportingOverflow(by: unit.scale)
+    guard !overflowed, milliseconds <= maximumMilliseconds else { return nil }
+    return CLIDuration(milliseconds: milliseconds)
+  }
 }
 
 /// Why an option exists on this leaf, which decides whether help publishes it.
@@ -238,14 +283,21 @@ enum CLICommandRegistry {
   static let helpOptionNames: Set<String> = ["--help", "-h"]
   static let versionOptionName = "--version"
 
-  /// `--output`. §8.1 requires every portable leaf to support at least `human`
-  /// and `json`; `jsonl` belongs to the durable event stream, which no leaf
-  /// publishes yet, so it is not in the accepted set.
+  /// `--output`. The grammar spells every mode the registry can express; which
+  /// of them a given leaf accepts is `outputModes` on that leaf.
+  ///
+  /// The two layers answer different questions and are worth keeping apart. A
+  /// value outside this set is not a mode at all and gets "not one of the
+  /// modes"; a real mode the leaf does not offer gets "not one of *this
+  /// command's* modes", which is the message that tells a caller asking
+  /// `job list --output jsonl` that streaming is a property of the command
+  /// rather than a typo. Folding jsonl out of the grammar, as this did while
+  /// nothing streamed, made the second message unreachable.
   static let outputOption = CLIOptionSpec(
     name: "--output",
     form: .value(
       placeholder: "human|json",
-      grammar: .enumeration([CLIOutputMode.human.rawValue, CLIOutputMode.json.rawValue])),
+      grammar: .enumeration(CLIOutputMode.allCases.map(\.rawValue))),
     summary: "output mode; machine modes emit one arkdeck.cli.result/1 document")
 
   /// §12 keeps `--json` exactly as it was: the daemon reply, pretty-printed,
@@ -428,7 +480,11 @@ enum CLICommandRegistry {
       if normalized.lifecycle == .current { normalized.lifecycle = .deprecated }
     }
     guard leaf.options.contains(where: { $0.name == outputOption.name }) else { return normalized }
-    if !normalized.outputModes.contains(.json) { normalized.outputModes.append(.json) }
+    // Declaring `--output` implies `json` for every leaf that did not say
+    // otherwise, which is all but one. `job watch` says otherwise: §8.1 scopes
+    // its machine mode to `jsonl`, and forcing `json` on would publish a
+    // single-document shape for a command whose whole contract is a stream.
+    if normalized.outputModes == [.human] { normalized.outputModes.append(.json) }
     if leaf.options.contains(where: { $0.name == jsonOption.name }),
       !normalized.mutuallyExclusive.contains(outputAndJSONAreExclusive)
     {
@@ -920,6 +976,55 @@ enum CLICommandRegistry {
         options: runtimeClientOptions([jobIDOption]),
         connectsToRuntime: true),
       CLILeafSpec(
+        token: "wait",
+        canonicalCommand: "job.wait",
+        summary: "wait for terminal, human action or unknown outcome; never cancels",
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
+        connectsToRuntime: true),
+      // §8.3 publishes these two so a caller can discover the event surface
+      // and be told, by the Runtime rather than by a hard-coded refusal, that
+      // it is not there yet: they call `job.events`, the daemon answers
+      // `unknownMethod`, and §8.4 turns that into `controlMethodUnavailable`.
+      // The alternative — leaving them out — teaches a caller the product has
+      // no event surface at all, and the day the daemon publishes the method
+      // these start working with no change here.
+      CLILeafSpec(
+        token: "events",
+        canonicalCommand: "job.events",
+        summary: "read one page of durable job events (requires the Runtime event stream)",
+        options: runtimeClientOptions([
+          jobIDOption,
+          CLIOptionSpec(
+            name: "--after-cursor",
+            form: .value(placeholder: "cursor", grammar: .opaque),
+            summary: "opaque exclusive cursor from a previous page"),
+          CLIOptionSpec(
+            name: "--page-size",
+            form: .value(placeholder: "1...1000", grammar: .positiveInteger(1...1000)),
+            summary: "events per page"),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "watch",
+        canonicalCommand: "job.watch",
+        summary: "follow durable job events (requires the Runtime event stream)",
+        options: runtimeClientOptions([
+          jobIDOption,
+          CLIOptionSpec(
+            name: "--after-cursor",
+            form: .value(placeholder: "cursor", grammar: .opaque),
+            summary: "resume after this opaque cursor instead of the stream origin"),
+        ]),
+        connectsToRuntime: true,
+        // §8.3: `human` or `jsonl`, and `--output json` is refused at parse
+        // time rather than silently downgraded — a caller asking for one
+        // document from a command that produces a stream has misread the
+        // contract, and answering anyway would hide that. The mode is declared
+        // now even though its Runtime producer is not built, because the mode
+        // is part of the published contract; what is missing is the event
+        // source, and that is exactly what the leaf reports when run.
+        outputModes: [.human, .jsonl]),
+      CLILeafSpec(
         token: "list",
         canonicalCommand: "job.list",
         summary: "list jobs, newest first",
@@ -979,6 +1084,18 @@ enum CLICommandRegistry {
         options: runtimeClientOptions([jobIDOption]),
         connectsToRuntime: true),
     ])
+
+  /// §5.2: how long this CLI process waits, and nothing else.
+  ///
+  /// It cannot extend an operation, plan or capability budget — those live in
+  /// the Runtime and outlast this process. The ceiling is a day because a wait
+  /// longer than that is a caller who meant to detach, and the honest answer
+  /// to that is `job status` on a schedule rather than a process held open
+  /// across a laptop suspending.
+  private static let waitTimeoutOption = CLIOptionSpec(
+    name: "--timeout",
+    form: .value(placeholder: "30s", grammar: .duration(maximumMilliseconds: 86_400_000)),
+    summary: "how long to wait before giving up; the job keeps running")
 
   private static let jobIDOption = CLIOptionSpec(
     name: "--job",

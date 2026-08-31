@@ -125,6 +125,16 @@ struct ArkDeckCommandLine {
       envelope = CLIResultEnvelope.withLifecycle(
         envelope, error.lifecycle, replacement: error.replacementArgvPattern)
       FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
+    case .jsonlStream:
+      // §8.3: a JSONL invocation ends with exactly one terminal event, and it
+      // carries the exact process exit code so a consumer reading only the
+      // stream reaches the same conclusion as one reading only `$?`.
+      FileHandle.standardOutput.write(
+        Data(
+          CLIEventEnvelope.terminalFailure(
+            command: error.command ?? CLIResultEnvelope.parsePhaseCommand,
+            sequence: 1, error: error,
+            controlRequestID: error.controlRequestID ?? newControlRequestID()).utf8))
     }
   }
 

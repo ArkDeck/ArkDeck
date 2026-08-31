@@ -71,7 +71,11 @@ enum RuntimeCLI {
     let controlRequestID = CLIArgumentParser.bootstrapControlRequestID(arguments)
     var rendering = CLIRendering.human
     if let index = arguments.firstIndex(of: "--output"), index + 1 < arguments.count {
-      if arguments[index + 1] == CLIOutputMode.json.rawValue { rendering = .envelope }
+      switch arguments[index + 1] {
+      case CLIOutputMode.json.rawValue: rendering = .envelope
+      case CLIOutputMode.jsonl.rawValue: rendering = .jsonlStream
+      default: break
+      }
       arguments.removeSubrange(index...(index + 1))
     }
     if let index = arguments.firstIndex(of: "--control-request-id"), index + 1 < arguments.count {
@@ -2515,6 +2519,129 @@ params))
     try emitCleanupDebt(subcommand, rest: rest, session: session)
   }
 
+
+  /// §6.1's `job wait`: block until the job settles, and never touch it.
+  ///
+  /// The wait is a bounded poll of `job.status` snapshots, which §8.3 permits
+  /// explicitly while forbidding the other thing polling could be made to look
+  /// like — a resumable event stream. There is no durable event source behind
+  /// this, so nothing here reports a cursor, and `--output jsonl` is not
+  /// offered: a caller who could ask for a stream would reasonably expect to
+  /// resume it.
+  ///
+  /// A timeout does not cancel. §5.2 scopes `--timeout` to how long *this
+  /// process* waits, and the job outlives the process either way; a wait that
+  /// cancelled on the way out would make giving up destructive, which is the
+  /// opposite of what a caller who set a deadline asked for.
+  static func emitJobWait(_ arguments: [String], session: CLIRuntimeSession) throws {
+    let options = try CLIOptions(arguments)
+    guard let jobID = options.value("--job") else {
+      throw CLIError(exitCode: EX_USAGE, message: "job wait requires --job <id>")
+    }
+    // The parser already refused anything the grammar rejects, so a value here
+    // that will not parse is a defect in the registry rather than a caller's
+    // mistake. Absent means wait until it settles: a default deadline would
+    // make `job wait` quietly stop watching a flash that legitimately runs for
+    // half an hour, and reporting a timeout it invented is worse than waiting.
+    var deadline: Date?
+    if let text = options.value("--timeout") {
+      guard let budget = CLIDuration.parse(text, maximumMilliseconds: 86_400_000) else {
+        throw session.fail(.invalidOption, "`job wait` --timeout is not a duration: \(text)")
+      }
+      deadline = Date().addingTimeInterval(budget.seconds)
+    }
+
+    // Gentle backoff rather than a fixed interval: a job that settles in a
+    // second should not wait a second to be noticed, and one that runs for
+    // half an hour should not be asked two thousand times.
+    var interval: TimeInterval = 0.25
+    let maximumInterval: TimeInterval = 2
+
+    while true {
+      let status = try session.request("job.status", ["jobId": .string(jobID)])
+      guard case .object(let fields) = status else {
+        throw session.fail(.recordUnreadable, "job \(jobID) returned no readable status")
+      }
+      guard case .string(let rawState)? = fields["state"] else {
+        throw session.fail(
+          .recordUnreadable, "job \(jobID) reported no state this build understands")
+      }
+      let settled = JobState(rawValue: rawState)?.isTerminal == true
+        || fields["outcomeUnknown"] == .bool(true)
+
+      if settled {
+        // §8.2: the projection was obtained, so this is `ok: true` with a full
+        // result whatever the job did. The outcome travels in the exit status
+        // and in `job.outcome`, which is why a consumer must read both.
+        session.emit(status)
+        if let terminal = terminalJobExit(status) {
+          throw CLIError(exitCode: terminal.code, message: terminal.reason)
+        }
+        return
+      }
+
+      // A job waiting on a person is not going to settle by being waited on
+      // longer, so reporting it immediately is the useful answer rather than
+      // holding the process until the deadline expires.
+      if fields["waitingForHuman"] == .bool(true) {
+        throw session.fail(
+          .humanActionRequired,
+          "job \(jobID) is waiting for a human action and will not settle on its own",
+          details: ["jobId": .string(jobID), "state": .string(rawState)])
+      }
+
+      if let deadline, Date() >= deadline {
+        // §8.4: a client deadline says nothing about the job. It is still
+        // running, still owns whatever it dispatched, and is still readable —
+        // so the failure carries its identity and last known state rather than
+        // implying the wait changed anything.
+        throw session.fail(
+          .clientTimeout,
+          "stopped waiting for job \(jobID); it is \(rawState) and still running",
+          details: ["jobId": .string(jobID), "state": .string(rawState)])
+      }
+
+      if let deadline {
+        let remaining = deadline.timeIntervalSinceNow
+        if remaining <= 0 { continue }
+        Thread.sleep(forTimeInterval: min(interval, remaining))
+      } else {
+        Thread.sleep(forTimeInterval: interval)
+      }
+      interval = min(interval * 2, maximumInterval)
+    }
+  }
+
+  /// §8.3's event surface, published ahead of its producer.
+  ///
+  /// `job.events` is the unary page RPC the whole event contract rests on, and
+  /// this build's daemon does not have it: the current `job.status` timeline is
+  /// a mutable string array with no event identity, revision or cursor, so
+  /// there is nothing to page over. §8.3 is explicit that `job watch` must
+  /// *report* unavailable in that state, which is why these leaves exist and
+  /// ask the Runtime rather than refusing locally — a hard-coded refusal would
+  /// still be a claim about the daemon, and it would go stale silently the day
+  /// the method lands. Asking makes the answer true by construction: the
+  /// daemon says `unknownMethod`, §8.4 turns that into
+  /// `controlMethodUnavailable`, and exit 69 says the surface is not there.
+  static func emitJobEvents(
+    _ subcommand: String, rest: [String], session: CLIRuntimeSession
+  ) throws {
+    let options = try CLIOptions(rest)
+    guard let jobID = options.value("--job") else {
+      throw CLIError(exitCode: EX_USAGE, message: "job \(subcommand) requires --job <id>")
+    }
+    var params: [String: JSONValue] = ["jobId": .string(jobID)]
+    if let cursor = options.value("--after-cursor") { params["afterCursor"] = .string(cursor) }
+    if let pageSize = options.value("--page-size"), let size = Int64(pageSize) {
+      params["pageSize"] = .integer(size)
+    }
+    // `watch` would loop over pages until a terminal event; it never gets past
+    // the first read today, and writing the loop around a call that cannot
+    // succeed would be inventing behaviour nothing can exercise.
+    session.emit(try session.request("job.events", params))
+  }
+
   static func emitJobResult(jobID: String, session: CLIRuntimeSession) throws {
     let status = try session.request("job.status", ["jobId": .string(jobID)])
     guard case .object(let statusFields) = status else {
@@ -2740,7 +2867,8 @@ params))
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing job subcommand (plan|submit|status|list|run|cancel|reconcile)")
+        message:
+          "missing job subcommand (plan|submit|status|wait|events|watch|list|run|cancel|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "job.\(subcommand)")
@@ -2779,6 +2907,10 @@ params))
       if let terminal = terminalJobExit(statusResponse) {
         throw CLIError(exitCode: terminal.code, message: terminal.reason)
       }
+    case "wait":
+      try emitJobWait(rest, session: session)
+    case "events", "watch":
+      try emitJobEvents(subcommand, rest: rest, session: session)
     case "run":
       // Resuming a reconciled job is what settles its authorization lineage.
       // `reconcile` deliberately leaves a `confirmedCompleted` decision

@@ -326,15 +326,27 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     let result = try run(["commands", "--output", "json"])
     let payload = try XCTUnwrap(try decoded(result.stdout)["result"] as? [String: Any])
     let commands = try XCTUnwrap(payload["commands"] as? [[String: Any]])
-    let withoutJSON = commands
+    // The bar is "can answer a machine", not "can answer in `json`": §8.1
+    // gives `job watch` `jsonl` instead, because its contract is a stream
+    // rather than one document. A leaf with neither is the conformance gap.
+    let withoutMachineMode = commands
       .filter { ($0["kind"] as? String) == "executable" }
-      .filter { !(($0["outputModes"] as? [String] ?? []).contains("json")) }
+      .filter { Set($0["outputModes"] as? [String] ?? []).isDisjoint(with: ["json", "jsonl"]) }
       .map { ($0["path"] as? [String] ?? []).joined(separator: " ") }
       .sorted()
     XCTAssertEqual(
-      withoutJSON, ["completion", "help"],
-      "a leaf that cannot answer in JSON is a §18 conformance gap; the two exempt surfaces "
+      withoutMachineMode, ["completion", "help"],
+      "a leaf no machine can read is a §18 conformance gap; the two exempt surfaces "
         + "are prose and script bytes, and nothing else may join them")
+
+    let streaming = commands
+      .filter { (($0["outputModes"] as? [String]) ?? []).contains("jsonl") }
+      .map { ($0["path"] as? [String] ?? []).joined(separator: " ") }
+      .sorted()
+    XCTAssertEqual(
+      streaming, ["job watch"],
+      "§8.1 scopes `jsonl` to the durable event stream; a leaf that takes the mode "
+        + "and cannot stream would accept something it has no producer for")
   }
 
   /// §12: a deprecated alias warns on stderr in human mode, and in a machine
