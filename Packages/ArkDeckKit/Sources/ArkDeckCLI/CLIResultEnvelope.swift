@@ -62,13 +62,16 @@ enum CLIResultEnvelope {
   /// `meta.lifecycle`, so a machine caller can tell it is driving a
   /// compatibility surface. The human-mode warning goes to stderr instead;
   /// machine stdout stays exactly one parseable document.
-  static func withLifecycle(_ envelope: JSONValue, _ status: CLILifecycleStatus) -> JSONValue {
+  static func withLifecycle(
+    _ envelope: JSONValue, _ status: CLILifecycleStatus, replacement: String? = nil
+  ) -> JSONValue {
     guard status != .current, case .object(var fields) = envelope,
       case .object(var meta)? = fields["meta"]
     else { return envelope }
     meta["lifecycle"] = .object([
       "status": .string(status.rawValue),
-      "replacementArgvPattern": .null,
+      "replacementArgvPattern": replacement.map(JSONValue.string) ?? .null,
+      // §12: not guessed. No removal has been scheduled for any of these.
       "removalVersion": .null,
     ])
     fields["meta"] = .object(meta)
@@ -144,6 +147,12 @@ struct CLIRegistryError: Error {
   /// carries its code and exit status, but rendering it as a second machine
   /// frame would break §8.1's one-document rule.
   var suppressesMachineRendering = false
+  /// §12 attaches the alias notice "regardless of domain success or failure",
+  /// so a failure envelope carries it too — otherwise a caller driving a
+  /// deprecated spelling would be told only on the runs that happened to
+  /// succeed.
+  var lifecycle: CLILifecycleStatus = .current
+  var replacementArgvPattern: String?
 
   var exitCode: Int32 { code.exitCode }
 }

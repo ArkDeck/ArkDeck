@@ -338,6 +338,43 @@ final class CLIProcessGoldenContractTests: XCTestCase {
         + "remaining one and needs a structured result before it can be closed")
   }
 
+  /// §12: a deprecated alias warns on stderr in human mode, and in a machine
+  /// mode says so in `meta.lifecycle` instead — so stdout stays exactly one
+  /// parseable document and the warning cannot corrupt it.
+  func testADeprecatedAliasWarnsOnStderrAndInMetaButNeverOnStdout() throws {
+    let socket = ["--socket", "/nonexistent/arkdeck-golden.sock"]
+
+    let human = try run(["cleanup-debt", "list"] + socket)
+    XCTAssertTrue(
+      human.stderr.contains("deprecated"), "human mode must say so: \(human.stderr)")
+    XCTAssertTrue(
+      human.stderr.contains("arkdeck recovery cleanup list"),
+      "the warning must name the exact replacement")
+
+    let machine = try run(["cleanup-debt", "list", "--output", "json"] + socket)
+    XCTAssertEqual(jsonDocumentCount(machine.stdout), 1)
+    XCTAssertFalse(
+      machine.stdout.contains("warning"), "a warning must never reach machine stdout")
+    let meta = try XCTUnwrap(try decoded(machine.stdout)["meta"] as? [String: Any])
+    let lifecycle = try XCTUnwrap(meta["lifecycle"] as? [String: Any])
+    XCTAssertEqual(lifecycle["status"] as? String, "deprecated")
+    XCTAssertEqual(
+      lifecycle["replacementArgvPattern"] as? String, "arkdeck recovery cleanup list")
+    // §12 forbids guessing a removal date.
+    XCTAssertTrue(lifecycle["removalVersion"] is NSNull)
+  }
+
+  /// The published spelling is the destination, so it carries no lifecycle at
+  /// all — not a "current" one.
+  func testTheReplacementSpellingCarriesNoLifecycle() throws {
+    let result = try run([
+      "recovery", "cleanup", "list", "--output", "json",
+      "--socket", "/nonexistent/arkdeck-golden.sock",
+    ])
+    let meta = try XCTUnwrap(try decoded(result.stdout)["meta"] as? [String: Any])
+    XCTAssertNil(meta["lifecycle"])
+  }
+
   func testTheTwoMachineSpellingsCannotBeCombined() throws {
     let result = try run(["operation", "list", "--output", "json", "--json"])
     XCTAssertEqual(result.exitCode, 64)
