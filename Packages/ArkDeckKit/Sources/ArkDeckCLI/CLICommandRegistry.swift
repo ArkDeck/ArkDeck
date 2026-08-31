@@ -811,7 +811,35 @@ enum CLICommandRegistry {
         ]),
       runtimeServiceNode,
       runtimeSigningNode,
+      runtimeBundleNode,
     ])
+
+  private static let runtimeBundleNode = CLINodeSpec(
+    token: "bundle", summary: "register and inspect immutable signed daemon bundles before service installation",
+    leaves: [
+      CLILeafSpec(token: "register", canonicalCommand: "runtime.bundle.register",
+        summary: "copy and verify a signed helper into the current-user bootstrap registry",
+        options: [
+          CLIOptionSpec(name: "--kind", form: .value(placeholder: "daemon-bundle", grammar: .enumeration(["daemon-bundle"])), summary: "registered helper kind", isRequired: true),
+          CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "source .app bundle; used only during registration", isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption,
+        ]),
+      CLILeafSpec(token: "list", canonicalCommand: "runtime.bundle.list",
+        summary: "read an immutable snapshot of registered bundle metadata",
+        options: snapshotPageOptions + [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(token: "inspect", canonicalCommand: "runtime.bundle.inspect",
+        summary: "revalidate the content and signature of an exact bundle reference",
+        options: [bootstrapBundleRefOption, outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(token: "remove", canonicalCommand: "runtime.bundle.remove",
+        summary: "retire an unreferenced bundle generation while retaining historical bytes",
+        options: [bootstrapBundleRefOption,
+          CLIOptionSpec(name: "--expected-generation", form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)), summary: "exact available generation", isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption]),
+    ])
+
+  private static let bootstrapBundleRefOption = CLIOptionSpec(
+    name: "--bundle", form: .value(placeholder: "bundle:sha256:digest", grammar: .opaque),
+    summary: "exact content-addressed bundle reference", isRequired: true)
 
   /// §6.1's durable target surface. `device list/show/adopt` stay as the
   /// frozen 1.x legacy spellings beside it (§12).

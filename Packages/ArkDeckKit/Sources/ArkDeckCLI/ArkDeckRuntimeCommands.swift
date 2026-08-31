@@ -1546,6 +1546,8 @@ enum RuntimeCLI {
     }
     var rest = Array(arguments.dropFirst())
     switch subcommand {
+    case "bundle":
+      try runBootstrapBundle(rest)
     case "service":
       try runAgentDaemon(
         rest, spelledAs: "runtime.service",
