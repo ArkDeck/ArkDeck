@@ -126,25 +126,25 @@ ArkDeckKit 测试使用 worktree 之外的稳定缓存。App 与 UI 测试改动
 
 ### 安装运行时
 
-SwiftPM 直接生成的可执行文件只用于开发，不能作为生产 LaunchAgent 安装。`agentd install` 只接受具备预期 Developer ID、hardened runtime、内嵌 provisioning profile 和共享 Keychain entitlement 的 `ArkDeckAgent.app`。请按[无头运行时指南](./Packages/ArkDeckKit/LaunchAgents/README.md)使用团队授权的签名与公证输入构建 helper，或在项目提供已签名发布包后使用发布包。
+SwiftPM 直接生成的可执行文件只用于开发，不能作为生产 LaunchAgent 安装。`runtime service install` 只接受具备预期 Developer ID、hardened runtime、内嵌 provisioning profile 和共享 Keychain entitlement 的 `ArkDeckAgent.app`。请按[无头运行时指南](./Packages/ArkDeckKit/LaunchAgents/README.md)使用团队授权的签名与公证输入构建 helper，或在项目提供已签名发布包后使用发布包。
 
 从已签名的 `ArkDeckCLI.app` 安装用户级守护进程，并把它指向你的 `hdc`：
 
 ```bash
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck \
-  agentd install --hdc /absolute/path/to/hdc
+  runtime service install --hdc /absolute/path/to/hdc
 ```
 
 然后确认一切就绪：
 
 ```bash
-/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck agentd status
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck runtime service status
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck doctor
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck device list
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck operation list
 ```
 
-`agentd install` 会校验并固定守护进程和 `hdc` 二进制。检查 `device list` 返回的候选设备后，使用 `arkdeck device adopt --candidate <connect-key>` 完成接管；没有候选或存在歧义时，ArkDeck 不会猜测。工作区配置、本地 HAP 签名、诊断与卸载方式也见无头运行时指南。
+`runtime service install` 会校验并固定守护进程和 `hdc` 二进制。检查 `device list` 返回的候选设备后，使用 `arkdeck device adopt --candidate <connect-key>` 完成接管；没有候选或存在歧义时，ArkDeck 不会猜测。工作区配置、本地 HAP 签名、诊断与卸载方式也见无头运行时指南。
 
 ## 仓库结构
 
