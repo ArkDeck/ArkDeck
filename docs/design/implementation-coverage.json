@@ -57,6 +57,8 @@
     "ArkDeckApp/Features/Overview/OverviewResumeSheet.swift",
     "ArkDeckApp/Features/Settings/SettingsRootView.swift",
     "ArkDeckApp/Features/Trace/TraceConfigurationView.swift",
+    "ArkDeckApp/Features/Trace/TraceFlagDraftEditor.swift",
+    "ArkDeckApp/Features/Trace/TraceFlagTagEditor.swift",
     "ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift",
     "ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift",
     "ArkDeckApp/Features/Trace/TraceWorkspaceView.swift",

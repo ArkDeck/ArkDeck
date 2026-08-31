@@ -217,7 +217,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 - [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)
 - [Debug 五标签与 sheets](../../ArkDeckApp/Features/Debug/DebugWorkspaceView.swift)
 - [Viewer 五 Inspector](../../ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift)
-- [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)
+- [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)、[flag draft editor](../../ArkDeckApp/Features/Trace/TraceFlagDraftEditor.swift)、[flag tag editor](../../ArkDeckApp/Features/Trace/TraceFlagTagEditor.swift)
 - [Device](../../ArkDeckApp/Features/Device/DeviceWorkspaceView.swift)、[Diagnostics](../../ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift)
 - [History](../../ArkDeckApp/Features/History/RuntimeHistoryView.swift)、[Jobs / recovery](../../ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift)、[Settings 七标签](../../ArkDeckApp/Features/Settings/SettingsRootView.swift)
 
