@@ -172,25 +172,25 @@ For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDe
 
 ### Installing the runtime
 
-The bare SwiftPM executables are development artifacts and cannot be installed as the production LaunchAgent. `agentd install` accepts only an `ArkDeckAgent.app` helper with the expected Developer ID, hardened runtime, embedded provisioning profile and shared Keychain entitlement. Build that helper with team-authorized signing and notarization inputs as described in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md), or use a signed project release package when one is available.
+The bare SwiftPM executables are development artifacts and cannot be installed as the production LaunchAgent. `runtime service install` accepts only an `ArkDeckAgent.app` helper with the expected Developer ID, hardened runtime, embedded provisioning profile and shared Keychain entitlement. Build that helper with team-authorized signing and notarization inputs as described in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md), or use a signed project release package when one is available.
 
 From a signed `ArkDeckCLI.app`, install the per-user daemon and point it at your `hdc`:
 
 ```bash
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck \
-  agentd install --hdc /absolute/path/to/hdc
+  runtime service install --hdc /absolute/path/to/hdc
 ```
 
 Then check that everything is wired up:
 
 ```bash
-/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck agentd status
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck runtime service status
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck doctor
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck device list
 /absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck operation list
 ```
 
-`agentd install` verifies and pins both the daemon and the `hdc` binary. Use `arkdeck device adopt --candidate <connect-key>` after reviewing the candidate reported by `device list`; ArkDeck will not guess when the choice is absent or ambiguous. Workspace setup, local HAP signing, diagnostics and uninstall are also covered in the headless runtime guide.
+`runtime service install` verifies and pins both the daemon and the `hdc` binary. Use `arkdeck device adopt --candidate <connect-key>` after reviewing the candidate reported by `device list`; ArkDeck will not guess when the choice is absent or ambiguous. Workspace setup, local HAP signing, diagnostics and uninstall are also covered in the headless runtime guide.
 
 ## Repository map
 
