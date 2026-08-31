@@ -939,14 +939,17 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "candidates",
         canonicalCommand: "device.candidates",
-        summary:
-          "one discovery snapshot: generation, per-candidate observation identity, "
-          + "authorization state and any adopted target",
+        summary: "live HDC candidates, their authorization state and any adopted target",
         options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--snapshot",
+            form: .flag,
+            summary:
+              "return a snapshot object with generation and observation IDs instead of an array"),
           CLIOptionSpec(
             name: "--use-warm-snapshot",
             form: .flag,
-            summary: "read the Runtime's warm snapshot instead of forcing a fresh device read")
+            summary: "read the Runtime's warm snapshot instead of forcing a fresh device read"),
         ]),
         connectsToRuntime: true),
       CLILeafSpec(

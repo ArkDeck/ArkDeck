@@ -1977,9 +1977,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       // §6.1's discovery shape, which `device.candidates` cannot carry: a
       // bare array has nowhere to put the snapshot generation, and §6.1
       // requires a fixed one. Rather than change a method the App and the
-      // Agent executor both parse, this is the object-shaped sibling and the
-      // CLI leaf points here — the same move `job.list` → `job.list-page`
-      // made for the same reason.
+      // Agent executor both parse, this is an additive object-shaped sibling.
+      // The CLI opts in with `device candidates --snapshot`; existing calls
+      // retain the array, including legacy-json output.
       guard let bootstrap else {
         return failure(
           id: request.id, code: .internalError,
