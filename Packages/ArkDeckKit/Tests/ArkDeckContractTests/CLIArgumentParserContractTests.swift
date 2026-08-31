@@ -284,6 +284,29 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertTrue(refused?.message.contains("human|jsonl") == true, refused?.message ?? "")
   }
 
+  /// §7.2: `target availability` is one Runtime call, not several stitched
+  /// together. The registry is where that is decided — a leaf that declared no
+  /// Runtime connection, or that took the identity as anything but a required
+  /// option, would be a different command.
+  func testTargetAvailabilityIsOneRuntimeCallTakingARequiredTargetIdentity() {
+    XCTAssertNotNil(success(["target", "availability", "--target", "T-1"]))
+    XCTAssertNotNil(success(["target", "availability", "--target", "T-1", "--output", "json"]))
+    XCTAssertEqual(failure(["target", "availability"])?.code, .invalidOption)
+
+    let leaf = CLICommandRegistry.allLeaves()
+      .first { $0.leaf.canonicalCommand == "target.availability" }?.leaf
+    XCTAssertEqual(leaf?.connectsToRuntime, true)
+    XCTAssertEqual(leaf?.lifecycle, .current)
+    XCTAssertNil(
+      leaf?.catalogOperation,
+      "§5.1 admits this as a bounded read-only observation; mapping it to an operation "
+        + "would put it inside Catalog + Job/WAL, which is where a device workflow belongs")
+    XCTAssertEqual(
+      CLIControlMethodRegistry.effect(of: "target.availability"), .boundedReadOnly,
+      "it creates no Job and writes no evidence, so an ambiguous failure from it is a "
+        + "plain failure rather than an unknown outcome")
+  }
+
   /// §5.2's duration grammar. Every rejected form is a caller meaning
   /// something the receiving contract cannot represent, so accepting any of
   /// them would round it silently.

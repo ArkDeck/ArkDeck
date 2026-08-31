@@ -1846,6 +1846,49 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "target.availability":
+      // §6.1's aggregate, owned by the Runtime because §7.1 forbids the
+      // alternative by name: the CLI must not issue several reads and declare
+      // from stale answers that a device is usable. Every fact below is read
+      // in one pass here, and each leg publishes its own freshness and reason
+      // so a caller can tell "checked and true" from "not checked".
+      //
+      // §5.1 admits this as a bounded read-only observation, not an operation:
+      // it creates no Job, produces no evidence and runs no device workflow.
+      // That last one is the line to keep — the App's capability matrix reaches
+      // this shape by running `debug.template.run`, and doing that here would
+      // move the aggregate inside Catalog + Job/WAL where §5.1 says it belongs.
+      guard let targetStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "target store is not configured")
+      }
+      guard case .string(let availabilityTargetID)? = request.params?["targetId"],
+        !availabilityTargetID.isEmpty
+      else {
+        return failure(id: request.id, code: .invalidParams, message: "targetId is required")
+      }
+      do {
+        guard let record = try targetStore.find(targetID: availabilityTargetID) else {
+          return failure(
+            id: request.id, code: .notFound,
+            message: "no durable target \(availabilityTargetID)")
+        }
+        var presence: JSONValue = Self.unobservedPresence()
+        if let bootstrap, let snapshot = try? await bootstrap.candidateSnapshotForPresentation() {
+          presence = Self.encodePresence(snapshot: snapshot, connectKey: record.connectKey)
+        }
+        return success(
+          id: request.id,
+          result: Self.encodeTargetAvailability(
+            record: record,
+            presence: presence,
+            tool: Self.encodeToolLeg(hdcRuntimeDiagnostics),
+            operations: await engine.operationAvailability(),
+            observedAtUTC: nowUTC()))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "device.candidates":
       // Read-only discovery: the one enumeration the App's device list needs.
       // It calls the bootstrap's candidate read directly — never `advance`,
@@ -2051,6 +2094,138 @@ public struct RuntimeControlPlaneHandler: Sendable {
   /// Built in steps rather than as one literal: the compiler cannot type-check
   /// a dictionary this size in reasonable time, and splitting it also keeps the
   /// decision fields readable as groups.
+  // MARK: target availability (§6.1)
+
+  /// The aggregate's leg vocabulary, closed on purpose and deliberately not
+  /// `RuntimeAvailabilityReasonCode`.
+  ///
+  /// That enum answers "why is this *operation* unavailable on this host"; this
+  /// one answers "what did the Runtime actually establish about this target
+  /// just now". §6.1 asks for the name not to be confused with
+  /// `RuntimeCapability`, and the same care applies one level down: sharing a
+  /// vocabulary between the two would make `provider_tool_unavailable` mean
+  /// both "the catalog cannot run this" and "we could not look".
+  enum TargetAvailabilityLeg {
+    /// Established true, from a fact read in this call.
+    static let ready = "ready"
+    /// Established false.
+    static let absent = "absent"
+    /// Not established either way, and the reason says which fact is missing.
+    /// This is never a pass: a caller must read it as "unknown", not "fine".
+    static let unresolved = "unresolved"
+  }
+
+  static func unobservedPresence() -> JSONValue {
+    .object([
+      "state": .string(TargetAvailabilityLeg.unresolved),
+      "observedAtUtc": .null,
+      "observationHealth": .null,
+      "reasonCode": .string("device_observation_unavailable"),
+      "reason": .string("the Runtime has no device observation source configured"),
+    ])
+  }
+
+  /// The warm snapshot, never a forced refresh.
+  ///
+  /// Making this probe the device would turn an availability question into a
+  /// device round trip, and §5.1 keeps bounded observations bounded. What the
+  /// caller gets instead is the observation's own age and health, published
+  /// rather than implied, so "present as of 40 seconds ago" cannot be misread
+  /// as "present now".
+  static func encodePresence(
+    snapshot: BootstrapCandidateSnapshot, connectKey: String
+  ) -> JSONValue {
+    let match = snapshot.candidates.first { $0.connectKey == connectKey }
+    let state = match == nil ? TargetAvailabilityLeg.absent : TargetAvailabilityLeg.ready
+    var fields: [String: JSONValue] = [
+      "state": .string(state),
+      "observedAtUtc": .string(snapshot.observedAtUTC),
+      "observationHealth": .string(snapshot.health.rawValue),
+      "deviceState": match.map { .string($0.state) } ?? .null,
+    ]
+    if match == nil {
+      fields["reasonCode"] = .string("device_not_observed")
+      fields["reason"] = .string("no candidate in the current snapshot matches this binding")
+    }
+    return .object(fields)
+  }
+
+  static func encodeToolLeg(_ diagnostics: HDCManagedRuntimeDiagnostics?) -> JSONValue {
+    guard let diagnostics else {
+      return .object([
+        "state": .string(TargetAvailabilityLeg.absent),
+        "reasonCode": .string("runtime_tool_unavailable"),
+        "reason": .string("Runtime has no managed HDC server"),
+      ])
+    }
+    return .object([
+      "state": .string(TargetAvailabilityLeg.ready),
+      "toolSha256": .string(diagnostics.executableSHA256),
+      "clientVersion": .string(diagnostics.clientVersion),
+      "serverVersion": .string(diagnostics.serverVersion),
+      "endpointSource": .string(diagnostics.endpointSource),
+    ])
+  }
+
+  /// Assembled in one function because the dictionary literal is past what the
+  /// type checker will infer inside a `switch` arm — the same reason
+  /// `encodeOperationDescriptor` exists.
+  static func encodeTargetAvailability(
+    record: RuntimeTargetRecord,
+    presence: JSONValue,
+    tool: JSONValue,
+    operations: [RuntimeOperationAvailability],
+    observedAtUTC: String
+  ) -> JSONValue {
+    .object([
+      "targetId": .string(record.targetID),
+      "observedAtUtc": .string(observedAtUTC),
+      "binding": .object([
+        "state": .string(TargetAvailabilityLeg.ready),
+        "bindingRevision": .integer(Int64(record.bindingRevision)),
+        "toolVersion": .string(record.toolVersion),
+        "stablePhysicalIdentitySha256": .string(record.stablePhysicalIdentitySHA256),
+        "adoptedAtUtc": .string(record.adoptedAtUTC),
+      ]),
+      "presence": presence,
+      "tool": tool,
+      // Host-scoped, and labelled as such. §7.2 allows target-dependent
+      // availability only from fresh binding/profile/tool facts, and
+      // `operationAvailability()` resolves none of those — it answers provider
+      // registration, provider availability, dispatcher tool and artifact
+      // store, all of which are properties of this host. Publishing it as
+      // target-resolved would be the exact failure this aggregate exists to
+      // prevent: a caller reading "available" as "available *on this device*".
+      "operations": .object([
+        "scope": .string("host"),
+        "targetResolution": .string(TargetAvailabilityLeg.unresolved),
+        "reasonCode": .string("target_scoped_operation_availability_unavailable"),
+        "reason": .string(
+          "operation availability is computed per host; no target-scoped resolver exists"),
+        "items": .array(
+          operations.map { item in
+            .object([
+              "reference": .string(item.reference),
+              "availability": .string(item.state.rawValue),
+              "reasons": .array(item.reasons.map(JSONValue.string)),
+              "reasonCodes": .array(item.reasonCodes.map { .string($0.rawValue) }),
+            ])
+          }),
+      ]),
+      // Nothing in this build resolves a target to a device profile:
+      // `descriptor.profiles` is published by the catalog and consumed by no
+      // resolver. Reporting a match would be inventing one, and reporting
+      // `ready` would be worse — so the leg says it is unresolved and names
+      // what is missing.
+      "profile": .object([
+        "state": .string(TargetAvailabilityLeg.unresolved),
+        "reasonCode": .string("profile_resolver_unavailable"),
+        "reason": .string(
+          "no target-to-profile resolver exists; catalog profiles are published but unmatched"),
+      ]),
+    ])
+  }
+
   static func encodeOperationDescriptor(
     _ descriptor: CatalogOperationDescriptor,
     availability: RuntimeOperationAvailability?

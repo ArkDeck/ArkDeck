@@ -772,6 +772,22 @@ enum CLICommandRegistry {
             isRequired: true)
         ]),
         connectsToRuntime: true),
+      // §7.2 forbids the shape this command looks like it should have: the CLI
+      // must not issue several reads and decide from them that a device is
+      // usable. So this is one Runtime call, and the aggregate is assembled
+      // where the facts are — the leaf only names it.
+      CLILeafSpec(
+        token: "availability",
+        canonicalCommand: "target.availability",
+        summary: "one Runtime-owned aggregate of binding, presence, tool and operation facts",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--target",
+            form: .value(placeholder: "target-id", grammar: .opaque),
+            summary: "durable target identity",
+            isRequired: true)
+        ]),
+        connectsToRuntime: true),
     ])
 
   // `doctor` is a leaf, but the tree is uniform: a one-leaf node whose token
