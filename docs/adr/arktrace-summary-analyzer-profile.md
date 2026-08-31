@@ -22,7 +22,7 @@ descriptor, an executable, arguments, or a search path.
 3. Select the descriptor through the production LaunchAgent boundary:
 
    ```text
-   arkdeck agentd update --arktrace-descriptor /absolute/path/to/distribution-descriptor.json
+   arkdeck runtime service update --arktrace-descriptor /absolute/path/to/distribution-descriptor.json
    ```
 
    The installer writes `ARKDECK_ARKTRACE_DESCRIPTOR` only after an owner-controlled,
@@ -51,7 +51,7 @@ Availability failures are stable machine reasons: `analyzer.arktraceNotFound`,
 not admit a Job or consume Runtime capability.
 
 For an upgrade, install and verify a new versioned directory, write a new exact descriptor, then
-run `arkdeck agentd update --arktrace-descriptor <new-descriptor>`. For rollback, select a retained
+run `arkdeck runtime service update --arktrace-descriptor <new-descriptor>`. For rollback, select a retained
 prior descriptor through the same update command; ArkDeck revalidates the retained bytes and
 materializes/reuses the matching private tree generation rather than trusting prior availability.
 Never repair or replace either the selected external install or a daemon-private generation in
