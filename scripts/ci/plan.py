@@ -3,7 +3,7 @@
 
 The planner deliberately lives outside GitHub Actions YAML so local validation
 and hosted validation classify the same diff.  An unavailable comparison base
-never means "nothing changed": it selects every compiled lane instead.
+never means "nothing changed": it selects every lane instead.
 """
 
 from __future__ import annotations
@@ -35,6 +35,17 @@ APP_PACKAGE_TARGET_PREFIXES = (
 WORKFLOWS_COMPOSITION_PREFIX = (
     "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/"
 )
+# The @arkdeck/ds interaction tests execute the docs/design prototype draft and
+# cross-check it against the audit inventory and the App/Package Swift sources
+# it names, so a change under any of these directories can flip an assertion.
+# PR #1606 merged all-green from ArkDeckApp/ alone while breaking two of them.
+DS_INTERACTION_INPUT_PREFIXES = (
+    "ArkDeckApp/",
+    "ArkDeckAppUITests/",
+    "Packages/",
+    "docs/design/",
+)
+DS_PACKAGE_DIR = "docs/design/arkdeck-ds"
 
 
 class PlanError(RuntimeError):
@@ -45,6 +56,7 @@ class PlanError(RuntimeError):
 class LaneSelection:
     swift: bool
     app: bool
+    ds: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -60,6 +72,7 @@ class CIPlan:
         return {
             "swift": self.lanes.swift,
             "app": self.lanes.app,
+            "ds": self.lanes.ds,
             "baseRevision": self.base_revision,
             "headRevision": self.head_revision,
             "baseKind": self.base_kind,
@@ -72,20 +85,25 @@ class CIPlan:
 def classify_paths(paths: Sequence[str]) -> LaneSelection:
     swift = False
     app = False
+    ds = False
     for raw_path in paths:
         if not raw_path or "\x00" in raw_path:
             raise PlanError("changed paths must be non-empty and NUL-free")
         path = raw_path.replace("\\", "/")
 
-        # A planner/workflow change validates both branches of the decision it
+        # A planner/workflow change validates every branch of the decision it
         # is changing.  This prevents a broken classifier from self-skipping.
         if path == SWIFT_WORKFLOW or path.startswith(PLANNER_PREFIX):
             swift = True
             app = True
+            ds = True
             continue
 
         if path.startswith("Packages/ArkDeckKit/") or path.startswith("Package."):
             swift = True
+
+        if any(path.startswith(prefix) for prefix in DS_INTERACTION_INPUT_PREFIXES):
+            ds = True
 
         # The desktop app links a precise subset of ArkDeckKit production
         # targets. Package tests, CLIs, agent processes, launch-agent inputs,
@@ -105,7 +123,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         ):
             app = True
 
-    return LaneSelection(swift=swift, app=app)
+    return LaneSelection(swift=swift, app=app, ds=ds)
 
 
 def _git(
@@ -212,7 +230,7 @@ def _all_lanes_plan(
     *, head_revision: str, base_kind: str, reason: str
 ) -> CIPlan:
     return CIPlan(
-        lanes=LaneSelection(swift=True, app=True),
+        lanes=LaneSelection(swift=True, app=True, ds=True),
         base_revision=None,
         head_revision=head_revision,
         base_kind=base_kind,
@@ -334,6 +352,7 @@ def _append_github_output(path: pathlib.Path, plan: CIPlan) -> None:
     values = {
         "swift": str(plan.lanes.swift).lower(),
         "app": str(plan.lanes.app).lower(),
+        "ds": str(plan.lanes.ds).lower(),
         "base": plan.base_revision or "unavailable",
         "head": plan.head_revision,
         "base-kind": plan.base_kind,
@@ -389,6 +408,17 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
         ),
         (python, "scripts/catalog_gen/generate.py", "--check"),
     ]
+    if plan.lanes.ds:
+        # node_modules is not committed and the suite imports esbuild/react
+        # from it.  Without the install, the files with only node: imports
+        # still pass and the rest die on ERR_MODULE_NOT_FOUND — a misleading
+        # partial pass — so the install is part of the lane, not a setup hint.
+        commands.extend(
+            [
+                ("npm", "--prefix", DS_PACKAGE_DIR, "ci"),
+                ("npm", "--prefix", DS_PACKAGE_DIR, "test"),
+            ]
+        )
     if plan.lanes.swift:
         commands.extend(
             [

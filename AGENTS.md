@@ -103,8 +103,10 @@ change/task 标为 approved/verified。
   ```
 
 - **最终本地闸只使用统一入口。**它固定运行 SDD、PR workflow tests、catalog generator tests
-  与零漂移检查，再按实际 diff 选择 ArkDeckKit full tests 和 App `build-for-testing`；可信 base
-  不可得时 fail closed 选择两条编译车道。`--filter`/`--skip-build` 只能用于开发反馈。
+  与零漂移检查，再按实际 diff 选择 ArkDeckKit full tests、App `build-for-testing` 与
+  `@arkdeck/ds` interaction tests（后者先 `npm ci` 再 `npm test`，跳过安装会得到误导性的
+  局部通过）；可信 base 不可得时 fail closed 选择全部车道。`--filter`/`--skip-build`
+  只能用于开发反馈。
 
   ```bash
   python3 scripts/ci/plan.py \
