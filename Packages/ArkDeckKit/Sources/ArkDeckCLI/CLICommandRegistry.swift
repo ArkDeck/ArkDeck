@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Foundation
 
 /// The one description of what `arkdeck` accepts.
@@ -1419,27 +1420,27 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "list",
         canonicalCommand: "artifact.list",
-        summary: "list the artifacts a job owns",
-        options: runtimeClientOptions([jobIDOption, artifactIDOption, allowSensitiveOption]),
-        connectsToRuntime: true),
+        summary: "list immutable artifacts for one Job or Import owner",
+        options: runtimeClientOptions(artifactOwnerOptions + snapshotPageOptions + [artifactIDOption, allowSensitiveOption]),
+        requiresExactlyOneOf: [["--job", "--import"]], connectsToRuntime: true),
       CLILeafSpec(
         token: "inspect",
         canonicalCommand: "artifact.inspect",
         summary: "owner, media type, privacy, byte count, digest and publish state",
-        options: runtimeClientOptions([
-          jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+        options: runtimeClientOptions(artifactOwnerOptions + [
+          requiredArtifactIDOption, allowSensitiveOption,
         ]),
-        connectsToRuntime: true),
+        requiresExactlyOneOf: [["--job", "--import"]], connectsToRuntime: true),
       CLILeafSpec(
         token: "read",
         canonicalCommand: "artifact.read",
         summary: "bounded range read of artifact content",
-        options: runtimeClientOptions([
-          jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+        options: runtimeClientOptions(artifactOwnerOptions + [
+          requiredArtifactIDOption, allowSensitiveOption,
           CLIOptionSpec(
             name: "--offset",
             form: .value(
-              placeholder: "byte-offset", grammar: .nonNegativeInteger(0...Int.max)),
+              placeholder: "byte-offset", grammar: .nonNegativeInteger(0...Int(ArtifactReadProjection.maximumSafeInteger))),
             summary: "first byte to read; 0 is the start of the artifact"),
           CLIOptionSpec(
             name: "--max-bytes",
@@ -1453,21 +1454,28 @@ enum CLICommandRegistry {
             summary: "write the decoded bytes to stdout and nothing else"),
         ]),
         mutuallyExclusive: [["--raw", "--output"], ["--raw", "--json"]],
-        connectsToRuntime: true),
+        requiresExactlyOneOf: [["--job", "--import"]], connectsToRuntime: true),
       CLILeafSpec(
         token: "export",
         canonicalCommand: "artifact.export",
         summary: "export artifact content to an explicit host directory",
-        options: runtimeClientOptions([
-          jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+        options: runtimeClientOptions(artifactOwnerOptions + [
+          requiredArtifactIDOption, allowSensitiveOption,
           CLIOptionSpec(
             name: "--destination",
             form: .value(placeholder: "directory", grammar: .opaque),
             summary: "existing host directory to write into",
             isRequired: true),
+          CLIOptionSpec(name: "--overwrite", form: .flag, summary: "replace only this exact exported file; still requires sensitive opt-in"),
         ]),
-        connectsToRuntime: true),
+        requiresExactlyOneOf: [["--job", "--import"]], connectsToRuntime: true),
     ], groups: [durableImportNode])
+
+  private static let artifactOwnerOptions: [CLIOptionSpec] = [
+    CLIOptionSpec(name: "--job", form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable Job owner"),
+    CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable Import owner"),
+    waitTimeoutOption, targetProtocolOption,
+  ]
 
   private static let importRequestOption = CLIOptionSpec(
     name: "--import-request-id", form: .value(placeholder: "id", grammar: .controlRequestID),
