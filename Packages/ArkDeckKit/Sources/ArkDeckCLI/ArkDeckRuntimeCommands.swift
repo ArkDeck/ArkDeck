@@ -1546,7 +1546,12 @@ enum RuntimeCLI {
     case "signing":
       try await runSigningAsync(rest, spelledAs: "runtime.signing")
     case "health":
-      let session = runtimeSession(&rest, command: "runtime.health")
+      var session = runtimeSession(&rest, command: "runtime.health")
+      if let index = rest.firstIndex(of: "--require-protocol"), index + 1 < rest.count,
+        let major = Int(rest[index + 1])
+      {
+        try session.negotiate(requiredMajor: major, forMethod: "health")
+      }
       session.emit(try session.request("health"))
     case "hdc":
       guard rest.first == "status" else {
@@ -2739,7 +2744,9 @@ params))
     switch subcommand {
     case "inspect":
       session.emit(
-        .object(["derivation": provenance, "capture": CLIOfflineDerivation.encode(capture: capture)]))
+        .object([
+          "derivation": provenance, "capture": CLIOfflineDerivation.encode(capture: capture),
+        ]))
     case "hit-test":
       guard let xText = options.value("--x"), let yText = options.value("--y"),
         let x = Double(xText), let y = Double(yText)

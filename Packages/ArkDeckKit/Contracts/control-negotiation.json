@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "arkdeck.control.registry/1",
+  "legacyVersion": "1.0.0",
+  "targetVersion": "2.0.0",
+  "supportedExactVersions": ["2.0.0", "1.0.0"],
+  "bootstrapVersion": "arkdeck.control.negotiation/1",
+  "bootstrapMethod": "protocol.negotiate",
+  "maximumBootstrapFrameBytes": 65536,
+  "targetMethods": ["health"],
+  "preBootstrapLegacyMethods": ["health"]
+}

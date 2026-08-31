@@ -38,6 +38,7 @@ enum CLIControlMethodRegistry {
   /// `debug.probe`, the three `flash.*` observations) read device and host
   /// facts without changing either — §8.4's test is mutation, not contact.
   private static let boundedReadOnlyMethods: Set<String> = [
+    ArkDeckControlProtocol.bootstrapMethod,
     "health",
     "doctor",
     "runtime.hdc-status",

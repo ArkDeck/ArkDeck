@@ -66,7 +66,7 @@ struct CLIRuntimeSession {
     var hasEmitted = false
   }
 
-  let client: AgentClient
+  var client: AgentClient
   /// The canonical dotted command, e.g. `job.status`.
   let command: String
   let rendering: CLIRendering
@@ -84,7 +84,19 @@ struct CLIRuntimeSession {
   final class StreamState {
     var nextSequence = 1
   }
-  
+
+  /// Negotiation selects a wire format without sending the domain request.
+  mutating func negotiate(requiredMajor: Int, forMethod method: String) throws {
+    do {
+      client = try client.negotiated(requiredMajor: requiredMajor, forMethod: method)
+    } catch let error as AgentClientError {
+      var mapped = CLIRuntimeSession.mapped(
+        error, method: ArkDeckControlProtocol.bootstrapMethod, command: command)
+      mapped.details["phase"] = .string("protocolNegotiation")
+      mapped.details["newDispatchCount"] = .integer(0)
+      throw stamped(mapped)
+    }
+  }
 
   /// Sends one request and maps any failure onto the §8.4 registry.
   func request(_ method: String, _ params: [String: JSONValue]? = nil) throws -> JSONValue {
@@ -180,6 +192,13 @@ struct CLIRuntimeSession {
         command: command, result: value, controlRequestID: controlRequestID)
       envelope = CLIResultEnvelope.withLifecycle(
         envelope, lifecycle, replacement: replacementArgvPattern)
+      if let version = client.selectedProtocolVersion,
+        case .object(var fields) = envelope, case .object(var meta)? = fields["meta"]
+      {
+        meta["controlProtocolVersion"] = .string(version)
+        fields["meta"] = .object(meta)
+        envelope = .object(fields)
+      }
       FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
     case .jsonlStream:
       FileHandle.standardOutput.write(

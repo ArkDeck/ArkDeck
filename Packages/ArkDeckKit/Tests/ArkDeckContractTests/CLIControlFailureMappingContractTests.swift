@@ -27,7 +27,8 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
 
   /// Every method the daemon dispatches on, scraped from its own switch.
   private func daemonMethods() throws -> Set<String> {
-    var found: Set<String> = []
+    // Bootstrap is deliberately handled before the domain method switch.
+    var found: Set<String> = [ArkDeckControlProtocol.bootstrapMethod]
     for line in try daemonSource().split(separator: "\n") {
       let trimmed = line.trimmingCharacters(in: .whitespaces)
       guard trimmed.hasPrefix("case \""), trimmed.hasSuffix("\":") else { continue }

@@ -130,8 +130,10 @@ final class CLIArgumentParserContractTests: XCTestCase {
       failure(["flash", "status", "--campaign-id", "E-1", "--socket", "/tmp/s"])?.code,
       .invalidOption)
     XCTAssertEqual(
-      failure(["update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o",
-        "--socket", "/tmp/s"])?.code,
+      failure([
+        "update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o",
+        "--socket", "/tmp/s",
+      ])?.code,
       .invalidOption)
     XCTAssertNotNil(success(["operation", "list", "--socket", "/tmp/s"]))
   }
@@ -307,6 +309,21 @@ final class CLIArgumentParserContractTests: XCTestCase {
         + "plain failure rather than an unknown outcome")
   }
 
+  func testProtocolNegotiationIsExplicitAndScopedToRuntimeHealth() {
+    for major in ["1", "2"] {
+      XCTAssertNotNil(
+        success(["runtime", "health", "--require-protocol", major, "--output", "json"]))
+    }
+    for major in ["0", "3", "02", "2.0.0", "-1"] {
+      XCTAssertEqual(
+        failure(["runtime", "health", "--require-protocol", major])?.code, .invalidOption)
+    }
+    XCTAssertEqual(failure(["job", "list", "--require-protocol", "2"])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure(["runtime", "health", "--require-protocol", "2", "--require-protocol", "1"])?.code,
+      .invalidOption)
+  }
+
   /// §5.2's duration grammar. Every rejected form is a caller meaning
   /// something the receiving contract cannot represent, so accepting any of
   /// them would round it silently.
@@ -349,15 +366,19 @@ final class CLIArgumentParserContractTests: XCTestCase {
   func testTheCorrelationIdentityIsValidatedAndEchoedOnlyWhenItIsSound() {
     XCTAssertNotNil(
       success(["job", "status", "--job", "J-1", "--control-request-id", "my.run:1-a_b"]))
-    for rejected in ["", "-leading", ".dot", "has space", "emoji-🙂", String(repeating: "a", count: 129)]
-    {
+    for rejected in [
+      "", "-leading", ".dot", "has space", "emoji-🙂", String(repeating: "a", count: 129),
+    ] {
       XCTAssertEqual(
         failure(["job", "status", "--job", "J-1", "--control-request-id", rejected])?.code,
         .invalidOption,
         "control request id \(rejected.debugDescription) must be refused")
     }
-    XCTAssertNotNil(success(["job", "status", "--job", "J-1", "--control-request-id",
-      String(repeating: "a", count: 128)]))
+    XCTAssertNotNil(
+      success([
+        "job", "status", "--job", "J-1", "--control-request-id",
+        String(repeating: "a", count: 128),
+      ]))
 
     // §8.1: exactly one sound value is echoed; anything else gets a fresh
     // bounded identity rather than putting unvalidated bytes in machine output.

@@ -809,12 +809,172 @@ final class AgentDaemonContractTests: XCTestCase {
 
   // MARK: - Transport-free protocol negatives
 
+  func testNegotiatedHealthUsesV2WhileDefaultClientKeepsV1() async throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+    let client = AgentClient(socketPath: server.socketURL.path)
+    let v2 = try client.negotiated(requiredMajor: 2, forMethod: "health")
+    XCTAssertEqual(v2.selectedProtocolVersion, "2.0.0")
+    let health = try v2.request(method: "health")
+    guard case .object(let fields) = health else { return XCTFail("missing health object") }
+    XCTAssertEqual(fields["protocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(fields["publishedMethods"], .array([.string("health")]))
+    let legacy = try client.request(method: "health")
+    guard case .object(let legacyFields) = legacy else { return XCTFail("missing legacy health") }
+    XCTAssertEqual(legacyFields["protocolVersion"], .string("1.0.0"))
+    XCTAssertEqual(
+      Set(legacyFields.keys), ["status", "protocolVersion", "catalogDigest", "providers"])
+    XCTAssertThrowsError(try client.negotiated(requiredMajor: 3, forMethod: "health")) { error in
+      guard case AgentClientError.daemonError(let code, _) = error else {
+        return XCTFail("expected unsupported version, got \(error)")
+      }
+      XCTAssertEqual(code, "unsupportedProtocolVersion")
+    }
+  }
+
+  func testV2CannotReachAnUnpublishedMutationOrLegacyAdoption() async throws {
+    let (handler, _) = try makeStack()
+    for method in [
+      "target.adopt", "job.submit", "job.run", "debug.start", "artifact.importHap.begin",
+    ] {
+      let frame = try CanonicalJSONEncoders.canonical().encode([
+        "protocolVersion": JSONValue.string("2.0.0"), "id": .string("refused-1"),
+        "method": .string(method), "params": .object([:]),
+      ])
+      let reply = await handler.handleFrame(frame)
+      XCTAssertFalse(reply.ok, method)
+      XCTAssertEqual(reply.error?.code, "unknownMethod", method)
+    }
+    let frame = Data(#"{"protocolVersion":"2.1.0","id":"exact","method":"target.adopt"}"#.utf8)
+    let rejected = await handler.handleFrame(frame)
+    XCTAssertEqual(rejected.error?.code, "unsupportedProtocolVersion")
+  }
+
+  func testBootstrapIsUnaryAndNeverInterpretsBundledDomainInput() async throws {
+    let (handler, _) = try makeStack()
+    let request = try ControlProtocolNegotiation.request(id: "neg-1", requiredMajor: 2)
+    let line = await handler.handleLine(request)
+    XCTAssertEqual(line.filter { $0 == 0x0A }.count, 1)
+    XCTAssertEqual(
+      try ControlProtocolNegotiation.selectedVersion(
+        response: Data(line.dropLast()), id: "neg-1", requiredMajor: 2), "2.0.0")
+
+    let invalid = [
+      #"{"bootstrapVersion":"arkdeck.control.negotiation/1","id":"neg-1","method":"protocol.negotiate","supportedExactVersions":["2.0.0"],"requiredMajor":2,"params":{"method":"target.adopt"}}"#,
+      #"{"protocolVersion":"2.0.0","id":"bad","method":"health","method":"target.adopt"}"#,
+      #"{"protocolVersion":"2.0.0","id":"bad","method":"health","credentials":"caller-facts"}"#,
+    ]
+    for raw in invalid {
+      let answer = await handler.handleLine(Data(raw.utf8))
+      let object = try JSONDecoder().decode([String: JSONValue].self, from: answer)
+      XCTAssertEqual(object["ok"], .bool(false))
+    }
+  }
+
+  func testCLIReportsTheProtocolItActuallyNegotiated() throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+    let products = Bundle(for: type(of: self)).bundleURL.deletingLastPathComponent()
+    for major in ["1", "2", "3"] {
+      let process = Process()
+      process.executableURL = products.appending(path: "arkdeck")
+      process.arguments = [
+        "runtime", "health", "--require-protocol", major,
+        "--socket", server.socketURL.path, "--output", "json",
+      ]
+      let out = Pipe()
+      let err = Pipe()
+      process.standardOutput = out
+      process.standardError = err
+      try process.run()
+      let bytes = out.fileHandleForReading.readDataToEndOfFile()
+      let errorBytes = err.fileHandleForReading.readDataToEndOfFile()
+      process.waitUntilExit()
+      let envelope = try JSONDecoder().decode([String: JSONValue].self, from: bytes)
+      if major == "3" {
+        XCTAssertEqual(process.terminationStatus, 64)
+        XCTAssertEqual(envelope["ok"], .bool(false))
+      } else {
+        XCTAssertEqual(process.terminationStatus, 0, String(decoding: errorBytes, as: UTF8.self))
+        guard case .object(let result)? = envelope["result"],
+          case .object(let meta)? = envelope["meta"]
+        else { return XCTFail("health must have a result and metadata") }
+        XCTAssertEqual(result["protocolVersion"], .string("\(major).0.0"))
+        XCTAssertEqual(meta["controlProtocolVersion"], result["protocolVersion"])
+      }
+    }
+  }
+
+  func testPreBootstrapDaemonNeverDowngradesATargetRequest() throws {
+    for major in [1, 2] {
+      let socketURL = stateDirectory.appending(path: "old-\(major).sock")
+      try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+      let listener = socket(AF_UNIX, SOCK_STREAM, 0)
+      XCTAssertGreaterThanOrEqual(listener, 0)
+      defer { close(listener) }
+      var address = sockaddr_un()
+      address.sun_family = sa_family_t(AF_UNIX)
+      withUnsafeMutableBytes(of: &address.sun_path) { buffer in
+        socketURL.path.utf8CString.withUnsafeBytes { source in
+          buffer.copyMemory(from: UnsafeRawBufferPointer(rebasing: source.prefix(buffer.count)))
+        }
+      }
+      let bound = withUnsafePointer(to: &address) { pointer in
+        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+          Darwin.bind(listener, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+        }
+      }
+      XCTAssertEqual(bound, 0)
+      XCTAssertEqual(listen(listener, 1), 0)
+      let served = expectation(description: "old daemon received bootstrap only")
+      DispatchQueue.global().async {
+        let connection = accept(listener, nil, nil)
+        guard connection >= 0 else { return served.fulfill() }
+        defer { close(connection) }
+        var request = Data()
+        var chunk = [UInt8](repeating: 0, count: 1024)
+        while !request.contains(0x0A) {
+          let count = read(connection, &chunk, chunk.count)
+          guard count > 0 else { return served.fulfill() }
+          request.append(contentsOf: chunk.prefix(count))
+        }
+        let object = try? JSONDecoder().decode([String: JSONValue].self, from: request)
+        XCTAssertEqual(object?["method"], .string("protocol.negotiate"))
+        XCTAssertNil(object?["protocolVersion"])
+        let reply = Data(
+          (#"{"id":"-","ok":false,"error":{"code":"malformedFrame","message":"undecodable request frame"}}"#
+            + "\n").utf8)
+        _ = reply.withUnsafeBytes { write(connection, $0.baseAddress!, $0.count) }
+        served.fulfill()
+      }
+      let client = AgentClient(socketPath: socketURL.path)
+      if major == 1 {
+        let legacy = try client.negotiated(requiredMajor: 1, forMethod: "health")
+        XCTAssertEqual(legacy.selectedProtocolVersion, "1.0.0")
+        XCTAssertThrowsError(try legacy.request(method: "job.submit", timeoutSeconds: 1)) {
+          guard case AgentClientError.daemonError(let code, _) = $0 else {
+            return XCTFail("a health fallback must not authorize another method")
+          }
+          XCTAssertEqual(code, "unsupportedProtocolVersion")
+        }
+      } else {
+        XCTAssertThrowsError(try client.negotiated(requiredMajor: 2, forMethod: "health")) {
+          guard case AgentClientError.daemonError(let code, _) = $0 else {
+            return XCTFail("target negotiation must be refused")
+          }
+          XCTAssertEqual(code, "unsupportedProtocolVersion")
+        }
+      }
+      wait(for: [served], timeout: 10)
+    }
+  }
+
   func testProtocolNegativesAreStructural() async throws {
     let (handler, _) = try makeStack()
     // Unknown major version.
     let wrongMajor = Data(
       """
-      {"protocolVersion":"2.0.0","id":"1","method":"health"}
+      {"protocolVersion":"3.0.0","id":"1","method":"health"}
       """.utf8)
     let rejected = await handler.handleFrame(wrongMajor)
     XCTAssertFalse(rejected.ok)

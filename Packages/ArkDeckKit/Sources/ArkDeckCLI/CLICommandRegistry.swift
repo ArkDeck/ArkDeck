@@ -789,7 +789,12 @@ enum CLICommandRegistry {
         token: "health",
         canonicalCommand: "runtime.health",
         summary: "control protocol, catalog digest and provider health",
-        options: runtimeClientOptions([]),
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--require-protocol",
+            form: .value(placeholder: "1|2", grammar: .enumeration(["1", "2"])),
+            summary: "negotiate this exact protocol major before reading health; never downgrade")
+        ]),
         connectsToRuntime: true)
     ],
     groups: [
@@ -1617,7 +1622,7 @@ enum CLICommandRegistry {
             form: .flag,
             summary: "replace an existing binding instead of leaving it unchanged"),
           outputOption,
-        ]),
+        ])
     ]
       + compatibilitySpelling(
         of: legacyFlashNode.leaves, as: "flash", replacedBy: "legacy flash")
