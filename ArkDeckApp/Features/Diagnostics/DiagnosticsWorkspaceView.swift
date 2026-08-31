@@ -121,9 +121,15 @@ struct DiagnosticsWorkspaceView: View {
 
   private var toolbar: some View {
     HStack(spacing: 12) {
-      Text(diagnosticsText(model.isHilogSummaryContext ? "diagnostics.hilog.title" : "diagnostics.title"))
-        .font(WorkspaceFont.sectionTitle)
-        .accessibilityIdentifier("diagnostics.workspace.title")
+      // Only the HiLog context names itself here. The plain context's title
+      // was the same words the window toolbar already shows, and spec §8 does
+      // not allow a content area to repeat the toolbar's page title — so that
+      // branch draws nothing and the reload control leads the strip instead.
+      if model.isHilogSummaryContext {
+        Text(diagnosticsText("diagnostics.hilog.title"))
+          .font(WorkspaceFont.sectionTitle)
+          .accessibilityIdentifier("diagnostics.workspace.title")
+      }
       Spacer()
       if model.session != nil || model.hilogSummary != nil {
         Button(diagnosticsText("diagnostics.session.reload"), action: model.reload)

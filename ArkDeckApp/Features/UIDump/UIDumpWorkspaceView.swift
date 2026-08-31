@@ -1203,6 +1203,20 @@ enum ViewerInspectorTab: String {
 /// Inspector vocabulary deliberately stays in English. These labels describe
 /// provider fields and debugging concepts beside an English Raw dump; changing
 /// them with the App locale makes the same concept wear two names in one pane.
+/// The Viewer inspector's vocabulary.
+///
+/// Empty states and the Advanced Dump search controls resolve through
+/// `UIDumpLocalizable`; everything else below stays hardcoded English. That
+/// split is the maintainer's ruling on audit F52 item 5, and it follows spec
+/// §5.3: tab names, group titles, field names, chips and the values shown
+/// inside those field lists are the Provider's own vocabulary, and translating
+/// them would make this pane disagree with the Raw dump beside it. A loading
+/// placeholder and a failure reason are neither an empty state nor a search
+/// control, so they stay English too until someone rules on them.
+///
+/// These are `let`, not computed: the search field rebuilds its rows on every
+/// keystroke, and a computed property would hit the bundle each time. The
+/// language is fixed by the launch arguments, so resolving once is correct.
 private enum ViewerInspectorCopy {
   static let properties = "Properties"
   static let layout = "Layout"
@@ -1225,19 +1239,19 @@ private enum ViewerInspectorCopy {
   static let verified = "Verified"
   static let yes = "Yes"
   static let no = "No"
-  static let selectPrompt = "Select a component"
-  static let rawUnavailable = "Raw fields are unavailable"
-  static let advancedUnavailable = "Select this tab to capture componentDetail fields"
+  static let selectPrompt = viewerText("viewer.properties.selectPrompt")
+  static let rawUnavailable = viewerText("viewer.properties.rawUnavailable")
+  static let advancedUnavailable = viewerText("viewer.advancedDump.unavailable")
   static let advancedLoading = "Capturing componentDetail…"
   static let advancedIdentifiersUnavailable =
     "This component has no numeric hostWindowId/componentId pair in the current capture"
   static let retry = "Retry"
-  static let advancedSearch = "Search Advanced Dump"
-  static let advancedSearchPlaceholder = "Search fields or values"
-  static let advancedSearchShortcut = "Search Advanced Dump (⌘F)"
-  static let advancedSearchResults = "Advanced Dump search results"
-  static let advancedSearchClear = "Clear search"
-  static let advancedSearchNoResults = "No matching fields or values"
+  static let advancedSearch = viewerText("viewer.advancedDump.search")
+  static let advancedSearchPlaceholder = viewerText("viewer.advancedDump.search.placeholder")
+  static let advancedSearchShortcut = viewerText("viewer.advancedDump.search.shortcut")
+  static let advancedSearchResults = viewerText("viewer.advancedDump.search.results")
+  static let advancedSearchClear = viewerText("viewer.advancedDump.search.clear")
+  static let advancedSearchNoResults = viewerText("viewer.advancedDump.search.noResults")
 
   static func show(_ title: String) -> String { "Show \(title)" }
 }

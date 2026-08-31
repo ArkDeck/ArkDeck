@@ -2129,6 +2129,18 @@ const VIEWER_COPY={
     "en": "Select component",
     "zh-Hans": "选择组件"
   },
+  "viewer.advancedDump.search": {
+    "en": "Search Advanced Dump",
+    "zh-Hans": "搜索 Advanced Dump"
+  },
+  "viewer.advancedDump.search.placeholder": {
+    "en": "Search fields or values",
+    "zh-Hans": "搜索字段或值"
+  },
+  "viewer.advancedDump.search.noResults": {
+    "en": "No matching fields or values",
+    "zh-Hans": "没有匹配的字段或值"
+  },
   "viewer.tree.expand": {
     "en": "Expand",
     "zh-Hans": "展开"
@@ -2354,7 +2366,7 @@ function viewerAdvancedFields(node){
 function viewerAdvancedResults(node){
   const all=viewerAdvancedFields(node),query=S.viewer.advancedQuery.trim().toLowerCase();
   const fields=all.filter(([key,value])=>`${key} ${value}`.toLowerCase().includes(query));
-  return `<span class="hint" data-sync-id="viewer.advancedDump.search.matchCount">${fields.length} / ${all.length}</span>${fields.length?viewerKV(fields):'<p class="hint" data-sync-id="viewer.advancedDump.search.noResults">No matching fields or values</p>'}`;
+  return `<span class="hint" data-sync-id="viewer.advancedDump.search.matchCount">${fields.length} / ${all.length}</span>${fields.length?viewerKV(fields):'<p class="hint" data-sync-id="viewer.advancedDump.search.noResults">${viewerCopy("viewer.advancedDump.search.noResults")}</p>'}`;
 }
 function setViewerAdvancedQuery(input){S.viewer.advancedQuery=input.value;$("viewerAdvancedResults").innerHTML=viewerAdvancedResults(viewerNode(S.viewer.selected));}
 function viewerAdvancedHTML(node){
@@ -2362,7 +2374,7 @@ function viewerAdvancedHTML(node){
   if(state==='loading')return '<p class="hint" role="status" data-sync-id="viewer.advancedDump.loading">Capturing componentDetail…</p>';
   if(state==='missingIDs')return '<p class="hint" data-sync-id="viewer.advancedDump">This component has no numeric hostWindowId/componentId pair in the current capture</p>';
   if(state==='failed')return `<div data-sync-id="viewer.advancedDump"><p class="hint">Demo: componentDetail capture failed. No previous component fields are reused.</p><button class="btn" data-sync-id="viewer.advancedDump.retry" onclick="S.viewer.advancedState='ready';renderPage()">Retry</button></div>`;
-  return `<p class="hint">${lc('演示字段。实际 App 在选中本标签时按当前 capture、binding 与组件数字 ID 读取 componentDetail。','Demo fields. The App loads componentDetail on selecting this tab, bound to the current capture, binding and numeric component IDs.')}</p><input class="inp" type="search" aria-label="Search Advanced Dump" placeholder="Search fields or values" data-sync-id="viewer.advancedDump.search" value="${esc(S.viewer.advancedQuery)}" oninput="setViewerAdvancedQuery(this)"><div id="viewerAdvancedResults" data-sync-id="viewer.advancedDump">${viewerAdvancedResults(node)}</div>`;
+  return `<p class="hint">${lc('演示字段。实际 App 在选中本标签时按当前 capture、binding 与组件数字 ID 读取 componentDetail。','Demo fields. The App loads componentDetail on selecting this tab, bound to the current capture, binding and numeric component IDs.')}</p><input class="inp" type="search" aria-label="${viewerCopy("viewer.advancedDump.search")}" placeholder="${viewerCopy("viewer.advancedDump.search.placeholder")}" data-sync-id="viewer.advancedDump.search" value="${esc(S.viewer.advancedQuery)}" oninput="setViewerAdvancedQuery(this)"><div id="viewerAdvancedResults" data-sync-id="viewer.advancedDump">${viewerAdvancedResults(node)}</div>`;
 }
 function viewerInspectorHTML(node){
   const raw=viewerRaw(node),tabs=VIEWER_TABS;
@@ -3061,7 +3073,7 @@ function pDiagnostics(){
   if(PARAMS.get('concept')==='diagnostics')return `<div class="warnbox" role="note">${lc("未来交互探索：交互式布防、追加 Marker、停止与跨时钟校准尚未接通。已发布 operation 支持有界 ringBuffered 采集及部分自动标记。以下完整会话是合成演示。","Future concept: interactive arm, append-marker, stop and cross-clock calibration are not connected. The published operation supports bounded ringBuffered capture and some automatic markers. The full session below is synthetic.")}</div>`+pDiagnosticsConcept();
   if(S.diagnostics.hilogSummary)return hilogSummaryHTML(S.diagnostics.hilogSummary);
   return `<div class="page-lead" data-page-title="Diagnostics"></div><section class="device-section">
-    <div class="device-actions"><b>Diagnostics</b><span class="spacer"></span>${['loaded','partial','trace'].includes(S.diagnostics.reader)?`<button class="btn" onclick="S.diagnostics.preview=null;renderPage()">${diagnosticsCopy('diagnostics.session.reload')}</button>`:''}<span class="chip warn" data-sync-id="diagnostics.alignment">${lc('无法对齐','Cannot align')}</span></div>
+    <div class="device-actions"><span class="spacer"></span>${['loaded','partial','trace'].includes(S.diagnostics.reader)?`<button class="btn" onclick="S.diagnostics.preview=null;renderPage()">${diagnosticsCopy('diagnostics.session.reload')}</button>`:''}<span class="chip warn" data-sync-id="diagnostics.alignment">${lc('无法对齐','Cannot align')}</span></div>
     <div class="device-actions"><button class="btn" disabled data-sync-id="diagnostics.capture.arm">${diagnosticsCopy('diagnostics.capture.arm')}</button><button class="btn" disabled data-sync-id="diagnostics.capture.mark">${diagnosticsCopy('diagnostics.capture.mark')}</button></div>
     <div class="warnbox" data-sync-id="diagnostics.capture.unavailable"><div><b>${diagnosticsCopy('diagnostics.capture.unavailable')}</b><p class="hint">${diagnosticsCopy('diagnostics.capture.unavailable.detail')}</p><span class="hint mono">diagnostic_session_capture_not_connected</span></div></div>
     ${diagnosticsSessionHTML()}

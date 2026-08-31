@@ -494,23 +494,6 @@
         }
       }
     },
-    "diagnostics.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diagnostics"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diagnostics"
-          }
-        }
-      }
-    },
     "diagnostics.session.loading": {
       "extractionState": "manual",
       "localizations": {

@@ -1803,14 +1803,25 @@ test('localization catalogs carry no keys for paths the App no longer renders', 
     assert.deepEqual(unreferenced(name), [], `${name} regained keys nothing renders`);
   }
 
-  // Held back on purpose, each tied to an open maintainer decision. Pinned by
-  // count so neither the cleanup nor the decision can drift silently.
-  assert.equal(
-    unreferenced('UIDumpLocalizable').length, 25,
-    'the Viewer inspector keys are held for the English-retention decision (F52-5)');
-  assert.equal(
-    unreferenced('SettingsLocalizable').length, 4,
-    'the Settings pane titles are held for the duplicate-page-title decision');
+  // Both decisions have since landed (F63). Settings' four pane titles were
+  // dead once a content area may not repeat the toolbar title, so that catalog
+  // is clean now. The Viewer keys went from 25 unreferenced to 23: the ruling
+  // covers empty states and search controls, so selectPrompt and rawUnavailable
+  // are wired up while the tab, group, field, chip and value words stay English
+  // on purpose — they are the Provider's vocabulary (spec §5.3).
+  assert.deepEqual(unreferenced('SettingsLocalizable'), []);
+  const viewerHeld = unreferenced('UIDumpLocalizable');
+  assert.equal(viewerHeld.length, 23, 'the reserved-English Viewer vocabulary');
+  for (const wired of ['viewer.properties.selectPrompt', 'viewer.properties.rawUnavailable']) {
+    assert.ok(!viewerHeld.includes(wired), `${wired} must now be referenced`);
+  }
+  // Every key held back is vocabulary, not prose: no empty state or search
+  // control may hide in this set.
+  for (const key of viewerHeld) {
+    assert.match(
+      key, /^viewer\.(tab|group|field|chip|value|action|tree)\./,
+      `${key} is held back but is not Provider vocabulary`);
+  }
 });
 
 test('every design preview is type-checked and bundled by a script', () => {

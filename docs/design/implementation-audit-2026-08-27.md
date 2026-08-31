@@ -1564,3 +1564,75 @@ U+2019）写成直引号。现改为从 `.xcstrings` 逐字取值。两条教训
 **是否引入稿件漂移**：#1618 未触碰任何 `.xcstrings`，两个编辑器是既有 Trace Viewer 时间轴标记
 编辑逻辑的**拆分**（该 PR 修的是异步更新期间的 SwiftUI 状态保持），无新增可见文案，故稿件侧
 无需变化。§3 矩阵的 Trace Viewer 行覆盖它们，生产 View 索引由 21/21 更新为 23/23。
+## 2026-08-31 F65：两条待裁决落地
+
+第十二批，基线 `ea5776f2`。维护者给出两条结论，本批同车落地：
+**①内容区不允许重复工具栏页面标题；②Viewer 空态和搜索控件走目录。**
+逐行结论见[2026-08-31 裁决落地台账](references/ui-consistency/2026-08-31-rulings-ledger.md)。
+
+**先更正 F52 第 5 条的一处不实陈述。** 该条写「`UIDumpLocalizable.xcstrings` 里这些键都有中文
+译文且无人引用」，并列举了六条。实测**六条里只有两条成立**：`Select a component`
+（`viewer.properties.selectPrompt`）与 `Raw fields are unavailable`
+（`viewer.properties.rawUnavailable`）确实是有译文的无引用键；而 `Retry`、
+`Search fields or values`、`Clear search`、`No matching fields or values`
+**在目录里根本没有键**。因此落地裁决 ② 不是「接上已有译文」，而是**新增键并新译**。
+原记述保留不改写，以本段为准。
+
+**裁决 ② 的分类：9 条走目录，其余保持英文。** 对 `ViewerInspectorCopy` 的 34 个成员逐条按
+渲染点分类，并对每条非 english 的判断做了对抗复核（复核方被要求「措辞未明确覆盖就驳回」）：
+
+| 结果 | 数量 | 内容 |
+| --- | --- | --- |
+| 走目录（复核 confirmed） | 9 | 空态 3：`selectPrompt`、`rawUnavailable`、`advancedUnavailable`；搜索控件 6：`advancedSearch` 及其 placeholder / shortcut / results / clear / noResults |
+| 保持英文 | 23 | tab 名、分组名、字段名、chip、字段列表里的值（`Yes`/`No`/`Available`/`Verified`）——spec §5.3 的 Provider 词表 |
+| **复核驳回** | 2 | `advancedLoading`（加载态）、`advancedIdentifiersUnavailable`（失败原因）——裁决只说「空态和搜索控件」，二者都不在措辞内 |
+
+**不擅自扩大裁决**：`retry` 是失败分支里的恢复动作、`show(_:)` 是动作、`Yes`/`No` 是技术字段
+列表里的值，裁决均未覆盖，全部保持英文。这条边界写进了 `ViewerInspectorCopy` 的类型注释，
+免得下一个人再问一遍。新增 7 条目录键（`viewer.advancedDump.*`），中英成对。
+
+**裁决 ① 的落地与一个连带效果。** `DiagnosticsWorkspaceView` 的自绘工具条此前用三元表达式
+渲染标题：HiLog 上下文显示 `diagnostics.hilog.title`（**与工具栏不同名，合规**），普通上下文
+显示 `diagnostics.title`（**与工具栏同名，违规**）。故不能整行删除——改为只在 HiLog 上下文
+渲染。稿件侧 `pDiagnostics()` 内容区那句字面 `<b>Diagnostics</b>` 一并删除。
+
+连带效果：`diagnostics.title` 随之成为死键（窗口标题走的是导航项的 `localizationKey`，
+不是这个键），已删除。`settings.{general,storage,toolchains,diagnostics}.title` 四条此前正是
+**因这条裁决未决**而在 F60 保留的，现确认为死键，一并删除——`SettingsLocalizable` 的无引用
+键归零。
+
+**同车更新一条 UI 断言。** `AppShellUITests.swift:622` 原本断言
+`app.staticTexts["diagnostics.workspace.title"]` 等于 `"Diagnostics"`——它**钉住的正是被裁决
+判为违规的行为**。改为断言该元素不存在。这不是回归，是断言对象本身被裁掉了。
+除此之外，20 处相关 UI 断言全部**不受影响**：它们一律按 accessibility identifier 查询，
+不依赖文案，所以文案中文化不会打红它们。
+
+### 本批自己引入又修掉的两个回归
+
+原生跑动抓到两处编译与设计测试都发现不了的问题，均为本批改动所致：
+
+1. **性能**：九条文案改成 `static var { viewerText(…) }` 后**每次访问都查 Bundle**，而
+   Advanced Dump 搜索每敲一个字符重建数百行，正是热路径——`typing a field query must not
+   block on rebuilding hundreds of rows` 实测 3.71s、上限 2.0s。改回 `static let`（只求值一次；
+   语言由启动参数固定），理由写进类型注释。
+2. **时序**：把 `assertDisplayed`（会等待）换成 `XCTAssertFalse(...exists)`（立即返回），
+   顺手删掉了一个隐式同步点。改为先等该页自己的内容到位再断言。
+
+### `testEnglishSweepOfEveryWorkspace`：既有失败，非本批引入
+
+该测试在本批分支上失败，失败点在 `:699`（`sweep` 内 Debug 面板检查）与 `:1796`（快照匹配）
+之间摇摆。**在干净 `main` 上取三个样本：1 次 `:1793` 快照、2 次 `:699` Debug 面板，消息与本批
+逐字相同**（`:1793` 与 `:1796` 是同一处，本批改测试文件多出 3 行）。两侧在同样两处之间摇摆、
+全部样本有效性信号为 0，故判为既有缺陷，本批既不引入也不负责修绿。
+
+先排除了文案原因：Debug 面板标题取自 `DebugLocalizable`，而本批的资源改动只涉及
+Diagnostics / Settings / UIDump 三个目录。**归因一律先在干净 `main` 上取样，不因「没碰那个
+工作区」就推给既有**——上面那两个回归当初都「看起来不是我的」。
+
+### CI 门状态更新
+
+F61 登记的「ds 交互测试不在任何 PR 门里」已由维护者拍板加门（chip `task_519ac5fa`），
+并由另一会话实现、推上 `agent/ain-022-ds-interaction-gate`：在 `swift-ci.yml` 的 plan 车道体系
+里新增第三条 `ds` 车道，触发面为套件真实读取的四个目录（`ArkDeckApp/`、`ArkDeckAppUITests/`、
+`Packages/`、`docs/design/`），折进现有 `swift` required 聚合器。状态由「已登记待决策」
+翻为**已决策、已实现、待合入**。
