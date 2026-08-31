@@ -1302,7 +1302,12 @@ enum RuntimeCLI {
       // never adopts — the Runtime's adopt path is a separate, explicit call.
       var params: [String: JSONValue] = [:]
       if rest.contains("--use-warm-snapshot") { params["useWarmSnapshot"] = .bool(true) }
-      session.emit(try session.request("device.candidates", params.isEmpty ? nil : params))
+      // `device.observations`, not `device.candidates`: §6.1 requires a fixed
+      // snapshot generation and a Runtime-issued observation ID per candidate,
+      // and the older method returns a bare array with nowhere to put the
+      // generation. The array method stays for the App and the Agent executor
+      // until they migrate — §13.2 lets the CLI move to the target shape first.
+      session.emit(try session.request("device.observations", params.isEmpty ? nil : params))
     case "list", "show":
       session.emit(try session.request("target.list"))
     case "adopt":

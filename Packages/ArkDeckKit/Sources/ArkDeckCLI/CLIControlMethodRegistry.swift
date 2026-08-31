@@ -44,6 +44,9 @@ enum CLIControlMethodRegistry {
     "operation.list",
     "operation.describe",
     "device.candidates",
+    // The object-shaped sibling §6.1 needs. Observes and reports: it reads the
+    // discovery snapshot and mints identity for it, and creates no binding.
+    "device.observations",
     "target.list",
     "target.show",
     // Read the registered configuration and report. They create nothing and

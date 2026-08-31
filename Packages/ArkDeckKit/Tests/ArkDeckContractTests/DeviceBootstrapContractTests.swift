@@ -148,6 +148,28 @@ final class DeviceBootstrapContractTests: XCTestCase {
     }
   }
 
+  /// Compares the facts a candidate assertion is about, without the
+  /// Runtime-issued observation ID.
+  ///
+  /// §8.5 mints a fresh opaque ID for every committed observation, so a whole-
+  /// value `XCTAssertEqual` against a fixture would compare a value that is
+  /// different by design on every run. These tests are about which candidates
+  /// a read publishes and in what state; the identity has its own tests in
+  /// `DeviceObservationIdentityContractTests`.
+  private func routes(_ candidates: [BootstrapCandidate]) -> [(String, String)] {
+    candidates.map { ($0.connectKey, $0.state) }
+  }
+
+  private func assertRoutes(
+    _ actual: [BootstrapCandidate], _ expected: [BootstrapCandidate],
+    _ message: String = "", file: StaticString = #filePath, line: UInt = #line
+  ) {
+    XCTAssertEqual(
+      routes(actual).map { "\($0.0)/\($0.1)" },
+      routes(expected).map { "\($0.0)/\($0.1)" },
+      message, file: file, line: line)
+  }
+
   private func informationMachine(
     observation: InformationObservation, timestamp: PresentationTimestamp = PresentationTimestamp()
   ) throws -> (DeviceBootstrapMachine, RuntimeTargetStore) {
@@ -314,8 +336,15 @@ final class DeviceBootstrapContractTests: XCTestCase {
     async let second = machine.enumerateCandidates()
     let results = try await (first, second)
 
-    XCTAssertEqual(results.0, [candidate])
-    XCTAssertEqual(results.1, [candidate])
+    assertRoutes(results.0, [candidate])
+    assertRoutes(results.1, [candidate])
+    // Both waiters coalesced onto one probe, so both must carry the same
+    // minted identity — a losing waiter receiving no ID would read as
+    // "this Runtime does not issue them".
+    XCTAssertNotNil(results.0.first?.observationID)
+    XCTAssertEqual(
+      results.0.first?.observationID, results.1.first?.observationID,
+      "one committed observation is one identity")
     let candidateReadCount = await observation.candidateReadCount
     XCTAssertEqual(
       candidateReadCount, 1,
@@ -332,7 +361,7 @@ final class DeviceBootstrapContractTests: XCTestCase {
       observation: observation, targetStore: store, nowUTC: { "2026-08-13T00:00:00Z" })
 
     let initial = try await machine.candidateSnapshotForPresentation()
-    XCTAssertEqual(initial.candidates, [first])
+    assertRoutes(initial.candidates, [first])
 
     let clock = ContinuousClock()
     let startedAt = clock.now
@@ -340,16 +369,16 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertLessThan(
       startedAt.duration(to: clock.now), .milliseconds(50),
       "a warm App launch must not join the next HDC command")
-    XCTAssertEqual(warm.candidates, [first])
+    assertRoutes(warm.candidates, [first])
 
     // Await the coalesced refresh itself instead of assuming a fixed wall
     // clock delay is enough on every CI runner. The assertion above owns the
     // warm-path latency contract; this call deterministically observes the
     // eventual refresh result without launching a duplicate provider probe.
     let refreshed = try await machine.refreshCandidateSnapshotForPresentation()
-    XCTAssertEqual(refreshed.candidates, [second])
+    assertRoutes(refreshed.candidates, [second])
     let published = try await machine.candidateSnapshotForPresentation()
-    XCTAssertEqual(published.candidates, [second])
+    assertRoutes(published.candidates, [second])
     let refreshedReadCount = await observation.candidateReadCount
     XCTAssertGreaterThanOrEqual(refreshedReadCount, 2)
     XCTAssertTrue(try store.list().isEmpty, "background observation remains read-only")
@@ -368,7 +397,7 @@ final class DeviceBootstrapContractTests: XCTestCase {
     try await Task.sleep(for: .milliseconds(20))
 
     let stale = try await machine.candidateSnapshotForPresentation()
-    XCTAssertEqual(stale.candidates, [candidate])
+    assertRoutes(stale.candidates, [candidate])
     XCTAssertEqual(stale.health, .stale)
     let failedReadCount = await observation.candidateReadCount
     XCTAssertGreaterThanOrEqual(failedReadCount, 2)
@@ -678,7 +707,7 @@ final class DeviceBootstrapContractTests: XCTestCase {
       observation: liveObservation, targetStore: store,
       nowUTC: { "2026-08-08T00:11:00Z" })
     let refreshed = try await liveMachine.enumerateCandidates()
-    XCTAssertEqual(
+    assertRoutes(
       refreshed, refreshedCanonicalCandidates,
       "the production bootstrap refresh must publish the live route observation")
     XCTAssertEqual(

@@ -939,7 +939,9 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "candidates",
         canonicalCommand: "device.candidates",
-        summary: "live HDC candidates, their authorization state and any adopted target",
+        summary:
+          "one discovery snapshot: generation, per-candidate observation identity, "
+          + "authorization state and any adopted target",
         options: runtimeClientOptions([
           CLIOptionSpec(
             name: "--use-warm-snapshot",

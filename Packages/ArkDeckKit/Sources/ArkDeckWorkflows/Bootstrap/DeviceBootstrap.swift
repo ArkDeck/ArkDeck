@@ -48,10 +48,19 @@ public enum BootstrapPhase: String, Sendable, Equatable, Codable {
 public struct BootstrapCandidate: Sendable, Equatable, Codable {
   public let connectKey: String
   public let state: String
+  /// §8.5's Runtime-issued lifecycle-scoped observation ID.
+  ///
+  /// `nil` means this candidate did not come through the Runtime's observation
+  /// registry — a fixture, or a decode in a test. It is not a missing value to
+  /// be filled in with something plausible: an ID a caller could pass to
+  /// `target adopt --observation` has to have been minted by the Runtime that
+  /// will check it.
+  public let observationID: String?
 
-  public init(connectKey: String, state: String) {
+  public init(connectKey: String, state: String, observationID: String? = nil) {
     self.connectKey = connectKey
     self.state = state
+    self.observationID = observationID
   }
 
   public var isAuthorized: Bool { state == "Connected" }
@@ -74,13 +83,21 @@ public struct BootstrapCandidateSnapshot: Sendable, Equatable {
   public let candidates: [BootstrapCandidate]
   public let observedAtUTC: String
   public let health: Health
+  /// §6.1's fixed snapshot generation, monotonic per daemon session.
+  ///
+  /// `nil` for a snapshot the observation registry never stamped, for the same
+  /// reason `observationID` is optional: a generation a caller could pass to
+  /// `target adopt --observation-generation` must be one the Runtime issued.
+  public let generation: UInt64?
 
   public init(
-    candidates: [BootstrapCandidate], observedAtUTC: String, health: Health
+    candidates: [BootstrapCandidate], observedAtUTC: String, health: Health,
+    generation: UInt64? = nil
   ) {
     self.candidates = candidates
     self.observedAtUTC = observedAtUTC
     self.health = health
+    self.generation = generation
   }
 }
 
@@ -1005,6 +1022,9 @@ public actor DeviceBootstrapMachine {
   private var candidateEnumeration: CandidateEnumeration?
   private var nextCandidateEnumerationID: UInt64 = 0
   private var latestCandidateSnapshot: BootstrapCandidateSnapshot?
+  /// Mints §8.5's snapshot generation and observation IDs. One per machine, so
+  /// the generation is monotonic for this daemon session.
+  private let observationRegistry = DeviceObservationRegistry()
   private var latestCandidateSnapshotObservedAt: ContinuousClock.Instant?
   private var latestCandidateRefreshFailed = false
   private var candidateMonitoringTask: Task<Void, Never>?
@@ -1047,9 +1067,12 @@ public actor DeviceBootstrapMachine {
       latestCandidateSnapshotObservedAt.map {
         $0.duration(to: candidateClock.now) <= candidateSnapshotFreshnessWindow
       } ?? false
-    return BootstrapCandidateSnapshot(
-      candidates: latestCandidateSnapshot.candidates,
-      observedAtUTC: latestCandidateSnapshot.observedAtUTC,
+    // Republished, not re-stamped: this is the same observation, and only its
+    // freshness differs. Minting here would make every warm read look like a
+    // new observation and would break the one thing a generation-scoped ID is
+    // for — pinning an exact snapshot for `target adopt`.
+    return observationRegistry.republish(
+      latestCandidateSnapshot,
       health: !latestCandidateRefreshFailed && isWithinFreshnessWindow ? .current : .stale)
   }
 
@@ -1228,8 +1251,16 @@ public actor DeviceBootstrapMachine {
     _ enumeration: CandidateEnumeration
   ) async throws -> BootstrapCandidateSnapshot {
     do {
-      let snapshot = try await enumeration.task.value
+      let observed = try await enumeration.task.value
+      // Stamped here rather than inside the enumeration task: the task runs off
+      // the actor, and the generation has to advance exactly once per committed
+      // observation. Every waiter that coalesced onto this refresh must also
+      // receive the stamped value — returning the raw snapshot to a losing
+      // waiter would hand it candidates with no observation ID at all, which
+      // reads as "this Runtime does not issue them" rather than "you raced".
+      var snapshot = observed
       if candidateEnumeration?.id == enumeration.id {
+        snapshot = observationRegistry.stamp(observed)
         candidateEnumeration = nil
         latestCandidateSnapshot = snapshot
         latestCandidateSnapshotObservedAt = candidateClock.now
@@ -1240,8 +1271,9 @@ public actor DeviceBootstrapMachine {
           invalidateDeviceInformation()
           informationRoutes = routes
         }
+        return snapshot
       }
-      return snapshot
+      return latestCandidateSnapshot ?? snapshot
     } catch {
       if candidateEnumeration?.id == enumeration.id {
         candidateEnumeration = nil
