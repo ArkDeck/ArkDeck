@@ -2533,6 +2533,222 @@ params))
   /// process* waits, and the job outlives the process either way; a wait that
   /// cancelled on the way out would make giving up destructive, which is the
   /// opposite of what a caller who set a deadline asked for.
+  // MARK: offline derivation (§6.2)
+
+  /// Reads one Artifact whole, through the bounded ranged read the Runtime
+  /// publishes.
+  ///
+  /// `artifact.read` answers a window and says where the next one starts, so
+  /// reading a whole file is a loop the caller owns. It is written to make no
+  /// progress silently: a page that returns nothing and does not report `eof`
+  /// ends the read with a failure rather than spinning, because the honest
+  /// answer to "the Runtime stopped feeding me" is not a truncated document
+  /// that looks complete.
+  static func readWholeArtifact(
+    jobID: String, artifactID: String, expectedByteCount: Int, session: CLIRuntimeSession
+  ) throws -> Data {
+    var bytes = Data()
+    var offset = 0
+    while true {
+      let page = try session.request(
+        "artifact.read",
+        [
+          "jobId": .string(jobID), "artifactId": .string(artifactID),
+          "offset": .integer(Int64(offset)),
+        ])
+      guard case .object(let fields) = page, case .string(let base64)? = fields["base64"],
+        let chunk = Data(base64Encoded: base64)
+      else {
+        throw session.fail(
+          .recordUnreadable, "artifact \(artifactID) returned no readable bytes at \(offset)")
+      }
+      bytes.append(chunk)
+      let reachedEnd = fields["eof"] == .bool(true)
+      guard case .integer(let next)? = fields["nextOffset"] else {
+        throw session.fail(
+          .recordUnreadable, "artifact \(artifactID) returned no next offset")
+      }
+      if reachedEnd { break }
+      guard Int(next) > offset else {
+        throw session.fail(
+          .recordUnreadable,
+          "artifact \(artifactID) stopped advancing at \(offset) without reporting eof")
+      }
+      offset = Int(next)
+    }
+    // The digest is checked by the caller; this only refuses a read that
+    // disagrees with the size the index published, which is the cheap half of
+    // "these are the bytes you think they are".
+    guard bytes.count == expectedByteCount else {
+      throw session.fail(
+        .artifactIntegrityFailed,
+        "artifact \(artifactID) read \(bytes.count) bytes; the index says "
+          + "\(expectedByteCount)")
+    }
+    return bytes
+  }
+
+  /// §6.2's `ui-dump inspect` / `hit-test`: a deterministic derivation over
+  /// artifact bytes, never a device read.
+  ///
+  /// The capture's own artifacts are the whole input. Nothing here contacts a
+  /// device, and the answer says so — a caller must be able to tell a picture
+  /// of a past moment from a reading of the current one, and the only place
+  /// that distinction can live is in the document.
+  static func emitUIDumpDerivation(
+    _ subcommand: String, rest: [String], session: CLIRuntimeSession
+  ) throws {
+    let options = try CLIOptions(rest)
+    guard let jobID = options.value("--job") else {
+      throw CLIError(exitCode: EX_USAGE, message: "ui-dump \(subcommand) requires --job <id>")
+    }
+    guard case .array(let entries) = try session.request(
+      "artifact.list", ["jobId": .string(jobID)])
+    else {
+      throw session.fail(.recordUnreadable, "job \(jobID) published no readable artifact list")
+    }
+
+    func entry(named name: String) -> [String: JSONValue]? {
+      for case .object(let fields) in entries
+      where fields["name"] == .string(name) && fields["status"] == .string("published") {
+        return fields
+      }
+      return nil
+    }
+    func firstEntry(mediaType: String) -> [String: JSONValue]? {
+      for case .object(let fields) in entries
+      where fields["mediaType"] == .string(mediaType)
+        && fields["status"] == .string("published") {
+        return fields
+      }
+      return nil
+    }
+    func source(_ fields: [String: JSONValue]) throws -> CLIOfflineDerivation.Source {
+      guard case .string(let artifactID)? = fields["artifactId"],
+        case .string(let name)? = fields["name"],
+        case .string(let mediaType)? = fields["mediaType"],
+        case .string(let sha256)? = fields["sha256"],
+        case .integer(let byteCount)? = fields["byteCount"]
+      else {
+        throw session.fail(
+          .recordUnreadable, "job \(jobID) published an artifact this build cannot read")
+      }
+      return CLIOfflineDerivation.Source(
+        artifactID: artifactID, name: name, mediaType: mediaType, sha256: sha256,
+        byteCount: Int(byteCount))
+    }
+
+    // Two different facts, told apart. An unknown job and a job that published
+    // nothing both come back as an empty list, and neither of them is "this
+    // capture has no tree" — saying the latter would send someone looking for
+    // a missing artifact in a job that was never a capture, or never existed.
+    guard !entries.isEmpty else {
+      throw session.fail(
+        .resourceNotFound,
+        "job \(jobID) has published no artifacts; check the job identity and that it "
+          + "reached a terminal state",
+        details: ["jobId": .string(jobID)])
+    }
+    guard let treeFields = entry(named: CLIOfflineDerivation.treeArtifactName) else {
+      throw session.fail(
+        .resourceNotFound,
+        "job \(jobID) published no `\(CLIOfflineDerivation.treeArtifactName)`, so it is "
+          + "not a UI dump capture",
+        details: ["jobId": .string(jobID)])
+    }
+    guard let screenshotFields = firstEntry(
+      mediaType: CLIOfflineDerivation.screenshotMediaType)
+    else {
+      throw session.fail(
+        .resourceNotFound, "job \(jobID) published no screenshot to derive against",
+        details: ["jobId": .string(jobID)])
+    }
+    let rawDumpFields = entry(named: CLIOfflineDerivation.rawDumpArtifactName)
+
+    let tree = try source(treeFields)
+    let screenshot = try source(screenshotFields)
+    let rawDump = try rawDumpFields.map(source)
+
+    let treeData = try readWholeArtifact(
+      jobID: jobID, artifactID: tree.artifactID, expectedByteCount: tree.byteCount,
+      session: session)
+    let screenshotData = try readWholeArtifact(
+      jobID: jobID, artifactID: screenshot.artifactID,
+      expectedByteCount: screenshot.byteCount, session: session)
+    let rawDumpData = try rawDump.map {
+      try readWholeArtifact(
+        jobID: jobID, artifactID: $0.artifactID, expectedByteCount: $0.byteCount,
+        session: session)
+    }
+
+    var targetID = ""
+    if case .string(let value)? = screenshotFields["targetId"] { targetID = value }
+    var bindingRevision = 0
+    if case .integer(let value)? = screenshotFields["bindingRevision"] {
+      bindingRevision = Int(value)
+    }
+    var observedFromUTC: String?
+    if case .string(let value)? = screenshotFields["observedFromUtc"] { observedFromUTC = value }
+    var observedToUTC: String?
+    if case .string(let value)? = screenshotFields["observedToUtc"] { observedToUTC = value }
+
+    let capture: ViewerCapture
+    do {
+      capture = try ViewerCaptureParser.parse(
+        screenshotData: screenshotData,
+        treeData: treeData,
+        rawDumpData: rawDumpData,
+        identity: ViewerCaptureIdentity(
+          jobID: jobID, targetID: targetID, bindingRevision: bindingRevision,
+          // The window the capture was taken in, not when the bytes were
+          // filed: a reader deciding whether this is a given moment needs the
+          // former, and `createdAtUtc` answers the latter.
+          capturedAtUTC: observedToUTC ?? observedFromUTC ?? ""))
+    } catch {
+      throw session.fail(
+        .recordUnreadable, "the capture artifacts did not parse: \(error)",
+        details: ["jobId": .string(jobID)])
+    }
+
+    let provenance = CLIOfflineDerivation.provenance(
+      sources: [tree, screenshot] + (rawDump.map { [$0] } ?? []),
+      observedFromUTC: observedFromUTC, observedToUTC: observedToUTC)
+
+    switch subcommand {
+    case "inspect":
+      session.emit(
+        .object(["derivation": provenance, "capture": CLIOfflineDerivation.encode(capture: capture)]))
+    case "hit-test":
+      guard let xText = options.value("--x"), let yText = options.value("--y"),
+        let x = Double(xText), let y = Double(yText)
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "ui-dump hit-test requires --x and --y")
+      }
+      // A capture whose coordinate mapping the provider never confirmed can
+      // still be inspected, and must not be hit-tested: the answer would be a
+      // node chosen from coordinates nobody verified. Refusing names the
+      // reason rather than returning "no node", which reads as "nothing there".
+      guard capture.coordinatesAreVerified else {
+        throw session.fail(
+          .factsDrifted,
+          "this capture's coordinate mapping was never verified, so a point cannot be "
+            + "resolved to a node",
+          details: ["jobId": .string(jobID)])
+      }
+      let hit = ViewerHitTesting.node(
+        in: capture, rootIdentity: options.value("--root"), x: x, y: y)
+      session.emit(
+        .object([
+          "derivation": provenance,
+          "point": .object(["x": .number(x), "y": .number(y)]),
+          "node": hit.map(CLIOfflineDerivation.encode(node:)) ?? .null,
+        ]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported ui-dump subcommand")
+    }
+  }
+
   static func emitJobWait(_ arguments: [String], session: CLIRuntimeSession) throws {
     let options = try CLIOptions(arguments)
     guard let jobID = options.value("--job") else {

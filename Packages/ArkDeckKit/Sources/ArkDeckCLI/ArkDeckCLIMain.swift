@@ -199,6 +199,20 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runCleanupDebt(arguments)
       case "recovery":
         try RuntimeCLI.runRecovery(arguments)
+      case "ui-dump":
+        // §6.2's deterministic local derivation: it reads published Artifact
+        // bytes and computes. The family is dispatched separately from the
+        // domain-operation layer above precisely because it submits no
+        // operation — routing it there would give it a Catalog mapping it
+        // must not have.
+        guard let verb = arguments.first, !verb.hasPrefix("-") else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "`ui-dump` needs a subcommand; run `arkdeck help ui-dump`")
+        }
+        var rest = Array(arguments.dropFirst())
+        let session = RuntimeCLI.runtimeSession(&rest, command: "ui-dump.\(verb)")
+        try RuntimeCLI.emitUIDumpDerivation(verb, rest: rest, session: session)
       case "screen", "input", "diagnostics", "analyze", "port-forward", "workspace":
         // §6.2's domain layer. The registry holds each leaf's exact Catalog
         // mapping, so dispatch is uniform and the family name carries no logic
