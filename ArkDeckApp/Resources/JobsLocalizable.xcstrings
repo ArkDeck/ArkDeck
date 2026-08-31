@@ -37,7 +37,6 @@
     "jobInspector.fact.recoveryRelation": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Recovery relation"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"恢复关系"}}}},
     "jobInspector.fact.target": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Target"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"目标"}}}},
     "jobInspector.progress": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Job in progress"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Job 正在进行"}}}},
-    "jobInspector.readOnly": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Read-only Runtime facts"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"只读 Runtime 事实"}}}},
     "jobInspector.refreshing": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Refreshing jobs"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在刷新 Job"}}}},
     "jobInspector.residue": {"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"%d cleanup items remain on the device."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备上仍有 %d 个清理项。"}}}},
     "jobInspector.residue.compact": {"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"%d residue"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%d 个残留"}}}},

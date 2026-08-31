@@ -1798,3 +1798,39 @@ F66 已经因为「无当前证据」删过一次同一条件，本批不重复�
 
 不主张修好任何测试，不主张原生套件变绿。主张的只有上述观测事实、F68 机制的适用面扩大，
 以及由此得出的一条工作规矩。
+
+## 2026-08-31 F70：结清 F60 保留的最后 25 条无引用键
+
+第十六批，基线 `e94c575b`。范围是 F60 台账明确登记为「本轮新发现，未经首轮那样的逐条核实」
+而整体保留的最后一档；逐条结论见
+[2026-08-31 批次十六台账](references/ui-consistency/2026-08-31-retired-keys-tail-ledger.md)。
+只删资源键，不改 Swift 逻辑、不改文案内容、不改设计稿。
+
+**判据比 F60 多补一条。** 沿用三判据并集（字面量 ∪ camelCase 访问器 ∪ 插值前缀），
+补上它没覆盖的**字符串拼接构造**（`"prefix." + variable`）。全 App 扫描该形态零命中，
+故三判据在当前状态下无缺口——但这一条现在写进台账，以后重跑不必重新发现。
+复扫得 `Localizable` 24 / `Jobs` 1 / `Device` **0**：F60 记的 Device 那条已被此后的批次消费，
+实删 **25 条**。
+
+**每条都追到消费方，不靠扫描判死。** 最容易误判的是
+`overview.status.{server,trust,channel,needsAttention}`——它们与 UI 测试使用的可访问性标识符
+`overview.status.X.value` 同名前缀。追到 `HDCStatusView.swift:141-151`：那里渲染的是
+`Text(LocalizedStringKey(serverHealthKey))` 一类的**值**（键来自 `overview.serverHealth.*`
+的 switch），四行没有标签，现布局是 `·` 分隔的单行。**标识符与本地化键同名前缀，不是同一个东西**
+——这正是 F60 第 3 节举的那个例子，本批把它推广到了四条。
+同族的还有 `overview.record.empty.*` 五条：空态实际渲染的是 `overview.record.recent.empty`，
+而 `overview.record.empty` 只是那一处的标识符。
+
+**判死一个键说明 App 不渲染它，不说明稿件也不画它。** 因此对每条的英文原值回稿件与 spec
+核对，避免用删键掩盖「稿有、实现无」：25 条里 24 条在稿件零命中；唯一命中的 `Needs Attention`
+是 `overview.section.needsAttention`（分区标题，两侧都在，spec §141 要求的也是它），
+与状态行标签不是一回事。空态则两侧逐字一致（`No recent runs yet. Start from a workflow in
+the sidebar.`），旧富空态两边都没有。**本批不产生新的 P-DRIFT。**
+
+**编辑手法**：花括号匹配的文本块删除，不用 `json.dumps` 重写（后者在 F60 期间实测产生
+9970 行插入）。diff 为 **0 插入 / 400 删除**，删后 JSON 合法、条数 255（279−24）与 70（71−1）。
+两个文件格式不同（`Jobs` 单行紧凑、`Localizable` 多行缩进），锚点只认 `"key": {` 再靠
+花括号匹配定界，两种通吃。
+
+**至此 F60 的三档保留全部结清**：`SettingsLocalizable` 4 条由 F65 结清（裁决第 1 条），
+`UIDumpLocalizable` 25 条由 F65/F67 结清（裁决第 2 条），本档 25 条由本批结清。
