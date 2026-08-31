@@ -89,6 +89,42 @@ final class ViewerUITests: XCTestCase {
       attach(app, name: "viewer-collapsed-outline")
     }
 
+    runViewerPhase("Outline controls have separate complete hit targets", in: app, processID: processID) {
+      let root = app.buttons["viewer.tree.node.1"]
+      let child = app.buttons["viewer.tree.node.3"]
+      let rootDisclosure = app.buttons["viewer.tree.disclosure.1"]
+      let childDisclosure = app.buttons["viewer.tree.disclosure.3"]
+      let selectedValue = root.value as? String
+      let unselectedValue = child.value as? String
+      XCTAssertNotNil(selectedValue)
+      XCTAssertNotNil(unselectedValue)
+      XCTAssertNotEqual(selectedValue, unselectedValue)
+      XCTAssertEqual(app.buttons.matching(identifier: "viewer.tree.node.1").count, 1)
+      XCTAssertTrue(rootDisclosure.exists)
+      XCTAssertTrue(childDisclosure.exists)
+      XCTAssertGreaterThan(childDisclosure.frame.minX, rootDisclosure.frame.minX)
+      XCTAssertLessThanOrEqual(childDisclosure.frame.maxX, child.frame.minX)
+      XCTAssertGreaterThanOrEqual(childDisclosure.frame.width, 24)
+      XCTAssertGreaterThanOrEqual(childDisclosure.frame.height, 24)
+      let tree = app.descendants(matching: .any)["viewer.tree.scroll"]
+      let rootRow = app.descendants(matching: .any)["viewer.tree.row.1"]
+      XCTAssertLessThanOrEqual(rootRow.frame.width, tree.frame.width + 1)
+
+      // Click well beyond the short Stage label. Its padded selection region
+      // must be interactive, not just the glyphs inside a plain Button.
+      child.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).click()
+      let selected = NSPredicate { _, _ in child.value as? String == selectedValue }
+      XCTAssertEqual(XCTWaiter.wait(
+        for: [XCTNSPredicateExpectation(predicate: selected, object: nil)], timeout: 5), .completed)
+      XCTAssertEqual(root.value as? String, unselectedValue)
+      rootDisclosure.click()
+      XCTAssertTrue(child.waitForNonExistenceFast(timeout: 5))
+      XCTAssertEqual(root.value as? String, unselectedValue, "disclosure must not select its row")
+      rootDisclosure.click()
+      XCTAssertTrue(child.waitForExistenceFast(timeout: 5))
+      freshCapture(in: app)
+    }
+
     // Screenshot nodes in the accessibility tree (Viewer-05 / §6.5).
     runViewerPhase("Screenshot nodes reachable with bounds hidden", in: app, processID: processID) {
       freshCapture(in: app)
@@ -458,21 +494,25 @@ final class ViewerUITests: XCTestCase {
     XCTAssertTrue(row.waitForExistenceFast(timeout: 5))
     let treeScroll = app.descendants(matching: .any)["viewer.tree.scroll"]
     XCTAssertTrue(treeScroll.waitForExistenceFast(timeout: 5))
+    // ScrollPosition targets the complete row, including its indentation and
+    // disclosure; the separate selection Button deliberately excludes them.
+    let scrollTarget = app.descendants(matching: .any)["viewer.tree.row.367"]
+    XCTAssertTrue(scrollTarget.waitForExistenceFast(timeout: 5))
     // The reveal resolves over more than one scroll transaction, so give the
     // scroll a bounded window to finish instead of measuring it in flight.
     // This tolerates only timing: if the reveal never centers the row, the
     // wait expires and the assertions below fail with the real geometry.
     let centered = NSPredicate { _, _ in
-      abs(row.frame.midX - treeScroll.frame.midX) <= 32
-        && abs(row.frame.midY - treeScroll.frame.midY) <= 32
+      abs(scrollTarget.frame.midX - treeScroll.frame.midX) <= 32
+        && abs(scrollTarget.frame.midY - treeScroll.frame.midY) <= 32
     }
     _ = XCTWaiter.wait(
       for: [XCTNSPredicateExpectation(predicate: centered, object: nil)], timeout: 5)
     XCTAssertEqual(
-      row.frame.midX, treeScroll.frame.midX, accuracy: 32,
+      scrollTarget.frame.midX, treeScroll.frame.midX, accuracy: 32,
       "selection reveal must center a wide component horizontally")
     XCTAssertEqual(
-      row.frame.midY, treeScroll.frame.midY, accuracy: 32,
+      scrollTarget.frame.midY, treeScroll.frame.midY, accuracy: 32,
       "selection reveal must center a deep component vertically")
     XCTAssertTrue(row.isHittable, "the selected row must remain visible, not just present in AX")
     XCTAssertFalse(row.label.isEmpty, "the selected row must keep visible semantic content")

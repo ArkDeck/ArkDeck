@@ -125,7 +125,7 @@ struct GlobalJobInspectorView: View {
   }
 
   private var activeJobCount: Int {
-    presentation.jobs.filter(isActive).count
+    presentation.jobs.count(where: isActive)
   }
 
   var body: some View {

@@ -271,9 +271,9 @@ struct FlashWorkspaceView: View {
           localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceReadinessBlockerCount(
             Int32(clamping: blockers)))
       }
-      let satisfied = plan.prerequisites.filter {
+      let satisfied = plan.prerequisites.count {
         $0.requirement == .required && $0.status == .satisfied
-      }.count
+      }
       return String(
         localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceReadinessCheckCount(
           Int32(clamping: satisfied)))

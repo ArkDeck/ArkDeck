@@ -16,6 +16,7 @@ struct DeviceWorkspaceView: View {
   @Bindable var recording: DeviceRecordingViewModel
   @State private var isSaveErrorPresented = false
   @State private var saveErrorMessage = ""
+  @State private var isSavingRecording = false
   @State private var workspaceWidth: CGFloat = 0
   @State private var screenAvailableSize = CGSize.zero
 
@@ -475,6 +476,7 @@ struct DeviceWorkspaceView: View {
         .accessibilityIdentifier("device.record.reveal")
         Button(deviceText("device.record.saveAs")) { save(ready) }
           .accessibilityIdentifier("device.record.saveAs")
+          .disabled(isSavingRecording)
         Button(deviceText("device.record.again")) { recording.reset() }
           .accessibilityIdentifier("device.record.again")
       }
@@ -486,21 +488,16 @@ struct DeviceWorkspaceView: View {
   /// Copied, never moved: the composed file stays where the workspace can
   /// still show it if the copy is cancelled or fails.
   private func save(_ ready: DeviceRecordingViewModel.Ready) {
+    guard !isSavingRecording else { return }
+    isSavingRecording = true
     let panel = NSSavePanel()
     panel.nameFieldStringValue = ready.url.lastPathComponent
     panel.allowedContentTypes = [.quickTimeMovie]
     Task { @MainActor in
+      defer { isSavingRecording = false }
       guard await panel.begin() == .OK, let destination = panel.url else { return }
-      let temporary = destination.deletingLastPathComponent().appending(
-        path: ".arkdeck-\(UUID().uuidString)-\(destination.lastPathComponent)")
-      defer { try? FileManager.default.removeItem(at: temporary) }
       do {
-        try FileManager.default.copyItem(at: ready.url, to: temporary)
-        if FileManager.default.fileExists(atPath: destination.path) {
-          _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
-        } else {
-          try FileManager.default.moveItem(at: temporary, to: destination)
-        }
+        try await DeviceRecordingExport.copy(from: ready.url, to: destination)
       } catch {
         saveErrorMessage = error.localizedDescription
         isSaveErrorPresented = true

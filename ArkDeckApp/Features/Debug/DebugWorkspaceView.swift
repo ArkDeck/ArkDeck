@@ -387,112 +387,6 @@ private struct DebugRemoteLibrarySelection: Equatable {
   }
 }
 
-@MainActor
-@Observable
-private final class DebugRemoteBuildBrowserViewModel {
-  private(set) var sources: [RemoteBuildSourcePresentation] = []
-  private(set) var listing: RemoteBuildDirectoryListing?
-  private(set) var isLoading = false
-  private(set) var errorMessage: String?
-  var selectedSourceID: UUID?
-  var selectedEntry: RemoteBuildDirectoryEntry?
-
-  private let provider: any RemoteBuildSourceProviding
-  private var generation = 0
-
-  init(provider: any RemoteBuildSourceProviding) { self.provider = provider }
-
-  var selectedSource: RemoteBuildSourcePresentation? {
-    sources.first { $0.id == selectedSourceID }
-  }
-
-  func loadSources() {
-    generation += 1
-    let currentGeneration = generation
-    isLoading = true
-    errorMessage = nil
-    let provider = provider
-    Task { [weak self] in
-      do {
-        let sources = try await provider.listSources()
-        guard let self, currentGeneration == self.generation else { return }
-        self.sources = sources
-        if !sources.contains(where: { $0.id == self.selectedSourceID }) {
-          self.selectedSourceID = sources.first?.id
-        }
-        if let sourceID = self.selectedSourceID {
-          self.loadDirectory(sourceID: sourceID, relativePath: "")
-        } else {
-          self.listing = nil
-          self.isLoading = false
-        }
-      } catch {
-        guard let self, currentGeneration == self.generation else { return }
-        self.errorMessage = error.localizedDescription
-        self.isLoading = false
-      }
-    }
-  }
-
-  func selectSource(_ sourceID: UUID?) {
-    guard selectedSourceID != sourceID else { return }
-    selectedSourceID = sourceID
-    selectedEntry = nil
-    guard let sourceID else {
-      listing = nil
-      return
-    }
-    loadDirectory(sourceID: sourceID, relativePath: "")
-  }
-
-  func open(_ entry: RemoteBuildDirectoryEntry) {
-    guard let sourceID = selectedSourceID else { return }
-    switch entry.kind {
-    case .directory:
-      selectedEntry = nil
-      loadDirectory(sourceID: sourceID, relativePath: entry.relativePath)
-    case .nativeLibrary:
-      selectedEntry = entry
-    }
-  }
-
-  func goUp() {
-    guard let sourceID = selectedSourceID, let listing, !listing.relativePath.isEmpty else {
-      return
-    }
-    let parent = listing.relativePath.split(separator: "/").dropLast().joined(separator: "/")
-    selectedEntry = nil
-    loadDirectory(sourceID: sourceID, relativePath: parent)
-  }
-
-  func reload() {
-    guard let sourceID = selectedSourceID else { return }
-    loadDirectory(sourceID: sourceID, relativePath: listing?.relativePath ?? "")
-  }
-
-  private func loadDirectory(sourceID: UUID, relativePath: String) {
-    generation += 1
-    let currentGeneration = generation
-    isLoading = true
-    errorMessage = nil
-    selectedEntry = nil
-    let provider = provider
-    Task { [weak self] in
-      do {
-        let listing = try await provider.listDirectory(
-          sourceID: sourceID, relativePath: relativePath)
-        guard let self, currentGeneration == self.generation else { return }
-        self.listing = listing
-        self.isLoading = false
-      } catch {
-        guard let self, currentGeneration == self.generation else { return }
-        self.errorMessage = error.localizedDescription
-        self.isLoading = false
-      }
-    }
-  }
-}
-
 private struct DebugRemoteBuildBrowserSheet: View {
   @Environment(\.dismiss) private var dismiss
   var model: DebugRemoteBuildBrowserViewModel
@@ -547,7 +441,7 @@ private struct DebugRemoteBuildBrowserSheet: View {
             } label: {
               Label(DebugL10n.text("debug.artifacts.remoteBrowser.up"), systemImage: "arrow.up")
             }
-            .disabled(model.listing?.relativePath.isEmpty != false || model.isLoading)
+            .disabled(!model.canGoUp)
             Button {
               model.reload()
             } label: {
@@ -561,8 +455,8 @@ private struct DebugRemoteBuildBrowserSheet: View {
               .foregroundStyle(.secondary)
               .accessibilityHidden(true)
             Text(
-              model.listing?.relativePath.isEmpty == false
-                ? model.listing?.relativePath ?? ""
+              !model.requestedRelativePath.isEmpty
+                ? model.requestedRelativePath
                 : DebugL10n.text("debug.artifacts.remoteBrowser.root")
             )
             .font(WorkspaceFont.monospacedValue)
@@ -588,6 +482,7 @@ private struct DebugRemoteBuildBrowserSheet: View {
                   : DebugL10n.text("debug.artifacts.remoteBrowser.library"))
             }
           }
+          .disabled(model.isLoading)
           .overlay {
             if model.listing?.entries.isEmpty == true && !model.isLoading {
               ContentUnavailableView(
@@ -608,13 +503,15 @@ private struct DebugRemoteBuildBrowserSheet: View {
         Button(DebugL10n.text("debug.artifacts.remoteBrowser.cancel")) { dismiss() }
         Spacer()
         Button(DebugL10n.text("debug.artifacts.remoteBrowser.choose")) {
-          guard let source = model.selectedSource, let entry = model.selectedEntry else { return }
+          guard let source = model.selectedSource, let entry = model.selectedLibraryEntry else {
+            return
+          }
           onChoose(
             DebugRemoteLibrarySelection(
               sourceID: source.id, sourceName: source.name, entry: entry))
         }
         .buttonStyle(.borderedProminent)
-        .disabled(model.selectedEntry == nil || model.isLoading)
+        .disabled(model.selectedLibraryEntry == nil)
       }
       .padding(WorkspaceMetrics.pageInsetHorizontal)
     }

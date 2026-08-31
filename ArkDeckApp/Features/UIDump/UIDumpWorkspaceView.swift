@@ -475,21 +475,27 @@ struct UIDumpWorkspaceView: View {
   ) -> some View {
     let selected = node.identity == model.selectedNodeIdentity
     let expanded = model.expandedNodeIdentities.contains(node.identity)
+    let leadingIndent = ViewerTreeLayoutPolicy.leadingIndent(
+      depth: visualDepth,
+      maximumDepth: maximumVisualDepth,
+      viewportWidth: Double(viewportWidth))
+    let disclosureWidth: CGFloat = 24
     return HStack(spacing: 6) {
       if node.children.isEmpty {
-        Color.clear.frame(width: 16, height: 16)
+        Color.clear.frame(width: disclosureWidth, height: Self.treeRowHeight)
       } else {
-        Button(
-          viewerText(expanded ? "viewer.tree.collapse" : "viewer.tree.expand"),
-          systemImage: "chevron.right"
-        ) {
-          model.toggleExpansion(node.identity)
+        Button { model.toggleExpansion(node.identity) } label: {
+          Label(
+            viewerText(expanded ? "viewer.tree.collapse" : "viewer.tree.expand"),
+            systemImage: "chevron.right")
+            .font(.caption2.bold())
+            .labelStyle(.iconOnly)
+            .rotationEffect(.degrees(expanded ? 90 : 0))
+            .frame(width: disclosureWidth, height: Self.treeRowHeight)
+            .contentShape(.rect)
         }
-        .font(.caption2.bold())
-        .rotationEffect(.degrees(expanded ? 90 : 0))
-        .labelStyle(.iconOnly)
         .buttonStyle(.plain)
-        .frame(width: 16, height: 16)
+        .accessibilityIdentifier("viewer.tree.disclosure.\(node.identity)")
       }
       Button { model.select(node.identity) } label: {
         HStack(spacing: 6) {
@@ -518,32 +524,27 @@ struct UIDumpWorkspaceView: View {
               .fixedSize()
           }
         }
+        // Padding attached outside a plain Button is not clickable. The
+        // label owns the remaining row area; the disclosure has a separate,
+        // non-overlapping hit target at the same tree indentation.
+        .padding(.trailing, 8)
+        .frame(minHeight: Self.treeRowHeight, alignment: .leading)
+        .frame(
+          minWidth: max(0, viewportWidth - 12 - leadingIndent - disclosureWidth - 6),
+          alignment: .leading)
+        .contentShape(.rect)
       }
       .buttonStyle(.plain)
       .accessibilityValue(
         selected ? viewerText("viewer.tree.selected") : viewerText("viewer.tree.notSelected"))
-      // Real merged dumps can exceed fifty levels. Preserve indentation while
-      // reserving enough of the current viewport for the node's actual label;
-      // otherwise auto-reveal shows a blue selection band with every glyph
-      // beyond the right edge.
-      .padding(
-        .leading,
-        CGFloat(
-          ViewerTreeLayoutPolicy.leadingIndent(
-            depth: visualDepth,
-            maximumDepth: maximumVisualDepth,
-            viewportWidth: Double(viewportWidth))))
-      .padding(.trailing, 8)
-      .frame(minHeight: Self.treeRowHeight, alignment: .leading)
-      // The floor keeps the selection capsule spanning the visible pane; the
-      // content decides the real width so nothing is truncated or wrapped.
-      .frame(minWidth: max(0, viewportWidth - 12), alignment: .leading)
+      .accessibilityIdentifier("viewer.tree.node.\(node.identity)")
     }
-    .contentShape(.rect)
+    .padding(.leading, leadingIndent)
     .foregroundStyle(selected ? Color.white : Color.primary)
     .background(selected ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 6))
     .padding(.horizontal, 6)
-    .accessibilityIdentifier("viewer.tree.node.\(node.identity)")
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("viewer.tree.row.\(node.identity)")
   }
 
   /// Node kind, not decoration. One identical outline square on every row told

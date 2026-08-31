@@ -190,7 +190,7 @@ struct TraceViewerRootView: View {
                 openPanel: presentOpenPanel
             )
         }
-        .background(TraceAnnouncementBridge(controller: controller))
+        .background { TraceAnnouncementBridge(controller: controller) }
         .onAppear { controller.markFirstWindowAppeared() }
     }
 
@@ -960,16 +960,17 @@ private struct TraceTimelinePane: View {
                                     where: { $0.id == hit.id }
                                 )
                             {
-                                FlagTagEditor(
+                                TraceFlagTagEditor(
                                     flag: flag,
-                                    rename: { controller.updateFlag(id: flag.id, label: $0) },
-                                    cycleColor: {
+                                    timestampText: time(flag.timestampNs),
+                                    rename: { id, label in controller.updateFlag(id: id, label: label) },
+                                    cycleColor: { id, colorIndex in
                                         controller.updateFlag(
-                                            id: flag.id, colorIndex: flag.colorIndex + 1
+                                            id: id, colorIndex: colorIndex
                                         )
                                     },
-                                    remove: {
-                                        controller.removeFlag(id: flag.id)
+                                    remove: { id in
+                                        controller.removeFlag(id: id)
                                         editingFlag = nil
                                     },
                                     dismiss: { editingFlag = nil }
@@ -1451,77 +1452,6 @@ private struct TraceResetZoomButton: View {
             Label(traceViewerText("Reset Zoom"), systemImage: "arrow.up.left.and.down.right.magnifyingglass")
         }
         .primaryToolbarTarget()
-    }
-}
-
-/// What a flag is for, written where the flag stands.
-///
-/// The Annotations list in the Inspector can already rename one, but a list of
-/// timestamps is not where anybody looks after pressing a marker: upstream
-/// names a flag at the flag, and so does this. The field commits on Return and
-/// on dismissal rather than on every keystroke -- each commit writes the
-/// trace's annotation sidecar, and a file per character typed is not what that
-/// persistence is for.
-private struct FlagTagEditor: View {
-    let flag: TimelineFlag
-    let rename: @MainActor (String) -> Void
-    let cycleColor: @MainActor () -> Void
-    let remove: @MainActor () -> Void
-    let dismiss: @MainActor () -> Void
-
-    @State private var text = ""
-    @FocusState private var fieldIsFocused: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField(traceViewerText("Tag"), text: $text)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 240)
-                .focused($fieldIsFocused)
-                .onSubmit {
-                    rename(text)
-                    dismiss()
-                }
-            HStack(spacing: 10) {
-                Button(action: cycleColor) {
-                    Label(traceViewerText("Change Colour"), systemImage: "circle.fill")
-                        .foregroundStyle(
-                            Color(cgColor: TimelineAnnotationColor.cgColor(at: flag.colorIndex))
-                        )
-                }
-                .buttonStyle(.borderless)
-                .labelStyle(.iconOnly)
-                .help(traceViewerText("Change Colour"))
-                .arktraceAccessibleTarget()
-                Text(time(flag.timestampNs))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Spacer()
-                Button(traceViewerText("Remove"), role: .destructive, action: remove)
-                    .arktraceAccessibleTarget()
-            }
-        }
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-        }
-        .shadow(radius: 10, y: 3)
-        .onExitCommand(perform: dismiss)
-        .onAppear {
-            text = flag.label
-            // A hop, because the field is asking for focus in the same pass
-            // that builds it; AppKit hands it over on the next one.
-            Task { @MainActor in
-                await Task.yield()
-                fieldIsFocused = true
-            }
-        }
-        // Whatever was typed is the tag, whether it was committed with Return
-        // or the editor was simply put away.
-        .onDisappear { rename(text) }
     }
 }
 
