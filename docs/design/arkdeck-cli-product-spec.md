@@ -460,7 +460,7 @@ destructive intent。
 | `runtime bundle` | `register`, `list`, `inspect`, `remove` | bounded 校验 signed daemon bundle 后生成 typed bundle reference；service install/update 只消费 reference |
 | `runtime hdc` | `status`, `impact-preview`, `restart` | 展示 exact tool/server facts；preview 建立 control action，mutation 必须 generation-bound、typed、audited |
 | `runtime signing` | `install`, `normalize`, `migrate`, `status`, `remove` | 只传 credential refs；秘密由平台 credential adapter 持有 |
-| `runtime storage` | `status`, `policy`, `root` | 未来 typed storage surface；不能直接修改 App preference 文件 |
+| `runtime storage` | `status`, `policy`, `root` | 未来 typed storage surface；不能直接修改 App preference 文件。`status` 必须来自 Runtime 拥有的单一 store owner，并把 Session 输出域与 Runtime artifact 域分开报告（不同 root、不同 quota、不同保留策略），不得合并成一个数字；owner 化之前该 leaf 保持 `unavailable`，不得基于 per-process 偏好副本报告 status。这是有范围的延期而不是空白：Runtime artifact 域已有一等 leaf `artifact quota`（total/used/remaining），延期只扣住没有可信来源的 Session 输出域，caller 不必为此另建第二条路径 |
 | `runtime support-bundle` | `preview`, `export` | 先预览清单/隐私，再显式导出 |
 | `runtime update` | `check`, `download`, `handoff`, `status`, `cancel`, `cleanup` | 用户同意与验证边界一致；不得静默安装 |
 | `maintainer update-feed` | `prepare`, `assemble` | 发布维护工具；不接触 private key |
@@ -1529,6 +1529,10 @@ generation；第一版可以先忠实暴露现有字段，达到 target contract
   machine contract；
 - client 仍在 `AgentClient.swift` 硬编码 `1.0.0`，daemon 则从共享 XPC contract 取版本，
   形成协议版本的第二真相源。这是后续独立垂直修复，不通过本 docs-only 修订暗改代码。
+- `legacy flash reconcile` 经 `RockchipLegacyFlashJournalReconciler.production()` 从
+  `SessionSettingsStore` 解析 Session 根，而该 store 的 owner 是调用进程自己的偏好副本。CLI 与
+  App 因此各读各的记录：用户在 App 里选定的自定义根，对这条已发布 leaf 不可见，结算沉默地发生在
+  另一个根上。这不是未来 `runtime storage` 的专属前提，而是一条现有 leaf 已经带着的缺陷。
 
 ### 13.3 Catalog 泛化可达、缺一等领域入口
 
@@ -1561,7 +1565,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | HDC tool selection | App/service 有配置路径，无完整 typed discover/select CLI | `runtime tool register/list/inspect/select/remove`；`blocked` → `direct` | B |
 | Workspace continuation | App 可构造受限新 Job，无稳定 CLI/local resource | typed continuation inspect/submit/run；`blocked` → `local` | B |
 | Session pin/cleanup/export | 底层 storage/catalog/planner primitive 存在，不等于已发布完整 App UI 或 CLI resource | Session list/show/pin/unpin 与 generation-bound preview/apply；`blocked` → `local` | C |
-| Storage/support bundle | 主要是 App 配置/导出组合 | typed storage/support resource；`blocked` → `local` | C |
+| Storage/support bundle | 不止是 App 配置/导出组合：存储被切成两个互不相交的根——App 拥有、用户可选的 Session 输出根（`SessionSettings` 的 quota/margin/retention 只作用于它），与 daemon 拥有、自带 quota/保留期的 Runtime artifact store。macOS 上前者的 owner 是各进程自己的 `UserDefaults.standard`，sandboxed App 与非 sandbox CLI 因此读到不同记录与不同默认根；且 App Sandbox 把 daemon state directory 放在容器之外，App 进程内无法计量 artifact store | typed storage/support resource，先建立 Runtime 拥有的单一 owner，再分域投影；`blocked` → `local` | C |
 | Device display name | App 在 UserDefaults 保存 candidate/target 显示名，不改 identity | `device/target display-name`；`blocked` → `local` | C |
 | History saved filter | AppStorage 中的本地 query preset | `history filter`；`blocked` → `local` | C |
 | Trace derived-cache purge | App controller 可回收 inactive derived DB，不是 Runtime evidence 删除 | `trace cache status/purge`；`blocked` → `local` | C |

@@ -277,9 +277,18 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 ### 5.10 Settings
 
 - 使用独立系统 Settings scene，七个标签为 General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics。Trace 内分 Cache / Licenses；按需读取避免首窗被 I/O 阻塞。
-- Toolchain 切换明确「只影响新 Job」；Storage 展示 root、quota、retention、pinned 与当前使用量；Updates 复用已实现的 signed update flow。
+- Toolchain 切换明确「只影响新 Job」；Storage 展示 root、quota、retention、pinned 与两个存储域各自的用量；Updates 复用已实现的 signed update flow。
 - Servers 支持 SSH password / key，test connection 产生 fingerprint 和 canonical root，保存验证事实；漂移 fail closed。移除来源不删除服务器文件。
 - Storage 可设置新 Job root、quota、safety margin、retention；使用量来自 inventory，不用示例数字补 unknown。
+- Storage 分别呈现两个存储域，任何一个都不得冒充另一个：
+  - **ArkDeck Runtime Artifact** 是任务真正写入的字节。它由 Runtime 计量并执行自己的配额，App
+    只能通过只读控制面读取该数字——App Sandbox 把 daemon 的 state directory 放在容器之外，进程内
+    扫描无论如何都只能描述 Session 输出根。Runtime 未作答时不显示数字，不得渲染成 0。
+  - **Session 输出根**是 App 拥有、用户可改的根目录，上方的 quota / safety margin / retention 只
+    作用于它。目录内无法识别的 Session 单独报出计数：保留目录永不删除无法核实的 Session，因此
+    「已存字节」与「可回收字节」是两个数。
+- Storage 不呈现 heavy-writer 准入判定。该判定由 Session 输出根的扫描得出，而消费它的
+  coordinator 没有任何生产写入方，放在用量旁会被读成「产品还能继续工作」。
 - Trace Cache 只清理未使用的 derived database，不删除原始 Trace；Licenses 展示随包许可证与第三方 notice。
 - Updates 只检查已签名 feed、下载并校验，再显式 Finder handoff，不静默安装。
 - App 诊断包目前始终排除 device raw；先选择目的地、预览 entry/hash/估算大小，再显式本地导出（AC-DIAG-002-01）。单个敏感 device Artifact 的导出入口在 History，不在 App 诊断包增加无效勾选。
