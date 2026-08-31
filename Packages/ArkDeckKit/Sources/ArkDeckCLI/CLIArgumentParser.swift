@@ -66,7 +66,31 @@ enum CLIArgumentParser {
 
   // MARK: Parse
 
+  /// §12 requires lifecycle metadata on a superseded leaf's answer regardless
+  /// of whether the invocation succeeded, and a refused option is still that
+  /// leaf's answer. Stamping it here rather than at each construction site is
+  /// what makes that true for every failure the parser can raise: there are a
+  /// dozen of them, they all already name the leaf, and the next one added
+  /// inherits the metadata instead of being the one that forgot it.
   static func parse(_ argv: [String]) -> Result<CLIInvocation, CLIRegistryError> {
+    switch parseWithoutLifecycle(argv) {
+    case .success(let invocation): return .success(invocation)
+    case .failure(let error):
+      guard let command = error.command,
+        let declared = CLICommandRegistry.allLeaves()
+          .first(where: { $0.leaf.canonicalCommand == command })?.leaf,
+        declared.lifecycle != .current || declared.replacementArgvPattern != nil
+      else { return .failure(error) }
+      var stamped = error
+      stamped.lifecycle = declared.lifecycle
+      stamped.replacementArgvPattern = declared.replacementArgvPattern
+      return .failure(stamped)
+    }
+  }
+
+  private static func parseWithoutLifecycle(_ argv: [String])
+    -> Result<CLIInvocation, CLIRegistryError>
+  {
     guard !argv.isEmpty else { return .success(.rootHelp) }
 
     var state = ParseState()

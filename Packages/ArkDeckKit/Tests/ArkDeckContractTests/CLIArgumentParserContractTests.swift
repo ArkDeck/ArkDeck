@@ -146,15 +146,121 @@ final class CLIArgumentParserContractTests: XCTestCase {
       success(["flash", "status", "--campaign-id", "E-1", "--output", "json"]))
     XCTAssertNotNil(success(["flash", "reconcile", "--output", "json"]))
 
-    // The maintainer feed tooling is the one family still without a structured
-    // result, so it refuses the option rather than wrap a sentence in an
-    // envelope and call that machine output.
+    // The maintainer feed tooling was the last family without a structured
+    // result. It answers under both spellings, because §12 keeps the alias's
+    // surface identical to its target's rather than merely working.
+    for family in [["update-feed"], ["maintainer", "update-feed"]] {
+      XCTAssertNotNil(
+        success(
+          family + [
+            "assemble", "--payload", "p", "--signature", "s", "--out", "o",
+            "--output", "json",
+          ]),
+        "\(family.joined(separator: " ")) assemble must answer in JSON")
+    }
+
+    // `--json` is not offered with it: §12 fixes that spelling as "the daemon
+    // reply, pretty-printed", and this family never speaks to the daemon.
     XCTAssertEqual(
       failure([
-        "update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o",
-        "--output", "json",
+        "maintainer", "update-feed", "assemble", "--payload", "p", "--signature", "s",
+        "--out", "o", "--json",
       ])?.code,
       .invalidOption)
+  }
+
+  /// §12's four remaining renames, each published under its target spelling
+  /// with the old one kept as a deprecated alias for this major.
+  ///
+  /// The point of checking both spellings of every leaf is that §12 promises
+  /// more than "the old name still runs": it promises the same surface. A
+  /// hand-written alias drifts one option at a time, and the first sign is a
+  /// caller whose script works under one name and is refused under the other.
+  func testTheRenamedFamiliesAreReachableUnderBothSpellings() {
+    let renamed: [(target: [String], alias: [String], leaves: [[String]])] = [
+      (["runtime", "service"], ["agentd"], [
+        ["status"], ["restart", "--maximum-wait-seconds", "30"], ["verify", "--job", "J-1"],
+        ["uninstall"],
+      ]),
+      (["runtime", "signing"], ["signing"], [["status"], ["normalize"]]),
+      (["maintainer", "update-feed"], ["update-feed"], [
+        ["assemble", "--payload", "p", "--signature", "s", "--out", "o"]
+      ]),
+      (["legacy", "flash"], ["flash"], [
+        ["status", "--campaign-id", "E-1"], ["reconcile"],
+      ]),
+    ]
+    for family in renamed {
+      for leaf in family.leaves {
+        XCTAssertNotNil(
+          success(family.target + leaf), "\((family.target + leaf).joined(separator: " "))")
+        XCTAssertNotNil(
+          success(family.alias + leaf), "\((family.alias + leaf).joined(separator: " "))")
+      }
+    }
+  }
+
+  /// The alias says it is superseded and names its exact replacement; the
+  /// target says nothing, because a warning on the published spelling would
+  /// train a caller to ignore warnings.
+  func testTheRenamedAliasesNameTheirReplacementAndTheTargetsDoNot() {
+    let expected = [
+      "agentd.status": "arkdeck runtime service status",
+      "signing.normalize": "arkdeck runtime signing normalize",
+      "update-feed.prepare": "arkdeck maintainer update-feed prepare",
+      "flash.reconcile": "arkdeck legacy flash reconcile",
+    ]
+    for (command, replacement) in expected {
+      let leaf = CLICommandRegistry.allLeaves().first { $0.leaf.canonicalCommand == command }?.leaf
+      XCTAssertEqual(leaf?.replacementArgvPattern, replacement, command)
+      XCTAssertNotEqual(leaf?.lifecycle, .current, command)
+    }
+    for command in [
+      "runtime.service.status", "runtime.signing.normalize",
+      "maintainer.update-feed.prepare",
+    ] {
+      let leaf = CLICommandRegistry.allLeaves().first { $0.leaf.canonicalCommand == command }?.leaf
+      XCTAssertEqual(leaf?.lifecycle, .current, command)
+      XCTAssertNil(leaf?.replacementArgvPattern, command)
+    }
+    // The archive keeps its `legacy` lifecycle across the rename: §12 forbids
+    // counting it as target conformance, and a rename is not a promotion.
+    for command in ["legacy.flash.status", "legacy.flash.reconcile"] {
+      let leaf = CLICommandRegistry.allLeaves().first { $0.leaf.canonicalCommand == command }?.leaf
+      XCTAssertEqual(leaf?.lifecycle, .legacy, command)
+    }
+  }
+
+  /// §12 wants the lifecycle on a superseded leaf's answer whatever the
+  /// outcome, and a refused option is still that leaf's answer. This is the
+  /// case the parse phase used to drop, because it builds its failures before
+  /// any session exists.
+  func testAParsePhaseFailureOnASupersededLeafStillCarriesItsLifecycle() {
+    let refused = failure(["agentd", "status", "--not-an-option"])
+    XCTAssertEqual(refused?.code, .invalidOption)
+    XCTAssertEqual(refused?.lifecycle, .deprecated)
+    XCTAssertEqual(refused?.replacementArgvPattern, "arkdeck runtime service status")
+
+    let target = failure(["runtime", "service", "status", "--not-an-option"])
+    XCTAssertEqual(target?.code, .invalidOption)
+    XCTAssertEqual(target?.lifecycle, .current)
+    XCTAssertNil(target?.replacementArgvPattern)
+  }
+
+  /// §5.2 names these four families explicitly: they never open the control
+  /// connection, so they refuse the endpoint alias rather than drop it.
+  func testTheRenamedFamiliesRefuseTheEndpointAliasUnderBothSpellings() {
+    let vectors = [
+      ["runtime", "signing", "status"], ["signing", "status"],
+      ["maintainer", "update-feed", "prepare"], ["update-feed", "prepare"],
+      ["legacy", "flash", "reconcile"], ["flash", "reconcile"],
+      ["runtime", "service", "status"], ["agentd", "status"],
+    ]
+    for vector in vectors {
+      XCTAssertEqual(
+        failure(vector + ["--socket", "/tmp/s"])?.code, .invalidOption,
+        "\(vector.joined(separator: " ")) must refuse --socket, not drop it")
+    }
   }
 
   /// §8.1 scopes `jsonl` to the durable event stream. No leaf publishes one,

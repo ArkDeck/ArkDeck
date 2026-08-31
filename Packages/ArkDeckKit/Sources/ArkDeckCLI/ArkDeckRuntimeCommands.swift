@@ -22,7 +22,8 @@ enum RuntimeCLI {
     let preservedUnknownJobIDs: [String]
   }
 
-  /// Every option `agentd install` and `agentd update` accept.
+  /// Every option `runtime service install` and `runtime service update` accept
+  /// (and therefore, per §12, their `agentd` compatibility spellings too).
   ///
   /// One list, exposed, because the failure it prevents already happened: the
   /// ArkForge lane flags were read by the command and absent from this
@@ -54,8 +55,18 @@ enum RuntimeCLI {
   /// The registry has already accepted or refused each of these, so this is
   /// extraction rather than validation — the parser is the one validator, and
   /// a second one here is how the two start disagreeing.
+  /// The rendering and failure-mapping context for one invocation.
+  ///
+  /// `connectsToRuntime: false` is for a leaf that computes entirely on the
+  /// host — §8.2's envelope is about how an invocation answers, not about
+  /// whether it spoke to the Runtime, so `maintainer update-feed` owes a
+  /// machine caller the same one document, `command` and lifecycle metadata as
+  /// anything else. What it must not do is consume `--socket`: the registry
+  /// declares that this leaf does not connect, and a handler that quietly
+  /// accepted an endpoint would make that declaration false in the one place
+  /// a caller cannot check.
   static func runtimeSession(
-    _ arguments: inout [String], command: String
+    _ arguments: inout [String], command: String, connectsToRuntime: Bool = true
   ) -> CLIRuntimeSession {
     let controlRequestID = CLIArgumentParser.bootstrapControlRequestID(arguments)
     var rendering = CLIRendering.human
@@ -73,7 +84,7 @@ enum RuntimeCLI {
     let declared = CLICommandRegistry.allLeaves()
       .first { $0.leaf.canonicalCommand == command }?.leaf
     return CLIRuntimeSession(
-      client: client(&arguments),
+      client: connectsToRuntime ? client(&arguments) : AgentClient(socketPath: defaultSocketPath()),
       command: command,
       rendering: rendering,
       controlRequestID: controlRequestID,
@@ -182,17 +193,29 @@ enum RuntimeCLI {
   /// Installs and diagnoses the one production daemon as a user-domain
   /// LaunchAgent. This surface invokes only `/bin/launchctl`; all device work
   /// still crosses the daemon's typed UDS/XPC control plane.
+  /// §12 publishes this family as `runtime service` and keeps `agentd` as its
+  /// compatibility spelling for this major. Which one the caller typed decides
+  /// the canonical command in machine output and therefore which registry leaf
+  /// the session reads its lifecycle from — so the spelling is a parameter
+  /// rather than a constant, and the target one is the default because the
+  /// alias is the exception.
   static func runAgentDaemon(
-    _ arguments: [String], service: LaunchAgentService = LaunchAgentService(),
+    _ arguments: [String], spelledAs canonicalPrefix: String = "runtime.service",
+    service: LaunchAgentService = LaunchAgentService(),
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing agentd subcommand (install|update|restart|status|verify|uninstall)")
+        message: "missing service subcommand (install|update|restart|status|verify|uninstall)")
     }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "agentd.\(subcommand)")
+    let session = runtimeSession(&rest, command: "\(canonicalPrefix).\(subcommand)")
+    session.warnIfLegacy()
+    // §12 has two spellings of this family live at once. A message that names
+    // the other one sends a reader to a command they did not run, so every
+    // diagnostic below is written in the spelling the caller actually typed.
+    let spelling = canonicalPrefix.replacingOccurrences(of: ".", with: " ")
     switch subcommand {
     case "install", "update":
       let options = try CLIOptions(rest)
@@ -329,7 +352,7 @@ enum RuntimeCLI {
         guard let parsed = Int(raw), (1...300).contains(parsed) else {
           throw CLIError(
             exitCode: EX_USAGE,
-            message: "agentd restart --maximum-wait-seconds must be between 1 and 300")
+            message: "\(spelling) restart --maximum-wait-seconds must be between 1 and 300")
         }
         maximumWaitSeconds = parsed
       } else {
@@ -355,7 +378,7 @@ enum RuntimeCLI {
       guard beforeJobs.blockingJobIDs.isEmpty else {
         throw CLIError(
           exitCode: 75,
-          message: "agentd restart refused while Runtime Jobs are active or unclosed: "
+          message: "\(spelling) restart refused while Runtime Jobs are active or unclosed: "
             + beforeJobs.blockingJobIDs.joined(separator: ", "))
       }
 
@@ -392,7 +415,7 @@ enum RuntimeCLI {
 
     case "status":
       guard rest.isEmpty else {
-        throw CLIError(exitCode: EX_USAGE, message: "agentd status accepts only --json")
+        throw CLIError(exitCode: EX_USAGE, message: "\(spelling) status accepts only --json")
       }
       let status = try service.status()
       let health: JSONValue
@@ -426,14 +449,14 @@ enum RuntimeCLI {
       {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "agentd verify --job cannot be combined with execution options")
+          message: "\(spelling) verify --job cannot be combined with execution options")
       }
       let maximumWaitSeconds: Int
       if let raw = options.value("--maximum-wait-seconds") {
         guard let parsed = Int(raw), (1...300).contains(parsed) else {
           throw CLIError(
             exitCode: EX_USAGE,
-            message: "agentd verify --maximum-wait-seconds must be between 1 and 300")
+            message: "\(spelling) verify --maximum-wait-seconds must be between 1 and 300")
         }
         maximumWaitSeconds = parsed
       } else {
@@ -514,7 +537,7 @@ enum RuntimeCLI {
 
     case "uninstall":
       guard rest.isEmpty else {
-        throw CLIError(exitCode: EX_USAGE, message: "agentd uninstall accepts only --json")
+        throw CLIError(exitCode: EX_USAGE, message: "\(spelling) uninstall accepts only --json")
       }
       session.emit(try encodedJSON(service.uninstall()))
 
@@ -672,26 +695,28 @@ enum RuntimeCLI {
   /// accepted only from an interactive terminal with echo disabled; neither
   /// argv nor the LaunchAgent environment can become a secret transport.
   static func runSigningAsync(
-    _ arguments: [String],
+    _ arguments: [String], spelledAs canonicalPrefix: String = "runtime.signing",
     store suppliedStore: OpenHarmonySigningPresetStore? = nil,
     materialParentURL: URL? = nil
   ) async throws {
     guard arguments.first == "install-sdk-release" else {
-      return try runSigning(arguments, store: suppliedStore)
+      return try runSigning(arguments, spelledAs: canonicalPrefix, store: suppliedStore)
     }
     let store =
       suppliedStore
       ?? OpenHarmonySigningPresetStore(
         secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "signing.install-sdk-release")
+    let session = runtimeSession(&rest, command: "\(canonicalPrefix).install-sdk-release")
+    session.warnIfLegacy()
+    let spelling = canonicalPrefix.replacingOccurrences(of: ".", with: " ")
     let options = try CLIOptions(rest)
     try options.validateAllowed(["--sdk", "--java", "--bundle-name", "--project-ref"])
     func required(_ name: String) throws -> String {
       guard let value = options.value(name), !value.isEmpty else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "signing install-sdk-release requires \(name)")
+          message: "\(spelling) install-sdk-release requires \(name)")
       }
       return value
     }
@@ -700,7 +725,7 @@ enum RuntimeCLI {
     for (name, value) in [("--sdk", sdk), ("--java", java)] where !value.hasPrefix("/") {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "signing install-sdk-release \(name) must be an absolute path")
+        message: "\(spelling) install-sdk-release \(name) must be an absolute path")
     }
     let installer = OpenHarmonySDKReleasePresetInstaller(
       store: store,
@@ -716,7 +741,7 @@ enum RuntimeCLI {
   }
 
   static func runSigning(
-    _ arguments: [String],
+    _ arguments: [String], spelledAs canonicalPrefix: String = "runtime.signing",
     store suppliedStore: OpenHarmonySigningPresetStore? = nil
   ) throws {
     let store =
@@ -731,7 +756,9 @@ enum RuntimeCLI {
       )
     }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "signing.\(subcommand)")
+    let session = runtimeSession(&rest, command: "\(canonicalPrefix).\(subcommand)")
+    session.warnIfLegacy()
+    let spelling = canonicalPrefix.replacingOccurrences(of: ".", with: " ")
     switch subcommand {
     case "install":
       let options = try CLIOptions(rest)
@@ -741,7 +768,7 @@ enum RuntimeCLI {
       ])
       func required(_ name: String) throws -> String {
         guard let value = options.value(name), !value.isEmpty else {
-          throw CLIError(exitCode: EX_USAGE, message: "signing install requires \(name)")
+          throw CLIError(exitCode: EX_USAGE, message: "\(spelling) install requires \(name)")
         }
         return value
       }
@@ -756,7 +783,7 @@ enum RuntimeCLI {
       ] where !value.hasPrefix("/") {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "signing install \(name) must be an absolute path")
+          message: "\(spelling) install \(name) must be an absolute path")
       }
       var keystorePassword = try readTTYSecret(prompt: "Keystore password: ")
       defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
@@ -787,7 +814,7 @@ enum RuntimeCLI {
 
     case "normalize":
       guard rest.isEmpty else {
-        throw CLIError(exitCode: EX_USAGE, message: "signing normalize accepts only --json")
+        throw CLIError(exitCode: EX_USAGE, message: "\(spelling) normalize accepts only --json")
       }
       session.emit(try encodedJSON(store.normalizeDevEcoSecrets()))
 
@@ -801,7 +828,7 @@ enum RuntimeCLI {
         throw CLIError(
           exitCode: EX_USAGE,
           message:
-            "signing migrate-deveco requires --build-profile and --daemon absolute paths")
+            "\(spelling) migrate-deveco requires --build-profile and --daemon absolute paths")
       }
       let daemonURL = URL(filePath: daemonPath)
       if suppliedStore == nil {
@@ -813,7 +840,7 @@ enum RuntimeCLI {
           throw CLIError(
             exitCode: EX_USAGE,
             message:
-              "signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon"
+              "\(spelling) migrate-deveco --daemon must name the canonical installed LaunchAgent daemon"
           )
         }
       }
@@ -859,7 +886,7 @@ enum RuntimeCLI {
 
     case "status":
       guard rest.isEmpty else {
-        throw CLIError(exitCode: EX_USAGE, message: "signing status accepts only --json")
+        throw CLIError(exitCode: EX_USAGE, message: "\(spelling) status accepts only --json")
       }
       // Status is a diagnostic probe, not an authorization ceremony. Match
       // the LaunchAgent's fail-closed read contract so it can never summon a
@@ -872,7 +899,7 @@ enum RuntimeCLI {
 
     case "remove":
       guard rest.isEmpty else {
-        throw CLIError(exitCode: EX_USAGE, message: "signing remove accepts only --json")
+        throw CLIError(exitCode: EX_USAGE, message: "\(spelling) remove accepts only --json")
       }
       session.emit(try encodedJSON(store.remove()))
 
@@ -1485,12 +1512,24 @@ enum RuntimeCLI {
   /// external Agent had no way to ask whether the Runtime it was about to drive
   /// was there, which catalog digest it was pinned to, or which providers it
   /// had (§13.2).
-  static func runRuntime(_ arguments: [String]) throws {
+  /// §6.3's `runtime` namespace. `service` and `signing` are the target
+  /// spellings of what `agentd` and `signing` still answer to for this major:
+  /// the same handlers, told which name they were reached by, so a caller
+  /// reading `command` in machine output sees the surface they actually typed.
+  static func runRuntime(_ arguments: [String]) async throws {
     guard let subcommand = arguments.first else {
-      throw CLIError(exitCode: EX_USAGE, message: "missing runtime subcommand (health|hdc)")
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing runtime subcommand (health|hdc|service|signing)")
     }
     var rest = Array(arguments.dropFirst())
     switch subcommand {
+    case "service":
+      try runAgentDaemon(
+        rest, spelledAs: "runtime.service",
+        beforeBootstrap: refreshSigningAccessIfInstalled)
+    case "signing":
+      try await runSigningAsync(rest, spelledAs: "runtime.signing")
     case "health":
       let session = runtimeSession(&rest, command: "runtime.health")
       session.emit(try session.request("health"))
