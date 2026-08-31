@@ -192,7 +192,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | settings.servers | Servers；empty/list/refresh/add/edit/remove | 已接线，只读SSH来源，不是四connector。F56 失败横幅换成共享 warn 通知 |
 | settings.serverEditor | password/key/defaultKey/probe/fingerprint/root/drift/save/refused | 未验证不能保存；秘密仅Keychain；次级原型已补中英文，修改输入使 demo 验证失效。F56 编辑器内两处失败提示同样换成共享通知 |
 | settings.serverDelete | 移除确认/cancel/bindingStale | 只移本地来源，不删远端文件 |
-| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字；F56 位置与用量两张事实列表走共享行，存储策略表单因是三列可编辑输入而保留自写 `Grid` |
+| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字；F56 位置与用量两张事实列表走共享行，存储策略表单因是三列可编辑输入而保留自写 `Grid`。**用量拆为两域**：Runtime Artifact（Jobs 实际写入处，经只读控制面向 Runtime 取数，App Sandbox 决定进程内无法自测）与 Session 输出根（quota/margin/retention 只作用于它）；两域各自独立的「未测量」态互不影响，任一未测量都不得渲染成 0。heavy-writer 准入事实行已移除——它由 Session 根扫描得出、消费它的 coordinator 无生产写入方，放在用量旁会被读成产品可用性 |
 | settings.traceCache | Trace→Cache；loading/inventory/refresh/purge/activeEntries | 已接线，仅 inactive derived；普通文案双语 |
 | settings.traceLicenses | Trace→Licenses；lazy/loading/notice/missing/reveal | 已接线，14 reviewed components；许可证原文保留 |
 | settings.updates | idle/checking/current/available/download/verify/consent/error/reveal | 独立Settings，签名校验，显式Finder handoff，不静默安装。F56 面板骨架走 `WorkspacePage` |

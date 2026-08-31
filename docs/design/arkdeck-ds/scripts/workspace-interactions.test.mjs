@@ -1371,19 +1371,36 @@ test('Settings panes expose the shared loading, error and success rows', () => {
     active.run("S.settingsTab='toolchains'");
     assert.ok(active.run('pSettings()').includes(value('settings.toolchains.futureJobsActive', language)));
 
-    // Storage keeps an invalid policy, unclassified bytes and an unreadable
-    // measurement apart instead of collapsing them into one number.
+    // Storage keeps an invalid policy, unclassified bytes and two independently
+    // unreadable measurements apart instead of collapsing them into one number.
     for (const [token, key] of [['invalid', 'settings.storage.validationError'],
       ['unknownPressure', 'settings.storage.unknownPressure'],
-      ['measurementUnavailable', 'settings.storage.measurementUnavailable']]) {
+      ['measurementUnavailable', 'settings.storage.measurementUnavailable'],
+      ['runtimeUnavailable', 'settings.storage.runtimeUnavailable']]) {
       const h = harness(`?page=settings&lang=${language}&settingsStorage=${token}`);
       h.run("S.settingsTab='storage'");
       assert.ok(h.run('pSettings()').includes(value(key, language)), `${token} storage state`);
     }
-    const unavailable = harness(`?page=settings&lang=${language}&settingsStorage=measurementUnavailable`);
-    unavailable.run("S.settingsTab='storage'");
-    assert.doesNotMatch(unavailable.run('pSettings()'), /data-sync-id="settings.storage.usage"/,
-      'an unavailable measurement must not show a usage number');
+    // Two roots, two figures. The Runtime's artifact store is what Jobs write
+    // to and the App cannot measure it, so it is read from the Runtime; the
+    // Session output root is what the quota and retention policy govern. A
+    // single number was one of these misreported as both.
+    const ok = harness(`?page=settings&lang=${language}&settingsStorage=ok`);
+    ok.run("S.settingsTab='storage'");
+    for (const id of ['settings.storage.runtimeUsage', 'settings.storage.sessionUsage']) {
+      assert.ok(ok.run('pSettings()').includes(`data-sync-id="${id}"`), `${id} figure`);
+    }
+    // Each domain withholds its own figure when it was not measured, and
+    // withholding one must not blank or fabricate the other.
+    for (const [token, absent, present] of [
+      ['measurementUnavailable', 'settings.storage.sessionUsage', 'settings.storage.runtimeUsage'],
+      ['runtimeUnavailable', 'settings.storage.runtimeUsage', 'settings.storage.sessionUsage']]) {
+      const h = harness(`?page=settings&lang=${language}&settingsStorage=${token}`);
+      h.run("S.settingsTab='storage'");
+      const pane = h.run('pSettings()');
+      assert.ok(!pane.includes(`data-sync-id="${absent}">`), `${token} must not show a number`);
+      assert.ok(pane.includes(`data-sync-id="${present}">`), `${token} must not blank the other root`);
+    }
   }
 });
 

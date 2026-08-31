@@ -215,6 +215,15 @@ package struct RockchipLegacyFlashJournalReconciler {
 
   /// Production composition over the retired host's historical session and
   /// owner-only AuthorizationUsage locations.
+  ///
+  /// `SessionSettingsStore` reads `UserDefaults.standard`, which is per-process:
+  /// this composition runs unsandboxed from the CLI, so it resolves the
+  /// unsandboxed default root — not whatever root the sandboxed App has stored
+  /// in its own container. That is the correct root for this reader, because it
+  /// is where the retired in-process host actually wrote, but it is correct by
+  /// coincidence rather than by construction. A custom root selected in the App
+  /// is invisible here, and any surface that needs one storage view across both
+  /// processes has to establish a shared owner first.
   public static func production() throws -> RockchipLegacyFlashJournalReconciler {
     let sessionsRoot = try SessionSettingsStore().load().sessionsRoot
     let applicationSupport = try FileManager.default.url(
