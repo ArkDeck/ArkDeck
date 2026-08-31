@@ -81,7 +81,6 @@
     "settings.diagnostics.scopeHash": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Scope SHA-256"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"范围 SHA-256"}}}},
     "settings.diagnostics.size": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Estimated size"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"预计大小"}}}},
     "settings.diagnostics.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Preview a bounded, local diagnostic bundle before explicitly exporting it."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"先预览范围受限的本地诊断包，再显式导出。"}}}},
-    "settings.diagnostics.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Diagnostics"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"诊断"}}}},
     "settings.diagnostics.warning": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Review the preview before sharing. Even a redacted bundle may reveal build and platform details."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"分享前请检查预览；即使经过脱敏，诊断包仍可能披露构建与平台信息。"}}}},
     "settings.error.exportDiagnostics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The approved diagnostic scope changed or could not be exported. Create a fresh preview before retrying."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已确认的诊断范围发生变化或无法导出，请重新生成预览后再试。"}}}},
     "settings.error.previewDiagnostics": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The diagnostic preview could not be created. Choose a new, empty destination."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法生成诊断预览，请选择一个尚不存在的新位置。"}}}},
@@ -105,7 +104,6 @@
     "settings.general.platform": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Platform"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"平台"}}}},
     "settings.general.privacy": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Privacy"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"隐私"}}}},
     "settings.general.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Customize ArkDeck and review build identity, platform information, and privacy guarantees."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"自定义 ArkDeck，并查看构建身份、平台信息与隐私保证。"}}}},
-    "settings.general.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"General"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"通用"}}}},
     "settings.general.version": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Version"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"版本"}}}},
     "settings.storage.admission": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"New heavy writers"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"新的大容量写入任务"}}}},
     "settings.storage.admission.blocked": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Blocked by storage pressure"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"因存储压力而阻断"}}}},
@@ -133,7 +131,6 @@
     "settings.storage.save": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Save policy"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"保存策略"}}}},
     "settings.storage.selectionError": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The storage folder could not be selected. Choose it again."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法选择存储目录，请重新选择。"}}}},
     "settings.storage.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Manage the Session root, quota, retention window, and current pressure."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"管理 Session 根目录、配额、保留周期与当前存储压力。"}}}},
-    "settings.storage.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Storage"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"存储"}}}},
     "settings.storage.unknownPressure": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Unclassified bytes are present; cleanup remains conservative."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"存在未分类字节，清理策略将保持保守。"}}}},
     "settings.storage.usage": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Current usage"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"当前用量"}}}},
     "settings.storage.validationError": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Enter whole numbers greater than zero, with a total quota larger than the safety margin."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请输入大于零的整数，并确保总配额大于安全余量。"}}}},
@@ -160,7 +157,6 @@
     "settings.toolchains.sha256": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"SHA-256"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"SHA-256"}}}},
     "settings.toolchains.source": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Source"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"来源"}}}},
     "settings.toolchains.subtitle": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Inspect the selected HDC executable and its verified server context."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"检查当前选中的 HDC 可执行文件及其已验证的服务端上下文。"}}}},
-    "settings.toolchains.title": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Toolchains"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"工具链"}}}},
     "settings.toolchains.trust": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Platform trust"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"平台信任"}}}}
 
 

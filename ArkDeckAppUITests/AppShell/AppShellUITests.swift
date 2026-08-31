@@ -673,8 +673,13 @@ final class AppShellUITests: XCTestCase {
 
       assertDisplayed(element("app.navigation.diagnostics", in: app), equals: "Diagnostics")
       select("app.navigation.diagnostics", in: app)
-      assertDisplayed(app.staticTexts["diagnostics.workspace.title"], equals: "Diagnostics")
-      XCTAssertTrue(element("diagnostics.session.empty", in: app).exists)
+      // The sidebar names the page and so does the window toolbar; spec §8 does
+      // not allow the content area to repeat it, so assert the duplicate is
+      // absent rather than pinning it in place. Wait for the page's own content
+      // first: the assertion this replaced waited, and a bare `exists` on a
+      // negative would race the navigation it follows.
+      XCTAssertTrue(element("diagnostics.session.empty", in: app).waitForExistenceFast(timeout: 10))
+      XCTAssertFalse(app.staticTexts["diagnostics.workspace.title"].exists)
       XCTAssertTrue(app.staticTexts[diagnosticsEmptyTitle].exists)
       // The fixture has an adopted device. That fact alone cannot turn a
       // disconnected recorder into a running session or save host markers.
