@@ -2929,36 +2929,6 @@ params))
     }
   }
 
-  /// §8.3's event surface, published ahead of its producer.
-  ///
-  /// `job.events` is the unary page RPC the whole event contract rests on, and
-  /// this build's daemon does not have it: the current `job.status` timeline is
-  /// a mutable string array with no event identity, revision or cursor, so
-  /// there is nothing to page over. §8.3 is explicit that `job watch` must
-  /// *report* unavailable in that state, which is why these leaves exist and
-  /// ask the Runtime rather than refusing locally — a hard-coded refusal would
-  /// still be a claim about the daemon, and it would go stale silently the day
-  /// the method lands. Asking makes the answer true by construction: the
-  /// daemon says `unknownMethod`, §8.4 turns that into
-  /// `controlMethodUnavailable`, and exit 69 says the surface is not there.
-  static func emitJobEvents(
-    _ subcommand: String, rest: [String], session: CLIRuntimeSession
-  ) throws {
-    let options = try CLIOptions(rest)
-    guard let jobID = options.value("--job") else {
-      throw CLIError(exitCode: EX_USAGE, message: "job \(subcommand) requires --job <id>")
-    }
-    var params: [String: JSONValue] = ["jobId": .string(jobID)]
-    if let cursor = options.value("--after-cursor") { params["afterCursor"] = .string(cursor) }
-    if let pageSize = options.value("--page-size"), let size = Int64(pageSize) {
-      params["pageSize"] = .integer(size)
-    }
-    // `watch` would loop over pages until a terminal event; it never gets past
-    // the first read today, and writing the loop around a call that cannot
-    // succeed would be inventing behaviour nothing can exercise.
-    session.emit(try session.request("job.events", params))
-  }
-
   static func emitJobResult(jobID: String, session: CLIRuntimeSession) throws {
     let status = try session.request("job.status", ["jobId": .string(jobID)])
     guard case .object(let statusFields) = status else {
@@ -3188,7 +3158,7 @@ params))
           "missing job subcommand (plan|submit|status|wait|events|watch|list|run|cancel|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "job.\(subcommand)")
+    var session = runtimeSession(&rest, command: "job.\(subcommand)")
     switch subcommand {
     case "plan":
       let planJSON = try operationRequestJSON(rest, subcommand: "job plan")
@@ -3218,6 +3188,9 @@ params))
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job status requires --job <id>")
       }
+      if let major = try CLIOptions(rest).value("--require-protocol").flatMap(Int.init) {
+        try session.negotiate(requiredMajor: major, forMethod: "job.status")
+      }
       let statusResponse = try session.request(
         "job.status", ["jobId": .string(rest[index + 1])])
       session.emit(statusResponse)
@@ -3225,9 +3198,12 @@ params))
         throw CLIError(exitCode: terminal.code, message: terminal.reason)
       }
     case "wait":
-      try emitJobWait(rest, session: session)
+      if session.rendering == .jsonlStream || rest.contains("--require-protocol")
+        || rest.contains("--after-cursor") || rest.contains("--page-size") {
+        try emitJobEventObservation(subcommand, rest: rest, session: session)
+      } else { try emitJobWait(rest, session: session) }
     case "events", "watch":
-      try emitJobEvents(subcommand, rest: rest, session: session)
+      try emitJobEventObservation(subcommand, rest: rest, session: session)
     case "run":
       // Resuming a reconciled job is what settles its authorization lineage.
       // `reconcile` deliberately leaves a `confirmedCompleted` decision

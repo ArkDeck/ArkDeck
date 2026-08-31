@@ -1103,56 +1103,27 @@ enum CLICommandRegistry {
         token: "status",
         canonicalCommand: "job.status",
         summary: "compact job state, progress and unknown-outcome flag",
-        options: runtimeClientOptions([jobIDOption]),
+        options: runtimeClientOptions([jobIDOption, targetProtocolOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "wait",
         canonicalCommand: "job.wait",
         summary: "wait for terminal, human action or unknown outcome; never cancels",
-        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
-        connectsToRuntime: true),
-      // §8.3 publishes these two so a caller can discover the event surface
-      // and be told, by the Runtime rather than by a hard-coded refusal, that
-      // it is not there yet: they call `job.events`, the daemon answers
-      // `unknownMethod`, and §8.4 turns that into `controlMethodUnavailable`.
-      // The alternative — leaving them out — teaches a caller the product has
-      // no event surface at all, and the day the daemon publishes the method
-      // these start working with no change here.
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption, targetProtocolOption, eventCursorOption, eventPageSizeOption]),
+        connectsToRuntime: true,
+        outputModes: [.human, .json, .jsonl]),
       CLILeafSpec(
         token: "events",
         canonicalCommand: "job.events",
-        summary: "read one page of durable job events (requires the Runtime event stream)",
-        options: runtimeClientOptions([
-          jobIDOption,
-          CLIOptionSpec(
-            name: "--after-cursor",
-            form: .value(placeholder: "cursor", grammar: .opaque),
-            summary: "opaque exclusive cursor from a previous page"),
-          CLIOptionSpec(
-            name: "--page-size",
-            form: .value(placeholder: "1...1000", grammar: .positiveInteger(1...1000)),
-            summary: "events per page"),
-        ]),
+        summary: "read one page of retained durable Job events",
+        options: runtimeClientOptions([jobIDOption, targetProtocolOption, eventCursorOption, eventPageSizeOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "watch",
         canonicalCommand: "job.watch",
-        summary: "follow durable job events (requires the Runtime event stream)",
-        options: runtimeClientOptions([
-          jobIDOption,
-          CLIOptionSpec(
-            name: "--after-cursor",
-            form: .value(placeholder: "cursor", grammar: .opaque),
-            summary: "resume after this opaque cursor instead of the stream origin"),
-        ]),
+        summary: "follow durable Job events until timeout or interruption; never runs or cancels",
+        options: runtimeClientOptions([jobIDOption, targetProtocolOption, eventCursorOption, eventPageSizeOption, waitTimeoutOption]),
         connectsToRuntime: true,
-        // §8.3: `human` or `jsonl`, and `--output json` is refused at parse
-        // time rather than silently downgraded — a caller asking for one
-        // document from a command that produces a stream has misread the
-        // contract, and answering anyway would hide that. The mode is declared
-        // now even though its Runtime producer is not built, because the mode
-        // is part of the published contract; what is missing is the event
-        // source, and that is exactly what the leaf reports when run.
         outputModes: [.human, .jsonl]),
       CLILeafSpec(
         token: "list",
@@ -1222,6 +1193,13 @@ enum CLICommandRegistry {
   /// longer than that is a caller who meant to detach, and the honest answer
   /// to that is `job status` on a schedule rather than a process held open
   /// across a laptop suspending.
+  private static let eventCursorOption = CLIOptionSpec(
+    name: "--after-cursor", form: .value(placeholder: "cursor", grammar: .opaque),
+    summary: "resume after this opaque cursor; omission reads from the retained origin")
+  private static let eventPageSizeOption = CLIOptionSpec(
+    name: "--page-size", form: .value(placeholder: "1...1000", grammar: .positiveInteger(1...1000)),
+    summary: "maximum event count per unary page")
+
   private static let waitTimeoutOption = CLIOptionSpec(
     name: "--timeout",
     form: .value(placeholder: "30s", grammar: .duration(maximumMilliseconds: 86_400_000)),

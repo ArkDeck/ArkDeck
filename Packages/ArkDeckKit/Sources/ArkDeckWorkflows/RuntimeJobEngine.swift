@@ -4514,6 +4514,15 @@ public actor RuntimeJobEngine {
     }
   }
 
+  /// Bounded metadata projection of the retained WAL. Looking up the exact
+  /// record first preserves resourceNotFound after whole-Job reclamation.
+  package func eventPage(jobID: String, afterCursor: String?, pageSize: Int) throws -> JSONValue {
+    let record = try recordForRead(jobID: jobID)
+    return try JournalEventPages.page(
+      directory: jobDirectory(for: record.jobID), jobID: record.jobID,
+      sessionID: record.sessionID, afterCursor: afterCursor, pageSize: pageSize)
+  }
+
   public func status(jobID: String) async throws -> RuntimeJobStatus {
     let record = try recordForRead(jobID: jobID)
     let indexes = await recoveryEpochIndexes()

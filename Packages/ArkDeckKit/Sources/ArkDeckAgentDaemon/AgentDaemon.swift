@@ -934,13 +934,57 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "job.events":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(id: request.id, code: .unknownMethod, message: "Job events require the target protocol")
+      }
+      do {
+        let fields = request.params ?? [:]
+        guard Set(fields.keys).isSubset(of: ["jobId", "afterCursor", "pageSize"]),
+          case .string(let jobID)? = fields["jobId"], AgentExecutionIntent.validIdentifier(jobID)
+        else { throw AgentExecutionControlFailure("invalidInput", "job.events requires an exact Job identity and closed options") }
+        var cursor: String?
+        if let value = fields["afterCursor"] {
+          guard case .string(let text) = value, !text.isEmpty, text.utf8.count <= 2048 else {
+            throw AgentExecutionControlFailure("invalidCursor", "afterCursor must be a bounded opaque cursor")
+          }
+          cursor = text
+        }
+        var size = 100
+        if let value = fields["pageSize"] {
+          guard case .integer(let number) = value, (1...1000).contains(number) else {
+            throw AgentExecutionControlFailure("invalidInput", "pageSize must be between 1 and 1000")
+          }
+          size = Int(number)
+        }
+        return success(id: request.id, result: try await engine.eventPage(jobID: jobID, afterCursor: cursor, pageSize: size))
+      } catch let error as AgentExecutionControlFailure {
+        return AgentWireProtocol.Response(id: request.id, ok: false, result: nil,
+          error: .init(code: error.code, message: error.message, details: [
+            "phase": .string("preAdmission"), "newDispatchCount": .integer(0),
+          ]))
+      } catch RuntimeJobEngineError.jobNotFound {
+        return failure(id: request.id, code: .notFound, message: "the referenced Job does not exist")
+      } catch {
+        return failure(id: request.id, code: .recordUnreadable, message: "the retained Job event history is unreadable")
+      }
+
     case "job.status":
       guard case .string(let jobID)? = request.params?["jobId"] else {
         return failure(id: request.id, code: .invalidParams, message: "jobId is required")
       }
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
+        Set(request.params?.keys.map { $0 } ?? []) != ["jobId"] || !AgentExecutionIntent.validIdentifier(jobID) {
+        return failure(id: request.id, code: .invalidParams, message: "job.status requires only an exact Job identity")
+      }
       do {
         let status = try await engine.status(jobID: jobID)
+        if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+          return success(id: request.id, result: try Self.targetJobStatus(status))
+        }
         return success(id: request.id, result: Self.encodeStatus(status))
+      } catch is AgentExecutionControlFailure {
+        return failure(id: request.id, code: .recordUnreadable, message: "Job status has no supported next action")
       } catch RuntimeJobEngineError.jobNotFound {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
       } catch RuntimeJobEngineError.jobRecordUnreadable {
@@ -2556,14 +2600,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     fields["outcomeUnknown"] = .bool(job.outcomeUnknown)
     let terminal = JobState(rawValue: job.state)?.isTerminal == true
     fields["state"] = .string(terminal ? "completed" : "jobOwned")
-    var next: [String: JSONValue] = [
-      "kind": .string(job.outcomeUnknown ? "reconcile" : terminal ? "readResult" : "wait"),
-      "owner": .object(["kind": .string("job"), "id": .string(jobID)]),
-      "resource": .object(["kind": .string("job"), "id": .string(jobID)]),
-      "reasonCode": .string(job.outcomeUnknown ? "recovery.outcomeUnknown" : terminal ? "job.resultAvailable" : "job.running"),
-    ]
-    if !job.outcomeUnknown && !terminal { next["retryAfter"] = .string("250ms") }
-    fields["nextAction"] = .object(next)
+    fields["nextAction"] = try Self.jobNextAction(job)
     fields["job"] = .object([
       "jobId": .string(jobID), "state": .string(job.state), "outcome": .string(job.outcomeUnknown ? "outcomeUnknown" : job.state),
       "outcomeUnknown": .bool(job.outcomeUnknown), "waitingForHuman": .bool(job.waitingForHuman),
@@ -2979,6 +3016,33 @@ public struct RuntimeControlPlaneHandler: Sendable {
     return JobListOptions(
       pageSize: pageSize, cursor: cursor, newestFirst: newestFirst,
       includeTimeline: includeTimeline, includeCurrent: includeCurrent)
+  }
+
+  private static func jobNextAction(_ status: RuntimeJobStatus) throws -> JSONValue {
+    guard let state = JobState(rawValue: status.state), !status.waitingForHuman else {
+      // A physical HAR must come from a durable owner; never invent a resume
+      // token from prose or from the old boolean projection.
+      throw AgentExecutionControlFailure("recordUnreadable", "Job status has no supported next action")
+    }
+    let uncertain = status.outcomeUnknown || [.waitingForRecovery, .reconciling].contains(state)
+    var next: [String: JSONValue] = [
+      "kind": .string(uncertain ? "reconcile" : state.isTerminal ? "readResult" : "wait"),
+      "owner": .object(["kind": .string("job"), "id": .string(status.jobID)]),
+      "resource": .object(["kind": .string("job"), "id": .string(status.jobID)]),
+      "reasonCode": .string(uncertain ? "recovery.outcomeUnknown" : state.isTerminal ? "job.resultAvailable" : "job.running"),
+    ]
+    if !uncertain && !state.isTerminal { next["retryAfter"] = .string("250ms") }
+    return .object(next)
+  }
+
+  private static func targetJobStatus(_ status: RuntimeJobStatus) throws -> JSONValue {
+    guard case .object(var fields) = encodeStatus(status, includeTimeline: false) else {
+      throw AgentExecutionControlFailure("recordUnreadable", "Job status could not be projected")
+    }
+    fields.removeValue(forKey: "timeline")
+    fields["schemaVersion"] = .string("arkdeck.job-status/1")
+    fields["nextAction"] = try jobNextAction(status)
+    return .object(fields)
   }
 
   private static func encodeStatus(

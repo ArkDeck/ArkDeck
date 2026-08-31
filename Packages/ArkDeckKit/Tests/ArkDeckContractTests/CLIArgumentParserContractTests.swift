@@ -288,7 +288,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
   /// distinction is what a caller needs: one message means "no such mode", the
   /// other means "this command does not stream".
   func testJsonlIsRefusedByEveryLeafThatDoesNotStream() {
-    for argv in [["job", "list"], ["doctor"], ["commands"], ["job", "wait", "--job", "J-1"]] {
+    for argv in [["job", "list"], ["doctor"], ["commands"]] {
       let error = failure(argv + ["--output", "jsonl"])
       XCTAssertEqual(error?.code, .invalidOption, argv.joined(separator: " "))
       XCTAssertTrue(
@@ -298,6 +298,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
     // The one that does stream takes it, and refuses the single-document mode
     // §8.3 says it must not offer.
     XCTAssertNotNil(success(["job", "watch", "--job", "J-1", "--output", "jsonl"]))
+    XCTAssertNotNil(success(["job", "wait", "--job", "J-1", "--output", "jsonl"]))
     let refused = failure(["job", "watch", "--job", "J-1", "--output", "json"])
     XCTAssertEqual(refused?.code, .invalidOption)
     XCTAssertTrue(refused?.message.contains("human|jsonl") == true, refused?.message ?? "")

@@ -291,7 +291,7 @@ public struct AgentClient: Sendable {
     while true {
       try deadline.check()
       var descriptor = pollfd(fd: fd, events: events, revents: 0)
-      let result = poll(&descriptor, 1, Int32(deadline.remainingMilliseconds))
+      let result = poll(&descriptor, 1, Int32(deadline.socketPollMilliseconds))
       try deadline.check()
       if result > 0 {
         guard descriptor.revents & Int16(POLLNVAL) == 0 else {
@@ -348,12 +348,14 @@ package struct AgentClientWaitDeadline: Sendable {
   private let wallDeadline: Date
   private let continuousDeadline: ContinuousClock.Instant
   private let budgetMilliseconds: Int
+  private let cancellation: AgentClientWaitCancellation?
 
-  package init(milliseconds: Int) throws {
+  package init(milliseconds: Int, cancellation: AgentClientWaitCancellation? = nil) throws {
     guard (1...86_400_000).contains(milliseconds) else {
       throw AgentClientError.transport("client wait must be between 1ms and 24h")
     }
     budgetMilliseconds = milliseconds
+    self.cancellation = cancellation
     wallDeadline = Date().addingTimeInterval(Double(milliseconds) / 1000)
     continuousDeadline = ContinuousClock.now.advanced(by: .milliseconds(milliseconds))
   }
@@ -369,6 +371,23 @@ package struct AgentClientWaitDeadline: Sendable {
   }
 
   package func check() throws {
+    if cancellation?.isCancelled == true { throw AgentClientWaitInterrupted() }
     guard remainingMilliseconds > 0 else { throw AgentClientError.deadlineExceeded }
   }
+
+  fileprivate var socketPollMilliseconds: Int {
+    min(remainingMilliseconds, cancellation == nil ? 86_400_000 : 100)
+  }
 }
+
+/// Cancels only the local wait, including a stalled unary read. It sends no
+/// cancellation, abandon, run or other mutation to the Runtime.
+package final class AgentClientWaitCancellation: @unchecked Sendable {
+  private let lock = NSLock()
+  private var cancelled = false
+  package init() {}
+  package var isCancelled: Bool { lock.withLock { cancelled } }
+  package func cancel() { lock.withLock { cancelled = true } }
+}
+
+package struct AgentClientWaitInterrupted: Error { package init() {} }

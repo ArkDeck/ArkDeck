@@ -85,6 +85,22 @@ final class AgentClientDeadlineContractTests: XCTestCase {
     }
   }
 
+  func testInterruptClosesAStalledUnaryReadWithoutWaitingForItsDeadline() throws {
+    let cancellation = AgentClientWaitCancellation()
+    try withPeer(reply: { _, connection, _ in
+      cancellation.cancel()
+      Self.awaitClientClose(connection)
+    }) { client in
+      let deadline = try AgentClientWaitDeadline(milliseconds: 30_000, cancellation: cancellation)
+      let started = ContinuousClock.now
+      XCTAssertThrowsError(try client.bounded(by: deadline).request(method: "job.events")) {
+        XCTAssertTrue($0 is AgentClientWaitInterrupted)
+      }
+      XCTAssertLessThan(started.duration(to: .now), .seconds(2))
+      XCTAssertGreaterThan(deadline.remainingMilliseconds, 20_000)
+    }
+  }
+
   func testPartialResponseBytesCannotRenewTheTotalReadBudget() throws {
     try withPeer(reply: { _, connection, _ in
       let response = Data((#"{"id":"test","ok":true,"result":{"ready":true}}"# + "\n").utf8)
