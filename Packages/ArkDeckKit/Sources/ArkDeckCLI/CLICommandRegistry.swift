@@ -497,7 +497,7 @@ enum CLICommandRegistry {
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
     jobNode, artifactNode, agentNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
-    flashNode, legacyNode, maintainerNode, agentdNode, signingNode, updateFeedNode,
+    flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
 
   /// A first-class name for one published operation (§6.2).
@@ -1475,6 +1475,49 @@ enum CLICommandRegistry {
     token: "legacy",
     summary: "explicit compatibility surfaces; frozen 1.x shape, never target conformance",
     groups: [legacyFlashNode])
+
+  /// §6.3's `ui-dump` family, minus the two leaves that reach a device.
+  ///
+  /// `inspect` and `hit-test` are §6.2 deterministic local derivations: they
+  /// read Artifact bytes the Runtime already published and compute, contacting
+  /// nothing. `ui-dump capture` is a `capture.diagnostics@1` preset and
+  /// `component-detail` builds an advanced-dump request against the same
+  /// operation — both are device captures, so they belong with the typed
+  /// presets rather than here, and filing them as offline derivations would
+  /// misdescribe what they do.
+  private static let uiDumpNode = CLINodeSpec(
+    token: "ui-dump",
+    summary: "derive a UI tree from a published capture; never reaches a device",
+    leaves: [
+      CLILeafSpec(
+        token: "inspect",
+        canonicalCommand: "ui-dump.inspect",
+        summary: "parse a published capture into its node tree, with parser and source digests",
+        options: runtimeClientOptions([jobIDOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "hit-test",
+        canonicalCommand: "ui-dump.hit-test",
+        summary: "resolve one screenshot coordinate to the node the device would hit",
+        options: runtimeClientOptions([
+          jobIDOption,
+          CLIOptionSpec(
+            name: "--x",
+            form: .value(placeholder: "0...", grammar: .nonNegativeInteger(0...Int.max)),
+            summary: "screenshot x coordinate in pixels",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--y",
+            form: .value(placeholder: "0...", grammar: .nonNegativeInteger(0...Int.max)),
+            summary: "screenshot y coordinate in pixels",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--root",
+            form: .value(placeholder: "node-identity", grammar: .opaque),
+            summary: "restrict the search to one subtree"),
+        ]),
+        connectsToRuntime: true),
+    ])
 
   private static let flashNode = CLINodeSpec(
     token: "flash",
