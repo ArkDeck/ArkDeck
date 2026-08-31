@@ -50,11 +50,11 @@ feed；feed 自身不能下发新的信任根。
    发布中的 ArkDeck App 相同。客户端会用同一条 code requirement 同时验证当前
    运行 App 与 DMG：Apple generic anchor、Developer ID Application leaf OID
    `1.2.840.113635.100.6.1.13` 存在，并且 leaf OU 等于当前 App 的 Team ID。
-4. 使用仓库构建出的 `arkdeck update-feed prepare` 流式计算最终 DMG 的长度和
+4. 使用仓库构建出的 `arkdeck maintainer update-feed prepare` 流式计算最终 DMG 的长度和
    SHA-256；该命令先验证版本、时间窗口、架构与 artifact URL，再生成确定性
    payload 与签名输入。失败时不得进入隔离签名步骤。
 5. 在隔离维护者终端使用本地 OpenSSL 私钥签名 signature input。
-6. 使用 `arkdeck update-feed assemble` 以 App 内置公钥组装并完整自验 feed。
+6. 使用 `arkdeck maintainer update-feed assemble` 以 App 内置公钥组装并完整自验 feed。
 7. 先上传 DMG，再下载回读并逐字节核对长度和 SHA-256。
 8. 最后上传 feed，下载回读并逐字节核对 feed SHA-256。
 9. 从已发布 App 手动检查一次；下载和 Finder handoff 仍分别需要用户动作。
@@ -62,7 +62,7 @@ feed；feed 自身不能下发新的信任根。
 示例中的路径必须替换为隔离环境的真实路径。不要把私钥路径赋给环境变量：
 
 ```bash
-arkdeck update-feed prepare \
+arkdeck maintainer update-feed prepare \
   --sequence 42 \
   --version 1.4.0 \
   --minimum-system 14.0.0 \
@@ -78,7 +78,7 @@ openssl pkeyutl -sign -rawin \
   -in /release/feed-work/arkdeck-update-signature-input-v1.bin \
   -out /release/feed-work/arkdeck-update-signature-v1.bin
 
-arkdeck update-feed assemble \
+arkdeck maintainer update-feed assemble \
   --payload /release/feed-work/arkdeck-update-payload-v1.json \
   --signature /release/feed-work/arkdeck-update-signature-v1.bin \
   --out /release/arkdeck-update-feed-v1.json
