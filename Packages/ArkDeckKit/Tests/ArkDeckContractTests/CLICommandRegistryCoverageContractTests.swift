@@ -219,6 +219,58 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
     }
   }
 
+  /// The same rule as tombstones, extended to leaves that are merely
+  /// superseded: a deprecation notice that names a command the build does not
+  /// publish sends a caller from the warning straight into an
+  /// `invalidCommand`. This is what makes it safe to add a replacement the
+  /// moment its leaf lands, rather than from memory.
+  func testEveryPublishedReplacementResolvesToALeaf() {
+    let executablePaths = Set(
+      CLICommandRegistry.allLeaves()
+        .filter { if case .executable = $0.leaf.kind { return true } else { return false } }
+        .map { $0.path.joined(separator: " ") })
+
+    var checked = 0
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      guard let pattern = leaf.replacementArgvPattern else { continue }
+      checked += 1
+      let name = path.joined(separator: " ")
+      XCTAssertTrue(pattern.hasPrefix("arkdeck "), "\(name): `\(pattern)` is not runnable")
+      let target = pattern.dropFirst("arkdeck ".count)
+        .split(separator: " ").map(String.init)
+        .prefix { !$0.hasPrefix("-") && !$0.hasPrefix("<") }
+        .joined(separator: " ")
+      XCTAssertTrue(
+        executablePaths.contains(target),
+        "\(name) points at `\(target)`, which is not an executable leaf in this build")
+    }
+    XCTAssertGreaterThan(checked, 0, "no replacement was checked; the scan found nothing")
+  }
+
+  /// A superseded leaf has to say so, and a current one must not: a warning on
+  /// a command that is the published spelling would train a caller to ignore
+  /// warnings.
+  func testOnlySupersededLeavesCarryALifecycleAndAReplacement() {
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      let name = path.joined(separator: " ")
+      if leaf.replacementArgvPattern != nil {
+        XCTAssertNotEqual(
+          leaf.lifecycle, .current, "\(name) has a replacement but claims to be current")
+      }
+    }
+    // The new spellings are the destination, so they carry neither.
+    for path in [["recovery", "cleanup", "list"], ["recovery", "flash-invocation", "status"]] {
+      let leaf = CLICommandRegistry.allLeaves().first { $0.path == path }?.leaf
+      XCTAssertEqual(leaf?.lifecycle, .current, path.joined(separator: " "))
+      XCTAssertNil(leaf?.replacementArgvPattern, path.joined(separator: " "))
+    }
+    // And the old ones point at them.
+    let debugStatus = CLICommandRegistry.allLeaves().first { $0.path == ["debug", "status"] }
+    XCTAssertEqual(
+      debugStatus?.leaf.replacementArgvPattern,
+      "arkdeck recovery flash-invocation status --invocation <id>")
+  }
+
   func testATombstoneWithoutAReplacementSaysWhy() {
     for (path, leaf) in CLICommandRegistry.allLeaves() {
       guard case .tombstone(let tombstone) = leaf.kind,

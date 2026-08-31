@@ -64,6 +64,8 @@ struct CLIRuntimeSession {
   let rendering: CLIRendering
   let controlRequestID: String
   let lifecycle: CLILifecycleStatus
+  /// The argv pattern that supersedes this command, when one is published.
+  var replacementArgvPattern: String?
   let outputState = OutputState()
 
   var isMachineOutput: Bool { rendering != .human }
@@ -83,6 +85,8 @@ struct CLIRuntimeSession {
     var stamped = error
     stamped.rendering = rendering
     stamped.controlRequestID = controlRequestID
+    stamped.lifecycle = lifecycle
+    stamped.replacementArgvPattern = replacementArgvPattern
     return stamped
   }
 
@@ -158,7 +162,8 @@ struct CLIRuntimeSession {
     case .envelope:
       var envelope = CLIResultEnvelope.success(
         command: command, result: value, controlRequestID: controlRequestID)
-      envelope = CLIResultEnvelope.withLifecycle(envelope, lifecycle)
+      envelope = CLIResultEnvelope.withLifecycle(
+        envelope, lifecycle, replacement: replacementArgvPattern)
       FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
     }
   }
@@ -166,11 +171,11 @@ struct CLIRuntimeSession {
   /// §12: the deprecation warning for an alias goes to stderr in human mode
   /// only. In machine mode it belongs in `meta.lifecycle`, so that stdout
   /// stays exactly one parseable document.
-  func warnIfLegacy(replacement: String?) {
+  func warnIfLegacy() {
     guard rendering == .human, lifecycle != .current else { return }
     var text = "warning: `\(command.replacingOccurrences(of: ".", with: " "))` is "
       + "\(lifecycle.rawValue)"
-    if let replacement { text += "; use `\(replacement)`" }
+    if let replacementArgvPattern { text += "; use `\(replacementArgvPattern)`" }
     FileHandle.standardError.write(Data((text + "\n").utf8))
   }
 

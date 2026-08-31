@@ -118,10 +118,12 @@ struct ArkDeckCommandLine {
       FileHandle.standardOutput.write(
         Data(CLIRuntimeSession.legacyDocument(CLIResultEnvelope.legacyFailure(error)).utf8))
     case .envelope:
-      let envelope = CLIResultEnvelope.failure(
+      var envelope = CLIResultEnvelope.failure(
         command: error.command ?? CLIResultEnvelope.parsePhaseCommand,
         error: error,
         controlRequestID: error.controlRequestID ?? newControlRequestID())
+      envelope = CLIResultEnvelope.withLifecycle(
+        envelope, error.lifecycle, replacement: error.replacementArgvPattern)
       FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
     }
   }
@@ -158,6 +160,8 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runJob(arguments)
       case "cleanup-debt":
         try RuntimeCLI.runCleanupDebt(arguments)
+      case "recovery":
+        try RuntimeCLI.runRecovery(arguments)
       case "agent":
         try await RuntimeCLI.runAgent(arguments)
       case "agentd":

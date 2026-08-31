@@ -70,15 +70,15 @@ enum RuntimeCLI {
       if rendering == .human { rendering = .legacyJSON }
       arguments.removeAll { $0 == "--json" }
     }
-    let lifecycle =
-      CLICommandRegistry.allLeaves()
-      .first { $0.leaf.canonicalCommand == command }?.leaf.lifecycle ?? .current
+    let declared = CLICommandRegistry.allLeaves()
+      .first { $0.leaf.canonicalCommand == command }?.leaf
     return CLIRuntimeSession(
       client: client(&arguments),
       command: command,
       rendering: rendering,
       controlRequestID: controlRequestID,
-      lifecycle: lifecycle)
+      lifecycle: declared?.lifecycle ?? .current,
+      replacementArgvPattern: declared?.replacementArgvPattern)
   }
 
   static func client(_ arguments: inout [String]) -> AgentClient {
@@ -1263,7 +1263,7 @@ enum RuntimeCLI {
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "device.\(subcommand)")
-    session.warnIfLegacy(replacement: nil)
+    session.warnIfLegacy()
     switch subcommand {
     case "candidates":
       // The one read an external Agent starts from: what is plugged in, whether
@@ -1282,6 +1282,130 @@ enum RuntimeCLI {
       session.emit(try session.request("target.adopt", params))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported device subcommand")
+    }
+  }
+
+  /// `arkdeck recovery ...` — §6.1's recovery surface.
+  ///
+  /// Both halves already existed under names that misdescribe them.
+  /// `cleanup-debt` made one kind of recovery a top-level noun, and `debug` was
+  /// the *protected destructive Flash recovery* invocation — a name that
+  /// collides head-on with the ordinary Debug product §6.2 describes, which is
+  /// why §13.2 records the collision and §12 schedules the rename. The old
+  /// spellings keep working as aliases for this major and now say so.
+  ///
+  /// No new Runtime method: these send exactly what the old spellings sent.
+  static func runRecovery(_ arguments: [String]) throws {
+    guard let group = arguments.first else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "missing recovery subcommand (cleanup|flash-invocation)")
+    }
+    let rest0 = Array(arguments.dropFirst())
+    guard let subcommand = rest0.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing recovery \(group) subcommand")
+    }
+    var rest = Array(rest0.dropFirst())
+
+    switch group {
+    case "cleanup":
+      let session = runtimeSession(&rest, command: "recovery.cleanup.\(subcommand)")
+      try emitCleanupDebt(subcommand, rest: rest, session: session)
+    case "flash-invocation":
+      let session = runtimeSession(
+        &rest, command: "recovery.flash-invocation.\(subcommand)")
+      try emitFlashInvocation(subcommand, rest: rest, session: session)
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported recovery subcommand")
+    }
+  }
+
+  /// Shared by `recovery cleanup` and its `cleanup-debt` alias, so the two
+  /// spellings cannot start behaving differently.
+  static func emitCleanupDebt(
+    _ subcommand: String, rest: [String], session: CLIRuntimeSession
+  ) throws {
+    switch subcommand {
+    case "list":
+      session.emit(try session.request("cleanupDebt.list"))
+    case "continue":
+      var residue: (key: String, value: String)?
+      if let index = rest.firstIndex(of: "--remote-path"), index + 1 < rest.count {
+        residue = ("remotePath", rest[index + 1])
+      } else if let index = rest.firstIndex(of: "--bundle"), index + 1 < rest.count {
+        residue = ("bundleName", rest[index + 1])
+      }
+      guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count,
+        let residue
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "cleanup continue requires --job <id> and one of "
+            + "--remote-path <recorded path> / --bundle <recorded bundle>")
+      }
+      session.emit(
+        try session.request(
+          "cleanupDebt.continue",
+          [
+            "jobId": .string(rest[jobIndex + 1]),
+            .init(residue.key): .string(residue.value),
+          ]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported cleanup subcommand")
+    }
+  }
+
+  /// Shared by `recovery flash-invocation` and its `debug` alias.
+  static func emitFlashInvocation(
+    _ subcommand: String, rest: [String], session: CLIRuntimeSession
+  ) throws {
+    func value(_ flag: String) -> String? {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
+      return rest[index + 1]
+    }
+    func document(_ flag: String) throws -> String {
+      guard let path = value(flag) else {
+        throw CLIError(exitCode: EX_USAGE, message: "flash-invocation requires \(flag)")
+      }
+      guard let text = try? String(contentsOf: URL(filePath: path), encoding: .utf8) else {
+        throw session.fail(.ioFailure, "cannot read \(path)")
+      }
+      return text
+    }
+
+    switch subcommand {
+    case "start":
+      session.emit(
+        try session.request(
+          "debug.start", ["requestJson": .string(try document("--request-file"))]))
+    case "evaluate":
+      guard let invocationID = value("--invocation"), let sourceSHA = value("--source-sha256"),
+        let buildSHA = value("--build-sha256")
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "flash-invocation evaluate requires --invocation, --action-file, "
+            + "--source-sha256 and --build-sha256")
+      }
+      session.emit(
+        try session.request(
+          "debug.evaluate",
+          [
+            "invocationId": .string(invocationID),
+            "actionJson": .string(try document("--action-file")),
+            "sourceSha256": .string(sourceSHA),
+            "buildSha256": .string(buildSHA),
+          ]))
+    case "status":
+      guard let invocationID = value("--invocation") else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "flash-invocation status requires --invocation <id>")
+      }
+      session.emit(
+        try session.request("debug.status", ["invocationId": .string(invocationID)]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported flash-invocation subcommand")
     }
   }
 
@@ -1611,7 +1735,7 @@ enum RuntimeCLI {
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "artifact.\(subcommand)")
-    session.warnIfLegacy(replacement: nil)
+    session.warnIfLegacy()
     let client = session.client
     if subcommand == "import-flash-bundle" {
       try importFlashBundle(rest, session: session)
@@ -2293,6 +2417,11 @@ params))
   /// action, so `--remote-path` is a lookup key into the ledger, never a
   /// device path a caller gets to choose. The daemon has owned these two
   /// methods since MU-4 and nothing could call them.
+  /// `arkdeck cleanup-debt ...` — the alias §12 keeps for this major.
+  ///
+  /// It delegates to the same helper `recovery cleanup` uses, so the two
+  /// spellings cannot start behaving differently; only the deprecation notice
+  /// differs, and that comes from the registry.
   static func runCleanupDebt(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
@@ -2300,45 +2429,10 @@ params))
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "cleanup-debt.\(subcommand)")
-    switch subcommand {
-    case "list":
-      session.emit(try session.request("cleanupDebt.list"))
-    case "continue":
-      var residue: (key: String, value: String)?
-      if let index = rest.firstIndex(of: "--remote-path"), index + 1 < rest.count {
-        residue = ("remotePath", rest[index + 1])
-      } else if let index = rest.firstIndex(of: "--bundle"), index + 1 < rest.count {
-        residue = ("bundleName", rest[index + 1])
-      }
-      guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count,
-        let residue
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "cleanup-debt continue requires --job <id> and one of "
-            + "--remote-path <recorded path> / --bundle <recorded bundle>")
-      }
-      session.emit(
-        try session.request(
-          "cleanupDebt.continue",
-          [
-            "jobId": .string(rest[jobIndex + 1]),
-            .init(residue.key): .string(residue.value),
-          ]))
-    default:
-      throw CLIError(exitCode: EX_USAGE, message: "unsupported cleanup-debt subcommand")
-    }
+    session.warnIfLegacy()
+    try emitCleanupDebt(subcommand, rest: rest, session: session)
   }
 
-  /// `job result` — the read an external Agent ends on (§6.1).
-  ///
-  /// It is a composition rather than a new daemon method: the status, the
-  /// verified evidence, the artifact inventory and the cleanup residue are four
-  /// existing reads, and §8.2 already expects a composite leaf to make several
-  /// unary requests. What it adds is the one thing a caller cannot assemble
-  /// safely by hand — a single exit status that distinguishes "still running"
-  /// from "finished badly" from "nobody knows what happened".
   static func emitJobResult(jobID: String, session: CLIRuntimeSession) throws {
     let status = try session.request("job.status", ["jobId": .string(jobID)])
     guard case .object(let statusFields) = status else {
@@ -2690,77 +2784,23 @@ params))
   /// The candidate file here is the closed recovery decision document; the
   /// CLI has no target, inputs, plan, argv or capability flag on the
   /// evaluation path.
+  /// `arkdeck debug ...` — the alias §12 keeps for this major.
+  ///
+  /// The name is the problem §13.2 records: this is the *protected destructive
+  /// Flash recovery* invocation, not the ordinary Debug product §6.2 describes,
+  /// and one of the two has to give the name back. It delegates to the same
+  /// helper `recovery flash-invocation` uses.
   static func runDebug(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE,
-        message: "missing debug subcommand (start|evaluate|status)")
+        exitCode: EX_USAGE, message: "missing debug subcommand (start|evaluate|status)")
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "debug.\(subcommand)")
-    session.warnIfLegacy(replacement: nil)
-
-    func value(_ flag: String) -> String? {
-      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
-      return rest[index + 1]
-    }
-
-    switch subcommand {
-    case "start":
-      guard let requestPath = value("--request-file") else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "debug start requires --request-file <destructive-flash-request.json>")
-      }
-      let requestURL = URL(filePath: requestPath)
-      guard let requestJSON = try? String(contentsOf: requestURL, encoding: .utf8) else {
-        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(requestURL.path)")
-      }
-      session.emit(try session.request("debug.start", ["requestJson": .string(requestJSON)]))
-
-    case "evaluate":
-      guard let invocationID = value("--invocation"),
-        let actionPath = value("--action-file"),
-        let sourceSHA256 = value("--source-sha256"),
-        let buildSHA256 = value("--build-sha256")
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "debug evaluate requires --invocation <id> --action-file <effect-action.json> "
-            + "--source-sha256 <sha256> --build-sha256 <sha256>")
-      }
-      let actionURL = URL(filePath: actionPath)
-      guard let actionJSON = try? String(contentsOf: actionURL, encoding: .utf8) else {
-        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(actionURL.path)")
-      }
-      session.emit(
-        try session.request(
-          "debug.evaluate",
-          [
-            "invocationId": .string(invocationID),
-            "actionJson": .string(actionJSON),
-            "sourceSha256": .string(sourceSHA256),
-            "buildSha256": .string(buildSHA256),
-          ]))
-
-    case "status":
-      guard let invocationID = value("--invocation") else {
-        throw CLIError(
-          exitCode: EX_USAGE, message: "debug status requires --invocation <id>")
-      }
-      session.emit(
-        try session.request("debug.status", ["invocationId": .string(invocationID)]))
-
-    default:
-      throw CLIError(exitCode: EX_USAGE, message: "unsupported debug subcommand")
-    }
+    session.warnIfLegacy()
+    try emitFlashInvocation(subcommand, rest: rest, session: session)
   }
 
-  /// SHA-256 of an already-open file, read from the start and leaving the
-  /// descriptor where it began. The upload re-reads the same descriptor and
-  /// re-hashes as it goes, so a file that changes underneath is still caught
-  /// by the identity and mtime checks after the last chunk.
   static func streamedDigest(ofDescriptor descriptor: Int32) throws -> String {
     guard lseek(descriptor, 0, SEEK_SET) == 0 else {
       throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")

@@ -868,6 +868,54 @@ final class CLIArgumentParserContractTests: XCTestCase {
       .string("arkdeck flash lane-preview --target <id> ..."))
   }
 
+  // MARK: The recovery namespace (§6.1, §12, §13.2)
+
+  /// §13.2 records the collision: `debug` is the *protected destructive Flash
+  /// recovery* invocation, not the ordinary Debug product §6.2 describes. Both
+  /// spellings work this major; the recovery one is where they belong.
+  func testTheRecoverySurfaceIsReachableAndTheOldSpellingsStillWork() {
+    let digest = String(repeating: "a", count: 64)
+    for argv in [
+      ["recovery", "cleanup", "list"],
+      ["recovery", "cleanup", "continue", "--job", "J-1", "--bundle", "b"],
+      ["recovery", "flash-invocation", "start", "--request-file", "r.json"],
+      ["recovery", "flash-invocation", "status", "--invocation", "I-1"],
+      [
+        "recovery", "flash-invocation", "evaluate", "--invocation", "I-1",
+        "--action-file", "a.json", "--source-sha256", digest, "--build-sha256", digest,
+      ],
+      ["cleanup-debt", "list"],
+      ["debug", "status", "--invocation", "I-1"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["recovery"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["recovery", "cleanup"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["recovery", "bogus"])?.code, .invalidCommand)
+    // An incomplete nested path names itself, not just its last token.
+    XCTAssertTrue(
+      failure(["recovery", "cleanup"])?.message.contains("`recovery cleanup`") == true)
+  }
+
+  /// The recovery evaluate leaf tightens the two digests the old spelling took
+  /// as free strings — §11.3 fixes them as lowercase hex.
+  func testTheRecoveryEvaluateDigestsAreConstrained() {
+    let base = [
+      "recovery", "flash-invocation", "evaluate", "--invocation", "I-1",
+      "--action-file", "a.json",
+    ]
+    let good = String(repeating: "a", count: 64)
+    XCTAssertNotNil(
+      success(base + ["--source-sha256", good, "--build-sha256", good]))
+    XCTAssertEqual(
+      failure(base + ["--source-sha256", "abc", "--build-sha256", good])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure(base + ["--source-sha256", good, "--build-sha256", good.uppercased()])?.code,
+      .invalidOption)
+  }
+
   // MARK: The surface itself
 
   /// Every command the previous hand-written dispatcher accepted still parses.

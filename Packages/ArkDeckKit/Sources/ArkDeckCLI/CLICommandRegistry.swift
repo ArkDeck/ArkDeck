@@ -158,6 +158,14 @@ struct CLILeafSpec {
   /// but its request, response and effect are the frozen 1.x ones, so it does
   /// not count as target conformance.
   var lifecycle: CLILifecycleStatus = .current
+  /// The argv pattern that supersedes this leaf, when one is published.
+  ///
+  /// Independent of `lifecycle`, because the two answer different questions: a
+  /// leaf can be a frozen 1.x surface *and* have a replacement (`device list`
+  /// is both), and it can be superseded without its own shape being frozen
+  /// (`cleanup-debt` is a plain alias). Folding them into one field would make
+  /// `legacy` mean two things.
+  var replacementArgvPattern: String?
 }
 
 struct CLIPositionalSpec: Equatable {
@@ -324,6 +332,26 @@ enum CLICommandRegistry {
   /// Marking them is not cosmetic: §12 forbids counting a legacy leaf as
   /// target conformance, and a machine caller has to be able to see which
   /// surface it is driving without reading this file.
+  /// The argv pattern that supersedes each superseded leaf.
+  ///
+  /// A leaf appears here only once its replacement is a real, executable
+  /// command — the same rule the tombstones follow, and
+  /// `testEveryPublishedReplacementResolvesToALeaf` enforces it. `device adopt`,
+  /// the `artifact import-*` verbs and the `flash` archive leaves are absent
+  /// because their targets (`target adopt` with observation identity,
+  /// `artifact import <kind>`, `legacy flash ...`) are not published yet;
+  /// naming them now would send a caller from a deprecation warning into an
+  /// `invalidCommand`.
+  private static let replacementArgvPatterns: [String: String] = [
+    "device.list": "arkdeck target list",
+    "device.show": "arkdeck target show --target <id>",
+    "cleanup-debt.list": "arkdeck recovery cleanup list",
+    "cleanup-debt.continue": "arkdeck recovery cleanup continue --job <id> ...",
+    "debug.start": "arkdeck recovery flash-invocation start --request-file <path>",
+    "debug.evaluate": "arkdeck recovery flash-invocation evaluate --invocation <id> ...",
+    "debug.status": "arkdeck recovery flash-invocation status --invocation <id>",
+  ]
+
   private static let legacyCompatibilityCommands: Set<String> = [
     "device.list", "device.show", "device.adopt",
     "debug.start", "debug.evaluate", "debug.status",
@@ -337,6 +365,13 @@ enum CLICommandRegistry {
     if legacyCompatibilityCommands.contains(leaf.canonicalCommand) {
       normalized.lifecycle = .legacy
     }
+    if let replacement = replacementArgvPatterns[leaf.canonicalCommand] {
+      normalized.replacementArgvPattern = replacement
+      // A leaf that is merely superseded, without its own shape being frozen,
+      // is deprecated rather than legacy: `cleanup-debt` is a plain alias for
+      // the same call.
+      if normalized.lifecycle == .current { normalized.lifecycle = .deprecated }
+    }
     guard leaf.options.contains(where: { $0.name == outputOption.name }) else { return normalized }
     if !normalized.outputModes.contains(.json) { normalized.outputModes.append(.json) }
     if leaf.options.contains(where: { $0.name == jsonOption.name }),
@@ -349,9 +384,103 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, artifactNode, agentNode, capabilityNode, cleanupDebtNode, debugNode, flashNode,
-    agentdNode, signingNode, updateFeedNode,
+    jobNode, artifactNode, agentNode, capabilityNode, recoveryNode, cleanupDebtNode, debugNode,
+    flashNode, agentdNode, signingNode, updateFeedNode,
   ]
+
+  /// §6.1's recovery surface.
+  ///
+  /// Two things live here that were previously spelled as something else.
+  /// `cleanup-debt` was a top-level noun for what is really one kind of
+  /// recovery, and `debug` was the protected destructive Flash recovery
+  /// invocation — a name that collides head-on with the ordinary Debug product
+  /// §6.2 describes (§13.2 records the collision). Both keep working as
+  /// aliases for this major; this is where they are supposed to be read from.
+  private static let recoveryNode = CLINodeSpec(
+    token: "recovery",
+    summary: "typed cleanup residue and protected Flash recovery invocations",
+    groups: [
+      CLINodeSpec(
+        token: "cleanup",
+        summary: "cleanup residue the Runtime recorded",
+        leaves: [
+          CLILeafSpec(
+            token: "list",
+            canonicalCommand: "recovery.cleanup.list",
+            summary: "list typed cleanup residue",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "continue",
+            canonicalCommand: "recovery.cleanup.continue",
+            summary: "continue a recorded cleanup inside its owner boundary",
+            options: runtimeClientOptions([
+              jobIDOption,
+              CLIOptionSpec(
+                name: "--remote-path",
+                form: .value(placeholder: "recorded-path", grammar: .opaque),
+                summary: "residue path exactly as the Runtime recorded it"),
+              CLIOptionSpec(
+                name: "--bundle",
+                form: .value(placeholder: "recorded-bundle", grammar: .opaque),
+                summary: "residue bundle exactly as the Runtime recorded it"),
+            ]),
+            requiresExactlyOneOf: [["--remote-path", "--bundle"]],
+            connectsToRuntime: true),
+        ]),
+      CLINodeSpec(
+        token: "flash-invocation",
+        summary: "protected destructive Flash recovery decision documents",
+        leaves: [
+          CLILeafSpec(
+            token: "start",
+            canonicalCommand: "recovery.flash-invocation.start",
+            summary: "create the closed recovery decision document",
+            options: runtimeClientOptions([
+              CLIOptionSpec(
+                name: "--request-file",
+                form: .value(placeholder: "path", grammar: .opaque),
+                summary: "destructive flash request document",
+                isRequired: true)
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "evaluate",
+            canonicalCommand: "recovery.flash-invocation.evaluate",
+            summary: "evaluate an effect action inside one invocation owner",
+            options: runtimeClientOptions([
+              invocationIDOption,
+              CLIOptionSpec(
+                name: "--action-file",
+                form: .value(placeholder: "path", grammar: .opaque),
+                summary: "typed effect action document",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--source-sha256",
+                form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+                summary: "source digest pinned by the invocation",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--build-sha256",
+                form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+                summary: "build digest pinned by the invocation",
+                isRequired: true),
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "status",
+            canonicalCommand: "recovery.flash-invocation.status",
+            summary: "read one invocation owner",
+            options: runtimeClientOptions([invocationIDOption]),
+            connectsToRuntime: true),
+        ]),
+    ])
+
+  private static let invocationIDOption = CLIOptionSpec(
+    name: "--invocation",
+    form: .value(placeholder: "invocation-id", grammar: .opaque),
+    summary: "exact invocation identity",
+    isRequired: true)
 
   /// §6.3's platform surface. Only the two read-only observations exist today;
   /// `service`, `tool`, `bundle`, `signing`, `storage`, `support-bundle` and
