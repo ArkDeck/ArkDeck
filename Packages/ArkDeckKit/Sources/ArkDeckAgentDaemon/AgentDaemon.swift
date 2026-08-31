@@ -17,7 +17,7 @@ import Foundation
 
 package enum AgentWireProtocol {
   public static let version = ArkDeckAgentXPC.wireProtocolVersion
-  package static let requiredMajor = 1
+  package static let requiredMajor = ArkDeckAgentXPC.wireProtocolMajor
 
   package struct Request: Codable, Sendable {
     package let protocolVersion: String
