@@ -4044,3 +4044,79 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   构建并校验签名，全部临时探针不得进入最终提交或产品。
 - 编译优化热点诊断不修改正式优化 pass 或 Runtime 安全逻辑；无真实设备、Artifact 或
   `REAL_DEVICE_PASS` 声明，旧 base 的测试与性能记录不替代 rebase 后的最终验证。
+
+## TASK-AIN-025 — 维护者与发布文档的 CLI 拼写同步
+
+- Status:in-progress（维护者要求为 `docs/adr/` 与 `docs/release/` 下两份打印可复制
+  CLI 命令的文档建立最小维护边界；本 Task 只有在定义 PR 经维护者 review/merge 进入
+  protected `main` 后，才能被后续文档 PR 声明。Task 定义本身不授权同一 PR 改写这两份
+  文档）
+- Compatibility note:这是维护者针对 §12 四族重命名后残留旧拼写的显式文档维护例外。
+  它只授权把文档打印的命令行改写成 §6.3 已发布的拼写，不恢复 readiness/verification/
+  archive 链，不把文档完成计为 Golden Journey 进度，也不扩张为通用文档治理框架。根目录
+  双语 README 仍归 TASK-AIN-023 的统一维护边界，本 Task 不触碰，两者的 Allowed paths
+  不相交
+- Golden Journey:GJ-1—GJ-5 共用的维护者与发布操作入口；本 Task 只确保文档打印的命令与
+  当前 CLI 已发布拼写一致，不改变任何 Journey 状态，也不产生真机结论
+- Platform:macos、GitHub repository documentation
+- Root cause:TASK-AIN-021 按 §12 迁移表发布了 `runtime service`、`runtime signing`、
+  `maintainer update-feed` 与 `legacy flash status/reconcile` 四族 §6.3 拼写，并按 §12
+  要求让旧拼写在本 major 内继续可用。同车更新的文档只覆盖当时 Allowed paths 之内的
+  `Packages/ArkDeckKit/LaunchAgents/README.md` 与 `docs/design/arktrace-user-guide{,.en}.md`；
+  `docs/adr/arktrace-summary-analyzer-profile.md` 仍打印 `arkdeck agentd update`，
+  `docs/release/macos-auto-update.md` 仍打印 `arkdeck update-feed prepare/assemble`。
+  命令仍能执行，但 CLI 现在会在 stderr 具名发出 §12 弃用警告并指出替代 argv，照这两份
+  文档逐行操作的读者因此被告知自己敲错了名字
+- Depends on:protected `main` 当前 `CLICommandRegistry` 已发布的 node/leaf 与 §12 兼容
+  拼写；不新增或修改 operation、provider、CLI 语法、integration/device profile 或
+  destructive policy
+- Production reachability:维护者阅读文档 → 按文档逐行执行已发布 CLI 命令 → 现有
+  admission 与 typed provider；文档不生成 trusted fact、capability、argv、远端路径或
+  硬件 evidence
+- Trusted fact sources:拼写来自
+  `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift` 的 published
+  node/leaf token 与 `compatibilitySpelling(of:as:replacedBy:)` 的 `replacedBy` 实参，
+  以及 `docs/design/arkdeck-cli-product-spec.md` §6.3 的目标命令树；不从历史 PR 描述、
+  本文件或旧文档推断当前 CLI 语法
+- Allowed paths:
+  - `docs/adr/arktrace-summary-analyzer-profile.md`
+  - `docs/release/macos-auto-update.md`
+- Forbidden paths:
+  - `README.md`、`README.zh-CN.md`（属 TASK-AIN-023）、`docs/design/**`，以及
+    `docs/adr/` 与 `docs/release/` 下 Allowed paths 未逐个列出的其余文件
+  - `AGENTS.md`、`PRODUCT-LOOP.md`、`.github/**`、`scripts/**`
+  - `Catalog/**`、`Packages/**`、`ArkDeckApp/**`、`ArkDeckAppUITests/**`、
+    `ArkDeck.xcodeproj/**`、`openspec/**`
+  - 产品行为、CLI 语法与退出码、Catalog digest、Task 状态、真实设备 evidence 与任何
+    安全不变量
+- Risk:low（只改文档打印的命令行；主要风险是把 registry 里不存在的拼写写进 runbook，
+  因此每处改写必须能逐 token 回指 protected-main 的 published node/leaf）
+- Hardware required:no（文档 PR 不连接 USB/HDC/RockUSB，不执行 device operation）
+- Decision-Grade:D0
+
+### Deliverables
+
+- `docs/adr/arktrace-summary-analyzer-profile.md` 的两处 `arkdeck agentd update
+  --arktrace-descriptor …` 改写为 `arkdeck runtime service update --arktrace-descriptor …`。
+- `docs/release/macos-auto-update.md` 的四处 `arkdeck update-feed prepare` /
+  `arkdeck update-feed assemble` 改写为 `arkdeck maintainer update-feed …`，包括正文步骤
+  与两个 code fence 内的命令。
+- 只改命令调用。`arkdeck-agentd` 二进制名、`com.arkdeck.agentd` launchd label、
+  `agentd.sock` socket 文件名与 `arkdeck-update-feed-v1.json` /
+  `arkdeck-update-feed-ed25519-private.pem` 文件名保持不变——它们都不是 CLI token。
+- 不改这两份文档的其他事实断言、发布顺序、安全边界或 openssl 步骤；`update-feed` 的人类
+  输出按 §12 保持逐字节不变，本 Task 不描述任何输出变化。
+
+### Verification
+
+- 每处改写后的 argv 逐 token 命中 `CLICommandRegistry` 的 published node/leaf；改写前后
+  两种拼写指向同一 `canonicalCommand`。
+- 最终文档 commit 使用 `TASK-AIN-025`，并在 push 前通过 base-tree
+  `scripts/check_pr_paths.py --repo-root . --preflight --base-revision origin/main
+  --head-revision HEAD`；不得在文档 PR 修改本 Task 或扩张 Allowed paths。
+- `python3 scripts/ci/plan.py --repo-root . --base-revision origin/main
+  --head-revision HEAD --merge-base --include-worktree --run-local` 选择 docs-only 路径，
+  且 SDD、catalog generator unittest、zero-drift 三道通用门全绿。
+- `git diff --check` 通过，两份文档的相对链接目标仍存在。
+- 设备连接、HDC/RockUSB/Flash dispatch、真实 Artifact 与 hardware evidence 均为 0；
+  验证结论只覆盖文档命令与 protected-main registry 一致，不产生 `REAL_DEVICE_PASS`。
