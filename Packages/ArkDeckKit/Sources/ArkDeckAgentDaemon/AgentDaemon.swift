@@ -196,6 +196,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   public func handleLine(_ line: Data) async -> Data {
+    if let response = ControlProtocolNegotiation.responseIfBootstrap(line) {
+      return response + Data("\n".utf8)
+    }
     let response = await handleFrame(line)
     let encoder = CanonicalJSONEncoders.canonical()
     let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
@@ -205,15 +208,36 @@ public struct RuntimeControlPlaneHandler: Sendable {
   func handleFrame(_ line: Data) async -> AgentWireProtocol.Response {
     let request: AgentWireProtocol.Request
     do {
+      var validator = StrictJSONDuplicateValidator(data: line)
+      try validator.validate()
       request = try JSONDecoder().decode(AgentWireProtocol.Request.self, from: line)
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        let object = try ControlProtocolNegotiation.decodeObject(line, maximumBytes: 4 * 1024 * 1024)
+        guard Set(object.keys).isSubset(of: ["protocolVersion", "id", "method", "params"]) else {
+          return failure(id: "-", code: .malformedFrame, message: "unknown target request field")
+        }
+      }
     } catch {
       return failure(id: "-", code: .malformedFrame, message: "undecodable request frame")
     }
-    let majorText = request.protocolVersion.split(separator: ".").first.map(String.init) ?? ""
-    guard Int(majorText) == AgentWireProtocol.requiredMajor else {
+    // Preserve the published 1.x decoder's forward-minor behavior. The new
+    // target table and every negotiated selection use exact released versions.
+    let legacyMajor =
+      Int(request.protocolVersion.split(separator: ".").first ?? "")
+      == AgentWireProtocol.requiredMajor
+    guard
+      legacyMajor || ArkDeckControlProtocol.supportedExactVersions.contains(request.protocolVersion)
+    else {
       return failure(
         id: request.id, code: .unsupportedProtocolVersion,
-        message: "this daemon speaks protocol major \(AgentWireProtocol.requiredMajor)")
+        message: "this daemon does not publish the requested exact protocol version")
+    }
+    if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
+      !ArkDeckControlProtocol.targetMethods.contains(request.method)
+    {
+      return failure(
+        id: request.id, code: .unknownMethod,
+        message: "this method is not published on the negotiated target protocol")
     }
     return await dispatch(request)
   }
@@ -222,6 +246,24 @@ public struct RuntimeControlPlaneHandler: Sendable {
     methodObserver?(request.method)
     switch request.method {
     case "health":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        guard request.params == nil || request.params?.isEmpty == true else {
+          return failure(
+            id: request.id, code: .invalidParams, message: "health accepts no parameters")
+        }
+        return success(
+          id: request.id,
+          result: .object([
+            "status": .string("ok"),
+            "protocolVersion": .string(request.protocolVersion),
+            "supportedExactVersions": .array(
+              ArkDeckControlProtocol.supportedExactVersions.map(JSONValue.string)),
+            "publishedMethods": .array(
+              ArkDeckControlProtocol.targetMethods.sorted().map(JSONValue.string)),
+            "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
+            "providers": .array(providerIDs.map(JSONValue.string)),
+          ]))
+      }
       return success(
         id: request.id,
         result: .object([

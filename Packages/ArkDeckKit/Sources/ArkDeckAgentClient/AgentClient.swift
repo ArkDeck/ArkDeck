@@ -18,9 +18,62 @@ public enum AgentClientError: Error, Equatable, Sendable {
 
 public struct AgentClient: Sendable {
   public let socketPath: String
+  /// Non-nil only after a successful version-neutral bootstrap (or the one
+  /// registry-authorized pre-bootstrap legacy fallback).
+  public let selectedProtocolVersion: String?
+  private let legacyFallbackMethod: String?
 
   public init(socketPath: String) {
     self.socketPath = socketPath
+    self.selectedProtocolVersion = nil
+    self.legacyFallbackMethod = nil
+  }
+
+  private init(
+    socketPath: String, selectedProtocolVersion: String, legacyFallbackMethod: String? = nil
+  ) {
+    self.socketPath = socketPath
+    self.selectedProtocolVersion = selectedProtocolVersion
+    self.legacyFallbackMethod = legacyFallbackMethod
+  }
+
+  public func negotiated(
+    requiredMajor: Int, forMethod method: String, timeoutSeconds: Int = 5
+  ) throws -> AgentClient {
+    let id = UUID().uuidString
+    let frame: Data
+    do {
+      frame = try ControlProtocolNegotiation.request(id: id, requiredMajor: requiredMajor)
+    } catch {
+      throw AgentClientError.malformedResponse("invalid negotiation request")
+    }
+    let response = try exchange(
+      frame, timeoutSeconds: timeoutSeconds,
+      maximumResponseBytes: ArkDeckControlProtocol.maximumBootstrapFrameBytes)
+    if ControlProtocolNegotiation.isPreBootstrapRefusal(response) {
+      guard requiredMajor == 1,
+        ArkDeckControlProtocol.preBootstrapLegacyMethods.contains(method)
+      else {
+        throw AgentClientError.daemonError(
+          code: "unsupportedProtocolVersion",
+          message: "the Runtime has no compatible negotiated protocol; no domain request was sent")
+      }
+      return AgentClient(
+        socketPath: socketPath, selectedProtocolVersion: ArkDeckControlProtocol.legacyVersion,
+        legacyFallbackMethod: method)
+    }
+    do {
+      let version = try ControlProtocolNegotiation.selectedVersion(
+        response: response, id: id, requiredMajor: requiredMajor)
+      return AgentClient(socketPath: socketPath, selectedProtocolVersion: version)
+    } catch ControlProtocolNegotiation.Failure.unsupported {
+      throw AgentClientError.daemonError(
+        code: "unsupportedProtocolVersion",
+        message:
+          "no common exact protocol version in the required major; no domain request was sent")
+    } catch {
+      throw AgentClientError.malformedResponse("invalid protocol negotiation response")
+    }
   }
 
   /// One request per connection: simple, race-free, and cheap at local
@@ -29,6 +82,37 @@ public struct AgentClient: Sendable {
     method: String, params: [String: JSONValue]? = nil, id: String = UUID().uuidString,
     timeoutSeconds: Int? = nil
   ) throws -> JSONValue {
+    if let legacyFallbackMethod, method != legacyFallbackMethod {
+      throw AgentClientError.daemonError(
+        code: "unsupportedProtocolVersion",
+        message: "legacy fallback is limited to its declared method; no domain request was sent")
+    }
+    let wire = AgentWireRequest(
+      protocolVersion: selectedProtocolVersion ?? ArkDeckAgentXPC.wireProtocolVersion,
+      id: id, method: method, params: params)
+    let payload = try CanonicalJSONEncoders.canonical().encode(wire)
+    let line = try exchange(payload, timeoutSeconds: timeoutSeconds)
+    let response: AgentWireResponse
+    do {
+      response = try JSONDecoder().decode(AgentWireResponse.self, from: line)
+    } catch {
+      throw AgentClientError.malformedResponse("\(error)")
+    }
+    guard response.id == id else {
+      throw AgentClientError.malformedResponse("response id mismatch")
+    }
+    if response.ok { return response.result ?? .null }
+    throw AgentClientError.daemonError(
+      code: response.error?.code ?? "unknown",
+      message: response.error?.message ?? "daemon returned no error detail")
+  }
+
+  private func exchange(
+    _ frame: Data, timeoutSeconds: Int?, maximumResponseBytes: Int = 8 * 1024 * 1024
+  ) throws -> Data {
+    guard selectedProtocolVersion == nil || frame.count + 1 <= 4 * 1024 * 1024 else {
+      throw AgentClientError.transport("oversized request; no request was sent")
+    }
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { throw AgentClientError.connectFailed("cannot create socket") }
     defer { close(fd) }
@@ -78,10 +162,7 @@ public struct AgentClient: Sendable {
       throw AgentClientError.connectFailed("connect failed: errno \(errno)")
     }
 
-    let wire = AgentWireRequest(
-      protocolVersion: ArkDeckAgentXPC.wireProtocolVersion, id: id, method: method, params: params)
-    let encoder = CanonicalJSONEncoders.canonical()
-    var payload = try encoder.encode(wire)
+    var payload = frame
     payload.append(0x0A)
     var written = 0
     let sendOK: Bool = payload.withUnsafeBytes { raw in
@@ -112,7 +193,7 @@ public struct AgentClient: Sendable {
         throw AgentClientError.transport("connection closed before response")
       }
       buffer.append(contentsOf: chunk[0..<count])
-      if buffer.count > 8 * 1024 * 1024 {
+      if buffer.count > maximumResponseBytes {
         throw AgentClientError.transport("oversized response")
       }
       if let offset = Self.frameTerminatorOffset(in: buffer, from: scannedByteCount) {
@@ -123,21 +204,17 @@ public struct AgentClient: Sendable {
     }
     let line = buffer.subdata(
       in: buffer.startIndex..<(buffer.startIndex + terminatorOffset))
-    let response: AgentWireResponse
-    do {
-      response = try JSONDecoder().decode(AgentWireResponse.self, from: line)
-    } catch {
-      throw AgentClientError.malformedResponse("\(error)")
+    guard terminatorOffset + 1 == buffer.count else {
+      throw AgentClientError.malformedResponse("multiple response frames for one request")
     }
-    guard response.id == id else {
-      throw AgentClientError.malformedResponse("response id mismatch")
+    if selectedProtocolVersion != nil {
+      do {
+        _ = try ControlProtocolNegotiation.decodeObject(line, maximumBytes: maximumResponseBytes)
+      } catch {
+        throw AgentClientError.malformedResponse("invalid negotiated response frame")
+      }
     }
-    if response.ok {
-      return response.result ?? .null
-    }
-    throw AgentClientError.daemonError(
-      code: response.error?.code ?? "unknown",
-      message: response.error?.message ?? "daemon returned no error detail")
+    return line
   }
 
   /// Offset of the first frame terminator at or after `searchedByteCount`,

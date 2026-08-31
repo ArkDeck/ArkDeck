@@ -43,7 +43,7 @@ final class ControlProtocolVersionContractTests: XCTestCase {
   }
 
   /// The definition is allowed to contain the literal. Nothing else is.
-  private static let definitionFile = "ArkDeckCore/AgentXPCContract.swift"
+  private static let definitionFile = "ArkDeckCore/ControlProtocolGenerated.swift"
 
   /// Every way a build could state the control protocol version a second time:
   /// filling the wire field with a literal, or publishing a literal list of
@@ -89,9 +89,10 @@ final class ControlProtocolVersionContractTests: XCTestCase {
     let version = ArkDeckAgentXPC.wireProtocolVersion
     XCTAssertEqual(AgentWireProtocol.version, version)
     XCTAssertEqual(
-      CLIProductVersion.supportedControlProtocolExactVersions, [version],
+      CLIProductVersion.supportedControlProtocolExactVersions,
+      ArkDeckControlProtocol.supportedExactVersions,
       "`--version` must publish what the client will actually send")
-    XCTAssertEqual(CLIProductVersion.preferredControlProtocol, version)
+    XCTAssertEqual(CLIProductVersion.preferredControlProtocol, ArkDeckControlProtocol.targetVersion)
 
     let major = Int(version.split(separator: ".").first.map(String.init) ?? "") ?? -1
     XCTAssertEqual(ArkDeckAgentXPC.wireProtocolMajor, major)
@@ -116,13 +117,37 @@ final class ControlProtocolVersionContractTests: XCTestCase {
     XCTAssertEqual(admitted, AgentWireProtocol.requiredMajor)
   }
 
-  /// §12 forbids claiming a version that cannot be negotiated. Until a daemon
-  /// offers 2.x, the published list is exactly one entry — a longer one would
-  /// promise a negotiation nothing implements.
+  /// Every advertised version must survive the actual bootstrap selection.
+  /// A v2 selection only publishes the methods that have a complete v2 handler.
   func testThePublishedListClaimsOnlyWhatThisBuildCanSpeak() {
-    XCTAssertEqual(ArkDeckAgentXPC.supportedWireProtocolExactVersions.count, 1)
+    for version in ArkDeckAgentXPC.supportedWireProtocolExactVersions {
+      let major = Int(version.split(separator: ".")[0])!
+      XCTAssertEqual(
+        try ControlProtocolNegotiation.select(
+          client: [version], daemon: ArkDeckControlProtocol.supportedExactVersions,
+          requiredMajor: major), version)
+    }
+    XCTAssertTrue(ArkDeckControlProtocol.targetMethods.contains("health"))
+    XCTAssertFalse(ArkDeckControlProtocol.targetMethods.contains("target.adopt"))
+  }
+
+  func testGeneratedProtocolVocabularyMatchesTheLanguageNeutralContract() throws {
+    let root = sourceRoot().deletingLastPathComponent()
+    let data = try Data(contentsOf: root.appending(path: "Contracts/control-negotiation.json"))
+    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    XCTAssertEqual(object["legacyVersion"] as? String, ArkDeckControlProtocol.legacyVersion)
+    XCTAssertEqual(object["targetVersion"] as? String, ArkDeckControlProtocol.targetVersion)
     XCTAssertEqual(
-      ArkDeckAgentXPC.supportedWireProtocolExactVersions.first,
-      ArkDeckAgentXPC.wireProtocolVersion)
+      object["supportedExactVersions"] as? [String], ArkDeckControlProtocol.supportedExactVersions)
+    XCTAssertEqual(object["bootstrapVersion"] as? String, ArkDeckControlProtocol.bootstrapVersion)
+    XCTAssertEqual(object["bootstrapMethod"] as? String, ArkDeckControlProtocol.bootstrapMethod)
+    XCTAssertEqual(
+      object["maximumBootstrapFrameBytes"] as? Int,
+      ArkDeckControlProtocol.maximumBootstrapFrameBytes)
+    XCTAssertEqual(
+      Set(object["targetMethods"] as? [String] ?? []), ArkDeckControlProtocol.targetMethods)
+    XCTAssertEqual(
+      Set(object["preBootstrapLegacyMethods"] as? [String] ?? []),
+      ArkDeckControlProtocol.preBootstrapLegacyMethods)
   }
 }
