@@ -344,7 +344,7 @@ final class CLIProcessGoldenContractTests: XCTestCase {
       .map { ($0["path"] as? [String] ?? []).joined(separator: " ") }
       .sorted()
     XCTAssertEqual(
-      streaming, ["job watch"],
+      streaming, ["job wait", "job watch"],
       "§8.1 scopes `jsonl` to the durable event stream; a leaf that takes the mode "
         + "and cannot stream would accept something it has no producer for")
   }

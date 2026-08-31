@@ -73,6 +73,7 @@ enum CLIControlMethodRegistry {
     "job.list",
     "job.list-page",
     "job.status",
+    "job.events",
     "job.evidence",
     "cleanupDebt.list",
     "artifact.quota",

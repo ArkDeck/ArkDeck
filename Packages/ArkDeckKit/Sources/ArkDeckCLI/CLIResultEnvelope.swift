@@ -189,13 +189,10 @@ enum CLIProductVersion {
   /// The bundle version. Its components are pinned separately below.
   static let machineContract = "arkdeck.cli.contracts/1"
   static let resultSchema: String? = CLIResultEnvelope.schemaVersion
-  /// Not published by this build: the page envelope and the `nextAction`
-  /// union arrive with the leaves that need them.
+  /// Individual v2 leaves now emit these shapes. Portable bundle export and
+  /// its component pins remain part of the final machine-contract migration.
   static let pageSchema: String? = nil
-  /// Published: `job watch --output jsonl` emits it. The Runtime event source
-  /// it streams from does not exist yet, so today every such stream is one
-  /// terminal event saying so — but the schema a consumer must parse is real
-  /// and fixed, which is what this field is for.
+  /// Published by the durable job.events/watch/wait path.
   static let eventSchema: String? = CLIEventEnvelope.schemaVersion
   static let nextActionSchema: String? = nil
   static let errorRegistry: String? = CLIErrorRegistryVersion.current
@@ -229,13 +226,8 @@ enum CLIBuildIdentity {
 
 /// §8.3's JSONL event line.
 ///
-/// Only the `terminal` event exists in this build, and that is not a shortcut:
-/// §8.3 requires exactly one terminal event per JSONL invocation, and the
-/// non-terminal ones are Runtime events with durable identity, position and
-/// cursor — none of which exists until the daemon publishes `job.events`. A
-/// stream that ends on its first line is a complete stream when there is
-/// nothing to stream, and it says so in the shape a consumer already parses,
-/// rather than in prose on stderr.
+/// Runtime rows retain their durable identity and cursor; the terminal frame
+/// belongs to the invocation, not to the Job's lifecycle.
 enum CLIEventEnvelope {
   static let schemaVersion = "arkdeck.cli.event/1"
 
@@ -245,7 +237,8 @@ enum CLIEventEnvelope {
   /// event: a cursor is a resume point, and inventing one would tell a caller
   /// it can continue from somewhere it never was.
   static func terminalFailure(
-    command: String, sequence: Int, error: CLIRegistryError, controlRequestID: String
+    command: String, sequence: Int, error: CLIRegistryError, controlRequestID: String,
+    lastCursor: String? = nil
   ) -> String {
     var errorFields: [String: JSONValue] = [
       "code": .string(error.code.rawValue),
@@ -260,7 +253,7 @@ enum CLIEventEnvelope {
       "type": .string("terminal"),
       "command": .string(command),
       "controlRequestId": .string(controlRequestID),
-      "lastCursor": .null,
+      "lastCursor": lastCursor.map(JSONValue.string) ?? .null,
       "ok": .bool(false),
       "exitCode": .integer(Int64(error.exitCode)),
       "error": .object(errorFields),
@@ -268,7 +261,8 @@ enum CLIEventEnvelope {
   }
 
   static func terminalSuccess(
-    command: String, sequence: Int, result: JSONValue, controlRequestID: String
+    command: String, sequence: Int, result: JSONValue, controlRequestID: String,
+    lastCursor: String? = nil, exitCode: Int32 = 0
   ) -> String {
     line([
       "schemaVersion": .string(schemaVersion),
@@ -276,11 +270,22 @@ enum CLIEventEnvelope {
       "type": .string("terminal"),
       "command": .string(command),
       "controlRequestId": .string(controlRequestID),
-      "lastCursor": .null,
+      "lastCursor": lastCursor.map(JSONValue.string) ?? .null,
       "ok": .bool(true),
-      "exitCode": .integer(0),
+      "exitCode": .integer(Int64(exitCode)),
       "result": result,
     ])
+  }
+
+  static func runtimeEvent(
+    command: String, sequence: Int, fields: [String: JSONValue], controlRequestID: String
+  ) -> String {
+    var value = fields
+    value["schemaVersion"] = .string(schemaVersion)
+    value["command"] = .string(command)
+    value["controlRequestId"] = .string(controlRequestID)
+    value["sequence"] = .integer(Int64(sequence))
+    return line(value)
   }
 
   /// One canonical document plus the newline that delimits it. §8.2's
