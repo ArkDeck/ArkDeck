@@ -192,7 +192,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | settings.servers | Servers；empty/list/refresh/add/edit/remove | 已接线，只读SSH来源，不是四connector。F56 失败横幅换成共享 warn 通知 |
 | settings.serverEditor | password/key/defaultKey/probe/fingerprint/root/drift/save/refused | 未验证不能保存；秘密仅Keychain；次级原型已补中英文，修改输入使 demo 验证失效。F56 编辑器内两处失败提示同样换成共享通知 |
 | settings.serverDelete | 移除确认/cancel/bindingStale | 只移本地来源，不删远端文件 |
-| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字；F56 位置与用量两张事实列表走共享行，存储策略表单因是三列可编辑输入而保留自写 `Grid` |
+| settings.storage | root/quota/margin/retention/invalid/unknown/pinned | soft claim不保证物理块；不删pinned。F53 补校验失败、未分类字节与用量不可用三态，用量不可用时不显示数字；F56 位置与用量两张事实列表走共享行，存储策略表单因是三列可编辑输入而保留自写 `Grid`。**用量拆为两域**：Runtime Artifact（Jobs 实际写入处，经只读控制面向 Runtime 取数，App Sandbox 决定进程内无法自测）与 Session 输出根（quota/margin/retention 只作用于它）；两域各自独立的「未测量」态互不影响，任一未测量都不得渲染成 0。heavy-writer 准入事实行已移除——它由 Session 根扫描得出、消费它的 coordinator 无生产写入方，放在用量旁会被读成产品可用性 |
 | settings.traceCache | Trace→Cache；loading/inventory/refresh/purge/activeEntries | 已接线，仅 inactive derived；普通文案双语 |
 | settings.traceLicenses | Trace→Licenses；lazy/loading/notice/missing/reveal | 已接线，14 reviewed components；许可证原文保留 |
 | settings.updates | idle/checking/current/available/download/verify/consent/error/reveal | 独立Settings，签名校验，显式Finder handoff，不静默安装。F56 面板骨架走 `WorkspacePage` |
@@ -1746,3 +1746,220 @@ viewport = (252.0, 93.0, 928.0, 640.0)         宿主 ∩ 窗口，再内缩 60
 
 **该失败在干净 `main` 上同样复现（同一按钮、同一坐标），与本审计各批改动无关。**
 本条从「根因未定」更新为「根因定位到 scroll/drag 零位移，未修复」，继续登记。
+## 2026-08-31 F69：Debug 分页条滚出窗口——F68 的机制在第二条测试上复现（未修复）
+
+基线 `e392127a`。F66 结尾登记的两条既有失败里，F68 已定案 Diagnostics 那条。
+本条是另一条：`AppShellUITests.testEnglishSweepOfEveryWorkspace`。
+**同样没修好**，因此本批不含任何 App 或测试代码改动，只登记查到的事实。
+
+### 失败点比消息看起来更靠后
+
+消息是 `Debug panel logs did not render`——**是第二个 tab，不是第一个**。工作区打开时本就停在
+artifacts 面板，循环首轮的断言因此平凡通过；真正的第一次点击是第二轮的 `logs`，它失败。
+
+### 实测数据（临时诊断，未提交）
+
+| 事实 | 值 |
+| --- | --- |
+| 五个 tab 的存在性 | `artifacts/logs/apps/network/commands` 全部 `exists=true` |
+| 它们的 frame | y ≈ −206…−211（如 `commands` = `(789.5, -206.51, 87.4, 15.0)`） |
+| 可命中性 | 全部 `isHittable=false` |
+| 面板文字 | 全程停在 `Build Artifact`，从未变化 |
+
+即**分页条随工作区一起滚出了窗口上沿**。`clickCorrectingNavigationSplitAXOffset` 只做坐标
+修正、从不滚动，于是每次点击都落在窗口之外，tab 从未被选中。
+
+### 修复失败，原因与 F68 同源
+
+在点击前加 `scrollIntoView(tab, in: app)`：两次有效取样（有效性信号均为 0）**以完全相同的消息
+失败**。已回退。（此前记录的失败行号 `:699` 与 `:701` 之差仅来自我自己插入的两行注释，
+不是两条不同失败。）
+
+无效的原因就是 F68 定案的那条：`scroll(byDeltaX:deltaY:)` 在这些宿主上零位移。
+本条的价值在于**把 F68 的机制从一条测试扩到第二条**——两条失败此前被当作互不相关的
+「根因未定」，现在是同一个机制的两个受害者。
+
+**因此「选错滚动宿主」这条一直以来的工作假设可以退休了**：不是选错，是选对了也推不动。
+沿该假设做过的三次修复（native-gate 台账的 `chooseEntry`、F66 的高度判据、本条的分页条）
+全部无效，均已回退。**在滚动为何空转查清之前，不再提交任何依赖 `scroll` 生效的修复，
+也不再把「加了 scrollIntoView 之后报错换了一种」当作进展。**
+
+### 一处试过但**未纳入**的守护
+
+给 `scrollIntoView` 的宿主筛选加「宿主须与窗口有交集」，确实修掉了本轮实验中出现的
+`Unable to find hit point for ScrollView, {{252.0, -401.0}, {928.0, 117.0}}`——该宿主通过了
+F66 新加的高度判据，却整个位于窗口上方。
+
+**但这份证据来自本批随后回退的调用点**：`scrollIntoView(tab)` 一删，触发场景在树里就不存在了。
+F66 已经因为「无当前证据」删过一次同一条件，本批不重复该错误——**不把只在已删代码上观测到的
+守护塞进 20 处调用点共用的 helper**。条件的机制记在此处，留给日后有真实触发的会话带证据再加。
+
+### 本批主张的边界
+
+不主张修好任何测试，不主张原生套件变绿。主张的只有上述观测事实、F68 机制的适用面扩大，
+以及由此得出的一条工作规矩。
+
+## 2026-08-31 F70：结清 F60 保留的最后 25 条无引用键
+
+第十六批，基线 `e94c575b`。范围是 F60 台账明确登记为「本轮新发现，未经首轮那样的逐条核实」
+而整体保留的最后一档；逐条结论见
+[2026-08-31 批次十六台账](references/ui-consistency/2026-08-31-retired-keys-tail-ledger.md)。
+只删资源键，不改 Swift 逻辑、不改文案内容、不改设计稿。
+
+**判据比 F60 多补一条。** 沿用三判据并集（字面量 ∪ camelCase 访问器 ∪ 插值前缀），
+补上它没覆盖的**字符串拼接构造**（`"prefix." + variable`）。全 App 扫描该形态零命中，
+故三判据在当前状态下无缺口——但这一条现在写进台账，以后重跑不必重新发现。
+复扫得 `Localizable` 24 / `Jobs` 1 / `Device` **0**：F60 记的 Device 那条已被此后的批次消费，
+实删 **25 条**。
+
+**每条都追到消费方，不靠扫描判死。** 最容易误判的是
+`overview.status.{server,trust,channel,needsAttention}`——它们与 UI 测试使用的可访问性标识符
+`overview.status.X.value` 同名前缀。追到 `HDCStatusView.swift:141-151`：那里渲染的是
+`Text(LocalizedStringKey(serverHealthKey))` 一类的**值**（键来自 `overview.serverHealth.*`
+的 switch），四行没有标签，现布局是 `·` 分隔的单行。**标识符与本地化键同名前缀，不是同一个东西**
+——这正是 F60 第 3 节举的那个例子，本批把它推广到了四条。
+同族的还有 `overview.record.empty.*` 五条：空态实际渲染的是 `overview.record.recent.empty`，
+而 `overview.record.empty` 只是那一处的标识符。
+
+**判死一个键说明 App 不渲染它，不说明稿件也不画它。** 因此对每条的英文原值回稿件与 spec
+核对，避免用删键掩盖「稿有、实现无」：25 条里 24 条在稿件零命中；唯一命中的 `Needs Attention`
+是 `overview.section.needsAttention`（分区标题，两侧都在，spec §141 要求的也是它），
+与状态行标签不是一回事。空态则两侧逐字一致（`No recent runs yet. Start from a workflow in
+the sidebar.`），旧富空态两边都没有。**本批不产生新的 P-DRIFT。**
+
+**编辑手法**：花括号匹配的文本块删除，不用 `json.dumps` 重写（后者在 F60 期间实测产生
+9970 行插入）。diff 为 **0 插入 / 400 删除**，删后 JSON 合法、条数 255（279−24）与 70（71−1）。
+两个文件格式不同（`Jobs` 单行紧凑、`Localizable` 多行缩进），锚点只认 `"key": {` 再靠
+花括号匹配定界，两种通吃。
+
+**至此 F60 的三档保留全部结清**：`SettingsLocalizable` 4 条由 F65 结清（裁决第 1 条），
+`UIDumpLocalizable` 25 条由 F65/F67 结清（裁决第 2 条），本档 25 条由本批结清。
+
+## 2026-08-31 F71：实测推翻 F69 的窗外落点假设，并更正一条已过时的台账结论
+
+第十七批，基线 `334c2e94`。F69 登记 Debug 分页条失败时给了一个假设：AX 把元素报在
+「未受约束的理想高度」原点上，因此合成点击落到**窗口之外**，`scroll` 空转同源。
+本批带插桩实测了它。**假设是错的**，一并查出的还有一条已过时的台账结论。
+本批不含任何 App 或测试代码改动——四次修复尝试全部失败并回退，只登记事实。
+
+### 一、窗外落点假设：**推翻**
+
+在 `clickCorrectingNavigationSplitAXOffset` 内打印 AX frame、窗口、修正量、算出的落点，
+以及落点是否在窗口内：
+
+```
+id=device.row.7f2c091a445e21 ax=(24,188,212,32)      overviewMidY=124.0   correction=-4.0    landing=(130.0,200.0)  inWindow=true
+id=debug.tab.artifacts       ax=(280,-211,119,24)    overviewMidY=-362.0  correction=482.0   landing=(339.5,283.0)  inWindow=true
+id=debug.tab.logs            ax=(439,-206.5,49,15)   overviewMidY=-362.0  correction=482.0   landing=(463.5,283.0)  inWindow=true
+id=debug.tab.apps/network/commands                   同上，landing y 均 ≈283，inWindow=true
+```
+
+窗口是 `(0,33,1180,760)`，五个落点全部落在窗内。**「点击落到窗口之外」不成立**，
+因而它也不能解释 `scroll` 空转。F69 里那段推理到此作废，本条为准。
+
+### 二、顺带查出：一条台账结论已过时
+
+F69 之所以没有停在「侧栏 vs 详情列」这个更简单的解释上，靠的是 native-gate 台账里的反例
+——「`testDebugHAPSelection…` 里同一条分页条、同一个 helper，点击生效」。本批把该测试单独跑了
+一遍：**它现在也红，且死在同一处**（`the Debug Apps tab never became active`，
+循环点了 3 次、探针记录 3 次点击全部无效）。
+
+**那条台账结论（「已验证有改善」一行）已过时，不能再当作反例或依据。** 已在
+[native-gate 台账](references/ui-consistency/2026-08-30-native-gate-ledger.md) 就地更正。
+因此这不是 sweep 特有的状态问题：**Debug 分页条的坐标点击当前整体失效**。
+
+### 三、两条实测出来的新事实
+
+**AX 错报真实存在且是状态相关的。** 同一次运行内，修正量从侧栏设备行时的 **−4** 跳到
+Debug 分页条时的 **+482**（对照组那轮是 +423.5）。前者说明那一刻 AX 报得基本正确，
+后者说明之后整棵树被平移了约 480pt。helper 的文档注释里那个 "**occasionally**" 得到了实证。
+
+**helper 的锚点常数是错的（4pt）。** `expectedOverviewMidY = toolbarMaxY + 35`；而在 AX
+未错报的那一刻实测 `overviewMidY = 124`、`toolbarMaxY = 85`，真值对应的是 **+39** 而非 +35。
+这 4pt 不足以解释失败（分页条高 24pt），但公式确实错，登记待修。
+
+### 四、四次尝试，四次失败
+
+| 尝试 | 结果 |
+| --- | --- |
+| 点击前 `scrollIntoView(tab)`（F69） | 无效，两次有效取样同消息失败 |
+| 宿主须与窗口有交集（F69） | 证据只存在于随后回退的调用点，未纳入 |
+| 收紧宿主非零高度（F66） | 无效，宿主本就选对 |
+| `tab.coordinate(withNormalizedOffset:).click()`（本批） | **无效**，五条同样失败 |
+
+第四次的依据是同文件里已验证过的写法——`debug.apps.postRun` 那处注释记着 macOS 26 上
+`click()` 会把命中点合成到可见 picker **上方 21pt**，改用元素自身 frame 中心可解。
+用到分页条上不成立：探针显示五个 tab 全部 **`isHittable=false`**，元素坐标同样解析到错报的
+frame 上。已回退。
+
+### 五、还剩什么
+
+**根因仍未查清。** 已排除：宿主选择错误（F68）、落点在窗外（本批）、元素坐标写法（本批）。
+已知但未利用的一条：分页条在 App 侧支持方向键
+（`DebugWorkspaceView.swift:189-192`，`.focusable()` + `onKeyPress`），而 `select()` 正是用
+「窗口相对定点点击 + 原生键盘选择」绕开同一个 AX 问题的。**但要用键盘先得让分页条拿到焦点，
+而取焦点本身又要点击**——这个循环没解开之前不提交任何修复。
+
+本批主张的只有：一个被推翻的假设、一条被更正的过时结论、两条新实测事实，以及四次失败的记录。
+不主张修好任何测试。
+
+## 2026-08-31 F72：#1644 的增量轮，顺带补上五个面板副标题（P-DRIFT）
+
+第十八批，基线 `c745a248`。`#1644` 改造了 Settings 存储面板并**自己镜像了主结构**，
+本轮按 §10 做它触发的增量核对；逐行结论见
+[2026-08-31 批次十八台账](references/ui-consistency/2026-08-31-settings-summary-ledger.md)。
+只改设计稿与 ds 测试，不动 App。
+
+**它的镜像基本完整，三处缺口。** `runtimeUnavailable` / `runtimeUsage` / `sessionUsage`
+及两条 detail 都有锚点镜像，已删的五个键在稿件零残留。缺的是：`settings.storage.runtimeTotal`
+与 `settings.storage.remaining` **文案在稿件里但没有 `data-sync-id`**（可读不可锚），
+以及 `settings.storage.unaccountedFormat` —— App 在 `unaccountedSessionCount > 0` 时渲染的
+未识别 Session 警告，**稿件完全没有、状态不可达**。本批补齐，新增 `?settingsStorage=unaccounted`。
+
+**核对 `settings.storage.subtitle` 时撞出一条系统性缺口。** 稿件里根本没有面板副标题结构，
+把范围扩到全部五个后确认：`settings.{general,remoteSources,toolchains,storage,diagnostics}.subtitle`
+**在 App 里全部经 `WorkspaceHeaderBar(summary:)` 真实渲染，在稿件里一条都没有**。
+按 §6 属 P-DRIFT，且**与 `#1644` 无关**——是此前各轮都没抓到的既有缺口，增量轮顺带兜住了它。
+本批在 `settingsPane()` 的同一位置补齐，文案逐字取自 `.xcstrings`。稿件独有的
+`trace` / `updates` 两页签没有对应 App 面板，不配副标题，也不为它们编造文案。
+
+**一次差点发生的误判，值得记。** `settings.storage.unaccountedFormat` 用 `git grep` 扫 Swift
+零命中，看着就是 `#1644` 顺手加进目录的死键——差一点就按「删键」处理，那会删掉一个正在渲染的
+警告。真相是它经生成符号被消费：`LocalizedStringResource.SettingsLocalizable.settingsStorageUnaccountedFormat(...)`
+（`SettingsRootView.swift:1005`），我的快扫模式 `storageUnaccounted` 漏了 `settings` 前缀。
+**把它救回来的是 F60/F70 定的 camelCase 访问器判据**——字面量扫描单独不足以判死一个键。
+这次它把结论从「死键」翻成「活键且稿件缺镜像」，方向正好相反。
+
+**验证。** ds 交互测试 82/82（新增一条），`npm run build`（含双向 `check:tokens`）exit 0。
+**做了负向验证**：把稿件回退到 `origin/main` 再跑，新测试确实变红，不是只对当前实现成立的
+套套逻辑。新测试的面板清单**从 App 源码正则派生**（扫 `WorkspaceHeaderBar(summary: Text(settingsText("…")))`），
+App 将来新增带副标题的面板会直接打红，直到稿件补上。
+
+## 2026-08-31 F73：页头摘要扫全，并修正 F72 自己留下的两处欠妥
+
+第十九批，基线 `4150fc8d`。F72 发现 Settings 五个面板副标题稿件全无；同一个共享页头
+在别的工作区也渲染摘要，本批把范围推广到全 App，并**自查修正 F72 自身的两处欠妥**。
+逐行结论见 [2026-08-31 批次十九台账](references/ui-consistency/2026-08-31-header-summary-ledger.md)。
+只改设计稿与 ds 测试，不动 App。
+
+**扫全结果：八个页头摘要，一处缺锚点。** Trace（`trace.workspace.summary`）与
+Debug（`debug.scope`）都已有锚点镜像；缺的是 Flash——文案在稿件里，但两个可能的锚点都没有。
+Flash 这条还有个 App 侧既有的不对称：**键名是 `flash.workspace.subtitle`，
+而 `summaryIdentifier` 是 `flash.workspace.title`**。本批不改 App，稿件按**标识符**对齐，
+因为 `data-sync-id` 镜像的是 App 给元素的名字，不是键名。
+
+**自查其一：F72 的锚点静态不可见。** 我在 F72 里把五条副标题写成
+`data-sync-id="${s[2]}"`（模板插值）。渲染后正确，harness 测试也过——但
+`grep 'data-sync-id="settings.storage.subtitle"'` 在稿件里得 **0**。
+**而这套核对方法本身大量依赖静态扫描查 P-DRIFT**，一个静态查不到的锚点等于没有对上账；
+我自己在本批开头扫查时就先被它误导了一次。已改成逐条写出字面量，
+并把这条要求写进新测试的失败信息（`write the id out literally, not interpolated`）。
+
+**自查其二：F72 把中文转义成了 `\uXXXX`。** 生成脚本用 `json.dumps` 图省事，
+结果稿件里出现 `自定…` 这样的行，而其余部分全是字面 CJK。这是需要人逐页评审的文件，
+可读性不该为生成脚本让路。已全部改回，全文件转义命中 1 → 0。
+
+**验证。** ds 交互测试 83/83（新增一条覆盖全部八个页头摘要），`npm run build` exit 0。
+**做了负向验证**：删掉刚补的 Flash 锚点再跑，新测试确实变红。新测试的清单从 App 源码正则派生
+**并断言恰为 8 条**——App 新增页头摘要会打红直到稿件补上，正则若悄悄少匹配也会打红，
+避免数目变化造成假绿。

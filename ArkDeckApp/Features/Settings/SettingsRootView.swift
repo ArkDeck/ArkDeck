@@ -865,8 +865,12 @@ private struct StorageSettingsPane: View {
           }
         }
 
-        GroupBox(settingsText("settings.storage.usage")) {
-          storageUsage(storage)
+        GroupBox(settingsText("settings.storage.runtimeUsage")) {
+          runtimeArtifactUsage(storage)
+        }
+
+        GroupBox(settingsText("settings.storage.sessionUsage")) {
+          sessionRootUsage(storage)
         }
       } else {
         SettingsLoadingRow()
@@ -914,32 +918,56 @@ private struct StorageSettingsPane: View {
     }
   }
 
+  /// The bytes the product actually writes. They are measured and bounded by
+  /// the Runtime, which is why this reads its figure instead of counting a
+  /// directory: the daemon's store sits outside this App's container.
+  ///
+  /// A Runtime that did not answer shows no number at all. Rendering silence as
+  /// an empty store is the same mistake one level down from measuring the wrong
+  /// directory: both produce a plausible figure about nothing.
   @ViewBuilder
-  private func storageUsage(_ storage: SettingsStoragePresentation) -> some View {
+  private func runtimeArtifactUsage(_ storage: SettingsStoragePresentation) -> some View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
-      if let currentBytes = storage.currentBytes {
+      if let artifacts = storage.runtimeArtifacts {
         ProgressView(
-          value: Double(currentBytes),
-          total: Double(max(storage.totalQuotaBytes, 1))
+          value: Double(artifacts.usedBytes),
+          total: Double(max(artifacts.totalBytes, 1))
         )
-        .accessibilityLabel(settingsText("settings.storage.usage"))
+        .accessibilityLabel(settingsText("settings.storage.runtimeUsage"))
         .accessibilityValue(
-          "\(ByteCountFormatter.string(fromByteCount: Int64(clamping: currentBytes), countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: Int64(clamping: storage.totalQuotaBytes), countStyle: .file))"
-        )
+          "\(storageBytes(artifacts.usedBytes)) / \(storageBytes(artifacts.totalBytes))")
         WorkspaceFactGrid {
-          settingsFact(
-            "settings.storage.currentUsage",
-            ByteCountFormatter.string(
-              fromByteCount: Int64(clamping: currentBytes), countStyle: .file))
-          settingsFact("settings.storage.pinned", pinnedSummary(storage))
-          settingsFact(
-            "settings.storage.admission",
-            settingsText(
-              storage.blocksNewHeavyWriters == true
-                ? "settings.storage.admission.blocked"
-                : "settings.storage.admission.ready"))
+          settingsFact("settings.storage.currentUsage", storageBytes(artifacts.usedBytes))
+          settingsFact("settings.storage.runtimeTotal", storageBytes(artifacts.totalBytes))
+          settingsFact("settings.storage.remaining", storageBytes(artifacts.remainingBytes))
         }
-        if storage.unknownPressure == true {
+      } else {
+        Label(
+          settingsText("settings.storage.runtimeUnavailable"),
+          systemImage: "questionmark.circle"
+        )
+        .foregroundStyle(.secondary)
+      }
+      Text(settingsText("settings.storage.runtimeUsage.detail"))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  /// The other root: the one the policy above governs. Reported on its own so
+  /// neither figure can be read as the whole product's storage.
+  @ViewBuilder
+  private func sessionRootUsage(_ storage: SettingsStoragePresentation) -> some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+      if let sessionRoot = storage.sessionRoot {
+        WorkspaceFactGrid {
+          settingsFact("settings.storage.currentUsage", storageBytes(sessionRoot.measuredBytes))
+          settingsFact("settings.storage.pinned", pinnedSummary(sessionRoot))
+        }
+        if sessionRoot.unaccountedSessionCount > 0 {
+          Label(unaccountedSummary(sessionRoot), systemImage: "exclamationmark.triangle")
+            .foregroundStyle(.orange)
+        } else if sessionRoot.measurementIncomplete {
           Label(
             settingsText("settings.storage.unknownPressure"),
             systemImage: "exclamationmark.triangle"
@@ -953,20 +981,29 @@ private struct StorageSettingsPane: View {
         )
         .foregroundStyle(.secondary)
       }
+      Text(settingsText("settings.storage.sessionUsage.detail"))
+        .font(.callout)
+        .foregroundStyle(.secondary)
       Text(settingsText("settings.storage.pinGuarantee"))
         .font(.callout)
         .foregroundStyle(.secondary)
     }
   }
 
-  private func pinnedSummary(_ storage: SettingsStoragePresentation) -> String {
-    guard let count = storage.pinnedSessionCount, let bytes = storage.pinnedBytes else {
-      return settingsText("settings.common.unknown")
-    }
-    return String(
+  private func storageBytes(_ bytes: UInt64) -> String {
+    ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
+  }
+
+  private func pinnedSummary(_ sessionRoot: SettingsSessionRootUsage) -> String {
+    String(
       localized: LocalizedStringResource.SettingsLocalizable.settingsStoragePinnedFormat(
-        count,
-        ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)))
+        sessionRoot.pinnedSessionCount, storageBytes(sessionRoot.pinnedBytes)))
+  }
+
+  private func unaccountedSummary(_ sessionRoot: SettingsSessionRootUsage) -> String {
+    String(
+      localized: LocalizedStringResource.SettingsLocalizable.settingsStorageUnaccountedFormat(
+        sessionRoot.unaccountedSessionCount))
   }
 
   private func synchronizeDrafts() {

@@ -1371,19 +1371,36 @@ test('Settings panes expose the shared loading, error and success rows', () => {
     active.run("S.settingsTab='toolchains'");
     assert.ok(active.run('pSettings()').includes(value('settings.toolchains.futureJobsActive', language)));
 
-    // Storage keeps an invalid policy, unclassified bytes and an unreadable
-    // measurement apart instead of collapsing them into one number.
+    // Storage keeps an invalid policy, unclassified bytes and two independently
+    // unreadable measurements apart instead of collapsing them into one number.
     for (const [token, key] of [['invalid', 'settings.storage.validationError'],
       ['unknownPressure', 'settings.storage.unknownPressure'],
-      ['measurementUnavailable', 'settings.storage.measurementUnavailable']]) {
+      ['measurementUnavailable', 'settings.storage.measurementUnavailable'],
+      ['runtimeUnavailable', 'settings.storage.runtimeUnavailable']]) {
       const h = harness(`?page=settings&lang=${language}&settingsStorage=${token}`);
       h.run("S.settingsTab='storage'");
       assert.ok(h.run('pSettings()').includes(value(key, language)), `${token} storage state`);
     }
-    const unavailable = harness(`?page=settings&lang=${language}&settingsStorage=measurementUnavailable`);
-    unavailable.run("S.settingsTab='storage'");
-    assert.doesNotMatch(unavailable.run('pSettings()'), /data-sync-id="settings.storage.usage"/,
-      'an unavailable measurement must not show a usage number');
+    // Two roots, two figures. The Runtime's artifact store is what Jobs write
+    // to and the App cannot measure it, so it is read from the Runtime; the
+    // Session output root is what the quota and retention policy govern. A
+    // single number was one of these misreported as both.
+    const ok = harness(`?page=settings&lang=${language}&settingsStorage=ok`);
+    ok.run("S.settingsTab='storage'");
+    for (const id of ['settings.storage.runtimeUsage', 'settings.storage.sessionUsage']) {
+      assert.ok(ok.run('pSettings()').includes(`data-sync-id="${id}"`), `${id} figure`);
+    }
+    // Each domain withholds its own figure when it was not measured, and
+    // withholding one must not blank or fabricate the other.
+    for (const [token, absent, present] of [
+      ['measurementUnavailable', 'settings.storage.sessionUsage', 'settings.storage.runtimeUsage'],
+      ['runtimeUnavailable', 'settings.storage.runtimeUsage', 'settings.storage.sessionUsage']]) {
+      const h = harness(`?page=settings&lang=${language}&settingsStorage=${token}`);
+      h.run("S.settingsTab='storage'");
+      const pane = h.run('pSettings()');
+      assert.ok(!pane.includes(`data-sync-id="${absent}">`), `${token} must not show a number`);
+      assert.ok(pane.includes(`data-sync-id="${present}">`), `${token} must not blank the other root`);
+    }
   }
 });
 
@@ -1950,5 +1967,102 @@ test('the prototype reaches the Viewer states the App renders', () => {
     assert.doesNotMatch(
       search.run('viewerAdvancedHTML(viewerNode(S.viewer.selected))'),
       /viewer-advanced-clear/, 'the clear control appears only with a query, as in the App');
+  }
+});
+
+// brief section 10, incremental round for #1644 (Settings storage rework).
+// It split one unlabelled usage figure into two stores, which the prototype
+// mirrored. Checking that mirror surfaced two gaps it did not cover: every
+// pane summary the App has ever rendered was missing, and the new
+// unaccounted-Sessions warning had no state at all. Both are P-DRIFT.
+test('every Settings pane summary and the unaccounted warning are mirrored', () => {
+  const settingsCopy = JSON.parse(read('ArkDeckApp/Resources/SettingsLocalizable.xcstrings')).strings;
+  const value = (key, lang) => settingsCopy[key].localizations[lang].stringUnit.value;
+  const view = read('ArkDeckApp/Features/Settings/SettingsRootView.swift');
+
+  // The pane list is derived from the App, not hard-coded here: a new pane
+  // with a summary must be mirrored, and this fails until it is.
+  const summaryKeys = [...view.matchAll(
+    /WorkspaceHeaderBar\(summary: Text\(settingsText\("([^"]+)"\)\)\)/g)].map(m => m[1]);
+  assert.ok(summaryKeys.length >= 5, 'the App renders a summary for each Settings pane');
+  const tabForKey = {
+    'settings.general.subtitle': 'general',
+    'settings.toolchains.subtitle': 'toolchains',
+    'settings.remoteSources.subtitle': 'servers',
+    'settings.storage.subtitle': 'storage',
+    'settings.diagnostics.subtitle': 'diagnostics',
+  };
+
+  for (const language of ['zh', 'en']) {
+    const lang = language === 'zh' ? 'zh-Hans' : 'en';
+    for (const key of summaryKeys) {
+      const tab = tabForKey[key];
+      assert.ok(tab, `${key} needs a prototype tab; add it to this map when the App gains a pane`);
+      const pane = harness(`?page=settings&settingsTab=${tab}&lang=${language}`).run('pSettings()');
+      assert.ok(
+        pane.includes(value(key, lang)),
+        `${key} must carry its App summary word for word in ${language}`);
+      assert.ok(pane.includes(`data-sync-id="${key}"`), `${key} must be anchored`);
+    }
+
+    // The App shows this whenever Sessions cannot be identified; the
+    // prototype could not reach that state before this round.
+    const plain = harness(`?page=settings&settingsTab=storage&lang=${language}`).run('pSettings()');
+    assert.doesNotMatch(plain, /settings\.storage\.unaccountedFormat/);
+    const flagged = harness(
+      `?page=settings&settingsTab=storage&settingsStorage=unaccounted&lang=${language}`
+    ).run('pSettings()');
+    assert.match(flagged, /data-sync-id="settings\.storage\.unaccountedFormat"/);
+    // The App's string is a count format; the prototype states its sample.
+    const [prefix] = value('settings.storage.unaccountedFormat', lang).split('%lld');
+    const [, suffix] = value('settings.storage.unaccountedFormat', lang).split('%lld');
+    assert.ok(flagged.includes(prefix.trim()) || flagged.includes(suffix.trim()));
+
+    // #1644 added these two labels without anchors; the copy was there and
+    // unreachable by identifier, which is what the mirror is for.
+    for (const key of ['settings.storage.runtimeTotal', 'settings.storage.remaining']) {
+      assert.ok(plain.includes(`data-sync-id="${key}"`), `${key} must be anchored`);
+      assert.ok(plain.includes(value(key, lang)), `${key} must carry its App label in ${language}`);
+    }
+  }
+});
+
+// F72 found every Settings pane summary missing from the prototype. The same
+// shared header renders summaries in three more workspaces, so this covers
+// all of them from one derived list: the App is the source of the inventory,
+// not a list maintained here.
+test('every WorkspaceHeaderBar summary in the App is mirrored and anchored', () => {
+  const catalogues = Object.fromEntries(
+    ['Settings', 'Flash', 'Trace', 'Debug'].map(name =>
+      [name, JSON.parse(read(`ArkDeckApp/Resources/${name}Localizable.xcstrings`)).strings]));
+  const lookup = key => {
+    for (const strings of Object.values(catalogues)) if (strings[key]) return strings[key];
+    throw new Error(`${key} is in no catalogue`);
+  };
+  const prototype = read('docs/design/prototype.html');
+
+  const views = [
+    'ArkDeckApp/Features/Settings/SettingsRootView.swift',
+    'ArkDeckApp/Features/Flash/FlashWorkspaceView.swift',
+    'ArkDeckApp/Features/Trace/TraceWorkspaceView.swift',
+    'ArkDeckApp/Features/Debug/DebugWorkspaceView.swift',
+  ];
+  const summaries = views.flatMap(path => [...read(path).matchAll(
+    /WorkspaceHeaderBar\(\s*summary: Text\([A-Za-z0-9_.]+\("([^"]+)"\)\)(?:,\s*summaryIdentifier: "([^"]+)")?/g
+  )].map(match => ({key: match[1], anchor: match[2] ?? match[1], path})));
+  assert.equal(summaries.length, 8, 'the App renders eight workspace summaries');
+
+  for (const {key, anchor, path} of summaries) {
+    // The anchor is the App's own identifier where it sets one — Flash names
+    // its summary `flash.workspace.title` while the key is `.subtitle`, and
+    // the prototype follows the App rather than the key.
+    assert.ok(
+      prototype.includes(`data-sync-id="${anchor}"`),
+      `${key} (${path}) must be anchored as ${anchor}; write the id out literally, not interpolated`);
+    for (const lang of ['zh-Hans', 'en']) {
+      assert.ok(
+        prototype.includes(lookup(key).localizations[lang].stringUnit.value),
+        `${key} must carry its App summary word for word in ${lang}`);
+    }
   }
 });

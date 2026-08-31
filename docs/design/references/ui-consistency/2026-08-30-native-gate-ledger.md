@@ -90,7 +90,7 @@ soak 在压 CPU，`HDCStatusUITests` 就出现 1 通过 / 5 失败，其中 4 �
 | --- | --- | --- |
 | `expandAdvancedDiagnostics` → ⌘⇧D | **已验证（两次有效取样）** | HDC 全类 6/6 × 2，且 `walkEveryDiagnosticState` 是这些测试的公共入口 |
 | `applyFixtureState` 沉降（5→20s） | **已验证（两次有效取样）** | 同上，含 `testEnglishFixtureSweep` 的 fixture 状态序列 |
-| Debug tab 切换 → 修正点击 | **已验证有改善，未验证到底** | 该测试此前失败在等 `debug.apps.postRun`（tab 没切过去）；现在能走到文件选择器，说明 tab 切换生效。但整条测试仍红于后续步骤 |
+| Debug tab 切换 → 修正点击 | ~~已验证有改善~~ → **2026-08-31 实测已过时，见审计 F71** | 当时记「能走到文件选择器，说明 tab 切换生效」。08-31 单独复跑该测试：**同样红，且死在同一处**（`the Debug Apps tab never became active`，循环点 3 次、探针记录 3 次点击全部无效）。**此行不能再当作「坐标点击对分页条有效」的依据** |
 | `chooseDebugPackage` 定位 Go to Folder 输入框 | **未被执行到** | 测试在 `chooseDebugPackage` 的**第一道** guard 就失败，从未到达被改的那几行。**本批不声称它有效** |
 
 ### 本批未修、已登记的一条既有失败
@@ -107,3 +107,20 @@ soak 在压 CPU，`HDCStatusUITests` 就出现 1 通过 / 5 失败，其中 4 �
 已回退，只登记。根因未定。
 
 **本批 PR 只主张已验证的两处 + 一处「有改善」，不主张把 `testDebugHAPSelection…` 修绿。**
+
+## 2026-08-31 补记：`scrollIntoView` 一族失败的机制定案（见审计 F68）
+
+本台账上文那条「加 `scrollIntoView(chooseEntry, …)` 后失败变成 `Unable to find hit point for
+ScrollView, {{1647.0, 200.0}, {245.0, 318.0}}`，根因未定」，与 F58/F59/F66 的同族观测，
+2026-08-31 查到了共同的机制：
+
+**`XCUIElement.scroll(byDeltaX:deltaY:)` 在这些滚动宿主上静默空转。** 插桩测得 12 次调用前后
+宿主与目标 frame 逐字节相同——不报错、不移动、不返回失败。`press(forDuration:thenDragTo:)`
+兜底同样零位移。
+
+由此，「选错滚动宿主」这条一直以来的工作假设**不成立或至少不充分**：即便选中正确宿主，
+滚动也推不动目标。此前三次沿该假设做的修复（本台账的 `chooseEntry`、F66 的高度判据、
+F69 的 Debug 分页条）全部无效，均已回退。
+
+**规矩**：在滚动为何空转查清之前，不再提交任何依赖 `scroll` 生效的修复；
+也不再把「加了 scrollIntoView 之后报错换了一种」当作进展。
