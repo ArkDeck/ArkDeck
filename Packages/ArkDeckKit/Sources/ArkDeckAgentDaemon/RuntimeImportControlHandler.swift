@@ -66,12 +66,17 @@ struct RuntimeImportControlHandler {
       case "artifact.import.abort":
         try exact(["importRequestId", "generation"])
         result = try await artifacts.abortImport(requestID: string("importRequestId"), generation: generation())
-      case "artifact.import.inspect":
+      case "artifact.import.inspect", "artifact.import.inspection":
         guard Set(fields.keys) == ["importId"] || Set(fields.keys) == ["importRequestId"] else {
           throw AgentExecutionControlFailure("invalidInput", "exactly one Import selector is required")
         }
-        result = try await artifacts.inspectImport(id: fields["importId"].map { _ in try string("importId") },
-          requestID: fields["importRequestId"].map { _ in try string("importRequestId") }).projection
+        let id = try fields["importId"].map { _ in try string("importId") }
+        let requestID = try fields["importRequestId"].map { _ in try string("importRequestId") }
+        if request.method == "artifact.import.inspection" {
+          result = try await engine.inspectImportReferences(id: id, requestID: requestID)
+        } else {
+          result = try await artifacts.inspectImport(id: id, requestID: requestID).projection
+        }
       case "artifact.import.list": result = try await artifacts.listImports(fields)
       default: throw AgentExecutionControlFailure("unknownMethod", "Import method is not published")
       }

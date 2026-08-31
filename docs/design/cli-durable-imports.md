@@ -95,6 +95,22 @@ If the process dies after recording release but before unpinning, Import lookup
 or an exact release retry finishes only the original retention transition. It
 never reacquires the lease, extends retention or recreates reclaimed content.
 
+Public `artifact import inspect` now returns `arkdeck.import-inspection/1`: the
+unchanged Import projection under `import`, plus `references` containing active
+Job IDs, the subset with unknown outcomes, and the count of active materialization
+holds. It reads the Import, holds and hash-verified durable Job references in one
+Artifact-owner turn. Terminal-looking Jobs with unknown outcomes remain blockers;
+known terminal Jobs do not. Corrupt reference history returns `recordUnreadable`,
+not a false empty set. Up to 1,000 Job identities are returned in ASCII order;
+overflow is refused rather than truncated. No inputs, host paths or executable
+arguments appear in this diagnostic. A `clear` reference state is only an
+observation, never a reservation or permission to release: release always rechecks
+its own serialized transition.
+
+The new `artifact.import.inspection` read RPC is negotiated separately. The
+existing `artifact.import.inspect` wire shape stays unchanged for upload recovery
+and earlier protocol-2 clients, and neither RPC dispatches a device operation.
+
 Import storage allows 4,096 retained owners, 16,384 chunk checkpoints per upload,
 2 MiB chunks and 8 GiB of declared active staging. Capacity exhaustion does not
 delete another owner. Private records, staging and identity indexes reject unsafe
@@ -114,7 +130,7 @@ the SQLite boundary, restarted and outcome-unknown Job references, corrupt
 reference history, and SIGKILL immediately before and after unpinning.
 
 Tagged Import selectors on Artifact list/inspect/read/export are described in
-`cli-artifact-resources.md`. Remaining full-CLI work includes expanded Import reference diagnostics,
+`cli-artifact-resources.md`. Remaining full-CLI work includes
 the remaining resource/control surfaces, default protocol migration and the full
 machine-contract manifest. GJ-1–GJ-5 real-device acceptance must use the reviewed
 protected-main Runtime and current Catalog digest through Agent/CLI.

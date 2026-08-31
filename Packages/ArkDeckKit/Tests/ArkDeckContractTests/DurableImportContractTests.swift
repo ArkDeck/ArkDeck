@@ -243,7 +243,10 @@ final class DurableImportContractTests: XCTestCase {
     let repeated = try cli(args)
     XCTAssertEqual(repeated.0, 0); XCTAssertEqual(repeated.1["result"], result.1["result"])
     let inspected = try cli(["artifact", "import", "inspect", "--import-request-id", "upload-test"])
-    XCTAssertEqual(inspected.0, 0); XCTAssertEqual(inspected.1["result"], result.1["result"])
+    XCTAssertEqual(inspected.0, 0)
+    let inspection = try ArtifactImportInspectionProjection(XCTUnwrap(inspected.1["result"]))
+    XCTAssertEqual(inspection.imported.value, result.1["result"])
+    XCTAssertEqual(inspection.activeJobIDs, []); XCTAssertEqual(inspection.activeMaterializationCount, 0)
     let jobs = try await engine.jobListSnapshot(RuntimeJobListQuery([:]))
     XCTAssertEqual(try object(jobs)["items"], .array([])); XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
@@ -266,7 +269,7 @@ final class DurableImportContractTests: XCTestCase {
     XCTAssertNotEqual(stale.0, 0)
     XCTAssertEqual(try object(XCTUnwrap(stale.1["error"]))["code"], .string("resourceConflict"))
     let inspected = try cli(["artifact", "import", "inspect", "--import", record.id])
-    let current = try ArtifactImportProjection(XCTUnwrap(inspected.1["result"]))
+    let current = try ArtifactImportInspectionProjection(XCTUnwrap(inspected.1["result"])).imported
     XCTAssertEqual(current.state, "released"); XCTAssertEqual(current.generation, 3)
     XCTAssertEqual(try object(current.value)["receipt"], try object(record.value)["receipt"])
     let listed = try cli(["artifact", "import", "list", "--state", "released"])
@@ -278,6 +281,34 @@ final class DurableImportContractTests: XCTestCase {
     let bytes = try await artifacts.read(jobID: record.id, artifactID: receipt.artifactID, maximumBytes: hap.count, allowSensitive: false)
     XCTAssertEqual(bytes, hap)
     let jobs = try await engine.listJobs(); XCTAssertTrue(jobs.isEmpty); XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testCLIInspectionReportsOnlyExactImportJobReferencesAndKeepsRecoveryWireStable() async throws {
+    let begun = try await begin()
+    _ = try await append(begun, data: hap)
+    let imported = try await commit(begun)
+    let receipt = try object(XCTUnwrap(object(imported.value)["receipt"]))
+    try startServer()
+    let request = try RuntimeOperationRequest(requestID: "referencing-job", idempotencyKey: "referencing-job",
+      target: .init(targetID: target.targetID, expectedBindingRevision: 1), operation: .init(id: "debug.hap", version: 1),
+      inputs: ["hapArtifactLease": try XCTUnwrap(receipt["lease"]), "bundleName": .string("com.example.fixture"), "abilityName": .string("EntryAbility")])
+    let accepted = try await engine.submit(RuntimeOperationCodec.encodeRequest(request))
+    let response = try cli(["artifact", "import", "inspect", "--import", imported.id])
+    XCTAssertEqual(response.0, 0, "\(response.1)")
+    let inspection = try ArtifactImportInspectionProjection(XCTUnwrap(response.1["result"]))
+    XCTAssertEqual(inspection.imported.id, imported.id); XCTAssertEqual(inspection.activeJobIDs, [accepted.jobID])
+    XCTAssertEqual(inspection.activeMaterializationCount, 0)
+    let other = try await begin("unrelated")
+    let unrelated = try cli(["artifact", "import", "inspect", "--import-request-id", "unrelated"])
+    let otherInspection = try ArtifactImportInspectionProjection(XCTUnwrap(unrelated.1["result"]))
+    XCTAssertEqual(otherInspection.imported.id, other.id); XCTAssertEqual(otherInspection.activeJobIDs, [])
+    let recovery = try AgentClient(socketPath: XCTUnwrap(server).socketURL.path)
+      .negotiated(requiredMajor: 2, forMethod: "artifact.import.inspect")
+      .request(method: "artifact.import.inspect", params: ["importId": .string(imported.id)])
+    XCTAssertEqual(try ArtifactImportProjection(recovery).value, imported.value)
+    try await engine.requestCancel(jobID: accepted.jobID)
+    _ = try await engine.releaseImport(id: imported.id, generation: 2)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   func testCLIChangedSourceFailsIntegrityWithoutAbortingStaging() async throws {
