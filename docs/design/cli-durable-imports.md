@@ -14,6 +14,7 @@ arkdeck artifact import inspect --import-request-id build-123 --output json
 arkdeck artifact import inspect --import IMPORT_ID --output json
 arkdeck artifact import list --target TARGET_ID --state inProgress --page-size 20 --output json
 arkdeck artifact import abort --import-request-id build-123 --expected-generation 1 --output json
+arkdeck artifact import release --import IMPORT_ID --generation 2 --output json
 ```
 
 The internal `artifact.import.begin/append/commit` RPCs are not public CLI
@@ -61,6 +62,31 @@ before removing staging, and repeated original-generation aborts retry cleanup.
 An aborted request cannot be resurrected. Once commit owns the Import, abort
 returns `resourceConflict`.
 
+Release closes only the original committed generation 2. It durably records
+`released` at generation 3 and an immutable `arkdeck.import-release/1` receipt
+before removing the pin. The original commit receipt stays unchanged. Repeating
+the same Import ID and generation 2 returns the original release receipt, including
+after restart or eventual garbage collection; a different generation conflicts.
+Existing default retention starts at release (seven days), and release itself
+does not remove or modify Artifact bytes. Inspect/list rediscover the released
+state, and retrying the original upload cannot revive its lease or pin.
+
+Import acquire and release share the Artifact actor. A transient hold protects
+each asynchronous materialization until SQLite Job admission, journal creation
+and Runtime initialization finish synchronously. Release refuses that hold before
+reading Job history, so it cannot race a new admission; returning the hold happens
+only after the durable Job reference exists. Existing durable Job inputs are the reference source, with
+their request hash checked before release. Active or outcome-unknown Jobs block
+release across restart, as do unreadable or altered references. Known terminal
+Jobs release their use without a separate refcount that could drift after a
+crash. Plan-only holds end when materialization returns or fails; no durable plan
+resource, Job, capability or device dispatch is created. A released or unreadable
+input is refused before a new Job is admitted.
+
+If the process dies after recording release but before unpinning, Import lookup
+or an exact release retry finishes only the original retention transition. It
+never reacquires the lease, extends retention or recreates reclaimed content.
+
 Import storage allows 4,096 retained owners, 16,384 chunk checkpoints per upload,
 2 MiB chunks and 8 GiB of declared active staging. Capacity exhaustion does not
 delete another owner. Private records, staging and identity indexes reject unsafe
@@ -74,9 +100,13 @@ Host fixtures cover actual SIGKILL during partial append, synchronized append,
 durable commit intent and publication-before-receipt; source/prefix corruption;
 symlinks; tombstones; snapshot restart; all registered validators; and actual CLI
 recovery after dropping all three mutation replies. These are not hardware passes.
+Lifecycle fixtures additionally cover actual CLI release and upload retry,
+concurrent submit/release, active plan holds, admission faults on both sides of
+the SQLite boundary, restarted and outcome-unknown Job references, corrupt
+reference history, and SIGKILL immediately before and after unpinning.
 
-Remaining full-CLI work includes generation-bound Import release with atomic
-Job/plan acquire, tagged Import selectors on Artifact list/inspect/read/export,
+Remaining full-CLI work includes tagged Import selectors on Artifact list/inspect/read/export,
+expanded Import reference diagnostics,
 the remaining resource/control surfaces, default protocol migration and the full
 machine-contract manifest. GJ-1–GJ-5 real-device acceptance must use the reviewed
 protected-main Runtime and current Catalog digest through Agent/CLI.

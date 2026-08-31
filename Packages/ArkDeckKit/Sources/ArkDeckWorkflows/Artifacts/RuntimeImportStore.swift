@@ -24,6 +24,7 @@ package struct RuntimeImportRecord: Codable, Sendable {
   package var chunks: [RuntimeImportChunk]
   package var receipt: JSONValue?
   package var validation: [String: JSONValue]?
+  package var releaseReceipt: JSONValue?
 
   package var projection: JSONValue {
     .object(["schemaVersion": .string("arkdeck.import/1"), "importId": .string(importID),
@@ -41,7 +42,7 @@ package struct RuntimeImportRecord: Codable, Sendable {
 /// uncommitted suffix before exposing nextOffset and verifies the committed
 /// prefix. A timeout never deletes an owner or advances its checkpoint.
 package final class RuntimeImportStore: @unchecked Sendable {
-  package enum FaultPoint { case afterPartialChunk, afterChunkSync, afterCommitIntent, afterPublication }
+  package enum FaultPoint { case afterPartialChunk, afterChunkSync, afterCommitIntent, afterPublication, afterReleaseIntent, afterUnpin }
   package typealias Fault = @Sendable (FaultPoint) throws -> Void
   private let root: URL
   private let fault: Fault
@@ -125,7 +126,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
   private func decode(_ url: URL) throws -> RuntimeImportRecord {
     let data = try read(url, maximum: maximumRecordBytes)
     let object = try ControlProtocolNegotiation.decodeObject(data, maximumBytes: maximumRecordBytes)
-    guard Set(object.keys).isSubset(of: ["schemaVersion", "importID", "intent", "intentFingerprint", "binding", "createdAtUTC", "updatedAtUTC", "generation", "state", "nextOffset", "chunks", "receipt", "validation"]) else {
+    guard Set(object.keys).isSubset(of: ["schemaVersion", "importID", "intent", "intentFingerprint", "binding", "createdAtUTC", "updatedAtUTC", "generation", "state", "nextOffset", "chunks", "receipt", "validation", "releaseReceipt"]) else {
       throw Self.error("recordUnreadable", "Import record has unknown fields")
     }
     let record = try JSONDecoder().decode(RuntimeImportRecord.self, from: data)
@@ -133,16 +134,26 @@ package final class RuntimeImportStore: @unchecked Sendable {
       try ArtifactImportIntent(intent) == record.intent,
       record.schemaVersion == "arkdeck.runtime-import/1", record.intentFingerprint == (try record.intent.fingerprint),
       url.standardizedFileURL.path == (try recordURL(record.intent.importRequestID)).standardizedFileURL.path, record.generation > 0,
-      ["inProgress", "committing", "committed", "aborted"].contains(record.state),
+      ["inProgress", "committing", "committed", "aborted", "released"].contains(record.state),
       ISO8601Timestamps.parse(record.createdAtUTC) != nil, ISO8601Timestamps.parse(record.updatedAtUTC) != nil,
       record.binding.targetID == record.intent.targetID,
       record.nextOffset >= 0, record.nextOffset <= record.intent.byteCount, record.chunks.count <= maximumChunks,
-      (record.state == "committed") == (record.receipt != nil),
-      (["committing", "committed"].contains(record.state)) == (record.validation != nil),
+      (["committed", "released"].contains(record.state)) == (record.receipt != nil),
+      (["committing", "committed", "released"].contains(record.state)) == (record.validation != nil),
+      (record.state == "released") == (record.releaseReceipt != nil),
       record.validation == nil || record.validation?["kind"] == .string(record.intent.kind)
     else { throw Self.error("recordUnreadable", "Import record failed validation") }
     _ = try identityURL(record.importID)
     _ = try ArtifactImportProjection(record.projection)
+    if let release = record.releaseReceipt {
+      let receipt = try ArtifactImportReleaseProjection(release)
+      guard receipt.importID == record.importID, case .object(let committed)? = record.receipt,
+        committed["artifactId"] == .string(receipt.artifactID), committed["lease"] == .string(receipt.lease),
+        case .object(let released) = release, released["importRequestId"] == .string(record.intent.importRequestID),
+        released["releasedAtUtc"] == .string(record.updatedAtUTC) else {
+        throw Self.error("recordUnreadable", "Import release does not match its committed owner")
+      }
+    }
     var offset = 0
     for chunk in record.chunks {
       guard chunk.offset == offset, (1...ArtifactImportIntent.maximumChunkBytes).contains(chunk.byteCount),
@@ -151,7 +162,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
       }
       offset += chunk.byteCount
     }
-    guard offset == record.nextOffset, !["committing", "committed"].contains(record.state) || offset == record.intent.byteCount else {
+    guard offset == record.nextOffset, !["committing", "committed", "released"].contains(record.state) || offset == record.intent.byteCount else {
       throw Self.error("recordUnreadable", "Import checkpoint does not match its state")
     }
     return record
@@ -254,7 +265,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
     return fd
   }
   package func recover(_ record: RuntimeImportRecord) throws {
-    if record.state == "aborted" || record.state == "committed" { try removeStaging(record); return }
+    if ["aborted", "committed", "released"].contains(record.state) { try removeStaging(record); return }
     let fd = try openPayload(record); defer { close(fd) }
     try verifyPrefix(record, descriptor: fd)
   }
@@ -402,6 +413,29 @@ package final class RuntimeImportStore: @unchecked Sendable {
     try removeStaging(record)
     return record
   }
+  package func release(id: String, generation: Int, deadline: String, now: String) throws -> RuntimeImportRecord {
+    var record = try byID(id)
+    if record.state == "released", generation == 2 { return record }
+    guard record.state == "committed", generation == record.generation, generation == 2,
+      case .object(let committed)? = record.receipt else {
+      throw Self.error("resourceConflict", "only the exact committed Import generation can be released")
+    }
+    let receipt: JSONValue = .object(["schemaVersion": .string("arkdeck.import-release/1"),
+      "importId": .string(record.importID), "importRequestId": .string(record.intent.importRequestID),
+      "owner": .object(["kind": .string("import"), "id": .string(record.importID)]),
+      "artifactId": committed["artifactId"]!, "lease": committed["lease"]!,
+      "releasedGeneration": .string("2"), "generation": .string("3"), "state": .string("released"),
+      "releasedAtUtc": .string(now), "retention": .object(["class": .string("default"), "pinned": .bool(false), "deadlineUtc": .string(deadline)])])
+    _ = try ArtifactImportReleaseProjection(receipt)
+    record.state = "released"; record.generation = 3; record.updatedAtUTC = now; record.releaseReceipt = receipt
+    // Closing the lease is durable before any unpin. A crash can leave an
+    // extra pin to finish, never a usable input whose bytes may be collected.
+    try save(record)
+    try fault(.afterReleaseIntent)
+    return record
+  }
+  package func afterImportUnpin() throws { try fault(.afterUnpin) }
+
   package func abort(requestID: String, generation: Int, now: String) throws -> RuntimeImportRecord {
     guard var record = try byRequest(requestID) else { throw Self.error("resourceNotFound", "Import does not exist") }
     if record.state == "aborted", generation == record.generation - 1 { try removeStaging(record); return record }

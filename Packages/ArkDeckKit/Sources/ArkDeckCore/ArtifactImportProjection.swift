@@ -15,7 +15,7 @@ package struct ArtifactImportProjection: Sendable {
       fields["schemaVersion"] == .string("arkdeck.import/1"), case .object(let metadata)? = fields["metadata"],
       let id = Self.string(fields["importId"]), id.hasPrefix("imp-"), let uuid = UUID(uuidString: String(id.dropFirst(4))), "imp-" + uuid.uuidString.lowercased() == id,
       let generation = ArtifactImportIntent.decimal(fields["generation"]), generation > 0,
-      let state = Self.string(fields["state"]), ["inProgress", "committing", "committed", "aborted"].contains(state),
+      let state = Self.string(fields["state"]), ["inProgress", "committing", "committed", "aborted", "released"].contains(state),
       let offset = ArtifactImportIntent.decimal(fields["nextOffset"]),
       let chunk = ArtifactImportIntent.decimal(fields["maximumChunkBytes"]), (1...ArtifactImportIntent.maximumChunkBytes).contains(chunk),
       Self.string(fields["createdAtUtc"]).flatMap(ISO8601Timestamps.parse) != nil,
@@ -23,9 +23,9 @@ package struct ArtifactImportProjection: Sendable {
     let intent: ArtifactImportIntent
     do { intent = try ArtifactImportIntent(metadata) } catch { throw invalid() }
     guard fields["importRequestId"] == .string(intent.importRequestID), fields["metadataFingerprint"] == .string(try intent.fingerprint), offset <= intent.byteCount else { throw invalid() }
-    guard generation == (["committed", "aborted"].contains(state) ? 2 : 1),
+    guard generation == (state == "released" ? 3 : ["committed", "aborted"].contains(state) ? 2 : 1),
       state != "committing" || offset == intent.byteCount else { throw invalid() }
-    if state == "committed" {
+    if ["committed", "released"].contains(state) {
       guard offset == intent.byteCount, case .object(let receipt)? = fields["receipt"],
         Set(receipt.keys) == ["schemaVersion", "importId", "importRequestId", "owner", "artifactId", "artifactDigest", "byteCount", "name", "mediaType", "privacy", "targetId", "bindingRevision", "lease", "generation", "validation"],
         receipt["schemaVersion"] == .string("arkdeck.import-receipt/1"), receipt["importId"] == .string(id),
@@ -34,7 +34,7 @@ package struct ArtifactImportProjection: Sendable {
         receipt["lease"] == .string("lease-v1:\(id):\(artifact)"), receipt["artifactDigest"] == .string(intent.sha256),
         receipt["byteCount"] == .string(String(intent.byteCount)), receipt["name"] == .string(intent.name),
         receipt["targetId"] == .string(intent.targetID), receipt["bindingRevision"] == .string(String(intent.bindingRevision)),
-        receipt["generation"] == .string(String(generation)), case .object(let validation)? = receipt["validation"],
+        receipt["generation"] == .string("2"), case .object(let validation)? = receipt["validation"],
         validation["kind"] == .string(intent.kind),
         receipt["mediaType"] == .string(intent.kind == "hap" ? (intent.name.hasSuffix(".hsp") ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap")
           : intent.kind == "workspace-patch" ? "text/x-diff" : intent.kind == "native-library" ? "application/x-elf" : "application/gzip"),

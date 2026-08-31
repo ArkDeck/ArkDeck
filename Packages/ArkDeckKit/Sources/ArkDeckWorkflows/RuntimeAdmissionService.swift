@@ -8,7 +8,7 @@
 import ArkDeckStorage
 import Foundation
 
-struct RuntimeAdmissionService {
+struct RuntimeAdmissionService: Sendable {
   private let repository: RuntimeJobRepository
 
   init(stateDirectory: URL) throws {

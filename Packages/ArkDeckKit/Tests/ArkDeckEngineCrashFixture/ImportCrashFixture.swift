@@ -24,6 +24,8 @@ func runImportCrashFixture(window: String, directory: URL) async throws {
     case .afterChunkSync: selected = window == "import-synced"
     case .afterCommitIntent: selected = window == "import-committing"
     case .afterPublication: selected = window == "import-published"
+    case .afterReleaseIntent: selected = window == "import-release-intent"
+    case .afterUnpin: selected = window == "import-unpinned"
     }
     if selected {
       try DurableFileWriter.createOrReplaceAtomically(destination: directory.appending(path: "ready"), data: Data(window.utf8))
@@ -35,4 +37,7 @@ func runImportCrashFixture(window: String, directory: URL) async throws {
   let suffix = Data(bytes.dropFirst(32))
   _ = try await owner.appendImport(id: record.id, generation: 1, offset: 32, chunk: suffix, sha256: SHA256Hex.string(of: suffix))
   _ = try await owner.commitImport(id: record.id, generation: 1) { _, _ in ["kind": .string("hap"), "container": .string("zip")] }
+  if ["import-release-intent", "import-unpinned"].contains(window) {
+    _ = try await owner.releaseImport(id: record.id, generation: 2, requireNoActiveJob: { _ in })
+  }
 }

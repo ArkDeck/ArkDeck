@@ -107,13 +107,19 @@ public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   public let sourceOperation: String
   public let bindingSnapshot: ArtifactBindingSnapshot
   public let privacy: CatalogArtifactPrivacy
-  public let retention: ArtifactRetention
+  public private(set) var retention: ArtifactRetention
   public let status: ArtifactStatus
   public let redactionApplied: Bool
   package var derivation: RuntimeArtifactDerivation? = nil
   /// When the producing step was reaching the device. Absent for products no
   /// step observed, such as the ones finalization composes.
   public var observationWindow: ArtifactObservationWindow? = nil
+}
+
+extension RuntimeArtifactMetadata {
+  fileprivate func replacingRetention(_ value: ArtifactRetention) -> Self {
+    var copy = self; copy.retention = value; return copy
+  }
 }
 
 package struct RuntimeArtifactDerivation: Sendable, Equatable, Codable {
@@ -637,6 +643,7 @@ public actor RuntimeArtifactStore {
   private var cachedIndexedBytes: Int?
   private var durableImportOwner: RuntimeImportStore?
   private let importFault: RuntimeImportStore.Fault
+  private var importUses: [UUID: [RuntimeImportLeaseReference]] = [:]
   private var payloadVerificationsByJob: [String: [String: ArtifactPayloadVerificationRecord]]
   private var loadedPayloadVerificationJobs: Set<String>
   private var payloadVerificationMetrics: RuntimeArtifactVerificationMetrics
@@ -1308,14 +1315,47 @@ public actor RuntimeArtifactStore {
     return store
   }
 
+  package func acquireImportInputs(_ references: [RuntimeImportLeaseReference]) throws -> RuntimeImportUseToken? {
+    guard !references.isEmpty else { return nil }
+    guard importUses.count < 1024 else { throw RuntimeJobEngineError.rejected(.conflict, "too many active input materializations") }
+    try requireUsableImportInputs(references)
+    let token = RuntimeImportUseToken(id: UUID(), references: references)
+    importUses[token.id] = references
+    return token
+  }
+
+  package func endImportUse(_ token: RuntimeImportUseToken) {
+    guard importUses[token.id] == token.references else { return }
+    importUses.removeValue(forKey: token.id)
+  }
+
+  private func requireUsableImportInputs(_ references: [RuntimeImportLeaseReference]) throws {
+    for reference in references {
+      do { _ = try resolveLease(reference.value) }
+      catch {
+        // This check always precedes Job admission. Admission failures are
+        // not wrapped here: a SQLite failure may be ambiguous.
+        throw RuntimeJobEngineError.rejected(.invalidInput,
+          "Import input is released, missing or unreadable; use a valid committed import before submitting a new Job")
+      }
+    }
+  }
+
   package func beginImport(_ intent: ArtifactImportIntent, binding: ArtifactBindingSnapshot) throws -> JSONValue {
-    try imports().begin(intent, binding: binding, now: nowUTC()).projection
+    let record = try imports().begin(intent, binding: binding, now: nowUTC())
+    try finishImportReleaseIfNeeded(record)
+    return record.projection
   }
   package func inspectImport(id: String? = nil, requestID: String? = nil) throws -> RuntimeImportRecord {
     guard (id == nil) != (requestID == nil) else { throw AgentExecutionControlFailure("invalidInput", "exactly one Import selector is required") }
     let store = try imports()
-    if let id { return try store.byID(id) }
-    guard let record = try store.byRequest(requestID!) else { throw AgentExecutionControlFailure("resourceNotFound", "Import does not exist") }
+    let record: RuntimeImportRecord
+    if let id { record = try store.byID(id) }
+    else {
+      guard let existing = try store.byRequest(requestID!) else { throw AgentExecutionControlFailure("resourceNotFound", "Import does not exist") }
+      record = existing
+    }
+    try finishImportReleaseIfNeeded(record)
     return record
   }
   package func appendImport(id: String, generation: Int, offset: Int, chunk: Data, sha256: String) throws -> JSONValue {
@@ -1332,7 +1372,7 @@ public actor RuntimeArtifactStore {
     for name in ["target", "state"] {
       if let value = fields[name] {
         guard case .string(let text) = value, AgentExecutionIntent.validIdentifier(text),
-          name != "state" || ["inProgress", "committing", "committed", "aborted"].contains(text) else {
+          name != "state" || ["inProgress", "committing", "committed", "aborted", "released"].contains(text) else {
           throw AgentExecutionControlFailure("invalidInput", "Import filter is invalid")
         }
         filters[name] = value
@@ -1357,6 +1397,7 @@ public actor RuntimeArtifactStore {
         guard filters["target"] == nil || filters["target"] == .string(record.intent.targetID),
           filters["state"] == nil || filters["state"] == .string(record.state) else { return }
         try store.recover(record)
+        try finishImportReleaseIfNeeded(record)
         let projection = record.projection
         total += try PortableCanonicalJSON.canonicalBytes(projection).count
         guard total <= 16 * 1024 * 1024, let date = ISO8601Timestamps.parse(record.createdAtUTC) else {
@@ -1416,6 +1457,65 @@ public actor RuntimeArtifactStore {
       "bindingRevision": .string(String(record.intent.bindingRevision)), "lease": .string(lease),
       "generation": .string(String(record.generation + 1)), "validation": .object(facts)])
     return try store.finishCommit(record, receipt: receipt, now: nowUTC()).projection
+  }
+
+  package func releaseImport(id: String, generation: Int, requireNoActiveJob: @Sendable (String) throws -> Void) throws -> JSONValue {
+    let store = try imports()
+    let record = try store.byID(id)
+    if record.state == "released", generation == 2 {
+      try finishImportReleaseIfNeeded(record)
+      return record.releaseReceipt!
+    }
+    guard record.state == "committed", record.generation == generation,
+      case .object(let receipt)? = record.receipt, case .string(let artifactID)? = receipt["artifactId"] else {
+      throw AgentExecutionControlFailure("resourceConflict", "release requires the exact committed Import generation")
+    }
+    guard !importUses.values.contains(where: { $0.contains(where: { $0.importID == id }) }) else {
+      throw AgentExecutionControlFailure("resourceConflict", "Import is still used by an active materialization")
+    }
+    // Acquire and release share this actor turn. Every new admission owns a
+    // transient hold until its Job row is durable, so an in-flight admission
+    // cannot slip between this check and lease closure. After a crash, the
+    // durable Job inputs retain the reference without a second refcount.
+    try requireNoActiveJob(id)
+    let metadata = try inspect(jobID: id, artifactID: artifactID)
+    guard metadata.providerID == "host", metadata.sourceOperation == "artifact.import-" + record.intent.kind,
+      metadata.bindingSnapshot == record.binding, metadata.sha256 == record.intent.sha256,
+      metadata.byteCount == record.intent.byteCount, metadata.retention.retentionClass == .pinnedUntilVerified,
+      metadata.retention.pinned, metadata.retention.deadlineUTC == nil else {
+      throw AgentExecutionControlFailure("resourceConflict", "Import retention or immutable identity does not permit release")
+    }
+    let now = nowUTC()
+    let retention = try retentionPolicy.retention(for: .default, createdAtUTC: now)
+    guard let deadline = retention.deadlineUTC else { throw AgentExecutionControlFailure("recordUnreadable", "Import release has no bounded retention policy") }
+    let released = try store.release(id: id, generation: generation, deadline: deadline, now: now)
+    try finishImportReleaseIfNeeded(released)
+    return released.releaseReceipt!
+  }
+
+  /// The closed lease is the durable linearization point. Recovery only
+  /// finishes its original bounded unpin; it never deletes Artifact bytes.
+  private func finishImportReleaseIfNeeded(_ record: RuntimeImportRecord) throws {
+    guard record.state == "released", let receipt = record.releaseReceipt else { return }
+    let release = try ArtifactImportReleaseProjection(receipt)
+    guard let metadata = try loadIndex(jobID: record.importID).artifacts.first(where: { $0.artifactID == release.artifactID }) else {
+      // Retention may already have reclaimed the Artifact. The historical
+      // release receipt stays idempotent and cannot recreate a pin or payload.
+      return
+    }
+    guard metadata.jobID == record.importID, metadata.sourceOperation == "artifact.import-" + record.intent.kind,
+      metadata.providerID == "host", metadata.sha256 == record.intent.sha256,
+      metadata.bindingSnapshot == record.binding, metadata.byteCount == record.intent.byteCount else {
+      throw AgentExecutionControlFailure("recordUnreadable", "released Import no longer matches its immutable Artifact")
+    }
+    let retention = ArtifactRetention(retentionClass: .default, deadlineUTC: release.deadline, pinned: false)
+    if metadata.retention == retention { return }
+    guard metadata.retention.retentionClass == .pinnedUntilVerified, metadata.retention.pinned,
+      metadata.retention.deadlineUTC == nil else {
+      throw AgentExecutionControlFailure("recordUnreadable", "Import release retention drifted")
+    }
+    try upsert(metadata.replacingRetention(retention), jobID: record.importID)
+    try imports().afterImportUnpin()
   }
 
   // MARK: - Lifecycle

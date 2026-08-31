@@ -21,6 +21,7 @@
     "artifact.import.commit",
     "artifact.import.inspect",
     "artifact.import.list",
+    "artifact.import.release",
     "device.observations",
     "health",
     "human-action.list",

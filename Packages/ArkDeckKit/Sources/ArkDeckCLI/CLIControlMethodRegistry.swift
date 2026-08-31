@@ -108,7 +108,7 @@ enum CLIControlMethodRegistry {
   /// here as a family: a `begin`/`append`/`commit` that fails ambiguously may
   /// have left staging state that only the import's own status can settle.
   private static let mutationCapableMethods: Set<String> = [
-    "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort",
+    "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.release",
     "target.adopt",
     "agent.run",
     "agent.resume",
@@ -203,7 +203,7 @@ enum CLIControlFailureMapper {
     // Import owners never dispatch a device operation. Their typed refusal
     // still permits already-durable upload state; it is not preAdmission.
     if ["artifact.import.begin", "artifact.import.append", "artifact.import.commit",
-        "artifact.import.abort", "artifact.import.inspect", "artifact.import.list"].contains(method),
+        "artifact.import.abort", "artifact.import.inspect", "artifact.import.list", "artifact.import.release"].contains(method),
       evidence.phase == "importOwner", evidence.newDispatchCount == 0,
       ["resourceConflict", "invalidInput", "operationUnavailable", "inputTooLarge",
         "invalidCursor", "idempotencyConflict", "resourceNotFound", "artifactIntegrityFailed", "quotaExceeded"].contains(wireCode),

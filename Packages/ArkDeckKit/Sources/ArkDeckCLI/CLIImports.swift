@@ -19,7 +19,7 @@ extension RuntimeCLI {
     session.client = session.client.bounded(by: deadline)
     let requestID = options.value("--import-request-id")
     do {
-      let method = ["list", "inspect", "abort"].contains(verb) ? "artifact.import.\(verb)" : "artifact.import.begin"
+      let method = ["list", "inspect", "abort", "release"].contains(verb) ? "artifact.import.\(verb)" : "artifact.import.begin"
       try session.negotiate(requiredMajor: 2, forMethod: method)
       if verb == "list" {
         var fields: [String: JSONValue] = [:]
@@ -31,13 +31,21 @@ extension RuntimeCLI {
         try CLIImportProjection.validatePage(value)
         session.emit(value); return
       }
-      if verb == "inspect" || verb == "abort" {
+      if ["inspect", "abort", "release"].contains(verb) {
         var fields: [String: JSONValue] = [:]
         if let id = options.value("--import") { fields["importId"] = .string(id) }
         if let requestID { fields["importRequestId"] = .string(requestID) }
-        if verb == "abort", let generation = options.value("--expected-generation") { fields["generation"] = .string(generation) }
+        if ["abort", "release"].contains(verb), let generation = options.value(verb == "release" ? "--generation" : "--expected-generation") {
+          fields["generation"] = .string(generation)
+        }
         let value = try session.request(method, fields)
-        _ = try CLIImportProjection(value)
+        if verb == "release" {
+          let receipt = try ArtifactImportReleaseProjection(value)
+          guard fields["importId"] == .string(receipt.importID), fields["generation"] == .string("2") else {
+            throw session.fail(.recordUnreadable, "Import release receipt does not match the requested owner and generation")
+          }
+        }
+        else { _ = try CLIImportProjection(value) }
         session.emit(value); return
       }
       guard let requestID, let target = options.value("--target"), let path = options.value("--file") else {
@@ -120,11 +128,13 @@ extension RuntimeCLI {
         }
         guard current.id == owner, current.intent == metadata else { throw session.fail(.recordUnreadable, "Import commit returned another owner") }
       }
-      guard ["committed", "aborted"].contains(current.state) else { throw session.fail(.resultNotReady, "Import remains resumable; retry with the same request identity") }
+      guard ["committed", "aborted", "released"].contains(current.state) else { throw session.fail(.resultNotReady, "Import remains resumable; retry with the same request identity") }
       session.emit(current.value)
       if current.state == "aborted" { throw CLIError(exitCode: 1, message: "Import request was aborted; it cannot be resurrected") }
+      if current.state == "released" { throw CLIError(exitCode: 1, message: "Import lease was released; use a new request identity for a new input") }
     } catch {
-      let details: [String: JSONValue] = requestID.map { ["importRequestId": .string($0)] } ?? [:]
+      var details: [String: JSONValue] = requestID.map { ["importRequestId": .string($0)] } ?? [:]
+      if let id = options.value("--import") { details["importId"] = .string(id) }
       if cancellation.isCancelled { throw session.fail(.clientInterrupted, "Import client interrupted; staged data remains resumable", details: details) }
       if deadline.remainingMilliseconds == 0 { throw session.fail(.clientTimeout, "Import client timed out; inspect or retry the same request identity", details: details) }
       if let failure = error as? AgentExecutionControlFailure { throw session.fail(CLIErrorCode(rawValue: failure.code) ?? .invalidInput, failure.message, details: details) }

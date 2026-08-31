@@ -1154,9 +1154,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       return success(id: request.id, result: .object(report))
 
-    case "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.list", "artifact.import.inspect":
+    case "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.list", "artifact.import.inspect", "artifact.import.release":
       return await RuntimeImportControlHandler(artifacts: artifactStore, targets: targetStore,
-        flashPolicy: durableImportFlashPolicy).response(request)
+        flashPolicy: durableImportFlashPolicy, engine: engine).response(request)
 
     case "artifact.importHap.begin":
       guard artifactStore != nil, let targetStore else {

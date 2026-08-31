@@ -7,6 +7,7 @@ struct RuntimeImportControlHandler {
   let artifacts: RuntimeArtifactStore?
   let targets: RuntimeTargetStore?
   let flashPolicy: FlashBundleImportPolicy
+  let engine: RuntimeJobEngine
 
   func response(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
     do {
@@ -59,6 +60,9 @@ struct RuntimeImportControlHandler {
           }
           return try Self.validate(file, record: record, policy: policy)
         }
+      case "artifact.import.release":
+        try exact(["importId", "generation"])
+        result = try await engine.releaseImport(id: string("importId"), generation: generation())
       case "artifact.import.abort":
         try exact(["importRequestId", "generation"])
         result = try await artifacts.abortImport(requestID: string("importRequestId"), generation: generation())

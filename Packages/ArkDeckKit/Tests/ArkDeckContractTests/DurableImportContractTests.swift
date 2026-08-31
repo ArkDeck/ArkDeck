@@ -248,6 +248,38 @@ final class DurableImportContractTests: XCTestCase {
     XCTAssertEqual(try object(jobs)["items"], .array([])); XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  func testCLIReleaseIsGenerationBoundRediscoverableAndDoesNotRepinOnUploadRetry() async throws {
+    try startServer()
+    let file = root.appending(path: "fixture.hap"); try hap.write(to: file)
+    let upload = ["artifact", "import", "hap", "--import-request-id", "release-cli", "--target", target.targetID, "--file", file.path]
+    let committed = try cli(upload)
+    XCTAssertEqual(committed.0, 0)
+    let record = try ArtifactImportProjection(XCTUnwrap(committed.1["result"]))
+    let command = ["artifact", "import", "release", "--import", record.id, "--generation", "2"]
+    let released = try cli(command)
+    XCTAssertEqual(released.0, 0, "\(released.1)")
+    let receipt = try ArtifactImportReleaseProjection(XCTUnwrap(released.1["result"]))
+    XCTAssertEqual(receipt.importID, record.id)
+    let repeated = try cli(command)
+    XCTAssertEqual(repeated.0, 0); XCTAssertEqual(repeated.1["result"], released.1["result"])
+    let stale = try cli(["artifact", "import", "release", "--import", record.id, "--generation", "3"])
+    XCTAssertNotEqual(stale.0, 0)
+    XCTAssertEqual(try object(XCTUnwrap(stale.1["error"]))["code"], .string("resourceConflict"))
+    let inspected = try cli(["artifact", "import", "inspect", "--import", record.id])
+    let current = try ArtifactImportProjection(XCTUnwrap(inspected.1["result"]))
+    XCTAssertEqual(current.state, "released"); XCTAssertEqual(current.generation, 3)
+    XCTAssertEqual(try object(current.value)["receipt"], try object(record.value)["receipt"])
+    let listed = try cli(["artifact", "import", "list", "--state", "released"])
+    XCTAssertEqual(try object(XCTUnwrap(listed.1["result"]))["items"], .array([current.value]))
+    let retry = try cli(upload)
+    XCTAssertEqual(retry.0, 1); XCTAssertEqual(retry.1["result"], current.value)
+    let metadata = try await artifacts.inspect(jobID: record.id, artifactID: receipt.artifactID)
+    XCTAssertFalse(metadata.retention.pinned)
+    let bytes = try await artifacts.read(jobID: record.id, artifactID: receipt.artifactID, maximumBytes: hap.count, allowSensitive: false)
+    XCTAssertEqual(bytes, hap)
+    let jobs = try await engine.listJobs(); XCTAssertTrue(jobs.isEmpty); XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testCLIChangedSourceFailsIntegrityWithoutAbortingStaging() async throws {
     let begun = try await begin()
     _ = try await append(begun, data: Data(hap.prefix(100)))
