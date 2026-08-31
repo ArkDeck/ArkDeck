@@ -1266,51 +1266,74 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.internalFailure(
         "cannot canonicalize the typed plan-only request: \(error)")
     }
-    let materialized = try await materializeTypedPlanBeforeAuthorization(
-      request: request, descriptor: descriptor,
-      jobID: Self.authorizationPlanJobID)
-    let selectedSteps = descriptor.steps.filter {
-      Self.stepIsRequested($0, descriptor: descriptor, inputs: request.inputs)
+    let importUse = try await acquireImportInputs(request.inputs, descriptor: descriptor)
+    do {
+      let materialized = try await materializeTypedPlanBeforeAuthorization(
+        request: request, descriptor: descriptor,
+        jobID: Self.authorizationPlanJobID)
+      let selectedSteps = descriptor.steps.filter {
+        Self.stepIsRequested($0, descriptor: descriptor, inputs: request.inputs)
+      }
+      // What this plan would need, answered without acquiring any of it.
+      //
+      // `planOnly` stops before `preauthorize` on purpose and still does: the
+      // three values below are read from what materialization already produced.
+      // Nothing here reserves, consumes, issues or looks up a capability, and
+      // no lineage or ledger row is written — the preview only reports which
+      // gate a submit would meet, which is the question a caller previously had
+      // to answer by submitting.
+      let effectiveEffect = Self.effectiveEffect(
+        descriptor: descriptor, inputs: request.inputs)
+      let providerBlocker: String? = {
+        guard let facts = materialized.providerFacts,
+          let provider = providers.provider(id: descriptor.provider.rawValue)
+        else { return nil }
+        return provider.executionAdmissionBlocker(for: descriptor, facts: facts)
+      }()
+      let preview = RuntimePlanOnlyPreview(
+        executionMode: "planOnly",
+        operationReference: descriptor.reference,
+        targetID: request.target.targetID,
+        bindingRevision: materialized.bindingRevision,
+        stableIdentitySHA256: materialized.stableTargetIdentitySHA256,
+        providerID: descriptor.provider.rawValue,
+        catalogDigest: RuntimeOperationCatalog.catalogDigest,
+        requestFingerprintSHA256: Self.fingerprint(of: canonicalRequestData),
+        materializedPlanDigest: materialized.planDigest,
+        inputs: request.inputs,
+        steps: selectedSteps.map {
+          RuntimePlanOnlyStep(
+            stepID: $0.stepID, kind: $0.kind.rawValue,
+            effect: $0.effect.rawValue,
+            cancellation: $0.cancellation.rawValue,
+            binding: $0.binding.rawValue, isOptional: $0.isOptional)
+        },
+        effectiveEffect: effectiveEffect.rawValue,
+        authorizationPolicy: descriptor.authorization[effectiveEffect]?.rawValue,
+        providerAdmissionBlocker: providerBlocker,
+        jobAdmitted: false,
+        dispatchDisposition: "notDispatched")
+      if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      return preview
+    } catch {
+      if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      throw error
     }
-    // What this plan would need, answered without acquiring any of it.
-    //
-    // `planOnly` stops before `preauthorize` on purpose and still does: the
-    // three values below are read from what materialization already produced.
-    // Nothing here reserves, consumes, issues or looks up a capability, and
-    // no lineage or ledger row is written — the preview only reports which
-    // gate a submit would meet, which is the question a caller previously had
-    // to answer by submitting.
-    let effectiveEffect = Self.effectiveEffect(
-      descriptor: descriptor, inputs: request.inputs)
-    let providerBlocker: String? = {
-      guard let facts = materialized.providerFacts,
-        let provider = providers.provider(id: descriptor.provider.rawValue)
-      else { return nil }
-      return provider.executionAdmissionBlocker(for: descriptor, facts: facts)
-    }()
-    return RuntimePlanOnlyPreview(
-      executionMode: "planOnly",
-      operationReference: descriptor.reference,
-      targetID: request.target.targetID,
-      bindingRevision: materialized.bindingRevision,
-      stableIdentitySHA256: materialized.stableTargetIdentitySHA256,
-      providerID: descriptor.provider.rawValue,
-      catalogDigest: RuntimeOperationCatalog.catalogDigest,
-      requestFingerprintSHA256: Self.fingerprint(of: canonicalRequestData),
-      materializedPlanDigest: materialized.planDigest,
-      inputs: request.inputs,
-      steps: selectedSteps.map {
-        RuntimePlanOnlyStep(
-          stepID: $0.stepID, kind: $0.kind.rawValue,
-          effect: $0.effect.rawValue,
-          cancellation: $0.cancellation.rawValue,
-          binding: $0.binding.rawValue, isOptional: $0.isOptional)
-      },
-      effectiveEffect: effectiveEffect.rawValue,
-      authorizationPolicy: descriptor.authorization[effectiveEffect]?.rawValue,
-      providerAdmissionBlocker: providerBlocker,
-      jobAdmitted: false,
-      dispatchDisposition: "notDispatched")
+  }
+
+  private func acquireImportInputs(_ inputs: [String: JSONValue], descriptor: CatalogOperationDescriptor) async throws -> RuntimeImportUseToken? {
+    let references: [RuntimeImportLeaseReference]
+    do { references = try RuntimeImportLeaseReference.inputs(inputs, descriptor: descriptor) }
+    catch { throw RuntimeJobEngineError.rejected(.invalidInput, "Import input references are malformed") }
+    return try await artifactStore?.acquireImportInputs(references)
+  }
+
+  package func releaseImport(id: String, generation: Int) async throws -> JSONValue {
+    guard let artifactStore else { throw AgentExecutionControlFailure("operationUnavailable", "Import store is unavailable") }
+    let admission = admissionService
+    return try await artifactStore.releaseImport(id: id, generation: generation) { id in
+      try admission.requireNoActiveImportReference(id)
+    }
   }
 
   // MARK: Submit
@@ -1428,115 +1451,128 @@ public actor RuntimeJobEngine {
     }
     let jobID = Self.stableJobID(
       idempotencyKey: request.idempotencyKey, requestFingerprint: fingerprint)
-    try beforeAdmission?()
-    let materialized = try await materializeTypedPlanBeforeAuthorization(
-      request: request, descriptor: descriptor,
-      jobID: Self.authorizationPlanJobID)
-    if let reviewedPlanDigest {
-      guard materialized.planDigest == reviewedPlanDigest else {
-        if beforeAdmission != nil {
-          throw AgentExecutionControlFailure("reviewedPlanMismatch", "the fresh materialized plan differs from the immutable reviewed plan")
-        }
-        throw RuntimeJobEngineError.rejected(
-          .conflict,
-          "materialized plan digest changed after review; zero admission and zero dispatch")
-      }
-    }
-    let preparedAuthorization = try await preauthorize(
-      request: request, descriptor: descriptor, effect: effectiveEffect,
-      materialized: materialized)
-    let persistedRequest: RuntimeOperationRequest
-    if preparedAuthorization.reference == request.authorization {
-      persistedRequest = request
-    } else {
-      do {
-        persistedRequest = try RuntimeOperationRequest(
-          requestID: request.requestID,
-          idempotencyKey: request.idempotencyKey,
-          target: request.target,
-          operation: request.operation,
-          inputs: request.inputs,
-          requestedOutputs: request.requestedOutputs,
-          authorization: preparedAuthorization.reference,
-          clientContext: request.clientContext)
-      } catch let rejection as RuntimeOperationRequestRejection {
-        throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
-      }
-    }
-
-    let timestamp = nowUTC()
-    var record = RuntimeJobRecord(
-      jobID: jobID,
-      request: persistedRequest,
-      operationReference: descriptor.reference,
-      catalogDigest: RuntimeOperationCatalog.catalogDigest,
-      providerID: descriptor.provider.rawValue,
-      createdAtUTC: timestamp,
-      actualEffect: effectiveEffect.rawValue,
-      admissionEvidence: preparedAuthorization.evidence,
-      materializedPlanDigest: materialized.planDigest,
-      materializedStableTargetIdentitySHA256:
-        materialized.stableTargetIdentitySHA256,
-      materializedBindingRevision: materialized.bindingRevision)
-    record.state = JobState.preflight.rawValue
-    record.timeline = ["jobCreated", "queued->preflight"]
-    if let recovery = preparedAuthorization.completeOverwriteRecovery {
-      record.timeline.append(
-        "complete-overwrite recovery classified epoch \(recovery.destructiveEpochOrdinal); "
-          + "covered intents \(recovery.coveredIntents.count)")
-    }
-    if let epochID = preparedAuthorization.recognizedRecoveryEpochID {
-      record.timeline.append(
-        "recognized durable complete-overwrite supersession \(epochID); device dispatch 0")
-    }
-    // Every asynchronous probe/preauthorization has finished. No await lies
-    // between this owner's deadline check and the durable Job admission.
-    try beforeAdmission?()
-    try configuration.admissionFaultInjector.check(.beforeAdmission)
-    switch try admissionService.admit(record: record, requestHash: fingerprint) {
-    case .duplicate(let existingJobID):
+    let importUse = try await acquireImportInputs(request.inputs, descriptor: descriptor)
+    do {
+      try beforeAdmission?()
+      let materialized = try await materializeTypedPlanBeforeAuthorization(
+        request: request, descriptor: descriptor,
+        jobID: Self.authorizationPlanJobID)
       if let reviewedPlanDigest {
-        let existing = try recordForRead(jobID: existingJobID)
-        guard existing.materializedPlanDigest == reviewedPlanDigest else {
+        guard materialized.planDigest == reviewedPlanDigest else {
+          if beforeAdmission != nil {
+            throw AgentExecutionControlFailure("reviewedPlanMismatch", "the fresh materialized plan differs from the immutable reviewed plan")
+          }
           throw RuntimeJobEngineError.rejected(
             .conflict,
-            "concurrent duplicate plan digest differs from the reviewed plan; zero new dispatch")
+            "materialized plan digest changed after review; zero admission and zero dispatch")
         }
       }
-      return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
-    case .conflict:
-      throw RuntimeJobEngineError.idempotencyConflict(
-        "idempotency key reuse with a different request")
-    case .admitted:
-      break
-    }
-    try configuration.admissionFaultInjector.check(.afterAdmission)
+      let preparedAuthorization = try await preauthorize(
+        request: request, descriptor: descriptor, effect: effectiveEffect,
+        materialized: materialized)
+      let persistedRequest: RuntimeOperationRequest
+      if preparedAuthorization.reference == request.authorization {
+        persistedRequest = request
+      } else {
+        do {
+          persistedRequest = try RuntimeOperationRequest(
+            requestID: request.requestID,
+            idempotencyKey: request.idempotencyKey,
+            target: request.target,
+            operation: request.operation,
+            inputs: request.inputs,
+            requestedOutputs: request.requestedOutputs,
+            authorization: preparedAuthorization.reference,
+            clientContext: request.clientContext)
+        } catch let rejection as RuntimeOperationRequestRejection {
+          throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
+        }
+      }
 
-    let jobDirectory = configuration.stateDirectory
-      .appending(path: "jobs", directoryHint: .isDirectory)
-      .appending(path: jobID, directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(
-      at: jobDirectory, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    let journal = try FileDurableJournal(url: jobDirectory.appending(path: "journal.jsonl"))
-    try configuration.admissionFaultInjector.check(.beforeJournalAppend)
-    try journal.appendAndSynchronize(
-      JournalEvent.jobCreated(
-        eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
-        timestamp: timestamp, executionMode: "execute",
-        schemaVersion: Self.journalSchemaVersion(of: record)))
-    try journal.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "to-preflight", sequence: 1, sessionID: record.sessionID, jobID: jobID,
-        timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted",
-        schemaVersion: Self.journalSchemaVersion(of: record)))
-    try configuration.admissionFaultInjector.check(.afterJournalAppend)
-    try configuration.admissionFaultInjector.check(.beforeRecordPersist)
-    try persistRuntimeRecord(record)
-    try configuration.admissionFaultInjector.check(.afterRecordPersist)
-    jobs[jobID] = JobRuntime(record: record, journal: journal, nextSequence: 2)
-    try configuration.admissionFaultInjector.check(.beforeResponse)
-    return RuntimeJobAcceptance(jobID: jobID, deduplicated: false)
+      let timestamp = nowUTC()
+      var record = RuntimeJobRecord(
+        jobID: jobID,
+        request: persistedRequest,
+        operationReference: descriptor.reference,
+        catalogDigest: RuntimeOperationCatalog.catalogDigest,
+        providerID: descriptor.provider.rawValue,
+        createdAtUTC: timestamp,
+        actualEffect: effectiveEffect.rawValue,
+        admissionEvidence: preparedAuthorization.evidence,
+        materializedPlanDigest: materialized.planDigest,
+        materializedStableTargetIdentitySHA256:
+          materialized.stableTargetIdentitySHA256,
+        materializedBindingRevision: materialized.bindingRevision)
+      record.originalSubmissionRequest = request
+      record.state = JobState.preflight.rawValue
+      record.timeline = ["jobCreated", "queued->preflight"]
+      if let recovery = preparedAuthorization.completeOverwriteRecovery {
+        record.timeline.append(
+          "complete-overwrite recovery classified epoch \(recovery.destructiveEpochOrdinal); "
+            + "covered intents \(recovery.coveredIntents.count)")
+      }
+      if let epochID = preparedAuthorization.recognizedRecoveryEpochID {
+        record.timeline.append(
+          "recognized durable complete-overwrite supersession \(epochID); device dispatch 0")
+      }
+      // The Import hold prevents release throughout materialization and
+      // admission. Keep SQLite admission, journal initialization and Runtime
+      // residency synchronous: a concurrent retry cannot see an accepted Job
+      // before it is runnable. Only then return the hold to the Artifact actor,
+      // where durable Job references continue to block release across restart.
+      try beforeAdmission?()
+      try configuration.admissionFaultInjector.check(.beforeAdmission)
+      let verdict = try admissionService.admit(record: record, requestHash: fingerprint)
+      switch verdict {
+      case .duplicate(let existingJobID):
+        if let reviewedPlanDigest {
+          let existing = try recordForRead(jobID: existingJobID)
+          guard existing.materializedPlanDigest == reviewedPlanDigest else {
+            throw RuntimeJobEngineError.rejected(
+              .conflict,
+              "concurrent duplicate plan digest differs from the reviewed plan; zero new dispatch")
+          }
+        }
+        if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+        return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
+      case .conflict:
+        throw RuntimeJobEngineError.idempotencyConflict(
+          "idempotency key reuse with a different request")
+      case .admitted:
+        break
+      }
+      try configuration.admissionFaultInjector.check(.afterAdmission)
+
+      let jobDirectory = configuration.stateDirectory
+        .appending(path: "jobs", directoryHint: .isDirectory)
+        .appending(path: jobID, directoryHint: .isDirectory)
+      try FileManager.default.createDirectory(
+        at: jobDirectory, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+      let journal = try FileDurableJournal(url: jobDirectory.appending(path: "journal.jsonl"))
+      try configuration.admissionFaultInjector.check(.beforeJournalAppend)
+      try journal.appendAndSynchronize(
+        JournalEvent.jobCreated(
+          eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
+          timestamp: timestamp, executionMode: "execute",
+          schemaVersion: Self.journalSchemaVersion(of: record)))
+      try journal.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "to-preflight", sequence: 1, sessionID: record.sessionID, jobID: jobID,
+          timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted",
+          schemaVersion: Self.journalSchemaVersion(of: record)))
+      try configuration.admissionFaultInjector.check(.afterJournalAppend)
+      try configuration.admissionFaultInjector.check(.beforeRecordPersist)
+      try persistRuntimeRecord(record)
+      try configuration.admissionFaultInjector.check(.afterRecordPersist)
+      jobs[jobID] = JobRuntime(record: record, journal: journal, nextSequence: 2)
+      try configuration.admissionFaultInjector.check(.beforeResponse)
+      if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      return RuntimeJobAcceptance(jobID: jobID, deduplicated: false)
+    } catch {
+      if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      throw error
+    }
   }
 
   // MARK: Run

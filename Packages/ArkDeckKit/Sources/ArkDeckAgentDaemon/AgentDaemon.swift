@@ -107,6 +107,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   /// could not derive a profile for is not registered, and the pair of
   /// properties keeps those two facts apart instead of letting an empty list
   /// stand for both "none configured" and "configured but unusable".
+  private let durableImportFlashPolicy: FlashBundleImportPolicy
   private let workspaceProjects: [WorkspaceProjectPublication]
   private let methodObserver: (@Sendable (String) -> Void)?
 
@@ -196,6 +197,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.traceRuntimeProbe = traceRuntimeProbe
     self.debugRuntimeProbe = debugRuntimeProbe
     self.debugInvocationController = debugInvocationController
+    self.durableImportFlashPolicy = flashBundleImportPolicy
     self.hapImports = HAPArtifactImportCoordinator()
     self.workspacePatchImports = WorkspacePatchArtifactImportCoordinator()
     if let flashBundleImportDirectory {
@@ -1152,6 +1154,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       return success(id: request.id, result: .object(report))
 
+    case "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.list", "artifact.import.inspect", "artifact.import.release":
+      return await RuntimeImportControlHandler(artifacts: artifactStore, targets: targetStore,
+        flashPolicy: durableImportFlashPolicy, engine: engine).response(request)
+
     case "artifact.importHap.begin":
       guard artifactStore != nil, let targetStore else {
         return failure(
@@ -1921,6 +1927,13 @@ public struct RuntimeControlPlaneHandler: Sendable {
       // Additive and read-only: it creates nothing, and the field vocabulary is
       // shared with `device.candidates` so the two projections cannot describe
       // the same device in two spellings.
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
+        (Set((request.params ?? [:]).keys) != ["targetId"]
+          || request.params?["targetId"].flatMap({ value -> String? in
+            if case .string(let id) = value, AgentExecutionIntent.validIdentifier(id) { return id }; return nil
+          }) == nil) {
+        return failure(id: request.id, code: .invalidParams, message: "target.show requires an exact targetId")
+      }
       guard let targetStore else {
         return failure(
           id: request.id, code: .internalError, message: "target store is not configured")
@@ -1951,9 +1964,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
             "observationHealth": .string(snapshot.health.rawValue),
           ])
         }
-        return success(
-          id: request.id,
-          result: .object([
+        var projection: [String: JSONValue] = [
             "targetId": .string(record.targetID),
             "bindingRevision": .integer(Int64(record.bindingRevision)),
             "toolVersion": .string(record.toolVersion),
@@ -1970,7 +1981,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
                 "confirmedAtUtc": $0.confirmedAtUTC.map(JSONValue.string) ?? .null,
               ])
             } ?? .null,
-          ]))
+          ]
+        if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+          projection["schemaVersion"] = .string("arkdeck.target/1")
+        }
+        return success(id: request.id, result: .object(projection))
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }

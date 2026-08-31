@@ -1348,6 +1348,51 @@ enum CLICommandRegistry {
             isRequired: true),
         ]),
         connectsToRuntime: true),
+    ], groups: [durableImportNode])
+
+  private static let importRequestOption = CLIOptionSpec(
+    name: "--import-request-id", form: .value(placeholder: "id", grammar: .controlRequestID),
+    summary: "caller-stable identity retained across retries")
+
+  private static let durableImportNode = CLINodeSpec(
+    token: "import", summary: "durable, resumable typed input uploads; no device dispatch",
+    leaves: ["hap", "workspace-patch", "flash-bundle", "native-library"].map { kind in
+      CLILeafSpec(token: kind, canonicalCommand: "artifact.import.\(kind)",
+        summary: "upload and commit a registered \(kind) input; retry the same identity to resume",
+        options: runtimeClientOptions([
+          CLIOptionSpec(name: "--import-request-id", form: .value(placeholder: "id", grammar: .controlRequestID),
+            summary: "stable Import identity; never reused for different metadata", isRequired: true),
+          targetIDOption,
+          CLIOptionSpec(name: "--file", form: .value(placeholder: "path", grammar: .opaque),
+            summary: "stable local regular file", isRequired: true),
+          waitTimeoutOption, targetProtocolOption,
+        ] + (kind == "flash-bundle" ? [CLIOptionSpec(name: "--device-profile",
+          form: .value(placeholder: "dayu200", grammar: .enumeration(["dayu200"])),
+          summary: "registered archive validator; defaults to dayu200")] : [])),
+        connectsToRuntime: true)
+    } + [
+      CLILeafSpec(token: "list", canonicalCommand: "artifact.import.list", summary: "fixed snapshot of durable Imports",
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
+          CLIOptionSpec(name: "--target", form: .value(placeholder: "id", grammar: .opaque), summary: "filter target identity"),
+          CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration(["inProgress", "committing", "committed", "aborted", "released"])), summary: "filter Import state")]),
+        connectsToRuntime: true),
+      CLILeafSpec(token: "inspect", canonicalCommand: "artifact.import.inspect", summary: "recover an Import and its durable receipt",
+        options: runtimeClientOptions([importRequestOption,
+          CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque), summary: "Runtime-assigned Import identity"),
+          waitTimeoutOption, targetProtocolOption]), requiresExactlyOneOf: [["--import", "--import-request-id"]],
+        connectsToRuntime: true),
+      CLILeafSpec(token: "release", canonicalCommand: "artifact.import.release", summary: "release an unused Import lease under its original generation",
+        options: runtimeClientOptions([
+          CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque),
+            summary: "exact committed Import owner", isRequired: true),
+          CLIOptionSpec(name: "--generation", form: .value(placeholder: "generation", grammar: .positiveInteger(1...9_007_199_254_740_991)),
+            summary: "original committed generation to release", isRequired: true), waitTimeoutOption, targetProtocolOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(token: "abort", canonicalCommand: "artifact.import.abort", summary: "discard staging and retain an irreversible request tombstone",
+        options: runtimeClientOptions([
+          CLIOptionSpec(name: "--import-request-id", form: .value(placeholder: "id", grammar: .controlRequestID),
+            summary: "exact request identity to abort", isRequired: true), generationOption, waitTimeoutOption, targetProtocolOption]),
+        connectsToRuntime: true),
     ])
 
   private static let targetIDOption = CLIOptionSpec(

@@ -15,6 +15,11 @@ import ArkDeckWorkflows
 import Darwin
 import Foundation
 
+if CommandLine.arguments.count == 3, CommandLine.arguments[1].hasPrefix("import-") {
+  try await runImportCrashFixture(window: CommandLine.arguments[1], directory: URL(filePath: CommandLine.arguments[2]))
+  exit(70)
+}
+
 enum Window: String {
   case afterIntentBeforeDispatch
   case afterDispatchBeforeOutcome
