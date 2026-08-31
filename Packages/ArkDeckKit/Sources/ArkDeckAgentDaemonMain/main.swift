@@ -922,6 +922,8 @@ Task.detached {
       targetObservations: targetObservations,
       agentExecutions: agentExecutions,
       hdcRuntimeDiagnostics: startedHDCServerHost?.diagnostics,
+      hdcStatusObserver: startedHDCServerHost?.statusObserver(
+        daemonVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String),
       artifactStore: artifactStore,
       flashBundleImportDirectory: resolvedStateDirectory.appending(
         path:

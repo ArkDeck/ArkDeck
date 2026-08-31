@@ -46,6 +46,16 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     private var exited = false
     private var exitReason: String?
     private var stopping = false
+    private var launch: HDCManagedProcessLaunch?
+
+    func recordLaunch(pid: Int32, executable: ProcessExecutableIdentityReceipt, request: ProcessRequest) {
+      let captured = HDCManagedProcessLaunch.capture(pid: pid, executable: executable, request: request)
+      lock.withLock { if launch == nil, !exited, !stopping { launch = captured } }
+    }
+
+    func activeLaunch() -> HDCManagedProcessLaunch? {
+      lock.withLock { armed && !exited && !stopping ? launch : nil }
+    }
 
     func arm() -> Bool {
       lock.lock()
@@ -78,15 +88,17 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
 
   private let task: Task<Void, Never>
   private let lifecycle: Lifecycle
+  private let executable: ResolvedExecutable
   package let diagnostics: HDCManagedRuntimeDiagnostics
 
   private init(
     task: Task<Void, Never>, lifecycle: Lifecycle,
-    diagnostics: HDCManagedRuntimeDiagnostics
+    diagnostics: HDCManagedRuntimeDiagnostics, executable: ResolvedExecutable
   ) {
     self.task = task
     self.lifecycle = lifecycle
     self.diagnostics = diagnostics
+    self.executable = executable
   }
 
   public static func start(
@@ -108,7 +120,9 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     let task = Task.detached {
       let reason: String
       do {
-        let result = try await FoundationProcessExecutor().executeIdentityBound(
+        let executor = FoundationProcessExecutor(identityBoundPreSpawnHook: { _ in }, launchObserver: { _ in },
+          identityBoundSpawnObserver: { identity, request, pid in lifecycle.recordLaunch(pid: pid, executable: identity, request: request) })
+        let result = try await executor.executeIdentityBound(
           request, captureLimit: 256 * 1024)
         reason = foregroundExitReason(result.execution.termination)
       } catch {
@@ -130,7 +144,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
           clientVersion: check.clientVersion,
           serverVersion: check.serverVersion,
           endpoint: selection.endpoint.rawValue,
-          endpointSource: selection.source.rawValue))
+          endpointSource: selection.source.rawValue), executable: executable)
       guard lifecycle.arm() else {
         throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
           lifecycle.recordedExitReason() ?? "foreground HDC server exited during readiness")
@@ -148,6 +162,11 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     lifecycle.requestStop()
     task.cancel()
     _ = await task.result
+  }
+
+  package func statusObserver(daemonVersion: String?) -> any HDCStatusObserving {
+    HeadlessHDCStatusObserver(executable: executable, startup: diagnostics, daemonVersion: daemonVersion,
+      managedLaunch: { [lifecycle] in lifecycle.activeLaunch() })
   }
 
   deinit {

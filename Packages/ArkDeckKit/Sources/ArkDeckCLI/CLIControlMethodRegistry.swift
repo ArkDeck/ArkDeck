@@ -42,6 +42,7 @@ enum CLIControlMethodRegistry {
     "health",
     "doctor",
     "runtime.hdc-status",
+    "runtime.hdc.status",
     "operation.list",
     "operation.describe",
     "device.candidates",

@@ -8,6 +8,6 @@ package enum ArkDeckControlProtocol {
   package static let bootstrapVersion = "arkdeck.control.negotiation/1"
   package static let bootstrapMethod = "protocol.negotiate"
   package static let maximumBootstrapFrameBytes = 65536
-  package static let targetMethods: Set<String> = ["agent.abandon", "agent.list", "agent.resume", "agent.run", "agent.status", "artifact.import.abort", "artifact.import.append", "artifact.import.begin", "artifact.import.commit", "artifact.import.inspect", "artifact.import.list", "artifact.import.release", "device.observations", "health", "human-action.list", "human-action.resume", "human-action.show", "job.events", "job.evidence", "job.list", "job.result", "job.show", "job.status", "job.timeline", "target.adopt", "target.show"]
+  package static let targetMethods: Set<String> = ["agent.abandon", "agent.list", "agent.resume", "agent.run", "agent.status", "artifact.import.abort", "artifact.import.append", "artifact.import.begin", "artifact.import.commit", "artifact.import.inspect", "artifact.import.list", "artifact.import.release", "device.observations", "health", "human-action.list", "human-action.resume", "human-action.show", "job.events", "job.evidence", "job.list", "job.result", "job.show", "job.status", "job.timeline", "runtime.hdc.status", "target.adopt", "target.show"]
   package static let preBootstrapLegacyMethods: Set<String> = ["health"]
 }
