@@ -56,10 +56,37 @@ package enum ArkDeckAgentClientName {
 /// `MachServices` key; all three must agree or the lookup fails closed.
 package enum ArkDeckAgentXPC {
   package static let machServiceName = "com.arkdeck.agentd"
-  /// The App's XPC door forwards the daemon's existing wire frame;
-  /// keeping the version here prevents App clients from inventing a legacy
-  /// key that passes the XPC allowlist but fails daemon decoding.
+  /// The one statement of the local control protocol version.
+  ///
+  /// §12 forbids a second source of truth for it, and there were three: this
+  /// contract, the literal `AgentClient` put in every request frame, and the
+  /// CLI's published supported-versions list. Nothing failed if they
+  /// disagreed — a drift would have surfaced as a daemon refusing its own
+  /// client with `unsupportedProtocolVersion`, which reads like a
+  /// compatibility problem rather than the editing mistake it would be.
+  /// Client, daemon and the `--version` projection all read this now.
   package static let wireProtocolVersion = "1.0.0"
+
+  /// The major this build speaks, derived rather than restated.
+  ///
+  /// A major stated separately is the same defect one octave down: it can
+  /// disagree with the version it is supposed to be the major of, and the
+  /// daemon's admission check compares against it. Deriving it means the two
+  /// cannot part company.
+  package static let wireProtocolMajor: Int = {
+    guard let text = wireProtocolVersion.split(separator: ".").first, let major = Int(text) else {
+      preconditionFailure("the wire protocol version must begin with a numeric major")
+    }
+    return major
+  }()
+
+  /// Every exact version this build can speak, in the numeric-descending
+  /// order §12 requires for the published list.
+  ///
+  /// §12's negotiated 2.x adds an entry here when a daemon offers one. Until
+  /// then there is exactly one, because claiming a version nothing can
+  /// negotiate is a promise the client cannot keep.
+  package static let supportedWireProtocolExactVersions = [wireProtocolVersion]
 
   /// Builds the single versioned request shape accepted by the daemon. Method
   /// admission remains in `AgentXPCEndpoint`; this only prevents App facades

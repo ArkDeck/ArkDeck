@@ -174,11 +174,13 @@ enum CLIProductVersion {
   /// The local control protocol versions this client can speak, in the
   /// numeric-descending canonical order §12 requires.
   ///
-  /// These mirror the single version `AgentClient` hard-codes today. Removing
-  /// that second source of truth is its own vertical change (spec §13.2);
-  /// until then this list must not be edited independently of it, and it must
-  /// not claim a 2.x the client cannot negotiate.
-  static let supportedControlProtocolExactVersions = ["1.0.0"]
+  /// Read from the wire contract rather than restated: this is what the
+  /// client will actually put in a request frame, so a caller reading
+  /// `--version` to decide whether to talk to this build is reading the
+  /// truth. It gains a 2.x entry when the client can negotiate one, not
+  /// before.
+  static let supportedControlProtocolExactVersions =
+    ArkDeckAgentXPC.supportedWireProtocolExactVersions
   static var preferredControlProtocol: String { supportedControlProtocolExactVersions[0] }
 
   /// The bundle version. Its components are pinned separately below.
