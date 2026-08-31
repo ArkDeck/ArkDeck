@@ -4,7 +4,7 @@ import Foundation
 
 /// Decodes the encrypted password strings emitted by DevEco Studio next to
 /// its generated PKCS#12 material. This is used only by the interactive
-/// `arkdeck signing install` boundary: the decoded value is placed in the
+/// `arkdeck runtime signing install` boundary: the decoded value is placed in the
 /// login Keychain, and Runtime Jobs never depend on mutable DevEco material.
 package enum OpenHarmonyDevEcoPasswordDecoder {
   private static let component = Data([

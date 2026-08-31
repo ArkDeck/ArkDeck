@@ -106,7 +106,8 @@ package enum ArkForgeLaneComposition {
           + "of its inputs is one nobody chose"
       case .legacyConfiguration:
         return
-          "no ArkForge lane: legacy three-key configuration must be migrated by agentd update "
+          "no ArkForge lane: legacy three-key configuration must be migrated by "
+          + "`runtime service update` "
           + "to one validated \(EnvironmentKey.bundlePath)"
       case .mixedConfiguration:
         return "no ArkForge lane: current bundle and legacy three-key configuration are mixed"

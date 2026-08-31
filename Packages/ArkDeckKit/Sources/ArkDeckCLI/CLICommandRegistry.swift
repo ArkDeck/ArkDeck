@@ -332,8 +332,11 @@ enum CLICommandRegistry {
   /// §12's migration table names these as explicit legacy-compatibility
   /// leaves for the current major: they keep the frozen 1.x request, response
   /// and effect, and the target spellings (`target list/show/adopt`,
-  /// `recovery flash-invocation ...`, `artifact import <kind>`,
-  /// `legacy flash ...`) arrive on the negotiated 2.x control protocol.
+  /// `recovery flash-invocation ...`, `artifact import <kind>`) arrive on the
+  /// negotiated 2.x control protocol. `legacy flash ...` is the exception that
+  /// proves the rule: it is published, and it is still `legacy`, because
+  /// moving a decode-only archive surface to a clearer name does not turn it
+  /// into a target one.
   ///
   /// Marking them is not cosmetic: §12 forbids counting a legacy leaf as
   /// target conformance, and a machine caller has to be able to see which
@@ -342,12 +345,17 @@ enum CLICommandRegistry {
   ///
   /// A leaf appears here only once its replacement is a real, executable
   /// command — the same rule the tombstones follow, and
-  /// `testEveryPublishedReplacementResolvesToALeaf` enforces it. `device adopt`,
-  /// the `artifact import-*` verbs and the `flash` archive leaves are absent
-  /// because their targets (`target adopt` with observation identity,
-  /// `artifact import <kind>`, `legacy flash ...`) are not published yet;
-  /// naming them now would send a caller from a deprecation warning into an
-  /// `invalidCommand`.
+  /// `testEveryPublishedReplacementResolvesToALeaf` enforces it. `device adopt`
+  /// and the `artifact import-*` verbs are absent because their targets
+  /// (`target adopt` with observation identity, `artifact import <kind>`) are
+  /// not published yet; naming them now would send a caller from a deprecation
+  /// warning into an `invalidCommand`.
+  ///
+  /// The families §12 renames wholesale — `agentd`, `signing`, `update-feed`
+  /// and the two `flash` archive leaves — are not listed here either, because
+  /// `compatibilitySpelling` derives their replacement from the target
+  /// spelling. A table entry would be a second place to get the same string
+  /// right.
   private static let replacementArgvPatterns: [String: String] = [
     "device.list": "arkdeck target list",
     "device.show": "arkdeck target show --target <id>",
@@ -364,7 +372,48 @@ enum CLICommandRegistry {
     "artifact.import-hap", "artifact.import-workspace-patch",
     "artifact.import-flash-bundle", "artifact.import-native-library",
     "flash.install-binding", "flash.status", "flash.reconcile",
+    "legacy.flash.status", "legacy.flash.reconcile",
   ]
+
+  /// The compatibility spelling of a family §12 is migrating.
+  ///
+  /// §12's migration table keeps every renamed family working under its old
+  /// name for the whole of this CLI major — same options, same positionals,
+  /// same effect, with a human-mode warning and machine lifecycle metadata.
+  /// The target spelling is the declaration and the alias is derived from it,
+  /// so the two cannot drift: an option added to `runtime service install`
+  /// is on `agentd install` in the same commit. Writing the alias out by hand
+  /// is exactly how a family ends up accepting an option under one name and
+  /// refusing it under the other, which is the failure §12 is trying to
+  /// prevent by keeping the alias at all.
+  ///
+  /// Three things differ, and each is derived rather than restated: the
+  /// canonical command the leaf reports, the lifecycle it carries, and the
+  /// argv that supersedes it. The next major deletes one call.
+  private static func compatibilitySpelling(
+    of leaves: [CLILeafSpec], as legacyToken: String, replacedBy targetArgv: String
+  ) -> [CLILeafSpec] {
+    leaves.map { leaf in
+      var alias = CLILeafSpec(
+        token: leaf.token,
+        canonicalCommand: "\(legacyToken).\(leaf.token)",
+        summary: leaf.summary,
+        kind: leaf.kind,
+        options: leaf.options,
+        positionals: leaf.positionals,
+        mutuallyExclusive: leaf.mutuallyExclusive,
+        requiresExactlyOneOf: leaf.requiresExactlyOneOf,
+        connectsToRuntime: leaf.connectsToRuntime,
+        outputModes: leaf.outputModes,
+        catalogOperation: leaf.catalogOperation)
+      alias.replacementArgvPattern = "arkdeck \(targetArgv) \(leaf.token)"
+      // Being renamed does not turn a frozen 1.x compatibility surface into a
+      // target one, so a `legacy` leaf stays `legacy` under both spellings.
+      // Everything else is merely superseded.
+      alias.lifecycle = leaf.lifecycle == .legacy ? .legacy : .deprecated
+      return alias
+    }
+  }
 
   private static func normalized(_ leaf: CLILeafSpec) -> CLILeafSpec {
     var normalized = leaf
@@ -392,7 +441,7 @@ enum CLICommandRegistry {
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
     jobNode, artifactNode, agentNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
-    flashNode, agentdNode, signingNode, updateFeedNode,
+    flashNode, legacyNode, maintainerNode, agentdNode, signingNode, updateFeedNode,
   ]
 
   /// A first-class name for one published operation (§6.2).
@@ -635,7 +684,9 @@ enum CLICommandRegistry {
             summary: "exact tool and server facts for the managed HDC runtime",
             options: runtimeClientOptions([]),
             connectsToRuntime: true)
-        ])
+        ]),
+      runtimeServiceNode,
+      runtimeSigningNode,
     ])
 
   /// §6.1's durable target surface. `device list/show/adopt` stay as the
@@ -1260,6 +1311,54 @@ enum CLICommandRegistry {
         ])
     ])
 
+  /// §6.3/§12's `legacy` namespace: the macOS historical-archive surface.
+  ///
+  /// These two are the whole of it, and they are here rather than under
+  /// `flash` because §12 draws a line that a shared prefix blurs. `flash` is
+  /// where a caller reaches a device; these only decode and settle records
+  /// that already exist, create no campaign and dispatch nothing, and are
+  /// explicitly not required of the portable core. Naming that separation is
+  /// what stops "the flash commands" from being read as one surface with one
+  /// conformance story.
+  ///
+  /// They stay `legacy` under the new spelling too: the rename moves where a
+  /// caller types them, not what they are. §12 forbids counting either as
+  /// target conformance, so promoting them to `current` on the way across
+  /// would have quietly bought conformance with a rename.
+  private static let legacyFlashNode = CLINodeSpec(
+    token: "flash",
+    summary: "historical campaign archive; decode and settle only, never dispatch",
+    leaves: [
+      CLILeafSpec(
+        token: "status",
+        canonicalCommand: "legacy.flash.status",
+        summary: "decode one historical campaign record; cannot dispatch",
+        options: [
+          CLIOptionSpec(
+            name: "--campaign-id",
+            form: .value(placeholder: "ECAMP-id", grammar: .opaque),
+            summary: "historical campaign identity",
+            isRequired: true),
+          outputOption,
+        ]),
+      CLILeafSpec(
+        token: "reconcile",
+        canonicalCommand: "legacy.flash.reconcile",
+        summary: "decode interrupted flash session journals; zero device dispatch",
+        options: [
+          CLIOptionSpec(
+            name: "--session",
+            form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "inspect one session instead of every unresolved one"),
+          outputOption,
+        ]),
+    ])
+
+  private static let legacyNode = CLINodeSpec(
+    token: "legacy",
+    summary: "explicit compatibility surfaces; frozen 1.x shape, never target conformance",
+    groups: [legacyFlashNode])
+
   private static let flashNode = CLINodeSpec(
     token: "flash",
     summary: "durable device binding and historical campaign archive",
@@ -1275,29 +1374,10 @@ enum CLICommandRegistry {
             summary: "replace an existing binding instead of leaving it unchanged"),
           outputOption,
         ]),
-      CLILeafSpec(
-        token: "status",
-        canonicalCommand: "flash.status",
-        summary: "decode one historical campaign record; cannot dispatch",
-        options: [
-          CLIOptionSpec(
-            name: "--campaign-id",
-            form: .value(placeholder: "ECAMP-id", grammar: .opaque),
-            summary: "historical campaign identity",
-            isRequired: true),
-          outputOption,
-        ]),
-      CLILeafSpec(
-        token: "reconcile",
-        canonicalCommand: "flash.reconcile",
-        summary: "decode interrupted flash session journals; zero device dispatch",
-        options: [
-          CLIOptionSpec(
-            name: "--session",
-            form: .value(placeholder: "session-id", grammar: .opaque),
-            summary: "inspect one session instead of every unresolved one"),
-          outputOption,
-        ]),
+    ]
+      + compatibilitySpelling(
+        of: legacyFlashNode.leaves, as: "flash", replacedBy: "legacy flash")
+      + [
       domainLeaf(
         "run", "flash.run", "flash.full-restore@1",
         "run the canonical full restore through the typed Agent surface"),
@@ -1453,33 +1533,33 @@ enum CLICommandRegistry {
     form: .value(placeholder: "1...300", grammar: .positiveInteger(1...300)),
     summary: "client-side wait budget in seconds")
 
-  private static let agentdNode = CLINodeSpec(
-    token: "agentd",
+  private static let runtimeServiceNode = CLINodeSpec(
+    token: "service",
     summary: "the local Runtime service for the current user",
     leaves: [
       CLILeafSpec(
         token: "install",
-        canonicalCommand: "agentd.install",
+        canonicalCommand: "runtime.service.install",
         summary: "install the daemon as a user-domain service",
         options: agentdInstallOptions + [outputOption, jsonOption]),
       CLILeafSpec(
         token: "update",
-        canonicalCommand: "agentd.update",
+        canonicalCommand: "runtime.service.update",
         summary: "update the installed daemon and its pinned host tools",
         options: agentdInstallOptions + [outputOption, jsonOption]),
       CLILeafSpec(
         token: "restart",
-        canonicalCommand: "agentd.restart",
+        canonicalCommand: "runtime.service.restart",
         summary: "restart the installed daemon",
         options: [maximumWaitSecondsOption, outputOption, jsonOption]),
       CLILeafSpec(
         token: "status",
-        canonicalCommand: "agentd.status",
+        canonicalCommand: "runtime.service.status",
         summary: "service and daemon health",
         options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "verify",
-        canonicalCommand: "agentd.verify",
+        canonicalCommand: "runtime.service.verify",
         summary: "end-to-end verification through the published typed surface",
         options: [
           CLIOptionSpec(
@@ -1503,18 +1583,25 @@ enum CLICommandRegistry {
         ]),
       CLILeafSpec(
         token: "uninstall",
-        canonicalCommand: "agentd.uninstall",
+        canonicalCommand: "runtime.service.uninstall",
         summary: "remove the installed daemon service",
         options: [outputOption, jsonOption]),
     ])
 
-  private static let signingNode = CLINodeSpec(
+  /// §12: the superseded spelling of `runtime service`, derived so it cannot drift.
+  private static let agentdNode = CLINodeSpec(
+    token: "agentd",
+    summary: "superseded spelling of `runtime service`",
+    leaves: compatibilitySpelling(
+      of: runtimeServiceNode.leaves, as: "agentd", replacedBy: "runtime service"))
+
+  private static let runtimeSigningNode = CLINodeSpec(
     token: "signing",
     summary: "local OpenHarmony signing presets; secrets stay in the platform store",
     leaves: [
       CLILeafSpec(
         token: "install-sdk-release",
-        canonicalCommand: "signing.install-sdk-release",
+        canonicalCommand: "runtime.signing.install-sdk-release",
         summary: "install the SDK release signing preset",
         options: [
           CLIOptionSpec(
@@ -1536,7 +1623,7 @@ enum CLICommandRegistry {
         ]),
       CLILeafSpec(
         token: "install",
-        canonicalCommand: "signing.install",
+        canonicalCommand: "runtime.signing.install",
         summary: "install a signing preset from explicit credential references",
         options: [
           CLIOptionSpec(
@@ -1573,12 +1660,12 @@ enum CLICommandRegistry {
         ]),
       CLILeafSpec(
         token: "normalize",
-        canonicalCommand: "signing.normalize",
+        canonicalCommand: "runtime.signing.normalize",
         summary: "normalize an installed preset in place",
         options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "migrate-deveco",
-        canonicalCommand: "signing.migrate-deveco",
+        canonicalCommand: "runtime.signing.migrate-deveco",
         summary: "migrate a DevEco build profile into a typed preset",
         options: [
           CLIOptionSpec(
@@ -1599,28 +1686,45 @@ enum CLICommandRegistry {
         ]),
       CLILeafSpec(
         token: "status",
-        canonicalCommand: "signing.status",
+        canonicalCommand: "runtime.signing.status",
         summary: "installed preset status",
         options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "remove",
-        canonicalCommand: "signing.remove",
+        canonicalCommand: "runtime.signing.remove",
         summary: "remove the installed preset",
         options: [outputOption, jsonOption]),
     ])
+
+  /// §12: the superseded spelling of `runtime signing`, derived so it cannot drift.
+  private static let signingNode = CLINodeSpec(
+    token: "signing",
+    summary: "superseded spelling of `runtime signing`",
+    leaves: compatibilitySpelling(
+      of: runtimeSigningNode.leaves, as: "signing", replacedBy: "runtime signing"))
 
   private static let projectRefOption = CLIOptionSpec(
     name: "--project-ref",
     form: .value(placeholder: "project-ref", grammar: .opaque),
     summary: "registered workspace project the preset belongs to")
 
-  private static let updateFeedNode = CLINodeSpec(
+  /// §6.3's maintainer namespace: release tooling that ships in the same
+  /// binary but is not part of the device-facing product surface. Keeping it
+  /// under one token is what lets help, completion and coverage separate "a
+  /// caller drives this" from "a maintainer publishes with this" without
+  /// either list having to know the individual command names.
+  private static let maintainerNode = CLINodeSpec(
+    token: "maintainer",
+    summary: "release maintenance tooling; never touches a private key",
+    groups: [maintainerUpdateFeedNode])
+
+  private static let maintainerUpdateFeedNode = CLINodeSpec(
     token: "update-feed",
     summary: "maintainer update-feed tooling; never touches a private key",
     leaves: [
       CLILeafSpec(
         token: "prepare",
-        canonicalCommand: "update-feed.prepare",
+        canonicalCommand: "maintainer.update-feed.prepare",
         summary: "emit the deterministic public payload and signature input",
         options: [
           CLIOptionSpec(
@@ -1668,10 +1772,14 @@ enum CLICommandRegistry {
             form: .value(placeholder: "directory", grammar: .opaque),
             summary: "output directory",
             isRequired: true),
+          // `--output json` only. `--json` means "the daemon reply, pretty
+          // printed" (§12 legacy-json), and this family never speaks to the
+          // daemon — offering it would promise a shape that has no source.
+          outputOption,
         ]),
       CLILeafSpec(
         token: "assemble",
-        canonicalCommand: "update-feed.assemble",
+        canonicalCommand: "maintainer.update-feed.assemble",
         summary: "verify a detached signature and assemble the feed",
         options: [
           CLIOptionSpec(
@@ -1689,8 +1797,16 @@ enum CLICommandRegistry {
             form: .value(placeholder: "feed.json", grammar: .opaque),
             summary: "assembled feed output path",
             isRequired: true),
+          outputOption,
         ]),
     ])
+
+  /// §12: the superseded spelling of `maintainer update-feed`, derived so it cannot drift.
+  private static let updateFeedNode = CLINodeSpec(
+    token: "update-feed",
+    summary: "superseded spelling of `maintainer update-feed`",
+    leaves: compatibilitySpelling(
+      of: maintainerUpdateFeedNode.leaves, as: "update-feed", replacedBy: "maintainer update-feed"))
 
   // MARK: Lookup
 

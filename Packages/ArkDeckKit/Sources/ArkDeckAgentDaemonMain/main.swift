@@ -841,7 +841,8 @@ Task.detached {
         Data(
           ("arkdeck-agentd: retired configuration is still set: "
             + removedHarnessKeys.sorted().joined(separator: ",")
-            + "; run `arkdeck agentd update` to regenerate the LaunchAgent plist\n").utf8))
+            + "; run `arkdeck runtime service update` to regenerate the LaunchAgent plist\n")
+            .utf8))
       exit(78)  // EX_CONFIG
     }
     /// The production lane plan previewer (CHG-2026-068): resolves the bound

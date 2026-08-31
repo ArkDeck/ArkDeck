@@ -332,10 +332,9 @@ final class CLIProcessGoldenContractTests: XCTestCase {
       .map { ($0["path"] as? [String] ?? []).joined(separator: " ") }
       .sorted()
     XCTAssertEqual(
-      withoutJSON,
-      ["completion", "help", "update-feed assemble", "update-feed prepare"],
-      "a leaf that cannot answer in JSON is a §18 conformance gap; `update-feed` is the "
-        + "remaining one and needs a structured result before it can be closed")
+      withoutJSON, ["completion", "help"],
+      "a leaf that cannot answer in JSON is a §18 conformance gap; the two exempt surfaces "
+        + "are prose and script bytes, and nothing else may join them")
   }
 
   /// §12: a deprecated alias warns on stderr in human mode, and in a machine
@@ -373,6 +372,82 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     ])
     let meta = try XCTUnwrap(try decoded(result.stdout)["meta"] as? [String: Any])
     XCTAssertNil(meta["lifecycle"])
+  }
+
+  /// The same §12 contract, over all four families renamed at once, through
+  /// the real binary.
+  ///
+  /// The parser-level tests already prove the registry declares this. What a
+  /// process golden adds is that the wiring in between actually carries it:
+  /// the handler has to build its canonical command from the spelling the
+  /// caller typed, and the failure mode when it does not is silent — the leaf
+  /// lookup misses, lifecycle falls back to `current`, and the alias stops
+  /// warning while every other test still passes.
+  func testEveryRenamedFamilyWarnsUnderItsAliasAndIsSilentUnderItsTarget() throws {
+    // `flash reconcile` is superseded *and* frozen, so its warning says
+    // `legacy` rather than `deprecated`. Both are §12 statuses that mean "not
+    // the published spelling"; what has to be identical across the four is
+    // that the alias names its exact replacement and the target does not warn.
+    let renamed: [(alias: [String], target: [String], status: String)] = [
+      (["agentd", "status"], ["runtime", "service", "status"], "deprecated"),
+      (["signing", "status"], ["runtime", "signing", "status"], "deprecated"),
+      (["flash", "reconcile"], ["legacy", "flash", "reconcile"], "legacy"),
+      (
+        ["update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o"],
+        ["maintainer", "update-feed", "assemble", "--payload", "p", "--signature", "s",
+          "--out", "o"],
+        "deprecated"
+      ),
+    ]
+    for family in renamed {
+      let replacement = "arkdeck " + family.target.filter { !$0.hasPrefix("-") }
+        .prefix(family.target.firstIndex(where: { $0.hasPrefix("-") }) ?? family.target.count)
+        .joined(separator: " ")
+
+      let human = try run(family.alias)
+      XCTAssertTrue(
+        human.stderr.contains("is \(family.status)"),
+        "`\(family.alias.joined(separator: " "))` must warn: \(human.stderr)")
+      XCTAssertTrue(
+        human.stderr.contains(replacement),
+        "the warning must name `\(replacement)`: \(human.stderr)")
+
+      let machine = try run(family.alias + ["--output", "json"])
+      XCTAssertEqual(
+        jsonDocumentCount(machine.stdout), 1,
+        "`\(family.alias.joined(separator: " "))` must print exactly one document")
+      XCTAssertFalse(
+        machine.stdout.contains("warning:"), "a warning must never reach machine stdout")
+      let meta = try XCTUnwrap(try decoded(machine.stdout)["meta"] as? [String: Any])
+      let lifecycle = try XCTUnwrap(
+        meta["lifecycle"] as? [String: Any],
+        "`\(family.alias.joined(separator: " "))` lost its lifecycle metadata")
+      XCTAssertEqual(lifecycle["status"] as? String, family.status)
+      XCTAssertEqual(
+        lifecycle["replacementArgvPattern"] as? String, replacement,
+        family.alias.joined(separator: " "))
+      XCTAssertTrue(lifecycle["removalVersion"] is NSNull, "§12 forbids guessing a date")
+
+      // The target spelling says nothing: `legacy flash` is the exception,
+      // because it is published *and* frozen, so it keeps a `legacy` status
+      // with no replacement to point at.
+      let targetHuman = try run(family.target)
+      XCTAssertFalse(
+        targetHuman.stderr.contains("deprecated"),
+        "`\(family.target.joined(separator: " "))` is the published spelling and must not warn")
+
+      let targetMachine = try run(family.target + ["--output", "json"])
+      let targetMeta = try XCTUnwrap(try decoded(targetMachine.stdout)["meta"] as? [String: Any])
+      if family.target.first == "legacy" {
+        let targetLifecycle = try XCTUnwrap(targetMeta["lifecycle"] as? [String: Any])
+        XCTAssertEqual(targetLifecycle["status"] as? String, "legacy")
+        XCTAssertTrue(targetLifecycle["replacementArgvPattern"] is NSNull)
+      } else {
+        XCTAssertNil(
+          targetMeta["lifecycle"],
+          "`\(family.target.joined(separator: " "))` is the destination and carries none")
+      }
+    }
   }
 
   func testTheTwoMachineSpellingsCannotBeCombined() throws {

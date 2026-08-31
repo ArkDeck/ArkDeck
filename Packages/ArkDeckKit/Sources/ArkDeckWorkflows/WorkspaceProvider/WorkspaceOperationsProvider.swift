@@ -952,7 +952,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     let hasPreset: Bool
     // Every preset on this path is host configuration: `sourceControlPreset`
     // exists exactly when the configured project root is a git working copy,
-    // the signing presets exist once `arkdeck signing install` has run, and
+    // the signing presets exist once `arkdeck runtime signing install` has run, and
     // the symbolizer exists once the daemon is configured with an analyzer.
     // Nothing here is a capability only a different build could supply.
     switch operation.reference {
@@ -980,7 +980,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       // and only a different build of ArkDeck could. That was true when the
       // flag was written and stopped being true hours later in the same day:
       // `waterFlowDemo` gained a `symbolizerPath` parameter, the daemon feeds
-      // it from `ARKDECK_ANALYZER_PATH`, and `agentd install`/`update` set that
+      // it from `ARKDECK_ANALYZER_PATH`, and `runtime service install`/`update` set that
       // key to the installed daemon by default. The flag and its comment were
       // never revisited, so the answer told every caller to give up on an
       // operation that host configuration reaches — a wrong "stop looking" is

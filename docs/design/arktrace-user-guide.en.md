@@ -47,7 +47,7 @@ Use an installed, signed ArkDeck runtime for product acceptance. First inspect t
 and the operation's live input description:
 
 ```bash
-arkdeck agentd status
+arkdeck runtime service status
 arkdeck doctor
 arkdeck target list --json
 arkdeck operation describe --operation capture.diagnostics@1 --json

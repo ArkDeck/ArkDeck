@@ -22,8 +22,8 @@ HDC 执行路径。
 3. 从已签名 CLI helper 运行：
 
    ```text
-   arkdeck agentd install --hdc /absolute/path/to/hdc
-   arkdeck agentd status
+   arkdeck runtime service install --hdc /absolute/path/to/hdc
+   arkdeck runtime service status
    arkdeck doctor
    ```
 
@@ -58,7 +58,7 @@ UDS；因此不需要 DevEco Studio、Terminal 或另一个后台脚本托管 HD
 `--daemon /absolute/path/to/ArkDeckAgent.app`。更新当前构建时运行：
 
 ```text
-arkdeck agentd update
+arkdeck runtime service update
 ```
 
 HDC 路径变化时同时传 `--hdc /new/absolute/path/to/hdc`。
@@ -68,9 +68,9 @@ HDC 路径变化时同时传 `--hdc /new/absolute/path/to/hdc`。
 Artifact 清单：
 
 ```text
-arkdeck agentd verify --target <target-id> --json
-arkdeck agentd restart --json
-arkdeck agentd verify --job <observe-or-full-restore-job-id> --json
+arkdeck runtime service verify --target <target-id> --json
+arkdeck runtime service restart --json
+arkdeck runtime service verify --job <observe-or-full-restore-job-id> --json
 ```
 
 `restart` 不复制 helper、不重写 plist/install receipt，也不删除 Runtime state；它会拒绝 active、
@@ -87,7 +87,7 @@ arkdeck agentd verify --job <observe-or-full-restore-job-id> --json
 distribution 的 owner-controlled descriptor 交给同一个安装边界，而不是手工编辑 plist：
 
 ```text
-arkdeck agentd update \
+arkdeck runtime service update \
   --arktrace-descriptor /absolute/path/to/distribution-descriptor.json
 arkdeck operation list --json
 ```
@@ -103,7 +103,7 @@ doctor 与 runtime drift 验证；operation 只有在这些检查全部通过后
 继续可用，安装时一次性传入两个受验证的绝对目录：
 
 ```text
-arkdeck agentd install --hdc /absolute/path/to/hdc \
+arkdeck runtime service install --hdc /absolute/path/to/hdc \
   --workspace-project /absolute/path/to/WaterFlowLayoutDemo \
   --deveco-sdk /Applications/DevEco-Studio.app/Contents/sdk
 ```
@@ -134,13 +134,13 @@ bundle。安装器只读取显式的 canonical SDK/Java 绝对路径，在 owner
 shell 字符串或 mutable SDK 路径交给 Runtime Job：
 
 ```text
-arkdeck signing install-sdk-release \
+arkdeck runtime signing install-sdk-release \
   --sdk /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony \
   --java /Applications/DevEco-Studio.app/Contents/jbr/Contents/Home/bin/java \
   --bundle-name com.example.waterflowdemo \
   --project-ref demo-app \
   --json
-arkdeck signing status --json
+arkdeck runtime signing status --json
 ```
 
 ArkDeck 会复制并固定 SDK release keystore/profile material 的身份；SDK profile 模板只携带
@@ -159,7 +159,7 @@ hapsigner；它不进入 argv、环境、receipt 或日志。CLI 与 daemon 通�
 或管道 stdin：
 
 ```text
-arkdeck signing install \
+arkdeck runtime signing install \
   --java /absolute/path/to/java \
   --jar /absolute/path/to/hap-sign-tool.jar \
   --keystore /absolute/private/path/release.p12 \
@@ -167,7 +167,7 @@ arkdeck signing install \
   --profile /absolute/path/release.p7b \
   --key-alias <alias> \
   --project-ref demo-app
-arkdeck signing status --json
+arkdeck runtime signing status --json
 arkdeck operation list --json
 ```
 
@@ -179,7 +179,7 @@ Keychain 信封。该 `storeFile`
 缺失、陈旧或指向另一 keystore 的 profile 会在改写 Keychain 前 fail closed：
 
 ```text
-arkdeck signing migrate-deveco \
+arkdeck runtime signing migrate-deveco \
   --build-profile /absolute/project/build-profile.json5 \
   --daemon "$HOME/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd" \
   --key-alias <actual-private-key-alias-if-profile-is-stale> \
@@ -250,7 +250,7 @@ code signing），非零退出只发布闭合的无秘密诊断码，并要求 t
 签名配置可逆撤销：
 
 ```text
-arkdeck signing remove --json
+arkdeck runtime signing remove --json
 ```
 
 该命令删除 ArkDeck receipt、当前单一 Keychain 信封及 receipt 记录的旧版 secret。SDK release
@@ -271,7 +271,7 @@ HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony 
 `openspec/changes/chg-2026-064-agent-native-decision-plane/evidence/runs/TASK-AND-002/`。
 
 - **plist 迁移**:旧安装的 LaunchAgent env 若仍带 `ARKDECK_HARNESS_*` 网关键,
-  运行一次 `arkdeck agentd update` 即可再生成不含这些键的 plist(update 读取旧
+  运行一次 `arkdeck runtime service update` 即可再生成不含这些键的 plist(update 读取旧
   配置时会忽略并丢弃它们)。手工编辑保留这些键的 plist 会让 daemon 启动时
   具名 fail-loud(exit 78)。`ARKDECK_HARNESS_MODEL_*` 同样在这个列表里:
   `arkdeck agent chat` 已删除,仓内无人再读这些键,而旧 plist 里可能还躺着一枚

@@ -141,7 +141,34 @@ struct ArkDeckCommandLine {
       case "flash":
         try await runFlash(arguments)
       case "update-feed":
-        try runUpdateFeed(arguments)
+        // §12's compatibility spelling of `maintainer update-feed`.
+        try runUpdateFeed(arguments, spelledAs: "update-feed")
+      case "maintainer":
+        guard arguments.first == "update-feed" else {
+          throw CLIError(
+            exitCode: EX_USAGE, message: "missing maintainer subcommand (update-feed)")
+        }
+        try runUpdateFeed(Array(arguments.dropFirst()), spelledAs: "maintainer.update-feed")
+      case "legacy":
+        // §6.3's explicit compatibility namespace. It holds the historical
+        // flash archive and nothing else: these decode and settle records that
+        // already exist and dispatch nothing, which is why §12 keeps them out
+        // of the surface a caller reaches a device through.
+        guard arguments.first == "flash" else {
+          throw CLIError(exitCode: EX_USAGE, message: "missing legacy subcommand (flash)")
+        }
+        let archiveArguments = Array(arguments.dropFirst())
+        switch archiveArguments.first {
+        case "status":
+          try runCampaignStatus(
+            Array(archiveArguments.dropFirst()), spelledAs: "legacy.flash.status")
+        case "reconcile":
+          try runFlashReconcile(
+            Array(archiveArguments.dropFirst()), spelledAs: "legacy.flash.reconcile")
+        default:
+          throw CLIError(
+            exitCode: EX_USAGE, message: "missing legacy flash subcommand (status|reconcile)")
+        }
       case "doctor":
         try RuntimeCLI.runDoctor(arguments)
       case "debug":
@@ -151,7 +178,7 @@ struct ArkDeckCommandLine {
       case "device":
         try RuntimeCLI.runDevice(arguments)
       case "runtime":
-        try RuntimeCLI.runRuntime(arguments)
+        try await RuntimeCLI.runRuntime(arguments)
       case "target":
         try await RuntimeCLI.runTarget(arguments)
       case "trace":
@@ -180,11 +207,14 @@ struct ArkDeckCommandLine {
       case "agent":
         try await RuntimeCLI.runAgent(arguments)
       case "agentd":
+        // §12's compatibility spellings. Both reach the same handler; only the
+        // name they report differs, which is what the registry needs to answer
+        // "is this the target surface?" without a second table.
         try RuntimeCLI.runAgentDaemon(
-          arguments,
+          arguments, spelledAs: "agentd",
           beforeBootstrap: RuntimeCLI.refreshSigningAccessIfInstalled)
       case "signing":
-        try await RuntimeCLI.runSigningAsync(arguments)
+        try await RuntimeCLI.runSigningAsync(arguments, spelledAs: "signing")
       case "capability":
         try RuntimeCLI.runCapability(arguments)
       case "artifact":
@@ -223,9 +253,9 @@ struct ArkDeckCommandLine {
     case "install-binding":
       try runInstallBinding(Array(arguments.dropFirst()))
     case "status":
-      try runCampaignStatus(Array(arguments.dropFirst()))
+      try runCampaignStatus(Array(arguments.dropFirst()), spelledAs: "flash.status")
     case "reconcile":
-      try runFlashReconcile(Array(arguments.dropFirst()))
+      try runFlashReconcile(Array(arguments.dropFirst()), spelledAs: "flash.reconcile")
     case "run":
       try await RuntimeCLI.runDomainOperation(
         path: ["flash", "run"], Array(arguments.dropFirst()))
@@ -254,9 +284,12 @@ struct ArkDeckCommandLine {
   /// decode/export-only. A close verb that can no longer close anything would
   /// report work it never did, so it is gone rather than kept as a no-op.
   /// Exit 4 while anything stays unresolved, so scripts still observe the debt.
-  static func runFlashReconcile(_ arguments: [String]) throws {
+  static func runFlashReconcile(
+    _ arguments: [String], spelledAs canonicalCommand: String = "legacy.flash.reconcile"
+  ) throws {
     var rest = arguments
-    let session = RuntimeCLI.runtimeSession(&rest, command: "flash.reconcile")
+    let session = RuntimeCLI.runtimeSession(&rest, command: canonicalCommand)
+    session.warnIfLegacy()
     let options = try CLIOptions(rest)
     try options.validateAllowed(["--session"])
     let reconciler = try RockchipLegacyFlashJournalReconciler.production()
@@ -435,7 +468,9 @@ struct ArkDeckCommandLine {
     case .openAgentReservation(let reservationID):
       print("  authority: campaign reservation=\(reservationID) (open)")
       if let campaignID = finding.campaignID {
-        print("  inspect: arkdeck flash status --campaign-id \(campaignID)")
+        // The target spelling: a hint that sends a caller into a deprecation
+        // warning teaches them to ignore the next one.
+        print("  inspect: arkdeck legacy flash status --campaign-id \(campaignID)")
       }
     case .closed(let reservationID):
       print("  authority: reservation=\(reservationID) (closed)")
@@ -480,9 +515,12 @@ struct ArkDeckCommandLine {
     print("device mutation dispatch: 0")
   }
 
-  static func runCampaignStatus(_ arguments: [String]) throws {
+  static func runCampaignStatus(
+    _ arguments: [String], spelledAs canonicalCommand: String = "legacy.flash.status"
+  ) throws {
     var rest = arguments
-    let session = RuntimeCLI.runtimeSession(&rest, command: "flash.status")
+    let session = RuntimeCLI.runtimeSession(&rest, command: canonicalCommand)
+    session.warnIfLegacy()
     let options = try CLIOptions(rest)
     try options.validateAllowed(["--campaign-id"])
     guard let campaignID = options.value("--campaign-id") else {
@@ -531,22 +569,86 @@ struct ArkDeckCommandLine {
 
   // MARK: update-feed
 
-  static func runUpdateFeed(_ arguments: [String]) throws {
+  /// §8.4 for the maintainer feed tooling.
+  ///
+  /// This family computes entirely on the host, so its failures are file and
+  /// format failures rather than control-plane ones. That does not make them
+  /// exempt: a leaf that publishes `--output json` owes every failure a code
+  /// and one document, and before this existed a missing payload file left
+  /// stdout empty and a sentence on stderr — the exact shape §8.2 forbids.
+  ///
+  /// The switch over `UpdateFeedError` is exhaustive on purpose. It is a
+  /// closed set, and a default branch would silently classify whatever case is
+  /// added to it next, which is how a signature failure ends up reported as a
+  /// bad argument.
+  private static func updateFeedFailure(
+    _ error: Error, _ session: CLIRuntimeSession, _ doing: String
+  ) -> Error {
+    // An argv refusal and an already-classified failure both keep their own.
+    if error is CLIRegistryError || error is CLIError { return error }
+
+    if let feed = error as? UpdateFeedError {
+      let code: CLIErrorCode
+      switch feed {
+      case .feedTooLarge, .payloadTooLarge:
+        code = .inputTooLarge
+      // The two that mean "do not publish this": the bytes are well-formed and
+      // the signature over them is not the one this key would produce.
+      case .invalidSignature, .unknownKey:
+        code = .artifactIntegrityFailed
+      case .malformedEnvelope, .nonCanonicalEnvelope, .wrongSchemaVersion, .malformedBase64,
+        .nonCanonicalPayload, .invalidPayload, .invalidVersion, .invalidSystemVersion,
+        .invalidArchitecture, .invalidTimestamp, .invalidValidityWindow, .feedNotYetValid,
+        .feedExpired, .invalidArtifactURL, .invalidArtifactLength, .invalidArtifactDigest:
+        code = .invalidInput
+      // A sequence the local replay ledger has already seen is a conflict with
+      // durable state, not a malformed input: the fix is a new sequence.
+      case .downgrade, .replay, .sequenceConflict, .nonIncreasingRelease:
+        code = .resourceConflict
+      case .replayStateCorrupt:
+        code = .recordUnreadable
+      case .replayStateWriteFailed:
+        code = .ioFailure
+      }
+      return session.fail(
+        code, "\(doing) failed: \(feed)", details: ["reason": .string("\(feed)")])
+    }
+
+    let cocoa = error as NSError
+    if cocoa.domain == NSCocoaErrorDomain,
+      [NSFileReadNoSuchFileError, NSFileNoSuchFileError].contains(cocoa.code)
+    {
+      return session.fail(.resourceNotFound, "\(doing) failed: \(cocoa.localizedDescription)")
+    }
+    return session.fail(.ioFailure, "\(doing) failed: \(cocoa.localizedDescription)")
+  }
+
+  static func runUpdateFeed(
+    _ arguments: [String], spelledAs canonicalPrefix: String = "maintainer.update-feed"
+  ) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(exitCode: EX_USAGE, message: "missing update-feed subcommand")
     }
     switch subcommand {
     case "prepare":
-      try prepareUpdateFeed(Array(arguments.dropFirst()))
+      try prepareUpdateFeed(
+        Array(arguments.dropFirst()), spelledAs: "\(canonicalPrefix).prepare")
     case "assemble":
-      try assembleUpdateFeed(Array(arguments.dropFirst()))
+      try assembleUpdateFeed(
+        Array(arguments.dropFirst()), spelledAs: "\(canonicalPrefix).assemble")
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported update-feed subcommand")
     }
   }
 
-  static func prepareUpdateFeed(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
+  static func prepareUpdateFeed(
+    _ arguments: [String], spelledAs canonicalCommand: String = "maintainer.update-feed.prepare"
+  ) throws {
+    var rest = arguments
+    let session = RuntimeCLI.runtimeSession(
+      &rest, command: canonicalCommand, connectsToRuntime: false)
+    session.warnIfLegacy()
+    let options = try CLIOptions(rest)
     try options.validateAllowed([
       "--sequence", "--version", "--minimum-system", "--issued-at", "--expires-at",
       "--artifact", "--artifact-url", "--notes", "--out",
@@ -566,7 +668,12 @@ struct ArkDeckCommandLine {
           + "artifact/artifact-url/notes/out")
     }
     let artifact = URL(filePath: artifactPath).standardizedFileURL
-    let measurement = try measureArtifact(artifact)
+    let measurement: (byteLength: UInt64, sha256: String)
+    do {
+      measurement = try measureArtifact(artifact)
+    } catch {
+      throw updateFeedFailure(error, session, "measuring \(artifact.path)")
+    }
     let payload = UpdateFeedPayload(
       sequence: sequence,
       version: version,
@@ -577,27 +684,57 @@ struct ArkDeckCommandLine {
       artifact: UpdateArtifactDescriptor(
         url: artifactURL, byteLength: measurement.byteLength, sha256: measurement.sha256),
       releaseNotesSummary: notes)
-    try UpdateFeedVerifier.validateUnsignedPayloadForSigning(payload)
-    let canonicalPayload = try UpdateFeedCodec.canonicalPayload(payload)
-    let signatureInput = try UpdateFeedCodec.signatureInput(
-      payload: canonicalPayload, keyID: UpdateFeedTrust.productionKeyID)
     let output = URL(filePath: outputPath).standardizedFileURL
-    try FileManager.default.createDirectory(
-      at: output, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
     let payloadURL = output.appending(path: "arkdeck-update-payload-v1.json")
     let inputURL = output.appending(path: "arkdeck-update-signature-input-v1.bin")
-    try canonicalPayload.write(to: payloadURL, options: [.atomic, .completeFileProtection])
-    try signatureInput.write(to: inputURL, options: [.atomic, .completeFileProtection])
-    print("payload: \(payloadURL.path)")
-    print("signature input: \(inputURL.path)")
-    print("artifact bytes: \(measurement.byteLength)")
-    print("artifact sha256: \(measurement.sha256)")
-    print("key ID: \(UpdateFeedTrust.productionKeyID)")
+    do {
+      try UpdateFeedVerifier.validateUnsignedPayloadForSigning(payload)
+      let canonicalPayload = try UpdateFeedCodec.canonicalPayload(payload)
+      let signatureInput = try UpdateFeedCodec.signatureInput(
+        payload: canonicalPayload, keyID: UpdateFeedTrust.productionKeyID)
+      try FileManager.default.createDirectory(
+        at: output, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+      try canonicalPayload.write(to: payloadURL, options: [.atomic, .completeFileProtection])
+      try signatureInput.write(to: inputURL, options: [.atomic, .completeFileProtection])
+    } catch {
+      throw updateFeedFailure(error, session, "preparing the payload")
+    }
+    // The human lines are kept verbatim rather than regenerated from the
+    // result: this is a release runbook people follow line by line, and
+    // §12 forbids changing what an existing spelling prints. The machine
+    // shape is additive.
+    guard session.isMachineOutput else {
+      print("payload: \(payloadURL.path)")
+      print("signature input: \(inputURL.path)")
+      print("artifact bytes: \(measurement.byteLength)")
+      print("artifact sha256: \(measurement.sha256)")
+      print("key ID: \(UpdateFeedTrust.productionKeyID)")
+      return
+    }
+    session.emit(
+      .object([
+        "payloadPath": .string(payloadURL.path),
+        "signatureInputPath": .string(inputURL.path),
+        "artifact": .object([
+          "url": .string(artifactURL),
+          "byteLength": .integer(Int64(measurement.byteLength)),
+          "sha256": .string(measurement.sha256),
+        ]),
+        "keyId": .string(UpdateFeedTrust.productionKeyID),
+        "sequence": .integer(Int64(sequence)),
+        "version": .string(version),
+      ]))
   }
 
-  static func assembleUpdateFeed(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
+  static func assembleUpdateFeed(
+    _ arguments: [String], spelledAs canonicalCommand: String = "maintainer.update-feed.assemble"
+  ) throws {
+    var rest = arguments
+    let session = RuntimeCLI.runtimeSession(
+      &rest, command: canonicalCommand, connectsToRuntime: false)
+    session.warnIfLegacy()
+    let options = try CLIOptions(rest)
     try options.validateAllowed(["--payload", "--signature", "--out"])
     guard let payloadPath = options.value("--payload"),
       let signaturePath = options.value("--signature"),
@@ -606,37 +743,74 @@ struct ArkDeckCommandLine {
       throw CLIError(
         exitCode: EX_USAGE, message: "assemble requires --payload, --signature and --out")
     }
-    let payload = try Data(
-      contentsOf: URL(filePath: payloadPath),
-      options: [.mappedIfSafe, .uncached])
-    let signature = try Data(
-      contentsOf: URL(filePath: signaturePath),
-      options: [.mappedIfSafe, .uncached])
-    let envelope = try UpdateFeedCodec.assemble(
-      canonicalPayload: payload,
-      signature: signature,
-      keyID: UpdateFeedTrust.productionKeyID)
-    let decoded = try UpdateFeedCodec.decodeAndVerify(
-      envelope, trust: try UpdateFeedTrust.production)
-    guard decoded.canonicalPayload == payload else {
-      throw CLIError(exitCode: 2, message: "self-verification payload mismatch")
+    let payload: Data
+    let signature: Data
+    do {
+      payload = try Data(
+        contentsOf: URL(filePath: payloadPath), options: [.mappedIfSafe, .uncached])
+    } catch {
+      throw updateFeedFailure(error, session, "reading \(payloadPath)")
+    }
+    do {
+      signature = try Data(
+        contentsOf: URL(filePath: signaturePath), options: [.mappedIfSafe, .uncached])
+    } catch {
+      throw updateFeedFailure(error, session, "reading \(signaturePath)")
+    }
+    let envelope: Data
+    do {
+      envelope = try UpdateFeedCodec.assemble(
+        canonicalPayload: payload,
+        signature: signature,
+        keyID: UpdateFeedTrust.productionKeyID)
+      let decoded = try UpdateFeedCodec.decodeAndVerify(
+        envelope, trust: try UpdateFeedTrust.production)
+      guard decoded.canonicalPayload == payload else {
+        // The envelope decodes and verifies but does not carry the bytes it
+        // was built from, which is an integrity failure rather than a bad
+        // argument: publishing it would ship a feed nobody signed.
+        throw session.fail(
+          .artifactIntegrityFailed,
+          "self-verification found the assembled feed does not carry the signed payload")
+      }
+    } catch {
+      throw updateFeedFailure(error, session, "assembling the feed")
     }
     let system = ProcessInfo.processInfo.operatingSystemVersion
-    _ = try UpdateFeedVerifier(
-      trust: try UpdateFeedTrust.production,
-      replayStore: CLIUpdateReplayStore()
-    ).verify(
-      envelope,
-      context: UpdateVerificationContext(
-        installedVersion: "0.0.0",
-        systemVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
-        architecture: "arm64"),
-      now: Date())
     let output = URL(filePath: outputPath).standardizedFileURL
-    try envelope.write(to: output, options: [.atomic, .completeFileProtection])
-    print("feed: \(output.path)")
-    print("feed sha256: \(UpdateFeedCodec.sha256(envelope))")
-    print("self-verification: valid")
+    do {
+      _ = try UpdateFeedVerifier(
+        trust: try UpdateFeedTrust.production,
+        replayStore: CLIUpdateReplayStore()
+      ).verify(
+        envelope,
+        context: UpdateVerificationContext(
+          installedVersion: "0.0.0",
+          systemVersion:
+            "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
+          architecture: "arm64"),
+        now: Date())
+      try envelope.write(to: output, options: [.atomic, .completeFileProtection])
+    } catch {
+      throw updateFeedFailure(error, session, "verifying and writing the feed")
+    }
+    // `self-verification: valid` is the only signal that the envelope,
+    // canonical payload and signature all agree, so it is a published fact
+    // rather than decoration: the machine shape has to carry it too, and the
+    // human line stays exactly as the runbook has it.
+    guard session.isMachineOutput else {
+      print("feed: \(output.path)")
+      print("feed sha256: \(UpdateFeedCodec.sha256(envelope))")
+      print("self-verification: valid")
+      return
+    }
+    session.emit(
+      .object([
+        "feedPath": .string(output.path),
+        "feedSha256": .string(UpdateFeedCodec.sha256(envelope)),
+        "keyId": .string(UpdateFeedTrust.productionKeyID),
+        "selfVerified": .bool(true),
+      ]))
   }
 
   static func measureArtifact(_ url: URL) throws -> (byteLength: UInt64, sha256: String) {
