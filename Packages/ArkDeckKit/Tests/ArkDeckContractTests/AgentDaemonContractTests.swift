@@ -443,6 +443,163 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(missingParam.error?.code, "invalidParams")
   }
 
+  /// The seam that actually keeps the host root out of the projection.
+  ///
+  /// Asserting that a hand-built publication does not contain a root proves
+  /// nothing — the root was never put in. This starts from a real
+  /// `WorkspaceProjectProfile`, which *does* hold the root and the resolved
+  /// executables with their fixed argv, runs it through the builder the daemon
+  /// uses, and checks that none of the three survive. That is the claim §7.9
+  /// makes, and it is the one that would break if the builder ever grew a
+  /// convenience field.
+  func testTheBuilderDropsTheHostRootAndExecutableFromARealProfile() throws {
+    let root = stateDirectory.appending(path: "secret-checkout", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let sleepTool = try WorkspaceExecutableIdentity.hashing(path: "/bin/sleep")
+    let inspection = try WorkspaceCommandPreset(
+      presetID: "inspect", executable: sleepTool, fixedArguments: ["0.01"], timeoutSeconds: 10)
+    let patching = try WorkspaceCommandPreset(
+      presetID: "patch", executable: sleepTool, fixedArguments: ["0.01"], timeoutSeconds: 10)
+    let build = try WorkspaceCommandPreset(
+      presetID: "release", executable: sleepTool,
+      fixedArguments: ["--secret-flag-value"], timeoutSeconds: 900)
+    let profile = try WorkspaceProjectProfile(
+      profileID: "leak-test@1", projectRef: "leak-test",
+      projectRoot: root.path, allowedFileGlobs: ["Sources/**"],
+      inspectionPreset: inspection, patchPreset: patching,
+      buildPresets: [build.presetID: build], testPresets: [:], symbolPresets: [:])
+
+    let publication = WorkspaceProjectPublication.make(
+      profile: profile, availability: { _ in .available })
+    // `.withoutEscapingSlashes` matters more than it looks: the default
+    // encoder writes `\/Users\/…`, so a `contains(root.path)` assertion could
+    // never fire for any path and the test would pass while leaking. It was
+    // written that way first, and only failed to fail when a leak was
+    // deliberately injected to check it.
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .withoutEscapingSlashes
+    let rendered = String(
+      data: try encoder.encode(
+        RuntimeControlPlaneHandler.encodeWorkspaceProject(publication)),
+      encoding: .utf8) ?? ""
+
+    XCTAssertTrue(rendered.contains("leak-test"), "the reference must be published")
+    XCTAssertTrue(rendered.contains("release"), "the preset reference must be published")
+    XCTAssertFalse(
+      rendered.contains(root.path), "the host root must never reach the projection")
+    XCTAssertFalse(
+      rendered.contains("/bin/sleep"), "the executable must never reach the projection")
+    XCTAssertFalse(
+      rendered.contains("--secret-flag-value"), "fixed argv must never reach the projection")
+    XCTAssertFalse(
+      rendered.contains(sleepTool.sha256),
+      "the pinned tool digest is host configuration, not a caller-facing reference")
+  }
+
+  /// §7.9's discovery half, and the one property it must never lose.
+  ///
+  /// The section says these leaves publish references, kinds, availability and
+  /// typed constraints and "不暴露 host root、executable、argv 或秘密". The daemon
+  /// cannot leak them here because the value it receives has nowhere to put
+  /// them — but a future projection could reintroduce the field, so the test
+  /// looks for the strings rather than for the shape.
+  func testWorkspaceDiscoveryPublishesReferencesAndNeverTheHostRootOrArgv() async throws {
+    let published = WorkspaceProjectPublication(
+      projectRef: "demo-app", kind: "primary", available: true,
+      reasonCode: nil, reason: nil,
+      allowedFileGlobs: ["entry/src/**"],
+      presets: [
+        .init(presetRef: "debug", kind: "build", timeoutSeconds: 900),
+        .init(presetRef: "unit", kind: "test", timeoutSeconds: 600),
+      ],
+      operations: [
+        .init(reference: "workspace.build-openharmony@1", available: true,
+          reasonCode: nil, reason: nil),
+        .init(reference: "workspace.inspect-git-status@1", available: false,
+          reasonCode: "workspace_preset_unavailable", reason: "workspace.presetUnavailable"),
+      ])
+    let (handler, _) = try makeStack(workspaceProjects: [published])
+
+    let listed = try await request(handler, method: "workspace.project.list")
+    XCTAssertTrue(listed.ok)
+    let rendered = String(
+      data: try JSONEncoder().encode(listed.result ?? .null), encoding: .utf8) ?? ""
+    XCTAssertTrue(rendered.contains("demo-app"), "the reference is the point of the projection")
+    XCTAssertTrue(rendered.contains("debug"), "preset refs are published")
+
+    // An unavailable operation says why, so a caller learns what to install
+    // rather than that the project is simply broken.
+    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first,
+      case .array(let operations)? = row["operations"]
+    else { return XCTFail("the projection must carry its operations") }
+    let unavailable = operations.compactMap { value -> [String: JSONValue]? in
+      guard case .object(let fields) = value,
+        fields["availability"] == .string("unavailable")
+      else { return nil }
+      return fields
+    }
+    XCTAssertEqual(unavailable.count, 1)
+    XCTAssertEqual(unavailable.first?["reasonCode"], .string("workspace_preset_unavailable"))
+  }
+
+  /// §7.9: an unknown reference is `workspaceReferenceNotFound`, which is not
+  /// `notFound`. The two send a caller somewhere different — one to a
+  /// different identity, the other to `workspace project list`.
+  func testAnUnregisteredWorkspaceReferenceHasItsOwnCode() async throws {
+    let (handler, _) = try makeStack(workspaceProjects: [
+      WorkspaceProjectPublication(
+        projectRef: "demo-app", kind: "primary", available: true, reasonCode: nil, reason: nil,
+        allowedFileGlobs: [], presets: [.init(presetRef: "debug", kind: "build",
+          timeoutSeconds: 900)],
+        operations: [])
+    ])
+    let unknownProject = try await request(
+      handler, method: "workspace.project.show", params: ["projectRef": .string("nope")])
+    XCTAssertFalse(unknownProject.ok)
+    XCTAssertEqual(unknownProject.error?.code, "workspaceReferenceNotFound")
+
+    let unknownPreset = try await request(
+      handler, method: "workspace.preset.show",
+      params: ["projectRef": .string("demo-app"), "presetRef": .string("nope")])
+    XCTAssertFalse(unknownPreset.ok)
+    XCTAssertEqual(unknownPreset.error?.code, "workspaceReferenceNotFound")
+
+    // The kind filter is a closed set; a value outside it is a bad argument
+    // rather than an empty list, which would read as "this project has none".
+    let badKind = try await request(
+      handler, method: "workspace.preset.list",
+      params: ["projectRef": .string("demo-app"), "kind": .string("sideways")])
+    XCTAssertFalse(badKind.ok)
+    XCTAssertEqual(badKind.error?.code, "invalidParams")
+
+    let filtered = try await request(
+      handler, method: "workspace.preset.list",
+      params: ["projectRef": .string("demo-app"), "kind": .string("test")])
+    XCTAssertTrue(filtered.ok)
+    guard case .array(let rows)? = filtered.result else {
+      return XCTFail("the preset list must be an array")
+    }
+    XCTAssertTrue(rows.isEmpty, "no test preset is registered, and that is not an error")
+  }
+
+  /// A project the daemon was configured with and could not resolve is
+  /// published, not omitted. An empty list would mean both "nothing
+  /// configured" and "configured but unusable", and only the second is
+  /// something an operator can act on.
+  func testAnUnresolvedWorkspaceProjectIsPublishedWithItsReason() async throws {
+    let (handler, _) = try makeStack(workspaceProjects: [
+      .unresolved(projectRef: "second-app", reason: "only the active project gets a profile")
+    ])
+    let listed = try await request(handler, method: "workspace.project.list")
+    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first else {
+      return XCTFail("the unresolved project must still be listed")
+    }
+    XCTAssertEqual(row["projectRef"], .string("second-app"))
+    XCTAssertEqual(row["availability"], .string("unavailable"))
+    XCTAssertEqual(row["kind"], .null, "it never resolved, so it has no kind")
+    XCTAssertNotNil(row["reason"], "an operator needs to know why")
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
@@ -454,6 +611,7 @@ final class AgentDaemonContractTests: XCTestCase {
     rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
+    workspaceProjects: [WorkspaceProjectPublication] = [],
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
@@ -496,6 +654,7 @@ final class AgentDaemonContractTests: XCTestCase {
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
       rockchipDeviceAccessObserver: rockchipDeviceAccessObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
+      workspaceProjects: workspaceProjects,
       methodObserver: nil)
     return (handler, engine)
   }

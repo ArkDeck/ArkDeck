@@ -442,6 +442,11 @@ Task.detached {
           guard parts.count == 2, !parts[0].isEmpty, parts[1].hasPrefix("/") else { return nil }
           return (parts[0], parts[1])
         })
+    // What `workspace project list` will publish. Every configured ref lands
+    // here — resolved or not — because an empty list would mean both "nothing
+    // configured" and "configured but unusable", and the second is the one an
+    // operator has to be able to see.
+    var workspaceProjectPublications: [WorkspaceProjectPublication] = []
     let configuredInspector = ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_INSPECTOR"]
     let signingPresetStore = OpenHarmonySigningPresetStore()
     let signingAttemptStore = try OpenHarmonySigningAttemptStore(
@@ -542,6 +547,14 @@ Task.detached {
           isolationManager: evolution, nowUTC: utcNow)
         workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
         workspaceRepairConfiguration = (profile, profiles, attempts, evolution)
+        // §7.9's discovery projection, built where the profile and the provider
+        // are both in scope. Availability comes from the provider so discovery
+        // and admission cannot disagree.
+        let resolvedProvider = workspaceOperations
+        workspaceProjectPublications.append(
+          WorkspaceProjectPublication.make(
+            profile: profile,
+            availability: { resolvedProvider.runtimeAvailability(for: $0) }))
       } catch {
         workspaceOperations = UnavailableWorkspaceOperationsProvider(
           reason: "workspace.projectProfileUnavailable:\(error)")
@@ -560,6 +573,15 @@ Task.detached {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
+    }
+    for configuredRef in workspaceRoots.keys.sorted()
+    where !workspaceProjectPublications.contains(where: { $0.projectRef == configuredRef }) {
+      workspaceProjectPublications.append(
+        WorkspaceProjectPublication.unresolved(
+          projectRef: configuredRef,
+          reason: configuredRef == activeProjectRef
+            ? "this project is active but its profile could not be derived"
+            : "only the active project gets a derived profile in this build"))
     }
     let workspaceReferenceLedger = WorkspaceReferenceLedgerHandle()
     if let evolution = workspaceRepairConfiguration?.evolution {
@@ -905,7 +927,8 @@ Task.detached {
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
-      debugInvocationController: debugInvocationController)
+      debugInvocationController: debugInvocationController,
+      workspaceProjects: workspaceProjectPublications)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)
     switch try server.start() {

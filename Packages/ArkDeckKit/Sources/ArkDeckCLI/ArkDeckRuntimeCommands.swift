@@ -2760,6 +2760,44 @@ params))
     }
   }
 
+  /// §7.9's `workspace project|preset list|show`.
+  ///
+  /// Read-only, and deliberately separate from the domain layer: these submit
+  /// no operation and map to no Catalog reference. What they publish is the
+  /// daemon's current registered configuration — references, kinds,
+  /// availability and typed constraints — and never a host root, an
+  /// executable or its arguments.
+  static func runWorkspaceDiscovery(_ group: String, _ arguments: [String]) throws {
+    guard let verb = arguments.first, !verb.hasPrefix("-") else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "missing workspace \(group) subcommand (list|show)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let session = runtimeSession(&rest, command: "workspace.\(group).\(verb)")
+    let options = try CLIOptions(rest)
+    var params: [String: JSONValue] = [:]
+    if let projectRef = options.value("--project") {
+      params["projectRef"] = .string(projectRef)
+    }
+    if let presetRef = options.value("--preset") { params["presetRef"] = .string(presetRef) }
+    if let kind = options.value("--kind") { params["kind"] = .string(kind) }
+
+    switch (group, verb) {
+    case ("project", "list"):
+      session.emit(try session.request("workspace.project.list"))
+    case ("project", "show"), ("preset", "list"), ("preset", "show"):
+      guard params["projectRef"] != nil else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "workspace \(group) \(verb) requires --project <ref>")
+      }
+      session.emit(try session.request("workspace.\(group).\(verb)", params))
+    default:
+      throw CLIError(
+        exitCode: EX_USAGE, message: "unsupported workspace \(group) subcommand \(verb)")
+    }
+  }
+
   static func emitJobWait(_ arguments: [String], session: CLIRuntimeSession) throws {
     let options = try CLIOptions(arguments)
     guard let jobID = options.value("--job") else {

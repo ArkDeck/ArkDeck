@@ -85,6 +85,9 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
       "conflict": .resourceConflict,
       "notFound": .resourceNotFound,
       "recordUnreadable": .recordUnreadable,
+      // §7.9's own code: a reference that is not registered on this host, as
+      // distinct from a durable record that does not exist.
+      "workspaceReferenceNotFound": .workspaceReferenceNotFound,
     ]
     for (wire, code) in expected {
       // The mapping must not depend on the method: these are unambiguous.
