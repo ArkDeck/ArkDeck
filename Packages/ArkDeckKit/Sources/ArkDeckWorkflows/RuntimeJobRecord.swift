@@ -60,6 +60,9 @@ public struct RuntimeScreenSequence: Codable, Sendable, Equatable {
 public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let jobID: String
   public let request: RuntimeOperationRequest
+  /// Exact caller intent before Runtime-owned authorization is materialized.
+  /// The admission index hashes this request, not the execution request above.
+  package var originalSubmissionRequest: RuntimeOperationRequest?
   public let operationReference: String
   public let catalogDigest: String
   public let providerID: String
@@ -100,6 +103,36 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public var outstandingResidueCount: Int?
 
   public var sessionID: String { "session-\(jobID)" }
+
+  /// Authorization enrichment must not make an unchanged Artifact input look
+  /// corrupt. Every accepted reconstruction still matches the original durable
+  /// fingerprint and all execution fields except the Runtime authorization.
+  func hasVerifiedSubmissionFingerprint(_ fingerprint: String) -> Bool {
+    do {
+      let submitted: RuntimeOperationRequest
+      if let originalSubmissionRequest {
+        submitted = originalSubmissionRequest
+      } else if SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(request)) == fingerprint {
+        return true
+      } else {
+        // Older Runtime records did not keep the pre-authorization request.
+        // Only an exact hash match proves that its authorization was absent;
+        // never discard an input, identity, output request or caller context.
+        submitted = try RuntimeOperationRequest(
+          requestID: request.requestID, idempotencyKey: request.idempotencyKey,
+          target: request.target, operation: request.operation, inputs: request.inputs,
+          requestedOutputs: request.requestedOutputs, authorization: nil,
+          clientContext: request.clientContext)
+      }
+      guard SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(submitted)) == fingerprint else { return false }
+      let execution = try RuntimeOperationRequest(
+        requestID: submitted.requestID, idempotencyKey: submitted.idempotencyKey,
+        target: submitted.target, operation: submitted.operation, inputs: submitted.inputs,
+        requestedOutputs: submitted.requestedOutputs, authorization: request.authorization,
+        clientContext: submitted.clientContext)
+      return execution == request
+    } catch { return false }
+  }
 
   func persist(into directory: URL) throws {
     try DurableFileWriter.createOrReplaceAtomically(

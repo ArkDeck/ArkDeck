@@ -67,8 +67,7 @@ extension RuntimeAdmissionService {
         let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data),
         record.jobID == persisted.jobID, record.state == persisted.state,
         record.request.idempotencyKey == persisted.idempotencyKey,
-        let canonicalRequest = try? CanonicalJSONEncoders.canonical().encode(record.request),
-        SHA256Hex.string(of: canonicalRequest) == persisted.requestHash,
+        record.hasVerifiedSubmissionFingerprint(persisted.requestHash),
         record.createdAtUTC == persisted.createdAtUTC, persisted.version > 0 else {
         throw AgentExecutionControlFailure("recordUnreadable", "Job references cannot be verified from durable history")
       }

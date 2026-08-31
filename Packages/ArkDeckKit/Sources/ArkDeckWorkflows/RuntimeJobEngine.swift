@@ -1503,6 +1503,7 @@ public actor RuntimeJobEngine {
         materializedStableTargetIdentitySHA256:
           materialized.stableTargetIdentitySHA256,
         materializedBindingRevision: materialized.bindingRevision)
+      record.originalSubmissionRequest = request
       record.state = JobState.preflight.rawValue
       record.timeline = ["jobCreated", "queued->preflight"]
       if let recovery = preparedAuthorization.completeOverwriteRecovery {

@@ -270,4 +270,44 @@ final class ImportLifecycleContractTests: XCTestCase {
       do { _ = try await store.resolveLease(release.lease); XCTFail("released input revived") } catch { }
     }
   }
+
+  func testAuthorizedJobKeepsOriginalInputFingerprintAcrossRestartAndLegacyRecords() async throws {
+    let imported = try await imported(); let engine = try engine()
+    let accepted = try await engine.submit(request(imported, hap: true))
+    let repository = try RuntimeJobRepository(stateDirectory: root.appending(path: "engine"))
+    let saved = try XCTUnwrap(repository.job(jobID: accepted.jobID))
+    let original = try XCTUnwrap(saved.initialRecordData)
+    let record = try JSONDecoder().decode(RuntimeJobRecord.self, from: original)
+    XCTAssertNotNil(record.request.authorization)
+    XCTAssertNotNil(record.originalSubmissionRequest)
+    XCTAssertNil(record.originalSubmissionRequest?.authorization)
+    XCTAssertTrue(record.hasVerifiedSubmissionFingerprint(saved.requestHash))
+    await conflict { _ = try await engine.releaseImport(id: imported.id, generation: 2) }
+
+    var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+    legacy.removeValue(forKey: "originalSubmissionRequest")
+    let legacyBytes = try JSONSerialization.data(withJSONObject: legacy)
+    let oldRecord = try JSONDecoder().decode(RuntimeJobRecord.self, from: legacyBytes)
+    XCTAssertTrue(oldRecord.hasVerifiedSubmissionFingerprint(saved.requestHash), "an exact hash proves the older pre-authorization request")
+    try repository.updateJobState(jobID: accepted.jobID, state: saved.state, updatedAtUTC: saved.updatedAtUTC, recordData: legacyBytes)
+    await conflict { _ = try await engine.releaseImport(id: imported.id, generation: 2) }
+
+    for field in ["request", "originalSubmissionRequest"] {
+      var corrupt = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var intent = try XCTUnwrap(corrupt[field] as? [String: Any])
+      var inputs = try XCTUnwrap(intent["inputs"] as? [String: Any])
+      inputs["hapArtifactLease"] = "lease-v1:unrelated:ART-00000000000000000000000000000000"
+      intent["inputs"] = inputs; corrupt[field] = intent
+      let bytes = try JSONSerialization.data(withJSONObject: corrupt)
+      try repository.updateJobState(jobID: accepted.jobID, state: saved.state, updatedAtUTC: saved.updatedAtUTC, recordData: bytes)
+      do { _ = try await engine.releaseImport(id: imported.id, generation: 2); XCTFail("altered \(field) bypassed the input hash") }
+      catch let failure as AgentExecutionControlFailure { XCTAssertEqual(failure.code, "recordUnreadable") }
+    }
+    try repository.updateJobState(jobID: accepted.jobID, state: saved.state, updatedAtUTC: saved.updatedAtUTC, recordData: original)
+    let restarted = try self.engine()
+    _ = try await restarted.recoverActiveJobs()
+    try await restarted.requestCancel(jobID: accepted.jobID)
+    _ = try await restarted.releaseImport(id: imported.id, generation: 2)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
 }

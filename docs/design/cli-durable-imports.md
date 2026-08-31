@@ -53,6 +53,14 @@ Artifact identity/digest, target, lease and generation 2. It survives lost outpu
 and daemon restart without another Artifact or pin. Imports create no Job records
 and do not appear in Job history or evidence.
 
+Job admission preserves the original submission separately from the execution
+request enriched with Runtime-owned authorization. Reference checks verify the
+original admission fingerprint and require every non-authorization field to
+remain equal. For older records without that submission, removing authorization
+is accepted only when the complete reconstructed request exactly matches the
+durable fingerprint. Altered inputs, identity or other intent fields still fail
+closed; no hash check or capability check is skipped.
+
 Workspace patches retain their exact validated source bytes and are marked
 `sensitive`; they are not diagnostic text to redact. Existing public binary
 publication restrictions and sensitive read/export policy remain intact.
