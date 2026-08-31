@@ -50,6 +50,10 @@ enum CLIControlMethodRegistry {
     "device.observations",
     "target.list",
     "target.show",
+    "agent.status",
+    "agent.list",
+    "human-action.list",
+    "human-action.show",
     // Read the registered configuration and report. They create nothing and
     // touch no device, so an ambiguous failure from one is a plain failure.
     "workspace.project.list",
@@ -99,6 +103,10 @@ enum CLIControlMethodRegistry {
   /// have left staging state that only the import's own status can settle.
   private static let mutationCapableMethods: Set<String> = [
     "target.adopt",
+    "agent.run",
+    "agent.resume",
+    "agent.abandon",
+    "human-action.resume",
     "flash.bind-current-loader",
     "debug.start",
     "debug.evaluate",
@@ -187,7 +195,9 @@ enum CLIControlFailureMapper {
   ) -> CLIErrorCode {
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",
-      "operationUnavailable":
+      "operationUnavailable", "inputTooLarge", "invalidCursor", "idempotencyConflict",
+      "reviewedPlanMismatch", "resourceNotFound", "humanActionExpired", "orchestrationBudgetExpired",
+      "orchestrationClockUntrusted", "bindingRevisionStale":
       // Target adoption's named refusals carry proof from its Runtime owner.
       // A legacy or malformed reply without that proof remains ambiguous.
       if evidence.provesZeroDispatchBeforeAdmission, let code = CLIErrorCode(rawValue: wireCode) {

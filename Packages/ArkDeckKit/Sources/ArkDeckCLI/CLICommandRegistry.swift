@@ -495,7 +495,7 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, artifactNode, agentNode, capabilityNode, recoveryNode, screenNode, inputNode,
+    jobNode, artifactNode, agentNode, humanActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
     flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
@@ -1367,6 +1367,32 @@ enum CLICommandRegistry {
     summary: "exact artifact identity",
     isRequired: true)
 
+  private static let executionIDOption = CLIOptionSpec(
+    name: "--execution-id", form: .value(placeholder: "id", grammar: .opaque),
+    summary: "caller-stable durable execution identity")
+
+  private static let targetProtocolOption = CLIOptionSpec(
+    name: "--require-protocol", form: .value(placeholder: "2", grammar: .enumeration(["2"])),
+    summary: "use Runtime-owned v2 resources; never downgrade")
+
+  private static let generationOption = CLIOptionSpec(
+    name: "--expected-generation", form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
+    summary: "exact current generation; drift refuses the mutation", isRequired: true)
+
+  private static let snapshotPageOptions: [CLIOptionSpec] = [
+    CLIOptionSpec(name: "--page-size", form: .value(placeholder: "100", grammar: .positiveInteger(1...1000)),
+      summary: "maximum items in a fixed snapshot page"),
+    CLIOptionSpec(name: "--cursor", form: .value(placeholder: "opaque-cursor", grammar: .opaque),
+      summary: "continue the same immutable query and page size"),
+  ]
+
+  private static let physicalSelectionOptions: [CLIOptionSpec] = [
+    CLIOptionSpec(name: "--selection", form: .value(placeholder: "value", grammar: .opaque),
+      summary: "opaque selection published by the exact action"),
+    CLIOptionSpec(name: "--selection-file", form: .value(placeholder: "path|-", grammar: .opaque),
+      summary: "typed JSON selection from a bounded UTF-8 document"),
+  ]
+
   private static let agentNode = CLINodeSpec(
     token: "agent",
     summary: "high-level typed execution entry for an external agent",
@@ -1375,51 +1401,78 @@ enum CLICommandRegistry {
         token: "run",
         canonicalCommand: "agent.run",
         summary: "discovery, binding, submit, run, evidence and artifact inventory",
-        options: runtimeClientOptions([
-          CLIOptionSpec(
-            name: "--operation",
-            form: .value(placeholder: "id@version", grammar: .opaque),
-            summary: "exact published operation reference",
-            isRequired: true),
-          CLIOptionSpec(
-            name: "--target",
-            form: .value(placeholder: "target-id", grammar: .opaque),
-            summary: "durable target; omitted lets typed discovery choose"),
-          CLIOptionSpec(
-            name: "--inputs-file",
-            form: .value(placeholder: "path", grammar: .opaque),
-            summary: "typed operation inputs"),
+        options: runtimeClientOptions(jobRequestOptions + [
+          executionIDOption, targetProtocolOption, waitTimeoutOption,
+          CLIOptionSpec(name: "--maximum-wait",
+            form: .value(placeholder: "5m", grammar: .duration(maximumMilliseconds: 86_400_000)),
+            summary: "durable orchestration deadline, including HAR and restart; default 5m"),
           CLIOptionSpec(
             name: "--capability",
             form: .value(placeholder: "CAP-RT-...", grammar: .opaque),
             summary: "reference to an existing Runtime capability; never a document"),
-          CLIOptionSpec(
-            name: "--execution-id",
-            form: .value(placeholder: "id", grammar: .opaque),
-            summary: "caller-stable execution identity for safe re-entry"),
+          CLIOptionSpec(name: "--reviewed-plan-digest", form: .value(placeholder: "sha256", grammar: .opaque),
+            summary: "immutable reviewed-plan precondition; never authority"),
         ]),
+        mutuallyExclusive: requestFileExclusions + [["--request-file", "--capability"], ["--request-file", "--reviewed-plan-digest"]],
+        requiresExactlyOneOf: [["--request-file", "--operation"]],
         connectsToRuntime: true),
+      CLILeafSpec(token: "status", canonicalCommand: "agent.status",
+        summary: "read a Runtime execution, including its pre-Job human action",
+        options: runtimeClientOptions([executionIDOption, waitTimeoutOption, targetProtocolOption]),
+        requiresExactlyOneOf: [["--execution-id"]], connectsToRuntime: true),
+      CLILeafSpec(token: "list", canonicalCommand: "agent.list", summary: "rediscover durable executions without disclosing inputs or selection",
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
+          CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration([
+            "orchestrating", "waitingForHuman", "creatingJob", "jobOwned", "completed", "failed", "abandoned", "budgetExpired", "clockUntrusted"])),
+            summary: "filter persisted execution state"),
+          CLIOptionSpec(name: "--operation", form: .value(placeholder: "id@version", grammar: .opaque), summary: "filter exact operation reference"),
+          CLIOptionSpec(name: "--target", form: .value(placeholder: "id", grammar: .opaque), summary: "filter resolved durable target"),
+        ]), connectsToRuntime: true),
+      CLILeafSpec(token: "abandon", canonicalCommand: "agent.abandon", summary: "abandon pre-Job orchestration; never cancel a Job",
+        options: runtimeClientOptions([executionIDOption, generationOption, waitTimeoutOption, targetProtocolOption]),
+        requiresExactlyOneOf: [["--execution-id"]], connectsToRuntime: true),
       CLILeafSpec(
         token: "resume",
         canonicalCommand: "agent.resume",
         summary: "resume an execution paused for typed physical assistance",
-        options: runtimeClientOptions([
+        options: runtimeClientOptions(physicalSelectionOptions + [targetProtocolOption, waitTimeoutOption,
           CLIOptionSpec(
             name: "--resume-token",
             form: .value(placeholder: "token", grammar: .opaque),
-            summary: "token published by the paused execution",
-            isRequired: true),
-          CLIOptionSpec(
-            name: "--selection",
-            form: .value(placeholder: "value", grammar: .opaque),
-            summary: "typed selection the human action asked for"),
+            summary: "legacy token; with protocol 2, an exact-value alias of resume-reference"),
+          CLIOptionSpec(name: "--resume-reference", form: .value(placeholder: "ref", grammar: .opaque),
+            summary: "exact Runtime-owned physical-assistance reference"),
         ]),
+        mutuallyExclusive: [["--selection", "--selection-file"]],
+        requiresExactlyOneOf: [["--resume-reference", "--resume-token"]],
         connectsToRuntime: true),
       CLILeafSpec(
         token: "chat",
         canonicalCommand: "agent.chat",
         summary: "retired: ArkDeck holds no model of its own",
         kind: .tombstone(.replacedBy("arkdeck agent run"))),
+    ])
+
+  private static let humanActionIDOption = CLIOptionSpec(
+    name: "--human-action", form: .value(placeholder: "id", grammar: .opaque),
+    summary: "exact Runtime-owned human action", isRequired: true)
+
+  private static let humanActionNode = CLINodeSpec(
+    token: "human-action", summary: "Runtime-owned typed physical assistance; never an impact approval",
+    leaves: [
+      CLILeafSpec(token: "list", canonicalCommand: "human-action.list", summary: "list persisted AgentExecution physical actions",
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
+          CLIOptionSpec(name: "--owner-kind", form: .value(placeholder: "agentExecution", grammar: .enumeration(["agentExecution"])),
+            summary: "published owner kind; must be paired with --owner"),
+          CLIOptionSpec(name: "--owner", form: .value(placeholder: "id", grammar: .opaque), summary: "exact owner identity"),
+        ]), connectsToRuntime: true),
+      CLILeafSpec(token: "show", canonicalCommand: "human-action.show", summary: "read exact action, selection schema, expiry and resume reference",
+        options: runtimeClientOptions([humanActionIDOption, waitTimeoutOption, targetProtocolOption]), connectsToRuntime: true),
+      CLILeafSpec(token: "resume", canonicalCommand: "human-action.resume", summary: "probe the exact physical assistance and continue its original owner",
+        options: runtimeClientOptions(physicalSelectionOptions + [humanActionIDOption, waitTimeoutOption, targetProtocolOption,
+          CLIOptionSpec(name: "--resume-reference", form: .value(placeholder: "ref", grammar: .opaque),
+            summary: "exact reference returned by this action", isRequired: true),
+        ]), mutuallyExclusive: [["--selection", "--selection-file"]], connectsToRuntime: true),
     ])
 
   private static let capabilityNode = CLINodeSpec(

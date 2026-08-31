@@ -29,7 +29,12 @@ final class APIBaselineGateContractTests: XCTestCase {
     let output = Pipe()
     let process = Process()
     process.executableURL = URL(filePath: "/usr/bin/xcrun")
-    process.arguments = ["swift", "build", "--arch", "arm64", "--package-path", baseline.path]
+    // The baseline is a nested consumer with its own build plan. Reusing that
+    // plan can omit newly added files in its local ArkDeckKit dependency even
+    // though the main package has rebuilt. Re-plan the inputs, while retaining
+    // compiled artifacts and every external-consumer API assertion.
+    process.arguments = ["swift", "build", "--arch", "arm64", "--package-path", baseline.path,
+      "--disable-build-manifest-caching"]
     process.standardOutput = output
     process.standardError = output
     try process.run()

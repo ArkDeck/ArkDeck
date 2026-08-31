@@ -82,6 +82,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
   private let targetObservations: TargetObservationCoordinator?
+  private let agentExecutions: RuntimeAgentExecutionCoordinator?
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
@@ -117,6 +118,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     targetStore: RuntimeTargetStore? = nil,
     bootstrap: DeviceBootstrapMachine? = nil,
     targetObservations: TargetObservationCoordinator? = nil,
+    agentExecutions: RuntimeAgentExecutionCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
@@ -135,6 +137,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providerIDs, nowUTC: nowUTC,
       targetStore: targetStore, bootstrap: bootstrap, targetObservations: targetObservations,
+      agentExecutions: agentExecutions,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
@@ -159,6 +162,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     targetStore: RuntimeTargetStore?,
     bootstrap: DeviceBootstrapMachine?,
     targetObservations: TargetObservationCoordinator? = nil,
+    agentExecutions: RuntimeAgentExecutionCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     artifactStore: RuntimeArtifactStore?,
     flashBundleImportDirectory: URL?,
@@ -181,6 +185,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.targetStore = targetStore
     self.bootstrap = bootstrap
     self.targetObservations = targetObservations
+    self.agentExecutions = agentExecutions
     self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
@@ -256,6 +261,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private func dispatch(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
     methodObserver?(request.method)
     switch request.method {
+    case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.list", "human-action.show", "human-action.resume":
+      return await agentExecutionRequest(request)
     case "health":
       if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
         guard request.params == nil || request.params?.isEmpty == true else {
@@ -2447,6 +2454,145 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   // MARK: device observations (§6.1, §8.5)
+
+  private func agentExecutionRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion, let agentExecutions else {
+      return failure(id: request.id, code: .unknownMethod, message: "Runtime execution resources require the published target protocol")
+    }
+    let fields = request.params ?? [:]
+    func string(_ key: String) throws -> String {
+      guard case .string(let value)? = fields[key], AgentExecutionIntent.validIdentifier(value) else {
+        throw AgentExecutionControlFailure("invalidInput", "\(key) must be a bounded resource identity")
+      }
+      return value
+    }
+    func exact(_ keys: Set<String>, optional: Set<String> = []) throws {
+      guard keys.isSubset(of: Set(fields.keys)), Set(fields.keys).isSubset(of: keys.union(optional)) else {
+        throw AgentExecutionControlFailure("invalidInput", "request fields do not match the closed method contract")
+      }
+    }
+    do {
+      let result: JSONValue
+      switch request.method {
+      case "agent.run": result = try await agentExecutions.run(fields)
+      case "agent.status":
+        try exact(["executionId"])
+        result = try await agentExecutions.status(string("executionId"))
+      case "agent.abandon":
+        try exact(["executionId", "expectedGeneration"])
+        let text = try string("expectedGeneration")
+        guard let generation = Int64(text), generation > 0, String(generation) == text else {
+          throw AgentExecutionControlFailure("invalidInput", "expectedGeneration must be a positive canonical decimal string")
+        }
+        result = try await agentExecutions.abandon(string("executionId"), expectedGeneration: generation)
+      case "agent.resume", "human-action.resume":
+        try exact(request.method == "agent.resume" ? ["resumeReference"] : ["resumeReference", "humanAction"], optional: ["selection"])
+        result = try await agentExecutions.resume(
+          reference: string("resumeReference"),
+          actionID: request.method == "human-action.resume" ? try string("humanAction") : nil,
+          selection: fields["selection"])
+      case "human-action.show":
+        try exact(["humanAction"])
+        result = try await agentExecutions.humanAction(string("humanAction"))
+      case "agent.list", "human-action.list":
+        let filterKeys: Set<String> = request.method == "agent.list" ? ["state", "operation", "target"] : ["ownerKind", "owner"]
+        try exact([], optional: filterKeys.union(["pageSize", "cursor"]))
+        let size: Int
+        if let value = fields["pageSize"] {
+          guard case .integer(let number) = value, (1...1000).contains(number) else {
+            throw AgentExecutionControlFailure("invalidInput", "pageSize must be between 1 and 1000")
+          }
+          size = Int(number)
+        } else { size = 100 }
+        let cursor: String?
+        if let value = fields["cursor"] {
+          guard case .string(let text) = value, text.utf8.count <= 256 else {
+            throw AgentExecutionControlFailure("invalidCursor", "cursor must be a bounded opaque string")
+          }
+          cursor = text
+        } else { cursor = nil }
+        let filters = fields.filter { filterKeys.contains($0.key) }
+        result = request.method == "agent.list"
+          ? try await agentExecutions.list(filters: filters, pageSize: size, cursor: cursor)
+          : try await agentExecutions.humanActions(filters: filters, pageSize: size, cursor: cursor)
+      default: return failure(id: request.id, code: .unknownMethod, message: "unknown execution method")
+      }
+      let executionMethods: Set<String> = ["agent.run", "agent.status", "agent.resume", "human-action.resume"]
+      return success(id: request.id, result: executionMethods.contains(request.method)
+        ? try await executionResultProjection(result) : result)
+    } catch let error as AgentExecutionControlFailure {
+      var details = error.details
+      // These named owner refusals occur before any new Job admission or
+      // dispatch in this invocation. Store/transport/internal failures do not
+      // receive this proof, since a durable publication may already exist.
+      if ["invalidInput", "inputTooLarge", "invalidCursor", "idempotencyConflict", "reviewedPlanMismatch",
+        "resourceConflict", "resourceNotFound", "operationUnavailable", "humanActionExpired",
+        "orchestrationBudgetExpired", "orchestrationClockUntrusted", "bindingRevisionStale", "admissionDenied"
+      ].contains(error.code) {
+        details["phase"] = .string("preAdmission")
+        details["newDispatchCount"] = .integer(0)
+      }
+      return AgentWireProtocol.Response(
+        id: request.id, ok: false, result: nil,
+        error: .init(code: error.code, message: error.message, details: details))
+    } catch let error as RuntimeJobEngineError {
+      switch error {
+      case .rejected(.invalidInput, _), .rejected(.invalidRequest, _):
+        return AgentWireProtocol.Response(id: request.id, ok: false, result: nil,
+          error: .init(code: "invalidInput", message: "typed operation inputs were rejected", details: [
+            "phase": .string("preAdmission"), "newDispatchCount": .integer(0),
+          ]))
+      default: return failure(id: request.id, code: .internalError, message: "execution could not be advanced; inspect the exact owner")
+      }
+    } catch {
+      return failure(id: request.id, code: .internalError, message: "execution resource could not be read or advanced; inspect the exact owner")
+    }
+  }
+
+  private func executionResultProjection(_ value: JSONValue) async throws -> JSONValue {
+    guard case .object(var fields) = value, case .string(let jobID)? = fields["jobId"] else { return value }
+    let job = try await engine.status(jobID: jobID)
+    fields["jobState"] = .string(job.state)
+    fields["outcomeUnknown"] = .bool(job.outcomeUnknown)
+    let terminal = JobState(rawValue: job.state)?.isTerminal == true
+    fields["state"] = .string(terminal ? "completed" : "jobOwned")
+    var next: [String: JSONValue] = [
+      "kind": .string(job.outcomeUnknown ? "reconcile" : terminal ? "readResult" : "wait"),
+      "owner": .object(["kind": .string("job"), "id": .string(jobID)]),
+      "resource": .object(["kind": .string("job"), "id": .string(jobID)]),
+      "reasonCode": .string(job.outcomeUnknown ? "recovery.outcomeUnknown" : terminal ? "job.resultAvailable" : "job.running"),
+    ]
+    if !job.outcomeUnknown && !terminal { next["retryAfter"] = .string("250ms") }
+    fields["nextAction"] = .object(next)
+    fields["job"] = .object([
+      "jobId": .string(jobID), "state": .string(job.state), "outcome": .string(job.outcomeUnknown ? "outcomeUnknown" : job.state),
+      "outcomeUnknown": .bool(job.outcomeUnknown), "waitingForHuman": .bool(job.waitingForHuman),
+      "outstandingResidueCount": job.outstandingResidueCount.map { .integer(Int64($0)) } ?? .null,
+    ])
+    guard JobState(rawValue: job.state)?.isTerminal == true else { return .object(fields) }
+    let snapshot = try await engine.evidenceSnapshot(jobID: jobID)
+    var artifacts: [RuntimeVerifiedArtifactEvidence] = []
+    var blockers: [String] = []
+    let declaresNoArtifacts = RuntimeOperationCatalog.descriptor(reference: snapshot.operationReference)?.artifacts.isEmpty == true
+    if let artifactStore {
+      do {
+        let inventory = try await artifactStore.list(jobID: jobID)
+        if !declaresNoArtifacts || !inventory.isEmpty {
+          let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: jobID)
+          artifacts = try await artifactStore.verifiedEvidenceArtifacts(jobID: jobID, intentionallyOmittedNames: omitted)
+        }
+      } catch { blockers.append("artifactIntegrityFailed") }
+    } else if !declaresNoArtifacts { blockers.append("artifactStoreUnavailable") }
+    if case .object(var evidence) = Self.encodeEvidence(snapshot: snapshot, artifacts: artifacts, blockers: blockers) {
+      // Automatic Agent results disclose evidence identities, never original
+      // inputs or unbounded probe detail. Sensitive bytes still require export.
+      for key in ["parameters", "traceProbeBefore", "traceProbeAfter"] { evidence.removeValue(forKey: key) }
+      evidence["status"] = .string(blockers.isEmpty ? "verified" : "blocked")
+      fields["evidence"] = .object(evidence)
+      fields["artifacts"] = evidence["artifacts"]
+    }
+    return .object(fields)
+  }
 
   private func targetObservationRequest(
     _ request: AgentWireProtocol.Request, adopting: Bool

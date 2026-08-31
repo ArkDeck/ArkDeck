@@ -8,6 +8,6 @@ package enum ArkDeckControlProtocol {
   package static let bootstrapVersion = "arkdeck.control.negotiation/1"
   package static let bootstrapMethod = "protocol.negotiate"
   package static let maximumBootstrapFrameBytes = 65536
-  package static let targetMethods: Set<String> = ["device.observations", "health", "target.adopt"]
+  package static let targetMethods: Set<String> = ["agent.abandon", "agent.list", "agent.resume", "agent.run", "agent.status", "device.observations", "health", "human-action.list", "human-action.resume", "human-action.show", "target.adopt"]
   package static let preBootstrapLegacyMethods: Set<String> = ["health"]
 }

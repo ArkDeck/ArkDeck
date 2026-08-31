@@ -6,6 +6,6 @@
   "bootstrapVersion": "arkdeck.control.negotiation/1",
   "bootstrapMethod": "protocol.negotiate",
   "maximumBootstrapFrameBytes": 65536,
-  "targetMethods": ["device.observations", "health", "target.adopt"],
+  "targetMethods": ["agent.abandon", "agent.list", "agent.resume", "agent.run", "agent.status", "device.observations", "health", "human-action.list", "human-action.resume", "human-action.show", "target.adopt"],
   "preBootstrapLegacyMethods": ["health"]
 }
