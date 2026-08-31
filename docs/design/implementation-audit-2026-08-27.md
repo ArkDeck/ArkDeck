@@ -1834,3 +1834,71 @@ the sidebar.`），旧富空态两边都没有。**本批不产生新的 P-DRIFT
 
 **至此 F60 的三档保留全部结清**：`SettingsLocalizable` 4 条由 F65 结清（裁决第 1 条），
 `UIDumpLocalizable` 25 条由 F65/F67 结清（裁决第 2 条），本档 25 条由本批结清。
+
+## 2026-08-31 F71：实测推翻 F69 的窗外落点假设，并更正一条已过时的台账结论
+
+第十七批，基线 `334c2e94`。F69 登记 Debug 分页条失败时给了一个假设：AX 把元素报在
+「未受约束的理想高度」原点上，因此合成点击落到**窗口之外**，`scroll` 空转同源。
+本批带插桩实测了它。**假设是错的**，一并查出的还有一条已过时的台账结论。
+本批不含任何 App 或测试代码改动——四次修复尝试全部失败并回退，只登记事实。
+
+### 一、窗外落点假设：**推翻**
+
+在 `clickCorrectingNavigationSplitAXOffset` 内打印 AX frame、窗口、修正量、算出的落点，
+以及落点是否在窗口内：
+
+```
+id=device.row.7f2c091a445e21 ax=(24,188,212,32)      overviewMidY=124.0   correction=-4.0    landing=(130.0,200.0)  inWindow=true
+id=debug.tab.artifacts       ax=(280,-211,119,24)    overviewMidY=-362.0  correction=482.0   landing=(339.5,283.0)  inWindow=true
+id=debug.tab.logs            ax=(439,-206.5,49,15)   overviewMidY=-362.0  correction=482.0   landing=(463.5,283.0)  inWindow=true
+id=debug.tab.apps/network/commands                   同上，landing y 均 ≈283，inWindow=true
+```
+
+窗口是 `(0,33,1180,760)`，五个落点全部落在窗内。**「点击落到窗口之外」不成立**，
+因而它也不能解释 `scroll` 空转。F69 里那段推理到此作废，本条为准。
+
+### 二、顺带查出：一条台账结论已过时
+
+F69 之所以没有停在「侧栏 vs 详情列」这个更简单的解释上，靠的是 native-gate 台账里的反例
+——「`testDebugHAPSelection…` 里同一条分页条、同一个 helper，点击生效」。本批把该测试单独跑了
+一遍：**它现在也红，且死在同一处**（`the Debug Apps tab never became active`，
+循环点了 3 次、探针记录 3 次点击全部无效）。
+
+**那条台账结论（「已验证有改善」一行）已过时，不能再当作反例或依据。** 已在
+[native-gate 台账](references/ui-consistency/2026-08-30-native-gate-ledger.md) 就地更正。
+因此这不是 sweep 特有的状态问题：**Debug 分页条的坐标点击当前整体失效**。
+
+### 三、两条实测出来的新事实
+
+**AX 错报真实存在且是状态相关的。** 同一次运行内，修正量从侧栏设备行时的 **−4** 跳到
+Debug 分页条时的 **+482**（对照组那轮是 +423.5）。前者说明那一刻 AX 报得基本正确，
+后者说明之后整棵树被平移了约 480pt。helper 的文档注释里那个 "**occasionally**" 得到了实证。
+
+**helper 的锚点常数是错的（4pt）。** `expectedOverviewMidY = toolbarMaxY + 35`；而在 AX
+未错报的那一刻实测 `overviewMidY = 124`、`toolbarMaxY = 85`，真值对应的是 **+39** 而非 +35。
+这 4pt 不足以解释失败（分页条高 24pt），但公式确实错，登记待修。
+
+### 四、四次尝试，四次失败
+
+| 尝试 | 结果 |
+| --- | --- |
+| 点击前 `scrollIntoView(tab)`（F69） | 无效，两次有效取样同消息失败 |
+| 宿主须与窗口有交集（F69） | 证据只存在于随后回退的调用点，未纳入 |
+| 收紧宿主非零高度（F66） | 无效，宿主本就选对 |
+| `tab.coordinate(withNormalizedOffset:).click()`（本批） | **无效**，五条同样失败 |
+
+第四次的依据是同文件里已验证过的写法——`debug.apps.postRun` 那处注释记着 macOS 26 上
+`click()` 会把命中点合成到可见 picker **上方 21pt**，改用元素自身 frame 中心可解。
+用到分页条上不成立：探针显示五个 tab 全部 **`isHittable=false`**，元素坐标同样解析到错报的
+frame 上。已回退。
+
+### 五、还剩什么
+
+**根因仍未查清。** 已排除：宿主选择错误（F68）、落点在窗外（本批）、元素坐标写法（本批）。
+已知但未利用的一条：分页条在 App 侧支持方向键
+（`DebugWorkspaceView.swift:189-192`，`.focusable()` + `onKeyPress`），而 `select()` 正是用
+「窗口相对定点点击 + 原生键盘选择」绕开同一个 AX 问题的。**但要用键盘先得让分页条拿到焦点，
+而取焦点本身又要点击**——这个循环没解开之前不提交任何修复。
+
+本批主张的只有：一个被推翻的假设、一条被更正的过时结论、两条新实测事实，以及四次失败的记录。
+不主张修好任何测试。
