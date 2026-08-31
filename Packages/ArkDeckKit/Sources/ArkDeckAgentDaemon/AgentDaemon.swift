@@ -1973,6 +1973,46 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       return success(id: request.id, result: Self.encodeWorkspacePreset(preset))
 
+    case "device.observations":
+      // §6.1's discovery shape, which `device.candidates` cannot carry: a
+      // bare array has nowhere to put the snapshot generation, and §6.1
+      // requires a fixed one. Rather than change a method the App and the
+      // Agent executor both parse, this is an additive object-shaped sibling.
+      // The CLI opts in with `device candidates --snapshot`; existing calls
+      // retain the array, including legacy-json output.
+      guard let bootstrap else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "bootstrap is not configured in this composition")
+      }
+      var observationsUseWarmSnapshot = false
+      switch request.params {
+      case nil, .some([:]):
+        observationsUseWarmSnapshot = false
+      case .some(["useWarmSnapshot": .bool(true)]):
+        observationsUseWarmSnapshot = true
+      default:
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "device.observations accepts only useWarmSnapshot=true")
+      }
+      do {
+        let snapshot =
+          observationsUseWarmSnapshot
+          ? try await bootstrap.candidateSnapshotForPresentation()
+          : try await bootstrap.refreshCandidateSnapshotForPresentation()
+        var rows: [JSONValue] = []
+        for candidate in snapshot.candidates {
+          let adopted = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
+          rows.append(
+            Self.encodeDeviceObservation(candidate: candidate, adoptedTarget: adopted))
+        }
+        return success(
+          id: request.id, result: Self.encodeDeviceObservations(snapshot, rows: rows))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "device.candidates":
       // Read-only discovery: the one enumeration the App's device list needs.
       // It calls the bootstrap's candidate read directly — never `advance`,
@@ -2344,6 +2384,42 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "presetRef": .string(preset.presetRef),
       "kind": .string(preset.kind),
       "timeoutSeconds": .integer(Int64(preset.timeoutSeconds)),
+    ])
+  }
+
+  // MARK: device observations (§6.1, §8.5)
+
+  static func encodeDeviceObservations(
+    _ snapshot: BootstrapCandidateSnapshot, rows: [JSONValue]
+  ) -> JSONValue {
+    .object([
+      // Null rather than zero when unstamped: a generation a caller passes to
+      // `target adopt --observation-generation` has to be one the Runtime
+      // issued, and `0` would look like one.
+      "snapshotGeneration": snapshot.generation.map { .integer(Int64($0)) } ?? .null,
+      "observedAtUtc": .string(snapshot.observedAtUTC),
+      "health": .string(snapshot.health.rawValue),
+      // §8.5's lifetime rule, published rather than left to be discovered.
+      // A caller must not hold an observation ID across a refresh, and this
+      // says so in a field instead of in documentation nobody reads at 2am.
+      "observationContinuity": .string(DeviceObservationIdentity.continuity.rawValue),
+      "observationContinuityReason": .string(DeviceObservationIdentity.continuityReason),
+      "observations": .array(rows),
+    ])
+  }
+
+  static func encodeDeviceObservation(
+    candidate: BootstrapCandidate, adoptedTarget: RuntimeTargetRecord?
+  ) -> JSONValue {
+    .object([
+      "observationId": candidate.observationID.map(JSONValue.string) ?? .null,
+      "candidateKey": .string(candidate.connectKey),
+      "authorizationState": .string(candidate.state),
+      // The adopted-target link §6.1 asks for, so a caller can tell a
+      // candidate that still needs physical trust from one already bound.
+      "adoptedTargetId": adoptedTarget.map { .string($0.targetID) } ?? .null,
+      "adoptedBindingRevision": adoptedTarget.map { .integer(Int64($0.bindingRevision)) }
+        ?? .null,
     ])
   }
 

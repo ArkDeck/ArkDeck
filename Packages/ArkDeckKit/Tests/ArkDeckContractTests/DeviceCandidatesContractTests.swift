@@ -134,6 +134,67 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "the discovery read must not create a binding")
   }
 
+  func testObservationSnapshotsMintIdentityWithoutAdoptingOrChangingLegacyShape() async throws {
+    let (handler, targetStore) = try makeHandler(candidates: [
+      BootstrapCandidate(connectKey: "candidate-route", state: "Connected")
+    ])
+    let first = await handler.handleFrame(frame("device.observations"))
+    let second = await handler.handleFrame(frame("device.observations"))
+    XCTAssertTrue(first.ok)
+    XCTAssertTrue(second.ok)
+    guard case .object(let firstSnapshot)? = first.result,
+      case .object(let secondSnapshot)? = second.result,
+      case .array(let firstRows)? = firstSnapshot["observations"],
+      case .array(let secondRows)? = secondSnapshot["observations"],
+      case .object(let firstRow)? = firstRows.first,
+      case .object(let secondRow)? = secondRows.first
+    else { return XCTFail("observation responses must carry snapshot rows") }
+    XCTAssertEqual(firstSnapshot["snapshotGeneration"], .integer(1))
+    XCTAssertEqual(secondSnapshot["snapshotGeneration"], .integer(2))
+    XCTAssertEqual(firstSnapshot["health"], .string("current"))
+    XCTAssertEqual(firstSnapshot["observedAtUtc"], .string("2026-08-07T00:00:00Z"))
+    XCTAssertEqual(firstSnapshot["observationContinuity"], .string("generationScoped"))
+    guard case .string(let firstID)? = firstRow["observationId"] else {
+      return XCTFail("the handler must publish a minted observation ID")
+    }
+    XCTAssertTrue(firstID.hasPrefix("obs-"))
+    XCTAssertNotEqual(firstRow["observationId"], secondRow["observationId"])
+    XCTAssertEqual(firstRow["candidateKey"], .string("candidate-route"))
+    XCTAssertEqual(firstRow["adoptedTargetId"], .null)
+    XCTAssertEqual(firstRow["adoptedBindingRevision"], .null)
+    XCTAssertTrue(try targetStore.list().isEmpty, "snapshot reads must never adopt")
+
+    let legacy = await handler.handleFrame(frame("device.candidates"))
+    XCTAssertTrue(legacy.ok)
+    guard case .array(let legacyRows)? = legacy.result,
+      case .object(let legacyRow)? = legacyRows.first
+    else { return XCTFail("the 1.x method must retain its array") }
+    XCTAssertEqual(legacyRow["connectKey"], .string("candidate-route"))
+    XCTAssertEqual(legacyRow["state"], .string("Connected"))
+    XCTAssertNil(legacyRow["observationId"])
+    XCTAssertTrue(try targetStore.list().isEmpty)
+  }
+
+  func testObservationMethodRejectsCallerFactsAndMissingBootstrap() async throws {
+    let (handler, targetStore) = try makeHandler(candidates: [])
+    for params in [
+      "{\"useWarmSnapshot\":false}", "{\"observationId\":\"caller-issued\"}",
+      "{\"snapshotGeneration\":1}", "{\"candidateKey\":\"caller-route\"}",
+    ] {
+      let response = await handler.handleFrame(
+        Data(
+          "{\"protocolVersion\":\"1.0.0\",\"id\":\"t\",\"method\":\"device.observations\",\"params\":\(params)}"
+            .utf8))
+      XCTAssertFalse(response.ok)
+      XCTAssertEqual(response.error?.code, "invalidParams")
+    }
+    XCTAssertTrue(try targetStore.list().isEmpty)
+    let (unconfigured, _) = try makeHandler(candidates: [], bootstrapConfigured: false)
+    let response = await unconfigured.handleFrame(frame("device.observations"))
+    XCTAssertFalse(response.ok)
+    XCTAssertEqual(response.error?.code, "internalError")
+  }
+
   // An adopted device joins its durable record; an unauthorized one carries
   // its raw reported state with no invented identity.
   func testAdoptedCandidateJoinsItsTargetRecord() async throws {

@@ -1288,6 +1288,18 @@ enum RuntimeCLI {
     }
   }
 
+  static func deviceCandidatesRequest(_ arguments: [String]) -> (
+    method: String, params: [String: JSONValue]?
+  ) {
+    // The published array remains the default in every rendering mode.
+    // A new option opts into the additive snapshot method; merely upgrading
+    // the CLI must not change existing scripts' response shape (§12).
+    let method = arguments.contains("--snapshot") ? "device.observations" : "device.candidates"
+    let params: [String: JSONValue]? =
+      arguments.contains("--use-warm-snapshot") ? ["useWarmSnapshot": .bool(true)] : nil
+    return (method, params)
+  }
+
   static func runDevice(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(exitCode: EX_USAGE, message: "missing device subcommand (list|adopt|show)")
@@ -1300,9 +1312,8 @@ enum RuntimeCLI {
       // The one read an external Agent starts from: what is plugged in, whether
       // it is authorized, and whether it is already adopted. It observes and
       // never adopts — the Runtime's adopt path is a separate, explicit call.
-      var params: [String: JSONValue] = [:]
-      if rest.contains("--use-warm-snapshot") { params["useWarmSnapshot"] = .bool(true) }
-      session.emit(try session.request("device.candidates", params.isEmpty ? nil : params))
+      let request = deviceCandidatesRequest(rest)
+      session.emit(try session.request(request.method, request.params))
     case "list", "show":
       session.emit(try session.request("target.list"))
     case "adopt":

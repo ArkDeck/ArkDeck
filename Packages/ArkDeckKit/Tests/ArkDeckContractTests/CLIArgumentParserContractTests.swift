@@ -787,6 +787,27 @@ final class CLIArgumentParserContractTests: XCTestCase {
 
   // MARK: Evidence, result and bounded reads (§6.1, §7.6, §9)
 
+  func testCandidateSnapshotIsExplicitAndPreservesExistingRequests() {
+    for output in [[], ["--json"], ["--output", "json"]] {
+      for warm in [[], ["--use-warm-snapshot"]] {
+        for snapshot in [[], ["--snapshot"]] {
+          let options = snapshot + warm + output
+          guard case .dispatch? = success(["device", "candidates"] + options) else {
+            return XCTFail("candidate options must dispatch")
+          }
+          let request = RuntimeCLI.deviceCandidatesRequest(options)
+          XCTAssertEqual(
+            request.method, snapshot.isEmpty ? "device.candidates" : "device.observations")
+          XCTAssertEqual(request.params, warm.isEmpty ? nil : ["useWarmSnapshot": .bool(true)])
+        }
+      }
+    }
+    XCTAssertEqual(
+      failure(["device", "candidates", "--snapshot", "--snapshot"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["target", "list", "--snapshot"])?.code, .invalidOption)
+    XCTAssertEqual(CLIControlMethodRegistry.effect(of: "device.observations"), .boundedReadOnly)
+  }
+
   func testTheResultAndEvidenceSurfaceIsReachable() {
     for argv in [
       ["job", "evidence", "--job", "J-1"],
