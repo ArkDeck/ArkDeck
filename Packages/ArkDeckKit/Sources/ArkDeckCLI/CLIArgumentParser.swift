@@ -570,6 +570,19 @@ enum CLIArgumentParser {
           command: leaf.canonicalCommand)
       }
       return nil
+    case .duration(let maximumMilliseconds):
+      guard CLIDuration.parse(value, maximumMilliseconds: maximumMilliseconds) != nil else {
+        return CLIRegistryError(
+          code: .invalidOption,
+          message:
+            "`\(name)` \(label) must be a duration like `30s` (digits then ms|s|m|h, "
+            + "no larger than \(maximumMilliseconds)ms)",
+          details: [
+            "command": .string(leaf.canonicalCommand), "option": .string(label),
+          ],
+          command: leaf.canonicalCommand)
+      }
+      return nil
     case .enumeration(let allowed):
       guard allowed.contains(value) else {
         return CLIRegistryError(

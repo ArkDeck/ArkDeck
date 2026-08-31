@@ -263,13 +263,56 @@ final class CLIArgumentParserContractTests: XCTestCase {
     }
   }
 
-  /// §8.1 scopes `jsonl` to the durable event stream. No leaf publishes one,
-  /// so accepting the mode would promise a stream that cannot be produced.
-  func testJsonlIsRefusedUntilADurableEventStreamExists() {
-    for argv in [["job", "list"], ["doctor"], ["commands"]] {
+  /// §8.1 scopes `jsonl` to the durable event stream, so a leaf that answers
+  /// with one document refuses it — and says so in its own terms, naming the
+  /// modes it does take rather than calling `jsonl` an unknown value. The
+  /// distinction is what a caller needs: one message means "no such mode", the
+  /// other means "this command does not stream".
+  func testJsonlIsRefusedByEveryLeafThatDoesNotStream() {
+    for argv in [["job", "list"], ["doctor"], ["commands"], ["job", "wait", "--job", "J-1"]] {
       let error = failure(argv + ["--output", "jsonl"])
       XCTAssertEqual(error?.code, .invalidOption, argv.joined(separator: " "))
+      XCTAssertTrue(
+        error?.message.contains("human|json") == true,
+        "\(argv.joined(separator: " ")): \(error?.message ?? "")")
     }
+    // The one that does stream takes it, and refuses the single-document mode
+    // §8.3 says it must not offer.
+    XCTAssertNotNil(success(["job", "watch", "--job", "J-1", "--output", "jsonl"]))
+    let refused = failure(["job", "watch", "--job", "J-1", "--output", "json"])
+    XCTAssertEqual(refused?.code, .invalidOption)
+    XCTAssertTrue(refused?.message.contains("human|jsonl") == true, refused?.message ?? "")
+  }
+
+  /// §5.2's duration grammar. Every rejected form is a caller meaning
+  /// something the receiving contract cannot represent, so accepting any of
+  /// them would round it silently.
+  func testTheDurationGrammarAcceptsOnlyItsPublishedForm() {
+    for good in ["1ms", "500ms", "30s", "2m", "1h", "24h"] {
+      XCTAssertNotNil(success(["job", "wait", "--job", "J-1", "--timeout", good]), good)
+    }
+    for bad in ["0s", "30", "1.5s", "30 s", "-5s", "30x", "1m30s", "", "025s", "25h"] {
+      XCTAssertEqual(
+        failure(["job", "wait", "--job", "J-1", "--timeout", bad])?.code, .invalidOption,
+        "`\(bad)` is not a duration")
+    }
+  }
+
+  /// The ceiling is checked before the multiplication, not after: a magnitude
+  /// that overflows on its way to milliseconds would otherwise land on a
+  /// negative deadline and make the wait return immediately — a timeout that
+  /// reports "I waited" without waiting.
+  func testADurationThatWouldOverflowIsRefusedRatherThanWrapped() {
+    XCTAssertNil(CLIDuration.parse("9223372036854775807h", maximumMilliseconds: 86_400_000))
+    XCTAssertNil(CLIDuration.parse("99999999999999999999h", maximumMilliseconds: 86_400_000))
+    XCTAssertEqual(
+      CLIDuration.parse("24h", maximumMilliseconds: 86_400_000)?.milliseconds, 86_400_000)
+    XCTAssertNil(CLIDuration.parse("25h", maximumMilliseconds: 86_400_000))
+    // `ms` also ends in `s`; matching the shorter suffix would read 500ms as
+    // 500 seconds — a thousandfold wait, in the direction nobody notices.
+    XCTAssertEqual(CLIDuration.parse("500ms", maximumMilliseconds: 86_400_000)?.milliseconds, 500)
+    XCTAssertEqual(
+      CLIDuration.parse("500s", maximumMilliseconds: 86_400_000)?.milliseconds, 500_000)
   }
 
   /// §12: `--json` keeps the shape it has always had and `--output json` is the
@@ -464,7 +507,14 @@ final class CLIArgumentParserContractTests: XCTestCase {
     // A component this build cannot produce is `null`, never a version copied
     // out of the spec: `--version` describes this client, not the document.
     XCTAssertEqual(fields["pageSchemaVersion"], .null)
-    XCTAssertEqual(fields["eventSchemaVersion"], .null)
+    XCTAssertEqual(fields["nextActionSchemaVersion"], .null)
+    // The event schema is the other way round, and the distinction is the
+    // point of this field: `job watch --output jsonl` really does emit
+    // `arkdeck.cli.event/1`, so a consumer can pin the shape it parses. That
+    // the Runtime event source behind it is missing is reported per call, as
+    // `controlMethodUnavailable`, not by pretending the client cannot produce
+    // the schema.
+    XCTAssertEqual(fields["eventSchemaVersion"], .string(CLIEventEnvelope.schemaVersion))
     guard case .array(let supported)? = fields["supportedControlProtocolExactVersions"] else {
       return XCTFail("the supported set must be a list")
     }

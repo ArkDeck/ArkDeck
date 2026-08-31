@@ -323,6 +323,15 @@ enum CLIRegistryProjection {
         "kind": .string("pattern"),
         "pattern": .string("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
       ])
+    case .duration(let maximumMilliseconds):
+      // The pattern travels with the ceiling: a portable implementation needs
+      // both to refuse the same inputs, and §5.2 fixes the pattern while
+      // leaving the bound to the option that waits.
+      return .object([
+        "kind": .string("duration"),
+        "pattern": .string("^[1-9][0-9]*(ms|s|m|h)$"),
+        "maximumMilliseconds": .integer(Int64(maximumMilliseconds)),
+      ])
     case .hexDigest(let length):
       return .object([
         "kind": .string("hexDigest"),

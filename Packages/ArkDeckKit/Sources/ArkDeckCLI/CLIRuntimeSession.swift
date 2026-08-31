@@ -16,6 +16,14 @@ enum CLIRendering: Equatable {
   case legacyJSON
   /// One `arkdeck.cli.result/1` document (§8.2).
   case envelope
+  /// A newline-delimited `arkdeck.cli.event/1` stream (§8.3).
+  ///
+  /// Distinct from `envelope` because the two make different promises: an
+  /// envelope is exactly one document describing a finished call, and a stream
+  /// is a sequence whose last line says how it ended. A caller that asked for
+  /// a stream and got an envelope would have to guess whether the command
+  /// finished or the mode was ignored.
+  case jsonlStream
 }
 
 /// §12 lifecycle metadata for a leaf, reported in machine output so a caller
@@ -69,6 +77,14 @@ struct CLIRuntimeSession {
   let outputState = OutputState()
 
   var isMachineOutput: Bool { rendering != .human }
+
+  /// The stream sequence number for the next event. §8.3 starts it at 1 and
+  /// requires it to increase strictly; it counts this CLI stream only and is
+  /// not a Runtime event position.
+  final class StreamState {
+    var nextSequence = 1
+  }
+  
 
   /// Sends one request and maps any failure onto the §8.4 registry.
   func request(_ method: String, _ params: [String: JSONValue]? = nil) throws -> JSONValue {
@@ -165,6 +181,12 @@ struct CLIRuntimeSession {
       envelope = CLIResultEnvelope.withLifecycle(
         envelope, lifecycle, replacement: replacementArgvPattern)
       FileHandle.standardOutput.write(Data(CLIResultEnvelope.render(envelope).utf8))
+    case .jsonlStream:
+      FileHandle.standardOutput.write(
+        Data(
+          CLIEventEnvelope.terminalSuccess(
+            command: command, sequence: 1, result: value,
+            controlRequestID: controlRequestID).utf8))
     }
   }
 
