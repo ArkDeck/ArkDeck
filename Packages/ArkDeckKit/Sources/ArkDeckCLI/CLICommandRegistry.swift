@@ -806,7 +806,10 @@ enum CLICommandRegistry {
             token: "status",
             canonicalCommand: "runtime.hdc.status",
             summary: "exact tool and server facts for the managed HDC runtime",
-            options: runtimeClientOptions([]),
+            options: runtimeClientOptions([
+              CLIOptionSpec(name: "--require-protocol", form: .value(placeholder: "1|2", grammar: .enumeration(["1", "2"])),
+                summary: "default 2 reads fresh facts; explicit 1 reads the frozen startup projection")
+            ]),
             connectsToRuntime: true)
         ]),
       runtimeServiceNode,

@@ -1565,8 +1565,12 @@ enum RuntimeCLI {
         throw CLIError(exitCode: EX_USAGE, message: "missing runtime hdc subcommand (status)")
       }
       var hdcRest = Array(rest.dropFirst())
-      let session = runtimeSession(&hdcRest, command: "runtime.hdc.status")
-      session.emit(try session.request("runtime.hdc-status"))
+      var session = runtimeSession(&hdcRest, command: "runtime.hdc.status")
+      let options = try CLIOptions(hdcRest)
+      let major = Int(options.value("--require-protocol") ?? "2") ?? 0
+      let method = major == 1 ? "runtime.hdc-status" : "runtime.hdc.status"
+      try session.negotiate(requiredMajor: major, forMethod: method)
+      session.emit(try session.request(method))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported runtime subcommand")
     }

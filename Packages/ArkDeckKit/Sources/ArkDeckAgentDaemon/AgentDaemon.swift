@@ -84,6 +84,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let targetObservations: TargetObservationCoordinator?
   private let agentExecutions: RuntimeAgentExecutionCoordinator?
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
+  private let hdcStatusObserver: (any HDCStatusObserving)?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
@@ -121,6 +122,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     targetObservations: TargetObservationCoordinator? = nil,
     agentExecutions: RuntimeAgentExecutionCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
+    hdcStatusObserver: (any HDCStatusObserving)? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -140,6 +142,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       targetStore: targetStore, bootstrap: bootstrap, targetObservations: targetObservations,
       agentExecutions: agentExecutions,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
+      hdcStatusObserver: hdcStatusObserver,
       artifactStore: artifactStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
@@ -165,6 +168,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     targetObservations: TargetObservationCoordinator? = nil,
     agentExecutions: RuntimeAgentExecutionCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
+    hdcStatusObserver: (any HDCStatusObserving)? = nil,
     artifactStore: RuntimeArtifactStore?,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
@@ -188,6 +192,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.targetObservations = targetObservations
     self.agentExecutions = agentExecutions
     self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
+    self.hdcStatusObserver = hdcStatusObserver
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.flashLanePlanPreviewer = flashLanePlanPreviewer
@@ -292,6 +297,15 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
           "providers": .array(providerIDs.map(JSONValue.string)),
         ]))
+
+    case "runtime.hdc.status":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(id: request.id, code: .unsupportedProtocolVersion, message: "live HDC status requires the target control protocol")
+      }
+      guard request.params == nil || request.params?.isEmpty == true else {
+        return failure(id: request.id, code: .invalidParams, message: "live HDC status does not accept caller facts or paths")
+      }
+      return success(id: request.id, result: await hdcStatusObserver?.snapshot() ?? HeadlessHDCStatusObserver.unconfigured())
 
     case "runtime.hdc-status":
       guard request.params == nil || request.params?.isEmpty == true else {
