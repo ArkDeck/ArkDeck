@@ -237,6 +237,9 @@ struct ArkDeckCommandLine {
           path: [command, verb], Array(arguments.dropFirst()))
       case "agent":
         try await RuntimeCLI.runAgent(arguments)
+      case "control-action":
+        guard let verb = arguments.first else { throw CLIError(exitCode: EX_USAGE, message: "control-action subcommand is required") }
+        try RuntimeCLI.runHDCControlAction(Array(arguments.dropFirst()), command: "control-action.\(verb)")
       case "human-action":
         try await RuntimeCLI.runRuntimeExecution(arguments, family: "human-action")
       case "agentd":

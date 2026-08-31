@@ -110,6 +110,14 @@ enum CLIControlMethodRegistry {
   /// have left staging state that only the import's own status can settle.
   private static let mutationCapableMethods: Set<String> = [
     "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.release",
+    // Preview publication, expiry invalidation and snapshot persistence can
+    // survive a lost response even though lifecycle dispatch remains zero.
+    "runtime.hdc.impact-preview",
+    "runtime.hdc.restart",
+    "control-action.list",
+    "control-action.show",
+    "control-action.reconcile",
+
     "target.adopt",
     "agent.run",
     "agent.resume",

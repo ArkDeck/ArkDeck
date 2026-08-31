@@ -139,7 +139,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       // This is the same request path the Unix socket uses: same decode, same
       // Runtime admission and same audit record. The XPC boundary adds only a
       // narrower operation/job ownership check.
-      let response = await handler.handleLine(frame)
+      let response = await handler.handleLine(frame, context: .appXPC)
       if case .appSubmit(let requestID, let kind) = admission,
         let jobID = Self.successfulSubmittedJobID(in: response, requestID: requestID)
       {

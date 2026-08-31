@@ -574,15 +574,31 @@ struct HDCExistingServerObservation: Sendable, Equatable {
   }
 }
 
-struct HDCManagedServerLaunchEvidence: Sendable, Equatable {
-  let endpoint: HDCServerEndpoint
-  let pid: Int32
-  let toolPath: URL
+package struct HDCManagedServerLaunchEvidence: Sendable, Equatable {
+  package let endpoint: HDCServerEndpoint
+  package let pid: Int32
+  package let toolPath: URL
   /// Complete argv excluding argv[0]. This is compared verbatim to the
   /// live process before ArkDeck can claim managed ownership.
-  let arguments: [String]
-  let generation: Int
-  let version: HDCProbeValue<String>
+  package let arguments: [String]
+  package let generation: Int
+  package let version: HDCProbeValue<String>
+
+  package init(
+    endpoint: HDCServerEndpoint,
+    pid: Int32,
+    toolPath: URL,
+    arguments: [String],
+    generation: Int,
+    version: HDCProbeValue<String>
+  ) {
+    self.endpoint = endpoint
+    self.pid = pid
+    self.toolPath = toolPath
+    self.arguments = arguments
+    self.generation = generation
+    self.version = version
+  }
 }
 
 /// Verifies a managed-server claim against the live process table. A record is
@@ -1294,20 +1310,20 @@ public enum HDCServerLifecycleDispatchResult: Sendable, Equatable {
   case blocked(HDCServerLifecycleDispatchBlock)
 }
 
-struct HDCManagedStartAuthorization: Sendable, Equatable, Hashable {
-  let id: UUID
-  let endpoint: HDCServerEndpoint
+package struct HDCManagedStartAuthorization: Sendable, Equatable, Hashable {
+  package let id: UUID
+  package let endpoint: HDCServerEndpoint
   /// Opaque managed-start dispatch permit minted together with the
   /// absent-endpoint authorization. It only feeds the observability counters;
   /// it is not itself a launch authorization.
   let dispatchPermit: HDCServerDispatchPermit
 
-  static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.id == rhs.id && lhs.endpoint == rhs.endpoint
       && lhs.dispatchPermit === rhs.dispatchPermit
   }
 
-  func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(id)
     hasher.combine(endpoint)
   }
@@ -1408,6 +1424,35 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   ) {
     invalidateDispatchLeases(for: endpoint)
     participantImpactReliability[endpoint] = isReliable
+  }
+
+  /// Atomically replaces the complete production participant inventory for
+  /// one endpoint. A lifecycle driver calls this only while its Runtime Job
+  /// admission interlock is held; stale recipients cannot remain in a later
+  /// impact hash, and a partial/duplicate inventory never becomes reliable.
+  package func replaceParticipants(
+    _ participants: [(HDCServerRecipient, HDCServerCriticalState)],
+    for endpoint: HDCServerEndpoint
+  ) -> Bool {
+    guard participants.allSatisfy({ $0.0.endpoint == endpoint }),
+      Set(participants.map(\.0)).count == participants.count
+    else {
+      invalidateDispatchLeases(for: endpoint)
+      participantImpactReliability[endpoint] = false
+      return false
+    }
+    invalidateDispatchLeases(for: endpoint)
+    let staleRecipients = recipients.keys.filter { $0.endpoint == endpoint }
+    for recipient in staleRecipients {
+      recipients.removeValue(forKey: recipient)
+      deliveredEvents.removeValue(forKey: recipient)
+    }
+    for (recipient, state) in participants {
+      recipients[recipient] = state
+      deliveredEvents[recipient] = []
+    }
+    participantImpactReliability[endpoint] = true
+    return true
   }
 
   public func state(for endpoint: HDCServerEndpoint) -> HDCServerState? {
@@ -1668,7 +1713,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   /// the expected port. The endpoint must have been absent when authorization
   /// was created, and the recorded PID, absolute tool path, and endpoint must
   /// all verify after the managed launch.
-  func authorizeManagedStart(at endpoint: HDCServerEndpoint) -> HDCManagedStartAuthorization? {
+  package func authorizeManagedStart(at endpoint: HDCServerEndpoint) -> HDCManagedStartAuthorization? {
     guard endpoints[endpoint] == nil else { return nil }
     let authorization = HDCManagedStartAuthorization(
       id: UUID(), endpoint: endpoint,
@@ -1678,7 +1723,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   }
 
   @discardableResult
-  func recordManagedStart(
+  package func recordManagedStart(
     authorization: HDCManagedStartAuthorization,
     evidence: HDCManagedServerLaunchEvidence
   ) -> Bool {

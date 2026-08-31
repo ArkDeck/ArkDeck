@@ -22,6 +22,9 @@
     "artifact.import.inspect",
     "artifact.import.list",
     "artifact.import.release",
+    "control-action.list",
+    "control-action.reconcile",
+    "control-action.show",
     "device.observations",
     "health",
     "human-action.list",
@@ -34,6 +37,8 @@
     "job.show",
     "job.status",
     "job.timeline",
+    "runtime.hdc.impact-preview",
+    "runtime.hdc.restart",
     "runtime.hdc.status",
     "target.adopt",
     "target.show"

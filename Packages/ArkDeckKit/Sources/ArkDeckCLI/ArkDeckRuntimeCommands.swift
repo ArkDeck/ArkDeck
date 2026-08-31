@@ -1563,8 +1563,12 @@ enum RuntimeCLI {
       }
       session.emit(try session.request("health"))
     case "hdc":
+      if ["impact-preview", "restart"].contains(rest.first ?? "") {
+        try runHDCControlAction(Array(rest.dropFirst()), command: "runtime.hdc.\(rest.first!)")
+        return
+      }
       guard rest.first == "status" else {
-        throw CLIError(exitCode: EX_USAGE, message: "missing runtime hdc subcommand (status)")
+        throw CLIError(exitCode: EX_USAGE, message: "missing runtime hdc subcommand (status, impact-preview or restart)")
       }
       var hdcRest = Array(rest.dropFirst())
       var session = runtimeSession(&hdcRest, command: "runtime.hdc.status")

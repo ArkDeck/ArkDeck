@@ -47,6 +47,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     private var exitReason: String?
     private var stopping = false
     private var launch: HDCManagedProcessLaunch?
+    private var confirmedLifecycleExitDeadline: UInt64?
 
     func recordLaunch(pid: Int32, executable: ProcessExecutableIdentityReceipt, request: ProcessRequest) {
       let captured = HDCManagedProcessLaunch.capture(pid: pid, executable: executable, request: request)
@@ -55,6 +56,18 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
 
     func activeLaunch() -> HDCManagedProcessLaunch? {
       lock.withLock { armed && !exited && !stopping ? launch : nil }
+    }
+
+    func retainedLaunch() -> HDCManagedProcessLaunch? {
+      lock.withLock { !exited && !stopping ? launch : nil }
+    }
+
+    func expectConfirmedLifecycleExit() {
+      lock.withLock {
+        let (deadline, overflow) = DispatchTime.now().uptimeNanoseconds
+          .addingReportingOverflow(20_000_000_000)
+        confirmedLifecycleExitDeadline = overflow ? UInt64.max : deadline
+      }
     }
 
     func arm() -> Bool {
@@ -76,7 +89,11 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
       defer { lock.unlock() }
       exited = true
       exitReason = reason
-      return armed && !stopping
+      launch = nil
+      let expected = confirmedLifecycleExitDeadline.map {
+        DispatchTime.now().uptimeNanoseconds <= $0
+      } ?? false
+      return armed && !stopping && !expected
     }
 
     func recordedExitReason() -> String? {
@@ -89,16 +106,24 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
   private let task: Task<Void, Never>
   private let lifecycle: Lifecycle
   private let executable: ResolvedExecutable
+  private let endpoint: HDCServerEndpointSelection
+  private let supervisor: HDCServerSupervisor
+  private let lifecycleAuditRouter: RuntimeHDCControlLifecycleAuditRouter
   package let diagnostics: HDCManagedRuntimeDiagnostics
 
   private init(
     task: Task<Void, Never>, lifecycle: Lifecycle,
-    diagnostics: HDCManagedRuntimeDiagnostics, executable: ResolvedExecutable
+    diagnostics: HDCManagedRuntimeDiagnostics, executable: ResolvedExecutable,
+    endpoint: HDCServerEndpointSelection, supervisor: HDCServerSupervisor,
+    lifecycleAuditRouter: RuntimeHDCControlLifecycleAuditRouter
   ) {
     self.task = task
     self.lifecycle = lifecycle
     self.diagnostics = diagnostics
     self.executable = executable
+    self.endpoint = endpoint
+    self.supervisor = supervisor
+    self.lifecycleAuditRouter = lifecycleAuditRouter
   }
 
   public static func start(
@@ -115,8 +140,43 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     endpoint selection: HDCServerEndpointSelection,
     onUnexpectedExit: @escaping @Sendable () -> Void = {}
   ) async throws -> HeadlessHDCServerHost {
+    try await startInternal(
+      executable: executable, endpoint: selection,
+      permitsUnregisteredTestFixture: false, onUnexpectedExit: onUnexpectedExit)
+  }
+
+  /// Package-test seam for the local fake executable. It still proves the
+  /// retained identity-bound spawn, process birth, fixed argv and listener,
+  /// but deliberately leaves the Supervisor lifecycle-ineligible because the
+  /// fixture has no published native health/identity family.
+  package static func startTestFixture(
+    executable: ResolvedExecutable,
+    endpoint selection: HDCServerEndpointSelection,
+    onUnexpectedExit: @escaping @Sendable () -> Void = {}
+  ) async throws -> HeadlessHDCServerHost {
+    try await startInternal(
+      executable: executable, endpoint: selection,
+      permitsUnregisteredTestFixture: true, onUnexpectedExit: onUnexpectedExit)
+  }
+
+  private static func startInternal(
+    executable: ResolvedExecutable,
+    endpoint selection: HDCServerEndpointSelection,
+    permitsUnregisteredTestFixture: Bool,
+    onUnexpectedExit: @escaping @Sendable () -> Void
+  ) async throws -> HeadlessHDCServerHost {
     let request = foregroundRequest(executable: executable, endpoint: selection)
     let lifecycle = Lifecycle()
+    let lifecycleAuditRouter = RuntimeHDCControlLifecycleAuditRouter()
+    let supervisor = HDCServerSupervisor(
+      auditStore: lifecycleAuditRouter, endpoint: selection.endpoint,
+      participantImpactReliable: false)
+    guard let managedStartAuthorization = await supervisor.authorizeManagedStart(
+      at: selection.endpoint)
+    else {
+      throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
+        "managed HDC endpoint was not absent before the foreground launch")
+    }
     let task = Task.detached {
       let reason: String
       do {
@@ -137,6 +197,55 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     do {
       let check = try await awaitReadiness(
         executable: executable, endpoint: selection, lifecycle: lifecycle)
+      guard let launch = lifecycle.retainedLaunch() else {
+        throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
+          "managed HDC launch identity was not retained")
+      }
+      let toolchain = HDCCandidate(
+        path: URL(filePath: executable.path), source: .userConfigured,
+        sha256: executable.sha256)
+      let identity: HDCServerProcessIdentityReceipt?
+      if permitsUnregisteredTestFixture {
+        identity = HDCServerProcessIdentityReceipt(
+          pid: launch.pid, startSeconds: launch.startSeconds,
+          startMicroseconds: launch.startMicroseconds,
+          executablePath: URL(filePath: launch.executablePath),
+          executableSHA256: launch.executableSHA256, endpoint: selection.endpoint)
+      } else {
+        let observation = await HDCCommandlessServerIdentity.observe(
+          toolchain: toolchain, endpoint: selection.endpoint)
+        identity = observation.identity
+      }
+      guard let identity, let generation = identity.stableGeneration,
+        identity.stableGeneration == generation,
+        launch.matches(identity),
+        HDCCommandlessServerIdentity.verifiesManagedProcess(
+          identity, arguments: launch.arguments),
+        await supervisor.recordManagedStart(
+          authorization: managedStartAuthorization,
+          evidence: HDCManagedServerLaunchEvidence(
+            endpoint: selection.endpoint, pid: identity.pid,
+            toolPath: identity.executablePath, arguments: launch.arguments,
+            generation: generation, version: .known(check.serverVersion)))
+      else {
+        throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
+          "managed HDC launch could not be bound to its live process identity")
+      }
+      if permitsUnregisteredTestFixture {
+        await supervisor.setParticipantImpactReliability(false, for: selection.endpoint)
+      } else {
+        let registered = await HDCServerProcessSupervisor(supervisor: supervisor)
+          .observeRegisteredExistingServer(endpoint: selection, toolchain: toolchain)
+        guard case .observed(let registeredGeneration, let registeredVersion) = registered.classification,
+          registeredGeneration == generation, registeredVersion == check.serverVersion,
+          let state = await supervisor.state(for: selection.endpoint),
+          state.health == .healthy, state.generation == generation,
+          state.ownership == .arkDeckManaged
+        else {
+          throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
+            "managed HDC Supervisor could not establish registered health and generation")
+        }
+      }
       let host = HeadlessHDCServerHost(
         task: task, lifecycle: lifecycle,
         diagnostics: HDCManagedRuntimeDiagnostics(
@@ -144,7 +253,8 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
           clientVersion: check.clientVersion,
           serverVersion: check.serverVersion,
           endpoint: selection.endpoint.rawValue,
-          endpointSource: selection.source.rawValue), executable: executable)
+          endpointSource: selection.source.rawValue), executable: executable, endpoint: selection,
+        supervisor: supervisor, lifecycleAuditRouter: lifecycleAuditRouter)
       guard lifecycle.arm() else {
         throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
           lifecycle.recordedExitReason() ?? "foreground HDC server exited during readiness")
@@ -164,9 +274,27 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     _ = await task.result
   }
 
+  package func controlImpactSource(engine: RuntimeJobEngine, targets: RuntimeTargetStore,
+    observations: TargetObservationCoordinator) -> any HDCControlImpactObserving {
+    HeadlessHDCControlImpactSource(executable: executable, endpoint: endpoint,
+      managedLaunch: { [lifecycle] in lifecycle.activeLaunch() }, engine: engine,
+      targets: targets, observations: observations, supervisor: supervisor)
+  }
+
+  package func controlLifecycleDriver(
+    engine: RuntimeJobEngine, targets: RuntimeTargetStore,
+    observations: TargetObservationCoordinator
+  ) -> any HDCControlLifecycleDriving {
+    HeadlessHDCControlLifecycleDriver(
+      executable: executable, endpoint: endpoint,
+      expectConfirmedLifecycleExit: { [lifecycle] in lifecycle.expectConfirmedLifecycleExit() },
+      engine: engine,
+      supervisor: supervisor, auditRouter: lifecycleAuditRouter)
+  }
+
   package func statusObserver(daemonVersion: String?) -> any HDCStatusObserving {
     HeadlessHDCStatusObserver(executable: executable, startup: diagnostics, daemonVersion: daemonVersion,
-      managedLaunch: { [lifecycle] in lifecycle.activeLaunch() })
+      managedLaunch: { [lifecycle] in lifecycle.activeLaunch() }, supervisor: supervisor)
   }
 
   deinit {

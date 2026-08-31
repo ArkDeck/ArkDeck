@@ -40,14 +40,17 @@ package struct HeadlessHDCStatusObserver: HDCStatusObserving {
   private let startup: HDCManagedRuntimeDiagnostics
   private let daemonVersion: String?
   private let managedLaunch: @Sendable () -> HDCManagedProcessLaunch?
+  private let supervisor: HDCServerSupervisor?
   private let observeIdentity: @Sendable (HDCCandidate, HDCServerEndpoint) async -> HDCSupervisorObservationResult
   private let inspectSignature: @Sendable (URL) throws -> JSONValue
   private let validateManagedProcess: @Sendable (HDCServerProcessIdentityReceipt, [String]) -> Bool
   private let nowUTC: @Sendable () -> String
 
   package init(executable: ResolvedExecutable, startup: HDCManagedRuntimeDiagnostics,
-    daemonVersion: String?, managedLaunch: @escaping @Sendable () -> HDCManagedProcessLaunch?) {
+    daemonVersion: String?, managedLaunch: @escaping @Sendable () -> HDCManagedProcessLaunch?,
+    supervisor: HDCServerSupervisor? = nil) {
     self.init(executable: executable, startup: startup, daemonVersion: daemonVersion, managedLaunch: managedLaunch,
+      supervisor: supervisor,
       observeIdentity: { await HDCCommandlessServerIdentity.observe(toolchain: $0, endpoint: $1) },
       inspectSignature: Self.signature,
       validateManagedProcess: HDCCommandlessServerIdentity.verifiesManagedProcess,
@@ -57,12 +60,14 @@ package struct HeadlessHDCStatusObserver: HDCStatusObserving {
   // Module-internal test seam, not a daemon caller or configuration input.
   init(executable: ResolvedExecutable, startup: HDCManagedRuntimeDiagnostics, daemonVersion: String?,
     managedLaunch: @escaping @Sendable () -> HDCManagedProcessLaunch?,
+    supervisor: HDCServerSupervisor? = nil,
     observeIdentity: @escaping @Sendable (HDCCandidate, HDCServerEndpoint) async -> HDCSupervisorObservationResult,
     inspectSignature: @escaping @Sendable (URL) throws -> JSONValue,
     validateManagedProcess: @escaping @Sendable (HDCServerProcessIdentityReceipt, [String]) -> Bool,
     nowUTC: @escaping @Sendable () -> String) {
     self.executable = executable; self.startup = startup; self.daemonVersion = daemonVersion
     self.managedLaunch = managedLaunch; self.observeIdentity = observeIdentity
+    self.supervisor = supervisor
     self.inspectSignature = inspectSignature; self.nowUTC = nowUTC
     self.validateManagedProcess = validateManagedProcess
   }
@@ -84,7 +89,14 @@ package struct HeadlessHDCStatusObserver: HDCStatusObserving {
       let signature = try inspectSignature(path)
       try pinned.revalidate()
       let launchedBefore = managedLaunch()
-      let result = await observeIdentity(HDCCandidate(path: path, source: .userConfigured, sha256: executable.sha256), HDCServerEndpoint(startup.endpoint))
+      let endpoint = HDCServerEndpoint(startup.endpoint)
+      let supervisedBefore: HDCServerState? = if let supervisor {
+        await supervisor.state(for: endpoint)
+      } else { nil }
+      let result = await observeIdentity(HDCCandidate(path: path, source: .userConfigured, sha256: executable.sha256), endpoint)
+      let supervisedAfter: HDCServerState? = if let supervisor {
+        await supervisor.state(for: endpoint)
+      } else { nil }
       try pinned.revalidate()
       fields["executableSHA256"] = .string(executable.sha256)
       fields["signature"] = signature
@@ -106,7 +118,13 @@ package struct HeadlessHDCStatusObserver: HDCStatusObserving {
         let managed: Bool
         if let launch = launchedBefore, launch == launchedAfter, launch.matches(receipt) {
           managed = validateManagedProcess(receipt, launch.arguments) && managedLaunch() == launch
-        } else { managed = false }
+        } else if let supervisedBefore, supervisedBefore == supervisedAfter,
+          supervisedBefore.endpoint == endpoint,
+          supervisedBefore.health == .healthy,
+          supervisedBefore.generation == generation,
+          supervisedBefore.ownership == .arkDeckManaged
+        { managed = true }
+        else { managed = false }
         try pinned.revalidate()
         fields["ownership"] = .string(managed ? "arkDeckManaged" : "unknown")
         fields["reasonCode"] = .string(managed ? "hdc.identityObserved" : "hdc.ownershipUnproven")
@@ -143,7 +161,7 @@ package struct HeadlessHDCStatusObserver: HDCStatusObserving {
       "startupVersions": .null, "reasonCode": .string("hdc.notConfigured"), "newDispatchCount": .integer(0)]
   }
 
-  private static func signature(_ path: URL) throws -> JSONValue {
+  package static func signature(_ path: URL) throws -> JSONValue {
     var code: SecStaticCode?
     guard SecStaticCodeCreateWithPath(path as CFURL, SecCSFlags(), &code) == errSecSuccess, let code else {
       throw AgentExecutionControlFailure("recordUnreadable", "native code identity is unavailable")

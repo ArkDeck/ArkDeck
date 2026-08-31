@@ -803,7 +803,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertTrue(keys.contains("runtime hdc status"))
     let hdcRow = try XCTUnwrap(
       CLICompletionScripts.table().first { $0.key == "runtime hdc" })
-    XCTAssertEqual(hdcRow.next, ["status"])
+    XCTAssertEqual(hdcRow.next, ["status", "impact-preview", "restart"])
   }
 
   // MARK: Discovery and health leaves (§6.1, §13.2)

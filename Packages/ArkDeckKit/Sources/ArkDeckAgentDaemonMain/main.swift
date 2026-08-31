@@ -803,6 +803,16 @@ Task.detached {
     let agentExecutions = try RuntimeAgentExecutionCoordinator(
       directory: resolvedStateDirectory.appending(path: "agent-executions"), engine: engine,
       targets: targetStore, observations: targetObservations)
+    let hdcControlActions = try startedHDCServerHost.map { host in
+      try RuntimeHDCControlActionCoordinator(directory: resolvedStateDirectory.appending(path: "hdc-control-actions"),
+        source: host.controlImpactSource(engine: engine, targets: targetStore, observations: targetObservations),
+        lifecycleDriver: host.controlLifecycleDriver(
+          engine: engine, targets: targetStore, observations: targetObservations),
+        catalogDigest: RuntimeOperationCatalog.catalogDigest)
+    }
+    let humanActionResources = try RuntimeHumanActionResourceCoordinator(
+      directory: resolvedStateDirectory.appending(path: "human-action-snapshots"),
+      agents: agentExecutions, controls: hdcControlActions)
     // HDC 3.2 has no public target event stream. The daemon therefore owns a
     // continuous read-only observation loop and lets App launches consume its
     // last completed, timestamped snapshot without joining an HDC command.
@@ -921,9 +931,11 @@ Task.detached {
       bootstrap: bootstrap,
       targetObservations: targetObservations,
       agentExecutions: agentExecutions,
+      humanActionResources: humanActionResources,
       hdcRuntimeDiagnostics: startedHDCServerHost?.diagnostics,
       hdcStatusObserver: startedHDCServerHost?.statusObserver(
         daemonVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String),
+      hdcControlActions: hdcControlActions,
       artifactStore: artifactStore,
       flashBundleImportDirectory: resolvedStateDirectory.appending(
         path:
