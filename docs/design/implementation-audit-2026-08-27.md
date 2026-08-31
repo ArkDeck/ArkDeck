@@ -1667,3 +1667,30 @@ F58 记录的屏外宿主（x=1647）则是当时我自己加 `scrollIntoView` �
 
 **该 Diagnostics 测试当前红于另一原因**：目标按钮停在 y=-688.5，滚动未能将其带回视口。
 干净 `main` 上同一按钮、同一坐标，故为既有缺陷，与本批无关，根因未定，继续登记。
+
+## 2026-08-31 F67：稿件补齐 Viewer 的三个空态与三处控件名称
+
+第十四批，基线 `5b4b4b9b`。范围是 F65「本批未覆盖」明确登记的一项：裁决把六条 Viewer 文案
+接进目录后，**稿件侧仍缺它们的镜像**——三条是稿件根本到不了的状态，三条是它从未承载的
+可访问名称。按 §6 属 P-DRIFT（实现有、稿无）。
+
+**三个此前不可达的状态：**
+
+| 状态 | App 渲染 | 稿件此前 | 本批 |
+| --- | --- | --- | --- |
+| 未选中组件 | `ContentUnavailableView(selectPrompt)` | `viewerNode()` **总是回退到首个节点**，因此该状态根本不存在 | `?viewerSelection=none` 使 `selected` 为空，检查器整块显示空态 |
+| Raw dump 无可格式化字段 | `formattedRawFields(…) ?? rawUnavailable` | Raw 标签总是输出 JSON | `?viewerRaw=unavailable` |
+| Advanced Dump 尚未采集 | 无字段且无失败时显示 `advancedUnavailable` | 只有 loading / missingIDs / failed 三态 | 新增 `unavailable` 态，与加载和失败分开 |
+
+**三处控件名称**：搜索快捷键提示（`title`）、匹配计数的 `aria-label`、以及清除搜索。
+清除控件在稿件里此前依赖 `<input type="search">` 的**原生**清除按钮——它**不承载任何名称**，
+辅助技术读不到。现改为与 App 同构的真实按钮（带 `aria-label`、`title` 与 data-sync-id，
+且仅在有查询时出现），新 class `viewer-advanced-clear` 已加入 `CLASS_TO_COMPONENT`。
+
+**文案一律从 `.xcstrings` 逐字取**，不手打（此前两次因手打弯引号出错）。
+harness 实测中英各三态与清除按钮的条件显示，全部正确。
+
+**过程中被 `check:tokens` 抓到一处自己的疏漏**：新 class 只写了映射、没在原型里定义 CSS，
+双向检查立刻报 `mapped to DumpInspector but the prototype no longer defines it`。
+同时修正了一处因字符串替换而产生的多余未闭合 `<span hidden>`——改 HTML 用文本替换容易出这种错，
+补 CSS 与修标记后 `check:tokens` 通过。

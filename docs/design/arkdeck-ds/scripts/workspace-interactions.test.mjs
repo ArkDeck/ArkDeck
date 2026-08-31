@@ -1902,3 +1902,53 @@ test('the prototype mirrors the surfaces #1606 added to the App', () => {
   const draft = source.slice(source.indexOf('function deviceDraftState'), source.indexOf('function setDeviceScenario'));
   assert.doesNotMatch(draft, /deviceLocale\(/, 'deviceDraftState must not read S.language');
 });
+
+test('the prototype reaches the Viewer states the App renders', () => {
+  // F65 wired six Viewer strings into the catalog but left the prototype's
+  // mirror to a batch of its own: three were states the prototype could not
+  // reach at all, three were accessibility names it never carried.
+  const catalog = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const native = (key, lang) => catalog[key].localizations[lang].stringUnit.value;
+
+  for (const language of ['zh', 'en']) {
+    const lang = language === 'zh' ? 'zh-Hans' : 'en';
+    const at = query => harness(`?page=dump&viewerState=captured&lang=${language}&${query}`);
+
+    // Nothing selected: the App shows a ContentUnavailableView, so the
+    // prototype may not quietly fall back to the first node.
+    const none = at('viewerSelection=none');
+    const empty = none.run('viewerInspectorHTML(viewerNode(S.viewer.selected))');
+    assert.match(empty, /data-sync-id="viewer\.properties\.selectPrompt"/);
+    assert.ok(empty.includes(native('viewer.properties.selectPrompt', lang)));
+
+    // Raw dump with no formattable fields.
+    const raw = at('viewerTab=raw&viewerRaw=unavailable');
+    const rawBody = raw.run('viewerInspectorHTML(viewerNode(S.viewer.selected))');
+    assert.match(rawBody, /data-sync-id="viewer\.properties\.rawUnavailable"/);
+    assert.ok(rawBody.includes(native('viewer.properties.rawUnavailable', lang)));
+
+    // Not captured yet is its own answer, distinct from loading and failure.
+    const advanced = at('viewerTab=advanced');
+    advanced.run("S.viewer.advancedState='unavailable'");
+    const idle = advanced.run('viewerAdvancedHTML(viewerNode(S.viewer.selected))');
+    assert.match(idle, /data-sync-id="viewer\.advancedDump\.unavailable"/);
+    assert.ok(idle.includes(native('viewer.advancedDump.unavailable', lang)));
+
+    // The search controls carry the same names the App gives them. The clear
+    // control is a real button: type=search's native affordance has no name.
+    const search = at('viewerTab=advanced');
+    search.run("S.viewer.advancedQuery='fixture'");
+    const withQuery = search.run('viewerAdvancedHTML(viewerNode(S.viewer.selected))');
+    for (const key of ['viewer.advancedDump.search.clear', 'viewer.advancedDump.search.shortcut']) {
+      assert.ok(withQuery.includes(native(key, lang)), `${key} must name its control in ${language}`);
+    }
+    assert.match(withQuery, /data-sync-id="viewer\.advancedDump\.search\.clear"/);
+    const results = search.run('viewerAdvancedResults(viewerNode(S.viewer.selected))');
+    assert.ok(results.includes(native('viewer.advancedDump.search.results', lang)));
+
+    search.run("S.viewer.advancedQuery=''");
+    assert.doesNotMatch(
+      search.run('viewerAdvancedHTML(viewerNode(S.viewer.selected))'),
+      /viewer-advanced-clear/, 'the clear control appears only with a query, as in the App');
+  }
+});
