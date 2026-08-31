@@ -665,27 +665,19 @@ private struct AppShellView: View {
   }
 
   var body: some View {
-    // The Job inspector is a sibling of the split view, not a passenger inside
-    // the detail pane (spec §3's window skeleton). Keeping it window-wide in
-    // both states is what stops its left edge from jumping across the sidebar
-    // the moment it is expanded. `VSplitView` only appears once there is a
-    // height worth dragging.
-    Group {
-      if isJobInspectorExpanded {
-        VSplitView {
-          navigationShell
-            .frame(minHeight: 320, maxHeight: .infinity)
-          jobInspector
-            .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
-        }
-      } else {
-        VStack(spacing: 0) {
-          navigationShell
-          Divider()
-          jobInspector
-            .frame(height: WorkspaceMetrics.jobInspectorBarHeight)
-        }
-      }
+    // One container owns both panes in both states. Replacing VSplitView with
+    // VStack when collapsed destroys their structural identities, including
+    // History's unsaved filters and the inspector's selected Job. A fixed
+    // collapsed height leaves no divider travel; expanded constraints retain
+    // the native, draggable 220...320pt inspector.
+    VSplitView {
+      navigationShell
+        .frame(minHeight: 320, maxHeight: .infinity)
+      jobInspector
+        .frame(
+          minHeight: isJobInspectorExpanded ? 220 : WorkspaceMetrics.jobInspectorBarHeight,
+          idealHeight: isJobInspectorExpanded ? 260 : WorkspaceMetrics.jobInspectorBarHeight,
+          maxHeight: isJobInspectorExpanded ? 320 : WorkspaceMetrics.jobInspectorBarHeight)
     }
     .frame(minWidth: 900, minHeight: 600)
     .onAppear {

@@ -54,6 +54,7 @@ struct RuntimeHistoryView: View {
   @State private var workspaceWidth: CGFloat = 0
   @State private var cachedFilterProjectionInput: FilterProjectionInput?
   @State private var cachedFilteredJobs: [RuntimeJobSummaryPresentation] = []
+  @State private var filterReferenceDate = Date.now
 
   @AppStorage("history.savedFilter.exists") private var hasSavedFilter = false
   @AppStorage("history.savedFilter.search") private var savedSearchText = ""
@@ -78,6 +79,7 @@ struct RuntimeHistoryView: View {
     let target: String
     let time: HistoryTimeFilter
     let activity: HistoryActivityFilter
+    let dependencies: HistoryFilterDependencies
   }
 
   private var selectedJob: RuntimeJobSummaryPresentation? {
@@ -101,7 +103,18 @@ struct RuntimeHistoryView: View {
       session: sessionFilter,
       target: targetFilter,
       time: timeFilter,
-      activity: activityFilter)
+      activity: activityFilter,
+      dependencies: filterDependencies)
+  }
+
+  private var filterDependencies: HistoryFilterDependencies {
+    HistoryFilterDependencies(
+      jobs: presentation.jobs, detailsByJobID: detailsByJobID,
+      referenceDate: filterReferenceDate)
+  }
+
+  private var nextFilterExpirationDate: Date? {
+    filterDependencies.nextExpirationDate(in: presentation.jobs, within: timeFilter.interval)
   }
 
   private var filteredJobs: [RuntimeJobSummaryPresentation] {
@@ -111,7 +124,8 @@ struct RuntimeHistoryView: View {
   }
 
   private func makeFilteredJobs() -> [RuntimeJobSummaryPresentation] {
-    let matching = presentation.jobs.filter(matchesFilters)
+    let dependencies = filterDependencies
+    let matching = presentation.jobs.filter { matchesFilters($0, dependencies: dependencies) }
     return matching
       .map { (job: $0, date: historyDate($0)) }
       .sorted { lhs, rhs in
@@ -147,6 +161,10 @@ struct RuntimeHistoryView: View {
     .onChange(of: filterProjectionInput, initial: true) { _, input in
       cachedFilteredJobs = makeFilteredJobs()
       cachedFilterProjectionInput = input
+    }
+    .onChange(of: timeFilter) { filterReferenceDate = .now }
+    .task(id: nextFilterExpirationDate) {
+      await refreshTimeFilterAtExpiration()
     }
     .onChange(of: filteredJobs.map(\.id), initial: true) { _, visibleIDs in
       // A reveal is only meaningful for the row set it was computed against.
@@ -193,6 +211,8 @@ struct RuntimeHistoryView: View {
       onLoadDetail?(job.id, job.operationReference)
     }
     .onChange(of: isRefreshInFlight) { _, isRefreshing in
+      // An identical job.list result must still refresh a relative window.
+      if !isRefreshing { filterReferenceDate = .now }
       // A refresh can invalidate an in-flight detail without changing either
       // the selected Job or the empty cache's keys. Restart that read too.
       guard !isRefreshing, let job = selectedJob, detailsByJobID[job.id] == nil else { return }
@@ -1289,8 +1309,13 @@ struct RuntimeHistoryView: View {
       identifier: id)
   }
 
-  private func matchesFilters(_ job: RuntimeJobSummaryPresentation) -> Bool {
-    if activityFilter != .all, activityFilter != activityCategory(for: job) { return false }
+  private func matchesFilters(
+    _ job: RuntimeJobSummaryPresentation, dependencies: HistoryFilterDependencies
+  ) -> Bool {
+    if activityFilter != .all,
+      activityFilter != HistoryActivityFilter(
+        workspaceKind: dependencies.workspaceKindsByJobID[job.id])
+    { return false }
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     if !query.isEmpty,
       ![
@@ -1305,8 +1330,17 @@ struct RuntimeHistoryView: View {
     if !modeFilter.matches(job.executionMode) { return false }
     if sessionFilter != Self.allSessions, job.sessionID != sessionFilter { return false }
     if targetFilter != Self.allTargets, job.targetID != targetFilter { return false }
-    if !timeFilter.matches(historyDate(job)) { return false }
+    if !dependencies.includes(historyDate(job), within: timeFilter.interval) { return false }
     return true
+  }
+
+  private func refreshTimeFilterAtExpiration() async {
+    guard let expiration = nextFilterExpirationDate else { return }
+    do {
+      try await Task.sleep(for: .seconds(max(0, expiration.timeIntervalSinceNow)))
+    } catch { return }
+    guard !Task.isCancelled else { return }
+    filterReferenceDate = .now
   }
 
   private func resetFilters() {
@@ -1320,21 +1354,17 @@ struct RuntimeHistoryView: View {
   }
 
   private func activityCount(_ filter: HistoryActivityFilter) -> Int {
-    presentation.jobs.filter {
+    presentation.jobs.count {
       filter == .all || filter == activityCategory(for: $0)
-    }.count
+    }
   }
 
   private func activityCategory(
     for job: RuntimeJobSummaryPresentation
   ) -> HistoryActivityFilter {
-    let workspaceKind = job.resolvedWorkspaceKind
-      ?? detailsByJobID[job.id]?.evidence.flatMap {
-        RuntimeWorkspaceKindProjection.kind(
-          forOperation: job.operationReference,
-          parameters: $0.parameters)
-      }
-    return HistoryActivityFilter(workspaceKind: workspaceKind)
+    HistoryActivityFilter(
+      workspaceKind: HistoryFilterDependencies.workspaceKind(
+        for: job, detail: detailsByJobID[job.id]))
   }
 
   private func saveCurrentFilter() {
@@ -1628,17 +1658,13 @@ private enum HistoryTimeFilter: String, CaseIterable, Identifiable {
   var id: String { rawValue }
   var localizationKey: String { "history.filter.time.\(rawValue)" }
 
-  func matches(_ date: Date?) -> Bool {
-    guard self != .anyTime else { return true }
-    guard let date else { return false }
-    let interval: TimeInterval
+  var interval: TimeInterval? {
     switch self {
-    case .anyTime: return true
-    case .lastHour: interval = 60 * 60
-    case .lastDay: interval = 24 * 60 * 60
-    case .lastWeek: interval = 7 * 24 * 60 * 60
+    case .anyTime: nil
+    case .lastHour: 60 * 60
+    case .lastDay: 24 * 60 * 60
+    case .lastWeek: 7 * 24 * 60 * 60
     }
-    return date >= Date.now.addingTimeInterval(-interval)
   }
 }
 

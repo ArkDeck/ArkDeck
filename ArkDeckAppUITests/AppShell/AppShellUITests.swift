@@ -258,6 +258,60 @@ final class AppShellUITests: XCTestCase {
     XCTAssertEqual(app.textFields["history.filter.search"].value as? String, "")
   }
 
+  /// Presentation-only regression: opening a cross-workspace panel must not
+  /// recreate History or discard either pane's selected record.
+  func testHistoryAndJobSelectionSurviveInspectorToggle() {
+    let app = launch(arguments: [
+      "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+      "--ui-test-window-frame=1180x783", "-AppleLanguages", "(en)",
+    ])
+    defer { app.terminate() }
+    XCTAssertTrue(
+      app.windows.firstMatch.waitForFrameSize(CGSize(width: 1180, height: 783), timeout: 5))
+    select("app.navigation.history", in: app)
+    let search = app.textFields["history.filter.search"]
+    XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+    search.click()
+    search.typeText("job-fixture")
+    element("history.activity.viewer", in: app).click()
+    assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+    let flashRow = app.cells
+      .containing(.staticText, identifier: "history.row.state.job-fixture-0002").firstMatch
+    XCTAssertTrue(flashRow.waitForNonExistenceFast(timeout: 5))
+
+    let toggle = app.buttons["jobInspector.toggle"]
+    toggle.click()
+    let inspectorList = element("jobInspector.list", in: app)
+    XCTAssertTrue(inspectorList.waitForExistenceFast(timeout: 10))
+    XCTAssertEqual(search.value as? String, "job-fixture")
+    XCTAssertFalse(flashRow.exists, "opening the inspector must preserve the unsaved Viewer filter")
+    assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+
+    // The row identifier propagates to its text descendants. Select the
+    // native List cell, not the first matching StaticText's clipped frame.
+    let inspectedJob = app.cells.containing(
+      .staticText, identifier: "jobInspector.row.job-fixture-0001").firstMatch
+    XCTAssertTrue(inspectedJob.waitForExistenceFast(timeout: 5))
+    inspectedJob.click()
+    XCTAssertTrue(
+      element("jobInspector", in: app).staticTexts["job-fixture-0001"]
+        .waitForExistenceFast(timeout: 5))
+    XCTAssertFalse(app.buttons["jobInspector.cancel"].exists)
+
+    toggle.click()
+    XCTAssertTrue(inspectorList.waitForNonExistenceFast(timeout: 5))
+    XCTAssertEqual(search.value as? String, "job-fixture")
+    XCTAssertFalse(flashRow.exists)
+    toggle.click()
+    XCTAssertTrue(inspectorList.waitForExistenceFast(timeout: 5))
+    XCTAssertEqual(search.value as? String, "job-fixture")
+    XCTAssertFalse(flashRow.exists)
+    XCTAssertTrue(
+      element("jobInspector.attention", in: app).waitForNonExistenceFast(timeout: 5),
+      "reopening must retain the selected successful Job, not reset to the attention Job")
+    assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+  }
+
   private func checkHistorySavedFilterRestoresActivityAndExposesOneFilterSet(in app: XCUIApplication) {
     Self.resizeHistoryWindow(in: app, to: 1180)
     select("app.navigation.history", in: app)

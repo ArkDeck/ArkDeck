@@ -37,6 +37,10 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
       contentsOf: repository.appending(
         path: "ArkDeckApp/Features/Settings/SettingsRootView.swift"),
       encoding: .utf8)
+    let viewModel = try String(
+      contentsOf: repository.appending(
+        path: "ArkDeckApp/Features/Settings/SettingsWorkspaceViewModel.swift"),
+      encoding: .utf8)
     let catalogData = try Data(
       contentsOf: repository.appending(
         path: "ArkDeckApp/Resources/SettingsLocalizable.xcstrings"))
@@ -46,7 +50,8 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
 
     XCTAssertTrue(app.contains("SettingsRootView("))
     XCTAssertTrue(app.contains("SettingsApplicationFacade.make()"))
-    XCTAssertTrue(view.contains("tableName: \"SettingsLocalizable\""))
+    XCTAssertTrue(viewModel.contains("func settingsText(_ key: String) -> String"))
+    XCTAssertTrue(viewModel.contains("tableName: \"SettingsLocalizable\""))
     for key in [
       "settings.tab.general",
       "settings.tab.toolchains",
@@ -59,7 +64,7 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
       let localizations = try XCTUnwrap(entry["localizations"] as? [String: Any])
       XCTAssertNotNil(localizations["en"], key)
       XCTAssertNotNil(localizations["zh-Hans"], key)
-      XCTAssertTrue(view.contains("\"\(key)\""), key)
+      XCTAssertTrue(view.contains("settingsText(\"\(key)\")"), key)
     }
   }
 
