@@ -162,6 +162,9 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       contentsOf: distribution.appending(path: "build-helpers.sh"), encoding: .utf8)
     for requiredStep in [
       "security cms -D",
+      "swift build --package-path \"$package_root\" --arch arm64 -c release --product arkdeck",
+      "swift build --package-path \"$package_root\" --arch arm64 -c release --product arkdeck-agentd",
+      "swift build --package-path \"$package_root\" --arch arm64 -c release --show-bin-path",
       "codesign --verify --strict --deep",
       "xcrun notarytool submit",
       "xcrun stapler staple",
@@ -180,8 +183,9 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     for requiredStep in [
       "security cms -D",
       "security find-identity -v -p codesigning",
-      "-c debug --product arkdeck",
-      "-c debug --product arkdeck-agentd",
+      "swift build --package-path \"$package_root\" --arch arm64 -c debug --product arkdeck",
+      "swift build --package-path \"$package_root\" --arch arm64 -c debug --product arkdeck-agentd",
+      "swift build --package-path \"$package_root\" --arch arm64 -c debug --show-bin-path",
       "codesign --verify --strict --deep",
       "--options runtime --timestamp=none",
       "LOCAL-DEVELOPMENT-BUILD.txt",

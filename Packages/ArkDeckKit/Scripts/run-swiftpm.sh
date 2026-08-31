@@ -26,9 +26,11 @@ Environment overrides:
   ARKDECK_SWIFTPM_CACHE_ROOT  Absolute cache root owned by this runner.
   ARKDECK_SWIFT_EXECUTABLE    Absolute Swift executable path.
 
-The runner owns --package-path, --scratch-path, and --cache-path so every
-worktree sees the same logical source and build paths. The source mirror
-contains tracked and non-ignored untracked files; ignored files stay local.
+The runner builds only arm64 and owns --arch and --triple; callers cannot
+override the architecture. It also owns --package-path, --scratch-path, and
+--cache-path so every worktree sees the same logical source and build paths.
+The source mirror contains tracked and non-ignored untracked files; ignored
+files stay local.
 Every target treats Swift's DeprecatedDeclaration diagnostic group as an
 error so local and CI test runs enforce the current SDK surface.
 EOF
@@ -59,7 +61,7 @@ esac
 
 for argument in "$@"; do
   case $argument in
-    --package-path|--package-path=*|--scratch-path|--scratch-path=*|--cache-path|--cache-path=*)
+    --package-path|--package-path=*|--scratch-path|--scratch-path=*|--cache-path|--cache-path=*|--arch|--arch=*|--triple|--triple=*)
       fail "'$argument' is managed by this runner" 64
       ;;
   esac
@@ -183,6 +185,7 @@ printf 'ArkDeck SwiftPM cache: %s\n' "$cache_root" >&2
 printf 'ArkDeck SwiftPM worktree: %s\n' "$repo_root" >&2
 
 exec "$swift_executable" "$swift_command" \
+  --arch arm64 \
   --package-path "$stable_package" \
   --scratch-path "$scratch_path" \
   --cache-path "$dependency_cache" \

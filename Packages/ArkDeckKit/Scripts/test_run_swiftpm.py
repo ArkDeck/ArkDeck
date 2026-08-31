@@ -79,6 +79,8 @@ class RunSwiftPMTests(unittest.TestCase):
             result.stdout.splitlines(),
             [
                 "build",
+                "--arch",
+                "arm64",
                 "--package-path",
                 str(canonical_cache_root / "workspace/Packages/ArkDeckKit"),
                 "--scratch-path",
@@ -136,6 +138,46 @@ class RunSwiftPMTests(unittest.TestCase):
                 result, _ = self.invoke("test", option)
                 self.assertEqual(result.returncode, 64)
                 self.assertIn("is managed by this runner", result.stderr)
+
+    def test_build_and_test_are_arm64_for_every_configuration(self) -> None:
+        for command in ("build", "test"):
+            for configuration in (
+                (),
+                ("-c", "debug"),
+                ("-c", "release"),
+                ("--configuration", "debug"),
+                ("--configuration", "release"),
+            ):
+                with self.subTest(command=command, configuration=configuration):
+                    result, _ = self.invoke(command, *configuration)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    arguments = result.stdout.splitlines()
+                    self.assertEqual(arguments[:3], [command, "--arch", "arm64"])
+                    self.assertEqual(arguments.count("--arch"), 1)
+                    self.assertNotIn("--triple", arguments)
+                    if configuration:
+                        self.assertEqual(arguments[-2:], list(configuration))
+
+    def test_runner_owned_architecture_cannot_be_overridden(self) -> None:
+        for command in ("build", "test"):
+            for options in (
+                ("--arch",),
+                ("--arch", "arm64"),
+                ("--arch", "x86_64"),
+                ("--arch=arm64",),
+                ("--arch=x86_64",),
+                ("--triple",),
+                ("--triple", "arm64-apple-macosx26.0"),
+                ("--triple", "x86_64-apple-macosx26.0"),
+                ("--triple=arm64-apple-macosx26.0",),
+                ("--triple=x86_64-apple-macosx26.0",),
+            ):
+                with self.subTest(command=command, options=options):
+                    result, cache_root = self.invoke(command, *options)
+                    self.assertEqual(result.returncode, 64)
+                    self.assertIn("is managed by this runner", result.stderr)
+                    self.assertEqual(result.stdout, "")
+                    self.assertFalse(cache_root.exists())
 
     def test_cache_root_must_be_absolute(self) -> None:
         temporary = self.enterContext(tempfile.TemporaryDirectory())

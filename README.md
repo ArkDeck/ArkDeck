@@ -134,6 +134,35 @@ App/UI-test build directly:
 sh scripts/ci/run-xcodebuild.sh
 ```
 
+For a locally signed, optimized Release app (without installing it):
+
+```bash
+sh scripts/ci/run-xcodebuild.sh --release
+```
+
+The app is built at
+`~/Library/Caches/com.arkdeck.ArkDeck/Xcode/Shared/DerivedData/Build/Products/Release/ArkDeck.app`
+by default. Both modes explicitly build **arm64 only**, including SwiftPM
+dependencies, and print Xcode's build timing summary. Release uses the project's
+Developer ID signing settings; it does not notarize or install the app. Keep
+the stable cache between runs: a new worktree-specific DerivedData path discards
+incremental reuse, and Debug products cannot replace optimized Release objects.
+The runner also enables Xcode's local content-addressed compilation cache, so
+identical compiler inputs can reuse prior results even after build-graph
+invalidation. Cache hit/miss diagnostics remain visible in the build log.
+To bound parallel build tasks on a memory-constrained host, set
+`ARKDECK_XCODE_JOBS` (1–64), for example:
+
+```bash
+ARKDECK_XCODE_JOBS=4 sh scripts/ci/run-xcodebuild.sh --release
+```
+
+This limits build-system tasks, not Swift's internal compiler threads. Keep the
+same limit and toolchain when comparing build timings; do not benchmark while
+another Xcode or SwiftPM build is running. An unchanged Release skips resource
+repackaging and signing, while a changed helper or declared resource still
+regenerates the bundled manifest before the app is signed.
+
 The CI classifier sends only the Package targets linked by the desktop app to
 the Xcode lane; CLI, Agent, LaunchAgent, fixture, and Package-test-only changes
 stay on the Swift lane. App and UI-test changes use `build-for-testing`; this

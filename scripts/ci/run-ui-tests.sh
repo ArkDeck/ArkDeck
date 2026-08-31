@@ -87,6 +87,16 @@ case ${1:-} in
     ;;
 esac
 
+# Architecture is owned by the runner, just like the app/Release build entry.
+# Validate before creating DerivedData or cleaning up any previous UI runner.
+for argument in "$@"; do
+  case $argument in
+    ARCHS=*|ONLY_ACTIVE_ARCH=*|-arch|-arch=*)
+      fail "architecture is managed by this runner: $argument" 64
+      ;;
+  esac
+done
+
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null) ||
   fail 'not inside a Git checkout'
 [ -d "$repo_root/ArkDeck.xcodeproj" ] ||
@@ -161,6 +171,8 @@ exec "$xcodebuild_executable" \
   -configuration Debug \
   -destination platform=macOS,arch=arm64 \
   -derivedDataPath "$derived_data" \
+  ARCHS=arm64 \
+  ONLY_ACTIVE_ARCH=YES \
   CODE_SIGN_IDENTITY=- \
   CODE_SIGNING_REQUIRED=YES \
   CODE_SIGNING_ALLOWED=YES \

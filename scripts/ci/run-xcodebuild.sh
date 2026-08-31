@@ -16,7 +16,10 @@ fi
 
 usage() {
   cat <<'EOF'
-usage: sh scripts/ci/run-xcodebuild.sh
+usage: sh scripts/ci/run-xcodebuild.sh [--release]
+
+Default: unsigned Debug build-for-testing (does not execute tests).
+--release: signed Release app build using the project's signing settings.
 
 Default cache root:
   ~/Library/Caches/com.arkdeck.ArkDeck/Xcode/Shared
@@ -24,9 +27,12 @@ Default cache root:
 Environment overrides:
   ARKDECK_XCODE_CACHE_ROOT       Absolute cache root owned by this runner.
   ARKDECK_XCODEBUILD_EXECUTABLE  Absolute xcodebuild executable path.
+  ARKDECK_XCODE_JOBS            Optional build task limit (1–64).
 
-The runner owns the project, scheme, destination, DerivedData, package caches,
-module cache, and build-for-testing action. The source mirror contains tracked
+The runner owns the project, scheme, arm64 architecture, destination,
+DerivedData, package caches, module cache, and build action. Both configurations
+reuse the same stable source mirror; Xcode separates their build products.
+The source mirror contains tracked
 and non-ignored untracked files; ignored files stay local.
 EOF
 }
@@ -36,16 +42,31 @@ fail() {
   exit "${2:-1}"
 }
 
+configuration=Debug
 case ${1:-} in
   -h|--help)
     usage
     exit 0
+    ;;
+  --release)
+    configuration=Release
+    shift
     ;;
   '') ;;
   *)
     fail "unexpected argument '$1'" 64
     ;;
 esac
+[ "$#" -eq 0 ] || fail "unexpected argument '$1'" 64
+
+build_jobs=${ARKDECK_XCODE_JOBS:-}
+if [ -n "$build_jobs" ]; then
+  case $build_jobs in
+    *[!0-9]*|0|0*) fail 'ARKDECK_XCODE_JOBS must be an integer from 1 to 64' 64 ;;
+  esac
+  [ "${#build_jobs}" -le 2 ] && [ "$build_jobs" -le 64 ] ||
+    fail 'ARKDECK_XCODE_JOBS must be an integer from 1 to 64' 64
+fi
 
 script_dir=$(CDPATH= cd -P -- "$(dirname -- "$0")" && pwd)
 script_path=$script_dir/$(basename -- "$0")
@@ -104,8 +125,11 @@ ignored_paths=$cache_root/ignored-paths
 mkdir -p "$derived_data" "$source_packages" "$package_cache" "$module_cache"
 
 if [ "$lock_held" -eq 0 ]; then
+  if [ "$configuration" = Release ]; then
+    set -- --release
+  fi
   exec /usr/bin/lockf -k "$lock_path" \
-    /bin/sh "$script_path" --arkdeck-internal-lock-held
+    /bin/sh "$script_path" --arkdeck-internal-lock-held "$@"
 fi
 
 if [ -L "$workspace_path" ]; then
@@ -133,20 +157,37 @@ fi
 printf 'ArkDeck Xcode cache: %s\n' "$cache_root" >&2
 printf 'ArkDeck Xcode worktree: %s\n' "$repo_root" >&2
 
+# Package targets have their own projects: the App's ARCHS does not constrain
+# their Release defaults. Pass arm64 at invocation scope so dependencies cannot
+# silently build an unused Intel slice. Do not override Release signing here:
+# the App and SwiftPM resource bundles intentionally have different settings.
+if [ "$configuration" = Release ]; then
+  set -- -onlyUsePackageVersionsFromResolvedFile build
+else
+  set -- CODE_SIGNING_ALLOWED=NO \
+    SWIFT_OPTIMIZATION_LEVEL=-Onone \
+    SWIFT_COMPILATION_MODE=singlefile \
+    build-for-testing
+fi
+if [ -n "$build_jobs" ]; then
+  set -- -jobs "$build_jobs" "$@"
+fi
+
 exec env \
   CLANG_MODULE_CACHE_PATH="$module_cache" \
   SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
   "$xcodebuild_executable" \
   -project "$workspace_path/ArkDeck.xcodeproj" \
   -scheme ArkDeck \
-  -configuration Debug \
+  -configuration "$configuration" \
   -destination platform=macOS,arch=arm64 \
   -derivedDataPath "$derived_data" \
   -clonedSourcePackagesDirPath "$source_packages" \
   -packageCachePath "$package_cache" \
   -showBuildTimingSummary \
   -hideShellScriptEnvironment \
-  CODE_SIGNING_ALLOWED=NO \
-  SWIFT_OPTIMIZATION_LEVEL=-Onone \
-  SWIFT_COMPILATION_MODE=singlefile \
-  build-for-testing
+  ARCHS=arm64 \
+  ONLY_ACTIVE_ARCH=YES \
+  COMPILATION_CACHE_ENABLE_CACHING=YES \
+  COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS=YES \
+  "$@"
