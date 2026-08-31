@@ -20,6 +20,11 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1].hasPrefix("import-
   exit(70)
 }
 
+if CommandLine.arguments.count == 3, CommandLine.arguments[1].hasPrefix("bootstrap-tool-") {
+  try runBootstrapToolCrashFixture(window: CommandLine.arguments[1], directory: URL(filePath: CommandLine.arguments[2]))
+  exit(70)
+}
+
 if CommandLine.arguments.count == 3, CommandLine.arguments[1].hasPrefix("bootstrap-bundle-") {
   try runBootstrapBundleCrashFixture(window: CommandLine.arguments[1], directory: URL(filePath: CommandLine.arguments[2]))
   exit(70)

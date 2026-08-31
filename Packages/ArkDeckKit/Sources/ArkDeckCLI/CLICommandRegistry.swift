@@ -830,6 +830,7 @@ enum CLICommandRegistry {
       runtimeServiceNode,
       runtimeSigningNode,
       runtimeBundleNode,
+      runtimeToolNode,
     ])
 
   private static let runtimeBundleNode = CLINodeSpec(
@@ -858,6 +859,33 @@ enum CLICommandRegistry {
   private static let bootstrapBundleRefOption = CLIOptionSpec(
     name: "--bundle", form: .value(placeholder: "bundle:sha256:digest", grammar: .opaque),
     summary: "exact content-addressed bundle reference", isRequired: true)
+
+  private static let runtimeToolNode = CLINodeSpec(
+    token: "tool", summary: "inspect and retain typed host tool candidates without selecting or executing them",
+    leaves: [
+      CLILeafSpec(token: "register", canonicalCommand: "runtime.tool.register",
+        summary: "copy a native HDC candidate and inspect its signature and published identity",
+        options: [
+          CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdc", grammar: .enumeration(["hdc"])), summary: "closed host tool role", isRequired: true),
+          CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "native executable source, used only during registration", isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption,
+        ]),
+      CLILeafSpec(token: "list", canonicalCommand: "runtime.tool.list",
+        summary: "read an immutable snapshot of registered tool candidates",
+        options: snapshotPageOptions + [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(token: "inspect", canonicalCommand: "runtime.tool.inspect",
+        summary: "revalidate an exact tool's content, signature and durable references",
+        options: [bootstrapToolRefOption, outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(token: "remove", canonicalCommand: "runtime.tool.remove",
+        summary: "retire an exact unselected, unreferenced tool; retain historical bytes",
+        options: [bootstrapToolRefOption,
+          CLIOptionSpec(name: "--expected-generation", form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)), summary: "exact available generation", isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption]),
+    ])
+
+  private static let bootstrapToolRefOption = CLIOptionSpec(
+    name: "--tool", form: .value(placeholder: "tool:sha256:digest", grammar: .opaque),
+    summary: "exact content-addressed host tool reference", isRequired: true)
 
   /// §6.1's durable target surface. `device list/show/adopt` stay as the
   /// frozen 1.x legacy spellings beside it (§12).
