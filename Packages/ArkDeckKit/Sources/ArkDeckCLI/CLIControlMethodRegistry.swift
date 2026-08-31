@@ -46,6 +46,12 @@ enum CLIControlMethodRegistry {
     "device.candidates",
     "target.list",
     "target.show",
+    // Read the registered configuration and report. They create nothing and
+    // touch no device, so an ambiguous failure from one is a plain failure.
+    "workspace.project.list",
+    "workspace.project.show",
+    "workspace.preset.list",
+    "workspace.preset.show",
     // Observes and reports. §5.1 admits it as a bounded read-only aggregate:
     // it creates no Job, writes no evidence, and deliberately runs no device
     // workflow — the warm candidate snapshot is read, never refreshed.
@@ -182,6 +188,11 @@ enum CLIControlFailureMapper {
     case "invalidParams": return .invalidInput
     case "conflict": return .resourceConflict
     case "notFound": return .resourceNotFound
+    // §7.9's own code. Distinct from `notFound` because it sends a caller
+    // somewhere different: not a durable record that is missing, but a
+    // reference that is not registered on this host — answered by
+    // `workspace project list`, not by a different identity.
+    case "workspaceReferenceNotFound": return .workspaceReferenceNotFound
     case "recordUnreadable": return .recordUnreadable
     case "rejected":
       // Only a closed handler contract proving both halves may say the

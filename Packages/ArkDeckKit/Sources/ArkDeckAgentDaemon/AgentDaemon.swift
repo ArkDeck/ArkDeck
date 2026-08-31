@@ -54,6 +54,13 @@ package enum AgentDaemonErrorCode: String, Sendable {
   case rejected
   case conflict
   case notFound
+  /// §7.9's own code for an unknown project or preset reference.
+  ///
+  /// Distinct from `notFound` because the two send a caller somewhere
+  /// different: `notFound` is a durable record that does not exist, while this
+  /// is a reference that is not registered on *this host* — the fix is
+  /// `workspace project list`, not a different identity.
+  case workspaceReferenceNotFound
   case recordUnreadable
   case internalError
 }
@@ -83,6 +90,15 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let nativeLibraryImports: NativeLibraryArtifactImportCoordinator
   /// Test seam: records which methods a client invoked. Production passes
   /// nil, so this cannot affect behaviour.
+  /// The workspace projects this daemon actually derived a profile for.
+  ///
+  /// §7.9 asks `workspace project list/show` to project the daemon's *current
+  /// registered configuration*, which is exactly this — not the environment
+  /// variable it was configured from. A root the daemon was told about but
+  /// could not derive a profile for is not registered, and the pair of
+  /// properties keeps those two facts apart instead of letting an empty list
+  /// stand for both "none configured" and "configured but unusable".
+  private let workspaceProjects: [WorkspaceProjectPublication]
   private let methodObserver: (@Sendable (String) -> Void)?
 
   public init(
@@ -103,6 +119,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
+    workspaceProjects: [WorkspaceProjectPublication] = [],
     methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
     self.init(
@@ -121,6 +138,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
       debugInvocationController: debugInvocationController,
+      workspaceProjects: workspaceProjects,
       methodObserver: methodObserver)
   }
 
@@ -143,6 +161,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
+    workspaceProjects: [WorkspaceProjectPublication] = [],
     methodObserver: (@Sendable (String) -> Void)?
   ) {
     self.engine = engine
@@ -172,6 +191,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         policy: flashBundleImportPolicy)
     }
     self.nativeLibraryImports = NativeLibraryArtifactImportCoordinator()
+    self.workspaceProjects = workspaceProjects.sorted { $0.projectRef < $1.projectRef }
     self.methodObserver = methodObserver
   }
 
@@ -1889,6 +1909,70 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "workspace.project.list":
+      // §7.9: project the daemon's current registered configuration. Read-only
+      // and derived from what was resolved at composition time, so it neither
+      // grants nor widens anything — it is the discovery half, and today it is
+      // the only way to learn a `projectRef` at all. §7.9 is explicit that the
+      // free-form strings in Catalog descriptors do not count as discovery.
+      return success(
+        id: request.id,
+        result: .array(workspaceProjects.map(Self.encodeWorkspaceProject)))
+
+    case "workspace.project.show":
+      guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty
+      else {
+        return failure(id: request.id, code: .invalidParams, message: "projectRef is required")
+      }
+      guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
+        return failure(
+          id: request.id, code: .workspaceReferenceNotFound,
+          message: "no workspace project \(projectRef) is registered on this host")
+      }
+      return success(id: request.id, result: Self.encodeWorkspaceProject(project))
+
+    case "workspace.preset.list":
+      guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty
+      else {
+        return failure(id: request.id, code: .invalidParams, message: "projectRef is required")
+      }
+      guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
+        return failure(
+          id: request.id, code: .workspaceReferenceNotFound,
+          message: "no workspace project \(projectRef) is registered on this host")
+      }
+      var presets = project.presets
+      if case .string(let kind)? = request.params?["kind"] {
+        guard ["build", "test", "signing", "symbol"].contains(kind) else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "kind must be one of build|test|signing|symbol")
+        }
+        presets = presets.filter { $0.kind == kind }
+      }
+      return success(
+        id: request.id, result: .array(presets.map(Self.encodeWorkspacePreset)))
+
+    case "workspace.preset.show":
+      guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty,
+        case .string(let presetRef)? = request.params?["presetRef"], !presetRef.isEmpty
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "projectRef and presetRef are required")
+      }
+      guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
+        return failure(
+          id: request.id, code: .workspaceReferenceNotFound,
+          message: "no workspace project \(projectRef) is registered on this host")
+      }
+      guard let preset = project.presets.first(where: { $0.presetRef == presetRef }) else {
+        return failure(
+          id: request.id, code: .workspaceReferenceNotFound,
+          message: "project \(projectRef) registers no preset \(presetRef)")
+      }
+      return success(id: request.id, result: Self.encodeWorkspacePreset(preset))
+
     case "device.candidates":
       // Read-only discovery: the one enumeration the App's device list needs.
       // It calls the bootstrap's candidate read directly — never `advance`,
@@ -2223,6 +2307,43 @@ public struct RuntimeControlPlaneHandler: Sendable {
         "reason": .string(
           "no target-to-profile resolver exists; catalog profiles are published but unmatched"),
       ]),
+    ])
+  }
+
+  // MARK: workspace discovery (§7.9)
+
+  /// Everything §7.9 permits, and nothing it forbids.
+  ///
+  /// There is no host root, executable or argv here because
+  /// `WorkspaceProjectPublication` cannot carry them — the omission is a
+  /// property of the value this function receives rather than a rule this
+  /// function follows.
+  static func encodeWorkspaceProject(_ project: WorkspaceProjectPublication) -> JSONValue {
+    .object([
+      "projectRef": .string(project.projectRef),
+      "kind": project.kind.map(JSONValue.string) ?? .null,
+      "availability": .string(project.available ? "available" : "unavailable"),
+      "reasonCode": project.reasonCode.map(JSONValue.string) ?? .null,
+      "reason": project.reason.map(JSONValue.string) ?? .null,
+      "allowedFileGlobs": .array(project.allowedFileGlobs.map(JSONValue.string)),
+      "presetRefs": .array(project.presets.map(Self.encodeWorkspacePreset)),
+      "operations": .array(
+        project.operations.map { operation in
+          .object([
+            "reference": .string(operation.reference),
+            "availability": .string(operation.available ? "available" : "unavailable"),
+            "reasonCode": operation.reasonCode.map(JSONValue.string) ?? .null,
+            "reason": operation.reason.map(JSONValue.string) ?? .null,
+          ])
+        }),
+    ])
+  }
+
+  static func encodeWorkspacePreset(_ preset: WorkspaceProjectPublication.Preset) -> JSONValue {
+    .object([
+      "presetRef": .string(preset.presetRef),
+      "kind": .string(preset.kind),
+      "timeoutSeconds": .integer(Int64(preset.timeoutSeconds)),
     ])
   }
 

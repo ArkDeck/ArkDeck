@@ -618,7 +618,70 @@ enum CLICommandRegistry {
       domainLeaf(
         "sweep", "workspace.sweep", "workspace.sweep-isolated-copies@1",
         "sweep isolated copies"),
+    ],
+    // §7.9's discovery half. Every leaf above needs a `--project` reference,
+    // and until these existed there was no way to learn one: §7.9 is explicit
+    // that the free-form strings and examples in Catalog descriptors are not
+    // discoverability. These read the daemon's current registered
+    // configuration and publish references, kinds and availability — never the
+    // host root, the executable or its arguments.
+    groups: [
+      CLINodeSpec(
+        token: "project",
+        summary: "registered workspace projects, by reference",
+        leaves: [
+          CLILeafSpec(
+            token: "list",
+            canonicalCommand: "workspace.project.list",
+            summary: "every project this Runtime has registered, with availability",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "show",
+            canonicalCommand: "workspace.project.show",
+            summary: "one project: kind, availability, preset refs and supported operations",
+            options: runtimeClientOptions([workspaceProjectRefOption]),
+            connectsToRuntime: true),
+        ]),
+      CLINodeSpec(
+        token: "preset",
+        summary: "kind-tagged preset references inside one registered project",
+        leaves: [
+          CLILeafSpec(
+            token: "list",
+            canonicalCommand: "workspace.preset.list",
+            summary: "preset references, optionally narrowed to one kind",
+            options: runtimeClientOptions([
+              workspaceProjectRefOption,
+              CLIOptionSpec(
+                name: "--kind",
+                form: .value(
+                  placeholder: "build|test|signing|symbol",
+                  grammar: .enumeration(["build", "test", "signing", "symbol"])),
+                summary: "narrow to one preset kind"),
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "show",
+            canonicalCommand: "workspace.preset.show",
+            summary: "one preset reference and its typed constraints",
+            options: runtimeClientOptions([
+              workspaceProjectRefOption,
+              CLIOptionSpec(
+                name: "--preset",
+                form: .value(placeholder: "preset-ref", grammar: .opaque),
+                summary: "preset reference from `workspace preset list`",
+                isRequired: true),
+            ]),
+            connectsToRuntime: true),
+        ]),
     ])
+
+  private static let workspaceProjectRefOption = CLIOptionSpec(
+    name: "--project",
+    form: .value(placeholder: "project-ref", grammar: .opaque),
+    summary: "registered project reference from `workspace project list`",
+    isRequired: true)
 
   /// §6.1's recovery surface.
   ///
