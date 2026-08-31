@@ -1155,6 +1155,7 @@ public actor RuntimeJobEngine {
   /// pinned - and therefore comparable - observation window.
   private let nowPreciseUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
+  private var jobRuns: [String: Task<RuntimeJobStatus, Error>] = [:]
   private var cancellationRequests: Set<String> = []
   private var activeDispatches: [String: ActiveRuntimeDispatch] = [:]
   private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
@@ -1315,6 +1316,49 @@ public actor RuntimeJobEngine {
   // MARK: Submit
 
   public func submit(_ requestData: Data) async throws -> RuntimeJobAcceptance {
+    try await submitOwned(requestData, beforeAdmission: nil)
+  }
+
+  /// The Runtime orchestration owner may impose an additional deadline on
+  /// *creating* a Job. It cannot relax any admission rule, supply facts, or
+  /// change the operation/plan/capability budget of an accepted Job.
+  package func submitForAgent(
+    _ requestData: Data, beforeAdmission: @escaping @Sendable () throws -> Void
+  ) async throws -> RuntimeJobAcceptance {
+    try await submitOwned(requestData, beforeAdmission: beforeAdmission)
+  }
+
+  /// Validate declared inputs before creating physical-assistance resources.
+  /// This shares the admission validator without reading facts or admitting a Job.
+  package func validateAgentIntent(_ intent: AgentExecutionIntent) throws {
+    guard let descriptor = RuntimeOperationCatalog.descriptor(reference: intent.operationReference) else {
+      throw RuntimeJobEngineError.rejected(.unknownOperation, "operation is not published")
+    }
+    try validateInputs(intent.inputs, against: descriptor)
+    try validateSupportedPlanInputs(intent.inputs, descriptor: descriptor)
+  }
+
+  /// Reconcile the acceptance-to-owner-publication crash window without
+  /// admitting anything. The exact original request is required; an ID alone
+  /// is never permission to attach an unrelated Job to an execution.
+  package func acceptedJobForAgent(_ requestData: Data) throws -> RuntimeJobAcceptance? {
+    let request = try RuntimeOperationCodec.decodeRequest(requestData)
+    let fingerprint = Self.fingerprint(of: try CanonicalJSONEncoders.canonical().encode(request))
+    switch try admissionService.lookup(idempotencyKey: request.idempotencyKey, requestHash: fingerprint) {
+    case .duplicate(let jobID):
+      if let digest = try Self.reviewedPlanDigest(in: requestData),
+        try recordForRead(jobID: jobID).materializedPlanDigest != digest {
+        throw AgentExecutionControlFailure("reviewedPlanMismatch", "the recovered Job differs from the immutable reviewed plan")
+      }
+      return RuntimeJobAcceptance(jobID: jobID, deduplicated: true)
+    case .conflict: throw RuntimeJobEngineError.idempotencyConflict("execution submission identity changed")
+    case .admitted: return nil
+    }
+  }
+
+  private func submitOwned(
+    _ requestData: Data, beforeAdmission: (@Sendable () throws -> Void)?
+  ) async throws -> RuntimeJobAcceptance {
     let request: RuntimeOperationRequest
     do {
       request = try RuntimeOperationCodec.decodeRequest(requestData)
@@ -1351,6 +1395,9 @@ public actor RuntimeJobEngine {
       if let reviewedPlanDigest {
         let existing = try recordForRead(jobID: existingJobID)
         guard existing.materializedPlanDigest == reviewedPlanDigest else {
+          if beforeAdmission != nil {
+            throw AgentExecutionControlFailure("reviewedPlanMismatch", "the existing Job differs from the immutable reviewed plan")
+          }
           throw RuntimeJobEngineError.rejected(
             .conflict,
             "deduplicated job plan digest differs from the reviewed plan; zero new dispatch")
@@ -1381,11 +1428,15 @@ public actor RuntimeJobEngine {
     }
     let jobID = Self.stableJobID(
       idempotencyKey: request.idempotencyKey, requestFingerprint: fingerprint)
+    try beforeAdmission?()
     let materialized = try await materializeTypedPlanBeforeAuthorization(
       request: request, descriptor: descriptor,
       jobID: Self.authorizationPlanJobID)
     if let reviewedPlanDigest {
       guard materialized.planDigest == reviewedPlanDigest else {
+        if beforeAdmission != nil {
+          throw AgentExecutionControlFailure("reviewedPlanMismatch", "the fresh materialized plan differs from the immutable reviewed plan")
+        }
         throw RuntimeJobEngineError.rejected(
           .conflict,
           "materialized plan digest changed after review; zero admission and zero dispatch")
@@ -1438,6 +1489,9 @@ public actor RuntimeJobEngine {
       record.timeline.append(
         "recognized durable complete-overwrite supersession \(epochID); device dispatch 0")
     }
+    // Every asynchronous probe/preauthorization has finished. No await lies
+    // between this owner's deadline check and the durable Job admission.
+    try beforeAdmission?()
     try configuration.admissionFaultInjector.check(.beforeAdmission)
     switch try admissionService.admit(record: record, requestHash: fingerprint) {
     case .duplicate(let existingJobID):
@@ -1488,6 +1542,19 @@ public actor RuntimeJobEngine {
   // MARK: Run
 
   public func run(jobID: String) async throws -> RuntimeJobStatus {
+    if let existing = jobRuns[jobID] { return try await existing.value }
+    // All callers join the same driver. Actor reentrancy during provider
+    // awaits must not let Agent recovery and a control request run one Job's
+    // confirmed boundary twice. Client cancellation does not cancel the Job.
+    let task = Task {
+      defer { jobRuns.removeValue(forKey: jobID) }
+      return try await runOwned(jobID: jobID)
+    }
+    jobRuns[jobID] = task
+    return try await task.value
+  }
+
+  private func runOwned(jobID: String) async throws -> RuntimeJobStatus {
     guard var runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
     }

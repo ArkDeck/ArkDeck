@@ -237,6 +237,8 @@ struct ArkDeckCommandLine {
           path: [command, verb], Array(arguments.dropFirst()))
       case "agent":
         try await RuntimeCLI.runAgent(arguments)
+      case "human-action":
+        try await RuntimeCLI.runRuntimeExecution(arguments, family: "human-action")
       case "agentd":
         // §12's compatibility spellings. Both reach the same handler; only the
         // name they report differs, which is what the registry needs to answer

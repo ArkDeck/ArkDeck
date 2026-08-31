@@ -1660,6 +1660,10 @@ enum RuntimeCLI {
   /// persisted resume token keeps physical assistance inside the same
   /// execution instead of asking a maintainer to restart host commands.
   static func runAgent(_ arguments: [String]) async throws {
+    if usesRuntimeExecution(arguments) {
+      try await runRuntimeExecution(arguments)
+      return
+    }
     // `agent chat` is a registry tombstone, answered before dispatch with its
     // exact replacement; it is not re-spelled here.
     guard let subcommand = arguments.first, subcommand == "run" || subcommand == "resume" else {

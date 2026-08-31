@@ -800,6 +800,9 @@ Task.detached {
     let targetObservations = TargetObservationCoordinator(
       observation: bootstrapObservation, targetStore: targetStore,
       usbRelations: { try TargetUSBRelation.registeredDAYU200() }, nowUTC: utcNow)
+    let agentExecutions = try RuntimeAgentExecutionCoordinator(
+      directory: resolvedStateDirectory.appending(path: "agent-executions"), engine: engine,
+      targets: targetStore, observations: targetObservations)
     // HDC 3.2 has no public target event stream. The daemon therefore owns a
     // continuous read-only observation loop and lets App launches consume its
     // last completed, timestamped snapshot without joining an HDC command.
@@ -917,6 +920,7 @@ Task.detached {
       targetStore: targetStore,
       bootstrap: bootstrap,
       targetObservations: targetObservations,
+      agentExecutions: agentExecutions,
       hdcRuntimeDiagnostics: startedHDCServerHost?.diagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: resolvedStateDirectory.appending(

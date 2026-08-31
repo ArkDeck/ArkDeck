@@ -138,7 +138,11 @@ public actor TargetObservationCoordinator {
     }
   }
 
-  package func adopt(_ reference: TargetObservationReference) async throws -> RuntimeTargetRecord {
+  package func adopt(
+    _ reference: TargetObservationReference,
+    beforeCommit: (@Sendable () throws -> Void)? = nil
+  ) async throws -> RuntimeTargetRecord {
+    try beforeCommit?()
     let initial = try current(reference, allowNewer: false)
     guard initial.relation != nil else {
       throw TargetObservationFailure(
@@ -162,6 +166,7 @@ public actor TargetObservationCoordinator {
     let live: [TargetUSBRelation]
     do {
       toolVersion = try await observation.observeToolVersion()
+      try beforeCommit?()
       readback = try await observation.observeDeviceIdentity(connectKey: reference.candidate)
       live = try usbRelations().filter { $0.isUsable && $0.serial == reference.candidate }
     } catch {
@@ -177,6 +182,7 @@ public actor TargetObservationCoordinator {
       throw TargetObservationFailure(
         "factsDrifted", "physical identity changed during adoption readback", reference: reference)
     }
+    try beforeCommit?()
     return try targetStore.adopt(
       stableIdentitySHA256: DeviceBootstrapMachine.stableIdentitySHA256(serial: relation.serial),
       connectKey: reference.candidate, toolVersion: toolVersion, nowUTC: nowUTC()
