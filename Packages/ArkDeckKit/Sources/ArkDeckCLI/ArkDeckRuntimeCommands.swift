@@ -1,6 +1,6 @@
 // Runtime client commands (CHG-2026-048, T09/T11).
 //
-// `arkdeck doctor`, `arkdeck operation list`, `arkdeck device list|adopt|show` and
+// `arkdeck doctor`, `arkdeck operation list`, `arkdeck target list|show` and
 // `arkdeck job submit|status` are thin daemon clients: they construct a
 // typed request or a control-plane call and print the response. No HDC,
 // no argv, no executor lives here - the CLI cannot execute a device
@@ -48,6 +48,39 @@ enum RuntimeCLI {
     ArkDeckAgentFilesystemLayout.defaultSocketURL().path
   }
 
+  /// Builds the session for one invocation and removes every option it owns
+  /// from `arguments`, so the family handler below still sees only its own.
+  ///
+  /// The registry has already accepted or refused each of these, so this is
+  /// extraction rather than validation — the parser is the one validator, and
+  /// a second one here is how the two start disagreeing.
+  static func runtimeSession(
+    _ arguments: inout [String], command: String
+  ) -> CLIRuntimeSession {
+    let controlRequestID = CLIArgumentParser.bootstrapControlRequestID(arguments)
+    var rendering = CLIRendering.human
+    if let index = arguments.firstIndex(of: "--output"), index + 1 < arguments.count {
+      if arguments[index + 1] == CLIOutputMode.json.rawValue { rendering = .envelope }
+      arguments.removeSubrange(index...(index + 1))
+    }
+    if let index = arguments.firstIndex(of: "--control-request-id"), index + 1 < arguments.count {
+      arguments.removeSubrange(index...(index + 1))
+    }
+    if arguments.contains("--json") {
+      if rendering == .human { rendering = .legacyJSON }
+      arguments.removeAll { $0 == "--json" }
+    }
+    let lifecycle =
+      CLICommandRegistry.allLeaves()
+      .first { $0.leaf.canonicalCommand == command }?.leaf.lifecycle ?? .current
+    return CLIRuntimeSession(
+      client: client(&arguments),
+      command: command,
+      rendering: rendering,
+      controlRequestID: controlRequestID,
+      lifecycle: lifecycle)
+  }
+
   static func client(_ arguments: inout [String]) -> AgentClient {
     var socketPath = defaultSocketPath()
     if let index = arguments.firstIndex(of: "--socket"), index + 1 < arguments.count {
@@ -55,17 +88,6 @@ enum RuntimeCLI {
       arguments.removeSubrange(index...(index + 1))
     }
     return AgentClient(socketPath: socketPath)
-  }
-
-  static func emit(_ value: JSONValue, json: Bool) {
-    if json {
-      let encoder = CanonicalJSONEncoders.canonicalPretty()
-      if let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8) {
-        print(text)
-        return
-      }
-    }
-    print(render(value, indent: 0))
   }
 
   /// A terminal Job that did not succeed must not leave the process at exit 0.
@@ -123,16 +145,10 @@ enum RuntimeCLI {
     return ("job.run", jobID)
   }
 
-  static func completeWaitedSubmit(
-    _ submitted: JSONValue, client: AgentClient, json: Bool
-  ) throws {
-    guard let call = waitedSubmitCall(submitted) else { return }
-    let response = try client.request(
-      method: call.method, params: ["jobId": .string(call.jobID)])
-    emit(response, json: json)
-    if let terminal = terminalJobExit(response) {
-      throw CLIError(exitCode: terminal.code, message: terminal.reason)
-    }
+  /// The human layout for a daemon reply, shared with `CLIRuntimeSession` so
+  /// there is one rendering rather than one per caller.
+  static func humanRendering(of value: JSONValue) -> String {
+    render(value, indent: 0)
   }
 
   private static func render(_ value: JSONValue, indent: Int) -> String {
@@ -159,9 +175,8 @@ enum RuntimeCLI {
 
   static func runDoctor(_ arguments: [String]) throws {
     var rest = arguments
-    let json = rest.contains("--json")
-    let client = client(&rest)
-    emit(try client.request(method: "doctor"), json: json)
+    let session = runtimeSession(&rest, command: "doctor")
+    session.emit(try session.request("doctor"))
   }
 
   /// Installs and diagnoses the one production daemon as a user-domain
@@ -177,8 +192,7 @@ enum RuntimeCLI {
         message: "missing agentd subcommand (install|update|restart|status|verify|uninstall)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    rest.removeAll { $0 == "--json" }
+    let session = runtimeSession(&rest, command: "agentd.\(subcommand)")
     switch subcommand {
     case "install", "update":
       let options = try CLIOptions(rest)
@@ -305,7 +319,7 @@ enum RuntimeCLI {
         arkTraceDescriptor: arkTraceDescriptor,
         arkForgeLane: arkForgeLane,
         beforeBootstrap: beforeBootstrap)
-      emit(try encodedJSON(receipt), json: json)
+      session.emit(try encodedJSON(receipt))
 
     case "restart":
       let options = try CLIOptions(rest)
@@ -359,7 +373,7 @@ enum RuntimeCLI {
           exitCode: 69,
           message: "Runtime current Job closure changed across daemon restart")
       }
-      emit(
+      session.emit(
         .object([
           "restart": try encodedJSON(restart),
           "restartProof": .object([
@@ -374,8 +388,7 @@ enum RuntimeCLI {
           ]),
           "launchAgent": try encodedJSON(after.status),
           "daemonHealth": after.health,
-        ]),
-        json: json)
+        ]))
 
     case "status":
       guard rest.isEmpty else {
@@ -395,12 +408,11 @@ enum RuntimeCLI {
       } else {
         health = .object(["status": .string("socket_absent")])
       }
-      emit(
+      session.emit(
         .object([
           "launchAgent": try encodedJSON(status),
           "daemonHealth": health,
-        ]),
-        json: json)
+        ]))
 
     case "verify":
       let options = try CLIOptions(rest)
@@ -433,13 +445,12 @@ enum RuntimeCLI {
       // then opens exactly the UDS that service owns.
       let status = try service.status()
       guard status.ready else {
-        emit(
+        session.emit(
           .object([
             "launchAgent": try encodedJSON(status),
             "runtime": .null,
             "runtimeVerified": .bool(false),
-          ]),
-          json: json)
+          ]))
         throw CLIError(
           exitCode: 69,
           message: "LaunchAgent is not ready: \(status.diagnostics.joined(separator: "; "))")
@@ -450,21 +461,19 @@ enum RuntimeCLI {
       if let persistedJobID {
         switch try verifier.verifyPersistedJob(jobID: persistedJobID) {
         case .verified(let report):
-          emit(
+          session.emit(
             .object([
               "launchAgent": try encodedJSON(status),
               "runtime": try encodedJSON(report),
               "runtimeVerified": .bool(true),
-            ]),
-            json: json)
+            ]))
         case .failed(let reason, let report):
-          emit(
+          session.emit(
             .object([
               "launchAgent": try encodedJSON(status),
               "runtime": try encodedJSON(report),
               "runtimeVerified": .bool(false),
-            ]),
-            json: json)
+            ]))
           throw CLIError(exitCode: 1, message: reason)
         }
         return
@@ -475,34 +484,31 @@ enum RuntimeCLI {
         executionID: options.value("--execution-id") ?? UUID().uuidString.lowercased())
       switch outcome {
       case .verified(let report):
-        emit(
+        session.emit(
           .object([
             "launchAgent": try encodedJSON(status),
             "runtime": try encodedJSON(report),
             "runtimeVerified": .bool(true),
-          ]),
-          json: json)
+          ]))
       case .awaitingHumanAction(let action, let receipt):
-        emit(
+        session.emit(
           .object([
             "humanAction": try encodedJSON(action),
             "launchAgent": try encodedJSON(status),
             "runtimeReceipt": try encodedJSON(receipt),
             "runtimeVerified": .bool(false),
-          ]),
-          json: json)
+          ]))
         FileHandle.standardError.write(
           Data(
             "resume with: arkdeck agent resume --resume-token \(action.resumeToken)\n".utf8))
         throw CLIError(exitCode: 75, message: "paused for physical assistance")
       case .failed(let reason, let report):
-        emit(
+        session.emit(
           .object([
             "launchAgent": try encodedJSON(status),
             "runtime": try encodedJSON(report),
             "runtimeVerified": .bool(false),
-          ]),
-          json: json)
+          ]))
         throw CLIError(exitCode: 1, message: reason)
       }
 
@@ -510,7 +516,7 @@ enum RuntimeCLI {
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "agentd uninstall accepts only --json")
       }
-      emit(try encodedJSON(service.uninstall()), json: json)
+      session.emit(try encodedJSON(service.uninstall()))
 
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported agentd subcommand")
@@ -678,8 +684,7 @@ enum RuntimeCLI {
       ?? OpenHarmonySigningPresetStore(
         secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    rest.removeAll { $0 == "--json" }
+    let session = runtimeSession(&rest, command: "signing.install-sdk-release")
     let options = try CLIOptions(rest)
     try options.validateAllowed(["--sdk", "--java", "--bundle-name", "--project-ref"])
     func required(_ name: String) throws -> String {
@@ -707,7 +712,7 @@ enum RuntimeCLI {
         bundleName: try required("--bundle-name"),
         javaExecutable: URL(filePath: java),
         sdkRoot: URL(filePath: sdk)))
-    emit(try encodedJSON(receipt), json: json)
+    session.emit(try encodedJSON(receipt))
   }
 
   static func runSigning(
@@ -726,8 +731,7 @@ enum RuntimeCLI {
       )
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    rest.removeAll { $0 == "--json" }
+    let session = runtimeSession(&rest, command: "signing.\(subcommand)")
     switch subcommand {
     case "install":
       let options = try CLIOptions(rest)
@@ -779,13 +783,13 @@ enum RuntimeCLI {
           keyAlias: try required("--key-alias")),
         keystorePassword: normalizedKeystorePassword,
         keyPassword: normalizedKeyPassword)
-      emit(try encodedJSON(receipt), json: json)
+      session.emit(try encodedJSON(receipt))
 
     case "normalize":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "signing normalize accepts only --json")
       }
-      emit(try encodedJSON(store.normalizeDevEcoSecrets()), json: json)
+      session.emit(try encodedJSON(store.normalizeDevEcoSecrets()))
 
     case "migrate-deveco":
       let options = try CLIOptions(rest)
@@ -847,12 +851,11 @@ enum RuntimeCLI {
       var keyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         encrypted.key, keystore: materialAnchor)
       defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
-      emit(
+      session.emit(
         try encodedJSON(
           migrationStore.migrateToSecretEnvelope(
             keystorePassword: keystorePassword, keyPassword: keyPassword,
-            keyAlias: options.value("--key-alias"))),
-        json: json)
+            keyAlias: options.value("--key-alias"))))
 
     case "status":
       guard rest.isEmpty else {
@@ -865,13 +868,13 @@ enum RuntimeCLI {
         suppliedStore
         ?? OpenHarmonySigningPresetStore(
           secrets: LoginKeychainSigningSecretStore())
-      emit(try encodedJSON(statusStore.status()), json: json)
+      session.emit(try encodedJSON(statusStore.status()))
 
     case "remove":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "signing remove accepts only --json")
       }
-      emit(try encodedJSON(store.remove()), json: json)
+      session.emit(try encodedJSON(store.remove()))
 
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported signing subcommand")
@@ -1010,7 +1013,9 @@ enum RuntimeCLI {
   }
 
   static func runOperation(_ arguments: [String]) throws {
-    guard let subcommand = arguments.first, ["list", "describe"].contains(subcommand) else {
+    guard let subcommand = arguments.first,
+      ["list", "describe", "example", "validate"].contains(subcommand)
+    else {
       throw CLIError(
         exitCode: EX_USAGE,
         message:
@@ -1018,32 +1023,52 @@ enum RuntimeCLI {
           + "arkdeck operation describe --operation <reference> [--socket <path>] [--json]")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    rest.removeAll { $0 == "--json" }
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "operation.\(subcommand)")
 
     if subcommand == "list" {
-      guard rest.isEmpty else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "operation list received unsupported arguments")
+      session.emit(try session.request("operation.list"))
+      return
+    }
+    guard let referenceIndex = rest.firstIndex(of: "--operation"),
+      referenceIndex + 1 < rest.count
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "operation \(subcommand) requires --operation <reference>")
+    }
+    let reference = rest[referenceIndex + 1]
+
+    if subcommand == "example" || subcommand == "validate" {
+      // Both read the descriptor the *daemon* published rather than the copy
+      // compiled into this binary: a CLI and a daemon can be different builds,
+      // and answering from the local catalog would describe an operation the
+      // running Runtime may not have.
+      let descriptor = try session.request(
+        "operation.describe", ["reference": .string(reference)])
+      if subcommand == "example" {
+        guard case .object(let fields) = descriptor, let example = fields["exampleRequest"],
+          example != .null
+        else {
+          throw session.fail(
+            .blockedByProductDefect,
+            "the Runtime publishes no example request for \(reference)",
+            details: ["operation": .string(reference)])
+        }
+        session.emit(example)
+        return
       }
-      emit(try client.request(method: "operation.list"), json: json)
+      try emitOperationValidation(
+        reference: reference, descriptor: descriptor, arguments: rest, session: session)
       return
     }
 
-    guard let index = rest.firstIndex(of: "--operation"), index + 1 < rest.count else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "operation describe requires --operation <reference>")
-    }
-    let described = try client.request(
-      method: "operation.describe", params: ["reference": .string(rest[index + 1])])
-    // One fact source, two shapes. `--json` is the machine's copy; without it
-    // the same reply is laid out for a person. Neither is a second description
-    // of the operation — they are the same reply rendered twice.
-    if json {
-      emit(described, json: true)
+    let described = try session.request(
+      "operation.describe", ["reference": .string(reference)])
+    // One fact source, three shapes. A machine mode is the same reply rendered
+    // for a parser; without one it is laid out for a person. None of them is a
+    // second description of the operation.
+    guard session.rendering == .human else {
+      session.emit(described)
       return
     }
     printOperationDescription(described)
@@ -1051,7 +1076,7 @@ enum RuntimeCLI {
 
   private static func printOperationDescription(_ response: JSONValue) {
     guard case .object(let fields) = response else {
-      emit(response, json: false)
+      print(humanRendering(of: response))
       return
     }
     func string(_ key: String) -> String {
@@ -1072,6 +1097,44 @@ enum RuntimeCLI {
             + (origin == "host_configuration"
               ? "configuring this host" : "a different build of ArkDeck"))
       }
+    }
+    // The decision half. A person reading this is deciding whether to run the
+    // operation, and "what will it be allowed to do, what will it produce, and
+    // how private is that" is the part they cannot get anywhere else.
+    if case .array(let permitted)? = fields["permittedEffects"], !permitted.isEmpty {
+      print("  may reach: " + permitted.map(render).joined(separator: ", "))
+    }
+    if case .object(let authorization)? = fields["authorization"], !authorization.isEmpty {
+      let rendered = authorization.keys.sorted().map { effect in
+        "\(effect)=\(render(authorization[effect] ?? .null))"
+      }
+      print("  authorized by: " + rendered.joined(separator: ", "))
+    }
+    if case .array(let steps)? = fields["steps"], !steps.isEmpty {
+      print("  plan (\(steps.count) steps):")
+      for case .object(let step) in steps {
+        var line = "    " + render(step["stepId"] ?? .null)
+        line += "  effect \(render(step["effect"] ?? .null))"
+        line += "  cancel \(render(step["cancellation"] ?? .null))"
+        if step["optional"] == .bool(true) { line += "  (optional)" }
+        if let compensation = step["compensation"], compensation != .string("none") {
+          line += "  compensates \(render(compensation))"
+        }
+        print(line)
+      }
+    }
+    if case .array(let artifacts)? = fields["artifacts"], !artifacts.isEmpty {
+      print("  artifacts:")
+      for case .object(let artifact) in artifacts {
+        var line = "    " + render(artifact["name"] ?? .null)
+        line += "  \(render(artifact["mediaType"] ?? .null))"
+        line += "  privacy \(render(artifact["privacy"] ?? .null))"
+        if artifact["required"] == .bool(true) { line += "  (required)" }
+        print(line)
+      }
+    }
+    if let recovery = fields["completeOverwriteRecovery"], recovery != .null {
+      print("  complete-overwrite recovery is published for this operation")
     }
     for (label, key) in [("inputs", "inputs"), ("outputs", "outputs")] {
       guard case .array(let rows)? = fields[key], !rows.isEmpty else { continue }
@@ -1114,24 +1177,233 @@ enum RuntimeCLI {
     }
   }
 
+  /// `operation validate` — the local half of "will this be accepted".
+  ///
+  /// It answers the one question the descriptor fully describes, names the
+  /// catalog digest that judged it, and says plainly that passing is not
+  /// admission. Claiming more would be worse than claiming nothing: a caller
+  /// who reads "valid" as "will run" learns otherwise only after dispatch.
+  static func emitOperationValidation(
+    reference: String, descriptor: JSONValue, arguments: [String], session: CLIRuntimeSession
+  ) throws {
+    guard let index = arguments.firstIndex(of: "--inputs-file"), index + 1 < arguments.count
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "operation validate requires --inputs-file <path|->")
+    }
+    let document = try boundedInputDocument(at: arguments[index + 1], session: session)
+    guard case .object(let fields) = descriptor, case .array(let inputs)? = fields["inputs"]
+    else {
+      throw session.fail(
+        .recordUnreadable, "the Runtime published no input contract for \(reference)")
+    }
+    let findings = CLIOperationInputValidation.findings(for: document, against: inputs)
+    let digest = (try? session.request("health")).flatMap { health -> JSONValue? in
+      guard case .object(let healthFields) = health else { return nil }
+      return healthFields["catalogDigest"]
+    }
+    session.emit(
+      .object([
+        "reference": .string(reference),
+        "structurallyValid": .bool(findings.isEmpty),
+        "findings": .array(findings.map(\.json)),
+        "checkedAgainst": .object([
+          "runtimeCatalogDigest": digest ?? .null,
+          "scope": .string("publishedInputContract"),
+        ]),
+      ]))
+    if !findings.isEmpty {
+      throw session.fail(
+        .invalidInput,
+        "\(findings.count) input problem\(findings.count == 1 ? "" : "s") for \(reference)")
+    }
+  }
+
+  /// §5.3: one UTF-8 JSON document, from a file or from stdin, refused before
+  /// the connection if it is over the bound.
+  static func boundedInputDocument(at path: String, session: CLIRuntimeSession) throws
+    -> JSONValue
+  {
+    let maximumBytes = 3 * 1024 * 1024
+    let data: Data
+    if path == "-" {
+      data = FileHandle.standardInput.readDataToEndOfFile()
+    } else {
+      guard let contents = FileManager.default.contents(atPath: path) else {
+        throw session.fail(.ioFailure, "cannot read typed inputs from \(path)")
+      }
+      data = contents
+    }
+    guard data.count <= maximumBytes else {
+      throw session.fail(
+        .inputTooLarge,
+        "typed inputs are \(data.count) bytes; the limit is \(maximumBytes)")
+    }
+    // Strict rather than `JSONDecoder` alone: a repeated key would otherwise be
+    // resolved silently, and which of the two values survived would depend on
+    // the decoder rather than on the document the caller wrote.
+    do {
+      return try CLIStrictJSON.decode(data)
+    } catch CLIStrictJSON.Failure.byteOrderMark {
+      throw session.fail(.invalidInput, "typed inputs must be UTF-8 without a byte order mark")
+    } catch CLIStrictJSON.Failure.notUTF8 {
+      throw session.fail(.invalidInput, "typed inputs must be UTF-8")
+    } catch CLIStrictJSON.Failure.duplicateKey(let key) {
+      throw session.fail(
+        .invalidInput,
+        "typed inputs repeat the key \(key); one of the two values would be lost silently")
+    } catch {
+      throw session.fail(.invalidInput, "typed inputs are not one valid JSON document")
+    }
+  }
+
   static func runDevice(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(exitCode: EX_USAGE, message: "missing device subcommand (list|adopt|show)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "device.\(subcommand)")
+    session.warnIfLegacy(replacement: nil)
     switch subcommand {
+    case "candidates":
+      // The one read an external Agent starts from: what is plugged in, whether
+      // it is authorized, and whether it is already adopted. It observes and
+      // never adopts — the Runtime's adopt path is a separate, explicit call.
+      var params: [String: JSONValue] = [:]
+      if rest.contains("--use-warm-snapshot") { params["useWarmSnapshot"] = .bool(true) }
+      session.emit(try session.request("device.candidates", params.isEmpty ? nil : params))
     case "list", "show":
-      emit(try client.request(method: "target.list"), json: json)
+      session.emit(try session.request("target.list"))
     case "adopt":
       var params: [String: JSONValue] = [:]
       if let index = rest.firstIndex(of: "--candidate"), index + 1 < rest.count {
         params["candidate"] = .string(rest[index + 1])
       }
-      emit(try client.request(method: "target.adopt", params: params), json: json)
+      session.emit(try session.request("target.adopt", params))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported device subcommand")
+    }
+  }
+
+  /// `arkdeck flash <observation>` — the five Flash methods §13.2 lists as
+  /// daemon-ready with no CLI leaf.
+  ///
+  /// Four of them observe and report: whether this host can reach the board at
+  /// all, what the bootloader looks like, what still has to hold before a
+  /// restore could be admitted, and which lane plan an already-imported archive
+  /// would anchor. Until now they were reachable only from the App, so a
+  /// headless caller could discover that a flash was impossible only by
+  /// attempting one.
+  ///
+  /// `bind-loader` is the exception and is a mutation: it binds the attached
+  /// Loader to the target, which is why it takes the expected binding revision
+  /// and fails closed on a drift rather than rebinding whatever is plugged in.
+  static func runFlashObservation(_ subcommand: String, _ arguments: [String]) throws {
+    // `arguments` is already past the subcommand token: dropping again here
+    // would silently swallow the caller's first option.
+    var rest = arguments
+    let session = runtimeSession(&rest, command: "flash.\(subcommand)")
+
+    func required(_ flag: String) throws -> String {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "flash \(subcommand) requires \(flag)")
+      }
+      return rest[index + 1]
+    }
+
+    switch subcommand {
+    case "device-access":
+      session.emit(try session.request("flash.device-access"))
+    case "bootloader-status":
+      session.emit(try session.request("flash.bootloader-status"))
+    case "prerequisites":
+      session.emit(
+        try session.request(
+          "flash.prerequisites",
+          [
+            "targetId": .string(try required("--target")),
+            "profileReference": .string(try required("--device-profile")),
+          ]))
+    case "lane-preview":
+      // The wire spelling stays `flash.lanePlanPreview`: §12 freezes the 1.x
+      // method tokens byte for byte, so the kebab-case command name is a
+      // registry mapping rather than a rename anyone may push down the wire.
+      session.emit(
+        try session.request(
+          "flash.lanePlanPreview",
+          [
+            "targetId": .string(try required("--target")),
+            "profileReference": .string(try required("--device-profile")),
+            "archiveSha256": .string(try required("--archive-sha256")),
+          ]))
+    case "bind-loader":
+      guard let revision = Int64(try required("--expected-binding-revision")) else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "flash bind-loader --expected-binding-revision must be a number")
+      }
+      session.emit(
+        try session.request(
+          "flash.bind-current-loader",
+          [
+            "targetId": .string(try required("--target")),
+            "expectedBindingRevision": .integer(revision),
+          ]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
+    }
+  }
+
+  /// `arkdeck runtime ...` — the local Runtime service and its host tools.
+  ///
+  /// `health` has had a daemon method since the control plane landed, but no
+  /// caller-facing leaf: the App and `agent run` called it internally while an
+  /// external Agent had no way to ask whether the Runtime it was about to drive
+  /// was there, which catalog digest it was pinned to, or which providers it
+  /// had (§13.2).
+  static func runRuntime(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing runtime subcommand (health|hdc)")
+    }
+    var rest = Array(arguments.dropFirst())
+    switch subcommand {
+    case "health":
+      let session = runtimeSession(&rest, command: "runtime.health")
+      session.emit(try session.request("health"))
+    case "hdc":
+      guard rest.first == "status" else {
+        throw CLIError(exitCode: EX_USAGE, message: "missing runtime hdc subcommand (status)")
+      }
+      var hdcRest = Array(rest.dropFirst())
+      let session = runtimeSession(&hdcRest, command: "runtime.hdc.status")
+      session.emit(try session.request("runtime.hdc-status"))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported runtime subcommand")
+    }
+  }
+
+  /// `arkdeck target ...` — the durable target surface.
+  ///
+  /// `device list/show` answered from `target.list` under a name that says
+  /// "device", which is the confusion §7.1 separates: a live device is an
+  /// observation, a target is a durable binding. Those spellings stay as frozen
+  /// legacy compatibility (§12); this is where the durable resource lives.
+  static func runTarget(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing target subcommand (list|show)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let session = runtimeSession(&rest, command: "target.\(subcommand)")
+    switch subcommand {
+    case "list":
+      session.emit(try session.request("target.list"))
+    case "show":
+      guard let index = rest.firstIndex(of: "--target"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "target show requires --target <id>")
+      }
+      session.emit(try session.request("target.show", ["targetId": .string(rest[index + 1])]))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported target subcommand")
     }
   }
 
@@ -1145,20 +1417,12 @@ enum RuntimeCLI {
         message: "usage: arkdeck trace probe --target <id> [--socket <path>] [--json]")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    rest.removeAll { $0 == "--json" }
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "trace.probe")
     guard let targetIndex = rest.firstIndex(of: "--target"), targetIndex + 1 < rest.count else {
       throw CLIError(exitCode: EX_USAGE, message: "trace probe requires --target <id>")
     }
-    let targetID = rest[targetIndex + 1]
-    rest.removeSubrange(targetIndex...(targetIndex + 1))
-    guard rest.isEmpty else {
-      throw CLIError(exitCode: EX_USAGE, message: "trace probe received unsupported arguments")
-    }
-    emit(
-      try client.request(method: "trace.probe", params: ["targetId": .string(targetID)]),
-      json: json)
+    session.emit(
+      try session.request("trace.probe", ["targetId": .string(rest[targetIndex + 1])]))
   }
 
   /// `arkdeck agent run|resume` - the Device Runtime Agent entry point.
@@ -1177,9 +1441,8 @@ enum RuntimeCLI {
       )
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
-    let executor = AgentRuntimeExecutor(client: client, nowUTC: RuntimeCLI.utcNow)
+    let session = runtimeSession(&rest, command: "agent.\(subcommand)")
+    let executor = AgentRuntimeExecutor(client: session.client, nowUTC: RuntimeCLI.utcNow)
     let outcome: RuntimeAgentExecutionOutcome
 
     if subcommand == "resume" {
@@ -1243,37 +1506,44 @@ enum RuntimeCLI {
           capabilityReference: capability, targetID: target,
           executionID: executionID ?? UUID().uuidString.lowercased()))
     }
-    let encoder = CanonicalJSONEncoders.canonicalPretty()
     switch outcome {
     case .completed(let receipt):
-      if json, let data = try? encoder.encode(receipt),
-        let text = String(data: data, encoding: .utf8)
-      {
-        print(text)
-      } else {
-        print("completed \(receipt.operationReference) job=\(receipt.jobID ?? "-")")
+      guard session.rendering == .human else {
+        session.emit(try encodedJSON(receipt))
+        return
       }
+      print("completed \(receipt.operationReference) job=\(receipt.jobID ?? "-")")
     case .awaitingHumanAction(let action, let receipt):
-      if json, let data = try? encoder.encode(receipt),
-        let text = String(data: data, encoding: .utf8)
-      {
-        print(text)
-      }
-      FileHandle.standardError.write(
-        Data(
-          """
-          human action required (\(action.kind.rawValue)): \(action.prompt)
-          \(action.selectionOptions.map { "selection options: \($0.joined(separator: ", "))\n" } ?? "")\
-          resume with: arkdeck agent resume --resume-token \(action.resumeToken)
+      // §8.2: a pause is a failure envelope with the `humanActionRequired`
+      // code, not a success document — the caller has to branch on the code,
+      // and the resume reference belongs in bounded details rather than in a
+      // sentence on stderr it would have to parse.
+      if session.rendering == .human {
+        FileHandle.standardError.write(
+          Data(
+            """
+            human action required (\(action.kind.rawValue)): \(action.prompt)
+            \(action.selectionOptions.map { "selection options: \($0.joined(separator: ", "))\n" } ?? "")\
+            resume with: arkdeck agent resume --resume-token \(action.resumeToken)
 
-          """.utf8))
-      throw CLIError(exitCode: 75, message: "paused for physical assistance")
-    case .failed(let reason, let receipt):
-      if json, let data = try? encoder.encode(receipt),
-        let text = String(data: data, encoding: .utf8)
-      {
-        print(text)
+            """.utf8))
       }
+      var details: [String: JSONValue] = [
+        "kind": .string(action.kind.rawValue),
+        "prompt": .string(action.prompt),
+        "resumeToken": .string(action.resumeToken),
+      ]
+      if let options = action.selectionOptions {
+        details["selectionOptions"] = .array(options.map(JSONValue.string))
+      }
+      if let jobID = receipt.jobID { details["jobId"] = .string(jobID) }
+      throw session.fail(
+        .humanActionRequired, "paused for physical assistance", details: details)
+    case .failed(let reason, let receipt):
+      // A terminal failed Job is a complete result, not a missing one: §8.2
+      // keeps `ok: true` and the full projection and puts the outcome in the
+      // exit status.
+      if session.rendering != .human { session.emit(try encodedJSON(receipt)) }
       throw CLIError(exitCode: 1, message: reason)
     }
   }
@@ -1289,21 +1559,18 @@ enum RuntimeCLI {
         message: "missing capability subcommand (list|inspect)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "capability.\(subcommand)")
     switch subcommand {
     case "list":
-      emit(try client.request(method: "capability.list"), json: json)
+      session.emit(try session.request("capability.list"))
     case "inspect":
       guard let index = rest.firstIndex(of: "--capability"), index + 1 < rest.count else {
         throw CLIError(
           exitCode: EX_USAGE, message: "capability inspect requires --capability <id>")
       }
-      emit(
-        try client.request(
-          method: "capability.inspect",
-          params: ["capabilityId": .string(rest[index + 1])]),
-        json: json)
+      session.emit(
+        try session.request(
+          "capability.inspect", ["capabilityId": .string(rest[index + 1])]))
     default:
       // draft/install/revoke are permanent registry refusals, answered before
       // dispatch. They are not re-spelled here.
@@ -1343,10 +1610,11 @@ enum RuntimeCLI {
           + "import-native-library|list|inspect|read|export)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "artifact.\(subcommand)")
+    session.warnIfLegacy(replacement: nil)
+    let client = session.client
     if subcommand == "import-flash-bundle" {
-      try importFlashBundle(rest, client: client, json: json)
+      try importFlashBundle(rest, session: session)
       return
     }
     if subcommand == "import-hap" {
@@ -1360,9 +1628,8 @@ enum RuntimeCLI {
       }
       let targetID = rest[targetIndex + 1]
       let payload = try readHAPImportPayload(path: rest[fileIndex + 1])
-      let begin = try client.request(
-        method: "artifact.importHap.begin",
-        params: [
+      let begin = try session.request("artifact.importHap.begin",
+[
           "targetId": .string(targetID),
           "name": .string(payload.name),
           "byteCount": .integer(Int64(payload.contents.count)),
@@ -1379,9 +1646,8 @@ enum RuntimeCLI {
       var committed = false
       defer {
         if !committed {
-          _ = try? client.request(
-            method: "artifact.importHap.abort",
-            params: ["uploadId": .string(uploadID)])
+          _ = try? session.request("artifact.importHap.abort",
+["uploadId": .string(uploadID)])
         }
       }
       let maximumChunk = Int(maximumChunkValue)
@@ -1389,9 +1655,8 @@ enum RuntimeCLI {
       while offset < payload.contents.count {
         let end = min(payload.contents.count, offset + maximumChunk)
         let chunk = payload.contents.subdata(in: offset..<end)
-        let appended = try client.request(
-          method: "artifact.importHap.append",
-          params: [
+        let appended = try session.request("artifact.importHap.append",
+[
             "uploadId": .string(uploadID),
             "offset": .integer(Int64(offset)),
             "base64": .string(chunk.base64EncodedString()),
@@ -1405,11 +1670,10 @@ enum RuntimeCLI {
         }
         offset = end
       }
-      let result = try client.request(
-        method: "artifact.importHap.commit",
-        params: ["uploadId": .string(uploadID)])
+      let result = try session.request("artifact.importHap.commit",
+["uploadId": .string(uploadID)])
       committed = true
-      emit(result, json: json)
+      session.emit(result)
       return
     }
     if subcommand == "import-workspace-patch" {
@@ -1425,9 +1689,8 @@ enum RuntimeCLI {
       }
       let targetID = rest[targetIndex + 1]
       let payload = try readWorkspacePatchImportPayload(path: rest[fileIndex + 1])
-      let begin = try client.request(
-        method: "artifact.importWorkspacePatch.begin",
-        params: [
+      let begin = try session.request("artifact.importWorkspacePatch.begin",
+[
           "targetId": .string(targetID),
           "name": .string(payload.name),
           "byteCount": .integer(Int64(payload.contents.count)),
@@ -1444,9 +1707,8 @@ enum RuntimeCLI {
       var committed = false
       defer {
         if !committed {
-          _ = try? client.request(
-            method: "artifact.importWorkspacePatch.abort",
-            params: ["uploadId": .string(uploadID)])
+          _ = try? session.request("artifact.importWorkspacePatch.abort",
+["uploadId": .string(uploadID)])
         }
       }
       let maximumChunk = Int(maximumChunkValue)
@@ -1454,9 +1716,8 @@ enum RuntimeCLI {
       while offset < payload.contents.count {
         let end = min(payload.contents.count, offset + maximumChunk)
         let chunk = payload.contents.subdata(in: offset..<end)
-        let appended = try client.request(
-          method: "artifact.importWorkspacePatch.append",
-          params: [
+        let appended = try session.request("artifact.importWorkspacePatch.append",
+[
             "uploadId": .string(uploadID),
             "offset": .integer(Int64(offset)),
             "base64": .string(chunk.base64EncodedString()),
@@ -1470,11 +1731,10 @@ enum RuntimeCLI {
         }
         offset = end
       }
-      let result = try client.request(
-        method: "artifact.importWorkspacePatch.commit",
-        params: ["uploadId": .string(uploadID)])
+      let result = try session.request("artifact.importWorkspacePatch.commit",
+["uploadId": .string(uploadID)])
       committed = true
-      emit(result, json: json)
+      session.emit(result)
       return
     }
     if subcommand == "import-native-library" {
@@ -1492,9 +1752,8 @@ enum RuntimeCLI {
       let targetID = rest[targetIndex + 1]
       let payload = try readNativeLibraryImportPayload(
         path: rest[fileIndex + 1])
-      let begin = try client.request(
-        method: "artifact.importNativeLibrary.begin",
-        params: [
+      let begin = try session.request("artifact.importNativeLibrary.begin",
+[
           "targetId": .string(targetID),
           "name": .string(payload.name),
           "byteCount": .integer(Int64(payload.contents.count)),
@@ -1512,9 +1771,8 @@ enum RuntimeCLI {
       var committed = false
       defer {
         if !committed {
-          _ = try? client.request(
-            method: "artifact.importNativeLibrary.abort",
-            params: ["uploadId": .string(uploadID)])
+          _ = try? session.request("artifact.importNativeLibrary.abort",
+["uploadId": .string(uploadID)])
         }
       }
       let maximumChunk = Int(maximumChunkValue)
@@ -1522,9 +1780,8 @@ enum RuntimeCLI {
       while offset < payload.contents.count {
         let end = min(payload.contents.count, offset + maximumChunk)
         let chunk = payload.contents.subdata(in: offset..<end)
-        let appended = try client.request(
-          method: "artifact.importNativeLibrary.append",
-          params: [
+        let appended = try session.request("artifact.importNativeLibrary.append",
+[
             "uploadId": .string(uploadID),
             "offset": .integer(Int64(offset)),
             "base64": .string(chunk.base64EncodedString()),
@@ -1538,11 +1795,16 @@ enum RuntimeCLI {
         }
         offset = end
       }
-      let result = try client.request(
-        method: "artifact.importNativeLibrary.commit",
-        params: ["uploadId": .string(uploadID)])
+      let result = try session.request("artifact.importNativeLibrary.commit",
+["uploadId": .string(uploadID)])
       committed = true
-      emit(result, json: json)
+      session.emit(result)
+      return
+    }
+    if subcommand == "quota" {
+      // Store headroom belongs to the store, not to a job: a caller asks it
+      // before it starts work, when it has no job to name yet.
+      session.emit(try session.request("artifact.quota"))
       return
     }
     guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count else {
@@ -1555,17 +1817,44 @@ enum RuntimeCLI {
     if rest.contains("--allow-sensitive") { params["allowSensitive"] = .bool(true) }
     switch subcommand {
     case "list":
-      emit(try client.request(method: "artifact.list", params: params), json: json)
+      session.emit(try session.request("artifact.list", params))
     case "inspect":
       guard params["artifactId"] != nil else {
         throw CLIError(exitCode: EX_USAGE, message: "artifact inspect requires --artifact <id>")
       }
-      emit(try client.request(method: "artifact.inspect", params: params), json: json)
+      session.emit(try session.request("artifact.inspect", params))
     case "read":
       guard params["artifactId"] != nil else {
         throw CLIError(exitCode: EX_USAGE, message: "artifact read requires --artifact <id>")
       }
-      emit(try client.request(method: "artifact.read", params: params), json: json)
+      // The registry has already refused an out-of-range `--max-bytes`, so the
+      // daemon's silent clamp cannot rewrite this caller's intent into a short
+      // read they would be unable to tell from the end of the artifact.
+      if let index = rest.firstIndex(of: "--offset"), index + 1 < rest.count,
+        let offset = Int64(rest[index + 1])
+      {
+        params["offset"] = .integer(offset)
+      }
+      if let index = rest.firstIndex(of: "--max-bytes"), index + 1 < rest.count,
+        let maximum = Int64(rest[index + 1])
+      {
+        params["maxBytes"] = .integer(maximum)
+      }
+      let read = try session.request("artifact.read", params)
+      guard rest.contains("--raw") else {
+        session.emit(read)
+        return
+      }
+      // §8.1: raw is bytes and nothing else — no envelope, and no trailing
+      // newline that would corrupt a binary artifact reassembled from several
+      // range reads.
+      guard case .object(let fields) = read, case .string(let base64)? = fields["base64"],
+        let bytes = Data(base64Encoded: base64)
+      else {
+        throw session.fail(
+          .recordUnreadable, "the Runtime returned no readable bytes for this range")
+      }
+      FileHandle.standardOutput.write(bytes)
     case "export":
       guard params["artifactId"] != nil else {
         throw CLIError(exitCode: EX_USAGE, message: "artifact export requires --artifact <id>")
@@ -1575,7 +1864,8 @@ enum RuntimeCLI {
           exitCode: EX_USAGE, message: "artifact export requires --destination <directory>")
       }
       params["destinationDirectory"] = .string(rest[index + 1])
-      emit(try client.request(method: "artifact.export", params: params), json: json)
+      session.emit(try session.request("artifact.export",
+params))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported artifact subcommand")
     }
@@ -1583,9 +1873,9 @@ enum RuntimeCLI {
 
   private static func importFlashBundle(
     _ arguments: [String],
-    client: AgentClient,
-    json: Bool
+    session: CLIRuntimeSession
   ) throws {
+    let client = session.client
     guard let targetIndex = arguments.firstIndex(of: "--target"),
       targetIndex + 1 < arguments.count,
       let fileIndex = arguments.firstIndex(of: "--file"),
@@ -1616,10 +1906,9 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message: "unsupported DAYU200 device profile \(profileReference)")
     }
-    emit(
+    session.emit(
       try importFlashBundleResult(
-        client: client, targetID: targetID, url: url, expectedProfile: nil),
-      json: json)
+        session: session, targetID: targetID, url: url, expectedProfile: nil))
   }
 
   /// Streams the archive to the daemon and returns the commit response. The
@@ -1630,7 +1919,7 @@ enum RuntimeCLI {
   /// and lets daemon validation derive its identity. Both lanes re-hash the
   /// same descriptor while uploading and reject source-file drift.
   private static func importFlashBundleResult(
-    client: AgentClient,
+    session: CLIRuntimeSession,
     targetID: String,
     url: URL,
     expectedProfile: RockchipFlashProfile?
@@ -1667,9 +1956,8 @@ enum RuntimeCLI {
       }
     }
 
-    let begin = try client.request(
-      method: "artifact.importFlashBundle.begin",
-      params: [
+    let begin = try session.request("artifact.importFlashBundle.begin",
+[
         "targetId": .string(targetID),
         "name": .string("images.tar.gz"),
         "byteCount": .integer(declaredByteCount),
@@ -1686,9 +1974,8 @@ enum RuntimeCLI {
     var committed = false
     defer {
       if !committed {
-        _ = try? client.request(
-          method: "artifact.importFlashBundle.abort",
-          params: ["uploadId": .string(uploadID)])
+        _ = try? session.request("artifact.importFlashBundle.abort",
+["uploadId": .string(uploadID)])
       }
     }
 
@@ -1707,9 +1994,8 @@ enum RuntimeCLI {
       if count == 0 { break }
       let chunk = Data(buffer[0..<count])
       hasher.update(data: chunk)
-      let appended = try client.request(
-        method: "artifact.importFlashBundle.append",
-        params: [
+      let appended = try session.request("artifact.importFlashBundle.append",
+[
           "uploadId": .string(uploadID),
           "offset": .integer(Int64(offset)),
           "base64": .string(chunk.base64EncodedString()),
@@ -1743,9 +2029,8 @@ enum RuntimeCLI {
         message:
           "flash bundle changed during import or does not match the pinned DAYU200 SHA-256")
     }
-    let result = try client.request(
-      method: "artifact.importFlashBundle.commit",
-      params: ["uploadId": .string(uploadID)])
+    let result = try session.request("artifact.importFlashBundle.commit",
+["uploadId": .string(uploadID)])
     committed = true
     return result
   }
@@ -2014,11 +2299,10 @@ enum RuntimeCLI {
         exitCode: EX_USAGE, message: "missing cleanup-debt subcommand (list|continue)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "cleanup-debt.\(subcommand)")
     switch subcommand {
     case "list":
-      emit(try client.request(method: "cleanupDebt.list"), json: json)
+      session.emit(try session.request("cleanupDebt.list"))
     case "continue":
       var residue: (key: String, value: String)?
       if let index = rest.firstIndex(of: "--remote-path"), index + 1 < rest.count {
@@ -2035,17 +2319,121 @@ enum RuntimeCLI {
             "cleanup-debt continue requires --job <id> and one of "
             + "--remote-path <recorded path> / --bundle <recorded bundle>")
       }
-      emit(
-        try client.request(
-          method: "cleanupDebt.continue",
-          params: [
+      session.emit(
+        try session.request(
+          "cleanupDebt.continue",
+          [
             "jobId": .string(rest[jobIndex + 1]),
             .init(residue.key): .string(residue.value),
-          ]),
-        json: json)
+          ]))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported cleanup-debt subcommand")
     }
+  }
+
+  /// `job result` — the read an external Agent ends on (§6.1).
+  ///
+  /// It is a composition rather than a new daemon method: the status, the
+  /// verified evidence, the artifact inventory and the cleanup residue are four
+  /// existing reads, and §8.2 already expects a composite leaf to make several
+  /// unary requests. What it adds is the one thing a caller cannot assemble
+  /// safely by hand — a single exit status that distinguishes "still running"
+  /// from "finished badly" from "nobody knows what happened".
+  static func emitJobResult(jobID: String, session: CLIRuntimeSession) throws {
+    let status = try session.request("job.status", ["jobId": .string(jobID)])
+    guard case .object(let statusFields) = status else {
+      throw session.fail(.recordUnreadable, "job \(jobID) returned no readable status")
+    }
+    guard case .string(let rawState)? = statusFields["state"],
+      let state = JobState(rawValue: rawState)
+    else {
+      throw session.fail(
+        .recordUnreadable, "job \(jobID) reported no state this build understands")
+    }
+    // §6.1: a non-terminal job is not a failure of the query, it is a result
+    // that does not exist yet. `job status` stays a successful read of the same
+    // job; only `result` refuses, because a caller asking for a result would
+    // otherwise get a half-finished one.
+    guard state.isTerminal else {
+      throw session.fail(
+        .resultNotReady, "job \(jobID) is \(rawState) and has no result yet",
+        details: ["jobId": .string(jobID), "state": .string(rawState)])
+    }
+
+    let evidence = try session.request("job.evidence", ["jobId": .string(jobID)])
+    let artifacts = try session.request("artifact.list", ["jobId": .string(jobID)])
+    let cleanup = cleanupResidue(for: jobID, session: session)
+    let outcomeUnknown = statusFields["outcomeUnknown"] == .bool(true)
+    let integrityFailure = evidenceIntegrityExit(evidence)
+
+    session.emit(
+      .object([
+        "job": status,
+        "terminal": .bool(true),
+        "outcomeUnknown": .bool(outcomeUnknown),
+        "evidence": annotatedEvidence(evidence, blocked: integrityFailure != nil),
+        "artifacts": artifacts,
+        "cleanup": cleanup,
+        // The typed next-action union is not published by this build, so the
+        // field is present and null rather than guessed at.
+        "nextAction": .null,
+      ]))
+
+    // The result is already on stdout, so everything below reports its outcome
+    // through the exit status and a stderr diagnostic — §8.2 is explicit that
+    // these cases stay `ok: true` with a full result, and the session enforces
+    // the one-document rule rather than leaving it to be remembered.
+    //
+    // An unknown outcome outranks a failed state: the job may have reached a
+    // terminal state while the effect it dispatched stays undetermined, and
+    // POL-RECOVERY-001 forbids replaying it either way.
+    if outcomeUnknown {
+      throw session.fail(
+        .outcomeUnknown,
+        "job \(jobID) outcome is unknown: reconcile it; the original effect is never replayed")
+    }
+    if let integrityFailure {
+      throw session.fail(.artifactIntegrityFailed, integrityFailure)
+    }
+    if let terminal = terminalJobExit(status) {
+      throw CLIError(exitCode: terminal.code, message: terminal.reason)
+    }
+  }
+
+  /// The cleanup residue recorded for one job.
+  ///
+  /// Residue is decoration on a result: a store that cannot answer must not
+  /// hide the terminal status the caller came for, so this reports an empty
+  /// list rather than failing the whole read.
+  private static func cleanupResidue(for jobID: String, session: CLIRuntimeSession) -> JSONValue {
+    guard case .array(let rows)? = try? session.request("cleanupDebt.list") else {
+      return .array([])
+    }
+    return .array(
+      rows.filter { row in
+        guard case .object(let fields) = row else { return false }
+        return fields["jobId"] == .string(jobID)
+      })
+  }
+
+  /// §8.2 asks for a stable reason on the evidence projection itself, not only
+  /// in the exit status.
+  private static func annotatedEvidence(_ evidence: JSONValue, blocked: Bool) -> JSONValue {
+    guard case .object(var fields) = evidence else { return evidence }
+    fields["status"] = .string(blocked ? "blocked" : "verified")
+    return .object(fields)
+  }
+
+  /// A non-empty blocker list means required evidence could not be verified.
+  static func evidenceIntegrityExit(_ evidence: JSONValue) -> String? {
+    guard case .object(let fields) = evidence,
+      case .array(let blockers)? = fields["blockers"], !blockers.isEmpty
+    else { return nil }
+    let named = blockers.compactMap { value -> String? in
+      if case .string(let text) = value { return text }
+      return nil
+    }
+    return "required evidence could not be verified: " + named.joined(separator: ", ")
   }
 
   /// Builds the typed v2 request document `job plan` and `job submit` send.
@@ -2061,6 +2449,12 @@ enum RuntimeCLI {
   /// `--request-file` stays for a caller that wants to control the document
   /// byte for byte; it is still passed through verbatim so the daemon, not
   /// this CLI, remains the validator.
+  /// True when the caller left the identity to be generated, so a submit
+  /// cannot be retried safely. Reported once, to stderr, in human mode.
+  static func generatesItsOwnIdempotencyKey(_ rest: [String]) -> Bool {
+    !rest.contains("--idempotency-key") && !rest.contains("--request-file")
+  }
+
   private static func operationRequestJSON(
     _ rest: [String], subcommand: String
   ) throws -> String {
@@ -2148,8 +2542,13 @@ enum RuntimeCLI {
         operationID: String(parts[0]),
         version: version,
         inputs: inputs,
-        requestID: "cli-\(UUID().uuidString.prefix(8).lowercased())",
-        idempotencyKey: "cli-\(UUID().uuidString.lowercased())")
+        // §5.3: a caller that wants to be able to retry fixes these. The
+        // generated pair stays the interactive default, but it is exactly what
+        // makes an unattended retry create a second job instead of returning
+        // the first, so it can no longer be the only behaviour available.
+        requestID: value("--request-id") ?? "cli-\(UUID().uuidString.prefix(8).lowercased())",
+        idempotencyKey: value("--idempotency-key")
+          ?? "cli-\(UUID().uuidString.lowercased())")
     } catch let rejection as RuntimeOperationRequestRejection {
       throw CLIError(exitCode: EX_USAGE, message: rejection.message)
     }
@@ -2168,46 +2567,39 @@ enum RuntimeCLI {
         message: "missing job subcommand (plan|submit|status|list|run|cancel|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "job.\(subcommand)")
     switch subcommand {
     case "plan":
       let planJSON = try operationRequestJSON(rest, subcommand: "job plan")
-      emit(
-        try client.request(
-          method: "job.plan", params: ["requestJson": .string(planJSON)]),
-        json: json)
+      session.emit(try session.request("job.plan", ["requestJson": .string(planJSON)]))
     case "list":
-      let pageSize: Int?
-      if let index = rest.firstIndex(of: "--page-size"), index + 1 < rest.count {
-        guard let value = Int(rest[index + 1]), (1...1_000).contains(value) else {
-          throw CLIError(exitCode: EX_USAGE, message: "--page-size must be 1...1000")
-        }
-        pageSize = value
-      } else {
-        pageSize = nil
+      // One shape, always. This used to call `job.list` (a bare array) when no
+      // flags were given and `job.list-page` (a page object) when any were, so
+      // the reply a script had to parse changed with the arguments it happened
+      // to pass — §13.2 records it as a defect, and a caller cannot write one
+      // parser against two shapes.
+      var params: [String: JSONValue] = [:]
+      if let index = rest.firstIndex(of: "--page-size"), index + 1 < rest.count,
+        let pageSize = Int64(rest[index + 1])
+      {
+        params["pageSize"] = .integer(pageSize)
       }
-      let cursor = rest.firstIndex(of: "--cursor").flatMap { index in
-        index + 1 < rest.count ? rest[index + 1] : nil
+      if let index = rest.firstIndex(of: "--cursor"), index + 1 < rest.count {
+        params["cursor"] = .string(rest[index + 1])
       }
-      if rest.contains("--cursor"), cursor == nil {
-        throw CLIError(exitCode: EX_USAGE, message: "--cursor requires a value")
+      if let index = rest.firstIndex(of: "--order"), index + 1 < rest.count {
+        params["order"] = .string(rest[index + 1])
       }
-      if pageSize != nil || cursor != nil {
-        var params: [String: JSONValue] = [:]
-        if let pageSize { params["pageSize"] = .integer(Int64(pageSize)) }
-        if let cursor { params["cursor"] = .string(cursor) }
-        emit(try client.request(method: "job.list-page", params: params), json: json)
-      } else {
-        emit(try client.request(method: "job.list"), json: json)
-      }
+      if rest.contains("--include-current") { params["includeCurrent"] = .bool(true) }
+      if rest.contains("--include-timeline") { params["includeTimeline"] = .bool(true) }
+      session.emit(try session.request("job.list-page", params))
     case "status":
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job status requires --job <id>")
       }
-      let statusResponse = try client.request(
-        method: "job.status", params: ["jobId": .string(rest[index + 1])])
-      emit(statusResponse, json: json)
+      let statusResponse = try session.request(
+        "job.status", ["jobId": .string(rest[index + 1])])
+      session.emit(statusResponse)
       if let terminal = terminalJobExit(statusResponse) {
         throw CLIError(exitCode: terminal.code, message: terminal.reason)
       }
@@ -2222,9 +2614,8 @@ enum RuntimeCLI {
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job run requires --job <id>")
       }
-      let runResponse = try client.request(
-        method: "job.run", params: ["jobId": .string(rest[index + 1])])
-      emit(runResponse, json: json)
+      let runResponse = try session.request("job.run", ["jobId": .string(rest[index + 1])])
+      session.emit(runResponse)
       if let terminal = terminalJobExit(runResponse) {
         throw CLIError(exitCode: terminal.code, message: terminal.reason)
       }
@@ -2232,10 +2623,29 @@ enum RuntimeCLI {
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job cancel requires --job <id>")
       }
-      emit(
-        try client.request(
-          method: "job.cancel", params: ["jobId": .string(rest[index + 1])]),
-        json: json)
+      session.emit(try session.request("job.cancel", ["jobId": .string(rest[index + 1])]))
+    case "evidence":
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job evidence requires --job <id>")
+      }
+      let evidence = try session.request(
+        "job.evidence", ["jobId": .string(rest[index + 1])])
+      session.emit(evidence)
+      // §9: an evidence integrity failure keeps the projection and changes the
+      // exit status. Rewriting it into an error would drop the very evidence
+      // the caller needs to see why it could not be trusted. The session has
+      // already emitted, so `fail` reports through the exit status and stderr
+      // rather than a second stdout document.
+      if let blocked = evidenceIntegrityExit(evidence) {
+        throw session.fail(.artifactIntegrityFailed, blocked)
+      }
+
+    case "result":
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job result requires --job <id>")
+      }
+      try emitJobResult(jobID: rest[index + 1], session: session)
+
     case "reconcile":
       // The daemon has owned `job.reconcile` since MU-4; the CLI did not
       // expose it, so a job left in `waitingForRecovery` had no operator
@@ -2246,16 +2656,29 @@ enum RuntimeCLI {
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job reconcile requires --job <id>")
       }
-      emit(
-        try client.request(method: "job.reconcile", params: ["jobId": .string(rest[index + 1])]),
-        json: json)
+      session.emit(try session.request("job.reconcile", ["jobId": .string(rest[index + 1])]))
     case "submit":
+      if generatesItsOwnIdempotencyKey(rest) {
+        session.progress(
+          "note: no --idempotency-key was given, so this submit generated one and cannot be "
+            + "retried safely; pass one to make a repeat return the same job")
+      }
       let requestJSON = try operationRequestJSON(rest, subcommand: "job submit")
-      let submitted = try client.request(
-        method: "job.submit", params: ["requestJson": .string(requestJSON)])
-      emit(submitted, json: json)
-      if rest.contains("--wait") {
-        try completeWaitedSubmit(submitted, client: client, json: json)
+      let submitted = try session.request("job.submit", ["requestJson": .string(requestJSON)])
+      // §8.1 allows exactly one document on machine stdout. This compound used
+      // to print the acceptance and then the wait result, so a caller parsing
+      // stdout got two JSON documents back to back and, in practice, read the
+      // first — the one that says nothing about how the job ended.
+      guard rest.contains("--wait"), let waited = waitedSubmitCall(submitted) else {
+        session.emit(submitted)
+        return
+      }
+      session.progress("submitted \(waited.jobID); waiting")
+      let waitedResponse = try session.request(
+        waited.method, ["jobId": .string(waited.jobID)])
+      session.emit(waitedResponse)
+      if let terminal = terminalJobExit(waitedResponse) {
+        throw CLIError(exitCode: terminal.code, message: terminal.reason)
       }
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported job subcommand")
@@ -2274,9 +2697,8 @@ enum RuntimeCLI {
         message: "missing debug subcommand (start|evaluate|status)")
     }
     var rest = Array(arguments.dropFirst())
-    let json = rest.contains("--json")
-    rest.removeAll { $0 == "--json" }
-    let client = client(&rest)
+    let session = runtimeSession(&rest, command: "debug.\(subcommand)")
+    session.warnIfLegacy(replacement: nil)
 
     func value(_ flag: String) -> String? {
       guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
@@ -2294,10 +2716,7 @@ enum RuntimeCLI {
       guard let requestJSON = try? String(contentsOf: requestURL, encoding: .utf8) else {
         throw CLIError(exitCode: EX_USAGE, message: "cannot read \(requestURL.path)")
       }
-      emit(
-        try client.request(
-          method: "debug.start", params: ["requestJson": .string(requestJSON)]),
-        json: json)
+      session.emit(try session.request("debug.start", ["requestJson": .string(requestJSON)]))
 
     case "evaluate":
       guard let invocationID = value("--invocation"),
@@ -2315,26 +2734,23 @@ enum RuntimeCLI {
       guard let actionJSON = try? String(contentsOf: actionURL, encoding: .utf8) else {
         throw CLIError(exitCode: EX_USAGE, message: "cannot read \(actionURL.path)")
       }
-      emit(
-        try client.request(
-          method: "debug.evaluate",
-          params: [
+      session.emit(
+        try session.request(
+          "debug.evaluate",
+          [
             "invocationId": .string(invocationID),
             "actionJson": .string(actionJSON),
             "sourceSha256": .string(sourceSHA256),
             "buildSha256": .string(buildSHA256),
-          ]),
-        json: json)
+          ]))
 
     case "status":
       guard let invocationID = value("--invocation") else {
         throw CLIError(
           exitCode: EX_USAGE, message: "debug status requires --invocation <id>")
       }
-      emit(
-        try client.request(
-          method: "debug.status", params: ["invocationId": .string(invocationID)]),
-        json: json)
+      session.emit(
+        try session.request("debug.status", ["invocationId": .string(invocationID)]))
 
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported debug subcommand")

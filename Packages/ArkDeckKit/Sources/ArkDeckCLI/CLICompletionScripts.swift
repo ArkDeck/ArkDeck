@@ -23,68 +23,80 @@ enum CLICompletionScripts {
     }
   }
 
-  /// Top-level tokens: product nodes plus the registry meta-commands.
-  private static var rootTokens: [String] {
-    CLICommandRegistry.nodes.map(\.token) + CLICommandRegistry.rootLeaves.map(\.token)
+  // MARK: The table every generator reads
+
+  /// What may follow one command prefix.
+  ///
+  /// Derived from the registry rather than from a hand-written nesting
+  /// assumption: the platform surface is three tokens deep in places, and a
+  /// generator that assumed two would silently stop completing there.
+  struct CompletionRow {
+    /// The tokens already typed, e.g. `["runtime", "hdc"]`. Empty at the root.
+    let prefix: [String]
+    /// Tokens that may come next.
+    let next: [String]
+
+    var key: String { prefix.joined(separator: " ") }
   }
 
-  /// Subcommands per node, retired and refused ones included: a caller who
-  /// types a retired token deserves to be completed to it and then told it is
-  /// retired, rather than left guessing at a typo.
-  private static var subcommands: [(node: String, tokens: [String])] {
-    CLICommandRegistry.nodes.compactMap { node in
-      let tokens = node.leaves.map(\.token).filter { !$0.isEmpty }
-      return tokens.isEmpty ? nil : (node.token, tokens)
+  static func table() -> [CompletionRow] {
+    var rows: [CompletionRow] = [
+      CompletionRow(
+        prefix: [],
+        next: CLICommandRegistry.nodes.map(\.token) + CLICommandRegistry.rootLeaves.map(\.token))
+    ]
+    func walk(_ node: CLINodeSpec, prefix: [String]) {
+      let path = prefix + [node.token]
+      // Retired and refused tokens are offered too: a caller who types one
+      // deserves to be completed to it and then told it is retired, rather
+      // than left wondering whether they mistyped.
+      if !node.childTokens.isEmpty {
+        rows.append(CompletionRow(prefix: path, next: node.childTokens))
+      }
+      for group in node.groups { walk(group, prefix: path) }
     }
-  }
+    for node in CLICommandRegistry.nodes { walk(node, prefix: []) }
 
-  private static func publishedOptions(node: String, leaf: String) -> [String] {
-    guard let spec = CLICommandRegistry.node(node)?.leaves.first(where: { $0.token == leaf })
-    else { return [] }
-    return spec.options.filter(\.isPublished).map(\.name)
+    // A leaf completes to its published options.
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      let options = leaf.options.filter(\.isPublished).map(\.name)
+      let positionals = leaf.positionals.compactMap { spec -> [String]? in
+        if case .enumeration(let values) = spec.grammar { return values }
+        return nil
+      }.flatMap { $0 }
+      let next = positionals + options + ["--help"]
+      rows.append(CompletionRow(prefix: path, next: next))
+    }
+    return rows
   }
 
   // MARK: bash
 
+  /// A `case` over the joined prefix rather than an associative array: macOS
+  /// still ships bash 3.2, which has no `declare -A`.
   private static func bash() -> String {
     var lines = [
       "# arkdeck bash completion — generated from \(CLICommandRegistry.schemaVersion)",
       "# Identities are never completed: see the CLI product spec §10.",
       "_arkdeck() {",
-      "  local cur prev root",
+      "  local cur prefix i",
       "  cur=\"${COMP_WORDS[COMP_CWORD]}\"",
-      "  root=\"\(rootTokens.joined(separator: " "))\"",
-      "  if [ \"$COMP_CWORD\" -eq 1 ]; then",
-      "    COMPREPLY=( $(compgen -W \"$root --help --version\" -- \"$cur\") )",
-      "    return 0",
-      "  fi",
-      "  case \"${COMP_WORDS[1]}\" in",
+      "  prefix=\"\"",
+      "  for ((i=1; i<COMP_CWORD; i++)); do",
+      "    case \"${COMP_WORDS[i]}\" in",
+      "      -*) ;;",
+      "      *) if [ -z \"$prefix\" ]; then prefix=\"${COMP_WORDS[i]}\";",
+      "         else prefix=\"$prefix ${COMP_WORDS[i]}\"; fi ;;",
+      "    esac",
+      "  done",
+      "  case \"$prefix\" in",
     ]
-    for (node, tokens) in subcommands {
-      lines.append("    \(node))")
-      lines.append("      if [ \"$COMP_CWORD\" -eq 2 ]; then")
+    for row in table() {
+      lines.append("    \"\(row.key)\")")
       lines.append(
-        "        COMPREPLY=( $(compgen -W \"\(tokens.joined(separator: " "))\" -- \"$cur\") )")
-      lines.append("        return 0")
-      lines.append("      fi")
-      lines.append("      case \"${COMP_WORDS[2]}\" in")
-      for token in tokens {
-        let options = publishedOptions(node: node, leaf: token)
-        lines.append("        \(token))")
-        lines.append(
-          "          COMPREPLY=( $(compgen -W \"\(options.joined(separator: " ")) --help\" "
-            + "-- \"$cur\") )")
-        lines.append("          return 0 ;;")
-      }
-      lines.append("      esac ;;")
+        "      COMPREPLY=( $(compgen -W \"\(row.next.joined(separator: " "))\" -- \"$cur\") ) ;;")
     }
-    lines.append("    completion)")
-    lines.append(
-      "      COMPREPLY=( $(compgen -W \"bash zsh fish powershell\" -- \"$cur\") )")
-    lines.append("      return 0 ;;")
-    lines.append("    help)")
-    lines.append("      COMPREPLY=( $(compgen -W \"$root\" -- \"$cur\") )")
-    lines.append("      return 0 ;;")
+    lines.append("    *) COMPREPLY=() ;;")
     lines.append("  esac")
     lines.append("  return 0")
     lines.append("}")
@@ -99,43 +111,24 @@ enum CLICompletionScripts {
       "#compdef arkdeck",
       "# generated from \(CLICommandRegistry.schemaVersion); identities are never completed.",
       "_arkdeck() {",
-      "  local -a roots",
-      "  roots=(\(rootTokens.map { "'\($0)'" }.joined(separator: " ")))",
-      "  if (( CURRENT == 2 )); then",
-      "    _describe 'command' roots",
-      "    return",
-      "  fi",
-      "  case \"${words[2]}\" in",
+      "  local prefix word",
+      "  prefix=\"\"",
+      "  for word in \"${words[@]:1:$((CURRENT - 2))}\"; do",
+      "    case \"$word\" in",
+      "      -*) ;;",
+      "      *) if [[ -z \"$prefix\" ]]; then prefix=\"$word\"; else prefix=\"$prefix $word\"; fi ;;",
+      "    esac",
+      "  done",
+      "  local -a candidates",
+      "  case \"$prefix\" in",
     ]
-    for (node, tokens) in subcommands {
-      lines.append("    \(node))")
-      lines.append("      if (( CURRENT == 3 )); then")
-      lines.append("        local -a subs")
-      lines.append("        subs=(\(tokens.map { "'\($0)'" }.joined(separator: " ")))")
-      lines.append("        _describe 'subcommand' subs")
-      lines.append("        return")
-      lines.append("      fi")
-      lines.append("      case \"${words[3]}\" in")
-      for token in tokens {
-        let options = publishedOptions(node: node, leaf: token)
-        lines.append("        \(token))")
-        lines.append("          local -a opts")
-        lines.append(
-          "          opts=(\((options + ["--help"]).map { "'\($0)'" }.joined(separator: " ")))")
-        lines.append("          _describe 'option' opts")
-        lines.append("          return ;;")
-      }
-      lines.append("      esac ;;")
+    for row in table() {
+      lines.append("    \"\(row.key)\")")
+      lines.append("      candidates=(\(row.next.map { "'\($0)'" }.joined(separator: " "))) ;;")
     }
-    lines.append("    completion)")
-    lines.append("      local -a shells")
-    lines.append("      shells=('bash' 'zsh' 'fish' 'powershell')")
-    lines.append("      _describe 'shell' shells")
-    lines.append("      return ;;")
-    lines.append("    help)")
-    lines.append("      _describe 'command' roots")
-    lines.append("      return ;;")
+    lines.append("    *) candidates=() ;;")
     lines.append("  esac")
+    lines.append("  (( ${#candidates} )) && _describe 'arkdeck' candidates")
     lines.append("}")
     lines.append("_arkdeck \"$@\"")
     return lines.joined(separator: "\n") + "\n"
@@ -148,35 +141,26 @@ enum CLICompletionScripts {
       "# arkdeck fish completion — generated from \(CLICommandRegistry.schemaVersion)",
       "# Identities are never completed: see the CLI product spec §10.",
       "complete -c arkdeck -f",
+      "function __arkdeck_prefix",
+      "  set -l tokens (commandline -poc)",
+      "  set -l parts",
+      "  for token in $tokens[2..-1]",
+      "    if not string match -q -- '-*' $token",
+      "      set parts $parts $token",
+      "    end",
+      "  end",
+      "  string join ' ' $parts",
+      "end",
     ]
-    for node in CLICommandRegistry.nodes {
-      lines.append(
-        "complete -c arkdeck -n '__fish_use_subcommand' -a '\(node.token)' "
-          + "-d '\(escapeFish(node.summary))'")
-      for leaf in node.leaves where !leaf.token.isEmpty {
-        lines.append(
-          "complete -c arkdeck -n '__fish_seen_subcommand_from \(node.token)' "
-            + "-a '\(leaf.token)' -d '\(escapeFish(leaf.summary))'")
-        for option in leaf.options where option.isPublished {
-          lines.append(
-            "complete -c arkdeck -n '__fish_seen_subcommand_from \(leaf.token)' "
-              + "-l '\(option.name.dropFirst(2))' -d '\(escapeFish(option.summary))'")
-        }
+    for row in table() {
+      let condition =
+        row.prefix.isEmpty
+        ? "test -z (__arkdeck_prefix)" : "test (__arkdeck_prefix) = '\(row.key)'"
+      for token in row.next {
+        lines.append("complete -c arkdeck -n \"\(condition)\" -a '\(token)'")
       }
     }
-    for leaf in CLICommandRegistry.rootLeaves {
-      lines.append(
-        "complete -c arkdeck -n '__fish_use_subcommand' -a '\(leaf.token)' "
-          + "-d '\(escapeFish(leaf.summary))'")
-    }
-    lines.append(
-      "complete -c arkdeck -n '__fish_seen_subcommand_from completion' "
-        + "-a 'bash zsh fish powershell'")
     return lines.joined(separator: "\n") + "\n"
-  }
-
-  private static func escapeFish(_ text: String) -> String {
-    text.replacingOccurrences(of: "'", with: "")
   }
 
   // MARK: powershell
@@ -187,33 +171,23 @@ enum CLICompletionScripts {
       "# Identities are never completed: see the CLI product spec §10.",
       "Register-ArgumentCompleter -Native -CommandName arkdeck -ScriptBlock {",
       "  param($wordToComplete, $commandAst, $cursorPosition)",
-      "  $tokens = $commandAst.CommandElements | ForEach-Object { $_.ToString() }",
-      "  $roots = @(\(rootTokens.map { "'\($0)'" }.joined(separator: ", ")))",
-      "  if ($tokens.Count -le 2) {",
-      "    return $roots | Where-Object { $_ -like \"$wordToComplete*\" } |",
-      "      ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }",
-      "  }",
-      "  $subcommands = @{",
+      "  $next = @{",
     ]
-    for (node, tokens) in subcommands {
-      lines.append("    '\(node)' = @(\(tokens.map { "'\($0)'" }.joined(separator: ", ")))")
+    for row in table() {
+      lines.append("    '\(row.key)' = @(\(row.next.map { "'\($0)'" }.joined(separator: ", ")))")
     }
     lines.append("  }")
-    lines.append("  $options = @{")
-    for (node, tokens) in subcommands {
-      for token in tokens {
-        let options = publishedOptions(node: node, leaf: token) + ["--help"]
-        lines.append(
-          "    '\(node) \(token)' = @(\(options.map { "'\($0)'" }.joined(separator: ", ")))")
-      }
-    }
+    lines.append(
+      "  $tokens = @($commandAst.CommandElements | ForEach-Object { $_.ToString() })"
+    )
+    lines.append("  $parts = @()")
+    lines.append("  if ($tokens.Count -gt 1) {")
+    lines.append("    foreach ($token in $tokens[1..($tokens.Count - 1)]) {")
+    lines.append("      if ($token -eq $wordToComplete) { continue }")
+    lines.append("      if ($token -notlike '-*') { $parts += $token }")
+    lines.append("    }")
     lines.append("  }")
-    lines.append("  $node = $tokens[1]")
-    lines.append("  if ($tokens.Count -eq 3) {")
-    lines.append("    $candidates = $subcommands[$node]")
-    lines.append("  } else {")
-    lines.append("    $candidates = $options[\"$node $($tokens[2])\"]")
-    lines.append("  }")
+    lines.append("  $candidates = $next[($parts -join ' ')]")
     lines.append("  if ($null -eq $candidates) { return }")
     lines.append("  $candidates | Where-Object { $_ -like \"$wordToComplete*\" } |")
     lines.append("    ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }")

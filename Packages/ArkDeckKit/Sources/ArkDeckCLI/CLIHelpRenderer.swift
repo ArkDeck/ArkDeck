@@ -55,6 +55,9 @@ enum CLIHelpRenderer {
     for leaf in node.leaves where !leaf.token.isEmpty {
       lines.append("  " + pad(leaf.token, 26) + leaf.summary + statusSuffix(leaf))
     }
+    for group in node.groups {
+      lines.append("  " + pad(group.token, 26) + group.summary + "  (group)")
+    }
     lines.append("")
     lines.append("`arkdeck help \(node.token) <subcommand>` describes one of them.")
     return lines.joined(separator: "\n")
@@ -190,16 +193,12 @@ enum CLIHelpRenderer {
 
   private static func summary(forPath path: String) -> String? {
     let tokens = path.split(separator: " ").map(String.init)
-    guard let first = tokens.first else { return nil }
-    if let leaf = CLICommandRegistry.rootLeaf(first), tokens.count == 1 { return leaf.summary }
-    guard let node = CLICommandRegistry.node(first) else { return nil }
-    if tokens.count == 1 {
-      if let only = node.leaves.first, node.leaves.count == 1, only.token.isEmpty {
-        return only.summary
-      }
-      return node.summary
+    if let leaf = CLICommandRegistry.rootLeaf(tokens.first ?? ""), tokens.count == 1 {
+      return leaf.summary
     }
-    return node.leaves.first { $0.token == tokens[1] }?.summary
+    return CLICommandRegistry.allLeaves()
+      .first { $0.path == tokens }?.leaf.summary
+      ?? CLICommandRegistry.node(tokens.first ?? "")?.summary
   }
 
   private static func statusSuffix(_ leaf: CLILeafSpec) -> String {
@@ -302,6 +301,13 @@ enum CLIRegistryProjection {
     switch grammar {
     case .opaque:
       return .object(["kind": .string("opaque")])
+    case .nonNegativeInteger(let range):
+      var fields: [String: JSONValue] = [
+        "kind": .string("nonNegativeInteger"),
+        "minimum": .integer(Int64(range.lowerBound)),
+      ]
+      if range.upperBound != Int.max { fields["maximum"] = .integer(Int64(range.upperBound)) }
+      return .object(fields)
     case .positiveInteger(let range):
       var fields: [String: JSONValue] = [
         "kind": .string("positiveInteger"),
@@ -309,6 +315,17 @@ enum CLIRegistryProjection {
       ]
       if range.upperBound != Int.max { fields["maximum"] = .integer(Int64(range.upperBound)) }
       return .object(fields)
+    case .controlRequestID:
+      return .object([
+        "kind": .string("pattern"),
+        "pattern": .string("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
+      ])
+    case .hexDigest(let length):
+      return .object([
+        "kind": .string("hexDigest"),
+        "length": .integer(Int64(length)),
+        "case": .string("lowercase"),
+      ])
     case .enumeration(let allowed):
       return .object([
         "kind": .string("enumeration"),

@@ -207,6 +207,135 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  /// §13.2: `operation describe` carried none of the fields an Agent needs to
+  /// decide *whether* to submit — only enough to build the request.
+  ///
+  /// Which effects the operation may reach and what authorises each of them,
+  /// what the plan does step by step and whether any of it compensates, what it
+  /// will produce and how private that is: all of it was in the catalog and
+  /// none of it was reachable from an installed daemon.
+  func testOperationDescribeCarriesTheDecisionFieldsNotJustTheInputContract() async throws {
+    let (handler, _) = try makeStack()
+    let response = try await request(
+      handler, method: "operation.describe",
+      params: ["reference": .string("capture.diagnostics@1")])
+    guard case .object(let result)? = response.result else {
+      return XCTFail("describe must return a bound object")
+    }
+    XCTAssertTrue(response.ok)
+
+    for key in [
+      "permittedEffects", "authorization", "defaultPolicyIssuanceEnabled", "concurrencyKey",
+      "outputByteBudget", "preflightAttempts", "profiles", "steps", "artifacts",
+      "completeOverwriteRecovery", "aliasFor",
+    ] {
+      XCTAssertNotNil(result[key], "describe must publish \(key)")
+    }
+    // The fields it already had must survive: this is additive.
+    for key in ["reference", "title", "inputs", "outputs", "exampleRequest", "availability"] {
+      XCTAssertNotNil(result[key], "\(key) must not have been dropped")
+    }
+
+    guard case .array(let steps)? = result["steps"], case .object(let step)? = steps.first
+    else { return XCTFail("a diagnostics capture declares steps") }
+    for key in ["stepId", "kind", "effect", "cancellation", "binding", "optional", "compensation"]
+    {
+      XCTAssertNotNil(step[key], "a projected step must carry \(key)")
+    }
+
+    guard case .array(let artifacts)? = result["artifacts"],
+      case .object(let artifact)? = artifacts.first
+    else { return XCTFail("a diagnostics capture declares artifacts") }
+    // Privacy decides whether reading or exporting needs an explicit opt-in, so
+    // a caller has to be able to see it before it starts the work.
+    XCTAssertNotNil(artifact["privacy"])
+    XCTAssertNotNil(artifact["role"])
+    XCTAssertNotNil(artifact["retentionClass"])
+  }
+
+  /// §6.1 asks the list to carry alias lineage, effect, binding and profile, so
+  /// an Agent can narrow the catalog without one describe call per operation.
+  func testOperationListCarriesEnoughToNarrowTheCatalog() async throws {
+    let (handler, _) = try makeStack()
+    let response = try await request(handler, method: "operation.list")
+    guard case .array(let rows)? = response.result, case .object(let row)? = rows.first else {
+      return XCTFail("operation.list must return an array of objects")
+    }
+    for key in [
+      "reference", "canonicalReference", "aliasFor", "minimumEffect", "binding", "profiles",
+      "availability", "reasons", "reasonCodes", "reasonOrigins",
+    ] {
+      XCTAssertNotNil(row[key], "operation.list must publish \(key)")
+    }
+  }
+
+  /// §13.2: `target show` is not an alias of `target.list`.
+  ///
+  /// A caller deciding whether it can drive a device needs the binding it will
+  /// pin, the identity that binding is against, and the last facts the Runtime
+  /// confirmed. `target.list` publishes none of the last two, so the only way
+  /// to learn them was to adopt and see.
+  func testTargetShowReturnsTheBindingIdentityAndFactsThatTargetListOmits() async throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-show", directoryHint: .isDirectory))
+    let identity = String(repeating: "b", count: 64)
+    let target = try targets.adopt(
+      stableIdentitySHA256: identity,
+      connectKey: "fixture-connect-key", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    let response = try await request(
+      handler, method: "target.show", params: ["targetId": .string(target.targetID)])
+    guard case .object(let result)? = response.result else {
+      return XCTFail("target.show must return a bound object")
+    }
+    XCTAssertTrue(response.ok)
+    XCTAssertEqual(result["targetId"], .string(target.targetID))
+    XCTAssertEqual(result["bindingRevision"], .integer(Int64(target.bindingRevision)))
+    XCTAssertEqual(result["toolVersion"], .string("3.2.0f"))
+    XCTAssertEqual(result["adoptedAtUtc"], .string("2026-08-08T00:00:00Z"))
+    // The three fields `target.list` does not publish.
+    XCTAssertEqual(result["connectKey"], .string("fixture-connect-key"))
+    XCTAssertEqual(result["stablePhysicalIdentitySha256"], .string(identity))
+    XCTAssertNotNil(result["observedFacts"], "the key is present even with no facts yet")
+    // No bootstrap is configured in this stack, so live state is absent rather
+    // than invented: an unobserved device must not read as offline.
+    XCTAssertEqual(result["live"], .null)
+
+    let listed = try await request(handler, method: "target.list")
+    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first else {
+      return XCTFail("target.list must still return its compact array")
+    }
+    XCTAssertNil(
+      row["connectKey"],
+      "target.list stays the compact projection; widening it would be the breaking change §12 "
+        + "defers to 2.x")
+  }
+
+  func testTargetShowFailsClosedOnAnUnknownOrMissingTarget() async throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-show-missing", directoryHint: .isDirectory))
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    let unknown = try await request(
+      handler, method: "target.show", params: ["targetId": .string("target-missing")])
+    XCTAssertFalse(unknown.ok)
+    XCTAssertEqual(unknown.error?.code, "notFound")
+
+    let missing = try await request(handler, method: "target.show")
+    XCTAssertFalse(missing.ok)
+    XCTAssertEqual(missing.error?.code, "invalidParams")
+
+    let empty = try await request(
+      handler, method: "target.show", params: ["targetId": .string("")])
+    XCTAssertFalse(empty.ok)
+    XCTAssertEqual(empty.error?.code, "invalidParams")
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,

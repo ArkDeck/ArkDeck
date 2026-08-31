@@ -49,7 +49,7 @@ and the operation's live input description:
 ```bash
 arkdeck agentd status
 arkdeck doctor
-arkdeck device list --json
+arkdeck target list --json
 arkdeck operation describe --operation capture.diagnostics@1 --json
 ```
 

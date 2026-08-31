@@ -246,8 +246,17 @@ public struct RuntimeControlPlaneHandler: Sendable {
         id: request.id,
         result: .array(
           availability.map { item in
-            .object([
+            // §6.1 asks the list to carry alias lineage, effect, binding and
+            // profile alongside availability, so an Agent can narrow the
+            // catalog without one describe call per operation.
+            let descriptor = RuntimeOperationCatalog.descriptor(reference: item.reference)
+            return .object([
               "reference": .string(item.reference),
+              "canonicalReference": .string(descriptor?.reference ?? item.reference),
+              "aliasFor": descriptor?.aliasFor.map(JSONValue.string) ?? .null,
+              "minimumEffect": descriptor.map { .string($0.minimumEffect.rawValue) } ?? .null,
+              "binding": descriptor.map { .string($0.binding.rawValue) } ?? .null,
+              "profiles": .array((descriptor?.profiles ?? []).map(JSONValue.string)),
               "availability": .string(item.state.rawValue),
               "reasons": .array(item.reasons.map(JSONValue.string)),
               // PRODUCT-LOOP §8: the machine-readable half, positionally
@@ -272,32 +281,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         .first { $0.reference == descriptor.reference }
       return success(
         id: request.id,
-        result: .object([
-          "reference": .string(descriptor.reference),
-          "title": .string(descriptor.title),
-          "provider": .string(descriptor.provider.rawValue),
-          "minimumEffect": .string(descriptor.minimumEffect.rawValue),
-          "binding": .string(descriptor.binding.rawValue),
-          "timeoutSeconds": .integer(Int64(descriptor.timeoutSeconds)),
-          "stepCount": .integer(Int64(descriptor.steps.count)),
-          "availability": .string(availability?.state.rawValue ?? "unavailable"),
-          "availabilityReasons": .array(
-            (availability?.reasons ?? ["runtime availability could not be resolved"])
-              .map(JSONValue.string)),
-          "availabilityReasonCodes": .array(
-            (availability?.reasonCodes ?? [.providerNotRegistered])
-              .map { .string($0.rawValue) }),
-          "availabilityReasonOrigins": .array(
-            (availability?.reasonCodes ?? [.providerNotRegistered])
-              .map { .string($0.origin.rawValue) }),
-          // The input contract, which this reply carried none of. A caller
-          // could learn a field's name only by being refused for omitting it,
-          // and its meaning only by reading the catalog source — which is not
-          // a surface anything talking to an installed daemon has.
-          "inputs": .array(descriptor.inputs.map(Self.encodeCatalogField)),
-          "outputs": .array(descriptor.outputs.map(Self.encodeCatalogField)),
-          "exampleRequest": RuntimeRequestEnvelope.exampleRequestJSON(for: descriptor) ?? .null,
-        ]))
+        result: Self.encodeOperationDescriptor(descriptor, availability: availability))
 
     case "flash.lanePlanPreview":
       // Read-only preview of the arkforged plan the permits would anchor
@@ -1797,6 +1781,71 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "target.show":
+      // §13.2 is explicit that this is not an alias of `target.list`. A caller
+      // deciding whether it can drive this device needs the binding revision it
+      // will pin, the physical identity that binding is against, the last facts
+      // the Runtime actually confirmed, and whether the device is visible right
+      // now. `target.list` publishes none of the last three, so a caller had to
+      // adopt-and-see instead of look.
+      //
+      // Additive and read-only: it creates nothing, and the field vocabulary is
+      // shared with `device.candidates` so the two projections cannot describe
+      // the same device in two spellings.
+      guard let targetStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "target store is not configured")
+      }
+      guard case .string(let requestedTargetID)? = request.params?["targetId"],
+        !requestedTargetID.isEmpty
+      else {
+        return failure(id: request.id, code: .invalidParams, message: "targetId is required")
+      }
+      do {
+        guard let record = try targetStore.find(targetID: requestedTargetID) else {
+          return failure(
+            id: request.id, code: .notFound,
+            message: "no durable target \(requestedTargetID)")
+        }
+        let observation =
+          (try? await engine.latestSucceededDeviceObservations())?[record.targetID]
+        // The warm snapshot only. Forcing a candidate refresh here would turn a
+        // record lookup into a device round trip; the freshness of what is
+        // reported is published instead of implied, so a caller that needs a
+        // current reading knows to ask for one.
+        var live: JSONValue = .null
+        if let bootstrap, let snapshot = try? await bootstrap.candidateSnapshotForPresentation() {
+          let match = snapshot.candidates.first { $0.connectKey == record.connectKey }
+          live = .object([
+            "state": match.map { .string($0.state) } ?? .string("Absent"),
+            "observedAtUtc": .string(snapshot.observedAtUTC),
+            "observationHealth": .string(snapshot.health.rawValue),
+          ])
+        }
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(record.targetID),
+            "bindingRevision": .integer(Int64(record.bindingRevision)),
+            "toolVersion": .string(record.toolVersion),
+            "adoptedAtUtc": .string(record.adoptedAtUTC),
+            "connectKey": .string(record.connectKey),
+            "stablePhysicalIdentitySha256": .string(record.stablePhysicalIdentitySHA256),
+            "live": live,
+            "observedFacts": observation.map {
+              .object([
+                "targetId": $0.targetID.map(JSONValue.string) ?? .null,
+                "model": $0.model.map(JSONValue.string) ?? .null,
+                "firmware": $0.firmware.map(JSONValue.string) ?? .null,
+                "transport": $0.transport.map(JSONValue.string) ?? .null,
+                "confirmedAtUtc": $0.confirmedAtUTC.map(JSONValue.string) ?? .null,
+              ])
+            } ?? .null,
+          ]))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "device.candidates":
       // Read-only discovery: the one enumeration the App's device list needs.
       // It calls the bootstrap's candidate read directly — never `advance`,
@@ -1997,6 +2046,111 @@ public struct RuntimeControlPlaneHandler: Sendable {
   /// Absent constraints stay absent rather than becoming nulls a caller has to
   /// tell apart from "unconstrained": every key present here is a rule that
   /// applies.
+  /// The full descriptor an Agent needs before it decides to submit.
+  ///
+  /// Built in steps rather than as one literal: the compiler cannot type-check
+  /// a dictionary this size in reasonable time, and splitting it also keeps the
+  /// decision fields readable as groups.
+  static func encodeOperationDescriptor(
+    _ descriptor: CatalogOperationDescriptor,
+    availability: RuntimeOperationAvailability?
+  ) -> JSONValue {
+    let reasonCodes = availability?.reasonCodes ?? [.providerNotRegistered]
+    var projected: [String: JSONValue] = [
+      "reference": .string(descriptor.reference),
+      "title": .string(descriptor.title),
+      "provider": .string(descriptor.provider.rawValue),
+      "minimumEffect": .string(descriptor.minimumEffect.rawValue),
+      "binding": .string(descriptor.binding.rawValue),
+      "timeoutSeconds": .integer(Int64(descriptor.timeoutSeconds)),
+      "stepCount": .integer(Int64(descriptor.steps.count)),
+    ]
+    projected["availability"] = .string(availability?.state.rawValue ?? "unavailable")
+    projected["availabilityReasons"] = .array(
+      (availability?.reasons ?? ["runtime availability could not be resolved"])
+        .map(JSONValue.string))
+    projected["availabilityReasonCodes"] = .array(reasonCodes.map { .string($0.rawValue) })
+    projected["availabilityReasonOrigins"] = .array(
+      reasonCodes.map { .string($0.origin.rawValue) })
+
+    // The input contract, which this reply carried none of before CHG-2026-064.
+    // A caller could learn a field's name only by being refused for omitting
+    // it, and its meaning only by reading the catalog source — which is not a
+    // surface anything talking to an installed daemon has.
+    projected["inputs"] = .array(descriptor.inputs.map(encodeCatalogField))
+    projected["outputs"] = .array(descriptor.outputs.map(encodeCatalogField))
+    projected["exampleRequest"] =
+      RuntimeRequestEnvelope.exampleRequestJSON(for: descriptor) ?? .null
+
+    // The decision fields §13.2 records as missing. An Agent choosing whether
+    // to submit needs to know which effects this operation may reach and what
+    // authorises each of them, what the plan will do step by step and whether
+    // any of it compensates, what it will produce and how private that is, and
+    // whether a complete-overwrite recovery contract exists.
+    projected["aliasFor"] = descriptor.aliasFor.map(JSONValue.string) ?? .null
+    projected["permittedEffects"] = .array(
+      descriptor.permittedEffects.map { .string($0.rawValue) })
+    projected["authorization"] = .object(
+      Dictionary(
+        uniqueKeysWithValues: descriptor.authorization.map {
+          ($0.key.rawValue, JSONValue.string($0.value.rawValue))
+        }))
+    projected["defaultPolicyIssuanceEnabled"] = .bool(descriptor.defaultPolicyIssuanceEnabled)
+    projected["concurrencyKey"] = .string(descriptor.concurrencyKey.rawValue)
+    projected["outputByteBudget"] = .integer(Int64(descriptor.outputByteBudget))
+    projected["preflightAttempts"] = .integer(Int64(descriptor.preflightAttempts))
+    projected["profiles"] = .array(descriptor.profiles.map(JSONValue.string))
+    projected["steps"] = .array(descriptor.steps.map(encodeCatalogStep))
+    projected["artifacts"] = .array(descriptor.artifacts.map(encodeCatalogArtifact))
+    projected["completeOverwriteRecovery"] =
+      descriptor.completeOverwriteRecovery.map { recovery in
+        .object([
+          "contractVersion": .string(recovery.contractVersion),
+          "overwriteStepId": .string(recovery.overwriteStepID),
+          "verificationStepIds": .array(recovery.verificationStepIDs.map(JSONValue.string)),
+          "profiles": .array(
+            recovery.profiles.map {
+              .object([
+                "reference": .string($0.reference),
+                "coveredEffects": .array($0.coveredEffects.map(JSONValue.string)),
+              ])
+            }),
+        ])
+      } ?? .null
+    return .object(projected)
+  }
+
+  /// One plan step, as an Agent needs to reason about it: what it does, what
+  /// effect it may reach, whether it can be cancelled, and what undoes it.
+  private static func encodeCatalogStep(_ step: CatalogStepDescriptor) -> JSONValue {
+    .object([
+      "stepId": .string(step.stepID),
+      "kind": .string(step.kind.rawValue),
+      "effect": .string(step.effect.rawValue),
+      "cancellation": .string(step.cancellation.rawValue),
+      "binding": .string(step.binding.rawValue),
+      "optional": .bool(step.isOptional),
+      "compensation": .string(step.compensation.rawValue),
+      "action": step.actionReference.map {
+        .object(["catalogId": .string($0.catalogID), "actionId": .string($0.actionID)])
+      } ?? .null,
+    ])
+  }
+
+  /// What the operation declares it will produce, and how private it is. The
+  /// privacy class is what decides whether reading or exporting it needs an
+  /// explicit opt-in, so a caller has to be able to see it before it starts.
+  private static func encodeCatalogArtifact(_ artifact: CatalogArtifactDescriptor) -> JSONValue {
+    .object([
+      "name": .string(artifact.name),
+      "role": .string(artifact.role.rawValue),
+      "mediaType": .string(artifact.mediaType),
+      "privacy": .string(artifact.privacy.rawValue),
+      "required": .bool(artifact.isRequired),
+      "retentionClass": .string(artifact.retentionClass.rawValue),
+    ])
+  }
+
   private static func encodeCatalogField(_ field: CatalogFieldDescriptor) -> JSONValue {
     var projected: [String: JSONValue] = [
       "name": .string(field.name),

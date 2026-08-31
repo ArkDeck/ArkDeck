@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckAgentClient
 @testable import ArkDeckCLI
 @testable import ArkDeckCore
 
@@ -135,9 +136,130 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(success(["operation", "list", "--socket", "/tmp/s"]))
   }
 
-  func testOutputIsRefusedByLeavesThatDoNotYetRenderIt() {
-    XCTAssertEqual(failure(["doctor", "--output", "json"])?.code, .invalidOption)
-    XCTAssertEqual(failure(["job", "list", "--output", "json"])?.code, .invalidOption)
+  func testOutputIsAcceptedByEveryLeafThatDeclaresItAndRefusedByTheRest() {
+    XCTAssertNotNil(success(["doctor", "--output", "json"]))
+    XCTAssertNotNil(success(["job", "list", "--output", "json"]))
+    XCTAssertNotNil(success(["agentd", "status", "--output", "json"]))
+
+    // The legacy archive leaves gained structured results, so they answer too.
+    XCTAssertNotNil(
+      success(["flash", "status", "--campaign-id", "E-1", "--output", "json"]))
+    XCTAssertNotNil(success(["flash", "reconcile", "--output", "json"]))
+
+    // The maintainer feed tooling is the one family still without a structured
+    // result, so it refuses the option rather than wrap a sentence in an
+    // envelope and call that machine output.
+    XCTAssertEqual(
+      failure([
+        "update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o",
+        "--output", "json",
+      ])?.code,
+      .invalidOption)
+  }
+
+  /// §8.1 scopes `jsonl` to the durable event stream. No leaf publishes one,
+  /// so accepting the mode would promise a stream that cannot be produced.
+  func testJsonlIsRefusedUntilADurableEventStreamExists() {
+    for argv in [["job", "list"], ["doctor"], ["commands"]] {
+      let error = failure(argv + ["--output", "jsonl"])
+      XCTAssertEqual(error?.code, .invalidOption, argv.joined(separator: " "))
+    }
+  }
+
+  /// §12: `--json` keeps the shape it has always had and `--output json` is the
+  /// new contract, so one invocation cannot ask for both.
+  func testTheTwoMachineOutputSpellingsExcludeEachOther() {
+    let error = failure(["operation", "list", "--output", "json", "--json"])
+    XCTAssertEqual(error?.code, .invalidOption)
+    XCTAssertTrue(error?.message.contains("only one of") == true)
+  }
+
+  func testTheCorrelationIdentityIsValidatedAndEchoedOnlyWhenItIsSound() {
+    XCTAssertNotNil(
+      success(["job", "status", "--job", "J-1", "--control-request-id", "my.run:1-a_b"]))
+    for rejected in ["", "-leading", ".dot", "has space", "emoji-🙂", String(repeating: "a", count: 129)]
+    {
+      XCTAssertEqual(
+        failure(["job", "status", "--job", "J-1", "--control-request-id", rejected])?.code,
+        .invalidOption,
+        "control request id \(rejected.debugDescription) must be refused")
+    }
+    XCTAssertNotNil(success(["job", "status", "--job", "J-1", "--control-request-id",
+      String(repeating: "a", count: 128)]))
+
+    // §8.1: exactly one sound value is echoed; anything else gets a fresh
+    // bounded identity rather than putting unvalidated bytes in machine output.
+    XCTAssertEqual(
+      CLIArgumentParser.bootstrapControlRequestID(["--control-request-id", "ok-1"]), "ok-1")
+    for unusable in [
+      ["--control-request-id"], ["--control-request-id", "bad id"],
+      ["--control-request-id", "a", "--control-request-id", "b"], [],
+    ] {
+      let generated = CLIArgumentParser.bootstrapControlRequestID(unusable)
+      XCTAssertTrue(generated.hasPrefix("ctl-"), "\(unusable)")
+      XCTAssertTrue(CLIControlRequestID.isValid(generated))
+    }
+  }
+
+  /// §12: an explicit legacy-compatibility leaf has to say so in machine
+  /// output, because the caller cannot otherwise tell it is driving the frozen
+  /// 1.x surface rather than the target one.
+  func testLegacyLeavesAreMarkedInTheRegistryAndInTheEnvelope() {
+    for path in [["device", "list"], ["debug", "status"], ["artifact", "import-hap"]] {
+      let leaf = CLICommandRegistry.allLeaves()
+        .first { $0.path == path }?.leaf
+      XCTAssertEqual(leaf?.lifecycle, .legacy, path.joined(separator: " "))
+    }
+    XCTAssertEqual(
+      CLICommandRegistry.allLeaves().first { $0.path == ["job", "status"] }?.leaf.lifecycle,
+      .current)
+
+    let envelope = CLIResultEnvelope.withLifecycle(
+      CLIResultEnvelope.success(
+        command: "device.list", result: .array([]), controlRequestID: "ctl-test"),
+      .legacy)
+    guard case .object(let fields) = envelope, case .object(let meta)? = fields["meta"],
+      case .object(let lifecycle)? = meta["lifecycle"]
+    else {
+      return XCTFail("a legacy leaf must carry meta.lifecycle")
+    }
+    XCTAssertEqual(lifecycle["status"], .string("legacy"))
+    XCTAssertEqual(lifecycle["replacementArgvPattern"], .null)
+    XCTAssertEqual(lifecycle["removalVersion"], .null)
+
+    // A current leaf carries no lifecycle at all rather than a "current" one.
+    let current = CLIResultEnvelope.withLifecycle(
+      CLIResultEnvelope.success(
+        command: "job.status", result: .object([:]), controlRequestID: "ctl-test"),
+      .current)
+    guard case .object(let plain) = current, case .object(let plainMeta)? = plain["meta"] else {
+      return XCTFail("meta is required")
+    }
+    XCTAssertNil(plainMeta["lifecycle"])
+  }
+
+  /// §12 lists "errors are not JSON" as a `--json` defect to fix while keeping
+  /// its shape. It is not the envelope: that is what `--output json` is for.
+  func testLegacyJsonAnswersFailuresAsJsonWithoutTheEnvelope() {
+    let error = CLIRegistryError(
+      code: .resourceNotFound, message: "unknown job J-1", command: "job.status")
+    guard case .object(let fields) = CLIResultEnvelope.legacyFailure(error) else {
+      return XCTFail("legacy-json failures must still be JSON")
+    }
+    XCTAssertNil(fields["schemaVersion"], "legacy-json is not the versioned envelope")
+    XCTAssertNil(fields["meta"])
+    guard case .object(let body)? = fields["error"] else { return XCTFail("error is required") }
+    XCTAssertEqual(body["code"], .string("resourceNotFound"))
+  }
+
+  /// The old renderer fell back to the human layout when encoding failed,
+  /// handing a machine caller prose where it expected JSON (§8.1 forbids it).
+  func testLegacyJsonNeverFallsBackToProse() {
+    let unencodable = JSONValue.number(.nan)
+    let rendered = CLIRuntimeSession.legacyDocument(unencodable)
+    XCTAssertTrue(rendered.hasPrefix("{"), "the fallback must still be JSON: \(rendered)")
+    XCTAssertTrue(rendered.contains("internalError"))
+    XCTAssertTrue(rendered.hasSuffix("\n"))
   }
 
   func testOutputIsAcceptedInEitherGlobalPositionButNotTwice() {
@@ -313,8 +435,21 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(error?.details["removalVersion"], "the field is required even when unknown")
   }
 
+  /// The pattern form comes back the moment its leaf exists — the guard that
+  /// refuses a replacement pointing at a missing command is what makes that
+  /// safe to do automatically rather than from memory.
+  func testTheRetiredPostflightNamesJobEvidenceNowThatItExists() {
+    let error = failure(["flash", "postflight"])
+    XCTAssertEqual(error?.code, .commandRemoved)
+    XCTAssertEqual(
+      error?.details["replacementArgvPattern"], .string("arkdeck job evidence --job <id>"))
+  }
+
+  /// `flash continue` is the example precisely because nothing replaces it:
+  /// historical campaigns are decode-only, so there is no argv pattern to give
+  /// and the reason has to carry the answer instead.
   func testARetiredCommandWithNoReplacementSaysSoRatherThanNamingOne() {
-    let error = failure(["flash", "preview"])
+    let error = failure(["flash", "continue"])
     XCTAssertEqual(error?.code, .commandRemoved)
     XCTAssertEqual(error?.details["replacementArgvPattern"], .null)
     XCTAssertNotNil(error?.details["reason"])
@@ -387,6 +522,350 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(CLIErrorCode.commandRemoved.exitCode, 64)
     XCTAssertEqual(CLIErrorCode.invalidInput.exitCode, 65)
     XCTAssertEqual(CLIErrorCode.internalError.exitCode, 70)
+  }
+
+  // MARK: Nested groups (§6.3)
+
+  /// §6.3's platform surface is three tokens deep. A two-level tree would have
+  /// forced `runtime hdc status` into a hyphenated leaf name that disagrees
+  /// with the published command tree, so groups nest.
+  func testAThreeTokenPathResolvesAndReportsItsOwnPathWhenIncomplete() {
+    guard case .dispatch(let path, let leaf, _)? = success(["runtime", "hdc", "status"]) else {
+      return XCTFail("a nested group must resolve to its leaf")
+    }
+    XCTAssertEqual(path, ["runtime", "hdc", "status"])
+    XCTAssertEqual(leaf.canonicalCommand, "runtime.hdc.status")
+
+    // An incomplete path is reported as the caller typed it, not as its last
+    // token alone — `hdc needs a subcommand` names nothing a caller can find.
+    let incomplete = failure(["runtime", "hdc"])
+    XCTAssertEqual(incomplete?.code, .invalidCommand)
+    XCTAssertTrue(incomplete?.message.contains("`runtime hdc`") == true, incomplete?.message ?? "")
+    XCTAssertEqual(failure(["runtime"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["runtime", "bogus"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["runtime", "hdc", "bogus"])?.code, .invalidCommand)
+  }
+
+  func testHelpAndCompletionFollowTheNestedTree() throws {
+    guard case .leafHelp(let path, _)? = success(["help", "runtime", "hdc", "status"]) else {
+      return XCTFail("help must walk to a nested leaf")
+    }
+    XCTAssertEqual(path, ["runtime", "hdc", "status"])
+    guard case .nodeHelp(let group)? = success(["help", "runtime", "hdc"]) else {
+      return XCTFail("help must stop at a nested group")
+    }
+    XCTAssertEqual(group.token, "hdc")
+
+    // The completion table is keyed by joined prefix, so it is depth-agnostic
+    // by construction rather than by a hard-coded two levels.
+    let keys = Set(CLICompletionScripts.table().map(\.key))
+    XCTAssertTrue(keys.contains("runtime"))
+    XCTAssertTrue(keys.contains("runtime hdc"))
+    XCTAssertTrue(keys.contains("runtime hdc status"))
+    let hdcRow = try XCTUnwrap(
+      CLICompletionScripts.table().first { $0.key == "runtime hdc" })
+    XCTAssertEqual(hdcRow.next, ["status"])
+  }
+
+  // MARK: Discovery and health leaves (§6.1, §13.2)
+
+  /// These four daemon methods have existed since the control plane landed and
+  /// had no caller-facing leaf, so an external Agent could not ask whether the
+  /// Runtime was there, what was plugged in, or what a target was bound to.
+  func testTheDaemonReadyDiscoverySurfaceIsReachable() {
+    for argv in [
+      ["runtime", "health"],
+      ["runtime", "hdc", "status"],
+      ["device", "candidates"],
+      ["device", "candidates", "--use-warm-snapshot"],
+      ["target", "list"],
+      ["target", "show", "--target", "T-1"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["target", "show"])?.code, .invalidOption)
+  }
+
+  /// §7.1 separates a live observation from a durable binding, and §12 keeps
+  /// the old spelling working as frozen legacy compatibility rather than
+  /// silently repointing it.
+  func testTheTargetSpellingIsCurrentWhileTheDeviceSpellingStaysLegacy() {
+    let leaves = CLICommandRegistry.allLeaves()
+    XCTAssertEqual(leaves.first { $0.path == ["target", "list"] }?.leaf.lifecycle, .current)
+    XCTAssertEqual(leaves.first { $0.path == ["target", "show"] }?.leaf.lifecycle, .current)
+    XCTAssertEqual(leaves.first { $0.path == ["device", "list"] }?.leaf.lifecycle, .legacy)
+    XCTAssertEqual(leaves.first { $0.path == ["device", "show"] }?.leaf.lifecycle, .legacy)
+    // `device candidates` is the target spelling (§6.1), so it is `current`
+    // even though its 1.x response still lacks the snapshot generation the
+    // target contract wants. Lifecycle answers "is there a newer spelling?";
+    // whether a leaf meets the target contract is a coverage question, and
+    // overloading one field with both would make `legacy` mean two things.
+    XCTAssertEqual(
+      leaves.first { $0.path == ["device", "candidates"] }?.leaf.lifecycle, .current)
+  }
+
+  // MARK: Evidence, result and bounded reads (§6.1, §7.6, §9)
+
+  func testTheResultAndEvidenceSurfaceIsReachable() {
+    for argv in [
+      ["job", "evidence", "--job", "J-1"],
+      ["job", "result", "--job", "J-1"],
+      ["artifact", "quota"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["job", "result"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["job", "evidence"])?.code, .invalidOption)
+  }
+
+  /// §13.2: the daemon silently clamps `maxBytes` to 4 MiB, which rewrites the
+  /// caller's intent into a short read they cannot tell from end-of-artifact.
+  /// §7.6's target contract refuses, so the parser refuses and the clamp
+  /// becomes unreachable from this CLI.
+  func testAnOutOfRangeReadIsRefusedRatherThanSilentlyClamped() {
+    XCTAssertEqual(
+      failure(["artifact", "read", "--job", "J", "--artifact", "A", "--max-bytes", "4194305"])?
+        .code,
+      .invalidOption)
+    XCTAssertEqual(
+      failure(["artifact", "read", "--job", "J", "--artifact", "A", "--max-bytes", "0"])?.code,
+      .invalidOption)
+    XCTAssertNotNil(
+      success(["artifact", "read", "--job", "J", "--artifact", "A", "--max-bytes", "4194304"]))
+  }
+
+  /// A byte offset starts at zero, so it cannot use the positive-integer
+  /// grammar — that would refuse the first read of every artifact.
+  func testAByteOffsetAcceptsZeroButStillRefusesPaddingAndSigns() {
+    XCTAssertNotNil(
+      success(["artifact", "read", "--job", "J", "--artifact", "A", "--offset", "0"]))
+    for rejected in ["-1", "007", "+0", "", " 0"] {
+      XCTAssertEqual(
+        failure(["artifact", "read", "--job", "J", "--artifact", "A", "--offset", rejected])?
+          .code,
+        .invalidOption,
+        "offset \(rejected.debugDescription) must be refused")
+    }
+    // An open-ended bound has to read as a lower bound: "must be 0" would say
+    // the only accepted offset is zero.
+    let message = failure(
+      ["artifact", "read", "--job", "J", "--artifact", "A", "--offset", "-1"])?.message
+    XCTAssertEqual(message?.contains("0 or greater"), true, message ?? "")
+  }
+
+  /// §8.1: raw is bytes and nothing else, so it cannot be combined with a mode
+  /// that wraps them.
+  func testRawBytesExcludeEveryMachineEnvelope() {
+    for mode in [["--output", "json"], ["--json"]] {
+      XCTAssertEqual(
+        failure(["artifact", "read", "--job", "J", "--artifact", "A", "--raw"] + mode)?.code,
+        .invalidOption)
+    }
+    XCTAssertNotNil(
+      success(["artifact", "read", "--job", "J", "--artifact", "A", "--raw"]))
+  }
+
+  /// §9 keeps a failed verification as a result with a different exit status,
+  /// not as an error that drops the evidence the caller needs to see.
+  func testEvidenceIntegrityIsDetectedFromBlockersRatherThanFromAMessage() {
+    XCTAssertNil(
+      RuntimeCLI.evidenceIntegrityExit(.object(["blockers": .array([])])),
+      "an empty blocker list is a verified projection")
+    XCTAssertNil(RuntimeCLI.evidenceIntegrityExit(.object([:])))
+    let blocked = RuntimeCLI.evidenceIntegrityExit(
+      .object(["blockers": .array([.string("artifactVerification:digestMismatch")])]))
+    XCTAssertEqual(blocked?.contains("digestMismatch"), true, blocked ?? "")
+  }
+
+  /// §8.1 allows exactly one document per machine invocation, and §8.2 makes
+  /// `job result` and `operation validate` emit a result and *then* exit
+  /// non-zero. The obvious way to write that emits an error envelope after the
+  /// result, handing a parser two documents where it expects one — so the
+  /// session tracks whether it has emitted and downgrades a later failure to
+  /// its exit status and a stderr diagnostic.
+  func testAFailureAfterAResultDoesNotBecomeASecondDocument() {
+    let session = CLIRuntimeSession(
+      client: AgentClient(socketPath: "/nonexistent"), command: "job.result",
+      rendering: .envelope, controlRequestID: "ctl-test", lifecycle: .current)
+
+    let beforeEmitting = session.fail(.outcomeUnknown, "unknown")
+    XCTAssertFalse(
+      beforeEmitting.suppressesMachineRendering,
+      "a failure with no result before it is still a machine document")
+
+    session.emit(.object([:]))
+    let afterEmitting = session.fail(.outcomeUnknown, "unknown")
+    XCTAssertTrue(afterEmitting.suppressesMachineRendering)
+    // The code and the exit status survive: only the second frame is dropped.
+    XCTAssertEqual(afterEmitting.code, .outcomeUnknown)
+    XCTAssertEqual(afterEmitting.exitCode, 75)
+  }
+
+  /// The terminal set comes from `JobState.isTerminal`, which is the state
+  /// machine's own answer. Re-deriving a list here is how `job result` would
+  /// start disagreeing with the engine about whether a job is finished —
+  /// `planned` is terminal for a plan-only job and reads like it is not.
+  func testTerminalityComesFromTheStateMachineRatherThanALocalList() {
+    XCTAssertTrue(JobState.planned.isTerminal)
+    XCTAssertTrue(JobState.succeeded.isTerminal)
+    XCTAssertTrue(JobState.recovered.isTerminal)
+    XCTAssertTrue(JobState.failed.isTerminal)
+    XCTAssertFalse(JobState.running.isTerminal)
+    XCTAssertFalse(JobState.waitingForRecovery.isTerminal)
+  }
+
+  // MARK: Retryable identity and stable pages (§5.3, §7.3, CLI-REQ-008)
+
+  /// §13.2: the flag form generated a fresh random identity per invocation, so
+  /// a retried submit created a second job instead of returning the first —
+  /// the one thing an unattended caller cannot afford to get wrong.
+  func testTheFlagFormLetsACallerFixItsRequestIdentity() {
+    guard case .dispatch? = success([
+      "job", "submit", "--target", "T-1", "--operation", "observe.device@1",
+      "--request-id", "run-7", "--idempotency-key", "run-7",
+    ]) else {
+      return XCTFail("a caller must be able to fix both identities")
+    }
+    guard case .dispatch? = success([
+      "job", "plan", "--target", "T-1", "--operation", "observe.device@1",
+      "--request-id", "run-7",
+    ]) else {
+      return XCTFail("plan takes the same identity flags")
+    }
+    // §5.3: the document form carries them itself, so the two are exclusive.
+    for flag in [["--request-id", "r"], ["--idempotency-key", "k"]] {
+      XCTAssertEqual(
+        failure(["job", "submit", "--request-file", "r.json"] + flag)?.code, .invalidOption,
+        flag.joined(separator: " "))
+    }
+  }
+
+  func testTheCallerIsToldWhenAnIdentityWasGeneratedForIt() {
+    XCTAssertTrue(
+      RuntimeCLI.generatesItsOwnIdempotencyKey([
+        "--target", "T-1", "--operation", "observe.device@1",
+      ]))
+    XCTAssertFalse(
+      RuntimeCLI.generatesItsOwnIdempotencyKey(["--idempotency-key", "k"]))
+    // A request document carries its own identity, so there is nothing to warn
+    // about — warning there would tell a caller who did the right thing that
+    // they did not.
+    XCTAssertFalse(RuntimeCLI.generatesItsOwnIdempotencyKey(["--request-file", "r.json"]))
+  }
+
+  /// §13.2: the reply a script had to parse changed with the arguments it
+  /// happened to pass — a bare array without flags, a page object with them.
+  /// One parser cannot be written against two shapes.
+  func testJobListPublishesOneShapeAndItsPageOptions() {
+    for argv in [
+      ["job", "list"],
+      ["job", "list", "--page-size", "10"],
+      ["job", "list", "--order", "newestFirst"],
+      ["job", "list", "--include-current", "--include-timeline"],
+      ["job", "list", "--cursor", "12", "--order", "oldestFirst"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["job", "list", "--order", "bogus"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["job", "list", "--order"])?.code, .invalidOption)
+  }
+
+  // MARK: Operation discovery (§6.1)
+
+  func testTheOperationSurfaceCoversExampleAndValidate() {
+    for argv in [
+      ["operation", "list"],
+      ["operation", "describe", "--operation", "observe.device@1"],
+      ["operation", "example", "--operation", "observe.device@1"],
+      ["operation", "validate", "--operation", "observe.device@1", "--inputs-file", "i.json"],
+      ["operation", "validate", "--operation", "observe.device@1", "--inputs-file", "-"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["operation", "example"])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure(["operation", "validate", "--operation", "observe.device@1"])?.code,
+      .invalidOption)
+  }
+
+  // MARK: Flash observations (§6.2, §13.2)
+
+  /// Five daemon methods §13.2 lists as ready with no CLI leaf. Four observe —
+  /// a headless caller could previously discover that a flash was impossible
+  /// only by attempting one — and `bind-loader` mutates, which is why it takes
+  /// the revision it expects.
+  func testTheFlashObservationSurfaceIsReachable() {
+    let digest = String(repeating: "a", count: 64)
+    for argv in [
+      ["flash", "device-access"],
+      ["flash", "bootloader-status"],
+      ["flash", "prerequisites", "--target", "T-1", "--device-profile", "dayu200"],
+      [
+        "flash", "lane-preview", "--target", "T-1", "--device-profile", "dayu200",
+        "--archive-sha256", digest,
+      ],
+      ["flash", "bind-loader", "--target", "T-1", "--expected-binding-revision", "3"],
+    ] {
+      guard case .dispatch? = success(argv) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    // Each required option is required.
+    XCTAssertEqual(failure(["flash", "prerequisites", "--target", "T-1"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["flash", "bind-loader", "--target", "T-1"])?.code, .invalidOption)
+  }
+
+  /// §11.3 fixes digests as lowercase hex. Accepting both cases would make one
+  /// digest two tokens, and the daemon's own check is case-insensitive — so
+  /// the narrower rule has to live here.
+  func testAnArchiveDigestMustBeSixtyFourLowercaseHexDigits() {
+    let base = ["flash", "lane-preview", "--target", "T-1", "--device-profile", "dayu200"]
+    XCTAssertNotNil(success(base + ["--archive-sha256", String(repeating: "a", count: 64)]))
+    for rejected in [
+      String(repeating: "A", count: 64),
+      String(repeating: "a", count: 63),
+      String(repeating: "a", count: 65),
+      String(repeating: "z", count: 64),
+      "",
+    ] {
+      XCTAssertEqual(
+        failure(base + ["--archive-sha256", rejected])?.code, .invalidOption,
+        "digest \(rejected.prefix(4))… must be refused")
+    }
+  }
+
+  /// §12 freezes the 1.x method tokens byte for byte. The kebab-case command
+  /// name is a registry mapping, and the camelCase wire spelling must survive
+  /// it — "unifying" the two is exactly what §12 forbids a port from doing.
+  func testTheKebabCaseCommandDoesNotRenameTheCamelCaseWireMethod() throws {
+    let source = try String(
+      contentsOf: URL(filePath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appending(path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(
+      source.contains("\"flash.lanePlanPreview\""),
+      "the frozen 1.x wire token must still be what goes on the wire")
+    let leaf = CLICommandRegistry.allLeaves().first { $0.path == ["flash", "lane-preview"] }
+    XCTAssertEqual(leaf?.leaf.canonicalCommand, "flash.lane-preview")
+  }
+
+  /// The pattern form returns as soon as its leaf exists, which is what the
+  /// resolve-to-a-real-leaf guard makes safe to do automatically.
+  func testTheRetiredFlashPreviewNamesLanePreviewNowThatItExists() {
+    let error = failure(["flash", "preview"])
+    XCTAssertEqual(error?.code, .commandRemoved)
+    XCTAssertEqual(
+      error?.details["replacementArgvPattern"],
+      .string("arkdeck flash lane-preview --target <id> ..."))
   }
 
   // MARK: The surface itself

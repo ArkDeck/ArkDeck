@@ -47,6 +47,23 @@ enum CLIArgumentParser {
     return mode
   }
 
+  /// §8.1: the correlation identity used for this invocation, chosen before
+  /// the parse so an argv failure still carries one.
+  ///
+  /// Exactly one syntactically valid value is echoed. A missing, repeated or
+  /// malformed one produces a fresh bounded identity rather than putting
+  /// unvalidated caller bytes into machine output.
+  static func bootstrapControlRequestID(_ argv: [String]) -> String {
+    let positions = argv.indices.filter { argv[$0] == CLICommandRegistry.controlRequestIDOption.name
+    }
+    guard positions.count == 1, let position = positions.first, position + 1 < argv.count,
+      CLIControlRequestID.isValid(argv[position + 1])
+    else {
+      return CLIControlRequestID.generated()
+    }
+    return argv[position + 1]
+  }
+
   // MARK: Parse
 
   static func parse(_ argv: [String]) -> Result<CLIInvocation, CLIRegistryError> {
@@ -83,7 +100,7 @@ enum CLIArgumentParser {
     let resolution = resolvePath(argv, from: &index, state: &state)
     switch resolution {
     case .failure(let error): return .failure(error)
-    case .success(.node(let node)):
+    case .success(.node(let path, let node)):
       // A node is not a command. `--help` makes it a help request; anything
       // else is an incomplete command path.
       if state.sawHelp {
@@ -94,9 +111,9 @@ enum CLIArgumentParser {
         CLIRegistryError(
           code: .invalidCommand,
           message:
-            "`\(node.token)` needs a subcommand: "
-            + node.leaves.map(\.token).filter { !$0.isEmpty }.joined(separator: "|"),
-          details: ["command": .string(node.token)]))
+            "`\(path.joined(separator: " "))` needs a subcommand: "
+            + node.childTokens.joined(separator: "|"),
+          details: ["command": .string(path.joined(separator: "."))]))
     case .success(.leaf(let path, let leaf)):
       return parseLeaf(
         argv, path: path, leaf: leaf, from: index, pathStart: pathStart, state: state)
@@ -147,7 +164,9 @@ enum CLIArgumentParser {
   }
 
   private enum PathTarget {
-    case node(CLINodeSpec)
+    /// A group, with the tokens that reached it — an incomplete path has to be
+    /// reported as the caller typed it, not as the last token alone.
+    case node(path: [String], node: CLINodeSpec)
     case leaf(path: [String], leaf: CLILeafSpec)
   }
 
@@ -160,7 +179,7 @@ enum CLIArgumentParser {
     if let leaf = CLICommandRegistry.rootLeaf(first) {
       return .success(.leaf(path: [first], leaf: leaf))
     }
-    guard let node = CLICommandRegistry.node(first) else {
+    guard var node = CLICommandRegistry.node(first) else {
       return .failure(
         CLIRegistryError(
           code: .invalidCommand,
@@ -168,42 +187,57 @@ enum CLIArgumentParser {
             "unknown command `\(first)`; run `arkdeck commands` to list the published surface",
           details: ["command": .string(first)]))
     }
-    // A node whose single leaf has an empty token *is* the command (`doctor`).
-    if node.leaves.count == 1, let only = node.leaves.first, only.token.isEmpty {
-      return .success(.leaf(path: [node.token], leaf: only))
-    }
-    guard index < argv.count else { return .success(.node(node)) }
 
-    let next = argv[index]
-    if next.hasPrefix("-") {
-      // §5.1: global options never sit between path tokens. `--help` is the
-      // one token that can complete the request here, because a node with no
-      // subcommand is exactly when a caller needs to be shown the subcommands.
-      if CLICommandRegistry.helpOptionNames.contains(next) {
-        if state.sawHelp { return .failure(duplicate(next)) }
-        state.sawHelp = true
-        index += 1
-        return .success(.node(node))
+    // Groups nest, so walk down until a leaf token matches or the path runs
+    // out. `doctor` is the degenerate case: a node whose single leaf has an
+    // empty token *is* the command.
+    var path = [first]
+    while true {
+      if node.leaves.count == 1, let only = node.leaves.first, only.token.isEmpty {
+        return .success(.leaf(path: path, leaf: only))
       }
-      return .failure(
-        CLIRegistryError(
-          code: .invalidOption,
-          message:
-            "`\(node.token)` needs a subcommand before any option: "
-            + node.leaves.map(\.token).filter { !$0.isEmpty }.joined(separator: "|"),
-          details: ["command": .string(node.token), "option": .string(next)]))
+      guard index < argv.count else { return .success(.node(path: path, node: node)) }
+
+      let next = argv[index]
+      if next.hasPrefix("-") {
+        // §5.1: global options never sit between path tokens. `--help` is the
+        // one token that can complete the request here, because a node with no
+        // subcommand is exactly when a caller needs to be shown its children.
+        if CLICommandRegistry.helpOptionNames.contains(next) {
+          if state.sawHelp { return .failure(duplicate(next)) }
+          state.sawHelp = true
+          index += 1
+          return .success(.node(path: path, node: node))
+        }
+        return .failure(
+          CLIRegistryError(
+            code: .invalidOption,
+            message:
+              "`\(path.joined(separator: " "))` needs a subcommand before any option: "
+              + node.childTokens.joined(separator: "|"),
+            details: [
+              "command": .string(path.joined(separator: ".")), "option": .string(next),
+            ]))
+      }
+      index += 1
+      path.append(next)
+      if let leaf = node.leaves.first(where: { $0.token == next }) {
+        return .success(.leaf(path: path, leaf: leaf))
+      }
+      guard let group = node.groups.first(where: { $0.token == next }) else {
+        return .failure(
+          CLIRegistryError(
+            code: .invalidCommand,
+            message:
+              "unknown `\(path.dropLast().joined(separator: " "))` subcommand `\(next)`: "
+              + node.childTokens.joined(separator: "|"),
+            details: [
+              "command": .string(path.dropLast().joined(separator: ".")),
+              "subcommand": .string(next),
+            ]))
+      }
+      node = group
     }
-    index += 1
-    guard let leaf = node.leaves.first(where: { $0.token == next }) else {
-      return .failure(
-        CLIRegistryError(
-          code: .invalidCommand,
-          message:
-            "unknown `\(node.token)` subcommand `\(next)`: "
-            + node.leaves.map(\.token).filter { !$0.isEmpty }.joined(separator: "|"),
-          details: ["command": .string(node.token), "subcommand": .string(next)]))
-    }
-    return .success(.leaf(path: [node.token, next], leaf: leaf))
   }
 
   private static func parseLeaf(
@@ -360,15 +394,23 @@ enum CLIArgumentParser {
       return .success(.leafHelp(path: [node.token], leaf: only))
     }
     if path.count == 1 { return .success(.nodeHelp(node)) }
-    guard path.count == 2, let leaf = node.leaves.first(where: { $0.token == path[1] }) else {
-      return .failure(
-        CLIRegistryError(
-          code: .invalidCommand,
-          message: "unknown command path `\(path.joined(separator: " "))`",
-          details: ["command": .string(path.joined(separator: " "))],
-          command: "help"))
+    var walked = node
+    for (offset, token) in path.dropFirst().enumerated() {
+      if let leaf = walked.leaves.first(where: { $0.token == token }),
+        offset == path.count - 2
+      {
+        return .success(.leafHelp(path: path, leaf: leaf))
+      }
+      guard let group = walked.groups.first(where: { $0.token == token }) else { break }
+      walked = group
+      if offset == path.count - 2 { return .success(.nodeHelp(walked)) }
     }
-    return .success(.leafHelp(path: path, leaf: leaf))
+    return .failure(
+      CLIRegistryError(
+        code: .invalidCommand,
+        message: "unknown command path `\(path.joined(separator: " "))`",
+        details: ["command": .string(path.joined(separator: " "))],
+        command: "help"))
   }
 
   private static func validate(
@@ -464,6 +506,9 @@ enum CLIArgumentParser {
       // not the parser's. Re-deriving a Runtime rule here is how two validators
       // start disagreeing about the same input.
       return nil
+    case .nonNegativeInteger(let range):
+      if value == "0" { return range.contains(0) ? nil : outOfRange(range, value, label, leaf, name) }
+      return check(.positiveInteger(range), value: value, label: label, leaf: leaf, name: name)
     case .positiveInteger(let range):
       // No sign, no leading zero, no whitespace: `Int(_:)` alone accepts `+7`
       // and `007`, which are two more spellings of the same value than a
@@ -472,13 +517,31 @@ enum CLIArgumentParser {
         !value.isEmpty && value.allSatisfy(\.isASCII) && value.allSatisfy(\.isNumber)
         && value.first != "0"
       guard isPlainDigits, let parsed = Int(value), range.contains(parsed) else {
-        let upper = range.upperBound == Int.max ? "" : "...\(range.upperBound)"
+        return outOfRange(range, value, label, leaf, name)
+      }
+      return nil
+    case .controlRequestID:
+      guard CLIControlRequestID.isValid(value) else {
         return CLIRegistryError(
           code: .invalidOption,
-          message: "`\(name)` \(label) must be \(range.lowerBound)\(upper)",
+          message:
+            "`\(name)` \(label) must match ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
           details: [
             "command": .string(leaf.canonicalCommand), "option": .string(label),
-            "value": .string(value),
+          ],
+          command: leaf.canonicalCommand)
+      }
+      return nil
+    case .hexDigest(let length):
+      let isLowercaseHex =
+        value.count == length
+        && value.allSatisfy { $0.isHexDigit && !$0.isUppercase }
+      guard isLowercaseHex else {
+        return CLIRegistryError(
+          code: .invalidOption,
+          message: "`\(name)` \(label) must be \(length) lowercase hex digits",
+          details: [
+            "command": .string(leaf.canonicalCommand), "option": .string(label),
           ],
           command: leaf.canonicalCommand)
       }
@@ -501,6 +564,25 @@ enum CLIArgumentParser {
   /// §12 fixes the shape of a removed token's answer: a lifecycle status, the
   /// exact argv pattern that replaces it (or an explicit `null`), and the
   /// version that removed it. "Retired" alone would leave an agent guessing.
+  private static func outOfRange(
+    _ range: ClosedRange<Int>, _ value: String, _ label: String, _ leaf: CLILeafSpec,
+    _ name: String
+  ) -> CLIRegistryError {
+    // An open-ended range has to read as a lower bound. "must be 0" would tell
+    // a caller the only accepted offset is zero.
+    let bound =
+      range.upperBound == Int.max
+      ? "\(range.lowerBound) or greater" : "\(range.lowerBound)...\(range.upperBound)"
+    return CLIRegistryError(
+      code: .invalidOption,
+      message: "`\(name)` \(label) must be \(bound)",
+      details: [
+        "command": .string(leaf.canonicalCommand), "option": .string(label),
+        "value": .string(value),
+      ],
+      command: leaf.canonicalCommand)
+  }
+
   private static func removedError(
     path: [String], leaf: CLILeafSpec, tombstone: CLITombstone
   ) -> CLIRegistryError {

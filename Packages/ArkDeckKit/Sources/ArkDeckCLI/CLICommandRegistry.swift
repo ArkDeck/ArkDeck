@@ -43,8 +43,16 @@ enum CLIValueGrammar: Equatable {
   case opaque
   /// `^[1-9][0-9]*$` inside the closed range, no leading zero or sign.
   case positiveInteger(ClosedRange<Int>)
+  /// The same, plus a bare `0`. A byte offset starts at zero, and reusing the
+  /// positive grammar for it would refuse the first read of every artifact.
+  case nonNegativeInteger(ClosedRange<Int>)
   /// One of a closed set of tokens, compared byte for byte.
   case enumeration([String])
+  /// Exactly `length` lowercase hex digits. §11.3 fixes digests as lowercase
+  /// hex, and accepting both cases would make the same digest two tokens.
+  case hexDigest(length: Int)
+  /// §8.1's correlation identity: `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`.
+  case controlRequestID
 }
 
 /// Why an option exists on this leaf, which decides whether help publishes it.
@@ -146,6 +154,10 @@ struct CLILeafSpec {
   /// Output modes this leaf can render. §8.1 requires the registry, not the
   /// renderer, to decide this.
   var outputModes: [CLIOutputMode] = [.human]
+  /// §12 lifecycle. `legacy` marks an explicit compatibility leaf: it works,
+  /// but its request, response and effect are the frozen 1.x ones, so it does
+  /// not count as target conformance.
+  var lifecycle: CLILifecycleStatus = .current
 }
 
 struct CLIPositionalSpec: Equatable {
@@ -165,10 +177,35 @@ enum CLIOutputMode: String, Equatable, CaseIterable {
 }
 
 /// A group of commands, e.g. `job`.
+///
+/// Groups nest: §6.3's platform surface is three tokens deep (`runtime hdc
+/// status`, `runtime tool register`), so a two-level tree would have forced
+/// those into hyphenated leaf names that disagree with the published command
+/// tree.
 struct CLINodeSpec {
   let token: String
   let summary: String
   var leaves: [CLILeafSpec] = []
+  var groups: [CLINodeSpec] = []
+
+  /// Everything reachable from this node, as `(pathSuffix, leaf)`.
+  func reachableLeaves() -> [(path: [String], leaf: CLILeafSpec)] {
+    var found: [(path: [String], leaf: CLILeafSpec)] = []
+    for leaf in leaves {
+      found.append((leaf.token.isEmpty ? [token] : [token, leaf.token], leaf))
+    }
+    for group in groups {
+      for reachable in group.reachableLeaves() {
+        found.append(([token] + reachable.path, reachable.leaf))
+      }
+    }
+    return found
+  }
+
+  /// The child tokens a caller may type next, in declaration order.
+  var childTokens: [String] {
+    leaves.map(\.token).filter { !$0.isEmpty } + groups.map(\.token)
+  }
 }
 
 // MARK: - Registry
@@ -187,10 +224,9 @@ enum CLICommandRegistry {
   static let helpOptionNames: Set<String> = ["--help", "-h"]
   static let versionOptionName = "--version"
 
-  /// `--output`, scoped in this release to the registry meta-commands and
-  /// `--version`. The Runtime leaves still publish `--json`; migrating them to
-  /// the versioned envelope is its own vertical change, and declaring the
-  /// option before it is honoured would advertise a mode that does not work.
+  /// `--output`. §8.1 requires every portable leaf to support at least `human`
+  /// and `json`; `jsonl` belongs to the durable event stream, which no leaf
+  /// publishes yet, so it is not in the accepted set.
   static let outputOption = CLIOptionSpec(
     name: "--output",
     form: .value(
@@ -198,11 +234,21 @@ enum CLICommandRegistry {
       grammar: .enumeration([CLIOutputMode.human.rawValue, CLIOutputMode.json.rawValue])),
     summary: "output mode; machine modes emit one arkdeck.cli.result/1 document")
 
-  /// The legacy machine-output flag on Runtime leaves.
+  /// §12 keeps `--json` exactly as it was: the daemon reply, pretty-printed,
+  /// with no envelope. Changing what an existing flag prints is a breaking
+  /// change that belongs to the next CLI major, so `--output json` is the new
+  /// contract and this one is the compatibility mode beside it.
   static let jsonOption = CLIOptionSpec(
     name: "--json",
     form: .flag,
-    summary: "emit the reply as JSON instead of the human layout")
+    summary: "legacy: print the raw reply as JSON, without the result envelope")
+
+  /// §8.1/§8.2: a caller-supplied correlation identity for one invocation. It
+  /// is not a Runtime idempotency key and nothing is derived from it.
+  static let controlRequestIDOption = CLIOptionSpec(
+    name: "--control-request-id",
+    form: .value(placeholder: "id", grammar: .controlRequestID),
+    summary: "correlate this control-plane call; not a Job or request identity")
 
   /// §11.1: recognised on macOS, never advertised, never a business parameter.
   static let socketOption = CLIOptionSpec(
@@ -212,8 +258,12 @@ enum CLICommandRegistry {
     stability: .macosCompatibilityOnly)
 
   private static func runtimeClientOptions(_ own: [CLIOptionSpec]) -> [CLIOptionSpec] {
-    own + [jsonOption, socketOption]
+    own + [outputOption, jsonOption, controlRequestIDOption, socketOption]
   }
+
+  /// The two machine-output spellings are exclusive: one invocation prints one
+  /// document, in one shape.
+  static let outputAndJSONAreExclusive = ["--output", "--json"]
 
   // MARK: Meta commands
 
@@ -248,15 +298,115 @@ enum CLICommandRegistry {
     ])
 
   /// Meta-commands are leaves at the root, not a resource namespace (§5.1).
-  static let rootLeaves: [CLILeafSpec] = [helpLeaf, commandsLeaf, completionLeaf]
+  static let rootLeaves: [CLILeafSpec] = [helpLeaf, commandsLeaf, completionLeaf].map(normalized)
 
   // MARK: Product commands
 
-  static let nodes: [CLINodeSpec] = [
-    doctorNode, operationNode, deviceNode, targetlessTraceNode, jobNode, artifactNode,
-    agentNode, capabilityNode, cleanupDebtNode, debugNode, flashNode, agentdNode,
-    signingNode, updateFeedNode,
+  static let nodes: [CLINodeSpec] = declaredNodes.map(normalized(node:))
+
+  private static func normalized(node: CLINodeSpec) -> CLINodeSpec {
+    var normalizedNode = node
+    normalizedNode.leaves = node.leaves.map(normalized)
+    normalizedNode.groups = node.groups.map(normalized(node:))
+    return normalizedNode
+  }
+
+  /// Facts that follow from a leaf's own declaration, applied once rather than
+  /// repeated on every leaf. A leaf that takes `--output` renders `json` by
+  /// definition, and the two machine-output spellings exclude each other by
+  /// definition; writing both out per leaf is how one of them gets forgotten.
+  /// §12's migration table names these as explicit legacy-compatibility
+  /// leaves for the current major: they keep the frozen 1.x request, response
+  /// and effect, and the target spellings (`target list/show/adopt`,
+  /// `recovery flash-invocation ...`, `artifact import <kind>`,
+  /// `legacy flash ...`) arrive on the negotiated 2.x control protocol.
+  ///
+  /// Marking them is not cosmetic: §12 forbids counting a legacy leaf as
+  /// target conformance, and a machine caller has to be able to see which
+  /// surface it is driving without reading this file.
+  private static let legacyCompatibilityCommands: Set<String> = [
+    "device.list", "device.show", "device.adopt",
+    "debug.start", "debug.evaluate", "debug.status",
+    "artifact.import-hap", "artifact.import-workspace-patch",
+    "artifact.import-flash-bundle", "artifact.import-native-library",
+    "flash.install-binding", "flash.status", "flash.reconcile",
   ]
+
+  private static func normalized(_ leaf: CLILeafSpec) -> CLILeafSpec {
+    var normalized = leaf
+    if legacyCompatibilityCommands.contains(leaf.canonicalCommand) {
+      normalized.lifecycle = .legacy
+    }
+    guard leaf.options.contains(where: { $0.name == outputOption.name }) else { return normalized }
+    if !normalized.outputModes.contains(.json) { normalized.outputModes.append(.json) }
+    if leaf.options.contains(where: { $0.name == jsonOption.name }),
+      !normalized.mutuallyExclusive.contains(outputAndJSONAreExclusive)
+    {
+      normalized.mutuallyExclusive.append(outputAndJSONAreExclusive)
+    }
+    return normalized
+  }
+
+  private static let declaredNodes: [CLINodeSpec] = [
+    doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
+    jobNode, artifactNode, agentNode, capabilityNode, cleanupDebtNode, debugNode, flashNode,
+    agentdNode, signingNode, updateFeedNode,
+  ]
+
+  /// §6.3's platform surface. Only the two read-only observations exist today;
+  /// `service`, `tool`, `bundle`, `signing`, `storage`, `support-bundle` and
+  /// `update` join this node as they are resourced, which is why it is a group
+  /// rather than a pair of hyphenated leaves.
+  private static let runtimeNode = CLINodeSpec(
+    token: "runtime",
+    summary: "the local Runtime service, its tools and its health",
+    leaves: [
+      CLILeafSpec(
+        token: "health",
+        canonicalCommand: "runtime.health",
+        summary: "control protocol, catalog digest and provider health",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true)
+    ],
+    groups: [
+      CLINodeSpec(
+        token: "hdc",
+        summary: "the HDC server the Runtime manages",
+        leaves: [
+          CLILeafSpec(
+            token: "status",
+            canonicalCommand: "runtime.hdc.status",
+            summary: "exact tool and server facts for the managed HDC runtime",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true)
+        ])
+    ])
+
+  /// §6.1's durable target surface. `device list/show/adopt` stay as the
+  /// frozen 1.x legacy spellings beside it (§12).
+  private static let targetNode = CLINodeSpec(
+    token: "target",
+    summary: "durable device targets and their bindings",
+    leaves: [
+      CLILeafSpec(
+        token: "list",
+        canonicalCommand: "target.list",
+        summary: "list durable targets and their binding revisions",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "show",
+        canonicalCommand: "target.show",
+        summary: "one target: binding, physical identity, last confirmed facts and live state",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--target",
+            form: .value(placeholder: "target-id", grammar: .opaque),
+            summary: "durable target identity",
+            isRequired: true)
+        ]),
+        connectsToRuntime: true),
+    ])
 
   // `doctor` is a leaf, but the tree is uniform: a one-leaf node whose token
   // equals the leaf token renders as `arkdeck doctor`.
@@ -281,6 +431,35 @@ enum CLICommandRegistry {
         canonicalCommand: "operation.list",
         summary: "list published operation references and availability",
         options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "example",
+        canonicalCommand: "operation.example",
+        summary: "print a submittable request for this operation; dispatches nothing",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--operation",
+            form: .value(placeholder: "id@version", grammar: .opaque),
+            summary: "exact published operation reference",
+            isRequired: true)
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "validate",
+        canonicalCommand: "operation.validate",
+        summary: "check typed inputs against the descriptor; touches no device",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--operation",
+            form: .value(placeholder: "id@version", grammar: .opaque),
+            summary: "exact published operation reference",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--inputs-file",
+            form: .value(placeholder: "path|-", grammar: .opaque),
+            summary: "typed inputs to check; `-` reads one JSON document from stdin",
+            isRequired: true),
+        ]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "describe",
@@ -311,6 +490,17 @@ enum CLICommandRegistry {
         canonicalCommand: "device.show",
         summary: "list durable targets and their binding revisions",
         options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "candidates",
+        canonicalCommand: "device.candidates",
+        summary: "live HDC candidates, their authorization state and any adopted target",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--use-warm-snapshot",
+            form: .flag,
+            summary: "read the Runtime's warm snapshot instead of forcing a fresh device read")
+        ]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "adopt",
@@ -367,6 +557,26 @@ enum CLICommandRegistry {
       name: "--expected-binding-revision",
       form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
       summary: "binding revision the caller expects; a drift fails closed"),
+    // §5.3: the flag form has to let a caller fix these. Without them the CLI
+    // generated a fresh random pair per invocation, so a retried submit created
+    // a second job instead of returning the first — which is the one thing an
+    // unattended caller cannot afford to get wrong.
+    CLIOptionSpec(
+      name: "--request-id",
+      form: .value(placeholder: "id", grammar: .opaque),
+      summary: "caller-stable request identity; omitted, one is generated per invocation"),
+    CLIOptionSpec(
+      name: "--idempotency-key",
+      form: .value(placeholder: "key", grammar: .opaque),
+      summary: "caller-stable idempotency key; the same key returns the same job"),
+  ]
+
+  /// `--request-file` carries the whole document, so every flag-form field is
+  /// exclusive with it (§5.3).
+  private static let requestFileExclusions: [[String]] = [
+    ["--request-file", "--target"], ["--request-file", "--operation"],
+    ["--request-file", "--inputs-file"], ["--request-file", "--expected-binding-revision"],
+    ["--request-file", "--request-id"], ["--request-file", "--idempotency-key"],
   ]
 
   private static let jobNode = CLINodeSpec(
@@ -378,11 +588,7 @@ enum CLICommandRegistry {
         canonicalCommand: "job.plan",
         summary: "materialize the exact plan without dispatching it",
         options: runtimeClientOptions(jobRequestOptions),
-        mutuallyExclusive: [
-          ["--request-file", "--target"], ["--request-file", "--operation"],
-          ["--request-file", "--inputs-file"],
-          ["--request-file", "--expected-binding-revision"],
-        ],
+        mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
       CLILeafSpec(
         token: "submit",
@@ -395,11 +601,7 @@ enum CLICommandRegistry {
               form: .flag,
               summary: "poll the submitted job until it settles")
           ]),
-        mutuallyExclusive: [
-          ["--request-file", "--target"], ["--request-file", "--operation"],
-          ["--request-file", "--inputs-file"],
-          ["--request-file", "--expected-binding-revision"],
-        ],
+        mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
       CLILeafSpec(
         token: "status",
@@ -420,6 +622,20 @@ enum CLICommandRegistry {
             name: "--cursor",
             form: .value(placeholder: "token", grammar: .opaque),
             summary: "opaque continuation cursor from a previous page"),
+          CLIOptionSpec(
+            name: "--order",
+            form: .value(
+              placeholder: "oldestFirst|newestFirst",
+              grammar: .enumeration(["oldestFirst", "newestFirst"])),
+            summary: "page order; the Runtime default is oldestFirst"),
+          CLIOptionSpec(
+            name: "--include-current",
+            form: .flag,
+            summary: "also return the jobs the Runtime currently considers active"),
+          CLIOptionSpec(
+            name: "--include-timeline",
+            form: .flag,
+            summary: "include each job's timeline entries"),
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -432,6 +648,18 @@ enum CLICommandRegistry {
         token: "cancel",
         canonicalCommand: "job.cancel",
         summary: "ask the Runtime to cancel at an allowed boundary",
+        options: runtimeClientOptions([jobIDOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "evidence",
+        canonicalCommand: "job.evidence",
+        summary: "verify and return trusted result evidence; creates no new facts",
+        options: runtimeClientOptions([jobIDOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "result",
+        canonicalCommand: "job.result",
+        summary: "terminal status, verified evidence, artifact inventory and cleanup residue",
         options: runtimeClientOptions([jobIDOption]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -506,6 +734,12 @@ enum CLICommandRegistry {
         options: runtimeClientOptions(artifactImportOptions),
         connectsToRuntime: true),
       CLILeafSpec(
+        token: "quota",
+        canonicalCommand: "artifact.quota",
+        summary: "store total, used and remaining bytes; the store refuses rather than evicts",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "list",
         canonicalCommand: "artifact.list",
         summary: "list the artifacts a job owns",
@@ -522,10 +756,26 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "read",
         canonicalCommand: "artifact.read",
-        summary: "bounded read of artifact content",
+        summary: "bounded range read of artifact content",
         options: runtimeClientOptions([
           jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+          CLIOptionSpec(
+            name: "--offset",
+            form: .value(
+              placeholder: "byte-offset", grammar: .nonNegativeInteger(0...Int.max)),
+            summary: "first byte to read; 0 is the start of the artifact"),
+          CLIOptionSpec(
+            name: "--max-bytes",
+            form: .value(
+              placeholder: "1...4194304",
+              grammar: .positiveInteger(1...artifactReadMaximumBytes)),
+            summary: "upper bound on the bytes returned by this read"),
+          CLIOptionSpec(
+            name: "--raw",
+            form: .flag,
+            summary: "write the decoded bytes to stdout and nothing else"),
         ]),
+        mutuallyExclusive: [["--raw", "--output"], ["--raw", "--json"]],
         connectsToRuntime: true),
       CLILeafSpec(
         token: "export",
@@ -541,6 +791,18 @@ enum CLICommandRegistry {
         ]),
         connectsToRuntime: true),
     ])
+
+  private static let targetIDOption = CLIOptionSpec(
+    name: "--target",
+    form: .value(placeholder: "target-id", grammar: .opaque),
+    summary: "durable target identity",
+    isRequired: true)
+
+  private static let deviceProfileOption = CLIOptionSpec(
+    name: "--device-profile",
+    form: .value(placeholder: "dayu200", grammar: .opaque),
+    summary: "published device profile reference",
+    isRequired: true)
 
   private static let requiredArtifactIDOption = CLIOptionSpec(
     name: "--artifact",
@@ -740,7 +1002,8 @@ enum CLICommandRegistry {
           CLIOptionSpec(
             name: "--rebind",
             form: .flag,
-            summary: "replace an existing binding instead of leaving it unchanged")
+            summary: "replace an existing binding instead of leaving it unchanged"),
+          outputOption,
         ]),
       CLILeafSpec(
         token: "status",
@@ -751,7 +1014,8 @@ enum CLICommandRegistry {
             name: "--campaign-id",
             form: .value(placeholder: "ECAMP-id", grammar: .opaque),
             summary: "historical campaign identity",
-            isRequired: true)
+            isRequired: true),
+          outputOption,
         ]),
       CLILeafSpec(
         token: "reconcile",
@@ -761,8 +1025,53 @@ enum CLICommandRegistry {
           CLIOptionSpec(
             name: "--session",
             form: .value(placeholder: "session-id", grammar: .opaque),
-            summary: "inspect one session instead of every unresolved one")
+            summary: "inspect one session instead of every unresolved one"),
+          outputOption,
         ]),
+      CLILeafSpec(
+        token: "device-access",
+        canonicalCommand: "flash.device-access",
+        summary: "host permission and driver access facts for Rockchip flashing",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "bootloader-status",
+        canonicalCommand: "flash.bootloader-status",
+        summary: "observed bootloader disposition of the attached board",
+        options: runtimeClientOptions([]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "prerequisites",
+        canonicalCommand: "flash.prerequisites",
+        summary: "everything that must hold before a restore can be admitted",
+        options: runtimeClientOptions([targetIDOption, deviceProfileOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "lane-preview",
+        canonicalCommand: "flash.lane-preview",
+        summary: "read-only preview of the lane plan an archive would anchor",
+        options: runtimeClientOptions([
+          targetIDOption, deviceProfileOption,
+          CLIOptionSpec(
+            name: "--archive-sha256",
+            form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+            summary: "digest of the imported firmware archive",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "bind-loader",
+        canonicalCommand: "flash.bind-loader",
+        summary: "bind the currently attached Loader to this target, CAS on its revision",
+        options: runtimeClientOptions([
+          targetIDOption,
+          CLIOptionSpec(
+            name: "--expected-binding-revision",
+            form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
+            summary: "revision the caller expects; a drift fails closed",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
       CLILeafSpec(
         token: "plan",
         canonicalCommand: "flash.plan",
@@ -772,8 +1081,9 @@ enum CLICommandRegistry {
         token: "preview",
         canonicalCommand: "flash.preview",
         summary: "retired: the Runtime owns Flash admission",
-        kind: .tombstone(
-          .noReplacement(reason: "Runtime admission replaced campaign preview"))),
+        // Now that `flash lane-preview` exists, the tombstone names the exact
+        // argv pattern instead of only saying what went away.
+        kind: .tombstone(.replacedBy("arkdeck flash lane-preview --target <id> ..."))),
       CLILeafSpec(
         token: "execute",
         canonicalCommand: "flash.execute",
@@ -789,15 +1099,9 @@ enum CLICommandRegistry {
         token: "postflight",
         canonicalCommand: "flash.postflight",
         summary: "retired: use Runtime job evidence",
-        // §12 names `job evidence --job <id>` as the replacement, but this
-        // build does not publish that leaf yet. A machine-readable pattern
-        // pointing at a command that answers `invalidCommand` is worse than an
-        // explicit "nothing yet", so the target is named in prose until the
-        // leaf exists — `testANamedReplacementResolvesToALeafThatExists`
-        // refuses the pattern form until then.
-        kind: .tombstone(
-          .noReplacement(
-            reason: "Runtime job evidence replaces it; this build publishes no `job evidence`"))),
+        // Now that `job evidence` exists, the tombstone can name the exact
+        // argv pattern §12 asks for instead of describing it in prose.
+        kind: .tombstone(.replacedBy("arkdeck job evidence --job <id>"))),
     ])
 
   private static let agentdInstallOptions: [CLIOptionSpec] = [
@@ -884,22 +1188,22 @@ enum CLICommandRegistry {
         token: "install",
         canonicalCommand: "agentd.install",
         summary: "install the daemon as a user-domain service",
-        options: agentdInstallOptions + [jsonOption]),
+        options: agentdInstallOptions + [outputOption, jsonOption]),
       CLILeafSpec(
         token: "update",
         canonicalCommand: "agentd.update",
         summary: "update the installed daemon and its pinned host tools",
-        options: agentdInstallOptions + [jsonOption]),
+        options: agentdInstallOptions + [outputOption, jsonOption]),
       CLILeafSpec(
         token: "restart",
         canonicalCommand: "agentd.restart",
         summary: "restart the installed daemon",
-        options: [maximumWaitSecondsOption, jsonOption]),
+        options: [maximumWaitSecondsOption, outputOption, jsonOption]),
       CLILeafSpec(
         token: "status",
         canonicalCommand: "agentd.status",
         summary: "service and daemon health",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "verify",
         canonicalCommand: "agentd.verify",
@@ -918,7 +1222,7 @@ enum CLICommandRegistry {
             name: "--job",
             form: .value(placeholder: "job-id", grammar: .opaque),
             summary: "read an existing profiled job instead of running one"),
-          jsonOption,
+          outputOption, jsonOption,
         ],
         mutuallyExclusive: [
           ["--job", "--target"], ["--job", "--maximum-wait-seconds"],
@@ -928,7 +1232,7 @@ enum CLICommandRegistry {
         token: "uninstall",
         canonicalCommand: "agentd.uninstall",
         summary: "remove the installed daemon service",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
     ])
 
   private static let signingNode = CLINodeSpec(
@@ -955,7 +1259,7 @@ enum CLICommandRegistry {
             form: .value(placeholder: "bundle-name", grammar: .opaque),
             summary: "application bundle name the preset signs for",
             isRequired: true),
-          projectRefOption, jsonOption,
+          projectRefOption, outputOption, jsonOption,
         ]),
       CLILeafSpec(
         token: "install",
@@ -992,13 +1296,13 @@ enum CLICommandRegistry {
             form: .value(placeholder: "alias", grammar: .opaque),
             summary: "key alias inside the keystore",
             isRequired: true),
-          projectRefOption, jsonOption,
+          projectRefOption, outputOption, jsonOption,
         ]),
       CLILeafSpec(
         token: "normalize",
         canonicalCommand: "signing.normalize",
         summary: "normalize an installed preset in place",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "migrate-deveco",
         canonicalCommand: "signing.migrate-deveco",
@@ -1018,18 +1322,18 @@ enum CLICommandRegistry {
             name: "--key-alias",
             form: .value(placeholder: "alias", grammar: .opaque),
             summary: "key alias inside the keystore"),
-          jsonOption,
+          outputOption, jsonOption,
         ]),
       CLILeafSpec(
         token: "status",
         canonicalCommand: "signing.status",
         summary: "installed preset status",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
       CLILeafSpec(
         token: "remove",
         canonicalCommand: "signing.remove",
         summary: "remove the installed preset",
-        options: [jsonOption]),
+        options: [outputOption, jsonOption]),
     ])
 
   private static let projectRefOption = CLIOptionSpec(
@@ -1117,6 +1421,15 @@ enum CLICommandRegistry {
 
   // MARK: Lookup
 
+  /// The daemon's own ceiling for one `artifact.read` (§13.2).
+  ///
+  /// It silently clamps a larger request to this, which rewrites the caller's
+  /// intent into a short read they cannot distinguish from the end of the
+  /// artifact. §7.6's target contract refuses instead, so the parser refuses
+  /// here — the wire request is unchanged, and the clamp simply becomes
+  /// unreachable from this CLI.
+  static let artifactReadMaximumBytes = 4 * 1024 * 1024
+
   /// The Golden Journey order root help leads with (§10).
   static let rootHelpHighlights: [String] = [
     "doctor", "device adopt", "operation describe", "agent run", "job status",
@@ -1135,11 +1448,7 @@ enum CLICommandRegistry {
   static func allLeaves() -> [(path: [String], leaf: CLILeafSpec)] {
     var found: [(path: [String], leaf: CLILeafSpec)] = []
     for leaf in rootLeaves { found.append(([leaf.token], leaf)) }
-    for node in nodes {
-      for leaf in node.leaves {
-        found.append((leaf.token.isEmpty ? [node.token] : [node.token, leaf.token], leaf))
-      }
-    }
+    for node in nodes { found.append(contentsOf: node.reachableLeaves()) }
     return found
   }
 }
