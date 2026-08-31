@@ -336,6 +336,113 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(empty.error?.code, "invalidParams")
   }
 
+  /// §6.1's `target availability`, and the reason it is a Runtime method.
+  ///
+  /// §7.2 forbids the CLI from issuing several reads and declaring from them
+  /// that a device is usable, so the aggregate is assembled here. What that
+  /// buys is only real if each leg says how it knows: this asserts that a leg
+  /// the Runtime could not establish reports `unresolved` with a reason code
+  /// rather than passing, because a caller reading a placeholder `ready` would
+  /// be told the device is fine by a check that never ran.
+  func testTargetAvailabilityReportsEachLegSeparatelyAndNeverPassesAnUncheckedOne()
+    async throws
+  {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-availability", directoryHint: .isDirectory))
+    let identity = String(repeating: "c", count: 64)
+    let target = try targets.adopt(
+      stableIdentitySHA256: identity,
+      connectKey: "availability-connect-key", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-31T00:00:00Z"
+    ).record
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    let response = try await request(
+      handler, method: "target.availability", params: ["targetId": .string(target.targetID)])
+    XCTAssertTrue(response.ok)
+    guard case .object(let result)? = response.result else {
+      return XCTFail("target.availability must return a bound object")
+    }
+    XCTAssertEqual(result["targetId"], .string(target.targetID))
+    XCTAssertNotNil(result["observedAtUtc"], "the aggregate publishes when it was taken")
+
+    // The binding leg is the one thing this stack really knows.
+    guard case .object(let binding)? = result["binding"] else {
+      return XCTFail("the binding leg must be an object")
+    }
+    XCTAssertEqual(binding["state"], .string("ready"))
+    XCTAssertEqual(binding["bindingRevision"], .integer(Int64(target.bindingRevision)))
+    XCTAssertEqual(binding["stablePhysicalIdentitySha256"], .string(identity))
+
+    // No bootstrap and no managed HDC in this stack, so neither leg may claim
+    // anything. This is the assertion that matters: an unobserved device must
+    // not read as available, and it must not read as merely absent either.
+    guard case .object(let presence)? = result["presence"] else {
+      return XCTFail("the presence leg must be an object")
+    }
+    XCTAssertEqual(presence["state"], .string("unresolved"))
+    XCTAssertNotNil(presence["reasonCode"], "an unresolved leg must say what is missing")
+    XCTAssertEqual(presence["observedAtUtc"], .null, "there is no observation to date")
+
+    guard case .object(let tool)? = result["tool"] else {
+      return XCTFail("the tool leg must be an object")
+    }
+    XCTAssertEqual(tool["state"], .string("absent"))
+    XCTAssertEqual(tool["reasonCode"], .string("runtime_tool_unavailable"))
+
+    // The operation leg is host-scoped and says so. §7.2 permits
+    // target-dependent availability only from fresh binding/profile/tool
+    // facts, and `operationAvailability()` resolves none of them — publishing
+    // it unlabelled would let a caller read "available" as "available on this
+    // device", which is exactly the claim this command exists to make honest.
+    guard case .object(let operations)? = result["operations"] else {
+      return XCTFail("the operation leg must be an object")
+    }
+    XCTAssertEqual(operations["scope"], .string("host"))
+    XCTAssertEqual(operations["targetResolution"], .string("unresolved"))
+    XCTAssertNotNil(operations["reasonCode"])
+    guard case .array(let items)? = operations["items"] else {
+      return XCTFail("the operation leg must carry its items")
+    }
+    XCTAssertFalse(items.isEmpty, "the catalog is not empty, so neither is this")
+
+    // Nothing resolves a target to a device profile in this build.
+    guard case .object(let profile)? = result["profile"] else {
+      return XCTFail("the profile leg must be an object")
+    }
+    XCTAssertEqual(profile["state"], .string("unresolved"))
+    XCTAssertEqual(profile["reasonCode"], .string("profile_resolver_unavailable"))
+
+    // No leg anywhere in the aggregate may be a bare `ready` with nothing
+    // behind it: every non-ready leg names a reason, and that is what lets a
+    // caller tell "checked and true" from "not checked".
+    for (name, leg) in [("presence", presence), ("tool", tool), ("profile", profile)] {
+      if leg["state"] != .string("ready") {
+        XCTAssertNotNil(leg["reasonCode"], "\(name) is not ready and must say why")
+        XCTAssertNotNil(leg["reason"], "\(name) must carry a human reason too")
+      }
+    }
+  }
+
+  /// An unknown target is `notFound`, not an aggregate of absences: reporting
+  /// legs for a device the Runtime never adopted would answer a question about
+  /// nothing.
+  func testTargetAvailabilityRefusesAnUnknownTarget() async throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-availability-missing", directoryHint: .isDirectory))
+    let (handler, _) = try makeStack(targetStore: targets)
+    let response = try await request(
+      handler, method: "target.availability", params: ["targetId": .string("T-nope")])
+    XCTAssertFalse(response.ok)
+    XCTAssertEqual(response.error?.code, "notFound")
+
+    let missingParam = try await request(handler, method: "target.availability")
+    XCTAssertFalse(missingParam.ok)
+    XCTAssertEqual(missingParam.error?.code, "invalidParams")
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,

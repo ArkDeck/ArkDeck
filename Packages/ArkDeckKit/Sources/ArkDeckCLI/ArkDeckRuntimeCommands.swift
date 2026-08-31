@@ -1558,7 +1558,8 @@ enum RuntimeCLI {
   static func runTarget(_ arguments: [String]) async throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing target subcommand (list|show|observe)")
+        exitCode: EX_USAGE,
+        message: "missing target subcommand (list|show|availability|observe)")
     }
     if subcommand == "observe" {
       try await runDomainOperation(
@@ -1575,6 +1576,16 @@ enum RuntimeCLI {
         throw CLIError(exitCode: EX_USAGE, message: "target show requires --target <id>")
       }
       session.emit(try session.request("target.show", ["targetId": .string(rest[index + 1])]))
+    case "availability":
+      guard let index = rest.firstIndex(of: "--target"), index + 1 < rest.count else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "target availability requires --target <id>")
+      }
+      // One request. Composing this here from `target.show`, `operation.list`
+      // and `runtime.hdc-status` is the thing §7.2 names and forbids: three
+      // reads taken at three moments, presented as one answer about now.
+      session.emit(
+        try session.request("target.availability", ["targetId": .string(rest[index + 1])]))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported target subcommand")
     }

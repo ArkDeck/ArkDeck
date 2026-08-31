@@ -46,6 +46,10 @@ enum CLIControlMethodRegistry {
     "device.candidates",
     "target.list",
     "target.show",
+    // Observes and reports. §5.1 admits it as a bounded read-only aggregate:
+    // it creates no Job, writes no evidence, and deliberately runs no device
+    // workflow — the warm candidate snapshot is read, never refreshed.
+    "target.availability",
     "trace.probe",
     "debug.probe",
     "debug.status",
