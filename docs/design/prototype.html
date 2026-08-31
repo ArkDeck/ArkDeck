@@ -415,19 +415,25 @@ select.inp{cursor:pointer}
 
 .viewer-tree{overflow:auto;flex:1;min-height:0;padding:6px;scroll-padding-block:6px;scrollbar-gutter:stable}
 /* 选中态是内缩胶囊,不是通栏色带;#id 靠 auto 列右对齐成一列,标签超长省略而不是硬切。 */
-.viewer-tree-row{width:100%;min-height:26px;display:grid;grid-template-columns:16px 16px minmax(0,1fr) auto;
+.viewer-tree-row{width:100%;min-height:26px;display:grid;grid-template-columns:16px minmax(0,1fr);
   align-items:center;gap:6px;border:0;border-radius:6px;background:transparent;color:var(--ink);
   padding-block:2px;padding-inline-end:8px;padding-inline-start:calc(6px + (var(--level,1) - 1) * 14px);
-  font-size:12px;text-align:start;cursor:pointer}
+  font-size:12px;text-align:start}
+/* The row holds two controls, matching the App: a named expand/collapse button
+   and the row itself as the selection target. A single button wrapping both
+   would leave the disclosure unreachable by name. */
+.viewer-tree-select{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:6px;
+  min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-align:start;padding:0;cursor:pointer}
+.viewer-tree-select:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
 .viewer-tree-row:hover{background:var(--selection)}
 .viewer-tree-row.on{background:var(--accent-fill);color:var(--accent-ink)}
-.viewer-tree-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.viewer-chevron:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
 .viewer-tree-row .label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .viewer-tree-row .sub{opacity:.66;margin-inline-start:6px}
 .viewer-tree-row.on .sub{opacity:.84}
 .viewer-tree-id{font:11px var(--mono);opacity:.55;font-variant-numeric:tabular-nums}
 .viewer-tree-row.on .viewer-tree-id{opacity:.85}
-.viewer-chevron{display:grid;place-items:center;width:16px;height:16px;color:var(--ink2)}
+.viewer-chevron{display:grid;place-items:center;width:16px;height:16px;color:var(--ink2);border:0;background:transparent;padding:0;cursor:pointer}
 .viewer-tree-row.on .viewer-chevron{color:inherit}
 .viewer-chevron svg{width:10px;height:10px;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;fill:none}
 .viewer-tree-row[aria-expanded="true"] .viewer-chevron svg{transform:rotate(90deg)}
@@ -2123,6 +2129,14 @@ const VIEWER_COPY={
     "en": "Select component",
     "zh-Hans": "选择组件"
   },
+  "viewer.tree.expand": {
+    "en": "Expand",
+    "zh-Hans": "展开"
+  },
+  "viewer.tree.collapse": {
+    "en": "Collapse",
+    "zh-Hans": "折叠"
+  },
   "viewer.search.previous": {
     "en": "Previous search result",
     "zh-Hans": "上一个搜索结果"
@@ -2228,20 +2242,31 @@ function viewerTreeHTML(){
     return `<p class="empty" data-sync-id="viewer.tree.noMatches">${viewerCopy("viewer.tree.noMatches")}</p>`;
   const rows=viewerVisibleNodes(),selectedVisible=rows.some(n=>n.id===S.viewer.selected),tabId=selectedVisible?S.viewer.selected:rows[0]?.id;
   if(!rows.length)return '<p class="empty" style="padding:12px">没有匹配的组件。请调整或清除搜索内容。</p>';
-  return rows.map(n=>{const hasChildren=viewerChildren(n.id).length>0;return `
-    <button class="viewer-tree-row ${n.id===S.viewer.selected?"on":""}" style="--level:${n.level}" data-viewer-node="${n.id}"
-      role="treeitem" aria-level="${n.level}" aria-selected="${n.id===S.viewer.selected}" tabindex="${n.id===tabId?0:-1}"
-      ${hasChildren?`aria-expanded="${S.viewer.expanded.has(n.id)}"`:""} onclick="viewerTreeClick(event,${n.id})" onkeydown="viewerTreeKey(event,${n.id})">
-      <span class="viewer-chevron" aria-hidden="true">${hasChildren?'<svg><use href="#i-chev-right"></use></svg>':""}</span><svg class="viewer-node-icon" aria-hidden="true"><use href="#i-${viewerNodeIcon(n.type)}"></use></svg>
-      <span class="label">${esc(n.type)}${n.text?`<span class="sub">${esc(n.text)}</span>`:""}</span><span class="viewer-tree-id">#${n.id}</span>
-    </button>`;}).join("");
+  return rows.map(n=>{
+    const hasChildren=viewerChildren(n.id).length>0,expanded=S.viewer.expanded.has(n.id);
+    // Two controls per row, as the App renders them: a named expand/collapse
+    // button and the row content as the selection target. The disclosure has to
+    // carry a name of its own — a chevron inside one big button is reachable by
+    // pointer but not by name.
+    const toggle=hasChildren
+      ? `<button class="viewer-chevron" data-sync-id="viewer.tree.${expanded?"collapse":"expand"}"
+          aria-label="${viewerCopy(expanded?"viewer.tree.collapse":"viewer.tree.expand")}" aria-expanded="${expanded}"
+          onclick="toggleViewerExpanded(${n.id})">${icon("chev-right",true)}</button>`
+      : '<span class="viewer-chevron" aria-hidden="true"></span>';
+    return `
+    <div class="viewer-tree-row ${n.id===S.viewer.selected?"on":""}" style="--level:${n.level}" data-viewer-node="${n.id}"
+      role="treeitem" aria-level="${n.level}" aria-selected="${n.id===S.viewer.selected}"
+      ${hasChildren?`aria-expanded="${expanded}"`:""}>
+      ${toggle}<button class="viewer-tree-select" tabindex="${n.id===tabId?0:-1}"
+        onclick="selectViewerNode(${n.id})" onkeydown="viewerTreeKey(event,${n.id})">
+        <svg class="viewer-node-icon" aria-hidden="true"><use href="#i-${viewerNodeIcon(n.type)}"></use></svg>
+        <span class="label">${esc(n.type)}${n.text?`<span class="sub">${esc(n.text)}</span>`:""}</span><span class="viewer-tree-id">#${n.id}</span>
+      </button>
+    </div>`;}).join("");
 }
-function viewerTreeClick(event,id){
-  if(event.target.closest(".viewer-chevron")&&viewerChildren(id).length){toggleViewerExpanded(id);return;}
-  selectViewerNode(id);
-}
+
 function viewerTreeKey(event,id){
-  const rows=[...document.querySelectorAll(".viewer-tree-row")],index=rows.indexOf(event.currentTarget);
+  const rows=[...document.querySelectorAll(".viewer-tree-select")],index=rows.indexOf(event.currentTarget);
   let target=null;
   if(event.key==="ArrowDown")target=rows[Math.min(index+1,rows.length-1)];
   else if(event.key==="ArrowUp")target=rows[Math.max(index-1,0)];
@@ -3188,6 +3213,7 @@ const DEVICE_COPY = {
     "device.target.none.detail": "真机操作会写设备，因此不会替你猜是哪一台。",
     "device.record.title": "录屏",
     "device.record.start": "录制",
+    "device.record.saveFailed": "无法保存录屏",
     "device.record.stop": "停止",
     "device.record.frames": "帧",
     "device.record.preflighting": "检查空间中",
@@ -3244,6 +3270,7 @@ const DEVICE_COPY = {
     "device.target.none.detail": "Device sends device mutations and will not guess which device you meant.",
     "device.record.title": "Recording",
     "device.record.start": "Record",
+    "device.record.saveFailed": "Couldn’t save recording",
     "device.record.stop": "Stop",
     "device.record.frames": "frames",
     "device.record.preflighting": "Checking storage",
@@ -3284,6 +3311,7 @@ const DEVICE_SCENARIOS=[
   ["quota","录屏 · 空间不足","Recording · insufficient space"],
   ["headroomUnknown","录屏 · 读不到剩余空间","Recording · headroom unavailable"],
   ["recordingFailed","录屏 · 采集失败","Recording · capture failure"],
+  ["recordingSaveFailed","录屏 · 采集成功但保存失败","Recording · captured then save failed"],
   ["runtimeUnavailable","录屏 · Runtime 入口未接通","Recording · Runtime entry unavailable"],
   ["missingFrames","录屏 · 缺帧结果","Recording · missing frames"],
   ["ready","录屏 · 已校验结果","Recording · validated result"]
@@ -3298,6 +3326,9 @@ function deviceDraftState(scenario="empty"){
   if(scenario==="quota")t.remainingBytes=1500000;
   if(scenario==="headroomUnknown")t.remainingBytes=null;
   if(scenario==="ready"){t.recordStage="ready";t.lastRecording={frameCount:40,fps:1.8,missing:0,path:"/tmp/ArkDeck-recording-demo.mov"};}
+  // Captured, then the write failed: the App raises device.record.saveFailed
+  // with the writer's own reason, so the reason is sample text, not a verdict.
+  if(scenario==="recordingSaveFailed"){t.recordStage="saveFailed";t.recordFailure={zh:"演示：帧已采集，写入目标磁盘时空间被占满。",en:"Demo: frames were captured, then the target disk filled up during the write."};}
   return t;
 }
 function setDeviceScenario(scenario){
@@ -3425,7 +3456,11 @@ function deviceRecordingHTML(t){
   let state="";
   if(t.recordStage==="idle")state=`<p class="device-small">${deviceText("device.record.ceiling")}</p>`;
   if(deviceRecordingBusy(t))state=`<p role="status" data-sync-id="device.record.stage">${deviceRecordingTitle(t)}</p>`;
-  if(t.recordStage==="failed")state=`<p class="device-warning" role="status" data-sync-id="device.record.failed">${esc(t.recordFailure||deviceText("device.record.failed"))}</p>`;
+  if(t.recordStage==="failed")state=`<p class="device-warning" role="status" data-sync-id="device.record.failed">${esc(bi(t.recordFailure)||deviceText("device.record.failed"))}</p>`;
+  // Saving is a separate failure from capturing: the frames were taken and then
+  // could not be written. The App raises this as an alert with the writer's own
+  // reason underneath; the prototype shows it inline (see the batch ledger).
+  if(t.recordStage==="saveFailed")state=`<div class="device-recording-result" data-sync-id="device.record.saveFailed" role="status"><p class="device-warning">${deviceText("device.record.saveFailed")}</p>${t.recordFailure?`<p class="device-small">${esc(bi(t.recordFailure))}</p>`:""}</div>`;
   if(t.recordStage==="refused"){
     const r=t.refusal,mb=n=>(n/1000000).toFixed(1)+" MB";
     state=`<div class="device-recording-result" data-sync-id="device.record.refused" role="status"><p class="device-warning">${deviceText("device.record.noRoom")}</p><p class="device-small">${deviceText("device.record.needs")} ${mb(r.needed)} · ${mb(r.remaining)} ${deviceText("device.record.free")}</p><p class="device-small">${deviceText("device.record.noRoom.detail")}</p></div>${r.fit>=2?`<button class="device-shrink" data-sync-id="device.record.shrink" onclick="deviceShrinkRecording()">${r.fit} ${deviceText("device.record.frames")} ${deviceText("device.record.wouldFit")}</button>`:""}`;

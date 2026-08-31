@@ -1845,3 +1845,49 @@ test('every design preview is type-checked and bundled by a script', () => {
     .filter(path => path.endsWith('.tsx'));
   assert.equal(previews.length, coverage.previewFiles.length);
 });
+
+test('the prototype mirrors the surfaces #1606 added to the App', () => {
+  // brief section 10: an App surface change triggers an incremental round.
+  // #1606 (SwiftUI modernization) added three strings; accessibility
+  // identifiers were added and removed symmetrically, so those three are the
+  // only new presentation. All three were missing from the prototype = P-DRIFT.
+  const viewerCopy = JSON.parse(read('ArkDeckApp/Resources/UIDumpLocalizable.xcstrings')).strings;
+  const deviceCopy = JSON.parse(read('ArkDeckApp/Resources/DeviceLocalizable.xcstrings')).strings;
+  const native = (catalog, key, lang) => catalog[key].localizations[lang].stringUnit.value;
+
+  for (const language of ['zh', 'en']) {
+    const lang = language === 'zh' ? 'zh-Hans' : 'en';
+
+    // The disclosure is a control with a name of its own, as the App renders
+    // it: a chevron inside one big row button is reachable by pointer but not
+    // by name, which is what this used to be.
+    const viewer = harness(`?page=dump&lang=${language}&viewerState=captured`);
+    const tree = viewer.run('viewerTreeHTML()');
+    assert.doesNotMatch(tree, /<button class="viewer-tree-row/, 'the row is a container, not one button');
+    assert.match(tree, /class="viewer-tree-select"/);
+    for (const [key, state] of [['viewer.tree.collapse', 'true'], ['viewer.tree.expand', 'false']]) {
+      const label = native(viewerCopy, key, lang);
+      assert.ok(
+        tree.includes(`aria-label="${label}"`) && tree.includes(`aria-expanded="${state}"`),
+        `${key} must name the disclosure in ${language}`);
+    }
+
+    // Saving is its own failure, separate from a capture failure, and reachable
+    // by its own state token.
+    const device = harness(`?page=device&lang=${language}&deviceState=recordingSaveFailed`);
+    const recording = device.run('deviceRecordingHTML(S.deviceControl)');
+    assert.match(recording, /data-sync-id="device\.record\.saveFailed"/);
+    assert.ok(recording.includes(native(deviceCopy, 'device.record.saveFailed', lang)));
+    // The sample reason is a language pair, not one language leaking into both.
+    assert.doesNotMatch(
+      recording.replace(/[一-鿿]/g, language === 'zh' ? '一' : ''),
+      language === 'en' ? /[一-鿿]/ : /(?!)/,
+      'the English recording failure must not fall back to Chinese');
+  }
+
+  // deviceDraftState runs before S exists, so a scenario that reads S.language
+  // there crashes the page. Keep sample copy as pairs resolved at render time.
+  const source = read('docs/design/prototype.html');
+  const draft = source.slice(source.indexOf('function deviceDraftState'), source.indexOf('function setDeviceScenario'));
+  assert.doesNotMatch(draft, /deviceLocale\(/, 'deviceDraftState must not read S.language');
+});
