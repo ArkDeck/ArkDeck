@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCLI
+@testable import ArkDeckCore
 
 /// The options the CLI accepts and the options it describes must be one set.
 ///
@@ -146,6 +147,69 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
     XCTAssertEqual(
       tombstone.replacementArgvPattern,
       "arkdeck agent run --operation flash.full-restore@1 ...")
+  }
+
+  // MARK: Domain commands (§6.2)
+
+  /// §6.2 requires a domain command to declare its exact Catalog mapping. A
+  /// reference that does not resolve would be a command that looks published
+  /// and submits nothing, and the compiler cannot see the difference because
+  /// it is a string.
+  func testEveryDeclaredCatalogMappingResolvesToAPublishedOperation() {
+    var checked = 0
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      guard let reference = leaf.catalogOperation else { continue }
+      checked += 1
+      XCTAssertNotNil(
+        RuntimeOperationCatalog.descriptor(reference: reference),
+        "\(path.joined(separator: " ")) maps to `\(reference)`, which the Catalog does not "
+          + "publish")
+    }
+    XCTAssertGreaterThan(checked, 20, "the scan found too few mappings to be trusted")
+  }
+
+  /// Which operations have a first-class name, pinned so that adding an
+  /// operation is a decision rather than an oversight.
+  ///
+  /// §6.2 does not require every operation to have one — §18 is explicit that a
+  /// generically reachable operation is complete without an alias — so this
+  /// does not demand coverage. It demands that the *gap* stay deliberate: a new
+  /// operation fails here until someone either names it or records why not.
+  ///
+  /// `flash.dayu200` is the standing exclusion, and not an oversight: §6.2 says
+  /// the convenience layer must never generate it, because it is a legacy alias
+  /// whose input schema differs from `flash.full-restore@1`. A caller that
+  /// really wants it submits it explicitly through the generic surface and the
+  /// published Runtime alias contract handles it — the CLI must not guess the
+  /// field mapping on their behalf.
+  func testTheSetOfOperationsWithoutAConvenienceNameIsDeliberate() {
+    let declared = Set(
+      CLICommandRegistry.allLeaves().compactMap { $0.leaf.catalogOperation })
+    let published = Set(RuntimeOperationCatalog.operations.map(\.reference))
+    XCTAssertEqual(
+      declared.subtracting(published), [], "a mapping points at nothing published")
+    XCTAssertEqual(
+      published.subtracting(declared), ["flash.dayu200"],
+      "an operation gained or lost a convenience name; name it or record why it has none")
+  }
+
+  /// §10: the operation's typed inputs come from `operation describe`, and a
+  /// domain command must not carry a second copy of them. A hand-written
+  /// `--x`/`--y` on `input tap` would be the copy that drifts the next time the
+  /// descriptor changes, and nothing would notice.
+  func testDomainCommandsCarryNoHandCopiedInputSchema() {
+    let allowed: Set<String> = [
+      "--target", "--inputs-file", "--capability", "--execution-id",
+      "--output", "--json", "--control-request-id", "--socket",
+    ]
+    for (path, leaf) in CLICommandRegistry.allLeaves() {
+      guard leaf.catalogOperation != nil else { continue }
+      let extra = leaf.options.map(\.name).filter { !allowed.contains($0) }.sorted()
+      XCTAssertEqual(
+        extra, [],
+        "\(path.joined(separator: " ")) restates operation inputs as flags: "
+          + extra.joined(separator: ", "))
+    }
   }
 
   // MARK: Registry hygiene

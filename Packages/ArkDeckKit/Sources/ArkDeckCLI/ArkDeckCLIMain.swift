@@ -145,7 +145,7 @@ struct ArkDeckCommandLine {
       case "doctor":
         try RuntimeCLI.runDoctor(arguments)
       case "debug":
-        try RuntimeCLI.runDebug(arguments)
+        try await RuntimeCLI.runDebug(arguments)
       case "operation":
         try RuntimeCLI.runOperation(arguments)
       case "device":
@@ -153,7 +153,7 @@ struct ArkDeckCommandLine {
       case "runtime":
         try RuntimeCLI.runRuntime(arguments)
       case "target":
-        try RuntimeCLI.runTarget(arguments)
+        try await RuntimeCLI.runTarget(arguments)
       case "trace":
         try RuntimeCLI.runTrace(arguments)
       case "job":
@@ -162,6 +162,21 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runCleanupDebt(arguments)
       case "recovery":
         try RuntimeCLI.runRecovery(arguments)
+      case "screen", "input", "diagnostics", "analyze", "port-forward", "workspace":
+        // §6.2's domain layer. The registry holds each leaf's exact Catalog
+        // mapping, so dispatch is uniform and the family name carries no logic
+        // of its own — which is what keeps these from becoming a second way to
+        // reach a device.
+        // `arguments` is already past the family token, so the subcommand is
+        // its first element — taking [1] silently built the path from the
+        // caller's first *option* instead.
+        guard let verb = arguments.first, !verb.hasPrefix("-") else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "`\(command)` needs a subcommand; run `arkdeck help \(command)`")
+        }
+        try await RuntimeCLI.runDomainOperation(
+          path: [command, verb], Array(arguments.dropFirst()))
       case "agent":
         try await RuntimeCLI.runAgent(arguments)
       case "agentd":
@@ -211,6 +226,9 @@ struct ArkDeckCommandLine {
       try runCampaignStatus(Array(arguments.dropFirst()))
     case "reconcile":
       try runFlashReconcile(Array(arguments.dropFirst()))
+    case "run":
+      try await RuntimeCLI.runDomainOperation(
+        path: ["flash", "run"], Array(arguments.dropFirst()))
     case "device-access", "bootloader-status", "prerequisites", "lane-preview", "bind-loader":
       try RuntimeCLI.runFlashObservation(subcommand, Array(arguments.dropFirst()))
     default:

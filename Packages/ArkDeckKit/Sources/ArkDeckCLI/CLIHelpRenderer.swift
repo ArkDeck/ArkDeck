@@ -239,6 +239,9 @@ enum CLIRegistryProjection {
       "path": .array(path.map(JSONValue.string)),
       "summary": .string(leaf.summary),
       "connectsToRuntime": .bool(leaf.connectsToRuntime),
+      // §6.2: the mapping is the contract. An agent reads it here rather than
+      // inferring it from the command's name.
+      "catalogOperation": leaf.catalogOperation.map(JSONValue.string) ?? .null,
       "outputModes": .array(leaf.outputModes.map { .string($0.rawValue) }),
       "options": .array(leaf.options.map(project(option:))),
       "positionals": .array(leaf.positionals.map(project(positional:))),

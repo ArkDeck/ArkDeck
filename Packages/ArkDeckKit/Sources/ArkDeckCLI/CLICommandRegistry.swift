@@ -158,6 +158,12 @@ struct CLILeafSpec {
   /// but its request, response and effect are the frozen 1.x ones, so it does
   /// not count as target conformance.
   var lifecycle: CLILifecycleStatus = .current
+  /// The exact published Catalog reference this leaf submits.
+  ///
+  /// §6.2 requires a domain command to declare its mapping in the registry
+  /// rather than build a request of its own: the leaf is a name for an
+  /// operation, not a second way to reach a device.
+  var catalogOperation: String?
   /// The argv pattern that supersedes this leaf, when one is published.
   ///
   /// Independent of `lifecycle`, because the two answer different questions: a
@@ -384,9 +390,130 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, artifactNode, agentNode, capabilityNode, recoveryNode, cleanupDebtNode, debugNode,
+    jobNode, artifactNode, agentNode, capabilityNode, recoveryNode, screenNode, inputNode,
+    diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
     flashNode, agentdNode, signingNode, updateFeedNode,
   ]
+
+  /// A first-class name for one published operation (§6.2).
+  ///
+  /// Every one takes the same arguments, because the operation's own typed
+  /// inputs come from `operation describe` — §10 forbids a domain command from
+  /// carrying a second copy of the input definition, which is precisely the
+  /// copy that drifts when the descriptor changes.
+  private static func domainLeaf(
+    _ token: String, _ command: String, _ operation: String, _ summary: String
+  ) -> CLILeafSpec {
+    CLILeafSpec(
+      token: token,
+      canonicalCommand: command,
+      summary: summary,
+      options: runtimeClientOptions([
+        CLIOptionSpec(
+          name: "--target",
+          form: .value(placeholder: "target-id", grammar: .opaque),
+          summary: "durable target; omitted lets typed discovery choose"),
+        CLIOptionSpec(
+          name: "--inputs-file",
+          form: .value(placeholder: "path", grammar: .opaque),
+          summary: "typed inputs; `arkdeck operation describe` publishes the schema"),
+        CLIOptionSpec(
+          name: "--capability",
+          form: .value(placeholder: "CAP-RT-...", grammar: .opaque),
+          summary: "reference to an existing Runtime capability; never a document"),
+        CLIOptionSpec(
+          name: "--execution-id",
+          form: .value(placeholder: "id", grammar: .opaque),
+          summary: "caller-stable execution identity for safe re-entry"),
+      ]),
+      connectsToRuntime: true,
+      catalogOperation: operation)
+  }
+
+  private static let screenNode = CLINodeSpec(
+    token: "screen",
+    summary: "screen capture and recording",
+    leaves: [
+      domainLeaf(
+        "record", "screen.record", "capture.screen-sequence@1",
+        "capture a bounded screen sequence")
+    ])
+
+  private static let inputNode = CLINodeSpec(
+    token: "input",
+    summary: "typed synthetic input",
+    leaves: [
+      domainLeaf("tap", "input.tap", "input.tap@1", "tap at typed coordinates"),
+      domainLeaf(
+        "long-press", "input.long-press", "input.long-press@1",
+        "long-press at typed coordinates"),
+      domainLeaf("swipe", "input.swipe", "input.swipe@1", "swipe between typed coordinates"),
+    ])
+
+  private static let diagnosticsNode = CLINodeSpec(
+    token: "diagnostics",
+    summary: "bounded diagnostic capture",
+    leaves: [
+      domainLeaf(
+        "capture", "diagnostics.capture", "capture.diagnostics@1",
+        "capture bounded HiLog, UI dump and trace with a structured artifact index")
+    ])
+
+  private static let analyzeNode = CLINodeSpec(
+    token: "analyze",
+    summary: "host-only analysis of captured artifacts",
+    leaves: [
+      domainLeaf("trace", "analyze.trace", "analyzer.analyze-trace@1", "analyze a trace"),
+      domainLeaf(
+        "trace-summary", "analyze.trace-summary", "analyzer.summarize-trace@1",
+        "summarize a trace"),
+      domainLeaf(
+        "hilog-summary", "analyze.hilog-summary", "analyzer.summarize-hilog@1",
+        "summarize a HiLog capture"),
+      domainLeaf(
+        "crash-signature", "analyze.crash-signature", "analyzer.extract-crash-signature@1",
+        "extract a crash signature"),
+    ])
+
+  private static let portForwardNode = CLINodeSpec(
+    token: "port-forward",
+    summary: "typed port forwarding",
+    leaves: [
+      domainLeaf(
+        "create", "port-forward.create", "port-forward.create@1", "create a typed forward"),
+      domainLeaf(
+        "remove", "port-forward.remove", "port-forward.remove@1", "remove a typed forward"),
+    ])
+
+  private static let workspaceNode = CLINodeSpec(
+    token: "workspace",
+    summary: "registered workspace inspection, build and test",
+    leaves: [
+      domainLeaf(
+        "status", "workspace.status", "workspace.inspect-git-status@1", "inspect git status"),
+      domainLeaf("diff", "workspace.diff", "workspace.inspect-diff@1", "inspect a diff"),
+      domainLeaf(
+        "inspect", "workspace.inspect", "workspace.inspect-source@1", "inspect source"),
+      domainLeaf(
+        "read", "workspace.read", "workspace.read-source-range@1", "read a typed source range"),
+      domainLeaf(
+        "isolate", "workspace.isolate", "workspace.prepare-isolated-copy@1",
+        "prepare an isolated copy"),
+      domainLeaf(
+        "checkpoint", "workspace.checkpoint", "workspace.create-checkpoint@1",
+        "create a checkpoint"),
+      domainLeaf("patch", "workspace.patch", "workspace.apply-patch@1", "apply a patch"),
+      domainLeaf("revert", "workspace.revert", "workspace.revert-patch@1", "revert a patch"),
+      domainLeaf(
+        "build", "workspace.build", "workspace.build-openharmony@1", "build for OpenHarmony"),
+      domainLeaf("test", "workspace.test", "workspace.run-tests@1", "run tests"),
+      domainLeaf("sign", "workspace.sign", "workspace.sign-openharmony-hap@1", "sign a HAP"),
+      domainLeaf(
+        "symbolize", "workspace.symbolize", "workspace.symbolize-crash@1", "symbolize a crash"),
+      domainLeaf(
+        "sweep", "workspace.sweep", "workspace.sweep-isolated-copies@1",
+        "sweep isolated copies"),
+    ])
 
   /// §6.1's recovery surface.
   ///
@@ -523,6 +650,9 @@ enum CLICommandRegistry {
         summary: "list durable targets and their binding revisions",
         options: runtimeClientOptions([]),
         connectsToRuntime: true),
+      domainLeaf(
+        "observe", "target.observe", "observe.device@1",
+        "read and verify tool, device and binding facts"),
       CLILeafSpec(
         token: "show",
         canonicalCommand: "target.show",
@@ -1064,8 +1194,9 @@ enum CLICommandRegistry {
 
   private static let debugNode = CLINodeSpec(
     token: "debug",
-    summary: "protected destructive Flash recovery invocations",
+    summary: "typed application debugging, and the retired recovery aliases",
     leaves: [
+      domainLeaf("hap", "debug.hap", "debug.hap@1", "install, launch and observe a HAP"),
       CLILeafSpec(
         token: "start",
         canonicalCommand: "debug.start",
@@ -1117,6 +1248,16 @@ enum CLICommandRegistry {
             isRequired: true)
         ]),
         connectsToRuntime: true),
+    ],
+    groups: [
+      CLINodeSpec(
+        token: "native",
+        summary: "app-owned native library deployment",
+        leaves: [
+          domainLeaf(
+            "deploy", "debug.native.deploy", "deploy.native-library.app-owned@1",
+            "deploy an app-owned native library")
+        ])
     ])
 
   private static let flashNode = CLINodeSpec(
@@ -1157,6 +1298,9 @@ enum CLICommandRegistry {
             summary: "inspect one session instead of every unresolved one"),
           outputOption,
         ]),
+      domainLeaf(
+        "run", "flash.run", "flash.full-restore@1",
+        "run the canonical full restore through the typed Agent surface"),
       CLILeafSpec(
         token: "device-access",
         canonicalCommand: "flash.device-access",
