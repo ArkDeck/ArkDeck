@@ -31,7 +31,7 @@ History 6 / Settings 4 = 63），**由此确认登记的 63 条正确，而我�
 | `HistoryLocalizable` | 6 | 全删（`history.column.*` 表列标题，F38/F39 后表格已改） | `fixed` |
 | `SettingsLocalizable` | 4 | **保留**：`settings.{general,storage,toolchains,diagnostics}.title` 是面板标题键，与**待裁决第 1 条**（内容区是否允许重复工具栏页面标题）直接相关，裁决为允许则要复用 | `registered` |
 | `UIDumpLocalizable` | 25 | **保留**：`viewer.tab/group/field/value/properties.*`，正是 F52 第 5 条所指；**待裁决第 2 条**若定为「空态/动作/搜索控件走目录」，这些正是要接上的键 | `registered` |
-| `Localizable` / `Jobs` / `Device` | 24 / 1 / 1 | **保留**：本轮新发现，未经首轮那样的逐条核实 | `registered` |
+| `Localizable` / `Jobs` / `Device` | 24 / 1 / 1 | **保留**：本轮新发现，未经首轮那样的逐条核实。**已于批次十六逐条核实并全删**（Device 那条此后被消费，实删 25 条）——见 [批次十六台账](2026-08-31-retired-keys-tail-ledger.md) 与审计记录 F70 | `registered` → `fixed` |
 
 合计删除 **59 条**，保留 **55 条**（4 + 25 + 26）。
 
