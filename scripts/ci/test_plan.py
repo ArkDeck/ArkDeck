@@ -20,23 +20,36 @@ SPEC.loader.exec_module(PLAN)
 
 
 class PathClassificationTests(unittest.TestCase):
-    def assert_lanes(self, paths, *, swift: bool, app: bool):
+    def assert_lanes(self, paths, *, swift: bool, app: bool, ds: bool):
         selection = PLAN.classify_paths(paths)
         self.assertEqual(selection.swift, swift)
         self.assertEqual(selection.app, app)
+        self.assertEqual(selection.ds, ds)
 
-    def test_docs_and_design_previews_skip_compiled_lanes(self):
+    def test_docs_and_previews_outside_design_select_no_lane(self):
         self.assert_lanes(
-            ["README.md", "docs/design/prototype.html", ".design-sync/previews/Card.tsx"],
+            ["README.md", "docs/README.md", ".design-sync/previews/Card.tsx"],
             swift=False,
             app=False,
+            ds=False,
         )
+
+    def test_design_docs_run_ds_lane_without_compiled_lanes(self):
+        for path in (
+            "docs/design/prototype.html",
+            "docs/design/implementation-coverage.json",
+            "docs/design/arkdeck-ds/scripts/workspace-interactions.test.mjs",
+            "docs/design/arkdeck-ds/package.json",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=False, app=False, ds=True)
 
     def test_package_tests_run_swift_without_rebuilding_app(self):
         self.assert_lanes(
             ["Packages/ArkDeckKit/Tests/ArkDeckCoreTests/SHA256HexTests.swift"],
             swift=True,
             app=False,
+            ds=True,
         )
 
     def test_app_package_target_sources_run_both_composition_lanes(self):
@@ -54,6 +67,7 @@ class PathClassificationTests(unittest.TestCase):
                     [f"Packages/ArkDeckKit/Sources/{target}/Example.swift"],
                     swift=True,
                     app=True,
+                    ds=True,
                 )
 
     def test_non_app_package_targets_skip_redundant_xcode_lane(self):
@@ -66,7 +80,7 @@ class PathClassificationTests(unittest.TestCase):
             "Packages/ArkDeckKit/LaunchAgents/LaunchAgent.swift",
         ):
             with self.subTest(path=path):
-                self.assert_lanes([path], swift=True, app=False)
+                self.assert_lanes([path], swift=True, app=False, ds=True)
 
     def test_package_manifest_runs_both_composition_lanes(self):
         for path in (
@@ -74,29 +88,36 @@ class PathClassificationTests(unittest.TestCase):
             "Packages/ArkDeckKit/Package.resolved",
         ):
             with self.subTest(path=path):
-                self.assert_lanes([path], swift=True, app=True)
+                self.assert_lanes([path], swift=True, app=True, ds=True)
 
-    def test_app_and_ui_tests_run_only_xcode_lane(self):
+    def test_app_and_ui_tests_run_xcode_and_ds_lanes(self):
+        # The ds half is the PR #1606 regression pin: an ArkDeckApp-only diff
+        # merged all-green while breaking two @arkdeck/ds interaction tests,
+        # because no lane ran the suite that reads these sources.
         self.assert_lanes(
             ["ArkDeckApp/Features/Flash/FlashWorkspaceView.swift"],
             swift=False,
             app=True,
+            ds=True,
         )
         self.assert_lanes(
             ["ArkDeckAppUITests/AppShell/AppShellUITests.swift"],
             swift=False,
             app=True,
+            ds=True,
         )
 
-    def test_project_planner_and_workflow_changes_cannot_self_skip(self):
+    def test_xcode_project_changes_skip_uninvolved_lanes(self):
         self.assert_lanes(
-            ["ArkDeck.xcodeproj/project.pbxproj"], swift=False, app=True
+            ["ArkDeck.xcodeproj/project.pbxproj"], swift=False, app=True, ds=False
+        )
+
+    def test_planner_and_workflow_changes_cannot_self_skip(self):
+        self.assert_lanes(
+            ["scripts/ci/plan.py"], swift=True, app=True, ds=True
         )
         self.assert_lanes(
-            ["scripts/ci/plan.py"], swift=True, app=True
-        )
-        self.assert_lanes(
-            [".github/workflows/swift-ci.yml"], swift=True, app=True
+            [".github/workflows/swift-ci.yml"], swift=True, app=True, ds=True
         )
 
 
@@ -152,6 +173,7 @@ class GitPlanTests(unittest.TestCase):
         self.assertEqual(plan.base_kind, "origin-main-merge-base")
         self.assertFalse(plan.lanes.swift)
         self.assertFalse(plan.lanes.app)
+        self.assertFalse(plan.lanes.ds)
 
     def test_agent_plan_is_cumulative_against_main(self):
         self.git("switch", "-qc", "agent/package")
@@ -165,6 +187,7 @@ class GitPlanTests(unittest.TestCase):
         )
         self.assertTrue(plan.lanes.swift)
         self.assertFalse(plan.lanes.app)
+        self.assertTrue(plan.lanes.ds)
 
     def test_main_push_uses_exact_before_revision(self):
         head = self.commit_file("docs/note.md", "docs\n")
@@ -174,6 +197,7 @@ class GitPlanTests(unittest.TestCase):
         )
         self.assertFalse(plan.lanes.swift)
         self.assertFalse(plan.lanes.app)
+        self.assertFalse(plan.lanes.ds)
 
     def test_missing_main_before_runs_every_lane(self):
         plan = PLAN.plan_from_push_event(
@@ -182,6 +206,7 @@ class GitPlanTests(unittest.TestCase):
         )
         self.assertTrue(plan.lanes.swift)
         self.assertTrue(plan.lanes.app)
+        self.assertTrue(plan.lanes.ds)
         self.assertEqual(plan.reason, "main-before-unavailable-fail-closed")
 
     def test_missing_agent_main_runs_every_lane(self):
@@ -194,6 +219,7 @@ class GitPlanTests(unittest.TestCase):
         )
         self.assertTrue(plan.lanes.swift)
         self.assertTrue(plan.lanes.app)
+        self.assertTrue(plan.lanes.ds)
         self.assertEqual(plan.reason, "base-unavailable-fail-closed")
 
     def test_cross_surface_rename_reports_removed_swift_path(self):
@@ -214,6 +240,7 @@ class GitPlanTests(unittest.TestCase):
         self.assertIn(source, plan.changed_files)
         self.assertTrue(plan.lanes.swift)
         self.assertTrue(plan.lanes.app)
+        self.assertTrue(plan.lanes.ds)
 
     def test_event_head_must_match_checkout(self):
         with self.assertRaises(PLAN.PlanError):
@@ -239,13 +266,14 @@ class GitPlanTests(unittest.TestCase):
         self.assertIn("README.md", plan.changed_files)
         self.assertFalse(plan.lanes.swift)
         self.assertTrue(plan.lanes.app)
+        self.assertTrue(plan.lanes.ds)
         self.assertEqual(plan.reason, "classified-changed-files-and-worktree")
 
 
 class CommandSelectionTests(unittest.TestCase):
-    def plan(self, *, swift: bool, app: bool):
+    def plan(self, *, swift: bool, app: bool, ds: bool = False):
         return PLAN.CIPlan(
-            lanes=PLAN.LaneSelection(swift=swift, app=app),
+            lanes=PLAN.LaneSelection(swift=swift, app=app, ds=ds),
             base_revision="0" * 40,
             head_revision="1" * 40,
             base_kind="test",
@@ -253,26 +281,35 @@ class CommandSelectionTests(unittest.TestCase):
             changed_files=(),
         )
 
-    def test_docs_plan_has_no_compiled_command(self):
+    def commands(self, plan) -> list[str]:
         with tempfile.TemporaryDirectory() as directory:
-            commands = PLAN.local_commands(pathlib.Path(directory), self.plan(swift=False, app=False))
-        flattened = "\n".join(" ".join(command) for command in commands)
+            selected = PLAN.local_commands(pathlib.Path(directory), plan)
+        return [" ".join(command) for command in selected]
+
+    def test_docs_plan_has_no_compiled_or_npm_command(self):
+        flattened = "\n".join(self.commands(self.plan(swift=False, app=False)))
         self.assertNotIn("run-test-lane.sh", flattened)
         self.assertNotIn("xcodebuild", flattened)
+        self.assertNotIn("npm", flattened)
 
     def test_test_only_plan_runs_swift_but_not_app(self):
-        with tempfile.TemporaryDirectory() as directory:
-            commands = PLAN.local_commands(pathlib.Path(directory), self.plan(swift=True, app=False))
-        flattened = "\n".join(" ".join(command) for command in commands)
+        flattened = "\n".join(self.commands(self.plan(swift=True, app=False)))
         self.assertIn("run-test-lane.sh full", flattened)
         self.assertNotIn("xcodebuild", flattened)
 
     def test_app_plan_builds_for_testing(self):
-        with tempfile.TemporaryDirectory() as directory:
-            commands = PLAN.local_commands(pathlib.Path(directory), self.plan(swift=False, app=True))
-        flattened = "\n".join(" ".join(command) for command in commands)
+        flattened = "\n".join(self.commands(self.plan(swift=False, app=True)))
         self.assertIn("scripts/ci/test_run_xcodebuild.py", flattened)
         self.assertIn("sh scripts/ci/run-xcodebuild.sh", flattened)
+
+    def test_ds_plan_installs_exact_dependencies_before_testing(self):
+        commands = self.commands(self.plan(swift=False, app=False, ds=True))
+        install = commands.index("npm --prefix docs/design/arkdeck-ds ci")
+        run = commands.index("npm --prefix docs/design/arkdeck-ds test")
+        self.assertLess(install, run)
+        flattened = "\n".join(commands)
+        self.assertNotIn("run-test-lane.sh", flattened)
+        self.assertNotIn("xcodebuild", flattened)
 
 
 if __name__ == "__main__":

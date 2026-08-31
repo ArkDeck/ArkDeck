@@ -333,6 +333,7 @@ def validate_automatic_check_contract(
     plan_job = _job_block(swift_text, "plan")
     swift_tests_job = _job_block(swift_text, "swift-tests")
     app_build_job = _job_block(swift_text, "app-build")
+    ds_job = _job_block(swift_text, "ds-interactions")
     swift_aggregate_job = _job_block(swift_text, "swift")
     for job_name, job_block in (
         ("Swift test", swift_tests_job),
@@ -395,14 +396,29 @@ def validate_automatic_check_contract(
         "          steps.app-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
+    # npm ci is load-bearing: node_modules is not committed, and without the
+    # install the interaction files that import esbuild/react die on
+    # ERR_MODULE_NOT_FOUND while the node:-only files still pass — a
+    # misleading partial pass, so the exact install is pinned before the run.
+    required_ds = (
+        "    needs: plan\n",
+        "    if: needs.plan.outputs.ds == 'true'\n",
+        "    runs-on: ubuntu-latest\n",
+        "        working-directory: docs/design/arkdeck-ds\n"
+        "        run: npm ci\n",
+        "        working-directory: docs/design/arkdeck-ds\n"
+        "        run: npm test\n",
+    )
     required_aggregate = (
-        "    needs: [plan, swift-tests, app-build]\n",
+        "    needs: [plan, swift-tests, app-build, ds-interactions]\n",
         "PLAN_RESULT: ${{ needs.plan.result }}",
         "SWIFT_RESULT: ${{ needs.swift-tests.result }}",
         "APP_RESULT: ${{ needs.app-build.result }}",
+        "DS_RESULT: ${{ needs.ds-interactions.result }}",
         'test "$PLAN_RESULT" = success',
         'test "$SWIFT_RESULT" = success',
         'test "$APP_RESULT" = success',
+        'test "$DS_RESULT" = success',
     )
     for token in required_plan:
         if token not in plan_job:
@@ -417,6 +433,15 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"App build job missing contract token: {token}"
             )
+    for token in required_ds:
+        if token not in ds_job:
+            raise WorkflowContractError(
+                f"ds interaction job missing contract token: {token}"
+            )
+    if ds_job.index("run: npm ci") > ds_job.index("run: npm test"):
+        raise WorkflowContractError(
+            "ds interaction job must install exact dependencies before testing"
+        )
     for token in required_aggregate:
         if token not in swift_aggregate_job:
             raise WorkflowContractError(
@@ -655,6 +680,33 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     "        run: sh scripts/ci/run-xcodebuild.sh\n",
                     "        run: true # app build missing\n",
+                ),
+            ),
+            (
+                "ds lane not gated on plan",
+                agent,
+                sdd,
+                swift.replace(
+                    "    if: needs.plan.outputs.ds == 'true'\n",
+                    "",
+                ),
+            ),
+            (
+                "ds install skipped",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: npm ci\n",
+                    "        run: true # install skipped\n",
+                ),
+            ),
+            (
+                "aggregator ignores ds result",
+                agent,
+                sdd,
+                swift.replace(
+                    '            test "$DS_RESULT" = success\n',
+                    "            true\n",
                 ),
             ),
             (

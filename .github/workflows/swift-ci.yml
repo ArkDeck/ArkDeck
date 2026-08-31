@@ -1,13 +1,14 @@
 name: Swift CI
 
-# Path-aware merge gate for the two compiled macOS surfaces.
+# Path-aware merge gate for the two compiled macOS surfaces and the
+# @arkdeck/ds interaction suite that cross-checks them against docs/design.
 #
 # The always-present `swift` aggregator is the stable status check.  A small
-# Linux planner computes the exact diff first, so docs/design-only pushes do
-# not allocate a macOS runner.  Agent branches compare their cumulative head
+# Linux planner computes the exact diff first, so docs-only pushes do not
+# allocate a macOS runner.  Agent branches compare their cumulative head
 # with the current origin/main merge base; this handles an all-zero first-push
 # `before` OID without conservatively compiling unrelated docs.  Missing base
-# facts fail closed by selecting both compiled lanes.
+# facts fail closed by selecting every lane.
 #
 # ArkDeckKit keeps its full test suite as the merge gate.  SwiftPM's stable
 # mirrored workspace makes a restored cache genuinely incremental across
@@ -37,6 +38,7 @@ jobs:
     outputs:
       swift: ${{ steps.paths.outputs.swift }}
       app: ${{ steps.paths.outputs.app }}
+      ds: ${{ steps.paths.outputs.ds }}
       base: ${{ steps.paths.outputs.base }}
       reason: ${{ steps.paths.outputs.reason }}
       changed-count: ${{ steps.paths.outputs.changed-count }}
@@ -78,6 +80,7 @@ jobs:
             echo "- Changed files: \`${{ steps.paths.outputs.changed-count }}\`"
             echo "- ArkDeckKit full tests: \`${{ steps.paths.outputs.swift }}\`"
             echo "- ArkDeck App build-for-testing: \`${{ steps.paths.outputs.app }}\`"
+            echo "- @arkdeck/ds interaction tests: \`${{ steps.paths.outputs.ds }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   swift-tests:
@@ -220,22 +223,64 @@ jobs:
           path: ${{ runner.temp }}/arkdeck-xcode
           key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
 
+  # The @arkdeck/ds interaction tests execute the docs/design prototype draft
+  # and cross-check the audit matrix, implementation-coverage.json and the App
+  # and Package Swift sources it names.  PR #1606 merged all-green while
+  # breaking two of them from ArkDeckApp/ alone, because no gate ran the
+  # suite; this lane closes that gap on every directory the suite reads.
+  #
+  # npm ci is not optional setup: node_modules is not committed and the suite
+  # imports esbuild/react from it.  Without the install, the files with only
+  # node: imports still pass and the rest die on ERR_MODULE_NOT_FOUND, which
+  # reads as a partial pass.  No app build is involved.
+  ds-interactions:
+    needs: plan
+    if: needs.plan.outputs.ds == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact revision with runner Git
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth=1 origin \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Runner Node version
+        run: node --version
+
+      - name: Install exact @arkdeck/ds dev dependencies
+        working-directory: docs/design/arkdeck-ds
+        run: npm ci
+
+      - name: "@arkdeck/ds interaction tests"
+        working-directory: docs/design/arkdeck-ds
+        run: npm test
+
   # Stable required-check name.  A job-level skip is a successful no-op;
   # workflow-level paths filters are intentionally absent because GitHub can
   # leave a required workflow that never started pending indefinitely.
   swift:
     if: always()
-    needs: [plan, swift-tests, app-build]
+    needs: [plan, swift-tests, app-build, ds-interactions]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require every selected compiled lane
+      - name: Require every selected lane
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           SWIFT_SELECTED: ${{ needs.plan.outputs.swift }}
           SWIFT_RESULT: ${{ needs.swift-tests.result }}
           APP_SELECTED: ${{ needs.plan.outputs.app }}
           APP_RESULT: ${{ needs.app-build.result }}
+          DS_SELECTED: ${{ needs.plan.outputs.ds }}
+          DS_RESULT: ${{ needs.ds-interactions.result }}
         run: |
           set -eu
           test "$PLAN_RESULT" = success
@@ -249,6 +294,11 @@ jobs:
           else
             test "$APP_RESULT" = skipped
           fi
+          if [ "$DS_SELECTED" = true ]; then
+            test "$DS_RESULT" = success
+          else
+            test "$DS_RESULT" = skipped
+          fi
 
       - name: Coverage summary
         if: always()
@@ -257,8 +307,10 @@ jobs:
             echo "### Swift CI"
             echo "- ArkDeckKit lane selected: \`${{ needs.plan.outputs.swift }}\`; result: \`${{ needs.swift-tests.result }}\`."
             echo "- ArkDeck App lane selected: \`${{ needs.plan.outputs.app }}\`; result: \`${{ needs.app-build.result }}\`."
+            echo "- @arkdeck/ds interaction lane selected: \`${{ needs.plan.outputs.ds }}\`; result: \`${{ needs.ds-interactions.result }}\`."
             echo "- ArkDeckKit changes retain the full test suite; test-only changes do not rebuild the App."
             echo "- App/UI-test/project changes compile with build-for-testing; no simulator or device test is claimed."
+            echo "- Design, App and Package changes run the @arkdeck/ds interaction tests after an exact npm ci."
             echo "- Cache restore order is exact inputs, then the newest same-toolchain protected-main entry; only protected main writes new entries."
             echo "- A green CI result is validation evidence, not maintainer approval."
           } >> "$GITHUB_STEP_SUMMARY"
