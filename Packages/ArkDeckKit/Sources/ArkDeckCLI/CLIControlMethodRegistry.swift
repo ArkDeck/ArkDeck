@@ -186,6 +186,15 @@ enum CLIControlFailureMapper {
     evidence: CLIControlFailureEvidence = CLIControlFailureEvidence()
   ) -> CLIErrorCode {
     switch wireCode {
+    case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",
+      "operationUnavailable":
+      // Target adoption's named refusals carry proof from its Runtime owner.
+      // A legacy or malformed reply without that proof remains ambiguous.
+      if evidence.provesZeroDispatchBeforeAdmission, let code = CLIErrorCode(rawValue: wireCode) {
+        return code
+      }
+      return CLIControlMethodRegistry.effect(of: method) == .boundedReadOnly
+        ? .internalError : .outcomeUnknown
     case "unsupportedProtocolVersion": return .protocolVersionUnsupported
     case "malformedFrame": return .protocolMalformed
     case "unknownMethod": return .controlMethodUnavailable

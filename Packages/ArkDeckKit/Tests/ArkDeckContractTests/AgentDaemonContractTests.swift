@@ -602,6 +602,7 @@ final class AgentDaemonContractTests: XCTestCase {
 
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
+    targetObservations: TargetObservationCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     includeDefaultArtifactStore: Bool = true,
     flashBundleImportPolicy: FlashBundleImportPolicy = .production,
@@ -643,6 +644,7 @@ final class AgentDaemonContractTests: XCTestCase {
       nowUTC: { "2026-07-29T00:00:00Z" },
       targetStore: targetStore,
       bootstrap: nil,
+      targetObservations: targetObservations,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: resolvedArtifactStore,
       flashBundleImportDirectory: stateDirectory.appending(
@@ -818,7 +820,8 @@ final class AgentDaemonContractTests: XCTestCase {
     let health = try v2.request(method: "health")
     guard case .object(let fields) = health else { return XCTFail("missing health object") }
     XCTAssertEqual(fields["protocolVersion"], .string("2.0.0"))
-    XCTAssertEqual(fields["publishedMethods"], .array([.string("health")]))
+    XCTAssertEqual(
+      fields["publishedMethods"], .array(ArkDeckControlProtocol.targetMethods.sorted().map(JSONValue.string)))
     let legacy = try client.request(method: "health")
     guard case .object(let legacyFields) = legacy else { return XCTFail("missing legacy health") }
     XCTAssertEqual(legacyFields["protocolVersion"], .string("1.0.0"))
@@ -835,7 +838,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testV2CannotReachAnUnpublishedMutationOrLegacyAdoption() async throws {
     let (handler, _) = try makeStack()
     for method in [
-      "target.adopt", "job.submit", "job.run", "debug.start", "artifact.importHap.begin",
+      "job.submit", "job.run", "debug.start", "artifact.importHap.begin",
     ] {
       let frame = try CanonicalJSONEncoders.canonical().encode([
         "protocolVersion": JSONValue.string("2.0.0"), "id": .string("refused-1"),
@@ -903,6 +906,98 @@ final class AgentDaemonContractTests: XCTestCase {
         XCTAssertEqual(meta["controlProtocolVersion"], result["protocolVersion"])
       }
     }
+  }
+
+  func testV2TargetAdoptionHasTypedRefusalsAndNeverFallsIntoLegacySelection() async throws {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
+    let owner = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() },
+      nowUTC: { "2026-08-31T12:00:00Z" })
+    let (handler, engine) = try makeStack(targetStore: targets, targetObservations: owner)
+    let server = try startServer(handler)
+    let client = try AgentClient(socketPath: server.socketURL.path)
+      .negotiated(requiredMajor: 2, forMethod: "device.observations")
+    port.setState("Unauthorized")
+    let observed = try client.request(method: "device.observations")
+    guard case .object(let snapshot) = observed,
+      case .array(let rows)? = snapshot["observations"], case .object(let row)? = rows.first
+    else { return XCTFail("expected an observation snapshot") }
+    let params: [String: JSONValue] = [
+      "candidate": try XCTUnwrap(row["candidateKey"]),
+      "observationId": try XCTUnwrap(row["observationId"]),
+      "observationGeneration": try XCTUnwrap(snapshot["snapshotGeneration"]),
+    ]
+    for (payload, expected) in [([String: JSONValue](), "invalidInput"), (params, "targetTrustPending")] {
+      XCTAssertThrowsError(try client.request(method: "target.adopt", params: payload)) {
+        guard case AgentClientError.structuredDaemonError(let code, _, let details) = $0 else {
+          return XCTFail("target failures need structured zero-dispatch evidence")
+        }
+        XCTAssertEqual(code, expected)
+        XCTAssertEqual(details["phase"], .string("preAdmission"))
+        XCTAssertEqual(details["newDispatchCount"], .integer(0))
+      }
+    }
+    port.setState("Connected")
+    XCTAssertThrowsError(try client.request(method: "target.adopt", params: params)) {
+      guard case AgentClientError.structuredDaemonError(let code, _, _) = $0 else {
+        return XCTFail("stale generation must have a typed refusal")
+      }
+      XCTAssertEqual(code, "resourceConflict")
+    }
+    XCTAssertEqual(try targets.list().count, 0)
+    let jobs = try await engine.listJobs()
+    XCTAssertEqual(jobs.count, 0, "adoption must not create or run a Job")
+  }
+
+  func testCLIAdoptsTheExactV2ObservationAndKeepsErrorsMachineReadable() throws {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
+    let owner = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() },
+      nowUTC: { "2026-08-31T12:00:00Z" })
+    let (handler, _) = try makeStack(targetStore: targets, targetObservations: owner)
+    let server = try startServer(handler)
+    func run(_ arguments: [String]) throws -> (Int32, [String: JSONValue]) {
+      let process = Process()
+      process.executableURL = Bundle(for: type(of: self)).bundleURL.deletingLastPathComponent()
+        .appending(path: "arkdeck")
+      process.arguments = arguments + ["--socket", server.socketURL.path, "--output", "json"]
+      let output = Pipe()
+      process.standardOutput = output
+      process.standardError = Pipe()
+      try process.run()
+      let bytes = output.fileHandleForReading.readDataToEndOfFile()
+      process.waitUntilExit()
+      return (process.terminationStatus, try JSONDecoder().decode([String: JSONValue].self, from: bytes))
+    }
+    let (discoveryExit, discovered) = try run(["device", "candidates", "--require-protocol", "2"])
+    XCTAssertEqual(discoveryExit, 0)
+    guard case .object(let snapshot)? = discovered["result"],
+      case .string(let generation)? = snapshot["snapshotGeneration"],
+      case .array(let rows)? = snapshot["observations"], case .object(let row)? = rows.first,
+      case .string(let candidate)? = row["candidateKey"],
+      case .string(let observation)? = row["observationId"]
+    else { return XCTFail("discovery must expose an exact adoption reference") }
+    let arguments = [
+      "target", "adopt", "--candidate", candidate, "--observation", observation,
+      "--observation-generation", generation,
+    ]
+    let (adoptExit, adopted) = try run(arguments)
+    XCTAssertEqual(adoptExit, 0)
+    XCTAssertEqual(adopted["ok"], .bool(true))
+    XCTAssertEqual(try targets.list().count, 1)
+    port.setRelations([TargetObservationCoordinatorContractTests.Port.relation(id: 99)])
+    let (refusedExit, refused) = try run(arguments)
+    XCTAssertEqual(refusedExit, 65)
+    guard case .object(let error)? = refused["error"], case .object(let details)? = error["details"] else {
+      return XCTFail("refusal must be a machine error with zero-dispatch details")
+    }
+    XCTAssertEqual(error["code"], .string("resourceConflict"))
+    XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    guard case .object(let meta)? = refused["meta"] else { return XCTFail("missing error metadata") }
+    XCTAssertEqual(meta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(try targets.list().count, 1)
   }
 
   func testPreBootstrapDaemonNeverDowngradesATargetRequest() throws {

@@ -27,9 +27,11 @@ only for methods in the generated legacy fallback table. Major 2 never falls
 back. A timeout, malformed reply, or arbitrary error is not a downgrade signal.
 
 The daemon retains the original 1.0.0 health shape and App/XPC behavior. The
-2.0.0 table initially publishes **health only** and reports `publishedMethods`.
-Other methods, including `target.adopt` and `job.submit`, are rejected before
-their handlers on 2.0.0. Advertising the wire format is not a claim that all
+2.0.0 table started with health and now also publishes `device.observations`
+and `target.adopt` through the [exact observation slice](cli-exact-observation-adoption.md).
+It reports its closed `publishedMethods` table; absent methods such as
+`job.submit` are rejected before their handlers on 2.0.0.
+Advertising the wire format is not a claim that all
 target CLI contracts have been implemented. Existing leaves continue using
 their published 1.x behavior until their own vertical migrations land.
 
@@ -43,5 +45,5 @@ bundle required by product spec §14.
 
 Host tests exercise real local sockets with fixture daemons and the CLI parser.
 They prove protocol behavior, not real-device execution or Golden Journey
-acceptance. Observation-bound adoption and Runtime-owned AgentExecution/HAR
-remain separate unfinished product capabilities.
+acceptance. The exact observation slice documents adoption coverage;
+Runtime-owned AgentExecution/HAR remains an unfinished product capability.

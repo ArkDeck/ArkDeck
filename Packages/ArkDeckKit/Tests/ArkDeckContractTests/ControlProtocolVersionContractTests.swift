@@ -128,7 +128,7 @@ final class ControlProtocolVersionContractTests: XCTestCase {
           requiredMajor: major), version)
     }
     XCTAssertTrue(ArkDeckControlProtocol.targetMethods.contains("health"))
-    XCTAssertFalse(ArkDeckControlProtocol.targetMethods.contains("target.adopt"))
+    XCTAssertFalse(ArkDeckControlProtocol.targetMethods.contains("capability.install"))
   }
 
   func testGeneratedProtocolVocabularyMatchesTheLanguageNeutralContract() throws {

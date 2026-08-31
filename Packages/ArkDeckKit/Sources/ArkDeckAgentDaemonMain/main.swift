@@ -791,11 +791,15 @@ Task.detached {
       stateDirectory: resolvedStateDirectory,
       driver: RuntimeJobEngineDebugAttemptDriver(engine: engine),
       nowUTC: utcNow)
+    let bootstrapObservation = ProviderBootstrapObservation(
+      provider: hdcProvider, dispatcher: hdcDispatcher)
     let bootstrap = DeviceBootstrapMachine(
-      observation: ProviderBootstrapObservation(
-        provider: hdcProvider, dispatcher: hdcDispatcher),
+      observation: bootstrapObservation,
       targetStore: targetStore,
       nowUTC: utcNow)
+    let targetObservations = TargetObservationCoordinator(
+      observation: bootstrapObservation, targetStore: targetStore,
+      usbRelations: { try TargetUSBRelation.registeredDAYU200() }, nowUTC: utcNow)
     // HDC 3.2 has no public target event stream. The daemon therefore owns a
     // continuous read-only observation loop and lets App launches consume its
     // last completed, timestamped snapshot without joining an HDC command.
@@ -912,6 +916,7 @@ Task.detached {
       nowUTC: utcNow,
       targetStore: targetStore,
       bootstrap: bootstrap,
+      targetObservations: targetObservations,
       hdcRuntimeDiagnostics: startedHDCServerHost?.diagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: resolvedStateDirectory.appending(

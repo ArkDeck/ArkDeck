@@ -324,6 +324,22 @@ final class CLIArgumentParserContractTests: XCTestCase {
       .invalidOption)
   }
 
+  func testTargetAdoptionRequiresAnExactReferenceAndDiscoveryMigrationIsExplicit() {
+    let prefix = ["target", "adopt", "--candidate", "usb", "--observation", "obs-1"]
+    XCTAssertNotNil(success(prefix + ["--observation-generation", "1"]))
+    XCTAssertEqual(failure(prefix)?.code, .invalidOption)
+    XCTAssertEqual(failure(["target", "adopt"])?.code, .invalidOption)
+    for generation in ["0", "01", "+1", "-1", "1.0", "18446744073709551616"] {
+      XCTAssertEqual(failure(prefix + ["--observation-generation", generation])?.code, .invalidOption)
+    }
+    XCTAssertNotNil(success(["device", "adopt"]), "legacy selection behavior remains explicit")
+    XCTAssertNotNil(success(["device", "candidates", "--require-protocol", "2"]))
+    for incompatible in ["--snapshot", "--use-warm-snapshot"] {
+      XCTAssertEqual(
+        failure(["device", "candidates", "--require-protocol", "2", incompatible])?.code, .invalidOption)
+    }
+  }
+
   /// §5.2's duration grammar. Every rejected form is a caller meaning
   /// something the receiving contract cannot represent, so accepting any of
   /// them would round it silently.

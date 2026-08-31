@@ -36,6 +36,13 @@ package enum AgentWireProtocol {
   package struct WireError: Codable, Sendable, Equatable {
     public let code: String
     public let message: String
+    let details: [String: JSONValue]?
+
+    init(code: String, message: String, details: [String: JSONValue]? = nil) {
+      self.code = code
+      self.message = message
+      self.details = details
+    }
   }
 
   package struct Response: Codable, Sendable {
@@ -74,6 +81,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let nowUTC: @Sendable () -> String
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
+  private let targetObservations: TargetObservationCoordinator?
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
@@ -108,6 +116,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     nowUTC: @escaping @Sendable () -> String,
     targetStore: RuntimeTargetStore? = nil,
     bootstrap: DeviceBootstrapMachine? = nil,
+    targetObservations: TargetObservationCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
@@ -125,7 +134,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.init(
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providerIDs, nowUTC: nowUTC,
-      targetStore: targetStore, bootstrap: bootstrap,
+      targetStore: targetStore, bootstrap: bootstrap, targetObservations: targetObservations,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
@@ -149,6 +158,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     nowUTC: @escaping @Sendable () -> String,
     targetStore: RuntimeTargetStore?,
     bootstrap: DeviceBootstrapMachine?,
+    targetObservations: TargetObservationCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     artifactStore: RuntimeArtifactStore?,
     flashBundleImportDirectory: URL?,
@@ -170,6 +180,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.nowUTC = nowUTC
     self.targetStore = targetStore
     self.bootstrap = bootstrap
+    self.targetObservations = targetObservations
     self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
@@ -2016,6 +2027,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return success(id: request.id, result: Self.encodeWorkspacePreset(preset))
 
     case "device.observations":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await targetObservationRequest(request, adopting: false)
+      }
       // §6.1's discovery shape, which `device.candidates` cannot carry: a
       // bare array has nowhere to put the snapshot generation, and §6.1
       // requires a fixed one. Rather than change a method the App and the
@@ -2160,6 +2174,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "target.adopt":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await targetObservationRequest(request, adopting: true)
+      }
       guard let bootstrap else {
         return failure(
           id: request.id, code: .internalError,
@@ -2430,6 +2447,90 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   // MARK: device observations (§6.1, §8.5)
+
+  private func targetObservationRequest(
+    _ request: AgentWireProtocol.Request, adopting: Bool
+  ) async -> AgentWireProtocol.Response {
+    guard let targetObservations else {
+      return failure(id: request.id, code: .unknownMethod, message: "target observation owner unavailable")
+    }
+    do {
+      if adopting {
+        let reference = try Self.targetObservationReference(request.params)
+        let record = try await targetObservations.adopt(reference)
+        return success(id: request.id, result: .object([
+          "outcome": .string("adopted"), "targetId": .string(record.targetID),
+          "bindingRevision": .integer(Int64(record.bindingRevision)),
+          "observationId": .string(reference.observationID),
+          "snapshotGeneration": .string(String(reference.generation)),
+        ]))
+      }
+      let following: TargetObservationReference?
+      switch request.params {
+      case nil, .some([:]): following = nil
+      case .some(let fields) where Set(fields.keys) == ["following"]:
+        guard case .object(let value)? = fields["following"] else {
+          throw TargetObservationFailure("invalidInput", "following must be an observation reference")
+        }
+        following = try Self.targetObservationReference(value)
+      default:
+        throw TargetObservationFailure("invalidInput", "device observations accepts only following")
+      }
+      let snapshot = try await targetObservations.snapshot(following: following)
+      let rows: [JSONValue] = try snapshot.observations.map { row in
+        let target = row.relation == nil ? nil
+          : try targetStore?.candidateTarget(connectKey: row.candidate.connectKey)
+        return .object([
+          "observationId": .string(row.observationID),
+          "candidateKey": .string(row.candidate.connectKey),
+          "authorizationState": .string(row.candidate.state),
+          "observationContinuity": .string(row.continuity),
+          "adoptedTargetId": target.map { .string($0.targetID) } ?? .null,
+          "bindingRevision": target.map { .integer(Int64($0.bindingRevision)) } ?? .null,
+        ])
+      }
+      return success(id: request.id, result: .object([
+        "schemaVersion": .string("arkdeck.device-observations/1"),
+        "snapshotGeneration": .string(String(snapshot.generation)),
+        "observedAtUtc": .string(snapshot.observedAtUTC),
+        "health": .string("current"), "observations": .array(rows),
+      ]))
+    } catch let error as TargetObservationFailure {
+      var details: [String: JSONValue] = [
+        "phase": .string("preAdmission"), "newDispatchCount": .integer(0),
+      ]
+      if let reference = error.reference {
+        details["candidate"] = .string(reference.candidate)
+        details["observationId"] = .string(reference.observationID)
+        details["observationGeneration"] = .string(String(reference.generation))
+      }
+      return AgentWireProtocol.Response(
+        id: request.id, ok: false, result: nil,
+        error: .init(code: error.code, message: error.message, details: details))
+    } catch {
+      // A store error may occur after its write started. Do not invent a
+      // zero-mutation receipt for that case; callers must inspect the target.
+      return failure(id: request.id, code: .internalError, message: "\(error)")
+    }
+  }
+
+  private static func targetObservationReference(_ fields: [String: JSONValue]?) throws
+    -> TargetObservationReference
+  {
+    guard let fields,
+      Set(fields.keys) == ["candidate", "observationId", "observationGeneration"],
+      case .string(let candidate)? = fields["candidate"], (1...1024).contains(candidate.utf8.count),
+      case .string(let observationID)? = fields["observationId"],
+      (1...128).contains(observationID.utf8.count),
+      case .string(let text)? = fields["observationGeneration"],
+      text.first != "0", text.utf8.allSatisfy({ (48...57).contains($0) }),
+      let generation = UInt64(text), generation > 0, generation <= UInt64(Int64.max)
+    else {
+      throw TargetObservationFailure(
+        "invalidInput", "candidate, observationId and canonical positive observationGeneration are required")
+    }
+    return TargetObservationReference(candidate: candidate, observationID: observationID, generation: generation)
+  }
 
   static func encodeDeviceObservations(
     _ snapshot: BootstrapCandidateSnapshot, rows: [JSONValue]

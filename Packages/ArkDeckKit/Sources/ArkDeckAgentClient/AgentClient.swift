@@ -14,6 +14,7 @@ public enum AgentClientError: Error, Equatable, Sendable {
   case transport(String)
   case malformedResponse(String)
   case daemonError(code: String, message: String)
+  case structuredDaemonError(code: String, message: String, details: [String: JSONValue])
 }
 
 public struct AgentClient: Sendable {
@@ -94,6 +95,19 @@ public struct AgentClient: Sendable {
     let line = try exchange(payload, timeoutSeconds: timeoutSeconds)
     let response: AgentWireResponse
     do {
+      if selectedProtocolVersion == ArkDeckControlProtocol.targetVersion {
+        let fields = try ControlProtocolNegotiation.decodeObject(line, maximumBytes: 8 * 1024 * 1024)
+        if fields["ok"] == .bool(true) {
+          guard Set(fields.keys) == ["id", "ok", "result"] else {
+            throw ControlProtocolNegotiation.Failure.malformed
+          }
+        } else {
+          guard Set(fields.keys) == ["id", "ok", "error"],
+            case .object(let error)? = fields["error"],
+            Set(error.keys).isSubset(of: ["code", "message", "details"])
+          else { throw ControlProtocolNegotiation.Failure.malformed }
+        }
+      }
       response = try JSONDecoder().decode(AgentWireResponse.self, from: line)
     } catch {
       throw AgentClientError.malformedResponse("\(error)")
@@ -102,6 +116,12 @@ public struct AgentClient: Sendable {
       throw AgentClientError.malformedResponse("response id mismatch")
     }
     if response.ok { return response.result ?? .null }
+    if selectedProtocolVersion == ArkDeckControlProtocol.targetVersion,
+      let error = response.error, let details = error.details
+    {
+      throw AgentClientError.structuredDaemonError(
+        code: error.code, message: error.message, details: details)
+    }
     throw AgentClientError.daemonError(
       code: response.error?.code ?? "unknown",
       message: response.error?.message ?? "daemon returned no error detail")
@@ -243,6 +263,7 @@ public struct AgentClient: Sendable {
     struct WireError: Codable {
       let code: String
       let message: String
+      let details: [String: JSONValue]?
     }
     let id: String
     let ok: Bool

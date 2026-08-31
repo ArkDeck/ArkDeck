@@ -820,6 +820,12 @@ enum CLICommandRegistry {
     summary: "durable device targets and their bindings",
     leaves: [
       CLILeafSpec(
+        token: "adopt",
+        canonicalCommand: "target.adopt",
+        summary: "reobserve one exact candidate snapshot and establish its durable target",
+        options: runtimeClientOptions(observationReferenceOptions),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "list",
         canonicalCommand: "target.list",
         summary: "list durable targets and their binding revisions",
@@ -947,6 +953,10 @@ enum CLICommandRegistry {
         summary: "live HDC candidates, their authorization state and any adopted target",
         options: runtimeClientOptions([
           CLIOptionSpec(
+            name: "--require-protocol",
+            form: .value(placeholder: "2", grammar: .enumeration(["2"])),
+            summary: "read v2 physical observation references for target adopt; never downgrade"),
+          CLIOptionSpec(
             name: "--snapshot",
             form: .flag,
             summary:
@@ -956,6 +966,7 @@ enum CLICommandRegistry {
             form: .flag,
             summary: "read the Runtime's warm snapshot instead of forcing a fresh device read"),
         ]),
+        mutuallyExclusive: [["--require-protocol", "--snapshot"], ["--require-protocol", "--use-warm-snapshot"]],
         connectsToRuntime: true),
       CLILeafSpec(
         token: "adopt",
@@ -969,6 +980,19 @@ enum CLICommandRegistry {
         ]),
         connectsToRuntime: true),
     ])
+
+  private static let observationReferenceOptions: [CLIOptionSpec] = [
+    CLIOptionSpec(
+      name: "--candidate", form: .value(placeholder: "key", grammar: .opaque),
+      summary: "exact candidate key from the Runtime observation", isRequired: true),
+    CLIOptionSpec(
+      name: "--observation", form: .value(placeholder: "observation-id", grammar: .opaque),
+      summary: "Runtime-issued physical observation identity", isRequired: true),
+    CLIOptionSpec(
+      name: "--observation-generation",
+      form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+      summary: "exact snapshot generation from discovery", isRequired: true),
+  ]
 
   private static let targetlessTraceNode = CLINodeSpec(
     token: "trace",

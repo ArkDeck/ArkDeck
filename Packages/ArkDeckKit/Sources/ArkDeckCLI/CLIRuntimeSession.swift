@@ -113,6 +113,7 @@ struct CLIRuntimeSession {
     var stamped = error
     stamped.rendering = rendering
     stamped.controlRequestID = controlRequestID
+    stamped.controlProtocolVersion = client.selectedProtocolVersion
     stamped.lifecycle = lifecycle
     stamped.replacementArgvPattern = replacementArgvPattern
     return stamped
@@ -137,6 +138,14 @@ struct CLIRuntimeSession {
     -> CLIRegistryError
   {
     switch error {
+    case .structuredDaemonError(let wireCode, let message, let details):
+      let evidence = CLIControlFailureEvidence.read(from: .object(details))
+      let code = CLIControlFailureMapper.code(
+        forWireCode: wireCode, method: method, evidence: evidence)
+      var fields = details
+      fields["method"] = .string(method)
+      fields["wireCode"] = .string(wireCode)
+      return CLIRegistryError(code: code, message: message, details: fields, command: command)
     case .daemonError(let wireCode, let message):
       // The daemon's wire error carries no structured details today, so the
       // evidence half of §8.4 is always empty and every ambiguous failure from
