@@ -916,6 +916,58 @@ final class CLIArgumentParserContractTests: XCTestCase {
       .invalidOption)
   }
 
+  // MARK: The domain layer (§6.2)
+
+  /// Every operation §6.2 gives a first-class name is reachable by that name.
+  func testTheDomainSurfaceIsReachable() {
+    for argv in [
+      ["screen", "record"], ["input", "tap"], ["input", "long-press"], ["input", "swipe"],
+      ["diagnostics", "capture"], ["analyze", "trace"], ["analyze", "trace-summary"],
+      ["analyze", "hilog-summary"], ["analyze", "crash-signature"],
+      ["port-forward", "create"], ["port-forward", "remove"],
+      ["workspace", "status"], ["workspace", "build"], ["workspace", "sweep"],
+      ["target", "observe"], ["debug", "hap"], ["debug", "native", "deploy"],
+      ["flash", "run"],
+    ] {
+      guard case .dispatch? = success(argv + ["--target", "T-1"]) else {
+        return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
+      }
+    }
+    XCTAssertEqual(failure(["analyze"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["analyze", "bogus"])?.code, .invalidCommand)
+    XCTAssertEqual(failure(["workspace", "bogus"])?.code, .invalidCommand)
+  }
+
+  /// CLI-REQ-003: the convenience name is an alias, never a precondition. The
+  /// generic surface has to reach the same operation, so a missing alias can
+  /// never make an operation unreachable.
+  func testEveryDomainOperationStaysReachableGenerically() {
+    for reference in CLICommandRegistry.allLeaves().compactMap({ $0.leaf.catalogOperation }) {
+      guard case .dispatch? = success(["agent", "run", "--operation", reference]) else {
+        return XCTFail("`agent run --operation \(reference)` must stay reachable")
+      }
+      guard case .dispatch? = success([
+        "job", "submit", "--target", "T-1", "--operation", reference,
+      ]) else {
+        return XCTFail("`job submit --operation \(reference)` must stay reachable")
+      }
+    }
+  }
+
+  /// A domain leaf takes the same four arguments everywhere, because the
+  /// operation's own inputs come from its descriptor (§10).
+  func testADomainLeafTakesInputsByFileRatherThanByFlag() {
+    XCTAssertNotNil(
+      success([
+        "input", "tap", "--target", "T-1", "--inputs-file", "i.json",
+        "--capability", "CAP-RT-1", "--execution-id", "run-1",
+      ]))
+    // The descriptor's own field names are not CLI options.
+    XCTAssertEqual(
+      failure(["input", "tap", "--target", "T-1", "--x", "10", "--y", "20"])?.code,
+      .invalidOption)
+  }
+
   // MARK: The surface itself
 
   /// Every command the previous hand-written dispatcher accepted still parses.

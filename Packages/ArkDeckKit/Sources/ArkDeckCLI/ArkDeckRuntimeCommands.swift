@@ -1512,9 +1512,15 @@ enum RuntimeCLI {
   /// "device", which is the confusion §7.1 separates: a live device is an
   /// observation, a target is a durable binding. Those spellings stay as frozen
   /// legacy compatibility (§12); this is where the durable resource lives.
-  static func runTarget(_ arguments: [String]) throws {
+  static func runTarget(_ arguments: [String]) async throws {
     guard let subcommand = arguments.first else {
-      throw CLIError(exitCode: EX_USAGE, message: "missing target subcommand (list|show)")
+      throw CLIError(
+        exitCode: EX_USAGE, message: "missing target subcommand (list|show|observe)")
+    }
+    if subcommand == "observe" {
+      try await runDomainOperation(
+        path: ["target", "observe"], Array(arguments.dropFirst()))
+      return
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "target.\(subcommand)")
@@ -1587,49 +1593,86 @@ enum RuntimeCLI {
       else {
         throw CLIError(exitCode: EX_USAGE, message: "agent run requires --operation <reference>")
       }
-      let parts = rest[operationIndex + 1].split(
-        separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
-      guard parts.count == 1 || parts.count == 2 else {
-        throw CLIError(exitCode: EX_USAGE, message: "invalid operation reference")
-      }
-      let version: Int?
-      if parts.count == 2 {
-        guard let parsed = Int(parts[1]), parsed > 0 else {
-          throw CLIError(exitCode: EX_USAGE, message: "invalid operation version")
-        }
-        version = parsed
-      } else {
-        version = nil
-      }
-      var inputs: [String: JSONValue] = [:]
-      if let index = rest.firstIndex(of: "--inputs-file"), index + 1 < rest.count {
-        let url = URL(filePath: rest[index + 1])
-        guard let data = try? Data(contentsOf: url),
-          let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data)
-        else {
-          throw CLIError(exitCode: EX_USAGE, message: "cannot read typed inputs from \(url.path)")
-        }
-        inputs = decoded
-      }
-      var capability: String?
-      if let index = rest.firstIndex(of: "--capability"), index + 1 < rest.count {
-        capability = rest[index + 1]
-      }
-      var target: String?
-      if let index = rest.firstIndex(of: "--target"), index + 1 < rest.count {
-        target = rest[index + 1]
-      }
-      var executionID: String?
-      if let index = rest.firstIndex(of: "--execution-id"), index + 1 < rest.count {
-        executionID = rest[index + 1]
-      }
-
       outcome = try executor.run(
-        RuntimeAgentExecutionRequest(
-          operationID: String(parts[0]), operationVersion: version, inputs: inputs,
-          capabilityReference: capability, targetID: target,
-          executionID: executionID ?? UUID().uuidString.lowercased()))
+        try agentExecutionRequest(reference: rest[operationIndex + 1], rest: rest))
     }
+    try emitAgentOutcome(outcome, session: session)
+  }
+
+  /// The one place an Agent execution request is built.
+  ///
+  /// `agent run` and every domain command in §6.2 come through here, so a
+  /// convenience name cannot acquire a second way to reach a device — §4 is
+  /// explicit that a domain command is a typed request builder and nothing
+  /// more. The only difference between them is where the operation reference
+  /// comes from: an argument, or the registry's declared mapping.
+  static func agentExecutionRequest(
+    reference: String, rest: [String]
+  ) throws -> RuntimeAgentExecutionRequest {
+    let parts = reference.split(
+      separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+    guard parts.count == 1 || parts.count == 2 else {
+      throw CLIError(exitCode: EX_USAGE, message: "invalid operation reference")
+    }
+    let version: Int?
+    if parts.count == 2 {
+      guard let parsed = Int(parts[1]), parsed > 0 else {
+        throw CLIError(exitCode: EX_USAGE, message: "invalid operation version")
+      }
+      version = parsed
+    } else {
+      version = nil
+    }
+    func value(_ flag: String) -> String? {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
+      return rest[index + 1]
+    }
+    var inputs: [String: JSONValue] = [:]
+    if let path = value("--inputs-file") {
+      let url = URL(filePath: path)
+      guard let data = try? Data(contentsOf: url),
+        let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+      else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read typed inputs from \(url.path)")
+      }
+      inputs = decoded
+    }
+    return RuntimeAgentExecutionRequest(
+      operationID: String(parts[0]), operationVersion: version, inputs: inputs,
+      capabilityReference: value("--capability"), targetID: value("--target"),
+      executionID: value("--execution-id") ?? UUID().uuidString.lowercased())
+  }
+
+  /// `arkdeck <domain> <verb>` — a published operation under the name §6.2
+  /// gives it.
+  ///
+  /// The registry holds the mapping; this only looks it up. A leaf with no
+  /// declared operation is a product gap, not something to improvise a request
+  /// for, so it says so rather than guessing (§6.2).
+  static func runDomainOperation(path: [String], _ arguments: [String]) async throws {
+    guard
+      let leaf = CLICommandRegistry.allLeaves().first(where: { $0.path == path })?.leaf,
+      let reference = leaf.catalogOperation
+    else {
+      throw CLIError(
+        exitCode: CLIErrorCode.blockedByProductDefect.exitCode,
+        message:
+          "`\(path.joined(separator: " "))` declares no Catalog operation; "
+          + "use `arkdeck agent run --operation <reference>` until it does")
+    }
+    var rest = arguments
+    let session = runtimeSession(&rest, command: leaf.canonicalCommand)
+    session.warnIfLegacy()
+    let executor = AgentRuntimeExecutor(client: session.client, nowUTC: RuntimeCLI.utcNow)
+    let outcome = try executor.run(
+      try agentExecutionRequest(reference: reference, rest: rest))
+    try emitAgentOutcome(outcome, session: session)
+  }
+
+  /// Renders whichever way an Agent execution ended, in the caller's shape.
+  static func emitAgentOutcome(
+    _ outcome: RuntimeAgentExecutionOutcome, session: CLIRuntimeSession
+  ) throws {
     switch outcome {
     case .completed(let receipt):
       guard session.rendering == .human else {
@@ -2790,10 +2833,22 @@ params))
   /// Flash recovery* invocation, not the ordinary Debug product §6.2 describes,
   /// and one of the two has to give the name back. It delegates to the same
   /// helper `recovery flash-invocation` uses.
-  static func runDebug(_ arguments: [String]) throws {
+  static func runDebug(_ arguments: [String]) async throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing debug subcommand (start|evaluate|status)")
+        exitCode: EX_USAGE, message: "missing debug subcommand (hap|start|evaluate|status)")
+    }
+    if subcommand == "hap" {
+      try await runDomainOperation(path: ["debug", "hap"], Array(arguments.dropFirst()))
+      return
+    }
+    if subcommand == "native" {
+      guard arguments.dropFirst().first == "deploy" else {
+        throw CLIError(exitCode: EX_USAGE, message: "missing debug native subcommand (deploy)")
+      }
+      try await runDomainOperation(
+        path: ["debug", "native", "deploy"], Array(arguments.dropFirst(2)))
+      return
     }
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "debug.\(subcommand)")
