@@ -2932,7 +2932,19 @@ final class AppShellUITests: XCTestCase {
     let targetX = element.frame.midX
     let hosts = app.scrollViews.allElementsBoundByIndex.filter { host in
       let frame = host.frame
-      return frame.width > 0 && frame.minX <= targetX && targetX <= frame.maxX
+      // Require a height as well as a width. The tie-break below is smallest
+      // area, so a zero-height scroll view does not merely compete for the
+      // host slot — it always wins it, at area zero, and then cannot be
+      // scrolled or hit. F59 recorded one such host on an older main
+      // ({{252.0, 441.0}, {648.0, 0.0}}), surfacing as "Unable to find hit
+      // point for ScrollView", which reads like a product defect and is not.
+      //
+      // This is a guard, not a repair of anything currently observable: no
+      // collapsed candidate reproduces on today's main, and adding the check
+      // changes no measured outcome. It is here because the selection rule is
+      // wrong on its own terms, not because a test is red today.
+      guard frame.width > 0, frame.height > 0 else { return false }
+      return frame.minX <= targetX && targetX <= frame.maxX
     }
     guard
       let host = hosts.min(by: { lhs, rhs in
