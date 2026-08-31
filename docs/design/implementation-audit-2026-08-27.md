@@ -206,7 +206,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 | design.components | Workspace chrome；32预览；light/dark/narrow/focus/disabled | 25 个已声明映射由 24 个新受控组件闭合；SessionSurfaces 与 F51 新增的 ViewerSurfaces 覆盖两组组合式组件；ArkTrace canvas 属上游插图，远程库未同步。BudgetMeters/OperationList/StageTrack/StatusStrip 按 spec §5.11 保留为退役 Automation 资料，原型已无消费方。F56 收敛 App 侧六份重复实现，`WorkspaceFactRow` 扩出四个可选行为承载它们；F57 把 14 处手写键值列表与 8 个行辅助函数收敛到 `WorkspaceFactGrid` / `WorkspaceFactRow`，余下 4 处三列表格/表单记 exception 并由回归强制写明理由 |
 | automation.retired | 旧Automation/HTASK稿 | CHG-2026-064已移除；旧URL只解释退役，不是待办 |
 
-### 生产 View 文件索引（21/21）
+### 生产 View 文件索引（23/23）
 
 以下每个文件都由上表中的对应页面/子面覆盖，包含同文件的私有 View；ViewModel/facade/资源随交互追到调用点。
 
@@ -217,7 +217,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 - [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)
 - [Debug 五标签与 sheets](../../ArkDeckApp/Features/Debug/DebugWorkspaceView.swift)
 - [Viewer 五 Inspector](../../ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift)
-- [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)
+- [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)、[Trace 标记编辑器](../../ArkDeckApp/Features/Trace/TraceFlagDraftEditor.swift)、[标记标签编辑器](../../ArkDeckApp/Features/Trace/TraceFlagTagEditor.swift)
 - [Device](../../ArkDeckApp/Features/Device/DeviceWorkspaceView.swift)、[Diagnostics](../../ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift)
 - [History](../../ArkDeckApp/Features/History/RuntimeHistoryView.swift)、[Jobs / recovery](../../ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift)、[Settings 七标签](../../ArkDeckApp/Features/Settings/SettingsRootView.swift)
 
@@ -1544,3 +1544,23 @@ App 以 alert 呈现（标题为该键，正文是写入器自己的原因）。
 
 同时复犯了一次批次四的老错：手打英文文案，把 App 原文里的 curly apostrophe（`Couldn’t`，
 U+2019）写成直引号。现改为从 `.xcstrings` 逐字取值。两条教训已记入共享 memory。
+
+## 2026-08-31 F64：把 #1618 拆出的两个 Trace 编辑器纳入覆盖清单
+
+增量修复，基线 `fa7c5348`。`npm test` 在 `main` 上失败于
+`every App View file and preview is covered and linked`：扫描得 23 个声明 View 的 App 文件，
+而 `implementation-coverage.json` 的 `appViewFiles` 是 21 个。缺的两个是 #1618 从
+`TraceViewerWorkspaceView` 拆出的 `TraceFlagDraftEditor.swift` 与 `TraceFlagTagEditor.swift`。
+
+**这是两个各自为绿、合起来才红的 PR。** #1618 新增文件、#1619 把该套件挂进 PR 门，两者分别
+合入时都是绿的；红只在 union 出现。由于新车道的触发面含 `Packages/`，这条红**阻塞了全仓的
+本地闸**，不只是设计侧的改动。
+
+**修法不是只改清单。** `coverage.appViewFiles` 同时被另外三条审计消费——裸 `Grid(` 扫描、
+精确字号角色、字号档位名单。把文件加进清单等于让它们受这三条约束，所以先逐条实测：两个文件
+**零裸 `Grid(`、零 `.font(.system(size:`**，本就合规，因此加入清单是正确的核对结论，不是让
+断言闭嘴。
+
+**是否引入稿件漂移**：#1618 未触碰任何 `.xcstrings`，两个编辑器是既有 Trace Viewer 时间轴标记
+编辑逻辑的**拆分**（该 PR 修的是异步更新期间的 SwiftUI 状态保持），无新增可见文案，故稿件侧
+无需变化。§3 矩阵的 Trace Viewer 行覆盖它们，生产 View 索引由 21/21 更新为 23/23。
