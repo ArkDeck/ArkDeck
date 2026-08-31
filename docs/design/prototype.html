@@ -1051,7 +1051,7 @@ const S = {
   // plus its own domain branches; the App renders them from one shared row.
   settings:{
     state:["loading","error","success"].includes(PARAMS.get("settingsState"))?PARAMS.get("settingsState"):"ready",
-    storage:["invalid","unknownPressure","measurementUnavailable","runtimeUnavailable"].includes(PARAMS.get("settingsStorage"))?PARAMS.get("settingsStorage"):"ok",
+    storage:["invalid","unknownPressure","measurementUnavailable","runtimeUnavailable","unaccounted"].includes(PARAMS.get("settingsStorage"))?PARAMS.get("settingsStorage"):"ok",
     activeJobs:PARAMS.get("settingsJobs")==="active"},
   jobs:[], jobSeq:1
 };
@@ -4871,10 +4871,26 @@ function settingsStateRowHTML(){
     return `<div class="okbox" role="status" data-sync-id="settings.success"><span>${lc("已将确认过的诊断包导出到本地。","The approved diagnostic bundle was exported locally.")}</span></div>`;
   return "";
 }
+/** The pane summaries the App renders in `WorkspaceHeaderBar(summary:)`.
+ *  Values are taken verbatim from `SettingsLocalizable.xcstrings`; the two
+ *  prototype-only tabs (trace, updates) have no App pane and so no summary. */
+const SETTINGS_SUBTITLES={
+  general:["\u81ea\u5b9a\u4e49 ArkDeck\uff0c\u5e76\u67e5\u770b\u6784\u5efa\u8eab\u4efd\u3001\u5e73\u53f0\u4fe1\u606f\u4e0e\u9690\u79c1\u4fdd\u8bc1\u3002","Customize ArkDeck and review build identity, platform information, and privacy guarantees.","settings.general.subtitle"],
+  toolchains:["\u68c0\u67e5\u5f53\u524d\u9009\u4e2d\u7684 HDC \u53ef\u6267\u884c\u6587\u4ef6\u53ca\u5176\u5df2\u9a8c\u8bc1\u7684\u670d\u52a1\u7aef\u4e0a\u4e0b\u6587\u3002","Inspect the selected HDC executable and its verified server context.","settings.toolchains.subtitle"],
+  servers:["\u7ba1\u7406\u7528\u4e8e\u6d4f\u89c8\u548c\u5bfc\u5165\u8fdc\u7aef\u7f16\u8bd1\u4ea7\u7269\u7684 SSH \u670d\u52a1\u5668\u3002","Manage SSH servers used to browse and import remote build artifacts.","settings.remoteSources.subtitle"],
+  storage:["\u7ba1\u7406 Session \u6839\u76ee\u5f55\u3001\u914d\u989d\u4e0e\u4fdd\u7559\u5468\u671f\uff0c\u5e76\u67e5\u770b\u6bcf\u4e2a\u5b58\u50a8\u5b9e\u9645\u5360\u7528\u4e86\u591a\u5c11\u3002","Manage the Session root, quota and retention window, and read what each store is actually holding.","settings.storage.subtitle"],
+  diagnostics:["\u5148\u9884\u89c8\u8303\u56f4\u53d7\u9650\u7684\u672c\u5730\u8bca\u65ad\u5305\uff0c\u518d\u663e\u5f0f\u5bfc\u51fa\u3002","Preview a bounded, local diagnostic bundle before explicitly exporting it.","settings.diagnostics.subtitle"]
+};
+function settingsSubtitleHTML(tab){
+  const s=SETTINGS_SUBTITLES[tab];
+  if(!s)return "";
+  return `<p class="hint" data-sync-id="${s[2]}">${lc(s[0],s[1])}</p>`;
+}
 function settingsPane(tab){
   const row=settingsStateRowHTML();
-  if(S.settings.state!=="ready")return row+settingsPaneBody(tab);
-  return settingsPaneBody(tab);
+  const summary=settingsSubtitleHTML(tab);
+  if(S.settings.state!=="ready")return summary+row+settingsPaneBody(tab);
+  return summary+settingsPaneBody(tab);
 }
 function settingsPaneBody(tab){
   switch(tab){
@@ -4888,7 +4904,7 @@ function settingsPaneBody(tab){
     <h3>${lc('ArkDeck Runtime Artifact','ArkDeck Runtime artifacts')}</h3>
     ${S.settings.storage==="runtimeUnavailable"
       ?`<p class="hint" data-sync-id="settings.storage.runtimeUnavailable">${lc('ArkDeck Runtime 未报告 Artifact 用量，因此这里不显示数字。','ArkDeck Runtime did not report its artifact usage, so no figure is shown here.')}</p>`
-      :`<dl class="kv"><dt>${lc('已用空间','Stored bytes')}</dt><dd data-sync-id="settings.storage.runtimeUsage">2.5 GB</dd><dt>${lc('Runtime 配额','Runtime quota')}</dt><dd>8 GiB</dd><dt>${lc('剩余','Remaining')}</dt><dd>5.5 GiB</dd></dl>`}
+      :`<dl class="kv"><dt>${lc('已用空间','Stored bytes')}</dt><dd data-sync-id="settings.storage.runtimeUsage">2.5 GB</dd><dt data-sync-id="settings.storage.runtimeTotal">${lc('Runtime 配额','Runtime quota')}</dt><dd>8 GiB</dd><dt data-sync-id="settings.storage.remaining">${lc('剩余','Remaining')}</dt><dd>5.5 GiB</dd></dl>`}
     <p class="hint" data-sync-id="settings.storage.runtimeUsage.detail">${lc('这里是 ArkDeck Runtime 为任务保存的 Artifact 字节。该配额由 Runtime 自行计量与执行；上方的策略作用于 Session 输出根，不作用于这里。','These are the bytes ArkDeck Runtime stores for Jobs. Runtime measures and enforces this quota itself; the policy above applies to the Session output root instead.')}</p>
     <h3>${lc('Session 输出根','Session output root')}</h3>
     ${S.settings.storage==="measurementUnavailable"
@@ -4896,6 +4912,8 @@ function settingsPaneBody(tab){
       :`<dl class="kv"><dt>${lc('已用空间','Stored bytes')}</dt><dd data-sync-id="settings.storage.sessionUsage">0 bytes</dd><dt>${lc('已固定 Session','Pinned Sessions')}</dt><dd data-sync-id="settings.storage.pinned">3 ${lc('个 Session','Sessions')} · 2.1 GiB</dd></dl>`}
     ${S.settings.storage==="unknownPressure"
       ?`<p class="hint" data-sync-id="settings.storage.unknownPressure">${lc('存在未分类字节，清理策略将保持保守。','Unclassified bytes are present; cleanup remains conservative.')}</p>`:""}
+    ${S.settings.storage==="unaccounted"
+      ?`<div class="warnbox" data-sync-id="settings.storage.unaccountedFormat"><div>${lc("2 \u4e2a Session \u65e0\u6cd5\u8bc6\u522b\uff1b\u5b83\u4eec\u4f1a\u88ab\u4fdd\u7559\uff0c\u4fdd\u7559\u6e05\u7406\u65e0\u6cd5\u56de\u6536\u5176\u5b57\u8282\u3002","2 Sessions could not be identified. They are retained, and retention cleanup cannot reclaim their bytes.")}</div></div>`:""}
     <p class="hint" data-sync-id="settings.storage.sessionUsage.detail">${lc('上方的配额、安全余量与保留周期只作用于这个根目录。Runtime Artifact 单独存放，不计入这里。','The quota, safety margin and retention window above apply to this root only. Runtime artifacts are stored separately and are not counted here.')}</p>
     <p class="hint" data-sync-id="settings.storage.pinGuarantee">${lc('保留策略清理绝不会删除已固定的 Session。','Retention cleanup never deletes pinned Sessions.')}</p><button class="btn" onclick="doneBtn(this,lc('演示：校验并保存策略','Demo: validate and save policy'))">${lc('保存策略','Save policy')}</button></section>`;
   case 'trace':return `<div class="seg"><button class="${S.traceSettingsTab==='cache'?'on':''}" onclick="S.traceSettingsTab='cache';renderPage()">${lc("缓存","Cache")}</button><button class="${S.traceSettingsTab==='licenses'?'on':''}" onclick="S.traceSettingsTab='licenses';renderPage()">${lc("许可证","Licenses")}</button></div>${S.traceSettingsTab==='cache'?`<section class="card"><h2>${lc("按内容寻址的缓存","Content-addressed Cache")}</h2><dl class="kv"><dt>${lc("大小","Size")}</dt><dd>—</dd><dt>${lc("条目","Entries")}</dt><dd>—</dd><dt>${lc("使用中","In use")}</dt><dd>—</dd></dl><div class="device-actions"><button class="btn" onclick="doneBtn(this,'Demo: refresh inventory')">${lc("刷新","Refresh")}</button><button class="btn" onclick="doneBtn(this,'Demo: purge inactive derived entries')">${lc("清理未使用条目","Purge Unused Entries")}</button></div><p class="hint">${lc("ArkTrace 仅清理未使用的派生数据库，不会删除原始 Trace 文件。","ArkTrace only purges inactive derived databases. Original trace files are never cache targets.")}</p></section>`:`<section class="card"><h2>${lc("开源许可证","Open Source Licenses")}</h2><p>${lc("ArkTrace 包含固定版本的 TraceStreamer 构建及已审查的源码依赖。","ArkTrace includes a pinned TraceStreamer build and its reviewed source closure.")}</p><h3>${lc("ArkTrace — MIT 许可证","ArkTrace \u2014 MIT License")}</h3><p class="hint">${lc('实际窗口按需读取随包 LICENSE / THIRD_PARTY_NOTICES。此原型不复制许可证正文。','The App lazily reads bundled LICENSE / THIRD_PARTY_NOTICES. This prototype does not copy their full text.')}</p><h3>${lc("第三方声明","Third-Party Notices")}</h3><div><button class="btn" onclick="doneBtn(this,'Demo: reveal bundled license files')">${lc("在 Finder 中显示许可证文件","Show License Files in Finder")}</button></div><span class="hint">${lc("14 个已审查组件","14 reviewed components")}</span></section>`}`;

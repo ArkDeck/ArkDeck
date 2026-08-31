@@ -1902,3 +1902,35 @@ frame 上。已回退。
 
 本批主张的只有：一个被推翻的假设、一条被更正的过时结论、两条新实测事实，以及四次失败的记录。
 不主张修好任何测试。
+
+## 2026-08-31 F72：#1644 的增量轮，顺带补上五个面板副标题（P-DRIFT）
+
+第十八批，基线 `c745a248`。`#1644` 改造了 Settings 存储面板并**自己镜像了主结构**，
+本轮按 §10 做它触发的增量核对；逐行结论见
+[2026-08-31 批次十八台账](references/ui-consistency/2026-08-31-settings-summary-ledger.md)。
+只改设计稿与 ds 测试，不动 App。
+
+**它的镜像基本完整，三处缺口。** `runtimeUnavailable` / `runtimeUsage` / `sessionUsage`
+及两条 detail 都有锚点镜像，已删的五个键在稿件零残留。缺的是：`settings.storage.runtimeTotal`
+与 `settings.storage.remaining` **文案在稿件里但没有 `data-sync-id`**（可读不可锚），
+以及 `settings.storage.unaccountedFormat` —— App 在 `unaccountedSessionCount > 0` 时渲染的
+未识别 Session 警告，**稿件完全没有、状态不可达**。本批补齐，新增 `?settingsStorage=unaccounted`。
+
+**核对 `settings.storage.subtitle` 时撞出一条系统性缺口。** 稿件里根本没有面板副标题结构，
+把范围扩到全部五个后确认：`settings.{general,remoteSources,toolchains,storage,diagnostics}.subtitle`
+**在 App 里全部经 `WorkspaceHeaderBar(summary:)` 真实渲染，在稿件里一条都没有**。
+按 §6 属 P-DRIFT，且**与 `#1644` 无关**——是此前各轮都没抓到的既有缺口，增量轮顺带兜住了它。
+本批在 `settingsPane()` 的同一位置补齐，文案逐字取自 `.xcstrings`。稿件独有的
+`trace` / `updates` 两页签没有对应 App 面板，不配副标题，也不为它们编造文案。
+
+**一次差点发生的误判，值得记。** `settings.storage.unaccountedFormat` 用 `git grep` 扫 Swift
+零命中，看着就是 `#1644` 顺手加进目录的死键——差一点就按「删键」处理，那会删掉一个正在渲染的
+警告。真相是它经生成符号被消费：`LocalizedStringResource.SettingsLocalizable.settingsStorageUnaccountedFormat(...)`
+（`SettingsRootView.swift:1005`），我的快扫模式 `storageUnaccounted` 漏了 `settings` 前缀。
+**把它救回来的是 F60/F70 定的 camelCase 访问器判据**——字面量扫描单独不足以判死一个键。
+这次它把结论从「死键」翻成「活键且稿件缺镜像」，方向正好相反。
+
+**验证。** ds 交互测试 82/82（新增一条），`npm run build`（含双向 `check:tokens`）exit 0。
+**做了负向验证**：把稿件回退到 `origin/main` 再跑，新测试确实变红，不是只对当前实现成立的
+套套逻辑。新测试的面板清单**从 App 源码正则派生**（扫 `WorkspaceHeaderBar(summary: Text(settingsText("…")))`），
+App 将来新增带副标题的面板会直接打红，直到稿件补上。
