@@ -203,6 +203,52 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     ).map(persistedJob)
   }
 
+  /// One SQLite read snapshot, one bounded record at a time. The callback may
+  /// build a small metadata snapshot but cannot execute another repository
+  /// operation while this statement owns the read lock. No admission/state
+  /// transaction or recovery semantics are changed by this query path.
+  package func forEachJob(jobID: String? = nil, _ body: (RuntimePersistedJob) throws -> Void) throws {
+    lock.lock()
+    defer { lock.unlock() }
+    let statement = try prepare("""
+      SELECT job_id, idempotency_key, request_hash, state, created_at_utc,
+             updated_at_utc, version, initial_record_json
+      FROM runtime_job
+      """ + (jobID == nil ? "" : " WHERE job_id = ?"))
+    defer { sqlite3_finalize(statement) }
+    if let jobID { try bind([.text(jobID)], to: statement) }
+    while true {
+      let result = sqlite3_step(statement)
+      if result == SQLITE_DONE { return }
+      guard result == SQLITE_ROW else { throw failure("Runtime snapshot query", code: result) }
+      try autoreleasepool {
+        // Check byte lengths before copying SQLite values into Swift memory.
+        // A malformed large row is never silently omitted from a complete list.
+        for column in 0..<sqlite3_column_count(statement) {
+          let count = Int(sqlite3_column_bytes(statement, column))
+          guard count <= (column == 7 ? 16 * 1024 * 1024 : 4096) else {
+            throw RuntimeJobRepositoryError.corrupt("Runtime Job snapshot record exceeds its read bound")
+          }
+        }
+        var values: [String: Value] = [:]
+        for column in 0..<sqlite3_column_count(statement) {
+          let name = String(cString: sqlite3_column_name(statement, column))
+          switch sqlite3_column_type(statement, column) {
+          case SQLITE_INTEGER: values[name] = .integer(sqlite3_column_int64(statement, column))
+          case SQLITE_TEXT:
+            if let text = sqlite3_column_text(statement, column) { values[name] = .text(String(cString: text)) }
+          case SQLITE_BLOB:
+            let count = Int(sqlite3_column_bytes(statement, column))
+            if count == 0 { values[name] = .blob(Data()) }
+            else if let bytes = sqlite3_column_blob(statement, column) { values[name] = .blob(Data(bytes: bytes, count: count)) }
+          default: break
+          }
+        }
+        try body(persistedJob(Row(values: values)))
+      }
+    }
+  }
+
   /// Jobs whose journal may still require recovery work.  Terminal history is
   /// deliberately excluded: the record and terminal transition were both
   /// durably written before this index row was advanced to a terminal state,

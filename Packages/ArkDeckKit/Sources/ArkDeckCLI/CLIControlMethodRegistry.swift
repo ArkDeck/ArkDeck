@@ -74,6 +74,9 @@ enum CLIControlMethodRegistry {
     "job.list-page",
     "job.status",
     "job.events",
+    "job.show",
+    "job.result",
+    "job.timeline",
     "job.evidence",
     "cleanupDebt.list",
     "artifact.quota",
@@ -216,6 +219,7 @@ enum CLIControlFailureMapper {
     // somewhere different: not a durable record that is missing, but a
     // reference that is not registered on this host — answered by
     // `workspace project list`, not by a different identity.
+    case "resultNotReady": return .resultNotReady
     case "workspaceReferenceNotFound": return .workspaceReferenceNotFound
     case "recordUnreadable": return .recordUnreadable
     case "rejected":

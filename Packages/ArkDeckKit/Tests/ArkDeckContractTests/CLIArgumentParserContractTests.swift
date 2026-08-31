@@ -327,7 +327,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
         + "plain failure rather than an unknown outcome")
   }
 
-  func testProtocolNegotiationIsExplicitAndScopedToRuntimeHealth() {
+  func testProtocolNegotiationIsScopedToHealthAndPublishedTargetLeaves() {
     for major in ["1", "2"] {
       XCTAssertNotNil(
         success(["runtime", "health", "--require-protocol", major, "--output", "json"]))
@@ -336,7 +336,12 @@ final class CLIArgumentParserContractTests: XCTestCase {
       XCTAssertEqual(
         failure(["runtime", "health", "--require-protocol", major])?.code, .invalidOption)
     }
-    XCTAssertEqual(failure(["job", "list", "--require-protocol", "2"])?.code, .invalidOption)
+    XCTAssertNotNil(success(["job", "list", "--require-protocol", "2"]))
+    for verb in ["status", "show", "evidence", "result", "timeline"] {
+      XCTAssertNotNil(success(["job", verb, "--job", "J-1", "--require-protocol", "2"]))
+      XCTAssertEqual(failure(["job", verb, "--job", "J-1", "--require-protocol", "1"])?.code, .invalidOption)
+    }
+    XCTAssertEqual(failure(["job", "run", "--job", "J-1", "--require-protocol", "2"])?.code, .invalidOption)
     XCTAssertEqual(
       failure(["runtime", "health", "--require-protocol", "2", "--require-protocol", "1"])?.code,
       .invalidOption)

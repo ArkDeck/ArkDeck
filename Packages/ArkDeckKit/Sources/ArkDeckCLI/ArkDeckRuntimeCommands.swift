@@ -3155,10 +3155,14 @@ params))
       throw CLIError(
         exitCode: EX_USAGE,
         message:
-          "missing job subcommand (plan|submit|status|wait|events|watch|list|run|cancel|reconcile)")
+          "missing job subcommand (plan|submit|status|show|wait|events|watch|list|timeline|run|cancel|evidence|result|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
     var session = runtimeSession(&rest, command: "job.\(subcommand)")
+    if usesJobReadResource(subcommand, rest: rest) {
+      try emitJobReadResource(subcommand, rest: rest, session: session)
+      return
+    }
     switch subcommand {
     case "plan":
       let planJSON = try operationRequestJSON(rest, subcommand: "job plan")

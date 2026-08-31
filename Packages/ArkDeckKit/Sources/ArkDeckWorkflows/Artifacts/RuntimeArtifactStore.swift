@@ -1074,6 +1074,25 @@ public actor RuntimeArtifactStore {
     intentionallyOmittedNames: Set<String> = []
   ) throws -> [RuntimeVerifiedArtifactEvidence] {
     let artifacts = try loadIndex(jobID: jobID).artifacts
+    return try verifyEvidence(artifacts, jobID: jobID, intentionallyOmittedNames: intentionallyOmittedNames)
+  }
+
+  /// Capture the inventory and its byte receipts in one actor turn. The
+  /// Runtime result must not combine a pre-publication list with receipts
+  /// produced after another Artifact writer has changed that list.
+  package func evidenceInventory(jobID: String, intentionallyOmittedNames: Set<String>) throws -> (
+    metadata: [RuntimeArtifactMetadata], verified: [RuntimeVerifiedArtifactEvidence], integrityFailed: Bool
+  ) {
+    let metadata = try loadIndex(jobID: jobID).artifacts
+    guard !metadata.isEmpty else { return ([], [], false) }
+    do {
+      return (metadata, try verifyEvidence(metadata, jobID: jobID, intentionallyOmittedNames: intentionallyOmittedNames), false)
+    } catch { return (metadata, [], true) }
+  }
+
+  private func verifyEvidence(
+    _ artifacts: [RuntimeArtifactMetadata], jobID: String, intentionallyOmittedNames: Set<String>
+  ) throws -> [RuntimeVerifiedArtifactEvidence] {
     guard !artifacts.isEmpty else {
       throw RuntimeArtifactError.evidenceVerificationFailed(
         "job \(jobID) has no published artifact metadata")
@@ -1093,15 +1112,8 @@ public actor RuntimeArtifactStore {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) bytes are missing")
       }
-      let bytes: Data
-      do {
-        bytes = try Data(contentsOf: url)
-      } catch {
-        throw RuntimeArtifactError.evidenceVerificationFailed(
-          "artifact \(metadata.artifactID) bytes cannot be read")
-      }
-      let digest = SHA256Hex.string(of: bytes)
-      guard digest == metadata.sha256, bytes.count == metadata.byteCount else {
+      let digest = try verifiedDigest(url: url, metadata: metadata)
+      guard digest == metadata.sha256 else {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) bytes/hash metadata mismatch")
       }
@@ -1113,13 +1125,51 @@ public actor RuntimeArtifactStore {
         bindingRevision: metadata.bindingSnapshot.bindingRevision,
         stableIdentitySHA256: metadata.bindingSnapshot.stableIdentitySHA256,
         providerID: metadata.providerID,
-        byteCount: bytes.count)
+        byteCount: metadata.byteCount)
     }
     guard !verified.isEmpty else {
       throw RuntimeArtifactError.evidenceVerificationFailed(
         "job \(jobID) has no published evidence artifacts")
     }
     return verified
+  }
+
+  /// Verification is metadata-only even for a large trace/archive: bytes are
+  /// hashed in bounded chunks and never returned or retained in one allocation.
+  /// A symlink, replacement, append or concurrent rewrite cannot earn a verified
+  /// receipt from bytes belonging to an unstable file.
+  private func verifiedDigest(url: URL, metadata: RuntimeArtifactMetadata) throws -> String {
+    func refused() -> RuntimeArtifactError { .evidenceVerificationFailed("artifact \(metadata.artifactID) has unreadable or unstable bytes") }
+    let fd = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+    guard fd >= 0 else { throw refused() }
+    defer { Darwin.close(fd) }
+    var initial = stat()
+    guard fstat(fd, &initial) == 0, initial.st_mode & S_IFMT == S_IFREG,
+      initial.st_uid == geteuid(), initial.st_nlink == 1,
+      initial.st_mode & (S_IWGRP | S_IWOTH) == 0, metadata.byteCount >= 0,
+      initial.st_size == metadata.byteCount else { throw refused() }
+    var hasher = SHA256()
+    var count = 0
+    var buffer = [UInt8](repeating: 0, count: 1024 * 1024)
+    while true {
+      let n = buffer.withUnsafeMutableBytes { Darwin.read(fd, $0.baseAddress, $0.count) }
+      if n < 0, errno == EINTR { continue }
+      guard n >= 0 else { throw refused() }
+      if n == 0 { break }
+      guard n <= metadata.byteCount - count else { throw refused() }
+      buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[..<n])) }
+      count += n
+    }
+    var final = stat()
+    var named = stat()
+    guard count == metadata.byteCount, fstat(fd, &final) == 0, lstat(url.path, &named) == 0,
+      final.st_dev == initial.st_dev, final.st_ino == initial.st_ino,
+      named.st_mode & S_IFMT == S_IFREG, named.st_dev == initial.st_dev, named.st_ino == initial.st_ino,
+      final.st_gen == initial.st_gen, final.st_size == initial.st_size, final.st_nlink == 1,
+      final.st_mtimespec.tv_sec == initial.st_mtimespec.tv_sec, final.st_mtimespec.tv_nsec == initial.st_mtimespec.tv_nsec,
+      final.st_ctimespec.tv_sec == initial.st_ctimespec.tv_sec, final.st_ctimespec.tv_nsec == initial.st_ctimespec.tv_nsec
+    else { throw refused() }
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   public func read(
@@ -1616,7 +1666,7 @@ public actor RuntimeArtifactStore {
     do {
       try Self.requireRegularFileWithoutSymlink(url, label: "artifact index")
       let document = try JSONDecoder().decode(
-        ArtifactIndexDocument.self, from: Data(contentsOf: url))
+        ArtifactIndexDocument.self, from: boundedIndexData(url))
       guard document.schemaVersion == ArtifactIndexDocument.currentSchemaVersion else {
         throw RuntimeArtifactError.indexCorrupted(
           "unsupported index schema \(document.schemaVersion)")
@@ -1645,6 +1695,32 @@ public actor RuntimeArtifactStore {
     } catch {
       throw RuntimeArtifactError.indexCorrupted("undecodable artifact index: \(error)")
     }
+  }
+
+  private func boundedIndexData(_ url: URL) throws -> Data {
+    let fd = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+    guard fd >= 0 else { throw RuntimeArtifactError.indexCorrupted("artifact index cannot be opened") }
+    defer { Darwin.close(fd) }
+    let limit = 16 * 1024 * 1024
+    var before = stat()
+    guard fstat(fd, &before) == 0, before.st_mode & S_IFMT == S_IFREG,
+      before.st_size > 0, before.st_size <= limit else {
+      throw RuntimeArtifactError.indexCorrupted("artifact index exceeds its read bound")
+    }
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+    while true {
+      let count = Darwin.read(fd, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0, data.count <= limit - count else { throw RuntimeArtifactError.indexCorrupted("artifact index read failed") }
+      if count == 0 { break }
+      data.append(contentsOf: buffer.prefix(count))
+    }
+    var after = stat()
+    guard fstat(fd, &after) == 0, Self.sameFileIdentityAndContent(before, after), data.count == before.st_size else {
+      throw RuntimeArtifactError.indexCorrupted("artifact index changed during read")
+    }
+    return data
   }
 
   private func upsert(_ metadata: RuntimeArtifactMetadata, jobID: String) throws {
@@ -1916,7 +1992,7 @@ public actor RuntimeArtifactStore {
   private func validateStoredPayload(
     _ metadata: RuntimeArtifactMetadata, at url: URL
   ) throws -> URL {
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
     guard descriptor >= 0 else {
       throw RuntimeArtifactError.indexCorrupted(
         "artifact payload is missing, linked or unreadable (errno \(errno))")

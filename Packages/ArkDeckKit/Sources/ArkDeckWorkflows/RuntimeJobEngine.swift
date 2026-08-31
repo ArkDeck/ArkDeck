@@ -4523,6 +4523,93 @@ public actor RuntimeJobEngine {
       sessionID: record.sessionID, afterCursor: afterCursor, pageSize: pageSize)
   }
 
+  /// Stable read resource; the exact record and its status share one capture
+  /// after async recovery-index discovery. No provider or Job driver is called.
+  package func jobReadSnapshot(jobID: String) async throws -> (record: RuntimeJobRecord, status: RuntimeJobStatus) {
+    let indexes = await recoveryEpochIndexes()
+    let record: RuntimeJobRecord
+    if let current = jobs[jobID]?.record { record = current }
+    else {
+      guard let persisted = try admissionService.boundedJob(jobID: jobID) else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+      record = try decodePersistedRecord(persisted)
+      guard record.state == persisted.state, record.createdAtUTC == persisted.createdAtUTC,
+        record.request.idempotencyKey == persisted.idempotencyKey, persisted.version > 0
+      else { throw RuntimeJobEngineError.jobRecordUnreadable(jobID) }
+    }
+    return (record, status(of: record,
+      supersededByRecoveryEpochID: indexes.supersededByJobID[jobID],
+      recoveryEpochID: indexes.establishedByJobID[jobID],
+      resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[jobID]))
+  }
+
+  package func jobListSnapshot(_ query: RuntimeJobListQuery) async throws -> JSONValue {
+    let pager = try RuntimeSnapshotPager(directory: configuration.stateDirectory.appending(path: "cli-job-snapshots"))
+    // A continuation reads only its original projection, never today's Jobs.
+    if query.cursor != nil {
+      return try pager.page(method: "job.list", filters: query.filters, order: query.order,
+        pageSize: query.pageSize, cursor: query.cursor, items: { [] })
+    }
+    let indexes = await recoveryEpochIndexes()
+    return try pager.page(method: "job.list", filters: query.filters, order: query.order,
+      pageSize: query.pageSize, cursor: nil) {
+      var captured: [(date: Date, id: String, value: JSONValue)] = []
+      var seen: Set<String> = []
+      var size = 0
+      func append(_ record: RuntimeJobRecord) throws {
+        guard let created = ISO8601Timestamps.parse(record.createdAtUTC) else {
+          throw RuntimeJobEngineError.jobRecordUnreadable(record.jobID)
+        }
+        let value = status(of: record,
+          supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
+          recoveryEpochID: indexes.establishedByJobID[record.jobID],
+          resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[record.jobID])
+        guard query.matches(value) else { return }
+        guard seen.insert(record.jobID).inserted else { throw RuntimeJobEngineError.jobRecordUnreadable(record.jobID) }
+        let projection = try RuntimeJobReadProjection.history(value, current: Self.isCurrentJob(value), includeTimeline: query.includeTimeline)
+        size += try PortableCanonicalJSON.canonicalBytes(projection).count
+        guard size <= 16 * 1024 * 1024 else {
+          throw AgentExecutionControlFailure("operationUnavailable", "Job snapshot exceeds its storage bound; narrow the query")
+        }
+        captured.append((created, record.jobID, projection))
+      }
+      try admissionService.forEachJob { persisted in
+        let durable = try decodePersistedRecord(persisted)
+        guard durable.state == persisted.state, durable.createdAtUTC == persisted.createdAtUTC,
+          durable.request.idempotencyKey == persisted.idempotencyKey, persisted.version > 0
+        else { throw RuntimeJobEngineError.jobRecordUnreadable(persisted.jobID) }
+        // The default is durable history, including nonterminal records.
+        // includeCurrent overlays the Runtime's current in-memory snapshots,
+        // including live progress/timeline not yet in the durable projection.
+        try append(query.includeCurrent ? jobs[persisted.jobID]?.record ?? durable : durable)
+      }
+      if query.includeCurrent {
+        for current in jobs.values where !seen.contains(current.record.jobID) { try append(current.record) }
+      }
+      captured.sort {
+        if $0.date != $1.date { return query.order == "createdAtDescJobIdAsc" ? $0.date > $1.date : $0.date < $1.date }
+        return $0.id.utf8.lexicographicallyPrecedes($1.id.utf8)
+      }
+      return captured.map(\.value)
+    }
+  }
+
+  package func jobTimelineSnapshot(jobID: String, pageSize: Int, cursor: String?) async throws -> JSONValue {
+    let pager = try RuntimeSnapshotPager(directory: configuration.stateDirectory.appending(path: "cli-job-snapshots"))
+    let filters: [String: JSONValue] = ["jobId": .string(jobID)]
+    if cursor != nil {
+      // Still require a retained Job; its explicit removal cannot be hidden
+      // by a leftover presentation snapshot.
+      _ = try await jobReadSnapshot(jobID: jobID)
+      return try pager.page(method: "job.timeline", filters: filters, order: "entryIndexAscPartIndexAsc",
+        pageSize: pageSize, cursor: cursor, items: { [] })
+    }
+    let snapshot = try await jobReadSnapshot(jobID: jobID)
+    return try pager.page(method: "job.timeline", filters: filters, order: "entryIndexAscPartIndexAsc",
+      pageSize: pageSize, cursor: nil) {
+      RuntimeJobReadProjection.timelineRows(snapshot.record.timeline)
+    }
+  }
+
   public func status(jobID: String) async throws -> RuntimeJobStatus {
     let record = try recordForRead(jobID: jobID)
     let indexes = await recoveryEpochIndexes()

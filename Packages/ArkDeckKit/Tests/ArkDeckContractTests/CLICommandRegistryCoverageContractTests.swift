@@ -40,6 +40,7 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
       + source("Sources/ArkDeckCLI/CLIDeviceWait.swift")
       + source("Sources/ArkDeckCLI/CLIAgentExecutions.swift")
       + source("Sources/ArkDeckCLI/CLIJobEvents.swift")
+      + source("Sources/ArkDeckCLI/CLIJobResources.swift")
   }
 
   /// Option tokens that appear as string literals in code.

@@ -867,6 +867,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "job.list":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
+      }
       do {
         if request.params?["pageSize"] != nil || request.params?["order"] != nil
           || request.params?["includeTimeline"] != nil
@@ -934,6 +937,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "job.show", "job.result", "job.timeline":
+      return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
+
     case "job.events":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
         return failure(id: request.id, code: .unknownMethod, message: "Job events require the target protocol")
@@ -970,18 +976,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "job.status":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
+      }
       guard case .string(let jobID)? = request.params?["jobId"] else {
         return failure(id: request.id, code: .invalidParams, message: "jobId is required")
       }
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
-        Set(request.params?.keys.map { $0 } ?? []) != ["jobId"] || !AgentExecutionIntent.validIdentifier(jobID) {
-        return failure(id: request.id, code: .invalidParams, message: "job.status requires only an exact Job identity")
-      }
       do {
         let status = try await engine.status(jobID: jobID)
-        if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-          return success(id: request.id, result: try Self.targetJobStatus(status))
-        }
         return success(id: request.id, result: Self.encodeStatus(status))
       } catch is AgentExecutionControlFailure {
         return failure(id: request.id, code: .recordUnreadable, message: "Job status has no supported next action")
@@ -996,6 +998,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "job.evidence":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
+      }
       guard case .string(let jobID)? = request.params?["jobId"] else {
         return failure(id: request.id, code: .invalidParams, message: "jobId is required")
       }
@@ -3019,30 +3024,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   private static func jobNextAction(_ status: RuntimeJobStatus) throws -> JSONValue {
-    guard let state = JobState(rawValue: status.state), !status.waitingForHuman else {
-      // A physical HAR must come from a durable owner; never invent a resume
-      // token from prose or from the old boolean projection.
-      throw AgentExecutionControlFailure("recordUnreadable", "Job status has no supported next action")
-    }
-    let uncertain = status.outcomeUnknown || [.waitingForRecovery, .reconciling].contains(state)
-    var next: [String: JSONValue] = [
-      "kind": .string(uncertain ? "reconcile" : state.isTerminal ? "readResult" : "wait"),
-      "owner": .object(["kind": .string("job"), "id": .string(status.jobID)]),
-      "resource": .object(["kind": .string("job"), "id": .string(status.jobID)]),
-      "reasonCode": .string(uncertain ? "recovery.outcomeUnknown" : state.isTerminal ? "job.resultAvailable" : "job.running"),
-    ]
-    if !uncertain && !state.isTerminal { next["retryAfter"] = .string("250ms") }
-    return .object(next)
-  }
-
-  private static func targetJobStatus(_ status: RuntimeJobStatus) throws -> JSONValue {
-    guard case .object(var fields) = encodeStatus(status, includeTimeline: false) else {
-      throw AgentExecutionControlFailure("recordUnreadable", "Job status could not be projected")
-    }
-    fields.removeValue(forKey: "timeline")
-    fields["schemaVersion"] = .string("arkdeck.job-status/1")
-    fields["nextAction"] = try jobNextAction(status)
-    return .object(fields)
+    try RuntimeJobReadProjection.nextAction(status)
   }
 
   private static func encodeStatus(
