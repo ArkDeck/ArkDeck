@@ -2026,3 +2026,43 @@ test('every Settings pane summary and the unaccounted warning are mirrored', () 
     }
   }
 });
+
+// F72 found every Settings pane summary missing from the prototype. The same
+// shared header renders summaries in three more workspaces, so this covers
+// all of them from one derived list: the App is the source of the inventory,
+// not a list maintained here.
+test('every WorkspaceHeaderBar summary in the App is mirrored and anchored', () => {
+  const catalogues = Object.fromEntries(
+    ['Settings', 'Flash', 'Trace', 'Debug'].map(name =>
+      [name, JSON.parse(read(`ArkDeckApp/Resources/${name}Localizable.xcstrings`)).strings]));
+  const lookup = key => {
+    for (const strings of Object.values(catalogues)) if (strings[key]) return strings[key];
+    throw new Error(`${key} is in no catalogue`);
+  };
+  const prototype = read('docs/design/prototype.html');
+
+  const views = [
+    'ArkDeckApp/Features/Settings/SettingsRootView.swift',
+    'ArkDeckApp/Features/Flash/FlashWorkspaceView.swift',
+    'ArkDeckApp/Features/Trace/TraceWorkspaceView.swift',
+    'ArkDeckApp/Features/Debug/DebugWorkspaceView.swift',
+  ];
+  const summaries = views.flatMap(path => [...read(path).matchAll(
+    /WorkspaceHeaderBar\(\s*summary: Text\([A-Za-z0-9_.]+\("([^"]+)"\)\)(?:,\s*summaryIdentifier: "([^"]+)")?/g
+  )].map(match => ({key: match[1], anchor: match[2] ?? match[1], path})));
+  assert.equal(summaries.length, 8, 'the App renders eight workspace summaries');
+
+  for (const {key, anchor, path} of summaries) {
+    // The anchor is the App's own identifier where it sets one — Flash names
+    // its summary `flash.workspace.title` while the key is `.subtitle`, and
+    // the prototype follows the App rather than the key.
+    assert.ok(
+      prototype.includes(`data-sync-id="${anchor}"`),
+      `${key} (${path}) must be anchored as ${anchor}; write the id out literally, not interpolated`);
+    for (const lang of ['zh-Hans', 'en']) {
+      assert.ok(
+        prototype.includes(lookup(key).localizations[lang].stringUnit.value),
+        `${key} must carry its App summary word for word in ${lang}`);
+    }
+  }
+});

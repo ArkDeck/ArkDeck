@@ -1934,3 +1934,32 @@ frame 上。已回退。
 **做了负向验证**：把稿件回退到 `origin/main` 再跑，新测试确实变红，不是只对当前实现成立的
 套套逻辑。新测试的面板清单**从 App 源码正则派生**（扫 `WorkspaceHeaderBar(summary: Text(settingsText("…")))`），
 App 将来新增带副标题的面板会直接打红，直到稿件补上。
+
+## 2026-08-31 F73：页头摘要扫全，并修正 F72 自己留下的两处欠妥
+
+第十九批，基线 `4150fc8d`。F72 发现 Settings 五个面板副标题稿件全无；同一个共享页头
+在别的工作区也渲染摘要，本批把范围推广到全 App，并**自查修正 F72 自身的两处欠妥**。
+逐行结论见 [2026-08-31 批次十九台账](references/ui-consistency/2026-08-31-header-summary-ledger.md)。
+只改设计稿与 ds 测试，不动 App。
+
+**扫全结果：八个页头摘要，一处缺锚点。** Trace（`trace.workspace.summary`）与
+Debug（`debug.scope`）都已有锚点镜像；缺的是 Flash——文案在稿件里，但两个可能的锚点都没有。
+Flash 这条还有个 App 侧既有的不对称：**键名是 `flash.workspace.subtitle`，
+而 `summaryIdentifier` 是 `flash.workspace.title`**。本批不改 App，稿件按**标识符**对齐，
+因为 `data-sync-id` 镜像的是 App 给元素的名字，不是键名。
+
+**自查其一：F72 的锚点静态不可见。** 我在 F72 里把五条副标题写成
+`data-sync-id="${s[2]}"`（模板插值）。渲染后正确，harness 测试也过——但
+`grep 'data-sync-id="settings.storage.subtitle"'` 在稿件里得 **0**。
+**而这套核对方法本身大量依赖静态扫描查 P-DRIFT**，一个静态查不到的锚点等于没有对上账；
+我自己在本批开头扫查时就先被它误导了一次。已改成逐条写出字面量，
+并把这条要求写进新测试的失败信息（`write the id out literally, not interpolated`）。
+
+**自查其二：F72 把中文转义成了 `\uXXXX`。** 生成脚本用 `json.dumps` 图省事，
+结果稿件里出现 `自定…` 这样的行，而其余部分全是字面 CJK。这是需要人逐页评审的文件，
+可读性不该为生成脚本让路。已全部改回，全文件转义命中 1 → 0。
+
+**验证。** ds 交互测试 83/83（新增一条覆盖全部八个页头摘要），`npm run build` exit 0。
+**做了负向验证**：删掉刚补的 Flash 锚点再跑，新测试确实变红。新测试的清单从 App 源码正则派生
+**并断言恰为 8 条**——App 新增页头摘要会打红直到稿件补上，正则若悄悄少匹配也会打红，
+避免数目变化造成假绿。
