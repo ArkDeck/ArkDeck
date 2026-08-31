@@ -55,6 +55,16 @@ struct RuntimeAdmissionService {
     try repository.allJobs()
   }
 
+  func forEachJob(_ body: (RuntimePersistedJob) throws -> Void) throws {
+    try repository.forEachJob(body)
+  }
+
+  func boundedJob(jobID: String) throws -> RuntimePersistedJob? {
+    var record: RuntimePersistedJob?
+    try repository.forEachJob(jobID: jobID) { record = $0 }
+    return record
+  }
+
   func activeJobs() throws -> [RuntimePersistedJob] {
     try repository.activeJobs()
   }
