@@ -1,8 +1,9 @@
 import ArkDeckCore
 import Foundation
 
-/// Runtime-issued, lifecycle-scoped observation identity for discovery
-/// candidates (§6.1, §8.5).
+/// Runtime-issued, lifecycle-scoped observation identity for the legacy 1.x
+/// discovery surface (§6.1, §8.5). Target v2 observations use the independent
+/// USB attachment proof in `TargetObservationCoordinator` instead.
 ///
 /// §8.5 states the rule in two halves: an observation ID binds durably to a
 /// canonical candidate relation *the Runtime can prove is continuous*, and a
@@ -18,15 +19,13 @@ import Foundation
 /// be followed. The Runtime therefore cannot prove continuity across
 /// snapshots, and mints a fresh ID for every generation.
 ///
-/// That is the conformant answer rather than a shortcut: persistence is what
+/// That is the conservative legacy answer: persistence is what
 /// §8.5 *permits* when continuity is provable, not what it requires, and
 /// reissuing is what it *mandates* when continuity cannot be shown. But it is
 /// a real limit with real consequences, so `continuity` publishes it instead
 /// of leaving a caller to discover it: an ID must not be held across a
-/// refresh, and `device wait`, whose contract is polling one observation
-/// lifecycle across refreshes, is not implementable until discovery can prove
-/// the relation — which needs a device-provided serial, i.e. a round trip per
-/// candidate per refresh.
+/// refresh. These legacy IDs cannot be used for target v2 adoption or for
+/// following a physical observation across refreshes.
 public struct DeviceObservationIdentity: Sendable, Equatable {
 
   /// What the Runtime can say about an observation ID's lifetime.

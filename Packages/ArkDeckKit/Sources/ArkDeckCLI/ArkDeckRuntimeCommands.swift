@@ -1305,10 +1305,15 @@ enum RuntimeCLI {
       throw CLIError(exitCode: EX_USAGE, message: "missing device subcommand (list|adopt|show)")
     }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "device.\(subcommand)")
+    var session = runtimeSession(&rest, command: "device.\(subcommand)")
     session.warnIfLegacy()
     switch subcommand {
     case "candidates":
+      if rest.contains("--require-protocol") {
+        try session.negotiate(requiredMajor: 2, forMethod: "device.observations")
+        session.emit(try session.request("device.observations"))
+        return
+      }
       // The one read an external Agent starts from: what is plugged in, whether
       // it is authorized, and whether it is already adopted. It observes and
       // never adopts — the Runtime's adopt path is a separate, explicit call.
@@ -1583,8 +1588,31 @@ enum RuntimeCLI {
       return
     }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "target.\(subcommand)")
+    var session = runtimeSession(&rest, command: "target.\(subcommand)")
     switch subcommand {
+    case "adopt":
+      let options = try CLIOptions(rest)
+      guard let candidate = options.value("--candidate"),
+        let observation = options.value("--observation"),
+        let generation = options.value("--observation-generation")
+      else {
+        throw session.fail(.invalidOption, "target adopt requires an exact observation reference")
+      }
+      try session.negotiate(requiredMajor: 2, forMethod: "target.adopt")
+      let result = try session.request("target.adopt", [
+        "candidate": .string(candidate), "observationId": .string(observation),
+        "observationGeneration": .string(generation),
+      ])
+      guard case .object(let fields) = result,
+        Set(fields.keys) == ["outcome", "targetId", "bindingRevision", "observationId", "snapshotGeneration"],
+        fields["outcome"] == .string("adopted"),
+        case .string(let target)? = fields["targetId"], !target.isEmpty,
+        case .integer(let revision)? = fields["bindingRevision"], revision > 0,
+        fields["observationId"] == .string(observation), fields["snapshotGeneration"] == .string(generation)
+      else {
+        throw session.fail(.outcomeUnknown, "target adoption returned no matching complete receipt")
+      }
+      session.emit(result)
     case "list":
       session.emit(try session.request("target.list"))
     case "show":

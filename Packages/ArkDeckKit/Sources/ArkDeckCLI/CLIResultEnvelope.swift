@@ -46,15 +46,17 @@ enum CLIResultEnvelope {
       "attentionRequired": .bool(error.code.requiresAttention),
     ]
     if !error.details.isEmpty { errorFields["details"] = .object(error.details) }
+    var meta: [String: JSONValue] = [
+      "controlRequestId": .string(controlRequestID),
+      "cliVersion": .string(CLIProductVersion.product),
+    ]
+    if let version = error.controlProtocolVersion { meta["controlProtocolVersion"] = .string(version) }
     return .object([
       "schemaVersion": .string(schemaVersion),
       "command": .string(command),
       "ok": .bool(false),
       "error": .object(errorFields),
-      "meta": .object([
-        "controlRequestId": .string(controlRequestID),
-        "cliVersion": .string(CLIProductVersion.product),
-      ]),
+      "meta": .object(meta),
     ])
   }
 
@@ -143,6 +145,7 @@ struct CLIRegistryError: Error {
   var rendering: CLIRendering = .human
   /// The correlation identity of the invocation that produced it.
   var controlRequestID: String?
+  var controlProtocolVersion: String?
   /// Set when a result document has already been written. The failure still
   /// carries its code and exit status, but rendering it as a second machine
   /// frame would break §8.1's one-document rule.

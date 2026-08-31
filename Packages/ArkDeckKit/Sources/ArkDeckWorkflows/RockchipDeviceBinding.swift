@@ -875,19 +875,23 @@ struct RockchipProductUSBIdentity: Sendable, Equatable {
   let productID: UInt16
   let topology: String
   let productName: String?
+  /// One IOKit attachment lifetime. It is not a durable device identity.
+  let registryEntryID: UInt64?
 
   init(
     serial: String,
     vendorID: UInt16,
     productID: UInt16,
     topology: String,
-    productName: String? = nil
+    productName: String? = nil,
+    registryEntryID: UInt64? = nil
   ) {
     self.serial = serial
     self.vendorID = vendorID
     self.productID = productID
     self.topology = topology
     self.productName = productName
+    self.registryEntryID = registryEntryID
   }
 
   var isLoader: Bool {
@@ -1045,10 +1049,13 @@ struct RockchipProductUSBProbe: Sendable {
         let serial = string(service, "USB Serial Number")
           ?? string(service, "kUSBSerialNumberString")
       else { continue }
+      var entryID: UInt64 = 0
+      let hasEntryID = IORegistryEntryGetRegistryEntryID(service, &entryID) == KERN_SUCCESS
       let identity = RockchipProductUSBIdentity(
         serial: serial, vendorID: vendor.uint16Value,
         productID: product.uint16Value, topology: String(location.uint64Value),
-        productName: string(service, "USB Product Name"))
+        productName: string(service, "USB Product Name"),
+        registryEntryID: hasEntryID && entryID != 0 ? entryID : nil)
       identities.append(identity)
     }
     return identities
