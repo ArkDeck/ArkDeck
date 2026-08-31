@@ -3970,3 +3970,77 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   `scripts/check_pr_paths.py --preflight`；不得在文档 PR 修改本 Task 或扩张 Allowed paths。
 - 设备连接、HDC/RockUSB/Flash dispatch、真实 Artifact 与 hardware evidence 均为 0；
   验证结论只覆盖资料与 protected-main 事实一致，不产生 `REAL_DEVICE_PASS`。
+
+## TASK-AIN-024 — ARM-only 构建与签名 Release 增量缓存
+
+- Status:in-progress（应维护者明确要求拟定的 Task 草案，尚待 review/merge；只有本定义
+  进入 protected `main` 后，才能作为后续实现 PR 的 base-tree 路径声明。本地实现、测试
+  通过或同一分支中存在本定义均不构成批准）
+- Compatibility note:本 Task 记录本次明确请求的 host 构建优化，不创建新 change、Core
+  Requirement、Acceptance 或治理框架。它与 `TASK-AIN-022` 的路径感知 CI 调度工作区分：
+  本次交付是 Apple silicon-only 构建入口、正式签名 Release 缓存与资源打包依赖；不修改
+  CI 分类、required checks 或 Task 路径检查规则，也不扩张任何旧 Task 的 Allowed paths
+- Golden Journey:GJ-1—GJ-5 共用的产品构建与验证反馈链；缩短已有产品修改的验证等待，
+  不改变任一 Journey 状态，不把 host build/test 计为真实设备验收
+- Platform:macos、Apple silicon、Xcode 26.6
+- Root cause:App target 的 arm64 设置没有约束独立 SwiftPM dependency project；临时
+  Release DerivedData 与配置切换导致重复优化编译；Trace 资源脚本每次强制执行，进而
+  触发无输入变化的资源复制与外层签名。大型 Swift 模块的实际优化成本需与上述重复工作分开
+- Depends on:protected `main` 已有的稳定源码镜像、互斥锁、SwiftPM/Xcode 构建入口、
+  pinned Trace helper、资源输入/输出清单和 Developer ID 签名配置；不引入新依赖或平台
+- Production reachability:local build entry → checksum source mirror + build lock →
+  arm64 dependency/App compilation → signed helper embedding → bundled manifest hash
+  update when inputs change → existing Release app signing
+- Allowed paths:
+  - `ArkDeck.xcodeproj/project.pbxproj`
+  - `Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh`
+  - `Packages/ArkDeckKit/Distribution/macOS/build-local-helpers.sh`
+  - `Packages/ArkDeckKit/Scripts/run-swiftpm.sh`
+  - `Packages/ArkDeckKit/Scripts/test_run_swiftpm.py`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/APIBaselineGateContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/LaunchAgentServiceContractTests.swift`
+  - `README.md`
+  - `scripts/ci/run-ui-tests.sh`
+  - `scripts/ci/run-xcodebuild.sh`
+  - `scripts/ci/test_run_xcodebuild.py`
+- Forbidden paths:
+  - `AGENTS.md`、`PRODUCT-LOOP.md`、`.github/**`、`scripts/check_pr_paths.py`、
+    `scripts/automation_config.json`、`scripts/ci/plan.py`
+  - `Catalog/**`、`openspec/**`、`Packages/ArkDeckKit/Sources/**`、`ArkDeckApp/**`、
+    `ArkDeckAppUITests/**`；本 Task 定义的审阅不授权实现 PR 再改本定义
+  - Runtime admission/capability、trusted facts、target/binding、device transport、
+    destructive recovery、真实硬件 evidence、helper 签名身份与 entitlement 语义
+- Risk:low（只改变 host 架构选择、缓存和资源增量调度；Release 的 `-O`、whole-module、
+  Developer ID、Hardened Runtime、App Sandbox 与签名后 helper 哈希边界保持不变。
+  缓存不得吞掉编译/签名失败或跳过选中的验证车道）
+- Hardware required:no（不安装或启动产品，不连接设备，不运行 HDC/RockUSB/Flash）
+- Decision-Grade:D0
+
+### Deliverables
+
+- Xcode、UI-test、SwiftPM 及 CLI/daemon helper 构建入口明确限定 arm64，覆盖依赖工程和
+  `--show-bin-path`；拒绝 wrapper 管理的架构覆盖，不删除设备 artifact 的其他 ABI 识别。
+- 稳定 Xcode runner 增加签名 `--release`，保留现有无签名 Debug `build-for-testing`；
+  两配置复用稳定镜像与本地内容寻址编译缓存，输出 timing/cache diagnostics；可选
+  `ARKDECK_XCODE_JOBS` 只接受 1–64，不将未经对照实测的并行度声明为最优默认。
+- Trace 资源 phase 按完整输入/输出依赖执行，跟踪许可证目录条目增删；始终根据最终
+  嵌入并签名的 helper 更新 bundled manifest，不修改 canonical manifest 或放宽 Sandbox。
+- 补充 runner、架构、签名边界、资源清单和打包哈希回归；README 说明正式入口、缓存首次
+  填充成本与并发测量限制。保持生产 Swift/SwiftUI 行为和独立 helper 发版流程不变。
+
+### Verification
+
+- 最终实现 commit 后运行 `scripts/check_pr_paths.py --preflight --base-revision
+  origin/main --head-revision HEAD`，本 Task 必须已存在于 base 且覆盖完整实现 diff。
+- 通过 `scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD
+  --merge-base --include-worktree --run-local`，包含 SDD、workflow/catalog tests、零漂移
+  及选中的 ArkDeckKit full tests、App/UI-test bundle build 与交互测试。
+- 签名 Release 实际构建成功；App/helper 为 arm64，`codesign --verify --deep --strict`
+  通过，bundled manifest 的 `binarySHA256` 匹配最终 helper，安全 entitlement 不变。
+- 分别记录首次缓存填充、稳态 no-op、单文件输入变化/恢复和 Debug → Release 切换。
+  no-op 不重复编译/资源打包/签名；相同编译输入恢复后检查实际 cache-hit diagnostics；
+  不把不同缓存、并行度或主机负载的墙钟直接解释为源码优化收益。
+- 新增未登记 license 的隔离负例须触发资源 phase 并被 Sandbox 拒绝；移除探针后重新
+  构建并校验签名，全部临时探针不得进入最终提交或产品。
+- 编译优化热点诊断不修改正式优化 pass 或 Runtime 安全逻辑；无真实设备、Artifact 或
+  `REAL_DEVICE_PASS` 声明，旧 base 的测试与性能记录不替代 rebase 后的最终验证。
