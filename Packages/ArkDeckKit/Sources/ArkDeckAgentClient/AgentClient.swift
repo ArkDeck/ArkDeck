@@ -15,6 +15,8 @@ public enum AgentClientError: Error, Equatable, Sendable {
   case malformedResponse(String)
   case daemonError(code: String, message: String)
   case structuredDaemonError(code: String, message: String, details: [String: JSONValue])
+  /// The caller's total waiting budget expired. This never cancels a request.
+  case deadlineExceeded
 }
 
 public struct AgentClient: Sendable {
@@ -23,19 +25,31 @@ public struct AgentClient: Sendable {
   /// registry-authorized pre-bootstrap legacy fallback).
   public let selectedProtocolVersion: String?
   private let legacyFallbackMethod: String?
+  private var waitDeadline: AgentClientWaitDeadline?
 
   public init(socketPath: String) {
     self.socketPath = socketPath
     self.selectedProtocolVersion = nil
     self.legacyFallbackMethod = nil
+    self.waitDeadline = nil
   }
 
   private init(
-    socketPath: String, selectedProtocolVersion: String, legacyFallbackMethod: String? = nil
+    socketPath: String, selectedProtocolVersion: String, legacyFallbackMethod: String? = nil,
+    waitDeadline: AgentClientWaitDeadline? = nil
   ) {
     self.socketPath = socketPath
     self.selectedProtocolVersion = selectedProtocolVersion
     self.legacyFallbackMethod = legacyFallbackMethod
+    self.waitDeadline = waitDeadline
+  }
+
+  /// All exchanges made with this copy, including negotiation, share the same
+  /// absolute deadline. Copying or negotiating it cannot renew the budget.
+  package func bounded(by deadline: AgentClientWaitDeadline) -> Self {
+    var copy = self
+    copy.waitDeadline = deadline
+    return copy
   }
 
   public func negotiated(
@@ -61,12 +75,13 @@ public struct AgentClient: Sendable {
       }
       return AgentClient(
         socketPath: socketPath, selectedProtocolVersion: ArkDeckControlProtocol.legacyVersion,
-        legacyFallbackMethod: method)
+        legacyFallbackMethod: method, waitDeadline: waitDeadline)
     }
     do {
       let version = try ControlProtocolNegotiation.selectedVersion(
         response: response, id: id, requiredMajor: requiredMajor)
-      return AgentClient(socketPath: socketPath, selectedProtocolVersion: version)
+      return AgentClient(
+        socketPath: socketPath, selectedProtocolVersion: version, waitDeadline: waitDeadline)
     } catch ControlProtocolNegotiation.Failure.unsupported {
       throw AgentClientError.daemonError(
         code: "unsupportedProtocolVersion",
@@ -83,6 +98,7 @@ public struct AgentClient: Sendable {
     method: String, params: [String: JSONValue]? = nil, id: String = UUID().uuidString,
     timeoutSeconds: Int? = nil
   ) throws -> JSONValue {
+    try waitDeadline?.check()
     if let legacyFallbackMethod, method != legacyFallbackMethod {
       throw AgentClientError.daemonError(
         code: "unsupportedProtocolVersion",
@@ -112,6 +128,7 @@ public struct AgentClient: Sendable {
     } catch {
       throw AgentClientError.malformedResponse("\(error)")
     }
+    try waitDeadline?.check()
     guard response.id == id else {
       throw AgentClientError.malformedResponse("response id mismatch")
     }
@@ -130,6 +147,7 @@ public struct AgentClient: Sendable {
   private func exchange(
     _ frame: Data, timeoutSeconds: Int?, maximumResponseBytes: Int = 8 * 1024 * 1024
   ) throws -> Data {
+    try waitDeadline?.check()
     guard selectedProtocolVersion == nil || frame.count + 1 <= 4 * 1024 * 1024 else {
       throw AgentClientError.transport("oversized request; no request was sent")
     }
@@ -146,7 +164,15 @@ public struct AgentClient: Sendable {
         fd, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
         socklen_t(MemoryLayout<Int32>.size)) == 0
     else { throw AgentClientError.transport("cannot suppress SIGPIPE") }
-    if let timeoutSeconds {
+    if waitDeadline != nil {
+      // SO_RCVTIMEO alone resets on every read, allowing a trickling peer to
+      // keep a bounded invocation alive forever. Nonblocking IO plus poll
+      // uses the remaining *total* budget for connect, write and every read.
+      let flags = fcntl(fd, F_GETFL)
+      guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else {
+        throw AgentClientError.transport("cannot configure nonblocking socket")
+      }
+    } else if let timeoutSeconds {
       guard timeoutSeconds > 0 else {
         throw AgentClientError.transport("timeout must be positive")
       }
@@ -178,23 +204,38 @@ public struct AgentClient: Sendable {
         Darwin.connect(fd, sockaddrPointer, socklen_t(MemoryLayout<sockaddr_un>.size))
       }
     }
-    guard connectResult == 0 else {
-      throw AgentClientError.connectFailed("connect failed: errno \(errno)")
+    if connectResult != 0 {
+      let connectError = errno
+      guard let waitDeadline,
+        connectError == EINPROGRESS || connectError == EALREADY || connectError == EWOULDBLOCK
+      else { throw AgentClientError.connectFailed("connect failed: errno \(connectError)") }
+      try Self.waitForSocket(fd, events: Int16(POLLOUT), deadline: waitDeadline)
+      var socketError: Int32 = 0
+      var size = socklen_t(MemoryLayout.size(ofValue: socketError))
+      guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &size) == 0, socketError == 0 else {
+        throw AgentClientError.connectFailed("connect failed: errno \(socketError)")
+      }
     }
 
     var payload = frame
     payload.append(0x0A)
     var written = 0
-    let sendOK: Bool = payload.withUnsafeBytes { raw in
-      guard let base = raw.baseAddress else { return false }
+    try payload.withUnsafeBytes { raw in
+      guard let base = raw.baseAddress else { throw AgentClientError.transport("empty request") }
       while written < payload.count {
+        try waitDeadline?.check()
         let result = write(fd, base + written, payload.count - written)
-        if result <= 0 { return false }
-        written += result
+        if result > 0 {
+          written += result
+        } else if result < 0, errno == EINTR {
+          continue
+        } else if result < 0, let waitDeadline, errno == EAGAIN || errno == EWOULDBLOCK {
+          try Self.waitForSocket(fd, events: Int16(POLLOUT), deadline: waitDeadline)
+        } else {
+          throw AgentClientError.transport("short write")
+        }
       }
-      return true
     }
-    guard sendOK else { throw AgentClientError.transport("short write") }
 
     // Only bytes that arrived since the last search can hold the terminator.
     // Rescanning the whole buffer after every read is quadratic in response
@@ -205,9 +246,15 @@ public struct AgentClient: Sendable {
     var chunk = [UInt8](repeating: 0, count: 64 * 1024)
     var terminatorOffset: Int
     while true {
+      try waitDeadline?.check()
       let count = read(fd, &chunk, chunk.count)
+      if count < 0, errno == EINTR { continue }
+      if count < 0, let waitDeadline, errno == EAGAIN || errno == EWOULDBLOCK {
+        try Self.waitForSocket(fd, events: Int16(POLLIN), deadline: waitDeadline)
+        continue
+      }
       if count <= 0 {
-        if errno == EAGAIN || errno == EWOULDBLOCK {
+        if count < 0, errno == EAGAIN || errno == EWOULDBLOCK {
           throw AgentClientError.transport("request timed out before response")
         }
         throw AgentClientError.transport("connection closed before response")
@@ -234,7 +281,29 @@ public struct AgentClient: Sendable {
         throw AgentClientError.malformedResponse("invalid negotiated response frame")
       }
     }
+    try waitDeadline?.check()
     return line
+  }
+
+  private static func waitForSocket(
+    _ fd: Int32, events: Int16, deadline: AgentClientWaitDeadline
+  ) throws {
+    while true {
+      try deadline.check()
+      var descriptor = pollfd(fd: fd, events: events, revents: 0)
+      let result = poll(&descriptor, 1, Int32(deadline.remainingMilliseconds))
+      try deadline.check()
+      if result > 0 {
+        guard descriptor.revents & Int16(POLLNVAL) == 0 else {
+          throw AgentClientError.transport("socket became invalid")
+        }
+        // HUP/ERR also wake the syscall, which then reports EOF/the IO error.
+        return
+      }
+      if result < 0, errno != EINTR {
+        throw AgentClientError.transport("socket wait failed: errno \(errno)")
+      }
+    }
   }
 
   /// Offset of the first frame terminator at or after `searchedByteCount`,
@@ -269,5 +338,37 @@ public struct AgentClient: Sendable {
     let ok: Bool
     let result: JSONValue?
     let error: WireError?
+  }
+}
+
+/// One invocation's waiting budget, never a Runtime operation budget. The
+/// continuous clock prevents wall-clock rollback or machine sleep from giving
+/// the client extra time; a forward wall-clock jump also expires the wait.
+package struct AgentClientWaitDeadline: Sendable {
+  private let wallDeadline: Date
+  private let continuousDeadline: ContinuousClock.Instant
+  private let budgetMilliseconds: Int
+
+  package init(milliseconds: Int) throws {
+    guard (1...86_400_000).contains(milliseconds) else {
+      throw AgentClientError.transport("client wait must be between 1ms and 24h")
+    }
+    budgetMilliseconds = milliseconds
+    wallDeadline = Date().addingTimeInterval(Double(milliseconds) / 1000)
+    continuousDeadline = ContinuousClock.now.advanced(by: .milliseconds(milliseconds))
+  }
+
+  package var remainingMilliseconds: Int {
+    let remaining = ContinuousClock.now.duration(to: continuousDeadline).components
+    let continuousMilliseconds = Double(remaining.seconds) * 1000
+      + Double(remaining.attoseconds) / 1_000_000_000_000_000
+    let wallMilliseconds = wallDeadline.timeIntervalSinceNow * 1000
+    let bounded = min(Double(budgetMilliseconds), continuousMilliseconds, wallMilliseconds)
+    guard bounded.isFinite, bounded > 0 else { return 0 }
+    return Int(bounded.rounded(.up))
+  }
+
+  package func check() throws {
+    guard remainingMilliseconds > 0 else { throw AgentClientError.deadlineExceeded }
   }
 }

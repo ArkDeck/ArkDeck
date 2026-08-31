@@ -45,6 +45,23 @@ final class CLIArgumentParserContractTests: XCTestCase {
 
   // MARK: Strict argv
 
+  func testDeviceWaitRequiresAnExactObservationAndClosedStateAndDuration() {
+    let reference = ["device", "wait", "--candidate", "key", "--observation", "obs",
+      "--observation-generation", "1"]
+    for state in ["connected", "unauthorized", "offline"] {
+      XCTAssertNotNil(success(reference + ["--state", state, "--timeout", "1ms"]))
+      XCTAssertNotNil(success(reference + ["--state", state]))
+    }
+    for state in ["Connected", "available", "loader", ""] {
+      XCTAssertEqual(failure(reference + ["--state", state])?.code, .invalidOption)
+    }
+    for timeout in ["0s", "1.5s", "30", "25h", "999999999999999999999h"] {
+      XCTAssertEqual(failure(reference + ["--state", "connected", "--timeout", timeout])?.code, .invalidOption)
+    }
+    XCTAssertEqual(failure(["device", "wait", "--candidate", "key", "--state", "connected"])?.code, .invalidOption)
+    XCTAssertEqual(failure(reference + ["--state", "connected", "--output", "jsonl"])?.code, .invalidOption)
+  }
+
   func testAnUnknownOptionIsRefusedRatherThanDropped() {
     let error = failure(["job", "status", "--job", "J-1", "--jobs", "J-2"])
     XCTAssertEqual(error?.code, .invalidOption)

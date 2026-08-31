@@ -46,6 +46,7 @@ is an unknown outcome, never an invented success or a retry.
 Tests cover local socket/CLI round trips, trust transitions, exact-generation
 refusals, duplicate/unproved candidates, same-key attachment replacement,
 mid-read identity drift and observation failure. They use injected fixture
-sources and do not establish real-device acceptance. The public `device wait`
-leaf, Runtime-owned AgentExecution/HAR and full portable CLI contract bundle
-remain unfinished follow-up capabilities.
+sources and do not establish real-device acceptance. The public
+[`device wait` leaf](cli-device-wait.md) now follows the same proved lifecycle
+with a total client deadline. Runtime-owned AgentExecution/HAR and the full
+portable CLI contract bundle remain unfinished follow-up capabilities.

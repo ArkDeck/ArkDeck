@@ -1000,6 +1000,105 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(try targets.list().count, 1)
   }
 
+  private func observationWaitStack(_ port: TargetObservationCoordinatorContractTests.Port) throws
+    -> (RuntimeTargetStore, AgentDaemonServer, [String], Int64)
+  {
+    let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
+    let owner = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() },
+      nowUTC: { "2026-08-31T14:00:00Z" })
+    let (handler, _) = try makeStack(targetStore: targets, targetObservations: owner)
+    let server = try startServer(handler)
+    let client = try AgentClient(socketPath: server.socketURL.path)
+      .negotiated(requiredMajor: 2, forMethod: "device.observations")
+    let snapshot = try client.request(method: "device.observations")
+    guard case .object(let fields) = snapshot, case .string(let generation)? = fields["snapshotGeneration"],
+      case .array(let rows)? = fields["observations"], case .object(let row)? = rows.first,
+      case .string(let candidate)? = row["candidateKey"],
+      case .string(let observation)? = row["observationId"], let number = Int64(generation)
+    else { throw AgentClientError.malformedResponse("fixture observation missing") }
+    return (targets, server, ["device", "wait", "--candidate", candidate, "--observation", observation,
+      "--observation-generation", generation], number)
+  }
+
+  private func runObservationCLI(_ arguments: [String], server: AgentDaemonServer) throws
+    -> (Int32, [String: JSONValue])
+  {
+    let process = Process()
+    process.executableURL = Bundle(for: type(of: self)).bundleURL.deletingLastPathComponent().appending(path: "arkdeck")
+    process.arguments = arguments + ["--socket", server.socketURL.path, "--output", "json"]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = Pipe()
+    let exited = DispatchSemaphore(value: 0)
+    process.terminationHandler = { _ in exited.signal() }
+    try process.run()
+    guard exited.wait(timeout: .now() + 8) == .success else {
+      process.terminate()
+      throw AgentClientError.transport("fixture CLI exceeded its watchdog")
+    }
+    let bytes = output.fileHandleForReading.readDataToEndOfFile()
+    return (process.terminationStatus, try JSONDecoder().decode([String: JSONValue].self, from: bytes))
+  }
+
+  func testCLIWaitFollowsProvedTrustTransitionsAndReturnsTheFinalGenerationWithoutAdopting() throws {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    port.setState("Unauthorized")
+    let (targets, server, reference, initialGeneration) = try observationWaitStack(port)
+    // The first wait poll still sees pending trust; the second proves the
+    // state transition on the same independent physical attachment.
+    port.onNextList { port.onNextList { port.setState("Connected") } }
+    let (code, result) = try runObservationCLI(reference + ["--state", "connected", "--timeout", "3s"], server: server)
+    XCTAssertEqual(code, 0)
+    XCTAssertEqual(result["ok"], .bool(true))
+    guard case .object(let receipt)? = result["result"],
+      case .string(let generation)? = receipt["snapshotGeneration"], let number = Int64(generation),
+      case .object(let row)? = receipt["observation"]
+    else { return XCTFail("wait must return its final exact observation") }
+    XCTAssertGreaterThan(number, initialGeneration)
+    XCTAssertEqual(receipt["state"], .string("connected"))
+    XCTAssertEqual(row["observationId"], .string(reference[5]))
+    XCTAssertEqual(row["adoptedTargetId"], .null)
+    port.onNextList { port.setState("Offline") }
+    let (offlineCode, offline) = try runObservationCLI(reference + ["--state", "offline", "--timeout", "3s"], server: server)
+    XCTAssertEqual(offlineCode, 0)
+    guard case .object(let offlineReceipt)? = offline["result"] else { return XCTFail("missing offline receipt") }
+    XCTAssertEqual(offlineReceipt["state"], .string("offline"))
+    XCTAssertEqual(try targets.list().count, 0)
+    XCTAssertEqual(try AgentClient(socketPath: server.socketURL.path).request(method: "job.list"), .array([]))
+  }
+
+  func testCLIWaitRejectsAReplacementEvenIfItsStateAlreadyMatches() throws {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let (targets, server, reference, _) = try observationWaitStack(port)
+    port.onNextList { port.setRelations([TargetObservationCoordinatorContractTests.Port.relation(id: 88)]) }
+    let (code, result) = try runObservationCLI(reference + ["--state", "connected", "--timeout", "3s"], server: server)
+    XCTAssertEqual(code, 65)
+    guard case .object(let error)? = result["error"], case .object(let details)? = error["details"] else {
+      return XCTFail("replacement must fail with an exact resource conflict")
+    }
+    XCTAssertEqual(error["code"], .string("resourceConflict"))
+    XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    XCTAssertEqual(try targets.list().count, 0)
+  }
+
+  func testCLIWaitTimeoutDoesNotAdoptAndRetainsTheObservationReference() throws {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    port.setState("Unauthorized")
+    let (targets, server, reference, _) = try observationWaitStack(port)
+    let (code, result) = try runObservationCLI(reference + ["--state", "connected", "--timeout", "200ms"], server: server)
+    XCTAssertEqual(code, 75)
+    guard case .object(let error)? = result["error"], case .object(let details)? = error["details"],
+      case .object(let meta)? = result["meta"] else { return XCTFail("timeout must be one machine error") }
+    XCTAssertEqual(error["code"], .string("clientTimeout"))
+    XCTAssertEqual(details["observationId"], .string(reference[5]))
+    XCTAssertEqual(details["requestedState"], .string("connected"))
+    XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    XCTAssertEqual(meta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(try targets.list().count, 0)
+    XCTAssertEqual(try AgentClient(socketPath: server.socketURL.path).request(method: "job.list"), .array([]))
+  }
+
   func testPreBootstrapDaemonNeverDowngradesATargetRequest() throws {
     for major in [1, 2] {
       let socketURL = stateDirectory.appending(path: "old-\(major).sock")

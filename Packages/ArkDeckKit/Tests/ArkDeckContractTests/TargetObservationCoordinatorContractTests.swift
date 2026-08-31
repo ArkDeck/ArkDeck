@@ -11,6 +11,7 @@ final class TargetObservationCoordinatorContractTests: XCTestCase {
     private var attachments: [TargetUSBRelation] = [Port.relation()]
     private var readFailure = false
     private var identityAction: (@Sendable () -> Void)?
+    private var nextListAction: (@Sendable () -> Void)?
     private var duplicate = false
 
     static func relation(id: UInt64 = 17, location: String = "100") -> TargetUSBRelation {
@@ -26,6 +27,9 @@ final class TargetObservationCoordinatorContractTests: XCTestCase {
     func onIdentity(_ action: @escaping @Sendable () -> Void) {
       lock.withLock { identityAction = action }
     }
+    func onNextList(_ action: @escaping @Sendable () -> Void) {
+      lock.withLock { nextListAction = action }
+    }
     func relations() throws -> [TargetUSBRelation] {
       try lock.withLock {
         if readFailure { throw BootstrapError.observationFailed("fixture read failure") }
@@ -33,7 +37,13 @@ final class TargetObservationCoordinatorContractTests: XCTestCase {
       }
     }
     func listCandidates() async throws -> [BootstrapCandidate] {
-      lock.withLock {
+      let action = lock.withLock {
+        let action = nextListAction
+        nextListAction = nil
+        return action
+      }
+      action?()
+      return lock.withLock {
         let row = BootstrapCandidate(connectKey: "150100424a544e4600", state: state)
         return duplicate ? [row, row] : [row]
       }
