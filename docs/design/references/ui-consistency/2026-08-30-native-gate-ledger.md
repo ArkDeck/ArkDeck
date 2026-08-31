@@ -90,7 +90,7 @@ soak 在压 CPU，`HDCStatusUITests` 就出现 1 通过 / 5 失败，其中 4 �
 | --- | --- | --- |
 | `expandAdvancedDiagnostics` → ⌘⇧D | **已验证（两次有效取样）** | HDC 全类 6/6 × 2，且 `walkEveryDiagnosticState` 是这些测试的公共入口 |
 | `applyFixtureState` 沉降（5→20s） | **已验证（两次有效取样）** | 同上，含 `testEnglishFixtureSweep` 的 fixture 状态序列 |
-| Debug tab 切换 → 修正点击 | **已验证有改善，未验证到底** | 该测试此前失败在等 `debug.apps.postRun`（tab 没切过去）；现在能走到文件选择器，说明 tab 切换生效。但整条测试仍红于后续步骤 |
+| Debug tab 切换 → 修正点击 | ~~已验证有改善~~ → **2026-08-31 实测已过时，见审计 F71** | 当时记「能走到文件选择器，说明 tab 切换生效」。08-31 单独复跑该测试：**同样红，且死在同一处**（`the Debug Apps tab never became active`，循环点 3 次、探针记录 3 次点击全部无效）。**此行不能再当作「坐标点击对分页条有效」的依据** |
 | `chooseDebugPackage` 定位 Go to Folder 输入框 | **未被执行到** | 测试在 `chooseDebugPackage` 的**第一道** guard 就失败，从未到达被改的那几行。**本批不声称它有效** |
 
 ### 本批未修、已登记的一条既有失败
