@@ -635,17 +635,32 @@ public actor RuntimeArtifactStore {
   /// almost a minute. The cache is process-local (so restart always rebuilds
   /// from durable truth) and GC invalidates it before changing indexes.
   private var cachedIndexedBytes: Int?
+  private var durableImportOwner: RuntimeImportStore?
+  private let importFault: RuntimeImportStore.Fault
   private var payloadVerificationsByJob: [String: [String: ArtifactPayloadVerificationRecord]]
   private var loadedPayloadVerificationJobs: Set<String>
   private var payloadVerificationMetrics: RuntimeArtifactVerificationMetrics
 
   public init(
-    rootURL: URL,
-    quota: ArtifactQuota = ArtifactQuota(),
+    rootURL: URL, quota: ArtifactQuota = ArtifactQuota(),
     redaction: ArtifactRedactionPolicy = ArtifactRedactionPolicy(),
     retentionPolicy: ArtifactRetentionPolicy = ArtifactRetentionPolicy(),
     nowUTC: @escaping @Sendable () -> String
   ) throws {
+    try self.init(rootURL: rootURL, quota: quota, redaction: redaction,
+      retentionPolicy: retentionPolicy, importFault: { _ in }, nowUTC: nowUTC)
+  }
+
+  /// Fault points are available only to host-side crash fixtures, never RPC.
+  package init(
+    rootURL: URL,
+    quota: ArtifactQuota = ArtifactQuota(),
+    redaction: ArtifactRedactionPolicy = ArtifactRedactionPolicy(),
+    retentionPolicy: ArtifactRetentionPolicy = ArtifactRetentionPolicy(),
+    importFault: @escaping RuntimeImportStore.Fault,
+    nowUTC: @escaping @Sendable () -> String
+  ) throws {
+    self.importFault = importFault
     self.rootURL = rootURL
     self.quota = quota
     self.redaction = redaction
@@ -782,19 +797,25 @@ public actor RuntimeArtifactStore {
   public func publishFile(
     _ request: RuntimeArtifactFilePublicationRequest
   ) throws -> RuntimeArtifactMetadata {
+    try publishFile(request, validatedImport: false)
+  }
+
+  private func publishFile(
+    _ request: RuntimeArtifactFilePublicationRequest, validatedImport: Bool
+  ) throws -> RuntimeArtifactMetadata {
     guard request.sourceFileURL.isFileURL,
       request.sourceFileURL.path.hasPrefix("/"),
       request.expectedByteCount > 0,
       request.expectedSHA256.range(
         of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
-      !request.mediaType.hasPrefix("text/"),
-      request.mediaType != "application/json"
+      validatedImport || !request.mediaType.hasPrefix("text/"),
+      validatedImport || request.mediaType != "application/json"
     else {
       throw RuntimeArtifactError.ioFailure(
         "file-backed publication requires an absolute binary file with exact size and SHA-256")
     }
     let sourceFD = Darwin.open(
-      request.sourceFileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+      request.sourceFileURL.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
     guard sourceFD >= 0 else {
       throw RuntimeArtifactError.ioFailure(
         "cannot open file-backed Artifact source (errno \(errno))")
@@ -1263,10 +1284,138 @@ public actor RuntimeArtifactStore {
     guard metadata.status.isPublished, metadata.sha256.count == 64 else {
       throw RuntimeArtifactError.artifactNotFound("Artifact lease is not readable")
     }
+    if jobID.hasPrefix("imp-") {
+      let owner = try imports().byID(jobID)
+      guard owner.state == "committed", case .object(let receipt)? = owner.receipt,
+        receipt["artifactId"] == .string(artifactID), metadata.bindingSnapshot == owner.binding,
+        metadata.sha256 == owner.intent.sha256, metadata.byteCount == owner.intent.byteCount,
+        metadata.name == owner.intent.name, metadata.sourceOperation == "artifact.import-" + owner.intent.kind else {
+        throw RuntimeArtifactError.artifactNotFound("Import lease has no committed matching owner")
+      }
+    }
     let fileURL = try storedFileURL(for: metadata)
     return RuntimeArtifactLeaseResolution(
       artifactID: artifactID, fileURL: fileURL, sha256: metadata.sha256,
       byteCount: metadata.byteCount, bindingSnapshot: metadata.bindingSnapshot)
+  }
+
+  // MARK: - Durable imported inputs (not Jobs)
+
+  private func imports() throws -> RuntimeImportStore {
+    if let durableImportOwner { return durableImportOwner }
+    let store = try RuntimeImportStore(directory: rootURL.appending(path: ".imports-v1"), fault: importFault)
+    durableImportOwner = store
+    return store
+  }
+
+  package func beginImport(_ intent: ArtifactImportIntent, binding: ArtifactBindingSnapshot) throws -> JSONValue {
+    try imports().begin(intent, binding: binding, now: nowUTC()).projection
+  }
+  package func inspectImport(id: String? = nil, requestID: String? = nil) throws -> RuntimeImportRecord {
+    guard (id == nil) != (requestID == nil) else { throw AgentExecutionControlFailure("invalidInput", "exactly one Import selector is required") }
+    let store = try imports()
+    if let id { return try store.byID(id) }
+    guard let record = try store.byRequest(requestID!) else { throw AgentExecutionControlFailure("resourceNotFound", "Import does not exist") }
+    return record
+  }
+  package func appendImport(id: String, generation: Int, offset: Int, chunk: Data, sha256: String) throws -> JSONValue {
+    try imports().append(id: id, generation: generation, offset: offset, chunk: chunk, sha256: sha256, now: nowUTC()).projection
+  }
+  package func abortImport(requestID: String, generation: Int) throws -> JSONValue {
+    try imports().abort(requestID: requestID, generation: generation, now: nowUTC()).projection
+  }
+  package func listImports(_ fields: [String: JSONValue]) throws -> JSONValue {
+    guard Set(fields.keys).isSubset(of: ["target", "state", "pageSize", "cursor"]) else {
+      throw AgentExecutionControlFailure("invalidInput", "Import list options are closed")
+    }
+    var filters: [String: JSONValue] = [:]
+    for name in ["target", "state"] {
+      if let value = fields[name] {
+        guard case .string(let text) = value, AgentExecutionIntent.validIdentifier(text),
+          name != "state" || ["inProgress", "committing", "committed", "aborted"].contains(text) else {
+          throw AgentExecutionControlFailure("invalidInput", "Import filter is invalid")
+        }
+        filters[name] = value
+      }
+    }
+    var size = 100
+    if let value = fields["pageSize"] {
+      guard case .integer(let count) = value, (1...1000).contains(count) else { throw AgentExecutionControlFailure("invalidInput", "invalid pageSize") }
+      size = Int(count)
+    }
+    var cursor: String?
+    if let value = fields["cursor"] {
+      guard case .string(let text) = value, !text.isEmpty, text.utf8.count <= 2048 else { throw AgentExecutionControlFailure("invalidCursor", "invalid Import cursor") }
+      cursor = text
+    }
+    let store = try imports()
+    let pager = try RuntimeSnapshotPager(directory: rootURL.appending(path: ".imports-v1/snapshots"))
+    return try pager.page(method: "artifact.import.list", filters: filters, order: "createdAtDescImportIdAsc", pageSize: size, cursor: cursor) {
+      var captured: [(Date, String, JSONValue)] = []
+      var total = 0
+      try store.visit { record in
+        guard filters["target"] == nil || filters["target"] == .string(record.intent.targetID),
+          filters["state"] == nil || filters["state"] == .string(record.state) else { return }
+        try store.recover(record)
+        let projection = record.projection
+        total += try PortableCanonicalJSON.canonicalBytes(projection).count
+        guard total <= 16 * 1024 * 1024, let date = ISO8601Timestamps.parse(record.createdAtUTC) else {
+          throw AgentExecutionControlFailure("operationUnavailable", "Import snapshot exceeds its storage bound; narrow the query")
+        }
+        captured.append((date, record.importID, projection))
+      }
+      captured.sort { $0.0 == $1.0 ? $0.1.utf8.lexicographicallyPrecedes($1.1.utf8) : $0.0 > $1.0 }
+      return captured.map { $0.2 }
+    }
+  }
+
+  /// Only the daemon's registered kind validator can supply this closure.
+  /// No RPC accepts a local URL, publication descriptor or validation facts.
+  /// Validation, commit intent, immutable publication and receipt persistence
+  /// remain in one actor turn, so abort cannot interleave with publication.
+  package func commitImport(
+    id: String, generation: Int,
+    validate: @Sendable (URL, RuntimeImportRecord) throws -> [String: JSONValue]
+  ) throws -> JSONValue {
+    let store = try imports()
+    let original = try store.byID(id)
+    if original.state == "committed", generation == original.generation || generation == original.generation - 1 { return original.projection }
+    guard original.generation == generation, ["inProgress", "committing"].contains(original.state),
+      original.nextOffset == original.intent.byteCount else { throw AgentExecutionControlFailure("resourceConflict", "Import is incomplete or no longer uploadable") }
+    guard original.generation < Int.max else { throw AgentExecutionControlFailure("recordUnreadable", "Import generation is exhausted") }
+    let file = try store.verifiedCompleteFile(original)
+    var before = stat()
+    guard lstat(file.path, &before) == 0 else { throw AgentExecutionControlFailure("recordUnreadable", "Import payload is unreadable") }
+    // The durable commit intent certifies that format and binding checks ran
+    // before publication. Recovery finishes that same publication even if a
+    // target subsequently changes; consumers still enforce the pinned binding.
+    let facts = try original.validation ?? validate(file, original)
+    var after = stat()
+    guard lstat(file.path, &after) == 0, Self.sameFileIdentityAndContent(before, after) else {
+      throw AgentExecutionControlFailure("recordUnreadable", "Import payload changed during validation")
+    }
+    let record = try store.startCommit(id: id, generation: generation, validation: facts, now: nowUTC())
+    let kind = record.intent.kind
+    let media = kind == "hap" ? (record.intent.name.hasSuffix(".hsp") ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap")
+      : kind == "workspace-patch" ? "text/x-diff" : kind == "native-library" ? "application/x-elf" : "application/gzip"
+    // A patch is exact source input, not redacted diagnostic text. Its privacy
+    // requires explicit sensitive read/export permission; bytes never change.
+    let privacy: CatalogArtifactPrivacy = kind == "workspace-patch" ? .sensitive : .standard
+    let metadata = try publishFile(.init(jobID: record.importID, sessionID: "import-" + record.importID,
+      stepID: "import-" + kind, name: record.intent.name, mediaType: media, privacy: privacy,
+      retentionClass: .pinnedUntilVerified, sourceOperation: "artifact.import-" + kind, providerID: "host",
+      bindingSnapshot: record.binding, sourceFileURL: file, expectedByteCount: record.intent.byteCount,
+      expectedSHA256: record.intent.sha256), validatedImport: true)
+    let lease = try leaseReference(jobID: metadata.jobID, artifactID: metadata.artifactID)
+    let receipt: JSONValue = .object(["schemaVersion": .string("arkdeck.import-receipt/1"),
+      "importId": .string(record.importID), "importRequestId": .string(record.intent.importRequestID),
+      "owner": .object(["kind": .string("import"), "id": .string(record.importID)]),
+      "artifactId": .string(metadata.artifactID), "artifactDigest": .string(metadata.sha256),
+      "byteCount": .string(String(metadata.byteCount)), "name": .string(metadata.name), "mediaType": .string(metadata.mediaType),
+      "privacy": .string(metadata.privacy.rawValue), "targetId": .string(record.intent.targetID),
+      "bindingRevision": .string(String(record.intent.bindingRevision)), "lease": .string(lease),
+      "generation": .string(String(record.generation + 1)), "validation": .object(facts)])
+    return try store.finishCommit(record, receipt: receipt, now: nowUTC()).projection
   }
 
   // MARK: - Lifecycle
@@ -2053,6 +2202,10 @@ public actor RuntimeArtifactStore {
     return try entries.compactMap { entry in
       let attributes = try FileManager.default.attributesOfItem(atPath: entry.path)
       if attributes[.type] as? FileAttributeType == .typeDirectory {
+        if entry.lastPathComponent == ".imports-v1" {
+          try Self.requireDirectoryWithoutSymlink(entry, label: "Import owner store")
+          return nil
+        }
         return entry
       }
       if attributes[.type] as? FileAttributeType == .typeRegular,

@@ -271,7 +271,7 @@ struct CLIJobEventPage {
   }
 }
 
-private final class CLIWaitSignalObserver {
+final class CLIWaitSignalObserver {
   private let source: DispatchSourceSignal
   // SIG_DFL is a null function pointer, not a missing initialization.
   private let prior: sig_t?

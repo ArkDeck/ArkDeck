@@ -1872,6 +1872,10 @@ enum RuntimeCLI {
   }
 
   static func runArtifact(_ arguments: [String]) throws {
+    if arguments.first == "import" {
+      try runDurableImport(Array(arguments.dropFirst()))
+      return
+    }
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,

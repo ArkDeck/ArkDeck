@@ -80,6 +80,8 @@ enum CLIControlMethodRegistry {
     "job.evidence",
     "cleanupDebt.list",
     "artifact.quota",
+    "artifact.import.list",
+    "artifact.import.inspect",
     "artifact.list",
     "artifact.inspect",
     "artifact.read",
@@ -106,6 +108,7 @@ enum CLIControlMethodRegistry {
   /// here as a family: a `begin`/`append`/`commit` that fails ambiguously may
   /// have left staging state that only the import's own status can settle.
   private static let mutationCapableMethods: Set<String> = [
+    "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort",
     "target.adopt",
     "agent.run",
     "agent.resume",
@@ -197,6 +200,14 @@ enum CLIControlFailureMapper {
     method: String,
     evidence: CLIControlFailureEvidence = CLIControlFailureEvidence()
   ) -> CLIErrorCode {
+    // Import owners never dispatch a device operation. Their typed refusal
+    // still permits already-durable upload state; it is not preAdmission.
+    if ["artifact.import.begin", "artifact.import.append", "artifact.import.commit",
+        "artifact.import.abort", "artifact.import.inspect", "artifact.import.list"].contains(method),
+      evidence.phase == "importOwner", evidence.newDispatchCount == 0,
+      ["resourceConflict", "invalidInput", "operationUnavailable", "inputTooLarge",
+        "invalidCursor", "idempotencyConflict", "resourceNotFound", "artifactIntegrityFailed", "quotaExceeded"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",
       "operationUnavailable", "inputTooLarge", "invalidCursor", "idempotencyConflict",

@@ -2,10 +2,41 @@
   "schemaVersion": "arkdeck.control.registry/1",
   "legacyVersion": "1.0.0",
   "targetVersion": "2.0.0",
-  "supportedExactVersions": ["2.0.0", "1.0.0"],
+  "supportedExactVersions": [
+    "2.0.0",
+    "1.0.0"
+  ],
   "bootstrapVersion": "arkdeck.control.negotiation/1",
   "bootstrapMethod": "protocol.negotiate",
   "maximumBootstrapFrameBytes": 65536,
-  "targetMethods": ["agent.abandon", "agent.list", "agent.resume", "agent.run", "agent.status", "device.observations", "health", "human-action.list", "human-action.resume", "human-action.show", "job.events", "job.evidence", "job.list", "job.result", "job.show", "job.status", "job.timeline", "target.adopt"],
-  "preBootstrapLegacyMethods": ["health"]
+  "targetMethods": [
+    "agent.abandon",
+    "agent.list",
+    "agent.resume",
+    "agent.run",
+    "agent.status",
+    "artifact.import.abort",
+    "artifact.import.append",
+    "artifact.import.begin",
+    "artifact.import.commit",
+    "artifact.import.inspect",
+    "artifact.import.list",
+    "device.observations",
+    "health",
+    "human-action.list",
+    "human-action.resume",
+    "human-action.show",
+    "job.events",
+    "job.evidence",
+    "job.list",
+    "job.result",
+    "job.show",
+    "job.status",
+    "job.timeline",
+    "target.adopt",
+    "target.show"
+  ],
+  "preBootstrapLegacyMethods": [
+    "health"
+  ]
 }
