@@ -66,9 +66,10 @@ validate_profile() {
 validate_profile "cli" "$cli_profile" "$team_identifier.com.arkdeck.cli"
 validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd"
 
-swift build --package-path "$package_root" -c release --product arkdeck
-swift build --package-path "$package_root" -c release --product arkdeck-agentd
-bin_root="$(swift build --package-path "$package_root" -c release --show-bin-path)"
+# Host helpers ship for Apple silicon only, including when Swift runs under Rosetta.
+swift build --package-path "$package_root" --arch arm64 -c release --product arkdeck
+swift build --package-path "$package_root" --arch arm64 -c release --product arkdeck-agentd
+bin_root="$(swift build --package-path "$package_root" --arch arm64 -c release --show-bin-path)"
 workflows_resource_bundle="$bin_root/ArkDeckKit_ArkDeckWorkflows.bundle"
 launch_agent_resource_bundle="$bin_root/ArkDeckKit_ArkDeckLaunchAgent.bundle"
 if [[ ! -d "$workflows_resource_bundle" || ! -d "$launch_agent_resource_bundle" ]]; then

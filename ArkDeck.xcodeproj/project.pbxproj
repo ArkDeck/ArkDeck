@@ -551,7 +551,6 @@
 		};
 		C20000000000000000000030 /* Copy Pinned Trace Runtime Resources */ = {
 			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = ();
 			inputFileListPaths = (
@@ -559,6 +558,7 @@
 			);
 			inputPaths = (
 				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/trace_streamer",
+				"$(SRCROOT)/Packages/ArkDeckKit/ThirdParty/TraceStreamer/LICENSES",
 			);
 			name = "Copy Pinned Trace Runtime Resources";
 			outputFileListPaths = (
@@ -681,6 +681,7 @@
 		A10000000000000000000070 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
@@ -707,7 +708,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -775,7 +776,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = com.arkdeck.desktop;
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -29,7 +29,7 @@ final class APIBaselineGateContractTests: XCTestCase {
     let output = Pipe()
     let process = Process()
     process.executableURL = URL(filePath: "/usr/bin/xcrun")
-    process.arguments = ["swift", "build", "--package-path", baseline.path]
+    process.arguments = ["swift", "build", "--arch", "arm64", "--package-path", baseline.path]
     process.standardOutput = output
     process.standardError = output
     try process.run()
