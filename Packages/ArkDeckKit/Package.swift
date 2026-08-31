@@ -155,7 +155,7 @@ let package = Package(
     ),
     .executableTarget(
       name: "ArkDeckEngineCrashFixture",
-      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
+      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows", "ArkDeckLaunchAgent"],
       path: "Tests/ArkDeckEngineCrashFixture"
     ),
     .executableTarget(

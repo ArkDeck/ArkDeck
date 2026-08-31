@@ -1091,7 +1091,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     return path
   }
 
-  private static func validateProductionDaemonBundle(
+  package static func validateProductionDaemonBundle(
     _ candidate: URL, fileManager: FileManager
   ) throws -> URL {
     guard candidate.path.hasPrefix("/") else {
