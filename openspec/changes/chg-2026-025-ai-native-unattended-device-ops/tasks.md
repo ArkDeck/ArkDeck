@@ -4047,10 +4047,15 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
 
 ## TASK-AIN-025 — 维护者与发布文档的 CLI 拼写同步
 
-- Status:in-progress（维护者要求为 `docs/adr/` 与 `docs/release/` 下两份打印可复制
-  CLI 命令的文档建立最小维护边界；本 Task 只有在定义 PR 经维护者 review/merge 进入
-  protected `main` 后，才能被后续文档 PR 声明。Task 定义本身不授权同一 PR 改写这两份
-  文档）
+- Status:done（2026-08-31；定义 PR #1639 合入 protected `main` 后，文档改写由 #1640
+  交付：`docs/adr/arktrace-summary-analyzer-profile.md` 两处改为
+  `arkdeck runtime service update`，`docs/release/macos-auto-update.md` 四处改为
+  `arkdeck maintainer update-feed prepare/assemble`。每处 argv 逐 token 回指
+  protected-main 的 published leaf；preflight 以 `TASK-AIN-025` 声明通过，
+  `plan.py --run-local` 选中 docs-only 路径且 SDD、catalog generator unittest、
+  zero-drift 三道通用门全绿。`arkdeck-agentd` 二进制名、`com.arkdeck.agentd` launchd
+  label、`agentd.sock` 与 feed/私钥文件名未动；`update-feed` 的人类输出按 §12 保持
+  逐字节不变。合入后全仓非 openspec markdown 的旧拼写残留扫描为零）
 - Compatibility note:这是维护者针对 §12 四族重命名后残留旧拼写的显式文档维护例外。
   它只授权把文档打印的命令行改写成 §6.3 已发布的拼写，不恢复 readiness/verification/
   archive 链，不把文档完成计为 Golden Journey 进度，也不扩张为通用文档治理框架。根目录
