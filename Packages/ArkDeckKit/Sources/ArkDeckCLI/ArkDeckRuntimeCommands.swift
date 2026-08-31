@@ -1308,6 +1308,8 @@ enum RuntimeCLI {
     var session = runtimeSession(&rest, command: "device.\(subcommand)")
     session.warnIfLegacy()
     switch subcommand {
+    case "wait":
+      try emitDeviceWait(rest, session: session)
     case "candidates":
       if rest.contains("--require-protocol") {
         try session.negotiate(requiredMajor: 2, forMethod: "device.observations")

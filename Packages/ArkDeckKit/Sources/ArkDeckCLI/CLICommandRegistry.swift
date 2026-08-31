@@ -936,6 +936,23 @@ enum CLICommandRegistry {
     summary: "live devices and durable targets",
     leaves: [
       CLILeafSpec(
+        token: "wait",
+        canonicalCommand: "device.wait",
+        summary: "wait on one proved device observation; never adopt or follow a replacement",
+        options: runtimeClientOptions(observationReferenceOptions + [
+          CLIOptionSpec(
+            name: "--state",
+            form: .value(
+              placeholder: "connected|unauthorized|offline",
+              grammar: .enumeration(["connected", "unauthorized", "offline"])),
+            summary: "exact authorization state to wait for", isRequired: true),
+          CLIOptionSpec(
+            name: "--timeout",
+            form: .value(placeholder: "30s", grammar: .duration(maximumMilliseconds: 86_400_000)),
+            summary: "total client wait including negotiation and IO; default 30s, maximum 24h"),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "list",
         canonicalCommand: "device.list",
         summary: "list durable targets and their binding revisions",

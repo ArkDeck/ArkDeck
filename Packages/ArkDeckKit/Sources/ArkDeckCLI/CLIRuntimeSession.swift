@@ -166,11 +166,13 @@ struct CLIRuntimeSession {
       return transportError(.connectFailed, method: method, command: command, cause: message)
     case .malformedResponse(let message):
       return transportError(.malformedResponse, method: method, command: command, cause: message)
+    case .deadlineExceeded:
+      return transportError(
+        .clientTimeout, method: method, command: command,
+        cause: "the client wait deadline expired; no cancellation was requested")
     case .transport(let message):
-      // The client cannot tell a timeout from a closed peer without reading its
-      // own message text, and a code chosen by matching prose is exactly what
-      // §8.4 forbids. Both prove the same thing — a request may have been sent
-      // and no response completed — so both are reported as a lost response.
+      // Legacy socket errors have no typed timeout. Do not infer a code by
+      // matching their prose; only deadlineExceeded proves a client deadline.
       return transportError(.lostResponse, method: method, command: command, cause: message)
     }
   }
