@@ -20,10 +20,17 @@ struct RuntimeHistoryView: View {
   let exportStatesByArtifactID: [String: RuntimeArtifactExportState]
   let isRefreshInFlight: Bool
   let isLoadOlderInFlight: Bool
+  let savedFilterQuery: RuntimeHistoryFilterQuery?
+  let isSavedFilterLoaded: Bool
+  let isSavedFilterMutationInFlight: Bool
+  let savedFilterFailure: String?
   let onRefresh: (() -> Void)?
   let onLoadOlder: (() -> Void)?
   let onLoadDetail: ((String, String) -> Void)?
   let onReloadDetail: ((String, String) -> Void)?
+  let onLoadSavedFilter: (() -> Void)?
+  let onSaveFilter: ((RuntimeHistoryFilterQuery) -> Void)?
+  let onDeleteSavedFilter: (() -> Void)?
   let onExportArtifact: ((String, RuntimeArtifactPresentation, URL, Bool) -> Void)?
   let onOpenWorkspace: ((RuntimeHistoryWorkspaceContext) -> Void)?
   var onOpenDiagnostics: ((RuntimeHistoryWorkspaceContext) -> Void)? = nil
@@ -55,17 +62,6 @@ struct RuntimeHistoryView: View {
   @State private var cachedFilterProjectionInput: FilterProjectionInput?
   @State private var cachedFilteredJobs: [RuntimeJobSummaryPresentation] = []
   @State private var filterReferenceDate = Date.now
-
-  @AppStorage("history.savedFilter.exists") private var hasSavedFilter = false
-  @AppStorage("history.savedFilter.search") private var savedSearchText = ""
-  @AppStorage("history.savedFilter.status") private var savedStatus = HistoryStatusFilter.all
-    .rawValue
-  @AppStorage("history.savedFilter.mode") private var savedMode = HistoryModeFilter.all.rawValue
-  @AppStorage("history.savedFilter.session") private var savedSession = Self.allSessions
-  @AppStorage("history.savedFilter.target") private var savedTarget = Self.allTargets
-  @AppStorage("history.savedFilter.time") private var savedTime = HistoryTimeFilter.anyTime.rawValue
-  @AppStorage("history.savedFilter.activity") private var savedActivity = HistoryActivityFilter.all
-    .rawValue
 
   private static let allTargets = "__all_targets__"
   private static let allSessions = "__all_sessions__"
@@ -163,6 +159,7 @@ struct RuntimeHistoryView: View {
       cachedFilterProjectionInput = input
     }
     .onChange(of: timeFilter) { filterReferenceDate = .now }
+    .task { onLoadSavedFilter?() }
     .task(id: nextFilterExpirationDate) {
       await refreshTimeFilterAtExpiration()
     }
@@ -441,15 +438,28 @@ struct RuntimeHistoryView: View {
 
   private var savedFilterMenu: some View {
     Menu(historyLocalized("history.filter.saved")) {
-      Button(historyLocalized("history.filter.save"), action: saveCurrentFilter)
+      Button(historyLocalized("history.filter.save")) {
+        onSaveFilter?(currentFilterQuery)
+      }
         .accessibilityIdentifier("history.filter.save")
-      if hasSavedFilter {
+        .disabled(!isSavedFilterLoaded || isSavedFilterMutationInFlight)
+      if savedFilterQuery != nil {
         Button(historyLocalized("history.filter.applySaved"), action: applySavedFilter)
           .accessibilityIdentifier("history.filter.applySaved")
+          .disabled(isSavedFilterMutationInFlight)
         Button(historyLocalized("history.filter.deleteSaved"), role: .destructive) {
-          hasSavedFilter = false
+          onDeleteSavedFilter?()
         }
         .accessibilityIdentifier("history.filter.deleteSaved")
+        .disabled(isSavedFilterMutationInFlight)
+      }
+      if let savedFilterFailure {
+        Text(savedFilterFailure)
+        Button(historyLocalized("history.filter.reloadSaved")) {
+          onLoadSavedFilter?()
+        }
+        .accessibilityIdentifier("history.filter.reloadSaved")
+        .disabled(isSavedFilterMutationInFlight)
       }
       Divider()
       Button(historyLocalized("history.filter.preset.needsAttention")) {
@@ -1367,26 +1377,28 @@ struct RuntimeHistoryView: View {
         for: job, detail: detailsByJobID[job.id]))
   }
 
-  private func saveCurrentFilter() {
-    savedSearchText = searchText
-    savedStatus = statusFilter.rawValue
-    savedMode = modeFilter.rawValue
-    savedSession = sessionFilter
-    savedTarget = targetFilter
-    savedTime = timeFilter.rawValue
-    savedActivity = activityFilter.rawValue
-    hasSavedFilter = true
+  private var currentFilterQuery: RuntimeHistoryFilterQuery {
+    RuntimeHistoryFilterQuery(
+      search: searchText,
+      status: statusFilter.rawValue,
+      mode: modeFilter.rawValue,
+      sessionID: sessionFilter == Self.allSessions ? nil : sessionFilter,
+      targetID: targetFilter == Self.allTargets ? nil : targetFilter,
+      timeRange: timeFilter.rawValue,
+      activity: activityFilter.rawValue)
   }
 
   private func applySavedFilter() {
-    searchText = savedSearchText
-    statusFilter = HistoryStatusFilter(rawValue: savedStatus) ?? .all
-    modeFilter = HistoryModeFilter(rawValue: savedMode) ?? .all
-    sessionFilter = sessions.contains(savedSession) ? savedSession : Self.allSessions
-    targetFilter = targets.contains(savedTarget) ? savedTarget : Self.allTargets
-    timeFilter = HistoryTimeFilter(rawValue: savedTime) ?? .anyTime
-    activityFilter = savedActivity == "toolkit"
-      ? .device : HistoryActivityFilter(rawValue: savedActivity) ?? .all
+    guard let savedFilterQuery else { return }
+    searchText = savedFilterQuery.search
+    statusFilter = HistoryStatusFilter(rawValue: savedFilterQuery.status) ?? .all
+    modeFilter = HistoryModeFilter(rawValue: savedFilterQuery.mode) ?? .all
+    sessionFilter = savedFilterQuery.sessionID.flatMap { sessions.contains($0) ? $0 : nil }
+      ?? Self.allSessions
+    targetFilter = savedFilterQuery.targetID.flatMap { targets.contains($0) ? $0 : nil }
+      ?? Self.allTargets
+    timeFilter = HistoryTimeFilter(rawValue: savedFilterQuery.timeRange) ?? .anyTime
+    activityFilter = HistoryActivityFilter(rawValue: savedFilterQuery.activity) ?? .all
   }
 
   private func historyDate(_ job: RuntimeJobSummaryPresentation) -> Date? {
@@ -1679,18 +1691,180 @@ final class RuntimeHistoryViewModel {
   private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
   private(set) var isRefreshInFlight = false
   private(set) var isLoadOlderInFlight = false
+  private(set) var savedFilterQuery: RuntimeHistoryFilterQuery?
+  private(set) var isSavedFilterLoaded = false
+  private(set) var isSavedFilterMutationInFlight = false
+  private(set) var savedFilterFailure: String?
   private let provider: any RuntimeHistoryApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
+  private let filterProvider: any RuntimeHistoryFilterApplicationProviding
   @ObservationIgnored private var historyGeneration = 0
   @ObservationIgnored private var detailGeneration = 0
   @ObservationIgnored private var detailRequestIDs: [String: UUID] = [:]
+  @ObservationIgnored private var savedFilterGeneration: UInt64 = 1
+  @ObservationIgnored private var savedFilterRequestID = UUID()
 
   init(
     provider: any RuntimeHistoryApplicationProviding,
-    detailProvider: any RuntimeJobDetailApplicationProviding
+    detailProvider: any RuntimeJobDetailApplicationProviding,
+    filterProvider: any RuntimeHistoryFilterApplicationProviding
   ) {
     self.provider = provider
     self.detailProvider = detailProvider
+    self.filterProvider = filterProvider
+  }
+
+  func loadSavedFilter() {
+    guard !isSavedFilterMutationInFlight else { return }
+    isSavedFilterMutationInFlight = true
+    savedFilterFailure = nil
+    let requestID = UUID()
+    savedFilterRequestID = requestID
+    let filterProvider = filterProvider
+    Task { [weak self] in
+      let result = await filterProvider.loadHistoryFilter()
+      guard let self, self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
+      switch result {
+      case .failed(let reason):
+        self.isSavedFilterMutationInFlight = false
+        self.savedFilterFailure = reason
+      case .loaded(let resource):
+        self.publishSavedFilter(resource)
+        guard resource.query == nil, let legacy = Self.legacySavedFilter() else {
+          self.isSavedFilterMutationInFlight = false
+          return
+        }
+        let migrated = await filterProvider.saveHistoryFilter(
+          legacy, expectedGeneration: resource.generation)
+        guard self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
+        switch migrated {
+        case .completed(let migratedResource):
+          self.isSavedFilterMutationInFlight = false
+          self.publishSavedFilter(migratedResource)
+          Self.removeLegacySavedFilter()
+        case .failed(let reason):
+          let reconciliation = await filterProvider.loadHistoryFilter()
+          guard self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
+          self.isSavedFilterMutationInFlight = false
+          switch reconciliation {
+          case .loaded(let current) where current.query == legacy:
+            self.publishSavedFilter(current)
+            Self.removeLegacySavedFilter()
+          case .loaded(let current):
+            self.publishSavedFilter(current)
+            self.savedFilterFailure = reason
+          case .failed:
+            self.savedFilterFailure = reason
+          }
+        }
+      }
+    }
+  }
+
+  func saveHistoryFilter(_ query: RuntimeHistoryFilterQuery) {
+    mutateSavedFilter(desiredQuery: query) { provider, generation in
+      await provider.saveHistoryFilter(query, expectedGeneration: generation)
+    }
+  }
+
+  func deleteSavedFilter() {
+    guard savedFilterQuery != nil else { return }
+    mutateSavedFilter(desiredQuery: nil) { provider, generation in
+      await provider.deleteHistoryFilter(expectedGeneration: generation)
+    }
+  }
+
+  private func mutateSavedFilter(
+    desiredQuery: RuntimeHistoryFilterQuery?,
+    request: @escaping @Sendable (
+      any RuntimeHistoryFilterApplicationProviding, UInt64
+    ) async -> RuntimeHistoryFilterMutationResult
+  ) {
+    guard isSavedFilterLoaded, !isSavedFilterMutationInFlight else { return }
+    isSavedFilterMutationInFlight = true
+    savedFilterFailure = nil
+    let requestID = UUID()
+    savedFilterRequestID = requestID
+    let generation = savedFilterGeneration
+    let filterProvider = filterProvider
+    Task { [weak self] in
+      let result = await request(filterProvider, generation)
+      guard let self, self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
+      switch result {
+      case .completed(let resource):
+        self.isSavedFilterMutationInFlight = false
+        self.publishSavedFilter(resource)
+        if desiredQuery != nil { Self.removeLegacySavedFilter() }
+      case .failed(let reason):
+        // A lost mutation reply is outcome-neutral. Read the owner before
+        // showing failure so an already-published save/delete is reconciled
+        // without ever retrying the mutation.
+        let reconciliation = await filterProvider.loadHistoryFilter()
+        guard self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
+        self.isSavedFilterMutationInFlight = false
+        switch reconciliation {
+        case .loaded(let current) where current.query == desiredQuery:
+          self.publishSavedFilter(current)
+          if desiredQuery != nil { Self.removeLegacySavedFilter() }
+        case .loaded(let current):
+          self.publishSavedFilter(current)
+          self.savedFilterFailure = reason
+        case .failed:
+          self.savedFilterFailure = reason
+        }
+      }
+    }
+  }
+
+  private func publishSavedFilter(_ resource: RuntimeHistoryFilterResource) {
+    savedFilterGeneration = resource.generation
+    savedFilterQuery = resource.query
+    isSavedFilterLoaded = true
+    savedFilterFailure = nil
+  }
+
+  private static let legacySavedFilterKeys = [
+    "history.savedFilter.exists", "history.savedFilter.search", "history.savedFilter.status",
+    "history.savedFilter.mode", "history.savedFilter.session", "history.savedFilter.target",
+    "history.savedFilter.time", "history.savedFilter.activity",
+  ]
+
+  private static func legacySavedFilter(
+    defaults: UserDefaults = .standard
+  ) -> RuntimeHistoryFilterQuery? {
+    guard defaults.bool(forKey: legacySavedFilterKeys[0]) else { return nil }
+    func member(_ key: String, of allowed: Set<String>, fallback: String) -> String {
+      guard let value = defaults.string(forKey: key), allowed.contains(value) else {
+        return fallback
+      }
+      return value
+    }
+    let session = defaults.string(forKey: "history.savedFilter.session")
+    let target = defaults.string(forKey: "history.savedFilter.target")
+    let savedActivity = defaults.string(forKey: "history.savedFilter.activity")
+    let activity = savedActivity == "toolkit" ? "device" : member(
+      "history.savedFilter.activity",
+      of: ["all", "flash", "viewer", "trace", "diagnostics", "debug", "device", "other"],
+      fallback: "all")
+    return RuntimeHistoryFilterQuery(
+      search: defaults.string(forKey: "history.savedFilter.search") ?? "",
+      status: member(
+        "history.savedFilter.status",
+        of: ["all", "active", "needsAttention", "succeeded", "failed", "interrupted", "cancelled"],
+        fallback: "all"),
+      mode: member(
+        "history.savedFilter.mode",
+        of: ["all", "execute", "planned", "simulated", "unknown"], fallback: "all"),
+      sessionID: session == "__all_sessions__" ? nil : session,
+      targetID: target == "__all_targets__" ? nil : target,
+      timeRange: member(
+        "history.savedFilter.time",
+        of: ["anyTime", "lastHour", "lastDay", "lastWeek"], fallback: "anyTime"),
+      activity: activity)
+  }
+
+  private static func removeLegacySavedFilter(defaults: UserDefaults = .standard) {
+    legacySavedFilterKeys.forEach(defaults.removeObject(forKey:))
   }
 
   /// Whether any listed job is still in a non-terminal state. Settings uses

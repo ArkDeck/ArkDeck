@@ -1371,6 +1371,41 @@ enum RuntimeCLI {
     session.emit(try session.request(method, params))
   }
 
+  static func runHistory(_ arguments: [String]) throws {
+    guard arguments.first == "filter", arguments.count >= 2 else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "missing history subcommand (filter list|save|delete)")
+    }
+    let verb = arguments[1]
+    guard ["list", "save", "delete"].contains(verb) else {
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported history filter subcommand")
+    }
+    var rest = Array(arguments.dropFirst(2))
+    var session = runtimeSession(&rest, command: "history.filter.\(verb)")
+    let method = "history.filter.\(verb)"
+    try session.negotiate(requiredMajor: 2, forMethod: method)
+    if verb == "list" {
+      session.emit(try session.request(method))
+      return
+    }
+    let options = try CLIOptions(rest)
+    guard let generation = options.value("--expected-generation") else {
+      throw session.fail(
+        .invalidOption, "history filter \(verb) requires --expected-generation")
+    }
+    var params: [String: JSONValue] = ["expectedGeneration": .string(generation)]
+    if verb == "save" {
+      params["search"] = .string(options.value("--search") ?? "")
+      params["status"] = .string(options.value("--status") ?? "all")
+      params["mode"] = .string(options.value("--mode") ?? "all")
+      params["sessionId"] = options.value("--session").map(JSONValue.string) ?? .null
+      params["targetId"] = options.value("--target").map(JSONValue.string) ?? .null
+      params["timeRange"] = .string(options.value("--time") ?? "anyTime")
+      params["activity"] = .string(options.value("--activity") ?? "all")
+    }
+    session.emit(try session.request(method, params))
+  }
+
   /// `arkdeck recovery ...` — §6.1's recovery surface.
   ///
   /// Both halves already existed under names that misdescribe them.

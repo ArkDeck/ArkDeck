@@ -195,6 +195,8 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runTrace(arguments)
       case "job":
         try RuntimeCLI.runJob(arguments)
+      case "history":
+        try RuntimeCLI.runHistory(arguments)
       case "cleanup-debt":
         try RuntimeCLI.runCleanupDebt(arguments)
       case "recovery":

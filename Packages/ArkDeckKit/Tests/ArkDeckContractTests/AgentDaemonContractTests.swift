@@ -487,6 +487,61 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(clearResult["generation"], .string("3"))
   }
 
+  func testCLIHistoryFilterUsesOneRuntimeOwnedCASResource() throws {
+    let filters = RuntimeHistoryFilterStore(
+      rootURL: stateDirectory, nowUTC: { "2026-09-01T08:30:00.000Z" })
+    let (handler, _) = try makeStack(historyFilterStore: filters)
+    let server = try startServer(handler)
+
+    let (listExit, listEnvelope) = try runObservationCLI(
+      ["history", "filter", "list"], server: server)
+    XCTAssertEqual(listExit, 0)
+    guard case .object(let initial)? = listEnvelope["result"],
+      case .object(let listMeta)? = listEnvelope["meta"]
+    else { return XCTFail("History filter list must return one versioned resource list") }
+    XCTAssertEqual(initial["generation"], .string("1"))
+    XCTAssertEqual(initial["filters"], .array([]))
+    XCTAssertEqual(listMeta["controlProtocolVersion"], .string("2.0.0"))
+
+    let (saveExit, saveEnvelope) = try runObservationCLI([
+      "history", "filter", "save", "--expected-generation", "1",
+      "--search", "flash failure", "--status", "needsAttention", "--mode", "execute",
+      "--session", "session-1", "--target", "target-1", "--time", "lastWeek",
+      "--activity", "flash",
+    ], server: server)
+    XCTAssertEqual(saveExit, 0)
+    guard case .object(let saved)? = saveEnvelope["result"],
+      case .object(let query)? = saved["query"]
+    else { return XCTFail("History filter save must return the complete query") }
+    XCTAssertEqual(saved["generation"], .string("2"))
+    XCTAssertEqual(query["search"], .string("flash failure"))
+    XCTAssertEqual(query["status"], .string("needsAttention"))
+    XCTAssertEqual(query["sessionId"], .string("session-1"))
+    XCTAssertEqual(query["targetId"], .string("target-1"))
+
+    let (staleExit, staleEnvelope) = try runObservationCLI([
+      "history", "filter", "delete", "--expected-generation", "1",
+    ], server: server)
+    XCTAssertEqual(staleExit, 65)
+    guard case .object(let staleError)? = staleEnvelope["error"],
+      case .object(let staleDetails)? = staleError["details"]
+    else { return XCTFail("History filter CAS refusal must remain typed") }
+    XCTAssertEqual(staleError["code"], .string("resourceConflict"))
+    XCTAssertEqual(staleDetails["phase"], .string("historyFilterOwner"))
+    XCTAssertEqual(staleDetails["newDispatchCount"], .integer(0))
+
+    let (deleteExit, deleteEnvelope) = try runObservationCLI([
+      "history", "filter", "delete", "--expected-generation", "2",
+    ], server: server)
+    XCTAssertEqual(deleteExit, 0)
+    guard case .object(let deleted)? = deleteEnvelope["result"] else {
+      return XCTFail("History filter delete must return its tombstone")
+    }
+    XCTAssertEqual(deleted["generation"], .string("3"))
+    XCTAssertEqual(deleted["query"], .null)
+    XCTAssertEqual(try RuntimeHistoryFilterStore(rootURL: stateDirectory).read().generation, 3)
+  }
+
   func testCLICandidateDisplayNameUsesExactObservationCASAndMigratesOnAdopt() async throws {
     let port = TargetObservationCoordinatorContractTests.Port()
     let targets = try RuntimeTargetStore(
@@ -881,6 +936,7 @@ final class AgentDaemonContractTests: XCTestCase {
     targetStore: RuntimeTargetStore? = nil,
     targetObservations: TargetObservationCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
+    historyFilterStore: RuntimeHistoryFilterStore? = nil,
     includeDefaultArtifactStore: Bool = true,
     flashBundleImportPolicy: FlashBundleImportPolicy = .production,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -924,6 +980,7 @@ final class AgentDaemonContractTests: XCTestCase {
       targetObservations: targetObservations,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: resolvedArtifactStore,
+      historyFilterStore: historyFilterStore,
       flashBundleImportDirectory: stateDirectory.appending(
         path:
           "flash-bundle-imports-\(UUID().uuidString)", directoryHint: .isDirectory),
