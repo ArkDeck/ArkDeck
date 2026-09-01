@@ -922,6 +922,7 @@ Task.detached {
         ComposedLanePlanPreviewer(lane: lane, profileID: profileID, providers: providers)
       }
     }
+    let historyFilterStore = RuntimeHistoryFilterStore(rootURL: resolvedStateDirectory)
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,
@@ -937,6 +938,7 @@ Task.detached {
         daemonVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String),
       hdcControlActions: hdcControlActions,
       artifactStore: artifactStore,
+      historyFilterStore: historyFilterStore,
       flashBundleImportDirectory: resolvedStateDirectory.appending(
         path:
           "flash-bundle-imports", directoryHint: .isDirectory),

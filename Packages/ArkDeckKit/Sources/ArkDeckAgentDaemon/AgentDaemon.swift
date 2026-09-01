@@ -100,6 +100,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcStatusObserver: (any HDCStatusObserving)?
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
   private let artifactStore: RuntimeArtifactStore?
+  private let historyFilterStore: RuntimeHistoryFilterStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
@@ -140,6 +141,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
+    historyFilterStore: RuntimeHistoryFilterStore? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
@@ -162,6 +164,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       hdcStatusObserver: hdcStatusObserver,
       hdcControlActions: hdcControlActions,
       artifactStore: artifactStore,
+      historyFilterStore: historyFilterStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
@@ -190,6 +193,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
+    historyFilterStore: RuntimeHistoryFilterStore? = nil,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -216,6 +220,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.hdcStatusObserver = hdcStatusObserver
     self.hdcControlActions = hdcControlActions
     self.artifactStore = artifactStore
+    self.historyFilterStore = historyFilterStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.flashLanePlanPreviewer = flashLanePlanPreviewer
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
@@ -1961,6 +1966,91 @@ public struct RuntimeControlPlaneHandler: Sendable {
             message: "artifact is sensitive; pass allowSensitive to export it")
         }
         return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "history.filter.list", "history.filter.save", "history.filter.delete":
+      guard let historyFilterStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "History filter store is not configured")
+      }
+      let fields = request.params ?? [:]
+      do {
+        switch request.method {
+        case "history.filter.list":
+          guard fields.isEmpty else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "History filter list accepts no parameters")
+          }
+          return success(id: request.id, result: try historyFilterStore.read().listProjection)
+        case "history.filter.save":
+          let expectedKeys: Set<String> = [
+            "expectedGeneration", "search", "status", "mode", "sessionId", "targetId",
+            "timeRange", "activity",
+          ]
+          guard Set(fields.keys) == expectedKeys,
+            case .string(let generationText)? = fields["expectedGeneration"],
+            let expectedGeneration = UInt64(generationText), expectedGeneration > 0,
+            expectedGeneration <= UInt64(Int64.max), String(expectedGeneration) == generationText,
+            case .string(let search)? = fields["search"],
+            case .string(let status)? = fields["status"],
+            case .string(let mode)? = fields["mode"],
+            case .string(let timeRange)? = fields["timeRange"],
+            case .string(let activity)? = fields["activity"]
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "History filter save requires one complete typed query and generation")
+          }
+          func nullableString(_ value: JSONValue?) -> (valid: Bool, value: String?) {
+            switch value {
+            case .string(let text)?: return (true, text)
+            case .null?: return (true, nil)
+            default: return (false, nil)
+            }
+          }
+          let session = nullableString(fields["sessionId"])
+          let target = nullableString(fields["targetId"])
+          guard session.valid, target.valid else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "History filter Session and target must be an identity or null")
+          }
+          let query = RuntimeHistoryFilterQuery(
+            search: search, status: status, mode: mode,
+            sessionID: session.value, targetID: target.value,
+            timeRange: timeRange, activity: activity)
+          return success(
+            id: request.id,
+            result: try historyFilterStore.save(
+              expectedGeneration: expectedGeneration, query: query).projection)
+        default:
+          guard Set(fields.keys) == ["expectedGeneration"],
+            case .string(let generationText)? = fields["expectedGeneration"],
+            let expectedGeneration = UInt64(generationText), expectedGeneration > 0,
+            expectedGeneration <= UInt64(Int64.max), String(expectedGeneration) == generationText
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "History filter delete requires one exact generation")
+          }
+          return success(
+            id: request.id,
+            result: try historyFilterStore.delete(
+              expectedGeneration: expectedGeneration).projection)
+        }
+      } catch let error as RuntimeHistoryFilterFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: [
+              "phase": .string("historyFilterOwner"),
+              "newDispatchCount": .integer(0),
+            ]))
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }

@@ -55,6 +55,7 @@ enum CLIControlMethodRegistry {
     "agent.list",
     "human-action.list",
     "human-action.show",
+    "history.filter.list",
     // Read the registered configuration and report. They create nothing and
     // touch no device, so an ambiguous failure from one is a plain failure.
     "workspace.project.list",
@@ -124,6 +125,8 @@ enum CLIControlMethodRegistry {
     "target.adopt",
     "target.display-name.clear",
     "target.display-name.set",
+    "history.filter.delete",
+    "history.filter.save",
     "agent.run",
     "agent.resume",
     "agent.abandon",
@@ -242,6 +245,11 @@ enum CLIControlFailureMapper {
       evidence.phase == "candidateDisplayNameOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "resourceConflict", "recordUnreadable", "quotaExceeded", "ioFailure",
         "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["history.filter.list", "history.filter.save", "history.filter.delete"].contains(method),
+      evidence.phase == "historyFilterOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
+        "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",

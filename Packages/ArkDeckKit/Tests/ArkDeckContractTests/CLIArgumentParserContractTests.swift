@@ -397,6 +397,35 @@ final class CLIArgumentParserContractTests: XCTestCase {
       .invalidOption)
   }
 
+  func testHistoryFilterPublishesOneClosedCASQuerySurface() {
+    XCTAssertNotNil(success(["history", "filter", "list", "--output", "json"]))
+    XCTAssertNotNil(
+      success([
+        "history", "filter", "save", "--expected-generation", "1",
+        "--search", "failure", "--status", "needsAttention", "--mode", "planned",
+        "--session", "S-1", "--target", "T-1", "--time", "lastWeek",
+        "--activity", "diagnostics",
+      ]))
+    XCTAssertNotNil(
+      success(["history", "filter", "delete", "--expected-generation", "2"]))
+    XCTAssertEqual(
+      failure(["history", "filter", "save"])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "history", "filter", "delete", "--expected-generation", "0",
+      ])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "history", "filter", "save", "--expected-generation", "1",
+        "--status", "success",
+      ])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "history", "filter", "delete", "--expected-generation", "1",
+        "--search", "must-not-be-ignored",
+      ])?.code, .invalidOption)
+  }
+
   func testProtocolNegotiationIsScopedToHealthAndPublishedTargetLeaves() {
     for major in ["1", "2"] {
       XCTAssertNotNil(

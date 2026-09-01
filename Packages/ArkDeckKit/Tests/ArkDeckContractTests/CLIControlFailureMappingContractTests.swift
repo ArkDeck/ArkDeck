@@ -189,6 +189,32 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
     }
   }
 
+  func testHistoryFilterOwnerKeepsPreciseLocalResourceFailures() {
+    let evidence = CLIControlFailureEvidence(
+      phase: "historyFilterOwner", newDispatchCount: 0)
+    for method in ["history.filter.save", "history.filter.delete"] {
+      for code in [
+        CLIErrorCode.invalidInput, .resourceConflict, .resourceNotFound,
+        .recordUnreadable, .quotaExceeded, .ioFailure, .outcomeUnknown,
+      ] {
+        XCTAssertEqual(
+          CLIControlFailureMapper.code(
+            forWireCode: code.rawValue, method: method, evidence: evidence),
+          code,
+          "\(method): \(code.rawValue)")
+      }
+      XCTAssertEqual(
+        CLIControlFailureMapper.code(
+          forWireCode: "resourceConflict", method: method),
+        .outcomeUnknown,
+        "a mutation reply without the local owner proof must stay ambiguous")
+    }
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forTransportFailure: .lostResponse, method: "history.filter.list"),
+      .runtimeUnavailable)
+  }
+
   func testLegacyInternalErrorKeepsItsCodeOnlyWhenNothingCouldHaveHappened() {
     XCTAssertEqual(
       CLIControlFailureMapper.code(forWireCode: "internalError", method: "job.status"),

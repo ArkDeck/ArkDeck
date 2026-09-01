@@ -1034,14 +1034,23 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(view.contains("filterPickers"))
     XCTAssertTrue(view.contains(".contentShape(.rect)"))
 
-    XCTAssertTrue(view.contains("history.savedFilter.activity"))
-    XCTAssertTrue(view.contains("savedActivity = activityFilter.rawValue"))
+    XCTAssertFalse(
+      view.contains("@AppStorage"),
+      "History saved filters must be owned by Runtime rather than the App container")
+    XCTAssertTrue(view.contains("RuntimeHistoryFilterQuery("))
+    XCTAssertTrue(view.contains("onSaveFilter?(currentFilterQuery)"))
+    XCTAssertTrue(view.contains("history.filter.reloadSaved"))
+    XCTAssertTrue(view.contains("expectedGeneration: resource.generation"))
+    XCTAssertGreaterThanOrEqual(
+      view.components(separatedBy: "self.savedFilterRequestID == requestID").count - 1,
+      4,
+      "loads, migration reconciliation and mutations must all reject superseded replies")
     XCTAssertTrue(
-      view.contains("activityFilter = savedActivity == \"toolkit\""),
-      "saved filters from before the rename must still restore Device")
+      view.contains("savedActivity == \"toolkit\" ? \"device\""),
+      "saved filters from before the rename must migrate to Device")
     XCTAssertTrue(
-      view.contains("? .device : HistoryActivityFilter(rawValue: savedActivity) ?? .all"),
-      "current filters must restore normally and unknown values must still fall back")
+      view.contains("HistoryActivityFilter(rawValue: savedFilterQuery.activity) ?? .all"),
+      "Runtime filters must restore normally and unknown values must fail to all")
 
     XCTAssertTrue(view.contains("detailGeneration &+= 1"))
     XCTAssertTrue(view.contains("self.detailsByJobID = [:]"))

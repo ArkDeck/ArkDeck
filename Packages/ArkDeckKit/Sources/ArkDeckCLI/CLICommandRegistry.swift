@@ -496,7 +496,7 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
+    jobNode, historyNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
     flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
@@ -1240,6 +1240,81 @@ enum CLICommandRegistry {
     ["--request-file", "--inputs-file"], ["--request-file", "--expected-binding-revision"],
     ["--request-file", "--request-id"], ["--request-file", "--idempotency-key"],
   ]
+
+  private static let historyFilterGenerationOption = CLIOptionSpec(
+    name: "--expected-generation",
+    form: .value(placeholder: "positive-integer", grammar: .positiveInteger(1...Int.max)),
+    summary: "exact generation returned by history filter list",
+    isRequired: true)
+
+  private static let historyNode = CLINodeSpec(
+    token: "history",
+    summary: "local History presentation resources",
+    groups: [
+      CLINodeSpec(
+        token: "filter",
+        summary: "the Runtime-owned saved History query preset",
+        leaves: [
+          CLILeafSpec(
+            token: "list",
+            canonicalCommand: "history.filter.list",
+            summary: "read the saved query and current generation",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "save",
+            canonicalCommand: "history.filter.save",
+            summary: "replace the saved query using generation compare-and-swap",
+            options: runtimeClientOptions([
+              historyFilterGenerationOption,
+              CLIOptionSpec(
+                name: "--search", form: .value(placeholder: "text", grammar: .opaque),
+                summary: "full-text term; omission saves an empty search"),
+              CLIOptionSpec(
+                name: "--status",
+                form: .value(
+                  placeholder: "status",
+                  grammar: .enumeration([
+                    "all", "active", "needsAttention", "succeeded", "failed", "interrupted",
+                    "cancelled",
+                  ])),
+                summary: "saved Job status filter; defaults to all"),
+              CLIOptionSpec(
+                name: "--mode",
+                form: .value(
+                  placeholder: "mode",
+                  grammar: .enumeration(["all", "execute", "planned", "simulated", "unknown"])),
+                summary: "saved execution-mode filter; defaults to all"),
+              CLIOptionSpec(
+                name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+                summary: "exact Session; omission means all Sessions"),
+              CLIOptionSpec(
+                name: "--target", form: .value(placeholder: "target-id", grammar: .opaque),
+                summary: "exact target; omission means all targets"),
+              CLIOptionSpec(
+                name: "--time",
+                form: .value(
+                  placeholder: "range",
+                  grammar: .enumeration(["anyTime", "lastHour", "lastDay", "lastWeek"])),
+                summary: "saved time range; defaults to anyTime"),
+              CLIOptionSpec(
+                name: "--activity",
+                form: .value(
+                  placeholder: "activity",
+                  grammar: .enumeration([
+                    "all", "flash", "viewer", "trace", "diagnostics", "debug", "device", "other",
+                  ])),
+                summary: "saved workspace activity; defaults to all"),
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "delete",
+            canonicalCommand: "history.filter.delete",
+            summary: "delete the saved query using generation compare-and-swap",
+            options: runtimeClientOptions([historyFilterGenerationOption]),
+            connectsToRuntime: true),
+        ])
+    ])
 
   private static let jobNode = CLINodeSpec(
     token: "job",

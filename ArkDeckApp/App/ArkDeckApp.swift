@@ -128,7 +128,8 @@ private final class ArkDeckAppModelStore {
     autoUpdate = AutoUpdateViewModel()
     runtimeHistory = RuntimeHistoryViewModel(
       provider: RuntimeHistoryApplicationFacade.make(),
-      detailProvider: RuntimeJobDetailApplicationFacade.make())
+      detailProvider: RuntimeJobDetailApplicationFacade.make(),
+      filterProvider: RuntimeHistoryFilterApplicationFacade.make())
     deviceList = DeviceListViewModel(
       provider: DeviceListApplicationFacade.make(),
       resetDisplayNames: ProcessInfo.processInfo.arguments.contains(
@@ -1092,10 +1093,17 @@ private struct AppShellView: View {
         exportStatesByArtifactID: runtimeHistory.exportStatesByArtifactID,
         isRefreshInFlight: runtimeHistory.isRefreshInFlight,
         isLoadOlderInFlight: runtimeHistory.isLoadOlderInFlight,
+        savedFilterQuery: runtimeHistory.savedFilterQuery,
+        isSavedFilterLoaded: runtimeHistory.isSavedFilterLoaded,
+        isSavedFilterMutationInFlight: runtimeHistory.isSavedFilterMutationInFlight,
+        savedFilterFailure: runtimeHistory.savedFilterFailure,
         onRefresh: runtimeHistory.refresh,
         onLoadOlder: runtimeHistory.loadOlder,
         onLoadDetail: runtimeHistory.loadDetail,
         onReloadDetail: runtimeHistory.reloadDetail,
+        onLoadSavedFilter: runtimeHistory.loadSavedFilter,
+        onSaveFilter: runtimeHistory.saveHistoryFilter,
+        onDeleteSavedFilter: runtimeHistory.deleteSavedFilter,
         onExportArtifact: runtimeHistory.exportArtifact,
         onOpenWorkspace: openHistoryWorkspace,
         onOpenDiagnostics: openHistoryDiagnostics,

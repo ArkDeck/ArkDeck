@@ -124,6 +124,7 @@ package enum ArkDeckAgentXPC {
     "flash.device-access",
     "flash.lanePlanPreview",
     "flash.prerequisites",
+    "history.filter.list",
     "job.evidence",
     "job.list",
     "job.list-page",
@@ -175,6 +176,14 @@ package enum ArkDeckAgentXPC {
     "flash.bind-current-loader"
   ]
 
+  /// History's single saved query preset is App-owned local presentation
+  /// state. These methods can only replace or remove that bounded Runtime
+  /// resource; they cannot submit a Job, touch an Artifact or reach a device.
+  package static let forwardableHistoryFilterMethods: Set<String> = [
+    "history.filter.delete",
+    "history.filter.save",
+  ]
+
   /// These names are generic in the daemon protocol. The XPC endpoint must
   /// additionally prove one of the closed App-owned typed requests and bind
   /// the returned Job identifier before forwarding run or cancel.
@@ -190,6 +199,7 @@ package enum ArkDeckAgentXPC {
     .union(forwardableHAPImportMethods)
     .union(forwardableNativeLibraryImportMethods)
     .union(forwardableRockchipBindingMethods)
+    .union(forwardableHistoryFilterMethods)
     .union(gatedAppJobMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.

@@ -89,6 +89,7 @@
     "history.evidence.transport": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Observed transport"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"观测传输"}}}},
     "history.filter.applySaved": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Apply saved filter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"应用已存筛选"}}}},
     "history.filter.deleteSaved": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Delete saved filter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"删除已存筛选"}}}},
+    "history.filter.reloadSaved": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Reload saved filter"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"重新加载已存筛选"}}}},
     "history.filter.device": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Filter by device"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"按设备筛选"}}}},
     "history.filter.device.all": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"All devices"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"所有设备"}}}},
     "history.filter.empty.description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Change or reset the filters to show recorded Jobs."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"更改或重置筛选条件以显示已记录的 Job。"}}}},

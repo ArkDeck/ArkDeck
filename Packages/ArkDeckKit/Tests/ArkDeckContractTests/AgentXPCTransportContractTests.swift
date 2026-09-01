@@ -84,6 +84,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       .union(ArkDeckAgentXPC.forwardableHAPImportMethods)
       .union(ArkDeckAgentXPC.forwardableNativeLibraryImportMethods)
       .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
+      .union(ArkDeckAgentXPC.forwardableHistoryFilterMethods)
     {
       XCTAssertEqual(
         AgentXPCEndpoint.admission(of: frame(method: method)), .direct(method: method),
@@ -111,6 +112,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         // no import, no permit, nothing durable.
         "device.candidates", "flash.bootloader-status", "flash.device-access", "flash.lanePlanPreview",
         "flash.prerequisites",
+        "history.filter.list",
         "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
         "runtime.hdc-status", "target.list", "trace.probe",
       ],
@@ -140,6 +142,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ArkDeckAgentXPC.forwardableRockchipBindingMethods,
       ["flash.bind-current-loader"],
       "Loader binding must remain one closed Runtime-owned identity action")
+    XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableHistoryFilterMethods,
+      ["history.filter.delete", "history.filter.save"],
+      "History may mutate only its bounded local saved-query resource")
     XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")
