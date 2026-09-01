@@ -1965,6 +1965,69 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "device.display-name.set", "device.display-name.clear":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(
+          id: request.id, code: .unsupportedProtocolVersion,
+          message: "candidate display-name resources require the target control protocol")
+      }
+      guard let targetObservations else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "target observation owner is not configured")
+      }
+      let fields = request.params ?? [:]
+      let expectedKeys: Set<String> = request.method == "device.display-name.set"
+        ? ["candidate", "observationId", "observationGeneration", "name"]
+        : ["candidate", "observationId", "observationGeneration"]
+      guard Set(fields.keys) == expectedKeys else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "candidate display-name mutation requires one exact observation")
+      }
+      do {
+        let reference = try Self.targetObservationReference(
+          Dictionary(uniqueKeysWithValues: [
+            "candidate", "observationId", "observationGeneration",
+          ].compactMap { key in fields[key].map { (key, $0) } }))
+        let resource: RuntimeCandidateDisplayName
+        if request.method == "device.display-name.set" {
+          guard case .string(let name)? = fields["name"] else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "candidate display-name set requires bounded text")
+          }
+          resource = try await targetObservations.setDisplayName(reference, name: name)
+        } else {
+          resource = try await targetObservations.clearDisplayName(reference)
+        }
+        return success(id: request.id, result: resource.projection)
+      } catch let error as TargetObservationFailure {
+        var details: [String: JSONValue] = [
+          "phase": .string("candidateDisplayNameOwner"),
+          "newDispatchCount": .integer(0),
+        ]
+        if let reference = error.reference {
+          details["candidate"] = .string(reference.candidate)
+          details["observationId"] = .string(reference.observationID)
+          details["observationGeneration"] = .string(String(reference.generation))
+        }
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(code: error.code, message: error.message, details: details))
+      } catch let error as RuntimeTargetDisplayNameFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: [
+              "phase": .string("candidateDisplayNameOwner"),
+              "newDispatchCount": .integer(0),
+            ]))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "target.display-name.set", "target.display-name.clear":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
         return failure(
@@ -3146,6 +3209,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       let snapshot = try await targetObservations.snapshot(following: following)
       let rows: [JSONValue] = try snapshot.observations.map { row in
+        guard let display = snapshot.displayNames[row.observationID] else {
+          throw TargetObservationFailure(
+            "recordUnreadable", "candidate display-name projection is incomplete")
+        }
         let target = row.relation == nil ? nil
           : try targetStore?.candidateTarget(connectKey: row.candidate.connectKey)
         return .object([
@@ -3155,6 +3222,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "observationContinuity": .string(row.continuity),
           "adoptedTargetId": target.map { .string($0.targetID) } ?? .null,
           "bindingRevision": target.map { .integer(Int64($0.bindingRevision)) } ?? .null,
+          "displayName": display.name.map(JSONValue.string) ?? .null,
+          "displayNameGeneration": .string(String(display.generation)),
         ])
       }
       return success(id: request.id, result: .object([

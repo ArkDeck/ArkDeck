@@ -60,9 +60,10 @@ extension RuntimeCLI {
         guard matches.count == 1, let row = matches.first,
           Set(row.keys) == [
             "candidateKey", "observationId", "authorizationState", "observationContinuity",
-            "adoptedTargetId", "bindingRevision",
+            "adoptedTargetId", "bindingRevision", "displayName", "displayNameGeneration",
           ],
-          row["observationContinuity"] == .string("relationProven")
+          row["observationContinuity"] == .string("relationProven"),
+          row["displayNameGeneration"] == .string(finalGeneration)
         else {
           throw session.fail(
             .resourceConflict,
@@ -82,6 +83,18 @@ extension RuntimeCLI {
         default:
           throw session.fail(
             .protocolMalformed, "the observation has an invalid adopted-target link")
+        }
+        switch row["displayName"] {
+        case .some(.null): break
+        case .some(.string(let name))
+        where name == name.precomposedStringWithCanonicalMapping
+          && name == name.trimmingCharacters(in: .whitespacesAndNewlines)
+          && (1...256).contains(name.utf8.count)
+          && name.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }):
+          break
+        default:
+          throw session.fail(
+            .protocolMalformed, "the observation has an invalid candidate display name")
         }
         lastGeneration = number
         try deadline.check()

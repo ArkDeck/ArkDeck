@@ -311,6 +311,8 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     self.lockURL = directoryURL.appending(path: ".targets.lock")
     self.displayNames = RuntimeTargetDisplayNameStore(rootURL: directoryURL)
     self.routeObservationNow = routeObservationNow
+    let activeTargetIDs = Set(try activeTargets().map(\.targetID))
+    try displayNames.reconcileAfterRuntimeRestart(activeTargetIDs: activeTargetIDs)
   }
 
   /// Publishes one provider-verified candidate snapshot for live route
@@ -374,6 +376,51 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     }
   }
 
+  package func candidateDisplayNames(
+    references: [TargetObservationReference]
+  ) throws -> [String: RuntimeCandidateDisplayName] {
+    try queue.sync { try displayNames.candidateDisplayNames(references: references) }
+  }
+
+  package func setCandidateDisplayName(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64,
+    name: String
+  ) throws -> RuntimeCandidateDisplayName {
+    try queue.sync {
+      let document = try load()
+      guard try candidateTarget(connectKey: reference.candidate, document: document) == nil else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceConflict", "candidate is already adopted; use its durable target resource")
+      }
+      return try displayNames.setCandidate(
+        reference, activeReferences: activeReferences,
+        nextGeneration: nextGeneration, name: name)
+    }
+  }
+
+  package func clearCandidateDisplayName(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64
+  ) throws -> RuntimeCandidateDisplayName {
+    try queue.sync {
+      let document = try load()
+      guard try candidateTarget(connectKey: reference.candidate, document: document) == nil else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceConflict", "candidate is already adopted; use its durable target resource")
+      }
+      return try displayNames.clearCandidate(
+        reference, activeReferences: activeReferences,
+        nextGeneration: nextGeneration)
+    }
+  }
+
+  package func expireCandidateDisplayNames() throws {
+    try queue.sync { try displayNames.expireCandidateDisplayNames() }
+  }
+
   /// Historical aliases remain in `list()` so old Job identity never changes.
   /// New selection surfaces use only the canonical records returned here.
   public func listActive() throws -> [RuntimeTargetRecord] {
@@ -391,25 +438,31 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   public func candidateTarget(connectKey: String) throws -> RuntimeTargetRecord? {
     try queue.sync {
       let document = try load()
-      let matches = document.targets.filter { $0.connectKey == connectKey }
-      guard matches.count <= 1 else {
-        throw BootstrapError.storeFailure("candidate connect key has ambiguous target owners")
-      }
-      guard let direct = matches.first else { return nil }
-      guard
-        let resolution = (document.aliasResolutions ?? []).first(where: {
-          $0.aliasTargetID == direct.targetID
-        })
-      else { return direct }
-      guard
-        let canonical = document.targets.first(where: {
-          $0.targetID == resolution.canonicalTargetID
-        })
-      else {
-        throw BootstrapError.storeFailure("resolved candidate canonical target is missing")
-      }
-      return canonical
+      return try candidateTarget(connectKey: connectKey, document: document)
     }
+  }
+
+  private func candidateTarget(
+    connectKey: String, document: TargetStoreDocument
+  ) throws -> RuntimeTargetRecord? {
+    let matches = document.targets.filter { $0.connectKey == connectKey }
+    guard matches.count <= 1 else {
+      throw BootstrapError.storeFailure("candidate connect key has ambiguous target owners")
+    }
+    guard let direct = matches.first else { return nil }
+    guard
+      let resolution = (document.aliasResolutions ?? []).first(where: {
+        $0.aliasTargetID == direct.targetID
+      })
+    else { return direct }
+    guard
+      let canonical = document.targets.first(where: {
+        $0.targetID == resolution.canonicalTargetID
+      })
+    else {
+      throw BootstrapError.storeFailure("resolved candidate canonical target is missing")
+    }
+    return canonical
   }
 
   /// Resolves the address the HDC provider must use without rewriting the
@@ -621,9 +674,62 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   ) throws -> (record: RuntimeTargetRecord, created: Bool) {
     try queue.sync {
       var document = try load()
+      let result = try materializeAdoption(
+        stableIdentitySHA256: stableIdentitySHA256, connectKey: connectKey,
+        toolVersion: toolVersion, nowUTC: nowUTC, document: &document)
+      if result.created { try persist(document) }
+      return result
+    }
+  }
+
+  package func adoptObservedCandidate(
+    stableIdentitySHA256: String,
+    connectKey: String,
+    toolVersion: String,
+    nowUTC: String,
+    reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextObservationGeneration: UInt64
+  ) throws -> (record: RuntimeTargetRecord, created: Bool) {
+    try queue.sync {
+      var document = try load()
+      let result = try materializeAdoption(
+        stableIdentitySHA256: stableIdentitySHA256, connectKey: connectKey,
+        toolVersion: toolVersion, nowUTC: nowUTC, document: &document)
+      // The target display record is staged while it is still invisible for a
+      // newly created binding. This queue also guards target reads, so no
+      // in-process observer can see a target without its migrated name.
+      try displayNames.stageCandidateAdoption(reference, targetID: result.record.targetID)
+      if result.created { try persist(document) }
+      try displayNames.finishCandidateAdoption(
+        reference, activeReferences: activeReferences,
+        nextGeneration: nextObservationGeneration)
+      return result
+    }
+  }
+
+  private func materializeAdoption(
+    stableIdentitySHA256: String,
+    connectKey: String,
+    toolVersion: String,
+    nowUTC: String,
+    document: inout TargetStoreDocument
+  ) throws -> (record: RuntimeTargetRecord, created: Bool) {
+    if let resolution = (document.aliasResolutions ?? []).first(where: {
+      $0.aliasStableIdentitySHA256 == stableIdentitySHA256
+        || $0.routedHDCIdentitySHA256 == stableIdentitySHA256
+    }),
+      let canonical = document.targets.first(where: {
+        $0.targetID == resolution.canonicalTargetID
+      })
+    {
+      return (canonical, false)
+    }
+    if let existing = document.targets.first(where: {
+      $0.stablePhysicalIdentitySHA256 == stableIdentitySHA256
+    }) {
       if let resolution = (document.aliasResolutions ?? []).first(where: {
-        $0.aliasStableIdentitySHA256 == stableIdentitySHA256
-          || $0.routedHDCIdentitySHA256 == stableIdentitySHA256
+        $0.aliasTargetID == existing.targetID
       }),
         let canonical = document.targets.first(where: {
           $0.targetID == resolution.canonicalTargetID
@@ -631,56 +737,27 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       {
         return (canonical, false)
       }
-      if let existing = document.targets.first(where: {
-        $0.stablePhysicalIdentitySHA256 == stableIdentitySHA256
-      }) {
-        if let resolution = (document.aliasResolutions ?? []).first(where: {
-          $0.aliasTargetID == existing.targetID
-        }),
-          let canonical = document.targets.first(where: {
-            $0.targetID == resolution.canonicalTargetID
-          })
-        {
-          return (canonical, false)
-        }
-        return (existing, false)
-      }
-      // Identity alone is not enough to recognise an already-adopted device.
-      //
-      // A Flash lineage advance keeps the durable target ID and the HDC
-      // connect key while replacing the identity with the Loader-derived one.
-      // The next time the daemon observes that device through HDC it derives
-      // the *normal-mode* identity, finds no record carrying it, and used to
-      // append a second record — whose derived ID collides with the first,
-      // because the ID is a prefix of the identity the device was adopted
-      // under. Bootstrap then refuses both with `ambiguous completed target
-      // binding lineage`, and the daemon will not start until someone edits
-      // the store by hand. Observed on 2026-08-05 after the 08-04 reflash.
-      //
-      // Same durable ID and same connect key is the same physical device seen
-      // through another provider's address face, which is exactly what the
-      // lineage advance documents. Return what is already adopted.
-      let derivedID = "TGT-\(stableIdentitySHA256.prefix(12))"
-      if let sameDevice = document.targets.first(where: { $0.targetID == derivedID }) {
-        guard sameDevice.connectKey == connectKey else {
-          // Same ID, different address: a genuine ambiguity a person must see,
-          // not something to resolve by guessing which one was meant.
-          throw BootstrapError.storeFailure(
-            "adopted target \(derivedID) is bound to another connect key")
-        }
-        return (sameDevice, false)
-      }
-      let record = RuntimeTargetRecord(
-        targetID: derivedID,
-        stablePhysicalIdentitySHA256: stableIdentitySHA256,
-        bindingRevision: 1,
-        connectKey: connectKey,
-        toolVersion: toolVersion,
-        adoptedAtUTC: nowUTC)
-      document.targets.append(record)
-      try persist(document)
-      return (record, true)
+      return (existing, false)
     }
+    // A Flash lineage advance can replace the stored identity while retaining
+    // the target ID and connect key. Do not append a colliding second record.
+    let derivedID = "TGT-\(stableIdentitySHA256.prefix(12))"
+    if let sameDevice = document.targets.first(where: { $0.targetID == derivedID }) {
+      guard sameDevice.connectKey == connectKey else {
+        throw BootstrapError.storeFailure(
+          "adopted target \(derivedID) is bound to another connect key")
+      }
+      return (sameDevice, false)
+    }
+    let record = RuntimeTargetRecord(
+      targetID: derivedID,
+      stablePhysicalIdentitySHA256: stableIdentitySHA256,
+      bindingRevision: 1,
+      connectKey: connectKey,
+      toolVersion: toolVersion,
+      adoptedAtUTC: nowUTC)
+    document.targets.append(record)
+    return (record, true)
   }
 
   /// Advances one adopted target across a strictly adjacent, externally

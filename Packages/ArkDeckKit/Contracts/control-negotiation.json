@@ -30,6 +30,8 @@
     "control-action.list",
     "control-action.reconcile",
     "control-action.show",
+    "device.display-name.clear",
+    "device.display-name.set",
     "device.observations",
     "health",
     "human-action.list",

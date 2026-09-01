@@ -355,6 +355,48 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ])?.code, .invalidOption)
   }
 
+  func testCandidateDisplayNameRequiresAnExactObservationCASReference() {
+    let reference = [
+      "--candidate", "150100424a544e4600",
+      "--observation", "OBS-1",
+      "--observation-generation", "7",
+    ]
+    XCTAssertNotNil(
+      success(["device", "display-name", "set"] + reference + ["--name", "Bench device"]))
+    XCTAssertNotNil(success(["device", "display-name", "clear"] + reference))
+
+    for missing in ["--candidate", "--observation", "--observation-generation"] {
+      var incomplete = reference
+      let index = try! XCTUnwrap(incomplete.firstIndex(of: missing))
+      incomplete.removeSubrange(index...(index + 1))
+      XCTAssertEqual(
+        failure(["device", "display-name", "clear"] + incomplete)?.code,
+        .invalidOption,
+        missing)
+    }
+    XCTAssertEqual(
+      failure(["device", "display-name", "set"] + reference)?.code,
+      .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "device", "display-name", "clear",
+      ] + reference + ["--name", "must-not-be-ignored"])?.code,
+      .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "device", "display-name", "clear", "--candidate", "key",
+        "--candidate", "other", "--observation", "OBS-1",
+        "--observation-generation", "7",
+      ])?.code,
+      .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "device", "display-name", "clear", "--candidate", "key",
+        "--observation", "OBS-1", "--observation-generation", "0",
+      ])?.code,
+      .invalidOption)
+  }
+
   func testProtocolNegotiationIsScopedToHealthAndPublishedTargetLeaves() {
     for major in ["1", "2"] {
       XCTAssertNotNil(

@@ -27,7 +27,6 @@ project `displayName` and `displayNameGeneration` beside existing binding
 fields. Setting or clearing a name never changes target identity, binding
 revision, connect key, provider facts, selection, admission, or device state.
 
-This slice covers durable target names only. Candidate display names and their
-proof-bound migration during adopt remain a separate product slice because
-they are scoped to an observation ID and snapshot generation rather than a
-durable target identity.
+Observation-scoped names use a separate resource and CAS contract documented
+in `docs/design/cli-candidate-display-names.md`. They can migrate into this
+resource only while Runtime still proves the exact candidate relation.

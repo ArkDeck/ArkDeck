@@ -1075,6 +1075,27 @@ enum CLICommandRegistry {
         connectsToRuntime: true),
     ])
 
+  private static let deviceDisplayNameNode = CLINodeSpec(
+    token: "display-name",
+    summary: "observation-scoped local names that never participate in identity",
+    leaves: [
+      CLILeafSpec(
+        token: "set", canonicalCommand: "device.display-name.set",
+        summary: "compare-and-swap one exact unadopted observation name",
+        options: runtimeClientOptions(observationReferenceOptions + [
+          CLIOptionSpec(
+            name: "--name", form: .value(placeholder: "text", grammar: .opaque),
+            summary: "normalized nonblank display text, at most 256 UTF-8 bytes",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "clear", canonicalCommand: "device.display-name.clear",
+        summary: "compare-and-swap removal of one exact observation name",
+        options: runtimeClientOptions(observationReferenceOptions),
+        connectsToRuntime: true),
+    ])
+
   private static let deviceNode = CLINodeSpec(
     token: "device",
     summary: "live devices and durable targets",
@@ -1140,7 +1161,8 @@ enum CLICommandRegistry {
             summary: "exact observed candidate key")
         ]),
         connectsToRuntime: true),
-    ])
+    ],
+    groups: [deviceDisplayNameNode])
 
   private static let observationReferenceOptions: [CLIOptionSpec] = [
     CLIOptionSpec(
