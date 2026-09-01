@@ -142,6 +142,26 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
     }
   }
 
+  func testTargetDisplayNameOwnerKeepsPreciseCASFailures() {
+    let evidence = CLIControlFailureEvidence(
+      phase: "targetDisplayNameOwner", newDispatchCount: 0)
+    for code in [
+      CLIErrorCode.invalidInput, .resourceConflict, .resourceNotFound,
+      .recordUnreadable, .quotaExceeded, .ioFailure, .outcomeUnknown,
+    ] {
+      XCTAssertEqual(
+        CLIControlFailureMapper.code(
+          forWireCode: code.rawValue, method: "target.display-name.set",
+          evidence: evidence),
+        code)
+    }
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forWireCode: "invalidInput", method: "target.display-name.set"),
+      .outcomeUnknown,
+      "a mutation reply without the Runtime owner's proof must stay ambiguous")
+  }
+
   func testLegacyInternalErrorKeepsItsCodeOnlyWhenNothingCouldHaveHappened() {
     XCTAssertEqual(
       CLIControlFailureMapper.code(forWireCode: "internalError", method: "job.status"),

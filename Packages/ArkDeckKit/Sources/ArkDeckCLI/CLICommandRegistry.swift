@@ -931,6 +931,31 @@ enum CLICommandRegistry {
     name: "--tool", form: .value(placeholder: "tool:sha256:digest", grammar: .opaque),
     summary: "exact content-addressed host tool reference", isRequired: true)
 
+  private static let targetDisplayNameNode = CLINodeSpec(
+    token: "display-name",
+    summary: "bounded local names kept separate from target identity and binding",
+    leaves: [
+      CLILeafSpec(
+        token: "set", canonicalCommand: "target.display-name.set",
+        summary: "compare-and-swap one durable target display name",
+        options: runtimeClientOptions([
+          targetIDOption, generationOption,
+          CLIOptionSpec(
+            name: "--name", form: .value(placeholder: "text", grammar: .opaque),
+            summary: "normalized nonblank display text, at most 256 UTF-8 bytes",
+            isRequired: true),
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "clear", canonicalCommand: "target.display-name.clear",
+        summary: "compare-and-swap removal of one durable target display name",
+        options: runtimeClientOptions([
+          targetIDOption, generationOption, targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+    ])
+
   /// §6.1's durable target surface. `device list/show/adopt` stay as the
   /// frozen 1.x legacy spellings beside it (§12).
   private static let targetNode = CLINodeSpec(
@@ -980,7 +1005,8 @@ enum CLICommandRegistry {
             isRequired: true)
         ]),
         connectsToRuntime: true),
-    ])
+    ],
+    groups: [targetDisplayNameNode])
 
   // `doctor` is a leaf, but the tree is uniform: a one-leaf node whose token
   // equals the leaf token renders as `arkdeck doctor`.

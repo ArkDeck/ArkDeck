@@ -49,6 +49,8 @@
     "runtime.hdc.restart",
     "runtime.hdc.status",
     "target.adopt",
+    "target.display-name.clear",
+    "target.display-name.set",
     "target.show"
   ],
   "preBootstrapLegacyMethods": [

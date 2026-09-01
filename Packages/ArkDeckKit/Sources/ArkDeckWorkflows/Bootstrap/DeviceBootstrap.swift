@@ -290,6 +290,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 
   private let url: URL
   private let lockURL: URL
+  private let displayNames: RuntimeTargetDisplayNameStore
   private let queue = DispatchQueue(label: "arkdeck.target-store")
   private let routeObservationNow: @Sendable () -> Date
   private let routeObservationFreshnessSeconds: TimeInterval = 5
@@ -308,6 +309,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     }
     self.url = directoryURL.appending(path: "targets.json")
     self.lockURL = directoryURL.appending(path: ".targets.lock")
+    self.displayNames = RuntimeTargetDisplayNameStore(rootURL: directoryURL)
     self.routeObservationNow = routeObservationNow
   }
 
@@ -330,14 +332,58 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     try queue.sync { try load().targets.first { $0.targetID == targetID } }
   }
 
+  package func targetDisplayNames(
+    targetIDs: [String]
+  ) throws -> [String: RuntimeTargetDisplayName] {
+    try queue.sync { try displayNames.read(targetIDs: targetIDs) }
+  }
+
+  package func targetDisplayName(targetID: String) throws -> RuntimeTargetDisplayName {
+    try queue.sync {
+      guard try activeTargets().contains(where: { $0.targetID == targetID }) else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceNotFound", "durable target does not exist or is an inactive alias")
+      }
+      return try displayNames.read(targetID: targetID)
+    }
+  }
+
+  package func setTargetDisplayName(
+    targetID: String, expectedGeneration: UInt64, name: String
+  ) throws -> RuntimeTargetDisplayName {
+    try queue.sync {
+      guard try activeTargets().contains(where: { $0.targetID == targetID }) else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceNotFound", "durable target does not exist or is an inactive alias")
+      }
+      return try displayNames.set(
+        targetID: targetID, expectedGeneration: expectedGeneration, name: name)
+    }
+  }
+
+  package func clearTargetDisplayName(
+    targetID: String, expectedGeneration: UInt64
+  ) throws -> RuntimeTargetDisplayName {
+    try queue.sync {
+      guard try activeTargets().contains(where: { $0.targetID == targetID }) else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceNotFound", "durable target does not exist or is an inactive alias")
+      }
+      return try displayNames.clear(
+        targetID: targetID, expectedGeneration: expectedGeneration)
+    }
+  }
+
   /// Historical aliases remain in `list()` so old Job identity never changes.
   /// New selection surfaces use only the canonical records returned here.
   public func listActive() throws -> [RuntimeTargetRecord] {
-    try queue.sync {
-      let document = try load()
-      let aliases = Set((document.aliasResolutions ?? []).map(\.aliasTargetID))
-      return document.targets.filter { !aliases.contains($0.targetID) }
-    }
+    try queue.sync { try activeTargets() }
+  }
+
+  private func activeTargets() throws -> [RuntimeTargetRecord] {
+    let document = try load()
+    let aliases = Set((document.aliasResolutions ?? []).map(\.aliasTargetID))
+    return document.targets.filter { !aliases.contains($0.targetID) }
   }
 
   /// Resolves one currently observed address only through a durable alias

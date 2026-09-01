@@ -1601,6 +1601,10 @@ enum RuntimeCLI {
         path: ["target", "observe"], Array(arguments.dropFirst()))
       return
     }
+    if subcommand == "display-name" {
+      try runTargetDisplayName(Array(arguments.dropFirst()))
+      return
+    }
     var rest = Array(arguments.dropFirst())
     var session = runtimeSession(&rest, command: "target.\(subcommand)")
     switch subcommand {
@@ -1647,6 +1651,37 @@ enum RuntimeCLI {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported target subcommand")
     }
+  }
+
+  private static func runTargetDisplayName(_ arguments: [String]) throws {
+    guard let verb = arguments.first, ["set", "clear"].contains(verb) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing target display-name subcommand (set|clear)")
+    }
+    var rest = Array(arguments.dropFirst())
+    var session = runtimeSession(&rest, command: "target.display-name.\(verb)")
+    let options = try CLIOptions(rest)
+    guard let targetID = options.value("--target"),
+      let generation = options.value("--expected-generation")
+    else {
+      throw session.fail(
+        .invalidOption,
+        "target display-name \(verb) requires --target and --expected-generation")
+    }
+    var params: [String: JSONValue] = [
+      "targetId": .string(targetID),
+      "expectedGeneration": .string(generation),
+    ]
+    if verb == "set" {
+      guard let name = options.value("--name") else {
+        throw session.fail(.invalidOption, "target display-name set requires --name")
+      }
+      params["name"] = .string(name)
+    }
+    let method = "target.display-name.\(verb)"
+    try session.negotiate(requiredMajor: 2, forMethod: method)
+    session.emit(try session.request(method, params))
   }
 
   /// Read-only Trace capability portrait from the daemon's protected

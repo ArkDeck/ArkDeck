@@ -120,6 +120,8 @@ enum CLIControlMethodRegistry {
     "control-action.reconcile",
 
     "target.adopt",
+    "target.display-name.clear",
+    "target.display-name.set",
     "agent.run",
     "agent.resume",
     "agent.abandon",
@@ -225,6 +227,14 @@ enum CLIControlFailureMapper {
       evidence.phase == "importOwner", evidence.newDispatchCount == 0,
       ["resourceConflict", "invalidInput", "operationUnavailable", "inputTooLarge",
         "invalidCursor", "idempotencyConflict", "resourceNotFound", "artifactIntegrityFailed", "quotaExceeded"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    // Target display names are a Runtime-owned local resource. The owner can
+    // prove exact CAS and validation failures without claiming that a lost
+    // publication response is safe to retry.
+    if ["target.display-name.set", "target.display-name.clear"].contains(method),
+      evidence.phase == "targetDisplayNameOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
+        "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",

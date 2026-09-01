@@ -1965,6 +1965,59 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "target.display-name.set", "target.display-name.clear":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(
+          id: request.id, code: .unsupportedProtocolVersion,
+          message: "target display-name resources require the target control protocol")
+      }
+      guard let targetStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "target store is not configured")
+      }
+      let fields = request.params ?? [:]
+      let expectedKeys: Set<String> = request.method == "target.display-name.set"
+        ? ["targetId", "expectedGeneration", "name"]
+        : ["targetId", "expectedGeneration"]
+      guard Set(fields.keys) == expectedKeys,
+        case .string(let targetID)? = fields["targetId"],
+        case .string(let generationText)? = fields["expectedGeneration"],
+        let expectedGeneration = UInt64(generationText), expectedGeneration > 0,
+        expectedGeneration <= UInt64(Int64.max), String(expectedGeneration) == generationText
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "target display-name mutation requires an exact target and generation")
+      }
+      do {
+        let resource: RuntimeTargetDisplayName
+        if request.method == "target.display-name.set" {
+          guard case .string(let name)? = fields["name"] else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "target display-name set requires bounded text")
+          }
+          resource = try targetStore.setTargetDisplayName(
+            targetID: targetID, expectedGeneration: expectedGeneration, name: name)
+        } else {
+          resource = try targetStore.clearTargetDisplayName(
+            targetID: targetID, expectedGeneration: expectedGeneration)
+        }
+        return success(id: request.id, result: resource.projection)
+      } catch let error as RuntimeTargetDisplayNameFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: [
+              "phase": .string("targetDisplayNameOwner"),
+              "newDispatchCount": .integer(0),
+            ]))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "target.list":
       guard let targetStore else {
         return failure(
@@ -1972,15 +2025,20 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let targets = try targetStore.listActive()
+        let displayNames = try targetStore.targetDisplayNames(
+          targetIDs: targets.map(\.targetID))
         return success(
           id: request.id,
           result: .array(
             targets.map { record in
-              .object([
+              let display = displayNames[record.targetID]!
+              return .object([
                 "targetId": .string(record.targetID),
                 "bindingRevision": .integer(Int64(record.bindingRevision)),
                 "toolVersion": .string(record.toolVersion),
                 "adoptedAtUtc": .string(record.adoptedAtUTC),
+                "displayName": display.name.map(JSONValue.string) ?? .null,
+                "displayNameGeneration": .string(String(display.generation)),
               ])
             }))
       } catch {
@@ -2020,6 +2078,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
             id: request.id, code: .notFound,
             message: "no durable target \(requestedTargetID)")
         }
+        let displayName = try targetStore.targetDisplayNames(
+          targetIDs: [record.targetID])[record.targetID]!
         let observation =
           (try? await engine.latestSucceededDeviceObservations())?[record.targetID]
         // The warm snapshot only. Forcing a candidate refresh here would turn a
@@ -2042,6 +2102,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
             "adoptedAtUtc": .string(record.adoptedAtUTC),
             "connectKey": .string(record.connectKey),
             "stablePhysicalIdentitySha256": .string(record.stablePhysicalIdentitySHA256),
+            "displayName": displayName.name.map(JSONValue.string) ?? .null,
+            "displayNameGeneration": .string(String(displayName.generation)),
             "live": live,
             "observedFacts": observation.map {
               .object([
