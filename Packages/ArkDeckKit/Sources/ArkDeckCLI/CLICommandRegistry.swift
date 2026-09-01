@@ -2604,6 +2604,15 @@ enum CLICommandRegistry {
     form: .value(placeholder: "1...300", grammar: .positiveInteger(1...300)),
     summary: "client-side wait budget in seconds")
 
+  private static let runtimeServiceBundleGenerationOption = CLIOptionSpec(
+    name: "--bundle-generation",
+    form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+    summary: "exact available daemon bundle generation", isRequired: true)
+  private static let runtimeServiceToolGenerationOption = CLIOptionSpec(
+    name: "--tool-generation",
+    form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+    summary: "exact available HDC tool generation", isRequired: true)
+
   private static let runtimeServiceNode = CLINodeSpec(
     token: "service",
     summary: "the local Runtime service for the current user",
@@ -2611,8 +2620,12 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "install",
         canonicalCommand: "runtime.service.install",
-        summary: "install the daemon as a user-domain service",
-        options: agentdInstallOptions + [outputOption, jsonOption]),
+        summary: "install exact registered daemon and HDC resources as a user-domain service",
+        options: [
+          bootstrapBundleRefOption, runtimeServiceBundleGenerationOption,
+          bootstrapToolRefOption, runtimeServiceToolGenerationOption,
+          outputOption, jsonOption,
+        ]),
       CLILeafSpec(
         token: "update",
         canonicalCommand: "runtime.service.update",
@@ -2664,7 +2677,13 @@ enum CLICommandRegistry {
     token: "agentd",
     summary: "superseded spelling of `runtime service`",
     leaves: compatibilitySpelling(
-      of: runtimeServiceNode.leaves, as: "agentd", replacedBy: "runtime service"))
+      of: [
+        CLILeafSpec(
+          token: "install", canonicalCommand: "runtime.service.install",
+          summary: "install the daemon from compatibility path inputs",
+          options: agentdInstallOptions + [outputOption, jsonOption]),
+      ] + Array(runtimeServiceNode.leaves.dropFirst(1)),
+      as: "agentd", replacedBy: "runtime service"))
 
   private static let runtimeSigningNode = CLINodeSpec(
     token: "signing",

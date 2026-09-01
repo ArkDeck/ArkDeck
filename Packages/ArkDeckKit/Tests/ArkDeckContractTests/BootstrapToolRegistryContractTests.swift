@@ -280,6 +280,38 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
     XCTAssertNoThrow(try owner.remove(active.activeToolRef, expectedGeneration: "1"))
   }
 
+  func testInitialServiceSelectionIsExactIdempotentAndCannotReplaceAnActiveTool() throws {
+    let source = try fixture()
+    let owner = selectionRegistry()
+    let first = try string(object(owner.register(file: source))["toolRef"])
+    let selected = try owner.initializeServiceSelection(
+      reference: first, expectedGeneration: "1")
+    XCTAssertEqual(selected.toolRef, first)
+    XCTAssertEqual(selected.activeGeneration, 1)
+    XCTAssertEqual(
+      try owner.initializeServiceSelection(reference: first, expectedGeneration: "1").toolRef,
+      first)
+    assertFailure("resourceConflict") {
+      _ = try owner.initializeServiceSelection(reference: first, expectedGeneration: "2")
+    }
+
+    let quarantine = Data("0081;fixture;service;replacement".utf8)
+    XCTAssertEqual(quarantine.withUnsafeBytes {
+      setxattr(source.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
+    }, 0)
+    let second = try string(object(owner.register(file: source))["toolRef"])
+    assertFailure("resourceConflict") {
+      _ = try owner.initializeServiceSelection(reference: second, expectedGeneration: "1")
+    }
+
+    _ = try owner.prepareSelection(
+      actionID: "service-selection-pending", newToolRef: second,
+      expectedActiveGeneration: "1")
+    assertFailure("resourceConflict") {
+      _ = try owner.initializeServiceSelection(reference: first, expectedGeneration: "1")
+    }
+  }
+
   func testFailedPendingSelectionKeepsOldPublishedGenerationAndUnpinsCandidate() throws {
     let source = try fixture()
     let owner = selectionRegistry()

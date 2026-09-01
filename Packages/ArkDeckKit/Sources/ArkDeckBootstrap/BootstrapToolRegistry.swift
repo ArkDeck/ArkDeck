@@ -299,6 +299,55 @@ package final class BootstrapToolRegistry {
     }
   }
 
+  /// Establishes the first service selection from an exact registered tool.
+  /// This is the bootstrap bridge for a machine with no daemon yet: later
+  /// changes still require `runtime.tool.select` and its control-action WAL.
+  /// Retrying the same exact selection is idempotent; a different selection,
+  /// an in-flight transition or an unreconciled outcome is never overwritten.
+  package func initializeServiceSelection(
+    reference: String, expectedGeneration: String
+  ) throws -> StartupSelection {
+    try owner.withSharedStore { directory, root in
+      var index = try readIndex(directory)
+      var record = try find(reference, in: index)
+      try verify(record, directory: directory, root: root)
+      guard record.state == "available", expectedGeneration == String(record.generation) else {
+        throw Files.failure(
+          "resourceConflict", "initial service tool is removed or its generation changed")
+      }
+      guard record.relocatable, knownIdentity(record.executableSHA256) != nil else {
+        throw Files.failure(
+          "operationUnavailable",
+          "initial service tool must be an exact available published relocatable HDC identity")
+      }
+      let active = try ReferenceOwner(kind: .activeSelection, id: "runtime-hdc-selection")
+      if let selection = index.selection {
+        guard selection.activeToolRef == reference, selection.pending == nil,
+          selection.lastOutcome == nil, record.references.contains(active)
+        else {
+          throw Files.failure(
+            "resourceConflict",
+            "an existing or unreconciled HDC selection can change only through runtime tool select")
+        }
+        return StartupSelection(
+          resolved: resolved(record, root: root), toolRef: reference,
+          activeGeneration: selection.activeGeneration, pendingActionID: nil)
+      }
+      guard !index.records.contains(where: { $0.references.contains(active) }) else {
+        throw Files.failure("recordUnreadable", "an active tool pin exists without its selection ledger")
+      }
+      record.references.append(active)
+      sortReferences(&record)
+      replace(record, in: &index)
+      index.selection = Selection(
+        activeToolRef: reference, activeGeneration: 1, pending: nil, lastOutcome: nil)
+      try saveIndex(index, directory: directory, root: root)
+      return StartupSelection(
+        resolved: resolved(record, root: root), toolRef: reference,
+        activeGeneration: 1, pendingActionID: nil)
+    }
+  }
+
   package func selectionCandidate(
     newToolRef: String, expectedActiveGeneration: String,
     pendingActionID: String? = nil

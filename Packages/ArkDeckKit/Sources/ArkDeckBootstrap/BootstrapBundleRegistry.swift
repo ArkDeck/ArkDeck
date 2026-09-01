@@ -218,6 +218,41 @@ package final class BootstrapBundleRegistry {
     }
   }
 
+  /// Commits one successfully installed bundle as the service's only active
+  /// installation reference. The caller acquires the candidate before it
+  /// changes launchd state, then calls this only after `bootstrap` succeeds.
+  /// A crash before this point deliberately leaves both bundles pinned; it can
+  /// leak storage, but it can never make the installed bytes disappear.
+  package func retainOnly(_ reference: String, owner: ReferenceOwner) throws {
+    try locked { directory in
+      var index = try readIndex(directory)
+      let selected = try find(reference, in: index)
+      guard selected.state == "available", selected.references.contains(owner) else {
+        throw Files.failure(
+          "resourceConflict", "installed bundle does not hold its durable installation reference")
+      }
+      for record in index.records { try verify(record, directory: directory) }
+      for position in index.records.indices where index.records[position].reference != reference {
+        index.records[position].references.removeAll { $0 == owner }
+      }
+      try saveIndex(index, directory)
+    }
+  }
+
+  /// Releases installation pins only after the managed service is confirmed
+  /// uninstalled. Failure leaves content retained and is therefore safe to
+  /// retry; it never guesses which external lifecycle effect occurred.
+  package func releaseAll(owner: ReferenceOwner) throws {
+    try locked { directory in
+      var index = try readIndex(directory)
+      for record in index.records { try verify(record, directory: directory) }
+      for position in index.records.indices {
+        index.records[position].references.removeAll { $0 == owner }
+      }
+      try saveIndex(index, directory)
+    }
+  }
+
   /// All bootstrap resource families serialize through this owner. Establish
   /// the durable bundle index before another family writes anything, so a
   /// genuinely missing index is never confused with a fresh independent store.

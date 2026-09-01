@@ -3,8 +3,9 @@ import XCTest
 
 @testable import ArkDeckCLI
 
-/// The options `agentd install` reads and the options it accepts must be one
-/// set.
+/// The service installer has two deliberately different option sets: the
+/// target spelling consumes typed registry references, while `agentd` keeps
+/// the bounded path-based compatibility reader.
 ///
 /// They were two. `validateAllowed` listed ten flags; the command then read
 /// five more — the whole ArkForge lane configuration — which meant the lane
@@ -36,7 +37,7 @@ final class AgentdOptionCoverageContractTests: XCTestCase {
       encoding: .utf8)
   }
 
-  func testEveryOptionTheInstallCommandReadsIsAlsoAllowed() throws {
+  func testEveryOptionTheInstallCommandReadsBelongsToOnePublishedSurface() throws {
     let source = try runtimeCommandsSource()
 
     // Only the install/update branch. Other subcommands in this file gate
@@ -60,14 +61,52 @@ final class AgentdOptionCoverageContractTests: XCTestCase {
 
     XCTAssertFalse(read.isEmpty, "the scan found no options; it has stopped testing anything")
 
-    let unlisted = read.subtracting(RuntimeCLI.agentdInstallOptions).sorted()
+    let accepted = RuntimeCLI.agentdInstallOptions
+      .union(RuntimeCLI.runtimeServiceInstallOptions)
+    let unlisted = read.subtracting(accepted).sorted()
     XCTAssertEqual(
       unlisted, [],
       """
-      these options are read by agentd install/update but rejected by \
-      validateAllowed, so a caller cannot reach the code that parses them: \
+      these options are read by service install/update but absent from every \
+      accepted surface, so a caller cannot reach the code that parses them: \
       \(unlisted.joined(separator: ", "))
       """)
+  }
+
+  func testTargetServiceUsesTypedResourcesAndLegacySpellingKeepsPaths() {
+    for flag in ["--daemon", "--hdc"] {
+      XCTAssertTrue(RuntimeCLI.agentdInstallOptions.contains(flag))
+      XCTAssertFalse(RuntimeCLI.runtimeServiceInstallOptions.contains(flag))
+    }
+    for flag in ["--bundle", "--bundle-generation", "--tool", "--tool-generation"] {
+      XCTAssertFalse(RuntimeCLI.agentdInstallOptions.contains(flag))
+      XCTAssertTrue(RuntimeCLI.runtimeServiceInstallOptions.contains(flag))
+    }
+
+    let digest = String(repeating: "a", count: 64)
+    let targetInstall = [
+      "runtime", "service", "install",
+      "--bundle", "bundle:sha256:\(digest)", "--bundle-generation", "1",
+      "--tool", "tool:sha256:\(digest)", "--tool-generation", "1",
+    ]
+    let legacy = [
+      "agentd", "install", "--daemon", "/tmp/ArkDeckAgent.app", "--hdc", "/tmp/hdc",
+    ]
+    if case .failure(let error) = CLIArgumentParser.parse(targetInstall) {
+      XCTFail("typed target install was rejected: \(error)")
+    }
+    if case .failure(let error) = CLIArgumentParser.parse(legacy) {
+      XCTFail("legacy path compatibility was rejected: \(error)")
+    }
+    for invalid in [
+      targetInstall + ["--hdc", "/tmp/other"],
+      targetInstall + ["--workspace-project", "/tmp/project"],
+      legacy + ["--bundle", "bundle:sha256:\(digest)"],
+    ] {
+      if case .success = CLIArgumentParser.parse(invalid) {
+        XCTFail("service surface accepted an option from the other lifecycle: \(invalid)")
+      }
+    }
   }
 
   func testTheLaneFlagsAreAllPresent() throws {

@@ -53,12 +53,18 @@ Continuation retains the original projection after later registrations/removals;
 changing page size or using an expired/foreign cursor is rejected. Inventory and
 inspection revalidate registered content; unreadable content is never omitted.
 
-This resource does not complete the service lifecycle contract. The App still
-needs its sandbox bridge to this shared owner; it must not create a separate
-container registry. Service install/update must adopt typed references and
-revalidate them, and any possible HDC interruption must use the shared impact
-preview/control-action/HAR path. Existing service compatibility commands are
-unchanged by this implementation. No real-device acceptance is claimed here.
+Fresh `runtime service install` consumes these exact bundle generations and
+holds a durable `installation` reference before changing launchd state. A
+successful install retains only the installed bundle; an interrupted or failed
+attempt leaves all candidates pinned for explicit reconciliation. It refuses
+an existing Runtime rather than acting as an update alias. Uninstall releases
+those pins only after the service removal succeeds. The deprecated `agentd`
+spelling retains its path reader for the compatibility cycle.
+
+The App still needs its sandbox bridge to this shared owner; it must not create
+a separate container registry. Typed service update remains pending on its
+shared impact preview/control-action/HAR integration because replacing the
+daemon can interrupt its HDC child. No real-device acceptance is claimed here.
 
 ## Native HDC candidates
 
@@ -102,13 +108,16 @@ layout; it returns the exact copied executable/dependency manifest. The Runtime
 consumer must retain/revalidate its directory and every file through the existing
 Process identity layer. This manifest is not an execution authorization.
 
-Tool selection, typed service adoption and the App bridge are not implemented
-by these four HDC commands. They still require the §7.8 control-action/HAR
-integration; registration never changes preferences or stops/restarts HDC. The
-optional installed-DevEco integration test statically checks the copied
-HDC/libusb pair and its drift handling, with no HDC invocation or device
-dispatch. Machines without that SDK explicitly skip that host test.
+Fresh `runtime service install` may establish the first active HDC selection
+from one exact registered tool generation. The operation is idempotent only for
+that same reference; it cannot replace an existing selection or overlap an
+unreconciled transition. Every later tool or running-service change remains on
+the §7.8 control-action/HAR path.
 
-The same inventory now supports bounded DevEco `--root` registration and
+The same inventory supports bounded DevEco `--root` registration and
 workspace-preset pins. Its different trust and retention shape is documented in
 [CLI workspace preset and DevEco toolchain lifecycle](cli-workspace-preset-toolchain-lifecycle.md).
+Registration itself never stops or restarts HDC. The optional installed-DevEco
+integration test statically checks the copied HDC/libusb pair and its drift
+handling, with no HDC invocation or device dispatch. Machines without that SDK
+explicitly skip that host test.
