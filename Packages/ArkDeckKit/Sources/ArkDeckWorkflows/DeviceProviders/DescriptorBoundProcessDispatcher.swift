@@ -126,17 +126,20 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let outputByteBudget: Int
   private let childEnvironment: [String: String]
+  private let childEnvironmentByExecutablePath: [String: [String: String]]
   private let processExecutor: FoundationProcessExecutor
 
   package init(
     resolver: any RuntimeExecutableResolving,
     outputByteBudget: Int = 8 * 1024 * 1024,
     childEnvironment: [String: String] = [:],
+    childEnvironmentByExecutablePath: [String: [String: String]] = [:],
     processExecutor: FoundationProcessExecutor = FoundationProcessExecutor()
   ) {
     self.resolver = resolver
     self.outputByteBudget = outputByteBudget
     self.childEnvironment = childEnvironment
+    self.childEnvironmentByExecutablePath = childEnvironmentByExecutablePath
     self.processExecutor = processExecutor
   }
 
@@ -206,6 +209,8 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
         subreceipt = try await execute(
           invocation, executable: executable, argumentZero: plan.argumentZero,
           workingDirectory: plan.workingDirectory,
+          childEnvironment: childEnvironmentByExecutablePath[executable.path]
+            ?? childEnvironment,
           executableLaunchMode: executableLaunchMode,
           verifiedAnalyzerSource: verifiedAnalyzerSource,
           // A plan that bounded its own output wins over this dispatcher's
@@ -317,6 +322,7 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     executable: ResolvedExecutable,
     argumentZero: String?,
     workingDirectory: String?,
+    childEnvironment: [String: String],
     executableLaunchMode: ProcessExecutableLaunchMode,
     verifiedAnalyzerSource: VerifiedRegularFileDescriptor?,
     captureLimit: Int

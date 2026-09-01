@@ -3,6 +3,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCLI
+@testable import ArkDeckBootstrap
 @testable import ArkDeckCore
 @testable import ArkDeckLaunchAgent
 @testable import ArkDeckOpenHarmony
@@ -33,6 +34,59 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
           version: "fixture-1", profileReferences: ["fixture-profile"])
       },
       nowUTC: { "2026-09-01T00:00:00Z" })
+  }
+  private func devecoRegistry() -> BootstrapDevEcoToolchainRegistry {
+    let inspect: (URL) throws -> BootstrapToolTrust = { url in
+      if url.pathExtension == "app" {
+        return BootstrapToolTrust(
+          signature: "verified", identifier: "com.huawei.devecostudio.ds",
+          teamIdentifier: "TZEA3TN37Q",
+          codeDirectorySHA256: String(repeating: "a", count: 64))
+      }
+      return BootstrapToolTrust(
+        signature: "verified", identifier: "node",
+        teamIdentifier: "HX7739G8FX",
+        codeDirectorySHA256: String(repeating: "b", count: 64))
+    }
+    return BootstrapDevEcoToolchainRegistry(
+      owner: BootstrapBundleRegistry(root: root.appending(path: "registry")),
+      inspectTrust: inspect, inspectPublisherTrust: inspect,
+      verifySignedResources: { contents, expected in
+        for (relativePath, digest) in expected {
+          XCTAssertEqual(
+            SHA256Hex.string(of: try Data(contentsOf: contents.appending(path: relativePath))),
+            digest)
+        }
+      },
+      nowUTC: { "2026-09-01T00:00:00Z" })
+  }
+  private func devecoFixture() throws -> URL {
+    let contents = root.appending(
+      path: "DevEco-Studio.app/Contents", directoryHint: .isDirectory)
+    for relative in [
+      "Resources", "sdk/default/openharmony", "tools/node/bin", "tools/hvigor/bin",
+      "_CodeSignature",
+    ] {
+      try FileManager.default.createDirectory(
+        at: contents.appending(path: relative, directoryHint: .isDirectory),
+        withIntermediateDirectories: true)
+    }
+    try Data("""
+      {"name":"DevEco Studio","version":"26.0.0.2","buildNumber":"26002",
+       "productCode":"DS","productVendor":"Huawei",
+       "launch":[{"os":"macOS","arch":"aarch64"}]}
+      """.utf8).write(to: contents.appending(path: "Resources/product-info.json"))
+    try Data("""
+      {"data":{"apiVersion":"26","platformVersion":"26.0.0","version":"26.0.0.25"}}
+      """.utf8).write(to: contents.appending(path: "sdk/default/sdk-pkg.json"))
+    let node = contents.appending(path: "tools/node/bin/node")
+    try Data("fixture native node".utf8).write(to: node)
+    XCTAssertEqual(chmod(node.path, 0o755), 0)
+    try Data("fixture hvigor".utf8).write(
+      to: contents.appending(path: "tools/hvigor/bin/hvigorw.js"))
+    try Data("fixture signed resource envelope".utf8).write(
+      to: contents.appending(path: "_CodeSignature/CodeResources"))
+    return contents
   }
   private func fixture(_ name: String = "fixture-hdc") throws -> URL {
     let url = root.appending(path: name)
@@ -297,6 +351,67 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
     }
   }
 
+  func testDevEcoRootRegistrationPinsTypedManifestAndClosedChildRoles() throws {
+    let contents = try devecoFixture()
+    let owner = devecoRegistry()
+    let registered = try owner.register(root: contents)
+    let fields = try object(registered)
+    let reference = try string(fields["toolRef"])
+    XCTAssertTrue(reference.hasPrefix("toolchain:sha256:"))
+    XCTAssertEqual(fields["kind"], .string("deveco"))
+    XCTAssertEqual(fields["sdkVersion"], .string("26.0.0.25"))
+    XCTAssertFalse(String(data: try CanonicalJSONEncoders.canonical().encode(registered), encoding: .utf8)!.contains(contents.path))
+    XCTAssertEqual(try devecoRegistry().register(root: contents), registered)
+
+    let dependency = try BootstrapToolRegistry.ReferenceOwner(
+      kind: .workspacePreset, id: "preset-fixture")
+    _ = try owner.acquire(reference, owner: dependency)
+    let resolved = try owner.resolve(reference, owner: dependency)
+    XCTAssertEqual(resolved.contentsRoot.path, contents.path)
+    XCTAssertEqual(resolved.sdkRoot.path, contents.appending(path: "sdk").path)
+    XCTAssertEqual(resolved.nodeExecutable.path, contents.appending(path: "tools/node/bin/node").path)
+    assertFailure("resourceConflict") {
+      _ = try devecoRegistry().remove(reference, expectedGeneration: "1")
+    }
+    try owner.release(reference, owner: dependency)
+    let removed = try devecoRegistry().remove(reference, expectedGeneration: "1")
+    XCTAssertEqual(try object(removed)["state"], .string("removed"))
+    XCTAssertEqual(try devecoRegistry().remove(reference, expectedGeneration: "1"), removed)
+    XCTAssertEqual(try devecoRegistry().inspect(reference), removed)
+    XCTAssertEqual(try devecoRegistry().listValues(), [removed])
+  }
+
+  func testDevEcoRootRejectsWrongShapeAndFailsClosedAfterChildDrift() throws {
+    assertFailure("invalidInput") {
+      _ = try devecoRegistry().register(root: root)
+    }
+    let contents = try devecoFixture()
+    let registered = try object(devecoRegistry().register(root: contents))
+    let reference = try string(registered["toolRef"])
+    let hvigor = contents.appending(path: "tools/hvigor/bin/hvigorw.js")
+    try Data("changed hvigor".utf8).write(to: hvigor)
+    assertFailure("recordUnreadable") { _ = try devecoRegistry().inspect(reference) }
+  }
+
+  func testInstalledDevEcoRootPassesStaticBundleAndChildIdentityInspection() throws {
+    let contents = URL(
+      filePath: "/Applications/DevEco-Studio.app/Contents",
+      directoryHint: .isDirectory)
+    guard FileManager.default.fileExists(atPath: contents.path) else {
+      throw XCTSkip("DevEco Studio is not installed; static host integration was not run")
+    }
+    let owner = BootstrapDevEcoToolchainRegistry(
+      owner: BootstrapBundleRegistry(root: root.appending(path: "installed-deveco-registry")))
+    let registered = try owner.register(root: contents)
+    let fields = try object(registered)
+    XCTAssertEqual(fields["kind"], .string("deveco"))
+    XCTAssertEqual(fields["state"], .string("available"))
+    XCTAssertEqual(try owner.inspect(try string(fields["toolRef"])), registered)
+    let rendered = String(
+      decoding: try CanonicalJSONEncoders.canonical().encode(registered), as: UTF8.self)
+    XCTAssertFalse(rendered.contains(contents.path))
+  }
+
   func testImmutableToolListAndCLIHandlerUseTheSameOwner() throws {
     let source = try fixture()
     var rows: [JSONValue] = []
@@ -330,7 +445,9 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
       let original = dup(STDOUT_FILENO)
       guard original >= 0, dup2(fd, STDOUT_FILENO) >= 0 else { throw Failure.injected }
       defer { fflush(stdout); _ = dup2(original, STDOUT_FILENO); close(original) }
-      try RuntimeCLI.runBootstrapTool(args + ["--output", "json", "--control-request-id", "tool-test"], registry: registry())
+      try RuntimeCLI.runBootstrapTool(
+        args + ["--output", "json", "--control-request-id", "tool-test"],
+        registry: registry(), devecoRegistry: devecoRegistry())
       fflush(stdout)
       return try object(JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: output)))
     }
@@ -341,9 +458,14 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
     XCTAssertEqual(registered["command"], .string("runtime.tool.register"))
     let reference = try string(object(XCTUnwrap(registered["result"]))["toolRef"])
     XCTAssertEqual(try invoke(["inspect", "--tool", reference])["result"], registered["result"])
-    let listed = try invoke(["list", "--page-size", "4"])
+    let deveco = try invoke([
+      "register", "--kind", "deveco", "--root", try devecoFixture().path,
+    ])
+    let devecoRef = try string(object(XCTUnwrap(deveco["result"]))["toolRef"])
+    XCTAssertTrue(devecoRef.hasPrefix("toolchain:sha256:"))
+    let listed = try invoke(["list", "--page-size", "10"])
     guard case .array(let all)? = try object(XCTUnwrap(listed["result"]))["items"] else { throw Failure.injected }
-    XCTAssertEqual(all.count, rows.count + 1)
+    XCTAssertEqual(all.count, rows.count + 2)
     let removal = try invoke(["remove", "--tool", reference, "--expected-generation", "1"])
     XCTAssertEqual(try object(XCTUnwrap(removal["result"]))["state"], .string("removed"))
     do {

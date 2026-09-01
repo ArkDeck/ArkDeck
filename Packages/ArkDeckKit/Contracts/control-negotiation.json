@@ -71,7 +71,12 @@
     "workspace.project.register",
     "workspace.project.remove",
     "workspace.project.show",
-    "workspace.project.update"
+    "workspace.project.update",
+    "workspace.preset.list",
+    "workspace.preset.register",
+    "workspace.preset.remove",
+    "workspace.preset.show",
+    "workspace.preset.update"
   ],
   "preBootstrapLegacyMethods": [
     "health"

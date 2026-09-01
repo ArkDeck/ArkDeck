@@ -102,9 +102,13 @@ layout; it returns the exact copied executable/dependency manifest. The Runtime
 consumer must retain/revalidate its directory and every file through the existing
 Process identity layer. This manifest is not an execution authorization.
 
-Tool selection, SDK/toolchain `--root` registration, typed service adoption and
-the App bridge are not implemented by these four commands. They still require
-the §7.8 control-action/HAR integration; registration never changes preferences
-or stops/restarts HDC. The optional installed-DevEco integration test statically
-checks the copied HDC/libusb pair and its drift handling, with no HDC invocation
-or device dispatch. Machines without that SDK explicitly skip that host test.
+Tool selection, typed service adoption and the App bridge are not implemented
+by these four HDC commands. They still require the §7.8 control-action/HAR
+integration; registration never changes preferences or stops/restarts HDC. The
+optional installed-DevEco integration test statically checks the copied
+HDC/libusb pair and its drift handling, with no HDC invocation or device
+dispatch. Machines without that SDK explicitly skip that host test.
+
+The same inventory now supports bounded DevEco `--root` registration and
+workspace-preset pins. Its different trust and retention shape is documented in
+[CLI workspace preset and DevEco toolchain lifecycle](cli-workspace-preset-toolchain-lifecycle.md).

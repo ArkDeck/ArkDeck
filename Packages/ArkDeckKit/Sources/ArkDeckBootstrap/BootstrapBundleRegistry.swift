@@ -48,7 +48,9 @@ package final class BootstrapBundleRegistry {
   private let fault: (String) throws -> Void
   private let nowUTC: () -> String
 
-  package convenience init() throws {
+  package convenience init(
+    validateBundle: ((URL) throws -> Void)? = nil
+  ) throws {
     // getpwuid_r deliberately ignores HOME and App Sandbox's container home.
     // A sandboxed caller without the shared bridge fails, rather than creating
     // a second registry that disagrees with the CLI/service owner.
@@ -59,15 +61,19 @@ package final class BootstrapBundleRegistry {
       let path = String(validatingCString: home), path.hasPrefix("/") else {
       throw Files.failure("runtimeUnavailable", "current-user bootstrap home is unavailable")
     }
-    self.init(root: URL(filePath: path).appending(path: "Library/Application Support/ArkDeck/Bootstrap/v1"))
+    self.init(
+      root: URL(filePath: path).appending(
+        path: "Library/Application Support/ArkDeck/Bootstrap/v1"),
+      validateBundle: validateBundle)
   }
 
   package init(root: URL, validateBundle: ((URL) throws -> Void)? = nil,
     fault: @escaping (String) throws -> Void = { _ in },
     nowUTC: @escaping () -> String = { ISO8601DateFormatter().string(from: Date()) }) {
     self.root = root
-    self.validateBundle = validateBundle ?? { candidate in
-      _ = try LaunchAgentService.validateProductionDaemonBundle(candidate, fileManager: .default)
+    self.validateBundle = validateBundle ?? { _ in
+      throw Files.failure(
+        "admissionDenied", "daemon bundle registration requires its production trust adapter")
     }
     self.fault = fault; self.nowUTC = nowUTC
   }

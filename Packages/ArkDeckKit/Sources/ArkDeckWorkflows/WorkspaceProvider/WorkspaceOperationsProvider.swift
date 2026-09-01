@@ -50,13 +50,15 @@ package struct WorkspaceCommandPreset: Sendable, Equatable {
   package let argumentZero: String?
   package let fixedArguments: [String]
   package let timeoutSeconds: Int
+  package let verifiedResources: [ResolvedExecutableResource]
 
   public init(
     presetID: String,
     executable: WorkspaceExecutableIdentity,
     argumentZero: String? = nil,
     fixedArguments: [String],
-    timeoutSeconds: Int
+    timeoutSeconds: Int,
+    verifiedResources: [ResolvedExecutableResource] = []
   ) throws {
     guard WorkspaceProviderSupport.isIdentifier(presetID) else {
       throw DeviceProviderError.factsUnavailable("workspace preset id is malformed")
@@ -71,15 +73,46 @@ package struct WorkspaceCommandPreset: Sendable, Equatable {
       fixedArguments.count <= 128,
       fixedArguments.allSatisfy({
         !$0.contains("\0") && $0.utf8.count <= 4_096
+      }),
+      verifiedResources.count <= 16,
+      Set(verifiedResources.map(\.path)).count == verifiedResources.count,
+      verifiedResources.allSatisfy({ resource in
+        resource.path.hasPrefix("/")
+          && URL(filePath: resource.path).standardizedFileURL.path == resource.path
+          && WorkspaceProviderSupport.isSHA256(resource.sha256)
+          && resource.byteCount > 0
       })
     else {
-      throw DeviceProviderError.factsUnavailable("workspace preset arguments are not bounded")
+      throw DeviceProviderError.factsUnavailable(
+        "workspace preset arguments or verified resources are not bounded")
     }
     self.presetID = presetID
     self.executable = executable
     self.argumentZero = argumentZero
     self.fixedArguments = fixedArguments
     self.timeoutSeconds = timeoutSeconds
+    self.verifiedResources = verifiedResources
+  }
+}
+
+package struct RuntimeWorkspaceResolvedPreset: Sendable, Equatable {
+  package let resource: RuntimeWorkspacePresetResource
+  package let nodePath: String?
+  package let hvigorScriptPath: String?
+  package let sdkRootPath: String?
+  package let verifiedResources: [ResolvedExecutableResource]
+
+  package init(
+    resource: RuntimeWorkspacePresetResource,
+    nodePath: String? = nil, hvigorScriptPath: String? = nil,
+    sdkRootPath: String? = nil,
+    verifiedResources: [ResolvedExecutableResource] = []
+  ) {
+    self.resource = resource
+    self.nodePath = nodePath
+    self.hvigorScriptPath = hvigorScriptPath
+    self.sdkRootPath = sdkRootPath
+    self.verifiedResources = verifiedResources
   }
 }
 
@@ -292,9 +325,10 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
   package static func waterFlowDemo(
     rootURL: URL,
     projectRef: String = "demo-app",
-    nodePath: String,
-    hvigorScriptPath: String,
-    symbolizerPath: String? = nil
+    nodePath: String? = nil,
+    hvigorScriptPath: String? = nil,
+    symbolizerPath: String? = nil,
+    registeredPresets: [RuntimeWorkspaceResolvedPreset]? = nil
   ) throws -> WorkspaceProjectProfile {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
     let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
@@ -310,11 +344,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
         "workspace.projectProfileUnavailable: project root is under a "
           + "macOS privacy-managed user folder; configure a LaunchAgent-readable path")
     }
-    let canonicalScript = URL(filePath: hvigorScriptPath)
-      .resolvingSymlinksInPath().standardizedFileURL.path
-    guard hvigorScriptPath.hasPrefix("/"),
-      FileManager.default.fileExists(atPath: canonicalScript),
-      FileManager.default.fileExists(
+    guard FileManager.default.fileExists(
         atPath: URL(filePath: root).appending(path: "build-profile.json5").path),
       FileManager.default.fileExists(
         atPath: URL(filePath: root)
@@ -327,7 +357,6 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     let sed = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/sed")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
     let tar = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/bsdtar")
-    let node = try WorkspaceExecutableIdentity.hashing(path: nodePath)
     let inspection = try WorkspaceCommandPreset(
       presetID: "source-inspection", executable: grep,
       fixedArguments: [], timeoutSeconds: 30)
@@ -354,21 +383,82 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     } else {
       sourceControl = nil
     }
-    let commonHvigorArguments = [
-      "--mode", "module",
-      "-p", "module=entry@default",
-      "-p", "product=default",
-      "-p", "buildMode=debug",
-      "--analyze=normal", "--parallel", "--incremental", "--no-daemon",
-    ]
-    let build = try WorkspaceCommandPreset(
-      presetID: "waterflow-debug", executable: node,
-      fixedArguments: [canonicalScript, "assembleHap"] + commonHvigorArguments,
-      timeoutSeconds: 1_800)
-    let tests = try WorkspaceCommandPreset(
-      presetID: "waterflow-tests", executable: node,
-      fixedArguments: [canonicalScript, "test"] + commonHvigorArguments,
-      timeoutSeconds: 1_800)
+    var builds: [String: WorkspaceCommandPreset] = [:]
+    var tests: [String: WorkspaceCommandPreset] = [:]
+    var buildProducts: [String: String] = [:]
+    if let registeredPresets {
+      for resolved in registeredPresets where ["build", "test"].contains(resolved.resource.kind) {
+        guard let nodePath = resolved.nodePath,
+          let hvigorScriptPath = resolved.hvigorScriptPath,
+          let module = resolved.resource.constraints.module,
+          let product = resolved.resource.constraints.product,
+          let buildMode = resolved.resource.constraints.buildMode
+        else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace.presetUnavailable: registered Hvigor preset did not resolve")
+        }
+        let canonicalScript = URL(filePath: hvigorScriptPath)
+          .resolvingSymlinksInPath().standardizedFileURL.path
+        guard nodePath.hasPrefix("/"), hvigorScriptPath.hasPrefix("/"),
+          FileManager.default.fileExists(atPath: canonicalScript)
+        else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace.presetUnavailable: registered Hvigor toolchain drifted")
+        }
+        let node = try WorkspaceExecutableIdentity.hashing(path: nodePath)
+        let common = [
+          "--mode", "module",
+          "-p", "module=\(module)@\(product)",
+          "-p", "product=\(product)",
+          "-p", "buildMode=\(buildMode)",
+          "--analyze=normal", "--parallel", "--incremental", "--no-daemon",
+        ]
+        let preset = try WorkspaceCommandPreset(
+          presetID: resolved.resource.presetRef, executable: node,
+          fixedArguments: [canonicalScript,
+            resolved.resource.kind == "build" ? "assembleHap" : "test"] + common,
+          timeoutSeconds: resolved.resource.timeoutSeconds,
+          verifiedResources: resolved.verifiedResources)
+        if resolved.resource.kind == "build" {
+          builds[preset.presetID] = preset
+          buildProducts[preset.presetID] =
+            "\(module)/build/\(product)/outputs/\(product)/\(module)-\(product)-unsigned.hap"
+        } else {
+          tests[preset.presetID] = preset
+        }
+      }
+    } else {
+      guard let nodePath, let hvigorScriptPath else {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace.projectProfileUnavailable: legacy Hvigor configuration is absent")
+      }
+      let canonicalScript = URL(filePath: hvigorScriptPath)
+        .resolvingSymlinksInPath().standardizedFileURL.path
+      guard hvigorScriptPath.hasPrefix("/"),
+        FileManager.default.fileExists(atPath: canonicalScript)
+      else {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent")
+      }
+      let node = try WorkspaceExecutableIdentity.hashing(path: nodePath)
+      let common = [
+        "--mode", "module", "-p", "module=entry@default",
+        "-p", "product=default", "-p", "buildMode=debug",
+        "--analyze=normal", "--parallel", "--incremental", "--no-daemon",
+      ]
+      let build = try WorkspaceCommandPreset(
+        presetID: "waterflow-debug", executable: node,
+        fixedArguments: [canonicalScript, "assembleHap"] + common,
+        timeoutSeconds: 1_800)
+      let test = try WorkspaceCommandPreset(
+        presetID: "waterflow-tests", executable: node,
+        fixedArguments: [canonicalScript, "test"] + common,
+        timeoutSeconds: 1_800)
+      builds[build.presetID] = build
+      tests[test.presetID] = test
+      buildProducts[build.presetID] =
+        "entry/build/default/outputs/default/entry-default-unsigned.hap"
+    }
     // ArkTS stacks are obfuscated in a release build: the frame names a
     // compiled unit and a position that no one can open. `sourceMaps.map` is
     // written beside the HAP by the same build, so the resolution is a lookup
@@ -390,15 +480,28 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     if let symbolizerPath,
       let symbolizer = try? WorkspaceExecutableIdentity.hashing(path: symbolizerPath)
     {
-      let preset = try WorkspaceCommandPreset(
-        presetID: "arkts-sourcemap", executable: symbolizer,
-        fixedArguments: [
-          "--symbolize-crash",
-          URL(filePath: root, directoryHint: .isDirectory)
-            .appending(path: "entry/build/default/outputs/default/mapping/sourceMaps.map").path,
-        ],
-        timeoutSeconds: 300)
-      symbols[preset.presetID] = preset
+      if let registeredPresets {
+        for resolved in registeredPresets where resolved.resource.kind == "symbol" {
+          guard let relativeMap = resolved.resource.constraints.relativeSourceMap else { continue }
+          let preset = try WorkspaceCommandPreset(
+            presetID: resolved.resource.presetRef, executable: symbolizer,
+            fixedArguments: [
+              "--symbolize-crash",
+              URL(filePath: root, directoryHint: .isDirectory)
+                .appending(path: relativeMap).path,
+            ], timeoutSeconds: resolved.resource.timeoutSeconds)
+          symbols[preset.presetID] = preset
+        }
+      } else {
+        let preset = try WorkspaceCommandPreset(
+          presetID: "arkts-sourcemap", executable: symbolizer,
+          fixedArguments: [
+            "--symbolize-crash",
+            URL(filePath: root, directoryHint: .isDirectory)
+              .appending(path: "entry/build/default/outputs/default/mapping/sourceMaps.map").path,
+          ], timeoutSeconds: 300)
+        symbols[preset.presetID] = preset
+      }
     }
     return try WorkspaceProjectProfile(
       profileID: "waterflow-openharmony@1", projectRef: projectRef,
@@ -411,26 +514,24 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       sourceReaderPreset: sourceReader,
       archiveCheckpointPreset: checkpointing,
       patchPreset: patching,
-      buildPresets: [build.presetID: build],
-      testPresets: [tests.presetID: tests],
+      buildPresets: builds,
+      testPresets: tests,
       symbolPresets: symbols,
-      buildProducts: [
-        build.presetID: "entry/build/default/outputs/default/entry-default-unsigned.hap"
-      ])
+      buildProducts: buildProducts)
   }
 
   fileprivate var executableIdentities: Set<WorkspaceExecutableIdentity> {
-    var values: Set<WorkspaceExecutableIdentity> = [
-      inspectionPreset.executable, patchPreset.executable,
-    ]
-    if let sourceControl = sourceControlPreset { values.insert(sourceControl.executable) }
-    if let sourceReader = sourceReaderPreset { values.insert(sourceReader.executable) }
-    if let archiveCheckpoint = archiveCheckpointPreset {
-      values.insert(archiveCheckpoint.executable)
-    }
-    for preset in buildPresets.values { values.insert(preset.executable) }
-    for preset in testPresets.values { values.insert(preset.executable) }
-    for preset in symbolPresets.values { values.insert(preset.executable) }
+    Set(commandPresets.map(\.executable))
+  }
+
+  fileprivate var commandPresets: [WorkspaceCommandPreset] {
+    var values = [inspectionPreset, patchPreset]
+    if let sourceControlPreset { values.append(sourceControlPreset) }
+    if let sourceReaderPreset { values.append(sourceReaderPreset) }
+    if let archiveCheckpointPreset { values.append(archiveCheckpointPreset) }
+    values.append(contentsOf: buildPresets.values)
+    values.append(contentsOf: testPresets.values)
+    values.append(contentsOf: symbolPresets.values)
     return values
   }
 }
@@ -805,15 +906,18 @@ extension WorkspacePatchAttemptStore: WorkspacePatchLineageReading {
 /// check again atomically at spawn.
 package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
   private let allowed: Set<WorkspaceExecutableIdentity>
+  private let resourcesByExecutable: [WorkspaceExecutableIdentity: [ResolvedExecutableResource]]
   private let requiresEveryIdentityAtGenericResolution: Bool
 
   public init(profile: WorkspaceProjectProfile) {
     self.allowed = profile.executableIdentities
+    self.resourcesByExecutable = Self.resourcesByExecutable(in: [profile])
     self.requiresEveryIdentityAtGenericResolution = true
   }
 
   package init(profiles: [WorkspaceProjectProfile]) {
     self.allowed = Set(profiles.flatMap(\.executableIdentities))
+    self.resourcesByExecutable = Self.resourcesByExecutable(in: profiles)
     self.requiresEveryIdentityAtGenericResolution = false
   }
 
@@ -875,7 +979,31 @@ package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
       throw RuntimeDispatchFailure.failed(
         "workspace executable identity drifted: \(identity.path)")
     }
-    return ResolvedExecutable(path: identity.path, sha256: identity.sha256)
+    return ResolvedExecutable(
+      path: identity.path, sha256: identity.sha256,
+      verifiedResources: resourcesByExecutable[identity] ?? [])
+  }
+
+  private static func resourcesByExecutable(
+    in profiles: [WorkspaceProjectProfile]
+  ) -> [WorkspaceExecutableIdentity: [ResolvedExecutableResource]] {
+    var result: [WorkspaceExecutableIdentity: [ResolvedExecutableResource]] = [:]
+    for profile in profiles {
+      for preset in profile.commandPresets {
+        var resources = result[preset.executable, default: []]
+        for resource in preset.verifiedResources
+        where !resources.contains(where: {
+          $0.path == resource.path && $0.sha256 == resource.sha256
+            && $0.byteCount == resource.byteCount
+            && $0.requireExecutable == resource.requireExecutable
+        }) {
+          resources.append(resource)
+        }
+        resources.sort { ($0.path, $0.sha256) < ($1.path, $1.sha256) }
+        result[preset.executable] = resources
+      }
+    }
+    return result
   }
 }
 

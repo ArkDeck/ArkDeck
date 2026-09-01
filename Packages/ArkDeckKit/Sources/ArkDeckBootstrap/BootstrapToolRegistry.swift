@@ -11,6 +11,7 @@ package final class BootstrapToolRegistry {
   package typealias ReferenceOwner = BootstrapBundleRegistry.ReferenceOwner
   private static let maximumToolBytes = BootstrapToolFiles.maximumBytes
   private let owner: BootstrapBundleRegistry
+  package var sharedOwner: BootstrapBundleRegistry { owner }
   private let inspectTrust: (URL) throws -> BootstrapToolTrust
   private let fault: (String) throws -> Void
   private let nowUTC: () -> String
@@ -196,10 +197,16 @@ package final class BootstrapToolRegistry {
 
   package func list<T>(_ render: (URL, [JSONValue]) throws -> T) throws -> T {
     try owner.withSharedStore { directory, root in
-      let index = try readIndex(directory)
-      for record in index.records { try verify(record, directory: directory, root: root) }
-      return try render(root.appending(path: "tool-snapshots"), index.records.map { value($0, in: index) })
+      return try render(
+        root.appending(path: "tool-snapshots"),
+        listValuesLocked(directory, root: root))
     }
+  }
+
+  package func listValuesLocked(_ directory: Int32, root: URL) throws -> [JSONValue] {
+    let index = try readIndex(directory)
+    for record in index.records { try verify(record, directory: directory, root: root) }
+    return index.records.map { value($0, in: index) }
   }
 
   package func remove(_ reference: String, expectedGeneration: String) throws -> JSONValue {

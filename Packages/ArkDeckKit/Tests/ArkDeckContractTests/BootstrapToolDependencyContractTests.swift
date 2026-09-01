@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import XCTest
+@testable import ArkDeckBootstrap
 @testable import ArkDeckCore
 @testable import ArkDeckLaunchAgent
 

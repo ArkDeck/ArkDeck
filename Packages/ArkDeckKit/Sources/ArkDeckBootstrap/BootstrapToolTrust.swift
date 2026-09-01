@@ -13,12 +13,31 @@ package struct BootstrapToolTrust: Codable, Equatable {
   package let codeDirectorySHA256: String?
 
   package static func inspect(_ url: URL) throws -> BootstrapToolTrust {
+    try inspect(url, validationFlags: SecCSFlags(
+      rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures))
+  }
+
+  /// Validates the signed native code and its publisher while deliberately
+  /// leaving mutable bundle resources to a separate, allowlisted resource
+  /// envelope check. DevEco's SDK manager may replace SDK payloads after the
+  /// app was signed, so validating every unrelated bundle resource would make
+  /// a still publisher-bound toolchain impossible to register. This flag does
+  /// not skip executable page hashes or CMS/publisher validation.
+  package static func inspectCodeOnly(_ url: URL) throws -> BootstrapToolTrust {
+    try inspect(url, validationFlags: SecCSFlags(
+      rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures
+        | kSecCSDoNotValidateResources))
+  }
+
+  private static func inspect(
+    _ url: URL, validationFlags: SecCSFlags
+  ) throws -> BootstrapToolTrust {
     var code: SecStaticCode?
     let opened = SecStaticCodeCreateWithPath(url as CFURL, SecCSFlags(), &code)
     guard opened == errSecSuccess, let code else {
       throw BootstrapBundleFiles.failure("admissionDenied", "host tool has no readable native code identity (status \(opened))")
     }
-    let status = SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures), nil)
+    let status = SecStaticCodeCheckValidity(code, validationFlags, nil)
     if status == errSecCSUnsigned {
       return Self(signature: "unsigned", identifier: nil, teamIdentifier: nil, codeDirectorySHA256: nil)
     }

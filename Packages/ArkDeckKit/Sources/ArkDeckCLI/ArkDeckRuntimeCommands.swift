@@ -3487,8 +3487,8 @@ params))
     var rest = Array(arguments.dropFirst())
     var session = runtimeSession(&rest, command: "workspace.\(group).\(verb)")
     let options = try CLIOptions(rest)
-    if group == "project" {
-      try session.negotiate(requiredMajor: 2, forMethod: "workspace.project.\(verb)")
+    if group == "project" || group == "preset" {
+      try session.negotiate(requiredMajor: 2, forMethod: "workspace.\(group).\(verb)")
     }
     var params: [String: JSONValue] = [:]
     if let projectRef = options.value("--project") {
@@ -3499,16 +3499,30 @@ params))
     if let requestID = options.value("--registration-request-id") {
       params["registrationRequestId"] = .string(requestID)
     }
+    if let requestID = options.value("--mutation-request-id") {
+      params["mutationRequestId"] = .string(requestID)
+    }
     if let root = options.value("--root") { params["root"] = .string(root) }
     if let generation = options.value("--expected-generation") {
       params["expectedGeneration"] = .string(generation)
+    }
+    for (option, field) in [
+      ("--template", "templateRef"), ("--toolchain", "toolchainRef"),
+      ("--toolchain-generation", "toolchainGeneration"),
+      ("--credential", "credentialRef"), ("--timeout-seconds", "timeoutSeconds"),
+      ("--module", "module"), ("--product", "product"),
+      ("--build-mode", "buildMode"),
+      ("--relative-source-map", "relativeSourceMap"),
+    ] {
+      if let value = options.value(option) { params[field] = .string(value) }
     }
 
     switch (group, verb) {
     case ("project", "list"):
       session.emit(try session.request("workspace.project.list"))
     case ("project", "show"), ("project", "update"), ("project", "remove"),
-      ("preset", "list"), ("preset", "show"):
+      ("preset", "list"), ("preset", "show"), ("preset", "register"),
+      ("preset", "update"), ("preset", "remove"):
       guard params["projectRef"] != nil else {
         throw CLIError(
           exitCode: EX_USAGE,

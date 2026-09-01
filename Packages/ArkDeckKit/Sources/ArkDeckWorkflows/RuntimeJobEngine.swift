@@ -1360,7 +1360,19 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "workspace operation requires a registered projectRef")
     }
-    do { return try workspaceProjectStore.acquireUse(projectRef: projectRef) }
+    let presetInputNames: Set<String> = [
+      "buildPresetRef", "testPresetRef", "signingPresetRef", "symbolPresetRef",
+    ]
+    let presetRefs = descriptor.inputs.compactMap { input -> String? in
+      guard presetInputNames.contains(input.name),
+        case .string(let value)? = inputs[input.name]
+      else { return nil }
+      return value
+    }
+    do {
+      return try workspaceProjectStore.acquireUse(
+        projectRef: projectRef, presetRefs: presetRefs)
+    }
     catch let failure as RuntimeWorkspaceProjectFailure {
       let code: RuntimeOperationErrorCode
       switch failure.code {
@@ -1425,6 +1437,74 @@ public actor RuntimeJobEngine {
     return try workspaceProjectStore.remove(
       projectRef: projectRef, expectedGeneration: expectedGeneration,
       requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
+  }
+
+  package func workspacePresetList(
+    projectRef: String, kind: String?
+  ) throws -> [RuntimeWorkspacePresetResource] {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace preset registration owner is unavailable")
+    }
+    return try workspaceProjectStore.listPresets(projectRef: projectRef, kind: kind)
+  }
+
+  package func workspacePresetInspect(
+    projectRef: String, presetRef: String
+  ) throws -> RuntimeWorkspacePresetResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace preset registration owner is unavailable")
+    }
+    return try workspaceProjectStore.inspectPreset(
+      projectRef: projectRef, presetRef: presetRef)
+  }
+
+  package func workspacePresetRegister(
+    requestID: String, projectRef: String, kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints
+  ) throws -> RuntimeWorkspacePresetResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace preset registration owner is unavailable")
+    }
+    return try workspaceProjectStore.registerPreset(
+      requestID: requestID, projectRef: projectRef, kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints)
+  }
+
+  package func workspacePresetUpdate(
+    requestID: String, projectRef: String, presetRef: String,
+    expectedGeneration: UInt64, kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints
+  ) throws -> RuntimeWorkspacePresetResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace preset registration owner is unavailable")
+    }
+    return try workspaceProjectStore.updatePreset(
+      requestID: requestID, projectRef: projectRef, presetRef: presetRef,
+      expectedGeneration: expectedGeneration, kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints,
+      requireNoActiveReference: admissionService.requireNoActiveWorkspacePresetReference)
+  }
+
+  package func workspacePresetRemove(
+    requestID: String, projectRef: String, presetRef: String,
+    expectedGeneration: UInt64
+  ) throws -> RuntimeWorkspacePresetResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace preset registration owner is unavailable")
+    }
+    return try workspaceProjectStore.removePreset(
+      requestID: requestID, projectRef: projectRef, presetRef: presetRef,
+      expectedGeneration: expectedGeneration,
+      requireNoActiveReference: admissionService.requireNoActiveWorkspacePresetReference)
   }
 
   package func releaseImport(id: String, generation: Int) async throws -> JSONValue {

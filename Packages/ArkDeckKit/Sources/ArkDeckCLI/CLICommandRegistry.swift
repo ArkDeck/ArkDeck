@@ -759,6 +759,7 @@ enum CLICommandRegistry {
                   placeholder: "build|test|signing|symbol",
                   grammar: .enumeration(["build", "test", "signing", "symbol"])),
                 summary: "narrow to one preset kind"),
+              targetProtocolOption,
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -772,6 +773,33 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "preset-ref", grammar: .opaque),
                 summary: "preset reference from `workspace preset list`",
                 isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "register",
+            canonicalCommand: "workspace.preset.register",
+            summary: "register one typed preset against a project and exact toolchain generation",
+            options: runtimeClientOptions(
+              [workspacePresetRegistrationRequestOption, workspaceProjectRefOption]
+                + workspacePresetDefinitionOptions + [targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "update",
+            canonicalCommand: "workspace.preset.update",
+            summary: "replace one exact preset generation with a typed definition",
+            options: runtimeClientOptions(
+              [workspacePresetMutationRequestOption, workspaceProjectRefOption,
+                workspacePresetRefOption, generationOption]
+                + workspacePresetDefinitionOptions + [targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "remove",
+            canonicalCommand: "workspace.preset.remove",
+            summary: "remove one unused exact preset generation",
+            options: runtimeClientOptions([
+              workspacePresetMutationRequestOption, workspaceProjectRefOption,
+              workspacePresetRefOption, generationOption, targetProtocolOption,
             ]),
             connectsToRuntime: true),
         ]),
@@ -813,6 +841,68 @@ enum CLICommandRegistry {
     form: .value(placeholder: "project-ref", grammar: .opaque),
     summary: "registered project reference from `workspace project list`",
     isRequired: true)
+
+  private static let workspacePresetRefOption = CLIOptionSpec(
+    name: "--preset",
+    form: .value(placeholder: "preset-ref", grammar: .opaque),
+    summary: "preset reference from `workspace preset list`",
+    isRequired: true)
+
+  private static let workspacePresetRegistrationRequestOption = CLIOptionSpec(
+    name: "--registration-request-id",
+    form: .value(placeholder: "id", grammar: .opaque),
+    summary: "caller-stable preset registration identity",
+    isRequired: true)
+
+  private static let workspacePresetMutationRequestOption = CLIOptionSpec(
+    name: "--mutation-request-id",
+    form: .value(placeholder: "id", grammar: .opaque),
+    summary: "caller-stable update or removal identity",
+    isRequired: true)
+
+  private static var workspacePresetDefinitionOptions: [CLIOptionSpec] {
+    [
+      CLIOptionSpec(
+        name: "--kind",
+        form: .value(
+          placeholder: "build|test|signing|symbol",
+          grammar: .enumeration(["build", "test", "signing", "symbol"])),
+        summary: "closed preset family", isRequired: true),
+      CLIOptionSpec(
+        name: "--template",
+        form: .value(placeholder: "template-ref", grammar: .opaque),
+        summary: "closed template reference for this preset kind", isRequired: true),
+      CLIOptionSpec(
+        name: "--toolchain",
+        form: .value(placeholder: "toolchain-ref", grammar: .opaque),
+        summary: "registered DevEco toolchain reference"),
+      CLIOptionSpec(
+        name: "--toolchain-generation",
+        form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+        summary: "exact registered toolchain generation"),
+      CLIOptionSpec(
+        name: "--credential",
+        form: .value(placeholder: "credential-ref", grammar: .opaque),
+        summary: "registered credential reference; secrets are never accepted"),
+      CLIOptionSpec(
+        name: "--timeout-seconds",
+        form: .value(placeholder: "1...3600", grammar: .positiveInteger(1...3_600)),
+        summary: "bounded execution timeout", isRequired: true),
+      CLIOptionSpec(
+        name: "--module", form: .value(placeholder: "module", grammar: .opaque),
+        summary: "typed Hvigor module constraint"),
+      CLIOptionSpec(
+        name: "--product", form: .value(placeholder: "product", grammar: .opaque),
+        summary: "typed Hvigor product constraint"),
+      CLIOptionSpec(
+        name: "--build-mode", form: .value(placeholder: "mode", grammar: .opaque),
+        summary: "typed Hvigor build mode constraint"),
+      CLIOptionSpec(
+        name: "--relative-source-map",
+        form: .value(placeholder: "relative-path", grammar: .opaque),
+        summary: "project-relative source-map output for a symbol preset"),
+    ]
+  }
 
   private static let workspaceContinuationSourceOption = CLIOptionSpec(
     name: "--source-job",
@@ -1144,12 +1234,14 @@ enum CLICommandRegistry {
     token: "tool", summary: "register, inspect and safely select typed host tool candidates",
     leaves: [
       CLILeafSpec(token: "register", canonicalCommand: "runtime.tool.register",
-        summary: "copy a native HDC candidate and inspect its signature and published identity",
+        summary: "register a bounded native tool or installed SDK root without selecting it",
         options: [
-          CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdc", grammar: .enumeration(["hdc"])), summary: "closed host tool role", isRequired: true),
-          CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "native executable source, used only during registration", isRequired: true),
+          CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdc|deveco", grammar: .enumeration(["hdc", "deveco"])), summary: "closed host tool or toolchain role", isRequired: true),
+          CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "HDC executable source, used only during registration"),
+          CLIOptionSpec(name: "--root", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "DevEco app Contents root, used only during registration"),
           outputOption, jsonOption, controlRequestIDOption,
-        ]),
+        ],
+        mutuallyExclusive: [["--file", "--root"]]),
       CLILeafSpec(token: "list", canonicalCommand: "runtime.tool.list",
         summary: "read an immutable snapshot of registered tool candidates",
         options: snapshotPageOptions + [outputOption, jsonOption, controlRequestIDOption]),
@@ -1175,8 +1267,8 @@ enum CLICommandRegistry {
     ])
 
   private static let bootstrapToolRefOption = CLIOptionSpec(
-    name: "--tool", form: .value(placeholder: "tool:sha256:digest", grammar: .opaque),
-    summary: "exact content-addressed host tool reference", isRequired: true)
+    name: "--tool", form: .value(placeholder: "tool-reference", grammar: .opaque),
+    summary: "exact content-addressed host tool or toolchain reference", isRequired: true)
 
   private static let targetDisplayNameNode = CLINodeSpec(
     token: "display-name",

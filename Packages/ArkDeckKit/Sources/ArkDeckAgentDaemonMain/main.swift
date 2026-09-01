@@ -6,6 +6,7 @@
 
 import ArkDeckAgentComposition
 import ArkDeckAgentDaemon
+import ArkDeckBootstrap
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckRuntime
@@ -714,8 +715,31 @@ Task.detached {
           guard parts.count == 2, !parts[0].isEmpty, parts[1].hasPrefix("/") else { return nil }
           return (parts[0], parts[1])
         })
+    let bootstrapRegistry = try BootstrapBundleRegistry()
+    let devecoToolchains = BootstrapDevEcoToolchainRegistry(owner: bootstrapRegistry)
+    let workspaceToolchainPinning = RuntimeWorkspaceToolchainPinning(
+      acquire: { reference, generation, presetRef in
+        do {
+          let owner = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .workspacePreset, id: presetRef)
+          _ = try devecoToolchains.acquire(
+            reference, expectedGeneration: String(generation), owner: owner)
+        } catch let failure as AgentExecutionControlFailure {
+          throw RuntimeWorkspaceProjectFailure(failure.code, failure.message)
+        }
+      },
+      release: { reference, presetRef in
+        do {
+          let owner = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .workspacePreset, id: presetRef)
+          try devecoToolchains.release(reference, owner: owner)
+        } catch let failure as AgentExecutionControlFailure {
+          throw RuntimeWorkspaceProjectFailure(failure.code, failure.message)
+        }
+      })
     let workspaceProjectStore = try RuntimeWorkspaceProjectStore(
-      rootURL: resolvedStateDirectory, nowUTC: utcNow)
+      rootURL: resolvedStateDirectory, toolchainPinning: workspaceToolchainPinning,
+      nowUTC: utcNow)
     // The legacy daemon flags are a compatibility reader only. Import them
     // once into the same Runtime owner used by the target CLI, so service
     // restart stops depending on a raw caller path and the target projection
@@ -733,6 +757,8 @@ Task.detached {
     }
     let registeredWorkspaceStartup = try workspaceProjectStore.startupRecords()
     let registeredWorkspaceProjects = registeredWorkspaceStartup.map(\.resource)
+    let registeredWorkspacePresetCompositions = try workspaceProjectStore
+      .presetCompositionRecords()
     let registeredWorkspaceCompositions = registeredWorkspaceStartup.compactMap(\.composition)
     let registeredWorkspaceRoots = Dictionary(
       uniqueKeysWithValues: registeredWorkspaceCompositions.map {
@@ -766,6 +792,52 @@ Task.detached {
     var workspaceDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
       reason: "no workspace ProjectProfile is configured")
     var workspaceChildEnvironment: [String: String] = [:]
+    var workspaceChildEnvironmentByExecutablePath: [String: [String: String]] = [:]
+    var resolvedPresetsByProject: [String: [RuntimeWorkspaceResolvedPreset]] = [:]
+    var workspacePresetResolutionFailures: [String: String] = [:]
+    for composition in registeredWorkspacePresetCompositions {
+      let resource = composition.resource
+      do {
+        switch resource.kind {
+        case "build", "test":
+          guard let toolchainRef = resource.toolchainRef,
+            let toolchainGeneration = resource.toolchainGeneration
+          else {
+            throw RuntimeWorkspaceProjectFailure(
+              "recordUnreadable", "registered Hvigor preset has no toolchain pin")
+          }
+          let owner = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .workspacePreset, id: resource.presetRef)
+          let toolchain = try devecoToolchains.resolve(
+            toolchainRef, expectedGeneration: String(toolchainGeneration), owner: owner)
+          let resolved = RuntimeWorkspaceResolvedPreset(
+            resource: resource, nodePath: toolchain.nodeExecutable.path,
+            hvigorScriptPath: toolchain.hvigorScript.path,
+            sdkRootPath: toolchain.sdkRoot.path,
+            verifiedResources: toolchain.verifiedResources.map {
+              ResolvedExecutableResource(
+                path: $0.url.path, sha256: $0.sha256,
+                byteCount: $0.byteCount, requireExecutable: $0.requireExecutable)
+            })
+          resolvedPresetsByProject[resource.projectRef, default: []].append(resolved)
+          workspaceChildEnvironmentByExecutablePath[toolchain.nodeExecutable.path] = [
+            "DEVECO_SDK_HOME": toolchain.sdkRoot.path
+          ]
+        case "symbol":
+          resolvedPresetsByProject[resource.projectRef, default: []].append(
+            RuntimeWorkspaceResolvedPreset(resource: resource))
+        case "signing":
+          workspacePresetResolutionFailures[resource.presetRef] =
+            "workspace.signingCredentialOwnerUnavailable"
+        default:
+          workspacePresetResolutionFailures[resource.presetRef] =
+            "workspace.presetKindUnsupported"
+        }
+      } catch {
+        workspacePresetResolutionFailures[resource.presetRef] =
+          "workspace.presetResolutionFailed:\(error)"
+      }
+    }
     if let configuredInspector {
       let resolver = try FixedExecutableResolver.hashing(
         path: configuredInspector, providerID: "workspace")
@@ -792,38 +864,42 @@ Task.detached {
             rootURL: URL(filePath: root, directoryHint: .isDirectory),
             projectRef: projectRef)
         case "openharmony", "demo-app":
-          let node =
-            ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
-            ?? "/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
-          let hvigor =
-            ProcessInfo.processInfo.environment["ARKDECK_DEVECO_HVIGOR_PATH"]
-            ?? "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw.js"
-          let configuredSDK =
-            ProcessInfo.processInfo.environment["ARKDECK_DEVECO_SDK_HOME"]
-            ?? ProcessInfo.processInfo.environment["DEVECO_SDK_HOME"]
-            ?? "/Applications/DevEco-Studio.app/Contents/sdk"
-          let sdk = URL(filePath: configuredSDK, directoryHint: .isDirectory)
-            .resolvingSymlinksInPath().standardizedFileURL
-          var sdkIsDirectory: ObjCBool = false
-          let openHarmonySDK = sdk.appending(
-            path:
-              "default/openharmony", directoryHint: .isDirectory)
-          guard configuredSDK.hasPrefix("/"),
-            FileManager.default.fileExists(
-              atPath: openHarmonySDK.path, isDirectory: &sdkIsDirectory),
-            sdkIsDirectory.boolValue
-          else {
-            throw DeviceProviderError.factsUnavailable(
-              "workspace.projectProfileUnavailable: DevEco OpenHarmony SDK is absent")
+          if legacyWorkspaceRoots[projectRef] != nil {
+            let node =
+              ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
+              ?? "/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
+            let hvigor =
+              ProcessInfo.processInfo.environment["ARKDECK_DEVECO_HVIGOR_PATH"]
+              ?? "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw.js"
+            let configuredSDK =
+              ProcessInfo.processInfo.environment["ARKDECK_DEVECO_SDK_HOME"]
+              ?? ProcessInfo.processInfo.environment["DEVECO_SDK_HOME"]
+              ?? "/Applications/DevEco-Studio.app/Contents/sdk"
+            let sdk = URL(filePath: configuredSDK, directoryHint: .isDirectory)
+              .resolvingSymlinksInPath().standardizedFileURL
+            var sdkIsDirectory: ObjCBool = false
+            let openHarmonySDK = sdk.appending(
+              path: "default/openharmony", directoryHint: .isDirectory)
+            guard configuredSDK.hasPrefix("/"),
+              FileManager.default.fileExists(
+                atPath: openHarmonySDK.path, isDirectory: &sdkIsDirectory),
+              sdkIsDirectory.boolValue
+            else {
+              throw DeviceProviderError.factsUnavailable(
+                "workspace.projectProfileUnavailable: DevEco OpenHarmony SDK is absent")
+            }
+            profile = try WorkspaceProjectProfile.waterFlowDemo(
+              rootURL: URL(filePath: root, directoryHint: .isDirectory),
+              projectRef: projectRef, nodePath: node, hvigorScriptPath: hvigor,
+              symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"])
+            workspaceChildEnvironment = ["DEVECO_SDK_HOME": sdk.path]
+          } else {
+            profile = try WorkspaceProjectProfile.waterFlowDemo(
+              rootURL: URL(filePath: root, directoryHint: .isDirectory),
+              projectRef: projectRef,
+              symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"],
+              registeredPresets: resolvedPresetsByProject[projectRef] ?? [])
           }
-          profile = try WorkspaceProjectProfile.waterFlowDemo(
-            rootURL: URL(filePath: root, directoryHint: .isDirectory),
-            projectRef: projectRef, nodePath: node, hvigorScriptPath: hvigor,
-            symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"])
-          // Hvigor rejects a missing or stale inherited DEVECO_SDK_HOME with
-          // configuration error 00303217. Pin the validated profile SDK on
-          // this child route instead of depending on the daemon launcher.
-          workspaceChildEnvironment = ["DEVECO_SDK_HOME": sdk.path]
         default:
           throw DeviceProviderError.factsUnavailable(
             "workspace.projectProfileUnavailable:\(projectRef) is unsupported")
@@ -884,7 +960,8 @@ Task.detached {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
         resolver: CombinedWorkspaceExecutableResolver(
           inspector: inspectorExecutable, operations: workspaceOperationResolver),
-        childEnvironment: workspaceChildEnvironment)
+        childEnvironment: workspaceChildEnvironment,
+        childEnvironmentByExecutablePath: workspaceChildEnvironmentByExecutablePath)
     } else if let inspectorExecutable {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
         resolver: FixedExecutableResolver(
@@ -900,10 +977,23 @@ Task.detached {
           reason: workspaceResolutionFailures[configuredRef]
             ?? "this project profile could not be derived"))
     }
+    let resolvedProjectRefs = Set(resolvedWorkspaceProfiles.map(\.projectRef))
+    let appliedPresetGenerations: [String: UInt64] = Dictionary(uniqueKeysWithValues:
+      registeredWorkspacePresetCompositions.compactMap { composition in
+        let resource = composition.resource
+        guard resolvedProjectRefs.contains(resource.projectRef),
+          resolvedPresetsByProject[resource.projectRef]?.contains(where: {
+            $0.resource.presetRef == resource.presetRef
+          }) == true,
+          workspacePresetResolutionFailures[resource.presetRef] == nil
+        else { return nil }
+        return (resource.presetRef, resource.generation)
+      })
     workspaceProjectStore.markApplied(
-      Dictionary(uniqueKeysWithValues: registeredWorkspaceProjects.map {
+      projects: Dictionary(uniqueKeysWithValues: registeredWorkspaceProjects.map {
         ($0.projectRef, $0.generation)
-      }))
+      }),
+      presets: appliedPresetGenerations)
     let workspaceReferenceLedger = WorkspaceReferenceLedgerHandle()
     if let evolution = workspaceEvolution {
       workspaceDispatcher = RuntimeOwnedWorkspaceDispatcher(

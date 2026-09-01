@@ -2677,10 +2677,136 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       return success(id: request.id, result: Self.encodeWorkspaceProject(project))
 
+    case "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(
+          id: request.id, code: .unsupportedProtocolVersion,
+          message: "workspace preset mutation requires the target control protocol")
+      }
+      let fields = request.params ?? [:]
+      do {
+        let resource: RuntimeWorkspacePresetResource
+        switch request.method {
+        case "workspace.preset.register":
+          guard let input = Self.decodeWorkspacePresetDefinition(
+            fields, mutationKeys: ["registrationRequestId", "projectRef"]),
+            case .string(let requestID)? = fields["registrationRequestId"],
+            case .string(let projectRef)? = fields["projectRef"]
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "workspace preset register requires one closed typed definition")
+          }
+          resource = try await engine.workspacePresetRegister(
+            requestID: requestID, projectRef: projectRef,
+            kind: input.kind, templateRef: input.templateRef,
+            toolchainRef: input.toolchainRef,
+            toolchainGeneration: input.toolchainGeneration,
+            credentialRef: input.credentialRef,
+            timeoutSeconds: input.timeoutSeconds, constraints: input.constraints)
+        case "workspace.preset.update":
+          guard let input = Self.decodeWorkspacePresetDefinition(
+            fields,
+            mutationKeys: [
+              "mutationRequestId", "projectRef", "presetRef", "expectedGeneration",
+            ]),
+            case .string(let requestID)? = fields["mutationRequestId"],
+            case .string(let projectRef)? = fields["projectRef"],
+            case .string(let presetRef)? = fields["presetRef"],
+            let generation = Self.canonicalPositiveUInt64(fields["expectedGeneration"])
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "workspace preset update requires identity, exact generation and definition")
+          }
+          resource = try await engine.workspacePresetUpdate(
+            requestID: requestID, projectRef: projectRef, presetRef: presetRef,
+            expectedGeneration: generation, kind: input.kind,
+            templateRef: input.templateRef, toolchainRef: input.toolchainRef,
+            toolchainGeneration: input.toolchainGeneration,
+            credentialRef: input.credentialRef,
+            timeoutSeconds: input.timeoutSeconds, constraints: input.constraints)
+        default:
+          guard Set(fields.keys)
+            == ["mutationRequestId", "projectRef", "presetRef", "expectedGeneration"],
+            case .string(let requestID)? = fields["mutationRequestId"],
+            case .string(let projectRef)? = fields["projectRef"],
+            case .string(let presetRef)? = fields["presetRef"],
+            let generation = Self.canonicalPositiveUInt64(fields["expectedGeneration"])
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "workspace preset remove requires identity and exact generation")
+          }
+          resource = try await engine.workspacePresetRemove(
+            requestID: requestID, projectRef: projectRef, presetRef: presetRef,
+            expectedGeneration: generation)
+        }
+        return success(id: request.id, result: resource.projection)
+      } catch let error as RuntimeWorkspaceProjectFailure {
+        return Self.workspacePresetFailure(id: request.id, error: error)
+      } catch let error as AgentExecutionControlFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: error.details.merging([
+              "phase": .string("workspacePresetOwner"),
+              "newDispatchCount": .integer(0),
+            ], uniquingKeysWith: { _, new in new })))
+      } catch {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: "recordUnreadable", message: "workspace preset owner failed",
+            details: [
+              "phase": .string("workspacePresetOwner"),
+              "newDispatchCount": .integer(0),
+            ]))
+      }
+
     case "workspace.preset.list":
       guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty
       else {
         return failure(id: request.id, code: .invalidParams, message: "projectRef is required")
+      }
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        let fields = request.params ?? [:]
+        guard Set(fields.keys).isSubset(of: ["projectRef", "kind"]) else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "workspace preset list accepts only projectRef and kind")
+        }
+        let kind: String?
+        if let value = fields["kind"] {
+          guard case .string(let text) = value else {
+            return failure(id: request.id, code: .invalidParams, message: "kind must be text")
+          }
+          kind = text
+        } else {
+          kind = nil
+        }
+        do {
+          let presets = try await engine.workspacePresetList(
+            projectRef: projectRef, kind: kind)
+          return success(
+            id: request.id,
+            result: .object([
+              "schemaVersion": .string("arkdeck.workspace-preset-list/1"),
+              "projectRef": .string(projectRef),
+              "presets": .array(presets.map(\.projection)),
+            ]))
+        } catch let error as RuntimeWorkspaceProjectFailure {
+          return Self.workspacePresetFailure(id: request.id, error: error)
+        } catch let error as AgentExecutionControlFailure {
+          return Self.workspacePresetFailure(
+            id: request.id,
+            error: RuntimeWorkspaceProjectFailure(error.code, error.message))
+        } catch {
+          return failure(
+            id: request.id, code: .recordUnreadable,
+            message: "workspace preset owner failed")
+        }
       }
       guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
         return failure(
@@ -2706,6 +2832,28 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(
           id: request.id, code: .invalidParams,
           message: "projectRef and presetRef are required")
+      }
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        guard Set(request.params?.keys.map { $0 } ?? []) == ["projectRef", "presetRef"] else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "workspace preset show requires exact projectRef and presetRef")
+        }
+        do {
+          let preset = try await engine.workspacePresetInspect(
+            projectRef: projectRef, presetRef: presetRef)
+          return success(id: request.id, result: preset.projection)
+        } catch let error as RuntimeWorkspaceProjectFailure {
+          return Self.workspacePresetFailure(id: request.id, error: error)
+        } catch let error as AgentExecutionControlFailure {
+          return Self.workspacePresetFailure(
+            id: request.id,
+            error: RuntimeWorkspaceProjectFailure(error.code, error.message))
+        } catch {
+          return failure(
+            id: request.id, code: .recordUnreadable,
+            message: "workspace preset owner failed")
+        }
       }
       guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
         return failure(
@@ -3523,6 +3671,66 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
   // MARK: workspace discovery (§7.9)
 
+  private struct WorkspacePresetDefinitionInput {
+    let kind: String
+    let templateRef: String
+    let toolchainRef: String?
+    let toolchainGeneration: UInt64?
+    let credentialRef: String?
+    let timeoutSeconds: Int
+    let constraints: RuntimeWorkspacePresetConstraints
+  }
+
+  private static func decodeWorkspacePresetDefinition(
+    _ fields: [String: JSONValue], mutationKeys: Set<String>
+  ) -> WorkspacePresetDefinitionInput? {
+    let required = mutationKeys.union(["kind", "templateRef", "timeoutSeconds"])
+    let optional: Set<String> = [
+      "toolchainRef", "toolchainGeneration", "credentialRef",
+      "module", "product", "buildMode", "relativeSourceMap",
+    ]
+    guard required.isSubset(of: Set(fields.keys)),
+      Set(fields.keys).isSubset(of: required.union(optional)),
+      case .string(let kind)? = fields["kind"],
+      case .string(let templateRef)? = fields["templateRef"],
+      let timeout = canonicalPositiveUInt64(fields["timeoutSeconds"]),
+      timeout <= UInt64(Int.max)
+    else { return nil }
+    func optionalString(_ key: String) -> String? {
+      guard let value = fields[key], case .string(let text) = value else { return nil }
+      return text
+    }
+    for key in optional where fields[key] != nil && key != "toolchainGeneration" {
+      guard case .string? = fields[key] else { return nil }
+    }
+    let toolchainGeneration: UInt64?
+    if fields["toolchainGeneration"] != nil {
+      guard let generation = canonicalPositiveUInt64(fields["toolchainGeneration"]) else {
+        return nil
+      }
+      toolchainGeneration = generation
+    } else {
+      toolchainGeneration = nil
+    }
+    return WorkspacePresetDefinitionInput(
+      kind: kind, templateRef: templateRef,
+      toolchainRef: optionalString("toolchainRef"),
+      toolchainGeneration: toolchainGeneration,
+      credentialRef: optionalString("credentialRef"),
+      timeoutSeconds: Int(timeout),
+      constraints: RuntimeWorkspacePresetConstraints(
+        module: optionalString("module"), product: optionalString("product"),
+        buildMode: optionalString("buildMode"),
+        relativeSourceMap: optionalString("relativeSourceMap")))
+  }
+
+  private static func canonicalPositiveUInt64(_ value: JSONValue?) -> UInt64? {
+    guard case .string(let text)? = value, let parsed = UInt64(text), parsed > 0,
+      parsed <= UInt64(Int64.max), String(parsed) == text
+    else { return nil }
+    return parsed
+  }
+
   /// Everything §7.9 permits, and nothing it forbids.
   ///
   /// There is no host root, executable or argv here because
@@ -3600,6 +3808,19 @@ public struct RuntimeControlPlaneHandler: Sendable {
         code: error.code, message: error.message,
         details: [
           "phase": .string("workspaceProjectOwner"),
+          "newDispatchCount": .integer(0),
+        ]))
+  }
+
+  static func workspacePresetFailure(
+    id: String, error: RuntimeWorkspaceProjectFailure
+  ) -> AgentWireProtocol.Response {
+    AgentWireProtocol.Response(
+      id: id, ok: false, result: nil,
+      error: .init(
+        code: error.code, message: error.message,
+        details: [
+          "phase": .string("workspacePresetOwner"),
           "newDispatchCount": .integer(0),
         ]))
   }
