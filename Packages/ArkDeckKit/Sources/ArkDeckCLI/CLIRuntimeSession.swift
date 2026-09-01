@@ -71,7 +71,7 @@ struct CLIRuntimeSession {
   let command: String
   let rendering: CLIRendering
   let controlRequestID: String
-  let lifecycle: CLILifecycleStatus
+  var lifecycle: CLILifecycleStatus
   /// The argv pattern that supersedes this command, when one is published.
   var replacementArgvPattern: String?
   let outputState = OutputState()

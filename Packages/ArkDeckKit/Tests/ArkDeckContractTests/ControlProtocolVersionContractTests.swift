@@ -128,6 +128,9 @@ final class ControlProtocolVersionContractTests: XCTestCase {
           requiredMajor: major), version)
     }
     XCTAssertTrue(ArkDeckControlProtocol.targetMethods.contains("health"))
+    XCTAssertTrue(
+      ["job.plan", "job.submit", "job.run"].allSatisfy(
+        ArkDeckControlProtocol.targetMethods.contains))
     XCTAssertFalse(ArkDeckControlProtocol.targetMethods.contains("capability.install"))
   }
 

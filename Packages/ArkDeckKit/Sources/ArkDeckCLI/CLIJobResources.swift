@@ -225,3 +225,90 @@ enum CLIJobReadValidation {
     return status == "verified" ? 0 : status == "resultNotReady" ? 75 : 2
   }
 }
+
+enum CLIJobLifecycleValidation {
+  static func validatePlan(
+    _ value: JSONValue, session: CLIRuntimeSession
+  ) throws {
+    func invalid(_ message: String) -> CLIRegistryError {
+      session.fail(.recordUnreadable, message)
+    }
+    guard case .object(let fields) = value,
+      Set(fields.keys) == [
+        "schemaVersion", "executionMode", "operation", "targetId", "bindingRevision",
+        "stableIdentitySha256", "providerId", "catalogDigest", "requestFingerprintSha256",
+        "materializedPlanDigest", "inputs", "steps", "effectiveEffect",
+        "authorizationPolicy", "providerAdmissionBlocker", "jobAdmitted",
+        "dispatchDisposition",
+      ],
+      fields["schemaVersion"] == .string("arkdeck.job-plan/1"),
+      fields["executionMode"] == .string("planOnly"),
+      fields["jobAdmitted"] == .bool(false),
+      fields["dispatchDisposition"] == .string("notDispatched"),
+      let operation = CLIJobEventPage.string(fields["operation"]), !operation.isEmpty,
+      let target = CLIJobEventPage.string(fields["targetId"]),
+      AgentExecutionIntent.validIdentifier(target),
+      let provider = CLIJobEventPage.string(fields["providerId"]), !provider.isEmpty,
+      let catalog = CLIJobEventPage.string(fields["catalogDigest"]),
+      SHA256Hex.isLowercaseSHA256(catalog),
+      let fingerprint = CLIJobEventPage.string(fields["requestFingerprintSha256"]),
+      SHA256Hex.isLowercaseSHA256(fingerprint),
+      let digest = CLIJobEventPage.string(fields["materializedPlanDigest"]),
+      SHA256Hex.isLowercaseSHA256(digest),
+      case .object? = fields["inputs"],
+      case .array(let steps)? = fields["steps"],
+      let effect = CLIJobEventPage.string(fields["effectiveEffect"]),
+      ["hostOnly", "readOnly", "deviceMutation", "destructive"].contains(effect)
+    else { throw invalid("the Runtime returned an invalid target Job plan") }
+    switch fields["bindingRevision"] {
+    case .integer(let value)?: guard value > 0 else { throw invalid("the target Job plan has an invalid binding revision") }
+    case .null?: break
+    default: throw invalid("the target Job plan has an invalid binding revision")
+    }
+    switch fields["stableIdentitySha256"] {
+    case .string(let value)?: guard SHA256Hex.isLowercaseSHA256(value) else { throw invalid("the target Job plan has an invalid stable identity") }
+    case .null?: break
+    default: throw invalid("the target Job plan has an invalid stable identity")
+    }
+    switch fields["authorizationPolicy"] {
+    case .string(let value)?:
+      guard ["defaultReadOnly", "standingCapability", "runtimeCapability"].contains(value)
+      else { throw invalid("the target Job plan has an unknown authorization policy") }
+    case .null?: break
+    default: throw invalid("the target Job plan has an invalid authorization policy")
+    }
+    switch fields["providerAdmissionBlocker"] {
+    case .string(let value)?: guard !value.isEmpty else { throw invalid("the target Job plan has an empty blocker") }
+    case .null?: break
+    default: throw invalid("the target Job plan has an invalid blocker")
+    }
+    for step in steps {
+      guard case .object(let row) = step,
+        Set(row.keys) == ["stepId", "kind", "effect", "cancellation", "binding", "optional"],
+        let id = CLIJobEventPage.string(row["stepId"]), !id.isEmpty,
+        let kind = CLIJobEventPage.string(row["kind"]), !kind.isEmpty,
+        let rowEffect = CLIJobEventPage.string(row["effect"]),
+        ["hostOnly", "readOnly", "deviceMutation", "destructive"].contains(rowEffect),
+        let cancellation = CLIJobEventPage.string(row["cancellation"]), !cancellation.isEmpty,
+        let binding = CLIJobEventPage.string(row["binding"]), !binding.isEmpty,
+        case .bool? = row["optional"]
+      else { throw invalid("the target Job plan contains an invalid step") }
+    }
+  }
+
+  static func validateAcceptance(
+    _ value: JSONValue, session: CLIRuntimeSession
+  ) throws {
+    guard case .object(let fields) = value,
+      Set(fields.keys) == ["schemaVersion", "jobId", "deduplicated", "newDispatchCount"],
+      fields["schemaVersion"] == .string("arkdeck.job-acceptance/1"),
+      let jobID = CLIJobEventPage.string(fields["jobId"]),
+      AgentExecutionIntent.validIdentifier(jobID),
+      case .bool? = fields["deduplicated"],
+      fields["newDispatchCount"] == .integer(0)
+    else {
+      throw session.fail(
+        .recordUnreadable, "the Runtime returned an invalid target Job acceptance")
+    }
+  }
+}

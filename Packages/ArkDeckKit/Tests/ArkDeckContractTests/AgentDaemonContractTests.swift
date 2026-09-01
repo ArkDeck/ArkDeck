@@ -838,7 +838,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testV2CannotReachAnUnpublishedMutationOrLegacyAdoption() async throws {
     let (handler, _) = try makeStack()
     for method in [
-      "job.submit", "job.run", "debug.start", "artifact.importHap.begin",
+      "debug.start", "artifact.importHap.begin",
     ] {
       let frame = try CanonicalJSONEncoders.canonical().encode([
         "protocolVersion": JSONValue.string("2.0.0"), "id": .string("refused-1"),
@@ -851,6 +851,117 @@ final class AgentDaemonContractTests: XCTestCase {
     let frame = Data(#"{"protocolVersion":"2.1.0","id":"exact","method":"target.adopt"}"#.utf8)
     let rejected = await handler.handleFrame(frame)
     XCTAssertEqual(rejected.error?.code, "unsupportedProtocolVersion")
+  }
+
+  func testV2PublishesClosedPlanSubmitAndRunWhileV1KeepsItsShape() async throws {
+    let (handler, engine) = try makeStack()
+    let server = try startServer(handler)
+    let client = try AgentClient(socketPath: server.socketURL.path).negotiated(
+      requiredMajor: 2, forMethod: "job.plan")
+    let requestJSON = """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-target-job-lifecycle","idempotencyKey":"idem-target-job-lifecycle",\
+      "target":{"targetId":"TGT-001","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """
+
+    XCTAssertThrowsError(
+      try client.request(
+        method: "job.plan",
+        params: ["requestJson": .string(requestJSON), "extra": .bool(true)])) { error in
+      guard case AgentClientError.structuredDaemonError(let code, _, let details) = error else {
+        return XCTFail("expected a structured closed-contract refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "invalidInput")
+      XCTAssertEqual(details["phase"], .string("preAdmission"))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    }
+    XCTAssertThrowsError(
+      try client.request(
+        method: "job.run", params: ["jobId": .string("JOB-ABSENT")])) { error in
+      guard case AgentClientError.structuredDaemonError(let code, _, let details) = error else {
+        return XCTFail("expected an exact absent-Job refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "resourceNotFound")
+      XCTAssertEqual(details["phase"], .string("preAdmission"))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    }
+
+    let planned = try client.request(
+      method: "job.plan", params: ["requestJson": .string(requestJSON)])
+    guard case .object(let plan) = planned else { return XCTFail("missing target plan") }
+    XCTAssertEqual(plan["schemaVersion"], .string("arkdeck.job-plan/1"))
+    XCTAssertEqual(plan["operation"], .string("observe.device@1"))
+    XCTAssertEqual(plan["targetId"], .string("TGT-001"))
+    XCTAssertEqual(plan["jobAdmitted"], .bool(false))
+    XCTAssertEqual(plan["dispatchDisposition"], .string("notDispatched"))
+    let afterPlan = try await engine.listJobs()
+    XCTAssertTrue(afterPlan.isEmpty)
+
+    var driftedDocument = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(requestJSON.utf8)) as? [String: Any])
+    driftedDocument["reviewedPlanDigest"] = String(repeating: "0", count: 64)
+    let driftedJSON = try XCTUnwrap(
+      String(
+        data: JSONSerialization.data(
+          withJSONObject: driftedDocument, options: [.sortedKeys]),
+        encoding: .utf8))
+    XCTAssertThrowsError(
+      try client.request(
+        method: "job.submit", params: ["requestJson": .string(driftedJSON)])) { error in
+      guard case AgentClientError.structuredDaemonError(let code, _, let details) = error else {
+        return XCTFail("expected a reviewed-plan refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "reviewedPlanMismatch")
+      XCTAssertEqual(details["phase"], .string("preAdmission"))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    }
+    let afterDrift = try await engine.listJobs()
+    XCTAssertTrue(afterDrift.isEmpty)
+
+    let submitted = try client.request(
+      method: "job.submit", params: ["requestJson": .string(requestJSON)])
+    guard case .object(let acceptance) = submitted,
+      case .string(let jobID)? = acceptance["jobId"]
+    else { return XCTFail("missing target Job acceptance") }
+    XCTAssertEqual(acceptance["schemaVersion"], .string("arkdeck.job-acceptance/1"))
+    XCTAssertEqual(acceptance["deduplicated"], .bool(false))
+    XCTAssertEqual(acceptance["newDispatchCount"], .integer(0))
+
+    let duplicate = try client.request(
+      method: "job.submit", params: ["requestJson": .string(requestJSON)])
+    guard case .object(let duplicateFields) = duplicate else {
+      return XCTFail("missing duplicate acceptance")
+    }
+    XCTAssertEqual(duplicateFields["jobId"], .string(jobID))
+    XCTAssertEqual(duplicateFields["deduplicated"], .bool(true))
+    let afterDuplicate = try await engine.listJobs()
+    XCTAssertEqual(afterDuplicate.count, 1)
+
+    let ran = try client.request(
+      method: "job.run", params: ["jobId": .string(jobID)])
+    guard case .object(let status) = ran else { return XCTFail("missing target Job status") }
+    XCTAssertEqual(status["schemaVersion"], .string("arkdeck.job-status/1"))
+    XCTAssertEqual(status["jobId"], .string(jobID))
+    XCTAssertEqual(status["state"], .string("succeeded"))
+
+    XCTAssertThrowsError(
+      try client.request(method: "job.run", params: ["jobId": .string(jobID)])) { error in
+      guard case AgentClientError.structuredDaemonError(let code, _, let details) = error else {
+        return XCTFail("expected an already-terminal refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "resourceConflict")
+      XCTAssertEqual(details["jobId"], .string(jobID))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    }
+
+    let legacy = try await request(
+      handler, method: "job.plan", params: ["requestJson": .string(requestJSON)])
+    guard case .object(let legacyPlan)? = legacy.result else {
+      return XCTFail("missing legacy plan")
+    }
+    XCTAssertNil(legacyPlan["schemaVersion"])
+    XCTAssertEqual(legacyPlan["operationReference"], .string("observe.device@1"))
   }
 
   func testBootstrapIsUnaryAndNeverInterpretsBundledDomainInput() async throws {

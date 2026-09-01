@@ -91,10 +91,13 @@ final class JobReadResourcesContractTests: XCTestCase {
         "method": .string(method), "params": .object(["jobId": .string(id)])])))
     return await RuntimeJobResourceReader(engine: engine, artifactStore: artifacts).response(request)
   }
-  private func cli(_ args: [String]) throws -> (Int32, [String: JSONValue]) {
+  private func cli(
+    _ args: [String], outputArguments: [String] = ["--output", "json"]
+  ) throws -> (Int32, [String: JSONValue]) {
     let process = Process()
     process.executableURL = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(path: "arkdeck")
-    process.arguments = args + ["--socket", try XCTUnwrap(server).socketURL.path, "--output", "json"]
+    process.arguments =
+      args + ["--socket", try XCTUnwrap(server).socketURL.path] + outputArguments
     let output = root.appending(path: "stdout-\(UUID()).json")
     FileManager.default.createFile(atPath: output.path, contents: nil)
     let handle = try FileHandle(forWritingTo: output)
@@ -117,6 +120,82 @@ final class JobReadResourcesContractTests: XCTestCase {
         contents: Data(String(repeating: "x", count: size).utf8))))
     }
     return values
+  }
+
+  func testRealCLIDefaultsPlanSubmitAndRunToTheTargetProtocol() async throws {
+    let connectKey = "150100424a544e4600"
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
+        connectKey: connectKey),
+      connectKey: connectKey, toolVersion: "3.2.0f", nowUTC: date
+    ).record
+    try startServer()
+    let requestArguments = [
+      "--target", adopted.targetID, "--expected-binding-revision",
+      String(adopted.bindingRevision),
+      "--operation", "observe.device@1",
+      "--request-id", "req-cli-v2-job-lifecycle",
+      "--idempotency-key", "idem-cli-v2-job-lifecycle",
+    ]
+
+    let planned = try cli(["job", "plan"] + requestArguments)
+    XCTAssertEqual(planned.0, 0, "\(planned.1)")
+    guard planned.0 == 0 else { return }
+    let plan = try object(XCTUnwrap(planned.1["result"]))
+    XCTAssertEqual(plan["schemaVersion"], .string("arkdeck.job-plan/1"))
+    XCTAssertEqual(plan["jobAdmitted"], .bool(false))
+    XCTAssertEqual(
+      try object(XCTUnwrap(planned.1["meta"]))["controlProtocolVersion"],
+      .string("2.0.0"))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+
+    let legacyPlan = try cli(
+      ["job", "plan"] + requestArguments, outputArguments: ["--json"])
+    XCTAssertEqual(legacyPlan.0, 0)
+    XCTAssertNil(legacyPlan.1["schemaVersion"])
+    XCTAssertEqual(
+      legacyPlan.1["operationReference"], .string("observe.device@1"))
+    XCTAssertNil(legacyPlan.1["ok"])
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+
+    let mixed = try cli(
+      ["job", "submit", "--wait", "--require-protocol", "2"] + requestArguments)
+    XCTAssertEqual(mixed.0, 64)
+    XCTAssertEqual(
+      try object(XCTUnwrap(mixed.1["error"]))["code"], .string("invalidOption"))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+
+    let submitted = try cli(["job", "submit"] + requestArguments)
+    XCTAssertEqual(submitted.0, 0)
+    let acceptance = try object(XCTUnwrap(submitted.1["result"]))
+    let jobID = try XCTUnwrap(CLIJobEventPage.string(acceptance["jobId"]))
+    XCTAssertEqual(acceptance["schemaVersion"], .string("arkdeck.job-acceptance/1"))
+    XCTAssertEqual(acceptance["deduplicated"], .bool(false))
+    XCTAssertEqual(acceptance["newDispatchCount"], .integer(0))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+
+    let ran = try cli(["job", "run", "--job", jobID])
+    XCTAssertEqual(ran.0, 0)
+    let status = try object(XCTUnwrap(ran.1["result"]))
+    XCTAssertEqual(status["schemaVersion"], .string("arkdeck.job-status/1"))
+    XCTAssertEqual(status["jobId"], .string(jobID))
+    XCTAssertEqual(status["state"], .string("succeeded"))
+    let dispatches = dispatcher.dispatchCount
+    XCTAssertGreaterThan(dispatches, 0)
+
+    let rerun = try cli(["job", "run", "--job", jobID])
+    XCTAssertEqual(rerun.0, 65)
+    XCTAssertEqual(
+      try object(XCTUnwrap(rerun.1["error"]))["code"],
+      .string("resourceConflict"))
+    XCTAssertEqual(dispatcher.dispatchCount, dispatches)
+
+    let duplicate = try cli(["job", "submit"] + requestArguments)
+    XCTAssertEqual(duplicate.0, 0)
+    let duplicateAcceptance = try object(XCTUnwrap(duplicate.1["result"]))
+    XCTAssertEqual(duplicateAcceptance["jobId"], .string(jobID))
+    XCTAssertEqual(duplicateAcceptance["deduplicated"], .bool(true))
+    XCTAssertEqual(dispatcher.dispatchCount, dispatches)
   }
 
   func testCompletedTypedFixtureRunReadsVerifiedResultWithoutNewDispatch() async throws {

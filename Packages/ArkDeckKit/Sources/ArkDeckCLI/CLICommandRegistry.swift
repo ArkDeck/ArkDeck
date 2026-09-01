@@ -1129,7 +1129,8 @@ enum CLICommandRegistry {
         token: "plan",
         canonicalCommand: "job.plan",
         summary: "materialize the exact plan without dispatching it",
-        options: runtimeClientOptions(jobRequestOptions),
+        options: runtimeClientOptions(
+          jobRequestOptions + [targetProtocolOption, waitTimeoutOption]),
         mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1141,7 +1142,8 @@ enum CLICommandRegistry {
             CLIOptionSpec(
               name: "--wait",
               form: .flag,
-              summary: "poll the submitted job until it settles")
+              summary: "deprecated 1.x compound; submit then run and wait explicitly"),
+            targetProtocolOption, waitTimeoutOption,
           ]),
         mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
@@ -1227,7 +1229,7 @@ enum CLICommandRegistry {
         token: "run",
         canonicalCommand: "job.run",
         summary: "run a fresh job, or resume one from a Runtime-proven safe boundary",
-        options: runtimeClientOptions([jobIDOption]),
+        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "cancel",
