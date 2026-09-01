@@ -1548,6 +1548,8 @@ enum RuntimeCLI {
     switch subcommand {
     case "bundle":
       try runBootstrapBundle(rest)
+    case "tool":
+      try runBootstrapTool(rest)
     case "service":
       try runAgentDaemon(
         rest, spelledAs: "runtime.service",

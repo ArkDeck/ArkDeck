@@ -251,6 +251,7 @@ package enum BootstrapBundleFiles {
         entry["byteCount"] = .string("0"); entry["sha256"] = .null
       } else {
         guard before.st_size >= 0, before.st_size <= maximumBytes - total else { throw failure("inputTooLarge", "bundle size limit exceeded") }
+        guard lseek(fd, 0, SEEK_SET) == 0 else { throw failure("ioFailure", "cannot rewind registered content for identity verification") }
         var hasher = SHA256(), consumed: Int64 = 0
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         while true {

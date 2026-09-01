@@ -7,7 +7,9 @@ import Foundation
 /// It holds content and references, not Runtime admission authority.
 package final class BootstrapBundleRegistry {
   private typealias Files = BootstrapBundleFiles
-  package enum ReferenceKind: String, Codable { case installation, rollback, controlAction, job, recovery }
+  package enum ReferenceKind: String, Codable {
+    case installation, rollback, controlAction, job, recovery, agentExecution, activeLease, activeSelection, workspacePreset
+  }
   package struct ReferenceOwner: Codable, Equatable {
     package let kind: ReferenceKind
     package let id: String
@@ -210,6 +212,16 @@ package final class BootstrapBundleRegistry {
     }
   }
 
+  /// All bootstrap resource families serialize through this owner. Establish
+  /// the durable bundle index before another family writes anything, so a
+  /// genuinely missing index is never confused with a fresh independent store.
+  package func withSharedStore<T>(_ body: (Int32, URL) throws -> T) throws -> T {
+    try locked { directory in
+      _ = try readIndex(directory)
+      return try body(directory, root)
+    }
+  }
+
   private func locked<T>(_ body: (Int32) throws -> T) throws -> T {
     let directory = try Files.openDirectory(root, create: true, privateLeaf: true)
     defer { close(directory) }
@@ -236,7 +248,7 @@ package final class BootstrapBundleRegistry {
 
   private func retainedBytes(_ directory: Int32) throws -> Int64 {
     let names = try Files.names(directory)
-    guard names.count <= 140 else { throw Files.failure("quotaExceeded", "bootstrap directory entry bound reached") }
+    guard names.count <= 300 else { throw Files.failure("quotaExceeded", "bootstrap directory entry bound reached") }
     var bytes: Int64 = 0, stagingCount = 0
     for name in names where name.hasPrefix("bundle-") && name.hasSuffix(".app") || name.hasPrefix(".staging-") {
       if name.hasPrefix(".staging-") { stagingCount += 1 }

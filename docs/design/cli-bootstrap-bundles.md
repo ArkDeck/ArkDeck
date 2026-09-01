@@ -1,4 +1,4 @@
-# CLI bootstrap bundle registration
+# CLI bootstrap bundle and HDC registration
 
 `runtime bundle register/list/inspect/remove` provides a pre-daemon resource for
 the signed macOS `daemon-bundle` kind. Registration copies an app bundle into the
@@ -59,3 +59,52 @@ container registry. Service install/update must adopt typed references and
 revalidate them, and any possible HDC interruption must use the shared impact
 preview/control-action/HAR path. Existing service compatibility commands are
 unchanged by this implementation. No real-device acceptance is claimed here.
+
+## Native HDC candidates
+
+The same store owner also exposes four local tool commands, without requiring
+a running daemon or accepting a socket, executable arguments, or SDK root:
+
+```text
+arkdeck runtime tool register --kind hdc --file /absolute/toolchains/hdc --output json
+arkdeck runtime tool inspect --tool tool:sha256:<digest> --output json
+arkdeck runtime tool list --page-size 100 --output json
+arkdeck runtime tool remove --tool tool:sha256:<digest> --expected-generation 1 --output json
+```
+
+Registration reads native Mach-O load commands without launching the candidate.
+The copied entry is named `hdc`. When it loads `@rpath/libusb_shared.dylib`, the
+required same-directory library is captured alongside it; missing, symbolic,
+hard-linked or oversized dependencies are rejected. File identity, bytes and
+quarantine are checked across copy and static signature inspection. The whole
+copy is bounded to 256 MiB, with a 32 MiB library bound. No arbitrary dyld search
+path is traversed. Unsupported relocation layouts may remain inspectable
+candidates but cannot resolve for a Runtime consumer.
+
+`arkdeck.runtime-tool/1` returns the content-addressed `toolRef`, generation,
+executable hash, dependency identities and signatures, known profile version
+or null, and durable references. Its SHA-256/JCS content digest includes the
+`hdc-sibling-libusb/1` layout and all tree entries; replacing libusb changes the
+tool reference even when the HDC executable is unchanged. Static signatures
+distinguish unsigned, ad-hoc and verified code; `platformTrust: unverified` and
+`executionAssessment: notPerformed` do not grant OS execution permission. A
+version is reported only when executable bytes match an existing published
+OpenHarmony profile. Registration never declares new Provider/hardware support.
+
+The tool family shares the bundle lock and snapshot semantics. It retains at
+most 128 records and 2 GiB including orphan/staging content. Exact-generation
+removal retires the resource without deleting bytes and is blocked by any
+installation, rollback, Job, AgentExecution, recovery, control-action, active
+selection, lease or workspace-preset reference. Only product code can acquire
+these pins. Resolving an available published HDC requires an exact durable
+consumer pin, complete content/trust validation and a supported relocation
+layout; it returns the exact copied executable/dependency manifest. The Runtime
+consumer must retain/revalidate its directory and every file through the existing
+Process identity layer. This manifest is not an execution authorization.
+
+Tool selection, SDK/toolchain `--root` registration, typed service adoption and
+the App bridge are not implemented by these four commands. They still require
+the §7.8 control-action/HAR integration; registration never changes preferences
+or stops/restarts HDC. The optional installed-DevEco integration test statically
+checks the copied HDC/libusb pair and its drift handling, with no HDC invocation
+or device dispatch. Machines without that SDK explicitly skip that host test.
