@@ -2,12 +2,12 @@
 
 Task: TASK-AIN-021
 
-This slice completes the build/test half of CLI-REQ-022 without introducing a
-second workspace executor. A fresh macOS host can register an existing DevEco
-installation, pin it from a typed workspace preset, restart the Runtime, and
-use the existing `workspace.build-openharmony@1` or
-`workspace.run-tests@1` Job paths. No caller-provided executable, argument
-array, SDK path or shell command crosses the preset boundary.
+This slice completes CLI-REQ-022 without introducing a second workspace
+executor. A fresh macOS host can register an existing DevEco installation and
+path-free signing credential, pin them from typed workspace presets, restart
+the Runtime, and use the existing build, test, or signing Job paths. No
+caller-provided executable, argument array, SDK path or shell command crosses
+the preset boundary.
 
 ## Registered DevEco toolchains
 
@@ -86,9 +86,10 @@ active presets. Preset/project Job acquisition, mutation and the durable Job
 reference scan run under the same owner serialization, so no mutation can
 publish a dangling reference or race an admitted Job.
 
-Toolchain acquire/release is a recoverable cross-store transaction: the
-project document first records the pending action, applies the toolchain pin
-change, publishes the preset state, and clears the pending action. Startup and
+External dependency acquire/release is a recoverable cross-store transaction:
+the project document first records the pending action, acquires the complete
+new toolchain/credential set, publishes the preset state, releases the old
+set, and clears the pending action. All operations are idempotent. Startup and
 every store read finish an interrupted transaction before serving data. The
 public projection remains path-free and reports `runtimeRestartRequired` until
 the daemon observes that exact generation.
@@ -102,9 +103,20 @@ and revalidates those resources together with the Node executable immediately
 before spawn. A registered OpenHarmony project with no active build/test preset
 stays read-only; it does not fall back to daemon environment paths.
 
-The signing preset schema is durable and path-free, but production composition
-keeps it unavailable with `workspace.signingCredentialOwnerUnavailable` until
-the separate credential-reference owner is implemented. This change therefore
-does not claim signing execution or real-device acceptance. Real-device build,
-test and signing evidence must be collected only after the relevant code is on
-protected `main` and the current Catalog digest is pinned.
+`runtime signing install-sdk-release|install` now wraps the existing measured
+receipt and Keychain envelope in `arkdeck.signing-credential/1`. Its
+content-derived `credential:sha256-*` reference contains no host path,
+Keychain account, or secret. The cross-process owner refuses replacement and
+removal while any workspace preset pins the reference; normalize and daemon
+identity refresh must preserve it, while `migrate-deveco` is treated as a
+replacement because it may change the key alias. Status, maintenance, and
+removal projections remain path-free.
+
+At startup, a signing preset must resolve both its exact toolchain pin and its
+exact credential pin. The provider accepts the workspace preset reference from
+the Job, resolves the credential only for that owner, and records the workspace
+preset reference in the materialized plan, signing result, and recovery
+readback. The lower-level fixed receipt ID is never a fallback for a registered
+profile. Real-device build, test, and signing evidence is collected only after
+the relevant code reaches protected `main` and the current Catalog digest is
+pinned.

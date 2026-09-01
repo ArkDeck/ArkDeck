@@ -112,6 +112,19 @@ package struct RuntimeWorkspaceToolchainPinning: Sendable {
   }
 }
 
+package struct RuntimeWorkspaceCredentialPinning: Sendable {
+  package let acquire: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
+  package let release: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
+
+  package init(
+    acquire: @escaping @Sendable (String, String) throws -> Void,
+    release: @escaping @Sendable (String, String) throws -> Void
+  ) {
+    self.acquire = acquire
+    self.release = release
+  }
+}
+
 package struct RuntimeWorkspaceProjectUseToken: Sendable {
   fileprivate let id: UUID
   fileprivate let projectRef: String
@@ -196,20 +209,26 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     var lastMutationDigest: String
   }
 
-  private struct PendingToolchainMutation: Codable, Equatable {
+  /// Kept under the historical `pendingToolchainMutation` document key so
+  /// stores written by the first workspace-preset release remain readable.
+  /// Optional credential fields extend the same crash-recovered transaction
+  /// to all external preset dependencies.
+  private struct PendingDependencyMutation: Codable, Equatable {
     let action: String
-    let toolchainRef: String
-    let toolchainGeneration: UInt64
+    let toolchainRef: String?
+    let toolchainGeneration: UInt64?
+    let credentialRef: String?
     let presetRef: String
     let proposedRecord: PresetRecord?
     let releaseAfterAcquireRef: String?
+    let releaseAfterAcquireCredentialRef: String?
   }
 
   private struct Document: Codable, Equatable {
-    var schemaVersion = "arkdeck.workspace-project-store/2"
+    var schemaVersion = "arkdeck.workspace-project-store/3"
     var records: [Record] = []
     var presets: [PresetRecord] = []
-    var pendingToolchainMutation: PendingToolchainMutation?
+    var pendingToolchainMutation: PendingDependencyMutation?
 
     private enum CodingKeys: String, CodingKey {
       case schemaVersion, records, presets, pendingToolchainMutation
@@ -223,7 +242,7 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
       records = try values.decode([Record].self, forKey: .records)
       presets = try values.decodeIfPresent([PresetRecord].self, forKey: .presets) ?? []
       pendingToolchainMutation = try values.decodeIfPresent(
-        PendingToolchainMutation.self, forKey: .pendingToolchainMutation)
+        PendingDependencyMutation.self, forKey: .pendingToolchainMutation)
     }
   }
 
@@ -248,12 +267,14 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
   private var appliedGenerations: [String: UInt64]
   private var appliedPresetGenerations: [String: UInt64]
   private let toolchainPinning: RuntimeWorkspaceToolchainPinning?
+  private let credentialPinning: RuntimeWorkspaceCredentialPinning?
 
   package init(
     rootURL: URL,
     appliedGenerations: [String: UInt64] = [:],
     appliedPresetGenerations: [String: UInt64] = [:],
     toolchainPinning: RuntimeWorkspaceToolchainPinning? = nil,
+    credentialPinning: RuntimeWorkspaceCredentialPinning? = nil,
     nowUTC: @escaping @Sendable () -> String = {
       ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
     }
@@ -262,6 +283,7 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     self.appliedGenerations = appliedGenerations
     self.appliedPresetGenerations = appliedPresetGenerations
     self.toolchainPinning = toolchainPinning
+    self.credentialPinning = credentialPinning
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
       at: directoryURL, withIntermediateDirectories: true,
@@ -410,14 +432,17 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           registeredAtUTC: timestamp, updatedAtUTC: timestamp,
           state: "available", lastMutationRequestID: requestID,
           lastMutationDigest: digest)
-        if let toolchainRef, let toolchainGeneration {
-          try requireToolchainOwner()
-          next.pendingToolchainMutation = PendingToolchainMutation(
+        if toolchainRef != nil || credentialRef != nil {
+          try requireDependencyOwners(
+            toolchainRef: toolchainRef, credentialRef: credentialRef)
+          next.pendingToolchainMutation = PendingDependencyMutation(
             action: "acquire", toolchainRef: toolchainRef,
-            toolchainGeneration: toolchainGeneration, presetRef: presetRef,
-            proposedRecord: record, releaseAfterAcquireRef: nil)
+            toolchainGeneration: toolchainGeneration, credentialRef: credentialRef,
+            presetRef: presetRef, proposedRecord: record,
+            releaseAfterAcquireRef: nil,
+            releaseAfterAcquireCredentialRef: nil)
           try save(next, rootFD: rootFD)
-          next = try reconcileToolchainMutation(next, rootFD: rootFD)
+          next = try reconcileDependencyMutation(next, rootFD: rootFD)
         } else {
           next.presets.append(record)
           next.presets.sort { $0.presetRef < $1.presetRef }
@@ -503,26 +528,38 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           registeredAtUTC: current.registeredAtUTC, updatedAtUTC: try validTimestamp(),
           state: "available", lastMutationRequestID: requestID,
           lastMutationDigest: mutationDigest)
-        if toolchainRef != current.toolchainRef {
-          if let toolchainRef, let toolchainGeneration {
-            try requireToolchainOwner()
-            next.pendingToolchainMutation = PendingToolchainMutation(
+        if toolchainRef != current.toolchainRef
+          || toolchainGeneration != current.toolchainGeneration
+          || credentialRef != current.credentialRef
+        {
+          if toolchainRef != nil || credentialRef != nil {
+            try requireDependencyOwners(
+              toolchainRef: toolchainRef, credentialRef: credentialRef)
+            next.pendingToolchainMutation = PendingDependencyMutation(
               action: "acquire", toolchainRef: toolchainRef,
-              toolchainGeneration: toolchainGeneration, presetRef: presetRef,
-              proposedRecord: proposed, releaseAfterAcquireRef: current.toolchainRef)
+              toolchainGeneration: toolchainGeneration, credentialRef: credentialRef,
+              presetRef: presetRef, proposedRecord: proposed,
+              releaseAfterAcquireRef: current.toolchainRef == toolchainRef
+                ? nil : current.toolchainRef,
+              releaseAfterAcquireCredentialRef: current.credentialRef == credentialRef
+                ? nil : current.credentialRef)
             try save(next, rootFD: rootFD)
-            next = try reconcileToolchainMutation(next, rootFD: rootFD)
+            next = try reconcileDependencyMutation(next, rootFD: rootFD)
           } else {
             next.presets[index] = proposed
-            if let old = current.toolchainRef {
-              try requireToolchainOwner()
-              next.pendingToolchainMutation = PendingToolchainMutation(
-                action: "release", toolchainRef: old,
-                toolchainGeneration: current.toolchainGeneration ?? 1,
-                presetRef: presetRef, proposedRecord: nil, releaseAfterAcquireRef: nil)
+            if current.toolchainRef != nil || current.credentialRef != nil {
+              try requireDependencyOwners(
+                toolchainRef: current.toolchainRef,
+                credentialRef: current.credentialRef)
+              next.pendingToolchainMutation = PendingDependencyMutation(
+                action: "release", toolchainRef: current.toolchainRef,
+                toolchainGeneration: current.toolchainGeneration,
+                credentialRef: current.credentialRef, presetRef: presetRef,
+                proposedRecord: nil, releaseAfterAcquireRef: nil,
+                releaseAfterAcquireCredentialRef: nil)
             }
             try save(next, rootFD: rootFD)
-            next = try reconcileToolchainMutation(next, rootFD: rootFD)
+            next = try reconcileDependencyMutation(next, rootFD: rootFD)
           }
         } else {
           next.presets[index] = proposed
@@ -581,15 +618,19 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
         next.presets[index].updatedAtUTC = try validTimestamp()
         next.presets[index].lastMutationRequestID = requestID
         next.presets[index].lastMutationDigest = mutationDigest
-        if let toolchainRef = current.toolchainRef {
-          try requireToolchainOwner()
-          next.pendingToolchainMutation = PendingToolchainMutation(
-            action: "release", toolchainRef: toolchainRef,
-            toolchainGeneration: current.toolchainGeneration ?? 1,
-            presetRef: presetRef, proposedRecord: nil, releaseAfterAcquireRef: nil)
+        if current.toolchainRef != nil || current.credentialRef != nil {
+          try requireDependencyOwners(
+            toolchainRef: current.toolchainRef,
+            credentialRef: current.credentialRef)
+          next.pendingToolchainMutation = PendingDependencyMutation(
+            action: "release", toolchainRef: current.toolchainRef,
+            toolchainGeneration: current.toolchainGeneration,
+            credentialRef: current.credentialRef, presetRef: presetRef,
+            proposedRecord: nil, releaseAfterAcquireRef: nil,
+            releaseAfterAcquireCredentialRef: nil)
         }
         try save(next, rootFD: rootFD)
-        next = try reconcileToolchainMutation(next, rootFD: rootFD)
+        next = try reconcileDependencyMutation(next, rootFD: rootFD)
         appliedPresetGenerations.removeValue(forKey: presetRef)
         return try presetResource(next.presets[index])
       }
@@ -886,21 +927,25 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           ? "active" : "runtimeRestartRequired"))
   }
 
-  private func requireToolchainOwner() throws {
-    guard toolchainPinning != nil else {
+  private func requireDependencyOwners(
+    toolchainRef: String?, credentialRef: String?
+  ) throws {
+    if toolchainRef != nil, toolchainPinning == nil {
       throw RuntimeWorkspaceProjectFailure(
         "operationUnavailable", "DevEco toolchain reference owner is unavailable")
+    }
+    if credentialRef != nil, credentialPinning == nil {
+      throw RuntimeWorkspaceProjectFailure(
+        "operationUnavailable", "signing credential reference owner is unavailable")
     }
   }
 
-  private func reconcileToolchainMutation(
+  private func reconcileDependencyMutation(
     _ document: Document, rootFD: Int32
   ) throws -> Document {
     guard let pending = document.pendingToolchainMutation else { return document }
-    guard let toolchainPinning else {
-      throw RuntimeWorkspaceProjectFailure(
-        "operationUnavailable", "DevEco toolchain reference owner is unavailable")
-    }
+    try requireDependencyOwners(
+      toolchainRef: pending.toolchainRef, credentialRef: pending.credentialRef)
     var next = document
     switch pending.action {
     case "acquire":
@@ -908,48 +953,80 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
         proposed.presetRef == pending.presetRef,
         proposed.toolchainRef == pending.toolchainRef,
         proposed.toolchainGeneration == pending.toolchainGeneration,
+        proposed.credentialRef == pending.credentialRef,
+        pending.toolchainRef != nil || pending.credentialRef != nil,
         proposed.state == "available"
       else {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace preset acquire transaction is inconsistent")
       }
       try validatePresetRecord(proposed, projects: document.records)
-      try toolchainPinning.acquire(
-        pending.toolchainRef, pending.toolchainGeneration, pending.presetRef)
+      if let toolchainRef = pending.toolchainRef,
+        let toolchainGeneration = pending.toolchainGeneration
+      {
+        try toolchainPinning!.acquire(
+          toolchainRef, toolchainGeneration, pending.presetRef)
+      }
+      if let credentialRef = pending.credentialRef {
+        try credentialPinning!.acquire(credentialRef, pending.presetRef)
+      }
       if let index = next.presets.firstIndex(where: { $0.presetRef == pending.presetRef }) {
         next.presets[index] = proposed
       } else {
         next.presets.append(proposed)
         next.presets.sort { $0.presetRef < $1.presetRef }
       }
-      if let old = pending.releaseAfterAcquireRef, old != pending.toolchainRef {
-        next.pendingToolchainMutation = PendingToolchainMutation(
-          action: "release", toolchainRef: old, toolchainGeneration: 1,
+      if pending.releaseAfterAcquireRef != nil
+        || pending.releaseAfterAcquireCredentialRef != nil
+      {
+        next.pendingToolchainMutation = PendingDependencyMutation(
+          action: "release", toolchainRef: pending.releaseAfterAcquireRef,
+          toolchainGeneration: pending.releaseAfterAcquireRef == nil ? nil : 1,
+          credentialRef: pending.releaseAfterAcquireCredentialRef,
           presetRef: pending.presetRef, proposedRecord: nil,
-          releaseAfterAcquireRef: nil)
+          releaseAfterAcquireRef: nil,
+          releaseAfterAcquireCredentialRef: nil)
       } else {
         next.pendingToolchainMutation = nil
       }
       try save(next, rootFD: rootFD)
       if next.pendingToolchainMutation != nil {
-        return try reconcileToolchainMutation(next, rootFD: rootFD)
+        return try reconcileDependencyMutation(next, rootFD: rootFD)
       }
       return next
     case "release":
-      guard pending.proposedRecord == nil, pending.releaseAfterAcquireRef == nil else {
+      guard pending.proposedRecord == nil, pending.releaseAfterAcquireRef == nil,
+        pending.releaseAfterAcquireCredentialRef == nil,
+        pending.toolchainRef != nil || pending.credentialRef != nil
+      else {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace preset release transaction is inconsistent")
       }
       guard let retained = document.presets.first(where: {
         $0.presetRef == pending.presetRef
-      }),
-        (retained.state == "removed" && retained.toolchainRef == pending.toolchainRef)
-          || (retained.state == "available" && retained.toolchainRef != pending.toolchainRef)
+      })
       else {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace preset release does not match its durable record")
       }
-      try toolchainPinning.release(pending.toolchainRef, pending.presetRef)
+      let toolchainMatches = pending.toolchainRef.map { reference in
+        (retained.state == "removed" && retained.toolchainRef == reference)
+          || (retained.state == "available" && retained.toolchainRef != reference)
+      } ?? true
+      let credentialMatches = pending.credentialRef.map { reference in
+        (retained.state == "removed" && retained.credentialRef == reference)
+          || (retained.state == "available" && retained.credentialRef != reference)
+      } ?? true
+      guard toolchainMatches, credentialMatches else {
+        throw RuntimeWorkspaceProjectFailure(
+          "recordUnreadable", "workspace preset release does not match its durable record")
+      }
+      if let toolchainRef = pending.toolchainRef {
+        try toolchainPinning!.release(toolchainRef, pending.presetRef)
+      }
+      if let credentialRef = pending.credentialRef {
+        try credentialPinning!.release(credentialRef, pending.presetRef)
+      }
       next.pendingToolchainMutation = nil
       try save(next, rootFD: rootFD)
       return next
@@ -1174,7 +1251,7 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     }
     defer { _ = flock(lockFD, LOCK_UN) }
     let loaded = try load(rootFD: rootFD)
-    let reconciled = try reconcileToolchainMutation(loaded, rootFD: rootFD)
+    let reconciled = try reconcileDependencyMutation(loaded, rootFD: rootFD)
     return try body(rootFD, reconciled)
   }
 
@@ -1211,7 +1288,10 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
       var duplicateValidator = StrictJSONDuplicateValidator(data: data)
       try duplicateValidator.validate()
       let document = try JSONDecoder().decode(Document.self, from: data)
-      guard ["arkdeck.workspace-project-store/1", "arkdeck.workspace-project-store/2"]
+      guard [
+        "arkdeck.workspace-project-store/1", "arkdeck.workspace-project-store/2",
+        "arkdeck.workspace-project-store/3",
+      ]
         .contains(document.schemaVersion),
         document.records.count <= Self.maximumProjects,
         document.presets.count <= Self.maximumPresets,
@@ -1219,7 +1299,8 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
         Set(document.records.map(\.registrationRequestID)).count == document.records.count,
         Set(document.presets.map(\.presetRef)).count == document.presets.count,
         Set(document.presets.map(\.registrationRequestID)).count == document.presets.count,
-        document.schemaVersion == "arkdeck.workspace-project-store/2"
+        ["arkdeck.workspace-project-store/2", "arkdeck.workspace-project-store/3"]
+          .contains(document.schemaVersion)
           || (document.presets.isEmpty && document.pendingToolchainMutation == nil)
       else {
         throw RuntimeWorkspaceProjectFailure(
@@ -1325,17 +1406,23 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
       }
       if let pending = document.pendingToolchainMutation {
         try validatePresetRef(pending.presetRef)
-        try validateGeneration(pending.toolchainGeneration)
+        if let generation = pending.toolchainGeneration {
+          try validateGeneration(generation)
+        }
         guard ["acquire", "release"].contains(pending.action),
-          Self.validToolchainRef(pending.toolchainRef),
-          pending.releaseAfterAcquireRef.map(Self.validToolchainRef) ?? true
+          (pending.toolchainRef == nil) == (pending.toolchainGeneration == nil),
+          pending.toolchainRef.map(Self.validToolchainRef) ?? true,
+          pending.credentialRef.map(Self.validCredentialRef) ?? true,
+          pending.toolchainRef != nil || pending.credentialRef != nil,
+          pending.releaseAfterAcquireRef.map(Self.validToolchainRef) ?? true,
+          pending.releaseAfterAcquireCredentialRef.map(Self.validCredentialRef) ?? true
         else {
           throw RuntimeWorkspaceProjectFailure(
             "recordUnreadable", "workspace preset transaction is inconsistent")
         }
       }
       var migrated = document
-      migrated.schemaVersion = "arkdeck.workspace-project-store/2"
+      migrated.schemaVersion = "arkdeck.workspace-project-store/3"
       return migrated
     } catch let failure as RuntimeWorkspaceProjectFailure {
       throw failure

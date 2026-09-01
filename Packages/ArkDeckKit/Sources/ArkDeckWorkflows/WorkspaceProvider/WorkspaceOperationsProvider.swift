@@ -116,6 +116,29 @@ package struct RuntimeWorkspaceResolvedPreset: Sendable, Equatable {
   }
 }
 
+package struct WorkspaceSigningPreset: Sendable, Equatable {
+  package let presetID: String
+  package let credentialRef: String
+  package let timeoutSeconds: Int
+
+  package init(
+    presetID: String, credentialRef: String, timeoutSeconds: Int
+  ) throws {
+    let prefix = "credential:sha256-"
+    let digest = String(credentialRef.dropFirst(prefix.count))
+    guard WorkspaceProviderSupport.isIdentifier(presetID),
+      credentialRef.hasPrefix(prefix), WorkspaceProviderSupport.isSHA256(digest),
+      (1...3_600).contains(timeoutSeconds)
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace signing preset is malformed")
+    }
+    self.presetID = presetID
+    self.credentialRef = credentialRef
+    self.timeoutSeconds = timeoutSeconds
+  }
+}
+
 package enum WorkspaceProjectProfileKind: String, Sendable, Equatable {
   case primary
   case evolution
@@ -141,6 +164,11 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
   package let patchPreset: WorkspaceCommandPreset
   package let buildPresets: [String: WorkspaceCommandPreset]
   package let testPresets: [String: WorkspaceCommandPreset]
+  package let signingPresets: [String: WorkspaceSigningPreset]
+  /// The fixed local receipt ID is a compatibility source for legacy daemon
+  /// environment profiles only. Runtime-registered profiles must name a
+  /// workspace preset and can never fall through to that lower-level ID.
+  package let allowsLegacySigningPresetFallback: Bool
   package let symbolPresets: [String: WorkspaceCommandPreset]
   /// A build preset may declare one deployable product whose bytes are read
   /// back after a successful build.  The path belongs to repository-managed
@@ -161,6 +189,8 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     buildPresets: [String: WorkspaceCommandPreset],
     testPresets: [String: WorkspaceCommandPreset],
     symbolPresets: [String: WorkspaceCommandPreset],
+    signingPresets: [String: WorkspaceSigningPreset] = [:],
+    allowsLegacySigningPresetFallback: Bool = true,
     buildProducts: [String: String] = [:],
     kind: WorkspaceProjectProfileKind = .primary
   ) throws {
@@ -181,6 +211,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       allowedFileGlobs.allSatisfy(WorkspaceProviderSupport.isSafeGlob),
       buildPresets.allSatisfy({ $0.key == $0.value.presetID }),
       testPresets.allSatisfy({ $0.key == $0.value.presetID }),
+      signingPresets.allSatisfy({ $0.key == $0.value.presetID }),
       symbolPresets.allSatisfy({ $0.key == $0.value.presetID }),
       buildProducts.keys.allSatisfy({ buildPresets[$0] != nil }),
       buildProducts.values.allSatisfy(WorkspaceProviderSupport.isSafeRelativePath)
@@ -198,6 +229,8 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     self.patchPreset = patchPreset
     self.buildPresets = buildPresets
     self.testPresets = testPresets
+    self.signingPresets = signingPresets
+    self.allowsLegacySigningPresetFallback = allowsLegacySigningPresetFallback
     self.symbolPresets = symbolPresets
     self.buildProducts = buildProducts
     self.kind = kind
@@ -385,6 +418,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     }
     var builds: [String: WorkspaceCommandPreset] = [:]
     var tests: [String: WorkspaceCommandPreset] = [:]
+    var signings: [String: WorkspaceSigningPreset] = [:]
     var buildProducts: [String: String] = [:]
     if let registeredPresets {
       for resolved in registeredPresets where ["build", "test"].contains(resolved.resource.kind) {
@@ -426,6 +460,16 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
         } else {
           tests[preset.presetID] = preset
         }
+      }
+      for resolved in registeredPresets where resolved.resource.kind == "signing" {
+        guard let credentialRef = resolved.resource.credentialRef else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace.signingPresetUnavailable: credential reference is absent")
+        }
+        let preset = try WorkspaceSigningPreset(
+          presetID: resolved.resource.presetRef, credentialRef: credentialRef,
+          timeoutSeconds: resolved.resource.timeoutSeconds)
+        signings[preset.presetID] = preset
       }
     } else {
       guard let nodePath, let hvigorScriptPath else {
@@ -517,6 +561,8 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       buildPresets: builds,
       testPresets: tests,
       symbolPresets: symbols,
+      signingPresets: signings,
+      allowsLegacySigningPresetFallback: registeredPresets == nil,
       buildProducts: buildProducts)
   }
 
@@ -1053,6 +1099,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
   private let availabilityProfiles: [WorkspaceProjectProfile]
   private let attempts: WorkspacePatchAttemptStore
   private let signingPresets: OpenHarmonySigningPresetStore?
+  private let signingCredentialOwner: OpenHarmonySigningCredentialOwner?
   private let signingAttempts: OpenHarmonySigningAttemptStore?
   private let isolationManager: (any WorkspaceIsolationManaging)?
   private let nowUTC: @Sendable () -> String
@@ -1061,6 +1108,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     profile: WorkspaceProjectProfile,
     attemptStore: WorkspacePatchAttemptStore,
     signingPresetStore: OpenHarmonySigningPresetStore? = nil,
+    signingCredentialOwner: OpenHarmonySigningCredentialOwner? = nil,
     signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
     isolationManager: (any WorkspaceIsolationManaging)? = nil,
     nowUTC: @escaping @Sendable () -> String
@@ -1070,6 +1118,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     self.availabilityProfiles = [profile]
     self.attempts = attemptStore
     self.signingPresets = signingPresetStore
+    self.signingCredentialOwner = signingCredentialOwner
     self.signingAttempts = signingAttemptStore
     self.isolationManager = isolationManager
     self.nowUTC = nowUTC
@@ -1080,6 +1129,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     profileRegistry: WorkspaceProjectProfileRegistry,
     attemptStore: WorkspacePatchAttemptStore,
     signingPresetStore: OpenHarmonySigningPresetStore? = nil,
+    signingCredentialOwner: OpenHarmonySigningCredentialOwner? = nil,
     signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
     isolationManager: (any WorkspaceIsolationManaging)? = nil,
     availabilityProfiles: [WorkspaceProjectProfile]? = nil,
@@ -1090,6 +1140,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     self.availabilityProfiles = availabilityProfiles ?? [profile]
     self.attempts = attemptStore
     self.signingPresets = signingPresetStore
+    self.signingCredentialOwner = signingCredentialOwner
     self.signingAttempts = signingAttemptStore
     self.isolationManager = isolationManager
     self.nowUTC = nowUTC
@@ -1133,13 +1184,29 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     case "workspace.build-openharmony@1":
       hasPreset = !profile.buildPresets.isEmpty
     case OpenHarmonyLocalSigning.operationReference:
-      guard let signingPresets else {
-        return .unavailable(
-          code: .workspacePresetUnavailable,
-          reason: "workspace.signingPresetUnavailable")
+      if !profile.signingPresets.isEmpty {
+        guard let signingCredentialOwner else {
+          return .unavailable(
+            code: .workspacePresetUnavailable,
+            reason: "workspace.signingCredentialOwnerUnavailable")
+        }
+        hasPreset = profile.signingPresets.values.contains { configured in
+          guard let receipt = try? signingCredentialOwner.resolve(
+            configured.credentialRef, owner: configured.presetID)
+          else { return false }
+          return receipt.projectRef == profile.projectRef
+        }
+      } else if profile.allowsLegacySigningPresetFallback {
+        guard let signingPresets else {
+          return .unavailable(
+            code: .workspacePresetUnavailable,
+            reason: "workspace.signingPresetUnavailable")
+        }
+        let status = signingPresets.status()
+        hasPreset = status.ready && status.projectRef == profile.projectRef
+      } else {
+        hasPreset = false
       }
-      let status = signingPresets.status()
-      hasPreset = status.ready && status.projectRef == profile.projectRef
     case "workspace.run-tests@1":
       hasPreset = !profile.testPresets.isEmpty
     case "workspace.symbolize-crash@1":
@@ -1217,6 +1284,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
+        signingCredentialOwner: signingCredentialOwner,
         signingAttemptStore: signingAttempts, isolationManager: isolationManager,
         nowUTC: nowUTC
       ).workspaceAuthorizationFacts(for: operation, inputs: inputs)
@@ -1287,6 +1355,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
+        signingCredentialOwner: signingCredentialOwner,
         signingAttemptStore: signingAttempts, isolationManager: isolationManager,
         nowUTC: nowUTC
       ).action(for: step, operation: operation, inputs: inputs, context: context)
@@ -1415,15 +1484,34 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
           "workspace unsigned HAP Artifact lease was not resolved before materialization")
       }
       let presetID = try string("signingPresetRef", in: inputs)
-      guard let signingPresets, let signingAttempts else {
+      guard let signingAttempts else {
         throw DeviceProviderError.unsupportedAction("workspace.signingPresetUnavailable")
       }
       let preset: OpenHarmonySigningPresetReceipt
-      do {
-        preset = try signingPresets.loadValidated(presetID: presetID)
-      } catch {
+      if let configured = profile.signingPresets[presetID] {
+        guard let signingCredentialOwner else {
+          throw DeviceProviderError.unsupportedAction(
+            "workspace.signingCredentialOwnerUnavailable")
+        }
+        do {
+          preset = try signingCredentialOwner.resolve(
+            configured.credentialRef, owner: presetID)
+        } catch {
+          throw DeviceProviderError.unsupportedAction(
+            "workspace.signingPresetUnavailable:\(error)")
+        }
+      } else if profile.signingPresets.isEmpty,
+        profile.allowsLegacySigningPresetFallback, let signingPresets
+      {
+        do {
+          preset = try signingPresets.loadValidated(presetID: presetID)
+        } catch {
+          throw DeviceProviderError.unsupportedAction(
+            "workspace.signingPresetUnavailable:\(error)")
+        }
+      } else {
         throw DeviceProviderError.unsupportedAction(
-          "workspace.signingPresetUnavailable:\(error)")
+          "workspace.signingPresetUnavailable:\(presetID)")
       }
       guard preset.projectRef == projectRef else {
         throw DeviceProviderError.unsupportedAction(
@@ -1441,7 +1529,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return .workspace(
         .signOpenHarmonyHap(
           WorkspaceOpenHarmonySigningAction(
-            jobID: context.jobID, projectRef: projectRef, preset: preset,
+            jobID: context.jobID, projectRef: projectRef,
+            signingPresetRef: presetID, preset: preset,
             inputArtifactID: artifact.artifactID,
             inputFilePath: artifact.fileURL.path,
             inputSHA256: artifact.sha256, inputByteCount: artifact.byteCount,
@@ -1677,6 +1766,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
+        signingCredentialOwner: signingCredentialOwner,
         signingAttemptStore: signingAttempts, isolationManager: isolationManager,
         nowUTC: nowUTC
       ).lower(action: action, context: context)
@@ -1818,6 +1908,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
+        signingCredentialOwner: signingCredentialOwner,
         signingAttemptStore: signingAttempts, isolationManager: isolationManager,
         nowUTC: nowUTC
       ).verify(receipt: receipt, action: action, context: context)
@@ -2064,6 +2155,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try await WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
+        signingCredentialOwner: signingCredentialOwner,
         signingAttemptStore: signingAttempts, isolationManager: isolationManager,
         nowUTC: nowUTC
       ).reconcile(intent: intent, context: context)

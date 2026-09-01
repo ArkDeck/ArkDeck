@@ -9929,7 +9929,7 @@ public actor RuntimeJobEngine {
       }
       arguments = [
         "projectRef": .string(signing.projectRef),
-        "signingPresetRef": .string(signing.preset.presetID),
+        "signingPresetRef": .string(signing.selectedSigningPresetRef),
         "inputArtifactId": .string(resolvedInputArtifact.artifactID),
         "inputSha256": .string(resolvedInputArtifact.sha256),
       ]

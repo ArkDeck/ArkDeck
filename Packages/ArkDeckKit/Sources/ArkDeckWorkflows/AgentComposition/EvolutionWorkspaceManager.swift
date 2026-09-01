@@ -800,6 +800,8 @@ package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
       buildPresets: try rebasedMap(source.buildPresets),
       testPresets: try rebasedMap(source.testPresets),
       symbolPresets: try rebasedMap(source.symbolPresets),
+      signingPresets: source.signingPresets,
+      allowsLegacySigningPresetFallback: source.allowsLegacySigningPresetFallback,
       buildProducts: source.buildProducts, kind: .evolution)
   }
 

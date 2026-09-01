@@ -476,7 +476,7 @@ generic `agent run --operation capture.diagnostics@1 --inputs-file ...` 提交 d
 | `runtime tool` | `register`, `list`, `inspect`, `select`, `remove` | bounded 校验 host tool 后生成 typed tool reference；active selection 使用 lifecycle preview/control action；不是 executable passthrough |
 | `runtime bundle` | `register`, `list`, `inspect`, `remove` | bounded 校验 signed daemon bundle 后生成 typed bundle reference；service install/update 只消费 reference |
 | `runtime hdc` | `status`, `impact-preview`, `restart` | 展示 exact tool/server facts；preview 建立 control action，mutation 必须 generation-bound、typed、audited |
-| `runtime signing` | `install`, `normalize`, `migrate`, `status`, `remove` | 只传 credential refs；秘密由平台 credential adapter 持有 |
+| `runtime signing` | `install-sdk-release`, `install`, `normalize`, `migrate-deveco`, `status`, `remove` | 安装边界读取 bounded 本地材料并只发布 path-free `credential:sha256-*` resource；秘密由平台 credential adapter 持有，后续 workspace/Job 只传 credential ref |
 | `runtime storage` | `status`, `policy`, `root` | 未来 typed storage surface；不能直接修改 App preference 文件。`status` 必须来自 Runtime 拥有的单一 store owner，并把 Session 输出域与 Runtime artifact 域分开报告（不同 root、不同 quota、不同保留策略），不得合并成一个数字；owner 化之前该 leaf 保持 `unavailable`，不得基于 per-process 偏好副本报告 status。这是有范围的延期而不是空白：Runtime artifact 域已有一等 leaf `artifact quota`（total/used/remaining），延期只扣住没有可信来源的 Session 输出域，caller 不必为此另建第二条路径 |
 | `runtime support-bundle` | `preview`, `export` | 先预览清单/隐私，再显式导出 |
 | `runtime update` | `check`, `download`, `handoff`, `status`, `cancel`, `cleanup` | 用户同意与验证边界一致；不得静默安装 |
@@ -957,6 +957,15 @@ human 模式可以在 stderr 显示可复制的 resume 示例；JSON 模式不�
   `build|test|signing|symbol` kind 接受 typed constraints。SDK/toolchain 必须先形成 registered toolchain
   ref，signing 只接受 credential ref；preset 永不接受 raw executable/argv。project/preset remove 与
   Job acquire 在同一 owner transaction 串行，不能产生 dangling ref。
+- macOS signing credential owner 把现有 measured receipt/Keychain envelope 包装成独立
+  `arkdeck.signing-credential/1` resource。content ref 不含 host path、Keychain account 或秘密；owner
+  使用跨进程锁和 crash marker 串行 install/replace/remove。workspace signing preset 注册必须在同一
+  durable dependency transaction 同时 pin exact toolchain ref 与 credential ref；update 先 acquire 新
+  dependency set、发布 preset generation，再幂等释放旧 set；remove/restart 在服务任何读取前结算未完成
+  release。任一 active preset 引用存在时，credential replace/remove 必须稳定拒绝。
+- `runtime signing normalize` 和 daemon identity refresh 只能执行保持 content ref 的维护；可能改变
+  key alias 的 `migrate-deveco` 属于 replace，必须遵守 active-reference gate 并返回新 ref。`status`、
+  maintenance 与 removal projection 不得回显 receipt path、材料 path、Keychain account 或秘密。
 - `workspace project list/show` 必须从 daemon 当前注册配置投影 stable `projectRef`、kind、
   availability、supported operation 与 preset refs，不暴露 host root、executable、argv 或秘密。
 - `workspace preset list/show --project <ref> [--kind build|test|signing|symbol]` 必须输出 kind-tagged
@@ -1607,7 +1616,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | Agent pause/HAR | `AgentRuntimeExecutor` 在 CLI 本地写 `PendingExecution` 文件；已有 HAR document 类型但无 production daemon wiring | Runtime-owned AgentExecution + HAR list/show/resume；`blocked` → `direct` | A |
 | Job event | App 和 CLI 都只有 snapshot/timeline polling，无 durable event ID/cursor | unary `job.events` + client watch；`blocked` → `direct` | B |
 | Workspace project lifecycle | Runtime 已持有 private root grant、stable `projectRef` 与 generation；target CLI 提供 register/update/remove/list/show，旧 daemon flags 只作一次兼容迁移输入 | `direct`；实现见 `cli-workspace-project-lifecycle.md` | B |
-| Workspace preset lifecycle | `buildPresetRef` 等仍来自内置 profile/描述性字符串，无独立 typed registration API | bounded preset register/update/remove + list/show；`blocked` → `direct` | B |
+| Workspace preset lifecycle | Runtime 已持有 bounded preset register/update/remove + list/show；build/test/symbol 解析 registered preset，signing 通过 crash-recovered dependency transaction pin exact toolchain + credential，并把 workspace preset ref 映射到 Job/result/recovery record | `direct`；实现见 `cli-workspace-preset-toolchain-lifecycle.md` 与本规格 §7.9 | B |
 | Imported input lifecycle | import commit 返回 store namespace 的 legacy synthetic `jobId` + Artifact ID，前者不是 Job engine record；无全局重发现和 release/unpin | durable Import + Import-owned Artifact 的 list/inspect/read/export/release；`blocked` → `direct` | B |
 | HDC lifecycle | 有 App/host lifecycle 组件，但无统一 durable control-action HAR carrier | impact preview → control action → HAR/resume → audited restart；`blocked` → `direct` | B |
 | Target availability | App 组合多个事实源，daemon 无聚合 projection | `target availability`；`blocked` → `direct` | B |

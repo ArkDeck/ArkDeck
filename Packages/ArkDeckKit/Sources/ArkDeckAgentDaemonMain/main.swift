@@ -717,6 +717,9 @@ Task.detached {
         })
     let bootstrapRegistry = try BootstrapBundleRegistry()
     let devecoToolchains = BootstrapDevEcoToolchainRegistry(owner: bootstrapRegistry)
+    let signingPresetStore = OpenHarmonySigningPresetStore()
+    let signingCredentialOwner = OpenHarmonySigningCredentialOwner(
+      store: signingPresetStore)
     let workspaceToolchainPinning = RuntimeWorkspaceToolchainPinning(
       acquire: { reference, generation, presetRef in
         do {
@@ -737,8 +740,26 @@ Task.detached {
           throw RuntimeWorkspaceProjectFailure(failure.code, failure.message)
         }
       })
+    let workspaceCredentialPinning = RuntimeWorkspaceCredentialPinning(
+      acquire: { reference, presetRef in
+        do {
+          try signingCredentialOwner.acquire(reference, owner: presetRef)
+        } catch {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "signing credential pin could not be validated")
+        }
+      },
+      release: { reference, presetRef in
+        do {
+          try signingCredentialOwner.release(reference, owner: presetRef)
+        } catch {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "signing credential pin could not be released")
+        }
+      })
     let workspaceProjectStore = try RuntimeWorkspaceProjectStore(
       rootURL: resolvedStateDirectory, toolchainPinning: workspaceToolchainPinning,
+      credentialPinning: workspaceCredentialPinning,
       nowUTC: utcNow)
     // The legacy daemon flags are a compatibility reader only. Import them
     // once into the same Runtime owner used by the target CLI, so service
@@ -782,7 +803,6 @@ Task.detached {
     // operator has to be able to see.
     var workspaceProjectPublications: [WorkspaceProjectPublication] = []
     let configuredInspector = ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_INSPECTOR"]
-    let signingPresetStore = OpenHarmonySigningPresetStore()
     let signingAttemptStore = try OpenHarmonySigningAttemptStore(
       rootURL: resolvedStateDirectory.appending(
         path:
@@ -827,8 +847,25 @@ Task.detached {
           resolvedPresetsByProject[resource.projectRef, default: []].append(
             RuntimeWorkspaceResolvedPreset(resource: resource))
         case "signing":
-          workspacePresetResolutionFailures[resource.presetRef] =
-            "workspace.signingCredentialOwnerUnavailable"
+          guard let toolchainRef = resource.toolchainRef,
+            let toolchainGeneration = resource.toolchainGeneration,
+            let credentialRef = resource.credentialRef
+          else {
+            throw RuntimeWorkspaceProjectFailure(
+              "recordUnreadable", "registered signing preset has incomplete dependencies")
+          }
+          let owner = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .workspacePreset, id: resource.presetRef)
+          _ = try devecoToolchains.resolve(
+            toolchainRef, expectedGeneration: String(toolchainGeneration), owner: owner)
+          let credential = try signingCredentialOwner.resolve(
+            credentialRef, owner: resource.presetRef)
+          guard credential.projectRef == resource.projectRef else {
+            throw RuntimeWorkspaceProjectFailure(
+              "resourceConflict", "signing credential project binding changed")
+          }
+          resolvedPresetsByProject[resource.projectRef, default: []].append(
+            RuntimeWorkspaceResolvedPreset(resource: resource))
         default:
           workspacePresetResolutionFailures[resource.presetRef] =
             "workspace.presetKindUnsupported"
@@ -928,6 +965,7 @@ Task.detached {
       workspaceOperations = WorkspaceOperationsProvider(
         profile: primaryProfile, profileRegistry: profiles,
         attemptStore: attempts, signingPresetStore: signingPresetStore,
+        signingCredentialOwner: signingCredentialOwner,
         signingAttemptStore: signingAttemptStore,
         isolationManager: evolution,
         availabilityProfiles: resolvedWorkspaceProfiles,
@@ -940,6 +978,7 @@ Task.detached {
         let projectProvider = WorkspaceOperationsProvider(
           profile: profile, profileRegistry: profiles,
           attemptStore: attempts, signingPresetStore: signingPresetStore,
+          signingCredentialOwner: signingCredentialOwner,
           signingAttemptStore: signingAttemptStore,
           isolationManager: evolution, nowUTC: utcNow)
         workspaceProjectPublications.append(

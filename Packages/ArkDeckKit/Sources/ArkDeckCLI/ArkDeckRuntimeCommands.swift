@@ -718,7 +718,8 @@ enum RuntimeCLI {
     // official public password, while private presets read the old envelope
     // only when an actual daemon-identity/access-schema migration is required.
     guard FileManager.default.fileExists(atPath: store.receiptPath) else { return }
-    try store.refreshDaemonKeychainIdentity()
+    let owner = OpenHarmonySigningCredentialOwner(store: store)
+    try owner.maintain { try store.refreshDaemonKeychainIdentity() }
   }
 
   /// Installs the single published OpenHarmony signing preset. Passwords are
@@ -736,6 +737,7 @@ enum RuntimeCLI {
       suppliedStore
       ?? OpenHarmonySigningPresetStore(
         secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    let credentialOwner = OpenHarmonySigningCredentialOwner(store: store)
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "\(canonicalPrefix).install-sdk-release")
     session.warnIfLegacy()
@@ -760,14 +762,16 @@ enum RuntimeCLI {
     let installer = OpenHarmonySDKReleasePresetInstaller(
       store: store,
       materialParentURL: materialParentURL ?? OpenHarmonyLocalSigning.defaultRootURL())
-    let receipt = try await installer.install(
-      configuration: OpenHarmonySDKReleasePresetConfiguration(
-        projectRef: options.value("--project-ref")
-          ?? OpenHarmonyLocalSigning.defaultProjectRef,
-        bundleName: try required("--bundle-name"),
-        javaExecutable: URL(filePath: java),
-        sdkRoot: URL(filePath: sdk)))
-    session.emit(try encodedJSON(receipt))
+    let (_, resource) = try await credentialOwner.replace {
+      try await installer.install(
+        configuration: OpenHarmonySDKReleasePresetConfiguration(
+          projectRef: options.value("--project-ref")
+            ?? OpenHarmonyLocalSigning.defaultProjectRef,
+          bundleName: try required("--bundle-name"),
+          javaExecutable: URL(filePath: java),
+          sdkRoot: URL(filePath: sdk)))
+    }
+    session.emit(try encodedJSON(resource.projection))
   }
 
   static func runSigning(
@@ -778,6 +782,7 @@ enum RuntimeCLI {
       suppliedStore
       ?? OpenHarmonySigningPresetStore(
         secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    let credentialOwner = OpenHarmonySigningCredentialOwner(store: store)
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
@@ -828,25 +833,37 @@ enum RuntimeCLI {
       var normalizedKeyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         keyPassword, keystore: keystoreURL)
       defer { normalizedKeyPassword.resetBytes(in: 0..<normalizedKeyPassword.count) }
-      let receipt = try store.install(
-        configuration: OpenHarmonySigningPresetConfiguration(
-          projectRef: options.value("--project-ref")
-            ?? OpenHarmonyLocalSigning.defaultProjectRef,
-          javaExecutable: URL(filePath: java),
-          signerJAR: URL(filePath: jar),
-          keystore: keystoreURL,
-          appCertificate: URL(filePath: certificate),
-          signedProfile: URL(filePath: profile),
-          keyAlias: try required("--key-alias")),
-        keystorePassword: normalizedKeystorePassword,
-        keyPassword: normalizedKeyPassword)
-      session.emit(try encodedJSON(receipt))
+      let (_, resource) = try credentialOwner.replace {
+        try store.install(
+          configuration: OpenHarmonySigningPresetConfiguration(
+            projectRef: options.value("--project-ref")
+              ?? OpenHarmonyLocalSigning.defaultProjectRef,
+            javaExecutable: URL(filePath: java),
+            signerJAR: URL(filePath: jar),
+            keystore: keystoreURL,
+            appCertificate: URL(filePath: certificate),
+            signedProfile: URL(filePath: profile),
+            keyAlias: try required("--key-alias")),
+          keystorePassword: normalizedKeystorePassword,
+          keyPassword: normalizedKeyPassword)
+      }
+      session.emit(try encodedJSON(resource.projection))
 
     case "normalize":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "\(spelling) normalize accepts only --json")
       }
-      session.emit(try encodedJSON(store.normalizeDevEcoSecrets()))
+      let normalization = try credentialOwner.maintain {
+        try store.normalizeDevEcoSecrets()
+      }
+      let resource = try credentialOwner.current()
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-maintenance/1"),
+        "operation": .string("normalize"),
+        "credential": resource.projection,
+        "normalizedKeystorePassword": .bool(normalization.normalizedKeystorePassword),
+        "normalizedKeyPassword": .bool(normalization.normalizedKeyPassword),
+      ])))
 
     case "migrate-deveco":
       let options = try CLIOptions(rest)
@@ -908,11 +925,19 @@ enum RuntimeCLI {
       var keyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         encrypted.key, keystore: materialAnchor)
       defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
-      session.emit(
-        try encodedJSON(
-          migrationStore.migrateToSecretEnvelope(
-            keystorePassword: keystorePassword, keyPassword: keyPassword,
-            keyAlias: options.value("--key-alias"))))
+      let migrationOwner = OpenHarmonySigningCredentialOwner(store: migrationStore)
+      let (migration, resource) = try migrationOwner.replace {
+        try migrationStore.migrateToSecretEnvelope(
+          keystorePassword: keystorePassword, keyPassword: keyPassword,
+          keyAlias: options.value("--key-alias"))
+      }
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-maintenance/1"),
+        "operation": .string("migrate-deveco"),
+        "credential": resource.projection,
+        "migrated": .bool(migration.migrated),
+        "legacyAccountCount": .integer(Int64(migration.legacyAccountCount)),
+      ])))
 
     case "status":
       guard rest.isEmpty else {
@@ -925,13 +950,40 @@ enum RuntimeCLI {
         suppliedStore
         ?? OpenHarmonySigningPresetStore(
           secrets: LoginKeychainSigningSecretStore())
-      session.emit(try encodedJSON(statusStore.status()))
+      let status = statusStore.status()
+      let statusOwner = OpenHarmonySigningCredentialOwner(store: statusStore)
+      let resource: OpenHarmonySigningCredentialResource?
+      var diagnostics = status.ready
+        ? []
+        : [status.installed
+          ? "signingCredentialUnavailable" : "signingCredentialNotInstalled"]
+      do { resource = try statusOwner.current() }
+      catch {
+        resource = nil
+        if status.installed { diagnostics.append("signingCredentialOwnerUnavailable") }
+      }
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-status/1"),
+        "installed": .bool(status.installed),
+        "ready": .bool(status.ready && resource != nil),
+        "credential": resource?.projection ?? .null,
+        "diagnostics": .array(diagnostics.map(JSONValue.string)),
+      ])))
 
     case "remove":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "\(spelling) remove accepts only --json")
       }
-      session.emit(try encodedJSON(store.remove()))
+      let removal = try credentialOwner.remove { try store.remove() }
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-removal/1"),
+        "state": .string("removed"),
+        "removedReceipt": .bool(removal.removedReceipt),
+        "removedKeystorePassword": .bool(removal.removedKeystorePassword),
+        "removedKeyPassword": .bool(removal.removedKeyPassword),
+        "removedManagedMaterial": .bool(removal.removedManagedMaterial),
+        "preservedSourceCount": .integer(Int64(removal.preservedSourcePaths.count)),
+      ])))
 
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported signing subcommand")
