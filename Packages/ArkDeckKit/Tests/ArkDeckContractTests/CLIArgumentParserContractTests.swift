@@ -203,6 +203,29 @@ final class CLIArgumentParserContractTests: XCTestCase {
       .invalidOption)
   }
 
+  func testDoctorPublishesBoundedDepthAndAutomationGateOptions() {
+    XCTAssertNotNil(success(["doctor", "--deep", "--require-healthy"]))
+    XCTAssertNotNil(
+      success(["doctor", "--require-healthy", "--output", "json", "--deep"]))
+    XCTAssertEqual(failure(["doctor", "--deep", "--deep"])?.code, .invalidOption)
+    XCTAssertEqual(failure(["doctor", "--target", "T-1"])?.code, .invalidOption)
+
+    XCTAssertEqual(
+      RuntimeCLI.doctorReadiness(
+        .object([
+          "schemaVersion": .string("arkdeck.doctor-report/1"),
+          "ready": .bool(false),
+        ])),
+      false)
+    XCTAssertNil(
+      RuntimeCLI.doctorReadiness(
+        .object([
+          "schemaVersion": .string("arkdeck.doctor-report/2"),
+          "ready": .bool(true),
+        ])),
+      "the CLI gate must refuse an unknown report instead of assuming it is healthy")
+  }
+
   /// §12's four remaining renames, each published under its target spelling
   /// with the old one kept as a deprecated alias for this major.
   ///

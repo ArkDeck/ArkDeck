@@ -494,6 +494,12 @@ generic `agent run --operation capture.diagnostics@1 --inputs-file ...` 提交 d
 automation gate；发现 blocker 时返回 `healthRequirementFailed` 与 exit 69。只有连最小报告都
 无法完成时才返回 transport/protocol/internal error。
 
+报告使用 `arkdeck.doctor-report/1`。finding 的 `severity` 固定为 `info|warning|blocker`，CLI 只读取
+Runtime 计算出的 `ready`，不得解析 summary 或复制 blocker registry。`--deep` 增加有界的 live HDC
+identity、Runtime Artifact quota 与 cleanup-debt 检查；每个子检查失败形成 blocker finding，不得抹掉
+其他已完成检查。storage 必须分别投影 Runtime Artifact 与 Session output 两个 owner 域；Session owner
+发布前明确返回 unavailable，不能把进程本地 App 偏好或两个 root 的数字拼成一个健康结论。
+
 ### 7.1 Device 与 Target
 
 `device` 和 `target` 必须分开：

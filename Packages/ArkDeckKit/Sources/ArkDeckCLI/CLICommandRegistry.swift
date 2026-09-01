@@ -1068,7 +1068,16 @@ enum CLICommandRegistry {
         token: "",
         canonicalCommand: "doctor",
         summary: "read-only Runtime, Catalog, provider and storage health summary",
-        options: runtimeClientOptions([]),
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--deep",
+            form: .flag,
+            summary: "run bounded live HDC, storage and recovery checks"),
+          CLIOptionSpec(
+            name: "--require-healthy",
+            form: .flag,
+            summary: "exit 69 when the completed report contains a blocker"),
+        ]),
         connectsToRuntime: true)
     ])
 

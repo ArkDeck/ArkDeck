@@ -34,6 +34,7 @@
     "device.display-name.clear",
     "device.display-name.set",
     "device.observations",
+    "doctor",
     "health",
     "human-action.list",
     "human-action.resume",
