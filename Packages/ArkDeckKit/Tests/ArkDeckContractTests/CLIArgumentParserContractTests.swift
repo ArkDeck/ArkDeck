@@ -327,6 +327,34 @@ final class CLIArgumentParserContractTests: XCTestCase {
         + "plain failure rather than an unknown outcome")
   }
 
+  func testTargetDisplayNameRequiresAnExactCASResourceReference() {
+    XCTAssertNotNil(
+      success([
+        "target", "display-name", "set", "--target", "T-1",
+        "--expected-generation", "1", "--name", "Lab device",
+      ]))
+    XCTAssertNotNil(
+      success([
+        "target", "display-name", "clear", "--target", "T-1",
+        "--expected-generation", "2",
+      ]))
+    XCTAssertEqual(
+      failure([
+        "target", "display-name", "set", "--target", "T-1",
+        "--expected-generation", "1",
+      ])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "target", "display-name", "clear", "--target", "T-1",
+        "--expected-generation", "0",
+      ])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "target", "display-name", "clear", "--target", "T-1",
+        "--expected-generation", "1", "--name", "must-not-be-ignored",
+      ])?.code, .invalidOption)
+  }
+
   func testProtocolNegotiationIsScopedToHealthAndPublishedTargetLeaves() {
     for major in ["1", "2"] {
       XCTAssertNotNil(

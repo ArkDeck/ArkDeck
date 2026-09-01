@@ -35,6 +35,32 @@ struct CLIWorkspaceContinuationDraft: Equatable {
     }
   }
 
+  private static func validTargetProjectionShape(_ target: [String: JSONValue]) -> Bool {
+    let baseKeys: Set<String> = [
+      "schemaVersion", "targetId", "bindingRevision", "toolVersion", "adoptedAtUtc",
+      "connectKey", "stablePhysicalIdentitySha256", "live", "observedFacts",
+    ]
+    let keys = Set(target.keys)
+    guard keys == baseKeys || keys == baseKeys.union(["displayName", "displayNameGeneration"])
+    else { return false }
+    guard keys != baseKeys else { return true }
+    guard case .string(let generation)? = target["displayNameGeneration"],
+      let parsed = UInt64(generation), parsed > 0, parsed <= UInt64(Int64.max),
+      String(parsed) == generation
+    else { return false }
+    switch target["displayName"] {
+    case .null?: return true
+    case .string(let name)?:
+      return name == name.precomposedStringWithCanonicalMapping
+        && name == name.trimmingCharacters(in: .whitespacesAndNewlines)
+        && (1...256).contains(name.utf8.count)
+        && name.unicodeScalars.allSatisfy {
+          !CharacterSet.controlCharacters.contains($0)
+        }
+    default: return false
+    }
+  }
+
   static func prepare(
     sourceJobID: String,
     jobShow: JSONValue,
@@ -153,10 +179,7 @@ struct CLIWorkspaceContinuationDraft: Equatable {
           show["materializedStableIdentitySha256"]),
         SHA256Hex.isLowercaseSHA256(materializedIdentity),
         case .object(let target)? = targetShow,
-        Set(target.keys) == [
-          "schemaVersion", "targetId", "bindingRevision", "toolVersion", "adoptedAtUtc",
-          "connectKey", "stablePhysicalIdentitySha256", "live", "observedFacts",
-        ],
+        Self.validTargetProjectionShape(target),
         target["schemaVersion"] == .string("arkdeck.target/1"),
         target["targetId"] == .string(sourceRequest.target.targetID),
         Self.nonnegativeInteger(target["bindingRevision"]) == Int64(requested),

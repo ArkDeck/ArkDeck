@@ -150,8 +150,12 @@ final class CLIWorkspaceContinuationContractTests: XCTestCase {
     ])
   }
 
-  private func target(revision: Int = 3, stableIdentity: String? = nil) -> JSONValue {
-    .object([
+  private func target(
+    revision: Int = 3,
+    stableIdentity: String? = nil,
+    displayName: JSONValue? = nil
+  ) -> JSONValue {
+    var fields: [String: JSONValue] = [
       "schemaVersion": .string("arkdeck.target/1"),
       "targetId": .string(targetID),
       "bindingRevision": .integer(Int64(revision)),
@@ -161,7 +165,12 @@ final class CLIWorkspaceContinuationContractTests: XCTestCase {
       "stablePhysicalIdentitySha256": .string(stableIdentity ?? identity),
       "live": .null,
       "observedFacts": .null,
-    ])
+    ]
+    if let displayName {
+      fields["displayName"] = displayName
+      fields["displayNameGeneration"] = .string("2")
+    }
+    return .object(fields)
   }
 
   func testRegistryPublishesAllThreeStableContinuationLeaves() throws {
@@ -289,6 +298,30 @@ final class CLIWorkspaceContinuationContractTests: XCTestCase {
       { error in
         XCTAssertEqual((error as? CLIRegistryError)?.code, code)
       }
+    }
+  }
+
+  func testAdditiveTargetDisplayNameFieldsDoNotMasqueradeAsBindingDrift() throws {
+    let source = try request()
+    let sourceShow = try show(request: source, effect: .readOnly)
+    for name in [JSONValue.null, .string("Bench device")] {
+      let draft = try CLIWorkspaceContinuationDraft.prepare(
+        sourceJobID: sourceJobID, jobShow: sourceShow, health: health(),
+        targetShow: target(displayName: name), session: session())
+      XCTAssertEqual(draft.bindingRevision, 3)
+      XCTAssertEqual(draft.stablePhysicalIdentitySHA256, identity)
+    }
+
+    guard case .object(var malformed) = target(displayName: .string("Bench device")) else {
+      return XCTFail("target fixture must be an object")
+    }
+    malformed["displayNameGeneration"] = .string("02")
+    XCTAssertThrowsError(
+      try CLIWorkspaceContinuationDraft.prepare(
+        sourceJobID: sourceJobID, jobShow: sourceShow, health: health(),
+        targetShow: .object(malformed), session: session()))
+    { error in
+      XCTAssertEqual((error as? CLIRegistryError)?.code, .bindingRevisionStale)
     }
   }
 

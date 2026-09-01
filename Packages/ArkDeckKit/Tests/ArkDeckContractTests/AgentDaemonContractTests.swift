@@ -336,6 +336,157 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(empty.error?.code, "invalidParams")
   }
 
+  func testTargetDisplayNameIsADurableCASResourceSeparateFromIdentity() async throws {
+    let directory = stateDirectory.appending(
+      path: "targets-display-name", directoryHint: .isDirectory)
+    let targets = try RuntimeTargetStore(directoryURL: directory)
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: String(repeating: "d", count: 64),
+      connectKey: "display-name-device", toolVersion: "3.2.0f",
+      nowUTC: "2026-09-01T00:00:00Z"
+    ).record
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    let initial = try await targetRequest(
+      handler, method: "target.show", params: ["targetId": .string(adopted.targetID)])
+    guard case .object(let initialFields)? = initial.result else {
+      return XCTFail("target.show must expose the display-name resource")
+    }
+    XCTAssertEqual(initialFields["displayName"], .null)
+    XCTAssertEqual(initialFields["displayNameGeneration"], .string("1"))
+
+    let set = try await targetRequest(
+      handler, method: "target.display-name.set",
+      params: [
+        "targetId": .string(adopted.targetID),
+        "expectedGeneration": .string("1"),
+        "name": .string("Lab device"),
+      ])
+    guard case .object(let setFields)? = set.result else {
+      return XCTFail("set must return the complete resource")
+    }
+    XCTAssertEqual(setFields["schemaVersion"], .string("arkdeck.target-display-name/1"))
+    XCTAssertEqual(setFields["name"], .string("Lab device"))
+    XCTAssertEqual(setFields["generation"], .string("2"))
+
+    let stale = try await targetRequest(
+      handler, method: "target.display-name.clear",
+      params: [
+        "targetId": .string(adopted.targetID),
+        "expectedGeneration": .string("1"),
+      ])
+    XCTAssertFalse(stale.ok)
+    XCTAssertEqual(stale.error?.code, "resourceConflict")
+    XCTAssertEqual(stale.error?.details?["phase"], .string("targetDisplayNameOwner"))
+    XCTAssertEqual(stale.error?.details?["newDispatchCount"], .integer(0))
+
+    let listed = try await request(handler, method: "target.list")
+    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first else {
+      return XCTFail("target.list must expose active display names")
+    }
+    XCTAssertEqual(row["displayName"], .string("Lab device"))
+    XCTAssertEqual(row["displayNameGeneration"], .string("2"))
+
+    let cleared = try await targetRequest(
+      handler, method: "target.display-name.clear",
+      params: [
+        "targetId": .string(adopted.targetID),
+        "expectedGeneration": .string("2"),
+      ])
+    guard case .object(let clearedFields)? = cleared.result else {
+      return XCTFail("clear must return the complete resource")
+    }
+    XCTAssertEqual(clearedFields["name"], .null)
+    XCTAssertEqual(clearedFields["generation"], .string("3"))
+
+    let reloaded = try RuntimeTargetStore(directoryURL: directory)
+    XCTAssertEqual(try reloaded.targetDisplayName(targetID: adopted.targetID).generation, 3)
+    XCTAssertNil(try reloaded.targetDisplayName(targetID: adopted.targetID).name)
+    XCTAssertEqual(
+      try reloaded.find(targetID: adopted.targetID), adopted,
+      "presentation mutations must not rewrite target identity or binding")
+  }
+
+  func testTargetDisplayNameRejectsUnknownTargetsInvalidNamesAndNonCanonicalGenerations()
+    async throws
+  {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-display-name-refusal", directoryHint: .isDirectory))
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: String(repeating: "e", count: 64),
+      connectKey: "display-name-refusal", toolVersion: "3.2.0f",
+      nowUTC: "2026-09-01T00:00:00Z"
+    ).record
+    let (handler, _) = try makeStack(targetStore: targets)
+
+    for (targetID, generation, name, expected) in [
+      ("target-missing", "1", "Known name", "resourceNotFound"),
+      (adopted.targetID, "01", "Known name", "invalidParams"),
+      (adopted.targetID, "1", " leading space", "invalidInput"),
+      (adopted.targetID, "1", "control\u{0085}character", "invalidInput"),
+      (adopted.targetID, "1", String(repeating: "a", count: 257), "invalidInput"),
+    ] {
+      let response = try await targetRequest(
+        handler, method: "target.display-name.set",
+        params: [
+          "targetId": .string(targetID), "expectedGeneration": .string(generation),
+          "name": .string(name),
+        ])
+      XCTAssertFalse(response.ok)
+      XCTAssertEqual(response.error?.code, expected)
+    }
+    XCTAssertEqual(try targets.targetDisplayName(targetID: adopted.targetID).generation, 1)
+  }
+
+  func testCLITargetDisplayNameNegotiatesV2AndPreservesTypedCASFailures() throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "targets-display-name-cli", directoryHint: .isDirectory))
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: String(repeating: "f", count: 64),
+      connectKey: "display-name-cli", toolVersion: "3.2.0f",
+      nowUTC: "2026-09-01T00:00:00Z"
+    ).record
+    let (handler, _) = try makeStack(targetStore: targets)
+    let server = try startServer(handler)
+
+    let (setExit, setEnvelope) = try runObservationCLI([
+      "target", "display-name", "set", "--target", adopted.targetID,
+      "--expected-generation", "1", "--name", "Bench device",
+    ], server: server)
+    XCTAssertEqual(setExit, 0)
+    XCTAssertEqual(setEnvelope["command"], .string("target.display-name.set"))
+    guard case .object(let setResult)? = setEnvelope["result"],
+      case .object(let setMeta)? = setEnvelope["meta"]
+    else { return XCTFail("CLI set must return one typed envelope") }
+    XCTAssertEqual(setResult["generation"], .string("2"))
+    XCTAssertEqual(setMeta["controlProtocolVersion"], .string("2.0.0"))
+
+    let (staleExit, staleEnvelope) = try runObservationCLI([
+      "target", "display-name", "clear", "--target", adopted.targetID,
+      "--expected-generation", "1",
+    ], server: server)
+    XCTAssertEqual(staleExit, 65)
+    guard case .object(let staleError)? = staleEnvelope["error"],
+      case .object(let details)? = staleError["details"]
+    else { return XCTFail("CLI CAS refusal must stay machine-readable") }
+    XCTAssertEqual(staleError["code"], .string("resourceConflict"))
+    XCTAssertEqual(details["phase"], .string("targetDisplayNameOwner"))
+    XCTAssertEqual(details["newDispatchCount"], .integer(0))
+
+    let (clearExit, clearEnvelope) = try runObservationCLI([
+      "target", "display-name", "clear", "--target", adopted.targetID,
+      "--expected-generation", "2",
+    ], server: server)
+    XCTAssertEqual(clearExit, 0)
+    guard case .object(let clearResult)? = clearEnvelope["result"] else {
+      return XCTFail("CLI clear must return the resource after publication")
+    }
+    XCTAssertEqual(clearResult["name"], .null)
+    XCTAssertEqual(clearResult["generation"], .string("3"))
+  }
+
   /// §6.1's `target availability`, and the reason it is a Runtime method.
   ///
   /// §7.2 forbids the CLI from issuing several reads and declaring from them
@@ -668,6 +819,25 @@ final class AgentDaemonContractTests: XCTestCase {
   ) async throws -> AgentWireProtocol.Response {
     let frame = try JSONEncoder().encode(
       AgentWireProtocol.Request(id: UUID().uuidString, method: method, params: params))
+    return await handler.handleFrame(frame)
+  }
+
+  private struct TargetControlRequest: Encodable {
+    let protocolVersion: String
+    let id: String
+    let method: String
+    let params: [String: JSONValue]?
+  }
+
+  private func targetRequest(
+    _ handler: RuntimeControlPlaneHandler,
+    method: String,
+    params: [String: JSONValue]? = nil
+  ) async throws -> AgentWireProtocol.Response {
+    let frame = try JSONEncoder().encode(
+      TargetControlRequest(
+        protocolVersion: ArkDeckControlProtocol.targetVersion,
+        id: UUID().uuidString, method: method, params: params))
     return await handler.handleFrame(frame)
   }
 
