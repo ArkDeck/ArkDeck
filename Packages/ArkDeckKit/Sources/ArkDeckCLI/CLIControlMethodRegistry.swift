@@ -119,6 +119,7 @@ enum CLIControlMethodRegistry {
     // survive a lost response even though lifecycle dispatch remains zero.
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
+    "runtime.tool.select",
     "control-action.list",
     "control-action.show",
     "control-action.reconcile",

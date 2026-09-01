@@ -99,6 +99,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let hdcStatusObserver: (any HDCStatusObserving)?
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
+  private let toolSelectionActions: RuntimeToolSelectionControlActionCoordinator?
+  private let controlActions: RuntimeControlActionResourceCoordinator?
   private let artifactStore: RuntimeArtifactStore?
   private let historyFilterStore: RuntimeHistoryFilterStore?
   private let traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)?
@@ -142,6 +144,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
+    toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
+    controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
     traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
@@ -167,6 +171,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       hdcStatusObserver: hdcStatusObserver,
       hdcControlActions: hdcControlActions,
+      toolSelectionActions: toolSelectionActions,
+      controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
       traceCacheMaintenance: traceCacheMaintenance,
@@ -198,6 +204,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
+    toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
+    controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
     traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
@@ -227,6 +235,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
     self.hdcStatusObserver = hdcStatusObserver
     self.hdcControlActions = hdcControlActions
+    self.toolSelectionActions = toolSelectionActions
+    self.controlActions = controlActions
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
     self.traceCacheMaintenance = traceCacheMaintenance
@@ -356,7 +366,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "providers": .array(providerIDs.map(JSONValue.string)),
         ]))
 
-    case "runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list", "control-action.show", "control-action.reconcile":
+    case "runtime.hdc.impact-preview", "runtime.hdc.restart", "runtime.tool.select", "control-action.list", "control-action.show", "control-action.reconcile":
       return await hdcControlActionRequest(request)
     case "runtime.hdc.status":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
@@ -3591,16 +3601,21 @@ public struct RuntimeControlPlaneHandler: Sendable {
     guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
       return failure(id: request.id, code: .unsupportedProtocolVersion, message: "control actions require protocol 2")
     }
-    guard let hdcControlActions else {
-      return AgentWireProtocol.Response(id: request.id, ok: false, result: nil,
-        error: .init(code: "operationUnavailable", message: "the Runtime HDC control-action owner is unavailable", details: ["newDispatchCount": .integer(0)]))
-    }
     let fields = request.params ?? [:]
     do {
       let result: JSONValue
       switch request.method {
-      case "runtime.hdc.impact-preview": result = try await hdcControlActions.preview(fields)
+      case "runtime.hdc.impact-preview":
+        guard let hdcControlActions else {
+          throw HDCControlValue.failure(
+            "operationUnavailable", "the Runtime HDC control-action owner is unavailable")
+        }
+        result = try await hdcControlActions.preview(fields)
       case "runtime.hdc.restart":
+        guard let hdcControlActions else {
+          throw HDCControlValue.failure(
+            "operationUnavailable", "the Runtime HDC control-action owner is unavailable")
+        }
         guard Set(fields.keys) == ["controlAction", "previewId", "previewDigest"],
           case .string(let action)? = fields["controlAction"], HDCControlValue.identifier(action),
           case .string(let preview)? = fields["previewId"], HDCControlValue.identifier(preview),
@@ -3608,11 +3623,28 @@ public struct RuntimeControlPlaneHandler: Sendable {
         else { throw HDCControlValue.failure("invalidInput", "restart requires one exact control-action preview tuple") }
         result = try await hdcControlActions.requestRestart(
           actionID: action, previewID: preview, previewDigest: digest)
+      case "runtime.tool.select":
+        guard let toolSelectionActions else {
+          throw HDCControlValue.failure(
+            "operationUnavailable", "the Runtime tool-selection owner is unavailable")
+        }
+        result = try await toolSelectionActions.select(fields)
       case "control-action.show", "control-action.reconcile":
         guard Set(fields.keys) == ["controlAction"], case .string(let id)? = fields["controlAction"], HDCControlValue.identifier(id) else {
           throw HDCControlValue.failure("invalidInput", "an exact control-action identity is required")
         }
-        result = request.method == "control-action.show" ? try await hdcControlActions.show(id) : try await hdcControlActions.reconcile(id)
+        if let controlActions {
+          result = request.method == "control-action.show"
+            ? try await controlActions.show(id)
+            : try await controlActions.reconcile(id)
+        } else if let hdcControlActions {
+          result = request.method == "control-action.show"
+            ? try await hdcControlActions.show(id)
+            : try await hdcControlActions.reconcile(id)
+        } else {
+          throw HDCControlValue.failure(
+            "operationUnavailable", "the Runtime control-action owner is unavailable")
+        }
       case "control-action.list":
         guard Set(fields.keys).isSubset(of: ["kind", "state", "pageSize", "cursor"]) else { throw HDCControlValue.failure("invalidInput", "unknown control-action list field") }
         let size: Int
@@ -3625,7 +3657,17 @@ public struct RuntimeControlPlaneHandler: Sendable {
           guard case .string(let text) = value, text.utf8.count <= 256 else { throw HDCControlValue.failure("invalidCursor", "invalid control-action cursor") }
           cursor = text
         } else { cursor = nil }
-        result = try await hdcControlActions.list(filters: fields.filter { ["kind", "state"].contains($0.key) }, pageSize: size, cursor: cursor)
+        let filters = fields.filter { ["kind", "state"].contains($0.key) }
+        if let controlActions {
+          result = try await controlActions.list(
+            filters: filters, pageSize: size, cursor: cursor)
+        } else if let hdcControlActions {
+          result = try await hdcControlActions.list(
+            filters: filters, pageSize: size, cursor: cursor)
+        } else {
+          throw HDCControlValue.failure(
+            "operationUnavailable", "the Runtime control-action owner is unavailable")
+        }
       default: return failure(id: request.id, code: .unknownMethod, message: "unknown control-action method")
       }
       return success(id: request.id, result: result)
@@ -3698,16 +3740,31 @@ public struct RuntimeControlPlaneHandler: Sendable {
           guard fields["selection"] == nil else {
             throw AgentExecutionControlFailure("invalidInput", "impact approval accepts no selection")
           }
-          if context.transport == .unixSocket, context.hasForegroundConsole,
-            let hdcControlActions
-          {
+          if context.transport == .unixSocket, context.hasForegroundConsole {
             if fields["challengeResponse"] == nil {
-              result = try await hdcControlActions.issueInteractiveChallenge(
-                actionID: actionID, resumeReference: reference)
+              if let controlActions {
+                result = try await controlActions.issueInteractiveChallenge(
+                  actionID: actionID, resumeReference: reference)
+              } else if let hdcControlActions {
+                result = try await hdcControlActions.issueInteractiveChallenge(
+                  actionID: actionID, resumeReference: reference)
+              } else {
+                throw AgentExecutionControlFailure(
+                  "operationUnavailable", "control-action owner is unavailable")
+              }
             } else if case .string(let response)? = fields["challengeResponse"] {
-              result = try await hdcControlActions.consumeInteractiveChallenge(
-                actionID: row.ownerID, resumeReference: reference,
-                response: response)
+              if let controlActions {
+                result = try await controlActions.consumeInteractiveChallenge(
+                  actionID: row.ownerID, resumeReference: reference,
+                  response: response)
+              } else if let hdcControlActions {
+                result = try await hdcControlActions.consumeInteractiveChallenge(
+                  actionID: row.ownerID, resumeReference: reference,
+                  response: response)
+              } else {
+                throw AgentExecutionControlFailure(
+                  "operationUnavailable", "control-action owner is unavailable")
+              }
             } else {
               throw AgentExecutionControlFailure(
                 "invalidInput", "challengeResponse must be the bounded console challenge")

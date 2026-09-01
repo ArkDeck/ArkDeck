@@ -283,7 +283,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     try store.replace(next, expectedGeneration: current.generation)
   }
 
-  private static func preview(
+  package static func preview(
     _ preview: HDCServerLifecycleImpactPreview
   ) -> [String: JSONValue] {
     let snapshot = preview.snapshot
@@ -303,7 +303,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     ]
   }
 
-  private static func confirmation(
+  package static func confirmation(
     _ confirmation: HDCServerLifecycleConfirmation
   ) -> [String: JSONValue] {
     [
@@ -317,7 +317,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     ]
   }
 
-  private static func intent(_ step: HDCServerLifecycleStep) -> [String: JSONValue] {
+  package static func intent(_ step: HDCServerLifecycleStep) -> [String: JSONValue] {
     [
       "stepId": .string(step.id.uuidString.lowercased()),
       "confirmationId": step.confirmationID.map {
@@ -331,7 +331,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     ]
   }
 
-  private static func outcome(
+  package static func outcome(
     _ outcome: HDCServerLifecycleExecutionOutcome
   ) -> [String: JSONValue] {
     switch outcome {
@@ -355,7 +355,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     }
   }
 
-  private static func postDispatchObservation(
+  package static func postDispatchObservation(
     _ observation: HDCServerLifecyclePostDispatchObservation?
   ) -> [String: JSONValue] {
     switch observation {
@@ -368,7 +368,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     }
   }
 
-  private static func observedScope(
+  package static func observedScope(
     _ scope: HDCServerLifecycleObservedScope
   ) -> [String: JSONValue] {
     [
@@ -418,7 +418,7 @@ package final class RuntimeHDCControlLifecycleAuditStore:
     }
   }
 
-  private static func otherClients(
+  package static func otherClients(
     _ detection: HDCServerOtherClientDetection
   ) -> [String: JSONValue] {
     switch detection {
@@ -448,13 +448,13 @@ package final class RuntimeHDCControlLifecycleAuditRouter:
 {
   package struct Binding: Sendable, Equatable { fileprivate let id: UUID }
   private let lock = NSLock()
-  private var active: (Binding, RuntimeHDCControlLifecycleAuditStore)?
+  private typealias Owner = any HDCServerLifecycleAuditStore & HDCServerLifecycleDispatchAuthorizing
+  private var active: (Binding, Owner)?
 
   package init() {}
 
-  package func bind(
-    _ store: RuntimeHDCControlLifecycleAuditStore
-  ) throws -> Binding {
+  package func bind<T>(_ store: T) throws -> Binding
+  where T: HDCServerLifecycleAuditStore, T: HDCServerLifecycleDispatchAuthorizing {
     lock.lock()
     defer { lock.unlock() }
     guard active == nil else {
@@ -503,7 +503,7 @@ package final class RuntimeHDCControlLifecycleAuditRouter:
       executableIdentity: executableIdentity)
   }
 
-  private nonisolated func required() throws -> RuntimeHDCControlLifecycleAuditStore {
+  private nonisolated func required() throws -> Owner {
     lock.lock()
     defer { lock.unlock() }
     guard let active else {

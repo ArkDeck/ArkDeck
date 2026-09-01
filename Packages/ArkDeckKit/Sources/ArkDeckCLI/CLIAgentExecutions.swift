@@ -145,16 +145,16 @@ extension RuntimeCLI {
       controlAction["state"] == .string("awaitingImpactApproval"),
       case .string(let controlActionID)? = controlAction["controlActionId"],
       case .object(let preview)? = controlAction["preview"],
-      let validatedPreview = try? HDCControlActionPreview(value: preview),
-      validatedPreview.value["controlActionId"] == .string(controlActionID),
+      let validatedPreview = validatedControlImpactPreview(preview),
+      validatedPreview["controlActionId"] == .string(controlActionID),
       case .object(let humanAction)? = challenge["humanAction"],
       humanAction["schemaVersion"] == .string("arkdeck.human-action/1"),
       case .string(let humanActionID)? = humanAction["actionId"],
       case .object(let binding)? = challenge["binding"],
       binding["controlActionId"] == .string(controlActionID),
       binding["humanActionId"] == .string(humanActionID),
-      binding["previewId"] == validatedPreview.value["previewId"],
-      binding["previewDigest"] == validatedPreview.value["previewDigest"]
+      binding["previewId"] == validatedPreview["previewId"],
+      binding["previewDigest"] == validatedPreview["previewDigest"]
     else {
       throw session.fail(
         .recordUnreadable,
@@ -169,11 +169,11 @@ extension RuntimeCLI {
     guard let bytes = try? encoder.encode(review),
       let rendered = String(data: bytes, encoding: .utf8)
     else {
-      throw session.fail(.internalError, "could not render the immutable HDC impact preview")
+      throw session.fail(.internalError, "could not render the immutable control-action impact preview")
     }
     FileHandle.standardError.write(
       Data(
-        ("Review the complete immutable HDC restart impact:\n"
+        ("Review the complete immutable Runtime control-action impact:\n"
           + rendered + "\nType this one-time challenge exactly: \(expected)\n> ").utf8))
     var input = Data()
     while input.count <= 64 {
@@ -215,18 +215,30 @@ extension RuntimeCLI {
     case "succeeded": return
     case "failed":
       throw session.fail(
-        .operationFailed, "HDC restart failed before a confirmed external effect",
+        .operationFailed, "Runtime control action failed before a confirmed external effect",
         details: ["controlAction": value])
     case "outcomeUnknown":
       throw session.fail(
-        .outcomeUnknown, "HDC restart entered its launch window and requires reconciliation",
+        .outcomeUnknown, "Runtime control action entered its launch window and requires reconciliation",
         details: ["controlAction": value])
     default:
       throw session.fail(
         dispatchCount == 0 ? .admissionDenied : .outcomeUnknown,
-        "HDC restart did not reach a trustworthy terminal state",
+        "Runtime control action did not reach a trustworthy terminal state",
         details: ["controlAction": value])
     }
+  }
+
+  private static func validatedControlImpactPreview(
+    _ value: [String: JSONValue]
+  ) -> [String: JSONValue]? {
+    if let preview = try? HDCControlActionPreview(value: value) {
+      return preview.value
+    }
+    if let preview = try? RuntimeToolSelectionPreview(value: value) {
+      return preview.value
+    }
+    return nil
   }
 
   static func runtimeExecutionIntent(_ options: CLIOptions, session: CLIRuntimeSession) throws -> AgentExecutionIntent {

@@ -7,12 +7,97 @@
 import ArkDeckAgentComposition
 import ArkDeckAgentDaemon
 import ArkDeckCore
+import ArkDeckLaunchAgent
 import ArkDeckRuntime
 import ArkDeckStorage
 import ArkDeckTraceAdapter
 import ArkDeckWorkflows
 import Darwin
 import Foundation
+
+private final class BootstrapToolSelectionRegistryAdapter:
+  RuntimeToolSelectionRegistryControlling, @unchecked Sendable
+{
+  let registry: BootstrapToolRegistry
+
+  init(registry: BootstrapToolRegistry) { self.registry = registry }
+
+  func candidate(
+    newToolRef: String, expectedActiveGeneration: UInt64,
+    pendingActionID: String?
+  ) throws -> RuntimeToolSelectionRegistryCandidate {
+    let value = try registry.selectionCandidate(
+      newToolRef: newToolRef,
+      expectedActiveGeneration: String(expectedActiveGeneration),
+      pendingActionID: pendingActionID)
+    return RuntimeToolSelectionRegistryCandidate(
+      activeTool: try RuntimeToolSelectionToolFacts(
+        registryProjection: value.selection.activeTool),
+      newTool: try RuntimeToolSelectionToolFacts(
+        registryProjection: value.newTool),
+      activeGeneration: value.selection.activeGeneration)
+  }
+
+  func prepare(
+    actionID: String, newToolRef: String, expectedActiveGeneration: UInt64
+  ) throws -> ResolvedExecutable {
+    _ = try registry.prepareSelection(
+      actionID: actionID, newToolRef: newToolRef,
+      expectedActiveGeneration: String(expectedActiveGeneration))
+    guard let startup = try registry.startupSelection(),
+      startup.pendingActionID == actionID,
+      startup.toolRef == newToolRef,
+      startup.activeGeneration == expectedActiveGeneration
+    else {
+      throw HDCControlValue.failure(
+        "recordUnreadable", "prepared tool selection lost its exact durable executable")
+    }
+    return try Self.resolved(startup.resolved)
+  }
+
+  func failPending(actionID: String, reasonCode: String) throws {
+    _ = try registry.failPendingSelection(
+      actionID: actionID, reasonCode: reasonCode)
+  }
+
+  func outcome(actionID: String) throws -> RuntimeToolSelectionDurableOutcome {
+    switch try registry.selectionOutcome(actionID: actionID) {
+    case .pending: return .pending
+    case .succeeded(let reference, let generation):
+      return .succeeded(activeToolRef: reference, activeGeneration: generation)
+    case .failed(let reference, let generation, let reason):
+      return .failed(
+        activeToolRef: reference, activeGeneration: generation,
+        reasonCode: reason)
+    case .absent: return .absent
+    }
+  }
+
+  func acknowledge(actionID: String) throws {
+    try registry.acknowledgeSelectionOutcome(actionID: actionID)
+  }
+
+  static func resolved(
+    _ value: BootstrapToolRegistry.ResolvedHDC
+  ) throws -> ResolvedExecutable {
+    let parent = value.executableURL.deletingLastPathComponent()
+    let resources = try value.dependencies.map { dependency in
+      guard let byteCount = Int(exactly: dependency.byteCount) else {
+        throw HDCControlValue.failure(
+          "recordUnreadable", "registered HDC dependency size is not representable")
+      }
+      return ResolvedExecutableResource(
+        path: parent.appending(path: dependency.name).path,
+        sha256: dependency.sha256, byteCount: byteCount,
+        requireExecutable: false)
+    }
+    return ResolvedExecutable(
+      path: value.executableURL.path,
+      sha256: value.executableSHA256,
+      verifiedResources: resources,
+      canonicalNamespaceRoot: parent.path)
+  }
+}
 
 /// Closed host-only HiLog analyzer mode. Never enters daemon startup, touches
 /// transport, or prints an input path/body in an error.
@@ -459,42 +544,123 @@ Task.detached {
     var traceRuntimeProbe: (any TraceRuntimeProbing)? = nil
     var debugRuntimeProbe: (any DebugRuntimeProbing)? = nil
     var executableSHA = ""
+    var selectedHDCPath: String?
+    var toolSelectionRegistry: BootstrapToolSelectionRegistryAdapter?
     if let configuredHDC {
-      let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
-      let resolvedHDC = try resolver.resolveExecutable(providerID: "hdc")
-      executableSHA = resolvedHDC.sha256
-      // The login-session daemon owns a foreground, loopback-only server.
-      // This avoids depending on a Terminal parent or HDC's client-side
-      // background daemonisation, and cancellation tears down the dedicated
-      // process group during LaunchAgent update/uninstall.
-      startedHDCServerHost = try await HeadlessHDCServerHost.start(
-        executable: resolvedHDC,
-        onUnexpectedExit: {
-          // An unexpected server death is a daemon crash boundary: launchd
-          // KeepAlive restarts the service, Runtime recovers durable Jobs, and
-          // startup must re-establish typed HDC readiness before reopening UDS.
-          Darwin.exit(70)
+      do {
+        let registry = try BootstrapToolRegistry(knownIdentity: { sha256 in
+          HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
+            BootstrapToolRegistry.PublishedIdentity(
+              version: $0.version, profileReferences: $0.profileReferences)
+          }
         })
-      hdcExecutableResolver = resolver
-      // Pointer injection is the one operation with an interaction budget, and
-      // it is a single device command, so a spawned client costs a process
-      // launch on top of the round trip that does the work. It is routed over
-      // a shell that is already open; everything else keeps the spawning path
-      // it has, including pointer injection whenever a channel cannot serve it.
-      hdcDispatcher = PointerInputChannelDispatcher(
-        fallback: DescriptorBoundProcessDispatcher.hdc(resolver: resolver),
-        resolver: resolver)
-      traceRuntimeProbe = FoundationTraceRuntimeProbe(
-        targetStore: targetStore, hdcResolver: resolver,
-        workingDirectory: resolvedStateDirectory)
-      debugRuntimeProbe = FoundationDebugRuntimeProbe(
-        targetStore: targetStore, hdcResolver: resolver,
-        workingDirectory: resolvedStateDirectory)
+        let adapter = BootstrapToolSelectionRegistryAdapter(registry: registry)
+        if try registry.startupSelection() == nil {
+          _ = try registry.adoptInstalledHDC(file: URL(filePath: configuredHDC))
+        }
+        if var startup = try registry.startupSelection() {
+          var resolvedHDC = try BootstrapToolSelectionRegistryAdapter.resolved(startup.resolved)
+          let startHost: @Sendable (ResolvedExecutable) async throws -> HeadlessHDCServerHost = {
+            executable in
+            try await HeadlessHDCServerHost.start(
+              executable: executable,
+              onUnexpectedExit: {
+                // An unexpected server death is a daemon crash boundary: launchd
+                // KeepAlive restarts the service and re-establishes the complete
+                // provider graph before reopening the control socket.
+                Darwin.exit(70)
+              })
+          }
+          do {
+            startedHDCServerHost = try await startHost(resolvedHDC)
+            if let pendingActionID = startup.pendingActionID {
+              do {
+                _ = try registry.publishPendingSelection(actionID: pendingActionID)
+              } catch {
+                switch try registry.selectionOutcome(actionID: pendingActionID) {
+                case .succeeded:
+                  break
+                case .pending:
+                  await startedHDCServerHost?.stop()
+                  startedHDCServerHost = nil
+                  _ = try registry.failPendingSelection(
+                    actionID: pendingActionID,
+                    reasonCode: "tool.selectionPublishFailed")
+                  guard let old = try registry.startupSelection(),
+                    old.pendingActionID == nil
+                  else {
+                    throw HDCControlValue.failure(
+                      "recordUnreadable", "failed tool selection lost its prior active executable")
+                  }
+                  startup = old
+                  resolvedHDC = try BootstrapToolSelectionRegistryAdapter.resolved(old.resolved)
+                  startedHDCServerHost = try await startHost(resolvedHDC)
+                case .failed:
+                  await startedHDCServerHost?.stop()
+                  startedHDCServerHost = nil
+                  guard let old = try registry.startupSelection() else { throw error }
+                  startup = old
+                  resolvedHDC = try BootstrapToolSelectionRegistryAdapter.resolved(old.resolved)
+                  startedHDCServerHost = try await startHost(resolvedHDC)
+                case .absent:
+                  throw error
+                }
+              }
+            }
+          } catch {
+            if let pendingActionID = startup.pendingActionID {
+              _ = try? registry.failPendingSelection(
+                actionID: pendingActionID,
+                reasonCode: "tool.selectedStartupVerificationFailed")
+              if let old = try registry.startupSelection(), old.pendingActionID == nil {
+                startup = old
+                resolvedHDC = try BootstrapToolSelectionRegistryAdapter.resolved(old.resolved)
+                startedHDCServerHost = try await startHost(resolvedHDC)
+              } else {
+                throw error
+              }
+            } else {
+              throw error
+            }
+          }
+          executableSHA = resolvedHDC.sha256
+          selectedHDCPath = resolvedHDC.path
+          let resolver = FixedExecutableResolver(table: ["hdc": resolvedHDC])
+          // The login-session daemon owns a foreground, loopback-only server.
+          // This avoids depending on a Terminal parent or HDC's client-side
+          // background daemonisation, and cancellation tears down the dedicated
+          // process group during LaunchAgent update/uninstall.
+          hdcExecutableResolver = resolver
+          // Pointer injection is the one operation with an interaction budget,
+          // and it is a single device command, so a spawned client costs a
+          // process launch on top of the round trip that does the work. It is
+          // routed over a shell that is already open; everything else keeps the
+          // spawning path it has, including pointer injection whenever a channel
+          // cannot serve it.
+          hdcDispatcher = PointerInputChannelDispatcher(
+            fallback: DescriptorBoundProcessDispatcher.hdc(resolver: resolver),
+            resolver: resolver)
+          traceRuntimeProbe = FoundationTraceRuntimeProbe(
+            targetStore: targetStore, hdcResolver: resolver,
+            workingDirectory: resolvedStateDirectory)
+          debugRuntimeProbe = FoundationDebugRuntimeProbe(
+            targetStore: targetStore, hdcResolver: resolver,
+            workingDirectory: resolvedStateDirectory)
+          toolSelectionRegistry = adapter
+        }
+      } catch {
+        await startedHDCServerHost?.stop()
+        startedHDCServerHost = nil
+        // Selection state and configured-tool adoption are part of the process
+        // identity boundary. Continuing to UDS composition after either fails
+        // would publish a Runtime whose HDC ownership is unknown.
+        throw error
+      }
     }
 
     let hdcProvider = HDCObservationProviderAdapter(
       factsPort: TargetStoreFactsPort(
-        targetStore: targetStore, executablePath: configuredHDC ?? "-",
+        targetStore: targetStore, executablePath: selectedHDCPath ?? "-",
         executableSHA256: executableSHA))
     let resolvedArkForgeInputs: ArkForgeLaneComposition.Inputs?
     switch ArkForgeLaneComposition.Inputs.read(ProcessInfo.processInfo.environment) {
@@ -960,16 +1126,39 @@ Task.detached {
     let agentExecutions = try RuntimeAgentExecutionCoordinator(
       directory: resolvedStateDirectory.appending(path: "agent-executions"), engine: engine,
       targets: targetStore, observations: targetObservations)
+    let hdcImpactSource = startedHDCServerHost.map { host in
+      host.controlImpactSource(
+        engine: engine, targets: targetStore, observations: targetObservations)
+    }
     let hdcControlActions = try startedHDCServerHost.map { host in
       try RuntimeHDCControlActionCoordinator(directory: resolvedStateDirectory.appending(path: "hdc-control-actions"),
-        source: host.controlImpactSource(engine: engine, targets: targetStore, observations: targetObservations),
+        source: hdcImpactSource!,
         lifecycleDriver: host.controlLifecycleDriver(
           engine: engine, targets: targetStore, observations: targetObservations),
         catalogDigest: RuntimeOperationCatalog.catalogDigest)
     }
+    let toolSelectionActions = try {
+      guard let host = startedHDCServerHost,
+        let hdcImpactSource, let toolSelectionRegistry
+      else { return Optional<RuntimeToolSelectionControlActionCoordinator>.none }
+      let lifecycle = host.toolSelectionLifecycleDriver(
+        engine: engine, registry: toolSelectionRegistry,
+        requestDaemonRecomposition: {
+          DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(250)) {
+            Darwin.exit(70)
+          }
+        })
+      return try RuntimeToolSelectionControlActionCoordinator(
+        directory: resolvedStateDirectory.appending(path: "tool-selection-control-actions"),
+        hdcSource: hdcImpactSource, registry: toolSelectionRegistry,
+        lifecycle: lifecycle, catalogDigest: RuntimeOperationCatalog.catalogDigest)
+    }()
+    let controlActions = try RuntimeControlActionResourceCoordinator(
+      directory: resolvedStateDirectory.appending(path: "control-action-snapshots"),
+      hdc: hdcControlActions, tools: toolSelectionActions)
     let humanActionResources = try RuntimeHumanActionResourceCoordinator(
       directory: resolvedStateDirectory.appending(path: "human-action-snapshots"),
-      agents: agentExecutions, controls: hdcControlActions)
+      agents: agentExecutions, controlResources: controlActions)
     // HDC 3.2 has no public target event stream. The daemon therefore owns a
     // continuous read-only observation loop and lets App launches consume its
     // last completed, timestamped snapshot without joining an HDC command.
@@ -1110,6 +1299,8 @@ Task.detached {
       hdcStatusObserver: startedHDCServerHost?.statusObserver(
         daemonVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String),
       hdcControlActions: hdcControlActions,
+      toolSelectionActions: toolSelectionActions,
+      controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
       traceCacheMaintenance: traceCacheMaintenance,

@@ -16,7 +16,7 @@ package protocol HDCControlLifecycleDriving: Sendable {
   ) async throws -> HDCControlActionRecord
 }
 
-private final class RuntimeHDCLifecycleInterlockOwner:
+package final class RuntimeHDCLifecycleInterlockOwner:
   HDCControlLifecycleInterlock, @unchecked Sendable
 {
   private let engine: RuntimeJobEngine
@@ -29,7 +29,7 @@ private final class RuntimeHDCLifecycleInterlockOwner:
     self.lease = lease
   }
 
-  func release() async throws {
+  package func release() async throws {
     let firstRelease = lock.withLock { () -> Bool in
       guard !released else { return false }
       released = true

@@ -25,6 +25,15 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
       }
     }, fault: fault, nowUTC: { "2026-09-01T00:00:00Z" })
   }
+  private func selectionRegistry() -> BootstrapToolRegistry {
+    .init(
+      owner: BootstrapBundleRegistry(root: root.appending(path: "selection-registry")),
+      knownIdentity: { _ in
+        BootstrapToolRegistry.PublishedIdentity(
+          version: "fixture-1", profileReferences: ["fixture-profile"])
+      },
+      nowUTC: { "2026-09-01T00:00:00Z" })
+  }
   private func fixture(_ name: String = "fixture-hdc") throws -> URL {
     let url = root.appending(path: name)
     let executable = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(path: "ArkDeckFakeHDCFixture")
@@ -157,6 +166,95 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
     XCTAssertNil(HDCRegisteredToolIdentity.match(sha256: String(repeating: "a", count: 64)))
   }
 
+  func testActiveSelectionWALPinsBothToolsAndPublishesOnlyAfterStartupVerification() throws {
+    let source = try fixture()
+    let owner = selectionRegistry()
+    let active = try owner.adoptInstalledHDC(file: source)
+    XCTAssertEqual(active.activeGeneration, 1)
+    XCTAssertNil(active.pendingActionID)
+    let quarantine = Data("0081;fixture;selection;candidate".utf8)
+    XCTAssertEqual(quarantine.withUnsafeBytes {
+      setxattr(source.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
+    }, 0)
+    let candidateRow = try object(owner.register(file: source))
+    let candidateRef = try string(candidateRow["toolRef"])
+    let candidate = try owner.selectionCandidate(
+      newToolRef: candidateRef, expectedActiveGeneration: "1")
+    XCTAssertEqual(candidate.selection.activeToolRef, active.activeToolRef)
+    XCTAssertEqual(
+      try RuntimeToolSelectionToolFacts(
+        registryProjection: candidate.selection.activeTool).toolRef,
+      active.activeToolRef)
+    XCTAssertEqual(
+      try RuntimeToolSelectionToolFacts(
+        registryProjection: candidate.newTool).toolRef,
+      candidateRef)
+
+    let prepared = try owner.prepareSelection(
+      actionID: "control-selection-one", newToolRef: candidateRef,
+      expectedActiveGeneration: "1")
+    XCTAssertEqual(prepared.activeToolRef, active.activeToolRef)
+    XCTAssertEqual(prepared.pendingActionID, "control-selection-one")
+    XCTAssertEqual(prepared.pendingToolRef, candidateRef)
+    XCTAssertEqual(try owner.selectionOutcome(actionID: "control-selection-one"), .pending)
+    XCTAssertThrowsError(try owner.selectionCandidate(
+      newToolRef: candidateRef, expectedActiveGeneration: "1"))
+    XCTAssertNoThrow(try owner.selectionCandidate(
+      newToolRef: candidateRef, expectedActiveGeneration: "1",
+      pendingActionID: "control-selection-one"))
+    assertFailure("resourceConflict") {
+      _ = try owner.remove(active.activeToolRef, expectedGeneration: "1")
+    }
+    assertFailure("resourceConflict") {
+      _ = try owner.remove(candidateRef, expectedGeneration: "1")
+    }
+    let startup = try XCTUnwrap(owner.startupSelection())
+    XCTAssertEqual(startup.pendingActionID, "control-selection-one")
+    XCTAssertEqual(startup.toolRef, candidateRef)
+    XCTAssertEqual(startup.activeGeneration, 1)
+
+    let published = try owner.publishPendingSelection(
+      actionID: "control-selection-one")
+    XCTAssertEqual(published.activeToolRef, candidateRef)
+    XCTAssertEqual(published.activeGeneration, 2)
+    XCTAssertNil(published.pendingActionID)
+    XCTAssertEqual(
+      try owner.selectionOutcome(actionID: "control-selection-one"),
+      .succeeded(activeToolRef: candidateRef, activeGeneration: 2))
+    try owner.acknowledgeSelectionOutcome(actionID: "control-selection-one")
+    XCTAssertEqual(try owner.selectionOutcome(actionID: "control-selection-one"), .absent)
+    XCTAssertNoThrow(try owner.remove(active.activeToolRef, expectedGeneration: "1"))
+  }
+
+  func testFailedPendingSelectionKeepsOldPublishedGenerationAndUnpinsCandidate() throws {
+    let source = try fixture()
+    let owner = selectionRegistry()
+    let active = try owner.adoptInstalledHDC(file: source)
+    let quarantine = Data("0081;fixture;selection;failure".utf8)
+    XCTAssertEqual(quarantine.withUnsafeBytes {
+      setxattr(source.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
+    }, 0)
+    let candidate = try string(object(owner.register(file: source))["toolRef"])
+    _ = try owner.prepareSelection(
+      actionID: "control-selection-failed", newToolRef: candidate,
+      expectedActiveGeneration: "1")
+    let failed = try owner.failPendingSelection(
+      actionID: "control-selection-failed",
+      reasonCode: "tool.selectedStartupVerificationFailed")
+    XCTAssertEqual(failed.activeToolRef, active.activeToolRef)
+    XCTAssertEqual(failed.activeGeneration, 1)
+    XCTAssertNil(failed.pendingActionID)
+    XCTAssertEqual(
+      try owner.selectionOutcome(actionID: "control-selection-failed"),
+      .failed(
+        activeToolRef: active.activeToolRef, activeGeneration: 1,
+        reasonCode: "tool.selectedStartupVerificationFailed"))
+    XCTAssertNoThrow(try owner.remove(candidate, expectedGeneration: "1"))
+    assertFailure("resourceConflict") {
+      _ = try owner.remove(active.activeToolRef, expectedGeneration: "1")
+    }
+  }
+
   func testInstalledSDKStaticRegistrationRetainsLibUSBAndNeedsNoOriginalPath() throws {
     // Host-only integration: inspect installed SDK bytes, never launch HDC.
     // CI without DevEco records a skip rather than claiming hardware evidence.
@@ -287,6 +385,28 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
     XCTAssertFalse(leaf.connectsToRuntime)
     for extra in [["--root", "/tmp/sdk"], ["--argv", "kill -r"], ["--socket", "/tmp/daemon"], ["--file", "/tmp/other"]] {
       if case .success = CLIArgumentParser.parse(valid + extra) { XCTFail("accepted \(extra)") }
+    }
+  }
+
+  func testToolSelectionIsRuntimeConnectedAndAcceptsOnlyTypedIntent() {
+    let digest = String(repeating: "a", count: 64)
+    let valid = [
+      "runtime", "tool", "select", "--tool", "tool:sha256:\(digest)",
+      "--expected-active-generation", "7", "--action-request-id", "selection-request-7",
+      "--output", "json",
+    ]
+    guard case .success(.dispatch(_, let leaf, let arguments)) = CLIArgumentParser.parse(valid)
+    else { return XCTFail("missing tool-selection command") }
+    XCTAssertEqual(leaf.canonicalCommand, "runtime.tool.select")
+    XCTAssertTrue(leaf.connectsToRuntime)
+    XCTAssertTrue(arguments.contains("--tool"))
+    for extra in [
+      ["--file", "/tmp/hdc"], ["--argv", "kill -r"],
+      ["--expected-generation", "7"], ["--tool", "tool:sha256:\(digest)"],
+    ] {
+      if case .success = CLIArgumentParser.parse(valid + extra) {
+        XCTFail("accepted untyped or duplicate tool-selection argument \(extra)")
+      }
     }
   }
 }

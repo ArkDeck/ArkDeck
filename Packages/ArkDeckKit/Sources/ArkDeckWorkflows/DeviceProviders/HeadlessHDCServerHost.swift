@@ -292,6 +292,20 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
       supervisor: supervisor, auditRouter: lifecycleAuditRouter)
   }
 
+  package func toolSelectionLifecycleDriver(
+    engine: RuntimeJobEngine,
+    registry: any RuntimeToolSelectionRegistryControlling,
+    requestDaemonRecomposition: @escaping @Sendable () -> Void
+  ) -> any RuntimeToolSelectionLifecycleDriving {
+    HeadlessHDCToolSelectionLifecycleDriver(
+      oldExecutable: executable, endpoint: endpoint, engine: engine,
+      supervisor: supervisor, auditRouter: lifecycleAuditRouter,
+      expectConfirmedLifecycleExit: { [lifecycle] in
+        lifecycle.expectConfirmedLifecycleExit()
+      }, registry: registry,
+      requestDaemonRecomposition: requestDaemonRecomposition)
+  }
+
   package func statusObserver(daemonVersion: String?) -> any HDCStatusObserving {
     HeadlessHDCStatusObserver(executable: executable, startup: diagnostics, daemonVersion: daemonVersion,
       managedLaunch: { [lifecycle] in lifecycle.activeLaunch() }, supervisor: supervisor)

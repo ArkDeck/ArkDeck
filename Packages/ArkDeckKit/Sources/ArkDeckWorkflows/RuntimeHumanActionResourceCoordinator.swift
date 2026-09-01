@@ -15,14 +15,26 @@ package struct RuntimeHumanActionResourceRow: Sendable, Equatable {
 /// pagination cannot omit one owner or splice pages from different reads.
 public actor RuntimeHumanActionResourceCoordinator {
   private let agents: RuntimeAgentExecutionCoordinator?
-  private let controls: RuntimeHDCControlActionCoordinator?
+  private let controls: RuntimeControlActionResourceCoordinator?
   private let pages: RuntimeSnapshotPager
 
   package init(
     directory: URL, agents: RuntimeAgentExecutionCoordinator?,
     controls: RuntimeHDCControlActionCoordinator?
   ) throws {
-    self.agents = agents; self.controls = controls
+    self.agents = agents
+    self.controls = try RuntimeControlActionResourceCoordinator(
+      directory: directory.appending(path: "control-actions"),
+      hdc: controls, tools: nil)
+    pages = try RuntimeSnapshotPager(directory: directory)
+  }
+
+  package init(
+    directory: URL, agents: RuntimeAgentExecutionCoordinator?,
+    controlResources: RuntimeControlActionResourceCoordinator?
+  ) throws {
+    self.agents = agents
+    controls = controlResources
     pages = try RuntimeSnapshotPager(directory: directory)
   }
 

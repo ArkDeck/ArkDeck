@@ -13,12 +13,25 @@ package struct HDCControlHumanAction: Equatable, Sendable {
     controlActionID: String, preview: HDCControlActionPreview,
     generation: UInt64, createdAt: String, expiresAt: String
   ) throws {
+    try self.init(controlActionID: controlActionID, preview: preview.value,
+      generation: generation, createdAt: createdAt, expiresAt: expiresAt)
+  }
+
+  package init(
+    controlActionID: String, preview: [String: JSONValue],
+    generation: UInt64, createdAt: String, expiresAt: String
+  ) throws {
+    guard case .string(let previewID)? = preview["previewId"],
+      HDCControlValue.identifier(previewID),
+      case .string(let previewDigest)? = preview["previewDigest"],
+      HDCControlValue.digest(previewDigest)
+    else { throw HDCControlValue.failure("recordUnreadable", "control-action preview binding is malformed") }
     try self.init(value: [
       "actionId": .string("har-" + UUID().uuidString.lowercased()),
       "resumeReference": .string("resume-" + UUID().uuidString.lowercased()),
       "controlActionId": .string(controlActionID),
-      "previewId": preview.value["previewId"]!,
-      "previewDigest": preview.value["previewDigest"]!,
+      "previewId": .string(previewID),
+      "previewDigest": .string(previewDigest),
       "controlActionGeneration": .string(String(generation)),
       "createdAt": .string(createdAt), "expiresAt": .string(expiresAt),
       "status": .string("waiting"),
