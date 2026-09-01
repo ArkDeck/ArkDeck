@@ -12,7 +12,10 @@ extension RuntimeCLI {
     _ verb: String,
     rest original: [String],
     command: String? = nil,
-    requiredSourceOperation: String? = nil
+    requiredSourceOperation: String? = nil,
+    requiredArtifactName: String? = nil,
+    requiredMediaType: String? = nil,
+    requiredPrivacy: String? = nil
   ) throws {
     var rest = original
     var session = runtimeSession(
@@ -59,6 +62,17 @@ extension RuntimeCLI {
           throw session.fail(
             .invalidInput,
             "selected Artifact does not belong to \(requiredSourceOperation)")
+        }
+      }
+      if requiredArtifactName != nil || requiredMediaType != nil || requiredPrivacy != nil {
+        guard case .object(let inventory) = metadata.value,
+          requiredArtifactName.map({ inventory["name"] == .string($0) }) ?? true,
+          requiredMediaType.map({ inventory["mediaType"] == .string($0) }) ?? true,
+          requiredPrivacy.map({ inventory["privacy"] == .string($0) }) ?? true
+        else {
+          throw session.fail(
+            .invalidInput,
+            "selected Artifact does not match the required typed resource")
         }
       }
       if verb == "inspect" { session.emit(metadata.value); return }

@@ -1314,6 +1314,11 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(failure(["analyze"])?.code, .invalidCommand)
     XCTAssertEqual(failure(["analyze", "bogus"])?.code, .invalidCommand)
     XCTAssertEqual(failure(["workspace", "bogus"])?.code, .invalidCommand)
+    XCTAssertNotNil(
+      success([
+        "trace", "export", "--job", "J-1", "--artifact", "A-1",
+        "--destination", "/tmp",
+      ]))
   }
 
   /// CLI-REQ-003: the convenience name is an alias, never a precondition. The

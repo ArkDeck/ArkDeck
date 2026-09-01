@@ -448,6 +448,9 @@ destructive intent。
   它不得把现有 App SSH/SFTP 代码直接包装成 CLI。
 - `ui-dump inspect/hit-test`、diagnostics preview 和 trace inspect 属于 deterministic local
   derivation；必须记录 parser/version/source Artifact digest，不能把派生结果冒充新设备证据。
+- `trace export` 不是派生或新 evidence；它要求 exact Job/Artifact reference，并在导出前验证
+  `capture.diagnostics@1`、`trace.htrace`、`application/octet-stream` 与 `sensitive` 四个 typed
+  metadata 字段，实际字节写入和 overwrite 仍由 Runtime Artifact policy 拥有。
 - 单帧/序列转视频是 presentation convenience；frame archive、index、时间和 digest 可读取即满足
   portable core。平台可另加 derive/export，但不能改变源 Artifact。
 
@@ -1496,7 +1499,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 ### 13.1 已有骨架
 
-当前 registry 已有 32 个一级命令、173 个可执行 leaf（另有 6 个 tombstone、3 个永久拒绝桩）。
+当前 registry 已有 32 个一级命令、174 个可执行 leaf（另有 6 个 tombstone、3 个永久拒绝桩）。
 以下底座可以保留并演进：
 
 - `operation list/describe`；
@@ -1572,6 +1575,7 @@ generation；第一版可以先忠实暴露现有字段，达到 target contract
 ### 13.3 Catalog 泛化可达与一等领域入口
 
 - screenshot/UI dump/component detail/trace typed capture preset；
+- trace raw Artifact export，经 exact operation/name/media type/privacy 约束后复用 Artifact policy；
 - diagnostics capture、screen sequence、tap/long-press/swipe；
 - HAP debug、native library deploy、port forward；
 - 四个 analyzer；

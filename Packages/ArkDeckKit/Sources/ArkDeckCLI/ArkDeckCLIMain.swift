@@ -199,6 +199,16 @@ struct ArkDeckCommandLine {
         }
         if verb == "probe" {
           try RuntimeCLI.runTrace(arguments)
+        } else if verb == "export" {
+          try RuntimeCLI.runArtifactResource(
+            "export",
+            rest: Array(arguments.dropFirst()),
+            command: "trace.export",
+            requiredSourceOperation:
+              DiagnosticSessionOfflineInspector.operationReference,
+            requiredArtifactName: "trace.htrace",
+            requiredMediaType: "application/octet-stream",
+            requiredPrivacy: "sensitive")
         } else {
           try await RuntimeCLI.runDomainOperation(
             path: ["trace", verb], Array(arguments.dropFirst()))

@@ -184,6 +184,36 @@ final class CLIDiagnosticsProcessContractTests: XCTestCase {
     XCTAssertEqual(
       try Data(contentsOf: URL(filePath: exportedPath)),
       hilog)
+
+    let trace = Data("immutable trace fixture".utf8)
+    let traceMetadata = try await publish(
+      jobID: jobID,
+      name: "trace.htrace",
+      mediaType: "application/octet-stream",
+      bytes: trace,
+      privacy: .sensitive)
+    let traceExported = try object(
+      result(
+        cli([
+          "trace", "export",
+          "--job", jobID,
+          "--artifact", traceMetadata.artifactID,
+          "--destination", destination.path,
+          "--allow-sensitive",
+        ])))
+    let traceExportedPath = try text(traceExported["exportedPath"])
+    XCTAssertEqual(
+      try Data(contentsOf: URL(filePath: traceExportedPath)),
+      trace)
+
+    let wrongTraceArtifact = try cli([
+      "trace", "export",
+      "--job", jobID,
+      "--artifact", hilogMetadata.artifactID,
+      "--destination", destination.path,
+      "--allow-sensitive",
+    ])
+    XCTAssertEqual(try errorCode(wrongTraceArtifact), "invalidInput")
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
