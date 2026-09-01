@@ -1,3 +1,4 @@
+import ArkDeckCore
 import ArkDeckStorage
 import Foundation
 
@@ -45,7 +46,7 @@ public struct SettingsRuntimeArtifactUsage: Equatable, Sendable {
   }
 }
 
-/// The App-owned Session output root, measured in this process.
+/// The Runtime-owned Session output root, measured by its durable owner.
 ///
 /// A second root, not a second view of the same bytes: nothing the Runtime
 /// publishes lands here. It is reported under its own name so the quota,
@@ -95,7 +96,7 @@ public struct SettingsStoragePresentation: Equatable, Sendable {
   public let retentionDays: UInt64
   /// `nil` when the Runtime did not report its artifact usage.
   public let runtimeArtifacts: SettingsRuntimeArtifactUsage?
-  /// `nil` when the Session output root could not be measured.
+  /// `nil` only on the legacy injected test seam when the root could not be measured.
   public let sessionRoot: SettingsSessionRootUsage?
 
   public init(
@@ -156,6 +157,9 @@ public struct SettingsDiagnosticBundlePreview: Equatable, Sendable {
 
 public enum SettingsApplicationError: Error, Equatable, Sendable {
   case diagnosticsUnavailable
+  case runtimeStorageUnavailable
+  case runtimeStorageRejected(String)
+  case runtimeStorageResponseInvalid
 }
 
 public protocol SettingsApplicationProviding: Sendable {
@@ -192,55 +196,122 @@ public enum SettingsApplicationFacade {
   }
 }
 
+package struct SettingsLegacyStorageMigrationPlan: Equatable, Sendable {
+  package let rootPath: String?
+  package let policy: RuntimeSessionStoragePolicy?
+
+  package init?(
+    legacy: SessionSettingsSnapshot,
+    current: SettingsStoragePresentation
+  ) {
+    // Generation 1 is the daemon's unpublished initial state. Once any App or
+    // CLI caller has changed it, old process-local preferences lose the race
+    // and can never overwrite the Runtime owner.
+    guard current.generation == 1, !current.usesCustomRoot, legacy.generation > 0 else {
+      return nil
+    }
+    if legacy.rootSource == .userBookmark {
+      let canonical = legacy.sessionsRoot.resolvingSymlinksInPath().standardizedFileURL.path
+      rootPath = canonical == current.rootPath ? nil : canonical
+    } else {
+      rootPath = nil
+    }
+    let candidate = RuntimeSessionStoragePolicy(
+      totalQuotaBytes: legacy.totalQuotaBytes,
+      safetyMarginBytes: legacy.safetyMarginBytes,
+      retentionDays: legacy.retentionDays)
+    if candidate.totalQuotaBytes == current.totalQuotaBytes,
+      candidate.safetyMarginBytes == current.safetyMarginBytes,
+      candidate.retentionDays == current.retentionDays
+    {
+      policy = nil
+    } else {
+      policy = candidate
+    }
+    if rootPath == nil, policy == nil { return nil }
+  }
+}
+
 private actor ProductionSettingsApplicationProvider: SettingsApplicationProviding {
-  private let storageRuntime: SessionStorageApplicationRuntime
-  private let runtimeArtifactUsage: @Sendable () async -> SettingsRuntimeArtifactUsage?
+  private let legacyStorageRuntime: SessionStorageApplicationRuntime?
+  private let legacyRuntimeArtifactUsage: (@Sendable () async -> SettingsRuntimeArtifactUsage?)?
+  private let legacyMigrationStore: SessionSettingsStore?
   private let supportBundleProvider: any RuntimeSupportBundleProviding
   private let general: SettingsGeneralPresentation
+  private var legacyMigrationAssessed = false
 
   init(
-    storageRuntime: SessionStorageApplicationRuntime = .production,
-    runtimeArtifactUsage: @escaping @Sendable () async -> SettingsRuntimeArtifactUsage? = {
-      await ProductionSettingsApplicationProvider.readRuntimeArtifactUsage()
-    },
+    storageRuntime: SessionStorageApplicationRuntime? = nil,
+    runtimeArtifactUsage: (@Sendable () async -> SettingsRuntimeArtifactUsage?)? = nil,
     bundle: Bundle = .main
   ) {
-    self.storageRuntime = storageRuntime
-    self.runtimeArtifactUsage = runtimeArtifactUsage
+    legacyStorageRuntime = storageRuntime
+    legacyRuntimeArtifactUsage = runtimeArtifactUsage
+    legacyMigrationStore = storageRuntime == nil ? SessionSettingsStore() : nil
     supportBundleProvider = RuntimeSupportBundleApplicationFacade.make(bundle: bundle)
     general = Self.makeGeneralPresentation(bundle: bundle)
   }
 
   func refresh() async throws -> SettingsApplicationPresentation {
-    let settings = try storageRuntime.settingsStore.load()
-    let retention = try? await storageRuntime.refresh()
-    let artifacts = await runtimeArtifactUsage()
+    let storage: SettingsStoragePresentation
+    if let storageRuntime = legacyStorageRuntime {
+      let settings = try storageRuntime.settingsStore.load()
+      let retention = try? await storageRuntime.refresh()
+      let artifacts: SettingsRuntimeArtifactUsage?
+      if let legacyRuntimeArtifactUsage {
+        artifacts = await legacyRuntimeArtifactUsage()
+      } else {
+        artifacts = nil
+      }
+      storage = Self.makeStoragePresentation(
+        settings: settings, retention: retention, runtimeArtifacts: artifacts)
+    } else {
+      let current = try await runtimeStorage(method: "runtime.storage.status")
+      storage = try await migrateLegacyStorageIfNeeded(current)
+    }
     return SettingsApplicationPresentation(
-      general: general,
-      storage: Self.makeStoragePresentation(
-        settings: settings, retention: retention, runtimeArtifacts: artifacts))
+      general: general, storage: storage)
   }
 
-  /// The Runtime's own figure, read over the allowlisted read-only method.
-  ///
-  /// Anything short of three well-formed nonnegative counts is "not measured".
-  /// Substituting zero for an unanswered question is the shape of the defect
-  /// this replaced: the number was always plausible and never about the store
-  /// the Runtime writes to.
-  private static func readRuntimeArtifactUsage() async -> SettingsRuntimeArtifactUsage? {
-    guard
-      case .success(let data) = await RuntimeXPCRequestTransport.request(
-        method: "artifact.quota", params: [:]),
-      let decoded = try? JSONSerialization.jsonObject(with: data),
-      let envelope = decoded as? [String: Any],
-      envelope["error"] == nil,
-      let result = envelope["result"] as? [String: Any],
-      let used = result["usedBytes"] as? Int, used >= 0,
-      let total = result["totalBytes"] as? Int, total >= 0,
-      let remaining = result["remainingBytes"] as? Int, remaining >= 0
-    else { return nil }
-    return SettingsRuntimeArtifactUsage(
-      usedBytes: UInt64(used), totalBytes: UInt64(total), remainingBytes: UInt64(remaining))
+  private func migrateLegacyStorageIfNeeded(
+    _ current: SettingsStoragePresentation
+  ) async throws -> SettingsStoragePresentation {
+    guard !legacyMigrationAssessed else { return current }
+    legacyMigrationAssessed = true
+    guard let legacyMigrationStore,
+      let legacy = try? legacyMigrationStore.load(),
+      let plan = SettingsLegacyStorageMigrationPlan(legacy: legacy, current: current)
+    else { return current }
+
+    var migrated = current
+    do {
+      // Move the root first. A root that the daemon cannot validate leaves the
+      // policy untouched and asks the user to reselect instead of publishing a
+      // half-migrated configuration. Every mutation is generation-bound.
+      if let rootPath = plan.rootPath {
+        migrated = try await runtimeStorage(
+          method: "runtime.storage.root",
+          params: [
+            "expectedGeneration": .string(String(migrated.generation)),
+            "rootPath": .string(rootPath),
+          ])
+      }
+      if let policy = plan.policy {
+        migrated = try await runtimeStorage(
+          method: "runtime.storage.policy",
+          params: [
+            "expectedGeneration": .string(String(migrated.generation)),
+            "totalQuotaBytes": .string(String(policy.totalQuotaBytes)),
+            "safetyMarginBytes": .string(String(policy.safetyMarginBytes)),
+            "retentionDays": .string(String(policy.retentionDays)),
+          ])
+      }
+      return migrated
+    } catch SettingsApplicationError.runtimeStorageRejected("resourceConflict") {
+      // Another App/CLI writer published first. Read its result and never
+      // replay the obsolete process-local preference.
+      return try await runtimeStorage(method: "runtime.storage.status")
+    }
   }
 
   func updateStoragePolicy(
@@ -248,27 +319,175 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     safetyMarginBytes: UInt64,
     retentionDays: UInt64
   ) async throws -> SettingsApplicationPresentation {
-    let current = try storageRuntime.settingsStore.load()
-    _ = try storageRuntime.settingsStore.savePolicy(
-      totalQuotaBytes: totalQuotaBytes,
-      safetyMarginBytes: safetyMarginBytes,
-      retentionDays: retentionDays,
-      expectedGeneration: current.generation)
-    return try await refresh()
+    if let storageRuntime = legacyStorageRuntime {
+      let current = try storageRuntime.settingsStore.load()
+      _ = try storageRuntime.settingsStore.savePolicy(
+        totalQuotaBytes: totalQuotaBytes,
+        safetyMarginBytes: safetyMarginBytes,
+        retentionDays: retentionDays,
+        expectedGeneration: current.generation)
+      return try await refresh()
+    }
+    let current = try await runtimeStorage(method: "runtime.storage.status")
+    let storage = try await runtimeStorage(
+      method: "runtime.storage.policy",
+      params: [
+        "expectedGeneration": .string(String(current.generation)),
+        "totalQuotaBytes": .string(String(totalQuotaBytes)),
+        "safetyMarginBytes": .string(String(safetyMarginBytes)),
+        "retentionDays": .string(String(retentionDays)),
+      ])
+    return SettingsApplicationPresentation(general: general, storage: storage)
   }
 
   func selectStorageRoot(_ url: URL) async throws -> SettingsApplicationPresentation {
-    let current = try storageRuntime.settingsStore.load()
-    _ = try storageRuntime.settingsStore.selectCustomRoot(
-      url, expectedGeneration: current.generation)
-    return try await refresh()
+    if let storageRuntime = legacyStorageRuntime {
+      let current = try storageRuntime.settingsStore.load()
+      _ = try storageRuntime.settingsStore.selectCustomRoot(
+        url, expectedGeneration: current.generation)
+      return try await refresh()
+    }
+    let current = try await runtimeStorage(method: "runtime.storage.status")
+    let storage = try await runtimeStorage(
+      method: "runtime.storage.root",
+      params: [
+        "expectedGeneration": .string(String(current.generation)),
+        "rootPath": .string(url.resolvingSymlinksInPath().standardizedFileURL.path),
+      ])
+    return SettingsApplicationPresentation(general: general, storage: storage)
   }
 
   func resetStorageRoot() async throws -> SettingsApplicationPresentation {
-    let current = try storageRuntime.settingsStore.load()
-    _ = try storageRuntime.settingsStore.resetRootToDefault(
-      expectedGeneration: current.generation)
-    return try await refresh()
+    if let storageRuntime = legacyStorageRuntime {
+      let current = try storageRuntime.settingsStore.load()
+      _ = try storageRuntime.settingsStore.resetRootToDefault(
+        expectedGeneration: current.generation)
+      return try await refresh()
+    }
+    let current = try await runtimeStorage(method: "runtime.storage.status")
+    let storage = try await runtimeStorage(
+      method: "runtime.storage.root",
+      params: [
+        "expectedGeneration": .string(String(current.generation)),
+        "resetToDefault": .bool(true),
+      ])
+    return SettingsApplicationPresentation(general: general, storage: storage)
+  }
+
+  private func runtimeStorage(
+    method: String,
+    params: [String: JSONValue]? = nil
+  ) async throws -> SettingsStoragePresentation {
+    let response = await RuntimeXPCRequestTransport.request(
+      method: method, params: params,
+      protocolVersion: ArkDeckControlProtocol.targetVersion)
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure: throw SettingsApplicationError.runtimeStorageUnavailable
+    }
+    guard let decoded = try? JSONSerialization.jsonObject(with: data),
+      let envelope = decoded as? [String: Any]
+    else { throw SettingsApplicationError.runtimeStorageResponseInvalid }
+    if let error = envelope["error"] as? [String: Any],
+      let code = error["code"] as? String
+    {
+      throw SettingsApplicationError.runtimeStorageRejected(code)
+    }
+    guard let result = envelope["result"] as? [String: Any],
+      Self.hasExactKeys(result, ["schemaVersion", "sessionDomain", "artifactDomain"]),
+      result["schemaVersion"] as? String == "arkdeck.runtime-storage/1",
+      let sessions = result["sessionDomain"] as? [String: Any],
+      Self.hasExactKeys(
+        sessions,
+        [
+          "schemaVersion", "generation", "rootPath", "rootKind", "policy", "usage",
+          "catalogGeneration",
+        ]),
+      sessions["schemaVersion"] as? String == "arkdeck.session-storage-status/1",
+      let generation = Self.positiveDecimal(sessions["generation"]),
+      let rootPath = sessions["rootPath"] as? String, rootPath.hasPrefix("/"),
+      rootPath == URL(filePath: rootPath, directoryHint: .isDirectory).standardizedFileURL.path,
+      let rootKind = sessions["rootKind"] as? String,
+      ["default", "custom"].contains(rootKind),
+      let policy = sessions["policy"] as? [String: Any],
+      Self.hasExactKeys(
+        policy, ["totalQuotaBytes", "safetyMarginBytes", "retentionDays"]),
+      let totalQuota = Self.positiveDecimal(policy["totalQuotaBytes"]),
+      let margin = Self.positiveDecimal(policy["safetyMarginBytes"]),
+      let retention = Self.positiveDecimal(policy["retentionDays"]),
+      totalQuota > margin,
+      let usage = sessions["usage"] as? [String: Any],
+      Self.hasExactKeys(
+        usage,
+        [
+          "usedBytes", "pinnedBytes", "sessionCount", "pinnedSessionCount",
+          "unaccountedSessionCount", "measurementIncomplete",
+        ]),
+      let used = Self.decimal(usage["usedBytes"]),
+      let pinned = Self.decimal(usage["pinnedBytes"]),
+      pinned <= used,
+      let sessionCount = Self.count(usage["sessionCount"]),
+      let pinnedCount = Self.count(usage["pinnedSessionCount"]),
+      pinnedCount <= sessionCount,
+      let unaccounted = Self.count(usage["unaccountedSessionCount"]),
+      let incomplete = usage["measurementIncomplete"] as? Bool,
+      Self.isOptionalDecimal(sessions["catalogGeneration"]),
+      let artifacts = result["artifactDomain"] as? [String: Any],
+      Self.hasExactKeys(
+        artifacts,
+        [
+          "schemaVersion", "rootReference", "policy", "totalBytes", "usedBytes",
+          "remainingBytes",
+        ]),
+      artifacts["schemaVersion"] as? String == "arkdeck.artifact-storage-status/1",
+      artifacts["rootReference"] as? String == "arkdeck-runtime://artifacts",
+      artifacts["policy"] as? String == "refuseNewWorkNeverEvict",
+      let artifactTotal = Self.decimal(artifacts["totalBytes"]),
+      let artifactUsed = Self.decimal(artifacts["usedBytes"]),
+      let artifactRemaining = Self.decimal(artifacts["remainingBytes"]),
+      artifactUsed <= artifactTotal,
+      artifactRemaining == artifactTotal - artifactUsed
+    else { throw SettingsApplicationError.runtimeStorageResponseInvalid }
+    return SettingsStoragePresentation(
+      generation: generation,
+      rootPath: rootPath,
+      usesCustomRoot: rootKind == "custom",
+      totalQuotaBytes: totalQuota,
+      safetyMarginBytes: margin,
+      retentionDays: retention,
+      runtimeArtifacts: SettingsRuntimeArtifactUsage(
+        usedBytes: artifactUsed, totalBytes: artifactTotal,
+        remainingBytes: artifactRemaining),
+      sessionRoot: SettingsSessionRootUsage(
+        measuredBytes: used, pinnedBytes: pinned,
+        pinnedSessionCount: pinnedCount,
+        unaccountedSessionCount: unaccounted,
+        measurementIncomplete: incomplete))
+  }
+
+  private static func decimal(_ value: Any?) -> UInt64? {
+    guard let text = value as? String, !text.isEmpty,
+      text.utf8.allSatisfy({ (48...57).contains($0) }),
+      text == "0" || text.first != "0"
+    else { return nil }
+    return UInt64(text)
+  }
+
+  private static func positiveDecimal(_ value: Any?) -> UInt64? {
+    decimal(value).flatMap { $0 > 0 ? $0 : nil }
+  }
+
+  private static func isOptionalDecimal(_ value: Any?) -> Bool {
+    value is NSNull || decimal(value) != nil
+  }
+
+  private static func hasExactKeys(_ object: [String: Any], _ keys: Set<String>) -> Bool {
+    Set(object.keys) == keys
+  }
+
+  private static func count(_ value: Any?) -> Int? {
+    decimal(value).flatMap(Int.init(exactly:))
   }
 
   func previewDiagnosticBundle(at destination: URL) async throws

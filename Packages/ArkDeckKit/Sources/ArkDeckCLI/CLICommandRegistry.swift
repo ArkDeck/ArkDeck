@@ -981,6 +981,7 @@ enum CLICommandRegistry {
       runtimeBundleNode,
       runtimeToolNode,
       runtimeSupportBundleNode,
+      runtimeStorageNode,
     ])
 
   private static let runtimeSupportBundleNode = CLINodeSpec(
@@ -1016,6 +1017,60 @@ enum CLICommandRegistry {
             isRequired: true),
           outputOption, jsonOption, controlRequestIDOption,
         ]),
+    ])
+
+  private static let runtimeStorageNode = CLINodeSpec(
+    token: "storage",
+    summary: "Runtime-owned Session output policy and separate Artifact headroom",
+    leaves: [
+      CLILeafSpec(
+        token: "status",
+        canonicalCommand: "runtime.storage.status",
+        summary: "report Session and Artifact storage domains without combining their quotas",
+        options: runtimeClientOptions([targetProtocolOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "policy",
+        canonicalCommand: "runtime.storage.policy",
+        summary: "replace the Session retention and quota policy using generation CAS",
+        options: runtimeClientOptions([
+          generationOption,
+          CLIOptionSpec(
+            name: "--total-quota-bytes",
+            form: .value(placeholder: "bytes", grammar: .positiveInteger(1...Int.max)),
+            summary: "Session output quota in bytes",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--safety-margin-bytes",
+            form: .value(placeholder: "bytes", grammar: .positiveInteger(1...Int.max)),
+            summary: "reserved Session output margin in bytes",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--retention-days",
+            form: .value(placeholder: "days", grammar: .positiveInteger(1...Int.max)),
+            summary: "Session retention duration in days",
+            isRequired: true),
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "root",
+        canonicalCommand: "runtime.storage.root",
+        summary: "select one Runtime-owned Session root using generation CAS",
+        options: runtimeClientOptions([
+          generationOption,
+          CLIOptionSpec(
+            name: "--root",
+            form: .value(placeholder: "absolute-path", grammar: .opaque),
+            summary: "existing owner-private writable Session directory"),
+          CLIOptionSpec(
+            name: "--default",
+            form: .flag,
+            summary: "restore the Runtime's fixed default Session directory"),
+          targetProtocolOption,
+        ]),
+        requiresExactlyOneOf: [["--root", "--default"]],
+        connectsToRuntime: true),
     ])
 
   private static let runtimeBundleNode = CLINodeSpec(

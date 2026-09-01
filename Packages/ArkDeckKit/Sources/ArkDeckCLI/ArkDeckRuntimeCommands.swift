@@ -1652,7 +1652,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing runtime subcommand (health|hdc|service|signing|support-bundle)")
+        message: "missing runtime subcommand (health|hdc|service|signing|storage|support-bundle)")
     }
     var rest = Array(arguments.dropFirst())
     switch subcommand {
@@ -1668,6 +1668,8 @@ enum RuntimeCLI {
       try await runSigningAsync(rest, spelledAs: "runtime.signing")
     case "support-bundle":
       try await runRuntimeSupportBundle(rest)
+    case "storage":
+      try runRuntimeStorage(rest)
     case "health":
       var session = runtimeSession(&rest, command: "runtime.health")
       if let index = rest.firstIndex(of: "--require-protocol"), index + 1 < rest.count,
@@ -1765,6 +1767,114 @@ enum RuntimeCLI {
         throw session.fail(.ioFailure, "the support bundle could not be read or written safely")
       }
     }
+  }
+
+  static func runRuntimeStorage(_ arguments: [String]) throws {
+    guard let verb = arguments.first, ["status", "policy", "root"].contains(verb) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing runtime storage subcommand (status|policy|root)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let resetToDefault = rest.contains("--default")
+    rest.removeAll { $0 == "--default" }
+    var session = runtimeSession(&rest, command: "runtime.storage.\(verb)")
+    let options = try CLIOptions(rest)
+    let method = "runtime.storage.\(verb)"
+    try session.negotiate(requiredMajor: 2, forMethod: method)
+    var fields: [String: JSONValue] = [:]
+    if verb != "status" {
+      guard let generation = options.value("--expected-generation") else {
+        throw session.fail(.invalidInput, "Runtime storage mutation requires a generation")
+      }
+      fields["expectedGeneration"] = .string(generation)
+    }
+    if verb == "policy" {
+      guard let total = options.value("--total-quota-bytes"),
+        let margin = options.value("--safety-margin-bytes"),
+        let days = options.value("--retention-days")
+      else {
+        throw session.fail(.invalidInput, "Runtime storage policy requires all policy fields")
+      }
+      fields["totalQuotaBytes"] = .string(total)
+      fields["safetyMarginBytes"] = .string(margin)
+      fields["retentionDays"] = .string(days)
+    } else if verb == "root" {
+      if resetToDefault {
+        fields["resetToDefault"] = .bool(true)
+      } else if let root = options.value("--root") {
+        fields["rootPath"] = .string(root)
+      } else {
+        throw session.fail(.invalidInput, "Runtime storage root requires one root selection")
+      }
+    }
+    let result = try session.request(method, fields.isEmpty ? nil : fields)
+    try validateRuntimeStorage(result, session: session)
+    session.emit(result)
+  }
+
+  private static func validateRuntimeStorage(
+    _ value: JSONValue,
+    session: CLIRuntimeSession
+  ) throws {
+    func fail() -> CLIRegistryError {
+      session.fail(.recordUnreadable, "the Runtime returned an invalid storage projection")
+    }
+    func decimal(_ value: JSONValue?, positive: Bool = false) -> UInt64? {
+      guard case .string(let text)? = value, !text.isEmpty,
+        text.utf8.allSatisfy({ (48...57).contains($0) }),
+        text == "0" || text.first != "0", let parsed = UInt64(text),
+        !positive || parsed > 0
+      else { return nil }
+      return parsed
+    }
+    guard case .object(let fields) = value,
+      Set(fields.keys) == ["schemaVersion", "sessionDomain", "artifactDomain"],
+      fields["schemaVersion"] == .string("arkdeck.runtime-storage/1"),
+      case .object(let sessions)? = fields["sessionDomain"],
+      Set(sessions.keys) == [
+        "schemaVersion", "generation", "rootPath", "rootKind", "policy", "usage",
+        "catalogGeneration",
+      ],
+      sessions["schemaVersion"] == .string("arkdeck.session-storage-status/1"),
+      decimal(sessions["generation"], positive: true) != nil,
+      case .string(let root)? = sessions["rootPath"], root.hasPrefix("/"),
+      root.utf8.count <= 4 * 1_024,
+      root == URL(filePath: root, directoryHint: .isDirectory).standardizedFileURL.path,
+      case .string(let rootKind)? = sessions["rootKind"], ["default", "custom"].contains(rootKind),
+      case .object(let policy)? = sessions["policy"],
+      Set(policy.keys) == ["totalQuotaBytes", "safetyMarginBytes", "retentionDays"],
+      let totalQuota = decimal(policy["totalQuotaBytes"], positive: true),
+      let safetyMargin = decimal(policy["safetyMarginBytes"], positive: true),
+      totalQuota > safetyMargin,
+      decimal(policy["retentionDays"], positive: true) != nil,
+      case .object(let usage)? = sessions["usage"],
+      Set(usage.keys) == [
+        "usedBytes", "pinnedBytes", "sessionCount", "pinnedSessionCount",
+        "unaccountedSessionCount", "measurementIncomplete",
+      ],
+      let usedBytes = decimal(usage["usedBytes"]),
+      let pinnedBytes = decimal(usage["pinnedBytes"]), pinnedBytes <= usedBytes,
+      let sessionCount = decimal(usage["sessionCount"]),
+      let pinnedSessionCount = decimal(usage["pinnedSessionCount"]),
+      pinnedSessionCount <= sessionCount,
+      decimal(usage["unaccountedSessionCount"]) != nil,
+      case .bool? = usage["measurementIncomplete"],
+      sessions["catalogGeneration"] == .null
+        || decimal(sessions["catalogGeneration"]) != nil,
+      case .object(let artifacts)? = fields["artifactDomain"],
+      Set(artifacts.keys) == [
+        "schemaVersion", "rootReference", "policy", "totalBytes", "usedBytes",
+        "remainingBytes",
+      ],
+      artifacts["schemaVersion"] == .string("arkdeck.artifact-storage-status/1"),
+      artifacts["rootReference"] == .string("arkdeck-runtime://artifacts"),
+      artifacts["policy"] == .string("refuseNewWorkNeverEvict"),
+      let artifactTotal = decimal(artifacts["totalBytes"]),
+      let artifactUsed = decimal(artifacts["usedBytes"]), artifactUsed <= artifactTotal,
+      let artifactRemaining = decimal(artifacts["remainingBytes"]),
+      artifactRemaining == artifactTotal - artifactUsed
+    else { throw fail() }
   }
 
   /// `arkdeck target ...` — the durable target surface.

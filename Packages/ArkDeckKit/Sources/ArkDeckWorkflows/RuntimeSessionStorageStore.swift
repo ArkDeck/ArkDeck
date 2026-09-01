@@ -1,0 +1,526 @@
+import ArkDeckCore
+import ArkDeckStorage
+import Darwin
+import Foundation
+
+public struct RuntimeSessionStoragePolicy: Codable, Equatable, Sendable {
+  public let totalQuotaBytes: UInt64
+  public let safetyMarginBytes: UInt64
+  public let retentionDays: UInt64
+
+  public init(
+    totalQuotaBytes: UInt64,
+    safetyMarginBytes: UInt64,
+    retentionDays: UInt64
+  ) {
+    self.totalQuotaBytes = totalQuotaBytes
+    self.safetyMarginBytes = safetyMarginBytes
+    self.retentionDays = retentionDays
+  }
+}
+
+public struct RuntimeSessionStorageStatus: Equatable, Sendable {
+  public let generation: UInt64
+  public let rootPath: String
+  public let usesCustomRoot: Bool
+  public let policy: RuntimeSessionStoragePolicy
+  public let currentBytes: UInt64
+  public let pinnedBytes: UInt64
+  public let sessionCount: Int
+  public let pinnedSessionCount: Int
+  public let unaccountedSessionCount: Int
+  public let measurementIncomplete: Bool
+  public let catalogGeneration: UInt64?
+
+  package var projection: JSONValue {
+    .object([
+      "schemaVersion": .string("arkdeck.session-storage-status/1"),
+      "generation": .string(String(generation)),
+      "rootPath": .string(rootPath),
+      "rootKind": .string(usesCustomRoot ? "custom" : "default"),
+      "policy": .object([
+        "totalQuotaBytes": .string(String(policy.totalQuotaBytes)),
+        "safetyMarginBytes": .string(String(policy.safetyMarginBytes)),
+        "retentionDays": .string(String(policy.retentionDays)),
+      ]),
+      "usage": .object([
+        "usedBytes": .string(String(currentBytes)),
+        "pinnedBytes": .string(String(pinnedBytes)),
+        "sessionCount": .string(String(sessionCount)),
+        "pinnedSessionCount": .string(String(pinnedSessionCount)),
+        "unaccountedSessionCount": .string(String(unaccountedSessionCount)),
+        "measurementIncomplete": .bool(measurementIncomplete),
+      ]),
+      "catalogGeneration": catalogGeneration.map { .string(String($0)) } ?? .null,
+    ])
+  }
+}
+
+public struct RuntimeSessionStorageFailure: Error, Equatable, Sendable {
+  public let code: String
+  public let message: String
+
+  package init(_ code: String, _ message: String) {
+    self.code = code
+    self.message = message
+  }
+}
+
+/// The daemon-owned Session storage configuration and measurement resource.
+///
+/// App and CLI reach this owner only through typed control methods. The file is
+/// private to the Runtime state directory, while a selected Session root is
+/// stored as one validated canonical path. No process-local preference is a
+/// source of truth after this owner is composed.
+public final class RuntimeSessionStorageStore: @unchecked Sendable {
+  private struct Document: Codable, Equatable {
+    var schemaVersion = "arkdeck.session-storage-store/1"
+    var generation: UInt64
+    var rootKind: String
+    var rootPath: String
+    var policy: RuntimeSessionStoragePolicy
+  }
+
+  public static let defaultPolicy = RuntimeSessionStoragePolicy(
+    totalQuotaBytes: 20 * 1_024 * 1_024 * 1_024,
+    safetyMarginBytes: 2 * 1_024 * 1_024 * 1_024,
+    retentionDays: 90)
+
+  private static let documentName = "session-storage.json"
+  private static let lockName = ".session-storage.lock"
+  private static let maximumDocumentBytes = 64 * 1_024
+  private static let maximumRootPathBytes = 4 * 1_024
+
+  private let ownerRoot: URL
+  private let defaultSessionsRoot: URL
+
+  package init(ownerRoot: URL, defaultSessionsRoot: URL) throws {
+    let normalizedOwner = ownerRoot.standardizedFileURL
+    try Self.requireOwnerDirectory(normalizedOwner)
+    // Resolve aliases only after the fixed default exists. Foundation cannot
+    // resolve an aliased ancestor reliably when the leaf itself is absent;
+    // persisting that pre-creation spelling would make the same root appear
+    // non-canonical on the next mutation.
+    try Self.ensureDirectory(defaultSessionsRoot)
+    self.ownerRoot = try Self.canonicalRoot(normalizedOwner)
+    self.defaultSessionsRoot = try Self.canonicalRoot(defaultSessionsRoot)
+    try requireDisjointFromOwner(self.defaultSessionsRoot)
+  }
+
+  package func status() throws -> RuntimeSessionStorageStatus {
+    try withLockedDocument { _, document in
+      try measuredStatus(document)
+    }
+  }
+
+  package func updatePolicy(
+    _ policy: RuntimeSessionStoragePolicy,
+    expectedGeneration: UInt64
+  ) throws -> RuntimeSessionStorageStatus {
+    try validate(policy)
+    return try mutate(expectedGeneration: expectedGeneration) { document in
+      document.policy = policy
+    }
+  }
+
+  package func updateRoot(
+    path: String?,
+    resetToDefault: Bool,
+    expectedGeneration: UInt64
+  ) throws -> RuntimeSessionStorageStatus {
+    guard (path != nil) != resetToDefault else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "select exactly one custom root or the default root")
+    }
+    let selected: URL
+    let kind: String
+    if resetToDefault {
+      selected = defaultSessionsRoot
+      kind = "default"
+    } else {
+      guard let path, path.utf8.count <= Self.maximumRootPathBytes,
+        path == path.trimmingCharacters(in: .whitespacesAndNewlines),
+        path.hasPrefix("/")
+      else {
+        throw RuntimeSessionStorageFailure(
+          "invalidInput", "Session root must be one bounded absolute path")
+      }
+      selected = try Self.canonicalRoot(URL(filePath: path, directoryHint: .isDirectory))
+      kind = "custom"
+    }
+    return try mutate(expectedGeneration: expectedGeneration) { document in
+      // A stale CAS request must have no filesystem write-probe side effect.
+      // The mutation helper checks generation before invoking this closure.
+      if resetToDefault {
+        try Self.ensureDirectory(selected)
+      }
+      try requireDisjointFromOwner(selected)
+      try Self.requireSafeWritableRoot(selected)
+      document.rootKind = kind
+      document.rootPath = selected.path
+    }
+  }
+
+  private func mutate(
+    expectedGeneration: UInt64,
+    change: (inout Document) throws -> Void
+  ) throws -> RuntimeSessionStorageStatus {
+    try withLockedDocument { owner, loaded in
+      guard expectedGeneration > 0, expectedGeneration <= UInt64(Int64.max) else {
+        throw RuntimeSessionStorageFailure(
+          "invalidInput", "expected generation must be a canonical positive integer")
+      }
+      guard loaded.generation == expectedGeneration else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session storage generation changed")
+      }
+      let next = loaded.generation.addingReportingOverflow(1)
+      guard !next.overflow, next.partialValue <= UInt64(Int64.max) else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session storage generation is exhausted")
+      }
+      var document = loaded
+      try change(&document)
+      document.generation = next.partialValue
+      try validate(document)
+      // Complete every fallible measurement before publishing the settings
+      // generation. Once save returns, composing the receipt cannot fail.
+      let result = try measuredStatus(document)
+      try save(document, owner: owner)
+      return result
+    }
+  }
+
+  private func measuredStatus(_ document: Document) throws -> RuntimeSessionStorageStatus {
+    let root = try activeRoot(document, createDefaultIfMissing: true)
+    let catalog = try SessionRetentionCatalog(sessionsRoot: root).scan(
+      retentionDays: document.policy.retentionDays,
+      policyGeneration: document.generation)
+    return RuntimeSessionStorageStatus(
+      generation: document.generation,
+      rootPath: root.path,
+      usesCustomRoot: document.rootKind == "custom",
+      policy: document.policy,
+      currentBytes: catalog.currentBytes,
+      pinnedBytes: catalog.pinnedBytes,
+      sessionCount: catalog.entries.count,
+      pinnedSessionCount: catalog.entries.filter(\.isPinned).count,
+      unaccountedSessionCount: catalog.unknownSessionIDs.count,
+      measurementIncomplete: catalog.unknownPressure,
+      catalogGeneration: catalog.catalogGeneration)
+  }
+
+  private func withLockedDocument<T>(
+    _ body: (Int32, Document) throws -> T
+  ) throws -> T {
+    let owner = Darwin.open(
+      ownerRoot.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard owner >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage owner directory cannot be opened")
+    }
+    defer { Darwin.close(owner) }
+    try Self.validateOwnedDirectory(owner, label: "Session storage owner")
+    let lock = Darwin.openat(
+      owner, Self.lockName, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard lock >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage lock cannot be opened")
+    }
+    defer { Darwin.close(lock) }
+    try Self.validateOwnedRegularFile(lock, label: "Session storage lock")
+    while flock(lock, LOCK_EX) != 0 {
+      if errno == EINTR { continue }
+      throw RuntimeSessionStorageFailure(
+        "resourceConflict", "Session storage lock cannot be acquired")
+    }
+    defer { _ = flock(lock, LOCK_UN) }
+    return try body(owner, load(owner: owner))
+  }
+
+  private func load(owner: Int32) throws -> Document {
+    let descriptor = Darwin.openat(
+      owner, Self.documentName, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+    if descriptor < 0, errno == ENOENT {
+      return Document(
+        generation: 1, rootKind: "default", rootPath: defaultSessionsRoot.path,
+        policy: Self.defaultPolicy)
+    }
+    guard descriptor >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage document cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    try Self.validateOwnedRegularFile(descriptor, label: "Session storage document")
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0, metadata.st_size > 0,
+      metadata.st_size <= Self.maximumDocumentBytes
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage document size is invalid")
+    }
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 4096)
+    while data.count < Int(metadata.st_size) {
+      let count = Darwin.read(
+        descriptor, &buffer, min(buffer.count, Int(metadata.st_size) - data.count))
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session storage document is truncated")
+      }
+      data.append(contentsOf: buffer.prefix(count))
+    }
+    do {
+      let document = try JSONDecoder().decode(Document.self, from: data)
+      try validate(document)
+      var canonical = try CanonicalJSONEncoders.canonical().encode(document)
+      canonical.append(0x0A)
+      guard canonical == data else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session storage document is not canonical")
+      }
+      return document
+    } catch let failure as RuntimeSessionStorageFailure {
+      throw failure
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage document failed schema validation")
+    }
+  }
+
+  private func save(_ document: Document, owner: Int32) throws {
+    var data = try CanonicalJSONEncoders.canonical().encode(document)
+    data.append(0x0A)
+    guard data.count <= Self.maximumDocumentBytes else {
+      throw RuntimeSessionStorageFailure(
+        "quotaExceeded", "Session storage document exceeds its byte bound")
+    }
+    let temporaryName = ".session-storage.\(UUID().uuidString.lowercased()).part"
+    let descriptor = Darwin.openat(
+      owner, temporaryName,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard descriptor >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "ioFailure", "Session storage transaction cannot be created")
+    }
+    var descriptorOpen = true
+    defer {
+      if descriptorOpen { Darwin.close(descriptor) }
+      _ = Darwin.unlinkat(owner, temporaryName, 0)
+    }
+    var offset = 0
+    while offset < data.count {
+      let count = data.withUnsafeBytes { bytes in
+        Darwin.write(descriptor, bytes.baseAddress!.advanced(by: offset), data.count - offset)
+      }
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw RuntimeSessionStorageFailure(
+          "ioFailure", "Session storage transaction cannot be written")
+      }
+      offset += count
+    }
+    guard fchmod(descriptor, 0o600) == 0, Darwin.fsync(descriptor) == 0,
+      Darwin.close(descriptor) == 0
+    else {
+      throw RuntimeSessionStorageFailure(
+        "ioFailure", "Session storage transaction cannot be synchronized")
+    }
+    descriptorOpen = false
+    guard renameat(owner, temporaryName, owner, Self.documentName) == 0,
+      Darwin.fsync(owner) == 0
+    else {
+      throw RuntimeSessionStorageFailure(
+        "outcomeUnknown", "Session storage publication outcome is unknown")
+    }
+  }
+
+  private func validate(_ document: Document) throws {
+    guard document.schemaVersion == "arkdeck.session-storage-store/1",
+      document.generation > 0, document.generation <= UInt64(Int64.max)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage record header is invalid")
+    }
+    guard ["default", "custom"].contains(document.rootKind),
+      document.rootPath.utf8.count <= Self.maximumRootPathBytes,
+      document.rootPath.hasPrefix("/")
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage root record is invalid")
+    }
+    let canonical: String
+    do {
+      canonical = try Self.canonicalRoot(
+        URL(filePath: document.rootPath, directoryHint: .isDirectory)).path
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage root record is not canonical")
+    }
+    guard document.rootPath == canonical else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage root record is not canonical")
+    }
+    guard document.rootKind != "default" || document.rootPath == defaultSessionsRoot.path else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage default root record drifted")
+    }
+    do {
+      try validate(document.policy)
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage policy record is invalid")
+    }
+  }
+
+  private func validate(_ policy: RuntimeSessionStoragePolicy) throws {
+    guard policy.totalQuotaBytes > policy.safetyMarginBytes,
+      policy.safetyMarginBytes > 0,
+      policy.retentionDays > 0,
+      policy.totalQuotaBytes <= UInt64(Int64.max),
+      policy.safetyMarginBytes <= UInt64(Int64.max),
+      policy.retentionDays <= UInt64(Int64.max)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session storage policy is outside its published bounds")
+    }
+  }
+
+  private func activeRoot(
+    _ document: Document,
+    createDefaultIfMissing: Bool
+  ) throws -> URL {
+    do {
+      let root = try Self.canonicalRoot(
+        URL(filePath: document.rootPath, directoryHint: .isDirectory))
+      if document.rootKind == "default", createDefaultIfMissing {
+        try Self.ensureDirectory(root)
+      }
+      try requireDisjointFromOwner(root)
+      try Self.requireSafeWritableRoot(root)
+      return root
+    } catch let failure as RuntimeSessionStorageFailure where failure.code == "invalidInput" {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "configured Session storage root is unavailable")
+    }
+  }
+
+  private func requireDisjointFromOwner(_ root: URL) throws {
+    func contains(_ ancestor: String, _ candidate: String) -> Bool {
+      if ancestor == "/" { return true }
+      return candidate == ancestor || candidate.hasPrefix(ancestor + "/")
+    }
+    guard !contains(root.path, ownerRoot.path), !contains(ownerRoot.path, root.path) else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session root must be disjoint from Runtime state")
+    }
+  }
+
+  private static func requireOwnerDirectory(_ url: URL) throws {
+    try ensureDirectory(url)
+    let descriptor = Darwin.open(
+      url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session storage owner directory cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    try validateOwnedDirectory(descriptor, label: "Session storage owner")
+  }
+
+  private static func ensureDirectory(_ url: URL) throws {
+    do {
+      try FileManager.default.createDirectory(
+        at: url, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "ioFailure", "Session storage directory cannot be created")
+    }
+  }
+
+  private static func canonicalRoot(_ url: URL) throws -> URL {
+    guard url.isFileURL, url.path.hasPrefix("/"),
+      url.path.utf8.count <= maximumRootPathBytes
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session root must be one bounded absolute path")
+    }
+    return url.resolvingSymlinksInPath().standardizedFileURL
+  }
+
+  private static func requireSafeWritableRoot(_ url: URL) throws {
+    var pathMetadata = stat()
+    guard Darwin.lstat(url.path, &pathMetadata) == 0,
+      pathMetadata.st_mode & S_IFMT == S_IFDIR,
+      pathMetadata.st_uid == geteuid(),
+      pathMetadata.st_mode & (S_IRUSR | S_IWUSR | S_IXUSR)
+        == (S_IRUSR | S_IWUSR | S_IXUSR),
+      pathMetadata.st_mode & 0o077 == 0
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session root ownership or permissions are unsafe")
+    }
+    let descriptor = Darwin.open(
+      url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session root cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    var opened = stat()
+    guard fstat(descriptor, &opened) == 0,
+      opened.st_dev == pathMetadata.st_dev, opened.st_ino == pathMetadata.st_ino
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session root changed while being opened")
+    }
+    let probeName = ".arkdeck-runtime-storage-probe-\(UUID().uuidString.lowercased())"
+    let probe = Darwin.openat(
+      descriptor, probeName,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard probe >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session root is not writable by the Runtime owner")
+    }
+    var probeOpen = true
+    defer {
+      if probeOpen { Darwin.close(probe) }
+      _ = Darwin.unlinkat(descriptor, probeName, 0)
+    }
+    guard Darwin.close(probe) == 0 else {
+      probeOpen = false
+      throw RuntimeSessionStorageFailure(
+        "ioFailure", "Session root write probe could not be closed")
+    }
+    probeOpen = false
+    guard Darwin.unlinkat(descriptor, probeName, 0) == 0 else {
+      throw RuntimeSessionStorageFailure(
+        "ioFailure", "Session root write probe could not be removed")
+    }
+  }
+
+  private static func validateOwnedDirectory(_ descriptor: Int32, label: String) throws {
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFDIR,
+      metadata.st_uid == geteuid(), metadata.st_mode & 0o077 == 0
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "\(label) ownership or permissions are unsafe")
+    }
+  }
+
+  private static func validateOwnedRegularFile(_ descriptor: Int32, label: String) throws {
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_uid == geteuid(), metadata.st_nlink == 1,
+      metadata.st_mode & 0o077 == 0
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "\(label) ownership or permissions are unsafe")
+    }
+  }
+}
