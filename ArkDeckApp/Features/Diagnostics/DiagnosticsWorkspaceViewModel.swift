@@ -111,13 +111,33 @@ final class DiagnosticsWorkspaceViewModel {
       isPreviewLoading = false
       switch result {
       case .loaded(let bytes):
-        guard let preview = DiagnosticArtifactTextPreview(bytes: bytes, mediaType: artifact.mediaType) else {
+        do {
+          guard artifact.byteCount >= 0,
+            artifact.byteCount
+              <= Int64(DiagnosticSessionOfflineInspector.maximumSafeInteger)
+          else {
+            throw DiagnosticSessionOfflineInspectorError.invalid(
+              "diagnostics_invalid_artifact_metadata")
+          }
+          let metadata = try DiagnosticOfflineArtifactMetadata(
+            artifactID: artifact.id,
+            name: artifact.name,
+            mediaType: artifact.mediaType,
+            privacy: artifact.privacy,
+            status: artifact.status,
+            statusDetail: artifact.statusDetail,
+            sourceOperation: artifact.sourceOperation,
+            byteCount: Int(artifact.byteCount),
+            sha256: artifact.status == "published" ? artifact.sha256 : nil)
+          let preview = try DiagnosticSessionOfflineInspector().preview(
+            DiagnosticOfflineArtifact(metadata: metadata, data: bytes),
+            contentAccessExplicit: true)
+          previewWasClipped = preview.wasClipped
+          previewReplacedInvalidUTF8 = preview.replacedInvalidUTF8
+          previewText = preview.text
+        } catch {
           previewError = diagnosticsText("diagnostics.preview.invalidStructuredText")
-          return
         }
-        previewWasClipped = preview.wasClipped
-        previewReplacedInvalidUTF8 = preview.replacedInvalidUTF8
-        previewText = preview.text
       case .failed(let reason): previewError = reason
       }
     }

@@ -558,11 +558,52 @@ enum CLICommandRegistry {
 
   private static let diagnosticsNode = CLINodeSpec(
     token: "diagnostics",
-    summary: "bounded diagnostic capture",
+    summary: "bounded capture and offline inspection of published diagnostic artifacts",
     leaves: [
       domainLeaf(
         "capture", "diagnostics.capture", "capture.diagnostics@1",
-        "capture bounded HiLog, UI dump and trace with a structured artifact index")
+        "capture bounded HiLog, UI dump and trace with a structured artifact index"),
+      CLILeafSpec(
+        token: "inspect",
+        canonicalCommand: "diagnostics.inspect",
+        summary: "validate one published diagnostic session and report its completeness",
+        options: runtimeClientOptions([
+          jobIDOption, waitTimeoutOption, targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "preview",
+        canonicalCommand: "diagnostics.preview",
+        summary: "derive a bounded text preview from one immutable diagnostic Artifact",
+        options: runtimeClientOptions([
+          jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+          CLIOptionSpec(
+            name: "--max-characters",
+            form: .value(
+              placeholder: "1...120000",
+              grammar: .positiveInteger(1...120_000)),
+            summary: "maximum Unicode characters in the local preview"),
+          waitTimeoutOption, targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "export",
+        canonicalCommand: "diagnostics.export",
+        summary: "export one exact diagnostic Artifact through the Artifact policy",
+        options: runtimeClientOptions([
+          jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+          CLIOptionSpec(
+            name: "--destination",
+            form: .value(placeholder: "directory", grammar: .opaque),
+            summary: "existing host directory to write into",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--overwrite",
+            form: .flag,
+            summary: "replace only this exact exported file"),
+          waitTimeoutOption, targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
     ])
 
   private static let analyzeNode = CLINodeSpec(

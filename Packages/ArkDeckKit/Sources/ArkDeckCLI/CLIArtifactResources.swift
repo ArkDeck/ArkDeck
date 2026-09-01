@@ -8,9 +8,16 @@ extension RuntimeCLI {
       && rest.contains { ["--import", "--require-protocol", "--page-size", "--cursor", "--timeout", "--overwrite"].contains($0) }
   }
 
-  static func runArtifactResource(_ verb: String, rest original: [String]) throws {
+  static func runArtifactResource(
+    _ verb: String,
+    rest original: [String],
+    command: String? = nil,
+    requiredSourceOperation: String? = nil
+  ) throws {
     var rest = original
-    var session = runtimeSession(&rest, command: "artifact.\(verb)")
+    var session = runtimeSession(
+      &rest,
+      command: command ?? "artifact.\(verb)")
     let options = try CLIOptions(rest.filter { !["--allow-sensitive", "--raw", "--overwrite"].contains($0) })
     let cancellation = AgentClientWaitCancellation()
     let observer = CLIWaitSignalObserver(cancellation: cancellation)
@@ -45,6 +52,15 @@ extension RuntimeCLI {
       fields["artifactId"] = .string(id)
       let metadata = try ArtifactResourceProjection(session.request("artifact.inspect", fields))
       guard metadata.owner == owner, metadata.id == id else { throw session.fail(.recordUnreadable, "Artifact metadata belongs to another owner or identity") }
+      if let requiredSourceOperation {
+        guard case .object(let inventory) = metadata.value,
+          inventory["sourceOperation"] == .string(requiredSourceOperation)
+        else {
+          throw session.fail(
+            .invalidInput,
+            "selected Artifact does not belong to \(requiredSourceOperation)")
+        }
+      }
       if verb == "inspect" { session.emit(metadata.value); return }
       fields["allowSensitive"] = .bool(rest.contains("--allow-sensitive"))
       if verb == "read" {
