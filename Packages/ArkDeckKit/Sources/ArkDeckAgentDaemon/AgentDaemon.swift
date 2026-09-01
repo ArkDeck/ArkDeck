@@ -303,6 +303,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
     _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
   ) async -> AgentWireProtocol.Response {
     methodObserver?(request.method)
+    if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
+      ["job.plan", "job.submit", "job.run"].contains(request.method)
+    {
+      return await targetJobLifecycleRequest(request)
+    }
     switch request.method {
     case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
       return await agentExecutionRequest(request)
@@ -2346,6 +2351,170 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return failure(
         id: request.id, code: .unknownMethod, message: "unknown method \(request.method)")
     }
+  }
+
+  /// The negotiated target Job lifecycle. The legacy switch below remains
+  /// byte-for-byte compatible with control protocol 1.x; this owner gives 2.x
+  /// closed request shapes, stable result projections and the phase evidence
+  /// required to distinguish a proven refusal from an unknown mutation
+  /// outcome.
+  private func targetJobLifecycleRequest(
+    _ request: AgentWireProtocol.Request
+  ) async -> AgentWireProtocol.Response {
+    let fields = request.params ?? [:]
+    func structuredFailure(
+      _ code: String, _ message: String, provesZeroNewDispatch: Bool,
+      inheritedDetails: [String: JSONValue] = [:]
+    ) -> AgentWireProtocol.Response {
+      var details = inheritedDetails
+      if provesZeroNewDispatch {
+        details["phase"] = .string("preAdmission")
+        details["newDispatchCount"] = .integer(0)
+      }
+      return AgentWireProtocol.Response(
+        id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message, details: details))
+    }
+    func requestJSON() throws -> String {
+      guard Set(fields.keys) == ["requestJson"] else {
+        throw AgentExecutionControlFailure(
+          "invalidInput",
+          "the target Job request accepts exactly one bounded requestJson")
+      }
+      guard case .string(let value)? = fields["requestJson"], !value.isEmpty else {
+        throw AgentExecutionControlFailure(
+          "invalidInput", "requestJson must be a non-empty typed request document")
+      }
+      guard value.utf8.count <= 4 * 1024 * 1024 else {
+        throw AgentExecutionControlFailure(
+          "inputTooLarge", "requestJson exceeds the target control request bound")
+      }
+      return value
+    }
+    do {
+      switch request.method {
+      case "job.plan":
+        let preview = try await engine.planOnly(Data(try requestJSON().utf8))
+        return success(id: request.id, result: Self.targetJobPlanProjection(preview))
+      case "job.submit":
+        let acceptance = try await engine.submitForTargetControl(
+          Data(try requestJSON().utf8))
+        return success(
+          id: request.id,
+          result: .object([
+            "schemaVersion": .string("arkdeck.job-acceptance/1"),
+            "jobId": .string(acceptance.jobID),
+            "deduplicated": .bool(acceptance.deduplicated),
+            "newDispatchCount": .integer(0),
+          ]))
+      case "job.run":
+        guard Set(fields.keys) == ["jobId"],
+          case .string(let jobID)? = fields["jobId"],
+          AgentExecutionIntent.validIdentifier(jobID)
+        else {
+          return structuredFailure(
+            "invalidInput", "job.run requires one exact bounded Job identity",
+            provesZeroNewDispatch: true)
+        }
+        let status = try await engine.runForTargetControl(jobID: jobID)
+        return success(id: request.id, result: try RuntimeJobReadProjection.status(status))
+      default:
+        return failure(id: request.id, code: .unknownMethod, message: "unknown Job lifecycle method")
+      }
+    } catch let error as AgentExecutionControlFailure {
+      let provenCodes: Set<String> = [
+        "invalidInput", "inputTooLarge", "idempotencyConflict", "reviewedPlanMismatch",
+        "resourceConflict", "resourceNotFound", "operationUnavailable", "admissionDenied",
+        "bindingRevisionStale", "factsDrifted",
+      ]
+      let ownerProvesZero =
+        error.details["phase"] == .string("preAdmission")
+        && error.details["newDispatchCount"] == .integer(0)
+      return structuredFailure(
+        error.code, error.message,
+        provesZeroNewDispatch:
+          ownerProvesZero
+          || (request.method != "job.run" && provenCodes.contains(error.code)),
+        inheritedDetails: error.details)
+    } catch let error as RuntimeJobEngineError {
+      switch error {
+      case .rejected(let code, let message):
+        let mapped: String
+        switch code {
+        case .invalidRequest, .invalidInput, .governanceFieldRejected:
+          mapped = "invalidInput"
+        case .requestTooLarge:
+          mapped = "inputTooLarge"
+        case .unknownOperation, .unsupportedProfile, .unsupportedVersion:
+          mapped = "operationUnavailable"
+        case .targetNotFound:
+          mapped = "resourceNotFound"
+        case .authorizationRequired:
+          mapped = "admissionDenied"
+        case .conflict, .deviceBusyBySession:
+          mapped = "resourceConflict"
+        }
+        return structuredFailure(
+          mapped, message,
+          // Planning never dispatches. Submit rejections are raised before
+          // the durable admission point. A run-time rejection may have
+          // followed device work and therefore carries no such proof.
+          provesZeroNewDispatch: request.method != "job.run")
+      case .idempotencyConflict(let message):
+        return structuredFailure(
+          "idempotencyConflict", message, provesZeroNewDispatch: true)
+      case .jobNotFound:
+        return structuredFailure(
+          "resourceNotFound", "the referenced Job does not exist",
+          provesZeroNewDispatch: request.method != "job.run")
+      case .jobRecordUnreadable:
+        return structuredFailure(
+          "recordUnreadable", "the referenced Job record is unreadable",
+          provesZeroNewDispatch: request.method != "job.run")
+      case .jobNotRunnable(let message):
+        return structuredFailure(
+          "resourceConflict", message, provesZeroNewDispatch: true)
+      case .internalFailure:
+        return structuredFailure(
+          "internalError", "the Runtime could not complete the Job lifecycle request",
+          provesZeroNewDispatch: request.method == "job.plan")
+      }
+    } catch {
+      return structuredFailure(
+        "internalError", "the Runtime could not complete the Job lifecycle request",
+        provesZeroNewDispatch: request.method == "job.plan")
+    }
+  }
+
+  private static func targetJobPlanProjection(
+    _ preview: RuntimePlanOnlyPreview
+  ) -> JSONValue {
+    .object([
+      "schemaVersion": .string("arkdeck.job-plan/1"),
+      "executionMode": .string(preview.executionMode),
+      "operation": .string(preview.operationReference),
+      "targetId": .string(preview.targetID),
+      "bindingRevision": preview.bindingRevision.map { .integer(Int64($0)) } ?? .null,
+      "stableIdentitySha256": preview.stableIdentitySHA256.map(JSONValue.string) ?? .null,
+      "providerId": .string(preview.providerID),
+      "catalogDigest": .string(preview.catalogDigest),
+      "requestFingerprintSha256": .string(preview.requestFingerprintSHA256),
+      "materializedPlanDigest": .string(preview.materializedPlanDigest),
+      "inputs": .object(preview.inputs),
+      "steps": .array(
+        preview.steps.map { step in
+          .object([
+            "stepId": .string(step.stepID), "kind": .string(step.kind),
+            "effect": .string(step.effect), "cancellation": .string(step.cancellation),
+            "binding": .string(step.binding), "optional": .bool(step.isOptional),
+          ])
+        }),
+      "effectiveEffect": .string(preview.effectiveEffect),
+      "authorizationPolicy": preview.authorizationPolicy.map(JSONValue.string) ?? .null,
+      "providerAdmissionBlocker": preview.providerAdmissionBlocker.map(JSONValue.string) ?? .null,
+      "jobAdmitted": .bool(preview.jobAdmitted),
+      "dispatchDisposition": .string(preview.dispatchDisposition),
+    ])
   }
 
   /// Which reply an Artifact-store failure deserves.

@@ -3182,7 +3182,15 @@ params))
     switch subcommand {
     case "plan":
       let planJSON = try operationRequestJSON(rest, subcommand: "job plan")
-      session.emit(try session.request("job.plan", ["requestJson": .string(planJSON)]))
+      let legacy = session.rendering == .legacyJSON
+      if legacy {
+        try prepareLegacyJobSession(&session, rest: rest, method: "job.plan")
+      } else {
+        try prepareTargetJobSession(&session, rest: rest, method: "job.plan")
+      }
+      let result = try session.request("job.plan", ["requestJson": .string(planJSON)])
+      if !legacy { try CLIJobLifecycleValidation.validatePlan(result, session: session) }
+      session.emit(result)
     case "list":
       // One shape, always. This used to call `job.list` (a bare array) when no
       // flags were given and `job.list-page` (a page object) when any were, so
@@ -3235,7 +3243,17 @@ params))
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job run requires --job <id>")
       }
+      let legacy = session.rendering == .legacyJSON
+      if legacy {
+        try prepareLegacyJobSession(&session, rest: rest, method: "job.run")
+      } else {
+        try prepareTargetJobSession(&session, rest: rest, method: "job.run")
+      }
       let runResponse = try session.request("job.run", ["jobId": .string(rest[index + 1])])
+      if !legacy {
+        _ = try CLIJobReadValidation.validate(
+          runResponse, verb: "status", jobID: rest[index + 1], options: [:], session: session)
+      }
       session.emit(runResponse)
       if let terminal = terminalJobExit(runResponse) {
         throw CLIError(exitCode: terminal.code, message: terminal.reason)
@@ -3285,7 +3303,22 @@ params))
             + "retried safely; pass one to make a repeat return the same job")
       }
       let requestJSON = try operationRequestJSON(rest, subcommand: "job submit")
+      let legacy = rest.contains("--wait") || session.rendering == .legacyJSON
+      if legacy {
+        try prepareLegacyJobSession(&session, rest: rest, method: "job.submit")
+      }
+      if rest.contains("--wait") {
+        session.lifecycle = .deprecated
+        session.replacementArgvPattern =
+          "job submit ...; job run --job <id>; job wait --job <id>"
+        session.warnIfLegacy()
+      } else if !legacy {
+        try prepareTargetJobSession(&session, rest: rest, method: "job.submit")
+      }
       let submitted = try session.request("job.submit", ["requestJson": .string(requestJSON)])
+      if !legacy {
+        try CLIJobLifecycleValidation.validateAcceptance(submitted, session: session)
+      }
       // §8.1 allows exactly one document on machine stdout. This compound used
       // to print the acceptance and then the wait result, so a caller parsing
       // stdout got two JSON documents back to back and, in practice, read the
@@ -3304,6 +3337,38 @@ params))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported job subcommand")
     }
+  }
+
+  private static func prepareTargetJobSession(
+    _ session: inout CLIRuntimeSession, rest: [String], method: String
+  ) throws {
+    try applyJobClientDeadline(&session, rest: rest, defaultTimeout: "30s")
+    try session.negotiate(requiredMajor: 2, forMethod: method)
+  }
+
+  private static func prepareLegacyJobSession(
+    _ session: inout CLIRuntimeSession, rest: [String], method: String
+  ) throws {
+    guard !rest.contains("--require-protocol") else {
+      let suffix = rest.contains("--wait")
+        ? "; submit, run and wait explicitly" : "; use --output json for the target shape"
+      throw session.fail(
+        .invalidOption,
+        "\(method) legacy compatibility cannot be combined with --require-protocol 2\(suffix)")
+    }
+    try applyJobClientDeadline(&session, rest: rest, defaultTimeout: nil)
+  }
+
+  private static func applyJobClientDeadline(
+    _ session: inout CLIRuntimeSession, rest: [String], defaultTimeout: String?
+  ) throws {
+    let options = try CLIOptions(rest.filter { $0 != "--wait" })
+    guard let timeout = options.value("--timeout") ?? defaultTimeout else { return }
+    guard let duration = CLIDuration.parse(timeout, maximumMilliseconds: 86_400_000) else {
+      throw session.fail(.invalidInput, "timeout must be a bounded duration")
+    }
+    session.client = session.client.bounded(
+      by: try AgentClientWaitDeadline(milliseconds: duration.milliseconds))
   }
 
   /// Protected destructive Flash recovery only. Ordinary Agent debugging is

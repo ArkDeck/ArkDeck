@@ -341,7 +341,18 @@ final class CLIArgumentParserContractTests: XCTestCase {
       XCTAssertNotNil(success(["job", verb, "--job", "J-1", "--require-protocol", "2"]))
       XCTAssertEqual(failure(["job", verb, "--job", "J-1", "--require-protocol", "1"])?.code, .invalidOption)
     }
-    XCTAssertEqual(failure(["job", "run", "--job", "J-1", "--require-protocol", "2"])?.code, .invalidOption)
+    XCTAssertNotNil(success(["job", "run", "--job", "J-1", "--require-protocol", "2"]))
+    for verb in ["plan", "submit"] {
+      XCTAssertNotNil(success([
+        "job", verb, "--target", "T-1", "--operation", "observe.device@1",
+        "--require-protocol", "2",
+      ]))
+      XCTAssertEqual(
+        failure([
+          "job", verb, "--target", "T-1", "--operation", "observe.device@1",
+          "--require-protocol", "1",
+        ])?.code, .invalidOption)
+    }
     XCTAssertEqual(
       failure(["runtime", "health", "--require-protocol", "2", "--require-protocol", "1"])?.code,
       .invalidOption)
