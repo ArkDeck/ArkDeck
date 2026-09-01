@@ -1223,7 +1223,7 @@ enum CLICommandRegistry {
 
   private static let targetlessTraceNode = CLINodeSpec(
     token: "trace",
-    summary: "trace capability observation, capture and Artifact access",
+    summary: "trace capability observation, capture, Artifact access, and derived-cache maintenance",
     leaves: [
       CLILeafSpec(
         token: "probe",
@@ -1258,6 +1258,25 @@ enum CLICommandRegistry {
           waitTimeoutOption, targetProtocolOption,
         ]),
         connectsToRuntime: true)
+    ],
+    groups: [
+      CLINodeSpec(
+        token: "cache",
+        summary: "inspect or purge Runtime-owned derived Trace databases",
+        leaves: [
+          CLILeafSpec(
+            token: "status",
+            canonicalCommand: "trace.cache.status",
+            summary: "read bounded cache inventory without exposing filesystem paths",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "purge",
+            canonicalCommand: "trace.cache.purge",
+            summary: "remove inactive lease-free derived databases; preserve trace Artifacts",
+            options: runtimeClientOptions([]),
+            connectsToRuntime: true),
+        ])
     ])
 
   /// Shared by `job plan` and `job submit`: either a complete request document

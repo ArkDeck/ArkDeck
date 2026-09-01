@@ -1608,7 +1608,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | Storage/support bundle | 不止是 App 配置/导出组合：存储被切成两个互不相交的根——App 拥有、用户可选的 Session 输出根（`SessionSettings` 的 quota/margin/retention 只作用于它），与 daemon 拥有、自带 quota/保留期的 Runtime artifact store。macOS 上前者的 owner 是各进程自己的 `UserDefaults.standard`，sandboxed App 与非 sandbox CLI 因此读到不同记录与不同默认根；且 App Sandbox 把 daemon state directory 放在容器之外，App 进程内无法计量 artifact store | typed storage/support resource，先建立 Runtime 拥有的单一 owner，再分域投影；`blocked` → `local` | C |
 | Device display name | App 在 UserDefaults 保存 candidate/target 显示名，不改 identity | `device/target display-name`；`blocked` → `local` | C |
 | History saved filter | Runtime 拥有单例 generation-CAS query preset，App/CLI 共用；旧 AppStorage 仅作一次性迁移输入 | `history filter list/save/delete`；`local` | C |
-| Trace derived-cache purge | App controller 可回收 inactive derived DB，不是 Runtime evidence 删除 | `trace cache status/purge`；`blocked` → `local` | C |
+| Trace derived-cache purge | Runtime 以固定 App container cache root 持有 lease-aware typed owner；App/CLI 共用，且不投影路径或删除原始 Trace Artifact | `trace cache status/purge`；`local`；实现见 `cli-trace-cache.md` | C |
 | Source/update | remote source 和 consumer auto-update 是 App/平台服务；maintainer feed 已另有 CLI | typed source 与 consumer update lifecycle；`blocked` → `local` | C |
 | Offline inspector | UI dump inspect/hit-test 与 diagnostics inspect/preview/export 已由 App/CLI 共用 typed owner，校验 exact operation、Artifact role/size/SHA-256 并发布 versioned machine schema；Trace inspect 尚无稳定 schema/owner boundary，因此整体仍为 `blocked` | versioned Trace local derivation service；`blocked` → `local` | C |
 | App icon/menu/shortcut | 只改变 App 呈现和导航 | `presentation`；不需要 CLI leaf | — |

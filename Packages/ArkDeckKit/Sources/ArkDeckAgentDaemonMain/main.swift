@@ -9,6 +9,7 @@ import ArkDeckAgentDaemon
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
+import ArkDeckTraceAdapter
 import ArkDeckWorkflows
 import Darwin
 import Foundation
@@ -165,6 +166,37 @@ struct RefusingDispatcher: RuntimeProcessDispatching {
 
   func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
     throw RuntimeDispatchFailure.failed(reason)
+  }
+}
+
+/// Product bridge from ArkTrace's path-fixed maintenance actor into the
+/// Runtime control resource. The bridge only maps value types; it cannot add a
+/// path, bypass a lease or select an original trace Artifact.
+struct ProductTraceCacheMaintenance: RuntimeTraceCacheMaintaining {
+  let service: ArkDeckTraceCacheMaintenanceService
+
+  func inventory() async throws -> RuntimeTraceCacheInventory {
+    let value = try await service.inventory()
+    return RuntimeTraceCacheInventory(
+      entryCount: value.entryCount,
+      totalByteCount: value.totalByteCount,
+      activeEntryCount: value.activeEntryCount)
+  }
+
+  func purgeUnused() async throws -> RuntimeTraceCachePurgeReport {
+    let value = try await service.purgeUnused()
+    func inventory(_ source: ArkDeckTraceCacheInventory) -> RuntimeTraceCacheInventory {
+      RuntimeTraceCacheInventory(
+        entryCount: source.entryCount,
+        totalByteCount: source.totalByteCount,
+        activeEntryCount: source.activeEntryCount)
+    }
+    return RuntimeTraceCachePurgeReport(
+      before: inventory(value.before), after: inventory(value.after),
+      recoveredPrivateDirectoryCount: value.recoveredPrivateDirectoryCount,
+      removedOrphanOwnerMarkerCount: value.removedOrphanOwnerMarkerCount,
+      removedEntryCount: value.removedEntryCount,
+      skippedActiveEntryCount: value.skippedActiveEntryCount)
   }
 }
 
@@ -923,6 +955,14 @@ Task.detached {
       }
     }
     let historyFilterStore = RuntimeHistoryFilterStore(rootURL: resolvedStateDirectory)
+    let traceCacheDirectory =
+      resolvedStateDirectory.standardizedFileURL == defaultStateDirectory.standardizedFileURL
+      ? ArkDeckTraceConfiguration.appContainerCachesDirectory()
+      : resolvedStateDirectory.appending(
+        path: "app-container-caches", directoryHint: .isDirectory)
+    let traceCacheMaintenance = ProductTraceCacheMaintenance(
+      service: try ArkDeckTraceCacheMaintenanceService(
+        cachesDirectory: traceCacheDirectory))
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,
@@ -939,6 +979,7 @@ Task.detached {
       hdcControlActions: hdcControlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
+      traceCacheMaintenance: traceCacheMaintenance,
       flashBundleImportDirectory: resolvedStateDirectory.appending(
         path:
           "flash-bundle-imports", directoryHint: .isDirectory),

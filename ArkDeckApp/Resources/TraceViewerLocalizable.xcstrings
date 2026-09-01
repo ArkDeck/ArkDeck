@@ -2253,6 +2253,23 @@
         }
       }
     },
+    "Removed {count} unused entries.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed {count} unused entries."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已清理 {count} 个未使用条目。"
+          }
+        }
+      }
+    },
     "ArkTrace only purges inactive derived databases. Original trace files are never cache targets.": {
       "extractionState": "manual",
       "localizations": {

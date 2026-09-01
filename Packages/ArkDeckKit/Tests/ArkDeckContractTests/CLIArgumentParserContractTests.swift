@@ -1361,6 +1361,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ["operation", "list"], ["operation", "describe", "--operation", "observe.device@1"],
       ["device", "list"], ["device", "show"], ["device", "adopt", "--candidate", "K"],
       ["trace", "probe", "--target", "T-1"],
+      ["trace", "cache", "status"], ["trace", "cache", "purge"],
       ["job", "plan", "--request-file", "r.json"],
       ["job", "submit", "--target", "T-1", "--operation", "observe.device@1", "--wait"],
       ["job", "status", "--job", "J-1"], ["job", "list"],

@@ -215,6 +215,26 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
       .runtimeUnavailable)
   }
 
+  func testTraceCacheOwnerPreservesStatusAndUnknownPurgeOutcomes() {
+    let evidence = CLIControlFailureEvidence(phase: "traceCacheOwner", newDispatchCount: 0)
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forWireCode: "recordUnreadable", method: "trace.cache.status", evidence: evidence),
+      .recordUnreadable)
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forWireCode: "outcomeUnknown", method: "trace.cache.purge", evidence: evidence),
+      .outcomeUnknown)
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forTransportFailure: .lostResponse, method: "trace.cache.status"),
+      .runtimeUnavailable)
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forTransportFailure: .lostResponse, method: "trace.cache.purge"),
+      .outcomeUnknown)
+  }
+
   func testLegacyInternalErrorKeepsItsCodeOnlyWhenNothingCouldHaveHappened() {
     XCTAssertEqual(
       CLIControlFailureMapper.code(forWireCode: "internalError", method: "job.status"),

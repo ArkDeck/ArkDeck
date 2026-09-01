@@ -158,7 +158,9 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
   static func admission(of frame: Data) -> Admission? {
     guard
       let request = try? JSONDecoder().decode(AgentWireProtocol.Request.self, from: frame),
-      request.protocolVersion == AgentWireProtocol.version
+      ArkDeckAgentXPC.supportedWireProtocolExactVersions.contains(request.protocolVersion),
+      request.protocolVersion != ArkDeckControlProtocol.targetVersion
+        || ArkDeckControlProtocol.targetMethods.contains(request.method)
     else { return nil }
 
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
@@ -167,6 +169,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       || ArkDeckAgentXPC.forwardableNativeLibraryImportMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableRockchipBindingMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableHistoryFilterMethods.contains(request.method)
+      || ArkDeckAgentXPC.forwardableTraceCacheMethods.contains(request.method)
     {
       return .direct(method: request.method)
     }

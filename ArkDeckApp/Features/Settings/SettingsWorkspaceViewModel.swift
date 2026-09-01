@@ -219,6 +219,60 @@ final class SettingsWorkspaceViewModel {
   }
 }
 
+/// Presentation state for Runtime-owned Trace cache maintenance. The model
+/// sees only typed inventory/report values: no cache path, database handle or
+/// original trace Artifact enters the App process.
+@MainActor
+@Observable
+final class TraceCacheSettingsViewModel {
+  private(set) var inventory: RuntimeTraceCacheInventory?
+  private(set) var lastPurgeReport: RuntimeTraceCachePurgeReport?
+  private(set) var isBusy = false
+  private(set) var failureMessage: String?
+
+  private let provider: any RuntimeTraceCacheApplicationProviding
+
+  init(
+    provider: any RuntimeTraceCacheApplicationProviding =
+      RuntimeTraceCacheApplicationFacade.make()
+  ) {
+    self.provider = provider
+  }
+
+  func refresh() async {
+    guard !isBusy else { return }
+    isBusy = true
+    failureMessage = nil
+    defer { isBusy = false }
+    switch await provider.loadTraceCache() {
+    case .loaded(let inventory):
+      self.inventory = inventory
+    case .failed(let reason):
+      failureMessage = reason
+    }
+  }
+
+  func purgeUnused() async {
+    guard !isBusy else { return }
+    isBusy = true
+    failureMessage = nil
+    defer { isBusy = false }
+    switch await provider.purgeUnusedTraceCache() {
+    case .completed(let report):
+      lastPurgeReport = report
+      inventory = report.after
+    case .failed(let reason):
+      // The request may have completed before the reply was lost. Never send
+      // another mutation automatically; reconcile through the read-only
+      // status resource and leave the original uncertainty visible.
+      failureMessage = reason
+      if case .loaded(let current) = await provider.loadTraceCache() {
+        inventory = current
+      }
+    }
+  }
+}
+
 func settingsText(_ key: String) -> String {
   NSLocalizedString(
     key,

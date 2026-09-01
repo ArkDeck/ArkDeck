@@ -57,11 +57,13 @@ enum RuntimeXPCRequestTransport {
   static func request(
     method: String,
     params: [String: JSONValue]? = nil,
-    timeoutSeconds: TimeInterval? = nil
+    timeoutSeconds: TimeInterval? = nil,
+    protocolVersion: String = ArkDeckAgentXPC.wireProtocolVersion
   ) async -> ResultValue {
     let frame: Data
     do {
-      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
+      frame = try ArkDeckAgentXPC.requestFrame(
+        method: method, params: params, protocolVersion: protocolVersion)
     } catch {
       return .failure(.compose)
     }

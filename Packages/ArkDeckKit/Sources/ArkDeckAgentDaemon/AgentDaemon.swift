@@ -101,6 +101,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
   private let artifactStore: RuntimeArtifactStore?
   private let historyFilterStore: RuntimeHistoryFilterStore?
+  private let traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
@@ -142,6 +143,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
+    traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
@@ -165,6 +167,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       hdcControlActions: hdcControlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
+      traceCacheMaintenance: traceCacheMaintenance,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
@@ -194,6 +197,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
+    traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -221,6 +225,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.hdcControlActions = hdcControlActions
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
+    self.traceCacheMaintenance = traceCacheMaintenance
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.flashLanePlanPreviewer = flashLanePlanPreviewer
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
@@ -2053,6 +2058,47 @@ public struct RuntimeControlPlaneHandler: Sendable {
             ]))
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "trace.cache.status", "trace.cache.purge":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(
+          id: request.id, code: .unsupportedProtocolVersion,
+          message: "Trace cache resources require the target control protocol")
+      }
+      guard request.params?.isEmpty != false else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "Trace cache status and purge accept no parameters")
+      }
+      guard let traceCacheMaintenance else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Trace cache maintenance is not configured")
+      }
+      do {
+        if request.method == "trace.cache.status" {
+          return success(
+            id: request.id,
+            result: try await traceCacheMaintenance.inventory().statusProjection)
+        }
+        return success(
+          id: request.id,
+          result: try await traceCacheMaintenance.purgeUnused().projection)
+      } catch {
+        let code = request.method == "trace.cache.status" ? "recordUnreadable" : "outcomeUnknown"
+        let message = request.method == "trace.cache.status"
+          ? "Trace cache inventory is unavailable"
+          : "Trace cache purge outcome is unknown; read status before requesting another purge"
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: code, message: message,
+            details: [
+              "phase": .string("traceCacheOwner"),
+              "newDispatchCount": .integer(0),
+              "purgeScope": .string("inactiveDerivedDatabases"),
+            ]))
       }
 
     case "device.display-name.set", "device.display-name.clear":

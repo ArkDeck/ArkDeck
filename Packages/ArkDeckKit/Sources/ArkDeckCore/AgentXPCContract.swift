@@ -84,12 +84,16 @@ package enum ArkDeckAgentXPC {
   package static func requestFrame(
     method: String,
     params: [String: JSONValue]? = nil,
-    requestID: String = UUID().uuidString
+    requestID: String = UUID().uuidString,
+    protocolVersion: String = wireProtocolVersion
   ) throws -> Data {
+    guard supportedWireProtocolExactVersions.contains(protocolVersion) else {
+      throw RequestFrameFailure.unsupportedProtocolVersion
+    }
     let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(
       RequestFrame(
-        protocolVersion: wireProtocolVersion,
+        protocolVersion: protocolVersion,
         id: requestID,
         method: method,
         params: params))
@@ -132,6 +136,7 @@ package enum ArkDeckAgentXPC {
     "operation.list",
     "runtime.hdc-status",
     "target.list",
+    "trace.cache.status",
     "trace.probe",
   ]
 
@@ -184,6 +189,13 @@ package enum ArkDeckAgentXPC {
     "history.filter.save",
   ]
 
+  /// Trace cache maintenance is a local, lease-aware mutation over derived
+  /// databases only. Runtime fixes the cache root at composition time; the App
+  /// cannot supply a path or ask this method to remove original trace Artifacts.
+  package static let forwardableTraceCacheMethods: Set<String> = [
+    "trace.cache.purge"
+  ]
+
   /// These names are generic in the daemon protocol. The XPC endpoint must
   /// additionally prove one of the closed App-owned typed requests and bind
   /// the returned Job identifier before forwarding run or cancel.
@@ -200,6 +212,7 @@ package enum ArkDeckAgentXPC {
     .union(forwardableNativeLibraryImportMethods)
     .union(forwardableRockchipBindingMethods)
     .union(forwardableHistoryFilterMethods)
+    .union(forwardableTraceCacheMethods)
     .union(gatedAppJobMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.
@@ -208,6 +221,10 @@ package enum ArkDeckAgentXPC {
   package enum RefusalReason: String, Sendable {
     case malformedRequestFrame
     case methodNotAllowlisted
+  }
+
+  private enum RequestFrameFailure: Error {
+    case unsupportedProtocolVersion
   }
 
   private struct RequestFrame: Encodable {
