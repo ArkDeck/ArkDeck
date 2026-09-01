@@ -99,15 +99,28 @@ final class JobReadResourcesContractTests: XCTestCase {
     process.arguments =
       args + ["--socket", try XCTUnwrap(server).socketURL.path] + outputArguments
     let output = root.appending(path: "stdout-\(UUID()).json")
+    let errors = root.appending(path: "stderr-\(UUID()).txt")
     FileManager.default.createFile(atPath: output.path, contents: nil)
+    FileManager.default.createFile(atPath: errors.path, contents: nil)
     let handle = try FileHandle(forWritingTo: output)
-    process.standardOutput = handle; process.standardError = FileHandle.nullDevice
+    let errorHandle = try FileHandle(forWritingTo: errors)
+    process.standardOutput = handle; process.standardError = errorHandle
     try process.run()
     let end = Date().addingTimeInterval(20)
     while process.isRunning && Date() < end { Thread.sleep(forTimeInterval: 0.01) }
     if process.isRunning { process.terminate(); throw FixtureError.missing }
     try handle.close()
-    return (process.terminationStatus, try object(CLIStrictJSON.decode(Data(contentsOf: output))))
+    try errorHandle.close()
+    let stdout = try Data(contentsOf: output)
+    let stderr = try Data(contentsOf: errors)
+    do {
+      return (process.terminationStatus, try object(CLIStrictJSON.decode(stdout)))
+    } catch {
+      XCTFail(
+        "CLI exited \(process.terminationStatus); stdout=\(String(decoding: stdout, as: UTF8.self)); "
+          + "stderr=\(String(decoding: stderr, as: UTF8.self))")
+      throw error
+    }
   }
   private func publishRequired(_ id: String, target: String = "TGT-fixture", size: Int = 20) async throws -> [RuntimeArtifactMetadata] {
     let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "observe.device@1"))
@@ -224,6 +237,81 @@ final class JobReadResourcesContractTests: XCTestCase {
     let evidence = try object(XCTUnwrap(fields["evidence"]))
     XCTAssertEqual(evidence["status"], .string("verified"))
     XCTAssertEqual(dispatcher.dispatchCount, dispatches)
+  }
+
+  func testWorkspaceContinuationRunsThroughRealCLIAndUDSAndAProcessRetryDoesNotRedispatch()
+    async throws
+  {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let clock = self.clock
+    let observations = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() },
+      nowUTC: { RuntimeAgentTime.format(clock.now()) })
+    let owner = try RuntimeAgentExecutionCoordinator(
+      directory: root.appending(path: "continuation-executions"),
+      engine: engine, targets: targets, observations: observations,
+      now: { clock.now() })
+    let source = try object(await owner.run([
+      "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+      "executionId": .string("continuation-source-execution"),
+      "operation": .string("observe.device@1"),
+      "inputs": .object([:]),
+      "maximumWaitMilliseconds": .string("30000"),
+    ]))
+    let sourceJobID = try XCTUnwrap(CLIJobEventPage.string(source["jobId"]))
+    var sourceFinished = false
+    for _ in 0..<400 {
+      if try await engine.status(jobID: sourceJobID).state == "succeeded" {
+        sourceFinished = true
+        break
+      }
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    XCTAssertTrue(sourceFinished)
+    try startServer()
+
+    let inspectEnvelope = try cli([
+      "workspace", "continuation", "inspect", "--source-job", sourceJobID,
+      "--require-protocol", "2",
+    ])
+    XCTAssertEqual(inspectEnvelope.0, 0, "\(inspectEnvelope.1)")
+    XCTAssertEqual(inspectEnvelope.1["ok"], .bool(true), "\(inspectEnvelope.1)")
+    let inspected = try object(XCTUnwrap(inspectEnvelope.1["result"]))
+    XCTAssertEqual(inspected["schemaVersion"], .string("arkdeck.workspace-continuation/1"))
+    XCTAssertEqual(inspected["sourceJobId"], .string(sourceJobID))
+    XCTAssertEqual(inspected["operation"], .string("observe.device@1"))
+    XCTAssertEqual(inspected["effectiveEffect"], .string("readOnly"))
+    XCTAssertEqual(inspected["jobId"], .null)
+    XCTAssertEqual(inspected["dispatched"], .bool(false))
+
+    let dispatchesBeforeContinuation = dispatcher.dispatchCount
+    let continuationID = "continuation-cli-uds-001"
+    let firstEnvelope = try cli([
+      "workspace", "continuation", "run", "--source-job", sourceJobID,
+      "--continuation-request-id", continuationID, "--require-protocol", "2",
+    ])
+    XCTAssertEqual(firstEnvelope.0, 0, "\(firstEnvelope.1)")
+    XCTAssertEqual(firstEnvelope.1["ok"], .bool(true), "\(firstEnvelope.1)")
+    let first = try object(XCTUnwrap(firstEnvelope.1["result"]))
+    XCTAssertEqual(first["continuationRequestId"], .string(continuationID))
+    XCTAssertEqual(first["deduplicated"], .bool(false))
+    XCTAssertEqual(first["dispatched"], .bool(true))
+    let continuationJobID = try XCTUnwrap(CLIJobEventPage.string(first["jobId"]))
+    XCTAssertNotEqual(continuationJobID, sourceJobID)
+    XCTAssertGreaterThan(dispatcher.dispatchCount, dispatchesBeforeContinuation)
+    let dispatchesAfterFirstRun = dispatcher.dispatchCount
+
+    let retryEnvelope = try cli([
+      "workspace", "continuation", "run", "--source-job", sourceJobID,
+      "--continuation-request-id", continuationID, "--require-protocol", "2",
+    ])
+    XCTAssertEqual(retryEnvelope.0, 0, "\(retryEnvelope.1)")
+    XCTAssertEqual(retryEnvelope.1["ok"], .bool(true), "\(retryEnvelope.1)")
+    let retry = try object(XCTUnwrap(retryEnvelope.1["result"]))
+    XCTAssertEqual(retry["jobId"], .string(continuationJobID))
+    XCTAssertEqual(retry["deduplicated"], .bool(true))
+    XCTAssertEqual(retry["dispatched"], .bool(false))
+    XCTAssertEqual(dispatcher.dispatchCount, dispatchesAfterFirstRun)
   }
 
   func testFixedJobSnapshotUsesTimeThenASCIIIdentityAndSurvivesUpdatesAndRestart() async throws {
