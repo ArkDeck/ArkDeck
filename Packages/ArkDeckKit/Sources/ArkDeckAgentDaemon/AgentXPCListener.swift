@@ -270,6 +270,17 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       return true
     }
     switch request.method {
+    case "session.cleanup.preview":
+      return fields.isEmpty
+    case "session.cleanup.apply":
+      guard Set(fields.keys) == ["previewId", "previewDigest"],
+        case .string(let previewID)? = fields["previewId"],
+        let uuid = UUID(uuidString: previewID),
+        uuid.uuidString.lowercased() == previewID,
+        case .string(let previewDigest)? = fields["previewDigest"],
+        SHA256Hex.isLowercaseSHA256(previewDigest)
+      else { return false }
+      return true
     case "session.list":
       guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else { return false }
       if let value = fields["pageSize"] {

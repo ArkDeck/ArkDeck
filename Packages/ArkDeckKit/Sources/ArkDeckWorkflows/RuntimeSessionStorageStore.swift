@@ -89,13 +89,21 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
   private static let documentName = "session-storage.json"
   private static let lockName = ".session-storage.lock"
   private static let sessionSnapshotDirectoryName = "session-resource-snapshots"
+  private static let cleanupPreviewDirectoryName = "session-cleanup-previews"
   private static let maximumDocumentBytes = 64 * 1_024
   private static let maximumRootPathBytes = 4 * 1_024
 
   private let ownerRoot: URL
   private let defaultSessionsRoot: URL
+  private let clock: @Sendable () -> Date
+  private let retentionController: SessionRetentionController
 
-  package init(ownerRoot: URL, defaultSessionsRoot: URL) throws {
+  package init(
+    ownerRoot: URL,
+    defaultSessionsRoot: URL,
+    clock: @escaping @Sendable () -> Date = { Date() },
+    retentionController: SessionRetentionController = SessionRetentionController()
+  ) throws {
     let normalizedOwner = ownerRoot.standardizedFileURL
     try Self.requireOwnerDirectory(normalizedOwner)
     // Resolve aliases only after the fixed default exists. Foundation cannot
@@ -105,6 +113,8 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     try Self.ensureDirectory(defaultSessionsRoot)
     self.ownerRoot = try Self.canonicalRoot(normalizedOwner)
     self.defaultSessionsRoot = try Self.canonicalRoot(defaultSessionsRoot)
+    self.clock = clock
+    self.retentionController = retentionController
     try requireDisjointFromOwner(self.defaultSessionsRoot)
   }
 
@@ -253,6 +263,293 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     }
   }
 
+  package func previewSessionCleanup(
+    activeSessionIDs: Set<String>
+  ) throws -> JSONValue {
+    guard activeSessionIDs.allSatisfy(AgentExecutionIntent.validIdentifier) else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Runtime active Session inventory is malformed")
+    }
+    return try withLockedDocument { _, document in
+      let snapshot = try sessionCatalog(document)
+      _ = try sessionRows(snapshot)
+      let createdAt = clock()
+      guard createdAt.timeIntervalSince1970.isFinite else {
+        throw RuntimeSessionStorageFailure(
+          "operationUnavailable", "Runtime clock is unavailable")
+      }
+      let expiresAt = createdAt.addingTimeInterval(10 * 60)
+      let previewID = UUID().uuidString.lowercased()
+      let projection = try cleanupPreviewProjection(
+        previewID: previewID, createdAt: createdAt, expiresAt: expiresAt,
+        document: document, snapshot: snapshot,
+        activeSessionIDs: activeSessionIDs)
+      guard case .object(let fields) = projection,
+        case .string(let digest)? = fields["previewDigest"],
+        case .string(let expiry)? = fields["expiresAtUtc"]
+      else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session cleanup preview projection is malformed")
+      }
+      let store = try cleanupRecordStore()
+      try store.create(
+        previewID: previewID, previewDigest: digest,
+        expiresAtUTC: expiry, preview: projection, now: createdAt)
+      return projection
+    }
+  }
+
+  package func applySessionCleanup(
+    previewID: String,
+    previewDigest: String,
+    activeSessionIDs: Set<String>
+  ) throws -> JSONValue {
+    guard let uuid = UUID(uuidString: previewID),
+      uuid.uuidString.lowercased() == previewID,
+      SHA256Hex.isLowercaseSHA256(previewDigest),
+      activeSessionIDs.allSatisfy(AgentExecutionIntent.validIdentifier)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session cleanup apply requires an exact preview tuple")
+    }
+    return try withLockedDocument { _, document in
+      let store = try cleanupRecordStore()
+      var record = try store.load(previewID)
+      guard record.previewDigest == previewDigest else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session cleanup preview digest does not match")
+      }
+      if record.state == .applied, record.result != .null { return record.result }
+      guard record.state == .ready else {
+        throw RuntimeSessionStorageFailure(
+          "outcomeUnknown", "Session cleanup may already have changed storage")
+      }
+      guard case .object(let stored) = record.preview,
+        case .string(let createdText)? = stored["createdAtUtc"],
+        case .string(let expiresText)? = stored["expiresAtUtc"],
+        let createdAt = ISO8601Timestamps.parseCanonicalPlain(createdText),
+        let expiresAt = ISO8601Timestamps.parseCanonicalPlain(expiresText),
+        expiresAt > clock()
+      else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session cleanup preview expired")
+      }
+      let snapshot = try sessionCatalog(document)
+      _ = try sessionRows(snapshot)
+      let current = try cleanupPreviewProjection(
+        previewID: previewID, createdAt: createdAt, expiresAt: expiresAt,
+        document: document, snapshot: snapshot,
+        activeSessionIDs: activeSessionIDs)
+      guard current == record.preview else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session cleanup facts changed after preview")
+      }
+      let plan = try retentionPlan(
+        snapshot, policy: document.policy,
+        activeSessionIDs: activeSessionIDs, now: createdAt)
+      record = try store.markApplying(record)
+      do {
+        let root = try activeRoot(document, createDefaultIfMissing: true)
+        let catalog = try SessionRetentionCatalog(sessionsRoot: root)
+        let after = try catalog.applyRetention(
+          plan, expectedSnapshot: snapshot,
+          retentionDays: document.policy.retentionDays,
+          policyGeneration: document.generation,
+          controller: retentionController)
+        let result = try cleanupResult(
+          previewID: previewID, previewDigest: previewDigest,
+          before: snapshot, after: after, plan: plan)
+        _ = try store.markApplied(record, result: result)
+        return result
+      } catch SessionRetentionCatalogError.staleSnapshot {
+        _ = try store.restoreReady(record)
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session cleanup facts changed before apply")
+      } catch {
+        throw RuntimeSessionStorageFailure(
+          "outcomeUnknown", "Session cleanup outcome requires inspection")
+      }
+    }
+  }
+
+  private func cleanupResult(
+    previewID: String,
+    previewDigest: String,
+    before: SessionRetentionCatalogSnapshot,
+    after: SessionRetentionCatalogSnapshot,
+    plan: SessionRetentionPlan
+  ) throws -> JSONValue {
+    _ = try sessionRows(after)
+    guard let beforeGeneration = before.catalogGeneration,
+      let afterGeneration = after.catalogGeneration
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session cleanup result generation is unavailable")
+    }
+    let removed = Set(plan.deletionSessionIDs)
+    let removedArtifacts = before.artifactsBySession
+      .filter { removed.contains($0.key) }
+      .flatMap { sessionID, artifacts in
+        artifacts.map { (sessionID, $0) }
+      }
+      .sorted {
+        ($0.0, $0.1.artifactID) < ($1.0, $1.1.artifactID)
+      }
+      .map { sessionID, artifact in
+        JSONValue.object([
+          "sessionId": .string(sessionID),
+          "artifactId": .string(artifact.artifactID),
+          "artifactDigest": .string(artifact.sha256),
+        ])
+      }
+    let reclaimed = before.sessions
+      .filter { removed.contains($0.sessionID) }
+      .reduce(UInt64(0)) { partial, session in
+        let sum = partial.addingReportingOverflow(session.sizeBytes)
+        return sum.overflow ? UInt64.max : sum.partialValue
+      }
+    return .object([
+      "schemaVersion": .string("arkdeck.session-cleanup-result/1"),
+      "previewId": .string(previewID),
+      "previewDigest": .string(previewDigest),
+      "generation": .string(String(beforeGeneration)),
+      "resultGeneration": .string(String(afterGeneration)),
+      "appliedAtUtc": .string(ISO8601Timestamps.string(from: clock())),
+      "removedSessionIds": .array(plan.deletionSessionIDs.sorted().map(JSONValue.string)),
+      "removedArtifacts": .array(removedArtifacts),
+      "reclaimedBytes": .string(String(reclaimed)),
+      "remainingBytes": .string(String(after.currentBytes)),
+      "newDispatchCount": .integer(0),
+    ])
+  }
+
+  private func cleanupRecordStore() throws -> RuntimeSessionCleanupRecordStore {
+    try RuntimeSessionCleanupRecordStore(
+      directory: ownerRoot.appending(
+        path: Self.cleanupPreviewDirectoryName, directoryHint: .isDirectory))
+  }
+
+  private func retentionPlan(
+    _ snapshot: SessionRetentionCatalogSnapshot,
+    policy: RuntimeSessionStoragePolicy,
+    activeSessionIDs: Set<String>,
+    now: Date
+  ) throws -> SessionRetentionPlan {
+    let planning = try snapshot.sessions.map { session -> RetainedSession in
+      guard activeSessionIDs.contains(session.sessionID), !session.isPinned else {
+        return session
+      }
+      return try RetainedSession(
+        sessionID: session.sessionID, root: session.root,
+        sizeBytes: session.sizeBytes, completedAt: session.completedAt,
+        expiresAt: session.expiresAt, isPinned: true)
+    }
+    return retentionController.plan(
+      sessions: planning,
+      totalQuotaBytes: policy.totalQuotaBytes,
+      safetyMarginBytes: policy.safetyMarginBytes,
+      now: now)
+  }
+
+  private func cleanupPreviewProjection(
+    previewID: String,
+    createdAt: Date,
+    expiresAt: Date,
+    document: Document,
+    snapshot: SessionRetentionCatalogSnapshot,
+    activeSessionIDs: Set<String>
+  ) throws -> JSONValue {
+    guard let generation = snapshot.catalogGeneration,
+      generation <= UInt64(Int64.max),
+      document.generation <= UInt64(Int64.max)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session cleanup generation is unavailable")
+    }
+    let plan = try retentionPlan(
+      snapshot, policy: document.policy,
+      activeSessionIDs: activeSessionIDs, now: createdAt)
+    let deleting = Set(plan.deletionSessionIDs)
+    let entries = Dictionary(uniqueKeysWithValues: snapshot.entries.map { ($0.sessionID, $0) })
+    var reclaimBytes: UInt64 = 0
+    let sessions: [JSONValue] = try snapshot.sessions
+      .sorted { $0.sessionID < $1.sessionID }
+      .map { session in
+        guard let entry = entries[session.sessionID],
+          let sessionExpiry = session.expiresAt,
+          entry.expiresAt == sessionExpiry,
+          entry.isPinned == session.isPinned,
+          let artifacts = snapshot.artifactsBySession[session.sessionID]
+        else {
+          throw RuntimeSessionStorageFailure(
+            "recordUnreadable", "Session cleanup inventory is inconsistent")
+        }
+        let active = activeSessionIDs.contains(session.sessionID)
+        let remove = deleting.contains(session.sessionID)
+        if remove {
+          let sum = reclaimBytes.addingReportingOverflow(session.sizeBytes)
+          guard !sum.overflow else {
+            throw RuntimeSessionStorageFailure(
+              "recordUnreadable", "Session cleanup byte total overflowed")
+          }
+          reclaimBytes = sum.partialValue
+        }
+        let reason: String
+        if active {
+          reason = "activeLease"
+        } else if session.isPinned {
+          reason = "pinned"
+        } else if remove, sessionExpiry <= createdAt {
+          reason = "expiredQuotaPressure"
+        } else if remove {
+          reason = "quotaPressure"
+        } else {
+          reason = "withinSafetyTarget"
+        }
+        let artifactValues = artifacts.map { artifact in
+          JSONValue.object([
+            "artifactId": .string(artifact.artifactID),
+            "artifactDigest": .string(artifact.sha256),
+            "byteCount": .string(String(artifact.byteCount)),
+            "role": .string(artifact.role),
+            "privacy": .string(
+              ["raw", "partial"].contains(artifact.role) ? "sensitive" : "unknown"),
+          ])
+        }
+        return .object([
+          "sessionId": .string(session.sessionID),
+          "disposition": .string(remove ? "reclaim" : "retain"),
+          "reason": .string(reason),
+          "sizeBytes": .string(String(session.sizeBytes)),
+          "expiresAtUtc": .string(ISO8601Timestamps.string(from: sessionExpiry)),
+          "pinned": .bool(session.isPinned),
+          "activeLease": .bool(active),
+          "artifacts": .array(artifactValues),
+        ])
+      }
+    var fields: [String: JSONValue] = [
+      "schemaVersion": .string("arkdeck.session-cleanup-preview/1"),
+      "previewId": .string(previewID),
+      "digestAlgorithm": .string("sha256-jcs"),
+      "generation": .string(String(generation)),
+      "policyGeneration": .string(String(document.generation)),
+      "createdAtUtc": .string(ISO8601Timestamps.string(from: createdAt)),
+      "expiresAtUtc": .string(ISO8601Timestamps.string(from: expiresAt)),
+      "confirmationRequired": .bool(true),
+      "currentBytes": .string(String(snapshot.currentBytes)),
+      "projectedBytes": .string(String(plan.projectedBytes)),
+      "safetyTargetBytes": .string(String(plan.safetyTargetBytes)),
+      "reclaimBytes": .string(String(reclaimBytes)),
+      "blocksNewHeavyWriters": .bool(plan.blocksNewHeavyWriters),
+      "sessions": .array(sessions),
+      "newDispatchCount": .integer(0),
+    ]
+    let digest = SHA256Hex.string(
+      of: try PortableCanonicalJSON.canonicalBytes(.object(fields)))
+    fields["previewDigest"] = .string(digest)
+    return .object(fields)
+  }
+
   private struct SessionRow {
     let sessionID: String
     let completedAt: Date
@@ -332,7 +629,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     _ failure: SessionRetentionCatalogError
   ) -> RuntimeSessionStorageFailure {
     switch failure {
-    case .staleGeneration:
+    case .staleGeneration, .staleSnapshot:
       return RuntimeSessionStorageFailure(
         "resourceConflict", "Session catalog generation changed")
     case .unknownSession:

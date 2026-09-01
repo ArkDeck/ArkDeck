@@ -5183,6 +5183,20 @@ public actor RuntimeJobEngine {
     return !state.isTerminal
   }
 
+  /// Session retention treats every nonterminal or outcome-unknown Runtime
+  /// Job as an active lease. The Session identifier is returned without any
+  /// filesystem path and is re-read for both preview and apply.
+  package func activeSessionIDsForRetention() -> Set<String> {
+    Set(jobs.values.compactMap { runtime in
+      let record = runtime.record
+      if record.outcomeUnknown { return record.sessionID }
+      guard let state = JobState(rawValue: record.state), state.isTerminal else {
+        return record.sessionID
+      }
+      return nil
+    })
+  }
+
   /// Reads one compact history page from SQLite. Current work that may sit
   /// outside this page is exposed separately by `listCurrentJobs()`; both
   /// views use the same typed status model and opaque cursor contract.

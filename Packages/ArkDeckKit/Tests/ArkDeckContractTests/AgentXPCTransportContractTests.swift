@@ -175,7 +175,8 @@ final class AgentXPCTransportContractTests: XCTestCase {
       "Settings may mutate only the generation-bound Runtime storage resource")
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableSessionMethods,
-      ["session.list", "session.pin", "session.show", "session.unpin"],
+      ["session.cleanup.apply", "session.cleanup.preview", "session.list", "session.pin",
+        "session.show", "session.unpin"],
       "Session access must remain on the closed Runtime catalog owner")
     XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
@@ -245,6 +246,29 @@ final class AgentXPCTransportContractTests: XCTestCase {
           method: method, params: params, requestID: "session-contract",
           protocolVersion: ArkDeckControlProtocol.targetVersion))
     }
+
+    XCTAssertEqual(
+      try admission("session.cleanup.preview"),
+      .direct(method: "session.cleanup.preview"))
+    XCTAssertNil(
+      try admission("session.cleanup.preview", ["confirm": .bool(true)]))
+    let cleanupID = "abcdefab-cdef-4abc-8abc-abcdefabcdef"
+    let cleanupDigest = String(repeating: "a", count: 64)
+    XCTAssertEqual(
+      try admission("session.cleanup.apply", [
+        "previewId": .string(cleanupID), "previewDigest": .string(cleanupDigest),
+      ]),
+      .direct(method: "session.cleanup.apply"))
+    XCTAssertNil(
+      try admission("session.cleanup.apply", [
+        "previewId": .string(cleanupID.uppercased()),
+        "previewDigest": .string(cleanupDigest),
+      ]))
+    XCTAssertNil(
+      try admission("session.cleanup.apply", [
+        "previewId": .string(cleanupID), "previewDigest": .string(cleanupDigest),
+        "confirmation": .string("yes"),
+      ]))
 
     XCTAssertEqual(try admission("session.list"), .direct(method: "session.list"))
     XCTAssertEqual(

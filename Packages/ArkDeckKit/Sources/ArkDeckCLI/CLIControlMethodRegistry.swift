@@ -136,6 +136,8 @@ enum CLIControlMethodRegistry {
     "history.filter.save",
     "runtime.storage.policy",
     "runtime.storage.root",
+    "session.cleanup.apply",
+    "session.cleanup.preview",
     "session.pin",
     "session.unpin",
     "workspace.project.register",
@@ -277,7 +279,8 @@ enum CLIControlFailureMapper {
       ["invalidInput", "resourceConflict", "operationUnavailable", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
-    if ["session.list", "session.show", "session.pin", "session.unpin"].contains(method),
+    if ["session.list", "session.show", "session.pin", "session.unpin",
+        "session.cleanup.preview", "session.cleanup.apply"].contains(method),
       evidence.phase == "sessionOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "invalidCursor", "resourceConflict", "resourceNotFound",
         "operationUnavailable", "inputTooLarge", "recordUnreadable", "quotaExceeded",

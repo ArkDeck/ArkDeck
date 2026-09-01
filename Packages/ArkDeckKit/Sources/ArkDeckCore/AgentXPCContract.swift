@@ -209,6 +209,8 @@ package enum ArkDeckAgentXPC {
   /// Inputs are closed at the XPC boundary: callers can name only one Session,
   /// a bounded opaque page cursor, or the exact catalog generation they read.
   package static let forwardableSessionMethods: Set<String> = [
+    "session.cleanup.apply",
+    "session.cleanup.preview",
     "session.list",
     "session.pin",
     "session.show",

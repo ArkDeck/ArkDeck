@@ -171,6 +171,37 @@ final class SessionResourceContractTests: XCTestCase {
     XCTAssertEqual(unpinned.exitCode, 0, diagnostic(unpinned))
     XCTAssertEqual(try result(unpinned)["generation"], .string("2"))
     XCTAssertEqual(try result(unpinned)["pinned"], .bool(false))
+
+    _ = try sessions.updatePolicy(
+      RuntimeSessionStoragePolicy(
+        totalQuotaBytes: 1_024, safetyMarginBytes: 1_023, retentionDays: 1),
+      expectedGeneration: 1)
+    let previewRun = try await run([
+      "session", "cleanup", "preview", "--socket", server.socketURL.path,
+      "--output", "json",
+    ])
+    XCTAssertEqual(previewRun.exitCode, 0, diagnostic(previewRun))
+    let preview = try result(previewRun)
+    XCTAssertEqual(preview["schemaVersion"], .string("arkdeck.session-cleanup-preview/1"))
+    guard case .string(let previewID)? = preview["previewId"],
+      case .string(let previewDigest)? = preview["previewDigest"]
+    else { return XCTFail("cleanup preview tuple is missing") }
+    let applyArguments = [
+      "session", "cleanup", "apply", "--preview-id", previewID,
+      "--preview-digest", previewDigest, "--socket", server.socketURL.path,
+      "--output", "json",
+    ]
+    let applied = try await run(applyArguments)
+    XCTAssertEqual(applied.exitCode, 0, diagnostic(applied))
+    let cleanupResult = try result(applied)
+    XCTAssertEqual(cleanupResult["schemaVersion"], .string("arkdeck.session-cleanup-result/1"))
+    XCTAssertEqual(cleanupResult["removedSessionIds"], .array([.string("session-cli")]))
+    let receiptRetry = try await run(applyArguments)
+    XCTAssertEqual(receiptRetry.exitCode, 0, diagnostic(receiptRetry))
+    XCTAssertEqual(try result(receiptRetry), cleanupResult)
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: sessionsRoot.appending(path: "2026/08/session-cli").path))
     let jobs = try await engine.listJobs()
     XCTAssertTrue(jobs.isEmpty)
   }
@@ -197,6 +228,20 @@ final class SessionResourceContractTests: XCTestCase {
         "session", "pin", "--session", "session-1", "--expected-generation", "0",
         "--root", "/tmp",
       ]).failure)
+    XCTAssertNotNil(CLIArgumentParser.parse(["session", "cleanup", "preview"]).success)
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "cleanup", "apply",
+        "--preview-id", "abcdefab-cdef-4abc-8abc-abcdefabcdef",
+        "--preview-digest", String(repeating: "a", count: 64),
+      ]).success)
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "cleanup", "apply",
+        "--preview-id", "abcdefab-cdef-4abc-8abc-abcdefabcdef",
+        "--preview-digest", String(repeating: "A", count: 64),
+      ]).failure)
+    XCTAssertNotNil(CLIArgumentParser.parse(["session", "cleanup", "confirm"]).failure)
   }
 
   func testUnaccountedContentCannotBeHiddenByAPartialSessionList() throws {

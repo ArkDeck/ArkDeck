@@ -7,6 +7,7 @@ import Foundation
 /// token or catalog generation; no local path crosses this boundary.
 struct RuntimeSessionResourceHandler {
   let storage: RuntimeSessionStorageStore?
+  let activeSessionIDs: @Sendable () async -> Set<String>
 
   func response(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
     func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
@@ -31,6 +32,24 @@ struct RuntimeSessionResourceHandler {
       let fields = request.params ?? [:]
       let result: JSONValue
       switch request.method {
+      case "session.cleanup.preview":
+        guard fields.isEmpty else {
+          return failed("invalidInput", "Session cleanup preview accepts no caller facts")
+        }
+        result = try storage.previewSessionCleanup(
+          activeSessionIDs: await activeSessionIDs())
+
+      case "session.cleanup.apply":
+        guard Set(fields.keys) == ["previewId", "previewDigest"],
+          case .string(let previewID)? = fields["previewId"],
+          case .string(let previewDigest)? = fields["previewDigest"]
+        else {
+          return failed("invalidInput", "Session cleanup apply requires one preview tuple")
+        }
+        result = try storage.applySessionCleanup(
+          previewID: previewID, previewDigest: previewDigest,
+          activeSessionIDs: await activeSessionIDs())
+
       case "session.list":
         guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else {
           return failed("invalidInput", "Session list options are closed")
@@ -85,6 +104,7 @@ struct RuntimeSessionResourceHandler {
       return failed(failure.code, failure.message)
     } catch {
       let mutation = request.method == "session.pin" || request.method == "session.unpin"
+        || request.method == "session.cleanup.apply"
       return failed(
         mutation ? "outcomeUnknown" : "recordUnreadable",
         mutation

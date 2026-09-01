@@ -377,8 +377,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return await RuntimeStorageResourceHandler(
         sessions: runtimeSessionStorage, artifacts: artifactStore
       ).response(request)
-    case "session.list", "session.show", "session.pin", "session.unpin":
-      return await RuntimeSessionResourceHandler(storage: runtimeSessionStorage)
+    case "session.list", "session.show", "session.pin", "session.unpin", "session.cleanup.preview", "session.cleanup.apply":
+      return await RuntimeSessionResourceHandler(
+        storage: runtimeSessionStorage,
+        activeSessionIDs: { await engine.activeSessionIDsForRetention() })
         .response(request)
     case "runtime.hdc.status":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {

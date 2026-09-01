@@ -1705,6 +1705,37 @@ enum CLICommandRegistry {
           targetProtocolOption,
         ]),
         connectsToRuntime: true),
+    ],
+    groups: [
+      CLINodeSpec(
+        token: "cleanup",
+        summary: "generation-bound Runtime Session retention",
+        leaves: [
+          CLILeafSpec(
+            token: "preview",
+            canonicalCommand: "session.cleanup.preview",
+            summary: "persist the exact Sessions and Artifacts eligible for retention cleanup",
+            options: runtimeClientOptions([targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "apply",
+            canonicalCommand: "session.cleanup.apply",
+            summary: "apply one unexpired cleanup preview without a separate confirmation token",
+            options: runtimeClientOptions([
+              CLIOptionSpec(
+                name: "--preview-id",
+                form: .value(placeholder: "id", grammar: .opaque),
+                summary: "exact immutable cleanup preview identity",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--preview-digest",
+                form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+                summary: "exact canonical cleanup preview digest",
+                isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+        ]),
     ])
 
   private static let historyNode = CLINodeSpec(

@@ -60,6 +60,8 @@
     "runtime.storage.root",
     "runtime.storage.status",
     "runtime.tool.select",
+    "session.cleanup.apply",
+    "session.cleanup.preview",
     "session.list",
     "session.pin",
     "session.show",
