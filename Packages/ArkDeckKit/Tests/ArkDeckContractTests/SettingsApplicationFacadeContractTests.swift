@@ -112,6 +112,36 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
 /// These tests hold the two roots apart: each figure is reported under its own
 /// name, and neither is defaulted to zero when it is simply not known.
 final class SettingsStorageDomainContractTests: XCTestCase {
+  func testLegacyPolicyMigratesOnlyIntoAnUntouchedRuntimeOwner() async throws {
+    let fixture = try StorageDomainFixture(label: "migration")
+    defer { fixture.cleanup() }
+    let legacy = try fixture.runtime.settingsStore.savePolicy(
+      totalQuotaBytes: 9_000, safetyMarginBytes: 1_000, retentionDays: 30,
+      expectedGeneration: 0)
+    let untouched = SettingsStoragePresentation(
+      generation: 1, rootPath: fixture.defaultRoot.path, usesCustomRoot: false,
+      totalQuotaBytes: RuntimeSessionStorageStore.defaultPolicy.totalQuotaBytes,
+      safetyMarginBytes: RuntimeSessionStorageStore.defaultPolicy.safetyMarginBytes,
+      retentionDays: RuntimeSessionStorageStore.defaultPolicy.retentionDays,
+      runtimeArtifacts: nil, sessionRoot: nil)
+
+    let plan = try XCTUnwrap(
+      SettingsLegacyStorageMigrationPlan(legacy: legacy, current: untouched))
+    XCTAssertNil(plan.rootPath)
+    XCTAssertEqual(
+      plan.policy,
+      RuntimeSessionStoragePolicy(
+        totalQuotaBytes: 9_000, safetyMarginBytes: 1_000, retentionDays: 30))
+
+    let alreadyOwned = SettingsStoragePresentation(
+      generation: 2, rootPath: untouched.rootPath, usesCustomRoot: false,
+      totalQuotaBytes: untouched.totalQuotaBytes,
+      safetyMarginBytes: untouched.safetyMarginBytes,
+      retentionDays: untouched.retentionDays,
+      runtimeArtifacts: nil, sessionRoot: nil)
+    XCTAssertNil(SettingsLegacyStorageMigrationPlan(legacy: legacy, current: alreadyOwned))
+  }
+
   func testRuntimeArtifactsAndSessionRootAreReportedAsDistinctDomains() async throws {
     let fixture = try StorageDomainFixture(label: "distinct")
     defer { fixture.cleanup() }
@@ -188,7 +218,9 @@ final class SettingsStorageDomainContractTests: XCTestCase {
         path: "ArkDeckApp/Features/Settings/SettingsRootView.swift"),
       encoding: .utf8)
 
-    XCTAssertTrue(facade.contains("method: \"artifact.quota\""))
+    XCTAssertTrue(facade.contains("method: \"runtime.storage.status\""))
+    XCTAssertTrue(facade.contains("ArkDeckControlProtocol.targetVersion"))
+    XCTAssertFalse(facade.contains("method: \"artifact.quota\""))
     XCTAssertTrue(view.contains("storage.runtimeArtifacts"))
     XCTAssertTrue(view.contains("sessionRoot.measuredBytes"))
     XCTAssertTrue(view.contains("settings.storage.runtimeUnavailable"))

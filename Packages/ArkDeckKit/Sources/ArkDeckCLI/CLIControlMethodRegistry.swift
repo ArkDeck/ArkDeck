@@ -43,6 +43,7 @@ enum CLIControlMethodRegistry {
     "doctor",
     "runtime.hdc-status",
     "runtime.hdc.status",
+    "runtime.storage.status",
     "operation.list",
     "operation.describe",
     "device.candidates",
@@ -131,6 +132,8 @@ enum CLIControlMethodRegistry {
     "target.display-name.set",
     "history.filter.delete",
     "history.filter.save",
+    "runtime.storage.policy",
+    "runtime.storage.root",
     "workspace.project.register",
     "workspace.project.update",
     "workspace.project.remove",
@@ -260,6 +263,11 @@ enum CLIControlFailureMapper {
     if ["history.filter.list", "history.filter.save", "history.filter.delete"].contains(method),
       evidence.phase == "historyFilterOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
+        "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["runtime.storage.status", "runtime.storage.policy", "runtime.storage.root"].contains(method),
+      evidence.phase == "runtimeStorageOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceConflict", "operationUnavailable", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     if ["workspace.project.list", "workspace.project.show", "workspace.project.register",

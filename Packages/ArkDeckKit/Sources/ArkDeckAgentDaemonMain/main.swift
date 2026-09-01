@@ -1269,6 +1269,10 @@ Task.detached {
       }
     }
     let historyFilterStore = RuntimeHistoryFilterStore(rootURL: resolvedStateDirectory)
+    let runtimeSessionStorage = try RuntimeSessionStorageStore(
+      ownerRoot: resolvedStateDirectory,
+      defaultSessionsRoot: rockchipRoot.appending(
+        path: "Sessions", directoryHint: .isDirectory))
     let traceCacheDirectory =
       resolvedStateDirectory.standardizedFileURL == defaultStateDirectory.standardizedFileURL
       ? ArkDeckTraceConfiguration.appContainerCachesDirectory()
@@ -1303,6 +1307,7 @@ Task.detached {
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
+      runtimeSessionStorage: runtimeSessionStorage,
       traceCacheMaintenance: traceCacheMaintenance,
       traceInspector: traceInspector,
       flashBundleImportDirectory: resolvedStateDirectory.appending(

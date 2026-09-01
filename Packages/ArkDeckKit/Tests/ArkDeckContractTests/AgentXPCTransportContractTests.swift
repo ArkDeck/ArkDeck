@@ -132,7 +132,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "flash.prerequisites",
         "history.filter.list",
         "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
-        "runtime.hdc-status", "target.list", "trace.probe",
+        "runtime.hdc-status", "runtime.storage.status", "target.list", "trace.probe",
         "trace.cache.status",
       ],
       "read-only surface drift is a control-plane decision")
@@ -170,6 +170,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ["trace.cache.purge"],
       "Trace may mutate only inactive derived databases through the fixed Runtime owner")
     XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableRuntimeStorageMethods,
+      ["runtime.storage.policy", "runtime.storage.root"],
+      "Settings may mutate only the generation-bound Runtime storage resource")
+    XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")
     for removed in ["task.cancel", "task.list", "task.pause", "task.reconcile", "task.submit"] {
@@ -177,6 +181,55 @@ final class AgentXPCTransportContractTests: XCTestCase {
         AgentXPCEndpoint.admission(of: frame(method: removed)), .direct(method: removed),
         "the in-process task plane was removed by CHG-2026-064; \(removed) must not forward")
     }
+  }
+
+  func testRuntimeStorageXPCFramesHaveClosedTypedParameters() throws {
+    func admission(
+      _ method: String, _ params: [String: JSONValue]? = nil
+    ) throws -> AgentXPCEndpoint.Admission? {
+      AgentXPCEndpoint.admission(
+        of: try ArkDeckAgentXPC.requestFrame(
+          method: method, params: params, requestID: "storage-contract",
+          protocolVersion: ArkDeckControlProtocol.targetVersion))
+    }
+
+    XCTAssertEqual(
+      try admission("runtime.storage.status"), .direct(method: "runtime.storage.status"))
+    XCTAssertNil(try admission("runtime.storage.status", ["path": .string("/tmp")]))
+    XCTAssertEqual(
+      try admission("runtime.storage.policy", [
+        "expectedGeneration": .string("1"),
+        "totalQuotaBytes": .string("10000"),
+        "safetyMarginBytes": .string("1000"),
+        "retentionDays": .string("7"),
+      ]),
+      .direct(method: "runtime.storage.policy"))
+    XCTAssertNil(
+      try admission("runtime.storage.policy", [
+        "expectedGeneration": .string("01"),
+        "totalQuotaBytes": .string("10000"),
+        "safetyMarginBytes": .string("1000"),
+        "retentionDays": .string("7"),
+      ]))
+    XCTAssertEqual(
+      try admission("runtime.storage.root", [
+        "expectedGeneration": .string("2"), "rootPath": .string("/tmp/sessions"),
+      ]),
+      .direct(method: "runtime.storage.root"))
+    XCTAssertEqual(
+      try admission("runtime.storage.root", [
+        "expectedGeneration": .string("2"), "resetToDefault": .bool(true),
+      ]),
+      .direct(method: "runtime.storage.root"))
+    XCTAssertNil(
+      try admission("runtime.storage.root", [
+        "expectedGeneration": .string("2"), "rootPath": .string("relative"),
+      ]))
+    XCTAssertNil(
+      try admission("runtime.storage.root", [
+        "expectedGeneration": .string("2"), "rootPath": .string("/tmp/sessions"),
+        "resetToDefault": .bool(true),
+      ]))
   }
 
   func testOnlyPublishedTypedAppSubmitsAndTheirJobShapeReachTheGate() throws {

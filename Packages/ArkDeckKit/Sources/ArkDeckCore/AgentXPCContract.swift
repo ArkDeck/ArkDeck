@@ -135,6 +135,7 @@ package enum ArkDeckAgentXPC {
     "job.status",
     "operation.list",
     "runtime.hdc-status",
+    "runtime.storage.status",
     "target.list",
     "trace.cache.status",
     "trace.probe",
@@ -196,6 +197,14 @@ package enum ArkDeckAgentXPC {
     "trace.cache.purge"
   ]
 
+  /// Session output configuration belongs to the daemon. These two methods
+  /// can only replace a generation-bound policy or validated local root; they
+  /// cannot dispatch a device operation or address the Artifact store.
+  package static let forwardableRuntimeStorageMethods: Set<String> = [
+    "runtime.storage.policy",
+    "runtime.storage.root",
+  ]
+
   /// These names are generic in the daemon protocol. The XPC endpoint must
   /// additionally prove one of the closed App-owned typed requests and bind
   /// the returned Job identifier before forwarding run or cancel.
@@ -213,6 +222,7 @@ package enum ArkDeckAgentXPC {
     .union(forwardableRockchipBindingMethods)
     .union(forwardableHistoryFilterMethods)
     .union(forwardableTraceCacheMethods)
+    .union(forwardableRuntimeStorageMethods)
     .union(gatedAppJobMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.

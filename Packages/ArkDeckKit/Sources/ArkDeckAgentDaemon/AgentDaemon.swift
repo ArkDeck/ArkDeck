@@ -103,6 +103,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let controlActions: RuntimeControlActionResourceCoordinator?
   private let artifactStore: RuntimeArtifactStore?
   private let historyFilterStore: RuntimeHistoryFilterStore?
+  private let runtimeSessionStorage: RuntimeSessionStorageStore?
   private let traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)?
   private let traceInspector: (any RuntimeTraceInspecting)?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
@@ -148,6 +149,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
+    runtimeSessionStorage: RuntimeSessionStorageStore? = nil,
     traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
     traceInspector: (any RuntimeTraceInspecting)? = nil,
     flashBundleImportDirectory: URL? = nil,
@@ -175,6 +177,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
+      runtimeSessionStorage: runtimeSessionStorage,
       traceCacheMaintenance: traceCacheMaintenance,
       traceInspector: traceInspector,
       flashBundleImportDirectory: flashBundleImportDirectory,
@@ -208,6 +211,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
+    runtimeSessionStorage: RuntimeSessionStorageStore? = nil,
     traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
     traceInspector: (any RuntimeTraceInspecting)? = nil,
     flashBundleImportDirectory: URL?,
@@ -239,6 +243,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.controlActions = controlActions
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
+    self.runtimeSessionStorage = runtimeSessionStorage
     self.traceCacheMaintenance = traceCacheMaintenance
     self.traceInspector = traceInspector
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
@@ -368,6 +373,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
     case "runtime.hdc.impact-preview", "runtime.hdc.restart", "runtime.tool.select", "control-action.list", "control-action.show", "control-action.reconcile":
       return await hdcControlActionRequest(request)
+    case "runtime.storage.status", "runtime.storage.policy", "runtime.storage.root":
+      return await RuntimeStorageResourceHandler(
+        sessions: runtimeSessionStorage, artifacts: artifactStore
+      ).response(request)
     case "runtime.hdc.status":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
         return failure(id: request.id, code: .unsupportedProtocolVersion, message: "live HDC status requires the target control protocol")

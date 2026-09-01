@@ -163,6 +163,15 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
         || ArkDeckControlProtocol.targetMethods.contains(request.method)
     else { return nil }
 
+    if request.method == "runtime.storage.status" {
+      guard request.params == nil || request.params?.isEmpty == true else { return nil }
+      return .direct(method: request.method)
+    }
+    if ArkDeckAgentXPC.forwardableRuntimeStorageMethods.contains(request.method) {
+      guard runtimeStorageParamsAreClosed(request) else { return nil }
+      return .direct(method: request.method)
+    }
+
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableHAPImportMethods.contains(request.method)
@@ -204,6 +213,39 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       return .appCancel(jobID: jobID)
     default:
       return nil
+    }
+  }
+
+  private static func runtimeStorageParamsAreClosed(
+    _ request: AgentWireProtocol.Request
+  ) -> Bool {
+    guard let fields = request.params else { return false }
+    func positive(_ key: String) -> Bool {
+      guard case .string(let text)? = fields[key], !text.isEmpty,
+        text.first != "0", text.utf8.allSatisfy({ (48...57).contains($0) }),
+        let value = UInt64(text), value <= UInt64(Int64.max)
+      else { return false }
+      return true
+    }
+    switch request.method {
+    case "runtime.storage.policy":
+      return Set(fields.keys) == [
+        "expectedGeneration", "totalQuotaBytes", "safetyMarginBytes", "retentionDays",
+      ] && [
+        "expectedGeneration", "totalQuotaBytes", "safetyMarginBytes", "retentionDays",
+      ].allSatisfy(positive)
+    case "runtime.storage.root":
+      guard positive("expectedGeneration") else { return false }
+      if Set(fields.keys) == ["expectedGeneration", "rootPath"] {
+        guard case .string(let path)? = fields["rootPath"] else { return false }
+        return !path.isEmpty && path.utf8.count <= 4 * 1_024
+          && path == path.trimmingCharacters(in: .whitespacesAndNewlines)
+          && path.hasPrefix("/")
+      }
+      return Set(fields.keys) == ["expectedGeneration", "resetToDefault"]
+        && fields["resetToDefault"] == .bool(true)
+    default:
+      return false
     }
   }
 
