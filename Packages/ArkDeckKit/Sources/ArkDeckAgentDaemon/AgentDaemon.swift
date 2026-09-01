@@ -880,6 +880,63 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "recovery.flash-invocation.list":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(
+          id: request.id, code: .unknownMethod,
+          message: "Flash invocation discovery requires protocol 2")
+      }
+      guard let debugInvocationController else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Runtime Flash invocation owner is not configured")
+      }
+      let params = request.params ?? [:]
+      guard Set(params.keys).isSubset(of: ["pageSize", "cursor"]) else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "Flash invocation list accepts only pageSize and cursor")
+      }
+      let pageSize: Int
+      if let value = params["pageSize"] {
+        guard case .integer(let number) = value, (1...1000).contains(number) else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "pageSize must be between 1 and 1000")
+        }
+        pageSize = Int(number)
+      } else {
+        pageSize = 100
+      }
+      let cursor: String?
+      if let value = params["cursor"] {
+        guard case .string(let text) = value, text.utf8.count <= 256 else {
+          return AgentWireProtocol.Response(
+            id: request.id, ok: false, result: nil,
+            error: .init(
+              code: "invalidCursor", message: "cursor must be a bounded opaque string",
+              details: [:]))
+        }
+        cursor = text
+      } else {
+        cursor = nil
+      }
+      do {
+        return success(
+          id: request.id,
+          result: try await debugInvocationController.list(
+            pageSize: pageSize, cursor: cursor))
+      } catch let error as AgentExecutionControlFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(code: error.code, message: error.message, details: [:]))
+      } catch let error as RuntimeDebugInvocationError {
+        return failure(
+          id: request.id, code: Self.debugInvocationErrorCode(error), message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "job.plan":
       guard case .string(let requestJson)? = request.params?["requestJson"] else {
         return failure(id: request.id, code: .invalidParams, message: "requestJson is required")

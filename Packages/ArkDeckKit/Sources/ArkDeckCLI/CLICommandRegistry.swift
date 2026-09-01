@@ -816,6 +816,12 @@ enum CLICommandRegistry {
         summary: "protected destructive Flash recovery decision documents",
         leaves: [
           CLILeafSpec(
+            token: "list",
+            canonicalCommand: "recovery.flash-invocation.list",
+            summary: "rediscover protected Flash recovery invocations from a fixed snapshot",
+            options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
             token: "start",
             canonicalCommand: "recovery.flash-invocation.start",
             summary: "create the closed recovery decision document",

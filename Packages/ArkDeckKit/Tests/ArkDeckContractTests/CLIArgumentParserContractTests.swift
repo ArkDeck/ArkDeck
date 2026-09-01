@@ -1254,6 +1254,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
     for argv in [
       ["recovery", "cleanup", "list"],
       ["recovery", "cleanup", "continue", "--job", "J-1", "--bundle", "b"],
+      ["recovery", "flash-invocation", "list", "--page-size", "100"],
       ["recovery", "flash-invocation", "start", "--request-file", "r.json"],
       ["recovery", "flash-invocation", "status", "--invocation", "I-1"],
       [
@@ -1273,6 +1274,9 @@ final class CLIArgumentParserContractTests: XCTestCase {
     // An incomplete nested path names itself, not just its last token.
     XCTAssertTrue(
       failure(["recovery", "cleanup"])?.message.contains("`recovery cleanup`") == true)
+    XCTAssertEqual(
+      failure(["recovery", "flash-invocation", "list", "--page-size", "0"])?.code,
+      .invalidOption)
   }
 
   /// The recovery evaluate leaf tightens the two digests the old spelling took
