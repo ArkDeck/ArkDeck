@@ -171,6 +171,10 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       guard runtimeStorageParamsAreClosed(request) else { return nil }
       return .direct(method: request.method)
     }
+    if ArkDeckAgentXPC.forwardableSessionMethods.contains(request.method) {
+      guard sessionParamsAreClosed(request) else { return nil }
+      return .direct(method: request.method)
+    }
 
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
@@ -244,6 +248,46 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       }
       return Set(fields.keys) == ["expectedGeneration", "resetToDefault"]
         && fields["resetToDefault"] == .bool(true)
+    default:
+      return false
+    }
+  }
+
+  private static func sessionParamsAreClosed(
+    _ request: AgentWireProtocol.Request
+  ) -> Bool {
+    let fields = request.params ?? [:]
+    func identifier(_ key: String) -> Bool {
+      guard case .string(let value)? = fields[key] else { return false }
+      return AgentExecutionIntent.validIdentifier(value)
+    }
+    func generation(_ key: String) -> Bool {
+      guard case .string(let text)? = fields[key], !text.isEmpty,
+        text.utf8.allSatisfy({ (48...57).contains($0) }),
+        text == "0" || text.first != "0",
+        let value = UInt64(text), value <= UInt64(Int64.max)
+      else { return false }
+      return true
+    }
+    switch request.method {
+    case "session.list":
+      guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else { return false }
+      if let value = fields["pageSize"] {
+        guard case .integer(let count) = value, (1...1_000).contains(count) else {
+          return false
+        }
+      }
+      if let value = fields["cursor"] {
+        guard case .string(let cursor) = value, !cursor.isEmpty,
+          cursor.utf8.count <= 2_048
+        else { return false }
+      }
+      return true
+    case "session.show":
+      return Set(fields.keys) == ["sessionId"] && identifier("sessionId")
+    case "session.pin", "session.unpin":
+      return Set(fields.keys) == ["sessionId", "expectedGeneration"]
+        && identifier("sessionId") && generation("expectedGeneration")
     default:
       return false
     }

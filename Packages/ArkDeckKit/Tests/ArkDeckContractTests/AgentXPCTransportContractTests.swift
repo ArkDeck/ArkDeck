@@ -174,6 +174,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ["runtime.storage.policy", "runtime.storage.root"],
       "Settings may mutate only the generation-bound Runtime storage resource")
     XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableSessionMethods,
+      ["session.list", "session.pin", "session.show", "session.unpin"],
+      "Session access must remain on the closed Runtime catalog owner")
+    XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")
     for removed in ["task.cancel", "task.list", "task.pause", "task.reconcile", "task.submit"] {
@@ -229,6 +233,48 @@ final class AgentXPCTransportContractTests: XCTestCase {
       try admission("runtime.storage.root", [
         "expectedGeneration": .string("2"), "rootPath": .string("/tmp/sessions"),
         "resetToDefault": .bool(true),
+      ]))
+  }
+
+  func testSessionXPCFramesHaveClosedTypedParameters() throws {
+    func admission(
+      _ method: String, _ params: [String: JSONValue]? = nil
+    ) throws -> AgentXPCEndpoint.Admission? {
+      AgentXPCEndpoint.admission(
+        of: try ArkDeckAgentXPC.requestFrame(
+          method: method, params: params, requestID: "session-contract",
+          protocolVersion: ArkDeckControlProtocol.targetVersion))
+    }
+
+    XCTAssertEqual(try admission("session.list"), .direct(method: "session.list"))
+    XCTAssertEqual(
+      try admission("session.list", [
+        "pageSize": .integer(10), "cursor": .string("opaque"),
+      ]),
+      .direct(method: "session.list"))
+    XCTAssertNil(try admission("session.list", ["pageSize": .integer(0)]))
+    XCTAssertEqual(
+      try admission("session.show", ["sessionId": .string("session-1")]),
+      .direct(method: "session.show"))
+    XCTAssertNil(try admission("session.show", ["sessionId": .string("../session")]))
+    XCTAssertEqual(
+      try admission("session.pin", [
+        "sessionId": .string("session-1"), "expectedGeneration": .string("0"),
+      ]),
+      .direct(method: "session.pin"))
+    XCTAssertEqual(
+      try admission("session.unpin", [
+        "sessionId": .string("session-1"), "expectedGeneration": .string("12"),
+      ]),
+      .direct(method: "session.unpin"))
+    XCTAssertNil(
+      try admission("session.pin", [
+        "sessionId": .string("session-1"), "expectedGeneration": .string("01"),
+      ]))
+    XCTAssertNil(
+      try admission("session.pin", [
+        "sessionId": .string("session-1"), "expectedGeneration": .string("0"),
+        "rootPath": .string("/tmp"),
       ]))
   }
 

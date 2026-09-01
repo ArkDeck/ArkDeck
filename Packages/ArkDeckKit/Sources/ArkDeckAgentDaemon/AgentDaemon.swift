@@ -377,6 +377,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return await RuntimeStorageResourceHandler(
         sessions: runtimeSessionStorage, artifacts: artifactStore
       ).response(request)
+    case "session.list", "session.show", "session.pin", "session.unpin":
+      return await RuntimeSessionResourceHandler(storage: runtimeSessionStorage)
+        .response(request)
     case "runtime.hdc.status":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
         return failure(id: request.id, code: .unsupportedProtocolVersion, message: "live HDC status requires the target control protocol")

@@ -88,6 +88,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
 
   private static let documentName = "session-storage.json"
   private static let lockName = ".session-storage.lock"
+  private static let sessionSnapshotDirectoryName = "session-resource-snapshots"
   private static let maximumDocumentBytes = 64 * 1_024
   private static let maximumRootPathBytes = 4 * 1_024
 
@@ -158,6 +159,192 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
       try Self.requireSafeWritableRoot(selected)
       document.rootKind = kind
       document.rootPath = selected.path
+    }
+  }
+
+  /// Returns one immutable, bounded page of Sessions from the Runtime-selected
+  /// root. The cursor names a private Runtime snapshot; it never exposes a
+  /// directory, catalog offset or App preference.
+  package func listSessions(pageSize: Int, cursor: String?) throws -> JSONValue {
+    let pager = try RuntimeSnapshotPager(
+      directory: ownerRoot.appending(
+        path: Self.sessionSnapshotDirectoryName, directoryHint: .isDirectory))
+    if cursor != nil {
+      return try pager.page(
+        method: "session.list", filters: [:],
+        order: "completedAtDescSessionIdAsc", pageSize: pageSize, cursor: cursor
+      ) {
+        // RuntimeSnapshotPager never evaluates this closure for a cursor. The
+        // stored page remains readable after the active root or policy moves.
+        []
+      }
+    }
+    return try withLockedDocument { _, document in
+      try pager.page(
+        method: "session.list", filters: [:],
+        order: "completedAtDescSessionIdAsc", pageSize: pageSize, cursor: nil
+      ) {
+        try sessionRows(sessionCatalog(document)).map(\.projection)
+      }
+    }
+  }
+
+  /// Reads one Session through the same catalog owner used by list and pin.
+  /// No Session directory or manifest path crosses the control protocol.
+  package func showSession(sessionID: String) throws -> JSONValue {
+    guard AgentExecutionIntent.validIdentifier(sessionID) else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "sessionId must be one bounded Runtime identifier")
+    }
+    return try withLockedDocument { _, document in
+      let snapshot = try sessionCatalog(document)
+      guard let row = try sessionRows(snapshot).first(where: { $0.sessionID == sessionID }) else {
+        throw RuntimeSessionStorageFailure(
+          "resourceNotFound", "Session is not present in the Runtime catalog")
+      }
+      return row.projection
+    }
+  }
+
+  /// Applies a generation-bound pin transition while holding the storage
+  /// configuration owner. A concurrent root or policy replacement therefore
+  /// cannot redirect this intent to another Session tree.
+  package func updateSessionPin(
+    sessionID: String,
+    isPinned: Bool,
+    expectedGeneration: UInt64
+  ) throws -> JSONValue {
+    guard AgentExecutionIntent.validIdentifier(sessionID),
+      expectedGeneration <= UInt64(Int64.max)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session pin requires a bounded identity and generation")
+    }
+    return try withLockedDocument { _, document in
+      let before = try sessionCatalog(document)
+      let beforeRows = try sessionRows(before)
+      guard before.catalogGeneration == expectedGeneration else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session catalog generation changed")
+      }
+      guard beforeRows.contains(where: { $0.sessionID == sessionID }) else {
+        throw RuntimeSessionStorageFailure(
+          "resourceNotFound", "Session is not present in the Runtime catalog")
+      }
+      let root = try activeRoot(document, createDefaultIfMissing: true)
+      let catalog = try SessionRetentionCatalog(sessionsRoot: root)
+      do {
+        _ = try catalog.updatePin(
+          sessionID: sessionID, isPinned: isPinned,
+          expectedGeneration: expectedGeneration)
+      } catch let failure as SessionRetentionCatalogError {
+        throw mapCatalogFailure(failure)
+      }
+      let after = try catalog.scan(
+        retentionDays: document.policy.retentionDays,
+        policyGeneration: document.generation)
+      guard let row = try sessionRows(after).first(where: { $0.sessionID == sessionID }),
+        row.isPinned == isPinned
+      else {
+        throw RuntimeSessionStorageFailure(
+          "outcomeUnknown", "Session pin publication cannot be read back exactly")
+      }
+      return row.projection
+    }
+  }
+
+  private struct SessionRow {
+    let sessionID: String
+    let completedAt: Date
+    let isPinned: Bool
+    let projection: JSONValue
+  }
+
+  private func sessionCatalog(
+    _ document: Document
+  ) throws -> SessionRetentionCatalogSnapshot {
+    let root = try activeRoot(document, createDefaultIfMissing: true)
+    do {
+      return try SessionRetentionCatalog(sessionsRoot: root).scan(
+        retentionDays: document.policy.retentionDays,
+        policyGeneration: document.generation)
+    } catch let failure as SessionRetentionCatalogError {
+      throw mapCatalogFailure(failure)
+    }
+  }
+
+  private func sessionRows(
+    _ snapshot: SessionRetentionCatalogSnapshot
+  ) throws -> [SessionRow] {
+    guard !snapshot.unknownPressure, snapshot.unknownSessionIDs.isEmpty else {
+      throw RuntimeSessionStorageFailure(
+        "operationUnavailable",
+        "Session catalog contains unaccounted content; inspect runtime storage status")
+    }
+    guard let generation = snapshot.catalogGeneration,
+      generation <= UInt64(Int64.max)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session catalog generation is unavailable")
+    }
+    let entries = Dictionary(grouping: snapshot.entries, by: \.sessionID)
+    guard snapshot.entries.count == snapshot.sessions.count,
+      Set(snapshot.entries.map(\.sessionID)) == Set(snapshot.sessions.map(\.sessionID))
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session catalog inventory is internally inconsistent")
+    }
+    var rows: [SessionRow] = []
+    for session in snapshot.sessions {
+      guard let matches = entries[session.sessionID], matches.count == 1,
+        let entry = matches.first,
+        entry.completedAt == session.completedAt,
+        entry.expiresAt == session.expiresAt,
+        entry.isPinned == session.isPinned,
+        let expiresAt = session.expiresAt
+      else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session catalog entry does not match measured content")
+      }
+      rows.append(
+        SessionRow(
+          sessionID: session.sessionID,
+          completedAt: session.completedAt,
+          isPinned: session.isPinned,
+          projection: .object([
+            "schemaVersion": .string("arkdeck.session/1"),
+            "sessionId": .string(session.sessionID),
+            "generation": .string(String(generation)),
+            "completedAtUtc": .string(ISO8601Timestamps.string(from: session.completedAt)),
+            "expiresAtUtc": .string(ISO8601Timestamps.string(from: expiresAt)),
+            "sizeBytes": .string(String(session.sizeBytes)),
+            "pinned": .bool(session.isPinned),
+            "policyGeneration": .string(String(entry.policyGeneration)),
+          ])))
+    }
+    return rows.sorted {
+      if $0.completedAt != $1.completedAt { return $0.completedAt > $1.completedAt }
+      return $0.sessionID.utf8.lexicographicallyPrecedes($1.sessionID.utf8)
+    }
+  }
+
+  private func mapCatalogFailure(
+    _ failure: SessionRetentionCatalogError
+  ) -> RuntimeSessionStorageFailure {
+    switch failure {
+    case .staleGeneration:
+      return RuntimeSessionStorageFailure(
+        "resourceConflict", "Session catalog generation changed")
+    case .unknownSession:
+      return RuntimeSessionStorageFailure(
+        "resourceNotFound", "Session is not present in the Runtime catalog")
+    case .generationOverflow:
+      return RuntimeSessionStorageFailure(
+        "resourceConflict", "Session catalog generation is exhausted")
+    case .invalidRoot, .invalidRetentionDays, .metadataUnavailable, .metadataCorrupt,
+      .unsafeSession:
+      return RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session catalog cannot be read safely")
     }
   }
 

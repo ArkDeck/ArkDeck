@@ -496,7 +496,7 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, historyNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
+    jobNode, sessionNode, historyNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
     flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
@@ -1653,6 +1653,59 @@ enum CLICommandRegistry {
     form: .value(placeholder: "positive-integer", grammar: .positiveInteger(1...Int.max)),
     summary: "exact generation returned by history filter list",
     isRequired: true)
+
+  private static let sessionCatalogGenerationOption = CLIOptionSpec(
+    name: "--expected-generation",
+    form: .value(placeholder: "non-negative-integer", grammar: .nonNegativeInteger(0...Int.max)),
+    summary: "exact Session catalog generation returned by list or show",
+    isRequired: true)
+
+  private static let sessionNode = CLINodeSpec(
+    token: "session",
+    summary: "Runtime-owned diagnostic Session resources",
+    leaves: [
+      CLILeafSpec(
+        token: "list",
+        canonicalCommand: "session.list",
+        summary: "read one immutable page of Sessions from the Runtime-selected root",
+        options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "show",
+        canonicalCommand: "session.show",
+        summary: "inspect one Session without exposing its private storage path",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "exact Session identity", isRequired: true),
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "pin",
+        canonicalCommand: "session.pin",
+        summary: "pin one Session using catalog generation compare-and-swap",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "exact Session identity", isRequired: true),
+          sessionCatalogGenerationOption,
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "unpin",
+        canonicalCommand: "session.unpin",
+        summary: "restore retention eligibility without deleting Session or Artifact data",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "exact Session identity", isRequired: true),
+          sessionCatalogGenerationOption,
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+    ])
 
   private static let historyNode = CLINodeSpec(
     token: "history",
