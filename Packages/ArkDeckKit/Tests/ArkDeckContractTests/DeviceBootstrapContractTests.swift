@@ -814,7 +814,9 @@ final class DeviceBootstrapContractTests: XCTestCase {
   }
 
   func testLegacyTargetRecordRemainsReadableWithoutCachedEvidenceFields() throws {
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: directory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
     let legacy = Data(
       """
       {
