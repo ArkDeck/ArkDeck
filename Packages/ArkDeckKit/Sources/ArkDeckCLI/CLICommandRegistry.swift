@@ -1223,7 +1223,7 @@ enum CLICommandRegistry {
 
   private static let targetlessTraceNode = CLINodeSpec(
     token: "trace",
-    summary: "trace capability observation and capture",
+    summary: "trace capability observation, capture and Artifact access",
     leaves: [
       CLILeafSpec(
         token: "probe",
@@ -1239,7 +1239,25 @@ enum CLICommandRegistry {
         connectsToRuntime: true),
       domainLeaf(
         "capture", "trace.capture", "capture.diagnostics@1",
-        "capture a bounded trace through the shared typed trace preset")
+        "capture a bounded trace through the shared typed trace preset"),
+      CLILeafSpec(
+        token: "export",
+        canonicalCommand: "trace.export",
+        summary: "export the exact raw trace Artifact through the Artifact policy",
+        options: runtimeClientOptions([
+          jobIDOption, requiredArtifactIDOption, allowSensitiveOption,
+          CLIOptionSpec(
+            name: "--destination",
+            form: .value(placeholder: "directory", grammar: .opaque),
+            summary: "existing host directory to write into",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--overwrite",
+            form: .flag,
+            summary: "replace only this exact exported trace file"),
+          waitTimeoutOption, targetProtocolOption,
+        ]),
+        connectsToRuntime: true)
     ])
 
   /// Shared by `job plan` and `job submit`: either a complete request document
