@@ -239,16 +239,7 @@ public enum DeviceControlFacade {
       target: DurableTargetReference(
         targetID: target.id, expectedBindingRevision: target.bindingRevision),
       operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
-      inputs: [
-        "durationSeconds": .integer(1),
-        "captureHilog": .bool(false),
-        "hilogFilters": .array([]),
-        "uiDump": .bool(false),
-        "crashLogs": .bool(false),
-        "uiScreenshot": .bool(true),
-        "uiComponentTree": .bool(false),
-        "redactionProfile": .string("standard"),
-      ],
+      inputs: try DiagnosticCapturePreset.screen(),
       requestedOutputs: [.rawArtifacts, .hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
         clientName: ArkDeckAgentClientName.deviceControl, targetID: target.id))

@@ -229,6 +229,29 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     XCTAssertEqual(error["code"] as? String, "invalidCommand")
   }
 
+  func testACapturePresetRejectsAnotherRecipeBeforeConnecting() throws {
+    let inputs = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-wrong-capture-preset-\(UUID().uuidString).json")
+    try Data(#"{"traceCategories":["sched"]}"#.utf8).write(to: inputs)
+    defer { try? FileManager.default.removeItem(at: inputs) }
+
+    let result = try run([
+      "screen", "capture",
+      "--inputs-file", inputs.path,
+      "--socket", "/nonexistent/arkdeck-golden.sock",
+      "--output", "json",
+    ])
+    XCTAssertEqual(result.exitCode, 65)
+    XCTAssertEqual(jsonDocumentCount(result.stdout), 1)
+    XCTAssertTrue(result.stderr.isEmpty, result.stderr)
+    let envelope = try decoded(result.stdout)
+    XCTAssertEqual(envelope["command"] as? String, "screen.capture")
+    let error = try XCTUnwrap(envelope["error"] as? [String: Any])
+    XCTAssertEqual(error["code"] as? String, "invalidInput")
+    XCTAssertTrue(
+      (error["message"] as? String)?.contains("does not accept input fields") == true)
+  }
+
   /// §12 fixes the shape of a removed token's answer, and an agent branches on
   /// these exact keys.
   func testARetiredCommandAnswersWithTheLifecycleContract() throws {

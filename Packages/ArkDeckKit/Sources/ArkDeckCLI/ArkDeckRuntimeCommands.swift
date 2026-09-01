@@ -1887,9 +1887,130 @@ enum RuntimeCLI {
     let session = runtimeSession(&rest, command: leaf.canonicalCommand)
     session.warnIfLegacy()
     let executor = AgentRuntimeExecutor(client: session.client, nowUTC: RuntimeCLI.utcNow)
-    let outcome = try executor.run(
-      try agentExecutionRequest(reference: reference, rest: rest))
+    let baseRequest = try agentExecutionRequest(reference: reference, rest: rest)
+    let request: RuntimeAgentExecutionRequest
+    do {
+      request = try capturePresetExecutionRequest(path: path, request: baseRequest)
+    } catch let failure as DiagnosticCapturePresetError {
+      throw session.fail(.invalidInput, failure.reason)
+    }
+    let outcome = try executor.run(request)
     try emitAgentOutcome(outcome, session: session)
+  }
+
+  /// Applies only the fixed, product-owned projections whose convenience
+  /// names promise more than a plain alias. Generic Agent/Job calls and every
+  /// other domain command keep the caller's descriptor-validated inputs.
+  static func capturePresetExecutionRequest(
+    path: [String],
+    request: RuntimeAgentExecutionRequest
+  ) throws -> RuntimeAgentExecutionRequest {
+    let inputs: [String: JSONValue]
+    switch path {
+    case ["screen", "capture"]:
+      try requireOnly(request.inputs, keys: ["screenshotImageType"], command: path)
+      inputs = try DiagnosticCapturePreset.screen(
+        imageType: try optionalString("screenshotImageType", in: request.inputs))
+    case ["ui-dump", "capture"]:
+      try requireOnly(request.inputs, keys: [], command: path)
+      inputs = DiagnosticCapturePreset.uiDump()
+    case ["ui-dump", "component-detail"]:
+      try requireOnly(
+        request.inputs, keys: ["windowId", "componentId"], command: path)
+      inputs = try DiagnosticCapturePreset.componentDetail(
+        windowID: try requiredString("windowId", in: request.inputs),
+        componentID: try requiredString("componentId", in: request.inputs))
+    case ["trace", "capture"]:
+      try requireOnly(
+        request.inputs,
+        keys: ["durationSeconds", "traceCategories", "traceBufferKB", "ringBuffered"],
+        command: path)
+      inputs = try DiagnosticCapturePreset.trace(
+        durationSeconds: try requiredInt("durationSeconds", in: request.inputs),
+        categories: try requiredStrings("traceCategories", in: request.inputs),
+        bufferKB: try requiredInt("traceBufferKB", in: request.inputs),
+        ringBuffered: try optionalBool("ringBuffered", in: request.inputs) ?? false)
+    default:
+      return request
+    }
+    return RuntimeAgentExecutionRequest(
+      operationID: request.operationID,
+      operationVersion: request.operationVersion,
+      inputs: inputs,
+      capabilityReference: request.capabilityReference,
+      targetID: request.targetID,
+      maximumWaitSeconds: request.maximumWaitSeconds,
+      executionID: request.executionID)
+  }
+
+  private static func requireOnly(
+    _ inputs: [String: JSONValue],
+    keys: Set<String>,
+    command: [String]
+  ) throws {
+    let extra = Set(inputs.keys).subtracting(keys).sorted()
+    guard extra.isEmpty else {
+      throw DiagnosticCapturePresetError.invalid(
+        "\(command.joined(separator: " ")) preset does not accept input fields: "
+          + extra.joined(separator: ", "))
+    }
+  }
+
+  private static func requiredString(
+    _ key: String,
+    in inputs: [String: JSONValue]
+  ) throws -> String {
+    guard case .string(let value)? = inputs[key] else {
+      throw DiagnosticCapturePresetError.invalid("\(key) must be a string")
+    }
+    return value
+  }
+
+  private static func optionalString(
+    _ key: String,
+    in inputs: [String: JSONValue]
+  ) throws -> String? {
+    guard let value = inputs[key] else { return nil }
+    guard case .string(let string) = value else {
+      throw DiagnosticCapturePresetError.invalid("\(key) must be a string")
+    }
+    return string
+  }
+
+  private static func requiredInt(
+    _ key: String,
+    in inputs: [String: JSONValue]
+  ) throws -> Int {
+    guard case .integer(let value)? = inputs[key], let result = Int(exactly: value) else {
+      throw DiagnosticCapturePresetError.invalid("\(key) must be an integer")
+    }
+    return result
+  }
+
+  private static func requiredStrings(
+    _ key: String,
+    in inputs: [String: JSONValue]
+  ) throws -> [String] {
+    guard case .array(let values)? = inputs[key] else {
+      throw DiagnosticCapturePresetError.invalid("\(key) must be a string array")
+    }
+    return try values.map { value in
+      guard case .string(let string) = value else {
+        throw DiagnosticCapturePresetError.invalid("\(key) must be a string array")
+      }
+      return string
+    }
+  }
+
+  private static func optionalBool(
+    _ key: String,
+    in inputs: [String: JSONValue]
+  ) throws -> Bool? {
+    guard let value = inputs[key] else { return nil }
+    guard case .bool(let bool) = value else {
+      throw DiagnosticCapturePresetError.invalid("\(key) must be a boolean")
+    }
+    return bool
   }
 
   /// Renders whichever way an Agent execution ended, in the caller's shape.

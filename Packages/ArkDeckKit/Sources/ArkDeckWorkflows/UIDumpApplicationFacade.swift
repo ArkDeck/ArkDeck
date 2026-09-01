@@ -1007,7 +1007,7 @@ public enum ViewerCaptureRequestBuilder {
   /// Viewer needs a current screenshot and component tree, not a prolonged
   /// diagnostic-log window. The published operation permits one second, so
   /// keep the Viewer capture bounded to its shortest truthful interval.
-  public static let durationSeconds = 1
+  public static let durationSeconds = DiagnosticCapturePreset.shortCaptureDurationSeconds
 
   public static func request(target: UIDumpTargetPresentation, nonce: String) throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
@@ -1016,19 +1016,10 @@ public enum ViewerCaptureRequestBuilder {
       target: DurableTargetReference(
         targetID: target.id, expectedBindingRevision: target.bindingRevision),
       operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
-      inputs: [
-        "durationSeconds": .integer(Int64(durationSeconds)),
-        // A Viewer recapture needs a verified PNG and component tree. It does
-        // not consume HiLog, whose buffer drain can dominate the interaction
-        // on a connected device.
-        "captureHilog": .bool(false),
-        "hilogFilters": .array([]),
-        "uiDump": .bool(true),
-        "crashLogs": .bool(false),
-        "uiScreenshot": .bool(true),
-        "uiComponentTree": .bool(true),
-        "redactionProfile": .string("standard"),
-      ],
+      // A Viewer recapture needs a verified PNG and component tree. It does
+      // not consume HiLog, whose buffer drain can dominate the interaction
+      // on a connected device.
+      inputs: DiagnosticCapturePreset.uiDump(),
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
         clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
@@ -1045,19 +1036,9 @@ public enum ViewerCaptureRequestBuilder {
       target: DurableTargetReference(
         targetID: target.id, expectedBindingRevision: target.bindingRevision),
       operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
-      inputs: [
-        "durationSeconds": .integer(Int64(durationSeconds)),
-        "captureHilog": .bool(false),
-        "hilogFilters": .array([]),
-        "uiDump": .bool(false),
-        "advancedDump": .bool(true),
-        "windowId": .string(selection.windowID),
-        "componentId": .string(selection.componentID),
-        "crashLogs": .bool(false),
-        "uiScreenshot": .bool(false),
-        "uiComponentTree": .bool(false),
-        "redactionProfile": .string("standard"),
-      ],
+      inputs: try DiagnosticCapturePreset.componentDetail(
+        windowID: selection.windowID,
+        componentID: selection.componentID),
       requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
       clientContext: RuntimeWorkspaceThread.clientContext(
         clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))
