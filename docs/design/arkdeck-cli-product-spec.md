@@ -1590,7 +1590,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | History saved filter | Runtime 拥有单例 generation-CAS query preset，App/CLI 共用；旧 AppStorage 仅作一次性迁移输入 | `history filter list/save/delete`；`local` | C |
 | Trace derived-cache purge | App controller 可回收 inactive derived DB，不是 Runtime evidence 删除 | `trace cache status/purge`；`blocked` → `local` | C |
 | Source/update | remote source 和 consumer auto-update 是 App/平台服务；maintainer feed 已另有 CLI | typed source 与 consumer update lifecycle；`blocked` → `local` | C |
-| Offline inspector | UI dump/hit-test/Trace/diagnostics parser 可链接，但无稳定跨平台 schema/owner boundary | versioned local derivation service；`blocked` → `local` | C |
+| Offline inspector | UI dump inspect/hit-test 已由 App/CLI 共用 typed owner，校验 exact Artifact role/size/SHA-256、固定 64 MiB 上限并发布 `arkdeck.ui-dump-inspection/1` / `arkdeck.ui-dump-hit-test/1`；diagnostics preview 与 Trace inspect 尚无各自的稳定 schema/owner boundary，因此整体仍为 `blocked` | versioned local derivation service；`blocked` → `local` | C |
 | App icon/menu/shortcut | 只改变 App 呈现和导航 | `presentation`；不需要 CLI leaf | — |
 
 实现它们时先建立 bounded Runtime/local service contract，再接 App 与 CLI。同一 vertical task 内

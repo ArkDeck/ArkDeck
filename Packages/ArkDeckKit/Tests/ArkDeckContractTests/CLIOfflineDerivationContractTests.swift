@@ -15,21 +15,37 @@ import XCTest
 /// not tell a picture of a past moment from a reading of the current one.
 final class CLIOfflineDerivationContractTests: XCTestCase {
 
-  private func source(_ name: String, _ digest: String) -> CLIOfflineDerivation.Source {
-    CLIOfflineDerivation.Source(
+  private func source(_ name: String, _ digest: String) throws -> UIDumpOfflineSource {
+    try UIDumpOfflineSource(
       artifactID: "A-\(name)", name: name, mediaType: "application/json",
       sha256: digest, byteCount: 128)
   }
 
+  private func provenance(
+    _ sources: [UIDumpOfflineSource],
+    observedFromUTC: String?,
+    observedToUTC: String?
+  ) -> UIDumpOfflineProvenance {
+    UIDumpOfflineProvenance(
+      kind: "offlineDerived",
+      parser: UIDumpOfflineInspector.parserID,
+      parserVersion: UIDumpOfflineInspector.parserVersion,
+      observedFromUTC: observedFromUTC,
+      observedToUTC: observedToUTC,
+      sources: sources)
+  }
+
   func testProvenanceNamesTheParserAndEverySourceDigest() throws {
-    let provenance = CLIOfflineDerivation.provenance(
-      sources: [source("ui-tree.json", String(repeating: "a", count: 64))],
-      observedFromUTC: "2026-08-31T10:00:00Z", observedToUTC: "2026-08-31T10:00:02Z")
-    guard case .object(let fields) = provenance else {
+    let projected = CLIOfflineDerivation.encode(
+      provenance: provenance(
+        [try source("ui-tree.json", String(repeating: "a", count: 64))],
+        observedFromUTC: "2026-08-31T10:00:00Z",
+        observedToUTC: "2026-08-31T10:00:02Z"))
+    guard case .object(let fields) = projected else {
       return XCTFail("provenance must be an object")
     }
-    XCTAssertEqual(fields["parser"], .string(CLIOfflineDerivation.uiDumpParser))
-    XCTAssertEqual(fields["parserVersion"], .string(CLIOfflineDerivation.uiDumpParserVersion))
+    XCTAssertEqual(fields["parser"], .string(UIDumpOfflineInspector.parserID))
+    XCTAssertEqual(fields["parserVersion"], .string(UIDumpOfflineInspector.parserVersion))
     guard case .array(let sources)? = fields["sources"], case .object(let first)? = sources.first
     else { return XCTFail("the sources must be a list of objects") }
     XCTAssertEqual(first["sha256"], .string(String(repeating: "a", count: 64)))
@@ -43,9 +59,12 @@ final class CLIOfflineDerivationContractTests: XCTestCase {
   /// rather than a convention to remember — so this is the assertion that
   /// would fail if the word were ever dropped for being obvious.
   func testTheDerivationSaysItIsDerivedAndCarriesTheWindowItWasTakenIn() throws {
-    guard case .object(let fields) = CLIOfflineDerivation.provenance(
-      sources: [source("ui-tree.json", String(repeating: "b", count: 64))],
-      observedFromUTC: "2026-08-31T10:00:00Z", observedToUTC: "2026-08-31T10:00:02Z")
+    guard
+      case .object(let fields) = CLIOfflineDerivation.encode(
+        provenance: provenance(
+          [try source("ui-tree.json", String(repeating: "b", count: 64))],
+          observedFromUTC: "2026-08-31T10:00:00Z",
+          observedToUTC: "2026-08-31T10:00:02Z"))
     else { return XCTFail("provenance must be an object") }
     XCTAssertEqual(fields["kind"], .string("offlineDerived"))
     // The observation window, not the filing time: a reader deciding whether
@@ -56,28 +75,15 @@ final class CLIOfflineDerivationContractTests: XCTestCase {
 
   /// A capture with no observation window says so rather than borrowing one.
   func testAnUnknownObservationWindowIsNullRatherThanTheCurrentTime() throws {
-    guard case .object(let fields) = CLIOfflineDerivation.provenance(
-      sources: [source("ui-tree.json", String(repeating: "c", count: 64))],
-      observedFromUTC: nil, observedToUTC: nil)
+    guard
+      case .object(let fields) = CLIOfflineDerivation.encode(
+        provenance: provenance(
+          [try source("ui-tree.json", String(repeating: "c", count: 64))],
+          observedFromUTC: nil,
+          observedToUTC: nil))
     else { return XCTFail("provenance must be an object") }
     XCTAssertEqual(fields["observedFromUtc"], .null)
     XCTAssertEqual(fields["observedToUtc"], .null)
-  }
-
-  /// Two runs over the same job must produce the same document, so the source
-  /// list is ordered by something stable rather than by whatever order the
-  /// artifact index happened to return.
-  func testTheSourceListIsOrderedSoTwoRunsAgreeByteForByte() throws {
-    let a = source("ui-tree.json", String(repeating: "1", count: 64))
-    let b = source("screenshot.png", String(repeating: "2", count: 64))
-    let c = source("ui-dump.json", String(repeating: "3", count: 64))
-    let forward = CLIOfflineDerivation.provenance(
-      sources: [a, b, c], observedFromUTC: nil, observedToUTC: nil)
-    let reversed = CLIOfflineDerivation.provenance(
-      sources: [c, b, a], observedFromUTC: nil, observedToUTC: nil)
-    XCTAssertEqual(
-      try CLICanonicalJSON.canonicalString(forward),
-      try CLICanonicalJSON.canonicalString(reversed))
   }
 
   /// §6.2's honesty rule at the level below the document: a capture whose

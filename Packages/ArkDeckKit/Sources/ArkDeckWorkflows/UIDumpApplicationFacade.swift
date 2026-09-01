@@ -1098,7 +1098,6 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
   /// round trips stops buying anything.
   private static let artifactChunkBytes: Int64 = 1_024 * 1_024
   private static let maximumSingleArtifactBytes = 32 * 1_024 * 1_024
-  private static let maximumCaptureBytes = 64 * 1_024 * 1_024
 
   func refreshWorkspace(
     deviceObservation: DeviceListPresentation
@@ -1276,7 +1275,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         named: "ui-dump.json", mediaType: "application/json", entries: entries)
       let total = ([screenshot, tree] + (rawDump.map { [$0] } ?? []))
         .reduce(Int64(0)) { $0 + $1.byteCount }
-      guard total <= Int64(Self.maximumCaptureBytes) else {
+      guard total <= Int64(UIDumpOfflineInspector.maximumCaptureBytes) else {
         throw ViewerArtifactFailure(
           message: "Viewer Artifact set exceeds its in-memory safety limit")
       }
@@ -1289,8 +1288,11 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       let screenshotData = try await readArtifact(screenshot, jobID: facts.jobID)
       let treeData = try await readArtifact(tree, jobID: facts.jobID)
       let rawDumpData: Data?
-      if let rawDump { rawDumpData = try await readArtifact(rawDump, jobID: facts.jobID) }
-      else { rawDumpData = nil }
+      if let rawDump {
+        rawDumpData = try await readArtifact(rawDump, jobID: facts.jobID)
+      } else {
+        rawDumpData = nil
+      }
       return (screenshotData: screenshotData, treeData: treeData, rawDumpData: rawDumpData)
     }
     let screenshotData = payload.screenshotData
@@ -1300,15 +1302,38 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       throw ViewerArtifactFailure(message: "Runtime did not report a terminal Viewer capture time")
     }
     let (capture, parseMilliseconds) = try ViewerSignpost.measureSync("viewer.parse") {
-      try ViewerCaptureParser.parse(
-        screenshotData: screenshotData,
-        treeData: treeData,
-        rawDumpData: rawDumpData,
-        identity: ViewerCaptureIdentity(
-          jobID: facts.jobID,
-          targetID: targetID,
-          bindingRevision: bindingRevision,
-          capturedAtUTC: capturedAtUTC))
+      func artifact(_ metadata: ViewerArtifactMetadata, _ data: Data) throws
+        -> UIDumpOfflineArtifact
+      {
+        try UIDumpOfflineArtifact(
+          source: UIDumpOfflineSource(
+            artifactID: metadata.id,
+            name: metadata.name,
+            mediaType: metadata.mediaType,
+            sha256: metadata.sha256,
+            byteCount: Int(metadata.byteCount)),
+          data: data)
+      }
+      do {
+        let inspection = try UIDumpOfflineInspector().inspect(
+          UIDumpOfflineCaptureInput(
+            identity: ViewerCaptureIdentity(
+              jobID: facts.jobID,
+              targetID: targetID,
+              bindingRevision: bindingRevision,
+              capturedAtUTC: capturedAtUTC),
+            screenshot: try artifact(screenshot, screenshotData),
+            tree: try artifact(tree, treeData),
+            rawDump: try rawDump.map { metadata in
+              try artifact(metadata, rawDumpData ?? Data())
+            },
+            observedFromUTC: nil,
+            observedToUTC: capturedAtUTC))
+        return inspection.capture
+      } catch {
+        throw ViewerArtifactFailure(
+          message: "Viewer offline inspection rejected the published Artifact set: \(error)")
+      }
     }
     return capture.withMetrics(
       ViewerCaptureMetrics(
