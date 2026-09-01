@@ -215,7 +215,23 @@ struct ArkDeckCommandLine {
         var rest = Array(arguments.dropFirst())
         let session = RuntimeCLI.runtimeSession(&rest, command: "ui-dump.\(verb)")
         try RuntimeCLI.emitUIDumpDerivation(verb, rest: rest, session: session)
-      case "screen", "input", "diagnostics", "analyze", "port-forward", "workspace":
+      case "diagnostics":
+        guard let verb = arguments.first, !verb.hasPrefix("-") else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message:
+              "diagnostics needs a subcommand; run arkdeck help diagnostics")
+        }
+        if verb == "capture" {
+          try await RuntimeCLI.runDomainOperation(
+            path: ["diagnostics", verb],
+            Array(arguments.dropFirst()))
+        } else {
+          try RuntimeCLI.runDiagnosticsResource(
+            verb,
+            rest: Array(arguments.dropFirst()))
+        }
+      case "screen", "input", "analyze", "port-forward", "workspace":
         // §6.2's domain layer. The registry holds each leaf's exact Catalog
         // mapping, so dispatch is uniform and the family name carries no logic
         // of its own — which is what keeps these from becoming a second way to

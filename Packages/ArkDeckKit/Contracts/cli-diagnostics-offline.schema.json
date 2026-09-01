@@ -1,0 +1,379 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/contracts/cli-diagnostics-offline.schema.json",
+  "title": "ArkDeck diagnostics offline derivation results",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/inspection"
+    },
+    {
+      "$ref": "#/$defs/preview"
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "name",
+        "mediaType",
+        "privacy",
+        "status",
+        "statusDetail",
+        "sourceOperation",
+        "byteCount",
+        "artifactDigest"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "privacy": {
+          "enum": [
+            "standard",
+            "sensitive"
+          ]
+        },
+        "status": {
+          "enum": [
+            "published",
+            "missing",
+            "truncated"
+          ]
+        },
+        "statusDetail": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        },
+        "sourceOperation": {
+          "const": "capture.diagnostics@1"
+        },
+        "byteCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "artifactDigest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "parser",
+        "parserVersion",
+        "sources"
+      ],
+      "properties": {
+        "kind": {
+          "const": "offlineDerived"
+        },
+        "parser": {
+          "const": "arkdeck.diagnostics-session-parser"
+        },
+        "parserVersion": {
+          "const": "1.0.0"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "toleranceMs",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "sameClock",
+            "calibrated",
+            "cannotAlign"
+          ]
+        },
+        "toleranceMs": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "screenshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactName",
+        "capturedAtUtc",
+        "takenAfterMarkMs"
+      ],
+      "properties": {
+        "artifactName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capturedAtUtc": {
+          "type": "string",
+          "minLength": 1
+        },
+        "takenAfterMarkMs": {
+          "type": "integer"
+        }
+      }
+    },
+    "screenshotAbsence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "milliseconds",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "takenTooFarFromMark",
+            "shutterWindowUncertain",
+            "captureFailed",
+            "notCaptured"
+          ]
+        },
+        "milliseconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "marker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "kind",
+        "atHostUtc",
+        "label",
+        "trigger",
+        "screenshot",
+        "screenshotAbsence"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "manual",
+            "automatic"
+          ]
+        },
+        "atHostUtc": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trigger": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "screenshot": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/screenshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "screenshotAbsence": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/screenshotAbsence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "missingProduct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "reason"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "operationReference",
+        "derivation",
+        "partial",
+        "alignment",
+        "markers",
+        "missingProducts",
+        "notDerived",
+        "ringHeldAnchor",
+        "artifacts"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "arkdeck.diagnostics-inspection/1"
+        },
+        "jobId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "operationReference": {
+          "const": "capture.diagnostics@1"
+        },
+        "derivation": {
+          "$ref": "#/$defs/provenance"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "alignment": {
+          "$ref": "#/$defs/alignment"
+        },
+        "markers": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/marker"
+          }
+        },
+        "missingProducts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/missingProduct"
+          }
+        },
+        "notDerived": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ringHeldAnchor": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "maxItems": 64000,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "derivation",
+        "text",
+        "replacedInvalidUtf8",
+        "clipped"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "arkdeck.diagnostics-preview/1"
+        },
+        "derivation": {
+          "$ref": "#/$defs/provenance"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 120000
+        },
+        "replacedInvalidUtf8": {
+          "type": "boolean"
+        },
+        "clipped": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

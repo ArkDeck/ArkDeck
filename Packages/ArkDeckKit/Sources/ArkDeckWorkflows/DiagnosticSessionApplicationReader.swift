@@ -9,7 +9,11 @@ public struct DiagnosticArtifactTextPreview: Sendable, Equatable {
   public let replacedInvalidUTF8: Bool
   public let wasClipped: Bool
 
-  public init?(bytes: Data, mediaType: String, maximumCharacters: Int = 120_000) {
+  public init?(
+    bytes: Data,
+    mediaType: String,
+    maximumCharacters: Int = 120_000
+  ) {
     guard bytes.count <= 2 * 1_024 * 1_024,
       (1...120_000).contains(maximumCharacters),
       mediaType == "text/plain" || mediaType == "application/json"
@@ -38,20 +42,28 @@ public enum DiagnosticSessionLoadResult: Sendable, Equatable {
   case unavailable(String)
 }
 
+/// App transport adapter for the shared, deterministic offline inspector.
+/// Runtime owns metadata and bytes; this adapter only binds those values and
+/// calls the same parser the CLI uses.
 public struct DiagnosticSessionApplicationReader: Sendable {
   private let provider: any RuntimeJobDetailApplicationProviding
-  private static let documentLimit = 1_024 * 1_024
 
   public init(provider: any RuntimeJobDetailApplicationProviding) {
     self.provider = provider
   }
 
-  public func load(_ context: RuntimeHistoryWorkspaceContext) async -> DiagnosticSessionLoadResult {
-    guard context.operationReference == "capture.diagnostics@1" else {
+  public func load(
+    _ context: RuntimeHistoryWorkspaceContext
+  ) async -> DiagnosticSessionLoadResult {
+    guard
+      context.operationReference
+        == DiagnosticSessionOfflineInspector.operationReference
+    else {
       return .unavailable("diagnostics_unsupported_operation")
     }
     let detail = await provider.loadJobDetail(
-      jobID: context.jobID, operationReference: context.operationReference)
+      jobID: context.jobID,
+      operationReference: context.operationReference)
     guard detail.jobID == context.jobID,
       let correlation = detail.correlation,
       correlation.jobID == context.jobID,
@@ -59,89 +71,60 @@ public struct DiagnosticSessionApplicationReader: Sendable {
       correlation.targetID == context.targetID,
       correlation.sessionID == context.sessionID,
       detail.artifactAvailability == .available
-    else { return .unavailable("diagnostics_job_correlation_unavailable") }
-    let artifacts = detail.artifacts
-    guard Set(artifacts.map(\.id)).count == artifacts.count,
-      Set(artifacts.map(\.name)).count == artifacts.count,
-      artifacts.allSatisfy({ $0.sourceOperation == context.operationReference })
-    else { return .unavailable("diagnostics_ambiguous_artifact_inventory") }
+    else {
+      return .unavailable("diagnostics_job_correlation_unavailable")
+    }
 
     do {
-      let indexData = try await document("artifact-index.json", in: artifacts, jobID: context.jobID)
-      let summaryData = try await document("capture-summary.json", in: artifacts, jobID: context.jobID)
-      let index = try JSONDecoder().decode(Index.self, from: indexData)
-      let summary = try JSONDecoder().decode(Index.self, from: summaryData)
-      guard index.jobId == context.jobID, summary.jobId == context.jobID,
-        index.operation == context.operationReference, summary.operation == context.operationReference,
-        index.artifacts == summary.artifacts,
-        let missingRequired = summary.missingRequired,
-        Set(missingRequired).count == missingRequired.count,
-        Set(missingRequired) == Set(summary.artifacts.filter {
-          $0.value.required && $0.value.status != "published"
-        }.keys),
-        summary.completeness == (missingRequired.isEmpty ? "complete" : "incomplete")
-      else { throw Failure("diagnostics_index_summary_mismatch") }
-      for (name, item) in index.artifacts {
-        guard ["published", "missing", "truncated"].contains(item.status) else {
-          throw Failure("diagnostics_unknown_artifact_status")
-        }
-        if item.status == "published" {
-          guard let metadata = artifacts.first(where: { $0.name == name }),
-            metadata.status == "published", item.artifactId == metadata.id,
-            item.byteCount == metadata.byteCount, item.sha256 == metadata.sha256
-          else { throw Failure("diagnostics_index_metadata_mismatch") }
-        } else if artifacts.contains(where: { $0.name == name && $0.status == "published" }) {
-          throw Failure("diagnostics_index_metadata_mismatch")
-        }
+      let inventory = try detail.artifacts.map(Self.metadata)
+      guard Set(inventory.map(\.artifactID)).count == inventory.count,
+        Set(inventory.map(\.name)).count == inventory.count,
+        inventory.allSatisfy({
+          $0.sourceOperation == context.operationReference
+        })
+      else {
+        throw Failure("diagnostics_ambiguous_artifact_inventory")
       }
 
-      var missing: [DiagnosticSessionReading.MissingProduct] = []
-      if let inputs = detail.evidence?.typedParameters {
-        var requested = try Self.requestedProducts(inputs)
-        // The published capture may provide PNG or JPEG. A published JPEG
-        // satisfies the screenshot channel, but never a separately reported
-        // required PNG entry in the Runtime index.
-        if requested.contains("screenshot.png"),
-          artifacts.contains(where: { $0.name == "screenshot.jpeg" && $0.status == "published" })
-        {
-          requested.remove("screenshot.png")
-          requested.insert("screenshot.jpeg")
-        }
-        for name in requested.union(missingRequired).sorted() {
-          guard artifacts.contains(where: { $0.name == name && $0.status == "published" }) else {
-            missing.append(.init(
-              name: name,
-              reason: index.artifacts[name]?.detail ?? index.artifacts[name]?.status ?? "not published"))
-            continue
-          }
-        }
-      } else {
-        missing.append(.init(name: "parameters", reason: "typed capture inputs were not reported"))
+      var documents: [String: DiagnosticOfflineArtifact] = [:]
+      for name in [
+        DiagnosticSessionOfflineInspector.indexArtifactName,
+        DiagnosticSessionOfflineInspector.summaryArtifactName,
+      ] {
+        documents[name] = try await document(
+          name,
+          inventory: inventory,
+          artifacts: detail.artifacts,
+          jobID: context.jobID)
+      }
+      if inventory.contains(where: {
+        $0.name == DiagnosticSessionOfflineInspector.markersArtifactName
+          && $0.status == "published"
+      }) {
+        let name = DiagnosticSessionOfflineInspector.markersArtifactName
+        documents[name] = try await document(
+          name,
+          inventory: inventory,
+          artifacts: detail.artifacts,
+          jobID: context.jobID)
       }
 
-      var marks: [DiagnosticSessionReading.Mark] = []
-      var notDerived: [String] = []
-      var ringHeldAnchor: Bool?
-      if artifacts.contains(where: { $0.name == "markers.json" && $0.status == "published" }) {
-        let markerData = try await document("markers.json", in: artifacts, jobID: context.jobID)
-        let document = try MarkerDocument.decode(markerData, jobID: context.jobID)
-        let reading = DiagnosticSessionReading.make(markersDocument: document)
-        marks = reading.marks
-        notDerived = reading.notDerived
-        // This is a Runtime-published coverage fact, not clock calibration.
-        if let coverage = document["coverage"] as? [String: Any],
-          let value = coverage["ringHeldAnchor"] as? Bool
-        { ringHeldAnchor = value }
-      } else {
-        missing.append(.init(name: "markers.json", reason: "marker document was not published"))
-      }
-      return .loaded(DiagnosticSessionPresentation(
-        reading: DiagnosticSessionReading(
+      let inspection = try DiagnosticSessionOfflineInspector().inspect(
+        DiagnosticSessionOfflineInput(
           jobID: context.jobID,
-          alignment: .cannotAlign(reason: "capture artifacts contain no host-to-device calibration"),
-          marks: marks, missingProducts: missing, notDerived: notDerived),
-        artifacts: artifacts, timeline: detail.timeline, ringHeldAnchor: ringHeldAnchor))
+          operationReference: context.operationReference,
+          typedParameters: detail.evidence?.typedParameters,
+          inventory: inventory,
+          documents: documents))
+      return .loaded(
+        DiagnosticSessionPresentation(
+          reading: inspection.reading,
+          artifacts: detail.artifacts,
+          timeline: detail.timeline,
+          ringHeldAnchor: inspection.ringHeldAnchor))
     } catch let failure as Failure {
+      return .unavailable(failure.reason)
+    } catch let failure as DiagnosticSessionOfflineInspectorError {
       return .unavailable(failure.reason)
     } catch {
       return .unavailable("diagnostics_unreadable_session_document")
@@ -149,119 +132,69 @@ public struct DiagnosticSessionApplicationReader: Sendable {
   }
 
   private func document(
-    _ name: String, in artifacts: [RuntimeArtifactPresentation], jobID: String
-  ) async throws -> Data {
-    guard let artifact = artifacts.first(where: { $0.name == name }),
-      artifact.status == "published", artifact.role == "derived",
-      artifact.privacy == "standard", artifact.mediaType == "application/json",
-      artifact.byteCount > 0, artifact.byteCount <= Int64(Self.documentLimit)
-    else { throw Failure("diagnostics_missing_or_unreadable_\(name)") }
+    _ name: String,
+    inventory: [DiagnosticOfflineArtifactMetadata],
+    artifacts: [RuntimeArtifactPresentation],
+    jobID: String
+  ) async throws -> DiagnosticOfflineArtifact {
+    guard let metadata = inventory.first(where: { $0.name == name }),
+      let artifact = artifacts.first(where: {
+        $0.id == metadata.artifactID && $0.name == name
+      }),
+      artifact.role == "derived",
+      metadata.status == "published",
+      metadata.mediaType == "application/json",
+      metadata.privacy == "standard",
+      metadata.byteCount > 0,
+      metadata.byteCount
+        <= DiagnosticSessionOfflineInspector.documentMaximumBytes
+    else {
+      throw Failure("diagnostics_missing_or_unreadable_\(name)")
+    }
     switch await provider.readArtifact(
-      jobID: jobID, artifact: artifact, maximumBytes: Self.documentLimit, allowSensitive: false)
+      jobID: jobID,
+      artifact: artifact,
+      maximumBytes: DiagnosticSessionOfflineInspector.documentMaximumBytes,
+      allowSensitive: false)
     {
     case .loaded(let bytes):
-      guard bytes.count == artifact.byteCount, SHA256Hex.string(of: bytes) == artifact.sha256 else {
-        throw Failure("diagnostics_artifact_integrity_mismatch")
-      }
-      return bytes
-    case .failed(let reason): throw Failure(reason)
+      return try DiagnosticOfflineArtifact(
+        metadata: metadata,
+        data: bytes)
+    case .failed(let reason):
+      throw Failure(reason)
     }
   }
 
-  /// Defaults are the published capture.diagnostics@1 defaults. Unselected
-  /// optional channels appear as "missing" in the index but are not partial
-  /// capture failures. Never derive this selection from display strings.
-  private static func requestedProducts(_ inputs: [String: JSONValue]) throws -> Set<String> {
-    func enabled(_ name: String, default value: Bool = false) throws -> Bool {
-      guard let reported = inputs[name] else { return value }
-      guard case .bool(let flag) = reported else { throw Failure("diagnostics_invalid_capture_parameters") }
-      return flag
+  private static func metadata(
+    _ artifact: RuntimeArtifactPresentation
+  ) throws -> DiagnosticOfflineArtifactMetadata {
+    guard artifact.byteCount >= 0,
+      artifact.byteCount <= Int64(Int.max)
+    else {
+      throw Failure("diagnostics_invalid_artifact_metadata")
     }
-    var names: Set<String> = []
-    if try enabled("captureHilog", default: true) { names.insert("hilog.txt") }
-    if try enabled("uiDump", default: true) { names.insert("ui-dump.json") }
-    if try enabled("advancedDump") { names.insert("advanced-dump.txt") }
-    if try enabled("uiComponentTree") { names.insert("ui-tree.json") }
-    if try enabled("uiScreenshot") {
-      let imageType: String
-      if let value = inputs["screenshotImageType"] {
-        guard case .string(let type) = value, ["png", "jpeg"].contains(type) else {
-          throw Failure("diagnostics_invalid_capture_parameters")
-        }
-        imageType = type
-      } else { imageType = "png" }
-      names.insert("screenshot.\(imageType)")
+    do {
+      return try DiagnosticOfflineArtifactMetadata(
+        artifactID: artifact.id,
+        name: artifact.name,
+        mediaType: artifact.mediaType,
+        privacy: artifact.privacy,
+        status: artifact.status,
+        statusDetail: artifact.statusDetail,
+        sourceOperation: artifact.sourceOperation,
+        byteCount: Int(artifact.byteCount),
+        sha256: artifact.status == "published" ? artifact.sha256 : nil)
+    } catch {
+      throw Failure("diagnostics_invalid_artifact_metadata")
     }
-    if try enabled("crashLogs") { names.insert("crash-index.txt") }
-    for (field, product) in [("crashLogName", "crash-log.txt"), ("bundleName", "application-liveness.json")] {
-      if let value = inputs[field] {
-        guard case .string(let text) = value, !text.isEmpty else { throw Failure("diagnostics_invalid_capture_parameters") }
-        names.insert(product)
-      }
-    }
-    if let value = inputs["traceCategories"] {
-      guard case .array(let tags) = value, tags.allSatisfy({
-        if case .string(let text) = $0 { return !text.isEmpty }
-        return false
-      }) else { throw Failure("diagnostics_invalid_capture_parameters") }
-      if !tags.isEmpty { names.insert("trace.htrace") }
-    }
-    return names
   }
 
   private struct Failure: Error {
     let reason: String
-    init(_ reason: String) { self.reason = reason }
-  }
 
-  private struct Index: Decodable {
-    let jobId: String
-    let operation: String
-    let artifacts: [String: Product]
-    let completeness: String?
-    let missingRequired: [String]?
-  }
-
-  private struct Product: Decodable, Equatable {
-    let status: String
-    let required: Bool
-    let artifactId: String?
-    let byteCount: Int64?
-    let sha256: String?
-    let detail: String?
-  }
-
-  private enum MarkerDocument {
-    static func decode(_ data: Data, jobID: String) throws -> [String: Any] {
-      guard let document = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-        document["documentType"] as? String == "arkdeck-diagnostic-markers",
-        document["schemaVersion"] as? String == "1.0.0",
-        document["jobId"] as? String == jobID,
-        let markers = document["markers"] as? [[String: Any]], markers.count <= 1_024,
-        let notDerived = document["notDerived"] as? [[String: Any]],
-        notDerived.allSatisfy({ $0["kind"] is String && $0["reason"] is String })
-      else { throw Failure("diagnostics_invalid_markers_document") }
-      for marker in markers {
-        switch marker["kind"] as? String {
-        case "manual":
-          guard let instant = marker["atHostUTC"] as? String,
-            ISO8601Timestamps.parse(instant) != nil
-          else { throw Failure("diagnostics_invalid_marker_timestamp") }
-        case "auto":
-          guard let trigger = marker["trigger"] as? String, !trigger.isEmpty else {
-            throw Failure("diagnostics_invalid_automatic_marker")
-          }
-          // Published step/crash markers may have no timestamp. Showing no
-          // time is correct; Job completion time is not an event timestamp.
-          if let instant = marker["atHostUTC"] {
-            guard let instant = instant as? String, ISO8601Timestamps.parse(instant) != nil else {
-              throw Failure("diagnostics_invalid_marker_timestamp")
-            }
-          }
-        default: throw Failure("diagnostics_unknown_marker_kind")
-        }
-      }
-      return document
+    init(_ reason: String) {
+      self.reason = reason
     }
   }
 }
