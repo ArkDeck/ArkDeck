@@ -1010,7 +1010,7 @@ enum CLICommandRegistry {
     summary: "exact content-addressed bundle reference", isRequired: true)
 
   private static let runtimeToolNode = CLINodeSpec(
-    token: "tool", summary: "inspect and retain typed host tool candidates without selecting or executing them",
+    token: "tool", summary: "register, inspect and safely select typed host tool candidates",
     leaves: [
       CLILeafSpec(token: "register", canonicalCommand: "runtime.tool.register",
         summary: "copy a native HDC candidate and inspect its signature and published identity",
@@ -1030,6 +1030,17 @@ enum CLICommandRegistry {
         options: [bootstrapToolRefOption,
           CLIOptionSpec(name: "--expected-generation", form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)), summary: "exact available generation", isRequired: true),
           outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(token: "select", canonicalCommand: "runtime.tool.select",
+        summary: "preview and request approval for one durable active HDC tool transition",
+        options: runtimeClientOptions([targetProtocolOption, waitTimeoutOption,
+          bootstrapToolRefOption,
+          CLIOptionSpec(name: "--expected-active-generation",
+            form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+            summary: "exact active selection generation", isRequired: true),
+          CLIOptionSpec(name: "--action-request-id",
+            form: .value(placeholder: "id", grammar: .opaque),
+            summary: "stable idempotency identity for lost-receipt recovery", isRequired: true),
+        ]), connectsToRuntime: true),
     ])
 
   private static let bootstrapToolRefOption = CLIOptionSpec(

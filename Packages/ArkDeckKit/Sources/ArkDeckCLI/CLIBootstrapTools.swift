@@ -1,3 +1,4 @@
+import ArkDeckAgentClient
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckWorkflows
@@ -7,9 +8,39 @@ extension RuntimeCLI {
   static func runBootstrapTool(_ arguments: [String], registry supplied: BootstrapToolRegistry? = nil) throws {
     guard let verb = arguments.first else { throw CLIError(exitCode: 64, message: "tool subcommand is required") }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "runtime.tool.\(verb)", connectsToRuntime: false)
+    var session = runtimeSession(
+      &rest, command: "runtime.tool.\(verb)", connectsToRuntime: verb == "select")
     do {
       let options = try CLIOptions(rest)
+      if verb == "select" {
+        var fields: [String: JSONValue] = [:]
+        for (flag, key) in [
+          ("--tool", "tool"),
+          ("--expected-active-generation", "expectedActiveGeneration"),
+          ("--action-request-id", "actionRequestId"),
+        ] {
+          guard let value = options.value(flag) else {
+            throw session.fail(
+              .invalidInput,
+              "select requires an exact tool, active generation and action request ID")
+          }
+          fields[key] = .string(value)
+        }
+        do { _ = try RuntimeToolSelectionIntent(fields) }
+        catch {
+          throw session.fail(.invalidInput, "tool-selection intent failed validation")
+        }
+        if let text = options.value("--timeout") {
+          guard let duration = CLIDuration.parse(
+            text, maximumMilliseconds: 86_400_000)
+          else { throw session.fail(.invalidInput, "invalid bounded control timeout") }
+          session.client = session.client.bounded(
+            by: try AgentClientWaitDeadline(milliseconds: duration.milliseconds))
+        }
+        try session.negotiate(requiredMajor: 2, forMethod: "runtime.tool.select")
+        session.emit(try session.request("runtime.tool.select", fields))
+        return
+      }
       let registry = try supplied ?? BootstrapToolRegistry(knownIdentity: { sha256 in
         HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
           BootstrapToolRegistry.PublishedIdentity(version: $0.version, profileReferences: $0.profileReferences)

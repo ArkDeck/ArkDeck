@@ -53,6 +53,15 @@ package struct ResolvedExecutableResource: Sendable, Equatable {
   package let sha256: String
   package let byteCount: Int
   package let requireExecutable: Bool
+
+  package init(
+    path: String, sha256: String, byteCount: Int, requireExecutable: Bool
+  ) {
+    self.path = path
+    self.sha256 = sha256
+    self.byteCount = byteCount
+    self.requireExecutable = requireExecutable
+  }
 }
 
 /// Resolves the tool binary for a provider at dispatch time. Production

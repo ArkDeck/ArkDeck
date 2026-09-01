@@ -56,6 +56,10 @@ public actor RuntimeHDCControlActionCoordinator {
 
   package func show(_ actionID: String) throws -> JSONValue { try refreshAge(required(actionID)).projection }
 
+  package func listRecords() throws -> [HDCControlActionRecord] {
+    try store.list().map(refreshAge)
+  }
+
   package func list(filters: [String: JSONValue], pageSize: Int, cursor: String?) throws -> JSONValue {
     guard Set(filters.keys).isSubset(of: ["kind", "state"]),
       filters["kind"] == nil || filters["kind"] == .string("hdcLifecycle"),

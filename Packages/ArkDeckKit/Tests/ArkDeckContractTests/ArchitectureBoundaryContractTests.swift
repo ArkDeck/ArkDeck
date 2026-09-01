@@ -65,7 +65,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ],
     "ArkDeckAgentDaemonMain": [
       "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
-      "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckTraceAdapter", "ArkDeckWorkflows",
+      "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckTraceAdapter",
+      "ArkDeckWorkflows",
     ],
   ]
 

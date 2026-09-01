@@ -56,6 +56,7 @@
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
     "runtime.hdc.status",
+    "runtime.tool.select",
     "target.adopt",
     "target.display-name.clear",
     "target.display-name.set",
