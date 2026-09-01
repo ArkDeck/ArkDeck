@@ -195,7 +195,7 @@ public enum SettingsApplicationFacade {
 private actor ProductionSettingsApplicationProvider: SettingsApplicationProviding {
   private let storageRuntime: SessionStorageApplicationRuntime
   private let runtimeArtifactUsage: @Sendable () async -> SettingsRuntimeArtifactUsage?
-  private let diagnosticExporter: LocalDiagnosticBundleExporter?
+  private let supportBundleProvider: any RuntimeSupportBundleProviding
   private let general: SettingsGeneralPresentation
 
   init(
@@ -207,7 +207,7 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   ) {
     self.storageRuntime = storageRuntime
     self.runtimeArtifactUsage = runtimeArtifactUsage
-    diagnosticExporter = try? LocalDiagnosticBundleExporter()
+    supportBundleProvider = RuntimeSupportBundleApplicationFacade.make(bundle: bundle)
     general = Self.makeGeneralPresentation(bundle: bundle)
   }
 
@@ -274,60 +274,22 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   func previewDiagnosticBundle(at destination: URL) async throws
     -> SettingsDiagnosticBundlePreview
   {
-    guard let diagnosticExporter else {
-      throw SettingsApplicationError.diagnosticsUnavailable
-    }
-    return Self.presentation(
-      try diagnosticExporter.preview(try diagnosticRequest(destination: destination)))
+    let preview = try await supportBundleProvider.preview(at: destination)
+    return SettingsDiagnosticBundlePreview(
+      scopeSHA256: preview.scopeSHA256,
+      includedEntries: preview.includedEntries,
+      estimatedBytes: preview.estimatedBytes,
+      deviceRawExcluded: preview.deviceRawExcluded,
+      sensitiveDataWarning: preview.sensitiveDataWarning)
   }
 
   func exportDiagnosticBundle(
     to destination: URL,
     approvedPreview: SettingsDiagnosticBundlePreview
   ) async throws -> URL {
-    guard let diagnosticExporter else {
-      throw SettingsApplicationError.diagnosticsUnavailable
-    }
-    let storagePreview = LocalDiagnosticBundlePreview(
-      scopeSHA256: approvedPreview.scopeSHA256,
-      includedEntries: approvedPreview.includedEntries,
-      estimatedBytes: approvedPreview.estimatedBytes,
-      deviceRawExcluded: approvedPreview.deviceRawExcluded,
-      sensitiveDataWarning: approvedPreview.sensitiveDataWarning)
-    return try diagnosticExporter.export(
-      diagnosticRequest(destination: destination),
-      trigger: .userInitiated,
-      approvedPreview: storagePreview
-    ).root
-  }
-
-  private func diagnosticRequest(destination: URL) throws -> LocalDiagnosticBundleRequest {
-    LocalDiagnosticBundleRequest(
-      destination: destination,
-      metadata: try DiagnosticBundleMetadata(
-        appName: general.appName,
-        appVersion: general.appVersion,
-        buildVersion: general.buildVersion,
-        platform: general.platform,
-        architecture: general.architecture),
-      tool: DiagnosticToolPlaceholder(
-        path: .redacted,
-        version: .unverified,
-        serverEndpoint: .redacted,
-        serverOwnership: .unverified),
-      logs: [],
-      recentSessions: [])
-  }
-
-  private static func presentation(
-    _ preview: LocalDiagnosticBundlePreview
-  ) -> SettingsDiagnosticBundlePreview {
-    SettingsDiagnosticBundlePreview(
-      scopeSHA256: preview.scopeSHA256,
-      includedEntries: preview.includedEntries,
-      estimatedBytes: preview.estimatedBytes,
-      deviceRawExcluded: preview.deviceRawExcluded,
-      sensitiveDataWarning: preview.sensitiveDataWarning)
+    let receipt = try await supportBundleProvider.export(
+      to: destination, approvedScopeSHA256: approvedPreview.scopeSHA256)
+    return URL(filePath: receipt.destination, directoryHint: .isDirectory)
   }
 
   /// The retention preview also carries `blocksNewHeavyWriters`, and it is

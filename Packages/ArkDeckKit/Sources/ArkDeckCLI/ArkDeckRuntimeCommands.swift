@@ -1652,7 +1652,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing runtime subcommand (health|hdc|service|signing)")
+        message: "missing runtime subcommand (health|hdc|service|signing|support-bundle)")
     }
     var rest = Array(arguments.dropFirst())
     switch subcommand {
@@ -1666,6 +1666,8 @@ enum RuntimeCLI {
         beforeBootstrap: refreshSigningAccessIfInstalled)
     case "signing":
       try await runSigningAsync(rest, spelledAs: "runtime.signing")
+    case "support-bundle":
+      try await runRuntimeSupportBundle(rest)
     case "health":
       var session = runtimeSession(&rest, command: "runtime.health")
       if let index = rest.firstIndex(of: "--require-protocol"), index + 1 < rest.count,
@@ -1691,6 +1693,77 @@ enum RuntimeCLI {
       session.emit(try session.request(method))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported runtime subcommand")
+    }
+  }
+
+  /// Host-local support export. The CLI consumes the same bounded facade as
+  /// Settings and never receives the underlying storage exporter or Session
+  /// paths. `export` recomputes the scope and requires the exact digest from a
+  /// prior preview, so changing the destination or any included bytes forces a
+  /// new privacy review before publication.
+  static func runRuntimeSupportBundle(
+    _ arguments: [String],
+    provider: any RuntimeSupportBundleProviding = RuntimeSupportBundleApplicationFacade.make()
+  ) async throws {
+    guard let verb = arguments.first, ["preview", "export"].contains(verb) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing runtime support-bundle subcommand (preview|export)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let session = runtimeSession(
+      &rest, command: "runtime.support-bundle.\(verb)", connectsToRuntime: false)
+    let options = try CLIOptions(rest)
+    try options.validateAllowed(
+      verb == "preview" ? ["--destination"] : ["--destination", "--preview-digest"])
+    guard let destinationPath = options.value("--destination"),
+      destinationPath.hasPrefix("/"),
+      URL(filePath: destinationPath).standardizedFileURL.path == destinationPath
+    else {
+      throw session.fail(
+        .invalidInput,
+        "runtime support-bundle requires a canonical absolute --destination")
+    }
+    let destination = URL(filePath: destinationPath)
+    do {
+      switch verb {
+      case "preview":
+        session.emit(try encodedJSON(await provider.preview(at: destination)))
+      case "export":
+        guard let digest = options.value("--preview-digest") else {
+          throw session.fail(
+            .invalidInput,
+            "runtime support-bundle export requires --preview-digest")
+        }
+        session.emit(
+          try encodedJSON(
+            await provider.export(to: destination, approvedScopeSHA256: digest)))
+      default:
+        preconditionFailure("validated support-bundle verb")
+      }
+    } catch let error as CLIRegistryError {
+      throw error
+    } catch let error as RuntimeSupportBundleServiceError {
+      switch error {
+      case .unavailable:
+        throw session.fail(.operationUnavailable, "the local support-bundle service is unavailable")
+      case .invalidDestination:
+        throw session.fail(.invalidInput, "the support-bundle destination is unsafe or invalid")
+      case .previewMismatch:
+        throw session.fail(
+          .previewDrifted,
+          "the support-bundle scope differs from the approved preview; preview it again")
+      case .destinationAlreadyExists:
+        throw session.fail(.resourceConflict, "the support-bundle destination already exists")
+      case .quotaExceeded:
+        throw session.fail(.quotaExceeded, "the support bundle exceeds its bounded export quota")
+      case .outcomeUnknown:
+        throw session.fail(
+          .outcomeUnknown,
+          "support-bundle publication outcome is unknown; inspect the destination before retrying")
+      case .ioFailure:
+        throw session.fail(.ioFailure, "the support bundle could not be read or written safely")
+      }
     }
   }
 
