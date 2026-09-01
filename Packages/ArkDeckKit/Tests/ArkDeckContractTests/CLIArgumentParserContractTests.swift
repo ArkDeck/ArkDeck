@@ -1252,6 +1252,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
   func testTheRecoverySurfaceIsReachableAndTheOldSpellingsStillWork() {
     let digest = String(repeating: "a", count: 64)
     for argv in [
+      ["debug", "probe", "--target", "T-1"],
       ["recovery", "cleanup", "list"],
       ["recovery", "cleanup", "continue", "--job", "J-1", "--bundle", "b"],
       ["recovery", "flash-invocation", "list", "--page-size", "100"],
@@ -1277,6 +1278,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(
       failure(["recovery", "flash-invocation", "list", "--page-size", "0"])?.code,
       .invalidOption)
+    XCTAssertEqual(failure(["debug", "probe"])?.code, .invalidOption)
   }
 
   /// The recovery evaluate leaf tightens the two digests the old spelling took

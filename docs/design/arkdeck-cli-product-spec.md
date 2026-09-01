@@ -387,7 +387,7 @@ materialized plan budget 或 capability expiry；其 absolute deadline、暂停�
 | `ui-dump` | `capture`, `inspect`, `hit-test`, `component-detail` | diagnostics typed preset + versioned parser；无 raw hidumper |
 | `trace` | `probe`, `capture`, `inspect`, `export` | `trace.probe` + `capture.diagnostics@1` + Artifact |
 | `analyze` | `trace`, `trace-summary`, `hilog-summary`, `crash-signature` | 四个 `analyzer.*@1` operation |
-| `debug` | `probe`, `template list/run`, `hap`, `native deploy`, `logs` | bounded debug probe RPC + template list；template run 必须迁入 approved Catalog operation/Job；`debug.hap@1`、deploy/diagnostics operation |
+| `debug` | `probe`, `template list/run`, `hap`, `native deploy`, `logs` | bounded debug probe RPC（CLI contract 见 `cli-debug-probe.md`）+ template list；template run 必须迁入 approved Catalog operation/Job；`debug.hap@1`、deploy/diagnostics operation |
 | `port-forward` | `create`, `remove` | `port-forward.*@1` |
 | `flash` | `device-access`, `bootloader-status`, `prerequisites`, `lane-preview`, `bind-loader`, `run` | Flash Runtime methods + `flash.full-restore@1`；plan 使用 generic `job plan`，当前 major 的 `flash plan` 保持 tombstone；没有 legacy executor |
 | `workspace` | `project list/show/register/update/remove`, `preset list/show/register/update/remove`, `status`, `diff`, `inspect`, `read`, `isolate`, `checkpoint`, `patch`, `revert`, `build`, `test`, `sign`, `symbolize`, `sweep`, `continuation inspect/submit/run` | 注册 workspace/project/preset resource + 已发布 `workspace.*@1` operations + 从原记录构造的新 typed request/Job |

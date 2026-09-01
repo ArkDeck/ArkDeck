@@ -335,6 +335,7 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
     }
     // The new spellings are the destination, so they carry neither.
     for path in [
+      ["debug", "probe"],
       ["recovery", "cleanup", "list"],
       ["recovery", "flash-invocation", "list"],
       ["recovery", "flash-invocation", "status"],

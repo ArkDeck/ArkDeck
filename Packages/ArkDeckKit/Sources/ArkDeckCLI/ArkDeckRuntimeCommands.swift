@@ -3762,7 +3762,20 @@ params))
   static func runDebug(_ arguments: [String]) async throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing debug subcommand (hap|start|evaluate|status)")
+        exitCode: EX_USAGE,
+        message: "missing debug subcommand (probe|hap|native|start|evaluate|status)")
+    }
+    if subcommand == "probe" {
+      var rest = Array(arguments.dropFirst())
+      var session = runtimeSession(&rest, command: "debug.probe")
+      let options = try CLIOptions(rest)
+      guard let targetID = options.value("--target") else {
+        throw session.fail(.invalidInput, "debug probe requires --target <id>")
+      }
+      try session.negotiate(requiredMajor: 2, forMethod: "debug.probe")
+      session.emit(
+        try session.request("debug.probe", ["targetId": .string(targetID)]))
+      return
     }
     if subcommand == "hap" {
       try await runDomainOperation(path: ["debug", "hap"], Array(arguments.dropFirst()))
