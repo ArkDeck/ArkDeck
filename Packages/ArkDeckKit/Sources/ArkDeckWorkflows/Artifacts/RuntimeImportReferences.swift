@@ -62,6 +62,24 @@ extension RuntimeAdmissionService {
   /// insertion can become untracked. Durable inputs retain the reference after
   /// a crash; no second reference count can drift.
   func requireNoActiveImportReference(_ importID: String) throws {
+    try forEachActiveImportReference(importID) { _ in
+      throw AgentExecutionControlFailure("resourceConflict", "Import is still referenced by an active or uncertain Job")
+    }
+  }
+
+  func activeImportReferenceJobs(_ importID: String) throws -> [(id: String, outcomeUnknown: Bool)] {
+    var jobs: [(id: String, outcomeUnknown: Bool)] = []
+    try forEachActiveImportReference(importID) { record in
+      guard jobs.count < 1000 else { throw AgentExecutionControlFailure("inputTooLarge", "Import reference inspection exceeds its Job bound") }
+      jobs.append((record.jobID, record.outcomeUnknown))
+    }
+    return jobs.sorted { $0.id.utf8.lexicographicallyPrecedes($1.id.utf8) }
+  }
+
+  /// Reuse exactly the release owner's durable-reference verification. This
+  /// scan runs synchronously while the Artifact actor holds its observation;
+  /// no asynchronous gap can separate plan holds from committed Job refs.
+  private func forEachActiveImportReference(_ importID: String, visit: (RuntimeJobRecord) throws -> Void) throws {
     try forEachJob { persisted in
       guard let data = persisted.initialRecordData,
         let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data),
@@ -81,7 +99,7 @@ extension RuntimeAdmissionService {
       do { references = try RuntimeImportLeaseReference.inputs(record.request.inputs, descriptor: descriptor) }
       catch { throw AgentExecutionControlFailure("recordUnreadable", "active Job Artifact references are malformed") }
       if references.contains(where: { $0.importID == importID }) {
-        throw AgentExecutionControlFailure("resourceConflict", "Import is still referenced by an active or uncertain Job")
+        try visit(record)
       }
     }
   }

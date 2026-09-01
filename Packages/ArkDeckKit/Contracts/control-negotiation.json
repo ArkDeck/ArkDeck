@@ -21,6 +21,7 @@
     "artifact.import.begin",
     "artifact.import.commit",
     "artifact.import.inspect",
+    "artifact.import.inspection",
     "artifact.import.list",
     "artifact.import.release",
     "artifact.inspect",

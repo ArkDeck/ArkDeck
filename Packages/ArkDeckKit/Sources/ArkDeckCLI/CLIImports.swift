@@ -19,7 +19,8 @@ extension RuntimeCLI {
     session.client = session.client.bounded(by: deadline)
     let requestID = options.value("--import-request-id")
     do {
-      let method = ["list", "inspect", "abort", "release"].contains(verb) ? "artifact.import.\(verb)" : "artifact.import.begin"
+      let method = verb == "inspect" ? "artifact.import.inspection"
+        : ["list", "abort", "release"].contains(verb) ? "artifact.import.\(verb)" : "artifact.import.begin"
       try session.negotiate(requiredMajor: 2, forMethod: method)
       if verb == "list" {
         var fields: [String: JSONValue] = [:]
@@ -43,6 +44,13 @@ extension RuntimeCLI {
           let receipt = try ArtifactImportReleaseProjection(value)
           guard fields["importId"] == .string(receipt.importID), fields["generation"] == .string("2") else {
             throw session.fail(.recordUnreadable, "Import release receipt does not match the requested owner and generation")
+          }
+        }
+        else if verb == "inspect" {
+          let inspection = try ArtifactImportInspectionProjection(value)
+          guard fields["importId"].map({ $0 == .string(inspection.imported.id) }) ?? true,
+            fields["importRequestId"].map({ $0 == .string(inspection.imported.intent.importRequestID) }) ?? true else {
+            throw session.fail(.recordUnreadable, "Import inspection returned another requested owner")
           }
         }
         else { _ = try CLIImportProjection(value) }

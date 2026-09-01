@@ -1509,6 +1509,26 @@ public actor RuntimeArtifactStore {
   package func appendImport(id: String, generation: Int, offset: Int, chunk: Data, sha256: String) throws -> JSONValue {
     try imports().append(id: id, generation: generation, offset: offset, chunk: chunk, sha256: sha256, now: nowUTC()).projection
   }
+
+  package func inspectImportReferences(
+    id: String?, requestID: String?,
+    jobs: @Sendable (String) throws -> [(id: String, outcomeUnknown: Bool)]
+  ) throws -> JSONValue {
+    let record = try inspectImport(id: id, requestID: requestID)
+    let active = try jobs(record.importID)
+    let holds = importUses.values.filter { $0.contains(where: { $0.importID == record.importID }) }.count
+    let value: JSONValue = .object([
+      "schemaVersion": .string("arkdeck.import-inspection/1"), "import": record.projection,
+      "references": .object([
+        "state": .string(active.isEmpty && holds == 0 ? "clear" : "referenced"),
+        "activeJobIds": .array(active.map { .string($0.id) }),
+        "outcomeUnknownJobIds": .array(active.filter(\.outcomeUnknown).map { .string($0.id) }),
+        "activeMaterializationCount": .string(String(holds)),
+      ]),
+    ])
+    _ = try ArtifactImportInspectionProjection(value)
+    return value
+  }
   package func abortImport(requestID: String, generation: Int) throws -> JSONValue {
     try imports().abort(requestID: requestID, generation: generation, now: nowUTC()).projection
   }

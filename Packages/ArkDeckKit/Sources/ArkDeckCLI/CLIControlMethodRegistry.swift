@@ -83,6 +83,7 @@ enum CLIControlMethodRegistry {
     "artifact.quota",
     "artifact.import.list",
     "artifact.import.inspect",
+    "artifact.import.inspection",
     "artifact.list",
     "artifact.inspect",
     "artifact.read",
@@ -219,7 +220,7 @@ enum CLIControlFailureMapper {
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Import owners never dispatch a device operation. Their typed refusal
     // still permits already-durable upload state; it is not preAdmission.
-    if ["artifact.import.begin", "artifact.import.append", "artifact.import.commit",
+    if ["artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.inspection",
         "artifact.import.abort", "artifact.import.inspect", "artifact.import.list", "artifact.import.release"].contains(method),
       evidence.phase == "importOwner", evidence.newDispatchCount == 0,
       ["resourceConflict", "invalidInput", "operationUnavailable", "inputTooLarge",

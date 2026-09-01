@@ -1343,6 +1343,14 @@ public actor RuntimeJobEngine {
     }
   }
 
+  package func inspectImportReferences(id: String?, requestID: String?) async throws -> JSONValue {
+    guard let artifactStore else { throw AgentExecutionControlFailure("operationUnavailable", "Import store is unavailable") }
+    let admission = admissionService
+    return try await artifactStore.inspectImportReferences(id: id, requestID: requestID) { id in
+      try admission.activeImportReferenceJobs(id)
+    }
+  }
+
   // MARK: Submit
 
   public func submit(_ requestData: Data) async throws -> RuntimeJobAcceptance {

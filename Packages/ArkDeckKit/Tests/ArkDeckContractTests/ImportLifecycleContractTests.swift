@@ -122,16 +122,25 @@ final class ImportLifecycleContractTests: XCTestCase {
 
   func testAdmittedJobBlocksReleaseAcrossRestartUntilCancelled() async throws {
     let record = try await imported(); var engine = try engine()
+    let before = try ArtifactImportInspectionProjection(await engine.inspectImportReferences(id: nil, requestID: record.intent.importRequestID))
+    XCTAssertEqual(before.imported.id, record.id); XCTAssertEqual(before.activeJobIDs, [])
     let resolved = try await artifacts.resolveLease(lease(record))
     let readback = try ArkTraceProfileFileReader.read(path: resolved.fileURL.path, maximumByteCount: resolved.byteCount)
     XCTAssertEqual(readback.data, bytes)
     let accepted = try await engine.submit(request(record))
+    let active = try ArtifactImportInspectionProjection(await engine.inspectImportReferences(id: record.id, requestID: nil))
+    XCTAssertEqual(active.activeJobIDs, [accepted.jobID]); XCTAssertEqual(active.outcomeUnknownJobIDs, [])
+    XCTAssertEqual(active.activeMaterializationCount, 0)
     await conflict { _ = try await engine.releaseImport(id: record.id, generation: 2) }
     artifacts = try RuntimeArtifactStore(rootURL: root.appending(path: "artifacts"), nowUTC: { "2026-09-01T00:00:01Z" })
     engine = try self.engine()
+    let restarted = try ArtifactImportInspectionProjection(await engine.inspectImportReferences(id: record.id, requestID: nil))
+    XCTAssertEqual(restarted.activeJobIDs, [accepted.jobID])
     await conflict { _ = try await engine.releaseImport(id: record.id, generation: 2) }
     _ = try await engine.recoverActiveJobs()
     try await engine.requestCancel(jobID: accepted.jobID)
+    let cancelled = try ArtifactImportInspectionProjection(await engine.inspectImportReferences(id: record.id, requestID: nil))
+    XCTAssertEqual(cancelled.activeJobIDs, []); XCTAssertEqual(cancelled.activeMaterializationCount, 0)
     let released = try await engine.releaseImport(id: record.id, generation: 2)
     _ = try ArtifactImportReleaseProjection(released)
     XCTAssertEqual(dispatcher.dispatchCount, 0)
@@ -149,9 +158,16 @@ final class ImportLifecycleContractTests: XCTestCase {
       }
       let entered = await gate.entered
       guard entered else { await gate.open(); _ = try? await planning.value; return XCTFail("plan did not reach its facts await") }
+      let planningReferences: Result<JSONValue, Error> = await Self.result {
+        try await engine.inspectImportReferences(id: record.id, requestID: nil)
+      }
       await conflict { _ = try await engine.releaseImport(id: record.id, generation: 2) }
       await gate.open()
       do { _ = try await planning.value; XCTAssertFalse(fails) } catch { XCTAssertTrue(fails, "\(error)") }
+      let held = try ArtifactImportInspectionProjection(planningReferences.get())
+      XCTAssertEqual(held.activeMaterializationCount, 1); XCTAssertEqual(held.activeJobIDs, [])
+      let finished = try ArtifactImportInspectionProjection(await engine.inspectImportReferences(id: record.id, requestID: nil))
+      XCTAssertEqual(finished.activeMaterializationCount, 0); XCTAssertEqual(finished.activeJobIDs, [])
       _ = try await engine.releaseImport(id: record.id, generation: 2)
       let jobs = try await engine.listJobs(); XCTAssertTrue(jobs.isEmpty)
     }
@@ -166,6 +182,8 @@ final class ImportLifecycleContractTests: XCTestCase {
     var uncertain = try JSONDecoder().decode(RuntimeJobRecord.self, from: XCTUnwrap(saved.initialRecordData))
     uncertain.state = "failed"; uncertain.outcomeUnknown = true
     try repository.updateJobState(jobID: accepted.jobID, state: uncertain.state, updatedAtUTC: "2026-09-01T00:00:01Z", recordData: uncertain.durableData())
+    let inspection = try ArtifactImportInspectionProjection(await engine.inspectImportReferences(id: record.id, requestID: nil))
+    XCTAssertEqual(inspection.activeJobIDs, [accepted.jobID]); XCTAssertEqual(inspection.outcomeUnknownJobIDs, [accepted.jobID])
     await conflict { _ = try await engine.releaseImport(id: record.id, generation: 2) }
     let still = try await artifacts.inspectImport(id: record.id); XCTAssertEqual(still.state, "committed")
   }
@@ -241,6 +259,8 @@ final class ImportLifecycleContractTests: XCTestCase {
     for bytes in [Data("{".utf8), try JSONSerialization.data(withJSONObject: altered)] {
       try repository.updateJobState(jobID: accepted.jobID, state: saved.state, updatedAtUTC: saved.updatedAtUTC, recordData: bytes)
       do { _ = try await engine.releaseImport(id: record.id, generation: 2); XCTFail("unverifiable references allowed release") }
+      catch let error as AgentExecutionControlFailure { XCTAssertEqual(error.code, "recordUnreadable") }
+      do { _ = try await engine.inspectImportReferences(id: record.id, requestID: nil); XCTFail("unverifiable history was reported as clear") }
       catch let error as AgentExecutionControlFailure { XCTAssertEqual(error.code, "recordUnreadable") }
       let state = try await artifacts.inspectImport(id: record.id); XCTAssertEqual(state.state, "committed")
     }

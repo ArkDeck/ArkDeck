@@ -1503,7 +1503,7 @@ enum CLICommandRegistry {
           CLIOptionSpec(name: "--target", form: .value(placeholder: "id", grammar: .opaque), summary: "filter target identity"),
           CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration(["inProgress", "committing", "committed", "aborted", "released"])), summary: "filter Import state")]),
         connectsToRuntime: true),
-      CLILeafSpec(token: "inspect", canonicalCommand: "artifact.import.inspect", summary: "recover an Import and its durable receipt",
+      CLILeafSpec(token: "inspect", canonicalCommand: "artifact.import.inspect", summary: "recover an Import, its receipt and active Job or plan references",
         options: runtimeClientOptions([importRequestOption,
           CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque), summary: "Runtime-assigned Import identity"),
           waitTimeoutOption, targetProtocolOption]), requiresExactlyOneOf: [["--import", "--import-request-id"]],
