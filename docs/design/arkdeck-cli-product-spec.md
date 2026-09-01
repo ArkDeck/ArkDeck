@@ -1606,7 +1606,8 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 |---|---|---|---|
 | Agent pause/HAR | `AgentRuntimeExecutor` 在 CLI 本地写 `PendingExecution` 文件；已有 HAR document 类型但无 production daemon wiring | Runtime-owned AgentExecution + HAR list/show/resume；`blocked` → `direct` | A |
 | Job event | App 和 CLI 都只有 snapshot/timeline polling，无 durable event ID/cursor | unary `job.events` + client watch；`blocked` → `direct` | B |
-| Workspace project/preset lifecycle | `projectRef`/`buildPresetRef` 来自 daemon install flags/配置与描述性字符串，无独立枚举/registration API | bounded project/preset register/update/remove + list/show；`blocked` → `direct` | B |
+| Workspace project lifecycle | Runtime 已持有 private root grant、stable `projectRef` 与 generation；target CLI 提供 register/update/remove/list/show，旧 daemon flags 只作一次兼容迁移输入 | `direct`；实现见 `cli-workspace-project-lifecycle.md` | B |
+| Workspace preset lifecycle | `buildPresetRef` 等仍来自内置 profile/描述性字符串，无独立 typed registration API | bounded preset register/update/remove + list/show；`blocked` → `direct` | B |
 | Imported input lifecycle | import commit 返回 store namespace 的 legacy synthetic `jobId` + Artifact ID，前者不是 Job engine record；无全局重发现和 release/unpin | durable Import + Import-owned Artifact 的 list/inspect/read/export/release；`blocked` → `direct` | B |
 | HDC lifecycle | 有 App/host lifecycle 组件，但无统一 durable control-action HAR carrier | impact preview → control action → HAR/resume → audited restart；`blocked` → `direct` | B |
 | Target availability | App 组合多个事实源，daemon 无聚合 projection | `target availability`；`blocked` → `direct` | B |

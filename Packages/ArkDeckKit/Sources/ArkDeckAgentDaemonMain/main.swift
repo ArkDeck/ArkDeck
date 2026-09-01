@@ -538,7 +538,7 @@ Task.detached {
     //   ARKDECK_WORKSPACE_PROJECTS=demo-app=/abs/path,other=/abs/other
     //   ARKDECK_WORKSPACE_ACTIVE_PROJECT=demo-app
     //   ARKDECK_DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk
-    let workspaceRoots = Dictionary(
+    let legacyWorkspaceRoots = Dictionary(
       uniqueKeysWithValues: (ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_PROJECTS"] ?? "")
         .split(separator: ",")
         .compactMap { entry -> (String, String)? in
@@ -548,6 +548,42 @@ Task.detached {
           guard parts.count == 2, !parts[0].isEmpty, parts[1].hasPrefix("/") else { return nil }
           return (parts[0], parts[1])
         })
+    let workspaceProjectStore = try RuntimeWorkspaceProjectStore(
+      rootURL: resolvedStateDirectory, nowUTC: utcNow)
+    // The legacy daemon flags are a compatibility reader only. Import them
+    // once into the same Runtime owner used by the target CLI, so service
+    // restart stops depending on a raw caller path and the target projection
+    // has one source of truth.
+    for (projectRef, root) in legacyWorkspaceRoots {
+      let kind: String
+      switch projectRef {
+      case "ArkDeck": kind = "arkdeck"
+      case "demo-app": kind = "openharmony"
+      default: continue
+      }
+      _ = try? workspaceProjectStore.register(
+        requestID: "legacy-\(projectRef)", kind: kind, rootPath: root,
+        projectRef: projectRef)
+    }
+    let registeredWorkspaceStartup = try workspaceProjectStore.startupRecords()
+    let registeredWorkspaceProjects = registeredWorkspaceStartup.map(\.resource)
+    let registeredWorkspaceCompositions = registeredWorkspaceStartup.compactMap(\.composition)
+    let registeredWorkspaceRoots = Dictionary(
+      uniqueKeysWithValues: registeredWorkspaceCompositions.map {
+        ($0.resource.projectRef, $0.rootPath)
+      })
+    var workspaceRoots = legacyWorkspaceRoots
+    for (projectRef, root) in registeredWorkspaceRoots { workspaceRoots[projectRef] = root }
+    let registeredWorkspaceKinds = Dictionary(
+      uniqueKeysWithValues: registeredWorkspaceProjects.map {
+        ($0.projectRef, $0.kind)
+      })
+    let registeredWorkspaceFailures = Dictionary(
+      uniqueKeysWithValues: registeredWorkspaceStartup.compactMap { startup in
+        startup.failure.map {
+          (startup.resource.projectRef, "workspace.projectRootUnavailable:\($0.message)")
+        }
+      })
     // What `workspace project list` will publish. Every configured ref lands
     // here — resolved or not — because an empty list would mean both "nothing
     // configured" and "configured but unusable", and the second is the one an
@@ -574,26 +610,22 @@ Task.detached {
     }
     let workspaceOperations: any DeviceProvider
     var workspaceOperationResolver: WorkspaceActionExecutableResolver?
-    var workspaceRepairConfiguration:
-      (
-        profile: WorkspaceProjectProfile,
-        profiles: WorkspaceProjectProfileRegistry,
-        attempts: WorkspacePatchAttemptStore,
-        evolution: EvolutionWorkspaceManager
-      )?
-    let configuredActiveProject =
-      ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_ACTIVE_PROJECT"]
-    let activeProjectRef =
-      configuredActiveProject
-      ?? (workspaceRoots.count == 1 ? workspaceRoots.keys.first : nil)
-    if let activeProjectRef, let activeRoot = workspaceRoots[activeProjectRef] {
+    var workspaceEvolution: EvolutionWorkspaceManager?
+    var resolvedWorkspaceProfiles: [WorkspaceProjectProfile] = []
+    var workspaceResolutionFailures = registeredWorkspaceFailures
+    // One provider registry can route every typed request by projectRef. Build
+    // all registered primary profiles here so a fresh host never needs the
+    // legacy ARKDECK_WORKSPACE_ACTIVE_PROJECT selector after registration.
+    for projectRef in workspaceRoots.keys.sorted() {
+      guard let root = workspaceRoots[projectRef] else { continue }
       do {
         let profile: WorkspaceProjectProfile
-        switch activeProjectRef {
-        case "ArkDeck":
+        switch registeredWorkspaceKinds[projectRef] ?? projectRef {
+        case "arkdeck", "ArkDeck":
           profile = try WorkspaceProjectProfile.arkDeck(
-            rootURL: URL(filePath: activeRoot, directoryHint: .isDirectory))
-        case "demo-app":
+            rootURL: URL(filePath: root, directoryHint: .isDirectory),
+            projectRef: projectRef)
+        case "openharmony", "demo-app":
           let node =
             ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
             ?? "/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
@@ -619,8 +651,8 @@ Task.detached {
               "workspace.projectProfileUnavailable: DevEco OpenHarmony SDK is absent")
           }
           profile = try WorkspaceProjectProfile.waterFlowDemo(
-            rootURL: URL(filePath: activeRoot, directoryHint: .isDirectory),
-            projectRef: activeProjectRef, nodePath: node, hvigorScriptPath: hvigor,
+            rootURL: URL(filePath: root, directoryHint: .isDirectory),
+            projectRef: projectRef, nodePath: node, hvigorScriptPath: hvigor,
             symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"])
           // Hvigor rejects a missing or stale inherited DEVECO_SDK_HOME with
           // configuration error 00303217. Pin the validated profile SDK on
@@ -628,47 +660,59 @@ Task.detached {
           workspaceChildEnvironment = ["DEVECO_SDK_HOME": sdk.path]
         default:
           throw DeviceProviderError.factsUnavailable(
-            "workspace.projectProfileUnavailable:\(activeProjectRef) is unsupported")
+            "workspace.projectProfileUnavailable:\(projectRef) is unsupported")
         }
-        let attempts = try WorkspacePatchAttemptStore(
-          rootURL: resolvedStateDirectory.appending(
-            path:
-              "workspace-patch-attempts", directoryHint: .isDirectory))
-        let profiles = WorkspaceProjectProfileRegistry(profile: profile)
-        let evolution = try EvolutionWorkspaceManager(
-          rootURL: resolvedStateDirectory.appending(
-            path:
-              "evolution-workspaces", directoryHint: .isDirectory),
-          profileRegistry: profiles,
-          patchLineage: attempts)
-        let unadoptedRuntimeWorkspaces = evolution.adoptRuntimeWorkspaces()
-        for workspaceID in unadoptedRuntimeWorkspaces {
-          print("runtime workspace not adopted for \(workspaceID)")
-        }
-        if !unadoptedRuntimeWorkspaces.isEmpty { fflush(stdout) }
-        workspaceOperations = WorkspaceOperationsProvider(
+        resolvedWorkspaceProfiles.append(profile)
+      } catch {
+        workspaceResolutionFailures[projectRef] = "workspace.projectProfileUnavailable:\(error)"
+      }
+    }
+    if let primaryProfile = resolvedWorkspaceProfiles.first {
+      let attempts = try WorkspacePatchAttemptStore(
+        rootURL: resolvedStateDirectory.appending(
+          path: "workspace-patch-attempts", directoryHint: .isDirectory))
+      let profiles = try WorkspaceProjectProfileRegistry(profiles: resolvedWorkspaceProfiles)
+      let evolution = try EvolutionWorkspaceManager(
+        rootURL: resolvedStateDirectory.appending(
+          path: "evolution-workspaces", directoryHint: .isDirectory),
+        profileRegistry: profiles,
+        patchLineage: attempts)
+      let unadoptedRuntimeWorkspaces = evolution.adoptRuntimeWorkspaces()
+      for workspaceID in unadoptedRuntimeWorkspaces {
+        print("runtime workspace not adopted for \(workspaceID)")
+      }
+      if !unadoptedRuntimeWorkspaces.isEmpty { fflush(stdout) }
+      workspaceEvolution = evolution
+      workspaceOperations = WorkspaceOperationsProvider(
+        profile: primaryProfile, profileRegistry: profiles,
+        attemptStore: attempts, signingPresetStore: signingPresetStore,
+        signingAttemptStore: signingAttemptStore,
+        isolationManager: evolution,
+        availabilityProfiles: resolvedWorkspaceProfiles,
+        nowUTC: utcNow)
+      workspaceOperationResolver = WorkspaceActionExecutableResolver(
+        profiles: resolvedWorkspaceProfiles)
+      // Availability is evaluated from each project's own closed profile,
+      // while execution routes through the shared registry above.
+      for profile in resolvedWorkspaceProfiles {
+        let projectProvider = WorkspaceOperationsProvider(
           profile: profile, profileRegistry: profiles,
           attemptStore: attempts, signingPresetStore: signingPresetStore,
           signingAttemptStore: signingAttemptStore,
           isolationManager: evolution, nowUTC: utcNow)
-        workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
-        workspaceRepairConfiguration = (profile, profiles, attempts, evolution)
-        // §7.9's discovery projection, built where the profile and the provider
-        // are both in scope. Availability comes from the provider so discovery
-        // and admission cannot disagree.
-        let resolvedProvider = workspaceOperations
         workspaceProjectPublications.append(
           WorkspaceProjectPublication.make(
             profile: profile,
-            availability: { resolvedProvider.runtimeAvailability(for: $0) }))
-      } catch {
-        workspaceOperations = UnavailableWorkspaceOperationsProvider(
-          reason: "workspace.projectProfileUnavailable:\(error)")
+            availability: { projectProvider.runtimeAvailability(for: $0) }))
       }
     } else {
+      let resolutionReason = workspaceResolutionFailures.keys.sorted()
+        .compactMap { workspaceResolutionFailures[$0] }
+        .joined(separator: "; ")
       workspaceOperations = UnavailableWorkspaceOperationsProvider(
-        reason:
-          "workspace.projectProfileUnavailable: select exactly one registered active project")
+        reason: resolutionReason.isEmpty
+          ? "workspace.projectProfileUnavailable: no registered project profile resolved"
+          : resolutionReason)
     }
     if let workspaceOperationResolver {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
@@ -680,17 +724,22 @@ Task.detached {
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
     }
-    for configuredRef in workspaceRoots.keys.sorted()
+    let configuredWorkspaceRefs = Set(workspaceRoots.keys)
+      .union(registeredWorkspaceProjects.map(\.projectRef))
+    for configuredRef in configuredWorkspaceRefs.sorted()
     where !workspaceProjectPublications.contains(where: { $0.projectRef == configuredRef }) {
       workspaceProjectPublications.append(
         WorkspaceProjectPublication.unresolved(
           projectRef: configuredRef,
-          reason: configuredRef == activeProjectRef
-            ? "this project is active but its profile could not be derived"
-            : "only the active project gets a derived profile in this build"))
+          reason: workspaceResolutionFailures[configuredRef]
+            ?? "this project profile could not be derived"))
     }
+    workspaceProjectStore.markApplied(
+      Dictionary(uniqueKeysWithValues: registeredWorkspaceProjects.map {
+        ($0.projectRef, $0.generation)
+      }))
     let workspaceReferenceLedger = WorkspaceReferenceLedgerHandle()
-    if let evolution = workspaceRepairConfiguration?.evolution {
+    if let evolution = workspaceEvolution {
       workspaceDispatcher = RuntimeOwnedWorkspaceDispatcher(
         fallback: workspaceDispatcher, manager: evolution,
         sweeper: evolution, referenceLedger: workspaceReferenceLedger)
@@ -761,7 +810,8 @@ Task.detached {
       tool: workspaceTool, operations: workspaceOperations)
     if workspaceOperationResolver != nil {
       print(
-        "workspace ProjectProfile ready for \(activeProjectRef ?? "-")")
+        "workspace ProjectProfiles ready for "
+          + resolvedWorkspaceProfiles.map(\.projectRef).joined(separator: ","))
       fflush(stdout)
     }
 
@@ -886,6 +936,7 @@ Task.detached {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
+      workspaceProjectStore: workspaceProjectStore,
       traceRuntimeProbe: traceRuntimeProbe,
       powerActivityController: PowerActivityController(),
       agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),

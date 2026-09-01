@@ -62,7 +62,12 @@
     "target.show",
     "trace.cache.purge",
     "trace.cache.status",
-    "trace.inspect"
+    "trace.inspect",
+    "workspace.project.list",
+    "workspace.project.register",
+    "workspace.project.remove",
+    "workspace.project.show",
+    "workspace.project.update"
   ],
   "preBootstrapLegacyMethods": [
     "health"

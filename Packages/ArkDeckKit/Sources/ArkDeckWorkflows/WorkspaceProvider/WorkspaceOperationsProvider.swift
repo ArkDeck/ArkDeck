@@ -194,7 +194,9 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
 
   /// Built-in profile for this repository. An explicit root override is
   /// configuration, not authority; the closed preset vocabulary stays here.
-  package static func arkDeck(rootURL: URL) throws -> WorkspaceProjectProfile {
+  package static func arkDeck(
+    rootURL: URL, projectRef: String = "ArkDeck"
+  ) throws -> WorkspaceProjectProfile {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
@@ -267,7 +269,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       ],
       timeoutSeconds: 900)
     return try WorkspaceProjectProfile(
-      profileID: "workspace-host@1", projectRef: "ArkDeck",
+      profileID: "workspace-host@1", projectRef: projectRef,
       projectRoot: root,
       allowedFileGlobs: [
         "Packages/ArkDeckKit/**", "Catalog/**", "docs/**",
@@ -803,9 +805,16 @@ extension WorkspacePatchAttemptStore: WorkspacePatchLineageReading {
 /// check again atomically at spawn.
 package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
   private let allowed: Set<WorkspaceExecutableIdentity>
+  private let requiresEveryIdentityAtGenericResolution: Bool
 
   public init(profile: WorkspaceProjectProfile) {
     self.allowed = profile.executableIdentities
+    self.requiresEveryIdentityAtGenericResolution = true
+  }
+
+  package init(profiles: [WorkspaceProjectProfile]) {
+    self.allowed = Set(profiles.flatMap(\.executableIdentities))
+    self.requiresEveryIdentityAtGenericResolution = false
   }
 
   package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
@@ -821,11 +830,23 @@ package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
     // selected one is checked in that same pass instead of a second time, and
     // the pass runs in path order so a profile with two drifted entries names
     // the same one every time.
-    let resolved = try validated(selected)
-    for identity in ordered.dropFirst() {
-      _ = try validated(identity)
+    if requiresEveryIdentityAtGenericResolution {
+      let resolved = try validated(selected)
+      for identity in ordered.dropFirst() {
+        _ = try validated(identity)
+      }
+      return resolved
     }
-    return resolved
+    // The production registry can contain independent project toolchains.
+    // Generic availability needs one usable route; action dispatch below
+    // still resolves and verifies the exact identity materialized for the
+    // selected project, so drift in one project cannot disable another and
+    // can never select fallback bytes for that action.
+    for identity in ordered {
+      if let resolved = try? validated(identity) { return resolved }
+    }
+    throw RuntimeDispatchFailure.failed(
+      "workspace registry has no available executable preset")
   }
 
   package func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
@@ -901,6 +922,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
   public let providerID = "workspace"
   private let profile: WorkspaceProjectProfile
   private let profileRegistry: WorkspaceProjectProfileRegistry
+  private let availabilityProfiles: [WorkspaceProjectProfile]
   private let attempts: WorkspacePatchAttemptStore
   private let signingPresets: OpenHarmonySigningPresetStore?
   private let signingAttempts: OpenHarmonySigningAttemptStore?
@@ -917,6 +939,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
   ) {
     self.profile = profile
     self.profileRegistry = WorkspaceProjectProfileRegistry(profile: profile)
+    self.availabilityProfiles = [profile]
     self.attempts = attemptStore
     self.signingPresets = signingPresetStore
     self.signingAttempts = signingAttemptStore
@@ -931,10 +954,12 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     signingPresetStore: OpenHarmonySigningPresetStore? = nil,
     signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
     isolationManager: (any WorkspaceIsolationManaging)? = nil,
+    availabilityProfiles: [WorkspaceProjectProfile]? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.profile = profile
     self.profileRegistry = profileRegistry
+    self.availabilityProfiles = availabilityProfiles ?? [profile]
     self.attempts = attemptStore
     self.signingPresets = signingPresetStore
     self.signingAttempts = signingAttemptStore
@@ -944,6 +969,21 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
 
   package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability {
+    var firstUnavailable: ProviderOperationAvailability?
+    for candidate in availabilityProfiles.sorted(by: { $0.projectRef < $1.projectRef }) {
+      let availability = runtimeAvailability(for: operation, profile: candidate)
+      if availability == .available { return .available }
+      if firstUnavailable == nil { firstUnavailable = availability }
+    }
+    return firstUnavailable
+      ?? .unavailable(
+        code: .workspacePresetUnavailable, reason: "no_workspace_project_registered")
+  }
+
+  private func runtimeAvailability(
+    for operation: CatalogOperationDescriptor,
+    profile: WorkspaceProjectProfile
   ) -> ProviderOperationAvailability {
     guard operation.provider == .workspace else {
       return .unavailable(
@@ -1126,6 +1166,11 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     guard projectRef == profile.projectRef else {
       throw DeviceProviderError.unsupportedAction(
         "workspace.projectProfileUnavailable:\(projectRef)")
+    }
+    if case .unavailable(_, let reason) = runtimeAvailability(
+      for: operation, profile: profile)
+    {
+      throw DeviceProviderError.unsupportedAction(reason)
     }
     // Exact base revision (CHG-2026-055, TASK-HFA-009). A caller that states
     // which tree it decided against gets that statement enforced: if the tree

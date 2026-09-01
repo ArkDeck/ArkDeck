@@ -6,6 +6,7 @@
 // fails closed both ways, and its first consumer lowers to an exact argv).
 
 import CryptoKit
+import Darwin
 import XCTest
 
 @testable import ArkDeckCore
@@ -87,7 +88,9 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       executablePath: "/usr/bin/grep", executableSHA256: String(repeating: "a", count: 64)),
     stdout: Data = Data("Sources/Foo.swift:12: WaterFlowPattern\n".utf8),
     exitStatus: Int32 = 0,
-    artifactStore: RuntimeArtifactStore? = nil
+    artifactStore: RuntimeArtifactStore? = nil,
+    workspaceProjectStore: RuntimeWorkspaceProjectStore? = nil,
+    workspaceProjects: [String: String] = ["demo-app": "/tmp/demo-app"]
   ) throws -> RuntimeJobEngine {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
@@ -96,7 +99,7 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       nowUTC: { "2026-07-31T00:00:00Z" })
     let providers = DeviceProviderRegistry(providers: [
       HDCObservationProviderAdapter(factsPort: witness),
-      workspaceProvider(tool: workspaceTool),
+      workspaceProvider(projects: workspaceProjects, tool: workspaceTool),
     ])
     return try RuntimeJobEngine(
       configuration: .init(
@@ -106,6 +109,7 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
         log: dispatcherLog, stdout: stdout, exitStatus: exitStatus),
       capabilityStore: capabilityStore,
       artifactStore: resolvedArtifactStore,
+      workspaceProjectStore: workspaceProjectStore,
       nowUTC: { "2026-07-31T00:00:00Z" })
   }
 
@@ -167,6 +171,43 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
     XCTAssertNil(evidence.bindingRevision)
     XCTAssertEqual(evidence.providerID, "workspace")
     XCTAssertEqual(evidence.actualEffect, "hostOnly")
+  }
+
+  func testAnAdmittedWorkspaceJobDurablyBlocksProjectRemovalUntilItIsTerminal() async throws {
+    let createdRoot = stateDirectory.appending(path: "registered-project", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: createdRoot, withIntermediateDirectories: true)
+    guard let resolvedRoot = realpath(createdRoot.path, nil) else { throw POSIXError(.ENOENT) }
+    defer { free(resolvedRoot) }
+    let root = String(cString: resolvedRoot)
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory.appending(path: "workspace-owner", directoryHint: .isDirectory))
+    let registered = try store.register(
+      requestID: "host-only-registration", kind: "arkdeck", rootPath: root)
+    store.markApplied([registered.projectRef: registered.generation])
+    let engine = try makeEngine(
+      witness: FactsWitness(), workspaceProjectStore: store,
+      workspaceProjects: [registered.projectRef: root])
+    let request = try request(inputs: [
+      "projectRef": .string(registered.projectRef),
+      "symbol": .string("WaterFlowPattern"),
+      "fileScope": .string("*.swift"),
+    ])
+
+    let accepted = try await engine.submit(request)
+    do {
+      _ = try await engine.workspaceProjectRemove(
+        projectRef: registered.projectRef, expectedGeneration: 1)
+      XCTFail("a nonterminal durable Job must keep its project registration")
+    } catch let failure as RuntimeWorkspaceProjectFailure {
+      XCTAssertEqual(failure.code, "resourceConflict")
+    }
+
+    let terminal = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(terminal.state, "succeeded")
+    let removed = try await engine.workspaceProjectRemove(
+      projectRef: registered.projectRef, expectedGeneration: 1)
+    XCTAssertEqual(removed.configurationStatus, "removed")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: root))
   }
 
   func testTheInspectionArtifactHoldsTheRealBytesAndNoDeviceBinding() async throws {

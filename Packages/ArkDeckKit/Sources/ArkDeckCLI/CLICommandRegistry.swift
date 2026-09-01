@@ -679,13 +679,68 @@ enum CLICommandRegistry {
             token: "list",
             canonicalCommand: "workspace.project.list",
             summary: "every project this Runtime has registered, with availability",
-            options: runtimeClientOptions([]),
+            options: runtimeClientOptions([targetProtocolOption]),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "show",
             canonicalCommand: "workspace.project.show",
             summary: "one project: kind, availability, preset refs and supported operations",
-            options: runtimeClientOptions([workspaceProjectRefOption]),
+            options: runtimeClientOptions([workspaceProjectRefOption, targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "register",
+            canonicalCommand: "workspace.project.register",
+            summary: "validate and persist one private workspace root grant",
+            options: runtimeClientOptions([
+              CLIOptionSpec(
+                name: "--registration-request-id",
+                form: .value(placeholder: "id", grammar: .opaque),
+                summary: "caller-stable registration identity",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--kind",
+                form: .value(
+                  placeholder: "arkdeck|openharmony",
+                  grammar: .enumeration(["arkdeck", "openharmony"])),
+                summary: "closed project profile family",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--root",
+                form: .value(placeholder: "absolute-path", grammar: .opaque),
+                summary: "host root accepted only by the registration owner",
+                isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "update",
+            canonicalCommand: "workspace.project.update",
+            summary: "replace an exact generation's private root grant",
+            options: runtimeClientOptions([
+              workspaceProjectRefOption,
+              generationOption,
+              CLIOptionSpec(
+                name: "--kind",
+                form: .value(
+                  placeholder: "arkdeck|openharmony",
+                  grammar: .enumeration(["arkdeck", "openharmony"])),
+                summary: "closed project profile family",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--root",
+                form: .value(placeholder: "absolute-path", grammar: .opaque),
+                summary: "replacement root accepted only by the registration owner",
+                isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "remove",
+            canonicalCommand: "workspace.project.remove",
+            summary: "remove an unused exact private root grant without deleting source",
+            options: runtimeClientOptions([
+              workspaceProjectRefOption, generationOption, targetProtocolOption,
+            ]),
             connectsToRuntime: true),
         ]),
       CLINodeSpec(

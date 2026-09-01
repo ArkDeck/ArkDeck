@@ -1144,6 +1144,7 @@ public actor RuntimeJobEngine {
   private let dispatcher: any RuntimeProcessDispatching
   private let capabilityStore: RuntimeCapabilityStore
   private let artifactStore: RuntimeArtifactStore?
+  private let workspaceProjectStore: RuntimeWorkspaceProjectStore?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   /// Present in the production daemon. A lease spans only an actively
   /// executing real Job and prevents idle *system* sleep; display sleep,
@@ -1176,6 +1177,7 @@ public actor RuntimeJobEngine {
     dispatcher: any RuntimeProcessDispatching,
     capabilityStore: RuntimeCapabilityStore,
     artifactStore: RuntimeArtifactStore? = nil,
+    workspaceProjectStore: RuntimeWorkspaceProjectStore? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     powerActivityController: PowerActivityController? = nil,
     agentUsageLedger: AgentAuthorityUsageLedger? = nil,
@@ -1187,6 +1189,7 @@ public actor RuntimeJobEngine {
     self.dispatcher = dispatcher
     self.capabilityStore = capabilityStore
     self.artifactStore = artifactStore
+    self.workspaceProjectStore = workspaceProjectStore
     self.traceRuntimeProbe = traceRuntimeProbe
     self.powerActivityController = powerActivityController
     self.agentUsageLedger = agentUsageLedger
@@ -1274,6 +1277,14 @@ public actor RuntimeJobEngine {
         "cannot canonicalize the typed plan-only request: \(error)")
     }
     let importUse = try await acquireImportInputs(request.inputs, descriptor: descriptor)
+    let workspaceUse: RuntimeWorkspaceProjectUseToken?
+    do {
+      workspaceUse = try acquireWorkspaceProjectInput(
+        request.inputs, descriptor: descriptor)
+    } catch {
+      if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      throw error
+    }
     do {
       let materialized = try await materializeTypedPlanBeforeAuthorization(
         request: request, descriptor: descriptor,
@@ -1321,9 +1332,11 @@ public actor RuntimeJobEngine {
         jobAdmitted: false,
         dispatchDisposition: "notDispatched")
       if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      if let workspaceUse { workspaceProjectStore?.endUse(workspaceUse) }
       return preview
     } catch {
       if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      if let workspaceUse { workspaceProjectStore?.endUse(workspaceUse) }
       throw error
     }
   }
@@ -1333,6 +1346,85 @@ public actor RuntimeJobEngine {
     do { references = try RuntimeImportLeaseReference.inputs(inputs, descriptor: descriptor) }
     catch { throw RuntimeJobEngineError.rejected(.invalidInput, "Import input references are malformed") }
     return try await artifactStore?.acquireImportInputs(references)
+  }
+
+  private func acquireWorkspaceProjectInput(
+    _ inputs: [String: JSONValue], descriptor: CatalogOperationDescriptor
+  ) throws -> RuntimeWorkspaceProjectUseToken? {
+    guard descriptor.provider == .workspace, let workspaceProjectStore else { return nil }
+    // The isolation-store sweep intentionally has no projectRef: its subject
+    // is Runtime-owned derived copies as a whole. All per-project operations
+    // declare the typed field and must acquire the exact registration below.
+    guard descriptor.inputs.contains(where: { $0.name == "projectRef" }) else { return nil }
+    guard case .string(let projectRef)? = inputs["projectRef"] else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput, "workspace operation requires a registered projectRef")
+    }
+    do { return try workspaceProjectStore.acquireUse(projectRef: projectRef) }
+    catch let failure as RuntimeWorkspaceProjectFailure {
+      let code: RuntimeOperationErrorCode
+      switch failure.code {
+      case "workspaceReferenceNotFound": code = .invalidInput
+      case "operationUnavailable": code = .unsupportedProfile
+      default: code = .conflict
+      }
+      throw RuntimeJobEngineError.rejected(
+        code, failure.message)
+    }
+  }
+
+  package func workspaceProjectList() throws -> [RuntimeWorkspaceProjectResource] {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace project registration owner is unavailable")
+    }
+    return try workspaceProjectStore.list()
+  }
+
+  package func workspaceProjectInspect(
+    projectRef: String
+  ) throws -> RuntimeWorkspaceProjectResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace project registration owner is unavailable")
+    }
+    return try workspaceProjectStore.inspect(projectRef)
+  }
+
+  package func workspaceProjectRegister(
+    requestID: String, kind: String, rootPath: String
+  ) throws -> RuntimeWorkspaceProjectResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace project registration owner is unavailable")
+    }
+    return try workspaceProjectStore.register(
+      requestID: requestID, kind: kind, rootPath: rootPath)
+  }
+
+  package func workspaceProjectUpdate(
+    projectRef: String, expectedGeneration: UInt64, kind: String, rootPath: String
+  ) throws -> RuntimeWorkspaceProjectResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace project registration owner is unavailable")
+    }
+    return try workspaceProjectStore.update(
+      projectRef: projectRef, expectedGeneration: expectedGeneration,
+      kind: kind, rootPath: rootPath,
+      requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
+  }
+
+  package func workspaceProjectRemove(
+    projectRef: String, expectedGeneration: UInt64
+  ) throws -> RuntimeWorkspaceProjectResource {
+    guard let workspaceProjectStore else {
+      throw AgentExecutionControlFailure(
+        "operationUnavailable", "workspace project registration owner is unavailable")
+    }
+    return try workspaceProjectStore.remove(
+      projectRef: projectRef, expectedGeneration: expectedGeneration,
+      requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
   }
 
   package func releaseImport(id: String, generation: Int) async throws -> JSONValue {
@@ -1485,6 +1577,14 @@ public actor RuntimeJobEngine {
     let jobID = Self.stableJobID(
       idempotencyKey: request.idempotencyKey, requestFingerprint: fingerprint)
     let importUse = try await acquireImportInputs(request.inputs, descriptor: descriptor)
+    let workspaceUse: RuntimeWorkspaceProjectUseToken?
+    do {
+      workspaceUse = try acquireWorkspaceProjectInput(
+        request.inputs, descriptor: descriptor)
+    } catch {
+      if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      throw error
+    }
     do {
       try beforeAdmission?()
       let materialized = try await materializeTypedPlanBeforeAuthorization(
@@ -1572,6 +1672,7 @@ public actor RuntimeJobEngine {
           }
         }
         if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+        if let workspaceUse { workspaceProjectStore?.endUse(workspaceUse) }
         return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
       case .conflict:
         throw RuntimeJobEngineError.idempotencyConflict(
@@ -1606,9 +1707,11 @@ public actor RuntimeJobEngine {
       jobs[jobID] = JobRuntime(record: record, journal: journal, nextSequence: 2)
       try configuration.admissionFaultInjector.check(.beforeResponse)
       if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      if let workspaceUse { workspaceProjectStore?.endUse(workspaceUse) }
       return RuntimeJobAcceptance(jobID: jobID, deduplicated: false)
     } catch {
       if let importUse, let artifactStore { await artifactStore.endImportUse(importUse) }
+      if let workspaceUse { workspaceProjectStore?.endUse(workspaceUse) }
       throw error
     }
   }

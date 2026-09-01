@@ -130,6 +130,9 @@ enum CLIControlMethodRegistry {
     "target.display-name.set",
     "history.filter.delete",
     "history.filter.save",
+    "workspace.project.register",
+    "workspace.project.update",
+    "workspace.project.remove",
     // Lease-aware local deletion of inactive derived Trace databases. A lost
     // response cannot prove which entries were removed, so callers reconcile
     // through trace.cache.status before making another explicit request.
@@ -257,6 +260,13 @@ enum CLIControlFailureMapper {
       evidence.phase == "historyFilterOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["workspace.project.list", "workspace.project.show", "workspace.project.register",
+        "workspace.project.update", "workspace.project.remove"].contains(method),
+      evidence.phase == "workspaceProjectOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceConflict", "workspaceReferenceNotFound", "idempotencyConflict",
+        "recordUnreadable", "quotaExceeded", "ioFailure", "factsDrifted", "outcomeUnknown",
+        "operationUnavailable"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     if ["trace.cache.status", "trace.cache.purge"].contains(method),
       evidence.phase == "traceCacheOwner", evidence.newDispatchCount == 0,

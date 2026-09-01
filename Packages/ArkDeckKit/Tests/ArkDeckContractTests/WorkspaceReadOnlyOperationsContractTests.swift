@@ -450,6 +450,41 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     XCTAssertEqual(makeProvider(production).runtimeAvailability(for: checkpoint), .available)
   }
 
+  func testMultiProjectAvailabilityRoutesTheExactSelectedProfile() throws {
+    let first = try makeProfile(withSourceControl: false, projectRef: "FirstProject")
+    let second = try makeProfile(withSourceControl: true, projectRef: "SecondProject")
+    let registry = try WorkspaceProjectProfileRegistry(profiles: [first, second])
+    let union = WorkspaceOperationsProvider(
+      profile: first, profileRegistry: registry,
+      attemptStore: try WorkspacePatchAttemptStore(
+        rootURL: state.appending(path: UUID().uuidString, directoryHint: .isDirectory)),
+      availabilityProfiles: [first, second],
+      nowUTC: { "2026-09-01T00:00:00Z" })
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.read-source-range@1"))
+
+    XCTAssertEqual(
+      union.runtimeAvailability(for: descriptor), .available,
+      "one project with the typed preset keeps the global operation route available")
+    XCTAssertThrowsError(
+      try union.action(
+        for: descriptor.steps[0], operation: descriptor,
+        inputs: [
+          "projectRef": .string("FirstProject"),
+          "filePath": .string("Sources/Water.swift"),
+          "lineStart": .integer(1), "lineEnd": .integer(2),
+        ], context: context()),
+      "the union must not lend another project's preset to the selected project")
+    XCTAssertNoThrow(
+      try union.action(
+        for: descriptor.steps[0], operation: descriptor,
+        inputs: [
+          "projectRef": .string("SecondProject"),
+          "filePath": .string("Sources/Water.swift"),
+          "lineStart": .integer(1), "lineEnd": .integer(2),
+        ], context: context()))
+  }
+
   // MARK: - The published surface stays closed
 
   func testTheCheckpointIsARuntimeAuthorizedMutationNotARead() throws {
@@ -590,7 +625,9 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     return try encoder.encode(request)
   }
 
-  private func makeProfile(withSourceControl: Bool) throws -> WorkspaceProjectProfile {
+  private func makeProfile(
+    withSourceControl: Bool, projectRef: String = "TestProject"
+  ) throws -> WorkspaceProjectProfile {
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
     let git = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/git")
@@ -605,7 +642,7 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
         presetID: "git", executable: git, fixedArguments: [], timeoutSeconds: 30)
       : nil
     return try WorkspaceProjectProfile(
-      profileID: "test-workspace@1", projectRef: "TestProject",
+      profileID: "test-workspace@1", projectRef: projectRef,
       projectRoot: root.path,
       allowedFileGlobs: ["Sources/**"],
       inspectionPreset: inspection, sourceControlPreset: sourceControl,
