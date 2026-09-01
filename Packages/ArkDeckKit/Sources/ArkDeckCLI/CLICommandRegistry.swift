@@ -1247,6 +1247,25 @@ enum CLICommandRegistry {
         "capture", "trace.capture", "capture.diagnostics@1",
         "capture a bounded trace through the shared typed trace preset"),
       CLILeafSpec(
+        token: "inspect",
+        canonicalCommand: "trace.inspect",
+        summary: "derive a path-free report from one exact published raw Trace Artifact",
+        options: runtimeClientOptions([
+          jobIDOption, requiredArtifactIDOption,
+          CLIOptionSpec(
+            name: "--allow-sensitive",
+            form: .flag,
+            summary: "explicit opt-in required before the raw Trace Artifact is inspected",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--timeout",
+            form: .value(
+              placeholder: "2m", grammar: .duration(maximumMilliseconds: 600_000)),
+            summary: "bounded Runtime inspection budget; default 2m, maximum 10m"),
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "export",
         canonicalCommand: "trace.export",
         summary: "export the exact raw trace Artifact through the Artifact policy",

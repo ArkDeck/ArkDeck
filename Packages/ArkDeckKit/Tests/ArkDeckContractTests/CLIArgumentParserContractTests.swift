@@ -87,6 +87,21 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertTrue(error?.message.contains("--job") == true)
   }
 
+  func testTraceInspectionRequiresAnExactSensitiveSourceAndBoundedBudget() {
+    let source = [
+      "trace", "inspect", "--job", "job-trace", "--artifact", "ART-trace",
+    ]
+    XCTAssertEqual(failure(source)?.code, .invalidOption)
+    XCTAssertNotNil(success(source + ["--allow-sensitive"]))
+    XCTAssertNotNil(success(source + ["--allow-sensitive", "--timeout", "1ms"]))
+    XCTAssertNotNil(success(source + ["--allow-sensitive", "--timeout", "10m"]))
+    for timeout in ["0s", "601s", "11m", "1h"] {
+      XCTAssertEqual(
+        failure(source + ["--allow-sensitive", "--timeout", timeout])?.code,
+        .invalidOption)
+    }
+  }
+
   /// An option that belongs to a sibling command is exactly the case the old
   /// scanning parser could not see: `job status` never looked for `--target`,
   /// so it went to the daemon as a status request with a silently discarded

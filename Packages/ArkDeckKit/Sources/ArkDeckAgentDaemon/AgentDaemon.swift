@@ -102,6 +102,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let artifactStore: RuntimeArtifactStore?
   private let historyFilterStore: RuntimeHistoryFilterStore?
   private let traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)?
+  private let traceInspector: (any RuntimeTraceInspecting)?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
@@ -144,6 +145,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
     traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
+    traceInspector: (any RuntimeTraceInspecting)? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     flashLanePlanPreviewer: (any FlashLanePlanPreviewing)? = nil,
@@ -168,6 +170,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
       traceCacheMaintenance: traceCacheMaintenance,
+      traceInspector: traceInspector,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
@@ -198,6 +201,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
     traceCacheMaintenance: (any RuntimeTraceCacheMaintaining)? = nil,
+    traceInspector: (any RuntimeTraceInspecting)? = nil,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -226,6 +230,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
     self.traceCacheMaintenance = traceCacheMaintenance
+    self.traceInspector = traceInspector
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.flashLanePlanPreviewer = flashLanePlanPreviewer
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
@@ -2171,6 +2176,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
+
+    case "trace.inspect":
+      return await RuntimeTraceInspectionResourceHandler(
+        engine: engine, artifacts: artifactStore, inspector: traceInspector
+      ).response(request)
 
     case "trace.cache.status", "trace.cache.purge":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {

@@ -67,6 +67,7 @@ enum CLIControlMethodRegistry {
     // workflow — the warm candidate snapshot is read, never refreshed.
     "target.availability",
     "trace.cache.status",
+    "trace.inspect",
     "trace.probe",
     "debug.probe",
     "debug.status",
@@ -260,6 +261,11 @@ enum CLIControlFailureMapper {
     if ["trace.cache.status", "trace.cache.purge"].contains(method),
       evidence.phase == "traceCacheOwner", evidence.newDispatchCount == 0,
       ["recordUnreadable", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if method == "trace.inspect",
+      evidence.phase == "traceInspectionOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "operationUnavailable", "resourceNotFound", "artifactIntegrityFailed",
+        "recordUnreadable", "operationFailed"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",

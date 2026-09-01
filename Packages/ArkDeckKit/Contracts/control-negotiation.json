@@ -60,7 +60,8 @@
     "target.display-name.set",
     "target.show",
     "trace.cache.purge",
-    "trace.cache.status"
+    "trace.cache.status",
+    "trace.inspect"
   ],
   "preBootstrapLegacyMethods": [
     "health"

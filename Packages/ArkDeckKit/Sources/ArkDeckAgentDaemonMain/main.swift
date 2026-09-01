@@ -200,6 +200,80 @@ struct ProductTraceCacheMaintenance: RuntimeTraceCacheMaintaining {
   }
 }
 
+/// Product bridge from the trusted ArkTrace distribution snapshot into the
+/// Runtime's path-free local inspection resource.
+struct ProductTraceOfflineInspector: RuntimeTraceInspecting {
+  let service: ArkDeckTraceOfflineInspectionService
+
+  init(profile: AnalyzerProfile, workingDirectory: URL) throws {
+    guard profile.analyzerRef == "trace-summary@1",
+      profile.preflightAvailability == .available,
+      let contract = profile.arkTraceSummaryContract,
+      let bundlePath = profile.canonicalNamespaceRoot,
+      profile.analyzerVersion.hasPrefix(contract.toolVersion + "+")
+    else { throw ArkTraceSummaryProfileError.contractMismatch }
+    let build = String(profile.analyzerVersion.dropFirst(contract.toolVersion.utf8.count + 1))
+    guard !build.isEmpty, build.utf8.count <= 128,
+      !build.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+    else { throw ArkTraceSummaryProfileError.contractMismatch }
+    service = try ArkDeckTraceOfflineInspectionService(
+      distributionBundleURL: URL(filePath: bundlePath, directoryHint: .isDirectory),
+      workingDirectory: workingDirectory,
+      contract: ArkDeckTraceOfflineInspectionContract(
+        engineVersion: contract.toolVersion,
+        engineBuild: build,
+        parserVersion: contract.parserVersion,
+        parserUpstreamRevision: contract.parserUpstreamRevision,
+        parserSHA256: contract.parserSHA256,
+        parserAdapterVersion: contract.parserAdapterVersion,
+        parserBuildRecipeVersion: contract.parserBuildRecipeVersion,
+        schemaAdapterVersion: contract.schemaAdapterVersion,
+        indexSchemaVersion: contract.indexSchemaVersion))
+  }
+
+  func inspect(
+    source: URL,
+    expectedSourceSHA256: String,
+    expectedSourceByteCount: Int
+  ) async throws -> RuntimeTraceInspectionReport {
+    let value = try await service.inspect(
+      source: source,
+      expectedSourceSHA256: expectedSourceSHA256,
+      expectedSourceByteCount: expectedSourceByteCount)
+    return try RuntimeTraceInspectionReport(
+      engineVersion: value.engineVersion,
+      engineBuild: value.engineBuild,
+      engineSourceRevision: value.engineSourceRevision,
+      sourceSHA256: value.sourceSHA256,
+      sourceByteCount: value.sourceByteCount,
+      durationNs: value.durationNs,
+      schemaFingerprint: value.schemaFingerprint,
+      parser: RuntimeTraceInspectionParser(
+        name: value.parserName,
+        version: value.parserVersion,
+        upstreamRevision: value.parserUpstreamRevision,
+        binarySHA256: value.parserSHA256,
+        adapterVersion: value.parserAdapterVersion,
+        buildRecipeVersion: value.parserBuildRecipeVersion),
+      schema: RuntimeTraceInspectionSchema(
+        adapterVersion: value.schemaAdapterVersion,
+        indexVersion: value.indexSchemaVersion,
+        upstreamDatabaseSHA256: value.upstreamDatabaseSHA256,
+        upstreamDatabaseByteCount: value.upstreamDatabaseByteCount),
+      capabilities: RuntimeTraceInspectionCapabilities(
+        cpuScheduling: value.cpuScheduling,
+        threadStates: value.threadStates,
+        namedSlices: value.namedSlices,
+        cpuCounters: value.cpuCounters,
+        processCounters: value.processCounters),
+      dataQualityStatus: value.dataQualityStatus,
+      dataQualityIssues: try value.dataQualityIssues.map {
+        try RuntimeTraceInspectionQualityIssue(
+          category: $0.category, scope: $0.scope, count: $0.count)
+      })
+  }
+}
+
 /// Bootstrap observation over the descriptor-bound dispatcher: every action
 /// is closed, read-only and verified by the provider's semantic parser.
 struct ProviderBootstrapObservation: BootstrapObservationPort {
@@ -963,6 +1037,14 @@ Task.detached {
     let traceCacheMaintenance = ProductTraceCacheMaintenance(
       service: try ArkDeckTraceCacheMaintenanceService(
         cachesDirectory: traceCacheDirectory))
+    let traceInspector = try analyzerProfiles.first(where: {
+      $0.analyzerRef == "trace-summary@1"
+    }).map {
+      try ProductTraceOfflineInspector(
+        profile: $0,
+        workingDirectory: resolvedStateDirectory.appending(
+          path: "trace-inspection", directoryHint: .isDirectory))
+    }
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,
@@ -980,6 +1062,7 @@ Task.detached {
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
       traceCacheMaintenance: traceCacheMaintenance,
+      traceInspector: traceInspector,
       flashBundleImportDirectory: resolvedStateDirectory.appending(
         path:
           "flash-bundle-imports", directoryHint: .isDirectory),

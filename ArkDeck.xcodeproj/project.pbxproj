@@ -865,7 +865,7 @@
 			repositoryURL = "https://github.com/ArkDeck/ArkTrace.git";
 			requirement = {
 				kind = revision;
-				revision = 84858f4225e48e8a71a559394cdcf857d23c39d1;
+				revision = e98a753ef61f616c8f95693cc4c4201c6b1e3393;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
