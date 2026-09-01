@@ -194,6 +194,30 @@ final class CLIArgumentParserContractTests: XCTestCase {
       .invalidOption)
   }
 
+  func testRuntimeUpdateIsLocalAndHandoffRequiresExactFinalConsent() {
+    for verb in ["check", "download", "status", "cancel", "cleanup"] {
+      guard case .dispatch(_, let leaf, _)? = success(["runtime", "update", verb]) else {
+        continue
+      }
+      XCTAssertFalse(leaf.connectsToRuntime)
+      XCTAssertEqual(
+        failure(["runtime", "update", verb, "--socket", "/tmp/runtime.sock"])?.code,
+        .invalidOption)
+      XCTAssertNotNil(success(["runtime", "update", verb, "--output", "json"]))
+    }
+
+    XCTAssertEqual(failure(["runtime", "update", "handoff"])?.code, .invalidOption)
+    XCTAssertEqual(
+      failure(["runtime", "update", "handoff", "--consent", "yes"])?.code,
+      .invalidOption)
+    guard case .dispatch(_, let handoff, _)? = success([
+      "runtime", "update", "handoff", "--consent", "reveal-in-finder",
+    ]) else { return }
+    XCTAssertFalse(handoff.connectsToRuntime)
+    XCTAssertNil(handoff.options.first { $0.name == "--destination" })
+    XCTAssertNil(handoff.options.first { $0.name == "--install" })
+  }
+
   func testOutputIsAcceptedByEveryLeafThatDeclaresItAndRefusedByTheRest() {
     XCTAssertNotNil(success(["doctor", "--output", "json"]))
     XCTAssertNotNil(success(["job", "list", "--output", "json"]))

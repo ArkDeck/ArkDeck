@@ -1335,7 +1335,7 @@ private final class AutoUpdateViewModel {
     }
   }
 
-  @ObservationIgnored private var service: AutoUpdateService?
+  @ObservationIgnored private var service: RuntimeUpdateApplicationFacade?
   private let identity = AutoUpdateApplicationFacade.currentProductIdentity()
   @ObservationIgnored private var started = false
   /// UI automation drives a declared state instead of the real updater, which

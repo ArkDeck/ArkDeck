@@ -1618,7 +1618,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | Device display name | App 在 UserDefaults 保存 candidate/target 显示名，不改 identity | `device/target display-name`；`blocked` → `local` | C |
 | History saved filter | Runtime 拥有单例 generation-CAS query preset，App/CLI 共用；旧 AppStorage 仅作一次性迁移输入 | `history filter list/save/delete`；`local` | C |
 | Trace derived-cache purge | Runtime 以固定 App container cache root 持有 lease-aware typed owner；App/CLI 共用，且不投影路径或删除原始 Trace Artifact | `trace cache status/purge`；`local`；实现见 `cli-trace-cache.md` | C |
-| Source/update | remote source 和 consumer auto-update 是 App/平台服务；maintainer feed 已另有 CLI | typed source 与 consumer update lifecycle；`blocked` → `local` | C |
+| Source/update | remote source 仍是 App/平台服务；consumer auto-update 由 App/CLI 共用 durable local owner，保持 signed feed、same-Team verification 与 Finder handoff 边界；maintainer feed 已另有 CLI | source 保持 `blocked`；`runtime update check/download/handoff/status/cancel/cleanup` 为 `local`，实现见 `cli-runtime-update.md` | C |
 | Offline inspector | UI dump inspect/hit-test、diagnostics inspect/preview/export 与 Trace inspect 均使用 typed owner；Trace Runtime owner 校验 exact Job/Artifact、`capture.diagnostics@1`、`trace.htrace`、media type/privacy/size/SHA-256，以固定 ArkTrace distribution 和 ephemeral session 发布 `arkdeck.trace-inspection/1`，不接受 caller path 且不创建 evidence | `local`；Trace 实现见 `cli-trace-inspection.md` | C |
 | App icon/menu/shortcut | 只改变 App 呈现和导航 | `presentation`；不需要 CLI leaf | — |
 

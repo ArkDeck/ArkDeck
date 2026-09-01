@@ -1652,7 +1652,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing runtime subcommand (health|hdc|service|signing|support-bundle)")
+        message: "missing runtime subcommand (health|hdc|service|signing|support-bundle|update)")
     }
     var rest = Array(arguments.dropFirst())
     switch subcommand {
@@ -1668,6 +1668,8 @@ enum RuntimeCLI {
       try await runSigningAsync(rest, spelledAs: "runtime.signing")
     case "support-bundle":
       try await runRuntimeSupportBundle(rest)
+    case "update":
+      try await runRuntimeUpdate(rest)
     case "health":
       var session = runtimeSession(&rest, command: "runtime.health")
       if let index = rest.firstIndex(of: "--require-protocol"), index + 1 < rest.count,

@@ -981,6 +981,7 @@ enum CLICommandRegistry {
       runtimeBundleNode,
       runtimeToolNode,
       runtimeSupportBundleNode,
+      runtimeUpdateNode,
     ])
 
   private static let runtimeSupportBundleNode = CLINodeSpec(
@@ -1016,6 +1017,45 @@ enum CLICommandRegistry {
             isRequired: true),
           outputOption, jsonOption, controlRequestIDOption,
         ]),
+    ])
+
+  private static let runtimeUpdateNode = CLINodeSpec(
+    token: "update",
+    summary: "check, verify, and hand off a signed ArkDeck update without installing it",
+    leaves: [
+      CLILeafSpec(
+        token: "check", canonicalCommand: "runtime.update.check",
+        summary: "fetch and verify the signed update feed; never download the artifact",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "download", canonicalCommand: "runtime.update.download",
+        summary: "download and verify the available signed artifact; never install it",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "handoff", canonicalCommand: "runtime.update.handoff",
+        summary: "reverify and reveal the exact artifact in Finder after explicit consent",
+        options: [
+          CLIOptionSpec(
+            name: "--consent",
+            form: .value(
+              placeholder: "reveal-in-finder",
+              grammar: .enumeration(["reveal-in-finder"])),
+            summary: "explicit final consent to reveal the verified artifact; does not install",
+            isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption,
+        ]),
+      CLILeafSpec(
+        token: "status", canonicalCommand: "runtime.update.status",
+        summary: "read the durable cross-process update lifecycle without exposing cache paths",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "cancel", canonicalCommand: "runtime.update.cancel",
+        summary: "request cancellation of the active check, download, or verification",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "cleanup", canonicalCommand: "runtime.update.cleanup",
+        summary: "recover a crashed owner and remove unreferenced update cache entries",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
     ])
 
   private static let runtimeBundleNode = CLINodeSpec(

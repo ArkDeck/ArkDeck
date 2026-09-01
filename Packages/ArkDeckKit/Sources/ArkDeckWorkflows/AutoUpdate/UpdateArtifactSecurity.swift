@@ -10,7 +10,7 @@ public enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
   case artifactReplaced
 }
 
-public struct ValidatedUpdateArtifact: Equatable, Sendable {
+public struct ValidatedUpdateArtifact: Codable, Equatable, Sendable {
   public let downloaded: DownloadedUpdateArtifact
   public let teamIdentifier: String
 
