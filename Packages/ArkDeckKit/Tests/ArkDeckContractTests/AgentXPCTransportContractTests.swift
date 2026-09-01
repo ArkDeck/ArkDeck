@@ -44,6 +44,12 @@ final class AgentXPCTransportContractTests: XCTestCase {
       #"{"protocolVersion":"1.0.0","id":"contract","method":"\#(method)"}"#.utf8)
   }
 
+  private func targetFrame(method: String) throws -> Data {
+    try ArkDeckAgentXPC.requestFrame(
+      method: method, requestID: "contract-target",
+      protocolVersion: ArkDeckControlProtocol.targetVersion)
+  }
+
   private func submitFrame(
     operationID: String = "flash.dayu200",
     operationVersion: Int? = nil,
@@ -76,6 +82,17 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertEqual(request.params, ["jobId": .string("JOB-1")])
   }
 
+  func testTargetFramesRequireAPublishedTargetMethodAndStayAllowlisted() throws {
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(of: try targetFrame(method: "trace.cache.status")),
+      .direct(method: "trace.cache.status"))
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(of: try targetFrame(method: "trace.cache.purge")),
+      .direct(method: "trace.cache.purge"))
+    XCTAssertNil(AgentXPCEndpoint.admission(of: try targetFrame(method: "trace.probe")))
+    XCTAssertNil(AgentXPCEndpoint.admission(of: try targetFrame(method: "not.published")))
+  }
+
   // Stateless methods forward by exact name. Generic job names are present
   // only as gated vocabulary and never pass from a method-only frame.
   func testTheAllowlistForwardsExactlyTheAppControlPlane() {
@@ -85,6 +102,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       .union(ArkDeckAgentXPC.forwardableNativeLibraryImportMethods)
       .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
       .union(ArkDeckAgentXPC.forwardableHistoryFilterMethods)
+      .union(ArkDeckAgentXPC.forwardableTraceCacheMethods)
     {
       XCTAssertEqual(
         AgentXPCEndpoint.admission(of: frame(method: method)), .direct(method: method),
@@ -115,6 +133,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "history.filter.list",
         "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
         "runtime.hdc-status", "target.list", "trace.probe",
+        "trace.cache.status",
       ],
       "read-only surface drift is a control-plane decision")
     XCTAssertEqual(
@@ -146,6 +165,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ArkDeckAgentXPC.forwardableHistoryFilterMethods,
       ["history.filter.delete", "history.filter.save"],
       "History may mutate only its bounded local saved-query resource")
+    XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableTraceCacheMethods,
+      ["trace.cache.purge"],
+      "Trace may mutate only inactive derived databases through the fixed Runtime owner")
     XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")

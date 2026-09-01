@@ -66,6 +66,7 @@ enum CLIControlMethodRegistry {
     // it creates no Job, writes no evidence, and deliberately runs no device
     // workflow — the warm candidate snapshot is read, never refreshed.
     "target.availability",
+    "trace.cache.status",
     "trace.probe",
     "debug.probe",
     "debug.status",
@@ -127,6 +128,10 @@ enum CLIControlMethodRegistry {
     "target.display-name.set",
     "history.filter.delete",
     "history.filter.save",
+    // Lease-aware local deletion of inactive derived Trace databases. A lost
+    // response cannot prove which entries were removed, so callers reconcile
+    // through trace.cache.status before making another explicit request.
+    "trace.cache.purge",
     "agent.run",
     "agent.resume",
     "agent.abandon",
@@ -250,6 +255,10 @@ enum CLIControlFailureMapper {
       evidence.phase == "historyFilterOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["trace.cache.status", "trace.cache.purge"].contains(method),
+      evidence.phase == "traceCacheOwner", evidence.newDispatchCount == 0,
+      ["recordUnreadable", "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",

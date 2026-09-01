@@ -1,5 +1,4 @@
 import AppKit
-import ArkTraceAppSupport
 import ArkDeckWorkflows
 import SwiftUI
 import UniformTypeIdentifiers
@@ -10,7 +9,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
   let isHDCRefreshInFlight: Bool
   let hdcConfigurationError: String?
   let hasActiveRuntimeJobs: Bool
-  let traceController: TraceDocumentController
+  @State private var traceCacheModel: TraceCacheSettingsViewModel
   let onHDCRefresh: () -> Void
   let onSelectHDC: (URL) -> Void
   let updatesContent: UpdatesContent
@@ -21,7 +20,8 @@ struct SettingsRootView<UpdatesContent: View>: View {
     isHDCRefreshInFlight: Bool,
     hdcConfigurationError: String?,
     hasActiveRuntimeJobs: Bool,
-    traceController: TraceDocumentController,
+    traceCacheProvider: any RuntimeTraceCacheApplicationProviding =
+      RuntimeTraceCacheApplicationFacade.make(),
     onHDCRefresh: @escaping () -> Void,
     onSelectHDC: @escaping (URL) -> Void,
     @ViewBuilder updatesContent: () -> UpdatesContent
@@ -31,7 +31,8 @@ struct SettingsRootView<UpdatesContent: View>: View {
     self.isHDCRefreshInFlight = isHDCRefreshInFlight
     self.hdcConfigurationError = hdcConfigurationError
     self.hasActiveRuntimeJobs = hasActiveRuntimeJobs
-    self.traceController = traceController
+    _traceCacheModel = State(
+      initialValue: TraceCacheSettingsViewModel(provider: traceCacheProvider))
     self.onHDCRefresh = onHDCRefresh
     self.onSelectHDC = onSelectHDC
     self.updatesContent = updatesContent()
@@ -61,7 +62,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
         StorageSettingsPane(model: model)
       }
       Tab(settingsText("settings.tab.trace"), systemImage: "waveform.path.ecg") {
-        TraceSettingsPane(controller: traceController)
+        TraceSettingsPane(model: traceCacheModel)
       }
       Tab(settingsText("settings.tab.updates"), systemImage: "arrow.triangle.2.circlepath") {
         WorkspacePage {

@@ -222,6 +222,72 @@ final class RemoteBuildSourceStateTests: XCTestCase {
   }
 }
 
+@MainActor
+final class TraceCacheSettingsStateTests: XCTestCase {
+  func testFailedPurgeReconcilesWithStatusWithoutRetryingTheMutation() async {
+    let current = RuntimeTraceCacheInventory(
+      entryCount: 1, totalByteCount: 1024, activeEntryCount: 1)
+    let provider = TraceCacheStateProvider(
+      purge: .failed("outcome unknown"), load: .loaded(current))
+    let model = TraceCacheSettingsViewModel(provider: provider)
+
+    await model.purgeUnused()
+
+    XCTAssertEqual(model.failureMessage, "outcome unknown")
+    XCTAssertEqual(model.inventory, current)
+    XCTAssertNil(model.lastPurgeReport)
+    let calls = await provider.calls()
+    XCTAssertEqual(calls, ["purge", "status"])
+  }
+
+  func testSuccessfulPurgePublishesTheReturnedAfterInventory() async {
+    let before = RuntimeTraceCacheInventory(
+      entryCount: 3, totalByteCount: 4096, activeEntryCount: 1)
+    let after = RuntimeTraceCacheInventory(
+      entryCount: 1, totalByteCount: 1024, activeEntryCount: 1)
+    let report = RuntimeTraceCachePurgeReport(
+      before: before, after: after,
+      recoveredPrivateDirectoryCount: 0,
+      removedOrphanOwnerMarkerCount: 0,
+      removedEntryCount: 2,
+      skippedActiveEntryCount: 1)
+    let provider = TraceCacheStateProvider(
+      purge: .completed(report), load: .loaded(before))
+    let model = TraceCacheSettingsViewModel(provider: provider)
+
+    await model.purgeUnused()
+
+    XCTAssertEqual(model.inventory, after)
+    XCTAssertEqual(model.lastPurgeReport, report)
+    XCTAssertNil(model.failureMessage)
+    let calls = await provider.calls()
+    XCTAssertEqual(calls, ["purge"])
+  }
+}
+
+private actor TraceCacheStateProvider: RuntimeTraceCacheApplicationProviding {
+  let purgeResult: RuntimeTraceCachePurgeResult
+  let loadResult: RuntimeTraceCacheLoadResult
+  private var recordedCalls: [String] = []
+
+  init(purge: RuntimeTraceCachePurgeResult, load: RuntimeTraceCacheLoadResult) {
+    purgeResult = purge
+    loadResult = load
+  }
+
+  func loadTraceCache() async -> RuntimeTraceCacheLoadResult {
+    recordedCalls.append("status")
+    return loadResult
+  }
+
+  func purgeUnusedTraceCache() async -> RuntimeTraceCachePurgeResult {
+    recordedCalls.append("purge")
+    return purgeResult
+  }
+
+  func calls() -> [String] { recordedCalls }
+}
+
 private struct BrowserStateFixture {
   let model: DebugRemoteBuildBrowserViewModel
   let provider: ControlledRemoteSourceStateProvider

@@ -1226,14 +1226,12 @@ private struct SettingsSceneContent: View {
   let hdcDiagnostics: HDCStatusViewModel
   let runtimeHistory: RuntimeHistoryViewModel
   let autoUpdate: AutoUpdateViewModel
-  let traceDocument: TraceDocumentController
 
   init(models: ArkDeckAppModelStore) {
     model = models.settingsWorkspace
     hdcDiagnostics = models.hdcDiagnostics
     runtimeHistory = models.runtimeHistory
     autoUpdate = models.autoUpdate
-    traceDocument = models.traceDocument
   }
 
   var body: some View {
@@ -1243,7 +1241,6 @@ private struct SettingsSceneContent: View {
       isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
       hdcConfigurationError: hdcDiagnostics.configurationError,
       hasActiveRuntimeJobs: runtimeHistory.hasActiveJobs,
-      traceController: traceDocument,
       onHDCRefresh: { hdcDiagnostics.refresh() },
       onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
     ) {

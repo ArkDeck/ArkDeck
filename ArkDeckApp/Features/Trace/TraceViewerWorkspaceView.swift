@@ -2226,7 +2226,7 @@ struct ShortcutHelpView: View {
 /// Each section defers its data to a `.task` that runs only when selected, so
 /// neither cache inspection nor license I/O can block the first app window.
 struct TraceSettingsPane: View {
-    var controller: TraceDocumentController
+    var model: TraceCacheSettingsViewModel
     @State private var selection = Section.cache
 
     private enum Section: String, CaseIterable, Identifiable {
@@ -2258,7 +2258,7 @@ struct TraceSettingsPane: View {
             Group {
                 switch selection {
                 case .cache:
-                    TraceCacheSettingsView(controller: controller)
+                    TraceCacheSettingsView(model: model)
                 case .licenses:
                     TraceLicensesView()
                 }
@@ -2272,31 +2272,49 @@ struct TraceSettingsPane: View {
 /// Observation boundary: cache inventory only. Inventory refreshes re-evaluate
 /// this Settings tab and never touch the main viewer window.
 struct TraceCacheSettingsView: View {
-    var controller: TraceDocumentController
+    var model: TraceCacheSettingsViewModel
 
     var body: some View {
         Form {
             Section(traceViewerText("Content-addressed Cache")) {
                 LabeledContent(
                     traceViewerText("Size"),
-                    value: controller.cacheInventory.map { bytes($0.totalByteCount) } ?? "—"
+                    value: model.inventory.map { bytes($0.totalByteCount) } ?? "—"
                 )
                 LabeledContent(
                     traceViewerText("Entries"),
-                    value: controller.cacheInventory.map { String($0.entryCount) } ?? "—"
+                    value: model.inventory.map { String($0.entryCount) } ?? "—"
                 )
                 LabeledContent(
                     traceViewerText("In use"),
-                    value: controller.cacheInventory.map { String($0.activeEntryCount) } ?? "—"
+                    value: model.inventory.map { String($0.activeEntryCount) } ?? "—"
                 )
+                if model.isBusy {
+                    ProgressView().controlSize(.small)
+                }
+                if let failure = model.failureMessage {
+                    Text(failure)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("settings.trace.cache.failure")
+                }
+                if let report = model.lastPurgeReport {
+                    Text(traceViewerText("Removed {count} unused entries.", values: [
+                        "count": String(report.removedEntryCount)
+                    ]))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 HStack {
                     Button(traceViewerText("Refresh")) {
-                        Task { await controller.refreshCacheInventory() }
+                        Task { await model.refresh() }
                     }
+                    .disabled(model.isBusy)
                     .arktraceAccessibleTarget()
                     Button(traceViewerText("Purge Unused Entries"), role: .destructive) {
-                        Task { await controller.purgeUnusedCache() }
+                        Task { await model.purgeUnused() }
                     }
+                    .disabled(model.isBusy)
                     .arktraceAccessibleTarget()
                     Spacer()
                 }
@@ -2307,7 +2325,7 @@ struct TraceCacheSettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .task { await controller.refreshCacheInventory() }
+        .task { await model.refresh() }
     }
 }
 

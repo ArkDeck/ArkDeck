@@ -56,7 +56,9 @@
     "target.adopt",
     "target.display-name.clear",
     "target.display-name.set",
-    "target.show"
+    "target.show",
+    "trace.cache.purge",
+    "trace.cache.status"
   ],
   "preBootstrapLegacyMethods": [
     "health"

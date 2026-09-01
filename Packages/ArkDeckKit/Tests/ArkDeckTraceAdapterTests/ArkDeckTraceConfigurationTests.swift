@@ -34,4 +34,34 @@ final class ArkDeckTraceConfigurationTests: XCTestCase {
       configuration.bundledParserExecutionPolicy,
       .signedBundleInPlace)
   }
+
+  func testDaemonDerivesTheSandboxCacheRootFromTheReviewedBundleIdentity() {
+    let root = ArkDeckTraceConfiguration.appContainerCachesDirectory(
+      homeDirectory: URL(filePath: "/Users/fixture", directoryHint: .isDirectory))
+    XCTAssertEqual(
+      root.path,
+      "/Users/fixture/Library/Containers/com.arkdeck.desktop/Data/Library/Caches")
+  }
+
+  func testMaintenanceOwnsOnlyEmptyDerivedCacheSiblings() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-trace-maintenance-\(UUID().uuidString)",
+      directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let originalTrace = root.appending(path: "original.htrace")
+    try Data("trace fixture".utf8).write(to: originalTrace)
+
+    let service = try ArkDeckTraceCacheMaintenanceService(cachesDirectory: root)
+    let inventory = try await service.inventory()
+    XCTAssertEqual(
+      inventory,
+      ArkDeckTraceCacheInventory(entryCount: 0, totalByteCount: 0, activeEntryCount: 0))
+
+    let report = try await service.purgeUnused()
+    XCTAssertEqual(report.before, inventory)
+    XCTAssertEqual(report.after, inventory)
+    XCTAssertEqual(report.removedEntryCount, 0)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: originalTrace.path))
+  }
 }

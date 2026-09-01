@@ -1760,6 +1760,19 @@ enum RuntimeCLI {
   /// provider. The CLI supplies only a durable target ID; executable
   /// selection, connect-key binding and every HDC argv remain Runtime-owned.
   static func runTrace(_ arguments: [String]) throws {
+    if arguments.first == "cache" {
+      guard arguments.count >= 2, ["status", "purge"].contains(arguments[1]) else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "usage: arkdeck trace cache (status|purge) [--socket <path>] [--output json]")
+      }
+      let method = "trace.cache.\(arguments[1])"
+      var rest = Array(arguments.dropFirst(2))
+      var session = runtimeSession(&rest, command: method)
+      try session.negotiate(requiredMajor: 2, forMethod: method)
+      session.emit(try session.request(method))
+      return
+    }
     guard arguments.first == "probe" else {
       throw CLIError(
         exitCode: EX_USAGE,

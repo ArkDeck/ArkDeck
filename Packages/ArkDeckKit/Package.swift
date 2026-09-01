@@ -46,7 +46,7 @@ let package = Package(
       revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"),
     .package(
       url: "https://github.com/ArkDeck/ArkTrace.git",
-      revision: "91a21d1d419c5fec8c56c8b7b742002325045861"),
+      revision: "84858f4225e48e8a71a559394cdcf857d23c39d1"),
   ],
   targets: [
     .target(
@@ -105,6 +105,7 @@ let package = Package(
       name: "ArkDeckTraceAdapter",
       dependencies: [
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
+        .product(name: "ArkTraceRuntime", package: "ArkTrace"),
       ]),
     .executableTarget(
       name: "ArkDeckCLI",
@@ -136,7 +137,7 @@ let package = Package(
       name: "ArkDeckAgentDaemonMain",
       dependencies: [
         "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
-        "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckWorkflows",
+        "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckTraceAdapter", "ArkDeckWorkflows",
       ]
     ),
     .executableTarget(
@@ -176,6 +177,7 @@ let package = Package(
       dependencies: [
         "ArkDeckTraceAdapter",
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
+        .product(name: "ArkTraceRuntime", package: "ArkTrace"),
       ]),
     .testTarget(
       name: "ArkDeckContractTests",
