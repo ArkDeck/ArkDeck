@@ -5052,7 +5052,7 @@ function pTraceViewer(){
   return `<div class="page-lead" data-page-title="Trace Viewer"></div>${controls}<div class="tv-layout">${sidebar}${content}</div>`;
 }
 function traceOpenFilePreview(){modal(`<div class="modal" role="dialog" aria-modal="true"><h3>${lc('打开 Trace','Open Trace')}</h3><p>${lc('实际 App 通过系统文件选择器打开本地 htrace / ftrace / systrace 文件，然后做有界读取、索引和错误校验。此原型不读取文件。','The App uses the system file picker for local htrace / ftrace / systrace, then performs bounded reads, indexing and validation. This prototype reads no files.')}</p><div class="mfoot"><button class="btn" onclick="closeModal()">${lc('关闭','Close')}</button><button class="btn pri" onclick="S.traceViewer.state='loaded';S.traceViewer.selection='none';closeModal();renderPage()">${lc('查看合成设计样本','View synthetic design sample')}</button></div></div>`);}
-/* Generated reference: ArkTrace 84858f4225e48e8a71a559394cdcf857d23c39d1 / Sources/ArkTraceAppSupport/TraceShortcutCatalog.swift
+/* Generated reference: ArkTrace e98a753ef61f616c8f95693cc4c4201c6b1e3393 / Sources/ArkTraceAppSupport/TraceShortcutCatalog.swift
    SHA-256 abd4309e5c29547dc167dd92e024efd3aee52f3c144d382b558e5b29d7fb2d9e. Product bindings remain upstream-owned. */
 const TRACE_SHORTCUT_SECTIONS=[
   {

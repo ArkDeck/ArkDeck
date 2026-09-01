@@ -235,6 +235,29 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
       .outcomeUnknown)
   }
 
+  func testTraceInspectionOwnerPreservesExactZeroDispatchFailures() {
+    let evidence = CLIControlFailureEvidence(
+      phase: "traceInspectionOwner", newDispatchCount: 0)
+    for code in [
+      CLIErrorCode.invalidInput, .operationUnavailable, .resourceNotFound,
+      .artifactIntegrityFailed, .recordUnreadable, .operationFailed,
+    ] {
+      XCTAssertEqual(
+        CLIControlFailureMapper.code(
+          forWireCode: code.rawValue, method: "trace.inspect", evidence: evidence),
+        code)
+    }
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forWireCode: "invalidInput", method: "trace.inspect"),
+      .internalError,
+      "an unproved daemon refusal must not be reported as a caller error")
+    XCTAssertEqual(
+      CLIControlFailureMapper.code(
+        forTransportFailure: .lostResponse, method: "trace.inspect"),
+      .runtimeUnavailable)
+  }
+
   func testLegacyInternalErrorKeepsItsCodeOnlyWhenNothingCouldHaveHappened() {
     XCTAssertEqual(
       CLIControlFailureMapper.code(forWireCode: "internalError", method: "job.status"),

@@ -1772,6 +1772,61 @@ enum RuntimeCLI {
   /// provider. The CLI supplies only a durable target ID; executable
   /// selection, connect-key binding and every HDC argv remain Runtime-owned.
   static func runTrace(_ arguments: [String]) throws {
+    if arguments.first == "inspect" {
+      var rest = Array(arguments.dropFirst())
+      var session = runtimeSession(&rest, command: "trace.inspect")
+      let allowsSensitive = rest.contains("--allow-sensitive")
+      let options = try CLIOptions(rest.filter { $0 != "--allow-sensitive" })
+      guard let jobID = options.value("--job"),
+        let artifactID = options.value("--artifact"),
+        AgentExecutionIntent.validIdentifier(jobID),
+        AgentExecutionIntent.validIdentifier(artifactID),
+        allowsSensitive
+      else {
+        throw session.fail(
+          .invalidInput,
+          "trace inspect requires exact --job/--artifact identities and --allow-sensitive")
+      }
+      guard let duration = CLIDuration.parse(
+        options.value("--timeout") ?? "2m", maximumMilliseconds: 600_000)
+      else {
+        throw session.fail(.invalidInput, "Trace inspection timeout must be 1ms...10m")
+      }
+      let cancellation = AgentClientWaitCancellation()
+      let observer = CLIWaitSignalObserver(cancellation: cancellation)
+      defer { observer.stop() }
+      session.client = session.client.bounded(
+        by: try AgentClientWaitDeadline(
+          milliseconds: duration.milliseconds + 5_000,
+          cancellation: cancellation))
+      let owner: ArtifactOwnerReference
+      do {
+        owner = try ArtifactOwnerReference(
+          .object(["kind": .string("job"), "id": .string(jobID)]))
+      } catch let failure as AgentExecutionControlFailure {
+        throw session.fail(.invalidInput, failure.message)
+      }
+      try session.negotiate(requiredMajor: 2, forMethod: "trace.inspect")
+      let value = try session.request(
+        "trace.inspect",
+        [
+          "owner": owner.value,
+          "artifactId": .string(artifactID),
+          "allowSensitive": .bool(true),
+          "timeoutMs": .integer(Int64(duration.milliseconds)),
+        ])
+      let projection: RuntimeTraceInspectionProjection
+      do {
+        projection = try RuntimeTraceInspectionProjection(value)
+      } catch {
+        throw session.fail(.recordUnreadable, "Runtime returned an invalid Trace inspection")
+      }
+      guard projection.owner == owner, projection.artifactID == artifactID else {
+        throw session.fail(.recordUnreadable, "Trace inspection belongs to another source")
+      }
+      session.emit(projection.value)
+      return
+    }
     if arguments.first == "cache" {
       guard arguments.count >= 2, ["status", "purge"].contains(arguments[1]) else {
         throw CLIError(

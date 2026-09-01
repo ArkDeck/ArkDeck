@@ -1576,6 +1576,8 @@ generation；第一版可以先忠实暴露现有字段，达到 target contract
 
 - screenshot/UI dump/component detail/trace typed capture preset；
 - trace raw Artifact export，经 exact operation/name/media type/privacy 约束后复用 Artifact policy；
+- trace offline inspection，经 Runtime-held descriptor 和固定 ArkTrace distribution 生成
+  `arkdeck.trace-inspection/1`，不接受 host/parser path，也不创建新 evidence；
 - diagnostics capture、screen sequence、tap/long-press/swipe；
 - HAP debug、native library deploy、port forward；
 - 四个 analyzer；
@@ -1610,7 +1612,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | History saved filter | Runtime 拥有单例 generation-CAS query preset，App/CLI 共用；旧 AppStorage 仅作一次性迁移输入 | `history filter list/save/delete`；`local` | C |
 | Trace derived-cache purge | Runtime 以固定 App container cache root 持有 lease-aware typed owner；App/CLI 共用，且不投影路径或删除原始 Trace Artifact | `trace cache status/purge`；`local`；实现见 `cli-trace-cache.md` | C |
 | Source/update | remote source 和 consumer auto-update 是 App/平台服务；maintainer feed 已另有 CLI | typed source 与 consumer update lifecycle；`blocked` → `local` | C |
-| Offline inspector | UI dump inspect/hit-test 与 diagnostics inspect/preview/export 已由 App/CLI 共用 typed owner，校验 exact operation、Artifact role/size/SHA-256 并发布 versioned machine schema；Trace inspect 尚无稳定 schema/owner boundary，因此整体仍为 `blocked` | versioned Trace local derivation service；`blocked` → `local` | C |
+| Offline inspector | UI dump inspect/hit-test、diagnostics inspect/preview/export 与 Trace inspect 均使用 typed owner；Trace Runtime owner 校验 exact Job/Artifact、`capture.diagnostics@1`、`trace.htrace`、media type/privacy/size/SHA-256，以固定 ArkTrace distribution 和 ephemeral session 发布 `arkdeck.trace-inspection/1`，不接受 caller path 且不创建 evidence | `local`；Trace 实现见 `cli-trace-inspection.md` | C |
 | App icon/menu/shortcut | 只改变 App 呈现和导航 | `presentation`；不需要 CLI leaf | — |
 
 实现它们时先建立 bounded Runtime/local service contract，再接 App 与 CLI。同一 vertical task 内

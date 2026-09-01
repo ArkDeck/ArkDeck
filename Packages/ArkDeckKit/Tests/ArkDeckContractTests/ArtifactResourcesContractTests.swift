@@ -12,6 +12,61 @@ import XCTest
 
 /// Isolated host fixtures; published fixture content is not device evidence.
 final class ArtifactResourcesContractTests: XCTestCase {
+  private actor TraceInspector: RuntimeTraceInspecting {
+    enum Mode: Sendable { case succeeds, mismatchedSource, waitsForCancellation }
+
+    struct Call: Sendable {
+      let source: URL
+      let sha256: String
+      let byteCount: Int
+    }
+
+    private var mode: Mode = .succeeds
+    private var calls: [Call] = []
+
+    func setMode(_ mode: Mode) { self.mode = mode }
+
+    func recordedCalls() -> [Call] { calls }
+
+    func inspect(
+      source: URL,
+      expectedSourceSHA256: String,
+      expectedSourceByteCount: Int
+    ) async throws -> RuntimeTraceInspectionReport {
+      calls.append(
+        Call(
+          source: source, sha256: expectedSourceSHA256,
+          byteCount: expectedSourceByteCount))
+      if mode == .waitsForCancellation {
+        try await Task.sleep(for: .seconds(60))
+      }
+      return try RuntimeTraceInspectionReport(
+        engineVersion: "4.3.7",
+        engineBuild: "fixture",
+        engineSourceRevision: String(repeating: "a", count: 40),
+        sourceSHA256:
+          mode == .succeeds
+          ? expectedSourceSHA256 : String(repeating: "f", count: 64),
+        sourceByteCount: expectedSourceByteCount,
+        durationNs: 42,
+        schemaFingerprint: String(repeating: "b", count: 64),
+        parser: RuntimeTraceInspectionParser(
+          name: "trace_streamer", version: "fixture",
+          upstreamRevision: String(repeating: "c", count: 40),
+          binarySHA256: String(repeating: "d", count: 64),
+          adapterVersion: "1", buildRecipeVersion: "1"),
+        schema: RuntimeTraceInspectionSchema(
+          adapterVersion: "1", indexVersion: 1,
+          upstreamDatabaseSHA256: String(repeating: "e", count: 64),
+          upstreamDatabaseByteCount: Int64(expectedSourceByteCount)),
+        capabilities: RuntimeTraceInspectionCapabilities(
+          cpuScheduling: true, threadStates: true, namedSlices: true,
+          cpuCounters: false, processCounters: false),
+        dataQualityStatus: "ok",
+        dataQualityIssues: [])
+    }
+  }
+
   private var root: URL!
   private var artifacts: RuntimeArtifactStore!
   private var engine: RuntimeJobEngine!
@@ -19,6 +74,7 @@ final class ArtifactResourcesContractTests: XCTestCase {
   private var server: AgentDaemonServer?
   private var handler: RuntimeControlPlaneHandler!
   private var dispatcher: RuntimeAgentExecutionContractTests.Dispatcher!
+  private var traceInspector: TraceInspector!
   private let now = "2026-09-01T00:00:00Z"
   private enum Failure: Error { case fixture }
 
@@ -27,16 +83,19 @@ final class ArtifactResourcesContractTests: XCTestCase {
     artifacts = try store()
     capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "capabilities"))
     dispatcher = RuntimeAgentExecutionContractTests.Dispatcher()
+    traceInspector = TraceInspector()
     engine = try RuntimeJobEngine(configuration: .init(stateDirectory: root.appending(path: "engine")),
       providers: DeviceProviderRegistry(providers: []), dispatcher: dispatcher,
       capabilityStore: capabilities, artifactStore: artifacts, nowUTC: { "2026-09-01T00:00:00Z" })
     handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities, providerIDs: [],
-      nowUTC: { "2026-09-01T00:00:00Z" }, artifactStore: artifacts)
+      nowUTC: { "2026-09-01T00:00:00Z" }, artifactStore: artifacts,
+      traceInspector: traceInspector)
     server = AgentDaemonServer(stateDirectory: root.appending(path: "ctl"), handler: handler, nowUTC: { "2026-09-01T00:00:00Z" })
     _ = try server?.start()
   }
   override func tearDownWithError() throws {
     server?.stop(); server = nil; handler = nil; engine = nil; artifacts = nil; capabilities = nil
+    traceInspector = nil
     try? FileManager.default.removeItem(at: root)
   }
   private func store(fault: @escaping RuntimeArtifactExport.Fault = { _ in }) throws -> RuntimeArtifactStore {
@@ -141,6 +200,90 @@ final class ArtifactResourcesContractTests: XCTestCase {
     let path = root.appending(path: "exports")
     try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
     return path
+  }
+
+  func testTraceInspectionUsesOneExactVerifiedArtifactThroughTheRealCLIProcess() async throws {
+    let job = try seedJob("job-trace-inspect")
+    let bytes = Data("trace-fixture".utf8)
+    let artifact = try await publish(
+      job, name: "trace.htrace", mediaType: "application/octet-stream",
+      bytes: bytes, privacy: .sensitive,
+      sourceOperation: "capture.diagnostics@1")
+
+    let inspected = try object(
+      result(
+        cli([
+          "trace", "inspect", "--job", job.id,
+          "--artifact", artifact.artifactID, "--allow-sensitive",
+          "--timeout", "999ms",
+        ])))
+    XCTAssertEqual(inspected["schemaVersion"], .string("arkdeck.trace-inspection/1"))
+    XCTAssertEqual(inspected["storageMode"], .string("ephemeral"))
+    XCTAssertEqual(inspected["deviceEvidenceCreated"], .bool(false))
+    XCTAssertNil(inspected["path"])
+    let source = try object(try XCTUnwrap(inspected["source"]))
+    XCTAssertEqual(source["artifactId"], .string(artifact.artifactID))
+    XCTAssertEqual(source["artifactDigest"], .string(artifact.sha256))
+    XCTAssertEqual(source["byteCount"], .string(String(bytes.count)))
+    let calls = await traceInspector.recordedCalls()
+    XCTAssertEqual(calls.count, 1)
+    XCTAssertTrue(try XCTUnwrap(calls.first).source.path.hasPrefix("/.vol/"))
+    XCTAssertEqual(calls.first?.sha256, artifact.sha256)
+    XCTAssertEqual(calls.first?.byteCount, bytes.count)
+  }
+
+  func testTraceInspectionRejectsWrongArtifactMetadataBeforeParserAccess() async throws {
+    let job = try seedJob("job-trace-inspect-decoy")
+    let artifact = try await publish(
+      job, name: "trace.txt", mediaType: "text/plain",
+      privacy: .standard, sourceOperation: "capture.diagnostics@1")
+
+    XCTAssertEqual(
+      try code(
+        cli([
+          "trace", "inspect", "--job", job.id,
+          "--artifact", artifact.artifactID, "--allow-sensitive",
+        ])),
+      "invalidInput")
+    let calls = await traceInspector.recordedCalls()
+    XCTAssertEqual(calls.count, 0)
+  }
+
+  func testTraceInspectionRejectsAParserReportForAnotherSource() async throws {
+    let job = try seedJob("job-trace-inspect-drift")
+    let artifact = try await publish(
+      job, name: "trace.htrace", mediaType: "application/octet-stream",
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    await traceInspector.setMode(.mismatchedSource)
+
+    XCTAssertEqual(
+      try code(
+        cli([
+          "trace", "inspect", "--job", job.id,
+          "--artifact", artifact.artifactID, "--allow-sensitive",
+        ])),
+      "artifactIntegrityFailed")
+    let calls = await traceInspector.recordedCalls()
+    XCTAssertEqual(calls.count, 1)
+  }
+
+  func testTraceInspectionTimeoutCancelsAndDrainsTheParser() async throws {
+    let job = try seedJob("job-trace-inspect-timeout")
+    let artifact = try await publish(
+      job, name: "trace.htrace", mediaType: "application/octet-stream",
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    await traceInspector.setMode(.waitsForCancellation)
+
+    XCTAssertEqual(
+      try code(
+        cli([
+          "trace", "inspect", "--job", job.id,
+          "--artifact", artifact.artifactID, "--allow-sensitive",
+          "--timeout", "1s",
+        ])),
+      "operationFailed")
+    let calls = await traceInspector.recordedCalls()
+    XCTAssertEqual(calls.count, 1)
   }
 
   func testUIDumpOfflineInspectionUsesExactVerifiedArtifactsThroughTheRealCLIProcess() async throws
