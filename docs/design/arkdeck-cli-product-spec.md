@@ -553,6 +553,14 @@ Windows validator 必须运行同一 canonical vectors。
 - list 的 JSON shape 不得因是否传 cursor 而从 array 变成 object；始终返回 page envelope。
 - `job events` 是按 opaque cursor 读取的 unary page RPC；`job watch` 只负责重复读页、
   按 stable event ID 去重并渲染。旧 timeline string array 不是 event store。
+- target `job plan`、`job submit`、`job run` 默认协商 control protocol 2.x，并共享一个有界的
+  client wait deadline；`--timeout` 只限制 CLI 等待，不取消或延长 Runtime Job。plan 返回闭合的
+  `arkdeck.job-plan/1`，submit 返回闭合的 `arkdeck.job-acceptance/1`（含 `jobId`、
+  `deduplicated`、`newDispatchCount: 0`），run 返回与 `job status` 相同的
+  `arkdeck.job-status/1`。CLI 必须验证完整 shape 后才输出，不能把未知/缺失字段当成功。
+- 已 terminal 或不存在的 Job 若在 `run` 的 Runtime-owned pre-dispatch check 被拒绝，返回 exact
+  owner identity、`phase: "preAdmission"` 与 `newDispatchCount: 0`；进入 shared driver 后的
+  任何 ambiguous failure 不得沿用该证明，按 mutation unknown 处理。
 
 所有 list/events 的 `result` 必须使用固定 page shape：
 

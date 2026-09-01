@@ -1349,6 +1349,18 @@ public actor RuntimeJobEngine {
     try await submitOwned(requestData, beforeAdmission: nil)
   }
 
+  /// The negotiated control owner needs the same typed reviewed-plan refusal
+  /// as AgentExecution, without gaining orchestration authority. The empty
+  /// callback changes no plan or deadline; its presence only asks
+  /// `submitOwned` to surface a reviewed-plan mismatch as the stable
+  /// `reviewedPlanMismatch` control reason instead of the frozen 1.x
+  /// `rejected(.conflict)` shape.
+  package func submitForTargetControl(
+    _ requestData: Data
+  ) async throws -> RuntimeJobAcceptance {
+    try await submitOwned(requestData, beforeAdmission: {})
+  }
+
   /// The Runtime orchestration owner may impose an additional deadline on
   /// *creating* a Job. It cannot relax any admission rule, supply facts, or
   /// change the operation/plan/capability budget of an accepted Job.
@@ -1606,6 +1618,41 @@ public actor RuntimeJobEngine {
     }
     jobRuns[jobID] = task
     return try await task.value
+  }
+
+  /// The negotiated control owner needs an exact pre-dispatch answer when a
+  /// Job is absent or already terminal. The generic `run` error cannot carry
+  /// that phase: the same `jobNotFound` case may also surface after provider
+  /// work has begun. This check runs inside the engine actor immediately
+  /// before joining/starting the one shared driver, so only this wrapper may
+  /// publish zero-new-dispatch evidence for those initial states.
+  package func runForTargetControl(jobID: String) async throws -> RuntimeJobStatus {
+    if jobs[jobID] == nil, jobRuns[jobID] == nil {
+      do {
+        let persisted = try recordForRead(jobID: jobID)
+        throw AgentExecutionControlFailure(
+          "resourceConflict", "job \(jobID) is \(persisted.state), not runnable",
+          details: [
+            "jobId": .string(jobID), "phase": .string("preAdmission"),
+            "newDispatchCount": .integer(0),
+          ])
+      } catch RuntimeJobEngineError.jobNotFound {
+        throw AgentExecutionControlFailure(
+          "resourceNotFound", "the referenced Job does not exist",
+          details: [
+            "jobId": .string(jobID), "phase": .string("preAdmission"),
+            "newDispatchCount": .integer(0),
+          ])
+      } catch RuntimeJobEngineError.jobRecordUnreadable {
+        throw AgentExecutionControlFailure(
+          "recordUnreadable", "the referenced Job record is unreadable",
+          details: [
+            "jobId": .string(jobID), "phase": .string("preAdmission"),
+            "newDispatchCount": .integer(0),
+          ])
+      }
+    }
+    return try await run(jobID: jobID)
   }
 
   private func runOwned(jobID: String) async throws -> RuntimeJobStatus {
