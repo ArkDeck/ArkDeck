@@ -190,8 +190,34 @@ enum RuntimeCLI {
 
   static func runDoctor(_ arguments: [String]) throws {
     var rest = arguments
-    let session = runtimeSession(&rest, command: "doctor")
-    session.emit(try session.request("doctor"))
+    var session = runtimeSession(&rest, command: "doctor")
+    let deep = rest.contains("--deep")
+    let requireHealthy = rest.contains("--require-healthy")
+    try session.negotiate(requiredMajor: 2, forMethod: "doctor")
+    let report = try session.request("doctor", ["deep": .bool(deep)])
+    guard let ready = doctorReadiness(report) else {
+      throw session.fail(
+        .recordUnreadable,
+        "Runtime returned a doctor report without its versioned readiness contract")
+    }
+    if requireHealthy, !ready {
+      throw session.fail(
+        .healthRequirementFailed,
+        "doctor completed and found one or more blocking health findings",
+        details: ["report": report])
+    }
+    session.emit(report)
+  }
+
+  /// Reads only the two invariant fields needed by the CLI gate. The Runtime
+  /// owns health classification; the CLI must not reinterpret finding prose or
+  /// maintain a second list of blocker codes.
+  static func doctorReadiness(_ report: JSONValue) -> Bool? {
+    guard case .object(let fields) = report,
+      fields["schemaVersion"] == .string("arkdeck.doctor-report/1"),
+      case .bool(let ready)? = fields["ready"]
+    else { return nil }
+    return ready
   }
 
   /// Installs and diagnoses the one production daemon as a user-domain

@@ -1078,6 +1078,62 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertGreaterThan(operationCount, 0)
   }
 
+  func testTargetDoctorReturnsACompleteReportWhenChecksFindBlockers() async throws {
+    let (handler, _) = try makeStack()
+    let doctor = try await targetRequest(
+      handler, method: "doctor", params: ["deep": .bool(false)])
+    XCTAssertTrue(doctor.ok, doctor.error?.message ?? "-")
+    guard case .object(let report)? = doctor.result,
+      case .array(let findings)? = report["findings"],
+      case .object(let checks)? = report["checks"],
+      case .object(let counts)? = report["findingCounts"]
+    else {
+      return XCTFail("target doctor must return the complete versioned report")
+    }
+    XCTAssertEqual(report["schemaVersion"], .string("arkdeck.doctor-report/1"))
+    XCTAssertEqual(report["mode"], .string("standard"))
+    XCTAssertEqual(report["overall"], .string("blocked"))
+    XCTAssertEqual(report["ready"], .bool(false))
+    XCTAssertFalse(findings.isEmpty)
+    XCTAssertNotEqual(counts["blocker"], .integer(0))
+    for scope in ["runtime", "catalog", "providers", "hdc", "storage", "target", "recovery"] {
+      XCTAssertNotNil(checks[scope], "doctor omitted the \(scope) check")
+    }
+  }
+
+  func testTargetDoctorDeepChecksAreBoundedAndBadParamsDispatchNothing() async throws {
+    let (handler, _) = try makeStack()
+    let deep = try await targetRequest(
+      handler, method: "doctor", params: ["deep": .bool(true)])
+    guard case .object(let report)? = deep.result,
+      case .object(let checks)? = report["checks"],
+      case .object(let storage)? = checks["storage"],
+      case .object(let runtimeArtifacts)? = storage["runtimeArtifacts"],
+      case .object(let sessionOutput)? = storage["sessionOutput"],
+      case .object(let recovery)? = checks["recovery"]
+    else {
+      return XCTFail("deep doctor must retain typed storage and recovery checks")
+    }
+    XCTAssertEqual(report["mode"], .string("deep"))
+    XCTAssertEqual(runtimeArtifacts["checked"], .bool(true))
+    XCTAssertEqual(recovery["checked"], .bool(true))
+    XCTAssertNotEqual(runtimeArtifacts["totalBytes"], .null)
+    XCTAssertEqual(sessionOutput["availability"], .string("unavailable"))
+    XCTAssertEqual(
+      sessionOutput["reasonCode"], .string("storage.sessionOutputOwnerNotPublished"),
+      "doctor must not merge the App Session root with Runtime Artifact quota")
+    XCTAssertNotEqual(recovery["outstandingCleanupCount"], .null)
+
+    for params in [
+      ["deep": JSONValue.string("true")],
+      ["unknown": JSONValue.bool(true)],
+    ] {
+      let invalid = try await targetRequest(handler, method: "doctor", params: params)
+      XCTAssertFalse(invalid.ok)
+      XCTAssertEqual(invalid.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+    }
+  }
+
   private func envelopeProbe(schemaVersion: String) -> Data {
     Data(
       """

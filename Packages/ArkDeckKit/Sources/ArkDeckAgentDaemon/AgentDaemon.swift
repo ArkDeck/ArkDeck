@@ -1318,6 +1318,26 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "doctor":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        let params = request.params ?? [:]
+        guard Set(params.keys).isSubset(of: ["deep"]) else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "doctor accepts only the deep boolean")
+        }
+        let deep: Bool
+        if let value = params["deep"] {
+          guard case .bool(let requested) = value else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "doctor deep must be a boolean")
+          }
+          deep = requested
+        } else {
+          deep = false
+        }
+        return success(id: request.id, result: await doctorReport(deep: deep))
+      }
       // `doctor` is the first call a caller with no prior context makes, and
       // the envelope contract was the thing it was about to need and could not
       // ask for: submitting without `schemaVersion` answered "required" without
@@ -2746,6 +2766,261 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return failure(
         id: request.id, code: .unknownMethod, message: "unknown method \(request.method)")
     }
+  }
+
+  /// §7's bounded diagnostic query. It always returns the minimum versioned
+  /// report, even when one of the optional probes fails. A failed subcheck is a
+  /// blocker finding; it is not allowed to erase the rest of the report or to
+  /// turn an observed unavailable component into a transport failure.
+  private func doctorReport(deep: Bool) async -> JSONValue {
+    var findings: [JSONValue] = []
+    var blockerCount = 0
+    var warningCount = 0
+
+    func addFinding(
+      code: String, severity: String, scope: String, summary: String,
+      details: [String: JSONValue] = [:]
+    ) {
+      if severity == "blocker" { blockerCount += 1 }
+      if severity == "warning" { warningCount += 1 }
+      var finding: [String: JSONValue] = [
+        "code": .string(code),
+        "severity": .string(severity),
+        "scope": .string(scope),
+        "summary": .string(summary),
+      ]
+      if !details.isEmpty { finding["details"] = .object(details) }
+      findings.append(.object(finding))
+    }
+
+    addFinding(
+      code: "runtime.controlReady", severity: "info", scope: "runtime",
+      summary: "the target control protocol is serving bounded diagnostic requests")
+
+    let operationAvailability = await engine.operationAvailability()
+    let availableOperationCount = operationAvailability.filter { $0.state == .available }.count
+    let unavailableOperationCount = operationAvailability.count - availableOperationCount
+    if availableOperationCount == 0 {
+      addFinding(
+        code: "catalog.noAvailableOperations", severity: "blocker", scope: "catalog",
+        summary: "the published Catalog has no operation available on this Runtime")
+    } else {
+      addFinding(
+        code: "catalog.availableOperations", severity: "info", scope: "catalog",
+        summary: "the Runtime can materialize at least one published operation",
+        details: ["availableOperationCount": .integer(Int64(availableOperationCount))])
+    }
+    if unavailableOperationCount > 0 {
+      addFinding(
+        code: "catalog.unavailableOperations", severity: "warning", scope: "catalog",
+        summary: "some published operations are unavailable with the current host configuration",
+        details: ["unavailableOperationCount": .integer(Int64(unavailableOperationCount))])
+    }
+
+    let sortedProviderIDs = providerIDs.sorted()
+    if sortedProviderIDs.isEmpty {
+      addFinding(
+        code: "provider.noneRegistered", severity: "blocker", scope: "provider",
+        summary: "the Runtime has no registered provider")
+    } else {
+      addFinding(
+        code: "provider.registered", severity: "info", scope: "provider",
+        summary: "the Runtime has registered providers",
+        details: ["providerCount": .integer(Int64(sortedProviderIDs.count))])
+    }
+
+    var hdcCheck: [String: JSONValue] = [
+      "checked": .bool(deep), "configured": .bool(hdcStatusObserver != nil),
+      "availability": .string(deep ? "unknown" : "notChecked"),
+      "ownership": .string("unknown"), "serverHealth": .string("unknown"),
+      "reasonCode": .string(deep ? "hdc.statusUnavailable" : "doctor.deepNotRequested"),
+    ]
+    if let hdcStatusObserver {
+      if deep {
+        let snapshot = await hdcStatusObserver.snapshot()
+        if case .object(let fields) = snapshot {
+          let availability = fields["availability"] ?? .string("unknown")
+          let ownership = fields["ownership"] ?? .string("unknown")
+          let serverHealth = fields["serverHealth"] ?? .string("unknown")
+          let reasonCode = fields["reasonCode"] ?? .string("hdc.statusIncomplete")
+          hdcCheck["availability"] = availability
+          hdcCheck["ownership"] = ownership
+          hdcCheck["serverHealth"] = serverHealth
+          hdcCheck["reasonCode"] = reasonCode
+          let isAvailable = availability == .string("available")
+          let isManaged = ownership == .string("arkDeckManaged")
+          if isAvailable, isManaged {
+            addFinding(
+              code: "hdc.identityReady", severity: "info", scope: "hdc",
+              summary: "the selected HDC server has a live Runtime-managed identity")
+          } else {
+            addFinding(
+              code: "hdc.identityUnavailable", severity: "blocker", scope: "hdc",
+              summary: "the selected HDC server identity is unavailable or not Runtime-managed",
+              details: ["reasonCode": reasonCode])
+          }
+        } else {
+          addFinding(
+            code: "hdc.statusUnreadable", severity: "blocker", scope: "hdc",
+            summary: "the bounded HDC status probe returned no structured report")
+          hdcCheck["reasonCode"] = .string("hdc.statusUnreadable")
+        }
+      } else {
+        addFinding(
+          code: "hdc.deepCheckSkipped", severity: "info", scope: "hdc",
+          summary: "live HDC identity was not requested; use doctor --deep to check it")
+      }
+    } else {
+      addFinding(
+        code: "hdc.notConfigured", severity: "blocker", scope: "hdc",
+        summary: "the Runtime has no bounded HDC status observer")
+      hdcCheck["availability"] = .string("unavailable")
+      hdcCheck["reasonCode"] = .string("hdc.notConfigured")
+    }
+
+    var artifactStorageCheck: [String: JSONValue] = [
+      "checked": .bool(deep), "configured": .bool(artifactStore != nil),
+      "totalBytes": .null, "usedBytes": .null, "remainingBytes": .null,
+    ]
+    if let artifactStore {
+      if deep {
+        do {
+          let used = try await artifactStore.totalBytesUsed()
+          let total = await artifactStore.quotaTotalBytes
+          let remaining = max(0, total - used)
+          artifactStorageCheck["totalBytes"] = .integer(Int64(total))
+          artifactStorageCheck["usedBytes"] = .integer(Int64(used))
+          artifactStorageCheck["remainingBytes"] = .integer(Int64(remaining))
+          if remaining == 0 {
+            addFinding(
+              code: "storage.quotaExhausted", severity: "blocker", scope: "storage",
+              summary: "the Runtime Artifact store has no remaining quota")
+          } else {
+            addFinding(
+              code: "storage.artifactStoreReady", severity: "info", scope: "storage",
+              summary: "the Runtime Artifact store is readable and has remaining quota")
+          }
+        } catch {
+          addFinding(
+            code: "storage.artifactStoreUnreadable", severity: "blocker", scope: "storage",
+            summary: "the Runtime Artifact store could not produce bounded quota facts")
+        }
+      } else {
+        addFinding(
+          code: "storage.deepCheckSkipped", severity: "info", scope: "storage",
+          summary: "Artifact quota accounting was not requested; use doctor --deep to check it")
+      }
+    } else {
+      addFinding(
+        code: "storage.artifactStoreNotConfigured", severity: "blocker", scope: "storage",
+        summary: "the Runtime Artifact store is not configured")
+    }
+    // The App-owned Session output root and the Runtime Artifact root are
+    // separate stores with different quotas and retention rules. Until a
+    // single Runtime owner for Session output is published, doctor reports the
+    // gap explicitly and never combines the two domains into one number.
+    addFinding(
+      code: "storage.sessionOutputOwnerUnavailable", severity: "warning", scope: "storage",
+      summary: "Session output storage has no published Runtime owner")
+    let storageCheck: [String: JSONValue] = [
+      "runtimeArtifacts": .object(artifactStorageCheck),
+      "sessionOutput": .object([
+        "checked": .bool(false),
+        "availability": .string("unavailable"),
+        "reasonCode": .string("storage.sessionOutputOwnerNotPublished"),
+      ]),
+    ]
+
+    var targetCheck: [String: JSONValue] = [
+      "configured": .bool(targetStore != nil), "bootstrapConfigured": .bool(bootstrap != nil),
+      "adoptedTargetCount": .null,
+    ]
+    if let targetStore {
+      do {
+        let targets = try targetStore.listActive()
+        targetCheck["adoptedTargetCount"] = .integer(Int64(targets.count))
+        addFinding(
+          code: targets.isEmpty ? "target.noneAdopted" : "target.storeReady",
+          severity: "info", scope: "target",
+          summary: targets.isEmpty
+            ? "the target store is readable and has no adopted target"
+            : "the target store is readable",
+          details: ["adoptedTargetCount": .integer(Int64(targets.count))])
+      } catch {
+        addFinding(
+          code: "target.storeUnreadable", severity: "blocker", scope: "target",
+          summary: "the durable target store could not be read")
+      }
+    } else {
+      addFinding(
+        code: "target.storeNotConfigured", severity: "blocker", scope: "target",
+        summary: "the durable target store is not configured")
+    }
+    if bootstrap == nil {
+      addFinding(
+        code: "target.discoveryNotConfigured", severity: "blocker", scope: "target",
+        summary: "device discovery is not configured")
+    }
+
+    var recoveryCheck: [String: JSONValue] = [
+      "checked": .bool(deep), "outstandingCleanupCount": .null,
+    ]
+    if deep {
+      do {
+        let debts = try await engine.listCleanupDebt()
+        recoveryCheck["outstandingCleanupCount"] = .integer(Int64(debts.count))
+        addFinding(
+          code: debts.isEmpty ? "recovery.noCleanupDebt" : "recovery.cleanupDebtOutstanding",
+          severity: debts.isEmpty ? "info" : "blocker", scope: "recovery",
+          summary: debts.isEmpty
+            ? "the Runtime has no outstanding cleanup debt"
+            : "the Runtime has outstanding cleanup debt",
+          details: ["outstandingCleanupCount": .integer(Int64(debts.count))])
+      } catch {
+        addFinding(
+          code: "recovery.cleanupDebtUnreadable", severity: "blocker", scope: "recovery",
+          summary: "the Runtime could not inspect outstanding cleanup debt")
+      }
+    } else {
+      addFinding(
+        code: "recovery.deepCheckSkipped", severity: "info", scope: "recovery",
+        summary: "cleanup debt was not requested; use doctor --deep to check it")
+    }
+
+    let ready = blockerCount == 0
+    let overall = blockerCount > 0 ? "blocked" : (warningCount > 0 ? "degraded" : "healthy")
+    return .object([
+      "schemaVersion": .string("arkdeck.doctor-report/1"),
+      "observedAt": .string(nowUTC()),
+      "mode": .string(deep ? "deep" : "standard"),
+      "overall": .string(overall),
+      "ready": .bool(ready),
+      "findingCounts": .object([
+        "blocker": .integer(Int64(blockerCount)),
+        "warning": .integer(Int64(warningCount)),
+        "info": .integer(Int64(max(0, findings.count - blockerCount - warningCount))),
+      ]),
+      "findings": .array(findings),
+      "checks": .object([
+        "runtime": .object([
+          "protocolVersion": .string(ArkDeckControlProtocol.targetVersion),
+          "runtimeRequestSchemaVersion": .string(RuntimeRequestEnvelope.schemaVersion),
+        ]),
+        "catalog": .object([
+          "digest": .string(RuntimeOperationCatalog.catalogDigest),
+          "operationCount": .integer(Int64(operationAvailability.count)),
+          "availableOperationCount": .integer(Int64(availableOperationCount)),
+          "unavailableOperationCount": .integer(Int64(unavailableOperationCount)),
+        ]),
+        "providers": .object([
+          "registered": .array(sortedProviderIDs.map(JSONValue.string)),
+        ]),
+        "hdc": .object(hdcCheck),
+        "storage": .object(storageCheck),
+        "target": .object(targetCheck),
+        "recovery": .object(recoveryCheck),
+      ]),
+    ])
   }
 
   /// The negotiated target Job lifecycle. The legacy switch below remains
