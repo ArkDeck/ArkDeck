@@ -30,6 +30,7 @@
     "control-action.list",
     "control-action.reconcile",
     "control-action.show",
+    "debug.probe",
     "device.display-name.clear",
     "device.display-name.set",
     "device.observations",

@@ -684,9 +684,24 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "debug.probe":
-      guard case .string(let targetID)? = request.params?["targetId"] else {
+      let params = request.params ?? [:]
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
+        Set(params.keys) != ["targetId"]
+      {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "Debug Runtime probe accepts only targetId")
+      }
+      guard case .string(let targetID)? = params["targetId"] else {
         return failure(
           id: request.id, code: .invalidParams, message: "targetId is required")
+      }
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
+        targetID.isEmpty || targetID.utf8.count > 128
+      {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "targetId must be a bounded durable target identity")
       }
       guard let debugRuntimeProbe else {
         return failure(
@@ -695,22 +710,62 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let snapshot = try await debugRuntimeProbe.probeDebugRuntime(targetID: targetID)
+        let isTargetProtocol = request.protocolVersion == ArkDeckControlProtocol.targetVersion
+        if isTargetProtocol {
+          let closedWarnings: Set<String> = [
+            "packageInventoryUnavailable", "packageInventoryUnparseable",
+            "forwardRulesUnavailable", "reverseRulesUnavailable",
+          ]
+          guard snapshot.targetID == targetID, snapshot.bindingRevision >= 1,
+            snapshot.packages.count <= 10_000,
+            Set(snapshot.packages).count == snapshot.packages.count,
+            snapshot.packages.allSatisfy({
+              DebugTypedValueValidator.isValidBundleName($0)
+            }),
+            snapshot.portRules.count <= 4_096,
+            snapshot.portRules.allSatisfy({
+              (1_024...65_535).contains($0.localPort)
+                && (1_024...65_535).contains($0.remotePort)
+            }),
+            snapshot.warnings.count <= closedWarnings.count,
+            Set(snapshot.warnings).count == snapshot.warnings.count,
+            snapshot.warnings.allSatisfy(closedWarnings.contains)
+          else {
+            return failure(
+              id: request.id, code: .internalError,
+              message: "Debug Runtime probe returned an invalid bounded projection")
+          }
+        }
+        let packages = isTargetProtocol ? snapshot.packages.sorted() : snapshot.packages
+        let portRules = isTargetProtocol
+          ? snapshot.portRules.sorted {
+            if $0.direction.rawValue != $1.direction.rawValue {
+              return $0.direction.rawValue < $1.direction.rawValue
+            }
+            if $0.localPort != $1.localPort { return $0.localPort < $1.localPort }
+            return $0.remotePort < $1.remotePort
+          } : snapshot.portRules
+        let warnings = isTargetProtocol ? snapshot.warnings.sorted() : snapshot.warnings
+        var result: [String: JSONValue] = [
+          "targetId": .string(snapshot.targetID),
+          "bindingRevision": .integer(Int64(snapshot.bindingRevision)),
+          "packages": .array(packages.map(JSONValue.string)),
+          "portRules": .array(
+            portRules.map { rule in
+              .object([
+                "direction": .string(rule.direction.rawValue),
+                "localPort": .integer(Int64(rule.localPort)),
+                "remotePort": .integer(Int64(rule.remotePort)),
+              ])
+            }),
+          "warnings": .array(warnings.map(JSONValue.string)),
+        ]
+        if isTargetProtocol {
+          result["schemaVersion"] = .string("arkdeck.debug-probe/1")
+        }
         return success(
           id: request.id,
-          result: .object([
-            "targetId": .string(snapshot.targetID),
-            "bindingRevision": .integer(Int64(snapshot.bindingRevision)),
-            "packages": .array(snapshot.packages.map(JSONValue.string)),
-            "portRules": .array(
-              snapshot.portRules.map { rule in
-                .object([
-                  "direction": .string(rule.direction.rawValue),
-                  "localPort": .integer(Int64(rule.localPort)),
-                  "remotePort": .integer(Int64(rule.remotePort)),
-                ])
-              }),
-            "warnings": .array(snapshot.warnings.map(JSONValue.string)),
-          ]))
+          result: .object(result))
       } catch {
         return failure(
           id: request.id, code: .rejected,

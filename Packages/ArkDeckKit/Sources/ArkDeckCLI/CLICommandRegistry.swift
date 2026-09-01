@@ -1949,6 +1949,12 @@ enum CLICommandRegistry {
     token: "debug",
     summary: "typed application debugging, and the retired recovery aliases",
     leaves: [
+      CLILeafSpec(
+        token: "probe",
+        canonicalCommand: "debug.probe",
+        summary: "observe target-bound package and port-forward facts without creating a Job",
+        options: runtimeClientOptions([targetIDOption, targetProtocolOption]),
+        connectsToRuntime: true),
       domainLeaf("hap", "debug.hap", "debug.hap@1", "install, launch and observe a HAP"),
       CLILeafSpec(
         token: "start",
