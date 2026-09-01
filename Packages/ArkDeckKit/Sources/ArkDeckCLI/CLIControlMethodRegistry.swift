@@ -209,6 +209,14 @@ enum CLIControlFailureMapper {
     method: String,
     evidence: CLIControlFailureEvidence = CLIControlFailureEvidence()
   ) -> CLIErrorCode {
+    // Artifact export distinguishes known pre-publication refusals from an
+    // uncertain publication itself. Its owner explicitly reports the latter
+    // as outcomeUnknown; zero device dispatch never hides a host write.
+    if ["artifact.list", "artifact.inspect", "artifact.read", "artifact.export"].contains(method),
+      evidence.phase == "artifactOwner", evidence.newDispatchCount == 0,
+      ["resourceConflict", "invalidInput", "operationUnavailable", "inputTooLarge", "invalidCursor",
+        "resourceNotFound", "artifactIntegrityFailed", "sensitiveAccessDenied", "operationFailed", "recordUnreadable"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Import owners never dispatch a device operation. Their typed refusal
     // still permits already-durable upload state; it is not preAdmission.
     if ["artifact.import.begin", "artifact.import.append", "artifact.import.commit",

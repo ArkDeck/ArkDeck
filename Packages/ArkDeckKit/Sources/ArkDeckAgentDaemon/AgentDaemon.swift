@@ -1824,6 +1824,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "artifact.list":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
+      }
       guard let artifactStore else {
         return failure(
           id: request.id, code: .internalError, message: "artifact store is not configured")
@@ -1841,6 +1844,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "artifact.inspect":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
+      }
       guard let artifactStore else {
         return failure(
           id: request.id, code: .internalError, message: "artifact store is not configured")
@@ -1861,6 +1867,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "artifact.read":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
+      }
       guard let artifactStore else {
         return failure(
           id: request.id, code: .internalError, message: "artifact store is not configured")
@@ -1917,6 +1926,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "artifact.export":
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
+      }
       guard let artifactStore else {
         return failure(
           id: request.id, code: .internalError, message: "artifact store is not configured")

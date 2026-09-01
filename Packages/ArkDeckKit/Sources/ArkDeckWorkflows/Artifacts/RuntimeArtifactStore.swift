@@ -643,6 +643,7 @@ public actor RuntimeArtifactStore {
   private var cachedIndexedBytes: Int?
   private var durableImportOwner: RuntimeImportStore?
   private let importFault: RuntimeImportStore.Fault
+  private let exportFault: RuntimeArtifactExport.Fault
   private var importUses: [UUID: [RuntimeImportLeaseReference]] = [:]
   private var payloadVerificationsByJob: [String: [String: ArtifactPayloadVerificationRecord]]
   private var loadedPayloadVerificationJobs: Set<String>
@@ -665,9 +666,11 @@ public actor RuntimeArtifactStore {
     redaction: ArtifactRedactionPolicy = ArtifactRedactionPolicy(),
     retentionPolicy: ArtifactRetentionPolicy = ArtifactRetentionPolicy(),
     importFault: @escaping RuntimeImportStore.Fault,
+    exportFault: @escaping RuntimeArtifactExport.Fault = { _ in },
     nowUTC: @escaping @Sendable () -> String
   ) throws {
     self.importFault = importFault
+    self.exportFault = exportFault
     self.rootURL = rootURL
     self.quota = quota
     self.redaction = redaction
@@ -1075,6 +1078,151 @@ public actor RuntimeArtifactStore {
   }
 
   // MARK: - Access (ID only)
+
+  // MARK: - Protocol-2 tagged Artifact resources
+
+  package func artifactInventory(owner: ArtifactOwnerReference, pageSize: Int, cursor: String?) throws -> JSONValue {
+    guard (1...1000).contains(pageSize) else { throw AgentExecutionControlFailure("invalidInput", "invalid Artifact page size") }
+    let imported = try importedOwner(owner)
+    // Keep snapshots inside the already-private, non-Job Import metadata tree.
+    // They never appear in Artifact quota inventory or Job history.
+    _ = try imports()
+    let pager = try RuntimeSnapshotPager(directory: rootURL.appending(path: ".imports-v1/artifact-snapshots"))
+    return try pager.page(method: "artifact.list", filters: ["owner": owner.value], order: "createdAtDescArtifactIdAsc",
+      pageSize: pageSize, cursor: cursor) {
+      var rows: [ArtifactResourceProjection] = []
+      var bytes = 0
+      for metadata in try list(jobID: owner.id) {
+        let value = try artifactProjection(metadata, owner: owner, imported: imported)
+        bytes += try PortableCanonicalJSON.canonicalBytes(value).count
+        guard bytes <= 16 * 1024 * 1024 else { throw AgentExecutionControlFailure("inputTooLarge", "Artifact inventory exceeds its snapshot bound") }
+        rows.append(try ArtifactResourceProjection(value))
+      }
+      rows.sort { $0.createdAt == $1.createdAt ? $0.id.utf8.lexicographicallyPrecedes($1.id.utf8) : $0.createdAt > $1.createdAt }
+      return rows.map(\.value)
+    }
+  }
+
+  package func inspectArtifact(owner: ArtifactOwnerReference, artifactID: String) throws -> JSONValue {
+    let imported = try importedOwner(owner)
+    return try artifactProjection(inspect(jobID: owner.id, artifactID: artifactID), owner: owner, imported: imported)
+  }
+
+  private func importedOwner(_ owner: ArtifactOwnerReference) throws -> RuntimeImportRecord? {
+    guard owner.kind == "import" else { return nil }
+    return try inspectImport(id: owner.id)
+  }
+
+  private func artifactProjection(_ metadata: RuntimeArtifactMetadata, owner: ArtifactOwnerReference, imported: RuntimeImportRecord?) throws -> JSONValue {
+    guard metadata.jobID == owner.id else { throw AgentExecutionControlFailure("recordUnreadable", "Artifact owner does not match its inventory") }
+    if let imported {
+      guard ["committed", "released"].contains(imported.state), case .object(let receipt)? = imported.receipt,
+        receipt["artifactId"] == .string(metadata.artifactID), metadata.providerID == "host",
+        metadata.sourceOperation == "artifact.import-" + imported.intent.kind, metadata.bindingSnapshot == imported.binding,
+        metadata.sha256 == imported.intent.sha256, metadata.byteCount == imported.intent.byteCount,
+        metadata.name == imported.intent.name else { throw AgentExecutionControlFailure("recordUnreadable", "Artifact does not match its committed Import owner") }
+    }
+    let status: String
+    switch metadata.status { case .published: status = "published"; case .missing: status = "missing"; case .truncated: status = "truncated" }
+    let lease: JSONValue = metadata.status.isPublished && imported?.state != "released"
+      ? .string("lease-v1:\(owner.id):\(metadata.artifactID)") : .null
+    let value: JSONValue = .object([
+      "schemaVersion": .string("arkdeck.artifact/1"), "owner": owner.value,
+      "artifactId": .string(metadata.artifactID), "name": .string(metadata.name), "mediaType": .string(metadata.mediaType),
+      "privacy": .string(metadata.privacy.rawValue), "byteCount": .integer(Int64(metadata.byteCount)),
+      "artifactDigest": metadata.sha256.isEmpty ? .null : .string(metadata.sha256), "status": .string(status), "lease": lease,
+      "createdAtUtc": .string(metadata.createdAtUTC), "sourceOperation": .string(metadata.sourceOperation), "providerId": .string(metadata.providerID),
+      "redactionApplied": .bool(metadata.redactionApplied),
+      "binding": .object(["targetId": .string(metadata.bindingSnapshot.targetID),
+        "bindingRevision": metadata.bindingSnapshot.bindingRevision.map { .integer(Int64($0)) } ?? .null,
+        "stableIdentitySha256": metadata.bindingSnapshot.stableIdentitySHA256.map(JSONValue.string) ?? .null]),
+      "retention": .object(["class": .string(metadata.retention.retentionClass.rawValue), "pinned": .bool(metadata.retention.pinned),
+        "deadlineUtc": metadata.retention.deadlineUTC.map(JSONValue.string) ?? .null]),
+      "observationWindow": metadata.observationWindow.map { .object(["startUtc": .string($0.startUTC), "endUtc": .string($0.endUTC)]) } ?? .null,
+    ])
+    _ = try ArtifactResourceProjection(value)
+    return value
+  }
+
+  package func readArtifact(owner: ArtifactOwnerReference, artifactID: String, offset: Int, maximumBytes: Int, allowSensitive: Bool) throws -> JSONValue {
+    guard offset >= 0, (1...ArtifactReadProjection.maximumBytes).contains(maximumBytes) else {
+      throw AgentExecutionControlFailure("invalidInput", "Artifact range is outside its published bound")
+    }
+    let imported = try importedOwner(owner)
+    let metadata = try inspect(jobID: owner.id, artifactID: artifactID)
+    _ = try artifactProjection(metadata, owner: owner, imported: imported)
+    guard offset <= metadata.byteCount else { throw AgentExecutionControlFailure("invalidInput", "Artifact offset exceeds its byte count") }
+    guard metadata.status.isPublished else { throw AgentExecutionControlFailure("resourceNotFound", "Artifact has no published content") }
+    guard metadata.privacy != .sensitive || allowSensitive else { throw RuntimeArtifactError.sensitiveAccessRequiresOptIn(artifactID) }
+    let opened = try openVerifiedArtifact(metadata)
+    defer { Darwin.close(opened.descriptor) }
+    let count = min(maximumBytes, metadata.byteCount - offset)
+    var bytes = Data(count: count)
+    try bytes.withUnsafeMutableBytes { buffer in
+      var consumed = 0
+      while consumed < count {
+        let n = pread(opened.descriptor, buffer.baseAddress!.advanced(by: consumed), count - consumed, off_t(offset + consumed))
+        if n < 0, errno == EINTR { continue }
+        guard n > 0 else { throw AgentExecutionControlFailure("artifactIntegrityFailed", "immutable Artifact range could not be read completely") }
+        consumed += n
+      }
+    }
+    try verifyOpenedArtifact(opened)
+    let next = offset + bytes.count
+    let value: JSONValue = .object(["artifactId": .string(artifactID), "artifactDigest": .string(metadata.sha256),
+      "offset": .integer(Int64(offset)), "nextOffset": .integer(Int64(next)), "totalByteCount": .integer(Int64(metadata.byteCount)),
+      "eof": .bool(next == metadata.byteCount), "byteCount": .integer(Int64(bytes.count)), "base64": .string(bytes.base64EncodedString())])
+    _ = try ArtifactReadProjection(value)
+    return value
+  }
+
+  package func exportArtifact(owner: ArtifactOwnerReference, artifactID: String, destinationDirectory: URL, overwrite: Bool, allowSensitive: Bool) throws -> JSONValue {
+    let imported = try importedOwner(owner)
+    let metadata = try inspect(jobID: owner.id, artifactID: artifactID)
+    _ = try artifactProjection(metadata, owner: owner, imported: imported)
+    guard metadata.status.isPublished else { throw AgentExecutionControlFailure("resourceNotFound", "Artifact has no published content") }
+    guard metadata.privacy != .sensitive || allowSensitive else { throw RuntimeArtifactError.sensitiveAccessRequiresOptIn(artifactID) }
+    let opened = try openVerifiedArtifact(metadata)
+    defer { Darwin.close(opened.descriptor) }
+    return try RuntimeArtifactExport.run(metadata: metadata, owner: owner, source: opened.descriptor,
+      destinationDirectory: destinationDirectory, protectedRoot: rootURL, overwrite: overwrite,
+      fault: exportFault, verifySource: { try verifyOpenedArtifact(opened) })
+  }
+
+  private struct OpenedArtifact {
+    let descriptor: Int32
+    let url: URL
+    let fingerprint: ArtifactPayloadFingerprint
+  }
+
+  private func openVerifiedArtifact(_ metadata: RuntimeArtifactMetadata) throws -> OpenedArtifact {
+    let url = try storedFileURL(for: metadata)
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+    guard descriptor >= 0 else { throw AgentExecutionControlFailure("artifactIntegrityFailed", "Artifact could not be opened") }
+    do {
+      var before = stat()
+      guard fstat(descriptor, &before) == 0, before.st_mode & S_IFMT == S_IFREG,
+        before.st_size == metadata.byteCount, before.st_uid == geteuid(), before.st_nlink == 1 else {
+        throw AgentExecutionControlFailure("artifactIntegrityFailed", "Artifact file identity drifted")
+      }
+      let fingerprint = ArtifactPayloadFingerprint(before)
+      if cachedPayloadVerification(jobID: metadata.jobID, artifactID: metadata.artifactID)?.matches(metadata: metadata, fingerprint: fingerprint) != true {
+        let hashed = try Self.sha256Hex(ofDescriptor: descriptor)
+        guard hashed.0 == metadata.sha256, hashed.1 == metadata.byteCount else { throw AgentExecutionControlFailure("artifactIntegrityFailed", "Artifact digest drifted") }
+      }
+      let opened = OpenedArtifact(descriptor: descriptor, url: url, fingerprint: fingerprint)
+      try verifyOpenedArtifact(opened)
+      return opened
+    } catch { Darwin.close(descriptor); throw error }
+  }
+
+  private func verifyOpenedArtifact(_ opened: OpenedArtifact) throws {
+    var current = stat(); var named = stat()
+    guard fstat(opened.descriptor, &current) == 0, lstat(opened.url.path, &named) == 0,
+      ArtifactPayloadFingerprint(current) == opened.fingerprint, ArtifactPayloadFingerprint(named) == opened.fingerprint else {
+      throw AgentExecutionControlFailure("artifactIntegrityFailed", "Artifact changed during content access")
+    }
+  }
 
   public func list(jobID: String) throws -> [RuntimeArtifactMetadata] {
     try loadIndex(jobID: jobID).artifacts

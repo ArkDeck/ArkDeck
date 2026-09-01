@@ -921,11 +921,17 @@ final class CLIArgumentParserContractTests: XCTestCase {
         .invalidOption,
         "offset \(rejected.debugDescription) must be refused")
     }
-    // An open-ended bound has to read as a lower bound: "must be 0" would say
-    // the only accepted offset is zero.
+    XCTAssertNotNil(success([
+      "artifact", "read", "--job", "J", "--artifact", "A", "--offset", "9007199254740991",
+    ]))
+    XCTAssertEqual(failure([
+      "artifact", "read", "--job", "J", "--artifact", "A", "--offset", "9007199254740992",
+    ])?.code, .invalidOption)
+    // The bound is now closed at the portable machine contract's exact-integer
+    // ceiling. The diagnostic must name both endpoints, not just zero.
     let message = failure(
       ["artifact", "read", "--job", "J", "--artifact", "A", "--offset", "-1"])?.message
-    XCTAssertEqual(message?.contains("0 or greater"), true, message ?? "")
+    XCTAssertEqual(message?.contains("0...9007199254740991"), true, message ?? "")
   }
 
   /// §8.1: raw is bytes and nothing else, so it cannot be combined with a mode

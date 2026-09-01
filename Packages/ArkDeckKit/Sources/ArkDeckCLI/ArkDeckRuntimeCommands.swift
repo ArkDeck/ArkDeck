@@ -1884,6 +1884,10 @@ enum RuntimeCLI {
   }
 
   static func runArtifact(_ arguments: [String]) throws {
+    if let verb = arguments.first, usesArtifactResource(verb, rest: Array(arguments.dropFirst())) {
+      try runArtifactResource(verb, rest: Array(arguments.dropFirst()))
+      return
+    }
     if arguments.first == "import" {
       try runDurableImport(Array(arguments.dropFirst()))
       return

@@ -113,8 +113,8 @@ concurrent submit/release, active plan holds, admission faults on both sides of
 the SQLite boundary, restarted and outcome-unknown Job references, corrupt
 reference history, and SIGKILL immediately before and after unpinning.
 
-Remaining full-CLI work includes tagged Import selectors on Artifact list/inspect/read/export,
-expanded Import reference diagnostics,
+Tagged Import selectors on Artifact list/inspect/read/export are described in
+`cli-artifact-resources.md`. Remaining full-CLI work includes expanded Import reference diagnostics,
 the remaining resource/control surfaces, default protocol migration and the full
 machine-contract manifest. GJ-1–GJ-5 real-device acceptance must use the reviewed
 protected-main Runtime and current Catalog digest through Agent/CLI.
