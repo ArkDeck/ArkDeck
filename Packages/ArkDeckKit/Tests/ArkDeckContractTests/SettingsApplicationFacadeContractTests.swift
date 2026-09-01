@@ -70,11 +70,17 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
 
   func testSettingsSourceKeepsDiagnosticRawExcludedAndUITestsOutOfModule() throws {
     let repository = repositoryRoot()
-    let facade = try String(
+    let settingsFacade = try String(
       contentsOf: repository.appending(
         path:
           "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/SettingsApplicationFacade.swift"),
       encoding: .utf8)
+    let supportFacade = try String(
+      contentsOf: repository.appending(
+        path:
+          "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/RuntimeSupportBundleApplicationFacade.swift"),
+      encoding: .utf8)
+    let facade = settingsFacade + supportFacade
     let view = try String(
       contentsOf: repository.appending(
         path: "ArkDeckApp/Features/Settings/SettingsRootView.swift"),

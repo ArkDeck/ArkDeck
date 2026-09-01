@@ -927,9 +927,9 @@ enum CLICommandRegistry {
     isRequired: true)
 
   /// §6.3's platform surface. Only the two read-only observations exist today;
-  /// `service`, `tool`, `bundle`, `signing`, `storage`, `support-bundle` and
-  /// `update` join this node as they are resourced, which is why it is a group
-  /// rather than a pair of hyphenated leaves.
+  /// Platform resources join this node as they are closed. Keeping one nested
+  /// tree lets `support-bundle` remain host-local while service/HDC leaves use
+  /// their own Runtime or platform adapters.
   private static let runtimeNode = CLINodeSpec(
     token: "runtime",
     summary: "the local Runtime service, its tools and its health",
@@ -980,6 +980,42 @@ enum CLICommandRegistry {
       runtimeSigningNode,
       runtimeBundleNode,
       runtimeToolNode,
+      runtimeSupportBundleNode,
+    ])
+
+  private static let runtimeSupportBundleNode = CLINodeSpec(
+    token: "support-bundle",
+    summary: "preview and explicitly export a bounded local support bundle",
+    leaves: [
+      CLILeafSpec(
+        token: "preview",
+        canonicalCommand: "runtime.support-bundle.preview",
+        summary: "show the exact entries, privacy warning and digest without writing a bundle",
+        options: [
+          CLIOptionSpec(
+            name: "--destination",
+            form: .value(placeholder: "absolute-directory", grammar: .opaque),
+            summary: "new directory that an approved export would create",
+            isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption,
+        ]),
+      CLILeafSpec(
+        token: "export",
+        canonicalCommand: "runtime.support-bundle.export",
+        summary: "export only the scope named by an exact prior preview digest",
+        options: [
+          CLIOptionSpec(
+            name: "--destination",
+            form: .value(placeholder: "absolute-directory", grammar: .opaque),
+            summary: "same new directory used for the approved preview",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--preview-digest",
+            form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+            summary: "exact scope digest returned by preview",
+            isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption,
+        ]),
     ])
 
   private static let runtimeBundleNode = CLINodeSpec(

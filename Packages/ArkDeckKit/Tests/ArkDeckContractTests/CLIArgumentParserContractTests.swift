@@ -170,6 +170,30 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(success(["operation", "list", "--socket", "/tmp/s"]))
   }
 
+  func testRuntimeSupportBundleRequiresPreviewBeforeExportAndNeverAcceptsRuntimeEndpoints() {
+    XCTAssertNotNil(
+      success([
+        "runtime", "support-bundle", "preview", "--destination", "/tmp/support",
+        "--output", "json",
+      ]))
+    XCTAssertNotNil(
+      success([
+        "runtime", "support-bundle", "export", "--destination", "/tmp/support",
+        "--preview-digest", String(repeating: "a", count: 64), "--output", "json",
+      ]))
+    XCTAssertEqual(
+      failure([
+        "runtime", "support-bundle", "export", "--destination", "/tmp/support",
+      ])?.code,
+      .invalidOption)
+    XCTAssertEqual(
+      failure([
+        "runtime", "support-bundle", "preview", "--destination", "/tmp/support",
+        "--endpoint", "/tmp/runtime.sock",
+      ])?.code,
+      .invalidOption)
+  }
+
   func testOutputIsAcceptedByEveryLeafThatDeclaresItAndRefusedByTheRest() {
     XCTAssertNotNil(success(["doctor", "--output", "json"]))
     XCTAssertNotNil(success(["job", "list", "--output", "json"]))
