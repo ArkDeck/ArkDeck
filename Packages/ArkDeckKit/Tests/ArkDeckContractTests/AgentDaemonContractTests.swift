@@ -487,6 +487,132 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(clearResult["generation"], .string("3"))
   }
 
+  func testCLICandidateDisplayNameUsesExactObservationCASAndMigratesOnAdopt() async throws {
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(
+        path: "candidate-display-name-cli", directoryHint: .isDirectory))
+    let owner = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() },
+      nowUTC: { "2026-09-01T01:00:00Z" })
+    let (handler, engine) = try makeStack(
+      targetStore: targets, targetObservations: owner)
+    let server = try startServer(handler)
+
+    func observation(_ envelope: [String: JSONValue]) throws
+      -> (candidate: String, observation: String, generation: String, row: [String: JSONValue])
+    {
+      guard case .object(let snapshot)? = envelope["result"],
+        case .string(let generation)? = snapshot["snapshotGeneration"],
+        case .array(let rows)? = snapshot["observations"],
+        case .object(let row)? = rows.first,
+        case .string(let candidate)? = row["candidateKey"],
+        case .string(let observation)? = row["observationId"]
+      else { throw AgentClientError.malformedResponse("candidate display-name observation missing") }
+      return (candidate, observation, generation, row)
+    }
+    func candidates() throws -> [String: JSONValue] {
+      try runObservationCLI(
+        ["device", "candidates", "--require-protocol", "2"], server: server).1
+    }
+
+    let initial = try observation(candidates())
+    XCTAssertEqual(initial.row["displayName"], .null)
+    XCTAssertEqual(initial.row["displayNameGeneration"], .string(initial.generation))
+    let exact = [
+      "--candidate", initial.candidate,
+      "--observation", initial.observation,
+      "--observation-generation", initial.generation,
+    ]
+    let (setExit, setEnvelope) = try runObservationCLI(
+      ["device", "display-name", "set"] + exact + ["--name", "Bench candidate"],
+      server: server)
+    XCTAssertEqual(setExit, 0)
+    XCTAssertEqual(setEnvelope["command"], .string("device.display-name.set"))
+    guard case .object(let setResult)? = setEnvelope["result"],
+      case .object(let setMeta)? = setEnvelope["meta"],
+      case .string(let namedGeneration)? = setResult["generation"]
+    else { return XCTFail("candidate set must return one typed resource") }
+    XCTAssertEqual(setResult["name"], .string("Bench candidate"))
+    XCTAssertEqual(setMeta["controlProtocolVersion"], .string("2.0.0"))
+
+    let named = try observation(candidates())
+    XCTAssertEqual(named.generation, namedGeneration)
+    XCTAssertEqual(named.row["displayName"], .string("Bench candidate"))
+    XCTAssertEqual(named.row["displayNameGeneration"], .string(namedGeneration))
+
+    let (staleExit, staleEnvelope) = try runObservationCLI(
+      ["device", "display-name", "clear"] + exact, server: server)
+    XCTAssertEqual(staleExit, 65)
+    guard case .object(let staleError)? = staleEnvelope["error"],
+      case .object(let staleDetails)? = staleError["details"]
+    else { return XCTFail("stale candidate CAS must be machine-readable") }
+    XCTAssertEqual(staleError["code"], .string("resourceConflict"))
+    XCTAssertEqual(staleDetails["phase"], .string("candidateDisplayNameOwner"))
+    XCTAssertEqual(staleDetails["newDispatchCount"], .integer(0))
+
+    let currentExact = [
+      "--candidate", named.candidate,
+      "--observation", named.observation,
+      "--observation-generation", named.generation,
+    ]
+    let (invalidExit, invalidEnvelope) = try runObservationCLI(
+      ["device", "display-name", "set"] + currentExact + ["--name", " leading"],
+      server: server)
+    XCTAssertEqual(invalidExit, 65)
+    guard case .object(let invalidError)? = invalidEnvelope["error"] else {
+      return XCTFail("invalid candidate name must be a typed refusal")
+    }
+    XCTAssertEqual(invalidError["code"], .string("invalidInput"))
+
+    let (clearExit, clearEnvelope) = try runObservationCLI(
+      ["device", "display-name", "clear"] + currentExact, server: server)
+    XCTAssertEqual(clearExit, 0)
+    guard case .object(let clearResult)? = clearEnvelope["result"],
+      case .string(let clearedGeneration)? = clearResult["generation"]
+    else { return XCTFail("candidate clear must return its new generation") }
+    XCTAssertEqual(clearResult["name"], .null)
+
+    let clearedExact = [
+      "--candidate", named.candidate,
+      "--observation", named.observation,
+      "--observation-generation", clearedGeneration,
+    ]
+    let (renamedExit, renamedEnvelope) = try runObservationCLI(
+      ["device", "display-name", "set"] + clearedExact + ["--name", "Lab board"],
+      server: server)
+    XCTAssertEqual(renamedExit, 0)
+    guard case .object(let renamedResult)? = renamedEnvelope["result"],
+      case .string(let adoptGeneration)? = renamedResult["generation"]
+    else { return XCTFail("candidate rename must advance generation") }
+
+    let (adoptExit, adoptEnvelope) = try runObservationCLI([
+      "target", "adopt", "--candidate", named.candidate,
+      "--observation", named.observation,
+      "--observation-generation", adoptGeneration,
+    ], server: server)
+    XCTAssertEqual(adoptExit, 0)
+    guard case .object(let adoptResult)? = adoptEnvelope["result"],
+      case .string(let targetID)? = adoptResult["targetId"]
+    else { return XCTFail("adopt must return the durable target") }
+
+    let (showExit, showEnvelope) = try runObservationCLI(
+      ["target", "show", "--target", targetID], server: server)
+    XCTAssertEqual(showExit, 0)
+    guard case .object(let target)? = showEnvelope["result"] else {
+      return XCTFail("target show must expose the migrated name")
+    }
+    XCTAssertEqual(target["displayName"], .string("Lab board"))
+    XCTAssertEqual(target["displayNameGeneration"], .string("2"))
+
+    let adopted = try observation(candidates())
+    XCTAssertEqual(adopted.row["adoptedTargetId"], .string(targetID))
+    XCTAssertEqual(adopted.row["displayName"], .null)
+    XCTAssertGreaterThan(Int(adopted.generation) ?? 0, Int(adoptGeneration) ?? 0)
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty, "display names and adoption must not create a Job")
+  }
+
   /// §6.1's `target availability`, and the reason it is a Runtime method.
   ///
   /// §7.2 forbids the CLI from issuing several reads and declaring from them

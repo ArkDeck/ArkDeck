@@ -119,6 +119,8 @@ enum CLIControlMethodRegistry {
     "control-action.show",
     "control-action.reconcile",
 
+    "device.display-name.clear",
+    "device.display-name.set",
     "target.adopt",
     "target.display-name.clear",
     "target.display-name.set",
@@ -235,6 +237,11 @@ enum CLIControlFailureMapper {
       evidence.phase == "targetDisplayNameOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["device.display-name.set", "device.display-name.clear"].contains(method),
+      evidence.phase == "candidateDisplayNameOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceConflict", "recordUnreadable", "quotaExceeded", "ioFailure",
+        "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     switch wireCode {
     case "resourceConflict", "factsDrifted", "admissionDenied", "targetTrustPending", "invalidInput",

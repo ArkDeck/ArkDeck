@@ -19,6 +19,25 @@ package struct RuntimeTargetDisplayName: Equatable, Sendable {
   }
 }
 
+package struct RuntimeCandidateDisplayName: Equatable, Sendable {
+  package let candidate: String
+  package let observationID: String
+  package let generation: UInt64
+  package let name: String?
+  package let updatedAtUTC: String?
+
+  package var projection: JSONValue {
+    .object([
+      "schemaVersion": .string("arkdeck.candidate-display-name/1"),
+      "candidateKey": .string(candidate),
+      "observationId": .string(observationID),
+      "generation": .string(String(generation)),
+      "name": name.map(JSONValue.string) ?? .null,
+      "updatedAtUtc": updatedAtUTC.map(JSONValue.string) ?? .null,
+    ])
+  }
+}
+
 package struct RuntimeTargetDisplayNameFailure: Error, Equatable, Sendable {
   package let code: String
   package let message: String
@@ -46,9 +65,26 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
     }
   }
 
+  private struct CandidateRecord: Codable, Equatable {
+    let candidate: String
+    let observationID: String
+    var generation: UInt64
+    var name: String
+    var updatedAtUTC: String
+    var stagedTargetID: String?
+    var stagedTargetGeneration: UInt64?
+
+    var resource: RuntimeCandidateDisplayName {
+      .init(
+        candidate: candidate, observationID: observationID, generation: generation,
+        name: name, updatedAtUTC: updatedAtUTC)
+    }
+  }
+
   private struct Document: Codable, Equatable {
     var schemaVersion = "arkdeck.target-display-names/1"
     var records: [Record] = []
+    var candidateRecords: [CandidateRecord]?
   }
 
   private static let documentName = "target-display-names.json"
@@ -112,6 +148,320 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
     try mutate(targetID: targetID, expectedGeneration: expectedGeneration, name: nil)
   }
 
+  package func candidateDisplayNames(
+    references: [TargetObservationReference]
+  ) throws -> [String: RuntimeCandidateDisplayName] {
+    try validateCandidateReferences(references)
+    return try withLockedDocument { _, document in
+      let records = Dictionary(
+        uniqueKeysWithValues: (document.candidateRecords ?? []).map {
+          (Self.candidateKey(candidate: $0.candidate, observationID: $0.observationID), $0)
+        })
+      return Dictionary(uniqueKeysWithValues: references.map { reference in
+        let record = records[
+          Self.candidateKey(
+            candidate: reference.candidate, observationID: reference.observationID)]
+        let resource: RuntimeCandidateDisplayName
+        if let record, record.generation == reference.generation {
+          resource = record.resource
+        } else {
+          resource = RuntimeCandidateDisplayName(
+            candidate: reference.candidate, observationID: reference.observationID,
+            generation: reference.generation, name: nil, updatedAtUTC: nil)
+        }
+        return (reference.observationID, resource)
+      })
+    }
+  }
+
+  package func setCandidate(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64,
+    name: String
+  ) throws -> RuntimeCandidateDisplayName {
+    try validateName(name)
+    return try mutateCandidate(
+      reference, activeReferences: activeReferences,
+      nextGeneration: nextGeneration, name: name)
+  }
+
+  package func clearCandidate(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64
+  ) throws -> RuntimeCandidateDisplayName {
+    try mutateCandidate(
+      reference, activeReferences: activeReferences,
+      nextGeneration: nextGeneration, name: nil)
+  }
+
+  package func expireCandidateDisplayNames() throws {
+    try withLockedDocument { root, document in
+      guard !(document.candidateRecords ?? []).isEmpty else { return }
+      var document = document
+      document.candidateRecords = []
+      try save(document, root: root)
+    }
+  }
+
+  /// Copies an exact observation-scoped name into the prospective durable
+  /// target record before the target binding becomes visible. The candidate
+  /// record remains until `finishCandidateAdoption`, so a failed target-store
+  /// publication cannot silently lose the only visible name. Repeating the
+  /// exact stage is idempotent.
+  package func stageCandidateAdoption(
+    _ reference: TargetObservationReference,
+    targetID: String
+  ) throws {
+    try validateCandidateReference(reference)
+    try validateTargetID(targetID)
+    try withLockedDocument { root, document in
+      var document = document
+      guard let candidateIndex = (document.candidateRecords ?? []).firstIndex(where: {
+        $0.candidate == reference.candidate && $0.observationID == reference.observationID
+      }) else { return }
+      var candidates = document.candidateRecords ?? []
+      let candidate = candidates[candidateIndex]
+      guard candidate.generation == reference.generation else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceConflict", "candidate display-name generation changed")
+      }
+      if let stagedTargetID = candidate.stagedTargetID,
+        let stagedGeneration = candidate.stagedTargetGeneration
+      {
+        guard stagedTargetID == targetID,
+          let target = document.records.first(where: { $0.targetID == targetID }),
+          target.generation == stagedGeneration, target.name == candidate.name
+        else {
+          throw RuntimeTargetDisplayNameFailure(
+            "recordUnreadable", "candidate display-name migration stage is inconsistent")
+        }
+        return
+      }
+      if let target = document.records.first(where: { $0.targetID == targetID }),
+        target.name != nil
+      {
+        // A durable target name outranks an observation-scoped suggestion.
+        // Finishing adoption clears the candidate record without rewriting it.
+        return
+      }
+      let targetIndex = document.records.firstIndex { $0.targetID == targetID }
+      let currentGeneration = targetIndex.map { document.records[$0].generation } ?? 1
+      let next = currentGeneration.addingReportingOverflow(1)
+      guard !next.overflow, next.partialValue <= UInt64(Int64.max) else {
+        throw RuntimeTargetDisplayNameFailure(
+          "resourceConflict", "target display-name generation is exhausted")
+      }
+      let timestamp = try validTimestamp()
+      let target = Record(
+        targetID: targetID, generation: next.partialValue, name: candidate.name,
+        updatedAtUTC: timestamp)
+      if let targetIndex { document.records[targetIndex] = target }
+      else {
+        guard document.records.count < Self.maximumRecords else {
+          throw RuntimeTargetDisplayNameFailure(
+            "quotaExceeded", "target display-name resource count exceeds its bound")
+        }
+        document.records.append(target)
+      }
+      candidates[candidateIndex].stagedTargetID = targetID
+      candidates[candidateIndex].stagedTargetGeneration = next.partialValue
+      document.candidateRecords = candidates
+      sort(&document)
+      try save(document, root: root)
+    }
+  }
+
+  package func finishCandidateAdoption(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64
+  ) throws {
+    try validateCandidateTransition(
+      reference, activeReferences: activeReferences, nextGeneration: nextGeneration)
+    try withLockedDocument { root, document in
+      var document = document
+      var records = document.candidateRecords ?? []
+      try validateCurrentCandidateRecords(
+        records, activeReferences: activeReferences,
+        expectedGeneration: reference.generation)
+      let active = Set(activeReferences.map {
+        Self.candidateKey(candidate: $0.candidate, observationID: $0.observationID)
+      })
+      records = records.compactMap { record in
+        let key = Self.candidateKey(
+          candidate: record.candidate, observationID: record.observationID)
+        guard active.contains(key),
+          !(record.candidate == reference.candidate
+            && record.observationID == reference.observationID)
+        else { return nil }
+        var record = record
+        record.generation = nextGeneration
+        record.stagedTargetID = nil
+        record.stagedTargetGeneration = nil
+        return record
+      }
+      document.candidateRecords = records
+      sort(&document)
+      try save(document, root: root)
+    }
+  }
+
+  /// Observation identities never survive a Runtime restart. Drop every
+  /// candidate record and any target-name stage whose binding was never
+  /// published, while preserving names of active durable targets.
+  package func reconcileAfterRuntimeRestart(activeTargetIDs: Set<String>) throws {
+    guard activeTargetIDs.count <= Self.maximumRecords else {
+      throw RuntimeTargetDisplayNameFailure(
+        "recordUnreadable", "active target display-name set exceeds its bound")
+    }
+    try withLockedDocument { root, document in
+      var reconciled = document
+      reconciled.records.removeAll { !activeTargetIDs.contains($0.targetID) }
+      reconciled.candidateRecords = []
+      sort(&reconciled)
+      if reconciled != document { try save(reconciled, root: root) }
+    }
+  }
+
+  private func mutateCandidate(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64,
+    name: String?
+  ) throws -> RuntimeCandidateDisplayName {
+    try validateCandidateTransition(
+      reference, activeReferences: activeReferences, nextGeneration: nextGeneration)
+    let timestamp = try validTimestamp()
+    return try withLockedDocument { root, document in
+      var document = document
+      var records = document.candidateRecords ?? []
+      try validateCurrentCandidateRecords(
+        records, activeReferences: activeReferences,
+        expectedGeneration: reference.generation)
+      let active = Set(activeReferences.map {
+        Self.candidateKey(candidate: $0.candidate, observationID: $0.observationID)
+      })
+      records = records.compactMap { record in
+        let key = Self.candidateKey(
+          candidate: record.candidate, observationID: record.observationID)
+        guard active.contains(key),
+          !(record.candidate == reference.candidate
+            && record.observationID == reference.observationID)
+        else { return nil }
+        var record = record
+        record.generation = nextGeneration
+        record.stagedTargetID = nil
+        record.stagedTargetGeneration = nil
+        return record
+      }
+      if let name {
+        guard records.count < Self.maximumRecords else {
+          throw RuntimeTargetDisplayNameFailure(
+            "quotaExceeded", "candidate display-name resource count exceeds its bound")
+        }
+        records.append(
+          CandidateRecord(
+            candidate: reference.candidate, observationID: reference.observationID,
+            generation: nextGeneration, name: name, updatedAtUTC: timestamp,
+            stagedTargetID: nil, stagedTargetGeneration: nil))
+      }
+      document.candidateRecords = records
+      sort(&document)
+      try save(document, root: root)
+      return RuntimeCandidateDisplayName(
+        candidate: reference.candidate, observationID: reference.observationID,
+        generation: nextGeneration, name: name, updatedAtUTC: timestamp)
+    }
+  }
+
+  private func validateCandidateTransition(
+    _ reference: TargetObservationReference,
+    activeReferences: [TargetObservationReference],
+    nextGeneration: UInt64
+  ) throws {
+    try validateCandidateReference(reference)
+    try validateCandidateReferences(activeReferences)
+    guard activeReferences.contains(reference),
+      activeReferences.allSatisfy({ $0.generation == reference.generation })
+    else {
+      throw RuntimeTargetDisplayNameFailure(
+        "resourceConflict", "candidate display-name observation is no longer current")
+    }
+    let next = reference.generation.addingReportingOverflow(1)
+    guard !next.overflow, next.partialValue == nextGeneration,
+      nextGeneration <= UInt64(Int64.max)
+    else {
+      throw RuntimeTargetDisplayNameFailure(
+        "resourceConflict", "candidate display-name generation cannot advance")
+    }
+  }
+
+  private func validateCurrentCandidateRecords(
+    _ records: [CandidateRecord],
+    activeReferences: [TargetObservationReference],
+    expectedGeneration: UInt64
+  ) throws {
+    let active = Set(activeReferences.map {
+      Self.candidateKey(candidate: $0.candidate, observationID: $0.observationID)
+    })
+    guard records.allSatisfy({ record in
+      let key = Self.candidateKey(
+        candidate: record.candidate, observationID: record.observationID)
+      return !active.contains(key) || record.generation == expectedGeneration
+    }) else {
+      throw RuntimeTargetDisplayNameFailure(
+        "resourceConflict", "candidate display-name generation changed")
+    }
+  }
+
+  private func validateCandidateReferences(_ references: [TargetObservationReference]) throws {
+    guard references.count <= Self.maximumRecords,
+      Set(references.map(\.observationID)).count == references.count,
+      Set(references.map {
+        Self.candidateKey(candidate: $0.candidate, observationID: $0.observationID)
+      }).count == references.count
+    else {
+      throw RuntimeTargetDisplayNameFailure(
+        "invalidInput", "candidate display-name snapshot is duplicate or excessive")
+    }
+    try references.forEach(validateCandidateReference)
+  }
+
+  private func validateCandidateReference(_ reference: TargetObservationReference) throws {
+    guard (1...1024).contains(reference.candidate.utf8.count),
+      (1...128).contains(reference.observationID.utf8.count),
+      reference.generation > 0, reference.generation <= UInt64(Int64.max)
+    else {
+      throw RuntimeTargetDisplayNameFailure(
+        "invalidInput", "candidate display-name requires an exact bounded observation")
+    }
+  }
+
+  private static func candidateKey(candidate: String, observationID: String) -> String {
+    "\(candidate)\n\(observationID)"
+  }
+
+  private func validTimestamp() throws -> String {
+    let timestamp = nowUTC()
+    guard ISO8601Timestamps.parse(timestamp) != nil else {
+      throw RuntimeTargetDisplayNameFailure(
+        "recordUnreadable", "display-name clock is unavailable")
+    }
+    return timestamp
+  }
+
+  private func sort(_ document: inout Document) {
+    document.records.sort { $0.targetID.utf8.lexicographicallyPrecedes($1.targetID.utf8) }
+    document.candidateRecords?.sort {
+      if $0.candidate != $1.candidate {
+        return $0.candidate.utf8.lexicographicallyPrecedes($1.candidate.utf8)
+      }
+      return $0.observationID.utf8.lexicographicallyPrecedes($1.observationID.utf8)
+    }
+  }
+
   private func mutate(
     targetID: String, expectedGeneration: UInt64, name: String?
   ) throws -> RuntimeTargetDisplayName {
@@ -133,11 +483,7 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
         throw RuntimeTargetDisplayNameFailure(
           "resourceConflict", "target display-name generation is exhausted")
       }
-      let timestamp = nowUTC()
-      guard ISO8601Timestamps.parse(timestamp) != nil else {
-        throw RuntimeTargetDisplayNameFailure(
-          "recordUnreadable", "target display-name clock is unavailable")
-      }
+      let timestamp = try validTimestamp()
       let record = Record(
         targetID: targetID, generation: next.partialValue, name: name,
         updatedAtUTC: timestamp)
@@ -149,7 +495,7 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
         }
         document.records.append(record)
       }
-      document.records.sort { $0.targetID.utf8.lexicographicallyPrecedes($1.targetID.utf8) }
+      sort(&document)
       try save(document, root: root)
       return record.resource
     }
@@ -273,13 +619,25 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
   }
 
   private func validate(_ document: Document) throws {
+    let candidates = document.candidateRecords ?? []
+    let orderedCandidates = candidates.sorted {
+      if $0.candidate != $1.candidate {
+        return $0.candidate.utf8.lexicographicallyPrecedes($1.candidate.utf8)
+      }
+      return $0.observationID.utf8.lexicographicallyPrecedes($1.observationID.utf8)
+    }
     guard document.schemaVersion == "arkdeck.target-display-names/1",
       document.records.count <= Self.maximumRecords,
+      candidates.count <= Self.maximumRecords,
       document.records.map(\.targetID)
         == document.records.map(\.targetID).sorted(by: {
           $0.utf8.lexicographicallyPrecedes($1.utf8)
         }),
-      Set(document.records.map(\.targetID)).count == document.records.count
+      Set(document.records.map(\.targetID)).count == document.records.count,
+      candidates == orderedCandidates,
+      Set(candidates.map {
+        Self.candidateKey(candidate: $0.candidate, observationID: $0.observationID)
+      }).count == candidates.count
     else {
       throw RuntimeTargetDisplayNameFailure(
         "recordUnreadable", "target display-name index is invalid")
@@ -293,6 +651,31 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
           "recordUnreadable", "target display-name record is invalid")
       }
       if let name = record.name { try validateName(name) }
+    }
+    for candidate in candidates {
+      try validateCandidateReference(
+        .init(
+          candidate: candidate.candidate, observationID: candidate.observationID,
+          generation: candidate.generation))
+      try validateName(candidate.name)
+      guard candidate.generation >= 2,
+        ISO8601Timestamps.parse(candidate.updatedAtUTC) != nil,
+        (candidate.stagedTargetID == nil) == (candidate.stagedTargetGeneration == nil)
+      else {
+        throw RuntimeTargetDisplayNameFailure(
+          "recordUnreadable", "candidate display-name record is invalid")
+      }
+      if let targetID = candidate.stagedTargetID,
+        let targetGeneration = candidate.stagedTargetGeneration
+      {
+        try validateTargetID(targetID)
+        guard let target = document.records.first(where: { $0.targetID == targetID }),
+          target.generation == targetGeneration, target.name == candidate.name
+        else {
+          throw RuntimeTargetDisplayNameFailure(
+            "recordUnreadable", "candidate display-name migration stage is invalid")
+        }
+      }
     }
   }
 

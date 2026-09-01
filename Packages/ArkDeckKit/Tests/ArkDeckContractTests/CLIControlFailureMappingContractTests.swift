@@ -162,6 +162,33 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
       "a mutation reply without the Runtime owner's proof must stay ambiguous")
   }
 
+  func testCandidateDisplayNameOwnerKeepsPreciseObservationCASFailures() {
+    let evidence = CLIControlFailureEvidence(
+      phase: "candidateDisplayNameOwner", newDispatchCount: 0)
+    for method in ["device.display-name.set", "device.display-name.clear"] {
+      for code in [
+        CLIErrorCode.invalidInput, .resourceConflict, .recordUnreadable,
+        .quotaExceeded, .ioFailure, .outcomeUnknown,
+      ] {
+        XCTAssertEqual(
+          CLIControlFailureMapper.code(
+            forWireCode: code.rawValue, method: method, evidence: evidence),
+          code,
+          "\(method): \(code.rawValue)")
+      }
+      XCTAssertEqual(
+        CLIControlFailureMapper.code(
+          forWireCode: "invalidInput", method: method),
+        .outcomeUnknown,
+        "a mutation reply without the observation owner's proof must stay ambiguous")
+      XCTAssertEqual(
+        CLIControlFailureMapper.code(
+          forTransportFailure: .lostResponse, method: method),
+        .outcomeUnknown,
+        "the caller cannot infer whether a published mutation took effect")
+    }
+  }
+
   func testLegacyInternalErrorKeepsItsCodeOnlyWhenNothingCouldHaveHappened() {
     XCTAssertEqual(
       CLIControlFailureMapper.code(forWireCode: "internalError", method: "job.status"),

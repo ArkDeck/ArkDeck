@@ -1304,6 +1304,10 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(exitCode: EX_USAGE, message: "missing device subcommand (list|adopt|show)")
     }
+    if subcommand == "display-name" {
+      try runDeviceDisplayName(Array(arguments.dropFirst()))
+      return
+    }
     var rest = Array(arguments.dropFirst())
     var session = runtimeSession(&rest, command: "device.\(subcommand)")
     session.warnIfLegacy()
@@ -1332,6 +1336,39 @@ enum RuntimeCLI {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported device subcommand")
     }
+  }
+
+  private static func runDeviceDisplayName(_ arguments: [String]) throws {
+    guard let verb = arguments.first, ["set", "clear"].contains(verb) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing device display-name subcommand (set|clear)")
+    }
+    var rest = Array(arguments.dropFirst())
+    var session = runtimeSession(&rest, command: "device.display-name.\(verb)")
+    let options = try CLIOptions(rest)
+    guard let candidate = options.value("--candidate"),
+      let observation = options.value("--observation"),
+      let generation = options.value("--observation-generation")
+    else {
+      throw session.fail(
+        .invalidOption,
+        "device display-name \(verb) requires an exact observation reference")
+    }
+    var params: [String: JSONValue] = [
+      "candidate": .string(candidate),
+      "observationId": .string(observation),
+      "observationGeneration": .string(generation),
+    ]
+    if verb == "set" {
+      guard let name = options.value("--name") else {
+        throw session.fail(.invalidOption, "device display-name set requires --name")
+      }
+      params["name"] = .string(name)
+    }
+    let method = "device.display-name.\(verb)"
+    try session.negotiate(requiredMajor: 2, forMethod: method)
+    session.emit(try session.request(method, params))
   }
 
   /// `arkdeck recovery ...` — §6.1's recovery surface.

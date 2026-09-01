@@ -27,7 +27,7 @@ package struct TargetUSBRelation: Equatable, Sendable {
   }
 }
 
-package struct TargetObservationReference: Equatable, Sendable {
+package struct TargetObservationReference: Equatable, Hashable, Sendable {
   package let candidate: String
   package let observationID: String
   package let generation: UInt64
@@ -64,6 +64,7 @@ package struct TargetObservationSnapshot: Sendable {
   package let generation: UInt64
   package let observedAtUTC: String
   package let observations: [TargetDeviceObservation]
+  package let displayNames: [String: RuntimeCandidateDisplayName]
 }
 
 /// The target protocol owns its discovery relation separately from the frozen
@@ -84,6 +85,7 @@ public actor TargetObservationCoordinator {
   private var latest: TargetObservationSnapshot?
   private var lastGeneration: UInt64 = 0
   private var inFlight: (id: UUID, task: Task<Reading, Error>)?
+  private var adoptionReceipts: [TargetObservationReference: RuntimeTargetRecord] = [:]
 
   package init(
     observation: any BootstrapObservationPort,
@@ -142,6 +144,13 @@ public actor TargetObservationCoordinator {
     _ reference: TargetObservationReference,
     beforeCommit: (@Sendable () throws -> Void)? = nil
   ) async throws -> RuntimeTargetRecord {
+    if let receipt = adoptionReceipts[reference] {
+      // A retry may return the prior receipt only while the Runtime can still
+      // prove the original physical observation. Otherwise a reused connect
+      // key could make the old target look like it belongs to a replacement.
+      _ = try await snapshot(following: reference)
+      return receipt
+    }
     try beforeCommit?()
     let initial = try current(reference, allowNewer: false)
     guard initial.relation != nil else {
@@ -183,10 +192,93 @@ public actor TargetObservationCoordinator {
         "factsDrifted", "physical identity changed during adoption readback", reference: reference)
     }
     try beforeCommit?()
-    return try targetStore.adopt(
+    guard let latest else {
+      throw TargetObservationFailure(
+        "resourceConflict", "the exact observation no longer has a current snapshot",
+        reference: reference)
+    }
+    let activeReferences = references(for: latest)
+    let nextGeneration = try generation(after: latest.generation, reference: reference)
+    let adopted = try targetStore.adoptObservedCandidate(
       stableIdentitySHA256: DeviceBootstrapMachine.stableIdentitySHA256(serial: relation.serial),
-      connectKey: reference.candidate, toolVersion: toolVersion, nowUTC: nowUTC()
-    ).record
+      connectKey: reference.candidate, toolVersion: toolVersion, nowUTC: nowUTC(),
+      reference: reference, activeReferences: activeReferences,
+      nextObservationGeneration: nextGeneration)
+    let nextReferences = activeReferences.map {
+      TargetObservationReference(
+        candidate: $0.candidate, observationID: $0.observationID,
+        generation: nextGeneration)
+    }
+    let names = try targetStore.candidateDisplayNames(references: nextReferences)
+    self.latest = TargetObservationSnapshot(
+      generation: nextGeneration, observedAtUTC: latest.observedAtUTC,
+      observations: latest.observations, displayNames: names)
+    lastGeneration = nextGeneration
+    if adoptionReceipts.count >= 1000 { adoptionReceipts.removeAll(keepingCapacity: true) }
+    adoptionReceipts[reference] = adopted.record
+    return adopted.record
+  }
+
+  package func setDisplayName(
+    _ reference: TargetObservationReference, name: String
+  ) throws -> RuntimeCandidateDisplayName {
+    try mutateDisplayName(reference, name: name)
+  }
+
+  package func clearDisplayName(
+    _ reference: TargetObservationReference
+  ) throws -> RuntimeCandidateDisplayName {
+    try mutateDisplayName(reference, name: nil)
+  }
+
+  private func mutateDisplayName(
+    _ reference: TargetObservationReference, name: String?
+  ) throws -> RuntimeCandidateDisplayName {
+    _ = try current(reference, allowNewer: false)
+    guard let latest else {
+      throw TargetObservationFailure(
+        "resourceConflict", "the exact observation no longer has a current snapshot",
+        reference: reference)
+    }
+    let activeReferences = references(for: latest)
+    let nextGeneration = try generation(after: latest.generation, reference: reference)
+    let resource = try name.map {
+      try targetStore.setCandidateDisplayName(
+        reference, activeReferences: activeReferences,
+        nextGeneration: nextGeneration, name: $0)
+    } ?? targetStore.clearCandidateDisplayName(
+      reference, activeReferences: activeReferences,
+      nextGeneration: nextGeneration)
+    let nextReferences = activeReferences.map {
+      TargetObservationReference(
+        candidate: $0.candidate, observationID: $0.observationID,
+        generation: nextGeneration)
+    }
+    let names = try targetStore.candidateDisplayNames(references: nextReferences)
+    self.latest = TargetObservationSnapshot(
+      generation: nextGeneration, observedAtUTC: latest.observedAtUTC,
+      observations: latest.observations, displayNames: names)
+    lastGeneration = nextGeneration
+    return resource
+  }
+
+  private func references(for snapshot: TargetObservationSnapshot) -> [TargetObservationReference] {
+    snapshot.observations.map {
+      TargetObservationReference(
+        candidate: $0.candidate.connectKey, observationID: $0.observationID,
+        generation: snapshot.generation)
+    }
+  }
+
+  private func generation(
+    after current: UInt64, reference: TargetObservationReference
+  ) throws -> UInt64 {
+    let next = current.addingReportingOverflow(1)
+    guard !next.overflow, next.partialValue <= UInt64(Int64.max) else {
+      throw TargetObservationFailure(
+        "resourceConflict", "observation generation is exhausted", reference: reference)
+    }
+    return next.partialValue
   }
 
   private func current(_ reference: TargetObservationReference, allowNewer: Bool) throws
@@ -242,9 +334,18 @@ public actor TargetObservationCoordinator {
     }
     // Unchanged, independently verified facts do not create a new fact
     // generation. A state transition does, while preserving a proved ID.
-    let generation = latest?.observations == rows ? latest!.generation : next.partialValue
+    let factsChanged = latest?.observations != rows
+    let generation = factsChanged ? next.partialValue : latest!.generation
+    if factsChanged { try targetStore.expireCandidateDisplayNames() }
     lastGeneration = generation
+    let references = rows.map {
+      TargetObservationReference(
+        candidate: $0.candidate.connectKey, observationID: $0.observationID,
+        generation: generation)
+    }
+    let names = try targetStore.candidateDisplayNames(references: references)
     return TargetObservationSnapshot(
-      generation: generation, observedAtUTC: nowUTC(), observations: rows)
+      generation: generation, observedAtUTC: nowUTC(), observations: rows,
+      displayNames: names)
   }
 }
