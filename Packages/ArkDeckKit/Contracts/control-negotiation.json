@@ -50,6 +50,7 @@
     "job.status",
     "job.submit",
     "job.timeline",
+    "recovery.flash-invocation.list",
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
     "runtime.hdc.status",

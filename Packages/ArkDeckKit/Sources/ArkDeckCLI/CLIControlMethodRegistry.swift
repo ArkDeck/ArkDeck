@@ -70,6 +70,7 @@ enum CLIControlMethodRegistry {
     "trace.probe",
     "debug.probe",
     "debug.status",
+    "recovery.flash-invocation.list",
     "capability.list",
     "capability.inspect",
     "job.plan",

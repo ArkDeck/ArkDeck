@@ -11,6 +11,7 @@ import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
 import CryptoKit
+import Darwin
 import Foundation
 
 public enum RuntimeDebugInvocationError: Error, Equatable, Sendable {
@@ -317,10 +318,13 @@ private struct RuntimeDebugInvocationDocument: Codable, Equatable, Sendable {
 public actor RuntimeDebugInvocationController {
   public static let maximumDestructiveEpochs = 16
   public static let maximumDurationSeconds: TimeInterval = 4 * 60 * 60
+  private static let maximumInvocationRecords = 4_096
+  private static let maximumInvocationDocumentBytes = 16 * 1_024 * 1_024
 
   private let stateDirectory: URL
   private let driver: any RuntimeDebugAttemptDriving
   private let nowUTC: @Sendable () -> String
+  private let pages: RuntimeSnapshotPager
   private var activeEvaluations: Set<String> = []
 
   public init(
@@ -331,12 +335,16 @@ public actor RuntimeDebugInvocationController {
     self.stateDirectory = stateDirectory
     self.driver = driver
     self.nowUTC = nowUTC
+    pages = try RuntimeSnapshotPager(
+      directory: stateDirectory.appending(
+        path: "runtime-debug-invocation-snapshots", directoryHint: .isDirectory))
+    let invocationDirectory = stateDirectory.appending(
+      path: "runtime-debug-invocations", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: stateDirectory.appending(
-        path:
-          "runtime-debug-invocations", directoryHint: .isDirectory),
+      at: invocationDirectory,
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
+    try Self.validateInvocationDirectory(invocationDirectory)
   }
 
   public func start(seedRequestData: Data) async throws -> RuntimeDebugInvocationStatus {
@@ -396,6 +404,58 @@ public actor RuntimeDebugInvocationController {
 
   public func status(invocationID: String) throws -> RuntimeDebugInvocationStatus {
     status(try load(invocationID))
+  }
+
+  /// Fixed-snapshot discovery for receipt recovery. The compact rows omit the
+  /// seed request, candidate provenance, evaluations and free-form details;
+  /// callers use `status` after selecting one exact invocation identity.
+  public func list(pageSize: Int, cursor: String?) throws -> JSONValue {
+    try pages.page(
+      method: "recovery.flash-invocation.list", filters: [:],
+      order: "createdAtDescInvocationIdAsc", pageSize: pageSize, cursor: cursor
+    ) {
+      try Self.validateInvocationDirectory(invocationDirectory)
+      let names = try FileManager.default.contentsOfDirectory(atPath: invocationDirectory.path)
+      guard names.count <= Self.maximumInvocationRecords else {
+        throw AgentExecutionControlFailure(
+          "operationUnavailable", "Flash invocation inventory exceeds its resource bound")
+      }
+      var rows: [(createdAt: String, invocationID: String, value: JSONValue)] = []
+      rows.reserveCapacity(names.count)
+      for name in names {
+        guard name.hasSuffix(".json") else {
+          throw RuntimeDebugInvocationError.persistenceFailure(
+            "Flash invocation directory contains an unknown entry")
+        }
+        let invocationID = String(name.dropLast(".json".count))
+        guard Self.validInvocationID(invocationID) else {
+          throw RuntimeDebugInvocationError.persistenceFailure(
+            "Flash invocation directory contains an invalid identity")
+        }
+        let document = try load(invocationID)
+        rows.append(
+          (
+            document.createdAtUTC, invocationID,
+            .object([
+              "schemaVersion": .string("arkdeck.recovery.flash-invocation-summary/1"),
+              "invocationId": .string(invocationID),
+              "state": .string(document.state),
+              "operationReference": .string(document.seedRequest.operation.reference),
+              "targetId": .string(document.seedRequest.target.targetID),
+              "bindingRevision": document.seedRequest.target.expectedBindingRevision.map {
+                .integer(Int64($0))
+              } ?? .null,
+              "createdAtUtc": .string(document.createdAtUTC),
+              "expiresAtUtc": .string(document.expiresAtUTC),
+              "destructiveEpochsUsed": .integer(Int64(document.destructiveEpochsUsed)),
+              "maximumDestructiveEpochs": .integer(Int64(Self.maximumDestructiveEpochs)),
+            ])))
+      }
+      return rows.sorted {
+        $0.createdAt == $1.createdAt
+          ? $0.invocationID < $1.invocationID : $0.createdAt > $1.createdAt
+      }.map(\.value)
+    }
   }
 
   public func evaluate(
@@ -606,15 +666,12 @@ public actor RuntimeDebugInvocationController {
   }
 
   private func load(_ invocationID: String) throws -> RuntimeDebugInvocationDocument {
-    guard invocationID.utf8.count <= 128,
-      invocationID.range(
-        of: #"^[a-z][A-Za-z0-9.-]*$"#, options: .regularExpression) != nil
-    else {
+    guard Self.validInvocationID(invocationID) else {
       throw RuntimeDebugInvocationError.invocationNotFound(invocationID)
     }
     do {
       let document = try JSONDecoder().decode(
-        RuntimeDebugInvocationDocument.self, from: Data(contentsOf: url(invocationID)))
+        RuntimeDebugInvocationDocument.self, from: try readInvocation(invocationID))
       guard document.schemaVersion == RuntimeDebugInvocationDocument.schemaVersion,
         document.invocationID == invocationID,
         document.destructiveEpochsUsed >= 0,
@@ -628,6 +685,68 @@ public actor RuntimeDebugInvocationController {
     } catch {
       throw RuntimeDebugInvocationError.invocationNotFound(invocationID)
     }
+  }
+
+  private static func validInvocationID(_ value: String) -> Bool {
+    value.utf8.count <= 128
+      && value.range(
+        of: #"^[a-z][A-Za-z0-9.-]*$"#, options: .regularExpression) != nil
+  }
+
+  private static func validateInvocationDirectory(_ directory: URL) throws {
+    var status = stat()
+    guard lstat(directory.path, &status) == 0,
+      status.st_mode & S_IFMT == S_IFDIR,
+      status.st_uid == geteuid(), status.st_mode & 0o077 == 0
+    else {
+      throw RuntimeDebugInvocationError.persistenceFailure(
+        "Flash invocation store is not a private Runtime directory")
+    }
+  }
+
+  private func readInvocation(_ invocationID: String) throws -> Data {
+    try Self.validateInvocationDirectory(invocationDirectory)
+    let descriptor = open(url(invocationID).path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+    if descriptor < 0, errno == ENOENT {
+      throw RuntimeDebugInvocationError.invocationNotFound(invocationID)
+    }
+    guard descriptor >= 0 else {
+      throw RuntimeDebugInvocationError.persistenceFailure(
+        "Flash invocation document cannot be opened")
+    }
+    defer { close(descriptor) }
+    var status = stat()
+    guard fstat(descriptor, &status) == 0,
+      status.st_mode & S_IFMT == S_IFREG,
+      status.st_uid == geteuid(), status.st_mode & 0o077 == 0,
+      status.st_nlink == 1,
+      status.st_size > 0, status.st_size <= Self.maximumInvocationDocumentBytes
+    else {
+      throw RuntimeDebugInvocationError.persistenceFailure(
+        "Flash invocation document failed identity or size validation")
+    }
+    var data = Data()
+    data.reserveCapacity(Int(status.st_size))
+    var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw RuntimeDebugInvocationError.persistenceFailure(
+          "Flash invocation document read failed")
+      }
+      if count == 0 { break }
+      data.append(contentsOf: buffer.prefix(count))
+      guard data.count <= Self.maximumInvocationDocumentBytes else {
+        throw RuntimeDebugInvocationError.persistenceFailure(
+          "Flash invocation document exceeded its size bound")
+      }
+    }
+    guard data.count == Int(status.st_size) else {
+      throw RuntimeDebugInvocationError.persistenceFailure(
+        "Flash invocation document changed while it was read")
+    }
+    return data
   }
 
   private func persist(_ document: RuntimeDebugInvocationDocument) throws {

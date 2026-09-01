@@ -1,6 +1,9 @@
+import Darwin
 import Foundation
 import XCTest
 
+@testable import ArkDeckAgentDaemon
+@testable import ArkDeckCLI
 @testable import ArkDeckCore
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
@@ -172,6 +175,126 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       nowUTC: { "2026-08-09T00:10:00Z" })
     let reopenedStatus = try await reopened.status(invocationID: started.invocationID)
     XCTAssertEqual(reopenedStatus, completed)
+  }
+
+  func testInvocationDiscoveryUsesAnImmutableBoundedSnapshot() async throws {
+    let root = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let clock = Clock("2026-08-09T00:00:00Z")
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: ScriptedDriver(outcomes: []), nowUTC: clock.now)
+    let first = try await controller.start(seedRequestData: encode(seedRequest()))
+    clock.set("2026-08-09T00:01:00Z")
+    let second = try await controller.start(seedRequestData: encode(seedRequest()))
+
+    let firstPage = try await controller.list(pageSize: 1, cursor: nil)
+    guard case .object(let firstFields) = firstPage,
+      case .array(let firstItems)? = firstFields["items"],
+      case .object(let newest)? = firstItems.first,
+      case .string(let cursor)? = firstFields["nextCursor"]
+    else { return XCTFail("first discovery page is malformed") }
+    XCTAssertEqual(newest["invocationId"], .string(second.invocationID))
+    XCTAssertEqual(newest["schemaVersion"], .string("arkdeck.recovery.flash-invocation-summary/1"))
+    XCTAssertNil(newest["seedRequest"])
+    XCTAssertNil(newest["evaluations"])
+    XCTAssertNil(newest["candidateSourceSha256"])
+
+    clock.set("2026-08-09T00:02:00Z")
+    let third = try await controller.start(seedRequestData: encode(seedRequest()))
+    let secondPage = try await controller.list(pageSize: 1, cursor: cursor)
+    guard case .object(let secondFields) = secondPage,
+      case .array(let secondItems)? = secondFields["items"],
+      case .object(let older)? = secondItems.first
+    else { return XCTFail("second discovery page is malformed") }
+    XCTAssertEqual(older["invocationId"], .string(first.invocationID))
+    XCTAssertEqual(secondFields["hasMore"], .bool(false))
+
+    let refreshed = try await controller.list(pageSize: 1, cursor: nil)
+    guard case .object(let refreshedFields) = refreshed,
+      case .array(let refreshedItems)? = refreshedFields["items"],
+      case .object(let current)? = refreshedItems.first
+    else { return XCTFail("refreshed discovery page is malformed") }
+    XCTAssertEqual(current["invocationId"], .string(third.invocationID))
+  }
+
+  func testInvocationDiscoveryRefusesASymbolicLinkWithoutFollowingIt() async throws {
+    let root = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: ScriptedDriver(outcomes: []),
+      nowUTC: { "2026-08-09T00:00:00Z" })
+    _ = try await controller.start(seedRequestData: encode(seedRequest()))
+    try FileManager.default.createSymbolicLink(
+      at: root.appending(
+        path: "runtime-debug-invocations/shadow.json"),
+      withDestinationURL: URL(filePath: "/etc/hosts"))
+
+    do {
+      _ = try await controller.list(pageSize: 100, cursor: nil)
+      XCTFail("discovery must not follow an entry outside the Runtime owner")
+    } catch let error as RuntimeDebugInvocationError {
+      guard case .persistenceFailure = error else {
+        return XCTFail("unexpected error \(error)")
+      }
+    }
+  }
+
+  func testRealCLIProcessRediscoversAnInvocationWithoutCandidateOrRequestDetails() async throws {
+    let root = URL(filePath: "/private/tmp/rdi-\(UUID().uuidString.prefix(8).lowercased())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let now = "2026-08-09T00:00:00Z"
+    let driver = ScriptedDriver(outcomes: [])
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: driver, nowUTC: { now })
+    let started = try await controller.start(seedRequestData: encode(seedRequest()))
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: root.appending(path: "capabilities"))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: root.appending(path: "engine")),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: RuntimeAgentExecutionContractTests.Dispatcher(),
+      capabilityStore: capabilities, nowUTC: { now })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [], nowUTC: { now },
+      debugInvocationController: controller)
+    let server = AgentDaemonServer(
+      stateDirectory: root.appending(path: "control"), handler: handler, nowUTC: { now })
+    _ = try server.start()
+    defer { server.stop() }
+
+    let process = Process()
+    process.executableURL = Bundle(for: Self.self).bundleURL
+      .deletingLastPathComponent().appending(path: "arkdeck")
+    process.arguments = [
+      "recovery", "flash-invocation", "list", "--page-size", "1",
+      "--socket", server.socketURL.path, "--output", "json",
+    ]
+    let outputURL = root.appending(path: "cli-output.json")
+    XCTAssertTrue(FileManager.default.createFile(atPath: outputURL.path, contents: nil))
+    let output = try FileHandle(forWritingTo: outputURL)
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    let deadline = Date().addingTimeInterval(25)
+    while process.isRunning && Date() < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    if process.isRunning {
+      kill(process.processIdentifier, SIGKILL)
+      process.waitUntilExit()
+    }
+    try output.close()
+    let bytes = try Data(contentsOf: outputURL)
+    XCTAssertEqual(process.terminationStatus, 0, String(decoding: bytes, as: UTF8.self))
+    guard case .object(let envelope) = try CLIStrictJSON.decode(bytes),
+      case .object(let page)? = envelope["result"],
+      case .array(let items)? = page["items"],
+      case .object(let item)? = items.first
+    else { return XCTFail("CLI discovery envelope is malformed") }
+    XCTAssertEqual(item["invocationId"], .string(started.invocationID))
+    XCTAssertEqual(item["targetId"], .string("dayu200-selected"))
+    XCTAssertNil(item["seedRequest"])
+    XCTAssertNil(item["evaluations"])
   }
 
   func testBrokerRejectsOrdinaryDebugSeedsAndNamesThePublishedJobSurface() async throws {

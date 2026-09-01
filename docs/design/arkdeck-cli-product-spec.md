@@ -346,7 +346,7 @@ materialized plan budget 或 capability expiry；其 absolute deadline、暂停�
 | `control-action reconcile --control-action <id>` | 只执行该 typed host action 已发布的 status/readback；unknown lifecycle intent 不 replay |
 | `recovery cleanup list` | 列出 typed cleanup residue/debt |
 | `recovery cleanup continue --job <id> ...` | 继续 Runtime 已记录且仍在 owner boundary 内的 cleanup |
-| `recovery flash-invocation list` | 固定分页重发现 current protected Flash recovery invocation；不读取任意 archive path |
+| `recovery flash-invocation list` | 固定分页重发现 current protected Flash recovery invocation；不读取任意 archive path；实现见 `cli-flash-invocation-list.md` |
 | `recovery flash-invocation start --invocation-request-id <id> ...` | 以 caller-stable request identity 幂等创建或返回同一 closed decision document；迁名不改变 admission |
 | `recovery flash-invocation evaluate --invocation <id> ...` | 只在 exact invocation owner 内求值；不创建新 authority 或 replay intent |
 | `recovery flash-invocation status (--invocation <id>\|--invocation-request-id <id>)` | 两种 identity 严格互斥；读取同一 owner，供 lost receipt 唯一重取 |

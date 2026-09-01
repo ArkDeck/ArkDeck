@@ -334,7 +334,11 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
       }
     }
     // The new spellings are the destination, so they carry neither.
-    for path in [["recovery", "cleanup", "list"], ["recovery", "flash-invocation", "status"]] {
+    for path in [
+      ["recovery", "cleanup", "list"],
+      ["recovery", "flash-invocation", "list"],
+      ["recovery", "flash-invocation", "status"],
+    ] {
       let leaf = CLICommandRegistry.allLeaves().first { $0.path == path }?.leaf
       XCTAssertEqual(leaf?.lifecycle, .current, path.joined(separator: " "))
       XCTAssertNil(leaf?.replacementArgvPattern, path.joined(separator: " "))

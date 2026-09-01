@@ -1495,6 +1495,18 @@ enum RuntimeCLI {
     }
 
     switch subcommand {
+    case "list":
+      let options = try CLIOptions(rest)
+      guard let pageSize = Int(options.value("--page-size") ?? "100") else {
+        throw session.fail(.invalidInput, "page-size must be between 1 and 1000")
+      }
+      var params: [String: JSONValue] = ["pageSize": .integer(Int64(pageSize))]
+      if let cursor = options.value("--cursor") { params["cursor"] = .string(cursor) }
+      var negotiatedSession = session
+      try negotiatedSession.negotiate(
+        requiredMajor: 2, forMethod: "recovery.flash-invocation.list")
+      negotiatedSession.emit(
+        try negotiatedSession.request("recovery.flash-invocation.list", params))
     case "start":
       session.emit(
         try session.request(
