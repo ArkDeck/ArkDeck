@@ -1297,9 +1297,11 @@ final class CLIArgumentParserContractTests: XCTestCase {
   /// Every operation §6.2 gives a first-class name is reachable by that name.
   func testTheDomainSurfaceIsReachable() {
     for argv in [
-      ["screen", "record"], ["input", "tap"], ["input", "long-press"], ["input", "swipe"],
+      ["screen", "capture"], ["screen", "record"],
+      ["input", "tap"], ["input", "long-press"], ["input", "swipe"],
       ["diagnostics", "capture"], ["analyze", "trace"], ["analyze", "trace-summary"],
       ["analyze", "hilog-summary"], ["analyze", "crash-signature"],
+      ["ui-dump", "capture"], ["ui-dump", "component-detail"], ["trace", "capture"],
       ["port-forward", "create"], ["port-forward", "remove"],
       ["workspace", "status"], ["workspace", "build"], ["workspace", "sweep"],
       ["target", "observe"], ["debug", "hap"], ["debug", "native", "deploy"],

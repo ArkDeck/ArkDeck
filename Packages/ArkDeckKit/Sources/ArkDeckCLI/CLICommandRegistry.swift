@@ -541,6 +541,9 @@ enum CLICommandRegistry {
     summary: "screen capture and recording",
     leaves: [
       domainLeaf(
+        "capture", "screen.capture", "capture.diagnostics@1",
+        "capture one screen image through the shared typed screenshot preset"),
+      domainLeaf(
         "record", "screen.record", "capture.screen-sequence@1",
         "capture a bounded screen sequence")
     ])
@@ -1220,7 +1223,7 @@ enum CLICommandRegistry {
 
   private static let targetlessTraceNode = CLINodeSpec(
     token: "trace",
-    summary: "trace capability observation",
+    summary: "trace capability observation and capture",
     leaves: [
       CLILeafSpec(
         token: "probe",
@@ -1233,7 +1236,10 @@ enum CLICommandRegistry {
             summary: "durable target identity",
             isRequired: true)
         ]),
-        connectsToRuntime: true)
+        connectsToRuntime: true),
+      domainLeaf(
+        "capture", "trace.capture", "capture.diagnostics@1",
+        "capture a bounded trace through the shared typed trace preset")
     ])
 
   /// Shared by `job plan` and `job submit`: either a complete request document
@@ -2012,19 +2018,22 @@ enum CLICommandRegistry {
     summary: "explicit compatibility surfaces; frozen 1.x shape, never target conformance",
     groups: [legacyFlashNode])
 
-  /// §6.3's `ui-dump` family, minus the two leaves that reach a device.
+  /// §6.3's `ui-dump` family.
   ///
   /// `inspect` and `hit-test` are §6.2 deterministic local derivations: they
   /// read Artifact bytes the Runtime already published and compute, contacting
-  /// nothing. `ui-dump capture` is a `capture.diagnostics@1` preset and
-  /// `component-detail` builds an advanced-dump request against the same
-  /// operation — both are device captures, so they belong with the typed
-  /// presets rather than here, and filing them as offline derivations would
-  /// misdescribe what they do.
+  /// nothing. `capture` and `component-detail` map to the shared typed
+  /// `capture.diagnostics@1` presets and therefore enter through Agent/Job.
   private static let uiDumpNode = CLINodeSpec(
     token: "ui-dump",
-    summary: "derive a UI tree from a published capture; never reaches a device",
+    summary: "capture or derive a bounded UI tree",
     leaves: [
+      domainLeaf(
+        "capture", "ui-dump.capture", "capture.diagnostics@1",
+        "capture a screenshot and component tree through the shared Viewer preset"),
+      domainLeaf(
+        "component-detail", "ui-dump.component-detail", "capture.diagnostics@1",
+        "capture one typed ArkUI component detail selection"),
       CLILeafSpec(
         token: "inspect",
         canonicalCommand: "ui-dump.inspect",

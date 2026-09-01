@@ -477,14 +477,6 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
     tags: [String],
     bufferKB: Int
   ) async -> TraceJobSubmissionResult {
-    guard (1...600).contains(durationSeconds), (1_024...65_536).contains(bufferKB),
-      !tags.isEmpty, tags.count <= 24,
-      Set(tags).count == tags.count,
-      tags.allSatisfy({ tag in
-        !tag.isEmpty && tag.utf8.count <= 64
-          && tag.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
-      })
-    else { return .failed("Trace request is outside the published bounds") }
     do {
       let nonce = UUID().uuidString.lowercased()
       let request = try RuntimeOperationRequest(
@@ -493,17 +485,10 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
         target: DurableTargetReference(
           targetID: target.id, expectedBindingRevision: target.bindingRevision),
         operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
-        inputs: [
-          "durationSeconds": .integer(Int64(durationSeconds)),
-          "hilogFilters": .array([]),
-          "traceCategories": .array(tags.map(JSONValue.string)),
-          "traceBufferKB": .integer(Int64(bufferKB)),
-          "uiDump": .bool(false),
-          "crashLogs": .bool(false),
-          "uiScreenshot": .bool(false),
-          "uiComponentTree": .bool(false),
-          "redactionProfile": .string("standard"),
-        ],
+        inputs: try DiagnosticCapturePreset.trace(
+          durationSeconds: durationSeconds,
+          categories: tags,
+          bufferKB: bufferKB),
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeWorkspaceThread.clientContext(
         clientName: ArkDeckAgentClientName.traceWorkspace, targetID: target.id))
@@ -521,6 +506,8 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
       return .submitted(TraceJobAcceptancePresentation(jobID: jobID))
     } catch let failure as TraceResponseFailure {
       return .failed(failure.message)
+    } catch let failure as DiagnosticCapturePresetError {
+      return .failed(failure.reason)
     } catch {
       return .failed(String(describing: error))
     }

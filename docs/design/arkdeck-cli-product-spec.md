@@ -451,6 +451,20 @@ destructive intent。
 - 单帧/序列转视频是 presentation convenience；frame archive、index、时间和 digest 可读取即满足
   portable core。平台可另加 derive/export，但不能改变源 Artifact。
 
+四个 capture preset 共用 `ArkDeckWorkflows.DiagnosticCapturePreset` 作为 App/CLI 唯一输入 owner。
+它们继续使用通用 domain leaf 的 `--inputs-file`，但只接受各自的 descriptor 子集，并在连接 Runtime
+前拒绝其他 recipe 的字段：
+
+| 命令 | `--inputs-file` projection |
+|---|---|
+| `screen capture` | 可省略；仅可选 `screenshotImageType: "png"|"jpeg"`，其余截图选择由 preset 固定 |
+| `ui-dump capture` | 可省略或 `{}`；固定选择 screenshot、UI dump 与 component tree |
+| `ui-dump component-detail` | 必须只含 `windowId`、`componentId` 两个 1...20 位十进制字符串 |
+| `trace capture` | 必须含 `durationSeconds`、`traceCategories`、`traceBufferKB`；仅可另带 boolean `ringBuffered` |
+
+这组 projection 不替代完整 operation schema。需要其他 `capture.diagnostics@1` 组合的 caller 仍通过
+generic `agent run --operation capture.diagnostics@1 --inputs-file ...` 提交 descriptor-validated inputs。
+
 ### 6.3 平台与维护者扩展
 
 | 命令族 | 目标 leaf | 便携语义 |
@@ -1482,7 +1496,8 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 ### 13.1 已有骨架
 
-当前 CLI 已有 14 个一级命令、约 48 个可执行 leaf。以下底座可以保留并演进：
+当前 registry 已有 32 个一级命令、173 个可执行 leaf（另有 6 个 tombstone、3 个永久拒绝桩）。
+以下底座可以保留并演进：
 
 - `operation list/describe`；
 - `job plan/submit/run/list/status/cancel/reconcile`；
@@ -1554,17 +1569,18 @@ generation；第一版可以先忠实暴露现有字段，达到 target contract
   App 因此各读各的记录：用户在 App 里选定的自定义根，对这条已发布 leaf 不可见，结算沉默地发生在
   另一个根上。这不是未来 `runtime storage` 的专属前提，而是一条现有 leaf 已经带着的缺陷。
 
-### 13.3 Catalog 泛化可达、缺一等领域入口
+### 13.3 Catalog 泛化可达与一等领域入口
 
-- screenshot/UI dump/HiLog/trace capture；
-- screen sequence、tap/long-press/swipe；
+- screenshot/UI dump/component detail/trace typed capture preset；
+- diagnostics capture、screen sequence、tap/long-press/swipe；
 - HAP debug、native library deploy、port forward；
 - 四个 analyzer；
 - 全部 workspace inspect/edit/build/test/sign/symbolize operation；
 - Flash current Runtime execution。
 
-这些不是执行缺口。一等领域命令只需 registry mapping、typed preset、统一 renderer 与测试；它们
-不得复制 provider lowering。
+以上 operation 都保留 generic Job/Agent surface，同时已有一等领域 mapping。四个
+`capture.diagnostics@1` convenience 通过同一个 typed preset owner 生成固定 projection；其余领域命令
+仍按 descriptor 接收 `--inputs-file`。两种路径都不复制 provider lowering。
 
 ### 13.4 需要新的 typed 产品面
 
@@ -1590,7 +1606,7 @@ control owner boundary。CLI 必须先使用 typed Runtime/local-service contrac
 | History saved filter | Runtime 拥有单例 generation-CAS query preset，App/CLI 共用；旧 AppStorage 仅作一次性迁移输入 | `history filter list/save/delete`；`local` | C |
 | Trace derived-cache purge | App controller 可回收 inactive derived DB，不是 Runtime evidence 删除 | `trace cache status/purge`；`blocked` → `local` | C |
 | Source/update | remote source 和 consumer auto-update 是 App/平台服务；maintainer feed 已另有 CLI | typed source 与 consumer update lifecycle；`blocked` → `local` | C |
-| Offline inspector | UI dump inspect/hit-test 已由 App/CLI 共用 typed owner，校验 exact Artifact role/size/SHA-256、固定 64 MiB 上限并发布 `arkdeck.ui-dump-inspection/1` / `arkdeck.ui-dump-hit-test/1`；diagnostics preview 与 Trace inspect 尚无各自的稳定 schema/owner boundary，因此整体仍为 `blocked` | versioned local derivation service；`blocked` → `local` | C |
+| Offline inspector | UI dump inspect/hit-test 与 diagnostics inspect/preview/export 已由 App/CLI 共用 typed owner，校验 exact operation、Artifact role/size/SHA-256 并发布 versioned machine schema；Trace inspect 尚无稳定 schema/owner boundary，因此整体仍为 `blocked` | versioned Trace local derivation service；`blocked` → `local` | C |
 | App icon/menu/shortcut | 只改变 App 呈现和导航 | `presentation`；不需要 CLI leaf | — |
 
 实现它们时先建立 bounded Runtime/local service contract，再接 App 与 CLI。同一 vertical task 内

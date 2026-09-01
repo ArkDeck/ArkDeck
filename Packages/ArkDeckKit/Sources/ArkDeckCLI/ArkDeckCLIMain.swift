@@ -192,7 +192,17 @@ struct ArkDeckCommandLine {
       case "target":
         try await RuntimeCLI.runTarget(arguments)
       case "trace":
-        try RuntimeCLI.runTrace(arguments)
+        guard let verb = arguments.first, !verb.hasPrefix("-") else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "`trace` needs a subcommand; run `arkdeck help trace`")
+        }
+        if verb == "probe" {
+          try RuntimeCLI.runTrace(arguments)
+        } else {
+          try await RuntimeCLI.runDomainOperation(
+            path: ["trace", verb], Array(arguments.dropFirst()))
+        }
       case "job":
         try RuntimeCLI.runJob(arguments)
       case "history":
@@ -202,19 +212,21 @@ struct ArkDeckCommandLine {
       case "recovery":
         try RuntimeCLI.runRecovery(arguments)
       case "ui-dump":
-        // §6.2's deterministic local derivation: it reads published Artifact
-        // bytes and computes. The family is dispatched separately from the
-        // domain-operation layer above precisely because it submits no
-        // operation — routing it there would give it a Catalog mapping it
-        // must not have.
         guard let verb = arguments.first, !verb.hasPrefix("-") else {
           throw CLIError(
             exitCode: EX_USAGE,
             message: "`ui-dump` needs a subcommand; run `arkdeck help ui-dump`")
         }
-        var rest = Array(arguments.dropFirst())
-        let session = RuntimeCLI.runtimeSession(&rest, command: "ui-dump.\(verb)")
-        try RuntimeCLI.emitUIDumpDerivation(verb, rest: rest, session: session)
+        if verb == "capture" || verb == "component-detail" {
+          try await RuntimeCLI.runDomainOperation(
+            path: ["ui-dump", verb], Array(arguments.dropFirst()))
+        } else {
+          // Deterministic local derivations read already-published Artifact
+          // bytes and submit no operation.
+          var rest = Array(arguments.dropFirst())
+          let session = RuntimeCLI.runtimeSession(&rest, command: "ui-dump.\(verb)")
+          try RuntimeCLI.emitUIDumpDerivation(verb, rest: rest, session: session)
+        }
       case "diagnostics":
         guard let verb = arguments.first, !verb.hasPrefix("-") else {
           throw CLIError(
