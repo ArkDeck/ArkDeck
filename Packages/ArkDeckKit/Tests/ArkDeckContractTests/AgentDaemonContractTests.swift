@@ -2484,12 +2484,11 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(reconciled.bindingRevision, 2)
   }
 
-  /// The companion case. An "unavailable, and here is the blocker" assertion
-  /// is only worth anything if configuring the missing piece removes that
-  /// blocker; otherwise the test passes on a daemon that is permanently
-  /// refusing for some unrelated reason. Same binary, one declared
-  /// environment difference.
-  func testConfiguredHDCDoesNotPublishFlashWhenTheArkForgeLaneIsAbsent() throws {
+  /// Production startup must not promote the executable fixture into a live
+  /// HDC identity. Fixture hosting has an explicit test-only composition; the
+  /// real daemon requires a registered semantic profile plus an identity-bound
+  /// retained spawn before it opens its control socket.
+  func testProductionDaemonRejectsUnregisteredConfiguredHDCBeforeOpeningUDS() throws {
     let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
@@ -2498,10 +2497,6 @@ final class AgentDaemonContractTests: XCTestCase {
       .appending(
         path: ".arkdeck-test-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: shortState) }
-    // The production composition now establishes a real foreground server
-    // before opening UDS. Use the executable fixture so startup exercises the
-    // exact descriptor-bound `-s 127.0.0.1:8710 -m` plus typed checkserver
-    // readiness path instead of relying on a path-presence placeholder.
     let hdcFixture = productsDirectory.appending(path: "ArkDeckFakeHDCFixture")
     guard FileManager.default.isExecutableFile(atPath: hdcFixture.path) else {
       throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
@@ -2515,47 +2510,14 @@ final class AgentDaemonContractTests: XCTestCase {
       if process.isRunning { process.terminate() }
     }
     let socketURL = shortState.appending(path: "agentd.sock")
-    XCTAssertTrue(
-      FileManager.default.fileExists(atPath: socketURL.path), "daemon never created its socket")
-    let operations = try listOperations(socketPath: socketURL.path)
-
-    // Depends on nothing but the variable this case sets: the HDC provider's
-    // own availability is unconditional, so the refusing dispatcher is the
-    // only thing that can block observation.
-    guard let observe = operations["observe.device@1"] else {
-      return XCTFail("production daemon must publish observe.device@1 availability")
-    }
-    XCTAssertEqual(
-      observe.availability, "available",
-      "a configured ARKDECK_HDC_PATH must admit observation: \(observe.reasons)")
-
-    // The Rockchip half. HDC alone is not a Flash lane: both the generic
-    // operation and the compatibility alias must publish the same startup
-    // composition failure instead of claiming that a dispatcher which has no
-    // live controller can execute them.
-    for reference in ["flash.full-restore@1", "flash.dayu200"] {
-      guard let flash = operations[reference] else {
-        return XCTFail("production daemon must publish \(reference) availability")
-      }
-      XCTAssertEqual(flash.availability, "unavailable", reference)
-      XCTAssertTrue(
-        flash.reasons.contains {
-          $0.contains("ARKDECK_ARKFORGE_BUNDLE_PATH is unset")
-        },
-        "\(reference) must name the absent lane configuration: \(flash.reasons)")
-      XCTAssertTrue(
-        flash.reasonCodes.contains("provider_tool_unavailable"),
-        "\(reference) must classify the missing lane as host configuration")
-      XCTAssertTrue(flash.reasonOrigins.contains("host_configuration"), reference)
-      XCTAssertFalse(
-        flash.reasons.contains { $0.contains("requires descriptor-bound HDC") },
-        "configured HDC must retire its own blocker: \(flash.reasons)")
-    }
-
-    process.terminate()
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: socketURL.path),
+      "an unregistered HDC fixture must not become a production Runtime")
     let stopDeadline = Date().addingTimeInterval(10)
     while process.isRunning && Date() < stopDeadline { usleep(50_000) }
-    XCTAssertFalse(process.isRunning, "SIGTERM must stop the daemon")
+    XCTAssertFalse(process.isRunning, "identity refusal must close startup")
+    process.waitUntilExit()
+    XCTAssertNotEqual(process.terminationStatus, 0)
   }
 
   func testWaterFlowProductionProfilePublishesTheClosedWorkspaceOperations() throws {
@@ -4352,7 +4314,7 @@ final class HeadlessHDCServerHostContractTests: XCTestCase {
       childEnvironment: ["OHOS_HDC_SERVER_PORT": String(port)])
     let executable = try resolvedExecutable(at: fixture)
 
-    let host = try await HeadlessHDCServerHost.start(
+    let host = try await HeadlessHDCServerHost.startTestFixture(
       executable: executable, endpoint: endpoint)
     XCTAssertTrue(
       HeadlessHDCServerHost.loopbackListenerIsReachable(endpoint: endpoint.endpoint),

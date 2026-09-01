@@ -1,6 +1,7 @@
 import ArkDeckAgentClient
 import ArkDeckCore
 import ArkDeckRuntime
+import Darwin
 import Foundation
 
 extension RuntimeCLI {
@@ -79,6 +80,28 @@ extension RuntimeCLI {
     do {
       try session.negotiate(requiredMajor: 2, forMethod: command)
       var result = try session.request(command, params)
+      if family == "human-action", verb == "resume" {
+        if case .object(let challenge) = result,
+          challenge["schemaVersion"] == .string("arkdeck.impact-approval-challenge/1")
+        {
+          let response = try readHDCImpactChallenge(challenge, session: session)
+          var resumed = params
+          resumed["challengeResponse"] = .string(response)
+          result = try session.request(command, resumed)
+          try emitHDCControlActionResult(result, session: session)
+          return
+        }
+        if case .object(let action) = result,
+          action["schemaVersion"] == .string("arkdeck.human-action/1"),
+          case .object(let owner)? = action["owner"],
+          owner["kind"] == .string("controlAction")
+        {
+          throw session.fail(
+            .humanActionRequired,
+            "impact approval requires the same foreground interactive console",
+            details: ["humanAction": result])
+        }
+      }
       guard verb == "run" || verb == "resume" else {
         if family == "agent", verb == "status" || verb == "abandon" { _ = try executionFields(result, session: session) }
         session.emit(result)
@@ -106,6 +129,103 @@ extension RuntimeCLI {
     } catch var error as CLIRegistryError {
       if let identity { error.details["executionId"] = identity }
       throw error
+    }
+  }
+
+  private static func readHDCImpactChallenge(
+    _ challenge: [String: JSONValue], session: CLIRuntimeSession
+  ) throws -> String {
+    guard isatty(STDIN_FILENO) == 1,
+      challenge["schemaVersion"] == .string("arkdeck.impact-approval-challenge/1"),
+      challenge["interactionOrigin"] == .string("interactiveConsole"),
+      case .string(let expected)? = challenge["challenge"],
+      expected.utf8.count == 17, expected.hasPrefix("ARKDECK-"),
+      case .object(let controlAction)? = challenge["controlAction"],
+      controlAction["schemaVersion"] == .string("arkdeck.control-action/1"),
+      controlAction["state"] == .string("awaitingImpactApproval"),
+      case .string(let controlActionID)? = controlAction["controlActionId"],
+      case .object(let preview)? = controlAction["preview"],
+      let validatedPreview = try? HDCControlActionPreview(value: preview),
+      validatedPreview.value["controlActionId"] == .string(controlActionID),
+      case .object(let humanAction)? = challenge["humanAction"],
+      humanAction["schemaVersion"] == .string("arkdeck.human-action/1"),
+      case .string(let humanActionID)? = humanAction["actionId"],
+      case .object(let binding)? = challenge["binding"],
+      binding["controlActionId"] == .string(controlActionID),
+      binding["humanActionId"] == .string(humanActionID),
+      binding["previewId"] == validatedPreview.value["previewId"],
+      binding["previewDigest"] == validatedPreview.value["previewDigest"]
+    else {
+      throw session.fail(
+        .recordUnreadable,
+        "Runtime impact challenge lacks its immutable control-action preview")
+    }
+    let review = JSONValue.object([
+      "controlActionId": controlAction["controlActionId"]!,
+      "generation": controlAction["generation"]!,
+      "preview": .object(preview),
+    ])
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
+    guard let bytes = try? encoder.encode(review),
+      let rendered = String(data: bytes, encoding: .utf8)
+    else {
+      throw session.fail(.internalError, "could not render the immutable HDC impact preview")
+    }
+    FileHandle.standardError.write(
+      Data(
+        ("Review the complete immutable HDC restart impact:\n"
+          + rendered + "\nType this one-time challenge exactly: \(expected)\n> ").utf8))
+    var input = Data()
+    while input.count <= 64 {
+      var byte: UInt8 = 0
+      let count = Darwin.read(STDIN_FILENO, &byte, 1)
+      if count == 0 { break }
+      if count < 0 {
+        if errno == EINTR { continue }
+        throw session.fail(.ioFailure, "could not read the foreground impact challenge")
+      }
+      if byte == 10 || byte == 13 { break }
+      guard byte >= 32, byte != 127 else {
+        throw session.fail(.invalidInput, "impact challenge contains invalid console bytes")
+      }
+      input.append(byte)
+    }
+    guard input.count <= 64, let response = String(data: input, encoding: .utf8),
+      response == expected
+    else {
+      throw session.fail(
+        .admissionDenied, "the typed impact challenge did not match; zero dispatch")
+    }
+    return response
+  }
+
+  private static func emitHDCControlActionResult(
+    _ value: JSONValue, session: CLIRuntimeSession
+  ) throws {
+    guard case .object(let fields) = value,
+      fields["schemaVersion"] == .string("arkdeck.control-action/1"),
+      case .string(let state)? = fields["state"],
+      case .integer(let dispatchCount)? = fields["dispatchCount"],
+      (0...1).contains(dispatchCount)
+    else {
+      throw session.fail(.recordUnreadable, "HDC restart returned no valid control action")
+    }
+    session.emit(value)
+    switch state {
+    case "succeeded": return
+    case "failed":
+      throw session.fail(
+        .operationFailed, "HDC restart failed before a confirmed external effect",
+        details: ["controlAction": value])
+    case "outcomeUnknown":
+      throw session.fail(
+        .outcomeUnknown, "HDC restart entered its launch window and requires reconciliation",
+        details: ["controlAction": value])
+    default:
+      throw session.fail(
+        dispatchCount == 0 ? .admissionDenied : .outcomeUnknown,
+        "HDC restart did not reach a trustworthy terminal state",
+        details: ["controlAction": value])
     }
   }
 

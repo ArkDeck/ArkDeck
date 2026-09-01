@@ -103,6 +103,38 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
   }
 
+  private actor BlockingFactsPort: HDCObservationFactsPort {
+    private var reached = false
+    private var released = false
+    private var reachedWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      if !reached {
+        reached = true
+        let waiters = reachedWaiters
+        reachedWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        if !released {
+          await withCheckedContinuation { releaseWaiters.append($0) }
+        }
+      }
+      return try await FactsPort().currentFacts(targetID: targetID)
+    }
+
+    func waitUntilReached() async {
+      if reached { return }
+      await withCheckedContinuation { reachedWaiters.append($0) }
+    }
+
+    func release() {
+      released = true
+      let waiters = releaseWaiters
+      releaseWaiters.removeAll()
+      waiters.forEach { $0.resume() }
+    }
+  }
+
   /// Counting dispatcher with per-action scripted receipts.
   private final class ScriptedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
     enum Script {
@@ -281,6 +313,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
   private func makeEngine(
     dispatcher: any RuntimeProcessDispatching,
+    factsPort: any HDCObservationFactsPort = FactsPort(),
     nowUTC: String = "2026-07-29T00:00:00Z",
     engineNowUTC: (@Sendable () -> String)? = nil,
     admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
@@ -301,7 +334,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         admissionFaultInjector: admissionFaultInjector,
         testHooks: testHooks),
       providers: DeviceProviderRegistry(providers: [
-        HDCObservationProviderAdapter(factsPort: FactsPort())
+        HDCObservationProviderAdapter(factsPort: factsPort)
       ]),
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
@@ -309,6 +342,45 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       powerActivityController: powerActivityController,
       nowUTC: engineNowUTC ?? { nowUTC })
     return (engine, capabilityStore)
+  }
+
+  func testHDCLifecycleInterlockClosesAlreadyMaterializingJobAdmissionRace()
+    async throws
+  {
+    let facts = BlockingFactsPort()
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, _) = try makeEngine(dispatcher: dispatcher, factsPort: facts)
+    let request = observeRequest(
+      idempotencyKey: "idem-hdc-interlock-race-01",
+      requestID: "req-hdc-interlock-race")
+    let submitting = Task { try await engine.submit(request) }
+
+    await facts.waitUntilReached()
+    let lease = try await engine.acquireHDCLifecycleInterlock()
+    await facts.release()
+    do {
+      _ = try await submitting.value
+      XCTFail("materializing Job crossed the final HDC lifecycle interlock")
+    } catch RuntimeJobEngineError.rejected(let code, let message) {
+      XCTAssertEqual(code, .conflict)
+      XCTAssertTrue(message.contains("blocks new Job admission"), message)
+    }
+    let blockedJobs = try await engine.listJobs()
+    XCTAssertTrue(blockedJobs.isEmpty)
+
+    try await engine.releaseHDCLifecycleInterlock(lease)
+    let accepted = try await engine.submit(request)
+    XCTAssertFalse(accepted.deduplicated)
+    let acceptedJobs = try await engine.listJobs()
+    XCTAssertEqual(acceptedJobs.map(\.jobID), [accepted.jobID])
+
+    do {
+      _ = try await engine.acquireHDCLifecycleInterlock()
+      XCTFail("current Job did not block the HDC lifecycle interlock")
+    } catch let failure as AgentExecutionControlFailure {
+      XCTAssertEqual(failure.code, "factsDrifted")
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   func testActiveJobOwnsIdleSleepLeaseAcrossDispatchAndEveryTerminal() async throws {

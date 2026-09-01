@@ -26,6 +26,12 @@ public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case internalFailure(String)
 }
 
+/// Opaque ownership token for the narrow host-wide HDC lifecycle window. It
+/// carries no process, endpoint, Job or capability authority.
+package struct RuntimeHDCLifecycleInterlockLease: Sendable, Equatable {
+  fileprivate let id: UUID
+}
+
 /// Closed caller-authority boundary shared by admission and its contract tests.
 /// A Runtime-owned policy never accepts a capability reference selected by a
 /// caller; only protected Runtime may issue and attach that exact capability.
@@ -1156,6 +1162,7 @@ public actor RuntimeJobEngine {
   private let nowPreciseUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var jobRuns: [String: Task<RuntimeJobStatus, Error>] = [:]
+  private var hdcLifecycleInterlockID: UUID?
   private var cancellationRequests: Set<String> = []
   private var activeDispatches: [String: ActiveRuntimeDispatch] = [:]
   private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
@@ -1434,6 +1441,12 @@ public actor RuntimeJobEngine {
       break
     }
 
+    guard hdcLifecycleInterlockID == nil else {
+      throw RuntimeJobEngineError.rejected(
+        .conflict,
+        "a confirmed host-wide HDC lifecycle action currently blocks new Job admission")
+    }
+
     // Authorization must reflect what this request will actually do, not
     // the operation's floor. capture.diagnostics@1 is readOnly until the
     // inputs select the remote-file trace and its cleanup, at which point
@@ -1521,6 +1534,11 @@ public actor RuntimeJobEngine {
       // before it is runnable. Only then return the hold to the Artifact actor,
       // where durable Job references continue to block release across restart.
       try beforeAdmission?()
+      guard hdcLifecycleInterlockID == nil else {
+        throw RuntimeJobEngineError.rejected(
+          .conflict,
+          "a confirmed host-wide HDC lifecycle action currently blocks new Job admission")
+      }
       try configuration.admissionFaultInjector.check(.beforeAdmission)
       let verdict = try admissionService.admit(record: record, requestHash: fingerprint)
       switch verdict {
@@ -4843,6 +4861,44 @@ public actor RuntimeJobEngine {
     let indexes = await recoveryEpochIndexes()
     let statuses = try allJobStatuses(indexes: indexes)
     return statuses.values.filter(Self.isCurrentJob).sorted { $0.jobID < $1.jobID }
+  }
+
+  /// Freezes the admission side of the host-wide HDC participant inventory.
+  /// The flag is installed before the current-Job read because that read may
+  /// suspend while deriving recovery indexes. A submit that was already
+  /// materializing must pass the same flag again immediately before durable
+  /// admission, closing both sides of the actor-reentrancy window.
+  package func acquireHDCLifecycleInterlock() async throws
+    -> RuntimeHDCLifecycleInterlockLease
+  {
+    guard hdcLifecycleInterlockID == nil else {
+      throw AgentExecutionControlFailure(
+        "resourceConflict", "another HDC lifecycle action owns the final Job interlock")
+    }
+    let lease = RuntimeHDCLifecycleInterlockLease(id: UUID())
+    hdcLifecycleInterlockID = lease.id
+    do {
+      let current = try await listCurrentJobs()
+      guard hdcLifecycleInterlockID == lease.id, current.isEmpty else {
+        if hdcLifecycleInterlockID == lease.id { hdcLifecycleInterlockID = nil }
+        throw AgentExecutionControlFailure(
+          "factsDrifted", "current Runtime Jobs block the HDC lifecycle action")
+      }
+      return lease
+    } catch {
+      if hdcLifecycleInterlockID == lease.id { hdcLifecycleInterlockID = nil }
+      throw error
+    }
+  }
+
+  package func releaseHDCLifecycleInterlock(
+    _ lease: RuntimeHDCLifecycleInterlockLease
+  ) throws {
+    guard hdcLifecycleInterlockID == lease.id else {
+      throw AgentExecutionControlFailure(
+        "resourceConflict", "HDC lifecycle interlock ownership changed")
+    }
+    hdcLifecycleInterlockID = nil
   }
 
   private func allJobStatuses(

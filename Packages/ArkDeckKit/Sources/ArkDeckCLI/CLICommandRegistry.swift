@@ -495,7 +495,7 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, artifactNode, agentNode, humanActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
+    jobNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
     flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
@@ -810,7 +810,22 @@ enum CLICommandRegistry {
               CLIOptionSpec(name: "--require-protocol", form: .value(placeholder: "1|2", grammar: .enumeration(["1", "2"])),
                 summary: "default 2 reads fresh facts; explicit 1 reads the frozen startup projection")
             ]),
-            connectsToRuntime: true)
+            connectsToRuntime: true),
+          CLILeafSpec(token: "impact-preview", canonicalCommand: "runtime.hdc.impact-preview",
+            summary: "persist an exact HDC restart impact preview; no lifecycle dispatch",
+            options: runtimeClientOptions([targetProtocolOption, waitTimeoutOption,
+              CLIOptionSpec(name: "--action", form: .value(placeholder: "restart", grammar: .enumeration(["restart"])), summary: "typed lifecycle action", isRequired: true),
+              CLIOptionSpec(name: "--server-endpoint-ref", form: .value(placeholder: "ref", grammar: .opaque), summary: "exact reference returned by HDC status", isRequired: true),
+              CLIOptionSpec(name: "--expected-server-generation", form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)), summary: "exact observed server generation", isRequired: true),
+              CLIOptionSpec(name: "--action-request-id", form: .value(placeholder: "id", grammar: .opaque), summary: "stable idempotency identity for lost-receipt recovery", isRequired: true),
+            ]), connectsToRuntime: true),
+          CLILeafSpec(token: "restart", canonicalCommand: "runtime.hdc.restart",
+            summary: "request exact impact approval; dispatch remains zero until explicit resume",
+            options: runtimeClientOptions([targetProtocolOption, waitTimeoutOption,
+              CLIOptionSpec(name: "--control-action", form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable control-action identity", isRequired: true),
+              CLIOptionSpec(name: "--preview-id", form: .value(placeholder: "id", grammar: .opaque), summary: "exact immutable preview identity", isRequired: true),
+              CLIOptionSpec(name: "--preview-digest", form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)), summary: "exact canonical preview digest", isRequired: true),
+            ]), connectsToRuntime: true)
         ]),
       runtimeServiceNode,
       runtimeSigningNode,
@@ -1535,21 +1550,37 @@ enum CLICommandRegistry {
     summary: "exact Runtime-owned human action", isRequired: true)
 
   private static let humanActionNode = CLINodeSpec(
-    token: "human-action", summary: "Runtime-owned typed physical assistance; never an impact approval",
+    token: "human-action", summary: "Runtime-owned physical assistance and explicit impact approval",
     leaves: [
-      CLILeafSpec(token: "list", canonicalCommand: "human-action.list", summary: "list persisted AgentExecution physical actions",
+      CLILeafSpec(token: "list", canonicalCommand: "human-action.list", summary: "list persisted actions across their exact Runtime owners",
         options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
-          CLIOptionSpec(name: "--owner-kind", form: .value(placeholder: "agentExecution", grammar: .enumeration(["agentExecution"])),
+          CLIOptionSpec(name: "--owner-kind", form: .value(placeholder: "kind", grammar: .enumeration(["agentExecution", "controlAction"])),
             summary: "published owner kind; must be paired with --owner"),
           CLIOptionSpec(name: "--owner", form: .value(placeholder: "id", grammar: .opaque), summary: "exact owner identity"),
         ]), connectsToRuntime: true),
       CLILeafSpec(token: "show", canonicalCommand: "human-action.show", summary: "read exact action, selection schema, expiry and resume reference",
         options: runtimeClientOptions([humanActionIDOption, waitTimeoutOption, targetProtocolOption]), connectsToRuntime: true),
-      CLILeafSpec(token: "resume", canonicalCommand: "human-action.resume", summary: "probe the exact physical assistance and continue its original owner",
+      CLILeafSpec(token: "resume", canonicalCommand: "human-action.resume", summary: "probe physical assistance or explicitly confirm one exact impact preview",
         options: runtimeClientOptions(physicalSelectionOptions + [humanActionIDOption, waitTimeoutOption, targetProtocolOption,
           CLIOptionSpec(name: "--resume-reference", form: .value(placeholder: "ref", grammar: .opaque),
             summary: "exact reference returned by this action", isRequired: true),
         ]), mutuallyExclusive: [["--selection", "--selection-file"]], connectsToRuntime: true),
+    ])
+
+  private static let controlActionIDOption = CLIOptionSpec(name: "--control-action",
+    form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable control-action identity", isRequired: true)
+
+  private static let controlActionNode = CLINodeSpec(token: "control-action", summary: "durable host lifecycle previews and readback",
+    leaves: [
+      CLILeafSpec(token: "list", canonicalCommand: "control-action.list", summary: "rediscover control actions with immutable snapshot pagination",
+        options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption, waitTimeoutOption,
+          CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdcLifecycle", grammar: .enumeration(["hdcLifecycle"])), summary: "filter the published control-action kind"),
+          CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration(["observing", "previewReady", "awaitingImpactApproval", "approvalRecorded", "dispatchPrepared", "dispatching", "succeeded", "failed", "outcomeUnknown", "blocked", "expired", "previewDrifted"])), summary: "filter persisted control-action state"),
+        ]), connectsToRuntime: true),
+      CLILeafSpec(token: "show", canonicalCommand: "control-action.show", summary: "read the exact immutable preview, generation and next action",
+        options: runtimeClientOptions([controlActionIDOption, targetProtocolOption, waitTimeoutOption]), connectsToRuntime: true),
+      CLILeafSpec(token: "reconcile", canonicalCommand: "control-action.reconcile", summary: "read back exact impact facts; never replay lifecycle intent",
+        options: runtimeClientOptions([controlActionIDOption, targetProtocolOption, waitTimeoutOption]), connectsToRuntime: true),
     ])
 
   private static let capabilityNode = CLINodeSpec(

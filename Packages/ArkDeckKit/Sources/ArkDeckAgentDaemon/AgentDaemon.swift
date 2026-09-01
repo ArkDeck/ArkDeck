@@ -13,6 +13,18 @@ import ArkDeckWorkflows
 import Darwin
 import Foundation
 
+package struct RuntimeControlRequestContext: Sendable, Equatable {
+  package enum Transport: String, Sendable { case direct, unixSocket, appXPC }
+  package let transport: Transport
+  package let hasForegroundConsole: Bool
+
+  package static let direct = Self(transport: .direct, hasForegroundConsole: false)
+  package static let appXPC = Self(transport: .appXPC, hasForegroundConsole: false)
+  package static func unixSocket(foregroundConsole: Bool) -> Self {
+    Self(transport: .unixSocket, hasForegroundConsole: foregroundConsole)
+  }
+}
+
 // MARK: - Wire protocol (v1)
 
 package enum AgentWireProtocol {
@@ -83,8 +95,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let bootstrap: DeviceBootstrapMachine?
   private let targetObservations: TargetObservationCoordinator?
   private let agentExecutions: RuntimeAgentExecutionCoordinator?
+  private let humanActionResources: RuntimeHumanActionResourceCoordinator?
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let hdcStatusObserver: (any HDCStatusObserving)?
+  private let hdcControlActions: RuntimeHDCControlActionCoordinator?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let flashLanePlanPreviewer: (any FlashLanePlanPreviewing)?
@@ -121,8 +135,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrap: DeviceBootstrapMachine? = nil,
     targetObservations: TargetObservationCoordinator? = nil,
     agentExecutions: RuntimeAgentExecutionCoordinator? = nil,
+    humanActionResources: RuntimeHumanActionResourceCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
+    hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -141,8 +157,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       providerIDs: providerIDs, nowUTC: nowUTC,
       targetStore: targetStore, bootstrap: bootstrap, targetObservations: targetObservations,
       agentExecutions: agentExecutions,
+      humanActionResources: humanActionResources,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       hdcStatusObserver: hdcStatusObserver,
+      hdcControlActions: hdcControlActions,
       artifactStore: artifactStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
@@ -167,8 +185,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrap: DeviceBootstrapMachine?,
     targetObservations: TargetObservationCoordinator? = nil,
     agentExecutions: RuntimeAgentExecutionCoordinator? = nil,
+    humanActionResources: RuntimeHumanActionResourceCoordinator? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
+    hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
@@ -191,8 +211,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.bootstrap = bootstrap
     self.targetObservations = targetObservations
     self.agentExecutions = agentExecutions
+    self.humanActionResources = humanActionResources
     self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
     self.hdcStatusObserver = hdcStatusObserver
+    self.hdcControlActions = hdcControlActions
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.flashLanePlanPreviewer = flashLanePlanPreviewer
@@ -219,16 +241,28 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   public func handleLine(_ line: Data) async -> Data {
+    await handleLine(line, context: .direct)
+  }
+
+  package func handleLine(
+    _ line: Data, context: RuntimeControlRequestContext
+  ) async -> Data {
     if let response = ControlProtocolNegotiation.responseIfBootstrap(line) {
       return response + Data("\n".utf8)
     }
-    let response = await handleFrame(line)
+    let response = await handleFrame(line, context: context)
     let encoder = CanonicalJSONEncoders.canonical()
     let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
     return payload + Data("\n".utf8)
   }
 
   func handleFrame(_ line: Data) async -> AgentWireProtocol.Response {
+    await handleFrame(line, context: .direct)
+  }
+
+  private func handleFrame(
+    _ line: Data, context: RuntimeControlRequestContext
+  ) async -> AgentWireProtocol.Response {
     let request: AgentWireProtocol.Request
     do {
       var validator = StrictJSONDuplicateValidator(data: line)
@@ -262,14 +296,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
         id: request.id, code: .unknownMethod,
         message: "this method is not published on the negotiated target protocol")
     }
-    return await dispatch(request)
+    return await dispatch(request, context: context)
   }
 
-  private func dispatch(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+  private func dispatch(
+    _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
+  ) async -> AgentWireProtocol.Response {
     methodObserver?(request.method)
     switch request.method {
-    case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.list", "human-action.show", "human-action.resume":
+    case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
       return await agentExecutionRequest(request)
+    case "human-action.list", "human-action.show", "human-action.resume":
+      return await humanActionRequest(request, context: context)
     case "health":
       if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
         guard request.params == nil || request.params?.isEmpty == true else {
@@ -298,6 +336,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "providers": .array(providerIDs.map(JSONValue.string)),
         ]))
 
+    case "runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list", "control-action.show", "control-action.reconcile":
+      return await hdcControlActionRequest(request)
     case "runtime.hdc.status":
       guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
         return failure(id: request.id, code: .unsupportedProtocolVersion, message: "live HDC status requires the target control protocol")
@@ -2533,8 +2573,162 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
   // MARK: device observations (§6.1, §8.5)
 
+  private func hdcControlActionRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+      return failure(id: request.id, code: .unsupportedProtocolVersion, message: "control actions require protocol 2")
+    }
+    guard let hdcControlActions else {
+      return AgentWireProtocol.Response(id: request.id, ok: false, result: nil,
+        error: .init(code: "operationUnavailable", message: "the Runtime HDC control-action owner is unavailable", details: ["newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    do {
+      let result: JSONValue
+      switch request.method {
+      case "runtime.hdc.impact-preview": result = try await hdcControlActions.preview(fields)
+      case "runtime.hdc.restart":
+        guard Set(fields.keys) == ["controlAction", "previewId", "previewDigest"],
+          case .string(let action)? = fields["controlAction"], HDCControlValue.identifier(action),
+          case .string(let preview)? = fields["previewId"], HDCControlValue.identifier(preview),
+          case .string(let digest)? = fields["previewDigest"], HDCControlValue.digest(digest)
+        else { throw HDCControlValue.failure("invalidInput", "restart requires one exact control-action preview tuple") }
+        result = try await hdcControlActions.requestRestart(
+          actionID: action, previewID: preview, previewDigest: digest)
+      case "control-action.show", "control-action.reconcile":
+        guard Set(fields.keys) == ["controlAction"], case .string(let id)? = fields["controlAction"], HDCControlValue.identifier(id) else {
+          throw HDCControlValue.failure("invalidInput", "an exact control-action identity is required")
+        }
+        result = request.method == "control-action.show" ? try await hdcControlActions.show(id) : try await hdcControlActions.reconcile(id)
+      case "control-action.list":
+        guard Set(fields.keys).isSubset(of: ["kind", "state", "pageSize", "cursor"]) else { throw HDCControlValue.failure("invalidInput", "unknown control-action list field") }
+        let size: Int
+        if let value = fields["pageSize"] {
+          guard case .integer(let number) = value, (1...1000).contains(number) else { throw HDCControlValue.failure("invalidInput", "invalid page size") }
+          size = Int(number)
+        } else { size = 100 }
+        let cursor: String?
+        if let value = fields["cursor"] {
+          guard case .string(let text) = value, text.utf8.count <= 256 else { throw HDCControlValue.failure("invalidCursor", "invalid control-action cursor") }
+          cursor = text
+        } else { cursor = nil }
+        result = try await hdcControlActions.list(filters: fields.filter { ["kind", "state"].contains($0.key) }, pageSize: size, cursor: cursor)
+      default: return failure(id: request.id, code: .unknownMethod, message: "unknown control-action method")
+      }
+      return success(id: request.id, result: result)
+    } catch let error as AgentExecutionControlFailure {
+      return AgentWireProtocol.Response(id: request.id, ok: false, result: nil,
+        error: .init(code: error.code, message: error.message, details: error.details.merging(["newDispatchCount": .integer(0)], uniquingKeysWith: { _, new in new })))
+    } catch {
+      return AgentWireProtocol.Response(id: request.id, ok: false, result: nil,
+        error: .init(code: "recordUnreadable", message: "control-action state cannot be read or persisted", details: ["newDispatchCount": .integer(0)]))
+    }
+  }
+
+  private func humanActionRequest(
+    _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
+  ) async -> AgentWireProtocol.Response {
+    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+      return failure(id: request.id, code: .unsupportedProtocolVersion, message: "human actions require protocol 2")
+    }
+    guard let humanActionResources else {
+      // Older/test compositions with only AgentExecution ownership preserve
+      // their exact behavior. Production always installs the union owner.
+      return await agentExecutionRequest(request)
+    }
+    let fields = request.params ?? [:]
+    func identifier(_ key: String) throws -> String {
+      guard case .string(let value)? = fields[key], AgentExecutionIntent.validIdentifier(value) else {
+        throw AgentExecutionControlFailure("invalidInput", "\(key) must be a bounded resource identity")
+      }
+      return value
+    }
+    do {
+      let result: JSONValue
+      switch request.method {
+      case "human-action.show":
+        guard Set(fields.keys) == ["humanAction"] else {
+          throw AgentExecutionControlFailure("invalidInput", "show requires one exact human action")
+        }
+        result = try await humanActionResources.show(identifier("humanAction"))
+      case "human-action.list":
+        guard Set(fields.keys).isSubset(of: ["ownerKind", "owner", "pageSize", "cursor"]) else {
+          throw AgentExecutionControlFailure("invalidInput", "unknown human-action list field")
+        }
+        let size: Int
+        if let value = fields["pageSize"] {
+          guard case .integer(let number) = value, (1...1000).contains(number) else {
+            throw AgentExecutionControlFailure("invalidInput", "pageSize must be between 1 and 1000")
+          }
+          size = Int(number)
+        } else { size = 100 }
+        let cursor: String?
+        if let value = fields["cursor"] {
+          guard case .string(let text) = value, text.utf8.count <= 256 else {
+            throw AgentExecutionControlFailure("invalidCursor", "cursor must be a bounded opaque string")
+          }
+          cursor = text
+        } else { cursor = nil }
+        result = try await humanActionResources.list(
+          filters: fields.filter { ["ownerKind", "owner"].contains($0.key) },
+          pageSize: size, cursor: cursor)
+      case "human-action.resume":
+        guard Set(fields.keys).isSubset(of: ["resumeReference", "humanAction", "selection", "challengeResponse"]),
+          Set(fields.keys).isSuperset(of: ["resumeReference", "humanAction"])
+        else { throw AgentExecutionControlFailure("invalidInput", "resume requires one exact human action and reference") }
+        let actionID = try identifier("humanAction")
+        let reference = try identifier("resumeReference")
+        guard let row = try await humanActionResources.owner(
+          actionID: actionID, resumeReference: reference)
+        else { throw AgentExecutionControlFailure("resourceNotFound", "human action does not exist") }
+        if row.ownerKind == "controlAction" {
+          guard fields["selection"] == nil else {
+            throw AgentExecutionControlFailure("invalidInput", "impact approval accepts no selection")
+          }
+          if context.transport == .unixSocket, context.hasForegroundConsole,
+            let hdcControlActions
+          {
+            if fields["challengeResponse"] == nil {
+              result = try await hdcControlActions.issueInteractiveChallenge(
+                actionID: actionID, resumeReference: reference)
+            } else if case .string(let response)? = fields["challengeResponse"] {
+              result = try await hdcControlActions.consumeInteractiveChallenge(
+                actionID: row.ownerID, resumeReference: reference,
+                response: response)
+            } else {
+              throw AgentExecutionControlFailure(
+                "invalidInput", "challengeResponse must be the bounded console challenge")
+            }
+          } else {
+            // A transport-free/direct RPC, redirected/background console or
+            // XPC response gets the same HAR back and cannot advance the owner.
+            result = row.value
+          }
+        } else {
+          guard let agentExecutions else {
+            throw AgentExecutionControlFailure("operationUnavailable", "AgentExecution owner is unavailable")
+          }
+          let execution = try await agentExecutions.resume(
+            reference: reference, actionID: actionID,
+            selection: fields["selection"])
+          result = try await executionResultProjection(execution)
+        }
+      default: return failure(id: request.id, code: .unknownMethod, message: "unknown human-action method")
+      }
+      return success(id: request.id, result: result)
+    } catch let error as AgentExecutionControlFailure {
+      var details = error.details
+      details["newDispatchCount"] = .integer(0)
+      details["phase"] = .string("preAdmission")
+      return AgentWireProtocol.Response(
+        id: request.id, ok: false, result: nil,
+        error: .init(code: error.code, message: error.message, details: details))
+    } catch {
+      return failure(id: request.id, code: .internalError, message: "human-action resource could not be read")
+    }
+  }
+
   private func agentExecutionRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
-    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion, let agentExecutions else {
+    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
       return failure(id: request.id, code: .unknownMethod, message: "Runtime execution resources require the published target protocol")
     }
     let fields = request.params ?? [:]
@@ -2550,6 +2744,20 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
     }
     do {
+      if request.method == "agent.resume", let humanActionResources {
+        try exact(["resumeReference"], optional: ["selection"])
+        if let row = try await humanActionResources.owner(
+          actionID: nil, resumeReference: string("resumeReference")),
+          row.ownerKind == "controlAction"
+        {
+          throw AgentExecutionControlFailure(
+            "admissionDenied", "agent resume cannot consume an impact approval",
+            details: ["humanAction": row.value])
+        }
+      }
+      guard let agentExecutions else {
+        throw AgentExecutionControlFailure("operationUnavailable", "AgentExecution owner is unavailable")
+      }
       let result: JSONValue
       switch request.method {
       case "agent.run": result = try await agentExecutions.run(fields)
@@ -3571,7 +3779,8 @@ public final class AgentDaemonServer: @unchecked Sendable {
         scannedByteCount = 0
         guard !line.isEmpty else { continue }
         beginRequest()
-        let response = await handler.handleLine(line)
+        let response = await handler.handleLine(
+          line, context: requestContext(connectionFD: connectionFD))
         var written = 0
         let total = response.count
         let sent: Bool = response.withUnsafeBytes { raw in
@@ -3618,6 +3827,59 @@ public final class AgentDaemonServer: @unchecked Sendable {
       else { return nil }
       return base.distance(to: UnsafeRawPointer(hit))
     }
+  }
+
+  /// Derive interaction eligibility from the accepted socket and the live
+  /// peer process. No request field participates. stdin and stderr must still
+  /// be the peer's controlling terminal and its process group must be the
+  /// foreground group; a redirected stdin, background job, exited/reused PID,
+  /// XPC frame or direct handler call therefore gets no console carrier.
+  private static func requestContext(
+    connectionFD: Int32
+  ) -> RuntimeControlRequestContext {
+    var peerUID: uid_t = 0
+    var peerGID: gid_t = 0
+    guard getpeereid(connectionFD, &peerUID, &peerGID) == 0,
+      peerUID == geteuid()
+    else { return .unixSocket(foregroundConsole: false) }
+    var peerPID: pid_t = 0
+    var peerPIDSize = socklen_t(MemoryLayout.size(ofValue: peerPID))
+    guard getsockopt(
+      connectionFD, SOL_LOCAL, LOCAL_PEERPID, &peerPID, &peerPIDSize) == 0,
+      peerPIDSize == MemoryLayout.size(ofValue: peerPID), peerPID > 1,
+      peerPID != getpid()
+    else { return .unixSocket(foregroundConsole: false) }
+
+    func processInfo() -> proc_bsdinfo? {
+      var info = proc_bsdinfo()
+      let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+      guard proc_pidinfo(peerPID, PROC_PIDTBSDINFO, 0, &info, size) == size,
+        info.pbi_pid == UInt32(peerPID), info.pbi_uid == peerUID,
+        info.pbi_pgid > 0, info.e_tpgid > 0,
+        info.pbi_pgid == info.e_tpgid,
+        info.e_tdev != 0, info.e_tdev != UInt32.max
+      else { return nil }
+      return info
+    }
+    func terminal(_ descriptor: Int32, device: UInt32) -> Bool {
+      var info = vnode_fdinfo()
+      let size = Int32(MemoryLayout<vnode_fdinfo>.size)
+      guard proc_pidfdinfo(
+        peerPID, descriptor, PROC_PIDFDVNODEINFO, &info, size) == size
+      else { return false }
+      return mode_t(info.pvi.vi_stat.vst_mode) & S_IFMT == S_IFCHR
+        && info.pvi.vi_stat.vst_rdev == device
+    }
+    guard let before = processInfo(),
+      terminal(STDIN_FILENO, device: before.e_tdev),
+      terminal(STDERR_FILENO, device: before.e_tdev),
+      let after = processInfo(),
+      before.pbi_start_tvsec == after.pbi_start_tvsec,
+      before.pbi_start_tvusec == after.pbi_start_tvusec,
+      before.pbi_pgid == after.pbi_pgid, before.e_tpgid == after.e_tpgid,
+      before.e_tdev == after.e_tdev
+    else { return .unixSocket(foregroundConsole: false) }
+    return .unixSocket(foregroundConsole: true)
   }
 }
 

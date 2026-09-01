@@ -545,6 +545,25 @@ public actor RuntimeAgentExecutionCoordinator {
     return found
   }
 
+  package func humanActionResourceRows(
+    ownerID: String?
+  ) throws -> [RuntimeHumanActionResourceRow] {
+    if let ownerID, !AgentExecutionIntent.validIdentifier(ownerID) {
+      throw AgentExecutionControlFailure("invalidInput", "invalid human-action owner")
+    }
+    var rows: [RuntimeHumanActionResourceRow] = []
+    try store.forEachRecord { record in
+      guard ownerID == nil || ownerID == record.intent.executionID else { return }
+      rows += record.actions.map { action in
+        RuntimeHumanActionResourceRow(
+          createdAt: action.createdAt, actionID: action.actionID,
+          ownerKind: "agentExecution", ownerID: record.intent.executionID,
+          resumeReference: action.resumeReference, value: action.projection)
+      }
+    }
+    return rows
+  }
+
   package func humanActions(
     filters: [String: JSONValue], pageSize: Int, cursor: String?
   ) throws -> JSONValue {
