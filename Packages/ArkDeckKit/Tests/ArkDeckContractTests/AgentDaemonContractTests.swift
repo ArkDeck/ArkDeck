@@ -932,6 +932,78 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertNotNil(row["reason"], "an operator needs to know why")
   }
 
+  func testTargetCLIRegistersUpdatesAndRemovesAWorkspaceProjectWithoutPublishingItsRoot() throws {
+    var firstRoot = stateDirectory.appending(path: "private-project-a", directoryHint: .isDirectory)
+    var secondRoot = stateDirectory.appending(path: "private-project-b", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: secondRoot, withIntermediateDirectories: true)
+    func canonicalRoot(_ root: URL) throws -> URL {
+      guard let canonical = realpath(root.path, nil) else { throw POSIXError(.ENOENT) }
+      defer { free(canonical) }
+      return URL(filePath: String(cString: canonical), directoryHint: .isDirectory)
+    }
+    firstRoot = try canonicalRoot(firstRoot)
+    secondRoot = try canonicalRoot(secondRoot)
+    let projectStore = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory.appending(path: "workspace-owner", directoryHint: .isDirectory),
+      nowUTC: { "2026-09-01T12:00:00.000Z" })
+    let (handler, _) = try makeStack(workspaceProjectStore: projectStore)
+    let server = try startServer(handler)
+
+    let (registerExit, registerEnvelope) = try runObservationCLI([
+      "workspace", "project", "register",
+      "--registration-request-id", "cli-registration-1",
+      "--kind", "arkdeck", "--root", firstRoot.path,
+    ], server: server)
+    XCTAssertEqual(registerExit, 0)
+    guard case .object(let registered)? = registerEnvelope["result"],
+      case .string(let projectRef)? = registered["projectRef"]
+    else { return XCTFail("registration must return the stable project resource") }
+    XCTAssertEqual(registered["schemaVersion"], .string("arkdeck.workspace-project/1"))
+    XCTAssertEqual(registered["generation"], .string("1"))
+    XCTAssertEqual(registered["configurationStatus"], .string("runtimeRestartRequired"))
+    XCTAssertEqual(registered["availability"], .string("unavailable"))
+
+    let registerBytes = try JSONEncoder().encode(registerEnvelope)
+    let registerText = String(decoding: registerBytes, as: UTF8.self)
+    XCTAssertFalse(registerText.contains(firstRoot.path))
+    XCTAssertFalse(registerText.contains(secondRoot.path))
+
+    let (listExit, listEnvelope) = try runObservationCLI(
+      ["workspace", "project", "list"], server: server)
+    XCTAssertEqual(listExit, 0)
+    guard case .object(let listed)? = listEnvelope["result"],
+      case .array(let projects)? = listed["projects"]
+    else { return XCTFail("target project list must publish its versioned collection") }
+    XCTAssertEqual(listed["schemaVersion"], .string("arkdeck.workspace-project-list/1"))
+    XCTAssertEqual(projects.count, 1)
+
+    let (updateExit, updateEnvelope) = try runObservationCLI([
+      "workspace", "project", "update", "--project", projectRef,
+      "--expected-generation", "1", "--kind", "arkdeck", "--root", secondRoot.path,
+    ], server: server)
+    XCTAssertEqual(updateExit, 0)
+    guard case .object(let updated)? = updateEnvelope["result"] else {
+      return XCTFail("update must return the advanced project resource")
+    }
+    XCTAssertEqual(updated["generation"], .string("2"))
+    XCTAssertEqual(updated["configurationStatus"], .string("runtimeRestartRequired"))
+
+    let (removeExit, removeEnvelope) = try runObservationCLI([
+      "workspace", "project", "remove", "--project", projectRef,
+      "--expected-generation", "2",
+    ], server: server)
+    XCTAssertEqual(removeExit, 0)
+    guard case .object(let removed)? = removeEnvelope["result"] else {
+      return XCTFail("remove must return the removed generation")
+    }
+    XCTAssertEqual(removed["configurationStatus"], .string("removed"))
+    XCTAssertEqual(removed["availability"], .string("removed"))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: firstRoot.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: secondRoot.path))
+    XCTAssertTrue(try projectStore.list().isEmpty)
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     targetObservations: TargetObservationCoordinator? = nil,
@@ -945,6 +1017,7 @@ final class AgentDaemonContractTests: XCTestCase {
     rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
+    workspaceProjectStore: RuntimeWorkspaceProjectStore? = nil,
     workspaceProjects: [WorkspaceProjectPublication] = [],
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
@@ -970,6 +1043,7 @@ final class AgentDaemonContractTests: XCTestCase {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: resolvedArtifactStore,
+      workspaceProjectStore: workspaceProjectStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
@@ -2944,6 +3018,137 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(process.terminationStatus, 0, "clean shutdown exits zero")
   }
 
+  func testProductionDaemonComposesEveryRegisteredWorkspaceProject() throws {
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    let shortState = URL(filePath: NSHomeDirectory()).appending(
+      path: ".arkdeck-workspace-project-test-\(UInt32.random(in: 0..<100_000))",
+      directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: shortState) }
+    let firstRoot = shortState.appending(path: "project-a", directoryHint: .isDirectory)
+    let secondRoot = shortState.appending(path: "project-b", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: firstRoot.appending(path: "Packages/ArkDeckKit", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("// fixture".utf8).write(
+      to: firstRoot.appending(path: "Packages/ArkDeckKit/Package.swift"))
+    try FileManager.default.createDirectory(
+      at: secondRoot.appending(path: "entry/src/main", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: secondRoot.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(
+      to: secondRoot.appending(path: "entry/src/main/module.json5"))
+    let hvigor = secondRoot.appending(path: "hvigorw.js")
+    try Data("// fixture".utf8).write(to: hvigor)
+    let sdk = shortState.appending(path: "sdk", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: sdk.appending(path: "default/openharmony", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    let store = try RuntimeWorkspaceProjectStore(rootURL: shortState)
+    let first = try store.register(
+      requestID: "production-project-a", kind: "arkdeck", rootPath: firstRoot.path,
+      projectRef: "a-arkdeck")
+    let second = try store.register(
+      requestID: "production-project-b", kind: "openharmony", rootPath: secondRoot.path,
+      projectRef: "b-openharmony")
+
+    let process = try launchProductionDaemon(
+      binary: binary, stateDirectory: shortState,
+      extraEnvironment: [
+        "ARKDECK_DEVECO_NODE_PATH": "/usr/bin/true",
+        "ARKDECK_DEVECO_HVIGOR_PATH": hvigor.path,
+        "ARKDECK_DEVECO_SDK_HOME": sdk.path,
+      ])
+    defer { stopProductionDaemon(process) }
+    let socketURL = shortState.appending(path: "agentd.sock")
+    let client = try AgentClient(socketPath: socketURL.path)
+      .negotiated(requiredMajor: 2, forMethod: "workspace.project.list")
+    let response = try client.request(method: "workspace.project.list")
+    guard case .object(let collection) = response,
+      case .array(let rows)? = collection["projects"]
+    else { return XCTFail("production project list must be a versioned collection") }
+    XCTAssertEqual(collection["schemaVersion"], .string("arkdeck.workspace-project-list/1"))
+    XCTAssertEqual(
+      Set(rows.compactMap { row -> String? in
+        guard case .object(let fields) = row, case .string(let ref)? = fields["projectRef"]
+        else { return nil }
+        XCTAssertEqual(fields["configurationStatus"], .string("active"))
+        XCTAssertEqual(fields["availability"], .string("available"))
+        XCTAssertNotEqual(fields["reasonCode"], .string("workspace_runtime_restart_required"))
+        return ref
+      }),
+      [first.projectRef, second.projectRef])
+    let rendered = String(decoding: try JSONEncoder().encode(response), as: UTF8.self)
+    XCTAssertFalse(rendered.contains(firstRoot.path))
+    XCTAssertFalse(rendered.contains(secondRoot.path))
+    let operations = try listOperations(socketPath: socketURL.path)
+    XCTAssertEqual(
+      operations["workspace.read-source-range@1"]?.availability, "available",
+      "a later OpenHarmony profile must not be blocked by the first ArkDeck profile")
+  }
+
+  func testProductionDaemonKeepsADriftedWorkspaceProjectRepairable() throws {
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    let shortState = URL(filePath: NSHomeDirectory()).appending(
+      path: ".arkdeck-workspace-drift-test-\(UInt32.random(in: 0..<100_000))",
+      directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: shortState) }
+    let root = shortState.appending(path: "project", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: root.appending(path: "Packages/ArkDeckKit", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("// fixture".utf8).write(
+      to: root.appending(path: "Packages/ArkDeckKit/Package.swift"))
+    let store = try RuntimeWorkspaceProjectStore(rootURL: shortState)
+    let registered = try store.register(
+      requestID: "production-project-drift", kind: "arkdeck", rootPath: root.path,
+      projectRef: "drifted-arkdeck")
+    let original = shortState.appending(path: "original-project", directoryHint: .isDirectory)
+    try FileManager.default.moveItem(at: root, to: original)
+    try FileManager.default.createDirectory(
+      at: root.appending(path: "Packages/ArkDeckKit", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("// replacement".utf8).write(
+      to: root.appending(path: "Packages/ArkDeckKit/Package.swift"))
+
+    let process = try launchProductionDaemon(binary: binary, stateDirectory: shortState)
+    defer { stopProductionDaemon(process) }
+    let client = try AgentClient(socketPath: shortState.appending(path: "agentd.sock").path)
+      .negotiated(requiredMajor: 2, forMethod: "workspace.project.show")
+    guard case .object(let shown) = try client.request(
+      method: "workspace.project.show",
+      params: ["projectRef": .string(registered.projectRef)])
+    else { return XCTFail("drifted project must remain discoverable") }
+    XCTAssertEqual(shown["configurationStatus"], .string("active"))
+    XCTAssertEqual(shown["availability"], .string("unavailable"))
+    guard case .string(let reason)? = shown["reason"] else {
+      return XCTFail("root drift must publish its path-free reason")
+    }
+    XCTAssertTrue(
+      reason.contains("root identity changed"),
+      "root drift must remain a path-free, actionable availability reason")
+
+    guard case .object(let updated) = try client.request(
+      method: "workspace.project.update",
+      params: [
+        "projectRef": .string(registered.projectRef),
+        "expectedGeneration": .string("1"),
+        "kind": .string("arkdeck"),
+        "root": .string(root.path),
+      ])
+    else { return XCTFail("the live owner must let the operator repair the grant") }
+    XCTAssertEqual(updated["generation"], .string("2"))
+    XCTAssertEqual(updated["configurationStatus"], .string("runtimeRestartRequired"))
+    XCTAssertTrue(process.isRunning)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: original.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+  }
+
   func testProductionDaemonAdvancesRuntimeTargetFromOwnerOnlyRockchipLineage() throws {
     let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
@@ -3339,6 +3544,12 @@ final class AgentDaemonContractTests: XCTestCase {
       usleep(50_000)
     }
     return process
+  }
+
+  private func stopProductionDaemon(_ process: Process) {
+    if process.isRunning { process.terminate() }
+    let deadline = Date().addingTimeInterval(10)
+    while process.isRunning && Date() < deadline { usleep(50_000) }
   }
 
   private var productsDirectory: URL {

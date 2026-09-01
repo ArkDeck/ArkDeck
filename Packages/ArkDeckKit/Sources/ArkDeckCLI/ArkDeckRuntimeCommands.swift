@@ -3286,7 +3286,7 @@ params))
     }
   }
 
-  /// §7.9's `workspace project|preset list|show`.
+  /// §7.9's workspace project owner and project/preset discovery.
   ///
   /// Read-only, and deliberately separate from the domain layer: these submit
   /// no operation and map to no Catalog reference. What they publish is the
@@ -3296,28 +3296,42 @@ params))
   static func runWorkspaceDiscovery(_ group: String, _ arguments: [String]) throws {
     guard let verb = arguments.first, !verb.hasPrefix("-") else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing workspace \(group) subcommand (list|show)")
+        exitCode: EX_USAGE,
+        message: "missing workspace \(group) subcommand")
     }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "workspace.\(group).\(verb)")
+    var session = runtimeSession(&rest, command: "workspace.\(group).\(verb)")
     let options = try CLIOptions(rest)
+    if group == "project" {
+      try session.negotiate(requiredMajor: 2, forMethod: "workspace.project.\(verb)")
+    }
     var params: [String: JSONValue] = [:]
     if let projectRef = options.value("--project") {
       params["projectRef"] = .string(projectRef)
     }
     if let presetRef = options.value("--preset") { params["presetRef"] = .string(presetRef) }
     if let kind = options.value("--kind") { params["kind"] = .string(kind) }
+    if let requestID = options.value("--registration-request-id") {
+      params["registrationRequestId"] = .string(requestID)
+    }
+    if let root = options.value("--root") { params["root"] = .string(root) }
+    if let generation = options.value("--expected-generation") {
+      params["expectedGeneration"] = .string(generation)
+    }
 
     switch (group, verb) {
     case ("project", "list"):
       session.emit(try session.request("workspace.project.list"))
-    case ("project", "show"), ("preset", "list"), ("preset", "show"):
+    case ("project", "show"), ("project", "update"), ("project", "remove"),
+      ("preset", "list"), ("preset", "show"):
       guard params["projectRef"] != nil else {
         throw CLIError(
           exitCode: EX_USAGE,
           message: "workspace \(group) \(verb) requires --project <ref>")
       }
       session.emit(try session.request("workspace.\(group).\(verb)", params))
+    case ("project", "register"):
+      session.emit(try session.request("workspace.project.register", params))
     default:
       throw CLIError(
         exitCode: EX_USAGE, message: "unsupported workspace \(group) subcommand \(verb)")

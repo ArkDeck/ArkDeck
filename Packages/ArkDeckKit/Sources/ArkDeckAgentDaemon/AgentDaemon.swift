@@ -2507,12 +2507,118 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "workspace.project.register", "workspace.project.update", "workspace.project.remove":
+      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
+        return failure(
+          id: request.id, code: .unsupportedProtocolVersion,
+          message: "workspace project mutation requires the target control protocol")
+      }
+      let fields = request.params ?? [:]
+      do {
+        let resource: RuntimeWorkspaceProjectResource
+        switch request.method {
+        case "workspace.project.register":
+          guard Set(fields.keys) == ["registrationRequestId", "kind", "root"],
+            case .string(let requestID)? = fields["registrationRequestId"],
+            case .string(let kind)? = fields["kind"],
+            case .string(let root)? = fields["root"]
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "workspace project register requires request identity, kind and root")
+          }
+          resource = try await engine.workspaceProjectRegister(
+            requestID: requestID, kind: kind, rootPath: root)
+        case "workspace.project.update":
+          guard Set(fields.keys) == ["projectRef", "expectedGeneration", "kind", "root"],
+            case .string(let projectRef)? = fields["projectRef"],
+            case .string(let generationText)? = fields["expectedGeneration"],
+            let generation = UInt64(generationText), generation > 0,
+            generation <= UInt64(Int64.max), String(generation) == generationText,
+            case .string(let kind)? = fields["kind"],
+            case .string(let root)? = fields["root"]
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "workspace project update requires exact project, generation, kind and root")
+          }
+          resource = try await engine.workspaceProjectUpdate(
+            projectRef: projectRef, expectedGeneration: generation,
+            kind: kind, rootPath: root)
+        default:
+          guard Set(fields.keys) == ["projectRef", "expectedGeneration"],
+            case .string(let projectRef)? = fields["projectRef"],
+            case .string(let generationText)? = fields["expectedGeneration"],
+            let generation = UInt64(generationText), generation > 0,
+            generation <= UInt64(Int64.max), String(generation) == generationText
+          else {
+            return failure(
+              id: request.id, code: .invalidParams,
+              message: "workspace project remove requires exact project and generation")
+          }
+          resource = try await engine.workspaceProjectRemove(
+            projectRef: projectRef, expectedGeneration: generation)
+        }
+        let publication = workspaceProjects.first { $0.projectRef == resource.projectRef }
+        return success(
+          id: request.id,
+          result: Self.encodeRegisteredWorkspaceProject(resource, publication: publication))
+      } catch let error as RuntimeWorkspaceProjectFailure {
+        return Self.workspaceProjectFailure(id: request.id, error: error)
+      } catch let error as AgentExecutionControlFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: error.details.merging([
+              "phase": .string("workspaceProjectOwner"),
+              "newDispatchCount": .integer(0),
+            ], uniquingKeysWith: { _, new in new })))
+      } catch {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: "recordUnreadable", message: "workspace project owner failed",
+            details: [
+              "phase": .string("workspaceProjectOwner"),
+              "newDispatchCount": .integer(0),
+            ]))
+      }
+
     case "workspace.project.list":
       // §7.9: project the daemon's current registered configuration. Read-only
       // and derived from what was resolved at composition time, so it neither
       // grants nor widens anything — it is the discovery half, and today it is
       // the only way to learn a `projectRef` at all. §7.9 is explicit that the
       // free-form strings in Catalog descriptors do not count as discovery.
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        do {
+          let resources = try await engine.workspaceProjectList()
+          return success(
+            id: request.id,
+            result: .object([
+              "schemaVersion": .string("arkdeck.workspace-project-list/1"),
+              "projects": .array(resources.map { resource in
+                Self.encodeRegisteredWorkspaceProject(
+                  resource,
+                  publication: workspaceProjects.first { $0.projectRef == resource.projectRef })
+              }),
+            ]))
+        } catch let error as RuntimeWorkspaceProjectFailure {
+          return Self.workspaceProjectFailure(id: request.id, error: error)
+        } catch let error as AgentExecutionControlFailure {
+          return AgentWireProtocol.Response(
+            id: request.id, ok: false, result: nil,
+            error: .init(
+              code: error.code, message: error.message,
+              details: [
+                "phase": .string("workspaceProjectOwner"),
+                "newDispatchCount": .integer(0),
+              ]))
+        } catch {
+          return failure(id: request.id, code: .recordUnreadable, message: "workspace project owner failed")
+        }
+      }
       return success(
         id: request.id,
         result: .array(workspaceProjects.map(Self.encodeWorkspaceProject)))
@@ -2521,6 +2627,29 @@ public struct RuntimeControlPlaneHandler: Sendable {
       guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty
       else {
         return failure(id: request.id, code: .invalidParams, message: "projectRef is required")
+      }
+      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
+        do {
+          let resource = try await engine.workspaceProjectInspect(projectRef: projectRef)
+          return success(
+            id: request.id,
+            result: Self.encodeRegisteredWorkspaceProject(
+              resource,
+              publication: workspaceProjects.first { $0.projectRef == resource.projectRef }))
+        } catch let error as RuntimeWorkspaceProjectFailure {
+          return Self.workspaceProjectFailure(id: request.id, error: error)
+        } catch let error as AgentExecutionControlFailure {
+          return AgentWireProtocol.Response(
+            id: request.id, ok: false, result: nil,
+            error: .init(
+              code: error.code, message: error.message,
+              details: [
+                "phase": .string("workspaceProjectOwner"),
+                "newDispatchCount": .integer(0),
+              ]))
+        } catch {
+          return failure(id: request.id, code: .recordUnreadable, message: "workspace project owner failed")
+        }
       }
       guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
         return failure(
@@ -3408,6 +3537,52 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "kind": .string(preset.kind),
       "timeoutSeconds": .integer(Int64(preset.timeoutSeconds)),
     ])
+  }
+
+  static func encodeRegisteredWorkspaceProject(
+    _ resource: RuntimeWorkspaceProjectResource,
+    publication: WorkspaceProjectPublication?
+  ) -> JSONValue {
+    guard case .object(var fields) = resource.projection else { return resource.projection }
+    if resource.configurationStatus == "removed" {
+      fields["availability"] = .string("removed")
+      fields["reasonCode"] = .string("workspace_project_removed")
+      fields["reason"] = .string("the private workspace root grant was removed")
+      fields["allowedFileGlobs"] = .array([])
+      fields["presetRefs"] = .array([])
+      fields["operations"] = .array([])
+      return .object(fields)
+    }
+    guard resource.configurationStatus == "active", let publication else {
+      fields["availability"] = .string("unavailable")
+      fields["reasonCode"] = .string("workspace_runtime_restart_required")
+      fields["reason"] = .string(
+        "restart the Runtime to compose the registered root before submitting a workspace Job")
+      fields["allowedFileGlobs"] = .array([])
+      fields["presetRefs"] = .array([])
+      fields["operations"] = .array([])
+      return .object(fields)
+    }
+    guard case .object(let published) = encodeWorkspaceProject(publication) else {
+      return .object(fields)
+    }
+    for (key, value) in published where key != "projectRef" && key != "kind" {
+      fields[key] = value
+    }
+    return .object(fields)
+  }
+
+  static func workspaceProjectFailure(
+    id: String, error: RuntimeWorkspaceProjectFailure
+  ) -> AgentWireProtocol.Response {
+    AgentWireProtocol.Response(
+      id: id, ok: false, result: nil,
+      error: .init(
+        code: error.code, message: error.message,
+        details: [
+          "phase": .string("workspaceProjectOwner"),
+          "newDispatchCount": .integer(0),
+        ]))
   }
 
   // MARK: device observations (§6.1, §8.5)
