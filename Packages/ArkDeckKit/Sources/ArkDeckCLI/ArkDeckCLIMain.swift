@@ -229,9 +229,15 @@ struct ArkDeckCommandLine {
         // §7.9's discovery leaves read the registered configuration; they
         // submit no operation, so they must not go through the domain layer,
         // which exists to map a leaf onto a Catalog reference.
-        if command == "workspace", verb == "project" || verb == "preset" {
-          try RuntimeCLI.runWorkspaceDiscovery(verb, Array(arguments.dropFirst()))
-          return
+        if command == "workspace" {
+          if verb == "project" || verb == "preset" {
+            try RuntimeCLI.runWorkspaceDiscovery(verb, Array(arguments.dropFirst()))
+            return
+          }
+          if verb == "continuation" {
+            try RuntimeCLI.runWorkspaceContinuation(Array(arguments.dropFirst()))
+            return
+          }
         }
         try await RuntimeCLI.runDomainOperation(
           path: [command, verb], Array(arguments.dropFirst()))

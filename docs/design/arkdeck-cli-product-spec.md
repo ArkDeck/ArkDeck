@@ -944,6 +944,18 @@ human 模式可以在 stderr 显示可复制的 resume 示例；JSON 模式不�
   availability，不使用 host path 作为临时逃生参数。
 - workspace continuation 必须从原 Job 建立新 typed request/identity/Job，重新核对 target、
   binding、Catalog 与 read-only/effect gate。它不 replay 原 authority，不直接调用 App view model。
+- `workspace continuation inspect|submit|run --source-job <job-id>` 必须协商 control protocol 2.x，
+  并让 health、source/target readback、submit、run 与 accepted-Job readback 共享同一个有界 deadline
+  （默认 30 秒）。source 必须 terminal、outcome known、无 human wait/residue/superseding recovery，
+  且 source/Runtime/CLI Catalog digest、当前 provider、device binding revision 与 stable physical identity
+  全部精确一致；只允许 effective `hostOnly|readOnly`，不复制 capability、campaign reservation、
+  session 或 provider lowering，含历史时间的非空 capture markers 必须拒绝。
+- `inspect` 只返回闭合的 `arkdeck.workspace-continuation/1` eligibility projection，不创建 Job 或
+  dispatch。`submit|run` 要求 caller-stable `--continuation-request-id`，用它同时作为 fresh request ID
+  与 idempotency key；收到闭合的 `arkdeck.job-acceptance/1` 后必须重新读取并精确匹配 accepted Job
+  的 request、Catalog 与 materialized binding。`run` 只对 Runtime 声明可运行的同一 Job 调用
+  `job.run`；同 identity 的 terminal retry 重新发现原 Job，返回 `deduplicated: true`、
+  `dispatched: false`，不得再次调用 run 或产生新 dispatch。
 
 ### 7.10 Local product resources
 

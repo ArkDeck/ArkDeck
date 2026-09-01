@@ -675,12 +675,55 @@ enum CLICommandRegistry {
             ]),
             connectsToRuntime: true),
         ]),
+      CLINodeSpec(
+        token: "continuation",
+        summary: "create a fresh read-only Job from one exact terminal Job",
+        leaves: [
+          CLILeafSpec(
+            token: "inspect",
+            canonicalCommand: "workspace.continuation.inspect",
+            summary: "recheck a source Job, current Catalog and target without creating a Job",
+            options: runtimeClientOptions([
+              workspaceContinuationSourceOption, waitTimeoutOption, targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "submit",
+            canonicalCommand: "workspace.continuation.submit",
+            summary: "submit one fresh typed Job under a caller-stable continuation identity",
+            options: runtimeClientOptions([
+              workspaceContinuationSourceOption, workspaceContinuationRequestOption,
+              waitTimeoutOption, targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "run",
+            canonicalCommand: "workspace.continuation.run",
+            summary: "rediscover and run the exact fresh Job without replaying old authority",
+            options: runtimeClientOptions([
+              workspaceContinuationSourceOption, workspaceContinuationRequestOption,
+              waitTimeoutOption, targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+        ]),
     ])
 
   private static let workspaceProjectRefOption = CLIOptionSpec(
     name: "--project",
     form: .value(placeholder: "project-ref", grammar: .opaque),
     summary: "registered project reference from `workspace project list`",
+    isRequired: true)
+
+  private static let workspaceContinuationSourceOption = CLIOptionSpec(
+    name: "--source-job",
+    form: .value(placeholder: "job-id", grammar: .opaque),
+    summary: "exact terminal Job whose typed request is rechecked",
+    isRequired: true)
+
+  private static let workspaceContinuationRequestOption = CLIOptionSpec(
+    name: "--continuation-request-id",
+    form: .value(placeholder: "id", grammar: .opaque),
+    summary: "caller-stable request and idempotency identity for the fresh Job",
     isRequired: true)
 
   /// §6.1's recovery surface.

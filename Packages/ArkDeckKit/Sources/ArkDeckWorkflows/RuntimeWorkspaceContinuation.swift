@@ -65,7 +65,9 @@ public struct RuntimeWorkspaceContinuation: Sendable, Equatable, Identifiable {
       clientContext: RuntimeClientContext(clientName: "arkdeck-overview-continuation", provenance: provenance))
   }
 
-  private static func inputsMatchCatalog(_ inputs: [String: JSONValue], descriptor: CatalogOperationDescriptor) -> Bool {
+  package static func inputsMatchCatalog(
+    _ inputs: [String: JSONValue], descriptor: CatalogOperationDescriptor
+  ) -> Bool {
     guard descriptor.inputs.filter(\.isRequired).allSatisfy({ inputs[$0.name] != nil }) else { return false }
     for (name, value) in inputs {
       guard let field = descriptor.inputs.first(where: { $0.name == name }) else { return false }
