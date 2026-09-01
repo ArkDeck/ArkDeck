@@ -2,7 +2,7 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
 
-/// §6.2's deterministic local derivation.
+/// Machine projection for §6.2's typed deterministic local derivation.
 ///
 /// `ui-dump inspect` and `ui-dump hit-test` answer from bytes the Runtime
 /// already published, not from the device. §6.2 asks two things of that, and
@@ -17,55 +17,22 @@ import Foundation
 ///   derived from, so "what the screen looked like when this was taken" cannot
 ///   be read as "what the screen looks like".
 ///
-/// The derivation runs in this process because it is deterministic and
-/// touches nothing: the same bytes give the same tree, no device is contacted,
-/// and no Runtime state moves. That is what makes it a local derivation rather
-/// than an observation, and it is also why it may not claim to be one.
+/// Parsing, bounds, source binding, and hit testing are owned by
+/// `UIDumpOfflineInspector` in ArkDeckWorkflows. This type only translates its
+/// typed result to the CLI's canonical JSON vocabulary.
 enum CLIOfflineDerivation {
-
-  /// The Viewer parser's published identity.
-  ///
-  /// It moves when the parse changes what it produces from the same bytes —
-  /// which is the only thing a consumer comparing two derivations cares
-  /// about. It is stated here rather than derived from the product version so
-  /// that a release which does not touch the parser does not look like it did.
-  static let uiDumpParser = "arkdeck.viewer.ui-dump-parser"
-  static let uiDumpParserVersion = "1.0.0"
-
-  /// One source Artifact, named and pinned.
-  struct Source {
-    let artifactID: String
-    let name: String
-    let mediaType: String
-    let sha256: String
-    let byteCount: Int
-  }
-
-  /// The artifact names a `capture.diagnostics@1` UI dump publishes. The tree
-  /// is required and the raw dump is not: some providers label an opaque text
-  /// window inventory as JSON, and the structured tree stays the source of
-  /// truth — an optional compatibility artifact must not be able to invalidate
-  /// a capture that is otherwise complete.
-  static let treeArtifactName = "ui-tree.json"
-  static let rawDumpArtifactName = "ui-dump.json"
-  static let screenshotMediaType = "image/png"
-
-  /// Projects the derivation's provenance. Sorted by name so that two runs
-  /// over the same job produce the same document.
-  static func provenance(sources: [Source], observedFromUTC: String?, observedToUTC: String?)
-    -> JSONValue
-  {
+  static func encode(provenance: UIDumpOfflineProvenance) -> JSONValue {
     .object([
       // The word a consumer branches on. §6.2 forbids a derived result from
       // impersonating device evidence, and a machine reader needs one field
       // to check rather than a convention to remember.
-      "kind": .string("offlineDerived"),
-      "parser": .string(uiDumpParser),
-      "parserVersion": .string(uiDumpParserVersion),
-      "observedFromUtc": observedFromUTC.map(JSONValue.string) ?? .null,
-      "observedToUtc": observedToUTC.map(JSONValue.string) ?? .null,
+      "kind": .string(provenance.kind),
+      "parser": .string(provenance.parser),
+      "parserVersion": .string(provenance.parserVersion),
+      "observedFromUtc": provenance.observedFromUTC.map(JSONValue.string) ?? .null,
+      "observedToUtc": provenance.observedToUTC.map(JSONValue.string) ?? .null,
       "sources": .array(
-        sources.sorted { $0.name < $1.name }.map { source in
+        provenance.sources.map { source in
           .object([
             "artifactId": .string(source.artifactID),
             "name": .string(source.name),

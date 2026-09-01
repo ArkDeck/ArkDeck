@@ -64,10 +64,32 @@ final class ArtifactResourcesContractTests: XCTestCase {
       createdAtUTC: now, initialRecordData: record.durableData())
     return try owner("job", id)
   }
-  private func publish(_ owner: ArtifactOwnerReference, name: String = "fixture.txt", bytes: Data = Data("fixture-content".utf8), privacy: CatalogArtifactPrivacy = .standard) async throws -> RuntimeArtifactMetadata {
-    try await artifacts.publish(.init(jobID: owner.id, sessionID: "fixture-session", stepID: "fixture-step", name: name,
-      mediaType: "text/plain", privacy: privacy, retentionClass: .default, sourceOperation: "observe.device@1", providerID: "hdc",
-      bindingSnapshot: .init(targetID: "TGT-fixture", bindingRevision: 1, stableIdentitySHA256: nil), contents: bytes))
+  private func publish(
+    _ owner: ArtifactOwnerReference,
+    name: String = "fixture.txt",
+    mediaType: String = "text/plain",
+    bytes: Data = Data("fixture-content".utf8),
+    privacy: CatalogArtifactPrivacy = .standard,
+    sourceOperation: String = "observe.device@1"
+  ) async throws -> RuntimeArtifactMetadata {
+    try await artifacts.publish(
+      .init(
+        jobID: owner.id, sessionID: "fixture-session", stepID: "fixture-step", name: name,
+        mediaType: mediaType, privacy: privacy, retentionClass: .default,
+        sourceOperation: sourceOperation, providerID: "hdc",
+        bindingSnapshot: .init(
+          targetID: "TGT-fixture", bindingRevision: 1, stableIdentitySHA256: nil), contents: bytes))
+  }
+
+  private func png(width: Int, height: Int) -> Data {
+    var bytes: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]
+    for value in [width, height] {
+      bytes.append(UInt8((value >> 24) & 0xff))
+      bytes.append(UInt8((value >> 16) & 0xff))
+      bytes.append(UInt8((value >> 8) & 0xff))
+      bytes.append(UInt8(value & 0xff))
+    }
+    return Data(bytes)
   }
   private func imported(bytes: Data, kind: String = "hap", name: String = "fixture.hap") async throws -> (ArtifactOwnerReference, String) {
     let intent = try ArtifactImportIntent(["schemaVersion": .string(ArtifactImportIntent.schemaVersion),
@@ -103,7 +125,7 @@ final class ArtifactResourcesContractTests: XCTestCase {
     try output.close(); return (process.terminationStatus, try Data(contentsOf: path))
   }
   private func result(_ response: (Int32, Data)) throws -> JSONValue {
-    XCTAssertEqual(response.0, 0)
+    XCTAssertEqual(response.0, 0, String(decoding: response.1, as: UTF8.self))
     return try XCTUnwrap(object(CLIStrictJSON.decode(response.1))["result"])
   }
   private func code(_ response: (Int32, Data)) throws -> String {
@@ -121,6 +143,72 @@ final class ArtifactResourcesContractTests: XCTestCase {
     return path
   }
 
+  func testUIDumpOfflineInspectionUsesExactVerifiedArtifactsThroughTheRealCLIProcess() async throws
+  {
+    let job = try seedJob("job-ui-dump")
+    let screenshot = png(width: 100, height: 100)
+    let tree = Data(
+      #"{"attributes":{"id":"root","type":"Page","bounds":"[0,0][100,100]","hitTestBehavior":"HitTestMode.Transparent"},"children":[{"attributes":{"id":"button","type":"Button","bounds":"[10,10][30,30]","clickable":true},"children":[]}] }"#
+        .utf8)
+    _ = try await publish(
+      job, name: UIDumpOfflineInspector.screenshotArtifactName,
+      mediaType: UIDumpOfflineInspector.screenshotMediaType, bytes: screenshot,
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    _ = try await publish(
+      job, name: UIDumpOfflineInspector.treeArtifactName,
+      mediaType: UIDumpOfflineInspector.treeMediaType, bytes: tree,
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+
+    let inspected = try object(result(cli(["ui-dump", "inspect", "--job", job.id])))
+    XCTAssertEqual(
+      inspected["schemaVersion"], .string(UIDumpOfflineInspection.schemaVersion))
+    let derivation = try object(XCTUnwrap(inspected["derivation"]))
+    XCTAssertEqual(derivation["kind"], .string("offlineDerived"))
+    XCTAssertEqual(derivation["parser"], .string(UIDumpOfflineInspector.parserID))
+    guard case .array(let sources)? = derivation["sources"] else {
+      return XCTFail("inspection must publish its exact source set")
+    }
+    XCTAssertEqual(
+      try sources.map { try text(object($0)["name"]) },
+      ["screenshot.png", "ui-tree.json"])
+
+    let hit = try object(
+      result(
+        cli([
+          "ui-dump", "hit-test", "--job", job.id, "--x", "20", "--y", "20",
+        ])))
+    XCTAssertEqual(hit["schemaVersion"], .string(UIDumpOfflineHitTest.schemaVersion))
+    XCTAssertEqual(try object(XCTUnwrap(hit["node"]))["deviceId"], .string("button"))
+
+    let decoy = try seedJob("job-ui-dump-decoy")
+    _ = try await publish(
+      decoy, name: "alternate.png", mediaType: UIDumpOfflineInspector.screenshotMediaType,
+      bytes: screenshot, privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    _ = try await publish(
+      decoy, name: UIDumpOfflineInspector.treeArtifactName,
+      mediaType: UIDumpOfflineInspector.treeMediaType, bytes: tree,
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    XCTAssertEqual(
+      try code(cli(["ui-dump", "inspect", "--job", decoy.id])),
+      "resourceNotFound",
+      "an arbitrary PNG must not impersonate the screenshot role")
+
+    let corrupted = try seedJob("job-ui-dump-corrupted")
+    let product = try await publish(
+      corrupted, name: UIDumpOfflineInspector.screenshotArtifactName,
+      mediaType: UIDumpOfflineInspector.screenshotMediaType, bytes: screenshot,
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    _ = try await publish(
+      corrupted, name: UIDumpOfflineInspector.treeArtifactName,
+      mediaType: UIDumpOfflineInspector.treeMediaType, bytes: tree,
+      privacy: .sensitive, sourceOperation: "capture.diagnostics@1")
+    let stored = root.appending(path: "artifacts/\(corrupted.id)/\(product.artifactID)")
+    XCTAssertEqual(chmod(stored.path, 0o600), 0)
+    try Data(repeating: 0x78, count: screenshot.count).write(to: stored)
+    XCTAssertEqual(
+      try code(cli(["ui-dump", "inspect", "--job", corrupted.id])),
+      "artifactIntegrityFailed")
+  }
   func testCLIJobAndImportOwnersAreDistinctAndReleasedInputRemainsReadable() async throws {
     let job = try seedJob(); let product = try await publish(job)
     let metadata = try ArtifactResourceProjection(result(cli(["artifact", "inspect", "--job", job.id, "--artifact", product.artifactID, "--require-protocol", "2"])))

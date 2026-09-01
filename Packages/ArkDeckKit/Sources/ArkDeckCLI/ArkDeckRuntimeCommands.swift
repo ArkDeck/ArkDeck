@@ -2733,40 +2733,52 @@ params))
   /// answer to "the Runtime stopped feeding me" is not a truncated document
   /// that looks complete.
   static func readWholeArtifact(
-    jobID: String, artifactID: String, expectedByteCount: Int, session: CLIRuntimeSession
+    owner: ArtifactOwnerReference,
+    artifactID: String,
+    expectedByteCount: Int,
+    expectedDigest: String,
+    session: CLIRuntimeSession
   ) throws -> Data {
     var bytes = Data()
     var offset = 0
     while true {
-      let page = try session.request(
-        "artifact.read",
-        [
-          "jobId": .string(jobID), "artifactId": .string(artifactID),
-          "offset": .integer(Int64(offset)),
-        ])
-      guard case .object(let fields) = page, case .string(let base64)? = fields["base64"],
-        let chunk = Data(base64Encoded: base64)
+      let page: ArtifactReadProjection
+      do {
+        page = try ArtifactReadProjection(
+          session.request(
+            "artifact.read",
+            [
+              "owner": owner.value, "artifactId": .string(artifactID),
+              "offset": .integer(Int64(offset)),
+              "maxBytes": .integer(Int64(ArtifactReadProjection.maximumBytes)),
+              // UI dump products are sensitive by contract. Choosing the explicit
+              // inspect/hit-test command is the opt-in to read this exact capture;
+              // no unrelated Artifact is selected or exposed.
+              "allowSensitive": .bool(true),
+            ]))
+      } catch let failure as AgentExecutionControlFailure {
+        throw session.fail(
+          CLIErrorCode(rawValue: failure.code) ?? .recordUnreadable,
+          failure.message)
+      }
+      guard page.artifactID == artifactID,
+        page.digest == expectedDigest,
+        page.totalByteCount == expectedByteCount,
+        page.offset == offset
       else {
         throw session.fail(
-          .recordUnreadable, "artifact \(artifactID) returned no readable bytes at \(offset)")
+          .recordUnreadable,
+          "artifact \(artifactID) returned a range for different immutable metadata")
       }
-      bytes.append(chunk)
-      let reachedEnd = fields["eof"] == .bool(true)
-      guard case .integer(let next)? = fields["nextOffset"] else {
-        throw session.fail(
-          .recordUnreadable, "artifact \(artifactID) returned no next offset")
-      }
-      if reachedEnd { break }
-      guard Int(next) > offset else {
+      bytes.append(page.bytes)
+      if page.nextOffset == page.totalByteCount { break }
+      guard page.nextOffset > offset else {
         throw session.fail(
           .recordUnreadable,
           "artifact \(artifactID) stopped advancing at \(offset) without reporting eof")
       }
-      offset = Int(next)
+      offset = page.nextOffset
     }
-    // The digest is checked by the caller; this only refuses a read that
-    // disagrees with the size the index published, which is the cheap half of
-    // "these are the bytes you think they are".
     guard bytes.count == expectedByteCount else {
       throw session.fail(
         .artifactIntegrityFailed,
@@ -2786,50 +2798,63 @@ params))
   static func emitUIDumpDerivation(
     _ subcommand: String, rest: [String], session: CLIRuntimeSession
   ) throws {
+    var session = session
     let options = try CLIOptions(rest)
     guard let jobID = options.value("--job") else {
       throw CLIError(exitCode: EX_USAGE, message: "ui-dump \(subcommand) requires --job <id>")
     }
-    guard case .array(let entries) = try session.request(
-      "artifact.list", ["jobId": .string(jobID)])
-    else {
-      throw session.fail(.recordUnreadable, "job \(jobID) published no readable artifact list")
+    let owner: ArtifactOwnerReference
+    do {
+      owner = try ArtifactOwnerReference(
+        .object(["kind": .string("job"), "id": .string(jobID)]))
+    } catch let failure as AgentExecutionControlFailure {
+      throw session.fail(.invalidInput, failure.message)
     }
+    try session.negotiate(requiredMajor: 2, forMethod: "artifact.list")
 
-    func entry(named name: String) -> [String: JSONValue]? {
-      for case .object(let fields) in entries
-      where fields["name"] == .string(name) && fields["status"] == .string("published") {
-        return fields
-      }
-      return nil
-    }
-    func firstEntry(mediaType: String) -> [String: JSONValue]? {
-      for case .object(let fields) in entries
-      where fields["mediaType"] == .string(mediaType)
-        && fields["status"] == .string("published") {
-        return fields
-      }
-      return nil
-    }
-    func source(_ fields: [String: JSONValue]) throws -> CLIOfflineDerivation.Source {
-      guard case .string(let artifactID)? = fields["artifactId"],
-        case .string(let name)? = fields["name"],
-        case .string(let mediaType)? = fields["mediaType"],
-        case .string(let sha256)? = fields["sha256"],
-        case .integer(let byteCount)? = fields["byteCount"]
-      else {
+    var entries: [JSONValue] = []
+    var cursor: String?
+    var snapshotRevision: String?
+    var seenCursors = Set<String>()
+    repeat {
+      var params: [String: JSONValue] = [
+        "owner": owner.value, "pageSize": .integer(1_000),
+      ]
+      if let cursor { params["cursor"] = .string(cursor) }
+      let page = try session.request("artifact.list", params)
+      do {
+        try ArtifactResourceProjection.validatePage(page, owner: owner, pageSize: 1_000)
+      } catch let failure as AgentExecutionControlFailure {
         throw session.fail(
-          .recordUnreadable, "job \(jobID) published an artifact this build cannot read")
+          CLIErrorCode(rawValue: failure.code) ?? .recordUnreadable,
+          failure.message)
       }
-      return CLIOfflineDerivation.Source(
-        artifactID: artifactID, name: name, mediaType: mediaType, sha256: sha256,
-        byteCount: Int(byteCount))
-    }
+      guard case .object(let fields) = page,
+        case .array(let rows)? = fields["items"],
+        case .string(let revision)? = fields["snapshotRevision"],
+        case .bool(let hasMore)? = fields["hasMore"]
+      else {
+        throw session.fail(.recordUnreadable, "job \(jobID) returned no readable Artifact page")
+      }
+      guard snapshotRevision == nil || snapshotRevision == revision else {
+        throw session.fail(.factsDrifted, "job \(jobID) Artifact snapshot changed while paging")
+      }
+      snapshotRevision = revision
+      entries.append(contentsOf: rows)
+      guard entries.count <= 64_000 else {
+        throw session.fail(.recordUnreadable, "job \(jobID) Artifact inventory exceeds its read bound")
+      }
+      if hasMore {
+        guard case .string(let next)? = fields["nextCursor"], seenCursors.insert(next).inserted
+        else {
+          throw session.fail(.recordUnreadable, "job \(jobID) Artifact pagination stopped advancing")
+        }
+        cursor = next
+      } else {
+        cursor = nil
+      }
+    } while cursor != nil
 
-    // Two different facts, told apart. An unknown job and a job that published
-    // nothing both come back as an empty list, and neither of them is "this
-    // capture has no tree" — saying the latter would send someone looking for
-    // a missing artifact in a job that was never a capture, or never existed.
     guard !entries.isEmpty else {
       throw session.fail(
         .resourceNotFound,
@@ -2837,76 +2862,168 @@ params))
           + "reached a terminal state",
         details: ["jobId": .string(jobID)])
     }
-    guard let treeFields = entry(named: CLIOfflineDerivation.treeArtifactName) else {
+
+    func entry(named name: String, mediaType: String) throws -> [String: JSONValue]? {
+      let matches = entries.compactMap { value -> [String: JSONValue]? in
+        guard case .object(let fields) = value,
+          fields["name"] == .string(name)
+        else { return nil }
+        return fields
+      }
+      guard matches.count <= 1 else {
+        throw session.fail(
+          .recordUnreadable,
+          "job \(jobID) published duplicate `\(name)` Artifacts")
+      }
+      guard let fields = matches.first else { return nil }
+      guard fields["status"] == .string("published"),
+        fields["mediaType"] == .string(mediaType),
+        fields["privacy"] == .string("sensitive")
+      else {
+        throw session.fail(
+          .recordUnreadable,
+          "job \(jobID) published `\(name)` with invalid status, media type, or privacy")
+      }
+      return fields
+    }
+    func source(_ fields: [String: JSONValue]) throws -> UIDumpOfflineSource {
+      guard case .string(let artifactID)? = fields["artifactId"],
+        case .string(let name)? = fields["name"],
+        case .string(let mediaType)? = fields["mediaType"],
+        case .string(let sha256)? = fields["artifactDigest"],
+        case .integer(let byteCount)? = fields["byteCount"],
+        byteCount >= 0, byteCount <= Int64(Int.max)
+      else {
+        throw session.fail(
+          .recordUnreadable, "job \(jobID) published an artifact this build cannot read")
+      }
+      do {
+        return try UIDumpOfflineSource(
+          artifactID: artifactID, name: name, mediaType: mediaType, sha256: sha256,
+          byteCount: Int(byteCount))
+      } catch {
+        throw session.fail(
+          .recordUnreadable,
+          "job \(jobID) published invalid metadata for `\(name)`")
+      }
+    }
+
+    guard
+      let treeFields = try entry(
+        named: UIDumpOfflineInspector.treeArtifactName,
+        mediaType: UIDumpOfflineInspector.treeMediaType)
+    else {
       throw session.fail(
         .resourceNotFound,
-        "job \(jobID) published no `\(CLIOfflineDerivation.treeArtifactName)`, so it is "
+        "job \(jobID) published no `\(UIDumpOfflineInspector.treeArtifactName)`, so it is "
           + "not a UI dump capture",
         details: ["jobId": .string(jobID)])
     }
-    guard let screenshotFields = firstEntry(
-      mediaType: CLIOfflineDerivation.screenshotMediaType)
+    guard
+      let screenshotFields = try entry(
+        named: UIDumpOfflineInspector.screenshotArtifactName,
+        mediaType: UIDumpOfflineInspector.screenshotMediaType)
     else {
       throw session.fail(
         .resourceNotFound, "job \(jobID) published no screenshot to derive against",
         details: ["jobId": .string(jobID)])
     }
-    let rawDumpFields = entry(named: CLIOfflineDerivation.rawDumpArtifactName)
+    let rawDumpFields = try entry(
+      named: UIDumpOfflineInspector.rawDumpArtifactName,
+      mediaType: UIDumpOfflineInspector.rawDumpMediaType)
 
     let tree = try source(treeFields)
     let screenshot = try source(screenshotFields)
     let rawDump = try rawDumpFields.map(source)
 
+    var expectedBytes = 0
+    for item in [tree, screenshot] + (rawDump.map { [$0] } ?? []) {
+      let sum = expectedBytes.addingReportingOverflow(item.byteCount)
+      guard !sum.overflow,
+        sum.partialValue <= UIDumpOfflineInspector.maximumCaptureBytes
+      else {
+        throw session.fail(
+          .recordUnreadable,
+          "job \(jobID) UI dump exceeds the bounded offline inspection size")
+      }
+      expectedBytes = sum.partialValue
+    }
+
     let treeData = try readWholeArtifact(
-      jobID: jobID, artifactID: tree.artifactID, expectedByteCount: tree.byteCount,
-      session: session)
+      owner: owner, artifactID: tree.artifactID, expectedByteCount: tree.byteCount,
+      expectedDigest: tree.sha256, session: session)
     let screenshotData = try readWholeArtifact(
-      jobID: jobID, artifactID: screenshot.artifactID,
-      expectedByteCount: screenshot.byteCount, session: session)
+      owner: owner, artifactID: screenshot.artifactID,
+      expectedByteCount: screenshot.byteCount, expectedDigest: screenshot.sha256,
+      session: session)
     let rawDumpData = try rawDump.map {
       try readWholeArtifact(
-        jobID: jobID, artifactID: $0.artifactID, expectedByteCount: $0.byteCount,
-        session: session)
+        owner: owner, artifactID: $0.artifactID, expectedByteCount: $0.byteCount,
+        expectedDigest: $0.sha256, session: session)
     }
 
     var targetID = ""
-    if case .string(let value)? = screenshotFields["targetId"] { targetID = value }
+    var bindingFields: [String: JSONValue] = [:]
+    if case .object(let value)? = screenshotFields["binding"] { bindingFields = value }
+    if case .string(let value)? = bindingFields["targetId"] { targetID = value }
     var bindingRevision = 0
-    if case .integer(let value)? = screenshotFields["bindingRevision"] {
+    if case .integer(let value)? = bindingFields["bindingRevision"] {
       bindingRevision = Int(value)
     }
     var observedFromUTC: String?
-    if case .string(let value)? = screenshotFields["observedFromUtc"] { observedFromUTC = value }
+    var observationFields: [String: JSONValue] = [:]
+    if case .object(let value)? = screenshotFields["observationWindow"] {
+      observationFields = value
+    }
+    if case .string(let value)? = observationFields["startUtc"] { observedFromUTC = value }
     var observedToUTC: String?
-    if case .string(let value)? = screenshotFields["observedToUtc"] { observedToUTC = value }
+    if case .string(let value)? = observationFields["endUtc"] { observedToUTC = value }
 
-    let capture: ViewerCapture
+    let inspector = UIDumpOfflineInspector()
+    let inspection: UIDumpOfflineInspection
     do {
-      capture = try ViewerCaptureParser.parse(
-        screenshotData: screenshotData,
-        treeData: treeData,
-        rawDumpData: rawDumpData,
-        identity: ViewerCaptureIdentity(
-          jobID: jobID, targetID: targetID, bindingRevision: bindingRevision,
-          // The window the capture was taken in, not when the bytes were
-          // filed: a reader deciding whether this is a given moment needs the
-          // former, and `createdAtUtc` answers the latter.
-          capturedAtUTC: observedToUTC ?? observedFromUTC ?? ""))
+      inspection = try inspector.inspect(
+        UIDumpOfflineCaptureInput(
+          identity: ViewerCaptureIdentity(
+            jobID: jobID, targetID: targetID, bindingRevision: bindingRevision,
+            // The window the capture was taken in, not when the bytes were
+            // filed: a reader deciding whether this is a given moment needs the
+            // former, and `createdAtUtc` answers the latter.
+            capturedAtUTC: observedToUTC ?? observedFromUTC ?? ""),
+          screenshot: try UIDumpOfflineArtifact(source: screenshot, data: screenshotData),
+          tree: try UIDumpOfflineArtifact(source: tree, data: treeData),
+          rawDump: try rawDump.map { source in
+            try UIDumpOfflineArtifact(source: source, data: rawDumpData ?? Data())
+          },
+          observedFromUTC: observedFromUTC,
+          observedToUTC: observedToUTC))
+    } catch UIDumpOfflineInspectorError.sourceByteCountMismatch(let name) {
+      throw session.fail(
+        .artifactIntegrityFailed,
+        "artifact `\(name)` byte count does not match its Runtime metadata",
+        details: ["jobId": .string(jobID)])
+    } catch UIDumpOfflineInspectorError.sourceDigestMismatch(let name) {
+      throw session.fail(
+        .artifactIntegrityFailed,
+        "artifact `\(name)` SHA-256 does not match its Runtime metadata",
+        details: ["jobId": .string(jobID)])
+    } catch UIDumpOfflineInspectorError.captureTooLarge {
+      throw session.fail(
+        .recordUnreadable,
+        "job \(jobID) UI dump exceeds the bounded offline inspection size")
     } catch {
       throw session.fail(
         .recordUnreadable, "the capture artifacts did not parse: \(error)",
         details: ["jobId": .string(jobID)])
     }
 
-    let provenance = CLIOfflineDerivation.provenance(
-      sources: [tree, screenshot] + (rawDump.map { [$0] } ?? []),
-      observedFromUTC: observedFromUTC, observedToUTC: observedToUTC)
-
     switch subcommand {
     case "inspect":
       session.emit(
         .object([
-          "derivation": provenance, "capture": CLIOfflineDerivation.encode(capture: capture),
+          "schemaVersion": .string(inspection.schemaVersion),
+          "derivation": CLIOfflineDerivation.encode(provenance: inspection.provenance),
+          "capture": CLIOfflineDerivation.encode(capture: inspection.capture),
         ]))
     case "hit-test":
       guard let xText = options.value("--x"), let yText = options.value("--y"),
@@ -2919,20 +3036,23 @@ params))
       // still be inspected, and must not be hit-tested: the answer would be a
       // node chosen from coordinates nobody verified. Refusing names the
       // reason rather than returning "no node", which reads as "nothing there".
-      guard capture.coordinatesAreVerified else {
+      let hit: UIDumpOfflineHitTest
+      do {
+        hit = try inspector.hitTest(
+          inspection, x: x, y: y, rootIdentity: options.value("--root"))
+      } catch UIDumpOfflineInspectorError.coordinatesUnverified {
         throw session.fail(
           .factsDrifted,
           "this capture's coordinate mapping was never verified, so a point cannot be "
             + "resolved to a node",
           details: ["jobId": .string(jobID)])
       }
-      let hit = ViewerHitTesting.node(
-        in: capture, rootIdentity: options.value("--root"), x: x, y: y)
       session.emit(
         .object([
-          "derivation": provenance,
-          "point": .object(["x": .number(x), "y": .number(y)]),
-          "node": hit.map(CLIOfflineDerivation.encode(node:)) ?? .null,
+          "schemaVersion": .string(hit.schemaVersion),
+          "derivation": CLIOfflineDerivation.encode(provenance: hit.provenance),
+          "point": .object(["x": .number(hit.x), "y": .number(hit.y)]),
+          "node": hit.node.map(CLIOfflineDerivation.encode(node:)) ?? .null,
         ]))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported ui-dump subcommand")

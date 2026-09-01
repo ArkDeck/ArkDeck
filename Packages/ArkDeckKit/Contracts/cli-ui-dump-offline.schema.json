@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/contracts/cli-ui-dump-offline.schema.json",
+  "title": "ArkDeck CLI UI dump offline derivation",
+  "oneOf": [
+    { "$ref": "#/$defs/inspection" },
+    { "$ref": "#/$defs/hitTest" }
+  ],
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "name", "mediaType", "sha256", "byteCount"],
+      "properties": {
+        "artifactId": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "name": {
+          "type": "string",
+          "enum": ["screenshot.png", "ui-tree.json", "ui-dump.json"]
+        },
+        "mediaType": { "type": "string", "enum": ["image/png", "application/json"] },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "byteCount": { "type": "integer", "minimum": 0, "maximum": 67108864 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "name": { "const": "screenshot.png" } }, "required": ["name"] },
+          "then": { "properties": { "mediaType": { "const": "image/png" } } }
+        },
+        {
+          "if": { "properties": { "name": { "enum": ["ui-tree.json", "ui-dump.json"] } }, "required": ["name"] },
+          "then": { "properties": { "mediaType": { "const": "application/json" } } }
+        }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind", "parser", "parserVersion", "observedFromUtc", "observedToUtc", "sources"
+      ],
+      "properties": {
+        "kind": { "const": "offlineDerived" },
+        "parser": { "const": "arkdeck.viewer.ui-dump-parser" },
+        "parserVersion": { "const": "1.0.0" },
+        "observedFromUtc": { "type": ["string", "null"] },
+        "observedToUtc": { "type": ["string", "null"] },
+        "sources": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/source" },
+          "allOf": [
+            { "contains": { "properties": { "name": { "const": "screenshot.png" } }, "required": ["name"] }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "name": { "const": "ui-tree.json" } }, "required": ["name"] }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "name": { "const": "ui-dump.json" } }, "required": ["name"] }, "minContains": 0, "maxContains": 1 }
+          ]
+        }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "minimum": 0 },
+        "height": { "type": "number", "minimum": 0 }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity", "deviceId", "parentIdentity", "children", "type", "text", "inspectorId",
+        "bounds", "visible", "enabled", "clickable", "focusable", "focused", "clipsChildren",
+        "hitTestBehavior", "zIndex", "depth"
+      ],
+      "properties": {
+        "identity": { "type": "string" },
+        "deviceId": { "type": ["string", "null"] },
+        "parentIdentity": { "type": ["string", "null"] },
+        "children": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string" },
+        "text": { "type": ["string", "null"] },
+        "inspectorId": { "type": ["string", "null"] },
+        "bounds": { "oneOf": [{ "$ref": "#/$defs/bounds" }, { "type": "null" }] },
+        "visible": { "type": "boolean" },
+        "enabled": { "type": ["boolean", "null"] },
+        "clickable": { "type": ["boolean", "null"] },
+        "focusable": { "type": ["boolean", "null"] },
+        "focused": { "type": ["boolean", "null"] },
+        "clipsChildren": { "type": "boolean" },
+        "hitTestBehavior": { "type": ["string", "null"] },
+        "zIndex": { "type": ["number", "null"] },
+        "depth": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screenshot", "coordinatesAreVerified", "roots", "nodeCount", "nodes"],
+      "properties": {
+        "screenshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 0 },
+            "height": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "coordinatesAreVerified": { "type": "boolean" },
+        "roots": { "type": "array", "items": { "type": "string" } },
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "derivation", "capture"],
+      "properties": {
+        "schemaVersion": { "const": "arkdeck.ui-dump-inspection/1" },
+        "derivation": { "$ref": "#/$defs/provenance" },
+        "capture": { "$ref": "#/$defs/capture" }
+      }
+    },
+    "hitTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "derivation", "point", "node"],
+      "properties": {
+        "schemaVersion": { "const": "arkdeck.ui-dump-hit-test/1" },
+        "derivation": { "$ref": "#/$defs/provenance" },
+        "point": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0 },
+            "y": { "type": "number", "minimum": 0 }
+          }
+        },
+        "node": { "oneOf": [{ "$ref": "#/$defs/node" }, { "type": "null" }] }
+      }
+    }
+  }
+}
