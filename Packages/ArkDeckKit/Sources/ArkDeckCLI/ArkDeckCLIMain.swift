@@ -197,7 +197,7 @@ struct ArkDeckCommandLine {
             exitCode: EX_USAGE,
             message: "`trace` needs a subcommand; run `arkdeck help trace`")
         }
-        if verb == "probe" {
+        if verb == "probe" || verb == "cache" {
           try RuntimeCLI.runTrace(arguments)
         } else if verb == "export" {
           try RuntimeCLI.runArtifactResource(

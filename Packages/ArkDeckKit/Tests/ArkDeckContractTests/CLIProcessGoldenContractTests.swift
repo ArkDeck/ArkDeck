@@ -278,6 +278,7 @@ final class CLIProcessGoldenContractTests: XCTestCase {
       ["job", "status", "--job", "J-1"],
       ["job", "run", "--job", "J-1"],
       ["target", "list"],
+      ["trace", "cache", "status"],
     ] {
       let result = try run(argv + ["--socket", "/nonexistent/arkdeck-golden.sock",
         "--output", "json"])
