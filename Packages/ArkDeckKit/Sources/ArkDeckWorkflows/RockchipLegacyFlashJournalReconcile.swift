@@ -216,22 +216,29 @@ package struct RockchipLegacyFlashJournalReconciler {
   /// Production composition over the retired host's historical session and
   /// owner-only AuthorizationUsage locations.
   ///
-  /// `SessionSettingsStore` reads `UserDefaults.standard`, which is per-process:
-  /// this composition runs unsandboxed from the CLI, so it resolves the
-  /// unsandboxed default root — not whatever root the sandboxed App has stored
-  /// in its own container. That is the correct root for this reader, because it
-  /// is where the retired in-process host actually wrote, but it is correct by
-  /// coincidence rather than by construction. A custom root selected in the App
-  /// is invisible here, and any surface that needs one storage view across both
-  /// processes has to establish a shared owner first.
+  /// The selected Session root comes from the same locked, daemon-owned store
+  /// used by `runtime storage` and the Session resources. The legacy reader does
+  /// not consult process-local preferences, so a custom root remains visible to
+  /// the unsandboxed CLI without adding a second storage owner or opening a
+  /// device transport.
   public static func production() throws -> RockchipLegacyFlashJournalReconciler {
-    let sessionsRoot = try SessionSettingsStore().load().sessionsRoot
-    let applicationSupport = try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask,
-      appropriateFor: nil, create: true)
+    try production(runtimeStateDirectory: ArkDeckAgentFilesystemLayout.defaultStateDirectory())
+  }
+
+  package static func production(
+    runtimeStateDirectory: URL
+  ) throws -> RockchipLegacyFlashJournalReconciler {
+    let ownerRoot = runtimeStateDirectory.standardizedFileURL
+    let applicationSupportRoot = ownerRoot.deletingLastPathComponent()
+    let sessionStorage = try RuntimeSessionStorageStore(
+      ownerRoot: ownerRoot,
+      defaultSessionsRoot: applicationSupportRoot.appending(
+        path: "Sessions", directoryHint: .isDirectory))
+    let sessionsRoot = URL(
+      filePath: try sessionStorage.status().rootPath,
+      directoryHint: .isDirectory)
     let usageRoot =
-      applicationSupport
-      .appending(path: "ArkDeck", directoryHint: .isDirectory)
+      applicationSupportRoot
       .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
     return RockchipLegacyFlashJournalReconciler(
       sessionsRoot: sessionsRoot,

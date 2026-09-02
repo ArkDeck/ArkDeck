@@ -1589,7 +1589,7 @@ Debug template 生产投影闭合。下表只保留跨平台范围，不得在 C
 
 不阻断命令面存在，但计入 conformance 差距，必须在对应 slice 内修，不能靠文档解释掉：
 
-2026-09-03 `TASK-AIN-021` 候选闭合五类产品差距：preflight rejection 投影、USB 重插 HAR、
+2026-09-03 `TASK-AIN-021` 经 #1703/#1707 闭合五类产品差距：preflight rejection 投影、USB 重插 HAR、
 legacy Runtime workspace root 清理、派生 Job 的来源项目引用，以及 App Debug template 的 Job
 投影。current domain leaf 保留 frozen 1.x read projection，
 但在 admission boundary 上协商 2.x `job.submit` owner。同一 `workspace patch` stale
@@ -1597,14 +1597,15 @@ legacy Runtime workspace root 清理、派生 Job 的来源项目引用，以及
 并逐项发布 `phase: preAdmission`、`newDispatchCount: 0` 与 `wireCode: invalidInput`；2.x
 `job list` 的 newest Job 在调用前后保持同一 ID/时间戳。fresh exact stable-identity + binding
 proof 现在会直接解决 `physicalConnection` action，不再追加冗余 `ambiguousIdentity` action；
-终态也由合约钉为 superseded/resolved 语义。五项均不再计入下列残留；候选结论仍待维护者
-review 后进入 protected `main`。
+终态也由合约钉为 superseded/resolved 语义。五项均不再计入下列残留。
+
+同日后续候选把 `legacy flash reconcile` 的 Session 根解析切到与 `runtime storage`/Session
+resource 共用的 daemon-owned `RuntimeSessionStorageStore`；读取持有同一文件锁，不再查看 CLI
+进程自己的 `UserDefaults`。该 leaf 仍是本地历史归档读取、保持冻结参数面且零设备派发；候选
+结论待维护者 review 后进入 protected `main`。
+
 - `job list` 的 newest/oldest 分页仍以 SQLite `rowid` 作 cursor 与同 timestamp tie-break
   （`RuntimeJobRepository.listJobs`）；§7.3 compound order 未落地，Windows portable 前必须替换。
-- `legacy flash reconcile` 仍经 `RockchipLegacyFlashJournalReconciler.production()` 从
-  `SessionSettingsStore`（调用进程自己的 `UserDefaults` 副本）取 Session 根；`runtime storage` 的
-  Runtime owner 已存在，该 legacy leaf 尚未切换过去。legacy 面不计 target conformance，但这仍是
-  一条已发布 leaf 带着的缺陷。
 - 1.x 兼容 wire path 的 `artifact.read` 仍把 `maxBytes` clamp 到 1…4 MiB；2.x target handler 已按
   §7.6 拒绝越界。前者按 §12 冻结，不再修改。
 - `help device` 中 `show` 的 summary 与 `list` 相同（"list durable targets…"），registry 文案错误。
