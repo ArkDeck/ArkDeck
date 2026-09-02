@@ -87,6 +87,35 @@ public enum DiagnosticCapturePreset {
     return inputs
   }
 
+  /// The Debug workspace's bounded HiLog window, shared by the App's
+  /// `submitLogs` and `arkdeck debug logs`. Exactly the dictionary the App has
+  /// always sent: `captureHilog` stays at the descriptor default (true) and
+  /// every other leg is off, so the effective effect remains read-only.
+  public static func logs(
+    durationSeconds: Int,
+    filters: [String]
+  ) throws -> [String: JSONValue] {
+    guard (1...600).contains(durationSeconds) else {
+      throw DiagnosticCapturePresetError.invalid("durationSeconds must be in 1...600")
+    }
+    guard filters.count <= 16,
+      filters.allSatisfy(DebugTypedValueValidator.isSafeHilogComponent)
+    else {
+      throw DiagnosticCapturePresetError.invalid(
+        "hilogFilters must contain at most 16 typed component filters of at most 200 "
+          + "alphanumeric, dot, underscore, colon or hyphen characters")
+    }
+    return [
+      "durationSeconds": .integer(Int64(durationSeconds)),
+      "hilogFilters": .array(filters.map(JSONValue.string)),
+      "uiDump": .bool(false),
+      "crashLogs": .bool(false),
+      "uiScreenshot": .bool(false),
+      "uiComponentTree": .bool(false),
+      "redactionProfile": .string("standard"),
+    ]
+  }
+
   private static func base(
     uiDump: Bool,
     uiScreenshot: Bool,

@@ -998,8 +998,11 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     durationSeconds: Int,
     filters: [String]
   ) async -> DebugLogJobSubmissionResult {
-    guard (1...600).contains(durationSeconds), filters.count <= 16,
-      filters.allSatisfy(DebugTypedValueValidator.isSafeHilogComponent)
+    // The projection is owned by the shared preset so the App and
+    // `arkdeck debug logs` cannot drift; the bounds it refuses are the ones
+    // this guard used to restate.
+    guard let inputs = try? DiagnosticCapturePreset.logs(
+      durationSeconds: durationSeconds, filters: filters)
     else { return .failed("HiLog request is outside the published bounds") }
     do {
       let nonce = UUID().uuidString.lowercased()
@@ -1009,15 +1012,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
         target: DurableTargetReference(
           targetID: target.id, expectedBindingRevision: target.bindingRevision),
         operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
-        inputs: [
-          "durationSeconds": .integer(Int64(durationSeconds)),
-          "hilogFilters": .array(filters.map(JSONValue.string)),
-          "uiDump": .bool(false),
-          "crashLogs": .bool(false),
-          "uiScreenshot": .bool(false),
-          "uiComponentTree": .bool(false),
-          "redactionProfile": .string("standard"),
-        ],
+        inputs: inputs,
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeWorkspaceThread.clientContext(
           clientName: ArkDeckAgentClientName.debugLogsWorkspace, targetID: target.id))

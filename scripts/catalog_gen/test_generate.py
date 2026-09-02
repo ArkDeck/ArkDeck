@@ -50,6 +50,7 @@ class RealCatalogTests(unittest.TestCase):
                 "capture.diagnostics@1",
                 "capture.screen-sequence@1",
                 "debug.hap@1",
+                "debug.template@1",
                 "deploy.native-library.app-owned@1",
                 "flash.dayu200",
                 "flash.full-restore@1",

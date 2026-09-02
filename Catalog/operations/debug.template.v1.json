@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "debug.template",
+  "version": 1,
+  "title": "Run one approved read-only Debug command template on the bound device",
+  "provider": "hdc",
+  "effect": {
+    "minimum": "readOnly",
+    "permitted": [
+      "readOnly"
+    ]
+  },
+  "authorization": {
+    "readOnly": "defaultReadOnly"
+  },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-shared-readonly",
+  "inputs": {
+    "fields": {
+      "templateId": {
+        "type": "string",
+        "required": true,
+        "enum": [
+          "device.packageInventory",
+          "device.debugParameterRead",
+          "device.windowInventory",
+          "device.uptime"
+        ],
+        "description": "Which closed read-only template to run. The remote command tokens, output budget and title of each member are provider-owned; the caller selects an identity and never supplies command text. `arkdeck debug template list` publishes the set with its disclosures."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "templateOutput": {
+        "type": "artifactReference",
+        "required": true
+      },
+      "templateReport": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "confirm-evidence-target",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Confirms the durable binding identity against the currently observed device before the template runs; identity drift fails closed. This operation is not evidence-eligible, so no model/firmware readback is recorded."
+    },
+    {
+      "stepID": "run-debug-template",
+      "kind": "runApprovedRemoteRead",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "The provider lowers the selected template identity to its fixed remote command tokens; there is no actionRef because the template set is the closed remote vocabulary of this operation, and no caller text reaches argv."
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 120,
+  "outputByteBudget": 12582912,
+  "retry": {
+    "preflightAttempts": 2,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "template-output.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "sensitive",
+      "required": true
+    },
+    {
+      "name": "template-report.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "openharmony-standard@1",
+    "dayu200"
+  ]
+}

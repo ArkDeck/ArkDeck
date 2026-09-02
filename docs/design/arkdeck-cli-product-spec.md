@@ -3,7 +3,7 @@
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness、批准载体或平台符合性声明。
 > 状态：目标规格；文中“目标命令”不代表当前版本已经实现。
 > 规格版本：0.3（2026-09-02，§13 差距盘点按 protected `main` `d28d57a3` 重算；0.2 为
-> 2026-08-30）；盘点基线为 28 个 canonical Catalog operation、1 个 alias、
+> 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
 > local control protocol `1.0.0`。实现与验收仍必须 pin exact Catalog digest，不能只比较数量。
 > 权威边界：Constitution Safety invariants / POL-*、`PRODUCT-LOOP.md`、accepted specs、
 > contracts、当前 `Catalog/` 与 Runtime 行为高于本文。发生冲突时本文失效，不能用本文修改
@@ -388,7 +388,7 @@ materialized plan budget 或 capability expiry；其 absolute deadline、暂停�
 | `ui-dump` | `capture`, `inspect`, `hit-test`, `component-detail` | diagnostics typed preset + versioned parser；无 raw hidumper |
 | `trace` | `probe`, `capture`, `inspect`, `export` | `trace.probe` + `capture.diagnostics@1` + Artifact |
 | `analyze` | `trace`, `trace-summary`, `hilog-summary`, `crash-signature` | 四个 `analyzer.*@1` operation |
-| `debug` | `probe`, `template list/run`, `hap`, `native deploy`, `logs` | bounded debug probe RPC（CLI contract 见 `cli-debug-probe.md`）+ template list；template run 必须迁入 approved Catalog operation/Job；`debug.hap@1`、deploy/diagnostics operation |
+| `debug` | `probe`, `template list/run`, `hap`, `native deploy`, `logs` | bounded debug probe RPC（CLI contract 见 `cli-debug-probe.md`）；`template list` 是闭集模板表的本地投影、`template run` 映射 `debug.template@1`（见 `cli-debug-template.md`）；`logs` 是 `capture.diagnostics@1` 的 HiLog-only typed preset（见 `cli-debug-logs.md`）；`debug.hap@1`、deploy operation |
 | `port-forward` | `create`, `remove` | `port-forward.*@1` |
 | `flash` | `device-access`, `bootloader-status`, `prerequisites`, `lane-preview`, `bind-loader`, `run` | Flash Runtime methods + `flash.full-restore@1`；plan 使用 generic `job plan`，当前 major 的 `flash plan` 保持 tombstone；没有 legacy executor |
 | `workspace` | `project list/show/register/update/remove`, `preset list/show/register/update/remove`, `status`, `diff`, `inspect`, `read`, `isolate`, `checkpoint`, `patch`, `revert`, `build`, `test`, `sign`, `symbolize`, `sweep`, `continuation inspect/submit/run` | 注册 workspace/project/preset resource + 已发布 `workspace.*@1` operations + 从原记录构造的新 typed request/Job |
@@ -407,6 +407,7 @@ materialized plan budget 或 capability expiry；其 absolute deadline、暂停�
 | `input.long-press@1` | `input long-press` |
 | `input.swipe@1` | `input swipe` |
 | `debug.hap@1` | `debug hap` |
+| `debug.template@1` | `debug template run` |
 | `deploy.native-library.app-owned@1` | `debug native deploy` |
 | `port-forward.create@1` | `port-forward create` |
 | `port-forward.remove@1` | `port-forward remove` |
@@ -455,7 +456,7 @@ destructive intent。
 - 单帧/序列转视频是 presentation convenience；frame archive、index、时间和 digest 可读取即满足
   portable core。平台可另加 derive/export，但不能改变源 Artifact。
 
-四个 capture preset 共用 `ArkDeckWorkflows.DiagnosticCapturePreset` 作为 App/CLI 唯一输入 owner。
+五个 capture preset 共用 `ArkDeckWorkflows.DiagnosticCapturePreset` 作为 App/CLI 唯一输入 owner。
 它们继续使用通用 domain leaf 的 `--inputs-file`，但只接受各自的 descriptor 子集，并在连接 Runtime
 前拒绝其他 recipe 的字段：
 
@@ -465,6 +466,7 @@ destructive intent。
 | `ui-dump capture` | 可省略或 `{}`；固定选择 screenshot、UI dump 与 component tree |
 | `ui-dump component-detail` | 必须只含 `windowId`、`componentId` 两个 1...20 位十进制字符串 |
 | `trace capture` | 必须含 `durationSeconds`、`traceCategories`、`traceBufferKB`；仅可另带 boolean `ringBuffered` |
+| `debug logs` | 必须含 `durationSeconds`（1...600）；仅可另带 `hilogFilters`（≤16 个 typed component filter）；其余 leg 固定关闭，与 App Debug workspace 的 `submitLogs` 共用同一 preset |
 
 这组 projection 不替代完整 operation schema。需要其他 `capture.diagnostics@1` 组合的 caller 仍通过
 generic `agent run --operation capture.diagnostics@1 --inputs-file ...` 提交 descriptor-validated inputs。
@@ -1526,8 +1528,9 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `legacy flash *`、`debug start/evaluate/status`、`cleanup-debt *`、`agentd/signing/update-feed *`）；
   它们运行时在 `meta.lifecycle` 报告 `legacy|deprecated` 与 replacement，但按 §12 不计 target
   conformance。
-- Catalog：28 个 canonical operation + `flash.dayu200` alias，digest
-  `b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce`。§6.2 mapping 表中 28 个
+- Catalog：29 个 canonical operation + `flash.dayu200` alias，digest
+  `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`（本 change 发布 `debug.template@1` 后的 digest；此前为
+  `b8c7148f…`）。§6.2 mapping 表中 29 个
   canonical 均已有一等领域 leaf（registry 的 `catalogOperation` 字段即契约），alias 只保留 generic
   `job/agent --operation` 入口，符合 §6.2 的设计。
 - Slice A 已落地：declarative registry、strict parser、help/commands/completion、`--output json/jsonl`、
@@ -1538,6 +1541,8 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `human-action list/show/resume`、process-level golden 合约测试（`CLIProcessGoldenContractTests`）。
 - Slice B 已落地：`flash device-access/bootloader-status/prerequisites/lane-preview/bind-loader/run`、
   `recovery flash-invocation list/start/evaluate/status`、`debug probe/hap`、`debug native deploy`、
+  `debug template list/run`（`debug.template@1`，实现见 `cli-debug-template.md`，随 `CHG-2026-073` 交付）、
+  `debug logs`（`capture.diagnostics@1` 的 HiLog-only preset，实现见 `cli-debug-logs.md`，同随 `CHG-2026-073` 交付）、
   screen/input/diagnostics/ui-dump/trace/analyze/port-forward/workspace 的全部 convenience mapping、
   workspace project/preset lifecycle 与 `workspace continuation inspect/submit/run`、
   `artifact import *` durable lifecycle、`runtime hdc impact-preview/restart` + `control-action *`、
@@ -1560,11 +1565,9 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| `debug template list/run` | 未发布。daemon `debug.template.run` 仍直接运行 closed HDC template，没有 Job/WAL | 先由独立 approved operation change 发布 typed Catalog mapping；此前 coverage 为 `blocked`，不得用 daemon method 存在冒充 conformance | B |
-| `debug logs` | 未发布 | 随 Debug namespace 收口一并交付 | B |
 | `source *`（8 个 leaf） | 没有 namespace。§6.2 规定 source resource/integration/profile 获批前保持 unavailable | 发布 typed source resource；或由维护者裁决 remote source 为 App/平台服务并在 coverage manifest 中显式分类。§18 不接受 `blocked` | C |
 | §14 机器契约产物 | `openspec/contracts/cli-*`、`cli-feature-coverage.json`、`app-product-capability-registry.yaml`、`Tests/Fixtures/CLI/**` 均不存在；`--version` 的 `pageSchemaVersion`/`nextActionSchemaVersion` 为 `null` | `openspec/contracts/**` 不在 `TASK-AIN-021` 的 Allowed paths 内，需先定义新 Task（定义 PR 与使用 PR 分家），再在同一垂直任务内交付 generator、产物与 CI fail-closed 校验 | A |
-| GJ-1～GJ-5 的 CLI headless 闭环 | 当前 digest 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交），但没有按 `PRODUCT-LOOP.md` 四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内在当前 digest 上用 CLI 完整复跑并按四态记录 | A/B |
+| GJ-1～GJ-5 的 CLI headless 闭环 | 上一 digest `b8c7148f…` 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交）；`CHG-2026-073` 发布 `debug.template@1` 后 digest 变更，按 `PRODUCT-LOOP.md` 这些记录只证明历史，且仍没有按四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内在当前 digest 上用 CLI 完整复跑并按四态记录 | A/B |
 | Windows（Slice D） | 未开始 | 不阻断 macOS-only claim；阻断跨平台 claim | D |
 
 ### 13.3 已发布 leaf 的残留缺陷

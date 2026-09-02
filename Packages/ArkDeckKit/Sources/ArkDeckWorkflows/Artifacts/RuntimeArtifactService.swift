@@ -224,6 +224,9 @@ enum RuntimeArtifactService {
       "capture-crash-index": ["crash-index.txt"],
       "capture-crash-log": ["crash-log.txt"],
     ],
+    "debug.template@1": [
+      "run-debug-template": ["template-output.txt", "template-report.json"]
+    ],
     "debug.hap@1": [
       "package-readback": ["install-readback.json"],
       "process-readback": ["process-readback.json"],
@@ -668,7 +671,7 @@ enum RuntimeArtifactService {
       output.append(receipt.stderr)
       return output
     case "hilog.txt", "ui-dump.json", "advanced-dump.txt", "debug-hilog.txt", "post-flash-hilog.txt",
-      "crash-index.txt", "crash-log.txt":
+      "crash-index.txt", "crash-log.txt", "template-output.txt":
       // These products are the bounded bytes received from the provider.
       return receipt.stdout
     default:
