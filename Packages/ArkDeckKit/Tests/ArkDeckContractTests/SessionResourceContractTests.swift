@@ -206,6 +206,95 @@ final class SessionResourceContractTests: XCTestCase {
     XCTAssertTrue(jobs.isEmpty)
   }
 
+  func testRealCLIProcessExportsASessionThroughPreviewAndApply() async throws {
+    let sessions = try store()
+    let source = try finalizedSessionWithArtifacts(
+      id: "session-export", jobID: "job-export", month: "08",
+      timestamp: "2026-08-04T00:00:00Z")
+    let artifacts = try RuntimeArtifactStore(
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
+      quota: ArtifactQuota(totalBytes: 12_345),
+      nowUTC: { "2026-09-02T00:00:00Z" })
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc")),
+      capabilityStore: capabilities, artifactStore: artifacts,
+      nowUTC: { "2026-09-02T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-02T00:00:00Z" }, artifactStore: artifacts,
+      runtimeSessionStorage: sessions)
+    let server = AgentDaemonServer(
+      stateDirectory: root.appending(path: "control", directoryHint: .isDirectory),
+      handler: handler, nowUTC: { "2026-09-02T00:00:00Z" })
+    _ = try server.start()
+    defer { server.stop() }
+
+    let exports = root.appending(path: "exports", directoryHint: .isDirectory)
+    try ownerDirectory(exports)
+    let destination = exports.appending(path: "session-export-copy", directoryHint: .isDirectory)
+    let previewRun = try await run([
+      "session", "export", "preview", "--session", "session-export",
+      "--destination", destination.path, "--socket", server.socketURL.path,
+      "--output", "json",
+    ])
+    XCTAssertEqual(previewRun.exitCode, 0, diagnostic(previewRun))
+    let preview = try result(previewRun)
+    XCTAssertEqual(preview["schemaVersion"], .string("arkdeck.session-export-preview/1"))
+    XCTAssertEqual(preview["allowSensitive"], .bool(false))
+    XCTAssertEqual(preview["newDispatchCount"], .integer(0))
+    guard case .string(let previewID)? = preview["previewId"],
+      case .string(let previewDigest)? = preview["previewDigest"]
+    else { return XCTFail("export preview tuple is missing") }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+
+    let applyArguments = [
+      "session", "export", "apply", "--preview-id", previewID,
+      "--preview-digest", previewDigest, "--socket", server.socketURL.path,
+      "--output", "json",
+    ]
+    let applied = try await run(applyArguments)
+    XCTAssertEqual(applied.exitCode, 0, diagnostic(applied))
+    let exportResult = try result(applied)
+    XCTAssertEqual(exportResult["schemaVersion"], .string("arkdeck.session-export-result/1"))
+    XCTAssertEqual(exportResult["sourceArtifactIds"], .array([.string("artifact-log")]))
+    XCTAssertEqual(exportResult["excludedArtifactIds"], .array([.string("artifact-raw")]))
+    XCTAssertEqual(exportResult["evidenceClass"], .string("derivedExport"))
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: destination.appending(path: "manifest.json").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: destination.appending(path: "artifacts/log/hilog.txt").path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: destination.appending(path: "artifacts/raw/device.bin").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: source.appending(path: "artifacts/raw/device.bin").path),
+      "export must not move or delete source Artifacts")
+
+    let receiptRetry = try await run(applyArguments)
+    XCTAssertEqual(receiptRetry.exitCode, 0, diagnostic(receiptRetry))
+    XCTAssertEqual(try result(receiptRetry), exportResult)
+    XCTAssertEqual(
+      try FileManager.default.contentsOfDirectory(atPath: exports.path), ["session-export-copy"])
+
+    let stale = try await run(applyArguments.map { $0 == previewDigest ? String(repeating: "0", count: 64) : $0 })
+    XCTAssertEqual(stale.exitCode, 65, diagnostic(stale))
+    let staleError = try error(stale)
+    XCTAssertEqual(staleError["code"], .string("resourceConflict"))
+    let staleDetails = try object(staleError["details"])
+    XCTAssertEqual(staleDetails["phase"], .string("sessionOwner"))
+    XCTAssertEqual(staleDetails["newDispatchCount"], .integer(0))
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
   func testParserPublishesClosedSessionResourceArguments() {
     XCTAssertNotNil(
       CLIArgumentParser.parse([
@@ -242,6 +331,36 @@ final class SessionResourceContractTests: XCTestCase {
         "--preview-digest", String(repeating: "A", count: 64),
       ]).failure)
     XCTAssertNotNil(CLIArgumentParser.parse(["session", "cleanup", "confirm"]).failure)
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "export", "preview", "--session", "session-1",
+        "--destination", "/private/tmp/session-1-export", "--allow-sensitive",
+      ]).success)
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "export", "preview", "--session", "session-1",
+      ]).failure, "the destination is part of the preview contract")
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "export", "apply",
+        "--preview-id", "abcdefab-cdef-4abc-8abc-abcdefabcdef",
+        "--preview-digest", String(repeating: "a", count: 64),
+      ]).success)
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "export", "apply",
+        "--preview-id", "abcdefab-cdef-4abc-8abc-abcdefabcdef",
+        "--preview-digest", String(repeating: "a", count: 64),
+        "--allow-sensitive",
+      ]).failure, "privacy is chosen at preview and bound by its digest")
+    XCTAssertNotNil(
+      CLIArgumentParser.parse([
+        "session", "export", "apply",
+        "--preview-id", "abcdefab-cdef-4abc-8abc-abcdefabcdef",
+        "--preview-digest", String(repeating: "a", count: 64),
+        "--destination", "/private/tmp/elsewhere",
+      ]).failure, "apply publishes the exact preview and names no destination of its own")
+    XCTAssertNotNil(CLIArgumentParser.parse(["session", "export", "confirm"]).failure)
   }
 
   func testUnaccountedContentCannotBeHiddenByAPartialSessionList() throws {
@@ -302,6 +421,50 @@ final class SessionResourceContractTests: XCTestCase {
     try ownerFile(
       Data(repeating: 0x53, count: bytes),
       at: session.appending(path: "payload.bin"))
+    return session
+  }
+
+  /// A finalized Session with one sensitive raw Artifact and one log
+  /// Artifact, so the export path exercises both privacy dispositions.
+  private func finalizedSessionWithArtifacts(
+    id: String, jobID: String, month: String, timestamp: String
+  ) throws -> URL {
+    let session = sessionsRoot
+      .appending(path: "2026", directoryHint: .isDirectory)
+      .appending(path: month, directoryHint: .isDirectory)
+      .appending(path: id, directoryHint: .isDirectory)
+    try ownerDirectory(session)
+    try ownerFile(
+      try CanonicalJSONEncoders.canonical().encode(
+        JSONValue.object([
+          "schemaVersion": .string("1.0.0"),
+          "sessionId": .string(id),
+          "jobId": .string(jobID),
+        ])),
+      at: session.appending(path: ".session-identity.json"))
+    let rawBytes = Data("device-secret-payload".utf8)
+    let logBytes = Data("09-02 00:00:00.000 I fixture: hilog line\n".utf8)
+    let rawPath = "artifacts/raw/device.bin"
+    let logPath = "artifacts/log/hilog.txt"
+    for (relative, bytes) in [(rawPath, rawBytes), (logPath, logBytes)] {
+      let file = session.appending(path: relative)
+      try ownerDirectory(file.deletingLastPathComponent())
+      try ownerFile(bytes, at: file)
+    }
+    let artifacts = [
+      try ArtifactRecord(
+        id: "artifact-log", role: .log, origin: "fixture",
+        relativePath: logPath, size: UInt64(logBytes.count),
+        sha256: SHA256Hex.string(of: logBytes), mediaType: "text/plain"),
+      try ArtifactRecord(
+        id: "artifact-raw", role: .raw, origin: "fixture",
+        relativePath: rawPath, size: UInt64(rawBytes.count),
+        sha256: SHA256Hex.string(of: rawBytes), mediaType: "application/octet-stream"),
+    ]
+    try ownerFile(
+      try SessionStorageFixtures.manifest(
+        sessionID: id, jobID: jobID, timestamp: timestamp, artifacts: artifacts),
+      at: session.appending(path: "manifest.json"))
     return session
   }
 

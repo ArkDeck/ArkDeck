@@ -7,6 +7,10 @@ extension RuntimeCLI {
       try runSessionCleanup(Array(arguments.dropFirst()))
       return
     }
+    if arguments.first == "export" {
+      try runSessionExport(Array(arguments.dropFirst()))
+      return
+    }
     guard let verb = arguments.first,
       ["list", "show", "pin", "unpin"].contains(verb)
     else {
@@ -238,6 +242,201 @@ extension RuntimeCLI {
       guard priorKey.map({ $0 < key }) ?? true else { throw fail() }
       priorKey = key
     }
+  }
+
+  private static func runSessionExport(_ arguments: [String]) throws {
+    guard let verb = arguments.first, ["preview", "apply"].contains(verb) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing session export subcommand (preview|apply)")
+    }
+    var rest = Array(arguments.dropFirst())
+    var session = runtimeSession(&rest, command: "session.export.\(verb)")
+    // Only preview declares `--allow-sensitive`; the registry parser has
+    // already refused it on apply, so this cannot smuggle a privacy choice
+    // past the digest-bound preview.
+    let allowSensitive = verb == "preview" && rest.contains("--allow-sensitive")
+    let options = try CLIOptions(rest.filter { $0 != "--allow-sensitive" })
+    let method = "session.export.\(verb)"
+    try session.negotiate(requiredMajor: 2, forMethod: method)
+    var fields: [String: JSONValue] = [:]
+    if verb == "preview" {
+      guard let sessionID = options.value("--session"),
+        AgentExecutionIntent.validIdentifier(sessionID)
+      else {
+        throw session.fail(
+          .invalidInput, "Session export preview requires one bounded Session identity")
+      }
+      // The owner proves the parent, its volume and the absence of the
+      // destination; the client only refuses a shape that can never be an
+      // absolute bounded host path, so a typo fails before a connection.
+      guard let destination = options.value("--destination"),
+        destination.hasPrefix("/"), destination.utf8.count <= 4 * 1_024,
+        destination == destination.trimmingCharacters(in: .whitespacesAndNewlines),
+        !destination.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+      else {
+        throw session.fail(
+          .invalidInput, "Session export preview requires one bounded absolute destination path")
+      }
+      fields = [
+        "sessionId": .string(sessionID),
+        "destinationPath": .string(destination),
+        "allowSensitive": .bool(allowSensitive),
+      ]
+    } else {
+      guard let previewID = options.value("--preview-id"),
+        let uuid = UUID(uuidString: previewID),
+        uuid.uuidString.lowercased() == previewID,
+        let digest = options.value("--preview-digest"),
+        SHA256Hex.isLowercaseSHA256(digest)
+      else {
+        throw session.fail(.invalidInput, "Session export apply requires one exact preview tuple")
+      }
+      fields = ["previewId": .string(previewID), "previewDigest": .string(digest)]
+    }
+    let result = try session.request(method, fields)
+    if verb == "preview" {
+      try validateSessionExportPreview(result, session: session)
+    } else {
+      try validateSessionExportResult(result, session: session)
+    }
+    session.emit(result)
+  }
+
+  private static let exportArtifactRoles: Set<String> = [
+    "raw", "derived", "log", "plan", "diagnostic", "partial",
+  ]
+
+  private static func validateSessionExportPreview(
+    _ value: JSONValue,
+    session: CLIRuntimeSession
+  ) throws {
+    func fail() -> CLIRegistryError {
+      session.fail(.recordUnreadable, "the Runtime returned an invalid Session export preview")
+    }
+    guard case .object(let fields) = value,
+      Set(fields.keys) == [
+        "schemaVersion", "previewId", "previewDigest", "digestAlgorithm", "sessionId",
+        "generation", "policyGeneration", "createdAtUtc", "expiresAtUtc",
+        "confirmationRequired", "allowSensitive", "sensitiveDefaultExcluded",
+        "deviceIdentifierPolicy", "estimatedBytes", "destination", "artifacts",
+        "newDispatchCount",
+      ],
+      fields["schemaVersion"] == .string("arkdeck.session-export-preview/1"),
+      fields["digestAlgorithm"] == .string("sha256-jcs"),
+      fields["confirmationRequired"] == .bool(true),
+      fields["sensitiveDefaultExcluded"] == .bool(true),
+      fields["deviceIdentifierPolicy"] == .string("redact"),
+      fields["newDispatchCount"] == .integer(0),
+      case .string(let previewID)? = fields["previewId"],
+      let uuid = UUID(uuidString: previewID), uuid.uuidString.lowercased() == previewID,
+      case .string(let digest)? = fields["previewDigest"], SHA256Hex.isLowercaseSHA256(digest),
+      case .string(let sessionID)? = fields["sessionId"],
+      AgentExecutionIntent.validIdentifier(sessionID),
+      canonicalDecimal(fields["generation"]) != nil,
+      let policyGeneration = canonicalDecimal(fields["policyGeneration"]), policyGeneration > 0,
+      case .string(let createdText)? = fields["createdAtUtc"],
+      let created = ISO8601Timestamps.parseCanonicalPlain(createdText),
+      case .string(let expiresText)? = fields["expiresAtUtc"],
+      let expires = ISO8601Timestamps.parseCanonicalPlain(expiresText), expires > created,
+      case .bool(let allowSensitive)? = fields["allowSensitive"],
+      let estimated = canonicalDecimal(fields["estimatedBytes"]),
+      case .object(let destination)? = fields["destination"],
+      Set(destination.keys) == [
+        "path", "parentDevice", "parentInode", "volumeIdentity", "expectedState",
+      ],
+      case .string(let path)? = destination["path"], path.hasPrefix("/"),
+      canonicalDecimal(destination["parentDevice"]) != nil,
+      canonicalDecimal(destination["parentInode"]) != nil,
+      case .string(let volume)? = destination["volumeIdentity"], !volume.isEmpty,
+      destination["expectedState"] == .string("absent"),
+      case .array(let rows)? = fields["artifacts"]
+    else { throw fail() }
+    var priorID: String?
+    var includedBytes: UInt64 = 0
+    for row in rows {
+      guard case .object(let artifact) = row,
+        Set(artifact.keys) == [
+          "artifactId", "artifactDigest", "byteCount", "role", "privacy", "disposition",
+          "transformation",
+        ],
+        case .string(let artifactID)? = artifact["artifactId"],
+        AgentExecutionIntent.validIdentifier(artifactID),
+        priorID.map({ $0.utf8.lexicographicallyPrecedes(artifactID.utf8) }) ?? true,
+        case .string(let artifactDigest)? = artifact["artifactDigest"],
+        SHA256Hex.isLowercaseSHA256(artifactDigest),
+        let bytes = canonicalDecimal(artifact["byteCount"]),
+        case .string(let role)? = artifact["role"], exportArtifactRoles.contains(role),
+        case .string(let privacy)? = artifact["privacy"],
+        ["sensitive", "unknown"].contains(privacy),
+        (["raw", "partial"].contains(role)) == (privacy == "sensitive"),
+        case .string(let disposition)? = artifact["disposition"],
+        ["include", "excludeByDefault"].contains(disposition),
+        case .string(let transformation)? = artifact["transformation"],
+        (disposition == "include") == (transformation == "redactDeviceIdentifiers"),
+        (disposition == "excludeByDefault") == (transformation == "excluded"),
+        // The privacy default is the contract: a sensitive row is included
+        // exactly when the caller opted in, and nothing else is ever excluded.
+        (disposition == "include") == (allowSensitive || privacy != "sensitive")
+      else { throw fail() }
+      priorID = artifactID
+      if disposition == "include" {
+        let sum = includedBytes.addingReportingOverflow(bytes)
+        guard !sum.overflow else { throw fail() }
+        includedBytes = sum.partialValue
+      }
+    }
+    guard includedBytes <= estimated else { throw fail() }
+    var digestFields = fields
+    digestFields.removeValue(forKey: "previewDigest")
+    guard SHA256Hex.string(
+      of: try PortableCanonicalJSON.canonicalBytes(.object(digestFields))) == digest
+    else { throw fail() }
+  }
+
+  private static func validateSessionExportResult(
+    _ value: JSONValue,
+    session: CLIRuntimeSession
+  ) throws {
+    func fail() -> CLIRegistryError {
+      session.fail(.recordUnreadable, "the Runtime returned an invalid Session export result")
+    }
+    func identifiers(_ value: JSONValue?) throws -> [String] {
+      guard case .array(let rows)? = value else { throw fail() }
+      let ids = try rows.map { row -> String in
+        guard case .string(let id) = row, AgentExecutionIntent.validIdentifier(id) else {
+          throw fail()
+        }
+        return id
+      }
+      guard ids == ids.sorted(), Set(ids).count == ids.count else { throw fail() }
+      return ids
+    }
+    guard case .object(let fields) = value,
+      Set(fields.keys) == [
+        "schemaVersion", "previewId", "previewDigest", "sessionId", "generation",
+        "resultGeneration", "publishedAtUtc", "exportedPath", "sourceArtifactIds",
+        "excludedArtifactIds", "deviceIdentifierPolicy", "evidenceClass", "newDispatchCount",
+      ],
+      fields["schemaVersion"] == .string("arkdeck.session-export-result/1"),
+      fields["deviceIdentifierPolicy"] == .string("redact"),
+      fields["evidenceClass"] == .string("derivedExport"),
+      fields["newDispatchCount"] == .integer(0),
+      case .string(let previewID)? = fields["previewId"],
+      let uuid = UUID(uuidString: previewID), uuid.uuidString.lowercased() == previewID,
+      case .string(let digest)? = fields["previewDigest"], SHA256Hex.isLowercaseSHA256(digest),
+      case .string(let sessionID)? = fields["sessionId"],
+      AgentExecutionIntent.validIdentifier(sessionID),
+      let generation = canonicalDecimal(fields["generation"]),
+      let resultGeneration = canonicalDecimal(fields["resultGeneration"]),
+      resultGeneration >= generation,
+      case .string(let publishedText)? = fields["publishedAtUtc"],
+      ISO8601Timestamps.parseCanonicalPlain(publishedText) != nil,
+      case .string(let exportedPath)? = fields["exportedPath"], exportedPath.hasPrefix("/")
+    else { throw fail() }
+    let included = try identifiers(fields["sourceArtifactIds"])
+    let excluded = try identifiers(fields["excludedArtifactIds"])
+    guard Set(included).isDisjoint(with: excluded) else { throw fail() }
   }
 
   private static func canonicalDecimal(_ value: JSONValue?) -> UInt64? {

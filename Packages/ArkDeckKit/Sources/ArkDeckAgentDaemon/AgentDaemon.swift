@@ -377,7 +377,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return await RuntimeStorageResourceHandler(
         sessions: runtimeSessionStorage, artifacts: artifactStore
       ).response(request)
-    case "session.list", "session.show", "session.pin", "session.unpin", "session.cleanup.preview", "session.cleanup.apply":
+    case "session.list", "session.show", "session.pin", "session.unpin", "session.cleanup.preview", "session.cleanup.apply", "session.export.preview", "session.export.apply":
       return await RuntimeSessionResourceHandler(
         storage: runtimeSessionStorage,
         activeSessionIDs: { await engine.activeSessionIDsForRetention() })

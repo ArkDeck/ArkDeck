@@ -60,6 +60,22 @@ package struct SessionRetentionCatalogArtifact: Equatable, Sendable {
   package let role: String
   package let byteCount: UInt64
   package let sha256: String
+  package let origin: String
+  package let relativePath: String
+  package let mediaType: String?
+  package let derivedFrom: [String]?
+
+  package var record: ArtifactRecord {
+    get throws {
+      guard let role = ArtifactRole(rawValue: role) else {
+        throw SessionRetentionCatalogError.metadataCorrupt
+      }
+      return try ArtifactRecord(
+        id: artifactID, role: role, origin: origin,
+        relativePath: relativePath, size: byteCount, sha256: sha256,
+        mediaType: mediaType, derivedFrom: derivedFrom)
+    }
+  }
 }
 
 package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
@@ -72,6 +88,9 @@ package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   public let rootIdentity: SessionCatalogRootIdentity
   public let volumeIdentity: VolumeIdentity
   package let artifactsBySession: [String: [SessionRetentionCatalogArtifact]]
+  package let artifactRecordsBySession: [String: [ArtifactRecord]]
+  package let jobIDBySession: [String: String]
+  package let manifestByteCountBySession: [String: UInt64]
 
   public var pinnedBytes: UInt64 {
     sessions.filter(\.isPinned).reduce(UInt64(0)) {
@@ -377,6 +396,24 @@ package struct SessionRetentionCatalog: Sendable {
           retainedIDs.contains(session.sessionID)
             ? (session.sessionID, session.artifacts)
             : nil
+        }),
+      artifactRecordsBySession: Dictionary(
+        uniqueKeysWithValues: scannedSessions.compactMap { session in
+          retainedIDs.contains(session.sessionID)
+            ? (session.sessionID, session.artifactRecords)
+            : nil
+        }),
+      jobIDBySession: Dictionary(
+        uniqueKeysWithValues: scannedSessions.compactMap { session in
+          retainedIDs.contains(session.sessionID)
+            ? (session.sessionID, session.jobID)
+            : nil
+        }),
+      manifestByteCountBySession: Dictionary(
+        uniqueKeysWithValues: scannedSessions.compactMap { session in
+          retainedIDs.contains(session.sessionID)
+            ? (session.sessionID, session.manifestByteCount)
+            : nil
         }))
   }
 
@@ -505,12 +542,16 @@ package struct SessionRetentionCatalog: Sendable {
       .appending(path: sessionID, directoryHint: .isDirectory)
     return ScannedSession(
       sessionID: sessionID, root: root, sizeBytes: size,
-      completedAt: manifest.completedAt,
+      completedAt: manifest.completedAt, jobID: manifest.jobID,
+      manifestByteCount: UInt64(manifestData.count),
       artifacts: manifest.artifacts.map {
         SessionRetentionCatalogArtifact(
           artifactID: $0.id, role: $0.role.rawValue,
-          byteCount: $0.size, sha256: $0.sha256)
-      }.sorted { $0.artifactID < $1.artifactID })
+          byteCount: $0.size, sha256: $0.sha256,
+          origin: $0.origin, relativePath: $0.relativePath,
+          mediaType: $0.mediaType, derivedFrom: $0.derivedFrom)
+      }.sorted { $0.artifactID < $1.artifactID },
+      artifactRecords: manifest.artifacts)
   }
 
   private func recordUnknown(
@@ -1045,7 +1086,10 @@ private struct ScannedSession {
   let root: URL
   let sizeBytes: UInt64
   let completedAt: Date
+  let jobID: String
+  let manifestByteCount: UInt64
   let artifacts: [SessionRetentionCatalogArtifact]
+  let artifactRecords: [ArtifactRecord]
 }
 
 private struct ScannedTree {

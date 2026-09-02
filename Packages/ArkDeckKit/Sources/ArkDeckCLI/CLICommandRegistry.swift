@@ -1736,6 +1736,47 @@ enum CLICommandRegistry {
             ]),
             connectsToRuntime: true),
         ]),
+      CLINodeSpec(
+        token: "export",
+        summary: "generation-bound derived export of one finalized Session",
+        leaves: [
+          CLILeafSpec(
+            token: "preview",
+            canonicalCommand: "session.export.preview",
+            summary:
+              "persist the exact Artifacts, privacy dispositions and destination facts one export would publish",
+            options: runtimeClientOptions([
+              CLIOptionSpec(
+                name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+                summary: "exact Session identity", isRequired: true),
+              CLIOptionSpec(
+                name: "--destination",
+                form: .value(placeholder: "new-directory", grammar: .opaque),
+                summary: "absent host directory the export will create; its parent must exist",
+                isRequired: true),
+              allowSensitiveOption,
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "apply",
+            canonicalCommand: "session.export.apply",
+            summary: "publish one unexpired export preview without a separate confirmation token",
+            options: runtimeClientOptions([
+              CLIOptionSpec(
+                name: "--preview-id",
+                form: .value(placeholder: "id", grammar: .opaque),
+                summary: "exact immutable export preview identity",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--preview-digest",
+                form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+                summary: "exact canonical export preview digest",
+                isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+        ]),
     ])
 
   private static let historyNode = CLINodeSpec(

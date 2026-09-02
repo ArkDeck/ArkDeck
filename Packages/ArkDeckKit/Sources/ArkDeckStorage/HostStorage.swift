@@ -562,6 +562,39 @@ package struct StorageClaim: Equatable, @unchecked Sendable {
     self.configurationToken = configurationToken
   }
 
+  /// Creates one process-local, bounded claim for exporting an already
+  /// finalized Session to an external host volume. This claim cannot publish
+  /// into Session storage and is not evidence that it created or owns the
+  /// source Session; the caller must separately hold and revalidate the exact
+  /// finalized catalog snapshot.
+  package static func finalizedSessionExport(
+    jobID: String,
+    destinationSnapshot: HostStorageSnapshot,
+    maximumGrowthBytes: UInt64
+  ) throws -> StorageClaim {
+    guard !destinationSnapshot.isReadOnly else {
+      throw SessionStorageError.volumeUnavailable("export destination is read-only")
+    }
+    let metadataHeadroom: UInt64 = 64 * 1_024
+    let finalizationHeadroom: UInt64 = 64 * 1_024
+    let budget = try StorageBudget(
+      metadataHeadroomBytes: metadataHeadroom,
+      finalizationHeadroomBytes: finalizationHeadroom,
+      remainingGrowthBytes: maximumGrowthBytes,
+      writerClass: .heavy)
+    guard budget.totalSoftClaimBytes <= destinationSnapshot.availableBytes else {
+      throw SessionStorageError.insufficientSpace(
+        required: budget.totalSoftClaimBytes,
+        available: destinationSnapshot.availableBytes)
+    }
+    let request = try StorageClaimRequest(
+      claimID: "session-export-\(UUID().uuidString.lowercased())",
+      jobID: jobID,
+      volumeIdentity: destinationSnapshot.volumeIdentity,
+      budget: budget)
+    return StorageClaim(request: request)
+  }
+
   package var remainingGrowthBytes: UInt64 { permit.remainingGrowth() }
 
   package var totalSoftClaimBytes: UInt64 {

@@ -175,8 +175,9 @@ final class AgentXPCTransportContractTests: XCTestCase {
       "Settings may mutate only the generation-bound Runtime storage resource")
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableSessionMethods,
-      ["session.cleanup.apply", "session.cleanup.preview", "session.list", "session.pin",
-        "session.show", "session.unpin"],
+      ["session.cleanup.apply", "session.cleanup.preview", "session.export.apply",
+        "session.export.preview", "session.list", "session.pin", "session.show",
+        "session.unpin"],
       "Session access must remain on the closed Runtime catalog owner")
     XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
@@ -269,6 +270,44 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "previewId": .string(cleanupID), "previewDigest": .string(cleanupDigest),
         "confirmation": .string("yes"),
       ]))
+
+    XCTAssertEqual(
+      try admission("session.export.preview", [
+        "sessionId": .string("session-1"),
+        "destinationPath": .string("/private/tmp/session-1-export"),
+        "allowSensitive": .bool(false),
+      ]),
+      .direct(method: "session.export.preview"))
+    XCTAssertNil(
+      try admission("session.export.preview", [
+        "sessionId": .string("session-1"),
+        "destinationPath": .string("relative/export"),
+        "allowSensitive": .bool(false),
+      ]),
+      "the destination must be an absolute host path")
+    XCTAssertNil(
+      try admission("session.export.preview", [
+        "sessionId": .string("session-1"),
+        "destinationPath": .string("/private/tmp/session-1-export"),
+      ]),
+      "the privacy choice is part of the closed preview vocabulary")
+    XCTAssertNil(
+      try admission("session.export.preview", [
+        "sessionId": .string("session-1"),
+        "destinationPath": .string("/private/tmp/session-1-export"),
+        "allowSensitive": .bool(true), "overwrite": .bool(true),
+      ]))
+    XCTAssertEqual(
+      try admission("session.export.apply", [
+        "previewId": .string(cleanupID), "previewDigest": .string(cleanupDigest),
+      ]),
+      .direct(method: "session.export.apply"))
+    XCTAssertNil(
+      try admission("session.export.apply", [
+        "previewId": .string(cleanupID), "previewDigest": .string(cleanupDigest),
+        "destinationPath": .string("/private/tmp/session-1-export"),
+      ]),
+      "apply publishes the exact preview; it accepts no destination of its own")
 
     XCTAssertEqual(try admission("session.list"), .direct(method: "session.list"))
     XCTAssertEqual(
