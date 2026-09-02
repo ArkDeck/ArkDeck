@@ -48,6 +48,58 @@ enum RuntimeJobSQLiteTestSupport {
     }
   }
 
+  static func rewriteAsSchemaV1(stateDirectory: URL) throws {
+    let databaseURL = stateDirectory.appending(path: "runtime-jobs.sqlite3")
+    var database: OpaquePointer?
+    let openCode = sqlite3_open_v2(
+      databaseURL.path, &database,
+      SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil)
+    guard openCode == SQLITE_OK, let database else {
+      throw failure("cannot open Runtime job test database", code: openCode)
+    }
+    defer { sqlite3_close_v2(database) }
+    sqlite3_busy_timeout(database, 5_000)
+    var message: UnsafeMutablePointer<CChar>?
+    let code = sqlite3_exec(
+      database,
+      """
+      BEGIN IMMEDIATE;
+      DROP INDEX runtime_job_created_idx;
+      DROP INDEX runtime_job_updated_idx;
+      ALTER TABLE runtime_job RENAME TO runtime_job_v2;
+      CREATE TABLE runtime_job(
+        job_id TEXT PRIMARY KEY,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        request_hash TEXT NOT NULL,
+        state TEXT NOT NULL,
+        created_at_utc TEXT NOT NULL,
+        updated_at_utc TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK(version >= 1),
+        initial_record_json BLOB
+      );
+      INSERT INTO runtime_job(
+        job_id, idempotency_key, request_hash, state, created_at_utc,
+        updated_at_utc, version, initial_record_json
+      )
+      SELECT job_id, idempotency_key, request_hash, state, created_at_utc,
+        updated_at_utc, version, initial_record_json
+      FROM runtime_job_v2;
+      DROP TABLE runtime_job_v2;
+      CREATE INDEX runtime_job_updated_idx
+        ON runtime_job(updated_at_utc DESC, job_id);
+      PRAGMA user_version=1;
+      COMMIT;
+      """,
+      nil, nil, &message)
+    guard code == SQLITE_OK else {
+      let detail = message.map { String(cString: $0) }
+      if let message { sqlite3_free(message) }
+      throw failure(
+        "cannot rewrite Runtime job test database as v1: \(detail ?? "unknown")",
+        code: code)
+    }
+  }
+
   private static func failure(_ message: String, code: Int32) -> NSError {
     NSError(
       domain: "RuntimeJobSQLiteTestSupport", code: Int(code),

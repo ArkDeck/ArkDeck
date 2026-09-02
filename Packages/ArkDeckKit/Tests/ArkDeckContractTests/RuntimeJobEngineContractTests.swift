@@ -715,16 +715,19 @@ final class RuntimeJobEngineContractTests: XCTestCase {
           observeRequest(
             idempotencyKey: "idem-history-page-\(index)", requestID: "req-history-page-\(index)")))
     }
+    let orderedIDs = accepted.map(\.jobID).sorted {
+      $0.utf8.lexicographicallyPrecedes($1.utf8)
+    }
     let first = try await engine.listJobs(pageSize: 2)
-    XCTAssertEqual(first.jobs.map(\.jobID), accepted.prefix(2).map(\.jobID))
+    XCTAssertEqual(first.jobs.map(\.jobID), Array(orderedIDs.prefix(2)))
     XCTAssertNotNil(first.nextCursor)
     let second = try await engine.listJobs(pageSize: 2, cursor: first.nextCursor)
-    XCTAssertEqual(second.jobs.map(\.jobID), accepted.suffix(1).map(\.jobID))
+    XCTAssertEqual(second.jobs.map(\.jobID), Array(orderedIDs.suffix(1)))
     XCTAssertNil(second.nextCursor)
 
     let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let historical = try await reopened.listJobs(pageSize: 3)
-    XCTAssertEqual(historical.jobs.map(\.jobID), accepted.map(\.jobID))
+    XCTAssertEqual(historical.jobs.map(\.jobID), orderedIDs)
     let status = try await reopened.status(jobID: accepted[2].jobID)
     XCTAssertEqual(status.state, "preflight")
   }
@@ -740,19 +743,112 @@ final class RuntimeJobEngineContractTests: XCTestCase {
             requestID: "req-current-history-\(index)")))
     }
     try await engine.requestCancel(jobID: accepted[2].jobID)
+    let orderedIDs = accepted.map(\.jobID).sorted {
+      $0.utf8.lexicographicallyPrecedes($1.utf8)
+    }
 
     let first = try await engine.listJobs(pageSize: 1, newestFirst: true)
-    XCTAssertEqual(first.jobs.map(\.jobID), [accepted[2].jobID])
+    XCTAssertEqual(first.jobs.map(\.jobID), [orderedIDs[0]])
     XCTAssertNotNil(first.nextCursor)
     let second = try await engine.listJobs(
       pageSize: 1, cursor: first.nextCursor, newestFirst: true)
-    XCTAssertEqual(second.jobs.map(\.jobID), [accepted[1].jobID])
+    XCTAssertEqual(second.jobs.map(\.jobID), [orderedIDs[1]])
 
     let current = try await engine.listCurrentJobs()
     XCTAssertEqual(Set(current.map(\.jobID)), Set(accepted.prefix(2).map(\.jobID)))
     XCTAssertTrue(
       current.contains { $0.jobID == accepted[0].jobID },
       "an older non-terminal Job must not disappear behind the newest page")
+  }
+
+  func testRepositoryPagesByParsedCreationInstantThenASCIIJobIDAcrossRestart() throws {
+    let repository = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let record = Data("{}".utf8)
+    for (jobID, timestamp) in [
+      ("job-z", "2026-08-03T00:00:00.100Z"),
+      ("job-earlier", "2026-08-03T00:00:00Z"),
+      ("job-a", "2026-08-03T00:00:00.100+00:00"),
+    ] {
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: jobID, idempotencyKey: "idem-\(jobID)", requestHash: "hash-\(jobID)",
+          initialState: JobState.preflight.rawValue, createdAtUTC: timestamp,
+          initialRecordData: record),
+        .admitted)
+    }
+
+    let oldestFirst = try repository.listJobs(pageSize: 1, cursor: nil)
+    XCTAssertEqual(oldestFirst.jobs.map(\.jobID), ["job-earlier"])
+    let oldestCursor = try XCTUnwrap(oldestFirst.nextCursor)
+    XCTAssertFalse(oldestCursor.contains("job-earlier"), "the logical key must remain opaque")
+
+    let reopened = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let secondOldest = try reopened.listJobs(pageSize: 1, cursor: oldestCursor)
+    XCTAssertEqual(secondOldest.jobs.map(\.jobID), ["job-a"])
+    let lastOldest = try reopened.listJobs(
+      pageSize: 1, cursor: try XCTUnwrap(secondOldest.nextCursor))
+    XCTAssertEqual(lastOldest.jobs.map(\.jobID), ["job-z"])
+    XCTAssertNil(lastOldest.nextCursor)
+
+    let newestFirst = try reopened.listJobs(pageSize: 1, cursor: nil, newestFirst: true)
+    XCTAssertEqual(newestFirst.jobs.map(\.jobID), ["job-a"])
+    let newestCursor = try XCTUnwrap(newestFirst.nextCursor)
+    let secondNewest = try reopened.listJobs(
+      pageSize: 1, cursor: newestCursor, newestFirst: true)
+    XCTAssertEqual(secondNewest.jobs.map(\.jobID), ["job-z"])
+    let lastNewest = try reopened.listJobs(
+      pageSize: 1, cursor: try XCTUnwrap(secondNewest.nextCursor), newestFirst: true)
+    XCTAssertEqual(lastNewest.jobs.map(\.jobID), ["job-earlier"])
+    XCTAssertNil(lastNewest.nextCursor)
+
+    XCTAssertThrowsError(
+      try reopened.listJobs(pageSize: 1, cursor: newestCursor, newestFirst: false)
+    ) { error in
+      guard case RuntimeJobRepositoryError.corrupt(let detail) = error else {
+        return XCTFail("expected corrupt cursor, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("cursor"), detail)
+    }
+  }
+
+  func testSchemaV1HistoryMigratesToLogicalCreationOrderIncludingLegacyRows() throws {
+    do {
+      let repository = try RuntimeJobRepository(stateDirectory: stateDirectory)
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: "job-current", idempotencyKey: "idem-current", requestHash: "hash-current",
+          initialState: JobState.preflight.rawValue,
+          createdAtUTC: "2026-08-03T00:00:00.100Z", initialRecordData: Data("{}".utf8)),
+        .admitted)
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: "job-legacy", idempotencyKey: "idem-legacy", requestHash: "hash-legacy",
+          initialState: JobState.succeeded.rawValue,
+          createdAtUTC: RuntimePersistedJob.legacyCreatedAtUTC,
+          initialRecordData: Data(
+            #"{"createdAtUTC":"2026-08-03T00:00:00Z"}"#.utf8)),
+        .admitted)
+    }
+    try RuntimeJobSQLiteTestSupport.rewriteAsSchemaV1(stateDirectory: stateDirectory)
+
+    let migrated = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let page = try migrated.listJobs(pageSize: 10, cursor: nil)
+    XCTAssertEqual(page.jobs.map(\.jobID), ["job-legacy", "job-current"])
+    XCTAssertEqual(page.jobs.first?.createdAtUTC, RuntimePersistedJob.legacyCreatedAtUTC)
+    XCTAssertNil(page.nextCursor)
+
+    XCTAssertEqual(
+      try migrated.admit(
+        jobID: "job-after", idempotencyKey: "idem-after", requestHash: "hash-after",
+        initialState: JobState.preflight.rawValue,
+        createdAtUTC: "2026-08-03T00:00:01Z", initialRecordData: Data("{}".utf8)),
+      .admitted)
+    let legacyFirst = try migrated.listLegacyJobs(pageSize: 2, cursor: nil)
+    XCTAssertEqual(legacyFirst.jobs.map(\.jobID), ["job-current", "job-legacy"])
+    let legacyLast = try migrated.listLegacyJobs(
+      pageSize: 2, cursor: try XCTUnwrap(legacyFirst.nextCursor))
+    XCTAssertEqual(legacyLast.jobs.map(\.jobID), ["job-after"])
+    XCTAssertNil(legacyLast.nextCursor)
   }
 
   func testUnreadablePersistedRecordIsDistinctFromMissingAcrossHistoryReads() async throws {
@@ -1000,12 +1096,12 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       pageSize: 3, cursor: nil, newestFirst: true)
     XCTAssertEqual(
       newest.jobs.map(\.jobID),
-      ["job-history-09999", "job-history-09998", "job-history-09997"])
+      ["job-history-00000", "job-history-00001", "job-history-00002"])
     let older = try repository.listJobs(
       pageSize: 3, cursor: newest.nextCursor, newestFirst: true)
     XCTAssertEqual(
       older.jobs.map(\.jobID),
-      ["job-history-09996", "job-history-09995", "job-history-09994"])
+      ["job-history-00003", "job-history-00004", "job-history-00005"])
   }
 
   func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {

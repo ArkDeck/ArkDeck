@@ -1090,7 +1090,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         {
           let options = try Self.jobListOptions(
             request.params, acceptsCursor: false, acceptsCurrent: false)
-          let page = try await engine.listJobs(
+          let page = try await engine.listLegacyJobs(
             pageSize: options.pageSize, newestFirst: options.newestFirst)
           return success(
             id: request.id,
@@ -1115,7 +1115,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         let options = try Self.jobListOptions(
           request.params, acceptsCursor: true, acceptsCurrent: true)
-        let page = try await engine.listJobs(
+        let page = try await engine.listLegacyJobs(
           pageSize: options.pageSize, cursor: options.cursor,
           newestFirst: options.newestFirst)
         let current = options.includeCurrent ? try await engine.listCurrentJobs() : []
