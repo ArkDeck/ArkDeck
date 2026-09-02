@@ -1474,6 +1474,7 @@ major 保留”只表示 explicit legacy compatibility，不能满足 target mac
 | `agentd ...` | `runtime service ...` | 当前 major 保留 alias，human 模式警告；下一 major tombstone |
 | `agentd install/update --hdc/--daemon <path>` | `runtime tool register` + `runtime bundle register`，再传 typed refs | compatibility reader 先做同等 hash/trust 校验；新 service contract 不消费 caller path |
 | `agentd install --workspace-project/--deveco-sdk <path>` | `workspace project register` + registered toolchain ref + `workspace preset register` | compatibility reader 可完成一次 bounded migration；target service install 不持有 raw project/SDK flags |
+| `agentd update` 省略 `--workspace-project/--deveco-sdk` | `runtime service update` + Runtime-owned workspace resources | legacy 拼写在当前 major 保留已安装 path pair；target 拼写省略 pair 时移除 legacy LaunchAgent 注入，显式 paired paths 仍可完成兼容周期；两者均不删除已注册 project/preset |
 | `signing ...` | `runtime signing ...` | 同上 |
 | `update-feed ...` | `maintainer update-feed ...` | 同上；仍是 platform/maintainer extension |
 | `device list` | `target list` | 当前 major 保留 exact 1.x target-array legacy result 且不计 target conformance；下一 CLI/registry major 为 `commandRemoved` tombstone，绝不静默改成 candidate list/page |

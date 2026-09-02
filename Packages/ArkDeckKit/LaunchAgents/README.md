@@ -112,7 +112,10 @@ arkdeck runtime service install --hdc /absolute/path/to/hdc \
 `entry/src/main/module.json5`，SDK 必须包含 `default/openharmony`。安装器把现有
 `demo-app` profile、SDK、`/usr/bin/grep` inspector 和同一已安装 daemon 的 analyzer 路径
 固化进用户 LaunchAgent，并在 `status` 中检查配置漂移。`update` 未重述这两个参数时保留
-已安装值；不会从 `PATH`、当前目录或 Terminal 环境猜测。
+已安装值的行为只冻结在 legacy `agentd update` 兼容拼写中。当前
+`runtime service update` 未重述这两个参数时会移除这组 legacy LaunchAgent 注入；显式同时传入
+两项仍可在兼容期重新选择。该迁移不会删除 `workspace project register` / `workspace preset
+register` 管理的 Runtime-owned 资源，也不会从 `PATH`、当前目录或 Terminal 环境猜测替代值。
 
 project 不得位于 `~/Desktop`、`~/Documents` 或 `~/Downloads`。这些目录由 macOS
 隐私/TCC 按可执行身份授权：Terminal 中可读不代表独立 LaunchAgent 可读，后台枚举还可能

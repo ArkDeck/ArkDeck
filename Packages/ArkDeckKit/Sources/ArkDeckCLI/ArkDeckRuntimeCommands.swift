@@ -348,9 +348,17 @@ enum RuntimeCLI {
         }
         hdcPath = configuredHDC
       }
-      let workspaceProject =
-        options.value("--workspace-project") ?? previousStatus?.workspaceProjectPath
-      let devecoSDK = options.value("--deveco-sdk") ?? previousStatus?.devecoSDKPath
+      // The frozen `agentd update` compatibility spelling keeps the legacy
+      // path pair when the caller omits it. The current `runtime service
+      // update` spelling is the bounded migration out of that configuration:
+      // omission removes the injected ProjectProfile while explicit paired
+      // paths can still complete the compatibility cycle. Runtime-owned
+      // workspace project/preset resources are durable and are not deleted.
+      let preservesLegacyWorkspace = canonicalPrefix == "agentd"
+      let workspaceProject = options.value("--workspace-project")
+        ?? (preservesLegacyWorkspace ? previousStatus?.workspaceProjectPath : nil)
+      let devecoSDK = options.value("--deveco-sdk")
+        ?? (preservesLegacyWorkspace ? previousStatus?.devecoSDKPath : nil)
       guard (workspaceProject == nil) == (devecoSDK == nil) else {
         throw CLIError(
           exitCode: EX_USAGE,
