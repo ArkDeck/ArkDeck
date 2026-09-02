@@ -53,6 +53,13 @@ operation 全部 `available`；HDC status 报告一个 `normal` 的 DAYU200。di
 （`runtime bundle register` → `runtime service update` → `runtime service verify`）更新到
 protected `main` 的 Runtime，再继续；这一步不是 Journey 的一部分。
 
+若 `runtime service status` 仍报告 `workspaceProjectPath` / `devecoSDKPath`，它们是旧版
+LaunchAgent 注入，不是当前 Runtime-owned workspace 注册。用当前拼写执行一次
+`arkdeck runtime service update --output json`（需要替换 helper 时同时传已验证的 `--daemon`），
+省略这两个 legacy path 参数；更新回执和 status 应不再含这两个字段，`workspace project list`
+及 `workspace preset list --project <ref>` 的注册资源必须保持不变。冻结的 `agentd update` 省略
+参数时仍保留旧值，只用于兼容验证，不能用来完成这项迁移。
+
 输入物料（放在 `/private/tmp/arkdeck-gj-headless-<date>/inputs/`）：
 
 - GJ-2：已签名单入口 HAP（08-28 记录用的同一包可复用），`bundleName`/`abilityName`；

@@ -234,9 +234,15 @@ OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.t
   不可用、sign 步骤 validator 钉常量、durable-history 校验在 77 行 legacy 行与 4 个旧 digest
   `waitingForRecovery` Job 上 fail-closed（PR #1699）；DevEco 自动签名凭据无法 headless 安装
   （PR #1700，`runtime signing install --build-profile`）。
+- Runtime service legacy workspace 清理：2026-09-02 用同一 Team provisioned 的本机候选执行
+  当前 `runtime service update`，省略 workspace/SDK path 后回执与 status 均不再含旧根，plist 的
+  5 个 workspace/analyzer 环境键全部消失；服务保持 ready、digest 不变、HDC/ArkTrace/ArkForge
+  identity 不变。`demo-app` 与 build/signing preset 仍为 active，target/binding 仍为
+  `TGT-958780b2ffb7` / r4，最新 Job 仍是更新前的
+  `job-cf76e61adb789f8b2bda5172a490d803`，4 个 `waitingForRecovery` unknown-outcome 历史原样保留。
+  legacy `agentd update` 的 omission-preserves 行为由 compatibility test 冻结。
 
-残留（不阻塞四态，记入 §13.3 候选）：`runtime service update` 无法清除 legacy
-`--workspace-project` 根；项目移除的 durable 引用扫描按字面 projectRef 匹配，隔离副本上的
+残留（不阻塞四态，记入 §13.3 候选）：项目移除的 durable 引用扫描按字面 projectRef 匹配，隔离副本上的
 非终态 Job 不会锁住来源项目；preflight rejection（如 `workspace.revisionConflict`）没有发布 §8.4 结构化零派发证据，domain leaf
 把 `rejected(invalidInput, …)` receipt 以 `ok:true`/`terminalState: rejected` 返回并降级为 exit 1（§9 应为 65/77），零派发只能由台账 diff 证明；`install-sdk-release` 装的样例 release
 凭据对设备不可信（`code:9568329`），可用凭据是 DevEco 为该 bundle 签发、device-ids 含本机
