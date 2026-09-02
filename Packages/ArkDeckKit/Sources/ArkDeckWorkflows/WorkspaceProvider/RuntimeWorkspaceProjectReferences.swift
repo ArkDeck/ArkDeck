@@ -10,7 +10,10 @@ extension RuntimeAdmissionService {
   /// Runs while the registration owner excludes in-flight materialization.
   /// A Job whose initial record is durable is therefore visible here before
   /// its short-lived owner token is released, closing the remove/admit race.
-  func requireNoActiveWorkspaceProjectReference(_ projectRef: String) throws {
+  func requireNoActiveWorkspaceProjectReference(
+    _ projectRef: String,
+    resolveRegistrationProjectRef: (String) -> String? = { _ in nil }
+  ) throws {
     try forEachJob { persisted in
       guard let data = persisted.initialRecordData,
         let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data),
@@ -46,7 +49,15 @@ extension RuntimeAdmissionService {
         }
         referencedProject = durable
       }
-      if referencedProject == projectRef {
+      // A Runtime-owned isolated copy is named by its derived projectRef in
+      // the request, but its registration, preset pins and removal protection
+      // belong to the source project. Admission uses this same provider-owned
+      // mapping before making the Job durable; the durable-reference scan must
+      // reuse it after the short-lived use token has been released. Unknown
+      // legacy/stale references keep the conservative literal comparison.
+      let registrationProject =
+        resolveRegistrationProjectRef(referencedProject) ?? referencedProject
+      if registrationProject == projectRef {
         throw RuntimeWorkspaceProjectFailure(
           "resourceConflict", "workspace project is referenced by an active or uncertain Job")
       }
