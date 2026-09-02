@@ -802,7 +802,8 @@ package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
       symbolPresets: try rebasedMap(source.symbolPresets),
       signingPresets: source.signingPresets,
       allowsLegacySigningPresetFallback: source.allowsLegacySigningPresetFallback,
-      buildProducts: source.buildProducts, kind: .evolution)
+      buildProducts: source.buildProducts, kind: .evolution,
+      sourceProjectRef: source.projectRef)
   }
 
   private static func rebase(_ value: String, from source: String, to destination: String) -> String

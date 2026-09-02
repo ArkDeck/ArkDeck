@@ -1369,9 +1369,19 @@ public actor RuntimeJobEngine {
       else { return nil }
       return value
     }
+    // A Runtime-owned isolated copy is registered nowhere: it is derived from
+    // a registered project and lives under the Runtime state directory. Its
+    // Jobs acquire the *source* registration, because the preset and
+    // toolchain pins, the generation guard and the removal protection belong
+    // to the tree it was copied from. Authorization still sees the copy for
+    // what it is (`workspaceIsIsolatedTaskCopy`); only the registration
+    // lookup is redirected. An unknown reference stays refused below.
+    let registration =
+      providers.provider(id: descriptor.provider.rawValue)?
+        .workspaceRegistrationProjectRef(for: projectRef) ?? projectRef
     do {
       return try workspaceProjectStore.acquireUse(
-        projectRef: projectRef, presetRefs: presetRefs)
+        projectRef: registration, presetRefs: presetRefs)
     }
     catch let failure as RuntimeWorkspaceProjectFailure {
       let code: RuntimeOperationErrorCode
@@ -4824,7 +4834,7 @@ public actor RuntimeJobEngine {
     else {
       guard let persisted = try admissionService.boundedJob(jobID: jobID) else { throw RuntimeJobEngineError.jobNotFound(jobID) }
       record = try decodePersistedRecord(persisted)
-      guard record.state == persisted.state, record.createdAtUTC == persisted.createdAtUTC,
+      guard record.state == persisted.state, persisted.createdAtMatches(record.createdAtUTC),
         record.request.idempotencyKey == persisted.idempotencyKey, persisted.version > 0
       else { throw RuntimeJobEngineError.jobRecordUnreadable(jobID) }
     }
@@ -4866,7 +4876,7 @@ public actor RuntimeJobEngine {
       }
       try admissionService.forEachJob { persisted in
         let durable = try decodePersistedRecord(persisted)
-        guard durable.state == persisted.state, durable.createdAtUTC == persisted.createdAtUTC,
+        guard durable.state == persisted.state, persisted.createdAtMatches(durable.createdAtUTC),
           durable.request.idempotencyKey == persisted.idempotencyKey, persisted.version > 0
         else { throw RuntimeJobEngineError.jobRecordUnreadable(persisted.jobID) }
         // The default is durable history, including nonterminal records.

@@ -122,6 +122,12 @@ package struct WorkspaceProvider: DeviceProvider {
     try operations?.workspaceAuthorizationFacts(for: operation, inputs: inputs)
   }
 
+  /// Forwarded for the same reason: only the operations provider knows which
+  /// registered project a derived copy belongs to.
+  package func workspaceRegistrationProjectRef(for projectRef: String) -> String? {
+    operations?.workspaceRegistrationProjectRef(for: projectRef)
+  }
+
   package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,

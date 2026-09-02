@@ -312,7 +312,11 @@ arkdeck artifact import workspace-patch --import-request-id gj5-<date>-patch --t
   --file inputs/gj5-fix.patch --output json
 arkdeck workspace patch --target <TGT> --inputs-file gj5-patch.json --output json
 arkdeck workspace build --inputs-file gj5-build.json --output json
-arkdeck workspace sign --inputs-file gj5-sign.json --output json
+arkdeck workspace sign --target <evolution-…> --inputs-file gj5-sign.json --output json
+arkdeck artifact export --job <sign-job> --artifact <signed ART> --allow-sensitive \
+  --destination inputs/signed --output json
+arkdeck artifact import hap --import-request-id gj5-<date>-verify --target <TGT> \
+  --file inputs/signed/<signed>.hap --output json
 arkdeck debug hap --target <TGT> --inputs-file gj5-verify.json \
   --execution-id gj5-<date>-verify --output json                 # 复验：部署修补构建，一次即可
 ```
@@ -326,6 +330,21 @@ materialized request」被拒，零派发。`--target <TGT>` 不会 adopt 或 pi
 它是 Runtime 对 profile 内文件的确定性摘要（`WorkspaceProviderSupport.workspaceRevision`），
 执行者按同一算法自行计算，`workspace isolate` 的 `isolated-workspace.json` 会把
 `sourceWorkspaceRevision` 回显以供核对。
+
+修复腿的作用对象是隔离副本，不是 `demo-app` 本体：`workspace isolate` 的
+`isolated-workspace.json` 给出副本的 `projectRef`（`evolution-…`）与 `workspaceRevision`，
+后续 `workspace patch/build` 的 `projectRef` 都填这个副本引用，
+`expectedWorkspaceRevision` 填副本的 revision（副本上的 patch 必填此项）。`workspace sign`
+是 host-only、签名凭据绑定在 `demo-app` 上，所以 `gj5-sign.json` 的 `projectRef` 填 `demo-app`、
+`signingPresetRef` 填已注册的 `preset-…`，并以 `--target <evolution-…>` 指向 build 产物
+（`unsigned.hap` lease）所在的副本作用域；签出的 `signed.hap` 用 `artifact export` 落盘后
+再 `artifact import hap --target <TGT>` 才能进 `debug hap`。副本是 Runtime 自有的任务副本，E1 变更由
+Runtime 自动签发 capability；对 `demo-app` 本体的 E1 请求仍然要求显式 grant（当前没有
+安装面，故必然 `authorizationRequired`）。副本不单独注册：它的 Job 取用来源项目
+（`demo-app`）的注册、preset 与 toolchain pin，所以 `buildPresetRef`/`signingPresetRef`
+仍是 `workspace preset list --project demo-app` 里的引用。daemon 重启后副本由
+`adoptRuntimeWorkspaces` 重新登记；若副本引用解析失败，用同一 `--execution-id` 重跑
+`workspace isolate` 即可重新登记而不会再拷贝一份。
 
 负向用例（零派发）：同一补丁 lease、`expectedWorkspaceRevision` 取已被取代的 revision，
 期望 `invalidInput`（`workspace.revisionConflict`）、exit 65，`job list` 前后台账相同。

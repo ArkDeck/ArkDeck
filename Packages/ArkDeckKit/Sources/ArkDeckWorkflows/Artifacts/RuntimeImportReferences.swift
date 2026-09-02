@@ -76,6 +76,19 @@ extension RuntimeAdmissionService {
     return jobs.sorted { $0.id.utf8.lexicographicallyPrecedes($1.id.utf8) }
   }
 
+  private static func leaseShapedInputs(_ inputs: [String: JSONValue]) -> [RuntimeImportLeaseReference] {
+    var found = Set<RuntimeImportLeaseReference>()
+    func visit(_ value: JSONValue) {
+      switch value {
+      case .string(let text): if let reference = (try? RuntimeImportLeaseReference(text)) ?? nil { found.insert(reference) }
+      case .array(let values): values.forEach(visit)
+      default: break
+      }
+    }
+    inputs.values.forEach(visit)
+    return found.sorted { $0.value.utf8.lexicographicallyPrecedes($1.value.utf8) }
+  }
+
   /// Reuse exactly the release owner's durable-reference verification. This
   /// scan runs synchronously while the Artifact actor holds its observation;
   /// no asynchronous gap can separate plan holds from committed Job refs.
@@ -86,18 +99,24 @@ extension RuntimeAdmissionService {
         record.jobID == persisted.jobID, record.state == persisted.state,
         record.request.idempotencyKey == persisted.idempotencyKey,
         record.hasVerifiedSubmissionFingerprint(persisted.requestHash),
-        record.createdAtUTC == persisted.createdAtUTC, persisted.version > 0 else {
+        persisted.createdAtMatches(record.createdAtUTC), persisted.version > 0 else {
         throw AgentExecutionControlFailure("recordUnreadable", "Job references cannot be verified from durable history")
       }
       if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true { return }
-      guard record.catalogDigest == RuntimeOperationCatalog.catalogDigest,
-        record.operationReference == record.request.operation.reference,
-        let descriptor = RuntimeOperationCatalog.descriptor(reference: record.operationReference) else {
-        throw AgentExecutionControlFailure("recordUnreadable", "active Job Artifact slots have no verifiable Catalog")
-      }
       let references: [RuntimeImportLeaseReference]
-      do { references = try RuntimeImportLeaseReference.inputs(record.request.inputs, descriptor: descriptor) }
-      catch { throw AgentExecutionControlFailure("recordUnreadable", "active Job Artifact references are malformed") }
+      if record.catalogDigest == RuntimeOperationCatalog.catalogDigest,
+        record.operationReference == record.request.operation.reference,
+        let descriptor = RuntimeOperationCatalog.descriptor(reference: record.operationReference)
+      {
+        do { references = try RuntimeImportLeaseReference.inputs(record.request.inputs, descriptor: descriptor) }
+        catch { throw AgentExecutionControlFailure("recordUnreadable", "active Job Artifact references are malformed") }
+      } else {
+        // A nonterminal Job from another Catalog digest has no descriptor to
+        // type its inputs against; its inputs are still durable text. Every
+        // lease-shaped string in them counts as a live reference, which can
+        // only over-report a reference, never miss one.
+        references = Self.leaseShapedInputs(record.request.inputs)
+      }
       if references.contains(where: { $0.importID == importID }) {
         try visit(record)
       }

@@ -135,6 +135,116 @@ final class JobReadResourcesContractTests: XCTestCase {
     return values
   }
 
+  func testLegacyImporterRowsStayVerifiableInDurableHistory() async throws {
+    // The retired legacy idempotency importer wrote its rows with the
+    // `legacy` creation sentinel while the record it copied carries the real
+    // timestamp. Those rows are terminal durable history: every scan that
+    // verifies a row against its record must excuse exactly that one column,
+    // and only for that sentinel — a row whose creation column disagrees
+    // with its record for any other reason stays unreadable.
+    try admitVerifiedRow("job-current", createdAtColumn: date)
+    try admitVerifiedRow(
+      "job-legacy", recordCreatedAtUTC: "2026-08-03T16:11:54Z",
+      createdAtColumn: RuntimePersistedJob.legacyCreatedAtUTC)
+
+    let listed = try rows(await page()).compactMap { row -> String? in
+      guard case .string(let id)? = row["jobId"] else { return nil }
+      return id
+    }
+    XCTAssertEqual(Set(listed), ["job-current", "job-legacy"])
+    let read = try await engine.jobReadSnapshot(jobID: "job-legacy")
+    XCTAssertEqual(read.record.createdAtUTC, "2026-08-03T16:11:54Z")
+    let admission = try RuntimeAdmissionService(stateDirectory: state)
+    XCTAssertNoThrow(try admission.requireNoActiveWorkspacePresetReference("preset-fixture"))
+    XCTAssertNoThrow(try admission.requireNoActiveWorkspaceProjectReference("demo-app"))
+    XCTAssertNoThrow(try admission.requireNoActiveImportReference("imp-fixture"))
+
+    // Any other disagreement between the column and the record is still a
+    // corrupt row, not history.
+    try admitVerifiedRow("job-drifted", createdAtColumn: "2026-01-01T00:00:00Z")
+    do {
+      _ = try await page()
+      XCTFail("a row whose creation column drifts from its record must stay unreadable")
+    } catch let error as RuntimeJobEngineError {
+      guard case .jobRecordUnreadable(let id) = error else { return XCTFail("\(error)") }
+      XCTAssertEqual(id, "job-drifted")
+    }
+    XCTAssertThrowsError(try admission.requireNoActiveWorkspacePresetReference("preset-fixture"))
+    XCTAssertThrowsError(try admission.requireNoActiveImportReference("imp-fixture"))
+  }
+
+  /// Admits a row whose request hash is the record's real submission
+  /// fingerprint, so the durable-history scans can verify it exactly as they
+  /// verify a row the Runtime admitted itself.
+  private func admitVerifiedRow(
+    _ id: String, recordCreatedAtUTC: String? = nil, createdAtColumn: String,
+    jobState: String = "succeeded", outcomeUnknown: Bool = false,
+    providerID: String = "hdc", operation: String = "observe.device@1",
+    catalogDigest: String = RuntimeOperationCatalog.catalogDigest,
+    inputs: [String: JSONValue] = [:]
+  ) throws {
+    let parts = operation.split(separator: "@")
+    let request = try RuntimeOperationRequest(requestID: "req-\(id)", idempotencyKey: "idem-\(id)",
+      target: DurableTargetReference(targetID: "TGT-fixture", expectedBindingRevision: 1),
+      operation: RuntimeOperationReference(id: String(parts[0]), version: Int(parts[1])!), inputs: inputs)
+    var record = RuntimeJobRecord(jobID: id, request: request, operationReference: operation,
+      catalogDigest: catalogDigest, providerID: providerID,
+      createdAtUTC: recordCreatedAtUTC ?? date,
+      actualEffect: "readOnly", admissionEvidence: nil, materializedPlanDigest: String(repeating: "a", count: 64),
+      materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 1)
+    record.state = jobState; record.actualStepKinds = []; record.outcomeUnknown = outcomeUnknown
+    let fingerprint = SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(request))
+    _ = try RuntimeJobRepository(stateDirectory: state).admit(
+      jobID: id, idempotencyKey: request.idempotencyKey, requestHash: fingerprint,
+      initialState: jobState, createdAtUTC: createdAtColumn,
+      initialRecordData: record.durableData())
+  }
+
+  func testNonterminalRowsFromAnotherCatalogDigestBlockOnlyWhatTheyReference() throws {
+    // A Job admitted under another Catalog digest that never reached a
+    // terminal state (an unrecoverable flash, say) has no descriptor in this
+    // build. Its provider and inputs are still durable: a flash Job cannot
+    // hold a workspace registration, and a lease-shaped input still holds its
+    // Import. Neither scan may fail closed on such a row.
+    let stale = String(repeating: "0", count: 64)
+    let flashImport = "imp-0f5c1d2e-3a4b-4c5d-8e6f-70a1b2c3d4e5"
+    let patchImport = "imp-1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+    try admitVerifiedRow(
+      "job-stale-flash", createdAtColumn: date, jobState: "waitingForRecovery",
+      outcomeUnknown: true, providerID: "rockchip", operation: "flash.dayu200@1",
+      catalogDigest: stale,
+      inputs: ["imageArtifactLease": .string("lease-v1:\(flashImport):ART-" + String(repeating: "1", count: 32))])
+    try admitVerifiedRow(
+      "job-stale-patch", createdAtColumn: date, jobState: "waitingForRecovery",
+      outcomeUnknown: true, providerID: "workspace", operation: "workspace.apply-patch@1",
+      catalogDigest: stale,
+      inputs: [
+        "projectRef": .string("demo-app"),
+        "patchArtifactRef": .string("lease-v1:\(patchImport):ART-" + String(repeating: "2", count: 32)),
+        "allowedFileGlobs": .array([.string("entry/**")]),
+      ])
+    try admitVerifiedRow(
+      "job-stale-build", createdAtColumn: date, jobState: "waitingForRecovery",
+      outcomeUnknown: true, providerID: "workspace", operation: "workspace.build-openharmony@1",
+      catalogDigest: stale,
+      inputs: ["projectRef": .string("other-project"), "buildPresetRef": .string("preset-fixture")])
+
+    let admission = try RuntimeAdmissionService(stateDirectory: state)
+    XCTAssertThrowsError(try admission.requireNoActiveWorkspaceProjectReference("demo-app")) { error in
+      XCTAssertEqual((error as? RuntimeWorkspaceProjectFailure)?.code, "resourceConflict")
+    }
+    XCTAssertNoThrow(try admission.requireNoActiveWorkspaceProjectReference("untouched-project"))
+    XCTAssertThrowsError(try admission.requireNoActiveWorkspacePresetReference("preset-fixture")) { error in
+      XCTAssertEqual((error as? RuntimeWorkspaceProjectFailure)?.code, "resourceConflict")
+    }
+    XCTAssertNoThrow(try admission.requireNoActiveWorkspacePresetReference("preset-untouched"))
+    XCTAssertThrowsError(try admission.requireNoActiveImportReference(flashImport)) { error in
+      XCTAssertEqual((error as? AgentExecutionControlFailure)?.code, "resourceConflict")
+    }
+    XCTAssertThrowsError(try admission.requireNoActiveImportReference(patchImport))
+    XCTAssertNoThrow(try admission.requireNoActiveImportReference("imp-9999aaaa-bbbb-4ccc-8ddd-eeeeffff0000"))
+  }
+
   func testRealCLIDefaultsPlanSubmitAndRunToTheTargetProtocol() async throws {
     let connectKey = "150100424a544e4600"
     let adopted = try targets.adopt(
