@@ -238,6 +238,38 @@ final class RockchipLegacyFlashJournalReconcileContractTests: XCTestCase {
 
   // MARK: - Finding unresolved sessions
 
+  func testProductionCompositionUsesRuntimeOwnedCustomSessionRoot() throws {
+    let runtimeState = base.appending(path: "Agentd", directoryHint: .isDirectory)
+    let runtimeDefault = base.appending(path: "Sessions", directoryHint: .isDirectory)
+    let selected = base.appending(path: "SelectedSessions", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: runtimeState, withIntermediateDirectories: false,
+      attributes: [.posixPermissions: 0o700])
+    try FileManager.default.createDirectory(
+      at: selected, withIntermediateDirectories: false,
+      attributes: [.posixPermissions: 0o700])
+
+    let storage = try RuntimeSessionStorageStore(
+      ownerRoot: runtimeState, defaultSessionsRoot: runtimeDefault)
+    _ = try storage.updateRoot(
+      path: selected.path, resetToDefault: false, expectedGeneration: 1)
+
+    let unresolved = selected.appending(
+      path: "runtime-owned-session", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: unresolved, withIntermediateDirectories: false,
+      attributes: [.posixPermissions: 0o700])
+    try Data("{\"not\":\"a journal event\"}\n".utf8).write(
+      to: unresolved.appending(path: "journal.jsonl"))
+
+    let production = try RockchipLegacyFlashJournalReconciler.production(
+      runtimeStateDirectory: runtimeState)
+    XCTAssertEqual(
+      production.sessionsRoot,
+      selected.resolvingSymlinksInPath().standardizedFileURL)
+    XCTAssertEqual(try production.scan().map(\.sessionID), ["runtime-owned-session"])
+  }
+
 
 
   func testCleanCrashBetweenStepsIsStillFlagged() throws {
