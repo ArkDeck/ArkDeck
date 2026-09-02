@@ -300,7 +300,34 @@ private func compileManualUIAOT() throws -> URL {
       "could not publish AOT actuator: \(String(cString: strerror(errno)))")
   }
   try validateManualUIAOTExecutable(paths.executable)
+  removeStaleManualUIAOTDigests(in: root, keeping: paths.digestDirectory)
   return paths.executable
+}
+
+/// The AOT root keys every compiled actuator by the digest of its source, so
+/// each edit of this file added a digest directory (its module cache alone is
+/// about seventy megabytes) and nothing removed the previous ones. Once the
+/// current digest is published its siblings are stale: no source names them,
+/// and an actuator still running from one keeps its executable alive through
+/// the kernel's own reference, not the path. Removal is best effort and limited
+/// to owner-private real directories with a digest-shaped name; the root itself
+/// was verified owner-private before compilation.
+private func removeStaleManualUIAOTDigests(in root: URL, keeping current: URL) {
+  let currentName = current.lastPathComponent
+  guard let names = try? FileManager.default.contentsOfDirectory(atPath: root.path) else {
+    return
+  }
+  for name in names where name != currentName && isManualUIAOTDigestName(name) {
+    let candidate = root.appendingPathComponent(name, isDirectory: true)
+    guard let status = try? manualUIFileStatus(candidate),
+      status.st_mode & S_IFMT == S_IFDIR, status.st_uid == geteuid()
+    else { continue }
+    try? FileManager.default.removeItem(at: candidate)
+  }
+}
+
+private func isManualUIAOTDigestName(_ name: String) -> Bool {
+  name.count == 64 && name.allSatisfy { $0.isHexDigit && !$0.isUppercase }
 }
 
 private func manualUIAOTInvocation(_ arguments: [String]) throws -> (
