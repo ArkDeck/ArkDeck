@@ -1117,6 +1117,15 @@
       - "form": "value"
         "grammar":
           "kind": "opaque"
+        "name": "--build-profile"
+        "placeholder": "absolute-build-profile.json5"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "DevEco build profile whose encrypted passwords unlock --keystore; omitted, the passwords are read from the terminal"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
         "name": "--project-ref"
         "placeholder": "project-ref"
         "published": true
@@ -17618,6 +17627,15 @@
         "required": true
         "stability": "standard"
         "summary": "key alias inside the keystore"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--build-profile"
+        "placeholder": "absolute-build-profile.json5"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "DevEco build profile whose encrypted passwords unlock --keystore; omitted, the passwords are read from the terminal"
       - "form": "value"
         "grammar":
           "kind": "opaque"

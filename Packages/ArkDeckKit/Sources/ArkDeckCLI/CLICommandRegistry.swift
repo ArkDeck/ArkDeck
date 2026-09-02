@@ -2888,6 +2888,10 @@ enum CLICommandRegistry {
             form: .value(placeholder: "alias", grammar: .opaque),
             summary: "key alias inside the keystore",
             isRequired: true),
+          CLIOptionSpec(
+            name: "--build-profile",
+            form: .value(placeholder: "absolute-build-profile.json5", grammar: .opaque),
+            summary: "DevEco build profile whose encrypted passwords unlock --keystore; omitted, the passwords are read from the terminal"),
           projectRefOption, outputOption, jsonOption,
         ]),
       CLILeafSpec(

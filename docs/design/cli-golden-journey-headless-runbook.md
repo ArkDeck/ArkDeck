@@ -321,6 +321,14 @@ arkdeck debug hap --target <TGT> --inputs-file gj5-verify.json \
   --execution-id gj5-<date>-verify --output json                 # 复验：部署修补构建，一次即可
 ```
 
+签名凭据前置：设备只装它信任的 profile。`install-sdk-release` 装的是 OpenHarmony 样例 release
+材料（profile 只对样例 bundle 有效），DAYU200 对 waterflowdemo 报 `code:9568329 verify signature
+failed`；可用的是 DevEco 自动签名的 debug profile（device-ids 含本机 UDID）。用
+`runtime signing install --build-profile <DevEco build-profile.json5> --keystore <同一 storeFile>
+… --key-alias debugKey --project-ref demo-app` 免 TTY 安装；换凭据前先 `workspace preset remove`
+掉钉住旧凭据的 signing preset，再 `runtime signing remove`，装完再 `workspace preset register
+--kind signing --credential <新 credential>` 并 `runtime service restart`。
+
 作用域配对：`analyze crash-signature` 与 `workspace patch` 都消费一个绑定在 `<TGT>` 上的
 Artifact lease（crash-index 采自该设备；补丁由 `artifact import workspace-patch --target <TGT>`
 上传），所以这两条 host-only 请求必须显式 `--target <TGT>`——省略会让 typed discovery 选

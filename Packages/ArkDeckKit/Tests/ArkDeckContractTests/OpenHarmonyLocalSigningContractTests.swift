@@ -595,8 +595,13 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertFalse(fixture.store.status().installed)
   }
 
-  func testDevEcoEncryptedPasswordsDecodeOnlyAtInteractiveInstallBoundary() throws {
-    let config = root.appending(path: "deveco-config", directoryHint: .isDirectory)
+  /// A DevEco auto-signing fixture: the `material/` tree beside the keystore
+  /// that binds DevEco's password ciphertext, one encrypted password, and the
+  /// plaintext it decodes to.
+  private func makeDevEcoPasswordFixture(
+    directory: String = "deveco-config"
+  ) throws -> (config: URL, keystore: URL, encrypted: String, expected: Data) {
+    let config = root.appending(path: directory, directoryHint: .isDirectory)
     let material = config.appending(path: "material", directoryHint: .isDirectory)
     let fd = material.appending(path: "fd", directoryHint: .isDirectory)
     let ac = material.appending(path: "ac", directoryHint: .isDirectory)
@@ -642,6 +647,13 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     try Data("fixture".utf8).write(to: keystore)
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o600], ofItemAtPath: keystore.path)
+    return (config, keystore, encrypted, expected)
+  }
+
+  func testDevEcoEncryptedPasswordsDecodeOnlyAtInteractiveInstallBoundary() throws {
+    let (config, keystore, encrypted, expected) = try makeDevEcoPasswordFixture()
+    let ce = config.appending(path: "material", directoryHint: .isDirectory)
+      .appending(path: "ce", directoryHint: .isDirectory)
 
     XCTAssertEqual(
       try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
@@ -829,6 +841,76 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertThrowsError(
       try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         Data(encrypted.utf8), keystore: keystore))
+  }
+
+  func testSigningInstallReadsDevEcoPasswordsFromABuildProfileWithoutATTY() throws {
+    // DevEco auto-signing passwords are machine-generated ciphertext a person
+    // never sees, so a headless host cannot type them. `signing install
+    // --build-profile` reads them from the DevEco build profile that names
+    // this exact keystore and decodes them at the same boundary the
+    // interactive install uses; a build profile naming another storeFile is
+    // refused before any secret is touched.
+    let (config, keystore, encrypted, expected) = try makeDevEcoPasswordFixture(
+      directory: "deveco-headless-config")
+    let jar = config.appending(path: "hap-sign-tool.jar")
+    let certificate = config.appending(path: "release.cer")
+    let profile = config.appending(path: "release.p7b")
+    try Data("jar".utf8).write(to: jar)
+    try Data("certificate".utf8).write(to: certificate)
+    try Data("profile".utf8).write(to: profile)
+    let buildProfile = config.appending(path: "build-profile.json5")
+    try Data(
+      """
+      {
+        app: {
+          signingConfigs: [{
+            storePassword: "\(encrypted)",
+            keyPassword: "\(encrypted)",
+            storeFile: "\(keystore.path)"
+          }]
+        }
+      }
+      """.utf8
+    ).write(to: buildProfile, options: .atomic)
+    let java = productsDirectory.appending(path: "ArkDeckFakeHapSignerFixture")
+      .resolvingSymlinksInPath()
+    let store = OpenHarmonySigningPresetStore(
+      rootURL: root.appending(path: "headless-preset"),
+      secrets: MemorySigningSecretStore(),
+      nowUTC: { "2026-09-02T00:00:00Z" })
+
+    let otherKeystore = config.appending(path: "other.p12")
+    try Data("other".utf8).write(to: otherKeystore)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: otherKeystore.path)
+    XCTAssertThrowsError(
+      try RuntimeCLI.runSigning(
+        [
+          "install", "--java", java.path, "--jar", jar.path,
+          "--keystore", otherKeystore.path, "--certificate", certificate.path,
+          "--profile", profile.path, "--key-alias", "debugkey",
+          "--build-profile", buildProfile.path, "--json",
+        ], store: store)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("different storeFile"), "\(error)")
+    }
+    XCTAssertFalse(store.status().installed)
+
+    try RuntimeCLI.runSigning(
+      [
+        "install", "--java", java.path, "--jar", jar.path,
+        "--keystore", keystore.path, "--certificate", certificate.path,
+        "--profile", profile.path, "--key-alias", "debugkey",
+        "--build-profile", buildProfile.path, "--json",
+      ], store: store)
+    let receipt = try store.loadValidated()
+    XCTAssertEqual(receipt.keyAlias, "debugkey")
+    var pair = try store.secretPair(for: receipt)
+    XCTAssertEqual(pair.keystore, expected, "the DevEco ciphertext must be decoded, not stored")
+    XCTAssertEqual(pair.key, expected)
+    pair.keystore.resetBytes(in: 0..<pair.keystore.count)
+    pair.key.resetBytes(in: 0..<pair.key.count)
+    XCTAssertTrue(store.status().ready, store.status().diagnostics.joined(separator: " | "))
   }
 
   func testPresetRejectsSymlinkAndPermissionWideningAndReceiptFieldDrift() throws {

@@ -103,6 +103,15 @@ and revalidates those resources together with the Node executable immediately
 before spawn. A registered OpenHarmony project with no active build/test preset
 stays read-only; it does not fall back to daemon environment paths.
 
+A DevEco auto-signing keystore is unlocked by machine-generated ciphertext a
+person never sees, so `runtime signing install` also accepts
+`--build-profile <DevEco build-profile.json5>`: the encrypted `storePassword`
+and `keyPassword` are read from the profile that names the same `storeFile`
+as `--keystore` and decoded at the same boundary the terminal prompt uses. A
+headless host can therefore install the profile a device already trusts (the
+debug profile listing its UDID) without a TTY; `migrate-deveco` stays the
+re-keying path for a preset that is already installed with that keystore.
+
 `runtime signing install-sdk-release|install` now wraps the existing measured
 receipt and Keychain envelope in `arkdeck.signing-credential/1`. Its
 content-derived `credential:sha256-*` reference contains no host path,

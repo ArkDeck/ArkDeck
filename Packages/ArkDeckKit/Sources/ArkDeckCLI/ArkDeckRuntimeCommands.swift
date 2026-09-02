@@ -916,7 +916,7 @@ enum RuntimeCLI {
       let options = try CLIOptions(rest)
       try options.validateAllowed([
         "--java", "--jar", "--keystore", "--certificate", "--profile",
-        "--key-alias", "--project-ref",
+        "--key-alias", "--project-ref", "--build-profile",
       ])
       func required(_ name: String) throws -> String {
         guard let value = options.value(name), !value.isEmpty else {
@@ -937,11 +937,36 @@ enum RuntimeCLI {
           exitCode: EX_USAGE,
           message: "\(spelling) install \(name) must be an absolute path")
       }
-      var keystorePassword = try readTTYSecret(prompt: "Keystore password: ")
-      defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
-      var keyPassword = try readTTYSecret(prompt: "Key password: ")
-      defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
       let keystoreURL = URL(filePath: keystore)
+      // The passwords come from a terminal, or — for DevEco auto-signing
+      // material, whose passwords are machine-generated ciphertext a person
+      // never sees — from the DevEco build-profile that names this exact
+      // keystore. A headless host can then install without a TTY, the same
+      // way `migrate-deveco` re-keys an installed preset; the decoder below
+      // still binds the ciphertext to the keystore's own material.
+      var keystorePassword: Data
+      var keyPassword: Data
+      if let buildProfilePath = options.value("--build-profile") {
+        guard buildProfilePath.hasPrefix("/") else {
+          throw CLIError(
+            exitCode: EX_USAGE, message: "\(spelling) install --build-profile must be an absolute path")
+        }
+        let encrypted = try readDevEcoBuildProfileSigningMaterial(
+          at: URL(filePath: buildProfilePath))
+        guard encrypted.storeFile.standardizedFileURL.path == keystoreURL.standardizedFileURL.path
+        else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "\(spelling) install --build-profile names a different storeFile than --keystore")
+        }
+        keystorePassword = encrypted.keystore
+        keyPassword = encrypted.key
+      } else {
+        keystorePassword = try readTTYSecret(prompt: "Keystore password: ")
+        keyPassword = try readTTYSecret(prompt: "Key password: ")
+      }
+      defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
+      defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
       var normalizedKeystorePassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         keystorePassword, keystore: keystoreURL)
       defer {
