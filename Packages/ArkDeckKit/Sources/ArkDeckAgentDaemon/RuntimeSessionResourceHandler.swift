@@ -50,6 +50,30 @@ struct RuntimeSessionResourceHandler {
           previewID: previewID, previewDigest: previewDigest,
           activeSessionIDs: await activeSessionIDs())
 
+      case "session.export.preview":
+        guard Set(fields.keys) == ["sessionId", "destinationPath", "allowSensitive"],
+          case .string(let sessionID)? = fields["sessionId"],
+          case .string(let destinationPath)? = fields["destinationPath"],
+          case .bool(let allowSensitive)? = fields["allowSensitive"]
+        else {
+          return failed(
+            "invalidInput",
+            "Session export preview requires one Session, one destination and one privacy choice")
+        }
+        result = try storage.previewSessionExport(
+          sessionID: sessionID, destinationPath: destinationPath,
+          allowSensitive: allowSensitive)
+
+      case "session.export.apply":
+        guard Set(fields.keys) == ["previewId", "previewDigest"],
+          case .string(let previewID)? = fields["previewId"],
+          case .string(let previewDigest)? = fields["previewDigest"]
+        else {
+          return failed("invalidInput", "Session export apply requires one preview tuple")
+        }
+        result = try storage.applySessionExport(
+          previewID: previewID, previewDigest: previewDigest)
+
       case "session.list":
         guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else {
           return failed("invalidInput", "Session list options are closed")
@@ -105,6 +129,7 @@ struct RuntimeSessionResourceHandler {
     } catch {
       let mutation = request.method == "session.pin" || request.method == "session.unpin"
         || request.method == "session.cleanup.apply"
+        || request.method == "session.export.apply"
       return failed(
         mutation ? "outcomeUnknown" : "recordUnreadable",
         mutation

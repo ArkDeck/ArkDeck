@@ -281,6 +281,27 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
         SHA256Hex.isLowercaseSHA256(previewDigest)
       else { return false }
       return true
+    case "session.export.preview":
+      // The destination is a caller-named absent directory; the owner proves
+      // its parent, volume and absence itself. The boundary only refuses a
+      // shape that could never be a bounded absolute host path.
+      guard Set(fields.keys) == ["sessionId", "destinationPath", "allowSensitive"],
+        identifier("sessionId"),
+        case .string(let destination)? = fields["destinationPath"],
+        destination.hasPrefix("/"), destination.utf8.count <= 4 * 1_024,
+        !destination.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+        case .bool? = fields["allowSensitive"]
+      else { return false }
+      return true
+    case "session.export.apply":
+      guard Set(fields.keys) == ["previewId", "previewDigest"],
+        case .string(let previewID)? = fields["previewId"],
+        let uuid = UUID(uuidString: previewID),
+        uuid.uuidString.lowercased() == previewID,
+        case .string(let previewDigest)? = fields["previewDigest"],
+        SHA256Hex.isLowercaseSHA256(previewDigest)
+      else { return false }
+      return true
     case "session.list":
       guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else { return false }
       if let value = fields["pageSize"] {

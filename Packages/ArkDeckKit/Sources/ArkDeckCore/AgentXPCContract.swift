@@ -211,6 +211,8 @@ package enum ArkDeckAgentXPC {
   package static let forwardableSessionMethods: Set<String> = [
     "session.cleanup.apply",
     "session.cleanup.preview",
+    "session.export.apply",
+    "session.export.preview",
     "session.list",
     "session.pin",
     "session.show",

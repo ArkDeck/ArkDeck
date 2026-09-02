@@ -62,6 +62,8 @@
     "runtime.tool.select",
     "session.cleanup.apply",
     "session.cleanup.preview",
+    "session.export.apply",
+    "session.export.preview",
     "session.list",
     "session.pin",
     "session.show",

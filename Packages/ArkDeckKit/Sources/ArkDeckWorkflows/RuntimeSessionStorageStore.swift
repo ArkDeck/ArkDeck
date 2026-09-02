@@ -90,6 +90,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
   private static let lockName = ".session-storage.lock"
   private static let sessionSnapshotDirectoryName = "session-resource-snapshots"
   private static let cleanupPreviewDirectoryName = "session-cleanup-previews"
+  private static let exportPreviewDirectoryName = "session-export-previews"
   private static let maximumDocumentBytes = 64 * 1_024
   private static let maximumRootPathBytes = 4 * 1_024
 
@@ -97,12 +98,14 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
   private let defaultSessionsRoot: URL
   private let clock: @Sendable () -> Date
   private let retentionController: SessionRetentionController
+  private let exportFaultInjector: SessionStorageFaultInjector
 
   package init(
     ownerRoot: URL,
     defaultSessionsRoot: URL,
     clock: @escaping @Sendable () -> Date = { Date() },
-    retentionController: SessionRetentionController = SessionRetentionController()
+    retentionController: SessionRetentionController = SessionRetentionController(),
+    exportFaultInjector: SessionStorageFaultInjector = .none
   ) throws {
     let normalizedOwner = ownerRoot.standardizedFileURL
     try Self.requireOwnerDirectory(normalizedOwner)
@@ -115,6 +118,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     self.defaultSessionsRoot = try Self.canonicalRoot(defaultSessionsRoot)
     self.clock = clock
     self.retentionController = retentionController
+    self.exportFaultInjector = exportFaultInjector
     try requireDisjointFromOwner(self.defaultSessionsRoot)
   }
 
@@ -260,6 +264,152 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
           "outcomeUnknown", "Session pin publication cannot be read back exactly")
       }
       return row.projection
+    }
+  }
+
+  package func previewSessionExport(
+    sessionID: String,
+    destinationPath: String,
+    allowSensitive: Bool
+  ) throws -> JSONValue {
+    guard AgentExecutionIntent.validIdentifier(sessionID) else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export requires one bounded Session identity")
+    }
+    return try withLockedDocument { _, document in
+      let snapshot = try sessionCatalog(document)
+      _ = try sessionRows(snapshot)
+      let root = try activeRoot(document, createDefaultIfMissing: true)
+      let destination = try exportDestinationFacts(
+        destinationPath, sourceRoot: root)
+      let createdAt = clock()
+      guard createdAt.timeIntervalSince1970.isFinite else {
+        throw RuntimeSessionStorageFailure(
+          "operationUnavailable", "Runtime clock is unavailable")
+      }
+      let expiresAt = createdAt.addingTimeInterval(10 * 60)
+      let previewID = UUID().uuidString.lowercased()
+      let projection = try exportPreviewProjection(
+        previewID: previewID, createdAt: createdAt, expiresAt: expiresAt,
+        sessionID: sessionID, allowSensitive: allowSensitive,
+        destination: destination, document: document, snapshot: snapshot)
+      guard case .object(let fields) = projection,
+        case .string(let digest)? = fields["previewDigest"],
+        case .string(let expiry)? = fields["expiresAtUtc"]
+      else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session export preview projection is malformed")
+      }
+      try exportRecordStore().create(
+        previewID: previewID, previewDigest: digest,
+        expiresAtUTC: expiry, preview: projection, now: createdAt)
+      return projection
+    }
+  }
+
+  package func applySessionExport(
+    previewID: String,
+    previewDigest: String
+  ) throws -> JSONValue {
+    guard let uuid = UUID(uuidString: previewID),
+      uuid.uuidString.lowercased() == previewID,
+      SHA256Hex.isLowercaseSHA256(previewDigest)
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export apply requires an exact preview tuple")
+    }
+    return try withLockedDocument { _, document in
+      let store = try exportRecordStore()
+      var record = try store.load(previewID)
+      guard record.previewDigest == previewDigest else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session export preview digest does not match")
+      }
+      if record.state == .applied, record.result != .null { return record.result }
+      guard record.state == .ready else {
+        throw RuntimeSessionStorageFailure(
+          "outcomeUnknown", "Session export may already have published output")
+      }
+      guard case .object(let stored) = record.preview,
+        case .string(let createdText)? = stored["createdAtUtc"],
+        case .string(let expiresText)? = stored["expiresAtUtc"],
+        let createdAt = ISO8601Timestamps.parseCanonicalPlain(createdText),
+        let expiresAt = ISO8601Timestamps.parseCanonicalPlain(expiresText),
+        expiresAt > clock(),
+        case .string(let sessionID)? = stored["sessionId"],
+        case .bool(let allowSensitive)? = stored["allowSensitive"],
+        case .object(let storedDestination)? = stored["destination"],
+        case .string(let destinationPath)? = storedDestination["path"]
+      else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session export preview expired or is malformed")
+      }
+      let snapshot = try sessionCatalog(document)
+      _ = try sessionRows(snapshot)
+      let root = try activeRoot(document, createDefaultIfMissing: true)
+      let destination = try exportDestinationFacts(
+        destinationPath, sourceRoot: root)
+      let current = try exportPreviewProjection(
+        previewID: previewID, createdAt: createdAt, expiresAt: expiresAt,
+        sessionID: sessionID, allowSensitive: allowSensitive,
+        destination: destination, document: document, snapshot: snapshot)
+      guard current == record.preview,
+        let retained = snapshot.sessions.first(where: { $0.sessionID == sessionID }),
+        let jobID = snapshot.jobIDBySession[sessionID],
+        let artifacts = snapshot.artifactRecordsBySession[sessionID],
+        case .string(let generationText)? = stored["generation"],
+        let generation = UInt64(generationText)
+      else {
+        throw RuntimeSessionStorageFailure(
+          "resourceConflict", "Session export facts changed after preview")
+      }
+      let layout = try SessionLayout(
+        sessionID: sessionID, jobID: jobID, root: retained.root)
+      let maximumGrowth = try exportMaximumGrowth(
+        snapshot: snapshot, sessionID: sessionID,
+        allowSensitive: allowSensitive)
+      let parent = URL(filePath: destinationPath).deletingLastPathComponent()
+      let destinationSnapshot: HostStorageSnapshot
+      do {
+        destinationSnapshot = try SystemHostStorageProbe().snapshot(for: parent)
+      } catch {
+        throw RuntimeSessionStorageFailure(
+          "operationUnavailable", "Session export destination capacity is unavailable")
+      }
+      let claim: StorageClaim
+      do {
+        claim = try StorageClaim.finalizedSessionExport(
+          jobID: jobID, destinationSnapshot: destinationSnapshot,
+          maximumGrowthBytes: maximumGrowth)
+      } catch {
+        throw RuntimeSessionStorageFailure(
+          "quotaExceeded", "Session export destination lacks bounded headroom")
+      }
+      record = try store.markApplying(record)
+      do {
+        let materialized = try SessionDiagnosticExporter(
+          faultInjector: exportFaultInjector
+        ).export(
+          layout: layout, artifacts: artifacts, claim: claim,
+          to: URL(filePath: destinationPath),
+          includeDeviceData: allowSensitive,
+          deviceIdentifierPolicy: .redact)
+        let after = try sessionCatalog(document)
+        guard after == snapshot else {
+          throw RuntimeSessionStorageFailure(
+            "outcomeUnknown", "Session changed while its export was published")
+        }
+        let result = try exportResult(
+          previewID: previewID, previewDigest: previewDigest,
+          generation: generation, sessionID: sessionID,
+          destinationPath: materialized.root.standardizedFileURL.path,
+          snapshot: snapshot, allowSensitive: allowSensitive)
+        _ = try store.markApplied(record, result: result)
+        return result
+      } catch {
+        throw RuntimeSessionStorageFailure(
+          "outcomeUnknown", "Session export outcome requires destination inspection")
+      }
     }
   }
 
@@ -421,6 +571,210 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
       "remainingBytes": .string(String(after.currentBytes)),
       "newDispatchCount": .integer(0),
     ])
+  }
+
+  private func exportPreviewProjection(
+    previewID: String,
+    createdAt: Date,
+    expiresAt: Date,
+    sessionID: String,
+    allowSensitive: Bool,
+    destination: JSONValue,
+    document: Document,
+    snapshot: SessionRetentionCatalogSnapshot
+  ) throws -> JSONValue {
+    guard let generation = snapshot.catalogGeneration,
+      generation <= UInt64(Int64.max),
+      document.generation <= UInt64(Int64.max),
+      snapshot.sessions.contains(where: { $0.sessionID == sessionID }),
+      let artifacts = snapshot.artifactsBySession[sessionID],
+      let manifestBytes = snapshot.manifestByteCountBySession[sessionID],
+      snapshot.jobIDBySession[sessionID] != nil,
+      snapshot.artifactRecordsBySession[sessionID] != nil
+    else {
+      throw RuntimeSessionStorageFailure(
+        "resourceNotFound", "Session is not present in the Runtime export catalog")
+    }
+    var estimatedBytes = manifestBytes
+    var rows: [JSONValue] = []
+    for artifact in artifacts {
+      let sensitive = ["raw", "partial"].contains(artifact.role)
+      let included = allowSensitive || !sensitive
+      if included {
+        let sum = estimatedBytes.addingReportingOverflow(artifact.byteCount)
+        guard !sum.overflow else {
+          throw RuntimeSessionStorageFailure(
+            "recordUnreadable", "Session export byte estimate overflowed")
+        }
+        estimatedBytes = sum.partialValue
+      }
+      rows.append(.object([
+        "artifactId": .string(artifact.artifactID),
+        "artifactDigest": .string(artifact.sha256),
+        "byteCount": .string(String(artifact.byteCount)),
+        "role": .string(artifact.role),
+        "privacy": .string(sensitive ? "sensitive" : "unknown"),
+        "disposition": .string(included ? "include" : "excludeByDefault"),
+        "transformation": .string(included ? "redactDeviceIdentifiers" : "excluded"),
+      ]))
+    }
+    var fields: [String: JSONValue] = [
+      "schemaVersion": .string("arkdeck.session-export-preview/1"),
+      "previewId": .string(previewID),
+      "digestAlgorithm": .string("sha256-jcs"),
+      "sessionId": .string(sessionID),
+      "generation": .string(String(generation)),
+      "policyGeneration": .string(String(document.generation)),
+      "createdAtUtc": .string(ISO8601Timestamps.string(from: createdAt)),
+      "expiresAtUtc": .string(ISO8601Timestamps.string(from: expiresAt)),
+      "confirmationRequired": .bool(true),
+      "allowSensitive": .bool(allowSensitive),
+      "sensitiveDefaultExcluded": .bool(true),
+      "deviceIdentifierPolicy": .string("redact"),
+      "estimatedBytes": .string(String(estimatedBytes)),
+      "destination": destination,
+      "artifacts": .array(rows),
+      "newDispatchCount": .integer(0),
+    ]
+    let digest = SHA256Hex.string(
+      of: try PortableCanonicalJSON.canonicalBytes(.object(fields)))
+    fields["previewDigest"] = .string(digest)
+    return .object(fields)
+  }
+
+  private func exportDestinationFacts(
+    _ path: String,
+    sourceRoot: URL
+  ) throws -> JSONValue {
+    guard !path.isEmpty, path.utf8.count <= 4 * 1_024,
+      path == path.trimmingCharacters(in: .whitespacesAndNewlines),
+      path.hasPrefix("/"),
+      !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export destination must be one bounded absolute path")
+    }
+    let physical = RuntimeArtifactExport.physicalPath(
+      URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL.path)
+    let destination = URL(filePath: physical, directoryHint: .isDirectory)
+    let name = destination.lastPathComponent
+    guard !name.isEmpty, name.utf8.count <= 255, name != ".", name != ".." else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export destination name is invalid")
+    }
+    let protected = [ownerRoot, sourceRoot].map {
+      RuntimeArtifactExport.physicalPath($0.standardizedFileURL.path)
+    }
+    guard protected.allSatisfy({ physical != $0 && !physical.hasPrefix($0 + "/") }) else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export destination must be outside Runtime storage")
+    }
+    let parent = destination.deletingLastPathComponent()
+    let descriptor: Int32
+    do {
+      descriptor = try ArkTraceProfileFileReader.openPhysicalDirectoryDescriptor(parent.path)
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export parent must exist without symbolic-link components")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFDIR,
+      metadata.st_uid == geteuid()
+    else {
+      throw RuntimeSessionStorageFailure(
+        "invalidInput", "Session export parent must be an owned directory")
+    }
+    var existing = stat()
+    if fstatat(descriptor, name, &existing, AT_SYMLINK_NOFOLLOW) == 0 {
+      throw RuntimeSessionStorageFailure(
+        "resourceConflict", "Session export destination already exists")
+    }
+    guard errno == ENOENT else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session export destination cannot be inspected")
+    }
+    let volume: VolumeIdentity
+    do {
+      volume = try SystemVolumeIdentityResolver().resolve(openFileDescriptor: descriptor)
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "operationUnavailable", "Session export destination volume is unavailable")
+    }
+    return .object([
+      "path": .string(physical),
+      "parentDevice": .string(String(UInt64(UInt32(bitPattern: metadata.st_dev)))),
+      "parentInode": .string(String(UInt64(metadata.st_ino))),
+      "volumeIdentity": .string(volume.value),
+      "expectedState": .string("absent"),
+    ])
+  }
+
+  private func exportMaximumGrowth(
+    snapshot: SessionRetentionCatalogSnapshot,
+    sessionID: String,
+    allowSensitive: Bool
+  ) throws -> UInt64 {
+    guard let artifacts = snapshot.artifactsBySession[sessionID] else {
+      throw RuntimeSessionStorageFailure(
+        "resourceNotFound", "Session export inventory is unavailable")
+    }
+    var maximum: UInt64 = 16 * 1_024 * 1_024
+    for artifact in artifacts {
+      let sensitive = ["raw", "partial"].contains(artifact.role)
+      guard allowSensitive || !sensitive else { continue }
+      let bound = max(artifact.byteCount, 64 * 1_024 * 1_024)
+      let sum = maximum.addingReportingOverflow(bound)
+      guard !sum.overflow else {
+        throw RuntimeSessionStorageFailure(
+          "quotaExceeded", "Session export write bound overflowed")
+      }
+      maximum = sum.partialValue
+    }
+    return maximum
+  }
+
+  private func exportResult(
+    previewID: String,
+    previewDigest: String,
+    generation: UInt64,
+    sessionID: String,
+    destinationPath: String,
+    snapshot: SessionRetentionCatalogSnapshot,
+    allowSensitive: Bool
+  ) throws -> JSONValue {
+    guard let artifacts = snapshot.artifactsBySession[sessionID] else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session export result inventory is unavailable")
+    }
+    let included = artifacts.filter {
+      allowSensitive || !["raw", "partial"].contains($0.role)
+    }.map(\.artifactID).sorted()
+    let excluded = artifacts.filter {
+      !allowSensitive && ["raw", "partial"].contains($0.role)
+    }.map(\.artifactID).sorted()
+    return .object([
+      "schemaVersion": .string("arkdeck.session-export-result/1"),
+      "previewId": .string(previewID),
+      "previewDigest": .string(previewDigest),
+      "sessionId": .string(sessionID),
+      "generation": .string(String(generation)),
+      "resultGeneration": .string(String(generation)),
+      "publishedAtUtc": .string(ISO8601Timestamps.string(from: clock())),
+      "exportedPath": .string(destinationPath),
+      "sourceArtifactIds": .array(included.map(JSONValue.string)),
+      "excludedArtifactIds": .array(excluded.map(JSONValue.string)),
+      "deviceIdentifierPolicy": .string("redact"),
+      "evidenceClass": .string("derivedExport"),
+      "newDispatchCount": .integer(0),
+    ])
+  }
+
+  private func exportRecordStore() throws -> RuntimeSessionExportRecordStore {
+    try RuntimeSessionExportRecordStore(
+      directory: ownerRoot.appending(
+        path: Self.exportPreviewDirectoryName, directoryHint: .isDirectory))
   }
 
   private func cleanupRecordStore() throws -> RuntimeSessionCleanupRecordStore {

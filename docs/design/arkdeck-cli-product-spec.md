@@ -1544,6 +1544,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `runtime tool/bundle *`、`runtime service/signing`、`maintainer update-feed`、canonical 命名迁移与
   tombstone。
 - Slice C 已落地：`session list/show/pin/unpin`、`session cleanup preview/apply`、
+  `session export preview/apply`（实现见 `cli-session-export.md`，随 `CHG-2026-072` 交付）、
   `runtime storage status/policy/root`（Runtime 单一 owner，Session 输出域与 Artifact 域分开报告）、
   `runtime support-bundle preview/export`、`runtime update *`、`device/target display-name`、
   `history filter *`、`trace cache status/purge`、`ui-dump inspect/hit-test`、
@@ -1559,7 +1560,6 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| `session export preview/apply` | 未发布。Runtime owner、`session.export.preview/apply` 控制方法与 CLI 在独立工作树进行中，随 proposed change `CHG-2026-072`（尚未进入 `main`）交付 | 该 change 经维护者 review/merge，并与 §7.5 逐条对齐 | C |
 | `debug template list/run` | 未发布。daemon `debug.template.run` 仍直接运行 closed HDC template，没有 Job/WAL | 先由独立 approved operation change 发布 typed Catalog mapping；此前 coverage 为 `blocked`，不得用 daemon method 存在冒充 conformance | B |
 | `debug logs` | 未发布 | 随 Debug namespace 收口一并交付 | B |
 | `source *`（8 个 leaf） | 没有 namespace。§6.2 规定 source resource/integration/profile 获批前保持 unavailable | 发布 typed source resource；或由维护者裁决 remote source 为 App/平台服务并在 coverage manifest 中显式分类。§18 不接受 `blocked` | C |
