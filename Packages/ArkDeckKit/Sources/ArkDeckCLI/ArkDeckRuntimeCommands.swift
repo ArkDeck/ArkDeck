@@ -2369,9 +2369,8 @@ enum RuntimeCLI {
           + "use `arkdeck agent run --operation <reference>` until it does")
     }
     var rest = arguments
-    let session = runtimeSession(&rest, command: leaf.canonicalCommand)
+    var session = runtimeSession(&rest, command: leaf.canonicalCommand)
     session.warnIfLegacy()
-    let executor = AgentRuntimeExecutor(client: session.client, nowUTC: RuntimeCLI.utcNow)
     let baseRequest = try agentExecutionRequest(reference: reference, rest: rest)
     let request: RuntimeAgentExecutionRequest
     do {
@@ -2379,7 +2378,23 @@ enum RuntimeCLI {
     } catch let failure as DiagnosticCapturePresetError {
       throw session.fail(.invalidInput, failure.reason)
     }
-    let outcome = try executor.run(request)
+    // Domain leaves are current product surfaces even though the one-shot
+    // executor still consumes several frozen 1.x read projections. Preserve
+    // those reads, but cross the Job admission boundary through the target
+    // owner so a refusal publishes its exact reason and zero-dispatch proof.
+    let legacyReadClient = session.client
+    try session.negotiate(requiredMajor: 2, forMethod: "job.submit")
+    let executor = AgentRuntimeExecutor(
+      client: legacyReadClient, jobSubmissionClient: session.client,
+      nowUTC: RuntimeCLI.utcNow)
+    let outcome: RuntimeAgentExecutionOutcome
+    do {
+      outcome = try executor.run(request)
+    } catch let error as AgentClientError {
+      throw session.stamped(
+        CLIRuntimeSession.mapped(
+          error, method: "job.submit", command: leaf.canonicalCommand))
+    }
     try emitAgentOutcome(outcome, session: session)
   }
 

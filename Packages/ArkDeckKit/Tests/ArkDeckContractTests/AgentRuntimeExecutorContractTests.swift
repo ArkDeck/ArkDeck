@@ -180,6 +180,26 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)
   }
 
+  func testTargetSubmissionClientKeepsTheOneShotSuccessReceiptCompatible() throws {
+    let legacyReads = try startDaemon()
+    let targetSubmission = try legacyReads.negotiated(
+      requiredMajor: 2, forMethod: "job.submit")
+    let outcome = try AgentRuntimeExecutor(
+      client: legacyReads, jobSubmissionClient: targetSubmission,
+      nowUTC: { "2026-07-29T00:00:00Z" }
+    ).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "observe.device", operationVersion: 1,
+        executionID: "target-submit-success-001"))
+
+    guard case .completed(let receipt) = outcome else {
+      return XCTFail("the target acceptance must remain consumable by the one-shot runner")
+    }
+    XCTAssertEqual(receipt.operationReference, "observe.device@1")
+    XCTAssertEqual(receipt.terminalState, "succeeded")
+    XCTAssertNotNil(receipt.jobID)
+  }
+
   func testHeadlessVerifierClosesUDSRuntimeArtifactAndPostflightWithoutUI() throws {
     let client = try startDaemon()
     let verifier = RuntimeHeadlessVerifier(

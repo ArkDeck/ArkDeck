@@ -237,7 +237,11 @@ OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.t
 
 残留（不阻塞四态，记入 §13.3 候选）：`runtime service update` 无法清除 legacy
 `--workspace-project` 根；项目移除的 durable 引用扫描按字面 projectRef 匹配，隔离副本上的
-非终态 Job 不会锁住来源项目；preflight rejection（如 `workspace.revisionConflict`）没有发布 §8.4 结构化零派发证据，domain leaf
-把 `rejected(invalidInput, …)` receipt 以 `ok:true`/`terminalState: rejected` 返回并降级为 exit 1（§9 应为 65/77），零派发只能由台账 diff 证明；`install-sdk-release` 装的样例 release
+非终态 Job 不会锁住来源项目；`install-sdk-release` 装的样例 release
 凭据对设备不可信（`code:9568329`），可用凭据是 DevEco 为该 bundle 签发、device-ids 含本机
 UDID 的 debug profile；本机磁盘低于 4 GiB 预留时 ArkForge prewarm 会以零派发拒绝 Flash。
+
+同日闭合的 preflight 投影缺陷不再列为残留：在当前 Runtime/Catalog digest 上以候选 CLI
+重跑 stale `workspace.revisionConflict`，结果为 `ok:false` / `invalidInput` / exit 65，
+并包含 `phase: preAdmission`、`newDispatchCount: 0`；2.x Job ledger newest ID 与时间戳在调用
+前后逐字相同。

@@ -1587,12 +1587,12 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 不阻断命令面存在，但计入 conformance 差距，必须在对应 slice 内修，不能靠文档解释掉：
 
-- preflight rejection 没有发布 §8.4 结构化零派发证据：2026-09-02 真机负向用例
-  （`workspace patch`，stale `expectedWorkspaceRevision`）被 Runtime 以
-  `rejected(invalidInput, "typed plan preflight failed before authorization: workspace.revisionConflict:…")`
-  拒绝，domain leaf 返回 `ok:true`、`result.terminalState: rejected`、`stepKinds: []`、无 `error`，
-  进程退出码为 1（`CLIControlMethodRegistry` 对无证据 `rejected` 的 fallback），而 §9 要求 65/77；
-  零派发只能由台账 diff 证明。修法在 daemon 侧补 §8.4 证据（`newDispatchCount`/phase），不是改分类。
+2026-09-02 已闭合 preflight rejection 投影：current domain leaf 保留 frozen 1.x read projection，
+但在 admission boundary 上协商 2.x `job.submit` owner。同一 `workspace patch` stale
+`expectedWorkspaceRevision` 负向用例现在返回 `ok:false`、`error.code: invalidInput`、exit 65，
+并逐项发布 `phase: preAdmission`、`newDispatchCount: 0` 与 `wireCode: invalidInput`；2.x
+`job list` 的 newest Job 在调用前后保持同一 ID/时间戳。这一项不再计入下列残留。
+
 - HAR crash-resume（runbook §2.1）实测：重插 USB 后 `agent resume` 没有仅凭 fresh probe 解决
   `physicalConnection` HAR，而是再产生一个 `ambiguousIdentity` HAR（唯一候选就是已 adopt 的
   target），要以 published choice 再 resume 一次才继续；被取代的 `physicalConnection` action
