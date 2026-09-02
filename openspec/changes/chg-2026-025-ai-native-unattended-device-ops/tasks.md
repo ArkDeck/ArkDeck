@@ -3749,24 +3749,29 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
 
 ## TASK-AIN-021 — App 生产可观察性与 typed 调试闭环收口
 
-- Status:in-progress（2026-09-02 对账：本 Task 名下的 CLI/App 产品 PR 已连续合入
-  protected `main`（至 #1688）。`arkdeck commands --output json` 实测 33 个一级入口、
-  217 个 leaf = 208 executable + 6 tombstone + 3 refused，29 个 canonical Catalog
-  operation 均有一等领域 leaf；`session export preview/apply` 已随 #1686 与
-  `CHG-2026-072` 发布，`debug template list/run` 与 `debug logs` 已随 #1688 与
-  `CHG-2026-073`（新 operation `debug.template@1`、`capture.diagnostics@1` 的 HiLog-only
-  preset、根级 `evidence/runs/TASK-DTO-001/`）发布，`debug` 族已按规格 §6.2 全部落地。
-  `source` 族已按 DEC-013（#1690，规格 0.4）归 `platformService` 退役，产品规格 §6 目标
-  命令树没有未发布 leaf。§14 机器契约产物（`openspec/contracts/cli-*`、feature coverage、App
-  capability registry、`Tests/Fixtures/CLI/**`）不在本 Task Allowed paths 内，已另立
-  `TASK-AIN-026`。`CHG-2026-073` 使 Catalog digest 变为 `508783ac…`；上一 digest `b8c7148f…` 上
-  CLI/App 发起的 observe、diagnostics、HAP、native 与 canonical Flash 真机成功记录
-  （`docs/design/references/v1.6-goal/`）按 `PRODUCT-LOOP.md` 只证明历史，GJ-1～GJ-5
-  的 CLI headless 逐步闭环尚未按四态记录，最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧
-  digest `d76ad775…`。App 侧 `debug.template.run` 直跑路径尚未迁到 Job。差距正本见
+- Status:in-progress（2026-09-02 晚间对账：本 Task 名下的 CLI/App 产品 PR 已连续合入
+  protected `main`（至 #1699）。`arkdeck commands --output json` 实测 33 个一级入口、
+  219 个 leaf = 210 executable + 6 tombstone + 3 refused，29 个 canonical Catalog
+  operation 均有一等领域 leaf；`session export preview/apply`（#1686、`CHG-2026-072`）、
+  `debug template list/run` 与 `debug logs`（#1688、`CHG-2026-073`）、`source` 族退役
+  （DEC-013，#1690）与 §14 机器契约产物（`TASK-AIN-026`，#1692）均已发布。当前 Catalog
+  digest `508783ac…` 上已按 `docs/design/cli-golden-journey-headless-runbook.md` 只用已发布
+  CLI 面 headless 复跑 GJ-1～GJ-5，五条全部 `REAL_DEVICE_PASS`（含 §2.1 HAR crash-resume 与
+  `debug.template@1` smoke），29 个 canonical operation 的真机覆盖矩阵 12 `realDevicePass` /
+  17 `notExercised`；脱敏记录与差距见 #1701（`references/v1.6-goal/gj-headless-rerun-2026-09-02.json`、
+  `real-device-validation.md`、产品规格 0.7 §13）。复跑期间修掉的产品缺陷：managed HDC
+  dual-stack 监听与执行台账毫秒时间（#1694）、补丁 lease 的 target 作用域（#1696）、隔离副本
+  注册取用来源项目、legacy `--workspace-project` 根下的注册 preset、sign 步骤 preset validator、
+  durable-history 校验在 legacy 台账行与旧 digest 非终态 Job 上 fail-closed（#1699）；DevEco
+  自动签名凭据的免 TTY 安装 `runtime signing install --build-profile` 在 #1700（`TASK-AIN-026`）
+  待合。残留（规格 §13.3）：preflight rejection 未发布 §8.4 零派发证据、domain leaf 退出码降级
+  为 1；重插 USB 后 resume 需再确认一次 `ambiguousIdentity` HAR 且被取代的 action 记为
+  `expired`；`runtime service update` 无法清除 legacy 根；项目移除的引用扫描按字面 projectRef
+  匹配；App 侧 `debug.template.run` 直跑路径尚未迁到 Job。差距正本见
   `docs/design/arkdeck-cli-product-spec.md` §13）
-- Golden Journey:GJ-4 为首要阻塞；同时关闭 GJ-1/GJ-2/GJ-3/GJ-5 已有生产数据只差
-  App/facade 投影的断点
+- Golden Journey:GJ-1～GJ-5 已在当前 digest `508783ac…` 上 headless `REAL_DEVICE_PASS`
+  （#1701 记录）；剩余为规格 §13.3 残留缺陷、17 个 `notExercised` operation 的真机覆盖与
+  App/facade 投影断点
 - Platform:macos
 - Requirements:`REQ-UX-007`、`REQ-WF-003`、`REQ-DEBUG-008`、`REQ-TRACE-010`、
   `REQ-FLASH-012`、`REQ-FLASH-013`、`REQ-FLASH-015`、`REQ-STO-003`
