@@ -6935,12 +6935,26 @@ public actor RuntimeJobEngine {
       resolved.bindingSnapshot, request: runtime.record.request,
       materializedStableIdentitySHA256:
         runtime.record.materializedStableTargetIdentitySHA256,
-      allowDeviceBoundHostSource:
-        runtime.record.providerID == CatalogProvider.analyzer.rawValue
-        || runtime.record.operationReference == OpenHarmonyLocalSigning.operationReference)
+      allowDeviceBoundHostSource: Self.consumesTargetScopedHostArtifact(
+        provider: runtime.record.providerID,
+        reference: runtime.record.operationReference))
     return ProviderResolvedInputArtifact(
       artifactID: resolved.artifactID, fileURL: resolved.fileURL,
       sha256: resolved.sha256, byteCount: resolved.byteCount)
+  }
+
+  /// Host-only operations that read an Artifact collected from, or imported
+  /// against, a durable device target. Analyzers read device evidence; local
+  /// signing reads a build output; `workspace.apply-patch@1` reads a patch
+  /// that `artifact import workspace-patch` bound to the target it was
+  /// imported for. Such a request names that target as its scope and pins no
+  /// binding revision; the lease's own provenance stays intact.
+  static func consumesTargetScopedHostArtifact(
+    provider: String, reference: String
+  ) -> Bool {
+    provider == CatalogProvider.analyzer.rawValue
+      || reference == OpenHarmonyLocalSigning.operationReference
+      || reference == "workspace.apply-patch@1"
   }
 
   private static func validateArtifactBinding(
@@ -7091,9 +7105,9 @@ public actor RuntimeJobEngine {
         try Self.validateArtifactBinding(
           artifact.bindingSnapshot, request: request,
           materializedStableIdentitySHA256: facts?.deviceIdentitySHA256,
-          allowDeviceBoundHostSource:
-            descriptor.provider == .analyzer
-            || descriptor.reference == OpenHarmonyLocalSigning.operationReference)
+          allowDeviceBoundHostSource: Self.consumesTargetScopedHostArtifact(
+            provider: descriptor.provider.rawValue,
+            reference: descriptor.reference))
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
