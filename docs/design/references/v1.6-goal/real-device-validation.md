@@ -241,3 +241,22 @@ OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.t
 把 `rejected(invalidInput, …)` receipt 以 `ok:true`/`terminalState: rejected` 返回并降级为 exit 1（§9 应为 65/77），零派发只能由台账 diff 证明；`install-sdk-release` 装的样例 release
 凭据对设备不可信（`code:9568329`），可用凭据是 DevEco 为该 bundle 签发、device-ids 含本机
 UDID 的 debug profile；本机磁盘低于 4 GiB 预留时 ArkForge prewarm 会以零派发拒绝 Flash。
+
+## 2026-09-02 Debug template 真实 App 投影
+
+使用本分支 Developer ID 签名的 Release App，通过生产 XPC 连接已安装 Runtime；未启用 App、
+Runtime 或设备 fixture。Debug → 只读工具只显示四个 approved template，没有自由文本 command、
+argv 或 path 输入。首次运行 `device.packageInventory` 得到 succeeded Job，但 UI 没有显示 Runtime
+已经发布的两个 Artifact；根因是 Debug 工作区 Job decoder 漏掉 `debug.template@1`，不是 Runtime
+或设备失败。补齐 exact operation allowlist 与回归测试后重新构建、验签并运行。
+
+最终 App 创建 `job-60fa9ca0dacfbdabba52db0d116ba691`，clientName 为
+`ArkDeckApp.DebugWorkspace.Commands`，operation 为 `debug.template@1`，target
+`TGT-958780b2ffb7` / binding r4。Job 于 13:45:23Z—13:45:24Z succeeded，
+`actualEffect=readOnly`、`outcomeUnknown=false`、residue 0；Runtime evidence 无 blocker，两个
+Artifact 均 published 且 bytesVerified。真实界面同步显示 exact Job、已知终态、两个 Artifact
+的名称、大小、digest 前缀、privacy 与各自导出入口；截图已逐图检查，原图只留本机。
+
+构建哈希、签名结果、完整脱敏 Job/Artifact 元数据、发现阶段和截图哈希见
+[App Debug template 验证记录](app-debug-template-job-verification-2026-09-02.json)。这关闭的是
+`TASK-AIN-021` 的 Debug template App 投影，不外推为其余 17 个 operation 或 USB 重插 HAR 已完成。

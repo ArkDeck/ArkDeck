@@ -73,7 +73,7 @@ StatusStrip 四格:
 - `策略` → `无可靠加密证据 → 按未受保护通道处理;设备授权 ≠ 链路机密性`
 
 卡片三「能力矩阵（当前 target）」,`DataTable`,列 = 能力 / 状态 / 探测证据（第三列 mono），固定四行:
-- `hidumper`：`debug.template.run(windowInventory)` 的 target / binding-bound 结果
+- `hidumper`：`debug.template@1(windowInventory)` 的 target / binding-bound Job 结果
 - `hitrace`：`trace.probe` 的 disposition、family、tag 数与 help SHA
 - `bytrace`：同一 `trace.probe` 的独立 disposition；probe failed / unrecognized 都显示 `无法确认`
 - `RockUSB Flash`：Catalog 中 `flash.dayu200` 的 availability / reason

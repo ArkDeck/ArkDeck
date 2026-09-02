@@ -194,12 +194,10 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
 
     async let traceResponse = DebugXPCReadTransport.request(
       method: "trace.probe", params: ["targetId": .string(targetID)])
-    async let hidumperResponse = DebugXPCReadTransport.request(
-      method: "debug.template.run",
-      params: [
-        "targetId": .string(targetID),
-        "templateId": .string(DebugRuntimeCommandTemplate.windowInventory.rawValue),
-      ])
+    async let hidumperRun = DebugTemplateJobExecution.run(
+      targetID: targetID,
+      bindingRevision: bindingRevision,
+      templateID: DebugRuntimeCommandTemplate.windowInventory.rawValue)
 
     var items: [OverviewCapabilityItemPresentation] = []
     switch await traceResponse {
@@ -213,8 +211,7 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
       }
     }
     items.insert(
-      Self.hidumperCapability(
-        from: await hidumperResponse, targetID: targetID, revision: bindingRevision),
+      Self.hidumperCapability(from: await hidumperRun),
       at: 0)
     items.append(Self.flashCapability(from: operations))
     return OverviewCapabilityMatrixPresentation(
@@ -309,37 +306,22 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
   }
 
   private static func hidumperCapability(
-    from response: Result<Data, DebugXPCReadFailure>,
-    targetID: String,
-    revision: Int
+    from run: DebugLogJobRunResult
   ) -> OverviewCapabilityItemPresentation {
-    do {
-      let data: Data
-      switch response {
-      case .success(let value): data = value
-      case .failure(let failure): throw failure
-      }
-      let envelope = try resultEnvelope(data)
-      guard let result = envelope["result"] as? [String: Any],
-        result["targetId"] as? String == targetID,
-        result["bindingRevision"] as? Int == revision,
-        result["templateId"] as? String == DebugRuntimeCommandTemplate.windowInventory.rawValue,
-        let truncated = result["outputTruncated"] as? Bool,
-        let lowering = result["loweringSha256"] as? String
-      else { throw DebugXPCReadFailure.transport("Runtime returned mismatched hidumper facts") }
-      let exitCode = result["exitCode"] as? Int
-      guard exitCode == 0, !truncated else {
-        return OverviewCapabilityItemPresentation(
-          id: "hidumper", name: "hidumper", state: .unknown,
-          evidence: "Probe did not complete cleanly")
-      }
+    switch run {
+    case .completed(let terminal)
+      where terminal.state == JobState.succeeded.rawValue && !terminal.outcomeUnknown:
       return OverviewCapabilityItemPresentation(
         id: "hidumper", name: "hidumper", state: .available,
-        evidence: "WindowManagerService read verified · lowering sha256 \(lowering.prefix(12))…")
-    } catch {
+        evidence: "debug.template@1 Job succeeded · \(terminal.jobID)")
+    case .completed(let terminal):
       return OverviewCapabilityItemPresentation(
         id: "hidumper", name: "hidumper", state: .unknown,
-        evidence: String(describing: error))
+        evidence: "debug.template@1 Job \(terminal.state) · \(terminal.jobID)")
+    case .failed(let failure):
+      return OverviewCapabilityItemPresentation(
+        id: "hidumper", name: "hidumper", state: .unknown,
+        evidence: failure)
     }
   }
 

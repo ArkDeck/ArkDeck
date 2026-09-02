@@ -44,11 +44,17 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
             "waitingForHuman": false, "outcomeUnknown": false,
             "outstandingResidueCount": 0,
           ],
+          [
+            "jobId": "job-template-1", "operation": "debug.template@1",
+            "targetId": "target-dayu200-a", "state": "succeeded",
+            "waitingForHuman": false, "outcomeUnknown": false,
+            "outstandingResidueCount": 0,
+          ],
         ])))
 
     XCTAssertEqual(presentation.targets.map(\.id), ["target-dayu200-a"])
     XCTAssertEqual(presentation.targets.first?.bindingRevision, 9)
-    XCTAssertEqual(presentation.jobs.map(\.id), ["job-debug-1"])
+    XCTAssertEqual(presentation.jobs.map(\.id), ["job-debug-1", "job-template-1"])
     XCTAssertTrue(presentation.jobs.first?.isActive == true)
     XCTAssertEqual(
       presentation.operation("capture.diagnostics@1")?.availability, .available)
@@ -432,6 +438,47 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       DebugApplicationFacade.approvedCommandTemplates.contains { $0.id == "requestRootMode" })
   }
 
+  func testTemplateRequestPinsPublishedOperationTargetOutputsAndCommandsClient() throws {
+    let request = try DebugTemplateRequestBuilder.request(
+      targetID: "target-dayu200-a",
+      bindingRevision: 9,
+      templateID: DebugRuntimeCommandTemplate.uptime.rawValue,
+      nonce: "contract")
+
+    XCTAssertEqual(request.requestID, "debug-template-ui-contract")
+    XCTAssertEqual(request.idempotencyKey, "debug-template-ui-contract")
+    XCTAssertEqual(request.target.targetID, "target-dayu200-a")
+    XCTAssertEqual(request.target.expectedBindingRevision, 9)
+    XCTAssertEqual(request.operation.id, "debug.template")
+    XCTAssertEqual(request.operation.version, 1)
+    XCTAssertEqual(
+      request.inputs, ["templateId": .string(DebugRuntimeCommandTemplate.uptime.rawValue)])
+    XCTAssertEqual(Set(request.requestedOutputs), [.rawArtifacts, .derivedArtifacts])
+    XCTAssertEqual(
+      request.clientContext?.clientName, ArkDeckAgentClientName.debugCommandsWorkspace)
+    XCTAssertThrowsError(
+      try DebugTemplateRequestBuilder.request(
+        targetID: "target-dayu200-a", bindingRevision: 9,
+        templateID: "shell rm -rf", nonce: "invalid"))
+  }
+
+  func testTemplateSubmissionReturnsTheRuntimeJobAndNeverRunsItInline() async {
+    let transport = DebugTemplateSubmissionTransport()
+    let result = await DebugTemplateJobSubmission.submit(
+      targetID: "target-dayu200-a",
+      bindingRevision: 9,
+      templateID: DebugRuntimeCommandTemplate.windowInventory.rawValue,
+      send: { await transport.request($0, $1) })
+
+    XCTAssertEqual(
+      result, .submitted(DebugLogJobAcceptancePresentation(jobID: "job-template-fixture")))
+    let snapshot = await transport.snapshot()
+    XCTAssertEqual(snapshot.methods, ["job.submit"])
+    let request = try? JSONDecoder().decode(
+      RuntimeOperationRequest.self, from: Data(snapshot.requestJSON.utf8))
+    XCTAssertEqual(request?.operation, RuntimeOperationReference(id: "debug.template", version: 1))
+  }
+
   func testApplicationSurfaceNamesOnlyClosedTypedWrites() throws {
     let source = try String(
       contentsOf: URL(filePath: #filePath)
@@ -455,7 +502,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(protocolBody.contains("func run(jobID:"))
     XCTAssertTrue(protocolBody.contains("func cancel(jobID:"))
     XCTAssertTrue(protocolBody.contains("func submitPortRule("))
-    XCTAssertTrue(protocolBody.contains("func runTemplate("))
+    XCTAssertTrue(protocolBody.contains("func submitTemplate("))
 
     for mutating in [
       "target.adopt",
@@ -464,7 +511,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       XCTAssertFalse(source.contains("\"\(mutating)\""))
     }
     for exposed in [
-      "operation.list", "target.list", "job.list", "debug.probe", "debug.template.run",
+      "operation.list", "target.list", "job.list", "debug.probe",
       "job.submit", "job.run", "job.cancel",
       "port-forward.create", "port-forward.remove",
       "deploy.native-library.app-owned",
@@ -475,6 +522,8 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     ] {
       XCTAssertTrue(source.contains("\"\(exposed)\""))
     }
+    XCTAssertFalse(source.contains("method: \"debug.template.run\""))
+    XCTAssertTrue(source.contains("RuntimeOperationReference(id: \"debug.template\", version: 1)"))
   }
 
   func testDebugAppsViewRunsTheTypedHAPPathInsteadOfADisabledPlaceholder() throws {
@@ -495,6 +544,29 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(view.contains("job.timeline.last"))
     XCTAssertFalse(view.contains("Button(DebugL10n.text(\"debug.apps.run\")) {}"))
     XCTAssertFalse(localization.contains("debug.blocked.hapImport"))
+  }
+
+  func testDebugCommandsViewProjectsTheTypedJobLifecycleAndArtifacts() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/DebugLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    XCTAssertTrue(view.contains("DebugApplicationFacade.debugTemplateReference"))
+    XCTAssertTrue(view.contains("model.submitTemplate(target:"))
+    XCTAssertTrue(view.contains("model.cancelCommand"))
+    XCTAssertTrue(view.contains("model.activeCommandJobID"))
+    XCTAssertTrue(view.contains("model.commandTerminal"))
+    XCTAssertTrue(view.contains("debug.commands.export.\\(row.artifact.id)"))
+    XCTAssertTrue(view.contains("DebugRecentJobsSection(model: model, jobs: relatedJobs)"))
+    XCTAssertFalse(view.contains("DebugRuntimeCommandResult"))
+    XCTAssertFalse(view.contains("commandResult"))
+    XCTAssertTrue(localization.contains("Runtime records the request as a durable Job"))
+    XCTAssertTrue(localization.contains("Runtime Job Artifacts"))
   }
 
   func testNativeLibraryRequestPinsPublishedOperationTargetAndClosedInputs() throws {
@@ -579,14 +651,13 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertFalse(view.contains(".tag(\"hashOnly\")"))
     XCTAssertFalse(view.contains(".tag(\"hashAndProcess\")"))
     XCTAssertFalse(view.contains(".tag(\"retainBackup\")"))
-    XCTAssertTrue(view.contains("DebugNativeLibraryAnnouncementBridge"))
+    XCTAssertTrue(view.contains("DebugAccessibilityAnnouncementBridge"))
     XCTAssertTrue(view.contains("notification: .announcementRequested"))
     XCTAssertTrue(view.contains("model.logFeedbackMatches(target: target)"))
     XCTAssertTrue(view.contains("model.hapFeedbackMatches(target: target)"))
     XCTAssertTrue(view.contains("model.portRuleFeedbackMatches(target: target)"))
     XCTAssertTrue(view.contains("model.commandFeedbackMatches(target: target"))
     XCTAssertTrue(view.contains("runtimeProbe.bindingRevision == target.bindingRevision"))
-    XCTAssertTrue(view.contains("result.bindingRevision == target.bindingRevision"))
     XCTAssertTrue(view.contains("fileURL: selectedLibraryURL"))
     XCTAssertTrue(
       view.contains("bindingRevision: target.bindingRevision"))
@@ -601,7 +672,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(localization.contains("获取日志"))
   }
 
-  func testDebugProbeAndCommandResponsesStayBoundToTargetAndClosedTemplate() throws {
+  func testDebugProbeResponseStaysBoundToTarget() throws {
     let target = DebugTargetPresentation(
       id: "target-dayu200-a", bindingRevision: 9, toolVersion: "3.2.0f",
       adoptedAtUTC: "2026-08-06T12:00:00Z")
@@ -635,26 +706,6 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       target: target)
     XCTAssertThrowsError(try privilegedSnapshot.get())
 
-    let command = DebugRuntimeResponseDecoding.command(
-      .success(
-        try objectResponse([
-          "targetId": target.id,
-          "bindingRevision": target.bindingRevision,
-          "templateId": DebugRuntimeCommandTemplate.uptime.rawValue,
-          "effect": "readOnly",
-          "executable": "hdc",
-          "executableSha256": String(repeating: "a", count: 64),
-          "arguments": ["-t", "<redacted-connect-key>", "shell", "uptime"],
-          "loweringSha256": String(repeating: "b", count: 64),
-          "exitCode": 0,
-          "durationMilliseconds": 91,
-          "stdout": "up 2 days\n",
-          "stderr": "",
-          "outputTruncated": false,
-        ])),
-      target: target, templateID: DebugRuntimeCommandTemplate.uptime.rawValue)
-    XCTAssertEqual(try command.get().exitCode, 0)
-    XCTAssertEqual(try command.get().argumentDisclosure[1], "<redacted-connect-key>")
   }
 
   func testDebugProbeParsersAcceptOnlyTypedPackageAndPortRows() {
@@ -778,5 +829,36 @@ private actor HAPSubmissionTransport {
             "ok": .bool(true), "id": .string("fixture"), "result": .object(result),
           ])))
     } catch { return .failure(.transport(String(describing: error))) }
+  }
+}
+
+/// Host-only typed-submit fixture. It deliberately refuses every method but
+/// `job.submit`, so the App facade cannot hide a direct command run here.
+private actor DebugTemplateSubmissionTransport {
+  private var methods: [String] = []
+  private var requestJSON = ""
+
+  func snapshot() -> (methods: [String], requestJSON: String) {
+    (methods, requestJSON)
+  }
+
+  func request(
+    _ method: String, _ params: [String: JSONValue]?
+  ) -> Result<Data, DebugXPCReadFailure> {
+    methods.append(method)
+    guard method == "job.submit",
+      case .string(let encoded)? = params?["requestJson"]
+    else { return .failure(.transport("unexpected fixture method: \(method)")) }
+    requestJSON = encoded
+    do {
+      return .success(
+        try CanonicalJSONEncoders.canonical().encode(
+          JSONValue.object([
+            "ok": .bool(true), "id": .string("fixture"),
+            "result": .object(["jobId": .string("job-template-fixture")]),
+          ])))
+    } catch {
+      return .failure(.transport(String(describing: error)))
+    }
   }
 }

@@ -42,6 +42,7 @@ package enum ArkDeckAgentClientName {
   package static let debugArtifactsWorkspace = "ArkDeckApp.DebugWorkspace.Artifacts"
   package static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
   package static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
+  package static let debugCommandsWorkspace = "ArkDeckApp.DebugWorkspace.Commands"
   /// Device's device-control workspace. It is named apart from the Viewer's
   /// client even though both capture a screenshot, because the daemon decides
   /// what an App may submit from the pair of client name and operation: a
@@ -123,7 +124,6 @@ package enum ArkDeckAgentXPC {
     "artifact.read",
     "device.candidates",
     "debug.probe",
-    "debug.template.run",
     "flash.bootloader-status",
     "flash.device-access",
     "flash.lanePlanPreview",

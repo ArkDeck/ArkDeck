@@ -63,6 +63,7 @@ enum AgentXPCAppJobKind: String, Sendable, Equatable {
   case debugNativeLibrary
   case debugHAP
   case debugPorts
+  case debugTemplate
   case deviceScreenshot
   case deviceRecording
   case deviceInput
@@ -365,6 +366,9 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
     case (ArkDeckAgentClientName.debugAppsWorkspace, "debug.hap"):
       guard case .integer(1)? = operation["version"] else { return nil }
       return .debugHAP
+    case (ArkDeckAgentClientName.debugCommandsWorkspace, "debug.template"):
+      guard case .integer(1)? = operation["version"] else { return nil }
+      return .debugTemplate
     case (ArkDeckAgentClientName.debugNetworkWorkspace, "port-forward.create"),
       (ArkDeckAgentClientName.debugNetworkWorkspace, "port-forward.remove"):
       guard case .integer(1)? = operation["version"] else { return nil }

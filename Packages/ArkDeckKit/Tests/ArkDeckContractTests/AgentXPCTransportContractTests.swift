@@ -124,7 +124,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         // identifier, no bytes. It is here so a workspace can be refused
         // before it starts work rather than after (TASK-IDC-002).
         "artifact.inspect", "artifact.list", "artifact.quota", "artifact.read",
-        "debug.probe", "debug.template.run",
+        "debug.probe",
         // flash.lanePlanPreview is read-only by contract (CHG-2026-068
         // LPP-AC-1): exactly inspect/discover/materialize on the daemon,
         // no import, no permit, nothing durable.
@@ -365,6 +365,22 @@ final class AgentXPCTransportContractTests: XCTestCase {
           operationVersion: 1,
           clientName: ArkDeckAgentClientName.debugAppsWorkspace)),
       .appSubmit(requestID: "contract-submit", kind: .debugHAP))
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "debug.template",
+          operationVersion: 1,
+          clientName: ArkDeckAgentClientName.debugCommandsWorkspace)),
+      .appSubmit(requestID: "contract-submit", kind: .debugTemplate))
+    XCTAssertNil(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "debug.template",
+          operationVersion: 1,
+          clientName: ArkDeckAgentClientName.debugNetworkWorkspace)))
+    XCTAssertNil(
+      AgentXPCEndpoint.admission(of: frame(method: "debug.template.run")),
+      "the App must execute templates only through its typed Job gate")
     XCTAssertEqual(
       AgentXPCEndpoint.admission(
         of: try submitFrame(

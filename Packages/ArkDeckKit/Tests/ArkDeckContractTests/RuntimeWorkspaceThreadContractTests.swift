@@ -170,6 +170,7 @@ final class RuntimeWorkspaceThreadContractTests: XCTestCase {
       ("capture.diagnostics", ArkDeckAgentClientName.traceWorkspace),
       ("capture.diagnostics", ArkDeckAgentClientName.debugLogsWorkspace),
       ("debug.hap", ArkDeckAgentClientName.debugAppsWorkspace),
+      ("debug.template", ArkDeckAgentClientName.debugCommandsWorkspace),
       ("port-forward.create", ArkDeckAgentClientName.debugNetworkWorkspace),
       ("input.tap", ArkDeckAgentClientName.deviceControl),
     ]
