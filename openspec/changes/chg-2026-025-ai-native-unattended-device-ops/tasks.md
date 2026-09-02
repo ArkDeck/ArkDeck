@@ -3749,9 +3749,19 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
 
 ## TASK-AIN-021 — App 生产可观察性与 typed 调试闭环收口
 
-- Status:in-progress（生产实现已在本地垂直工作树完成，等待本 Task 路径护栏经维护者
-  review/merge 进入 protected `main` 后提交产品 PR；本 Task PR 自身不修改产品代码、
-  Catalog 或 Runtime 行为）
+- Status:in-progress（2026-09-02 对账：本 Task 名下的 CLI/App 产品 PR 已连续合入
+  protected `main`（至 #1683）。`arkdeck commands --output json` 实测 33 个一级入口、
+  212 个 leaf = 203 executable + 6 tombstone + 3 refused，28 个 canonical Catalog
+  operation 均有一等领域 leaf。产品规格 §6 目标命令树中只剩 `session export
+  preview/apply`、`debug template list/run`、`debug logs` 与 `source` namespace 未发布：
+  session export 随独立工作树中的 proposed change `CHG-2026-072` 交付，debug template
+  须先由独立 approved operation change 发布 typed Catalog mapping。§14 机器契约产物
+  （`openspec/contracts/cli-*`、feature coverage、App capability registry、
+  `Tests/Fixtures/CLI/**`）不在本 Task Allowed paths 内，需另立 Task。当前 Catalog digest
+  `b8c7148f…` 上已有 CLI/App 发起的 observe、diagnostics、HAP、native 与 canonical Flash
+  真机成功记录（`docs/design/references/v1.6-goal/`），但 GJ-1～GJ-5 的 CLI headless
+  逐步闭环尚未按四态记录，最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`。
+  差距正本见 `docs/design/arkdeck-cli-product-spec.md` §13）
 - Golden Journey:GJ-4 为首要阻塞；同时关闭 GJ-1/GJ-2/GJ-3/GJ-5 已有生产数据只差
   App/facade 投影的断点
 - Platform:macos
