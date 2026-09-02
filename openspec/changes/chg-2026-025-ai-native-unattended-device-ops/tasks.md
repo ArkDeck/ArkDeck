@@ -3756,10 +3756,10 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   `CHG-2026-072` 发布，`debug template list/run` 与 `debug logs` 已随 #1688 与
   `CHG-2026-073`（新 operation `debug.template@1`、`capture.diagnostics@1` 的 HiLog-only
   preset、根级 `evidence/runs/TASK-DTO-001/`）发布，`debug` 族已按规格 §6.2 全部落地。
-  产品规格 §6 目标命令树中只剩 `source` namespace 未发布，需维护者裁决为 typed resource
-  还是平台服务。§14 机器契约产物（`openspec/contracts/cli-*`、feature coverage、App
-  capability registry、`Tests/Fixtures/CLI/**`）不在本 Task Allowed paths 内，需另立
-  Task。`CHG-2026-073` 使 Catalog digest 变为 `508783ac…`；上一 digest `b8c7148f…` 上
+  `source` 族已按 DEC-013（#1690，规格 0.4）归 `platformService` 退役，产品规格 §6 目标
+  命令树没有未发布 leaf。§14 机器契约产物（`openspec/contracts/cli-*`、feature coverage、App
+  capability registry、`Tests/Fixtures/CLI/**`）不在本 Task Allowed paths 内，已另立
+  `TASK-AIN-026`。`CHG-2026-073` 使 Catalog digest 变为 `508783ac…`；上一 digest `b8c7148f…` 上
   CLI/App 发起的 observe、diagnostics、HAP、native 与 canonical Flash 真机成功记录
   （`docs/design/references/v1.6-goal/`）按 `PRODUCT-LOOP.md` 只证明历史，GJ-1～GJ-5
   的 CLI headless 逐步闭环尚未按四态记录，最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧
@@ -4138,3 +4138,105 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
 - `git diff --check` 通过，两份文档的相对链接目标仍存在。
 - 设备连接、HDC/RockUSB/Flash dispatch、真实 Artifact 与 hardware evidence 均为 0；
   验证结论只覆盖文档命令与 protected-main registry 一致，不产生 `REAL_DEVICE_PASS`。
+
+## TASK-AIN-026 — CLI 语言无关机器契约产物与 feature coverage
+
+- Status:in-progress（维护者要求交付 CLI「全功能」结论的最后一道机器门；本 Task 只有在
+  定义 PR 经维护者 review/merge 进入 protected `main` 后，才能被后续实现 PR 声明。Task 定义
+  本身不授权同一 PR 修改 Allowed paths 中的文件）
+- Compatibility note:本 Task 交付产品规格 §14 列出的全部机器可读产物与 §15.1 的共享 fixture
+  基线。它是 `TASK-AIN-021` 之外的独立路径边界：`openspec/contracts/**` 不在 021 授权内，而
+  这些产物的唯一事实源是 021 已交付的 Swift registry/contract 代码。它不恢复 readiness/
+  verification/archive 链，不把文档完成计为 Golden Journey 进度，也不替代当前 Catalog digest
+  的真机验证
+- Golden Journey:GJ-1—GJ-5 共用的外部 Agent 发现面；本 Task 让外部 Agent 与未来 Windows 复刻
+  只读 language-neutral registry/schema/fixtures 即可，不改变任何 Journey 状态
+- Platform:macos（产物本身平台无关）
+- Root cause:产品规格 §14 的十项产物与 `Tests/Fixtures/CLI/**` 全部不存在；`--version` 的
+  `pageSchemaVersion` 与 `nextActionSchemaVersion` 仍为 `null`；§18 要求 coverage manifest 在
+  macOS 上没有 `blocked`/`partial`/`unclassified`，而今天没有 manifest 可判。`TASK-AIN-021`
+  的 Allowed paths 不含 `openspec/contracts/**`，所以这些产物无法在其名下交付
+- Depends on:protected `main` 上的 `CLICommandRegistry`、`CLIErrorRegistry`、
+  `CLIResultEnvelope`/`CLIEventEnvelope`、`CLICanonicalJSON`、`CLIControlMethodRegistry`、
+  `ArkDeckControlProtocol`（generated）、`RuntimeOperationCatalog`（generated）、DEC-013 与
+  `docs/design/implementation-coverage.json`；不新增 operation、provider、integration/device
+  profile 或 destructive policy
+- Production reachability:外部 Agent 或 Windows port 读取 `openspec/contracts/cli-*` →
+  与 `arkdeck commands --output json`、`arkdeck --version --output json` 零漂移 → 同一
+  fixture 驱动 Swift parser/process 合约测试；产物不生成 trusted fact、capability、argv、
+  远端路径或硬件 evidence
+- Trusted fact sources:命令面、错误码、schema 版本与 canonical JSON 来自上述 Swift registry；
+  operation 清单来自 generated Catalog；daemon method 集合来自 generated control registry 与
+  `CLIControlMethodRegistry` 的穷举分类；App 能力清单来自 `ArkDeckApp/**` 的用户可触发
+  route/menu/action 与 `docs/design/implementation-coverage.json`；分类闭集与判定规则来自
+  产品规格 §14/§18
+- Allowed paths:
+  - `openspec/contracts/cli-command-registry.yaml`
+  - `openspec/contracts/cli-result.schema.json`
+  - `openspec/contracts/cli-page.schema.json`
+  - `openspec/contracts/cli-event.schema.json`
+  - `openspec/contracts/cli-next-action.schema.json`
+  - `openspec/contracts/cli-error-registry.yaml`
+  - `openspec/contracts/cli-canonical-json-vectors.json`
+  - `openspec/contracts/cli-feature-coverage.json`
+  - `openspec/contracts/app-product-capability-registry.yaml`
+  - `openspec/contracts/runtime-control-plane.schema.json`
+  - `Packages/ArkDeckKit/**`
+  - `ArkDeckApp/**`（仅为 App route/menu/action 登记 stable feature ID；不改交互、导航与
+    可见文案，因此不触发设计稿镜像）
+  - `docs/design/**`
+- Forbidden paths:
+  - `openspec/contracts/**` 中未逐个列出的其余文件（`capability-registry.yaml`、
+    `catalogs/**`、`workflow-step-registry.yaml`、`workflow-step.schema.json`、
+    `manifest.schema.json`、`hardware-evidence.schema.json`、`journal-event.schema.json`、
+    `provider-contracts.md`）
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/integrations/**`、`openspec/platforms/**`、其他 change 目录
+  - `Catalog/**`、`scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、`README.md`、
+    `README.zh-CN.md`、`.design-sync/**`
+  - 任何 CLI 语法/退出码/wire method 语义变更、Runtime admission/capability/trusted fact、
+    device transport、真实硬件 evidence
+- Risk:low（产物由 Swift 事实源生成并以合约测试钉零漂移；主要风险是把 target 写成已实现，
+  或把真实的 `blocked` 写成别的分类，因此 generator 必须按 §14 校验 classification↔status，
+  App 登记表的每个 ID 必须有 coverage 条目，孤儿/重复/未知 ID 在 Swift 车道 fail closed。
+  `openspec/contracts/cli-*` 的手改若绕过 Swift 车道，由后续 `TASK-AIN-022` 的路径分类器
+  把这些文件归入 Swift 车道触发面）
+- Hardware required:no
+- Decision-Grade:D0
+
+### Deliverables
+
+- Package 内的 Swift 生成入口（dev 可执行或等价），从 `CLICommandRegistry`、
+  `CLIErrorRegistry`、canonical JSON vectors 与 control registry 生成
+  `cli-command-registry.yaml`（含 executable leaf 的 lifecycle/replacement 元数据）、
+  `cli-error-registry.yaml`、`cli-canonical-json-vectors.json` 与 `cli-feature-coverage.json`，
+  并提供零漂移 `--check`。
+- 手写并以真实 CLI 输出验证的 `cli-result.schema.json`、`cli-page.schema.json`、
+  `cli-event.schema.json`、`cli-next-action.schema.json` 与 `runtime-control-plane.schema.json`；
+  `--version` 的 `pageSchemaVersion`/`nextActionSchemaVersion` 改为非 `null` 并 pin 到这些 schema。
+- `app-product-capability-registry.yaml`：App 每个 route、menu action 与用户可触发 command 的
+  stable feature ID、owner、classification 与 CLI 等价路径（含 DEC-013 的 `platformService`）；
+  `ArkDeckApp/**` 只登记 ID，不改交互与文案。
+- `cli-feature-coverage.json`：daemon method、Catalog operation、CLI registry 与 App 登记表的
+  并集，每条含 §14 的 classification/targetClassification/targetCommand/requiredPlatforms/
+  implementationStatusByPlatform/conformanceFixture；macOS 上不得残留 `blocked`、`partial` 或
+  `unclassified`，除非产品事实确实如此并在规格 §13 同步登记。
+- `Packages/ArkDeckKit/Tests/Fixtures/CLI/**`：§15.1 的 argv-array → normalized request/
+  result/exit fixture 基线（每个 portable leaf 的 valid/invalid argv、JSON envelope、错误映射、
+  tombstone、`--output jsonl` 拒绝、canonical JSON、page/`nextAction` union），由 Swift 合约
+  测试逐条执行。
+- `docs/design/cli-machine-contracts.md`，并同步产品规格 §13/§14/§18 与 §16 Slice A 的落地状态。
+
+### Verification
+
+- generator `--check` 与 Swift 合约测试对全部产物零漂移；删除任一 registry 条目或改动 App ID
+  时对应测试打红（canary 反证，exit 0 ≠ 成功）。
+- `arkdeck commands --output json`、`arkdeck --version --output json` 与产物逐字段一致；每个
+  JSON schema 对真实 CLI 输出 fixture 通过，且对至少一个反例失败。
+- coverage manifest 的 classification↔status 校验、孤儿/重复/未知 ID fail closed；App 登记表与
+  `docs/design/implementation-coverage.json` 的 surface 清单交叉核对。
+- `python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD
+  --merge-base --include-worktree --run-local` 选中 Swift 与 App 车道并全绿；最终实现 commit
+  使用 `TASK-AIN-026` 并在 push 前通过 base-tree `scripts/check_pr_paths.py --preflight`。
+- 设备连接、HDC/RockUSB/Flash dispatch、真实 Artifact 与 hardware evidence 均为 0；验证结论
+  只覆盖机器契约与 protected-main 事实源一致，不产生 `REAL_DEVICE_PASS`。
