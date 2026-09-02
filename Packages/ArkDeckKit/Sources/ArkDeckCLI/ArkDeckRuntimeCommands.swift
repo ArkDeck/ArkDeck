@@ -7,6 +7,7 @@
 // operation even in principle, only ask the daemon to.
 
 import ArkDeckAgentClient
+import ArkDeckBootstrap
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckRuntime
