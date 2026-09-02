@@ -1604,9 +1604,10 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
 
   private static func validRelativePath(_ value: String) -> Bool {
     guard !value.isEmpty, value.utf8.count <= 1_024, !value.hasPrefix("/"),
-      !value.utf8.contains(0), URL(filePath: value).standardized.path == value
+      !value.utf8.contains(0)
     else { return false }
-    return !value.split(separator: "/").contains("..")
+    let components = value.split(separator: "/", omittingEmptySubsequences: false)
+    return components.allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
   }
 
   private static func validateOwnerDirectory(_ url: URL) throws {

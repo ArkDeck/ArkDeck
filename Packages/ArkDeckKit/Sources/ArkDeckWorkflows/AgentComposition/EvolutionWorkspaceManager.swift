@@ -865,8 +865,13 @@ package final class EvolutionWorkspaceManager: EvolutionWorkspacePort,
       guard !relative.isEmpty, relative.utf8.count <= maximumRelativePathBytes else {
         throw EvolutionWorkspaceError.unsafeSourceEntry("relativePathExceeded")
       }
-      if relative == ".build" || relative.hasPrefix(".build/") {
-        if relative == ".build" { enumerator.skipDescendants() }
+      // SwiftPM writes path-bound module caches below each package's `.build`
+      // directory. They are neither part of the workspace revision (hidden
+      // entries are skipped there) nor portable into an isolated tree. Copying
+      // a nested cache makes an otherwise clean `workspace.run-tests` fail
+      // before it can compile anything in the new location.
+      if relative.split(separator: "/").contains(where: { $0 == ".build" }) {
+        if entry.lastPathComponent == ".build" { enumerator.skipDescendants() }
         continue
       }
       let values = try entry.resourceValues(forKeys: [

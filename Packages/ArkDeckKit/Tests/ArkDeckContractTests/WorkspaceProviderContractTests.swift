@@ -185,6 +185,12 @@ final class WorkspaceProviderContractTests: XCTestCase {
       try Data(contentsOf: patchURL))
   }
 
+  func testInspectSourceIsAvailableWhenTheProfilePinsAnInspector() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.inspect-source@1"))
+    XCTAssertEqual(provider.runtimeAvailability(for: descriptor), .available)
+  }
+
   func testProductionProfileBindsSwiftPMExecutableRoleAndSelfSafeTestPreset() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }

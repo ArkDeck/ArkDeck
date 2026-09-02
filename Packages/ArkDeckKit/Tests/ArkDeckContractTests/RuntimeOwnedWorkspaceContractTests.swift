@@ -177,13 +177,15 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
     XCTAssertEqual(automatic.first?.consumptionCount, 1)
   }
 
-  func testNonterminalDerivedJobKeepsItsSourceProjectRegistration() async throws {
+  func testNonterminalDerivedJobKeepsItsSourceProjectRegistrationForBuiltinPreset() async throws {
     let sourceRoot = try temporaryDirectory("reference-source")
     let stateRoot = try temporaryDirectory("reference-state")
     try FileManager.default.createDirectory(
       at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
     try Data("line one\nline two\n".utf8).write(
       to: sourceRoot.appending(path: "Sources/App.txt"))
+    try Data([0x50, 0x4b, 0x03, 0x04, 0x41, 0x52, 0x4b, 0x44, 0x45, 0x43, 0x4b]).write(
+      to: sourceRoot.appending(path: "Sources/Input.hap"))
     // XCTest's temporary directory is spelled through macOS's `/var` alias.
     // The registration contract intentionally rejects symlink ancestry, so
     // feed it the physical path just as a real CLI caller must.
@@ -231,13 +233,12 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
         nowUTC: { Self.fixedTimestamp }),
       workspaceProjectStore: projectStore)
     let request = try operationRequest(
-      id: "workspace.read-source-range", requestID: "request-derived-reference",
+      id: "workspace.build-openharmony", requestID: "request-derived-reference",
       idempotencyKey: "idempotency-derived-reference",
       inputs: [
         "projectRef": .string(isolation.workspaceProjectRef),
-        "filePath": .string("Sources/App.txt"),
-        "lineStart": .integer(1),
-        "lineEnd": .integer(1),
+        "buildPresetRef": .string("copy-hap"),
+        "expectedWorkspaceRevision": .string(sourceRevision),
       ])
     let accepted = try await engine.submit(try JSONEncoder().encode(request))
 

@@ -214,8 +214,9 @@ CLI 面对同一台 DAYU200（`TGT-958780b2ffb7`，binding revision 4，hdc 3.2.
 OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.template@1` smoke。
 脱敏记录（只留 SHA-256、jobId、executionId、计数与 UTC 时间）见
 [gj-headless-rerun-2026-09-02.json](gj-headless-rerun-2026-09-02.json)，其中
-`operationRealDeviceCoverage` 给出 29 个 canonical operation 的真机覆盖矩阵：12 个
-`realDevicePass`，17 个 `notExercised`。
+`operationRealDeviceCoverage` 给出 29 个 canonical operation 的真机覆盖矩阵。2026-09-03
+补跑后为 29 个 `realDevicePass`、0 个 `notExercised`；每个 operation 的代表 Job ID 均记录在
+同一脱敏文件中。
 
 | Journey | 四态 | 关键事实 |
 |---|---|---|
@@ -247,7 +248,7 @@ OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.t
   fail closed；Job succeeded 后同一 remove 越过 active/uncertain 引用扫描并由既有 preset 阻止，
   项目 generation、preset、四条历史 unknown Job 与 residue 均未改变。
 
-残留（不阻塞四态，记入 §13.3 候选）：`install-sdk-release` 装的样例 release
+运行环境观察（不是 CLI 功能缺陷）：`install-sdk-release` 装的样例 release
 凭据对设备不可信（`code:9568329`），可用凭据是 DevEco 为该 bundle 签发、device-ids 含本机
 UDID 的 debug profile；本机磁盘低于 4 GiB 预留时 ArkForge prewarm 会以零派发拒绝 Flash。
 
@@ -255,6 +256,38 @@ UDID 的 debug profile；本机磁盘低于 4 GiB 预留时 ArkForge prewarm 会
 重跑 stale `workspace.revisionConflict`，结果为 `ok:false` / `invalidInput` / exit 65，
 并包含 `phase: preAdmission`、`newDispatchCount: 0`；2.x Job ledger newest ID 与时间戳在调用
 前后逐字相同。
+
+### 2026-09-03 `TASK-AIN-021` 候选收口
+
+在同一 Catalog digest 上，用最终 Team-provisioned arm64 候选补跑原先未单独覆盖的 17 个
+operation；涉及设备的行继续使用同一 target 与 binding。候选 CLI executable SHA-256 为
+`03385f2f0b42c78bf9d566888376ee4c4dd6d70cbf3e43910dc4cba1f0c3a6e6`，已安装 Runtime
+executable SHA-256 为
+`b5931c7a144011222ea7934de48371e01cbe624cb1a31301bcd04e62fd24a4d6`，最终服务状态为 `ok`。
+
+- Analyzer/trace：`analyzer.analyze-trace@1`、`analyzer.summarize-trace@1`、
+  `analyzer.summarize-hilog@1` 均 succeeded。
+- Device interaction：`capture.screen-sequence@1`、tap/long-press/swipe 与 port-forward
+  create/remove 均 succeeded；port lowering 修正为 HDC `fport`/`rport` tuple，并以 exact list
+  readback 验证。
+- Workspace：checkpoint、diff、source inspect/range、patch/revert、tests、sweep 与
+  symbolize-crash 均 succeeded。`workspace.symbolize-crash@1` 只接受来自 HDC
+  `capture.diagnostics@1` 的 device-bound crash-log Artifact；错误 hilog provenance 在建 Job 前
+  拒绝。
+- Runtime invariants：跨 Catalog digest 复用同一 execution/idempotency key 返回
+  `idempotencyConflict`，没有创建 Job 或产生新 dispatch；隔离副本不再复用绝对路径绑定的嵌套
+  SwiftPM `.build` cache。
+
+原来阻止 `TASK-AIN-021` 收口的五类缺陷也已在同一候选中闭合：preflight rejection 发布
+`preAdmission`/零派发证据与 exit 65；USB 重插在 fresh exact identity + binding proof 后不再追加
+冗余 `ambiguousIdentity` HAR，且被取代 action 的终态正确；`runtime service update` 清除五个
+legacy workspace/SDK/analyzer key；派生 Job 保留来源项目引用；App 的 Debug template 统一经
+Runtime Job 投影。USB 修复由生产 HAR 合约锁定；2026-09-02 旧执行中出现的第二轮确认仍作为
+修复前历史观察保留，不回写成新的真机运行。
+
+Typed workspace sweep 随后删除 3 个本轮覆盖副本；另外 3 个 unknown 或 revision-drifted 副本由
+fail-closed GC 原样保留，没有用手工文件删除绕过 Runtime。上述结论是待维护者 review 的候选
+证据，不替代 protected `main` 批准。
 
 ## 2026-09-02 Debug template 真实 App 投影
 
@@ -272,5 +305,5 @@ Artifact 均 published 且 bytesVerified。真实界面同步显示 exact Job、
 的名称、大小、digest 前缀、privacy 与各自导出入口；截图已逐图检查，原图只留本机。
 
 构建哈希、签名结果、完整脱敏 Job/Artifact 元数据、发现阶段和截图哈希见
-[App Debug template 验证记录](app-debug-template-job-verification-2026-09-02.json)。这关闭的是
-`TASK-AIN-021` 的 Debug template App 投影，不外推为其余 17 个 operation 或 USB 重插 HAR 已完成。
+[App Debug template 验证记录](app-debug-template-job-verification-2026-09-02.json)。结合上节的
+17 个 operation 补跑与 USB HAR 修复合约，这一 App 投影不再是 `TASK-AIN-021` 的未覆盖项。

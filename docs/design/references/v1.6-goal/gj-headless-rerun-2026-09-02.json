@@ -766,13 +766,79 @@
       "notes": "Five product gaps were found and fixed on the way (PR #1696 merged a326c64d; PR #1699 merged b25ad279; PR #1700 open): patch-lease target scope, isolated-copy registration, registered presets under a legacy root, the sign-step preset validator, durable-history scans on legacy/stale-digest rows, and headless DevEco credential install. The signing credential installed by install-sdk-release is not trusted by the device for com.example.waterflowdemo; the DevEco debug profile is."
     }
   ],
+  "taskAIN021FollowUp": {
+    "date": "2026-09-03",
+    "state": "candidateCompletePendingMaintainerReview",
+    "evidenceKind": "redacted-metadata-derived-from-real-runtime-and-production-contracts",
+    "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "candidate": {
+      "baseRevision": "ebb03393b8f6cbcbd5ac8fdcd9690c86eaf70cdd",
+      "cliExecutableSHA256": "03385f2f0b42c78bf9d566888376ee4c4dd6d70cbf3e43910dc4cba1f0c3a6e6",
+      "runtimeExecutableSHA256": "b5931c7a144011222ea7934de48371e01cbe624cb1a31301bcd04e62fd24a4d6",
+      "bundleIdentifier": "com.arkdeck.cli",
+      "teamIdentifier": "8AQTYW5FKR",
+      "architecture": "arm64",
+      "runtimeServiceStatus": "ok"
+    },
+    "coverageSummary": {
+      "canonicalOperationCount": 29,
+      "realDevicePass": 29,
+      "notExercised": 0
+    },
+    "appProjection": {
+      "state": "realDevicePass",
+      "operationReference": "debug.template@1",
+      "jobID": "job-60fa9ca0dacfbdabba52db0d116ba691",
+      "terminalState": "succeeded",
+      "actualEffect": "readOnly",
+      "outcomeUnknown": false,
+      "artifactCount": 2
+    },
+    "residualDefectClosures": [
+      {
+        "kind": "preflightProjection",
+        "result": "The 2.x domain leaf now returns invalidInput with phase preAdmission, newDispatchCount 0 and exit 65; the Job ledger remains unchanged."
+      },
+      {
+        "kind": "usbReconnectHumanAction",
+        "result": "Fresh exact stable-identity and binding evidence now resolves the physicalConnection action without emitting a redundant ambiguousIdentity action; contract coverage pins zero dispatch before proof and the superseded terminal status."
+      },
+      {
+        "kind": "legacyRuntimeWorkspaceRoot",
+        "result": "A daemon-only runtime service update removed all five legacy workspace, SDK and analyzer environment keys while preserving the pinned HDC, ArkTrace and ArkForge identities."
+      },
+      {
+        "kind": "derivedWorkspaceProjectReference",
+        "result": "Derived Jobs retain their source project ownership, so project removal remains fail closed while an active or uncertain derived Job still references it."
+      },
+      {
+        "kind": "appDebugTemplateProjection",
+        "result": "The App submits debug.template@1 as a Runtime Job and projects its terminal state and both published Artifacts instead of calling the deprecated direct control method."
+      }
+    ],
+    "coverageDefectsClosed": [
+      "port-forward create/remove lowering now uses the HDC fport/rport tuple and exact list readback",
+      "idempotency reuse across Catalog digests is rejected before Job creation or dispatch",
+      "workspace source inspection, built-in test presets and symbol-map relative paths are accepted by their intended typed operations",
+      "isolated copies exclude nested SwiftPM .build caches whose absolute paths cannot be reused",
+      "symbolize-crash accepts only a device-bound capture.diagnostics crash-log Artifact with exact HDC provenance across the host project scope"
+    ],
+    "cleanup": {
+      "typedSweepJobID": "job-1a8396ba313f082e659a470fbf474d92",
+      "destroyedCurrentCoverageCopies": 3,
+      "retainedUnvouchedCopies": 3,
+      "note": "Fail-closed GC retained unknown or revision-drifted trees; no manual filesystem deletion was used."
+    }
+  },
   "operationRealDeviceCoverage": {
     "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
     "operations": [
       {
         "operationReference": "analyzer.analyze-trace@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-b4239f0345289a6a54e81132d689dac4"
+        ]
       },
       {
         "operationReference": "analyzer.extract-crash-signature@1",
@@ -783,13 +849,17 @@
       },
       {
         "operationReference": "analyzer.summarize-hilog@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-449d98f7c6b5fc0840692e5cadc92a69"
+        ]
       },
       {
         "operationReference": "analyzer.summarize-trace@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-315a545b1512a84ee299cb4ddc69634c"
+        ]
       },
       {
         "operationReference": "capture.diagnostics@1",
@@ -807,8 +877,10 @@
       },
       {
         "operationReference": "capture.screen-sequence@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-f5a99fc6c6f1e9ab6669b739d5840563"
+        ]
       },
       {
         "operationReference": "debug.hap@1",
@@ -846,18 +918,24 @@
       },
       {
         "operationReference": "input.long-press@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-e30afaba3abf093d272396f94cb481ff"
+        ]
       },
       {
         "operationReference": "input.swipe@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-585c198c6f31bf96d4e3ad46f6dfad2f"
+        ]
       },
       {
         "operationReference": "input.tap@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-7bdf2b59c2e7350e8e19ffcbf15a37e7"
+        ]
       },
       {
         "operationReference": "observe.device@1",
@@ -871,19 +949,24 @@
       },
       {
         "operationReference": "port-forward.create@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-1fde62c6e9d38bcf0e15376a4d253383"
+        ]
       },
       {
         "operationReference": "port-forward.remove@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-eebe11a2f12fd35f67da78918dacb150"
+        ]
       },
       {
         "operationReference": "workspace.apply-patch@1",
         "state": "realDevicePass",
         "jobIDs": [
-          "job-b0b96042dcc400d101267cbe02ae550a"
+          "job-b0b96042dcc400d101267cbe02ae550a",
+          "job-bd97f3958398daf31ef3211cee748fda"
         ]
       },
       {
@@ -895,13 +978,17 @@
       },
       {
         "operationReference": "workspace.create-checkpoint@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-e94de3c99ab78bcf670f26fdce3353f7"
+        ]
       },
       {
         "operationReference": "workspace.inspect-diff@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-77c6b1e0367ea7c0433145554968662c"
+        ]
       },
       {
         "operationReference": "workspace.inspect-git-status@1",
@@ -912,8 +999,10 @@
       },
       {
         "operationReference": "workspace.inspect-source@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-e55a3a9804af9a13e9ae7afe06edb729"
+        ]
       },
       {
         "operationReference": "workspace.prepare-isolated-copy@1",
@@ -924,18 +1013,24 @@
       },
       {
         "operationReference": "workspace.read-source-range@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-5c292f9fb71fbf5b7afd85fa81691c27"
+        ]
       },
       {
         "operationReference": "workspace.revert-patch@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-fd268b661b9468bfc99e46f681f7cfb8"
+        ]
       },
       {
         "operationReference": "workspace.run-tests@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-4841228568f917850d0e34ef2d5e6349"
+        ]
       },
       {
         "operationReference": "workspace.sign-openharmony-hap@1",
@@ -947,13 +1042,17 @@
       },
       {
         "operationReference": "workspace.sweep-isolated-copies@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-b21d6e29bee77db90b824eaeeb371aab"
+        ]
       },
       {
         "operationReference": "workspace.symbolize-crash@1",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-e56ab088ba15ed95367eda356f3133ec"
+        ]
       }
     ]
   }

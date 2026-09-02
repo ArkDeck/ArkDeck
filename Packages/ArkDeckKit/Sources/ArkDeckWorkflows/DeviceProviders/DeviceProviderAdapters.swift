@@ -793,6 +793,19 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     }
   }
 
+  /// Canonical task tuple used by HDC's shared `fport ls`/`fport rm` surface.
+  /// Forward rows are host -> device; reverse rows are device -> host, so the
+  /// endpoint order changes even though the typed spec always names host as
+  /// `localPort` and device as `remotePort`.
+  private static func portForwardEndpoints(_ spec: HDCPortForwardSpec) -> [String] {
+    switch spec.direction {
+    case .forward:
+      return ["tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"]
+    case .reverse:
+      return ["tcp:\(spec.remotePort)", "tcp:\(spec.localPort)"]
+    }
+  }
+
   package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
@@ -1378,22 +1391,21 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           timeoutSeconds: 30))
     case .createPortForward(let spec):
       let verb = spec.direction == .forward ? "fport" : "rport"
+      let endpoints = Self.portForwardEndpoints(spec)
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            [verb, "tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"],
-            context: context),
+            [verb] + endpoints, context: context),
           timeoutSeconds: 30))
     case .removePortForward(let spec):
-      let verb = spec.direction == .forward ? "fport" : "rport"
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            [verb, "rm", "tcp:\(spec.localPort)"], context: context),
+            ["fport", "rm"] + Self.portForwardEndpoints(spec), context: context),
           timeoutSeconds: 30))
     case .readPackagePresence(let bundle):
       return TypedProcessPlan(
@@ -1427,13 +1439,12 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           argumentSummary: try deviceArguments(
             ["shell", "ls", "-ld", path.remotePath], context: context),
           timeoutSeconds: 15))
-    case .readPortForwardPresence(let spec):
-      let verb = spec.direction == .forward ? "fport" : "rport"
+    case .readPortForwardPresence:
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: try deviceArguments([verb, "ls"], context: context),
+          argumentSummary: try deviceArguments(["fport", "ls"], context: context),
           timeoutSeconds: 30))
     case .sendNativeLibraryToStaging(let deployment):
       guard let resolved = context.resolvedInputArtifact,
@@ -2809,10 +2820,14 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       else {
         return .unknown(reason: "port-forward presence readback is not trustworthy")
       }
-      let expected = ["tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"]
+      let expected = Self.portForwardEndpoints(spec)
+      let direction = spec.direction == .forward ? "[Forward]" : "[Reverse]"
       let present = text.split(whereSeparator: \.isNewline).contains { line in
         let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
-        return expected.allSatisfy(fields.contains)
+        guard fields.contains(direction), fields.count >= expected.count else { return false }
+        return fields.indices.dropLast(expected.count - 1).contains { index in
+          Array(fields[index..<(index + expected.count)]) == expected
+        }
       }
       return .verified(summary: ["present": present ? "true" : "false"])
     }
