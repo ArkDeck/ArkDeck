@@ -70,6 +70,44 @@ final class CLITypedCapturePresetContractTests: XCTestCase {
     XCTAssertNil(projected.inputs["advancedDump"])
   }
 
+  func testDebugLogsUsesTheSharedHilogPreset() throws {
+    let projected = try RuntimeCLI.capturePresetExecutionRequest(
+      path: ["debug", "logs"],
+      request: request(inputs: [
+        "durationSeconds": .integer(30),
+        "hilogFilters": .array([.string("com.example.app"), .string("ArkUI:Layout")]),
+      ]))
+    XCTAssertEqual(
+      projected.inputs,
+      try DiagnosticCapturePreset.logs(
+        durationSeconds: 30, filters: ["com.example.app", "ArkUI:Layout"]))
+    XCTAssertEqual(projected.inputs["uiScreenshot"], .bool(false))
+    XCTAssertEqual(projected.inputs["uiComponentTree"], .bool(false))
+    XCTAssertEqual(projected.inputs["crashLogs"], .bool(false))
+    XCTAssertNil(projected.inputs["traceCategories"])
+
+    let bare = try RuntimeCLI.capturePresetExecutionRequest(
+      path: ["debug", "logs"], request: request(inputs: ["durationSeconds": .integer(5)]))
+    XCTAssertEqual(bare.inputs["hilogFilters"], .array([]))
+
+    XCTAssertThrowsError(
+      try RuntimeCLI.capturePresetExecutionRequest(
+        path: ["debug", "logs"],
+        request: request(inputs: [
+          "durationSeconds": .integer(5), "hilogFilters": .array([.string("a b; rm")]),
+        ])),
+      "a filter that could read as a shell fragment never reaches the request")
+    XCTAssertThrowsError(
+      try RuntimeCLI.capturePresetExecutionRequest(
+        path: ["debug", "logs"],
+        request: request(inputs: ["durationSeconds": .integer(601)])))
+    XCTAssertThrowsError(
+      try RuntimeCLI.capturePresetExecutionRequest(
+        path: ["debug", "logs"],
+        request: request(inputs: ["durationSeconds": .integer(5), "uiDump": .bool(true)])),
+      "the logs preset accepts no other diagnostics leg")
+  }
+
   func testPresetRejectsFieldsFromAnotherDiagnosticsRecipe() {
     XCTAssertThrowsError(
       try RuntimeCLI.capturePresetExecutionRequest(

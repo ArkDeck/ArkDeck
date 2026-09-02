@@ -9653,6 +9653,18 @@ public actor RuntimeJobEngine {
           "port_forward_\(spec.direction.rawValue)_\(spec.localPort)_\(spec.remotePort)")
       ]
     case .runApprovedRemoteRead:
+      if case .hdc(.runDebugTemplate(let template))? = action {
+        // The template identity is the whole parameter set; the durable
+        // intent names it so replay and reconciliation see which closed
+        // command ran, never the tokens as free text.
+        arguments = [
+          "catalogId": .string("arkdeck-remote-operations"),
+          "actionId": .string("debugTemplate"),
+          "parameters": .object(["templateId": .string(template.rawValue)]),
+          "artifactId": .string("template-output"),
+        ]
+        break
+      }
       if case .hdc(.inspectNativeLibrary(let deployment, let expectation))? = action {
         arguments = [
           "catalogId": .string("arkdeck-remote-operations"),

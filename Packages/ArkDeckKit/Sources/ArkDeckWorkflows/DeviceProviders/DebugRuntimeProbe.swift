@@ -7,6 +7,39 @@ public enum DebugRuntimeCommandTemplate: String, Codable, CaseIterable, Sendable
   case debugParameterRead = "device.debugParameterRead"
   case windowInventory = "device.windowInventory"
   case uptime = "device.uptime"
+
+  /// The closed remote command tokens after the connect-key selector. This
+  /// table is the single owner of what each template runs: the legacy direct
+  /// probe, the `debug.template@1` Catalog operation and the CLI disclosure
+  /// all read it, so a member cannot drift between the three.
+  public var remoteCommand: [String] {
+    switch self {
+    case .packageInventory: return ["shell", "bm", "dump", "-a"]
+    case .debugParameterRead: return ["shell", "param", "get", "persist.ace.debug.enabled"]
+    case .windowInventory: return ["shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"]
+    case .uptime: return ["shell", "uptime"]
+    }
+  }
+
+  /// The stdout budget the template's output must fit in; a larger answer
+  /// is a truncated, failed read rather than a partial success.
+  public var outputByteBudget: Int {
+    switch self {
+    case .packageInventory: return 2 * 1024 * 1024
+    case .debugParameterRead: return 4 * 1024
+    case .windowInventory: return 8 * 1024 * 1024
+    case .uptime: return 16 * 1024
+    }
+  }
+
+  public var title: String {
+    switch self {
+    case .packageInventory: return "Installed package inventory"
+    case .debugParameterRead: return "ACE debug parameter readback"
+    case .windowInventory: return "Window manager inventory"
+    case .uptime: return "Device uptime"
+    }
+  }
 }
 
 public enum DebugRuntimePortDirection: String, Codable, Sendable {
@@ -213,22 +246,8 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
   ) async throws -> DebugRuntimeCommandResult {
     let route = try requireRoute(targetID)
     let hdc = try hdcResolver.resolveExecutable(providerID: "hdc")
-    let command: [String]
-    let budget: Int
-    switch template {
-    case .packageInventory:
-      command = ["shell", "bm", "dump", "-a"]
-      budget = 2 * 1024 * 1024
-    case .debugParameterRead:
-      command = ["shell", "param", "get", "persist.ace.debug.enabled"]
-      budget = 4 * 1024
-    case .windowInventory:
-      command = ["shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"]
-      budget = 8 * 1024 * 1024
-    case .uptime:
-      command = ["shell", "uptime"]
-      budget = 16 * 1024
-    }
+    let command = template.remoteCommand
+    let budget = template.outputByteBudget
     let exactArguments = deviceArguments(route: route, command: command)
     let receipt = try await runner.run(
       executable: hdc, arguments: exactArguments,

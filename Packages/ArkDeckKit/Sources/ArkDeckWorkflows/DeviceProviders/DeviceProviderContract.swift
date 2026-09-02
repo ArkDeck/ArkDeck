@@ -109,6 +109,10 @@ public enum HDCProviderAction: Sendable, Equatable {
   case readOwnedPathPresence(HDCOwnedRemotePath)
   case readOwnedDirectoryPresence(HDCOwnedRemoteDirectory)
   case readPortForwardPresence(HDCPortForwardSpec)
+  /// One closed read-only Debug template (`debug.template@1`). The member
+  /// selects fixed remote command tokens owned by `DebugRuntimeCommandTemplate`;
+  /// nothing the caller wrote reaches argv.
+  case runDebugTemplate(DebugRuntimeCommandTemplate)
 }
 
 /// Engine-resolved flash input. The URL is not supplied by a Runtime
@@ -437,6 +441,7 @@ public enum TypedProviderAction: Sendable, Equatable {
     case .hdc(.readPackagePresence), .hdc(.readProcessPresence),
       .hdc(.readOwnedPathPresence), .hdc(.readOwnedDirectoryPresence),
       .hdc(.readPortForwardPresence),
+      .hdc(.runDebugTemplate),
       .hdc(.inspectNativeLibrary):
       return .readOnly
     case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.captureScreenshot),
@@ -589,6 +594,9 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case .hdc(.queryProperty(let property)):
       self.init(
         kind: "hdc.queryProperty", arguments: ["property": .string(property.rawValue)])
+    case .hdc(.runDebugTemplate(let template)):
+      self.init(
+        kind: "hdc.runDebugTemplate", arguments: ["templateId": .string(template.rawValue)])
     case .hdc(.observeStorage(let request)):
       self.init(
         kind: "hdc.observeStorage",
@@ -1152,6 +1160,11 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "hdc.listDeviceCandidates": return .hdc(.listDeviceCandidates)
     case "hdc.observeDevice":
       return .hdc(.observeDevice(connectKey: try string("connectKey")))
+    case "hdc.runDebugTemplate":
+      guard let template = DebugRuntimeCommandTemplate(rawValue: try string("templateId")) else {
+        throw DeviceProviderError.unsupportedAction("persisted debug template is not in the closed set")
+      }
+      return .hdc(.runDebugTemplate(template))
     case "hdc.queryProperty":
       guard let property = HDCAllowlistedProperty(rawValue: try string("property")) else {
         throw DeviceProviderError.unsupportedAction("persisted query property is not allowlisted")

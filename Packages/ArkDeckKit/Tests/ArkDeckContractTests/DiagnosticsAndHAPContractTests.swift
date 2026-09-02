@@ -539,6 +539,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         throw RuntimeDispatchFailure.failed("unexpected provider")
       }
       switch action {
+      case .runDebugTemplate:
+        note("runDebugTemplate")
+        return receipt("up 1 day\n")
       case .injectPointerInput:
         note("injectPointerInput")
         // uinput's own acknowledgement shape. The verdict is read from

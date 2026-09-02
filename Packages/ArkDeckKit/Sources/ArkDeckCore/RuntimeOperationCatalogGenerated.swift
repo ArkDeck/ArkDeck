@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce"
+  public static let catalogDigest = "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -311,6 +311,38 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "install-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "process-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "debug-hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default)
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
+    ),
+    CatalogOperationDescriptor(
+      id: "debug.template",
+      version: 1,
+      title: "Run one approved read-only Debug command template on the bound device",
+      provider: .hdc,
+      minimumEffect: .readOnly,
+      permittedEffects: [.readOnly],
+      authorization: [.readOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceSharedReadOnly,
+      inputs: [
+        CatalogFieldDescriptor(name: "templateId", type: .string, isRequired: true, enumValues: ["device.packageInventory", "device.debugParameterRead", "device.windowInventory", "device.uptime"], summary: "Which closed read-only template to run. The remote command tokens, output budget and title of each member are provider-owned; the caller selects an identity and never supplies command text. `arkdeck debug template list` publishes the set with its disclosures.")
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "templateOutput", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "templateReport", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "run-debug-template", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 12582912,
+      preflightAttempts: 2,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "template-output.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "template-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),

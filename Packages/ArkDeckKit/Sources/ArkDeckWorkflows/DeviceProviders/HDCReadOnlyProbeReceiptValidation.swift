@@ -10,11 +10,20 @@ enum HDCReadOnlyProbeReceiptValidation {
     _ receipt: ProviderSubprocessReceipt,
     context: String
   ) throws {
-    var parser = HDCSemanticOutputParser()
-    parser.consume(ProcessOutputChunk(stream: .stdout, bytes: receipt.stdout))
-    parser.consume(ProcessOutputChunk(stream: .stderr, bytes: receipt.stderr))
+    if let reason = semanticFailureReason(stdout: receipt.stdout, stderr: receipt.stderr) {
+      throw DeviceProviderError.factsUnavailable("\(context): \(reason)")
+    }
+  }
 
-    guard case .failure(let failure) = parser.finish(exitCode: 0) else { return }
+  /// The same marker classification for a receipt that has already been
+  /// captured by another path (`debug.template@1` verifies the engine's
+  /// process receipt rather than a subprocess receipt).
+  static func semanticFailureReason(stdout: Data, stderr: Data) -> String? {
+    var parser = HDCSemanticOutputParser()
+    parser.consume(ProcessOutputChunk(stream: .stdout, bytes: stdout))
+    parser.consume(ProcessOutputChunk(stream: .stderr, bytes: stderr))
+
+    guard case .failure(let failure) = parser.finish(exitCode: 0) else { return nil }
     let reason: String
     switch failure {
     case .unauthorized:
@@ -26,6 +35,6 @@ enum HDCReadOnlyProbeReceiptValidation {
     case .nonZeroExit(let status):
       reason = "HDC exited \(status)"
     }
-    throw DeviceProviderError.factsUnavailable("\(context): \(reason)")
+    return reason
   }
 }

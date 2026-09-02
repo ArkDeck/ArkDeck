@@ -131,7 +131,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   ) -> ProviderOperationAvailability {
     switch operation.reference {
     case "observe.device@1", "capture.diagnostics@1", "capture.screen-sequence@1",
-      "debug.hap@1",
+      "debug.hap@1", "debug.template@1",
       "port-forward.create@1", "port-forward.remove@1",
       "input.tap@1", "input.long-press@1", "input.swipe@1":
       return .available
@@ -183,6 +183,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case .injectPointerInput:
       return .hdc(.injectPointerInput(try pointerInputSpec(operation, inputs, context)))
     case .runApprovedRemoteRead:
+      if operation.reference == "debug.template@1", step.stepID == "run-debug-template" {
+        return .hdc(.runDebugTemplate(try debugTemplate(inputs)))
+      }
       if descriptorIsDebugHAP(operation), step.actionReference?.actionID == "packageInfo" {
         return try debugHAPAction(for: step, inputs: inputs, context: context)
       }
@@ -295,6 +298,19 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
 
   private func descriptorIsDebugHAP(_ operation: CatalogOperationDescriptor) -> Bool {
     operation.id == "debug.hap"
+  }
+
+  /// The template identity is the only input `debug.template@1` takes, and
+  /// admission has already held it to the descriptor's closed enum. Anything
+  /// else is refused here rather than mapped to a nearest command.
+  private func debugTemplate(_ inputs: [String: JSONValue]) throws -> DebugRuntimeCommandTemplate {
+    guard case .string(let templateID)? = inputs["templateId"],
+      let template = DebugRuntimeCommandTemplate(rawValue: templateID)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "templateId input is not one of the closed Debug templates")
+    }
+    return template
   }
 
   /// The gesture is the operation's identity, never an input: `input.tap@1`
@@ -814,6 +830,17 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           argumentSummary: try deviceArguments(
             ["shell", "param", "get", property.rawValue], context: context),
           timeoutSeconds: 15))
+    case .runDebugTemplate(let template):
+      // The tokens come from the template table, the connect key from the
+      // binding, and the budget travels with the plan so the dispatcher's
+      // default cannot silently widen or narrow what the template promised.
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(template.remoteCommand, context: context),
+          timeoutSeconds: 30),
+        outputByteBudget: template.outputByteBudget)
     case .observeStorage:
       return TypedProcessPlan(
         action: action,
@@ -1951,6 +1978,33 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       case .malformed(let reason):
         return .unknown(reason: reason)
       }
+    case .runDebugTemplate(let template):
+      guard !receipt.stdoutTruncated else {
+        return .failed(code: "truncated", detail: "template output exceeded its byte budget")
+      }
+      guard let exitStatus = receipt.exitStatus else {
+        return .unknown(reason: "template produced no process result")
+      }
+      guard exitStatus == 0 else {
+        return .failed(
+          code: "templateExitStatus", detail: "template \(template.rawValue) exited \(exitStatus)")
+      }
+      // HDC reports transport and authorization failures in stdout while
+      // exiting zero; those markers are a failed read, not device output.
+      if let reason = HDCReadOnlyProbeReceiptValidation.semanticFailureReason(
+        stdout: receipt.stdout, stderr: receipt.stderr)
+      {
+        return .failed(code: "targetUnavailable", detail: reason)
+      }
+      return .verified(summary: [
+        "templateId": template.rawValue,
+        "remoteCommand": template.remoteCommand.joined(separator: " "),
+        "exitStatus": String(exitStatus),
+        "durationMilliseconds": String(Int((receipt.durationSeconds * 1_000).rounded())),
+        "stdoutByteCount": String(receipt.stdout.count),
+        "stdoutTruncated": "false",
+        "stderrByteCount": String(receipt.stderr.count),
+      ])
     case .queryProperty(let property):
       guard !receipt.stdoutTruncated else {
         return .failed(code: "truncated", detail: "property output exceeded budget")
@@ -3523,7 +3577,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     switch intent.action {
     case .hdc(.observeTool), .hdc(.observeServer), .hdc(.listDeviceCandidates),
       .hdc(.observeDevice), .hdc(.queryProperty), .hdc(.observeStorage), .hdc(.captureHilog),
-      .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
+      .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact), .hdc(.runDebugTemplate):
       // Read-only families: re-observation is always safe.
       return .confirmedNotExecuted
     case .hdc(.queryPackageReadback), .hdc(.verifyProcessState),

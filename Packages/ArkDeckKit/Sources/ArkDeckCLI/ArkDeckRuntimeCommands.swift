@@ -2380,6 +2380,11 @@ enum RuntimeCLI {
       inputs = try DiagnosticCapturePreset.componentDetail(
         windowID: try requiredString("windowId", in: request.inputs),
         componentID: try requiredString("componentId", in: request.inputs))
+    case ["debug", "logs"]:
+      try requireOnly(request.inputs, keys: ["durationSeconds", "hilogFilters"], command: path)
+      inputs = try DiagnosticCapturePreset.logs(
+        durationSeconds: try requiredInt("durationSeconds", in: request.inputs),
+        filters: try optionalStrings("hilogFilters", in: request.inputs) ?? [])
     case ["trace", "capture"]:
       try requireOnly(
         request.inputs,
@@ -2460,6 +2465,14 @@ enum RuntimeCLI {
       }
       return string
     }
+  }
+
+  private static func optionalStrings(
+    _ key: String,
+    in inputs: [String: JSONValue]
+  ) throws -> [String]? {
+    guard inputs[key] != nil else { return nil }
+    return try requiredStrings(key, in: inputs)
   }
 
   private static func optionalBool(
@@ -4226,7 +4239,7 @@ params))
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing debug subcommand (probe|hap|native|start|evaluate|status)")
+        message: "missing debug subcommand (probe|template|logs|hap|native|start|evaluate|status)")
     }
     if subcommand == "probe" {
       var rest = Array(arguments.dropFirst())
@@ -4240,8 +4253,25 @@ params))
         try session.request("debug.probe", ["targetId": .string(targetID)]))
       return
     }
+    if subcommand == "template" {
+      switch arguments.dropFirst().first {
+      case "list":
+        try runDebugTemplateList(Array(arguments.dropFirst(2)))
+      case "run":
+        try await runDomainOperation(
+          path: ["debug", "template", "run"], Array(arguments.dropFirst(2)))
+      default:
+        throw CLIError(
+          exitCode: EX_USAGE, message: "missing debug template subcommand (list|run)")
+      }
+      return
+    }
     if subcommand == "hap" {
       try await runDomainOperation(path: ["debug", "hap"], Array(arguments.dropFirst()))
+      return
+    }
+    if subcommand == "logs" {
+      try await runDomainOperation(path: ["debug", "logs"], Array(arguments.dropFirst()))
       return
     }
     if subcommand == "native" {

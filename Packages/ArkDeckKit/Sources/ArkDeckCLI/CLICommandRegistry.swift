@@ -2398,6 +2398,9 @@ enum CLICommandRegistry {
         options: runtimeClientOptions([targetIDOption, targetProtocolOption]),
         connectsToRuntime: true),
       domainLeaf("hap", "debug.hap", "debug.hap@1", "install, launch and observe a HAP"),
+      domainLeaf(
+        "logs", "debug.logs", "capture.diagnostics@1",
+        "capture one bounded HiLog window through the shared typed logs preset"),
       CLILeafSpec(
         token: "start",
         canonicalCommand: "debug.start",
@@ -2451,6 +2454,20 @@ enum CLICommandRegistry {
         connectsToRuntime: true),
     ],
     groups: [
+      CLINodeSpec(
+        token: "template",
+        summary: "closed read-only Debug command templates, run through the Runtime Job path",
+        leaves: [
+          CLILeafSpec(
+            token: "list",
+            canonicalCommand: "debug.template.list",
+            summary: "publish the closed template set with its remote command disclosure and budgets",
+            options: [outputOption],
+            outputModes: [.human, .json]),
+          domainLeaf(
+            "run", "debug.template.run", "debug.template@1",
+            "run one approved read-only Debug template as a Runtime Job"),
+        ]),
       CLINodeSpec(
         token: "native",
         summary: "app-owned native library deployment",
