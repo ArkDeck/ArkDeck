@@ -3,14 +3,6 @@ import Foundation
 import XCTest
 
 final class ManualUIFlashDriverContractTests: XCTestCase {
-  /// Reuse imported SDK modules across validator invocations. The validator
-  /// script itself is still interpreted from current source each time; a
-  /// fresh module cache per assertion turned three small shape checks into
-  /// several minutes of unrelated AppKit/Foundation cold compilation.
-  private static let candidateValidatorModuleCache = FileManager.default.temporaryDirectory
-    .appending(
-      path: "manual-ui-validator-modules-\(UUID().uuidString)", directoryHint: .isDirectory)
-
   private func repositoryRoot() -> URL {
     var repositoryRoot = URL(filePath: #filePath)
     for _ in 0..<5 {
@@ -32,8 +24,10 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   private func runCandidateValidator(_ candidateURL: URL) throws -> (
     status: Int32, stdout: String, stderr: String
   ) {
-    let cache = Self.candidateValidatorModuleCache
-    try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+    // The validator script is interpreted from current source each time;
+    // only the imported SDK modules are cached, in the directory every
+    // interpreting test process shares (see ManualUIFlashFixtures).
+    let cache = try ManualUIFlashFixtures.sharedModuleCache()
     let output = Pipe()
     let errors = Pipe()
     let process = Process()
