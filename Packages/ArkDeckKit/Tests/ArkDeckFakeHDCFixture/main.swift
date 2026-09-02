@@ -198,23 +198,59 @@ case .headlessServer, .managedServer:
     // output.
     Thread.sleep(forTimeInterval: 1)
   }
-  let listener = socket(AF_INET, SOCK_STREAM, 0)
-  guard listener >= 0 else { exit(65) }
+  // Real `hdc 3.2.0f` binds its channel host through a dual-stack socket, so
+  // the kernel reports the listener as AF_INET6 with the IPv4-mapped loopback
+  // `::ffff:127.0.0.1`. `ARKDECK_FAKE_HDC_LISTENER_FAMILY=inet6-mapped`
+  // reproduces that shape so the managed-ownership gate is proven against the
+  // socket family the real tool actually uses, not only the plain AF_INET one.
+  let listenerFamily = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_LISTENER_FAMILY"]
+  let listener: Int32
+  let bindResult: Int32
   var reuse: Int32 = 1
-  guard
-    setsockopt(
-      listener, SOL_SOCKET, SO_REUSEADDR, &reuse,
-      socklen_t(MemoryLayout<Int32>.size)) == 0
-  else { exit(66) }
-  var address = sockaddr_in(
-    sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
-    sin_family: sa_family_t(AF_INET),
-    sin_port: port.bigEndian,
-    sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")),
-    sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
-  let bindResult = withUnsafePointer(to: &address) { pointer in
-    pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
-      Darwin.bind(listener, socketAddress, socklen_t(MemoryLayout<sockaddr_in>.size))
+  if listenerFamily == "inet6-mapped" || listenerFamily == "inet6-loopback" {
+    // `inet6-loopback` binds the IPv6 loopback `::1` only: a listener that
+    // can never serve `127.0.0.1`, kept so the ownership rule is proven to
+    // accept the mapped form and not every AF_INET6 socket on the port.
+    listener = socket(AF_INET6, SOCK_STREAM, 0)
+    guard listener >= 0 else { exit(65) }
+    var v6Only: Int32 = listenerFamily == "inet6-loopback" ? 1 : 0
+    guard
+      setsockopt(
+        listener, SOL_SOCKET, SO_REUSEADDR, &reuse,
+        socklen_t(MemoryLayout<Int32>.size)) == 0,
+      setsockopt(
+        listener, Int32(IPPROTO_IPV6), IPV6_V6ONLY, &v6Only,
+        socklen_t(MemoryLayout<Int32>.size)) == 0
+    else { exit(66) }
+    var address = sockaddr_in6()
+    address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+    address.sin6_family = sa_family_t(AF_INET6)
+    address.sin6_port = port.bigEndian
+    let bound = listenerFamily == "inet6-loopback" ? "::1" : "::ffff:127.0.0.1"
+    guard inet_pton(AF_INET6, bound, &address.sin6_addr) == 1 else { exit(66) }
+    bindResult = withUnsafePointer(to: &address) { pointer in
+      pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+        Darwin.bind(listener, socketAddress, socklen_t(MemoryLayout<sockaddr_in6>.size))
+      }
+    }
+  } else {
+    listener = socket(AF_INET, SOCK_STREAM, 0)
+    guard listener >= 0 else { exit(65) }
+    guard
+      setsockopt(
+        listener, SOL_SOCKET, SO_REUSEADDR, &reuse,
+        socklen_t(MemoryLayout<Int32>.size)) == 0
+    else { exit(66) }
+    var address = sockaddr_in(
+      sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
+      sin_family: sa_family_t(AF_INET),
+      sin_port: port.bigEndian,
+      sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")),
+      sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
+    bindResult = withUnsafePointer(to: &address) { pointer in
+      pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+        Darwin.bind(listener, socketAddress, socklen_t(MemoryLayout<sockaddr_in>.size))
+      }
     }
   }
   guard bindResult == 0, listen(listener, 4) == 0 else { exit(67) }

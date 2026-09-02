@@ -5,15 +5,34 @@ import CryptoKit
 import Darwin
 import Foundation
 
+/// The one canonical time form the execution store writes and reads:
+/// `yyyy-MM-ddTHH:mm:ss.SSSZ`, millisecond precision.
+///
+/// The value is rounded to the millisecond *before* it is formatted, and a
+/// parsed value is rounded the same way before it is compared back. Formatting
+/// a raw `Date` through the fractional ISO 8601 style truncates whatever lies
+/// below the millisecond, and a parsed `.002` is a binary double just under
+/// two milliseconds — so the old round trip disagreed with itself for about
+/// half of all timestamps, which surfaced as `orchestrationClockUntrusted`
+/// ("orchestration time cannot be represented") at execution creation and
+/// would have made stored records unreadable by their own reader.
 package enum RuntimeAgentTime {
   package static func format(_ date: Date) -> String {
-    date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    let milliseconds = (date.timeIntervalSince1970 * 1000).rounded()
+    let wholeSeconds = (milliseconds / 1000).rounded(.down)
+    let fraction = Int(milliseconds - wholeSeconds * 1000)
+    let seconds = Date(timeIntervalSince1970: wholeSeconds)
+      .formatted(Date.ISO8601FormatStyle())
+    return String(seconds.dropLast()) + String(format: ".%03dZ", fraction)
   }
 
   package static func parse(_ value: String) -> Date? {
-    guard let date = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value),
-      format(date) == value else { return nil }
-    return date
+    guard let parsed = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value)
+    else { return nil }
+    let normalized = Date(
+      timeIntervalSince1970: (parsed.timeIntervalSince1970 * 1000).rounded() / 1000)
+    guard format(normalized) == value else { return nil }
+    return normalized
   }
 }
 

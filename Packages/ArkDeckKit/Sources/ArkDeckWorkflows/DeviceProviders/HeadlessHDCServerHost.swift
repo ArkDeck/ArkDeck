@@ -234,8 +234,21 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
       if permitsUnregisteredTestFixture {
         await supervisor.setParticipantImpactReliability(false, for: selection.endpoint)
       } else {
-        let registered = await HDCServerProcessSupervisor(supervisor: supervisor)
-          .observeRegisteredExistingServer(endpoint: selection, toolchain: toolchain)
+        // hdc 3.2.0f publishes the commandless identity family (0.6.0) and no
+        // checkserver golden; 3.2.0d publishes the read-only checkserver
+        // family (0.3.0). Bind through the family the selected tool belongs
+        // to, as the App facade does: gating every tool on the 0.3.0 registry
+        // meant a daemon launching 3.2.0f could never establish its own
+        // server's health and restarted forever.
+        let processSupervisor = HDCServerProcessSupervisor(supervisor: supervisor)
+        let registered: HDCRegisteredServerObservationResult
+        if HDCServerProcessSupervisor.selectsCommandlessFamily(toolchain) {
+          registered = await processSupervisor.observeManagedCommandlessServer(
+            endpoint: selection, toolchain: toolchain, serverVersion: check.serverVersion)
+        } else {
+          registered = await processSupervisor.observeRegisteredExistingServer(
+            endpoint: selection, toolchain: toolchain)
+        }
         guard case .observed(let registeredGeneration, let registeredVersion) = registered.classification,
           registeredGeneration == generation, registeredVersion == check.serverVersion,
           let state = await supervisor.state(for: selection.endpoint),

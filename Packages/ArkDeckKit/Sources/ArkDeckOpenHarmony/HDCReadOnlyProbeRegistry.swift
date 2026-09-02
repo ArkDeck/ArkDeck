@@ -499,19 +499,7 @@ struct SystemHDCServerProcessIdentityObserver: HDCServerProcessIdentityObserving
   }
 
   private func isLoopbackOrWildcardListener(_ socket: socket_info) -> Bool {
-    let address = socket.soi_proto.pri_tcp.tcpsi_ini.insi_laddr
-    if socket.soi_family == AF_INET {
-      let value = address.ina_46.i46a_addr4.s_addr
-      return value == in_addr_t(INADDR_ANY) || value == inet_addr("127.0.0.1")
-    }
-    let bytes = withUnsafeBytes(of: address.ina_6) { Array($0) }
-    let wildcard = bytes.allSatisfy { $0 == 0 }
-    let mappedLoopback =
-      bytes.count == 16
-      && bytes[0..<10].allSatisfy { $0 == 0 }
-      && bytes[10] == 0xFF && bytes[11] == 0xFF
-      && Array(bytes[12..<16]) == [127, 0, 0, 1]
-    return wildcard || mappedLoopback
+    HDCListenerAddressFacts.isLoopbackOrWildcard(socket)
   }
 
   private func localIPv4Port(_ endpoint: HDCServerEndpoint) -> UInt16? {

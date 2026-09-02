@@ -371,16 +371,13 @@ struct HDCExact320FSystemIdentityObserver: HDCServerProcessIdentityObserving {
         bigEndian: UInt16(
           truncatingIfNeeded: socket.psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport))
       guard port == selectedPort else { continue }
-      let address = socket.psi.soi_proto.pri_tcp.tcpsi_ini.insi_laddr
-      let addressBytes: [UInt8]
-      if socket.psi.soi_family == AF_INET {
-        addressBytes = withUnsafeBytes(of: address.ina_46.i46a_addr4.s_addr) { Array($0) }
-      } else {
-        addressBytes = withUnsafeBytes(of: address.ina_6) { Array($0) }
+      // Decode the address the way the kernel labels it (`insi_vflag`), not
+      // by the socket family: real hdc 3.2.0f listens through a dual-stack
+      // AF_INET6 socket whose local address is the plain IPv4 loopback.
+      guard let local = HDCListenerAddressFacts.localAddress(socket.psi) else {
+        return .unregisteredAddress
       }
-      if Self.isRegisteredListenerAddress(
-        family: Int32(socket.psi.soi_family), addressBytes: addressBytes)
-      {
+      if Self.isRegisteredListenerAddress(family: local.family, addressBytes: local.bytes) {
         matches += 1
       } else {
         return .unregisteredAddress
