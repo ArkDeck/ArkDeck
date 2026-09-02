@@ -1395,6 +1395,15 @@ public actor RuntimeJobEngine {
     }
   }
 
+  private func requireNoActiveWorkspaceProjectReference(_ projectRef: String) throws {
+    let workspaceProvider = providers.provider(id: CatalogProvider.workspace.rawValue)
+    try admissionService.requireNoActiveWorkspaceProjectReference(
+      projectRef,
+      resolveRegistrationProjectRef: {
+        workspaceProvider?.workspaceRegistrationProjectRef(for: $0)
+      })
+  }
+
   package func workspaceProjectList() throws -> [RuntimeWorkspaceProjectResource] {
     guard let workspaceProjectStore else {
       throw AgentExecutionControlFailure(
@@ -1434,7 +1443,7 @@ public actor RuntimeJobEngine {
     return try workspaceProjectStore.update(
       projectRef: projectRef, expectedGeneration: expectedGeneration,
       kind: kind, rootPath: rootPath,
-      requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
+      requireNoActiveReference: requireNoActiveWorkspaceProjectReference)
   }
 
   package func workspaceProjectRemove(
@@ -1446,7 +1455,7 @@ public actor RuntimeJobEngine {
     }
     return try workspaceProjectStore.remove(
       projectRef: projectRef, expectedGeneration: expectedGeneration,
-      requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
+      requireNoActiveReference: requireNoActiveWorkspaceProjectReference)
   }
 
   package func workspacePresetList(

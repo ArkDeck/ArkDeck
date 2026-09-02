@@ -234,10 +234,14 @@ OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.t
   不可用、sign 步骤 validator 钉常量、durable-history 校验在 77 行 legacy 行与 4 个旧 digest
   `waitingForRecovery` Job 上 fail-closed（PR #1699）；DevEco 自动签名凭据无法 headless 安装
   （PR #1700，`runtime signing install --build-profile`）。
+- Project lifecycle：当前 digest 上，派生 workspace 的非终态
+  `workspace.read-source-range@1` Job `job-b475fb7ed5388acd20f58d9790413dc4`
+  使来源项目 `demo-app` 的 remove 在 `workspaceProjectOwner` 阶段以 `resourceConflict`
+  fail closed；Job succeeded 后同一 remove 越过 active/uncertain 引用扫描并由既有 preset 阻止，
+  项目 generation、preset、四条历史 unknown Job 与 residue 均未改变。
 
 残留（不阻塞四态，记入 §13.3 候选）：`runtime service update` 无法清除 legacy
-`--workspace-project` 根；项目移除的 durable 引用扫描按字面 projectRef 匹配，隔离副本上的
-非终态 Job 不会锁住来源项目；preflight rejection（如 `workspace.revisionConflict`）没有发布 §8.4 结构化零派发证据，domain leaf
+`--workspace-project` 根；preflight rejection（如 `workspace.revisionConflict`）没有发布 §8.4 结构化零派发证据，domain leaf
 把 `rejected(invalidInput, …)` receipt 以 `ok:true`/`terminalState: rejected` 返回并降级为 exit 1（§9 应为 65/77），零派发只能由台账 diff 证明；`install-sdk-release` 装的样例 release
 凭据对设备不可信（`code:9568329`），可用凭据是 DevEco 为该 bundle 签发、device-ids 含本机
 UDID 的 debug profile；本机磁盘低于 4 GiB 预留时 ArkForge prewarm 会以零派发拒绝 Flash。

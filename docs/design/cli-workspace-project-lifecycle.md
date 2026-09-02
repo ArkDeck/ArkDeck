@@ -52,6 +52,14 @@ the mutation. Once a Job is terminal with a known outcome, the registration
 can be changed. Root identity is checked again on every acquisition, so a
 directory replacement fails as `factsDrifted` before a Job is admitted.
 
+A Job admitted against a Runtime-owned isolated project retains the source
+project registration rather than the derived reference. The workspace
+provider owns this mapping because it owns the verified isolation manifest;
+the mutation scan applies the same mapping to every active or uncertain Job.
+An unknown historical reference falls back to exact literal matching instead
+of guessing a source. A terminal Job with a known outcome releases the source
+registration lock just like a Job submitted directly against that source.
+
 The legacy `ARKDECK_WORKSPACE_PROJECTS` daemon flag is a compatibility reader.
 Recognized built-in entries are migrated idempotently into the same private
 store and subsequent target discovery reads that store. Preset and toolchain
