@@ -410,6 +410,10 @@ extension DeviceProvider {
     for operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts? { nil }
+
+  /// Default: this provider registers no workspace projects, so a request's
+  /// `projectRef` is acquired exactly as written.
+  package func workspaceRegistrationProjectRef(for projectRef: String) -> String? { nil }
 }
 
 public enum TypedProviderAction: Sendable, Equatable {
@@ -2073,6 +2077,11 @@ public protocol DeviceProvider: Sendable {
     for operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts?
+
+  /// The registered workspace project a request's `projectRef` acquires
+  /// before admission; `nil` when this provider cannot name one. A
+  /// Runtime-owned isolated copy answers with the project it derives from.
+  func workspaceRegistrationProjectRef(for projectRef: String) -> String?
 
   /// Removes provider-owned temporary state only after Runtime has durably
   /// closed a known terminal. Unknown outcomes deliberately retain readback

@@ -1041,7 +1041,7 @@ private enum WorkflowStepValidator {
       try reader.identifier("buildPresetRef")
     case .signWorkspaceOpenHarmonyHap:
       try reader.identifier("projectRef")
-      try reader.constant("signingPresetRef", value: "openharmony-release@1")
+      try reader.signingPresetReference("signingPresetRef")
       try reader.identifier("inputArtifactId")
       try reader.sha256("inputSha256")
     case .runWorkspaceTests:
@@ -1148,6 +1148,21 @@ private enum WorkflowStepValidator {
     func constant(_ key: String, value expected: String) throws {
       guard try string(key) == expected else {
         throw invalid(key, "constant \(expected)")
+      }
+    }
+
+    /// The closed set of signing presets is owned by the workspace provider:
+    /// a preset registered through `workspace preset register` (a `preset-`
+    /// reference in identifier grammar) or the legacy `openharmony-release@1`
+    /// credential preset. The step holds the reference to that grammar;
+    /// resolution and the credential's project binding stay with the provider.
+    func signingPresetReference(_ key: String) throws {
+      let value = try string(key)
+      guard value == "openharmony-release@1"
+        || (value.hasPrefix("preset-") && value.count > "preset-".count
+          && WorkflowStepValidator.isValidIdentifier(value))
+      else {
+        throw invalid(key, "openharmony-release@1 or a registered preset- reference")
       }
     }
 

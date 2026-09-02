@@ -925,10 +925,18 @@ Task.detached {
               throw DeviceProviderError.factsUnavailable(
                 "workspace.projectProfileUnavailable: DevEco OpenHarmony SDK is absent")
             }
+            // A legacy root keeps its environment-derived presets, and it
+            // also carries every preset registered against the same project:
+            // the registration owner reports those as active, so a build or
+            // signing preset a caller pinned through `workspace preset
+            // register` must be usable here too, not only after the legacy
+            // flag has been dropped. `nil` when nothing is registered keeps
+            // the legacy signing fallback exactly as before.
             profile = try WorkspaceProjectProfile.waterFlowDemo(
               rootURL: URL(filePath: root, directoryHint: .isDirectory),
               projectRef: projectRef, nodePath: node, hvigorScriptPath: hvigor,
-              symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"])
+              symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"],
+              registeredPresets: resolvedPresetsByProject[projectRef])
             workspaceChildEnvironment = ["DEVECO_SDK_HOME": sdk.path]
           } else {
             profile = try WorkspaceProjectProfile.waterFlowDemo(

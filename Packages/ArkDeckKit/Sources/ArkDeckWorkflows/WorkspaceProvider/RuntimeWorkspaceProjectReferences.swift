@@ -17,24 +17,34 @@ extension RuntimeAdmissionService {
         record.jobID == persisted.jobID, record.state == persisted.state,
         record.request.idempotencyKey == persisted.idempotencyKey,
         record.hasVerifiedSubmissionFingerprint(persisted.requestHash),
-        record.createdAtUTC == persisted.createdAtUTC, persisted.version > 0
+        persisted.createdAtMatches(record.createdAtUTC), persisted.version > 0
       else {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace Job references cannot be verified")
       }
       if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true { return }
-      guard record.catalogDigest == RuntimeOperationCatalog.catalogDigest,
-        record.operationReference == record.request.operation.reference,
-        let descriptor = RuntimeOperationCatalog.descriptor(reference: record.operationReference)
-      else {
-        throw RuntimeWorkspaceProjectFailure(
-          "recordUnreadable", "active workspace Job has no verifiable Catalog descriptor")
-      }
-      guard descriptor.provider == .workspace else { return }
-      guard descriptor.inputs.contains(where: { $0.name == "projectRef" }) else { return }
-      guard case .string(let referencedProject)? = record.request.inputs["projectRef"] else {
-        throw RuntimeWorkspaceProjectFailure(
-          "recordUnreadable", "active workspace Job has no typed project reference")
+      // The provider is a durable identity fact of the record: a Job another
+      // provider owns cannot reference a workspace project, whatever Catalog
+      // digest it was admitted under.
+      guard record.providerID == CatalogProvider.workspace.rawValue else { return }
+      let referencedProject: String
+      if let descriptor = Self.currentDescriptor(for: record) {
+        guard descriptor.inputs.contains(where: { $0.name == "projectRef" }) else { return }
+        guard case .string(let typed)? = record.request.inputs["projectRef"] else {
+          throw RuntimeWorkspaceProjectFailure(
+            "recordUnreadable", "active workspace Job has no typed project reference")
+        }
+        referencedProject = typed
+      } else {
+        // A nonterminal workspace Job from another Catalog digest has no
+        // descriptor to type its inputs against, but its inputs are still
+        // durable text under the same closed names. Reading the project
+        // reference directly can only over-report a reference, never miss one.
+        guard case .string(let durable)? = record.request.inputs["projectRef"] else {
+          throw RuntimeWorkspaceProjectFailure(
+            "recordUnreadable", "active workspace Job has no verifiable project reference")
+        }
+        referencedProject = durable
       }
       if referencedProject == projectRef {
         throw RuntimeWorkspaceProjectFailure(
@@ -50,23 +60,21 @@ extension RuntimeAdmissionService {
         record.jobID == persisted.jobID, record.state == persisted.state,
         record.request.idempotencyKey == persisted.idempotencyKey,
         record.hasVerifiedSubmissionFingerprint(persisted.requestHash),
-        record.createdAtUTC == persisted.createdAtUTC, persisted.version > 0
+        persisted.createdAtMatches(record.createdAtUTC), persisted.version > 0
       else {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace Job references cannot be verified")
       }
       if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true { return }
-      guard record.catalogDigest == RuntimeOperationCatalog.catalogDigest,
-        record.operationReference == record.request.operation.reference,
-        let descriptor = RuntimeOperationCatalog.descriptor(reference: record.operationReference)
-      else {
-        throw RuntimeWorkspaceProjectFailure(
-          "recordUnreadable", "active workspace Job has no verifiable Catalog descriptor")
-      }
-      guard descriptor.provider == .workspace else { return }
-      for input in descriptor.inputs
-      where Self.workspacePresetInputNames.contains(input.name) {
-        if case .string(let referencedPreset)? = record.request.inputs[input.name],
+      guard record.providerID == CatalogProvider.workspace.rawValue else { return }
+      // With a current descriptor only its declared preset inputs count; a
+      // stale-digest Job is read by the closed preset input names directly.
+      let presetInputNames: [String] =
+        Self.currentDescriptor(for: record).map { descriptor in
+          descriptor.inputs.map(\.name).filter(Self.workspacePresetInputNames.contains)
+        } ?? Self.workspacePresetInputNames.sorted()
+      for name in presetInputNames {
+        if case .string(let referencedPreset)? = record.request.inputs[name],
           referencedPreset == presetRef
         {
           throw RuntimeWorkspaceProjectFailure(
@@ -74,5 +82,14 @@ extension RuntimeAdmissionService {
         }
       }
     }
+  }
+
+  /// The record's descriptor in this build's Catalog, when the record was
+  /// admitted under this exact digest; `nil` for a Job from another digest.
+  private static func currentDescriptor(for record: RuntimeJobRecord) -> CatalogOperationDescriptor? {
+    guard record.catalogDigest == RuntimeOperationCatalog.catalogDigest,
+      record.operationReference == record.request.operation.reference
+    else { return nil }
+    return RuntimeOperationCatalog.descriptor(reference: record.operationReference)
   }
 }

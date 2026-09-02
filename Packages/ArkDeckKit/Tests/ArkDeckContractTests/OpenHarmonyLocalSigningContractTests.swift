@@ -25,6 +25,33 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     if let root { try? FileManager.default.removeItem(at: root) }
   }
 
+  func testSigningStepAcceptsRegisteredPresetReferencesAndTheLegacyConstant() throws {
+    // The closed set of signing presets is the provider's: a preset registered
+    // through `workspace preset register` is a `preset-` reference, the
+    // legacy credential preset is `openharmony-release@1`. The step only
+    // holds the argument to that grammar; anything else is refused before any
+    // provider work.
+    func step(_ preset: String) throws -> WorkflowStep {
+      try WorkflowStep(
+        id: "sign-hap", kind: .signWorkspaceOpenHarmonyHap, declaredEffect: .hostOnly,
+        declaredCancellation: .atSafeBoundary, declaredBindingRequirement: .none,
+        arguments: [
+          "projectRef": .string("demo-app"),
+          "signingPresetRef": .string(preset),
+          "inputArtifactId": .string("ART-input"),
+          "inputSha256": .string(String(repeating: "a", count: 64)),
+        ])
+    }
+    XCTAssertNoThrow(try step("preset-4ad8fe99f82867e9e1a94e5d"))
+    XCTAssertNoThrow(try step("openharmony-release@1"))
+    for rejected in ["waterflow-release", "preset-", "preset-../x", "openharmony-release@2", ""] {
+      XCTAssertThrowsError(try step(rejected), "\(rejected) must not name a signing preset") {
+        error in
+        XCTAssertTrue("\(error)".contains("signingPresetRef"), "\(error)")
+      }
+    }
+  }
+
   func testCredentialOwnerPublishesPathFreeReferenceAndPinsExactOwners() throws {
     let fixture = try makeFixture(mode: "success")
     let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)

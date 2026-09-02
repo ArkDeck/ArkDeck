@@ -24,6 +24,21 @@ package struct RuntimePersistedJob: Sendable, Equatable {
   public let updatedAtUTC: String
   public let version: Int
   package let initialRecordData: Data?
+
+  /// The creation column of a row the retired legacy idempotency importer
+  /// wrote (TASK-DHA-001, #1029): it copied the entry without a timestamp and
+  /// stamped this sentinel instead. The importer is gone (#1259) but its rows
+  /// are durable history, and their initial record carries the real
+  /// timestamp, so the column cannot be asked to agree with the record.
+  package static let legacyCreatedAtUTC = "legacy"
+
+  /// Whether this row's creation column verifies the record's own creation
+  /// timestamp: equal, or the legacy sentinel above. Every other identity
+  /// fact (job id, state, idempotency key, fingerprint, version) still has to
+  /// agree; only the one column the importer never had is excused.
+  package func createdAtMatches(_ recordCreatedAtUTC: String) -> Bool {
+    createdAtUTC == recordCreatedAtUTC || createdAtUTC == Self.legacyCreatedAtUTC
+  }
 }
 
 package struct RuntimeJobRepositoryPage: Sendable, Equatable {

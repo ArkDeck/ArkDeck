@@ -175,6 +175,10 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
   /// configuration, never to a model proposal or task input.
   package let buildProducts: [String: String]
   public let kind: WorkspaceProjectProfileKind
+  /// For a Runtime-owned derived copy, the registered project it was copied
+  /// from. Registration, preset pins and removal protection belong to that
+  /// project; the copy itself is registered nowhere.
+  package let sourceProjectRef: String?
 
   public init(
     profileID: String,
@@ -192,7 +196,8 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     signingPresets: [String: WorkspaceSigningPreset] = [:],
     allowsLegacySigningPresetFallback: Bool = true,
     buildProducts: [String: String] = [:],
-    kind: WorkspaceProjectProfileKind = .primary
+    kind: WorkspaceProjectProfileKind = .primary,
+    sourceProjectRef: String? = nil
   ) throws {
     let canonical = URL(filePath: projectRoot)
       .resolvingSymlinksInPath().standardizedFileURL.path
@@ -214,7 +219,9 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       signingPresets.allSatisfy({ $0.key == $0.value.presetID }),
       symbolPresets.allSatisfy({ $0.key == $0.value.presetID }),
       buildProducts.keys.allSatisfy({ buildPresets[$0] != nil }),
-      buildProducts.values.allSatisfy(WorkspaceProviderSupport.isSafeRelativePath)
+      buildProducts.values.allSatisfy(WorkspaceProviderSupport.isSafeRelativePath),
+      sourceProjectRef.map(WorkspaceProviderSupport.isIdentifier) ?? true,
+      sourceProjectRef != projectRef
     else {
       throw DeviceProviderError.factsUnavailable("workspace ProjectProfile is malformed")
     }
@@ -234,6 +241,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     self.symbolPresets = symbolPresets
     self.buildProducts = buildProducts
     self.kind = kind
+    self.sourceProjectRef = sourceProjectRef
   }
 
   /// Whether `root` is tracked by some git working copy, its own or one it
@@ -1269,6 +1277,19 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
   /// (CHG-2026-055, TASK-HFA-009 r2). All are computed here, from files, at
   /// admission time — the engine cannot derive them and a stale value would
   /// be exactly the drift the grant exists to prevent.
+  /// The registered project a request's `projectRef` acquires. A primary
+  /// profile is its own registration; a Runtime-owned derived copy acquires
+  /// the project it was copied from, because that is where the preset and
+  /// toolchain pins, the generation guard and the removal protection live.
+  /// An unknown reference maps to nothing, and admission refuses it as before.
+  package func workspaceRegistrationProjectRef(for projectRef: String) -> String? {
+    guard let profile = profileRegistry.profile(for: projectRef) else { return nil }
+    switch profile.kind {
+    case .primary: return profile.projectRef
+    case .evolution: return profile.sourceProjectRef
+    }
+  }
+
   package func workspaceAuthorizationFacts(
     for operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]

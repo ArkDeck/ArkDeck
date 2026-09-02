@@ -323,6 +323,63 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ])
   }
 
+  func testWaterFlowProfileWithLegacyConfigurationStillCarriesRegisteredPresets() throws {
+    // A daemon started with the legacy `--workspace-project` root composes
+    // the WaterFlow profile from environment-derived Node/Hvigor paths. The
+    // presets a caller registered against the same project through
+    // `workspace preset register` are reported active by the registration
+    // owner, so the composition must carry them: the registered preset is
+    // the one a Job can acquire (`waterflow-debug` is not a registered
+    // reference), and the legacy signing fallback closes once a registered
+    // signing preset can be pinned.
+    let project = root.appending(path: "LegacyWaterFlow", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: project.appending(path: "entry/src/main", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(
+      to: project.appending(path: "entry/src/main/module.json5"))
+    let script = project.appending(path: "hvigorw.js")
+    try Data("// fixture".utf8).write(to: script)
+    let resource = RuntimeWorkspacePresetResource(
+      presetRef: "preset-legacy-host-build", generation: 1,
+      projectRef: "demo-app", kind: "build",
+      templateRef: "openharmony.hvigor-build@1",
+      toolchainRef: "toolchain:sha256:" + String(repeating: "b", count: 64),
+      toolchainGeneration: 1, credentialRef: nil, timeoutSeconds: 1_200,
+      constraints: RuntimeWorkspacePresetConstraints(
+        module: "entry", product: "default", buildMode: "debug"),
+      registeredAtUTC: "2026-09-02T00:00:00.000Z",
+      updatedAtUTC: "2026-09-02T00:00:00.000Z", configurationStatus: "active")
+    let registered = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, projectRef: resource.projectRef,
+      nodePath: "/usr/bin/true", hvigorScriptPath: script.path,
+      registeredPresets: [
+        RuntimeWorkspaceResolvedPreset(
+          resource: resource, nodePath: "/usr/bin/true",
+          hvigorScriptPath: script.path, sdkRootPath: "/private/sdk",
+          verifiedResources: [])
+      ])
+    let build = try XCTUnwrap(registered.buildPresets[resource.presetRef])
+    XCTAssertEqual(build.timeoutSeconds, 1_200)
+    XCTAssertEqual(
+      registered.buildProducts[resource.presetRef],
+      "entry/build/default/outputs/default/entry-default-unsigned.hap")
+    XCTAssertNil(
+      registered.buildPresets["waterflow-debug"],
+      "a registered preset replaces the environment-derived one it supersedes")
+    XCTAssertFalse(registered.allowsLegacySigningPresetFallback)
+
+    // Without a registration the legacy composition is exactly what it was.
+    let legacy = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, projectRef: "demo-app",
+      nodePath: "/usr/bin/true", hvigorScriptPath: script.path,
+      registeredPresets: nil)
+    XCTAssertNotNil(legacy.buildPresets["waterflow-debug"])
+    XCTAssertNil(legacy.buildPresets[resource.presetRef])
+    XCTAssertTrue(legacy.allowsLegacySigningPresetFallback)
+  }
+
   func testWaterFlowProfileLowersRegisteredPresetConstraintsWithoutLegacyFallback() throws {
     let project = root.appending(path: "RegisteredWaterFlow", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
