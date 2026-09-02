@@ -266,6 +266,44 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  func testPhysicalReconnectStartsAFreshObservationAndResolvesWithoutASecondHAR() async throws {
+    let identity = DeviceBootstrapMachine.stableIdentitySHA256(
+      serial: "150100424a544e4600")
+    let existing = try targets.adopt(
+      stableIdentitySHA256: identity, connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f", nowUTC: RuntimeAgentTime.format(clock.now())).record
+    port.setState("Offline")
+    let owner = try owner()
+    let first = try action(await owner.run(request()))
+    XCTAssertEqual(first.fields["reasonCode"], .string("device.notObserved"))
+
+    // Replugging preserves the device's independently read serial but creates
+    // a new USB attachment/observation identity. The physical HAR authorizes
+    // probing that new attachment; it does not authorize guessing a device.
+    port.setRelations([TargetObservationCoordinatorContractTests.Port.relation(id: 18)])
+    port.setState("Connected")
+    let resumed = try object(await owner.resume(reference: first.reference))
+    XCTAssertEqual(resumed["state"], .string("jobOwned"), "unexpected resume projection: \(resumed)")
+    XCTAssertNotEqual(resumed["jobId"], .null, "reconnect must transfer the exact intent to a Job")
+    let finished = try await waitForJob(owner)
+
+    XCTAssertEqual(finished["state"], .string("completed"))
+    XCTAssertEqual(finished["jobState"], .string("succeeded"))
+    XCTAssertEqual(finished["targetId"], .string(existing.targetID))
+    XCTAssertEqual(finished["bindingRevision"], .integer(Int64(existing.bindingRevision)))
+    guard case .string(let actionID)? = first.fields["actionId"] else {
+      return XCTFail("human-action identity is absent")
+    }
+    let original = try object(await owner.humanAction(actionID))
+    XCTAssertEqual(original["status"], .string("resolvedByFreshProbe"))
+    let page = try object(await owner.humanActions(filters: [:], pageSize: 10, cursor: nil))
+    guard case .array(let actions)? = page["items"] else {
+      return XCTFail("human-action page is absent")
+    }
+    XCTAssertEqual(actions.count, 1, "a proven singleton reconnect must not manufacture an identity HAR")
+    XCTAssertEqual(try targets.list(), [existing], "a normal USB replug must not advance target lineage")
+  }
+
   func testConcurrentReentryCreatesOneJobAndDoesNotCancelIt() async throws {
     let owner = try owner()
     let fields = request()
