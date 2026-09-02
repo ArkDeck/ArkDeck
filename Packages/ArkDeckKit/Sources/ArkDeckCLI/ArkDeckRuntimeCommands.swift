@@ -348,9 +348,17 @@ enum RuntimeCLI {
         }
         hdcPath = configuredHDC
       }
-      let workspaceProject =
-        options.value("--workspace-project") ?? previousStatus?.workspaceProjectPath
-      let devecoSDK = options.value("--deveco-sdk") ?? previousStatus?.devecoSDKPath
+      // The frozen `agentd update` compatibility spelling keeps the legacy
+      // path pair when the caller omits it. The current `runtime service
+      // update` spelling is the bounded migration out of that configuration:
+      // omission removes the injected ProjectProfile while explicit paired
+      // paths can still complete the compatibility cycle. Runtime-owned
+      // workspace project/preset resources are durable and are not deleted.
+      let preservesLegacyWorkspace = canonicalPrefix == "agentd"
+      let workspaceProject = options.value("--workspace-project")
+        ?? (preservesLegacyWorkspace ? previousStatus?.workspaceProjectPath : nil)
+      let devecoSDK = options.value("--deveco-sdk")
+        ?? (preservesLegacyWorkspace ? previousStatus?.devecoSDKPath : nil)
       guard (workspaceProject == nil) == (devecoSDK == nil) else {
         throw CLIError(
           exitCode: EX_USAGE,
@@ -2369,9 +2377,8 @@ enum RuntimeCLI {
           + "use `arkdeck agent run --operation <reference>` until it does")
     }
     var rest = arguments
-    let session = runtimeSession(&rest, command: leaf.canonicalCommand)
+    var session = runtimeSession(&rest, command: leaf.canonicalCommand)
     session.warnIfLegacy()
-    let executor = AgentRuntimeExecutor(client: session.client, nowUTC: RuntimeCLI.utcNow)
     let baseRequest = try agentExecutionRequest(reference: reference, rest: rest)
     let request: RuntimeAgentExecutionRequest
     do {
@@ -2379,7 +2386,23 @@ enum RuntimeCLI {
     } catch let failure as DiagnosticCapturePresetError {
       throw session.fail(.invalidInput, failure.reason)
     }
-    let outcome = try executor.run(request)
+    // Domain leaves are current product surfaces even though the one-shot
+    // executor still consumes several frozen 1.x read projections. Preserve
+    // those reads, but cross the Job admission boundary through the target
+    // owner so a refusal publishes its exact reason and zero-dispatch proof.
+    let legacyReadClient = session.client
+    try session.negotiate(requiredMajor: 2, forMethod: "job.submit")
+    let executor = AgentRuntimeExecutor(
+      client: legacyReadClient, jobSubmissionClient: session.client,
+      nowUTC: RuntimeCLI.utcNow)
+    let outcome: RuntimeAgentExecutionOutcome
+    do {
+      outcome = try executor.run(request)
+    } catch let error as AgentClientError {
+      throw session.stamped(
+        CLIRuntimeSession.mapped(
+          error, method: "job.submit", command: leaf.canonicalCommand))
+    }
     try emitAgentOutcome(outcome, session: session)
   }
 

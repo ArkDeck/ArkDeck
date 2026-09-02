@@ -264,6 +264,69 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     XCTAssertEqual(code, "workspace.gitStatusFailed")
   }
 
+  func testSymbolizeConsumesOnlyADeviceBoundDiagnosticsCrashLogAcrossProjectScope()
+    async throws
+  {
+    let symbolProfile = try makeProfile(withSourceControl: true, withSymbolizer: true)
+    let engine = try makeEngine(operations: makeProvider(symbolProfile))
+    let deviceBinding = ArtifactBindingSnapshot(
+      targetID: "TGT-DAYU200-01", bindingRevision: 7,
+      stableIdentitySHA256:
+        "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547")
+    let crash = try await engineArtifacts.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-crash-input", sessionID: "session-crash-input",
+        stepID: "capture-crash-log", name: "crash-log.txt", mediaType: "text/plain",
+        privacy: .sensitive, retentionClass: .default,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: deviceBinding, contents: Data("stack\n".utf8)))
+    let crashLease = try await engineArtifacts.leaseReference(
+      jobID: crash.jobID, artifactID: crash.artifactID)
+
+    let accepted = try await engine.submit(
+      try engineRequest(
+        "workspace.symbolize-crash@1",
+        inputs: [
+          "projectRef": .string("TestProject"),
+          "symbolPresetRef": .string("symbols"),
+          "dumpArtifactRef": .string(crashLease),
+        ]))
+    XCTAssertFalse(accepted.deduplicated)
+    let terminal = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(terminal.state, "succeeded")
+    let products = try await engineArtifacts.list(jobID: accepted.jobID)
+    XCTAssertTrue(
+      products.contains {
+        $0.name == "symbolized-crash.txt"
+      })
+
+    let wrongProduct = try await engineArtifacts.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-hilog-input", sessionID: "session-hilog-input",
+        stepID: "capture-hilog", name: "hilog.txt", mediaType: "text/plain",
+        privacy: .sensitive, retentionClass: .default,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: deviceBinding, contents: Data("not a crash\n".utf8)))
+    let wrongLease = try await engineArtifacts.leaseReference(
+      jobID: wrongProduct.jobID, artifactID: wrongProduct.artifactID)
+    do {
+      _ = try await engine.submit(
+        try engineRequest(
+          "workspace.symbolize-crash@1",
+          inputs: [
+            "projectRef": .string("TestProject"),
+            "symbolPresetRef": .string("symbols"),
+            "dumpArtifactRef": .string(wrongLease),
+          ]))
+      XCTFail("a different diagnostics product must not cross the project scope")
+    } catch RuntimeJobEngineError.rejected(let code, let message) {
+      XCTAssertEqual(code, .invalidInput)
+      XCTAssertTrue(message.contains("device-bound capture.diagnostics crash-log.txt"))
+    }
+    let jobs = try await engine.listJobs()
+    XCTAssertEqual(jobs.count, 1, "refusal must create no Job")
+  }
+
   func testRecoveryOfAReadConfirmsNothingHappened() async throws {
     let action = try action(
       "workspace.inspect-git-status@1", inputs: ["projectRef": .string("TestProject")])
@@ -590,7 +653,9 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
 
   private var engineArtifacts: RuntimeArtifactStore!
 
-  private func makeEngine() throws -> RuntimeJobEngine {
+  private func makeEngine(
+    operations: WorkspaceOperationsProvider? = nil
+  ) throws -> RuntimeJobEngine {
     let scope = state.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     engineArtifacts = try RuntimeArtifactStore(
       rootURL: scope.appending(path: "artifacts", directoryHint: .isDirectory),
@@ -601,7 +666,7 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
       providers: DeviceProviderRegistry(providers: [
         WorkspaceProvider(
           registry: WorkspaceProjectRegistry(roots: ["TestProject": root.path]),
-          operations: provider)
+          operations: operations ?? provider)
       ]),
       dispatcher: EngineDispatcher(stdout: Data("observation\n".utf8)),
       capabilityStore: try RuntimeCapabilityStore(
@@ -626,12 +691,14 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
   }
 
   private func makeProfile(
-    withSourceControl: Bool, projectRef: String = "TestProject"
+    withSourceControl: Bool, withSymbolizer: Bool = false,
+    projectRef: String = "TestProject"
   ) throws -> WorkspaceProjectProfile {
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
     let git = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/git")
     let sed = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/sed")
+    let trueExecutable = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/true")
     let inspection = try WorkspaceCommandPreset(
       presetID: "inspect", executable: grep, fixedArguments: [], timeoutSeconds: 10)
     let patching = try WorkspaceCommandPreset(
@@ -640,6 +707,12 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
       withSourceControl
       ? try WorkspaceCommandPreset(
         presetID: "git", executable: git, fixedArguments: [], timeoutSeconds: 30)
+      : nil
+    let symbolizer =
+      withSymbolizer
+      ? try WorkspaceCommandPreset(
+        presetID: "symbols", executable: trueExecutable,
+        fixedArguments: [], timeoutSeconds: 30)
       : nil
     return try WorkspaceProjectProfile(
       profileID: "test-workspace@1", projectRef: projectRef,
@@ -651,7 +724,8 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
           presetID: "read", executable: sed, fixedArguments: [], timeoutSeconds: 10)
         : nil,
       patchPreset: patching,
-      buildPresets: [:], testPresets: [:], symbolPresets: [:])
+      buildPresets: [:], testPresets: [:],
+      symbolPresets: symbolizer.map { [$0.presetID: $0] } ?? [:])
   }
 
   private func makeArchiveProfile() throws -> WorkspaceProjectProfile {

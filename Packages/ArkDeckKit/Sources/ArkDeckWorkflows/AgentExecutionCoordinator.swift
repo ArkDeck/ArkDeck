@@ -238,7 +238,17 @@ public actor RuntimeAgentExecutionCoordinator {
       // A typed pre-admission rejection is a terminal execution result, not
       // an excuse to re-enter admission with fresh state on the same ID.
       switch error {
-      case .rejected, .idempotencyConflict:
+      case .idempotencyConflict(let message):
+        record.state = .failed
+        record.failureCode = "idempotencyConflict"
+        try commit(&record)
+        throw AgentExecutionControlFailure(
+          "idempotencyConflict", message,
+          details: [
+            "executionId": .string(record.intent.executionID),
+            "phase": .string("preAdmission"), "newDispatchCount": .integer(0),
+          ])
+      case .rejected:
         if try await engine.acceptedJobForAgent(request) == nil {
           record.state = .failed
           record.failureCode = "admissionDenied"
@@ -501,7 +511,8 @@ public actor RuntimeAgentExecutionCoordinator {
 
   package func status(_ id: String) async throws -> JSONValue {
     var record = try requireRecord(id)
-    if record.jobID == nil, let submission = record.submissionRequest,
+    if !record.state.isTerminal, record.jobID == nil,
+      let submission = record.submissionRequest,
       let accepted = try await engine.acceptedJobForAgent(submission) {
       record.jobID = accepted.jobID // Read-only recovery of a lost creation receipt.
       record.state = .jobOwned

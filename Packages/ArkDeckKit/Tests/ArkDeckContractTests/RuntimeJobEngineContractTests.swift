@@ -651,6 +651,36 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(afterRestart.jobID, first.jobID)
   }
 
+  func testIdempotencyKeyCannotAttachAJobFromAnotherCatalogDigest() async throws {
+    let request = observeRequest(idempotencyKey: "idem-stale-catalog-0001")
+    let (engine, _) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let accepted = try await engine.submit(request)
+
+    let repository = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let saved = try XCTUnwrap(repository.job(jobID: accepted.jobID))
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: XCTUnwrap(saved.initialRecordData))
+        as? [String: Any])
+    document["catalogDigest"] = String(repeating: "0", count: 64)
+    let staleRecord = try JSONSerialization.data(withJSONObject: document)
+    try repository.updateJobState(
+      jobID: saved.jobID, state: saved.state,
+      updatedAtUTC: saved.updatedAtUTC, recordData: staleRecord)
+
+    let (reopened, _) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .observationHappy))
+    do {
+      _ = try await reopened.submit(request)
+      XCTFail("an unchanged request must not deduplicate across Catalog digests")
+    } catch let error as RuntimeJobEngineError {
+      guard case .idempotencyConflict(let message) = error else {
+        return XCTFail("expected idempotencyConflict, got \(error)")
+      }
+      XCTAssertTrue(message.contains("different Catalog digest"))
+    }
+  }
+
   func testFreshStateAdmissionCreatesEveryDurableProjectionAndSurvivesRestart() async throws {
     let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let accepted = try await engine.submit(observeRequest(idempotencyKey: "idem-fresh-state-01"))

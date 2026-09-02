@@ -53,6 +53,13 @@ operation 全部 `available`；HDC status 报告一个 `normal` 的 DAYU200。di
 （`runtime bundle register` → `runtime service update` → `runtime service verify`）更新到
 protected `main` 的 Runtime，再继续；这一步不是 Journey 的一部分。
 
+若 `runtime service status` 仍报告 `workspaceProjectPath` / `devecoSDKPath`，它们是旧版
+LaunchAgent 注入，不是当前 Runtime-owned workspace 注册。用当前拼写执行一次
+`arkdeck runtime service update --output json`（需要替换 helper 时同时传已验证的 `--daemon`），
+省略这两个 legacy path 参数；更新回执和 status 应不再含这两个字段，`workspace project list`
+及 `workspace preset list --project <ref>` 的注册资源必须保持不变。冻结的 `agentd update` 省略
+参数时仍保留旧值，只用于兼容验证，不能用来完成这项迁移。
+
 输入物料（放在 `/private/tmp/arkdeck-gj-headless-<date>/inputs/`）：
 
 - GJ-2：已签名单入口 HAP（08-28 记录用的同一包可复用），`bundleName`/`abilityName`；
@@ -354,8 +361,13 @@ Runtime 自动签发 capability；对 `demo-app` 本体的 E1 请求仍然要求
 `adoptRuntimeWorkspaces` 重新登记；若副本引用解析失败，用同一 `--execution-id` 重跑
 `workspace isolate` 即可重新登记而不会再拷贝一份。
 
-负向用例（零派发）：同一补丁 lease、`expectedWorkspaceRevision` 取已被取代的 revision，
-按 §9 期望 `invalidInput`（`workspace.revisionConflict`）、exit 65（或 77）。当前实测为 exit 1：domain leaf 拿到的是 `rejected(invalidInput, …)` 的 execution receipt（envelope `ok:true`、`result.terminalState: rejected`、`stepKinds: []`、无 `error`），该 rejection 的 daemon handler 没有发布 §8.4 的结构化零派发证据，CLI 只能按 `CLIControlMethodRegistry` 的 fallback 降级为 `operationFailed`（1）——这是已发布 leaf 的残留 conformance 缺口（规格 §13.3），不是本节期望值写错。零派发由 `job list` 前后台账相同证明（2.x `job list` 或 `runtime-jobs.sqlite3` 的 dump 里都不出现该 execution），不由退出码证明。
+负向用例（零派发）：同一补丁 lease、`expectedWorkspaceRevision` 取已被取代的 revision。
+2026-09-02 在当前 Runtime/Catalog digest 上用候选 CLI 复跑后，domain leaf 返回
+`ok:false`、`error.code: invalidInput`、exit 65；`error.details` 同时给出
+`wireCode: invalidInput`、`method: job.submit`、`phase: preAdmission` 与
+`newDispatchCount: 0`。2.x `job list --page-size 1` 在调用前后都以
+`job-cf76e61adb789f8b2bda5172a490d803`（`2026-09-02T09:56:27Z`）为 newest Job，
+精确证明没有创建 Job；这组结构化证据与台账不变量共同满足 §8.4/§9。
 
 判据：
 

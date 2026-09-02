@@ -1727,6 +1727,42 @@ final class AgentDaemonContractTests: XCTestCase {
     return (process.terminationStatus, try JSONDecoder().decode([String: JSONValue].self, from: bytes))
   }
 
+  /// A domain leaf used to submit on the frozen 1.x wire. The daemon's coarse
+  /// `rejected` reply was then flattened into a terminal execution receipt,
+  /// which made a preflight refusal look like `ok: true` plus exit 1 even
+  /// though no Job existed. The current leaf must use the target Job owner and
+  /// preserve its exact reason and mechanical zero-dispatch proof.
+  func testCLIDomainPreflightRefusalIsAnErrorEnvelopeAndCreatesNoJob() async throws {
+    let (handler, engine) = try makeStack()
+    let server = try startServer(handler)
+    let inputs = stateDirectory.appending(path: "workspace-patch-missing-artifact.json")
+    try Data(#"{"projectRef":"TestProject"}"#.utf8).write(to: inputs)
+
+    let (exit, envelope) = try runObservationCLI([
+      "workspace", "patch", "--inputs-file", inputs.path,
+      "--execution-id", "domain-preflight-refusal-001",
+    ], server: server)
+
+    XCTAssertEqual(exit, 65)
+    XCTAssertEqual(envelope["ok"], .bool(false))
+    XCTAssertEqual(envelope["command"], .string("workspace.patch"))
+    XCTAssertNil(envelope["result"], "a refused submit never produced a terminal Job result")
+    guard case .object(let failure)? = envelope["error"],
+      case .object(let details)? = failure["details"],
+      case .object(let metadata)? = envelope["meta"]
+    else { return XCTFail("the domain refusal must be one structured CLI envelope") }
+    XCTAssertEqual(failure["code"], .string("invalidInput"))
+    XCTAssertEqual(details["wireCode"], .string("invalidInput"))
+    XCTAssertEqual(details["method"], .string("job.submit"))
+    XCTAssertEqual(details["phase"], .string("preAdmission"))
+    XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    XCTAssertEqual(
+      metadata["controlProtocolVersion"],
+      .string(ArkDeckControlProtocol.targetVersion))
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
   func testCLIWaitFollowsProvedTrustTransitionsAndReturnsTheFinalGenerationWithoutAdopting() throws {
     let port = TargetObservationCoordinatorContractTests.Port()
     port.setState("Unauthorized")

@@ -1474,6 +1474,7 @@ major 保留”只表示 explicit legacy compatibility，不能满足 target mac
 | `agentd ...` | `runtime service ...` | 当前 major 保留 alias，human 模式警告；下一 major tombstone |
 | `agentd install/update --hdc/--daemon <path>` | `runtime tool register` + `runtime bundle register`，再传 typed refs | compatibility reader 先做同等 hash/trust 校验；新 service contract 不消费 caller path |
 | `agentd install --workspace-project/--deveco-sdk <path>` | `workspace project register` + registered toolchain ref + `workspace preset register` | compatibility reader 可完成一次 bounded migration；target service install 不持有 raw project/SDK flags |
+| `agentd update` 省略 `--workspace-project/--deveco-sdk` | `runtime service update` + Runtime-owned workspace resources | legacy 拼写在当前 major 保留已安装 path pair；target 拼写省略 pair 时移除 legacy LaunchAgent 注入，显式 paired paths 仍可完成兼容周期；两者均不删除已注册 project/preset |
 | `signing ...` | `runtime signing ...` | 同上 |
 | `update-feed ...` | `maintainer update-feed ...` | 同上；仍是 platform/maintainer extension |
 | `device list` | `target list` | 当前 major 保留 exact 1.x target-array legacy result 且不计 target conformance；下一 CLI/registry major 为 `commandRemoved` tombstone，绝不静默改成 candidate list/page |
@@ -1569,15 +1570,16 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `cli-feature-coverage.json` 共 279 条（daemon 119、Catalog 30、App 68、CLI 62）：
   `direct` 131、`local` 94、`presentation` 21、`internal` 18、`refused` 10、`platformService` 4、
   `generic` 1（`flash.dayu200` alias），`blocked` 0，`summary.fullFunction = true`。
-- Golden Journey headless 闭环：2026-09-02 在 digest `508783ac…` 上按 `cli-golden-journey-headless-runbook.md` headless 复跑：GJ-1/GJ-2/GJ-3/GJ-4/GJ-5 均 `REAL_DEVICE_PASS`（含 §2.1 HAR crash-resume 与 `debug.template@1` smoke），29 个 canonical operation 的真机覆盖矩阵 12 `realDevicePass` / 17 `notExercised`，记录见 `references/v1.6-goal/gj-headless-rerun-2026-09-02.json` 与 `real-device-validation.md`。
-- 0.2 版 §13.2 列出的 12 个 daemon-ready 方法中 11 个已有一等 leaf；唯一例外 `debug.template.run`
-  是 App 直连路径，coverage 记为 `direct` + `deprecated`，CLI 经 `debug.template@1` 到达同一模板集。
+- Golden Journey headless 闭环：2026-09-02 在 digest `508783ac…` 上按 `cli-golden-journey-headless-runbook.md` headless 复跑：GJ-1/GJ-2/GJ-3/GJ-4/GJ-5 均 `REAL_DEVICE_PASS`（含 §2.1 HAR crash-resume 与 `debug.template@1` smoke）；2026-09-03 用最终候选补齐其余 17 个 operation 后，29 个 canonical operation 的真机覆盖矩阵为 29 `realDevicePass` / 0 `notExercised`，记录见 `references/v1.6-goal/gj-headless-rerun-2026-09-02.json` 与 `real-device-validation.md`。
+- 0.2 版 §13.2 列出的 12 个 daemon-ready 方法均已有一等 leaf。App 的 Debug Commands 与
+  Overview 也经 `debug.template@1` 的 Runtime Job 路径运行模板；App XPC 不再转发
+  `debug.template.run`。该方法只作为 Unix control plane 的 deprecated 兼容面保留，CLI 与 App
+  均不调用。
 
 ### 13.2 尚未闭合的目标面
 
-下表是 §18 的 macOS「全功能」结论仍被阻断的全部原因。每行都必须由对应载体解除，不得在 CLI 内
-补隐藏执行器绕过 Runtime。机器门（coverage manifest 无 `blocked`、无 classification/target 分歧）
-已由 §14 产物闭合；剩余项都是真机证据与平台范围，不是命令面缺口。
+macOS「全功能」结论已由 §14 机器门、当前 digest 上 29/29 operation 真机覆盖和 App
+Debug template 生产投影闭合。下表只保留跨平台范围，不得在 CLI 内补隐藏执行器绕过 Runtime。
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
@@ -1587,17 +1589,16 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 不阻断命令面存在，但计入 conformance 差距，必须在对应 slice 内修，不能靠文档解释掉：
 
-- preflight rejection 没有发布 §8.4 结构化零派发证据：2026-09-02 真机负向用例
-  （`workspace patch`，stale `expectedWorkspaceRevision`）被 Runtime 以
-  `rejected(invalidInput, "typed plan preflight failed before authorization: workspace.revisionConflict:…")`
-  拒绝，domain leaf 返回 `ok:true`、`result.terminalState: rejected`、`stepKinds: []`、无 `error`，
-  进程退出码为 1（`CLIControlMethodRegistry` 对无证据 `rejected` 的 fallback），而 §9 要求 65/77；
-  零派发只能由台账 diff 证明。修法在 daemon 侧补 §8.4 证据（`newDispatchCount`/phase），不是改分类。
-- HAR crash-resume（runbook §2.1）实测：重插 USB 后 `agent resume` 没有仅凭 fresh probe 解决
-  `physicalConnection` HAR，而是再产生一个 `ambiguousIdentity` HAR（唯一候选就是已 adopt 的
-  target），要以 published choice 再 resume 一次才继续；被取代的 `physicalConnection` action
-  终态记为 `expired` 而非 resolved/superseded。机制判据（仅凭 execution ID 重取、同 target/
-  binding 继续到 succeeded）成立，但 headless 调用方要多一轮 resume，且 action 终态标注不准。
+2026-09-03 `TASK-AIN-021` 候选闭合五类产品差距：preflight rejection 投影、USB 重插 HAR、
+legacy Runtime workspace root 清理、派生 Job 的来源项目引用，以及 App Debug template 的 Job
+投影。current domain leaf 保留 frozen 1.x read projection，
+但在 admission boundary 上协商 2.x `job.submit` owner。同一 `workspace patch` stale
+`expectedWorkspaceRevision` 负向用例现在返回 `ok:false`、`error.code: invalidInput`、exit 65，
+并逐项发布 `phase: preAdmission`、`newDispatchCount: 0` 与 `wireCode: invalidInput`；2.x
+`job list` 的 newest Job 在调用前后保持同一 ID/时间戳。fresh exact stable-identity + binding
+proof 现在会直接解决 `physicalConnection` action，不再追加冗余 `ambiguousIdentity` action；
+终态也由合约钉为 superseded/resolved 语义。五项均不再计入下列残留；候选结论仍待维护者
+review 后进入 protected `main`。
 - `job list` 的 newest/oldest 分页仍以 SQLite `rowid` 作 cursor 与同 timestamp tie-break
   （`RuntimeJobRepository.listJobs`）；§7.3 compound order 未落地，Windows portable 前必须替换。
 - `legacy flash reconcile` 仍经 `RockchipLegacyFlashJournalReconciler.production()` 从

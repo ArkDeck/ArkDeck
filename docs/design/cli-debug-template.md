@@ -12,8 +12,8 @@ direct daemon method.
 of the closed set (`device.packageInventory`, `device.debugParameterRead`,
 `device.windowInventory`, `device.uptime`). The HDC provider owns the remote
 command tokens, the per-template stdout budget and the 30-second timeout;
-`DebugRuntimeCommandTemplate` is the one table that the provider, the legacy
-direct probe and the CLI listing all read, so the three cannot drift. The
+`DebugRuntimeCommandTemplate` is the one table that the provider, the App's
+typed Job builder and the CLI listing all read, so the three cannot drift. The
 operation is `readOnly`, `defaultReadOnly`, bound to the confirmed device, and
 confirms the binding identity against the live device before the template
 step. It is deliberately not evidence-eligible: the execution kernel names no
@@ -39,9 +39,13 @@ generic domain leaf for `debug.template@1`: `--target`, `--inputs-file`,
 `--capability` and `--execution-id`, with the typed inputs coming from
 `operation describe` rather than from hand-copied flags.
 
-The legacy `debug.template.run` control method remains for the App's Debug
-workspace and Overview capability matrix; the CLI never calls it. Migrating
-those App paths onto the Job operation is a separate change.
+The App's Debug workspace and Overview capability matrix now submit
+`debug.template@1` and execute the returned Runtime Job. The Debug surface
+projects the Job lifecycle and lets the operator export its bounded Artifacts;
+Overview reports the exact successful Job as its hidumper evidence. The App
+XPC boundary no longer forwards the legacy `debug.template.run` method. That
+method remains deprecated on the Unix control plane for compatibility only;
+neither the App nor the CLI calls it.
 
 The contract fixtures cover registry and parser shape, a real `arkdeck`
 subprocess listing, and a scripted engine run: admission of the enum, the

@@ -176,6 +176,45 @@ final class EvolutionWorkspaceContractTests: XCTestCase {
       isolated.projectRoot)
   }
 
+  func testEvolutionWorkspaceExcludesNestedSwiftPMBuildCaches() async throws {
+    let sourceRoot = try temporaryDirectory("nested-build-cache-source")
+    let stateRoot = try temporaryDirectory("nested-build-cache-state")
+    let packageRoot = sourceRoot.appending(path: "Sources/Packages/App")
+    try FileManager.default.createDirectory(
+      at: packageRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("source\n".utf8).write(
+      to: packageRoot.appending(path: "Sources/App.swift"))
+    try FileManager.default.createDirectory(
+      at: packageRoot.appending(path: ".build/ModuleCache"),
+      withIntermediateDirectories: true)
+    try Data("path-bound cache\n".utf8).write(
+      to: packageRoot.appending(path: ".build/ModuleCache/cache.pcm"))
+    let profile = try workspaceProfile(root: sourceRoot)
+    let allowedPaths = ["Sources/**"]
+    let policy = try EvolutionWorkspacePolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID, globs: allowedPaths),
+      allowedPaths: allowedPaths,
+      allowedOperations: ["workspace.run-tests@1"])
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: stateRoot.appending(path: "evolution"), profileRegistry: registry)
+
+    let workspace = try await manager.prepareWorkspace(
+      htaskID: "runtime-job-nested-build-cache", sourceProjectRef: profile.projectRef,
+      policy: policy, createdAtUTC: timestamp)
+    let isolated = try XCTUnwrap(registry.profile(for: workspace.projectRef))
+    let isolatedRoot = URL(filePath: isolated.projectRoot)
+
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: isolatedRoot.appending(path: "Sources/Packages/App/Sources/App.swift").path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: isolatedRoot.appending(path: "Sources/Packages/App/.build").path),
+      "path-bound SwiftPM caches must never enter an isolated workspace")
+  }
+
   func testInvalidAndStaleWorkspaceRevisionFailClosed() async throws {
     XCTAssertThrowsError(
       try EvolutionWorkspacePolicy(

@@ -177,6 +177,90 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
     XCTAssertEqual(automatic.first?.consumptionCount, 1)
   }
 
+  func testNonterminalDerivedJobKeepsItsSourceProjectRegistrationForBuiltinPreset() async throws {
+    let sourceRoot = try temporaryDirectory("reference-source")
+    let stateRoot = try temporaryDirectory("reference-state")
+    try FileManager.default.createDirectory(
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("line one\nline two\n".utf8).write(
+      to: sourceRoot.appending(path: "Sources/App.txt"))
+    try Data([0x50, 0x4b, 0x03, 0x04, 0x41, 0x52, 0x4b, 0x44, 0x45, 0x43, 0x4b]).write(
+      to: sourceRoot.appending(path: "Sources/Input.hap"))
+    // XCTest's temporary directory is spelled through macOS's `/var` alias.
+    // The registration contract intentionally rejects symlink ancestry, so
+    // feed it the physical path just as a real CLI caller must.
+    guard let physical = realpath(sourceRoot.path, nil) else { throw POSIXError(.ENOENT) }
+    defer { free(physical) }
+    let physicalSourceRoot = URL(
+      filePath: String(cString: physical), directoryHint: .isDirectory)
+
+    let projectStore = try RuntimeWorkspaceProjectStore(
+      rootURL: stateRoot.appending(path: "workspace-projects"))
+    let registration = try projectStore.register(
+      requestID: "derived-reference-registration", kind: "arkdeck",
+      rootPath: physicalSourceRoot.path)
+    projectStore.markApplied([registration.projectRef: registration.generation])
+    let profile = try workspaceProfile(
+      root: physicalSourceRoot, projectRef: registration.projectRef,
+      includesSourceReader: true)
+    let sourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: profile.allowedFileGlobs)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: stateRoot.appending(path: "evolution"), profileRegistry: registry)
+    let isolation = WorkspaceIsolationIntent(
+      runtimeOwnerID: "runtime-derived-reference-job",
+      sourceProjectRef: registration.projectRef,
+      expectedWorkspaceRevision: sourceRevision,
+      isolatedWorkspaceRevision: sourceRevision,
+      createdAtUTC: timestamp, allowedFileGlobs: profile.allowedFileGlobs)
+    _ = try await manager.prepare(isolation)
+
+    let provider = try workspaceProvider(
+      profile: profile, registry: registry, manager: manager,
+      stateRoot: stateRoot, suffix: "reference")
+    let process = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: profile))
+    let dispatcher = RuntimeOwnedWorkspaceDispatcher(fallback: process, manager: manager)
+    let engine = try runtimeEngine(
+      stateRoot: stateRoot.appending(path: "engine"), provider: provider,
+      dispatcher: dispatcher,
+      capabilityStore: try RuntimeCapabilityStore(
+        directoryURL: stateRoot.appending(path: "capabilities")),
+      artifactStore: try RuntimeArtifactStore(
+        rootURL: stateRoot.appending(path: "artifacts"),
+        nowUTC: { Self.fixedTimestamp }),
+      workspaceProjectStore: projectStore)
+    let request = try operationRequest(
+      id: "workspace.build-openharmony", requestID: "request-derived-reference",
+      idempotencyKey: "idempotency-derived-reference",
+      inputs: [
+        "projectRef": .string(isolation.workspaceProjectRef),
+        "buildPresetRef": .string("copy-hap"),
+        "expectedWorkspaceRevision": .string(sourceRevision),
+      ])
+    let accepted = try await engine.submit(try JSONEncoder().encode(request))
+
+    do {
+      _ = try await engine.workspaceProjectRemove(
+        projectRef: registration.projectRef,
+        expectedGeneration: registration.generation)
+      XCTFail("a nonterminal derived Job must retain its source registration")
+    } catch let failure as RuntimeWorkspaceProjectFailure {
+      XCTAssertEqual(failure.code, "resourceConflict")
+      XCTAssertTrue(failure.message.contains("active or uncertain Job"))
+    }
+
+    let terminal = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(terminal.state, "succeeded", terminal.timeline.joined(separator: " | "))
+    let removed = try await engine.workspaceProjectRemove(
+      projectRef: registration.projectRef,
+      expectedGeneration: registration.generation)
+    XCTAssertEqual(removed.configurationStatus, "removed")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: physicalSourceRoot.path))
+  }
+
   func testSourceDriftIsRejectedBeforeAnIsolatedCopyIsPublished() async throws {
     let sourceRoot = try temporaryDirectory("drift-source")
     let stateRoot = try temporaryDirectory("drift-state")
@@ -654,7 +738,11 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
     return url
   }
 
-  private func workspaceProfile(root: URL) throws -> WorkspaceProjectProfile {
+  private func workspaceProfile(
+    root: URL,
+    projectRef: String = "RuntimeIsolationProject",
+    includesSourceReader: Bool = false
+  ) throws -> WorkspaceProjectProfile {
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
     let copy = try WorkspaceExecutableIdentity.hashing(path: "/bin/cp")
@@ -668,10 +756,20 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
         "Sources/Input.hap",
         "entry/build/default/outputs/default/entry-default-unsigned.hap",
       ], timeoutSeconds: 10)
+    let sourceReader: WorkspaceCommandPreset?
+    if includesSourceReader {
+      sourceReader = try WorkspaceCommandPreset(
+        presetID: "source-reader",
+        executable: WorkspaceExecutableIdentity.hashing(path: "/usr/bin/sed"),
+        fixedArguments: [], timeoutSeconds: 10)
+    } else {
+      sourceReader = nil
+    }
     return try WorkspaceProjectProfile(
-      profileID: "runtime-isolation-test@1", projectRef: "RuntimeIsolationProject",
+      profileID: "runtime-isolation-test@1", projectRef: projectRef,
       projectRoot: root.path, allowedFileGlobs: ["Sources/**"],
-      inspectionPreset: inspection, patchPreset: patching,
+      inspectionPreset: inspection, sourceReaderPreset: sourceReader,
+      patchPreset: patching,
       buildPresets: [build.presetID: build], testPresets: [:], symbolPresets: [:],
       buildProducts: [
         build.presetID: "entry/build/default/outputs/default/entry-default-unsigned.hap"

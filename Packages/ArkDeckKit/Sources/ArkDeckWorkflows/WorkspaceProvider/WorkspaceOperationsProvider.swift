@@ -1238,6 +1238,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       hasPreset = profile.sourceControlPreset != nil
     case "workspace.create-checkpoint@1":
       hasPreset = profile.sourceControlPreset != nil || profile.archiveCheckpointPreset != nil
+    case "workspace.inspect-source@1":
+      hasPreset = true
     case "workspace.read-source-range@1":
       hasPreset = profile.sourceReaderPreset != nil
     default:

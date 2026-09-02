@@ -89,8 +89,10 @@ public enum RuntimeRequestEnvelope {
     for descriptor: CatalogOperationDescriptor
   ) -> RuntimeOperationRequest? {
     var inputs: [String: JSONValue] = [:]
-    for field in descriptor.inputs where field.isRequired {
-      inputs[field.name] = placeholder(for: field)
+    for field in descriptor.inputs {
+      if field.isRequired {
+        inputs[field.name] = placeholder(for: field)
+      }
     }
     return try? RuntimeOperationRequest.operatorFlagForm(
       targetID: "TGT-REPLACE-ME",
@@ -1365,10 +1367,17 @@ public actor RuntimeJobEngine {
     ]
     let presetRefs = descriptor.inputs.compactMap { input -> String? in
       guard presetInputNames.contains(input.name),
-        case .string(let value)? = inputs[input.name]
+        case .string(let value)? = inputs[input.name],
+        value.hasPrefix("preset-")
       else { return nil }
       return value
     }
+    // Runtime-owned presets use the closed `preset-…` reference grammar and
+    // need a generation/use pin in the mutable registration store. Project
+    // profiles also publish immutable code-owned presets such as
+    // `arkdeck-tests`; those are protected by the source project use token
+    // plus their executable identity and must not be looked up as resources
+    // that can never exist in the store.
     // A Runtime-owned isolated copy is registered nowhere: it is derived from
     // a registered project and lives under the Runtime state directory. Its
     // Jobs acquire the *source* registration, because the preset and
@@ -1393,6 +1402,15 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.rejected(
         code, failure.message)
     }
+  }
+
+  private func requireNoActiveWorkspaceProjectReference(_ projectRef: String) throws {
+    let workspaceProvider = providers.provider(id: CatalogProvider.workspace.rawValue)
+    try admissionService.requireNoActiveWorkspaceProjectReference(
+      projectRef,
+      resolveRegistrationProjectRef: {
+        workspaceProvider?.workspaceRegistrationProjectRef(for: $0)
+      })
   }
 
   package func workspaceProjectList() throws -> [RuntimeWorkspaceProjectResource] {
@@ -1434,7 +1452,7 @@ public actor RuntimeJobEngine {
     return try workspaceProjectStore.update(
       projectRef: projectRef, expectedGeneration: expectedGeneration,
       kind: kind, rootPath: rootPath,
-      requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
+      requireNoActiveReference: requireNoActiveWorkspaceProjectReference)
   }
 
   package func workspaceProjectRemove(
@@ -1446,7 +1464,7 @@ public actor RuntimeJobEngine {
     }
     return try workspaceProjectStore.remove(
       projectRef: projectRef, expectedGeneration: expectedGeneration,
-      requireNoActiveReference: admissionService.requireNoActiveWorkspaceProjectReference)
+      requireNoActiveReference: requireNoActiveWorkspaceProjectReference)
   }
 
   package func workspacePresetList(
@@ -1578,8 +1596,9 @@ public actor RuntimeJobEngine {
     let fingerprint = Self.fingerprint(of: try CanonicalJSONEncoders.canonical().encode(request))
     switch try admissionService.lookup(idempotencyKey: request.idempotencyKey, requestHash: fingerprint) {
     case .duplicate(let jobID):
+      let existing = try currentCatalogDuplicate(jobID: jobID)
       if let digest = try Self.reviewedPlanDigest(in: requestData),
-        try recordForRead(jobID: jobID).materializedPlanDigest != digest {
+        existing.materializedPlanDigest != digest {
         throw AgentExecutionControlFailure("reviewedPlanMismatch", "the recovered Job differs from the immutable reviewed plan")
       }
       return RuntimeJobAcceptance(jobID: jobID, deduplicated: true)
@@ -1624,8 +1643,8 @@ public actor RuntimeJobEngine {
       idempotencyKey: request.idempotencyKey, requestHash: fingerprint)
     {
     case .duplicate(let existingJobID):
+      let existing = try currentCatalogDuplicate(jobID: existingJobID)
       if let reviewedPlanDigest {
-        let existing = try recordForRead(jobID: existingJobID)
         guard existing.materializedPlanDigest == reviewedPlanDigest else {
           if beforeAdmission != nil {
             throw AgentExecutionControlFailure("reviewedPlanMismatch", "the existing Job differs from the immutable reviewed plan")
@@ -1753,8 +1772,8 @@ public actor RuntimeJobEngine {
       let verdict = try admissionService.admit(record: record, requestHash: fingerprint)
       switch verdict {
       case .duplicate(let existingJobID):
+        let existing = try currentCatalogDuplicate(jobID: existingJobID)
         if let reviewedPlanDigest {
-          let existing = try recordForRead(jobID: existingJobID)
           guard existing.materializedPlanDigest == reviewedPlanDigest else {
             throw RuntimeJobEngineError.rejected(
               .conflict,
@@ -6941,13 +6960,12 @@ public actor RuntimeJobEngine {
       return nil
     }
     let resolved = try await artifactStore.resolveLease(lease)
-    try Self.validateArtifactBinding(
-      resolved.bindingSnapshot, request: runtime.record.request,
+    try Self.validateResolvedInputArtifact(
+      resolved, request: runtime.record.request,
       materializedStableIdentitySHA256:
         runtime.record.materializedStableTargetIdentitySHA256,
-      allowDeviceBoundHostSource: Self.consumesTargetScopedHostArtifact(
-        provider: runtime.record.providerID,
-        reference: runtime.record.operationReference))
+      provider: runtime.record.providerID,
+      reference: runtime.record.operationReference)
     return ProviderResolvedInputArtifact(
       artifactID: resolved.artifactID, fileURL: resolved.fileURL,
       sha256: resolved.sha256, byteCount: resolved.byteCount)
@@ -6965,6 +6983,44 @@ public actor RuntimeJobEngine {
     provider == CatalogProvider.analyzer.rawValue
       || reference == OpenHarmonyLocalSigning.operationReference
       || reference == "workspace.apply-patch@1"
+  }
+
+  /// `workspace.symbolize-crash@1` has two intentionally different subjects:
+  /// the request is scoped to the registered project whose symbols are used,
+  /// while its immutable input was captured from a device target. Requiring
+  /// those target IDs to be equal makes the published operation impossible.
+  /// The exception stays narrower than generic host Artifact consumption: it
+  /// accepts only the exact HDC crash product promised by the Catalog and a
+  /// complete device binding, and the operation itself remains host-only.
+  private static func validateResolvedInputArtifact(
+    _ artifact: RuntimeArtifactLeaseResolution,
+    request: RuntimeOperationRequest,
+    materializedStableIdentitySHA256: String?,
+    provider: String,
+    reference: String
+  ) throws {
+    if reference == "workspace.symbolize-crash@1" {
+      guard artifact.name == "crash-log.txt",
+        artifact.sourceOperation == "capture.diagnostics@1",
+        artifact.providerID == CatalogProvider.hdc.rawValue,
+        request.target.expectedBindingRevision == nil,
+        artifact.bindingSnapshot.targetID != request.target.targetID,
+        let bindingRevision = artifact.bindingSnapshot.bindingRevision,
+        bindingRevision > 0,
+        let stableIdentity = artifact.bindingSnapshot.stableIdentitySHA256,
+        Self.isLowercaseSHA256(stableIdentity)
+      else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "workspace crash dump lease is not a device-bound capture.diagnostics crash-log.txt")
+      }
+      return
+    }
+    try validateArtifactBinding(
+      artifact.bindingSnapshot, request: request,
+      materializedStableIdentitySHA256: materializedStableIdentitySHA256,
+      allowDeviceBoundHostSource: consumesTargetScopedHostArtifact(
+        provider: provider, reference: reference))
   }
 
   private static func validateArtifactBinding(
@@ -7112,12 +7168,11 @@ public actor RuntimeJobEngine {
       }
       do {
         let artifact = try await artifactStore.resolveLease(lease)
-        try Self.validateArtifactBinding(
-          artifact.bindingSnapshot, request: request,
+        try Self.validateResolvedInputArtifact(
+          artifact, request: request,
           materializedStableIdentitySHA256: facts?.deviceIdentitySHA256,
-          allowDeviceBoundHostSource: Self.consumesTargetScopedHostArtifact(
-            provider: descriptor.provider.rawValue,
-            reference: descriptor.reference))
+          provider: descriptor.provider.rawValue,
+          reference: descriptor.reference)
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
@@ -8706,6 +8761,19 @@ public actor RuntimeJobEngine {
     }
     guard let persisted else { throw RuntimeJobEngineError.jobNotFound(jobID) }
     return try decodePersistedRecord(persisted)
+  }
+
+  /// A typed request is only an idempotent replay while the Catalog that
+  /// materialized it is still exact. The same request can lower to a
+  /// different plan after a Catalog update, so attaching its old Job to a
+  /// fresh owner would publish an unrunnable cross-digest execution.
+  private func currentCatalogDuplicate(jobID: String) throws -> RuntimeJobRecord {
+    let existing = try recordForRead(jobID: jobID)
+    guard existing.catalogDigest == RuntimeOperationCatalog.catalogDigest else {
+      throw RuntimeJobEngineError.idempotencyConflict(
+        "idempotency key belongs to a Job admitted under a different Catalog digest")
+    }
+    return existing
   }
 
   private func decodePersistedRecord(_ persisted: RuntimePersistedJob) throws -> RuntimeJobRecord {

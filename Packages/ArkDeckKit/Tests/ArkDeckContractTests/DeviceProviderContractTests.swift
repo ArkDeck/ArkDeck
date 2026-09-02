@@ -332,6 +332,70 @@ final class DeviceProviderContractTests: XCTestCase {
         context: context))
   }
 
+  func testPortForwardLoweringUsesTheCanonicalFullHDCTaskTuple() throws {
+    let forward = try HDCPortForwardSpec(
+      direction: .forward, localPort: 23_451, remotePort: 34_561)
+    let reverse = try HDCPortForwardSpec(
+      direction: .reverse, localPort: 23_452, remotePort: 34_562)
+
+    func arguments(_ action: TypedProviderAction) throws -> [String] {
+      let plan = try hdc.lower(action: action, context: context)
+      guard case .process(_, let arguments, let timeout) = plan.kind else {
+        throw DeviceProviderError.unsupportedAction("port forwarding must use one process")
+      }
+      XCTAssertEqual(timeout, 30)
+      return arguments
+    }
+
+    XCTAssertEqual(
+      try arguments(.hdc(.createPortForward(forward))),
+      ["-t", "150100424a544e4600", "fport", "tcp:23451", "tcp:34561"])
+    XCTAssertEqual(
+      try arguments(.hdc(.createPortForward(reverse))),
+      ["-t", "150100424a544e4600", "rport", "tcp:34562", "tcp:23452"])
+    XCTAssertEqual(
+      try arguments(.hdc(.removePortForward(forward))),
+      ["-t", "150100424a544e4600", "fport", "rm", "tcp:23451", "tcp:34561"])
+    XCTAssertEqual(
+      try arguments(.hdc(.removePortForward(reverse))),
+      ["-t", "150100424a544e4600", "fport", "rm", "tcp:34562", "tcp:23452"])
+    for spec in [forward, reverse] {
+      XCTAssertEqual(
+        try arguments(.hdc(.readPortForwardPresence(spec))),
+        ["-t", "150100424a544e4600", "fport", "ls"])
+    }
+  }
+
+  func testPortForwardReadbackMatchesTupleOrderAndDirection() throws {
+    let forward = try HDCPortForwardSpec(
+      direction: .forward, localPort: 23_451, remotePort: 34_561)
+    let reverse = try HDCPortForwardSpec(
+      direction: .reverse, localPort: 23_451, remotePort: 34_561)
+
+    func presence(_ text: String, spec: HDCPortForwardSpec) throws -> String? {
+      let receipt = ProviderProcessReceipt(
+        exitStatus: 0, stdout: Data(text.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.1)
+      guard case .verified(let summary) = try hdc.verify(
+        receipt: receipt, action: .hdc(.readPortForwardPresence(spec)), context: context)
+      else { return nil }
+      return summary["present"]
+    }
+
+    let rows = """
+      tcp:23451 tcp:34561 [Forward]
+      tcp:34561 tcp:23451 [Reverse]
+      """
+    XCTAssertEqual(try presence(rows, spec: forward), "true")
+    XCTAssertEqual(try presence(rows, spec: reverse), "true")
+    XCTAssertEqual(
+      try presence("tcp:34561 tcp:23451 [Forward]\n", spec: forward), "false",
+      "swapped endpoints are a different task")
+    XCTAssertEqual(
+      try presence("tcp:23451 tcp:34561 [Reverse]\n", spec: forward), "false",
+      "the same endpoints in the other direction are a different task")
+  }
+
   func testRockchipMaterializesEveryPublishedRuntimeStepWithoutLegacyAuthorization() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))

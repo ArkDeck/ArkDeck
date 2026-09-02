@@ -676,6 +676,46 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
   }
 
+  func testTargetUpdateMigratesOutOfTheLegacyWorkspaceConfiguration() throws {
+    let project = root.appending(path: "WaterFlowLayoutDemo", directoryHint: .isDirectory)
+    let module = project.appending(path: "entry/src/main", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appending(path: "module.json5"))
+    let sdk = root.appending(path: "DevEco/sdk", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: sdk.appending(path: "default/openharmony", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    _ = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      workspace: LaunchAgentWorkspaceConfiguration(
+        projectRoot: project, devecoSDKRoot: sdk))
+
+    runner.removeAllCommands()
+    try RuntimeCLI.runAgentDaemon(
+      ["update", "--daemon", daemonBundle.path, "--json"],
+      service: service)
+
+    let environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    for key in [
+      ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey,
+      ArkDeckLaunchAgent.workspaceActiveProjectEnvironmentKey,
+      ArkDeckLaunchAgent.devecoSDKEnvironmentKey,
+      ArkDeckLaunchAgent.analyzerEnvironmentKey,
+      ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey,
+    ] {
+      XCTAssertNil(environment[key], key)
+    }
+    let receipt = try JSONDecoder().decode(
+      LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
+    XCTAssertNil(receipt.workspaceProjectPath)
+    XCTAssertNil(receipt.devecoSDKPath)
+    let status = try service.status()
+    XCTAssertNil(status.workspaceProjectPath)
+    XCTAssertNil(status.devecoSDKPath)
+  }
+
   func testWorkspaceConfigurationFailsClosedUnlessProjectAndSDKAreBothValid() throws {
     XCTAssertThrowsError(
       try RuntimeCLI.runAgentDaemon(

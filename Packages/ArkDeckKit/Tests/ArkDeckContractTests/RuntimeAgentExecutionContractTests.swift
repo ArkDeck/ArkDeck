@@ -332,6 +332,46 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     catch let error as AgentExecutionControlFailure { XCTAssertEqual(error.code, "resourceConflict") }
   }
 
+  func testConflictingJobIdempotencyNeverLeavesACrossOwnedExecution() async throws {
+    let identity = DeviceBootstrapMachine.stableIdentitySHA256(
+      serial: "150100424a544e4600")
+    let target = try targets.adopt(
+      stableIdentitySHA256: identity, connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f", nowUTC: RuntimeAgentTime.format(clock.now())).record
+    let existing = try RuntimeOperationRequest(
+      requestID: "existing-request", idempotencyKey: "shared-job-idempotency",
+      target: .init(
+        targetID: target.targetID,
+        expectedBindingRevision: target.bindingRevision),
+      operation: .init(id: "observe.device", version: 1), inputs: [:],
+      requestedOutputs: [.derivedArtifacts], authorization: nil,
+      clientContext: nil)
+    _ = try await engine.submit(RuntimeOperationCodec.encodeRequest(existing))
+
+    var conflicting = request("execution-conflict")
+    conflicting["requestId"] = .string("owner-request")
+    conflicting["idempotencyKey"] = .string("shared-job-idempotency")
+    conflicting["target"] = .object([
+      "targetId": .string(target.targetID),
+      "expectedBindingRevision": .integer(Int64(target.bindingRevision)),
+    ])
+    let owner = try owner()
+    do {
+      _ = try await owner.run(conflicting)
+      XCTFail("a Job idempotency conflict must be surfaced")
+    } catch let error as AgentExecutionControlFailure {
+      XCTAssertEqual(error.code, "idempotencyConflict")
+      XCTAssertEqual(error.details["newDispatchCount"], .integer(0))
+    }
+    let status = try object(await owner.status("execution-conflict"))
+    XCTAssertEqual(status["state"], .string("failed"))
+    XCTAssertEqual(status["failureCode"], .string("idempotencyConflict"))
+    XCTAssertEqual(status["jobId"], .null)
+    let jobs = try await engine.listJobs()
+    XCTAssertEqual(jobs.count, 1)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testInvalidInputsAreRefusedBeforeAnyExecutionOrHumanActionExists() async throws {
     port.setState("Unauthorized")
     let owner = try owner()

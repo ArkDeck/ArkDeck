@@ -179,15 +179,25 @@ package struct AgentRuntimeExecutor: Sendable {
   }
 
   private let client: AgentClient
+  /// The target-protocol owner for the admission boundary.
+  ///
+  /// The one-shot runner still reads the frozen 1.x projections it was built
+  /// around, but a current domain leaf must submit through the negotiated 2.x
+  /// lifecycle so a pre-admission refusal can carry its exact domain code and
+  /// the two-part zero-dispatch proof. Keeping this client separate avoids
+  /// pretending the legacy read projections have the target response shape.
+  private let jobSubmissionClient: AgentClient
   private let stateDirectory: URL
   private let nowUTC: @Sendable () -> String
 
   public init(
     client: AgentClient,
+    jobSubmissionClient: AgentClient? = nil,
     stateDirectory: URL? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.client = client
+    self.jobSubmissionClient = jobSubmissionClient ?? client
     self.stateDirectory =
       stateDirectory
       ?? URL(filePath: client.socketPath).deletingLastPathComponent()
@@ -470,9 +480,18 @@ package struct AgentRuntimeExecutor: Sendable {
     let submitted: JSONValue
     do {
       submitted = try call(
+        client: jobSubmissionClient,
         method: "job.submit", params: ["requestJson": .string(requestText)],
         deadline: deadline)
     } catch let error as AgentClientError {
+      // A target-protocol failure carries the Runtime owner's structured
+      // admission evidence. The CLI session must map it; flattening it into a
+      // terminal receipt would incorrectly report a Job that was never born.
+      // Transport failures from the mutation-capable submit likewise have to
+      // retain their unknown-outcome semantics.
+      if jobSubmissionClient.selectedProtocolVersion == ArkDeckControlProtocol.targetVersion {
+        throw error
+      }
       if case .daemonError(_, let message) = error {
         return .failed(
           reason: message,
@@ -808,6 +827,13 @@ package struct AgentRuntimeExecutor: Sendable {
   private func call(
     method: String, params: [String: JSONValue]? = nil, timeoutSeconds: Int
   ) throws -> JSONValue {
+    try call(client: client, method: method, params: params, timeoutSeconds: timeoutSeconds)
+  }
+
+  private func call(
+    client: AgentClient, method: String, params: [String: JSONValue]? = nil,
+    timeoutSeconds: Int
+  ) throws -> JSONValue {
     try client.request(
       method: method, params: params,
       id: "agent-\(UUID().uuidString.lowercased())",
@@ -819,6 +845,15 @@ package struct AgentRuntimeExecutor: Sendable {
   ) throws -> JSONValue {
     try call(
       method: method, params: params,
+      timeoutSeconds: try deadline.remainingSeconds())
+  }
+
+  private func call(
+    client: AgentClient, method: String, params: [String: JSONValue]? = nil,
+    deadline: ExecutionDeadline
+  ) throws -> JSONValue {
+    try call(
+      client: client, method: method, params: params,
       timeoutSeconds: try deadline.remainingSeconds())
   }
 

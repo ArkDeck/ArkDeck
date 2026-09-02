@@ -316,6 +316,40 @@ final class RuntimeWorkspaceProjectStoreContractTests: XCTestCase {
       removed)
   }
 
+  func testSymbolPresetAcceptsOneCanonicalRelativeSourceMap() throws {
+    let root = try makeRoot("symbol-project")
+    let store = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    let project = try store.register(
+      requestID: "symbol-project-registration", kind: "openharmony", rootPath: root.path)
+
+    let preset = try store.registerPreset(
+      requestID: "symbol-preset-registration", projectRef: project.projectRef,
+      kind: "symbol", templateRef: "openharmony.arkts-symbol@1",
+      toolchainRef: nil, toolchainGeneration: nil, credentialRef: nil,
+      timeoutSeconds: 300,
+      constraints: RuntimeWorkspacePresetConstraints(
+        relativeSourceMap: "entry/build/default/outputs/default/mapping/sourceMaps.map"))
+    XCTAssertEqual(
+      preset.constraints.relativeSourceMap,
+      "entry/build/default/outputs/default/mapping/sourceMaps.map")
+
+    for unsafePath in [
+      "/tmp/sourceMaps.map", "entry/../sourceMaps.map",
+      "entry/./sourceMaps.map", "entry//sourceMaps.map",
+    ] {
+      XCTAssertThrowsError(
+        try store.registerPreset(
+          requestID: "symbol-preset-unsafe-\(unsafePath)", projectRef: project.projectRef,
+          kind: "symbol", templateRef: "openharmony.arkts-symbol@1",
+          toolchainRef: nil, toolchainGeneration: nil, credentialRef: nil,
+          timeoutSeconds: 300,
+          constraints: RuntimeWorkspacePresetConstraints(relativeSourceMap: unsafePath))
+      ) { error in
+        XCTAssertEqual((error as? RuntimeWorkspaceProjectFailure)?.code, "invalidInput")
+      }
+    }
+  }
+
   func testPresetReleaseTransactionRecoversBeforeTheStoreServesReads() throws {
     let root = try makeRoot("recovery-project")
     let pins = ToolchainPins()

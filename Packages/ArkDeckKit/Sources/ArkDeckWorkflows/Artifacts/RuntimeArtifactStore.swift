@@ -555,19 +555,28 @@ public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
   public let sha256: String
   public let byteCount: Int
   package let bindingSnapshot: ArtifactBindingSnapshot
+  package let name: String
+  package let sourceOperation: String
+  package let providerID: String
 
   public init(
     artifactID: String,
     fileURL: URL,
     sha256: String,
     byteCount: Int,
-    bindingSnapshot: ArtifactBindingSnapshot
+    bindingSnapshot: ArtifactBindingSnapshot,
+    name: String = "",
+    sourceOperation: String = "",
+    providerID: String = ""
   ) {
     self.artifactID = artifactID
     self.fileURL = fileURL
     self.sha256 = sha256
     self.byteCount = byteCount
     self.bindingSnapshot = bindingSnapshot
+    self.name = name
+    self.sourceOperation = sourceOperation
+    self.providerID = providerID
   }
 }
 
@@ -1451,7 +1460,9 @@ public actor RuntimeArtifactStore {
     let fileURL = try storedFileURL(for: metadata)
     return RuntimeArtifactLeaseResolution(
       artifactID: artifactID, fileURL: fileURL, sha256: metadata.sha256,
-      byteCount: metadata.byteCount, bindingSnapshot: metadata.bindingSnapshot)
+      byteCount: metadata.byteCount, bindingSnapshot: metadata.bindingSnapshot,
+      name: metadata.name, sourceOperation: metadata.sourceOperation,
+      providerID: metadata.providerID)
   }
 
   // MARK: - Durable imported inputs (not Jobs)
