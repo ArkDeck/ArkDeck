@@ -2,7 +2,8 @@
 
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness、批准载体或平台符合性声明。
 > 状态：目标规格；文中“目标命令”不代表当前版本已经实现。
-> 规格版本：0.2（2026-08-30）；盘点基线为 28 个 canonical Catalog operation、1 个 alias、
+> 规格版本：0.3（2026-09-02，§13 差距盘点按 protected `main` `d28d57a3` 重算；0.2 为
+> 2026-08-30）；盘点基线为 28 个 canonical Catalog operation、1 个 alias、
 > local control protocol `1.0.0`。实现与验收仍必须 pin exact Catalog digest，不能只比较数量。
 > 权威边界：Constitution Safety invariants / POL-*、`PRODUCT-LOOP.md`、accepted specs、
 > contracts、当前 `Catalog/` 与 Runtime 行为高于本文。发生冲突时本文失效，不能用本文修改
@@ -1512,130 +1513,78 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 ## 13. 当前实现差距
 
-### 13.1 已有骨架
+> 本节按 protected `main` `d28d57a3`（2026-09-02）重算。命令面的事实源是
+> `arkdeck commands --output json`（`arkdeck.cli.command-registry/1`）；本节的数字都可以由它
+> 重新得出，不再手数 Swift。
 
-当前 registry 已有 32 个一级命令、174 个可执行 leaf（另有 6 个 tombstone、3 个永久拒绝桩）。
-以下底座可以保留并演进：
+### 13.1 已实现面
 
-- `operation list/describe`；
-- `job plan/submit/run/list/status/cancel/reconcile`；
-- `agent run/resume`；
-- target adoption、trace probe；
-- HAP/workspace patch/Flash bundle/native library import；
-- Artifact list/inspect/read/export；
-- capability read-only inspection；
-- cleanup debt continuation；
-- macOS runtime service、signing 与 maintainer feed 工具。
+- registry：33 个一级入口、212 个 leaf = 203 个 executable + 6 个 parse-only tombstone
+  （`agent chat`、`flash plan/preview/execute/continue/postflight`）+ 3 个永久拒绝桩
+  （`capability draft/install/revoke`）。executable 中包含 §12 的 legacy/deprecated 兼容拼写
+  （`device list/show/adopt`、`artifact import-*`、`flash install-binding/status/reconcile`、
+  `legacy flash *`、`debug start/evaluate/status`、`cleanup-debt *`、`agentd/signing/update-feed *`）；
+  它们运行时在 `meta.lifecycle` 报告 `legacy|deprecated` 与 replacement，但按 §12 不计 target
+  conformance。
+- Catalog：28 个 canonical operation + `flash.dayu200` alias，digest
+  `b8c7148fc7cd9f7a413167262a6d44bf35e049a62a94613f3a94248ab08784ce`。§6.2 mapping 表中 28 个
+  canonical 均已有一等领域 leaf（registry 的 `catalogOperation` 字段即契约），alias 只保留 generic
+  `job/agent --operation` 入口，符合 §6.2 的设计。
+- Slice A 已落地：declarative registry、strict parser、help/commands/completion、`--output json/jsonl`、
+  error registry 与 exit registry、control protocol 2.x 协商（保留 1.x）、
+  `operation list/describe/example/validate`、`runtime health`、`runtime hdc status`、
+  `device candidates/wait`、`target show/availability`、`job events/watch/wait/result/evidence`、
+  `artifact quota` 与 bounded range read、durable AgentExecution（`agent list/status/abandon`）、
+  `human-action list/show/resume`、process-level golden 合约测试（`CLIProcessGoldenContractTests`）。
+- Slice B 已落地：`flash device-access/bootloader-status/prerequisites/lane-preview/bind-loader/run`、
+  `recovery flash-invocation list/start/evaluate/status`、`debug probe/hap`、`debug native deploy`、
+  screen/input/diagnostics/ui-dump/trace/analyze/port-forward/workspace 的全部 convenience mapping、
+  workspace project/preset lifecycle 与 `workspace continuation inspect/submit/run`、
+  `artifact import *` durable lifecycle、`runtime hdc impact-preview/restart` + `control-action *`、
+  `runtime tool/bundle *`、`runtime service/signing`、`maintainer update-feed`、canonical 命名迁移与
+  tombstone。
+- Slice C 已落地：`session list/show/pin/unpin`、`session cleanup preview/apply`、
+  `runtime storage status/policy/root`（Runtime 单一 owner，Session 输出域与 Artifact 域分开报告）、
+  `runtime support-bundle preview/export`、`runtime update *`、`device/target display-name`、
+  `history filter *`、`trace cache status/purge`、`ui-dump inspect/hit-test`、
+  `diagnostics inspect/preview/export`、`trace inspect/export`。各面的实现契约见
+  `docs/design/cli-*.md`。
+- 0.2 版 §13.2 列出的 12 个 daemon-ready 方法中 11 个已有一等 leaf；唯一例外 `debug.template.run`
+  见 13.2。
 
-所有当前 Catalog descriptor 已经可以经 generic Job/Agent surface 理论触达。因此重设计的重点是
-补齐产品资源面、消除语义混名，并把隐式行为变成机器契约，而不是重写 Runtime executor。
+### 13.2 尚未闭合的目标面
 
-### 13.2 daemon-ready、CLI 缺失
+下表是 §18 的 macOS「全功能」结论仍被阻断的全部原因。每行都必须由对应载体解除，不得在 CLI 内
+补隐藏执行器绕过 Runtime。
 
-以下正式 daemon 方法应作为首批 vertical slice 的实现输入；多数只需补 CLI，但目标 projection
-仍必须逐项核对，不能把“方法存在”等同于“目标 contract 已完成”：
-
-| daemon method | 目标 CLI |
-|---|---|
-| `health` | `runtime health` |
-| `runtime.hdc-status` | `runtime hdc status` |
-| `device.candidates` | `device candidates` |
-| `artifact.quota` | `artifact quota` |
-| `job.evidence` | `job evidence` / `job result` |
-| `debug.probe` | `debug probe` |
-| `debug.template.run` | `debug template run`（先迁入 approved Catalog operation/Job） |
-| `flash.lanePlanPreview` | `flash lane-preview` |
-| `flash.prerequisites` | `flash prerequisites` |
-| `flash.device-access` | `flash device-access` |
-| `flash.bootloader-status` | `flash bootloader-status` |
-| `flash.bind-current-loader` | `flash bind-loader` |
-
-`health` 不是完全无消费者：当前 `agent run`、service status/restart 等内部路径会调用它；
-缺口是没有一等、portable、可被外部 Agent 直接调用的 `runtime health` leaf。
-`debug.template.run` 也不是“只补 CLI”：当前 implementation 会直接运行 closed HDC template，
-没有 Job/WAL。目标 `debug template run` 必须先由独立 approved operation change 发布 typed
-Catalog mapping；在此之前 coverage 为 `blocked`，不得用 daemon method 存在冒充 CLI conformance。
-`capability.draft`、`capability.install`、`capability.revoke` 则不是缺口：它们是已注册的
-永久拒绝桩，coverage 必须标记 `refused` 并保持零管理效果。
-
-其中 `device.candidates` 当前已有 observed time/health 等事实，但没有本规格要求的 durable snapshot
-generation；第一版可以先忠实暴露现有字段，达到 target contract 前必须扩正式 response schema。
-`target show` 所需的单 target/profile/last-facts projection 也不是当前 `target.list` 的简单别名。
-
-同时修复：
-
-- `device list/show` 当前都调用 `target.list`；
-- `operation describe` 当前没有完整投影 effect/authorization、step/recovery、Artifact/privacy 等
-  Agent decision fields；
-- `artifact read` 未暴露 daemon 已有的 offset/maxBytes；
-- daemon 当前把 artifact `maxBytes` 静默 clamp 到 1...4 MiB；target strict contract 必须按 §7.6
-  拒绝越界而不是改写 caller intent；
-- `job list` 未暴露 order/includeTimeline/includeCurrent，且 page shape 随 flags 改变；
-- 当前 newest pagination 以 SQLite `rowid` 作为同 timestamp 隐式顺序，不能作为 Windows
-  portable tie-break；target 使用 §7.3 compound order；
-- `job submit` flag form 默认随机 idempotency，无法安全重试；
-- `job submit --wait --json` 输出多个 pretty JSON documents；
-- 未知、重复和不适用 option 在多条路径被静默忽略；
-- 没有 `--help`、`--version`、completion、process-level golden 或完整 exit registry；
-- 当前 `debug` 实际是 protected destructive Flash recovery，名字与产品 Debug 冲突；
-- `flash plan/preview/continue/postflight` 的现有 tombstone 不都提供 exact replacement/no-replacement
-  machine contract；
-- client 仍在 `AgentClient.swift` 硬编码 `1.0.0`，daemon 则从共享 XPC contract 取版本，
-  形成协议版本的第二真相源。这是后续独立垂直修复，不通过本 docs-only 修订暗改代码。
-- `legacy flash reconcile` 经 `RockchipLegacyFlashJournalReconciler.production()` 从
-  `SessionSettingsStore` 解析 Session 根，而该 store 的 owner 是调用进程自己的偏好副本。CLI 与
-  App 因此各读各的记录：用户在 App 里选定的自定义根，对这条已发布 leaf 不可见，结算沉默地发生在
-  另一个根上。这不是未来 `runtime storage` 的专属前提，而是一条现有 leaf 已经带着的缺陷。
-
-### 13.3 Catalog 泛化可达与一等领域入口
-
-- screenshot/UI dump/component detail/trace typed capture preset；
-- trace raw Artifact export，经 exact operation/name/media type/privacy 约束后复用 Artifact policy；
-- trace offline inspection，经 Runtime-held descriptor 和固定 ArkTrace distribution 生成
-  `arkdeck.trace-inspection/1`，不接受 host/parser path，也不创建新 evidence；
-- diagnostics capture、screen sequence、tap/long-press/swipe；
-- HAP debug、native library deploy、port forward；
-- 四个 analyzer；
-- 全部 workspace inspect/edit/build/test/sign/symbolize operation；
-- Flash current Runtime execution。
-
-以上 operation 都保留 generic Job/Agent surface，同时已有一等领域 mapping。四个
-`capture.diagnostics@1` convenience 通过同一个 typed preset owner 生成固定 projection；其余领域命令
-仍按 descriptor 接收 `--inputs-file`。两种路径都不复制 provider lowering。
-
-### 13.4 需要新的 typed 产品面
-
-这些缺口是 CLI-local 状态、App 本地偏好/facade、library/storage primitive、平台服务和纯缺失
-Runtime resource 的混合清单，不能统称为 App-only 或 package-internal。当前 CLI target 已链接
-`ArkDeckWorkflows`，部分 parser/facade 也是 Swift `public`；可 import 不等于有权绕过本地
-control owner boundary。CLI 必须先使用 typed Runtime/local-service contract，不得 in-process
-调用 App facade、直读 store 或复制私有组合。
-
-| 能力 | 当前事实 | 目标面/分类 | 最早 slice |
+| 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| Agent pause/HAR | `AgentRuntimeExecutor` 在 CLI 本地写 `PendingExecution` 文件；已有 HAR document 类型但无 production daemon wiring | Runtime-owned AgentExecution + HAR list/show/resume；`blocked` → `direct` | A |
-| Job event | App 和 CLI 都只有 snapshot/timeline polling，无 durable event ID/cursor | unary `job.events` + client watch；`blocked` → `direct` | B |
-| Workspace project lifecycle | Runtime 已持有 private root grant、stable `projectRef` 与 generation；target CLI 提供 register/update/remove/list/show，旧 daemon flags 只作一次兼容迁移输入 | `direct`；实现见 `cli-workspace-project-lifecycle.md` | B |
-| Workspace preset lifecycle | Runtime 已持有 bounded preset register/update/remove + list/show；build/test/symbol 解析 registered preset，signing 通过 crash-recovered dependency transaction pin exact toolchain + credential，并把 workspace preset ref 映射到 Job/result/recovery record | `direct`；实现见 `cli-workspace-preset-toolchain-lifecycle.md` 与本规格 §7.9 | B |
-| Imported input lifecycle | import commit 返回 store namespace 的 legacy synthetic `jobId` + Artifact ID，前者不是 Job engine record；无全局重发现和 release/unpin | durable Import + Import-owned Artifact 的 list/inspect/read/export/release；`blocked` → `direct` | B |
-| HDC lifecycle | 有 App/host lifecycle 组件，但无统一 durable control-action HAR carrier | impact preview → control action → HAR/resume → audited restart；`blocked` → `direct` | B |
-| Target availability | App 组合多个事实源，daemon 无聚合 projection | `target availability`；`blocked` → `direct` | B |
-| HDC tool selection | App/service 有配置路径，无完整 typed discover/select CLI | `runtime tool register/list/inspect/select/remove`；`blocked` → `direct` | B |
-| Workspace continuation | App 可构造受限新 Job，无稳定 CLI/local resource | typed continuation inspect/submit/run；`blocked` → `local` | B |
-| Session pin/cleanup/export | 底层 storage/catalog/planner primitive 存在，不等于已发布完整 App UI 或 CLI resource | Session list/show/pin/unpin 与 generation-bound preview/apply；`blocked` → `local` | C |
-| Storage/support bundle | 不止是 App 配置/导出组合：存储被切成两个互不相交的根——App 拥有、用户可选的 Session 输出根（`SessionSettings` 的 quota/margin/retention 只作用于它），与 daemon 拥有、自带 quota/保留期的 Runtime artifact store。macOS 上前者的 owner 是各进程自己的 `UserDefaults.standard`，sandboxed App 与非 sandbox CLI 因此读到不同记录与不同默认根；且 App Sandbox 把 daemon state directory 放在容器之外，App 进程内无法计量 artifact store | typed storage/support resource，先建立 Runtime 拥有的单一 owner，再分域投影；`blocked` → `local` | C |
-| Device display name | App 在 UserDefaults 保存 candidate/target 显示名，不改 identity | `device/target display-name`；`blocked` → `local` | C |
-| History saved filter | Runtime 拥有单例 generation-CAS query preset，App/CLI 共用；旧 AppStorage 仅作一次性迁移输入 | `history filter list/save/delete`；`local` | C |
-| Trace derived-cache purge | Runtime 以固定 App container cache root 持有 lease-aware typed owner；App/CLI 共用，且不投影路径或删除原始 Trace Artifact | `trace cache status/purge`；`local`；实现见 `cli-trace-cache.md` | C |
-| Source/update | remote source 仍是 App/平台服务；consumer auto-update 由 App/CLI 共用 durable local owner，保持 signed feed、same-Team verification 与 Finder handoff 边界；maintainer feed 已另有 CLI | source 保持 `blocked`；`runtime update check/download/handoff/status/cancel/cleanup` 为 `local`，实现见 `cli-runtime-update.md` | C |
-| Offline inspector | UI dump inspect/hit-test、diagnostics inspect/preview/export 与 Trace inspect 均使用 typed owner；Trace Runtime owner 校验 exact Job/Artifact、`capture.diagnostics@1`、`trace.htrace`、media type/privacy/size/SHA-256，以固定 ArkTrace distribution 和 ephemeral session 发布 `arkdeck.trace-inspection/1`，不接受 caller path 且不创建 evidence | `local`；Trace 实现见 `cli-trace-inspection.md` | C |
-| App icon/menu/shortcut | 只改变 App 呈现和导航 | `presentation`；不需要 CLI leaf | — |
+| `session export preview/apply` | 未发布。Runtime owner、`session.export.preview/apply` 控制方法与 CLI 在独立工作树进行中，随 proposed change `CHG-2026-072`（尚未进入 `main`）交付 | 该 change 经维护者 review/merge，并与 §7.5 逐条对齐 | C |
+| `debug template list/run` | 未发布。daemon `debug.template.run` 仍直接运行 closed HDC template，没有 Job/WAL | 先由独立 approved operation change 发布 typed Catalog mapping；此前 coverage 为 `blocked`，不得用 daemon method 存在冒充 conformance | B |
+| `debug logs` | 未发布 | 随 Debug namespace 收口一并交付 | B |
+| `source *`（8 个 leaf） | 没有 namespace。§6.2 规定 source resource/integration/profile 获批前保持 unavailable | 发布 typed source resource；或由维护者裁决 remote source 为 App/平台服务并在 coverage manifest 中显式分类。§18 不接受 `blocked` | C |
+| §14 机器契约产物 | `openspec/contracts/cli-*`、`cli-feature-coverage.json`、`app-product-capability-registry.yaml`、`Tests/Fixtures/CLI/**` 均不存在；`--version` 的 `pageSchemaVersion`/`nextActionSchemaVersion` 为 `null` | `openspec/contracts/**` 不在 `TASK-AIN-021` 的 Allowed paths 内，需先定义新 Task（定义 PR 与使用 PR 分家），再在同一垂直任务内交付 generator、产物与 CI fail-closed 校验 | A |
+| GJ-1～GJ-5 的 CLI headless 闭环 | 当前 digest 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交），但没有按 `PRODUCT-LOOP.md` 四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内在当前 digest 上用 CLI 完整复跑并按四态记录 | A/B |
+| Windows（Slice D） | 未开始 | 不阻断 macOS-only claim；阻断跨平台 claim | D |
 
-实现它们时先建立 bounded Runtime/local service contract，再接 App 与 CLI。同一 vertical task 内
-提交代码、contract、tests 和必要文档。若引入新 operation、provider、integration/device profile
-或 destructive admission 变化，仍须按仓库规则提交对应 OpenSpec change；本规格不能代替审批。
+### 13.3 已发布 leaf 的残留缺陷
 
-### 13.5 纯展示，不是 CLI 阻塞项
+不阻断命令面存在，但计入 conformance 差距，必须在对应 slice 内修，不能靠文档解释掉：
+
+- `job list` 的 newest/oldest 分页仍以 SQLite `rowid` 作 cursor 与同 timestamp tie-break
+  （`RuntimeJobRepository.listJobs`）；§7.3 compound order 未落地，Windows portable 前必须替换。
+- `legacy flash reconcile` 仍经 `RockchipLegacyFlashJournalReconciler.production()` 从
+  `SessionSettingsStore`（调用进程自己的 `UserDefaults` 副本）取 Session 根；`runtime storage` 的
+  Runtime owner 已存在，该 legacy leaf 尚未切换过去。legacy 面不计 target conformance，但这仍是
+  一条已发布 leaf 带着的缺陷。
+- 1.x 兼容 wire path 的 `artifact.read` 仍把 `maxBytes` clamp 到 1…4 MiB；2.x target handler 已按
+  §7.6 拒绝越界。前者按 §12 冻结，不再修改。
+- `commands --output json` 只对 tombstone 投影 `lifecycleStatus`/`replacementArgvPattern`；
+  legacy/deprecated 拼写在 projection 与 help 里不可辨，只有运行时 `meta.lifecycle` 可辨。生成 §14
+  的 `cli-command-registry.yaml` 时必须补齐。
+- `help device` 中 `show` 的 summary 与 `list` 相同（"list durable targets…"），registry 文案错误。
+
+### 13.4 纯展示，不是 CLI 阻塞项
 
 - Timeline/native tree/window chrome；
 - Finder/Explorer reveal；
