@@ -690,6 +690,11 @@ package actor HDCServerProcessSupervisor {
   private let readOnlyProbeRegistry: HDCReadOnlyProbeRegistry
   private let semanticProfile: HDCRegisteredSemanticProfile
   private let identityObserver: any HDCServerProcessIdentityObserving
+  /// The observer for the OPENHARMONY-TOOLS@0.6.0 commandless identity
+  /// family. Production pins the exact 3.2.0f system observer; the contract
+  /// seam below reuses the injected observer so the family's managed-startup
+  /// path can be driven without the pinned executable.
+  private let commandlessIdentityObserver: any HDCServerProcessIdentityObserving
 
   public init(
     supervisor: HDCServerSupervisor,
@@ -706,6 +711,8 @@ package actor HDCServerProcessSupervisor {
     readOnlyProbeRegistry = .pinnedProduction
     self.semanticProfile = semanticProfile
     identityObserver = SystemHDCServerProcessIdentityObserver()
+    commandlessIdentityObserver =
+      HDCExact320FSystemIdentityObserver.supervisorObservationProduction
   }
 
   init(
@@ -725,6 +732,82 @@ package actor HDCServerProcessSupervisor {
     self.readOnlyProbeRegistry = readOnlyProbeRegistry
     self.semanticProfile = semanticProfile
     self.identityObserver = identityObserver
+    commandlessIdentityObserver = identityObserver
+  }
+
+  /// Whether the selected executable belongs to the OPENHARMONY-TOOLS@0.6.0
+  /// commandless identity family (hdc 3.2.0f) rather than the 0.3.0
+  /// read-only `checkserver` family (hdc 3.2.0d).
+  package static func selectsCommandlessFamily(_ toolchain: HDCCandidate) -> Bool {
+    toolchain.sha256 == HDCSupervisorObservationProbeCatalog.targetExecutableSHA256
+  }
+
+  /// The managed-startup counterpart of `observeRegisteredExistingServer` for
+  /// the commandless family.
+  ///
+  /// That family publishes a bracketed process/listener identity but no
+  /// `checkserver` golden of its own, so its health is the host's readiness
+  /// `checkserver`, parsed by the registered `openHarmony320Family` semantic
+  /// parser and handed in as `serverVersion`. The generation is minted from
+  /// the identity observation, exactly as the App facade does for this
+  /// family; without this path a daemon that launched hdc 3.2.0f was gated
+  /// on the 3.2.0d checkserver registry and could never bind its own server.
+  package func observeManagedCommandlessServer(
+    endpoint: HDCServerEndpointSelection,
+    toolchain: HDCCandidate,
+    serverVersion: String
+  ) async -> HDCRegisteredServerObservationResult {
+    guard Self.selectsCommandlessFamily(toolchain) else {
+      return HDCRegisteredServerObservationResult(
+        classification: .unsupported(
+          reason: "selected executable is outside OPENHARMONY-TOOLS@0.6.0"))
+    }
+    let session = HDCSupervisorObservationApplicationSession.makeContract(
+      supervisor: supervisor, toolchain: toolchain, endpointSelection: endpoint,
+      identityObserver: commandlessIdentityObserver)
+    let observation = await session.observe()
+    let generation: Int
+    switch observation.classification {
+    case .observed(let observed):
+      generation = observed
+    case .unavailable(let reason):
+      return HDCRegisteredServerObservationResult(classification: .unavailable(reason: reason))
+    case .unknown(let reason):
+      return HDCRegisteredServerObservationResult(classification: .unknown(reason: reason))
+    case .timedOut:
+      return HDCRegisteredServerObservationResult(classification: .timedOut)
+    case .cancelled:
+      return HDCRegisteredServerObservationResult(classification: .cancelled)
+    case .unsupported(let reason):
+      return HDCRegisteredServerObservationResult(classification: .unsupported(reason: reason))
+    }
+    guard let identity = observation.identity else {
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(reason: "commandless observation carried no identity"))
+    }
+    guard !serverVersion.isEmpty, !serverVersion.contains("\n") else {
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint,
+        reason: "managed readiness checkserver did not establish a server version")
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(
+          reason: "managed readiness checkserver did not establish a server version"),
+        identity: identity)
+    }
+    let state = await supervisor.observeRegisteredServerIdentity(
+      endpoint: endpoint.endpoint, health: .healthy, version: .known(serverVersion),
+      generation: generation,
+      reason:
+        "managed launch readiness checkserver (openHarmony320Family) bound to the commandless identity observation")
+    guard state.health == .healthy, state.generation == generation else {
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(
+          reason: "supervisor did not retain the managed health and generation"),
+        identity: identity)
+    }
+    return HDCRegisteredServerObservationResult(
+      classification: .observed(generation: generation, serverVersion: serverVersion),
+      identity: identity)
   }
 
   @discardableResult
