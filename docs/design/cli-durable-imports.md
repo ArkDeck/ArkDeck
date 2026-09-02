@@ -28,6 +28,15 @@ path. Native Artifact export prefixes are normalized to the registered library
 name; flash archives use `images.tar.gz` as their logical name. Source symlinks,
 nonregular files and changed identity/content fail before continuing an upload.
 
+A `workspace-patch` Import is scoped, not device-bound: its lease records the
+durable target the caller named and no binding revision or device identity.
+The consuming host-only request must name that same target
+(`arkdeck workspace patch --target TARGET_ID --inputs-file …`), exactly as
+`workspace sign` names the target of the build output it signs; `projectRef`
+still selects the workspace root, and the request neither adopts nor pins the
+device. A patch request that lets typed discovery choose the project scope
+finds the lease unresolvable and is refused before any dispatch.
+
 The Runtime persists request-to-Import identity before accepting bytes. One
 Artifact store actor owns append, commit and abort. Upload generation stays 1
 while `nextOffset` advances; each chunk binds exact offset, length and digest.

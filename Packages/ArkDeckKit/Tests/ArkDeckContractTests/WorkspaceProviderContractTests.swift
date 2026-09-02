@@ -590,6 +590,88 @@ final class WorkspaceProviderContractTests: XCTestCase {
     XCTAssertEqual(grantStatus.lineage.map(\.outcome), [.confirmed, .confirmed])
   }
 
+  func testRuntimeConsumesADeviceScopedPatchLeaseOnlyUnderThatTarget() async throws {
+    // `artifact import workspace-patch` binds its lease to the durable device
+    // target the caller named, with no binding revision and no identity. The
+    // consuming host-only request keeps that target as its scope; the same
+    // lease under the project scope stays unresolvable, exactly as before.
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: state.appending(path: "device-scoped-patch-artifacts"),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    let patchBytes = try Data(
+      contentsOf: writePatch(relativePath: "Sources/App.txt"))
+    let imported = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-import-device-patch", sessionID: "session-import-device-patch",
+        stepID: "import-patch", name: "change.patch",
+        mediaType: "text/x-diff", privacy: .sensitive,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-workspace-patch", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DEVICE", bindingRevision: nil,
+          stableIdentitySHA256: nil),
+        contents: patchBytes))
+    let patchLease = try await artifactStore.leaseReference(
+      jobID: imported.jobID, artifactID: imported.artifactID)
+    let grantStore = try RuntimeCapabilityStore(
+      directoryURL: state.appending(path: "device-scoped-patch-grant"))
+    try await installWorkspaceGrant(
+      into: grantStore, operations: ["workspace.apply-patch"])
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: state.appending(path: "device-scoped-patch-engine")),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: RuntimeProcessDispatcherRouter(
+        hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
+      capabilityStore: grantStore,
+      artifactStore: artifactStore,
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    let inputs: [String: JSONValue] = [
+      "projectRef": .string("TestProject"),
+      "patchArtifactRef": .string(patchLease),
+      "allowedFileGlobs": .array([.string("Sources/**")]),
+    ]
+
+    // Project scope: the lease names another target, so admission refuses it
+    // before any dispatch and the tree is untouched.
+    do {
+      _ = try await engine.submit(
+        try JSONEncoder().encode(
+          try operationRequest(
+            id: "workspace.apply-patch", inputs: inputs,
+            requestID: "request-project-scoped-patch",
+            idempotencyKey: "idempotency-project-scoped-patch")))
+      XCTFail("a device-scoped patch lease must not resolve under the project scope")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(let code, let detail) = error else { return XCTFail("\(error)") }
+      XCTAssertEqual(code, .invalidInput)
+      XCTAssertTrue(detail.contains("does not match the materialized request"), detail)
+    }
+    XCTAssertEqual(
+      try Data(contentsOf: root.appending(path: "Sources/App.txt")),
+      Data("old\n".utf8))
+
+    // The target the import named: no binding revision is pinned, the lease
+    // resolves, and the patch lands.
+    let accepted = try await engine.submit(
+      try JSONEncoder().encode(
+        try operationRequest(
+          id: "workspace.apply-patch", inputs: inputs,
+          requestID: "request-device-scoped-patch",
+          idempotencyKey: "idempotency-device-scoped-patch",
+          targetID: "TGT-DEVICE")))
+    let status = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(status.state, "succeeded", "timeline: \(status.timeline)")
+    XCTAssertEqual(
+      try Data(contentsOf: root.appending(path: "Sources/App.txt")),
+      Data("new\n".utf8))
+    let published = try await artifactStore.list(jobID: accepted.jobID)
+    let report = try XCTUnwrap(published.first { $0.name == "applied-patch.json" })
+    XCTAssertEqual(report.bindingSnapshot.targetID, "TGT-DEVICE")
+    XCTAssertNil(report.bindingSnapshot.bindingRevision)
+    XCTAssertNil(report.bindingSnapshot.stableIdentitySHA256)
+  }
+
   func testReceiptLostRevertReconcilesOnceAndClosesAttempt() async throws {
     let patchURL = try writePatch(relativePath: "Sources/App.txt")
     let patchContext = executionContext(
@@ -1273,13 +1355,14 @@ final class WorkspaceProviderContractTests: XCTestCase {
     inputs: [String: JSONValue],
     requestID: String,
     idempotencyKey: String,
-    authorization: RuntimeCapabilityReference? = workspaceGrantReference
+    authorization: RuntimeCapabilityReference? = workspaceGrantReference,
+    targetID: String = "workspace-test"
   ) throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
       requestID: requestID,
       idempotencyKey: idempotencyKey,
       target: DurableTargetReference(
-        targetID: "workspace-test"),
+        targetID: targetID),
       operation: RuntimeOperationReference(id: id, version: 1),
       inputs: inputs,
       authorization: authorization)

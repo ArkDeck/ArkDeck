@@ -170,7 +170,7 @@ arkdeck artifact import inspect --import-request-id gj2-<date>-entry --output js
 ```
 
 ```text
-arkdeck debug hap --require-protocol 2 --target <TGT> --inputs-file gj2.json \
+arkdeck debug hap --target <TGT> --inputs-file gj2.json \
   --execution-id gj2-<date> --output json
 arkdeck job wait --job <job-id> --output jsonl
 arkdeck job result --job <job-id> --output json
@@ -300,21 +300,32 @@ arkdeck workspace project list --output json
 arkdeck workspace preset list --project <project-ref> --output json
 arkdeck artifact import hap --import-request-id gj5-<date>-probe --target <TGT> \
   --file inputs/crash-probe-signed.hap --output json
-arkdeck debug hap --require-protocol 2 --target <TGT> --inputs-file gj5-repro.json \
+arkdeck debug hap --target <TGT> --inputs-file gj5-repro.json \
   --execution-id gj5-<date>-repro --output json                  # 复现
 arkdeck job evidence --job <job-id> --output json
 arkdeck artifact list --job <job-id> --output json
 arkdeck artifact read --job <job-id> --artifact <crash-index ART> --output json
-arkdeck analyze crash-signature --inputs-file gj5-crash.json --output json      # 期望 answered
+arkdeck analyze crash-signature --target <TGT> --inputs-file gj5-crash.json \
+  --output json                                                    # 期望 answered
 arkdeck workspace isolate --inputs-file gj5-isolate.json --output json
 arkdeck artifact import workspace-patch --import-request-id gj5-<date>-patch --target <TGT> \
   --file inputs/gj5-fix.patch --output json
-arkdeck workspace patch --inputs-file gj5-patch.json --output json
+arkdeck workspace patch --target <TGT> --inputs-file gj5-patch.json --output json
 arkdeck workspace build --inputs-file gj5-build.json --output json
 arkdeck workspace sign --inputs-file gj5-sign.json --output json
-arkdeck debug hap --require-protocol 2 --target <TGT> --inputs-file gj5-verify.json \
+arkdeck debug hap --target <TGT> --inputs-file gj5-verify.json \
   --execution-id gj5-<date>-verify --output json                 # 复验：部署修补构建，一次即可
 ```
+
+作用域配对：`analyze crash-signature` 与 `workspace patch` 都消费一个绑定在 `<TGT>` 上的
+Artifact lease（crash-index 采自该设备；补丁由 `artifact import workspace-patch --target <TGT>`
+上传），所以这两条 host-only 请求必须显式 `--target <TGT>`——省略会让 typed discovery 选
+`demo-app`/`analyzer-host` 作用域，lease 以「target/binding/identity does not match the
+materialized request」被拒，零派发。`--target <TGT>` 不会 adopt 或 pin 设备（receipt 的
+`bindingRevision` 为空），projectRef 仍决定工作树根。`expectedWorkspaceRevision` 没有读面：
+它是 Runtime 对 profile 内文件的确定性摘要（`WorkspaceProviderSupport.workspaceRevision`），
+执行者按同一算法自行计算，`workspace isolate` 的 `isolated-workspace.json` 会把
+`sourceWorkspaceRevision` 回显以供核对。
 
 负向用例（零派发）：同一补丁 lease、`expectedWorkspaceRevision` 取已被取代的 revision，
 期望 `invalidInput`（`workspace.revisionConflict`）、exit 65，`job list` 前后台账相同。

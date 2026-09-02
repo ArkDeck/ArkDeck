@@ -771,6 +771,49 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertFalse(called.contains("target.adopt"), "host-only signing must not adopt a device")
   }
 
+  func testArtifactBoundPatchApplyPreservesItsTargetWithoutAdoptingADevice() throws {
+    // `artifact import workspace-patch` binds its lease to a durable device
+    // target. The consuming host-only request must keep that target as its
+    // scope, exactly as artifact-bound signing does; the project stays the
+    // workspace root. A patch request without a lease keeps the strict rule.
+    let recorder = try startRecordingDaemon()
+    let outcome = try executor(recorder.client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "workspace.apply-patch", operationVersion: 1,
+        inputs: [
+          "projectRef": .string("demo-app"),
+          "allowedFileGlobs": .array([.string("entry/src/main/ets/**")]),
+          "patchArtifactRef": .string("lease-v1:imp-example:ART-PATCH"),
+        ],
+        targetID: "TGT-ARTIFACT-BOUND",
+        executionID: "artifact-bound-patch-001"))
+    guard case .failed(let reason, let receipt) = outcome else {
+      return XCTFail("the fixture lacks the workspace provider and must reject: \(outcome)")
+    }
+    XCTAssertEqual(receipt.targetID, "TGT-ARTIFACT-BOUND")
+    XCTAssertNil(receipt.bindingRevision)
+    XCTAssertFalse(reason.contains("does not match projectRef"), reason)
+    let called = recorder.observedMethods()
+    XCTAssertTrue(called.contains("job.submit"))
+    XCTAssertFalse(called.contains("target.list"), "host-only patching must not list devices")
+    XCTAssertFalse(called.contains("target.adopt"), "host-only patching must not adopt a device")
+
+    let strict = try executor(recorder.client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "workspace.revert-patch", operationVersion: 1,
+        inputs: [
+          "projectRef": .string("demo-app"),
+          "patchAttemptRef": .string("attempt-example"),
+        ],
+        targetID: "TGT-ARTIFACT-BOUND",
+        executionID: "artifact-bound-patch-002"))
+    guard case .failed(let strictReason, let strictReceipt) = strict else {
+      return XCTFail("a host-only request without an Artifact keeps the project scope: \(strict)")
+    }
+    XCTAssertTrue(strictReason.contains("does not match projectRef"), strictReason)
+    XCTAssertNil(strictReceipt.jobID, "a refused host scope submits nothing")
+  }
+
   /// A daemon whose handler records which methods were invoked.
   private struct MethodRecorder {
     let client: AgentClient

@@ -315,9 +315,16 @@ package struct AgentRuntimeExecutor: Sendable {
       } else {
         declaredProject = nil
       }
+      // A host-only operation that consumes an imported Artifact keeps the
+      // Artifact's durable target as its scope: every published import binds
+      // its lease to a durable device target, so the consuming request must
+      // name that same target or the lease can never resolve. The project
+      // stays the workspace root; the target is provenance, not a device
+      // to adopt or pin.
       let preservesArtifactTargetScope =
-        request.reference == "workspace.sign-openharmony-hap@1"
-        && request.inputs["unsignedHapArtifactLease"] != nil
+        Self.hostOnlyArtifactConsumers[request.reference].map {
+          request.inputs[$0] != nil
+        } ?? false
       if let requestedTarget = request.targetID, let declaredProject,
         requestedTarget != declaredProject, !preservesArtifactTargetScope
       {
@@ -678,6 +685,16 @@ package struct AgentRuntimeExecutor: Sendable {
     }
     return digest
   }
+
+  /// Host-only operations whose typed input is an imported Artifact lease,
+  /// keyed by the input that carries it. `workspace.sign-openharmony-hap@1`
+  /// consumes a build output; `workspace.apply-patch@1` consumes a
+  /// `artifact import workspace-patch` upload. Both are bound to the durable
+  /// target the import named, never to a device binding revision.
+  static let hostOnlyArtifactConsumers: [String: String] = [
+    "workspace.sign-openharmony-hap@1": "unsignedHapArtifactLease",
+    "workspace.apply-patch@1": "patchArtifactRef",
+  ]
 
   /// Resolves the published descriptor through the daemon before selecting a
   /// target. A host-only operation still carries its declared host/project
