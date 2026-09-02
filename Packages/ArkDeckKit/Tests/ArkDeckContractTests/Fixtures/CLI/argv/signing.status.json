@@ -1,0 +1,93 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "signing",
+        "status"
+      ],
+      "expected": {
+        "command": "signing.status",
+        "handlerArguments": [
+          "signing",
+          "status"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "signing",
+        "status",
+        "--help"
+      ],
+      "expected": {
+        "command": "signing.status",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "signing",
+        "status",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.status",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing status"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "signing",
+        "status",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.status",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing status"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "signing",
+        "status",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.status",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing status"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "signing.status",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "signing",
+    "status"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

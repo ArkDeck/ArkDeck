@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release",
+        "--import",
+        "sample",
+        "--generation",
+        "1"
+      ],
+      "expected": {
+        "command": "artifact.import.release",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "release",
+          "--import",
+          "sample",
+          "--generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.import.release",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release",
+        "--import",
+        "sample",
+        "--generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.release",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release",
+        "--import",
+        "sample",
+        "--generation",
+        "1",
+        "--import",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.release",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.release",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release",
+        "--import",
+        "sample",
+        "--generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.release",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "release",
+        "--import",
+        "sample",
+        "--generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.import.release",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "release",
+          "--import",
+          "sample",
+          "--generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.import.release",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "artifact",
+    "import",
+    "release"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

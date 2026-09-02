@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "test"
+      ],
+      "expected": {
+        "command": "workspace.test",
+        "handlerArguments": [
+          "workspace",
+          "test"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "test",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.test",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "test",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.test",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "test",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.test",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "test",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.test",
+        "handlerArguments": [
+          "workspace",
+          "test",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.test",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "test"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

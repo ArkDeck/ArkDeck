@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "install-binding"
+      ],
+      "expected": {
+        "command": "flash.install-binding",
+        "handlerArguments": [
+          "flash",
+          "install-binding"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "install-binding",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.install-binding",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "install-binding",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.install-binding",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "install-binding",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.install-binding",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "install-binding",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.install-binding",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.install-binding",
+  "kind": "executable",
+  "lifecycleStatus": "legacy",
+  "path": [
+    "flash",
+    "install-binding"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

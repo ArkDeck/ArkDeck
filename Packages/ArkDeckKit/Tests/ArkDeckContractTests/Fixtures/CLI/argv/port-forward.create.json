@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "port-forward",
+        "create"
+      ],
+      "expected": {
+        "command": "port-forward.create",
+        "handlerArguments": [
+          "port-forward",
+          "create"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "create",
+        "--help"
+      ],
+      "expected": {
+        "command": "port-forward.create",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "create",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "port-forward.create",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "create",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "port-forward.create",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "create",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "port-forward.create",
+        "handlerArguments": [
+          "port-forward",
+          "create",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "port-forward.create",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "port-forward",
+    "create"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

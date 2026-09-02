@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "target",
+        "observe"
+      ],
+      "expected": {
+        "command": "target.observe",
+        "handlerArguments": [
+          "target",
+          "observe"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "target",
+        "observe",
+        "--help"
+      ],
+      "expected": {
+        "command": "target.observe",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "target",
+        "observe",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.observe",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "target",
+        "observe",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.observe",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "target",
+        "observe",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "target.observe",
+        "handlerArguments": [
+          "target",
+          "observe",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "target.observe",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "target",
+    "observe"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

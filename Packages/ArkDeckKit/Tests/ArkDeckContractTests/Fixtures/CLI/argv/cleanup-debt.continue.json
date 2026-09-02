@@ -1,0 +1,156 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue",
+        "--job",
+        "sample",
+        "--remote-path",
+        "sample"
+      ],
+      "expected": {
+        "command": "cleanup-debt.continue",
+        "handlerArguments": [
+          "cleanup-debt",
+          "continue",
+          "--job",
+          "sample",
+          "--remote-path",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue",
+        "--help"
+      ],
+      "expected": {
+        "command": "cleanup-debt.continue",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue",
+        "--job",
+        "sample",
+        "--remote-path",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "cleanup-debt.continue",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery cleanup continue --job <id> ..."
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue",
+        "--job",
+        "sample",
+        "--remote-path",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "cleanup-debt.continue",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery cleanup continue --job <id> ..."
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "cleanup-debt.continue",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery cleanup continue --job <id> ..."
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue",
+        "--job",
+        "sample",
+        "--remote-path",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "cleanup-debt.continue",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery cleanup continue --job <id> ..."
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "continue",
+        "--job",
+        "sample",
+        "--remote-path",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "cleanup-debt.continue",
+        "handlerArguments": [
+          "cleanup-debt",
+          "continue",
+          "--job",
+          "sample",
+          "--remote-path",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "cleanup-debt.continue",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "cleanup-debt",
+    "continue"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

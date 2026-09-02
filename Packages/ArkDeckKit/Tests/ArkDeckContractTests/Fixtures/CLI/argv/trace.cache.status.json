@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "trace",
+        "cache",
+        "status"
+      ],
+      "expected": {
+        "command": "trace.cache.status",
+        "handlerArguments": [
+          "trace",
+          "cache",
+          "status"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "trace",
+        "cache",
+        "status",
+        "--help"
+      ],
+      "expected": {
+        "command": "trace.cache.status",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "trace",
+        "cache",
+        "status",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.cache.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "cache",
+        "status",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.cache.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "trace",
+        "cache",
+        "status",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.cache.status",
+        "handlerArguments": [
+          "trace",
+          "cache",
+          "status",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "trace.cache.status",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "trace",
+    "cache",
+    "status"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "screen",
+        "capture"
+      ],
+      "expected": {
+        "command": "screen.capture",
+        "handlerArguments": [
+          "screen",
+          "capture"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "screen",
+        "capture",
+        "--help"
+      ],
+      "expected": {
+        "command": "screen.capture",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "screen",
+        "capture",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "screen.capture",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "screen",
+        "capture",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "screen.capture",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "screen",
+        "capture",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "screen.capture",
+        "handlerArguments": [
+          "screen",
+          "capture",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "screen.capture",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "screen",
+    "capture"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

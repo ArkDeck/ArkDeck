@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "checkpoint"
+      ],
+      "expected": {
+        "command": "workspace.checkpoint",
+        "handlerArguments": [
+          "workspace",
+          "checkpoint"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "checkpoint",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.checkpoint",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "checkpoint",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.checkpoint",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "checkpoint",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.checkpoint",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "checkpoint",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.checkpoint",
+        "handlerArguments": [
+          "workspace",
+          "checkpoint",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.checkpoint",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "checkpoint"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

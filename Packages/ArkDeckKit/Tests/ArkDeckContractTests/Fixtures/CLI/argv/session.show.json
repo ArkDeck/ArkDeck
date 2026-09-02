@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "session",
+        "show",
+        "--session",
+        "sample"
+      ],
+      "expected": {
+        "command": "session.show",
+        "handlerArguments": [
+          "session",
+          "show",
+          "--session",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "session",
+        "show",
+        "--help"
+      ],
+      "expected": {
+        "command": "session.show",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "session",
+        "show",
+        "--session",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "session",
+        "show",
+        "--session",
+        "sample",
+        "--session",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "session",
+        "show"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "session",
+        "show",
+        "--session",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "session",
+        "show",
+        "--session",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "session.show",
+        "handlerArguments": [
+          "session",
+          "show",
+          "--session",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "session.show",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "session",
+    "show"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

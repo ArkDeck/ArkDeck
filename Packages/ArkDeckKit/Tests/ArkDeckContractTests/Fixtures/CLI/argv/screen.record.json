@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "screen",
+        "record"
+      ],
+      "expected": {
+        "command": "screen.record",
+        "handlerArguments": [
+          "screen",
+          "record"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "screen",
+        "record",
+        "--help"
+      ],
+      "expected": {
+        "command": "screen.record",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "screen",
+        "record",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "screen.record",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "screen",
+        "record",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "screen.record",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "screen",
+        "record",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "screen.record",
+        "handlerArguments": [
+          "screen",
+          "record",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "screen.record",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "screen",
+    "record"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

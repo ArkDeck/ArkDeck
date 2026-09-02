@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register",
+        "--kind",
+        "daemon-bundle",
+        "--file",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.bundle.register",
+        "handlerArguments": [
+          "runtime",
+          "bundle",
+          "register",
+          "--kind",
+          "daemon-bundle",
+          "--file",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.bundle.register",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register",
+        "--kind",
+        "daemon-bundle",
+        "--file",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register",
+        "--kind",
+        "daemon-bundle",
+        "--file",
+        "sample",
+        "--kind",
+        "daemon-bundle"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register",
+        "--kind",
+        "daemon-bundle",
+        "--file",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "register",
+        "--kind",
+        "daemon-bundle",
+        "--file",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.bundle.register",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "bundle",
+    "register"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

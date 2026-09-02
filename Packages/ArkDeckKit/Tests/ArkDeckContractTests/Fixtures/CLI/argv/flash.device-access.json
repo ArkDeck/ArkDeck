@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "device-access"
+      ],
+      "expected": {
+        "command": "flash.device-access",
+        "handlerArguments": [
+          "flash",
+          "device-access"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "device-access",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.device-access",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "device-access",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.device-access",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "device-access",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.device-access",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "device-access",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.device-access",
+        "handlerArguments": [
+          "flash",
+          "device-access",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.device-access",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "device-access"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

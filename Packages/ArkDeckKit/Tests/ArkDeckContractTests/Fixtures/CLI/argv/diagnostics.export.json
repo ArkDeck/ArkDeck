@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "diagnostics",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample"
+      ],
+      "expected": {
+        "command": "diagnostics.export",
+        "handlerArguments": [
+          "diagnostics",
+          "export",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--destination",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "export",
+        "--help"
+      ],
+      "expected": {
+        "command": "diagnostics.export",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "export"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "diagnostics.export",
+        "handlerArguments": [
+          "diagnostics",
+          "export",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--destination",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "diagnostics.export",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "diagnostics",
+    "export"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

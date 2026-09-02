@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--name",
+        "sample"
+      ],
+      "expected": {
+        "command": "device.display-name.set",
+        "handlerArguments": [
+          "device",
+          "display-name",
+          "set",
+          "--candidate",
+          "sample",
+          "--observation",
+          "sample",
+          "--observation-generation",
+          "1",
+          "--name",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set",
+        "--help"
+      ],
+      "expected": {
+        "command": "device.display-name.set",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--name",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.display-name.set",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--name",
+        "sample",
+        "--candidate",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.display-name.set",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.display-name.set",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--name",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.display-name.set",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "device",
+        "display-name",
+        "set",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--name",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "device.display-name.set",
+        "handlerArguments": [
+          "device",
+          "display-name",
+          "set",
+          "--candidate",
+          "sample",
+          "--observation",
+          "sample",
+          "--observation-generation",
+          "1",
+          "--name",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "device.display-name.set",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "device",
+    "display-name",
+    "set"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

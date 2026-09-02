@@ -1,0 +1,93 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "agentd",
+        "install"
+      ],
+      "expected": {
+        "command": "agentd.install",
+        "handlerArguments": [
+          "agentd",
+          "install"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "agentd",
+        "install",
+        "--help"
+      ],
+      "expected": {
+        "command": "agentd.install",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "agentd",
+        "install",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agentd.install",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime service install"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "agentd",
+        "install",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agentd.install",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime service install"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "agentd",
+        "install",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agentd.install",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime service install"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "agentd.install",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "agentd",
+    "install"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

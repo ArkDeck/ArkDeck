@@ -1,0 +1,116 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "job",
+        "wait",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.wait",
+        "handlerArguments": [
+          "job",
+          "wait",
+          "--job",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "job",
+        "wait",
+        "--help"
+      ],
+      "expected": {
+        "command": "job.wait",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "job",
+        "wait",
+        "--job",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "job",
+        "wait",
+        "--job",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "job",
+        "wait"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "job",
+        "wait",
+        "--job",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.wait",
+        "handlerArguments": [
+          "job",
+          "wait",
+          "--job",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "job.wait",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "job",
+    "wait"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

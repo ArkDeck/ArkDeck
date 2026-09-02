@@ -1,0 +1,117 @@
+{
+  "bundleVersion": "arkdeck.cli.contracts/1",
+  "canonicalJsonVersion": "arkdeck.cli.canonical-json/1",
+  "cliVersion": "0.1.0",
+  "rejections": [
+    {
+      "name": "positiveInfinity",
+      "reason": "nonFiniteNumber"
+    },
+    {
+      "name": "negativeInfinity",
+      "reason": "nonFiniteNumber"
+    },
+    {
+      "name": "nan",
+      "reason": "nonFiniteNumber"
+    },
+    {
+      "name": "integerBeyondExactRange",
+      "reason": "integerBeyondExactRange(\"9223372036854775807\")"
+    },
+    {
+      "name": "unsignedIntegerBeyondExactRange",
+      "reason": "integerBeyondExactRange(\"18446744073709551615\")"
+    }
+  ],
+  "schemaVersion": "arkdeck.cli.canonical-json-vectors/1",
+  "vectors": [
+    {
+      "canonical": "{}",
+      "name": "emptyObject",
+      "value": {}
+    },
+    {
+      "canonical": "[]",
+      "name": "emptyArray",
+      "value": []
+    },
+    {
+      "canonical": "[null,true,false,0,\"\"]",
+      "name": "scalars",
+      "value": [
+        null,
+        true,
+        false,
+        0,
+        ""
+      ]
+    },
+    {
+      "canonical": "{\"B\":0,\"a\":2,\"aa\":3,\"b\":1}",
+      "name": "keyOrderIsUtf16CodeUnit",
+      "value": {
+        "B": 0,
+        "a": 2,
+        "aa": 3,
+        "b": 1
+      }
+    },
+    {
+      "canonical": "{\"Z\":4,\"z\":1,\"é\":2,\"😀\":3}",
+      "name": "nonAsciiKeyOrder",
+      "value": {
+        "Z": 4,
+        "z": 1,
+        "é": 2,
+        "😀": 3
+      }
+    },
+    {
+      "canonical": "\"quote\\\" backslash\\\\ newline\\n tab\\t control\\u0001 slash/ euro€ emoji😀\"",
+      "name": "stringEscapes",
+      "value": "quote\" backslash\\ newline\n tab\t control\u0001 slash/ euro€ emoji😀"
+    },
+    {
+      "canonical": "[-1,1,9007199254740991]",
+      "name": "integers",
+      "value": [
+        -1,
+        1,
+        9007199254740991
+      ]
+    },
+    {
+      "canonical": "9007199254740991",
+      "name": "unsignedInteger",
+      "value": 9007199254740991
+    },
+    {
+      "canonical": "[0.5,1,0,1e+21,123456789.125]",
+      "name": "numbers",
+      "value": [
+        0.5,
+        1,
+        0,
+        1e+21,
+        123456789.125
+      ]
+    },
+    {
+      "canonical": "{\"list\":[{},[],{\"k\":[null]}],\"text\":\"x\"}",
+      "name": "nested",
+      "value": {
+        "list": [
+          {},
+          [],
+          {
+            "k": [
+              null
+            ]
+          }
+        ],
+        "text": "x"
+      }
+    }
+  ]
+}

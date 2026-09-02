@@ -1,0 +1,198 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install",
+        "--java",
+        "sample",
+        "--jar",
+        "sample",
+        "--keystore",
+        "sample",
+        "--certificate",
+        "sample",
+        "--profile",
+        "sample",
+        "--key-alias",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.signing.install",
+        "handlerArguments": [
+          "runtime",
+          "signing",
+          "install",
+          "--java",
+          "sample",
+          "--jar",
+          "sample",
+          "--keystore",
+          "sample",
+          "--certificate",
+          "sample",
+          "--profile",
+          "sample",
+          "--key-alias",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.signing.install",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install",
+        "--java",
+        "sample",
+        "--jar",
+        "sample",
+        "--keystore",
+        "sample",
+        "--certificate",
+        "sample",
+        "--profile",
+        "sample",
+        "--key-alias",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install",
+        "--java",
+        "sample",
+        "--jar",
+        "sample",
+        "--keystore",
+        "sample",
+        "--certificate",
+        "sample",
+        "--profile",
+        "sample",
+        "--key-alias",
+        "sample",
+        "--java",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install",
+        "--java",
+        "sample",
+        "--jar",
+        "sample",
+        "--keystore",
+        "sample",
+        "--certificate",
+        "sample",
+        "--profile",
+        "sample",
+        "--key-alias",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "install",
+        "--java",
+        "sample",
+        "--jar",
+        "sample",
+        "--keystore",
+        "sample",
+        "--certificate",
+        "sample",
+        "--profile",
+        "sample",
+        "--key-alias",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.signing.install",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "signing",
+    "install"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "port-forward",
+        "remove"
+      ],
+      "expected": {
+        "command": "port-forward.remove",
+        "handlerArguments": [
+          "port-forward",
+          "remove"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "remove",
+        "--help"
+      ],
+      "expected": {
+        "command": "port-forward.remove",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "remove",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "port-forward.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "remove",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "port-forward.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "port-forward",
+        "remove",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "port-forward.remove",
+        "handlerArguments": [
+          "port-forward",
+          "remove",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "port-forward.remove",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "port-forward",
+    "remove"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

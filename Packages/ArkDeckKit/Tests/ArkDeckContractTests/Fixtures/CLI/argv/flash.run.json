@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "run"
+      ],
+      "expected": {
+        "command": "flash.run",
+        "handlerArguments": [
+          "flash",
+          "run"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "run",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.run",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "run",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "run",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "run",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.run",
+        "handlerArguments": [
+          "flash",
+          "run",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.run",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "run"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

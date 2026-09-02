@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "job",
+        "plan"
+      ],
+      "expected": {
+        "command": "job.plan",
+        "handlerArguments": [
+          "job",
+          "plan"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "job",
+        "plan",
+        "--help"
+      ],
+      "expected": {
+        "command": "job.plan",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "job",
+        "plan",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.plan",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "job",
+        "plan",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.plan",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "job",
+        "plan",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.plan",
+        "handlerArguments": [
+          "job",
+          "plan",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "job.plan",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "job",
+    "plan"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

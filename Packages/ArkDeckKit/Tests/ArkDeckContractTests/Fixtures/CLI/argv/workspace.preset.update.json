@@ -1,0 +1,228 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1"
+      ],
+      "expected": {
+        "command": "workspace.preset.update",
+        "handlerArguments": [
+          "workspace",
+          "preset",
+          "update",
+          "--mutation-request-id",
+          "sample",
+          "--project",
+          "sample",
+          "--preset",
+          "sample",
+          "--expected-generation",
+          "1",
+          "--kind",
+          "build",
+          "--template",
+          "sample",
+          "--timeout-seconds",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.preset.update",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--mutation-request-id",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "update",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.preset.update",
+        "handlerArguments": [
+          "workspace",
+          "preset",
+          "update",
+          "--mutation-request-id",
+          "sample",
+          "--project",
+          "sample",
+          "--preset",
+          "sample",
+          "--expected-generation",
+          "1",
+          "--kind",
+          "build",
+          "--template",
+          "sample",
+          "--timeout-seconds",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.preset.update",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "preset",
+    "update"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

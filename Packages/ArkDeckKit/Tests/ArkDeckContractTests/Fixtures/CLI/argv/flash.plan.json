@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "plan"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "commandRemoved",
+        "command": "flash.plan",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "plan",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.plan",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.plan",
+  "kind": "tombstone",
+  "lifecycleStatus": "removed",
+  "path": [
+    "flash",
+    "plan"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

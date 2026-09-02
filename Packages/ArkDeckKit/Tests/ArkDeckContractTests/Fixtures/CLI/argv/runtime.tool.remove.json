@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove",
+        "--tool",
+        "sample",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "runtime.tool.remove",
+        "handlerArguments": [
+          "runtime",
+          "tool",
+          "remove",
+          "--tool",
+          "sample",
+          "--expected-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.tool.remove",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove",
+        "--tool",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove",
+        "--tool",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--tool",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove",
+        "--tool",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "remove",
+        "--tool",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.tool.remove",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "tool",
+    "remove"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

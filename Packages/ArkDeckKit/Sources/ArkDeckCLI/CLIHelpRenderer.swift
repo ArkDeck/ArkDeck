@@ -253,6 +253,12 @@ enum CLIRegistryProjection {
     switch leaf.kind {
     case .executable:
       fields["kind"] = .string("executable")
+      // §12: a superseded or frozen spelling says so here as well as in
+      // `meta.lifecycle`, so a reader of the registry can tell a compatibility
+      // leaf from the target one without running it.
+      fields["lifecycleStatus"] = .string(leaf.lifecycle.rawValue)
+      fields["replacementArgvPattern"] =
+        leaf.replacementArgvPattern.map(JSONValue.string) ?? .null
     case .tombstone(let tombstone):
       fields["kind"] = .string("tombstone")
       fields["lifecycleStatus"] = .string("removed")
@@ -262,6 +268,8 @@ enum CLIRegistryProjection {
       if let reason = tombstone.reason { fields["replacementReason"] = .string(reason) }
     case .refused(let reason):
       fields["kind"] = .string("refused")
+      fields["lifecycleStatus"] = .string(leaf.lifecycle.rawValue)
+      fields["replacementArgvPattern"] = .null
       fields["refusalReason"] = .string(reason)
     }
     return .object(fields)

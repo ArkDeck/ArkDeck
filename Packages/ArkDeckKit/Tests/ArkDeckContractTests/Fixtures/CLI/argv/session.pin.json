@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "session",
+        "pin",
+        "--session",
+        "sample",
+        "--expected-generation",
+        "0"
+      ],
+      "expected": {
+        "command": "session.pin",
+        "handlerArguments": [
+          "session",
+          "pin",
+          "--session",
+          "sample",
+          "--expected-generation",
+          "0"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "session",
+        "pin",
+        "--help"
+      ],
+      "expected": {
+        "command": "session.pin",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "session",
+        "pin",
+        "--session",
+        "sample",
+        "--expected-generation",
+        "0",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.pin",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "session",
+        "pin",
+        "--session",
+        "sample",
+        "--expected-generation",
+        "0",
+        "--session",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.pin",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "session",
+        "pin"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.pin",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "session",
+        "pin",
+        "--session",
+        "sample",
+        "--expected-generation",
+        "0",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.pin",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "session",
+        "pin",
+        "--session",
+        "sample",
+        "--expected-generation",
+        "0",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "session.pin",
+        "handlerArguments": [
+          "session",
+          "pin",
+          "--session",
+          "sample",
+          "--expected-generation",
+          "0",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "session.pin",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "session",
+    "pin"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

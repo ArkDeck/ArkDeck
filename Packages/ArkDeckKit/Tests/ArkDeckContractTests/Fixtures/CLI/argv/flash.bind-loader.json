@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1"
+      ],
+      "expected": {
+        "command": "flash.bind-loader",
+        "handlerArguments": [
+          "flash",
+          "bind-loader",
+          "--target",
+          "sample",
+          "--expected-binding-revision",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.bind-loader",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.bind-loader",
+        "handlerArguments": [
+          "flash",
+          "bind-loader",
+          "--target",
+          "sample",
+          "--expected-binding-revision",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.bind-loader",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "bind-loader"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

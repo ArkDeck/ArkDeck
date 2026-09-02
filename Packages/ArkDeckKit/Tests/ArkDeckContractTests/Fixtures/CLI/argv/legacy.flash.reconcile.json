@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "legacy",
+        "flash",
+        "reconcile"
+      ],
+      "expected": {
+        "command": "legacy.flash.reconcile",
+        "handlerArguments": [
+          "legacy",
+          "flash",
+          "reconcile"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "legacy",
+        "flash",
+        "reconcile",
+        "--help"
+      ],
+      "expected": {
+        "command": "legacy.flash.reconcile",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "legacy",
+        "flash",
+        "reconcile",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "legacy.flash.reconcile",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "legacy",
+        "flash",
+        "reconcile",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "legacy.flash.reconcile",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "legacy",
+        "flash",
+        "reconcile",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "legacy.flash.reconcile",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "legacy.flash.reconcile",
+  "kind": "executable",
+  "lifecycleStatus": "legacy",
+  "path": [
+    "legacy",
+    "flash",
+    "reconcile"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

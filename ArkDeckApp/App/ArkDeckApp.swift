@@ -406,6 +406,22 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     }
   }
 
+  /// §14: every route names its stable product capability. The switch is
+  /// exhaustive, so a new route cannot ship without an entry in the shared
+  /// registry that the coverage manifest is generated from.
+  var productCapability: AppNavigationCapability {
+    switch self {
+    case .overview: .overview
+    case .flash: .flash
+    case .debug: .debug
+    case .uiDump: .uiDump
+    case .trace: .trace
+    case .device: .device
+    case .diagnostics: .diagnostics
+    case .history: .history
+    }
+  }
+
   var systemImageName: String {
     switch self {
     case .overview: "rectangle.grid.2x2"

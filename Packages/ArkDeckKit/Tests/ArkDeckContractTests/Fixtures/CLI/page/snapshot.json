@@ -1,0 +1,15 @@
+{
+  "hasMore": false,
+  "items": [
+    {
+      "createdAt": "2026-09-02T04:00:00Z",
+      "jobId": "job-0f3c2a7e-4d1b-4c0a-9e2d-5b6a7c8d9e0f",
+      "state": "running"
+    }
+  ],
+  "nextCursor": null,
+  "order": "createdAtDescJobIdAsc",
+  "pageKind": "snapshot",
+  "schemaVersion": "arkdeck.cli.page/1",
+  "snapshotRevision": "rev-000000000012"
+}

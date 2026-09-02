@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run",
+        "--source-job",
+        "sample",
+        "--continuation-request-id",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.continuation.run",
+        "handlerArguments": [
+          "workspace",
+          "continuation",
+          "run",
+          "--source-job",
+          "sample",
+          "--continuation-request-id",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.continuation.run",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run",
+        "--source-job",
+        "sample",
+        "--continuation-request-id",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.continuation.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run",
+        "--source-job",
+        "sample",
+        "--continuation-request-id",
+        "sample",
+        "--source-job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.continuation.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.continuation.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run",
+        "--source-job",
+        "sample",
+        "--continuation-request-id",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.continuation.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "continuation",
+        "run",
+        "--source-job",
+        "sample",
+        "--continuation-request-id",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.continuation.run",
+        "handlerArguments": [
+          "workspace",
+          "continuation",
+          "run",
+          "--source-job",
+          "sample",
+          "--continuation-request-id",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.continuation.run",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "continuation",
+    "run"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

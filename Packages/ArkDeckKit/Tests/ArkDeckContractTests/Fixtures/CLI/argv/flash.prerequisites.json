@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "prerequisites",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.prerequisites",
+        "handlerArguments": [
+          "flash",
+          "prerequisites",
+          "--target",
+          "sample",
+          "--device-profile",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "prerequisites",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.prerequisites",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "prerequisites",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.prerequisites",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "prerequisites",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.prerequisites",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "prerequisites"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.prerequisites",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "flash",
+        "prerequisites",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.prerequisites",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "prerequisites",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.prerequisites",
+        "handlerArguments": [
+          "flash",
+          "prerequisites",
+          "--target",
+          "sample",
+          "--device-profile",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.prerequisites",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "prerequisites"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

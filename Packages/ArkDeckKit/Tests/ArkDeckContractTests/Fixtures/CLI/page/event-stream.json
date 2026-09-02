@@ -1,0 +1,21 @@
+{
+  "hasMore": false,
+  "items": [
+    {
+      "cursor": "evc-1.job-0f3c2a7e.12",
+      "data": {
+        "outcome": "verified",
+        "stepId": "observe-device"
+      },
+      "eventId": "evt-6c5b4a39-2817-4f0e-9d8c-7b6a5f4e3d2c",
+      "runtimeRevision": "12",
+      "streamPosition": "12",
+      "type": "job.stepCompleted"
+    }
+  ],
+  "nextCursor": "evc-1.job-0f3c2a7e.12",
+  "order": "streamPositionAsc",
+  "pageKind": "eventStream",
+  "schemaVersion": "arkdeck.cli.page/1",
+  "snapshotRevision": "12"
+}

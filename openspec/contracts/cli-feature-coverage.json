@@ -1,0 +1,5072 @@
+{
+  "appCapabilityRegistrySchemaVersion": "arkdeck.app-product-capability-registry/1",
+  "bundleVersion": "arkdeck.cli.contracts/1",
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "classificationVocabulary": [
+    "direct",
+    "generic",
+    "local",
+    "presentation",
+    "platformService",
+    "internal",
+    "refused",
+    "blocked"
+  ],
+  "cliVersion": "0.1.0",
+  "commandRegistrySchemaVersion": "arkdeck.cli.command-registry/1",
+  "entries": [
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/agent.abandon.json",
+      "equivalentCommands": [],
+      "feature": "agent.abandon",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:agent.abandon",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck agent abandon --expected-generation <n> (--execution-id <id>)"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/agent.chat.json",
+      "equivalentCommands": [],
+      "feature": "agent.chat",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "removed",
+      "note": "replaced by `arkdeck agent run`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agent.chat",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck agent chat"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/agent.list.json",
+      "equivalentCommands": [],
+      "feature": "agent.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:agent.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck agent list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/agent.resume.json",
+      "equivalentCommands": [],
+      "feature": "agent.resume",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:agent.resume",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck agent resume (--resume-reference <ref> | --resume-token <token>)"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/agent.run.json",
+      "equivalentCommands": [],
+      "feature": "agent.run",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:agent.run",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck agent run (--request-file <path> | --operation <id@version>)"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/agent.status.json",
+      "equivalentCommands": [],
+      "feature": "agent.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:agent.status",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck agent status (--execution-id <id>)"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/agentd.install.json",
+      "equivalentCommands": [],
+      "feature": "agentd.install",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime service install`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agentd.install",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck agentd install"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/agentd.restart.json",
+      "equivalentCommands": [],
+      "feature": "agentd.restart",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime service restart`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agentd.restart",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck agentd restart"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/agentd.status.json",
+      "equivalentCommands": [],
+      "feature": "agentd.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime service status`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agentd.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck agentd status"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/agentd.uninstall.json",
+      "equivalentCommands": [],
+      "feature": "agentd.uninstall",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime service uninstall`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agentd.uninstall",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck agentd uninstall"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/agentd.update.json",
+      "equivalentCommands": [],
+      "feature": "agentd.update",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime service update`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agentd.update",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck agentd update"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/agentd.verify.json",
+      "equivalentCommands": [],
+      "feature": "agentd.verify",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime service verify`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:agentd.verify",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck agentd verify"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/analyze.trace.json",
+      "equivalentCommands": [],
+      "feature": "analyzer.analyze-trace@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:analyzer.analyze-trace@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck analyze trace"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/analyze.crash-signature.json",
+      "equivalentCommands": [],
+      "feature": "analyzer.extract-crash-signature@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:analyzer.extract-crash-signature@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck analyze crash-signature"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/analyze.hilog-summary.json",
+      "equivalentCommands": [],
+      "feature": "analyzer.summarize-hilog@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:analyzer.summarize-hilog@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck analyze hilog-summary"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/analyze.trace-summary.json",
+      "equivalentCommands": [],
+      "feature": "analyzer.summarize-trace@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:analyzer.summarize-trace@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck analyze trace-summary"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/agent.run.json",
+      "equivalentCommands": [],
+      "feature": "app.automation.retired",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Retired Automation plane",
+      "owner": "AppShell",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:automation.retired",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck agent run --operation <reference> ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.hap.json",
+      "equivalentCommands": [
+        "arkdeck debug hap --inputs-file <path>"
+      ],
+      "feature": "app.debug.apps",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "HAP install, launch and observe",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.apps",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import hap ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.native-library.json",
+      "equivalentCommands": [
+        "arkdeck debug native deploy --inputs-file <path>"
+      ],
+      "feature": "app.debug.artifacts",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Native library deployment",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.artifacts",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import native-library ..."
+    },
+    {
+      "classification": "platformService",
+      "conformanceFixture": "argv/artifact.import.native-library.json",
+      "equivalentCommands": [
+        "arkdeck debug native deploy --inputs-file <path>"
+      ],
+      "feature": "app.debug.browser",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Remote build source browser",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.browser",
+      "targetClassification": "platformService",
+      "targetCommand": "arkdeck artifact import native-library ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.template.list.json",
+      "equivalentCommands": [
+        "arkdeck debug template run --inputs-file <path>"
+      ],
+      "feature": "app.debug.commands",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Closed read-only command templates",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.commands",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug template list"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/debug.logs.json",
+      "equivalentCommands": [],
+      "feature": "app.debug.logConfirm",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "HiLog request confirmation",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.logConfirm",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck debug logs --inputs-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.logs.json",
+      "equivalentCommands": [],
+      "feature": "app.debug.logs",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Bounded HiLog window",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.logs",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug logs --inputs-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/port-forward.create.json",
+      "equivalentCommands": [
+        "arkdeck port-forward remove --inputs-file <path>"
+      ],
+      "feature": "app.debug.network",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Typed port forwarding",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.network",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck port-forward create --inputs-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.plan.json",
+      "equivalentCommands": [],
+      "feature": "app.debug.plan",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Deployment replacement plan",
+      "owner": "Debug",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:debug.plan",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job plan --operation deploy.native-library.app-owned@1 ..."
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.design.components",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Design-system component gallery",
+      "owner": "AppShell",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:design.components",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/input.tap.json",
+      "equivalentCommands": [
+        "arkdeck input long-press ...",
+        "arkdeck input swipe ..."
+      ],
+      "feature": "app.device.control",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Typed pointer input",
+      "owner": "Device",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:device.control",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck input tap ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/device.candidates.json",
+      "equivalentCommands": [
+        "arkdeck target show --target <id>"
+      ],
+      "feature": "app.device.details",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Observed device details",
+      "owner": "Device",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:device.details",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck device candidates"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/job.events.json",
+      "equivalentCommands": [],
+      "feature": "app.device.events",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Live input event feedback",
+      "owner": "Device",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:device.events",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck job events --job <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/screen.capture.json",
+      "equivalentCommands": [
+        "arkdeck screen record --inputs-file <path>"
+      ],
+      "feature": "app.device.recording",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Screen capture and recording",
+      "owner": "Device",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:device.recording",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck screen capture"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/device.display-name.set.json",
+      "equivalentCommands": [
+        "arkdeck target display-name set ..."
+      ],
+      "feature": "app.device.rename",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Local display name",
+      "owner": "Device",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:device.rename",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck device display-name set ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/device.wait.json",
+      "equivalentCommands": [
+        "arkdeck target adopt --candidate <key> ..."
+      ],
+      "feature": "app.device.trust",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "First-trust prompt and adoption",
+      "owner": "Device",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:device.trust",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck device wait --candidate <key> ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/diagnostics.capture.json",
+      "equivalentCommands": [],
+      "feature": "app.diagnostics.capture",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Diagnostics capture",
+      "owner": "Diagnostics",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:diagnostics.capture",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck diagnostics capture --inputs-file <path>"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.diagnostics.concept",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Diagnostics concept pages",
+      "owner": "Diagnostics",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:diagnostics.concept",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/analyze.hilog-summary.json",
+      "equivalentCommands": [],
+      "feature": "app.diagnostics.hilogSummary",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "HiLog summary",
+      "owner": "Diagnostics",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:diagnostics.hilogSummary",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck analyze hilog-summary --inputs-file <path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/diagnostics.inspect.json",
+      "equivalentCommands": [
+        "arkdeck diagnostics preview ..."
+      ],
+      "feature": "app.diagnostics.reader",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Diagnostics reader",
+      "owner": "Diagnostics",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:diagnostics.reader",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck diagnostics inspect ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.prerequisites.json",
+      "equivalentCommands": [
+        "arkdeck flash device-access --target <id>",
+        "arkdeck flash bootloader-status --target <id>"
+      ],
+      "feature": "app.flash.main",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Flash prerequisites and device access",
+      "owner": "Flash",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:flash.main",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash prerequisites --target <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.lane-preview.json",
+      "equivalentCommands": [
+        "arkdeck job plan --operation flash.full-restore@1 ..."
+      ],
+      "feature": "app.flash.plan",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Exact flash plan",
+      "owner": "Flash",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:flash.plan",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash lane-preview --target <id> ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.run.json",
+      "equivalentCommands": [
+        "arkdeck job watch --job <id>"
+      ],
+      "feature": "app.flash.runtime",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Flash execution timeline",
+      "owner": "Flash",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:flash.runtime",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash run --target <id> --inputs-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.continuation.inspect.json",
+      "equivalentCommands": [],
+      "feature": "app.history.context",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Workspace continuation context",
+      "owner": "History",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:history.context",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace continuation inspect --source-job <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.show.json",
+      "equivalentCommands": [
+        "arkdeck job result --job <id>",
+        "arkdeck job evidence --job <id>"
+      ],
+      "feature": "app.history.detail",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Job detail and evidence",
+      "owner": "History",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:history.detail",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job show --job <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.export.json",
+      "equivalentCommands": [
+        "arkdeck session export preview ...",
+        "arkdeck session export apply ..."
+      ],
+      "feature": "app.history.export",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Artifact and Session export",
+      "owner": "History",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:history.export",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact export ..."
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/history.filter.list.json",
+      "equivalentCommands": [
+        "arkdeck history filter save ..."
+      ],
+      "feature": "app.history.filters",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Saved history filter",
+      "owner": "History",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:history.filters",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck history filter list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.list.json",
+      "equivalentCommands": [],
+      "feature": "app.history.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Job history",
+      "owner": "History",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:history.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job list"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.menu.help.traceShortcuts",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Help › Trace Keyboard Shortcuts",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:menu.help.traceShortcuts",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/trace.capture.json",
+      "equivalentCommands": [],
+      "feature": "app.menu.trace.capture",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace › Capture Trace…",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:menu.trace.capture",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck trace capture --inputs-file <path>"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.menu.trace.filterProcesses",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace › Filter Trace Processes",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:menu.trace.filterProcesses",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/trace.inspect.json",
+      "equivalentCommands": [],
+      "feature": "app.menu.trace.open",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace › Open Trace…",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:menu.trace.open",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck trace inspect ..."
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.menu.trace.reload",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace › Reload Trace",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:menu.trace.reload",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.menu.trace.searchEvents",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace › Search Events",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:menu.trace.searchEvents",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.health.json",
+      "equivalentCommands": [
+        "arkdeck runtime hdc status"
+      ],
+      "feature": "app.overview.environment",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Environment and connection facts",
+      "owner": "Overview",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:overview.environment",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime health"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.hdc.impact-preview.json",
+      "equivalentCommands": [
+        "arkdeck control-action show --control-action <id>"
+      ],
+      "feature": "app.overview.hdcImpact",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "HDC lifecycle impact preview",
+      "owner": "Overview",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:overview.hdcImpact",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime hdc impact-preview"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/doctor.json",
+      "equivalentCommands": [
+        "arkdeck target availability --target <id>"
+      ],
+      "feature": "app.overview.main",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Current target and next step",
+      "owner": "Overview",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:overview.main",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck doctor"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/agent.resume.json",
+      "equivalentCommands": [
+        "arkdeck human-action resume ..."
+      ],
+      "feature": "app.overview.resume",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Resume a waiting execution",
+      "owner": "Overview",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:overview.resume",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck agent resume --resume-reference <ref>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.support-bundle.preview.json",
+      "equivalentCommands": [
+        "arkdeck runtime support-bundle export ..."
+      ],
+      "feature": "app.settings.diagnostics",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Support bundle",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.diagnostics",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime support-bundle preview"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.settings.general",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "General preferences",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.general",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "platformService",
+      "conformanceFixture": "argv/artifact.import.native-library.json",
+      "equivalentCommands": [],
+      "feature": "app.settings.serverDelete",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Remote build source removal",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.serverDelete",
+      "targetClassification": "platformService",
+      "targetCommand": "arkdeck artifact import native-library ..."
+    },
+    {
+      "classification": "platformService",
+      "conformanceFixture": "argv/artifact.import.native-library.json",
+      "equivalentCommands": [],
+      "feature": "app.settings.serverEditor",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Remote build source editor",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.serverEditor",
+      "targetClassification": "platformService",
+      "targetCommand": "arkdeck artifact import native-library ..."
+    },
+    {
+      "classification": "platformService",
+      "conformanceFixture": "argv/artifact.import.native-library.json",
+      "equivalentCommands": [],
+      "feature": "app.settings.servers",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Remote build sources",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.servers",
+      "targetClassification": "platformService",
+      "targetCommand": "arkdeck artifact import native-library ..."
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.storage.status.json",
+      "equivalentCommands": [
+        "arkdeck runtime storage policy ...",
+        "arkdeck runtime storage root ..."
+      ],
+      "feature": "app.settings.storage",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Runtime storage",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.storage",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime storage status"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.tool.list.json",
+      "equivalentCommands": [
+        "arkdeck runtime bundle list",
+        "arkdeck runtime signing status",
+        "arkdeck workspace preset list"
+      ],
+      "feature": "app.settings.toolchains",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Tool, bundle and signing lifecycle",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.toolchains",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime tool list"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/trace.cache.status.json",
+      "equivalentCommands": [
+        "arkdeck trace cache purge"
+      ],
+      "feature": "app.settings.traceCache",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace derived cache",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.traceCache",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck trace cache status"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.settings.traceLicenses",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace licenses",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.traceLicenses",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.update.check.json",
+      "equivalentCommands": [
+        "arkdeck runtime update status"
+      ],
+      "feature": "app.settings.updates",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Runtime updates",
+      "owner": "Settings",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:settings.updates",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime update check"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.shell.inspector",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Inspector panel chrome",
+      "owner": "AppShell",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:shell.inspector",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.shell.navigation",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Workspace navigation",
+      "owner": "AppShell",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:shell.navigation",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/human-action.list.json",
+      "equivalentCommands": [
+        "arkdeck recovery cleanup list",
+        "arkdeck control-action list"
+      ],
+      "feature": "app.shell.recovery",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Recovery and human-action banner",
+      "owner": "AppShell",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:shell.recovery",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck human-action list"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.system.panels",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "System panels",
+      "owner": "AppShell",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:system.panels",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/trace.export.json",
+      "equivalentCommands": [
+        "arkdeck artifact read ..."
+      ],
+      "feature": "app.trace.artifact",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace artifact export",
+      "owner": "Trace",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:trace.artifact",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck trace export --job <id> --artifact <id> ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/trace.capture.json",
+      "equivalentCommands": [],
+      "feature": "app.trace.capture",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace capture",
+      "owner": "Trace",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:trace.capture",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck trace capture --inputs-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/trace.probe.json",
+      "equivalentCommands": [],
+      "feature": "app.trace.runtime",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace runtime readiness",
+      "owner": "Trace",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:trace.runtime",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck trace probe --target <id>"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.traceViewer.annotation",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace annotation",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.annotation",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/trace.inspect.json",
+      "equivalentCommands": [],
+      "feature": "app.traceViewer.event",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace event detail",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.event",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck trace inspect ..."
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.traceViewer.loading",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace loading state",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.loading",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/trace.inspect.json",
+      "equivalentCommands": [],
+      "feature": "app.traceViewer.range",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace range selection",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.range",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck trace inspect ..."
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/job.list.json",
+      "equivalentCommands": [],
+      "feature": "app.traceViewer.recent",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Recent traces",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.recent",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck job list"
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "app.traceViewer.shortcuts",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace keyboard shortcuts",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.shortcuts",
+      "targetClassification": "presentation",
+      "targetCommand": null
+    },
+    {
+      "classification": "presentation",
+      "conformanceFixture": "argv/trace.inspect.json",
+      "equivalentCommands": [
+        "arkdeck analyze trace ..."
+      ],
+      "feature": "app.traceViewer.timeline",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Trace timeline",
+      "owner": "TraceViewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:traceViewer.timeline",
+      "targetClassification": "presentation",
+      "targetCommand": "arkdeck trace inspect ..."
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/ui-dump.inspect.json",
+      "equivalentCommands": [],
+      "feature": "app.viewer.accessibility",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Accessibility tree",
+      "owner": "Viewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:viewer.accessibility",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck ui-dump inspect ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/ui-dump.component-detail.json",
+      "equivalentCommands": [],
+      "feature": "app.viewer.advanced",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Component detail dump",
+      "owner": "Viewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:viewer.advanced",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck ui-dump component-detail --inputs-file <path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/ui-dump.inspect.json",
+      "equivalentCommands": [
+        "arkdeck ui-dump hit-test ..."
+      ],
+      "feature": "app.viewer.layout",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Layout bounds",
+      "owner": "Viewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:viewer.layout",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck ui-dump inspect ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/ui-dump.capture.json",
+      "equivalentCommands": [],
+      "feature": "app.viewer.main",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "UI dump capture",
+      "owner": "Viewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:viewer.main",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck ui-dump capture"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/ui-dump.inspect.json",
+      "equivalentCommands": [],
+      "feature": "app.viewer.properties",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Node properties",
+      "owner": "Viewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:viewer.properties",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck ui-dump inspect ..."
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.read.json",
+      "equivalentCommands": [],
+      "feature": "app.viewer.raw",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "note": "Raw dump text",
+      "owner": "Viewer",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "app:viewer.raw",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact read --job <id> --artifact <id> --allow-sensitive"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/artifact.export.json",
+      "equivalentCommands": [],
+      "feature": "artifact.export",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.export",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck artifact export --artifact <artifact-id> --destination <directory> (--job <id> | --import <id>)"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.abort.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.abort",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.abort",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import abort --import-request-id <id> --expected-generation <n>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import.hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.append",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "bounded chunk frame behind `artifact import <kind>`",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.append",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import hap --import-request-id <id> --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import.hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.begin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "durable import session opening behind `artifact import <kind>`",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.begin",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import hap --import-request-id <id> --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import.hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.commit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "digest-checked commit behind `artifact import <kind>`",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.commit",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import hap --import-request-id <id> --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.flash-bundle.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.flash-bundle",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:artifact.import.flash-bundle",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import flash-bundle --import-request-id <id> --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.inspect.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.inspect",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.inspect",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import inspect (--import <id> | --import-request-id <id>)"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import.hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.inspection",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "idempotent re-entry probe behind `artifact import <kind>`",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.inspection",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import hap --import-request-id <id> --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.list.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.release.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.release",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.import.release",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import release --import <id> --generation <generation>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import.workspace-patch.json",
+      "equivalentCommands": [],
+      "feature": "artifact.import.workspace-patch",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:artifact.import.workspace-patch",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import workspace-patch --import-request-id <id> --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importFlashBundle.abort",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x abort frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importFlashBundle.abort",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importFlashBundle.append",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x chunk frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importFlashBundle.append",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importFlashBundle.begin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importFlashBundle.begin",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importFlashBundle.commit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x commit frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importFlashBundle.commit",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importHap.abort",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x abort frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importHap.abort",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importHap.append",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x chunk frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importHap.append",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import-hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importHap.begin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importHap.begin",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-hap.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importHap.commit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x commit frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importHap.commit",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-native-library.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importNativeLibrary.abort",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x abort frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importNativeLibrary.abort",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-native-library.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importNativeLibrary.append",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x chunk frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importNativeLibrary.append",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import-native-library.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importNativeLibrary.begin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importNativeLibrary.begin",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-native-library.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importNativeLibrary.commit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x commit frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importNativeLibrary.commit",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importWorkspacePatch.abort",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x abort frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importWorkspacePatch.abort",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importWorkspacePatch.append",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x chunk frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importWorkspacePatch.append",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importWorkspacePatch.begin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importWorkspacePatch.begin",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
+      "equivalentCommands": [],
+      "feature": "artifact.importWorkspacePatch.commit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x commit frame",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:artifact.importWorkspacePatch.commit",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/artifact.inspect.json",
+      "equivalentCommands": [],
+      "feature": "artifact.inspect",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.inspect",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck artifact inspect --artifact <artifact-id> (--job <id> | --import <id>)"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/artifact.list.json",
+      "equivalentCommands": [],
+      "feature": "artifact.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck artifact list (--job <id> | --import <id>)"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/artifact.quota.json",
+      "equivalentCommands": [],
+      "feature": "artifact.quota",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.quota",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck artifact quota"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/artifact.read.json",
+      "equivalentCommands": [],
+      "feature": "artifact.read",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:artifact.read",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck artifact read --artifact <artifact-id> (--job <id> | --import <id>)"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/capability.draft.json",
+      "equivalentCommands": [],
+      "feature": "capability.draft",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "capability authoring is Runtime-owned; the CLI names the method only to refuse it",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:capability.draft",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck capability draft"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/capability.inspect.json",
+      "equivalentCommands": [],
+      "feature": "capability.inspect",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:capability.inspect",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck capability inspect --capability <capability-id>"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/capability.install.json",
+      "equivalentCommands": [],
+      "feature": "capability.install",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "capability installation is Runtime-owned; the CLI names the method only to refuse it",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:capability.install",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck capability install"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/capability.list.json",
+      "equivalentCommands": [],
+      "feature": "capability.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:capability.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck capability list"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/capability.revoke.json",
+      "equivalentCommands": [],
+      "feature": "capability.revoke",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "capability revocation is Runtime-owned; the CLI names the method only to refuse it",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:capability.revoke",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck capability revoke"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/trace.capture.json",
+      "equivalentCommands": [
+        "arkdeck screen capture",
+        "arkdeck diagnostics capture",
+        "arkdeck debug logs",
+        "arkdeck ui-dump capture",
+        "arkdeck ui-dump component-detail"
+      ],
+      "feature": "capture.diagnostics@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:capture.diagnostics@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck trace capture"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/screen.record.json",
+      "equivalentCommands": [],
+      "feature": "capture.screen-sequence@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:capture.screen-sequence@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck screen record"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/recovery.cleanup.continue.json",
+      "equivalentCommands": [
+        "arkdeck cleanup-debt continue --job <job-id> (--remote-path <recorded-path> | --bundle <recorded-bundle>)"
+      ],
+      "feature": "cleanupDebt.continue",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:cleanupDebt.continue",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck recovery cleanup continue --job <job-id> (--remote-path <recorded-path> | --bundle <recorded-bundle>)"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/recovery.cleanup.list.json",
+      "equivalentCommands": [
+        "arkdeck cleanup-debt list"
+      ],
+      "feature": "cleanupDebt.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:cleanupDebt.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck recovery cleanup list"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/commands.json",
+      "equivalentCommands": [],
+      "feature": "commands",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:commands",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck commands"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/completion.json",
+      "equivalentCommands": [],
+      "feature": "completion",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:completion",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck completion <shell>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/control-action.list.json",
+      "equivalentCommands": [],
+      "feature": "control-action.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:control-action.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck control-action list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/control-action.reconcile.json",
+      "equivalentCommands": [],
+      "feature": "control-action.reconcile",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:control-action.reconcile",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck control-action reconcile --control-action <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/control-action.show.json",
+      "equivalentCommands": [],
+      "feature": "control-action.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:control-action.show",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck control-action show --control-action <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/recovery.flash-invocation.evaluate.json",
+      "equivalentCommands": [
+        "arkdeck debug evaluate --invocation <invocation-id> --action-file <path> --source-sha256 <sha256> --build-sha256 <sha256>"
+      ],
+      "feature": "debug.evaluate",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:debug.evaluate",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck recovery flash-invocation evaluate --invocation <invocation-id> --action-file <path> --source-sha256 <sha256> --build-sha256 <sha256>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.hap.json",
+      "equivalentCommands": [],
+      "feature": "debug.hap@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:debug.hap@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug hap"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.probe.json",
+      "equivalentCommands": [],
+      "feature": "debug.probe",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:debug.probe",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug probe --target <target-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/recovery.flash-invocation.start.json",
+      "equivalentCommands": [
+        "arkdeck debug start --request-file <path>"
+      ],
+      "feature": "debug.start",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:debug.start",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck recovery flash-invocation start --request-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/recovery.flash-invocation.status.json",
+      "equivalentCommands": [
+        "arkdeck debug status --invocation <invocation-id>"
+      ],
+      "feature": "debug.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:debug.status",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck recovery flash-invocation status --invocation <invocation-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.template.run.json",
+      "equivalentCommands": [],
+      "feature": "debug.template.run",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "App direct path; the CLI reaches the same closed template set through Catalog operation debug.template@1",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:debug.template.run",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug template run"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.template.run.json",
+      "equivalentCommands": [],
+      "feature": "debug.template@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:debug.template@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug template run"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/debug.native.deploy.json",
+      "equivalentCommands": [],
+      "feature": "deploy.native-library.app-owned@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:deploy.native-library.app-owned@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck debug native deploy"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/device.candidates.json",
+      "equivalentCommands": [],
+      "feature": "device.candidates",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:device.candidates",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck device candidates"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/device.display-name.clear.json",
+      "equivalentCommands": [],
+      "feature": "device.display-name.clear",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:device.display-name.clear",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck device display-name clear --candidate <key> --observation <observation-id> --observation-generation <generation>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/device.display-name.set.json",
+      "equivalentCommands": [],
+      "feature": "device.display-name.set",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:device.display-name.set",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck device display-name set --candidate <key> --observation <observation-id> --observation-generation <generation> --name <text>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/device.wait.json",
+      "equivalentCommands": [
+        "arkdeck device list"
+      ],
+      "feature": "device.observations",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "observation snapshot read by `device wait` and `device list`",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:device.observations",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck device wait --candidate <key> --observation <observation-id> --observation-generation <generation> --state <connected|unauthorized|offline>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/device.show.json",
+      "equivalentCommands": [],
+      "feature": "device.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "superseded by `arkdeck target show --target <id>`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:device.show",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck device show"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/diagnostics.export.json",
+      "equivalentCommands": [],
+      "feature": "diagnostics.export",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:diagnostics.export",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck diagnostics export --job <job-id> --artifact <artifact-id> --destination <directory>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/doctor.json",
+      "equivalentCommands": [],
+      "feature": "doctor",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:doctor",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck doctor"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.bind-loader.json",
+      "equivalentCommands": [],
+      "feature": "flash.bind-current-loader",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:flash.bind-current-loader",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash bind-loader --target <target-id> --expected-binding-revision <n>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.bootloader-status.json",
+      "equivalentCommands": [],
+      "feature": "flash.bootloader-status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:flash.bootloader-status",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash bootloader-status"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/flash.continue.json",
+      "equivalentCommands": [],
+      "feature": "flash.continue",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "removed",
+      "note": "historical campaigns are decode-only",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.continue",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck flash continue"
+    },
+    {
+      "classification": "generic",
+      "conformanceFixture": "argv/job.submit.json",
+      "equivalentCommands": [],
+      "feature": "flash.dayu200",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "alias of flash.full-restore@1",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:flash.dayu200",
+      "targetClassification": "generic",
+      "targetCommand": "arkdeck job submit --operation flash.dayu200 --inputs-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.device-access.json",
+      "equivalentCommands": [],
+      "feature": "flash.device-access",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:flash.device-access",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash device-access"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/flash.execute.json",
+      "equivalentCommands": [],
+      "feature": "flash.execute",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "removed",
+      "note": "replaced by `arkdeck agent run --operation flash.full-restore@1 ...`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.execute",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck flash execute"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.run.json",
+      "equivalentCommands": [],
+      "feature": "flash.full-restore@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:flash.full-restore@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash run"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/flash.install-binding.json",
+      "equivalentCommands": [],
+      "feature": "flash.install-binding",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.install-binding",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck flash install-binding"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.lane-preview.json",
+      "equivalentCommands": [],
+      "feature": "flash.lanePlanPreview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:flash.lanePlanPreview",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash lane-preview --target <target-id> --device-profile <dayu200> --archive-sha256 <sha256>"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/flash.plan.json",
+      "equivalentCommands": [],
+      "feature": "flash.plan",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "removed",
+      "note": "replaced by `arkdeck job plan --operation flash.full-restore@1 ...`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.plan",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck flash plan"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/flash.postflight.json",
+      "equivalentCommands": [],
+      "feature": "flash.postflight",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "removed",
+      "note": "replaced by `arkdeck job evidence --job <id>`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.postflight",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck flash postflight"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.prerequisites.json",
+      "equivalentCommands": [],
+      "feature": "flash.prerequisites",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:flash.prerequisites",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash prerequisites --target <target-id> --device-profile <dayu200>"
+    },
+    {
+      "classification": "refused",
+      "conformanceFixture": "argv/flash.preview.json",
+      "equivalentCommands": [],
+      "feature": "flash.preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "removed",
+      "note": "replaced by `arkdeck flash lane-preview --target <id> ...`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.preview",
+      "targetClassification": "refused",
+      "targetCommand": "arkdeck flash preview"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/flash.reconcile.json",
+      "equivalentCommands": [],
+      "feature": "flash.reconcile",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "superseded by `arkdeck legacy flash reconcile`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.reconcile",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck flash reconcile"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/flash.status.json",
+      "equivalentCommands": [],
+      "feature": "flash.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "note": "superseded by `arkdeck legacy flash status`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:flash.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck flash status --campaign-id <ECAMP-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.health.json",
+      "equivalentCommands": [],
+      "feature": "health",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:health",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime health"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/help.json",
+      "equivalentCommands": [],
+      "feature": "help",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:help",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck help"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/history.filter.delete.json",
+      "equivalentCommands": [],
+      "feature": "history.filter.delete",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:history.filter.delete",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck history filter delete --expected-generation <positive-integer>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/history.filter.list.json",
+      "equivalentCommands": [],
+      "feature": "history.filter.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:history.filter.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck history filter list"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/history.filter.save.json",
+      "equivalentCommands": [],
+      "feature": "history.filter.save",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:history.filter.save",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck history filter save --expected-generation <positive-integer>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/human-action.list.json",
+      "equivalentCommands": [],
+      "feature": "human-action.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:human-action.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck human-action list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/human-action.resume.json",
+      "equivalentCommands": [],
+      "feature": "human-action.resume",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:human-action.resume",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck human-action resume --human-action <id> --resume-reference <ref>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/human-action.show.json",
+      "equivalentCommands": [],
+      "feature": "human-action.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:human-action.show",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck human-action show --human-action <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/input.long-press.json",
+      "equivalentCommands": [],
+      "feature": "input.long-press@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:input.long-press@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck input long-press"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/input.swipe.json",
+      "equivalentCommands": [],
+      "feature": "input.swipe@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:input.swipe@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck input swipe"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/input.tap.json",
+      "equivalentCommands": [],
+      "feature": "input.tap@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:input.tap@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck input tap"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.cancel.json",
+      "equivalentCommands": [],
+      "feature": "job.cancel",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.cancel",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job cancel --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.events.json",
+      "equivalentCommands": [],
+      "feature": "job.events",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.events",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job events --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.evidence.json",
+      "equivalentCommands": [],
+      "feature": "job.evidence",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.evidence",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job evidence --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.list.json",
+      "equivalentCommands": [],
+      "feature": "job.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job list"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": "argv/job.list.json",
+      "equivalentCommands": [],
+      "feature": "job.list-page",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "cursor page form of job.list used by `job list`",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.list-page",
+      "targetClassification": "internal",
+      "targetCommand": "arkdeck job list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.plan.json",
+      "equivalentCommands": [],
+      "feature": "job.plan",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.plan",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job plan"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.reconcile.json",
+      "equivalentCommands": [],
+      "feature": "job.reconcile",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.reconcile",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job reconcile --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.result.json",
+      "equivalentCommands": [],
+      "feature": "job.result",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.result",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job result --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.run.json",
+      "equivalentCommands": [],
+      "feature": "job.run",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.run",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job run --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.show.json",
+      "equivalentCommands": [],
+      "feature": "job.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.show",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job show --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.status.json",
+      "equivalentCommands": [],
+      "feature": "job.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.status",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job status --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.submit.json",
+      "equivalentCommands": [],
+      "feature": "job.submit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.submit",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job submit"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.timeline.json",
+      "equivalentCommands": [],
+      "feature": "job.timeline",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.timeline",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job timeline --job <job-id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.wait.json",
+      "equivalentCommands": [],
+      "feature": "job.wait",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:job.wait",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job wait --job <job-id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/legacy.flash.reconcile.json",
+      "equivalentCommands": [],
+      "feature": "legacy.flash.reconcile",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:legacy.flash.reconcile",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck legacy flash reconcile"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/legacy.flash.status.json",
+      "equivalentCommands": [],
+      "feature": "legacy.flash.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "legacy",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:legacy.flash.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck legacy flash status --campaign-id <ECAMP-id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/maintainer.contracts.check.json",
+      "equivalentCommands": [],
+      "feature": "maintainer.contracts.check",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:maintainer.contracts.check",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck maintainer contracts check --contracts-directory <directory> --fixtures-directory <directory>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/maintainer.contracts.export.json",
+      "equivalentCommands": [],
+      "feature": "maintainer.contracts.export",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:maintainer.contracts.export",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck maintainer contracts export --contracts-directory <directory> --fixtures-directory <directory>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/maintainer.update-feed.assemble.json",
+      "equivalentCommands": [],
+      "feature": "maintainer.update-feed.assemble",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:maintainer.update-feed.assemble",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck maintainer update-feed assemble --payload <payload.json> --signature <signature.bin> --out <feed.json>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/maintainer.update-feed.prepare.json",
+      "equivalentCommands": [],
+      "feature": "maintainer.update-feed.prepare",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:maintainer.update-feed.prepare",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck maintainer update-feed prepare --sequence <n> --version <x.y.z> --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <directory>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/target.observe.json",
+      "equivalentCommands": [],
+      "feature": "observe.device@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:observe.device@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck target observe"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/operation.describe.json",
+      "equivalentCommands": [],
+      "feature": "operation.describe",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:operation.describe",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck operation describe --operation <id@version>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/operation.example.json",
+      "equivalentCommands": [],
+      "feature": "operation.example",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:operation.example",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck operation example --operation <id@version>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/operation.list.json",
+      "equivalentCommands": [],
+      "feature": "operation.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:operation.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck operation list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/operation.validate.json",
+      "equivalentCommands": [],
+      "feature": "operation.validate",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:operation.validate",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck operation validate --operation <id@version> --inputs-file <path|->"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/port-forward.create.json",
+      "equivalentCommands": [],
+      "feature": "port-forward.create@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:port-forward.create@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck port-forward create"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/port-forward.remove.json",
+      "equivalentCommands": [],
+      "feature": "port-forward.remove@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:port-forward.remove@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck port-forward remove"
+    },
+    {
+      "classification": "internal",
+      "conformanceFixture": null,
+      "equivalentCommands": [],
+      "feature": "protocol.negotiate",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "note": "protocol bootstrap performed by every connecting leaf; never a feature of its own",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:protocol.negotiate",
+      "targetClassification": "internal",
+      "targetCommand": null
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/recovery.flash-invocation.list.json",
+      "equivalentCommands": [],
+      "feature": "recovery.flash-invocation.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:recovery.flash-invocation.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck recovery flash-invocation list"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.bundle.inspect.json",
+      "equivalentCommands": [],
+      "feature": "runtime.bundle.inspect",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.bundle.inspect",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime bundle inspect --bundle <bundle:sha256:digest>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.bundle.register.json",
+      "equivalentCommands": [],
+      "feature": "runtime.bundle.register",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.bundle.register",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime bundle register --kind <daemon-bundle> --file <absolute-path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.bundle.remove.json",
+      "equivalentCommands": [],
+      "feature": "runtime.bundle.remove",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.bundle.remove",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime bundle remove --bundle <bundle:sha256:digest> --expected-generation <generation>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.hdc.status.json",
+      "equivalentCommands": [],
+      "feature": "runtime.hdc-status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "legacy",
+      "note": "1.x spelling that `runtime hdc status` falls back to on a legacy Runtime",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.hdc-status",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime hdc status"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.hdc.impact-preview.json",
+      "equivalentCommands": [],
+      "feature": "runtime.hdc.impact-preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.hdc.impact-preview",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime hdc impact-preview --action <restart> --server-endpoint-ref <ref> --expected-server-generation <n> --action-request-id <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.hdc.restart.json",
+      "equivalentCommands": [],
+      "feature": "runtime.hdc.restart",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.hdc.restart",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime hdc restart --control-action <id> --preview-id <id> --preview-digest <sha256>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.hdc.status.json",
+      "equivalentCommands": [],
+      "feature": "runtime.hdc.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.hdc.status",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime hdc status"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.service.install.json",
+      "equivalentCommands": [],
+      "feature": "runtime.service.install",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.service.install",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime service install --bundle <bundle:sha256:digest> --bundle-generation <generation> --tool <tool-reference> --tool-generation <generation>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.service.restart.json",
+      "equivalentCommands": [],
+      "feature": "runtime.service.restart",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.service.restart",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime service restart"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.service.status.json",
+      "equivalentCommands": [],
+      "feature": "runtime.service.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.service.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime service status"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.service.uninstall.json",
+      "equivalentCommands": [],
+      "feature": "runtime.service.uninstall",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.service.uninstall",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime service uninstall"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.service.update.json",
+      "equivalentCommands": [],
+      "feature": "runtime.service.update",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.service.update",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime service update"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.service.verify.json",
+      "equivalentCommands": [],
+      "feature": "runtime.service.verify",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.service.verify",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime service verify"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.signing.install.json",
+      "equivalentCommands": [],
+      "feature": "runtime.signing.install",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.signing.install",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime signing install --java <absolute-path> --jar <absolute-path> --keystore <absolute-path> --certificate <absolute-path> --profile <absolute-path> --key-alias <alias>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.signing.install-sdk-release.json",
+      "equivalentCommands": [],
+      "feature": "runtime.signing.install-sdk-release",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.signing.install-sdk-release",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime signing install-sdk-release --sdk <absolute-path> --java <absolute-path> --bundle-name <bundle-name>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.signing.migrate-deveco.json",
+      "equivalentCommands": [],
+      "feature": "runtime.signing.migrate-deveco",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.signing.migrate-deveco",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime signing migrate-deveco --build-profile <absolute-build-profile.json5> --daemon <absolute-agentd-path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.signing.normalize.json",
+      "equivalentCommands": [],
+      "feature": "runtime.signing.normalize",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.signing.normalize",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime signing normalize"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.signing.remove.json",
+      "equivalentCommands": [],
+      "feature": "runtime.signing.remove",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.signing.remove",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime signing remove"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.storage.policy.json",
+      "equivalentCommands": [],
+      "feature": "runtime.storage.policy",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.storage.policy",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.storage.root.json",
+      "equivalentCommands": [],
+      "feature": "runtime.storage.root",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.storage.root",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime storage root --expected-generation <n> (--root <absolute-path> | --default)"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.storage.status.json",
+      "equivalentCommands": [],
+      "feature": "runtime.storage.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:runtime.storage.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime storage status"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.tool.inspect.json",
+      "equivalentCommands": [],
+      "feature": "runtime.tool.inspect",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.tool.inspect",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime tool inspect --tool <tool-reference>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.tool.register.json",
+      "equivalentCommands": [],
+      "feature": "runtime.tool.register",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.tool.register",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime tool register --kind <hdc|deveco>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.tool.remove.json",
+      "equivalentCommands": [],
+      "feature": "runtime.tool.remove",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.tool.remove",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime tool remove --tool <tool-reference> --expected-generation <generation>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/runtime.tool.select.json",
+      "equivalentCommands": [],
+      "feature": "runtime.tool.select",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:runtime.tool.select",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck runtime tool select --tool <tool-reference> --expected-active-generation <generation> --action-request-id <id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.update.cancel.json",
+      "equivalentCommands": [],
+      "feature": "runtime.update.cancel",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.update.cancel",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime update cancel"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.update.cleanup.json",
+      "equivalentCommands": [],
+      "feature": "runtime.update.cleanup",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.update.cleanup",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime update cleanup"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.update.download.json",
+      "equivalentCommands": [],
+      "feature": "runtime.update.download",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.update.download",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime update download"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/runtime.update.handoff.json",
+      "equivalentCommands": [],
+      "feature": "runtime.update.handoff",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:runtime.update.handoff",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime update handoff --consent <reveal-in-finder>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.cleanup.apply.json",
+      "equivalentCommands": [],
+      "feature": "session.cleanup.apply",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.cleanup.apply",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session cleanup apply --preview-id <id> --preview-digest <sha256>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.cleanup.preview.json",
+      "equivalentCommands": [],
+      "feature": "session.cleanup.preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.cleanup.preview",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session cleanup preview"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.export.apply.json",
+      "equivalentCommands": [],
+      "feature": "session.export.apply",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.export.apply",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session export apply --preview-id <id> --preview-digest <sha256>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.export.preview.json",
+      "equivalentCommands": [],
+      "feature": "session.export.preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.export.preview",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session export preview --session <session-id> --destination <new-directory>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.list.json",
+      "equivalentCommands": [],
+      "feature": "session.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session list"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.pin.json",
+      "equivalentCommands": [],
+      "feature": "session.pin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.pin",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session pin --session <session-id> --expected-generation <non-negative-integer>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.show.json",
+      "equivalentCommands": [],
+      "feature": "session.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.show",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session show --session <session-id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/session.unpin.json",
+      "equivalentCommands": [],
+      "feature": "session.unpin",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:session.unpin",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck session unpin --session <session-id> --expected-generation <non-negative-integer>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/signing.install.json",
+      "equivalentCommands": [],
+      "feature": "signing.install",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime signing install`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:signing.install",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck signing install --java <absolute-path> --jar <absolute-path> --keystore <absolute-path> --certificate <absolute-path> --profile <absolute-path> --key-alias <alias>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/signing.install-sdk-release.json",
+      "equivalentCommands": [],
+      "feature": "signing.install-sdk-release",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime signing install-sdk-release`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:signing.install-sdk-release",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck signing install-sdk-release --sdk <absolute-path> --java <absolute-path> --bundle-name <bundle-name>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/signing.migrate-deveco.json",
+      "equivalentCommands": [],
+      "feature": "signing.migrate-deveco",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime signing migrate-deveco`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:signing.migrate-deveco",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck signing migrate-deveco --build-profile <absolute-build-profile.json5> --daemon <absolute-agentd-path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/signing.normalize.json",
+      "equivalentCommands": [],
+      "feature": "signing.normalize",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime signing normalize`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:signing.normalize",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck signing normalize"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/signing.remove.json",
+      "equivalentCommands": [],
+      "feature": "signing.remove",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime signing remove`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:signing.remove",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck signing remove"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/signing.status.json",
+      "equivalentCommands": [],
+      "feature": "signing.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck runtime signing status`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:signing.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck signing status"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/target.adopt.json",
+      "equivalentCommands": [
+        "arkdeck device adopt"
+      ],
+      "feature": "target.adopt",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:target.adopt",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck target adopt --candidate <key> --observation <observation-id> --observation-generation <generation>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/target.availability.json",
+      "equivalentCommands": [],
+      "feature": "target.availability",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:target.availability",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck target availability --target <target-id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/target.display-name.clear.json",
+      "equivalentCommands": [],
+      "feature": "target.display-name.clear",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:target.display-name.clear",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck target display-name clear --target <target-id> --expected-generation <n>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/target.display-name.set.json",
+      "equivalentCommands": [],
+      "feature": "target.display-name.set",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:target.display-name.set",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck target display-name set --target <target-id> --expected-generation <n> --name <text>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/target.list.json",
+      "equivalentCommands": [],
+      "feature": "target.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:target.list",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck target list"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/target.show.json",
+      "equivalentCommands": [],
+      "feature": "target.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:target.show",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck target show --target <target-id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/trace.cache.purge.json",
+      "equivalentCommands": [],
+      "feature": "trace.cache.purge",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:trace.cache.purge",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck trace cache purge"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/trace.cache.status.json",
+      "equivalentCommands": [],
+      "feature": "trace.cache.status",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:trace.cache.status",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck trace cache status"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/trace.inspect.json",
+      "equivalentCommands": [],
+      "feature": "trace.inspect",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:trace.inspect",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck trace inspect --job <job-id> --artifact <artifact-id> --allow-sensitive"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/trace.probe.json",
+      "equivalentCommands": [],
+      "feature": "trace.probe",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:trace.probe",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck trace probe --target <target-id>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/update-feed.assemble.json",
+      "equivalentCommands": [],
+      "feature": "update-feed.assemble",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck maintainer update-feed assemble`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:update-feed.assemble",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck update-feed assemble --payload <payload.json> --signature <signature.bin> --out <feed.json>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/update-feed.prepare.json",
+      "equivalentCommands": [],
+      "feature": "update-feed.prepare",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "deprecated",
+      "note": "superseded by `arkdeck maintainer update-feed prepare`",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "cli:update-feed.prepare",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck update-feed prepare --sequence <n> --version <x.y.z> --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <directory>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.patch.json",
+      "equivalentCommands": [],
+      "feature": "workspace.apply-patch@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.apply-patch@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace patch"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.build.json",
+      "equivalentCommands": [],
+      "feature": "workspace.build-openharmony@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.build-openharmony@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace build"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.continuation.run.json",
+      "equivalentCommands": [],
+      "feature": "workspace.continuation.run",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:workspace.continuation.run",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace continuation run --source-job <job-id> --continuation-request-id <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.continuation.submit.json",
+      "equivalentCommands": [],
+      "feature": "workspace.continuation.submit",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "cli:workspace.continuation.submit",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace continuation submit --source-job <job-id> --continuation-request-id <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.checkpoint.json",
+      "equivalentCommands": [],
+      "feature": "workspace.create-checkpoint@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.create-checkpoint@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace checkpoint"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.diff.json",
+      "equivalentCommands": [],
+      "feature": "workspace.inspect-diff@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.inspect-diff@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace diff"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.status.json",
+      "equivalentCommands": [],
+      "feature": "workspace.inspect-git-status@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.inspect-git-status@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace status"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.inspect.json",
+      "equivalentCommands": [],
+      "feature": "workspace.inspect-source@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.inspect-source@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace inspect"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.isolate.json",
+      "equivalentCommands": [],
+      "feature": "workspace.prepare-isolated-copy@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.prepare-isolated-copy@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace isolate"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.preset.list.json",
+      "equivalentCommands": [],
+      "feature": "workspace.preset.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.preset.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace preset list --project <project-ref>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.preset.register.json",
+      "equivalentCommands": [],
+      "feature": "workspace.preset.register",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.preset.register",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace preset register --registration-request-id <id> --project <project-ref> --kind <build|test|signing|symbol> --template <template-ref> --timeout-seconds <1...3600>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.preset.remove.json",
+      "equivalentCommands": [],
+      "feature": "workspace.preset.remove",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.preset.remove",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace preset remove --mutation-request-id <id> --project <project-ref> --preset <preset-ref> --expected-generation <n>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.preset.show.json",
+      "equivalentCommands": [],
+      "feature": "workspace.preset.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.preset.show",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace preset show --project <project-ref> --preset <preset-ref>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.preset.update.json",
+      "equivalentCommands": [],
+      "feature": "workspace.preset.update",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.preset.update",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace preset update --mutation-request-id <id> --project <project-ref> --preset <preset-ref> --expected-generation <n> --kind <build|test|signing|symbol> --template <template-ref> --timeout-seconds <1...3600>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.project.list.json",
+      "equivalentCommands": [],
+      "feature": "workspace.project.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.project.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace project list"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.project.register.json",
+      "equivalentCommands": [],
+      "feature": "workspace.project.register",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.project.register",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace project register --registration-request-id <id> --kind <arkdeck|openharmony> --root <absolute-path>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.project.remove.json",
+      "equivalentCommands": [],
+      "feature": "workspace.project.remove",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.project.remove",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace project remove --project <project-ref> --expected-generation <n>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.project.show.json",
+      "equivalentCommands": [],
+      "feature": "workspace.project.show",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.project.show",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace project show --project <project-ref>"
+    },
+    {
+      "classification": "local",
+      "conformanceFixture": "argv/workspace.project.update.json",
+      "equivalentCommands": [],
+      "feature": "workspace.project.update",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:workspace.project.update",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck workspace project update --project <project-ref> --expected-generation <n> --kind <arkdeck|openharmony> --root <absolute-path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.read.json",
+      "equivalentCommands": [],
+      "feature": "workspace.read-source-range@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.read-source-range@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace read"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.revert.json",
+      "equivalentCommands": [],
+      "feature": "workspace.revert-patch@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.revert-patch@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace revert"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.test.json",
+      "equivalentCommands": [],
+      "feature": "workspace.run-tests@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.run-tests@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace test"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.sign.json",
+      "equivalentCommands": [],
+      "feature": "workspace.sign-openharmony-hap@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.sign-openharmony-hap@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace sign"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.sweep.json",
+      "equivalentCommands": [],
+      "feature": "workspace.sweep-isolated-copies@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.sweep-isolated-copies@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace sweep"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/workspace.symbolize.json",
+      "equivalentCommands": [],
+      "feature": "workspace.symbolize-crash@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:workspace.symbolize-crash@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck workspace symbolize"
+    }
+  ],
+  "lifecycleVocabulary": [
+    "current",
+    "deprecated",
+    "legacy",
+    "removed"
+  ],
+  "platformVocabulary": [
+    "macos",
+    "windows"
+  ],
+  "schemaVersion": "arkdeck.cli.feature-coverage/1",
+  "summary": {
+    "blocked": [],
+    "byClassification": {
+      "direct": 131,
+      "generic": 1,
+      "internal": 18,
+      "local": 94,
+      "platformService": 4,
+      "presentation": 21,
+      "refused": 10
+    },
+    "bySource": {
+      "app": 68,
+      "catalog": 30,
+      "cli": 62,
+      "daemon": 119
+    },
+    "entries": 279,
+    "fullFunction": true
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "agent",
+        "abandon",
+        "--expected-generation",
+        "1",
+        "--execution-id",
+        "sample"
+      ],
+      "expected": {
+        "command": "agent.abandon",
+        "handlerArguments": [
+          "agent",
+          "abandon",
+          "--expected-generation",
+          "1",
+          "--execution-id",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "agent",
+        "abandon",
+        "--help"
+      ],
+      "expected": {
+        "command": "agent.abandon",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "agent",
+        "abandon",
+        "--expected-generation",
+        "1",
+        "--execution-id",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.abandon",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "agent",
+        "abandon",
+        "--expected-generation",
+        "1",
+        "--execution-id",
+        "sample",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.abandon",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "agent",
+        "abandon"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.abandon",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "agent",
+        "abandon",
+        "--expected-generation",
+        "1",
+        "--execution-id",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.abandon",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "agent",
+        "abandon",
+        "--expected-generation",
+        "1",
+        "--execution-id",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "agent.abandon",
+        "handlerArguments": [
+          "agent",
+          "abandon",
+          "--expected-generation",
+          "1",
+          "--execution-id",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "agent.abandon",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "agent",
+    "abandon"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

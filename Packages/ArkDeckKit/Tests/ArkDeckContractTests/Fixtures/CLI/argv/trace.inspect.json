@@ -1,0 +1,155 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "trace",
+        "inspect",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--allow-sensitive"
+      ],
+      "expected": {
+        "command": "trace.inspect",
+        "handlerArguments": [
+          "trace",
+          "inspect",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--allow-sensitive"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "trace",
+        "inspect",
+        "--help"
+      ],
+      "expected": {
+        "command": "trace.inspect",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "trace",
+        "inspect",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--allow-sensitive",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "inspect",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--allow-sensitive",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "inspect"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "trace",
+        "inspect",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--allow-sensitive",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "trace",
+        "inspect",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--allow-sensitive",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.inspect",
+        "handlerArguments": [
+          "trace",
+          "inspect",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--allow-sensitive",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "trace.inspect",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "trace",
+    "inspect"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

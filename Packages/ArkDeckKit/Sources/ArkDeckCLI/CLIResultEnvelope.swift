@@ -189,12 +189,13 @@ enum CLIProductVersion {
   /// The bundle version. Its components are pinned separately below.
   static let machineContract = "arkdeck.cli.contracts/1"
   static let resultSchema: String? = CLIResultEnvelope.schemaVersion
-  /// Individual v2 leaves now emit these shapes. Portable bundle export and
-  /// its component pins remain part of the final machine-contract migration.
-  static let pageSchema: String? = nil
+  /// Pinned by the §14 bundle: `openspec/contracts/cli-page.schema.json`
+  /// and `cli-next-action.schema.json` describe exactly these shapes, and
+  /// `arkdeck maintainer contracts check` holds the files to the build.
+  static let pageSchema: String? = CLIMachineContracts.pageSchemaVersion
   /// Published by the durable job.events/watch/wait path.
   static let eventSchema: String? = CLIEventEnvelope.schemaVersion
-  static let nextActionSchema: String? = nil
+  static let nextActionSchema: String? = CLIMachineContracts.nextActionSchemaVersion
   static let errorRegistry: String? = CLIErrorRegistryVersion.current
   static let canonicalJson: String? = CLICanonicalJSON.version
 }

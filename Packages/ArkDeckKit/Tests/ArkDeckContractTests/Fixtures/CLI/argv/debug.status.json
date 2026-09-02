@@ -1,0 +1,142 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "debug",
+        "status",
+        "--invocation",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.status",
+        "handlerArguments": [
+          "debug",
+          "status",
+          "--invocation",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "debug",
+        "status",
+        "--help"
+      ],
+      "expected": {
+        "command": "debug.status",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "debug",
+        "status",
+        "--invocation",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.status",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation status --invocation <id>"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "status",
+        "--invocation",
+        "sample",
+        "--invocation",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.status",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation status --invocation <id>"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "status"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.status",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation status --invocation <id>"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "debug",
+        "status",
+        "--invocation",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.status",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation status --invocation <id>"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "debug",
+        "status",
+        "--invocation",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.status",
+        "handlerArguments": [
+          "debug",
+          "status",
+          "--invocation",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "debug.status",
+  "kind": "executable",
+  "lifecycleStatus": "legacy",
+  "path": [
+    "debug",
+    "status"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

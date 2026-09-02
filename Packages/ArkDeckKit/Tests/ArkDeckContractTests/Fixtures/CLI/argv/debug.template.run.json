@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "debug",
+        "template",
+        "run"
+      ],
+      "expected": {
+        "command": "debug.template.run",
+        "handlerArguments": [
+          "debug",
+          "template",
+          "run"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "run",
+        "--help"
+      ],
+      "expected": {
+        "command": "debug.template.run",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "run",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.template.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "run",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.template.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "run",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.template.run",
+        "handlerArguments": [
+          "debug",
+          "template",
+          "run",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "debug.template.run",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "debug",
+    "template",
+    "run"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

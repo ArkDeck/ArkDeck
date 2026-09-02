@@ -1,0 +1,152 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle",
+        "--target",
+        "sample",
+        "--file",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.import-flash-bundle",
+        "handlerArguments": [
+          "artifact",
+          "import-flash-bundle",
+          "--target",
+          "sample",
+          "--file",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.import-flash-bundle",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle",
+        "--target",
+        "sample",
+        "--file",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import-flash-bundle",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle",
+        "--target",
+        "sample",
+        "--file",
+        "sample",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import-flash-bundle",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import-flash-bundle",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle",
+        "--target",
+        "sample",
+        "--file",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import-flash-bundle",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import-flash-bundle",
+        "--target",
+        "sample",
+        "--file",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.import-flash-bundle",
+        "handlerArguments": [
+          "artifact",
+          "import-flash-bundle",
+          "--target",
+          "sample",
+          "--file",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.import-flash-bundle",
+  "kind": "executable",
+  "lifecycleStatus": "legacy",
+  "path": [
+    "artifact",
+    "import-flash-bundle"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

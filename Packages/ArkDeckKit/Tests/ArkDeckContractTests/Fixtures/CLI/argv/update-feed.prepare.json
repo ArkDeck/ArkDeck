@@ -1,0 +1,235 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "update-feed",
+        "prepare",
+        "--sequence",
+        "1",
+        "--version",
+        "sample",
+        "--minimum-system",
+        "sample",
+        "--issued-at",
+        "sample",
+        "--expires-at",
+        "sample",
+        "--artifact",
+        "sample",
+        "--artifact-url",
+        "sample",
+        "--notes",
+        "sample",
+        "--out",
+        "sample"
+      ],
+      "expected": {
+        "command": "update-feed.prepare",
+        "handlerArguments": [
+          "update-feed",
+          "prepare",
+          "--sequence",
+          "1",
+          "--version",
+          "sample",
+          "--minimum-system",
+          "sample",
+          "--issued-at",
+          "sample",
+          "--expires-at",
+          "sample",
+          "--artifact",
+          "sample",
+          "--artifact-url",
+          "sample",
+          "--notes",
+          "sample",
+          "--out",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "update-feed",
+        "prepare",
+        "--help"
+      ],
+      "expected": {
+        "command": "update-feed.prepare",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "update-feed",
+        "prepare",
+        "--sequence",
+        "1",
+        "--version",
+        "sample",
+        "--minimum-system",
+        "sample",
+        "--issued-at",
+        "sample",
+        "--expires-at",
+        "sample",
+        "--artifact",
+        "sample",
+        "--artifact-url",
+        "sample",
+        "--notes",
+        "sample",
+        "--out",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "update-feed.prepare",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck maintainer update-feed prepare"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "update-feed",
+        "prepare",
+        "--sequence",
+        "1",
+        "--version",
+        "sample",
+        "--minimum-system",
+        "sample",
+        "--issued-at",
+        "sample",
+        "--expires-at",
+        "sample",
+        "--artifact",
+        "sample",
+        "--artifact-url",
+        "sample",
+        "--notes",
+        "sample",
+        "--out",
+        "sample",
+        "--sequence",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "update-feed.prepare",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck maintainer update-feed prepare"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "update-feed",
+        "prepare"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "update-feed.prepare",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck maintainer update-feed prepare"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "update-feed",
+        "prepare",
+        "--sequence",
+        "1",
+        "--version",
+        "sample",
+        "--minimum-system",
+        "sample",
+        "--issued-at",
+        "sample",
+        "--expires-at",
+        "sample",
+        "--artifact",
+        "sample",
+        "--artifact-url",
+        "sample",
+        "--notes",
+        "sample",
+        "--out",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "update-feed.prepare",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck maintainer update-feed prepare"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "update-feed",
+        "prepare",
+        "--sequence",
+        "1",
+        "--version",
+        "sample",
+        "--minimum-system",
+        "sample",
+        "--issued-at",
+        "sample",
+        "--expires-at",
+        "sample",
+        "--artifact",
+        "sample",
+        "--artifact-url",
+        "sample",
+        "--notes",
+        "sample",
+        "--out",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "update-feed.prepare",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck maintainer update-feed prepare"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "update-feed.prepare",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "update-feed",
+    "prepare"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

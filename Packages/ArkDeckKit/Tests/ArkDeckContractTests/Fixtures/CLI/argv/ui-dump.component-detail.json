@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "ui-dump",
+        "component-detail"
+      ],
+      "expected": {
+        "command": "ui-dump.component-detail",
+        "handlerArguments": [
+          "ui-dump",
+          "component-detail"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "component-detail",
+        "--help"
+      ],
+      "expected": {
+        "command": "ui-dump.component-detail",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "component-detail",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.component-detail",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "component-detail",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.component-detail",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "component-detail",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "ui-dump.component-detail",
+        "handlerArguments": [
+          "ui-dump",
+          "component-detail",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "ui-dump.component-detail",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "ui-dump",
+    "component-detail"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

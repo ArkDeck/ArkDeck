@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "trace",
+        "capture"
+      ],
+      "expected": {
+        "command": "trace.capture",
+        "handlerArguments": [
+          "trace",
+          "capture"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "trace",
+        "capture",
+        "--help"
+      ],
+      "expected": {
+        "command": "trace.capture",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "trace",
+        "capture",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.capture",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "capture",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.capture",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "trace",
+        "capture",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.capture",
+        "handlerArguments": [
+          "trace",
+          "capture",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "trace.capture",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "trace",
+    "capture"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

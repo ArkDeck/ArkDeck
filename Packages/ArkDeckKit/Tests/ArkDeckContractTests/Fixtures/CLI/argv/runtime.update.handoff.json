@@ -1,0 +1,138 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--consent",
+        "reveal-in-finder"
+      ],
+      "expected": {
+        "command": "runtime.update.handoff",
+        "handlerArguments": [
+          "runtime",
+          "update",
+          "handoff",
+          "--consent",
+          "reveal-in-finder"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.update.handoff",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--consent",
+        "reveal-in-finder",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.handoff",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--consent",
+        "reveal-in-finder",
+        "--consent",
+        "reveal-in-finder"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.handoff",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.handoff",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--consent",
+        "reveal-in-finder",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.handoff",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--consent",
+        "reveal-in-finder",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.handoff",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.update.handoff",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "update",
+    "handoff"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

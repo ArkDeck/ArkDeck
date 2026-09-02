@@ -1,0 +1,93 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "signing",
+        "remove"
+      ],
+      "expected": {
+        "command": "signing.remove",
+        "handlerArguments": [
+          "signing",
+          "remove"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "signing",
+        "remove",
+        "--help"
+      ],
+      "expected": {
+        "command": "signing.remove",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "signing",
+        "remove",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.remove",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing remove"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "signing",
+        "remove",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.remove",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing remove"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "signing",
+        "remove",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.remove",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing remove"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "signing.remove",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "signing",
+    "remove"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

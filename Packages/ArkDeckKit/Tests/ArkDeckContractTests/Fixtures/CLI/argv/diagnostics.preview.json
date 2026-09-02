@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "diagnostics",
+        "preview",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample"
+      ],
+      "expected": {
+        "command": "diagnostics.preview",
+        "handlerArguments": [
+          "diagnostics",
+          "preview",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "preview",
+        "--help"
+      ],
+      "expected": {
+        "command": "diagnostics.preview",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "preview",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "preview",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "preview"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "preview",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "preview",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "diagnostics.preview",
+        "handlerArguments": [
+          "diagnostics",
+          "preview",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "diagnostics.preview",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "diagnostics",
+    "preview"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

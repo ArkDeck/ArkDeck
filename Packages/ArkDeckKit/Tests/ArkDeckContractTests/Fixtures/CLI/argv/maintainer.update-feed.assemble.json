@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble",
+        "--payload",
+        "sample",
+        "--signature",
+        "sample",
+        "--out",
+        "sample"
+      ],
+      "expected": {
+        "command": "maintainer.update-feed.assemble",
+        "handlerArguments": [
+          "maintainer",
+          "update-feed",
+          "assemble",
+          "--payload",
+          "sample",
+          "--signature",
+          "sample",
+          "--out",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble",
+        "--help"
+      ],
+      "expected": {
+        "command": "maintainer.update-feed.assemble",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble",
+        "--payload",
+        "sample",
+        "--signature",
+        "sample",
+        "--out",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.update-feed.assemble",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble",
+        "--payload",
+        "sample",
+        "--signature",
+        "sample",
+        "--out",
+        "sample",
+        "--payload",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.update-feed.assemble",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.update-feed.assemble",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble",
+        "--payload",
+        "sample",
+        "--signature",
+        "sample",
+        "--out",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.update-feed.assemble",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "assemble",
+        "--payload",
+        "sample",
+        "--signature",
+        "sample",
+        "--out",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.update-feed.assemble",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "maintainer.update-feed.assemble",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "maintainer",
+    "update-feed",
+    "assemble"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

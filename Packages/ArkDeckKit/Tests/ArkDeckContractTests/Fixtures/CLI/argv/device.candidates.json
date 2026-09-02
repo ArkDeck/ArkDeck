@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "device",
+        "candidates"
+      ],
+      "expected": {
+        "command": "device.candidates",
+        "handlerArguments": [
+          "device",
+          "candidates"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "device",
+        "candidates",
+        "--help"
+      ],
+      "expected": {
+        "command": "device.candidates",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "device",
+        "candidates",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.candidates",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "device",
+        "candidates",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.candidates",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "device",
+        "candidates",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "device.candidates",
+        "handlerArguments": [
+          "device",
+          "candidates",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "device.candidates",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "device",
+    "candidates"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

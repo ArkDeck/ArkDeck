@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "debug",
+        "hap"
+      ],
+      "expected": {
+        "command": "debug.hap",
+        "handlerArguments": [
+          "debug",
+          "hap"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "debug",
+        "hap",
+        "--help"
+      ],
+      "expected": {
+        "command": "debug.hap",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "debug",
+        "hap",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.hap",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "hap",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.hap",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "debug",
+        "hap",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.hap",
+        "handlerArguments": [
+          "debug",
+          "hap",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "debug.hap",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "debug",
+    "hap"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

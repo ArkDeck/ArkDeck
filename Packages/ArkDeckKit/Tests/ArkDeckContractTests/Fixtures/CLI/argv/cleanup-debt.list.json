@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "cleanup-debt",
+        "list"
+      ],
+      "expected": {
+        "command": "cleanup-debt.list",
+        "handlerArguments": [
+          "cleanup-debt",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "cleanup-debt.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "cleanup-debt.list",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery cleanup list"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "cleanup-debt.list",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery cleanup list"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "cleanup-debt",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "cleanup-debt.list",
+        "handlerArguments": [
+          "cleanup-debt",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "cleanup-debt.list",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "cleanup-debt",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

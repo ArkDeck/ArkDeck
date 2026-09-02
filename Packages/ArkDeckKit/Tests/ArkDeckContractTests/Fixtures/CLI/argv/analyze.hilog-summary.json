@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "analyze",
+        "hilog-summary"
+      ],
+      "expected": {
+        "command": "analyze.hilog-summary",
+        "handlerArguments": [
+          "analyze",
+          "hilog-summary"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "analyze",
+        "hilog-summary",
+        "--help"
+      ],
+      "expected": {
+        "command": "analyze.hilog-summary",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "analyze",
+        "hilog-summary",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "analyze.hilog-summary",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "analyze",
+        "hilog-summary",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "analyze.hilog-summary",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "analyze",
+        "hilog-summary",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "analyze.hilog-summary",
+        "handlerArguments": [
+          "analyze",
+          "hilog-summary",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "analyze.hilog-summary",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "analyze",
+    "hilog-summary"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

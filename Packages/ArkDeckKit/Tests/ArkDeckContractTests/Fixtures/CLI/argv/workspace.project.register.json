@@ -1,0 +1,172 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.register",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "register",
+          "--registration-request-id",
+          "sample",
+          "--kind",
+          "arkdeck",
+          "--root",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.project.register",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--registration-request-id",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.register",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "register",
+          "--registration-request-id",
+          "sample",
+          "--kind",
+          "arkdeck",
+          "--root",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.project.register",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "project",
+    "register"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
