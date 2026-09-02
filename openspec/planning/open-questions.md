@@ -438,6 +438,59 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   属对 DEC-011 既有适用范围的确认而非改变,不触发该重开;DEC-011/ADR-0003 原文
   不动)**
 
+## DEC-013 CLI `source` 族的归属：App Remote Build Source 是平台服务，不是 CLI 产品面
+
+- Status：decided（2026-09-02；裁决由维护者作出，效力由维护者 review/merge 本 decision PR
+  构成——merge 即 attestation，V2 治理，先例 DEC-001/002/004/006/012）
+- Owner：product owner
+- Raised：2026-09-02，`docs/design/arkdeck-cli-product-spec.md` 0.3 §13.2 对账时：该表把
+  `source *`（8 个目标 leaf）列为 macOS「全功能」结论的阻断项，并写明两条出路——发布 typed
+  source resource，或由维护者裁决 remote source 为 App/平台服务并在 coverage manifest 中显式
+  分类。
+- Question：CLI 是否需要 `source list/add/probe/remove/ls/fetch/bind/unbind` 这一族 leaf？
+  App 的 Remote Build Source（Settings › Servers、Debug › Artifacts 的只读 SSH 浏览、Overview
+  的 source 绑定）在 feature coverage manifest 中如何分类，才不违反 §18「不得存在 `blocked`」？
+- Decision：
+  1. **Remote Build Source 是 App 平台服务，不进入 CLI 产品面。** `source` 族从目标命令树
+     （§6.2）退役，不再是缺口；本 major 内不发布 `source` namespace，也不把 App 的 SSH/SFTP
+     代码包装成 CLI。
+  2. **CLI 的等价路径是本地导入。** 该 App 能力的产品结果只有一个——把一个已签名的
+     app-owned `.so` 变成 Artifact lease 再交 `deploy.native-library.app-owned@1`。CLI 以
+     `artifact import native-library <本地文件>` + `debug native deploy` 达到同一结果；把远端
+     文件放到本机是操作者/外部 Agent 自己的宿主动作，不是 Runtime 的职责（§2.2 明确 CLI
+     不做 SSH/SFTP shell）。
+  3. **分类词表新增 `platformService`。** 含义：App 拥有的宿主平台服务（凭据、远端主机、
+     host-key 固定），其产品结果 CLI 经 bounded local import/registration 可达；不需要 CLI
+     leaf；coverage 条目必须写明 App owner 与 CLI 等价路径；不计入 §18 缺口。Remote Build
+     Source 的 list/probe/save/remove/listDirectory/fetchNativeLibrary/bind/unbind 全部归此类。
+  4. **Windows：** `platformService` 由该平台 App 自行实现或缺席，不影响 portable core
+     conformance，不得因缺席而记 `notImplemented`。
+- 依据：
+  - App 面事实：`RemoteBuildSourceApplicationFacade` 只保存一个 SSH endpoint、在一个 canonical
+    build root 下只读列目录、读一个有界的 native library；不接受命令、argv、环境或可写 SFTP；
+    凭据只进 Keychain；host-key 首次固定、指纹漂移 fail closed（`macos-ux-interaction-spec.md`
+    的 Servers 与 Debug Artifacts 段）。它是导入前的取件器，不是设备工作流。
+  - 规格既有立场：§2.2「不把 CLI 变成 SSH/SFTP shell」；§4「本地主机配置可以通过 bounded
+    import/registration 读取用户明确选择的文件」；§6.2 原约束「source 在正式 source
+    resource/integration/profile 获批前保持 unavailable，不得包装 App SSH/SFTP 代码」；0.2 版
+    §13.4 已把 remote source 描述为「App/平台服务」。
+  - Runtime 事实：daemon 没有任何 source 方法；typed source resource 需要新的 integration/
+    profile 审批、daemon 侧凭据 owner 与远端主机信任模型，而没有任何 Golden Journey 要求
+    headless 远端取件。
+- Boundary：
+  1. 本裁决不删除 App 的 Remote Build Source，也不改其安全边界（只读、root 内、Keychain、
+     host-key 固定）。
+  2. §14 的 coverage generator 落地时，Remote Build Source 的每个 App action 必须以
+     `platformService` 登记并指向 CLI 等价路径；不得以 `presentation` 或 `internal` 冒充。
+  3. Reopen rule：若某个 accepted Golden Journey 明确要求外部 Agent headless 从远端构建主机
+     取件，须另起 source resource change（integration/profile 审批 + daemon 凭据 owner），届时
+     `source` 族按当时规格重新进入目标树；在此之前不得以「隐藏 SSH 执行器」方式补齐。
+- Unblocked by this decision：`docs/design/arkdeck-cli-product-spec.md` §13.2 的 `source`
+  阻断行随本 PR 移除；macOS「全功能」结论的剩余阻断只剩 §14 机器契约产物与 GJ-1～GJ-5 的
+  CLI headless 复跑（Windows 不阻断 macOS-only claim）。
+- Affected specs：`docs/design/arkdeck-cli-product-spec.md`（0.3 → 0.4：§1、§6.2、§13.2、
+  §13.4、§14、§16、§18）；`openspec/specs/**` 不变。
+
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
 - Revision：r2 evidence-owner correction candidate；仅维护者 review/merge 本 PR 后生效

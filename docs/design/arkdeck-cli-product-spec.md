@@ -2,8 +2,8 @@
 
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness、批准载体或平台符合性声明。
 > 状态：目标规格；文中“目标命令”不代表当前版本已经实现。
-> 规格版本：0.3（2026-09-02，§13 差距盘点按 protected `main` `d28d57a3` 重算；0.2 为
-> 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
+> 规格版本：0.4（2026-09-02，按 DEC-013 让 `source` 族退役并新增 `platformService` 分类；
+> 0.3 同日按 protected `main` `d28d57a3` 重算 §13；0.2 为 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
 > local control protocol `1.0.0`。实现与验收仍必须 pin exact Catalog digest，不能只比较数量。
 > 权威边界：Constitution Safety invariants / POL-*、`PRODUCT-LOOP.md`、accepted specs、
 > contracts、当前 `Catalog/` 与 Runtime 行为高于本文。发生冲突时本文失效，不能用本文修改
@@ -29,8 +29,8 @@ ArkDeck CLI 是 Device Agent Runtime 的完整 headless 产品面。它的目标
 2. 每个稳定 Runtime 资源都有可发现、可查询、可等待、可恢复的 CLI 入口；daemon 已有的
    正式方法不能只供 App 使用。
 3. 每个 daemon method、Catalog operation 与 App 产品能力都在同一 feature coverage
-   manifest 中分类为 `direct`、`generic`、`local`、`presentation`、`internal`、
-   `refused` 或 `blocked`；不得存在 `unclassified` 暗功能。
+   manifest 中分类为 `direct`、`generic`、`local`、`presentation`、`platformService`、
+   `internal`、`refused` 或 `blocked`；不得存在 `unclassified` 暗功能。
 4. 命令、请求、JSON、错误、退出码和 conformance fixture 是语言无关契约；macOS 与 Windows
    只替换 transport、service、credential、filesystem、USB 等平台 adapter。
 
@@ -393,7 +393,6 @@ materialized plan budget 或 capability expiry；其 absolute deadline、暂停�
 | `flash` | `device-access`, `bootloader-status`, `prerequisites`, `lane-preview`, `bind-loader`, `run` | Flash Runtime methods + `flash.full-restore@1`；plan 使用 generic `job plan`，当前 major 的 `flash plan` 保持 tombstone；没有 legacy executor |
 | `workspace` | `project list/show/register/update/remove`, `preset list/show/register/update/remove`, `status`, `diff`, `inspect`, `read`, `isolate`, `checkpoint`, `patch`, `revert`, `build`, `test`, `sign`, `symbolize`, `sweep`, `continuation inspect/submit/run` | 注册 workspace/project/preset resource + 已发布 `workspace.*@1` operations + 从原记录构造的新 typed request/Job |
 | `trace cache` | `status`, `purge` | 本地派生数据库的 typed lease/retention surface；不删除原始 trace Artifact |
-| `source` | `list`, `add`, `probe`, `remove`, `ls`, `fetch`, `bind`, `unbind` | 未来 typed source resource；只接受 source ref 与绑定根内 relative path |
 
 当前 Catalog 到目标领域命令的 canonical mapping 如下。这个表用于证明现有 operation coverage；
 所有 operation 同时保留 generic `agent run --operation ...` 和 `job ... --operation ...` 入口。
@@ -446,8 +445,10 @@ destructive intent。
   `flash execute` 的旧 host path。
 - `workspace` 命令只能使用已注册 workspace reference、artifact reference 和 typed relative
   range；不得接收 raw remote root 或 raw build command。
-- `source` 在正式 source resource/integration/profile 获批并落入 Runtime 前保持 unavailable。
-  它不得把现有 App SSH/SFTP 代码直接包装成 CLI。
+- 远端构建来源（App 的 Remote Build Source）按 DEC-013 归 `platformService`，不进入本命令树：
+  CLI 以 `artifact import native-library` + `debug native deploy` 达到同一产品结果，不把 App 的
+  SSH/SFTP 代码包装成 CLI；只有 accepted Golden Journey 明确要求 headless 远端取件时才另起
+  source resource change。
 - `ui-dump inspect/hit-test`、diagnostics preview 和 trace inspect 属于 deterministic local
   derivation；必须记录 parser/version/source Artifact digest，不能把派生结果冒充新设备证据。
 - `trace export` 不是派生或新 evidence；它要求 exact Job/Artifact reference，并在导出前验证
@@ -1565,7 +1566,6 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| `source *`（8 个 leaf） | 没有 namespace。§6.2 规定 source resource/integration/profile 获批前保持 unavailable | 发布 typed source resource；或由维护者裁决 remote source 为 App/平台服务并在 coverage manifest 中显式分类。§18 不接受 `blocked` | C |
 | §14 机器契约产物 | `openspec/contracts/cli-*`、`cli-feature-coverage.json`、`app-product-capability-registry.yaml`、`Tests/Fixtures/CLI/**` 均不存在；`--version` 的 `pageSchemaVersion`/`nextActionSchemaVersion` 为 `null` | `openspec/contracts/**` 不在 `TASK-AIN-021` 的 Allowed paths 内，需先定义新 Task（定义 PR 与使用 PR 分家），再在同一垂直任务内交付 generator、产物与 CI fail-closed 校验 | A |
 | GJ-1～GJ-5 的 CLI headless 闭环 | 上一 digest `b8c7148f…` 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交）；`CHG-2026-073` 发布 `debug.template@1` 后 digest 变更，按 `PRODUCT-LOOP.md` 这些记录只证明历史，且仍没有按四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内在当前 digest 上用 CLI 完整复跑并按四态记录 | A/B |
 | Windows（Slice D） | 未开始 | 不阻断 macOS-only claim；阻断跨平台 claim | D |
@@ -1587,14 +1587,18 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   的 `cli-command-registry.yaml` 时必须补齐。
 - `help device` 中 `show` 的 summary 与 `list` 相同（"list durable targets…"），registry 文案错误。
 
-### 13.4 纯展示，不是 CLI 阻塞项
+### 13.4 纯展示与平台服务，不是 CLI 阻塞项
 
 - Timeline/native tree/window chrome；
 - Finder/Explorer reveal；
 - App 的本地视频播放与视图状态；
-- Overview 卡片排列和 workspace navigation。
+- Overview 卡片排列和 workspace navigation；
+- App Remote Build Source（Settings › Servers、Debug › Artifacts 的只读 SSH 浏览、Overview 的
+  source 绑定）：按 DEC-013 归 `platformService`，CLI 等价路径是本地
+  `artifact import native-library` + `debug native deploy`。
 
-CLI 能按 schema inspect/export 源数据与派生数据，并明确 parser/version/digest，即满足功能等价。
+CLI 能按 schema inspect/export 源数据与派生数据，并明确 parser/version/digest，即满足功能等价；
+`platformService` 条目以其 CLI 等价路径满足功能等价。
 
 ## 14. 机器可读规格产物
 
@@ -1642,11 +1646,12 @@ Packages/ArkDeckKit/Tests/Fixtures/CLI/**
 | `generic` | 已可经 Catalog `operation/job/agent` 泛化执行，只缺领域 convenience |
 | `local` | 已有 App/CLI 共用的 bounded、versioned 本地产品资源，不改 Runtime authority |
 | `presentation` | 只是视觉/导航/播放器行为，底层数据已可 inspect/export，不需要 CLI leaf |
+| `platformService` | App 拥有的宿主平台服务（凭据、远端主机、host-key 固定），其产品结果 CLI 经 bounded local import/registration 可达；不需要 CLI leaf，条目必须写明 App owner 与 CLI 等价路径（DEC-013） |
 | `internal` | 只是公开 leaf 的封闭 protocol plumbing，例如 artifact chunk frame；不应出现在 help |
 | `refused` | 为兼容/安全而保留的具名 method/tombstone，每次都以 stable reason 拒绝且零 effect |
 | `blocked` | 缺少达到目标的完整公开产品面/所有者边界；即使已有部分 typed daemon method 也可属此类，并会阻止相应的“全功能”结论 |
 
-deprecated/legacy 是额外 lifecycle metadata，不是第八种可达性分类。raw command、capability admin
+deprecated/legacy 是额外 lifecycle metadata，不是第九种可达性分类。raw command、capability admin
 管理效果、legacy executor 等 forbidden effect 必须从 executable registry 缺席；旧 CLI token 可仅作为
 parse-only compatibility tombstone 存在。若为拒绝旧 caller 而保留了具名 wire method，则只能标
 `refused`。`requiredPlatforms` 是目标，
@@ -1672,7 +1677,7 @@ registry、generated Catalog index、declarative CLI registry，以及
 必须引用 registry 中的 stable feature ID；纯 layout/render helper 不登记。任何输入新增 feature ID
 但 coverage 没有 exact entry、出现重复/孤儿 ID 或引用未知 ID，CI 都 fail closed。
 新 canonical Catalog operation 的默认 `targetClassification` 可以是 `generic`；只有 accepted GJ/
-产品 workflow 明确要求一等 convenience/resource 时才是 `direct`。因此“generic”不是缺口，
+产品 workflow 明确要求一等 convenience/resource 时才是 `direct`。因此“generic”与 `platformService` 都不是缺口，
 `classification != targetClassification` 和任何 `blocked` 才是该平台的覆盖缺口。
 
 覆盖检查必须保证：
@@ -1807,7 +1812,7 @@ exit；不得以 shell script 的 quoting 作为共享事实源。
 - Session retention、storage/support bundle；
 - device/target display name、History saved filter、Trace derived-cache purge；
 - offline parser/schema；
-- source/update 等平台服务；
+- update 平台服务（remote source 按 DEC-013 归 `platformService`，不资源化）；
 - 每项都先有 typed contract，再由 App/CLI 共用，不直接包装私有 facade。
 
 ### Slice D：Windows W0/W1
@@ -2070,7 +2075,8 @@ CLI 称为“全功能”；macOS 达成不表示 Windows 已实现，Windows �
 - Slice A/B 已实现，Slice C 中所有非纯展示且属于既有产品的能力已经资源化，coverage manifest
   在该平台没有 `classification != targetClassification`，也没有任何 `blocked`、`partial`、
   `notImplemented`、`deferred` 或 `nonConformant`；以 `generic` 为目标且已 generic 可达的 Catalog
-  operation 是完成态，不要求无产品价值的别名；
+  operation 是完成态，不要求无产品价值的别名；`platformService` 条目（DEC-013）不是缺口，但
+  必须写明其 CLI 等价路径；
 - GJ-1～GJ-5 都能从 CLI headless 完成，且当前 digest 的适用真机证据成立；
 - JSON/error/exit/help/completion/argv conformance 全通过；
 - App/local 能力均已资源化或明确证明为 presentation-only，不存在隐式私有绕行；任何仍为
