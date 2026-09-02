@@ -652,7 +652,7 @@ struct SystemHDCManagedServerProcessInspector: HDCManagedServerProcessInspecting
           Int32(MemoryLayout<socket_fdinfo>.size))
       }
       guard socketBytes == MemoryLayout<socket_fdinfo>.size,
-        socket.psi.soi_family == AF_INET,
+        socket.psi.soi_family == AF_INET || socket.psi.soi_family == AF_INET6,
         socket.psi.soi_protocol == IPPROTO_TCP,
         socket.psi.soi_kind == SOCKINFO_TCP,
         socket.psi.soi_proto.pri_tcp.tcpsi_state == TSI_S_LISTEN
@@ -660,14 +660,25 @@ struct SystemHDCManagedServerProcessInspector: HDCManagedServerProcessInspecting
       let socketPort = UInt16(
         bigEndian: UInt16(
           truncatingIfNeeded: socket.psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport))
-      let address = socket.psi.soi_proto.pri_tcp.tcpsi_ini.insi_laddr.ina_46.i46a_addr4.s_addr
-      if socketPort == selectedPort,
-        address == in_addr_t(INADDR_ANY) || address == inet_addr("127.0.0.1")
-      {
+      if socketPort == selectedPort, Self.isLocalListenerAddress(socket.psi) {
         return true
       }
     }
     return false
+  }
+
+  /// The listener a managed HDC server owns for `127.0.0.1:<port>`.
+  ///
+  /// Real `hdc 3.2.0f` binds its channel host through a dual-stack socket. The
+  /// kernel then reports the listener as an `AF_INET6` socket whose local
+  /// address is an IPv4 one (`insi_vflag` carries `INI_IPV4`, and the address
+  /// lives in `ina_46`), which is what `lsof` prints as `IPv6 … 127.0.0.1`.
+  /// Reading the family alone and decoding `ina_6` misses it, and the daemon
+  /// then launches a server it can never bind to its own identity. A wildcard
+  /// bind (`0.0.0.0` / `::`) still counts as owning the loopback port; any
+  /// other address is not a local ArkDeck-launched daemon.
+  static func isLocalListenerAddress(_ socket: socket_info) -> Bool {
+    HDCListenerAddressFacts.isLoopbackOrWildcard(socket)
   }
 
   private func localIPv4Port(_ endpoint: HDCServerEndpoint) -> UInt16? {
@@ -2519,5 +2530,50 @@ struct HDCDeviceObservationComposition: Sendable {
 
   func presentationEvents() async -> [HDCDeviceObservationPresentationEvent] {
     await presentationBridge.events()
+  }
+}
+
+/// How the kernel describes a TCP listener's local address, read the way
+/// `lsof` reads it rather than the way the socket was created.
+///
+/// `insi_vflag` says which address family the *address* is in; the socket
+/// family says only how it was created. A dual-stack `AF_INET6` socket bound
+/// to `127.0.0.1` reports `INI_IPV4` with the address in `ina_46`, and its
+/// `ina_6` bytes are not the `::ffff:` mapped form — they are the raw union
+/// with the IPv4 address in the last four bytes. Every listener-ownership
+/// rule in this module decodes through here so the three observers agree.
+package enum HDCListenerAddressFacts {
+  /// `INI_IPV4` / `INI_IPV6` from `<sys/proc_info.h>`; the macros do not
+  /// import into Swift on current SDKs.
+  static let ipv4Flag: UInt8 = 0x1
+  static let ipv6Flag: UInt8 = 0x2
+
+  /// The address family the listener's local address is expressed in, with
+  /// its bytes: 4 for IPv4, 16 for IPv6. `nil` for anything that is neither.
+  package static func localAddress(_ socket: socket_info) -> (family: Int32, bytes: [UInt8])? {
+    let ini = socket.soi_proto.pri_tcp.tcpsi_ini
+    guard socket.soi_family == AF_INET || socket.soi_family == AF_INET6 else { return nil }
+    let flags = UInt8(truncatingIfNeeded: ini.insi_vflag)
+    if socket.soi_family == AF_INET || flags & ipv4Flag != 0 {
+      let value = ini.insi_laddr.ina_46.i46a_addr4.s_addr
+      return (AF_INET, withUnsafeBytes(of: value) { Array($0) })
+    }
+    guard flags & ipv6Flag != 0 || flags == 0 else { return nil }
+    return (AF_INET6, withUnsafeBytes(of: ini.insi_laddr.ina_6) { Array($0) })
+  }
+
+  /// Exactly the IPv4 loopback, or a wildcard bind that serves it.
+  package static func isLoopbackOrWildcard(_ socket: socket_info) -> Bool {
+    guard let (family, bytes) = localAddress(socket) else { return false }
+    if family == AF_INET {
+      return bytes == [0, 0, 0, 0] || bytes == [127, 0, 0, 1]
+    }
+    guard bytes.count == 16 else { return false }
+    let wildcard = bytes.allSatisfy { $0 == 0 }
+    let mappedLoopback =
+      bytes[0..<10].allSatisfy { $0 == 0 }
+      && bytes[10] == 0xFF && bytes[11] == 0xFF
+      && Array(bytes[12..<16]) == [127, 0, 0, 1]
+    return wildcard || mappedLoopback
   }
 }
