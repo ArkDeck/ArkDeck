@@ -1,0 +1,960 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-09-02",
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md",
+  "journeys": [
+    {
+      "date": "2026-09-02",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 4,
+      "cliBuildIdentity": "sha256:0b2b063dbd9c765e852f8c035bdc45db7f26f689951ebd2d4f33d03df94e5ddd (local helper build of main b25ad279 + PR #1700)",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "goldenJourney": "GJ-1",
+      "state": "REAL_DEVICE_PASS",
+      "runtimeSourceRevision": "efc81d39 (main) + agent/hdc-managed-listener-dual-stack-20260902 8322ca8d (PR #1694)",
+      "runtimeExecutableSHA256": "6155a084b771338ee942d590753bd4f6a726fa1ce6ad2a8cbe3a4d47554f4655",
+      "executionIDs": [
+        "gj1-20260902",
+        "gj1-20260902-har"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-880bb670bb989a1cd15b2e5d034af6a2",
+          "operationReference": "observe.device@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T06:17:07.883Z",
+          "finishedAtUTC": null,
+          "path": "agent run --operation observe.device@1",
+          "actualEffect": "readOnly"
+        },
+        {
+          "jobID": "job-a7f9353a082030678465482d3e55fb53",
+          "operationReference": "observe.device@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T06:07:54Z",
+          "finishedAtUTC": "2026-09-02T06:07:54Z",
+          "path": "job submit/run/result/evidence",
+          "actualEffect": "readOnly"
+        },
+        {
+          "jobID": "job-118e1ac06bd10a33ec5a892702e75801",
+          "operationReference": "observe.device@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [
+            "har-8d03b1dc-d44b-425b-93d1-7741bbc6e532 (physicalConnection, expired after supersession)",
+            "har-f56b4e8c-bde6-4083-8531-e65a2a6ccd32 (ambiguousIdentity, resolvedByFreshProbe)"
+          ],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T09:26:08Z",
+          "finishedAtUTC": "2026-09-02T09:26:09Z",
+          "path": "agent run without --target → HAR → resume (§2.1)",
+          "actualEffect": "readOnly"
+        }
+      ],
+      "zeroDispatchChecks": [],
+      "notes": "doctor --deep --require-healthy exit 0; device candidates/target adopt (already adopted, r4)/target show/availability read through protocol 2; runtime service restart then job show/result still readable.",
+      "harCrashResume": {
+        "runbookSection": "2.1",
+        "step1": "device candidates still returned the cached observation snapshot (health current, observedAt 09:24:31Z) right after the unplug; the execution itself observed no device",
+        "step2": {
+          "executionId": "gj1-20260902-har",
+          "cliExit": 75,
+          "code": "humanActionRequired",
+          "humanAction": {
+            "actionId": "har-8d03b1dc-d44b-425b-93d1-7741bbc6e532",
+            "category": "physicalConnection",
+            "reasonCode": "device.notObserved",
+            "minimumAction": "human.connectOrPowerDevice",
+            "newDispatchCount": 0,
+            "status": "waiting",
+            "createdAt": "2026-09-02T09:24:31.738Z",
+            "expiresAt": "2026-09-02T09:34:31.726Z"
+          },
+          "stdoutDiscarded": true
+        },
+        "step4": {
+          "agentStatusByExecutionIdOnly": {
+            "humanActionStatus": "waiting",
+            "nextActionKind": "humanAction",
+            "resumeReference": "resume-a736fc68-feea-4924-8333-b151fd11e2e7"
+          },
+          "humanActionList": {
+            "count": 1,
+            "actionId": "har-8d03b1dc-d44b-425b-93d1-7741bbc6e532"
+          },
+          "humanActionShowResumeReferenceIdentical": true,
+          "firstResume": {
+            "cliExit": 75,
+            "code": "humanActionRequired",
+            "note": "the Runtime observed the reconnected device and raised a second HAR: ambiguousIdentity / device.identityAmbiguous with one published choice (the adopted target's candidate), minimumAction human.confirmDeviceIdentity, newDispatchCount 0; execution generation 3 -> 5",
+            "secondHumanAction": {
+              "actionId": "har-f56b4e8c-bde6-4083-8531-e65a2a6ccd32",
+              "resumeReference": "resume-372a6f41-7446-44a4-b688-ceb6e4b4692b"
+            }
+          },
+          "secondResume": {
+            "selection": "the published choice value",
+            "cliExit": 0,
+            "job": {
+              "jobID": "job-118e1ac06bd10a33ec5a892702e75801",
+              "operationReference": "observe.device@1",
+              "terminalState": "succeeded",
+              "outcomeUnknown": false,
+              "actualEffect": "readOnly",
+              "actualStepKinds": [
+                "probeHostTool",
+                "probeHDCServer",
+                "probeDevice",
+                "runApprovedRemoteRead"
+              ],
+              "targetId": "TGT-958780b2ffb7",
+              "bindingRevision": 4,
+              "artifactCount": 3,
+              "startedAtUTC": "2026-09-02T09:26:08Z",
+              "finishedAtUTC": "2026-09-02T09:26:09Z"
+            }
+          },
+          "finalHumanActions": [
+            {
+              "actionId": "har-f56b4e8c-bde6-4083-8531-e65a2a6ccd32",
+              "category": "ambiguousIdentity",
+              "status": "resolvedByFreshProbe"
+            },
+            {
+              "actionId": "har-8d03b1dc-d44b-425b-93d1-7741bbc6e532",
+              "category": "physicalConnection",
+              "status": "expired"
+            }
+          ]
+        },
+        "verdict": "REAL_DEVICE_PASS: exit 75 with newDispatchCount 0; execution refetched by ID alone (no local file) with the waiting action and its resumeReference identical to human-action show; resume continued to a succeeded Job on the same target and binding revision 4 (no rebind on replug); no CLI local state involved",
+        "observations": [
+          "the replug did not resolve the physicalConnection HAR by a fresh probe alone: the Runtime asked for an explicit identity confirmation (ambiguousIdentity) even though the only candidate is the adopted target, so a headless caller needs one more resume with the published choice",
+          "the superseded physicalConnection HAR is recorded as `expired` rather than resolved/superseded after its execution moved on to the identity HAR"
+        ]
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 4,
+      "cliBuildIdentity": "sha256:0b2b063dbd9c765e852f8c035bdc45db7f26f689951ebd2d4f33d03df94e5ddd (local helper build of main b25ad279 + PR #1700)",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "goldenJourney": "GJ-2",
+      "state": "REAL_DEVICE_PASS",
+      "runtimeSourceRevision": "efc81d39 (main) + agent/hdc-managed-listener-dual-stack-20260902 8322ca8d (PR #1694)",
+      "runtimeExecutableSHA256": "6155a084b771338ee942d590753bd4f6a726fa1ce6ad2a8cbe3a4d47554f4655",
+      "executionIDs": [
+        "gj2-20260902",
+        "gj2-20260902-retain",
+        "gj2-20260902-diag",
+        "gj2-20260902-cleanup"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-351cf08ae8737e778eb11d1f74e5127c",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T06:17:37Z",
+          "finishedAtUTC": "2026-09-02T06:18:04Z",
+          "path": "debug hap (install/start/readback/hilog/stop/uninstall)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-502b8940a7e6ea3703c45b0d9d772e33",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "startedAtUTC": "2026-09-02T06:21:10Z",
+          "finishedAtUTC": "2026-09-02T06:22:15Z",
+          "path": "debug hap (retain, running)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-e64f8f9127a237093015d3e7ca14a411",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 10,
+          "startedAtUTC": "2026-09-02T06:23:18Z",
+          "finishedAtUTC": "2026-09-02T06:24:27Z",
+          "path": "diagnostics capture (hilog + ui dump + ui tree + screenshot + trace)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-76d45f6e90f2ab03f8fc1c28d553d90d",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T06:24:31Z",
+          "finishedAtUTC": "2026-09-02T06:24:50Z",
+          "path": "debug hap (cleanup uninstall)",
+          "actualEffect": "deviceMutation"
+        }
+      ],
+      "zeroDispatchChecks": [],
+      "notes": "",
+      "hap": {
+        "name": "gj3-release.hap",
+        "sha256": "a538712da8611e8857cd2c46368924ed7c1b11c150adc47626293aff92157f78",
+        "bundleName": "com.example.scrollablecomponentstatic",
+        "abilityName": "EntryAbility",
+        "importRequestId": "gj2-20260902-entry"
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 4,
+      "cliBuildIdentity": "sha256:0b2b063dbd9c765e852f8c035bdc45db7f26f689951ebd2d4f33d03df94e5ddd (local helper build of main b25ad279 + PR #1700)",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "goldenJourney": "GJ-3",
+      "state": "REAL_DEVICE_PASS",
+      "runtimeSourceRevision": "efc81d39 (main) + agent/hdc-managed-listener-dual-stack-20260902 8322ca8d (PR #1694)",
+      "runtimeExecutableSHA256": "6155a084b771338ee942d590753bd4f6a726fa1ce6ad2a8cbe3a4d47554f4655",
+      "executionIDs": [
+        "gj3-20260902-install2",
+        "gj3-20260902-deploy2",
+        "gj3-20260902-diag",
+        "gj3-20260902-rollback",
+        "gj3-20260902-cleanup"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-83f8ff65d6715a5c0a54558fed7cc62e",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "startedAtUTC": "2026-09-02T06:38:43Z",
+          "finishedAtUTC": "2026-09-02T06:38:47Z",
+          "path": "debug hap (reinstall, retain running)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-c55d058d46c65525073bdc03dd38e0a3",
+          "operationReference": "deploy.native-library.app-owned@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "startedAtUTC": "2026-09-02T06:39:22Z",
+          "finishedAtUTC": "2026-09-02T06:39:33Z",
+          "path": "debug native deploy (candidate v2: staging verify, backup, atomic publish, restart, verify-loaded-library)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-cc7d61c1f24fd2a1b77d5dd1beab5273",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 9,
+          "startedAtUTC": "2026-09-02T06:40:11Z",
+          "finishedAtUTC": "2026-09-02T06:40:24Z",
+          "path": "diagnostics capture (bundle-scoped, crash logs)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-4c92ba9fc2421cdb3ee1a28dabbec7d7",
+          "operationReference": "deploy.native-library.app-owned@1",
+          "terminalState": "failed",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "startedAtUTC": "2026-09-02T06:40:24Z",
+          "finishedAtUTC": "2026-09-02T06:40:40Z",
+          "path": "debug native deploy (ghost library: start-target failed, rollback-native-library verified, compensation cleanup verified)",
+          "actualEffect": "deviceMutation"
+        },
+        {
+          "jobID": "job-86191df46bc94413350a70f0c36938f6",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T06:41:25Z",
+          "finishedAtUTC": "2026-09-02T06:41:42Z",
+          "path": "debug hap (cleanup uninstall)",
+          "actualEffect": "deviceMutation"
+        }
+      ],
+      "zeroDispatchChecks": [],
+      "notes": "",
+      "library": {
+        "candidate": "libarkdeck_gj-candidate-v2.signed.so",
+        "sha256": "c20fcd9b29b46ae06a312aa2db6f053672fef82d80f7b482f0f90d154c80f2d3",
+        "buildId": "ba7d5110d13be1f3c0348e9bd6f2d613ca32169f",
+        "abi": "armeabi-v7a",
+        "targetBundle": "com.example.scrollablecomponentstatic",
+        "importRequestId": "gj3-20260902-lib"
+      },
+      "rollbackCandidate": {
+        "name": "libarkdeck_gj-rollback-ghost.signed.so",
+        "sha256": "260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a",
+        "defect": "unresolvable DT_NEEDED libarkdeck_ghost.so",
+        "importRequestId": "gj3-20260902-ghost"
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 4,
+      "cliBuildIdentity": "sha256:0b2b063dbd9c765e852f8c035bdc45db7f26f689951ebd2d4f33d03df94e5ddd (local helper build of main b25ad279 + PR #1700)",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "goldenJourney": "GJ-4",
+      "state": "REAL_DEVICE_PASS",
+      "runtimeSourceRevision": "efc81d39 (main) + agent/hdc-managed-listener-dual-stack-20260902 8322ca8d (PR #1694)",
+      "runtimeExecutableSHA256": "6155a084b771338ee942d590753bd4f6a726fa1ce6ad2a8cbe3a4d47554f4655",
+      "executionIDs": [
+        "gj4-20260902-b",
+        "gj4-20260902-postflight"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-034a0b63747debed0a94861f733b7aec",
+          "operationReference": null,
+          "terminalState": "failed",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": null,
+          "startedAtUTC": null,
+          "finishedAtUTC": null,
+          "path": "flash run (attempt a)",
+          "note": "prewarm refused before capability consumption, zero dispatch: ArkForge store refused the 731 MB import because the host volume had 3.26 GB free against a 4 GiB reserve; freed session build products, retried"
+        },
+        {
+          "jobID": "job-8fb446e730b0fb4ba20953f4e0a40ee5",
+          "operationReference": "flash.full-restore@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-02T06:50:34Z",
+          "finishedAtUTC": "2026-09-02T07:00:49Z",
+          "path": "flash run (attempt b)",
+          "actualEffect": "destructive"
+        },
+        {
+          "jobID": "job-d5d45d40426b49ce77fe07c36e040da7",
+          "operationReference": null,
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": null,
+          "startedAtUTC": null,
+          "finishedAtUTC": null,
+          "path": "agent run observe.device@1 (postflight)"
+        }
+      ],
+      "zeroDispatchChecks": [],
+      "notes": "the CLI client timed out after 10 minutes while the Job kept running under the Runtime; the Job finished 07:00:49Z and was read back afterwards; device reconnected in HDC normal mode with binding revision 4 and firmware OpenHarmony-7.0.0.37 confirmed by machine readback.",
+      "archive": {
+        "name": "version-Daily_Version-OpenHarmony_7.0.0.37-20260805_180512-dayu200_img.tar.gz",
+        "sha256": "8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a",
+        "byteCount": 730766386,
+        "importRequestId": "gj4-20260902-archive"
+      },
+      "authorization": {
+        "campaign": "gj4-headless-20260902",
+        "enabledVia": "runtime service update --arkforge-campaign",
+        "enabledExitCode": 0,
+        "disabledExitCode": 0,
+        "campaignAfterRun": "",
+        "runtimeCapability": "CAP-RT-POLICY-1CB94C1D374560ED6D40B2A0B1B43218D44E1164-G1"
+      },
+      "arkforge": {
+        "bundleRevision": "3f5b48cd",
+        "arkforgedSHA256": "435844144822a1a679433be5b0168bf0bae3d6038539b3071de082744931370d",
+        "daemonJob": "JOB-000001A060E4B5F7-0037",
+        "daemonSteps": "23/23 every step completed"
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 4,
+      "cliBuildIdentity": "sha256:0b2b063dbd9c765e852f8c035bdc45db7f26f689951ebd2d4f33d03df94e5ddd (local helper build of main b25ad279 + PR #1700)",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "goldenJourney": "GJ-5",
+      "state": "REAL_DEVICE_PASS",
+      "runtimeSourceRevision": "main a326c64d (#1696) for repro/patch; main b25ad279 (#1699) + PR #1700 for build/sign/verify",
+      "runtimeExecutableSHA256": "8d9af70f5767a9660b25392b9f601190d51c9f9266aea2965d2309dfc3d06ba9 (final daemon); earlier fix-leg daemons 53406d4f…, ed6e6bf3…, c4e59454…, 9df0cffe…, 8ef83067…",
+      "executionIDs": [
+        "gj5-20260902-repro",
+        "gj5-20260902-diag",
+        "gj5-20260902-diag2",
+        "gj5-20260902-crash-t",
+        "gj5-20260902-isolate",
+        "gj5-20260902-patch-evo2",
+        "gj5-20260902-build-evo3",
+        "gj5-20260902-sign4",
+        "gj5-20260902-verify2",
+        "gj5-20260902-diag-verify2",
+        "gj5-20260902-diag-verify3",
+        "gj5-20260902-patch-stale"
+      ],
+      "repro": {
+        "probeImport": {
+          "importRequestId": "gj5-20260902-probe",
+          "lease": "lease-v1:imp-a9fad8f8-a4ab-4640-950f-7a6c4e8f2401:ART-1c7d7fab1790ab3f96fd95772cf1c834",
+          "hap": "inputs/waterflow-crash-baseline.hap",
+          "sha256": "ee083149…"
+        },
+        "debugHap": {
+          "jobId": "job-8966521315174d6775ae0f0f40cd32bd",
+          "terminalState": "succeeded",
+          "actualEffect": "deviceMutation",
+          "cleanupPolicy": "retain",
+          "postRunAbilityState": "running",
+          "startedAtUTC": "2026-09-02T07:16:24Z",
+          "finishedAtUTC": "2026-09-02T07:16:33Z",
+          "artifacts": [
+            "install-readback.json",
+            "process-readback.json",
+            "debug-hilog.txt"
+          ]
+        },
+        "captureBeforeCrashWindow": {
+          "jobId": "job-2a68fb051e2ea293af5960c768e4b169",
+          "liveness": "HEALTHY/targetProcessRunning",
+          "observedAtUtc": "2026-09-02T07:16:35Z",
+          "note": "captured 7 s after start, inside the 12 s crash window; not the verdict"
+        },
+        "captureAfterCrashWindow": {
+          "jobId": "job-b30f2021c7e4b26ee1e3bc38091d286e",
+          "liveness": "UNHEALTHY/targetProcessNotRunning",
+          "observedAtUtc": "2026-09-02T07:20:17Z",
+          "crashIndexArtifact": "ART-0ad2cec3bdb305290000be39a46930bb",
+          "crashIndexEntries": [
+            "jscrash-com.example.waterflowdemo-20010044-20170903222938"
+          ],
+          "crashIndexEntryCount": 1
+        },
+        "analyzeCrashSignature": {
+          "jobId": "job-0d51a835f78c8a8ca3bf8299aecff931",
+          "operation": "analyzer.extract-crash-signature@1",
+          "status": "answered",
+          "entries": 1,
+          "note": "first attempt without --target rejected: lease target/binding/identity mismatch (analyzer-host scope); rerun with --target TGT-958780b2ffb7"
+        }
+      },
+      "workspacePrerequisites": {
+        "devecoToolchain": "toolchain:sha256:9cee08f1e191112cb68a24ec3aa941f8d5342482224258ee3e34cdd122855e27",
+        "buildPreset": "preset-61cd4ff69eaeb454b6b1466c",
+        "signingPreset": "preset-4ad8fe99f82867e9e1a94e5d",
+        "credential": "credential:sha256-2a9f05b5397d8dc2803c973382c89299c2c8392a44233e8d922b145bf9ab34dc",
+        "workspaceStatusJob": "job-dee7914bedb1188b0c0e19bcc8387329",
+        "sourceWorkspaceRevision": "701c5bd956121cbd187195411f2f12ec6c3db362ff10851d29b1a33cd8531dae",
+        "isolate": {
+          "jobId": "job-4aedbff14d9533e6fdbb9b8fc3b403e1",
+          "workspaceId": "evo-ccba528f43caa8311acd7138",
+          "isolatedRevision": "e0d4131e6973b82a946a68c1de3c4251c24b964e2beffff2336dda409b1a174e"
+        },
+        "patchImport": {
+          "importRequestId": "gj5-20260902-patch",
+          "lease": "lease-v1:imp-16672fca-3863-49d8-a72a-d92ba0ac4148:ART-7d630f93a32aae2f274919dcc3bdde46",
+          "patch": "inputs/gj5-fix.patch",
+          "byteCount": 610
+        }
+      },
+      "fixLeg": {
+        "runtimeBuilds": {
+          "leaseScopeFix": "PR #1696 (merged a326c64d)",
+          "registrationPresetsSigningLegacyRows": "PR #1699 (agent/workspace-isolated-copy-registration-20260902)"
+        },
+        "patch": {
+          "jobId": "job-b0b96042dcc400d101267cbe02ae550a",
+          "target": "TGT-958780b2ffb7",
+          "projectRef": "evolution-ccba528f43caa8311acd",
+          "previousWorkspaceRevision": "e0d4131e6973b82a946a68c1de3c4251c24b964e2beffff2336dda409b1a174e",
+          "workspaceRevision": "e145d3939161b394c66843133c92987722a6af3a05637d8fd24497ecceb6d405",
+          "patchAttemptRef": "patch-2b525760b9c35a99777d502b48728eec",
+          "touchedFiles": "entry/src/main/ets/entryability/EntryAbility.ets",
+          "authority": "runtimeCapability CAP-RT-POLICY-9627739AB08DCB66CBEED559CF2F826DA4E1AC5E-G1 (automatic, isolated task copy)",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false
+        },
+        "build": {
+          "jobId": "job-a967c8cf70a8f12127d8285617cdfdf2",
+          "projectRef": "evolution-ccba528f43caa8311acd",
+          "buildPresetRef": "preset-61cd4ff69eaeb454b6b1466c",
+          "unsignedHap": "ART-94066e4063c9638e0683fc22f3110a1e (2748896 bytes, sha256 72af6901554bcfa9293c602172c06336bf56dced314851cedb8a2683cc625522)",
+          "startedAtUTC": "2026-09-02T08:13:28Z",
+          "finishedAtUTC": "2026-09-02T08:14:05Z",
+          "terminalState": "succeeded"
+        },
+        "signAttemptWithSdkReleaseCredential": {
+          "jobId": "job-31d299b573f6cfe8884f27b09482b76e",
+          "projectRef": "demo-app",
+          "target": "evolution-ccba528f43caa8311acd",
+          "signingPresetRef": "preset-4ad8fe99f82867e9e1a94e5d",
+          "signedHapSha256": "2c81a444c80e08566830918e4f06080f480e958c3bf23f10b9a5dde0375bfe34",
+          "terminalState": "succeeded",
+          "verification": "verified (hap-sign-tool verify-app also succeeds on the host)",
+          "deviceOutcome": "debug hap job-f9bd8e94d2922582d9d579429d3eb892 failed: installRejected code:9568329 verify signature failed — the credential is the OpenHarmony SDK sample release material (profile bundle com.example.scrollablecomponentstatic, pki_internal), not trusted by the device for com.example.waterflowdemo"
+        },
+        "credentialFinding": "the device accepts the Huawei debug profile that signed inputs/waterflow-crash-baseline.hap (~/.ohos/config/default_WaterFlowLayoutDemo_*, app-identifier 6918716957883740899, device-ids include this DAYU200); swapping needs workspace preset remove → runtime signing remove → runtime signing migrate-deveco (build profile ~/Downloads/WaterFlowLayoutDemo/build-profile.json5, canonical daemon executable) → preset register → restart",
+        "credentialSwap": {
+          "presetRemovals": [
+            "preset-e99003dca64ab6564c97d4d3 (accidental second preset, removed)",
+            "preset-4ad8fe99f82867e9e1a94e5d (SDK-release credential, removed)"
+          ],
+          "oldCredentialRemoval": "runtime signing remove after clearing 43 login-keychain items the old CLI build owned (Keychain delete status -25244 from the Runtime path: partition list of items created by another build)",
+          "newCredential": {
+            "credentialRef": "credential:sha256-562430f169572876eb7ea8c3f5f0f2f0fa6553004cdf7726306790ebf760d6f1",
+            "installedAtUtc": "2026-09-02T09:12:32Z",
+            "source": "runtime signing install --build-profile ~/Downloads/WaterFlowLayoutDemo/build-profile.json5 (DevEco debug profile, bundle com.example.waterflowdemo, device-ids include this DAYU200)",
+            "signingPreset": "preset-3667528438767fb6b68fd0ad"
+          }
+        },
+        "sign": {
+          "jobId": "job-49c4c5fb871368abac34dd1f16400190",
+          "projectRef": "demo-app",
+          "target": "evolution-ccba528f43caa8311acd",
+          "signingPresetRef": "preset-3667528438767fb6b68fd0ad",
+          "signedHap": "ART-6bdcf1d36a6466763f3e2c1e2fdf921d (2816438 bytes, sha256 65b0309a82b38a511ecf7945fd3b3f7e24f993021ca3adff5f070cdb63074ed6)",
+          "hostVerify": "hap-sign-tool verify-app success; profile bundle-name com.example.waterflowdemo type debug",
+          "terminalState": "succeeded",
+          "actualEffect": "hostOnly"
+        }
+      },
+      "verify": {
+        "exportedSignedHap": "inputs/signed/ART-6bdcf1d36a6466763f3e2c1e2fdf921d-signed.hap",
+        "import": {
+          "importRequestId": "gj5-20260902-verify2",
+          "lease": "lease-v1:imp-88e63932-8fac-4bd4-882e-94bb5634fa83:ART-5f2ad759a47f152a3f6b97923f6c5cdc"
+        },
+        "debugHap": {
+          "jobId": "job-d7af4b393b5d80820628993ff245eb8d",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "actualEffect": "deviceMutation",
+          "startedAtUTC": "2026-09-02T09:13:46Z",
+          "finishedAtUTC": "2026-09-02T09:13:55Z",
+          "installReadback": {
+            "deployedArtifactSha256": "65b0309a82b38a511ecf7945fd3b3f7e24f993021ca3adff5f070cdb63074ed6",
+            "matchesSignedHap": true,
+            "firmware": "OpenHarmony-7.0.0.37",
+            "installed": true
+          },
+          "processReadback": "running true"
+        },
+        "livenessInsideWindow": {
+          "jobId": "job-5b2a2a5939e77b140a11f710eb555442",
+          "observedAtUtc": "2026-09-02T09:13:56Z",
+          "state": "HEALTHY",
+          "note": "about 8 s after start, inside the crash window; not the verdict"
+        },
+        "livenessAfterWindow": {
+          "jobId": "job-2f8b2b3af84d89bcc114d2ae3637fa94",
+          "observedAtUtc": "2026-09-02T09:14:31Z",
+          "state": "HEALTHY",
+          "reasonCode": "targetProcessRunning",
+          "secondsAfterStart": 43,
+          "crashIndexEntries": [
+            "jscrash-com.example.waterflowdemo-20010044-20170903222938"
+          ],
+          "crashIndexEntryCount": 1,
+          "crashIndexUnchangedSinceRepro": true
+        }
+      },
+      "negative": {
+        "input": "gj5-patch-stale.json (same lease, expectedWorkspaceRevision = superseded e0d4131e…)",
+        "result": "rejected invalidInput workspace.revisionConflict:e0d4131e6973!=e145d3939161",
+        "cliExit": 1,
+        "envelope": "ok:true terminalState:rejected (the domain leaf reports the refusal in-band; exit 65 as written in the runbook does not match the leaf)",
+        "ledger": "runtime-jobs.sqlite3 dump has 0 rows naming gj5-20260902-patch-stale vs 1 for the successful patch execution → zero admission, zero dispatch"
+      },
+      "budgets": {
+        "maxRounds": 1,
+        "roundsUsed": 1,
+        "e1Jobs": [
+          "job-8966521315174d6775ae0f0f40cd32bd (repro debug.hap)",
+          "job-b0b96042dcc400d101267cbe02ae550a (apply-patch)",
+          "job-a967c8cf70a8f12127d8285617cdfdf2 (build)",
+          "job-d7af4b393b5d80820628993ff245eb8d (verify debug.hap)"
+        ],
+        "stopOnOutcomeUnknown": "none occurred",
+        "stopOnHumanActionRequired": "none occurred",
+        "stopOnAuthorizationRequired": "occurred on the registered tree (demo-app E1 needs an explicit grant); resolved by targeting the isolated copy, which the Runtime authorizes automatically",
+        "wallClock": "07:16Z repro → 09:14Z verify, dominated by the five product fixes in between"
+      },
+      "discipline": {
+        "rawDeviceCommands": 0,
+        "appUse": 0,
+        "repositoryFileWrites": 0,
+        "note": "only published arkdeck faces plus host-side hap-sign-tool verify-app (read-only) and a one-off login-keychain cleanup of ArkDeck's own stale credential items"
+      },
+      "blockers": [
+        {
+          "kind": "productDefect",
+          "summary": "workspace patch cannot consume a CLI-imported patch lease (device-bound import vs project-scoped host request)",
+          "fix": "PR #1696 merged"
+        },
+        {
+          "kind": "productDefect",
+          "summary": "isolated copies (evolution-*) are refused by the project registration acquisition; registered presets are ignored under a legacy --workspace-project root; the sign step validator pins signingPresetRef to openharmony-release@1",
+          "fix": "PR #1699"
+        },
+        {
+          "kind": "productDefect",
+          "summary": "durable-history reference scans fail closed on the 77 legacy-importer rows and on four stale-digest waitingForRecovery flash Jobs (blocks workspace preset/project removal, Import inspection/release, 2.x job list)",
+          "fix": "PR #1699"
+        },
+        {
+          "kind": "hostConfiguration",
+          "summary": "installed signing credential (SDK release sample) is not trusted by the device for com.example.waterflowdemo",
+          "fix": "credential swap via migrate-deveco (in progress)"
+        }
+      ],
+      "jobs": [
+        {
+          "jobID": "job-8966521315174d6775ae0f0f40cd32bd",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "startedAtUTC": "2026-09-02T07:16:24Z",
+          "finishedAtUTC": "2026-09-02T07:16:33Z",
+          "path": "repro debug hap (retain/running, 20 s diagnostics)"
+        },
+        {
+          "jobID": "job-b30f2021c7e4b26ee1e3bc38091d286e",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "liveness after the crash window (UNHEALTHY/targetProcessNotRunning; crash-index 1 entry)"
+        },
+        {
+          "jobID": "job-0d51a835f78c8a8ca3bf8299aecff931",
+          "operationReference": "analyzer.extract-crash-signature@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "analyze crash-signature --target <TGT> (answered, 1 entry)"
+        },
+        {
+          "jobID": "job-dee7914bedb1188b0c0e19bcc8387329",
+          "operationReference": "workspace.inspect-git-status@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "workspace status"
+        },
+        {
+          "jobID": "job-4aedbff14d9533e6fdbb9b8fc3b403e1",
+          "operationReference": "workspace.prepare-isolated-copy@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "workspace isolate"
+        },
+        {
+          "jobID": "job-b0b96042dcc400d101267cbe02ae550a",
+          "operationReference": "workspace.apply-patch@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "workspace patch --target <TGT> (isolated copy, automatic capability)"
+        },
+        {
+          "jobID": "job-a967c8cf70a8f12127d8285617cdfdf2",
+          "operationReference": "workspace.build-openharmony@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "startedAtUTC": "2026-09-02T08:13:28Z",
+          "finishedAtUTC": "2026-09-02T08:14:05Z",
+          "path": "workspace build (isolated copy, registered preset)"
+        },
+        {
+          "jobID": "job-49c4c5fb871368abac34dd1f16400190",
+          "operationReference": "workspace.sign-openharmony-hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "workspace sign --target <evolution-…> (demo-app, DevEco debug credential)"
+        },
+        {
+          "jobID": "job-d7af4b393b5d80820628993ff245eb8d",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "startedAtUTC": "2026-09-02T09:13:46Z",
+          "finishedAtUTC": "2026-09-02T09:13:55Z",
+          "path": "verify debug hap (install-readback pinned to signed.hap sha)"
+        },
+        {
+          "jobID": "job-2f8b2b3af84d89bcc114d2ae3637fa94",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "path": "liveness 43 s after start (HEALTHY/targetProcessRunning; crash-index unchanged, 1 entry)"
+        }
+      ],
+      "zeroDispatchChecks": [
+        {
+          "input": "gj5-patch-stale.json (same lease, expectedWorkspaceRevision = superseded e0d4131e…)",
+          "result": "rejected invalidInput workspace.revisionConflict:e0d4131e6973!=e145d3939161",
+          "cliExit": 1,
+          "envelope": "ok:true terminalState:rejected (the domain leaf reports the refusal in-band; exit 65 as written in the runbook does not match the leaf)",
+          "ledger": "runtime-jobs.sqlite3 dump has 0 rows naming gj5-20260902-patch-stale vs 1 for the successful patch execution → zero admission, zero dispatch"
+        }
+      ],
+      "notes": "Five product gaps were found and fixed on the way (PR #1696 merged a326c64d; PR #1699 merged b25ad279; PR #1700 open): patch-lease target scope, isolated-copy registration, registered presets under a legacy root, the sign-step preset validator, durable-history scans on legacy/stale-digest rows, and headless DevEco credential install. The signing credential installed by install-sdk-release is not trusted by the device for com.example.waterflowdemo; the DevEco debug profile is."
+    }
+  ],
+  "operationRealDeviceCoverage": {
+    "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "operations": [
+      {
+        "operationReference": "analyzer.analyze-trace@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "analyzer.extract-crash-signature@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-0d51a835f78c8a8ca3bf8299aecff931"
+        ]
+      },
+      {
+        "operationReference": "analyzer.summarize-hilog@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "analyzer.summarize-trace@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "capture.diagnostics@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-e64f8f9127a237093015d3e7ca14a411",
+          "job-cc7d61c1f24fd2a1b77d5dd1beab5273",
+          "job-50d8ed36af11e3dac47ab64b654f6a94",
+          "job-2a68fb051e2ea293af5960c768e4b169",
+          "job-b30f2021c7e4b26ee1e3bc38091d286e",
+          "job-c7eda3bb5c93b2dbdf6f667dca03ac9c",
+          "job-5b2a2a5939e77b140a11f710eb555442",
+          "job-2f8b2b3af84d89bcc114d2ae3637fa94"
+        ]
+      },
+      {
+        "operationReference": "capture.screen-sequence@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "debug.hap@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-351cf08ae8737e778eb11d1f74e5127c",
+          "job-502b8940a7e6ea3703c45b0d9d772e33",
+          "job-76d45f6e90f2ab03f8fc1c28d553d90d",
+          "job-83f8ff65d6715a5c0a54558fed7cc62e",
+          "job-86191df46bc94413350a70f0c36938f6",
+          "job-8966521315174d6775ae0f0f40cd32bd",
+          "job-d7af4b393b5d80820628993ff245eb8d"
+        ]
+      },
+      {
+        "operationReference": "debug.template@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-8755aefe2e16e14aff3642a475b68f9b"
+        ]
+      },
+      {
+        "operationReference": "deploy.native-library.app-owned@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-c55d058d46c65525073bdc03dd38e0a3"
+        ]
+      },
+      {
+        "operationReference": "flash.full-restore@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-8fb446e730b0fb4ba20953f4e0a40ee5"
+        ]
+      },
+      {
+        "operationReference": "input.long-press@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "input.swipe@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "input.tap@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "observe.device@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-a7f9353a082030678465482d3e55fb53",
+          "job-880bb670bb989a1cd15b2e5d034af6a2",
+          "job-d5d45d40426b49ce77fe07c36e040da7",
+          "job-118e1ac06bd10a33ec5a892702e75801"
+        ]
+      },
+      {
+        "operationReference": "port-forward.create@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "port-forward.remove@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.apply-patch@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-b0b96042dcc400d101267cbe02ae550a"
+        ]
+      },
+      {
+        "operationReference": "workspace.build-openharmony@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-a967c8cf70a8f12127d8285617cdfdf2"
+        ]
+      },
+      {
+        "operationReference": "workspace.create-checkpoint@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.inspect-diff@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.inspect-git-status@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-dee7914bedb1188b0c0e19bcc8387329"
+        ]
+      },
+      {
+        "operationReference": "workspace.inspect-source@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.prepare-isolated-copy@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-4aedbff14d9533e6fdbb9b8fc3b403e1"
+        ]
+      },
+      {
+        "operationReference": "workspace.read-source-range@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.revert-patch@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.run-tests@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.sign-openharmony-hap@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-31d299b573f6cfe8884f27b09482b76e",
+          "job-49c4c5fb871368abac34dd1f16400190"
+        ]
+      },
+      {
+        "operationReference": "workspace.sweep-isolated-copies@1",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.symbolize-crash@1",
+        "state": "notExercised",
+        "jobIDs": []
+      }
+    ]
+  }
+}

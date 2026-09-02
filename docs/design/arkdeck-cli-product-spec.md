@@ -2,7 +2,7 @@
 
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness、批准载体或平台符合性声明。
 > 状态：目标规格；文中“目标命令”不代表当前版本已经实现。
-> 规格版本：0.6（2026-09-02，按 `PRODUCT-LOOP.md` §6 重述 §15.3 的 GJ-1/GJ-3/GJ-5 判据，并在
+> 规格版本：0.7（2026-09-02，按当前 digest 的 headless 真机复跑记录 §13 的 Golden Journey 四态与覆盖矩阵；0.6 同日按 `PRODUCT-LOOP.md` §6 重述 §15.3 的 GJ-1/GJ-3/GJ-5 判据，并在
 > §13.2 要求 operation 真机覆盖矩阵；0.5 同日由 `TASK-AIN-026` 落地 §14 机器契约产物、§13 按
 > protected `main` `4bde4749` 重算；0.4 同日按 DEC-013 让 `source` 族退役并新增 `platformService` 分类；
 > 0.3 同日按 `d28d57a3` 重算 §13；0.2 为 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
@@ -1569,6 +1569,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `cli-feature-coverage.json` 共 279 条（daemon 119、Catalog 30、App 68、CLI 62）：
   `direct` 131、`local` 94、`presentation` 21、`internal` 18、`refused` 10、`platformService` 4、
   `generic` 1（`flash.dayu200` alias），`blocked` 0，`summary.fullFunction = true`。
+- Golden Journey headless 闭环：2026-09-02 在 digest `508783ac…` 上按 `cli-golden-journey-headless-runbook.md` headless 复跑：GJ-1/GJ-2/GJ-3/GJ-4/GJ-5 均 `REAL_DEVICE_PASS`（含 §2.1 HAR crash-resume 与 `debug.template@1` smoke），29 个 canonical operation 的真机覆盖矩阵 12 `realDevicePass` / 17 `notExercised`，记录见 `references/v1.6-goal/gj-headless-rerun-2026-09-02.json` 与 `real-device-validation.md`。
 - 0.2 版 §13.2 列出的 12 个 daemon-ready 方法中 11 个已有一等 leaf；唯一例外 `debug.template.run`
   是 App 直连路径，coverage 记为 `direct` + `deprecated`，CLI 经 `debug.template@1` 到达同一模板集。
 
@@ -1580,13 +1581,23 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| GJ-1～GJ-5 的 CLI headless 闭环 | 上一 digest `b8c7148f…` 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交）；`CHG-2026-073` 发布 `debug.template@1` 后 digest 变更，按 `PRODUCT-LOOP.md` 这些记录只证明历史，且仍没有按四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内按 `cli-golden-journey-headless-runbook.md` 在当前 digest 上用 CLI 完整复跑并按四态记录，附 29 个 canonical operation 的真机覆盖矩阵（`realDevicePass`/`notExercised`），其中 `debug.template@1` 至少一条 smoke | A/B |
 | Windows（Slice D） | 未开始 | 不阻断 macOS-only claim；阻断跨平台 claim | D |
 
 ### 13.3 已发布 leaf 的残留缺陷
 
 不阻断命令面存在，但计入 conformance 差距，必须在对应 slice 内修，不能靠文档解释掉：
 
+- preflight rejection 没有发布 §8.4 结构化零派发证据：2026-09-02 真机负向用例
+  （`workspace patch`，stale `expectedWorkspaceRevision`）被 Runtime 以
+  `rejected(invalidInput, "typed plan preflight failed before authorization: workspace.revisionConflict:…")`
+  拒绝，domain leaf 返回 `ok:true`、`result.terminalState: rejected`、`stepKinds: []`、无 `error`，
+  进程退出码为 1（`CLIControlMethodRegistry` 对无证据 `rejected` 的 fallback），而 §9 要求 65/77；
+  零派发只能由台账 diff 证明。修法在 daemon 侧补 §8.4 证据（`newDispatchCount`/phase），不是改分类。
+- HAR crash-resume（runbook §2.1）实测：重插 USB 后 `agent resume` 没有仅凭 fresh probe 解决
+  `physicalConnection` HAR，而是再产生一个 `ambiguousIdentity` HAR（唯一候选就是已 adopt 的
+  target），要以 published choice 再 resume 一次才继续；被取代的 `physicalConnection` action
+  终态记为 `expired` 而非 resolved/superseded。机制判据（仅凭 execution ID 重取、同 target/
+  binding 继续到 succeeded）成立，但 headless 调用方要多一轮 resume，且 action 终态标注不准。
 - `job list` 的 newest/oldest 分页仍以 SQLite `rowid` 作 cursor 与同 timestamp tie-break
   （`RuntimeJobRepository.listJobs`）；§7.3 compound order 未落地，Windows portable 前必须替换。
 - `legacy flash reconcile` 仍经 `RockchipLegacyFlashJournalReconciler.production()` 从

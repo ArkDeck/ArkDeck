@@ -355,7 +355,7 @@ Runtime 自动签发 capability；对 `demo-app` 本体的 E1 请求仍然要求
 `workspace isolate` 即可重新登记而不会再拷贝一份。
 
 负向用例（零派发）：同一补丁 lease、`expectedWorkspaceRevision` 取已被取代的 revision，
-期望 `invalidInput`（`workspace.revisionConflict`）、exit 65，`job list` 前后台账相同。
+按 §9 期望 `invalidInput`（`workspace.revisionConflict`）、exit 65（或 77）。当前实测为 exit 1：domain leaf 拿到的是 `rejected(invalidInput, …)` 的 execution receipt（envelope `ok:true`、`result.terminalState: rejected`、`stepKinds: []`、无 `error`），该 rejection 的 daemon handler 没有发布 §8.4 的结构化零派发证据，CLI 只能按 `CLIControlMethodRegistry` 的 fallback 降级为 `operationFailed`（1）——这是已发布 leaf 的残留 conformance 缺口（规格 §13.3），不是本节期望值写错。零派发由 `job list` 前后台账相同证明（2.x `job list` 或 `runtime-jobs.sqlite3` 的 dump 里都不出现该 execution），不由退出码证明。
 
 判据：
 

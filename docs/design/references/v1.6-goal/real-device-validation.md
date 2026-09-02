@@ -204,3 +204,40 @@ Job 全部逐项相同，已有成功 Flash 的五项独立核验仍通过，Har
 本轮将稿件改为摘要/详情分离和精确 Artifact 预览，不把设计截图当硬件证据。
 完整命令范围、二进制/截图/日志哈希与失败记录见
 [F36 post-merge 元数据](flash-history-focus-verification-2026-08-28.json)。
+
+
+## 2026-09-02 全功能 CLI headless 复跑（digest `508783ac…`）
+
+按 `docs/design/cli-golden-journey-headless-runbook.md` 在当前 Catalog digest
+`508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684` 上，只用已发布 `arkdeck`
+CLI 面对同一台 DAYU200（`TGT-958780b2ffb7`，binding revision 4，hdc 3.2.0f，固件
+OpenHarmony-7.0.0.37）headless 复跑五条 Golden Journey，并做了 `debug.template@1` smoke。
+脱敏记录（只留 SHA-256、jobId、executionId、计数与 UTC 时间）见
+[gj-headless-rerun-2026-09-02.json](gj-headless-rerun-2026-09-02.json)，其中
+`operationRealDeviceCoverage` 给出 29 个 canonical operation 的真机覆盖矩阵：12 个
+`realDevicePass`，17 个 `notExercised`。
+
+| Journey | 四态 | 关键事实 |
+|---|---|---|
+| GJ-1 Device Observe | `REAL_DEVICE_PASS` | `agent run`/`job submit` 两条路径的 `observe.device@1` 各一次 succeeded；设备级 `capture.diagnostics@1`（hilog + ui-dump）；`runtime service restart` 后两条 Job 仍可读；§2.1 HAR crash-resume：拔线后 `agent run` exit 75/`newDispatchCount 0`，仅凭 execution ID 重取到 waiting action 与逐字相同的 `resumeReference`，插回后 resume（经一次 `ambiguousIdentity` 确认）继续到 `succeeded`，target/binding r4 不变 |
+| GJ-2 HAP Debug | `REAL_DEVICE_PASS` | `debug.hap@1` 完整周期、retain/running、bundle 级 diagnostics（hilog/ui-dump/ui-tree/screenshot/trace/liveness）、cleanup |
+| GJ-3 Native Debug | `REAL_DEVICE_PASS` | `deploy.native-library.app-owned@1` 的 verify-remote-staging/backup/atomic-publish/restart/verify-loaded-library；幽灵依赖候选触发 `rollback-native-library` 与补偿 cleanup |
+| GJ-4 Flash Recovery | `REAL_DEVICE_PASS` | canonical `flash.full-restore@1` 经命名 campaign 的 Runtime capability 提交，ArkForge 23/23 步、readback OpenHarmony-7.0.0.37、残留 0，campaign 用后即关（lane 回到 hardwareGated） |
+| GJ-5 Bounded AI Debug Loop | `REAL_DEVICE_PASS` | 复现（retain/running → 窗后 liveness `UNHEALTHY`/`targetProcessNotRunning`、crash-index 恰一条、`analyzer.extract-crash-signature@1` answered）→ `workspace isolate/patch/build/sign`（隔离副本、Runtime 自动签发 capability）→ 签出 HAP `artifact export` + `artifact import hap` → `debug.hap@1` 复验（install-readback 钉到 signed.hap SHA-256，启动后 43 s liveness `HEALTHY`，crash-index 不变）；负向 stale revision 被 `workspace.revisionConflict` 拒且台账零新增 |
+
+复跑本身暴露并修掉的产品缺陷（每条都在当前 digest 上用 CLI 复现后修复、再实测通过）：
+
+- Runtime 启动：真机 hdc 3.2.0f 的 dual-stack 监听被 managed-server 身份检查拒；执行台账时间
+  形式非毫秒规范（PR #1694）。
+- GJ-5 修复腿：CLI 导入的补丁 lease 绑设备 target 而 host-only 请求绑 projectRef
+  （PR #1696）；隔离副本不在 2.x 项目注册表、legacy `--workspace-project` 根下注册 preset
+  不可用、sign 步骤 validator 钉常量、durable-history 校验在 77 行 legacy 行与 4 个旧 digest
+  `waitingForRecovery` Job 上 fail-closed（PR #1699）；DevEco 自动签名凭据无法 headless 安装
+  （PR #1700，`runtime signing install --build-profile`）。
+
+残留（不阻塞四态，记入 §13.3 候选）：`runtime service update` 无法清除 legacy
+`--workspace-project` 根；项目移除的 durable 引用扫描按字面 projectRef 匹配，隔离副本上的
+非终态 Job 不会锁住来源项目；preflight rejection（如 `workspace.revisionConflict`）没有发布 §8.4 结构化零派发证据，domain leaf
+把 `rejected(invalidInput, …)` receipt 以 `ok:true`/`terminalState: rejected` 返回并降级为 exit 1（§9 应为 65/77），零派发只能由台账 diff 证明；`install-sdk-release` 装的样例 release
+凭据对设备不可信（`code:9568329`），可用凭据是 DevEco 为该 bundle 签发、device-ids 含本机
+UDID 的 debug profile；本机磁盘低于 4 GiB 预留时 ArkForge prewarm 会以零派发拒绝 Flash。
