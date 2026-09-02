@@ -233,7 +233,7 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - **Apps** 已接 `debug.hap@1`：单 HAP 导入、bundle/Ability 校验；安装策略固定 installOrReplace，清理仅 uninstall/retain，结束状态 stopped/running，可选 diagnostics（1–300 秒）。全新安装与恢复之前版本未发布，不提供选项。typed request 默认折叠，完整计划按 Catalog 的 14 个步骤显示；可用性、文件和身份输入共同决定运行按钮。真实 submit/cancel、terminal 和 Artifact 已接线，原型仅预览参数，不创建演示 Job 冒充执行。
 - 包库存的独立启动/停止/卸载与整套 HAP workflow 是不同入口；前者未有对应独立闭集 operation，仍禁用并说明原因，不能把 HAP workflow 的发布当作包行操作授权。
 - **Network** 使用 `port-forward.create@1` / `port-forward.remove@1`，支持 forward/reverse，端口只接受 1024…65535 的十进制字段。真实 Runtime Job 与 exact inverse/readback 补偿可见，不接受 shell fragment。
-- **Commands** 只允许 daemon 已实现的 closed read-only template；lowered argv 是只读 disclosure，结果保留 Artifact 来源与失败原因。Root、任意终端等不提供执行入口。
+- **Commands** 只允许 `debug.template@1` 已发布的 closed read-only template；App 提交 typed request，Runtime 创建并运行可取消的 Job，页面显示精确 Job、terminal、timeline 与可导出的 bounded Artifact。lowered argv 只在派生 report Artifact 中披露，绝不成为 UI 输入。Root、任意终端等不提供执行入口。
 
 **尚未实现的设计输入**：SMB/WSL connector、多 root/批量来源搜索与多选、`.abc` deployment、独立 device restart、设备日志 buffer 清除。保留相应需求与安全边界；只有对应 behavior/Catalog/Provider/recovery/readback 发布后才进入当前可操作稿。当前原型不画这些功能的虚假成功态，也不以删规格来消除实现缺口。
 

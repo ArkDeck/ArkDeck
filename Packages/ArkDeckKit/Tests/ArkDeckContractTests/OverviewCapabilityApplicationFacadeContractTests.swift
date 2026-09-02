@@ -99,7 +99,9 @@ final class OverviewCapabilityApplicationFacadeContractTests: XCTestCase {
       encoding: .utf8)
 
     XCTAssertTrue(source.contains("method: \"trace.probe\""))
-    XCTAssertTrue(source.contains("method: \"debug.template.run\""))
+    XCTAssertTrue(source.contains("DebugTemplateJobExecution.run("))
+    XCTAssertFalse(source.contains("method: \"debug.template.run\""))
+    XCTAssertTrue(source.contains("debug.template@1 Job succeeded"))
     XCTAssertTrue(source.contains("ArkForgeFlashOperation.canonicalReference"))
     XCTAssertFalse(source.contains("flash.dayu200"))
     XCTAssertFalse(source.contains("flashd"))

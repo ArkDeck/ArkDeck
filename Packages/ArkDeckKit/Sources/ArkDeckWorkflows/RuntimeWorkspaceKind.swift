@@ -42,8 +42,8 @@ public enum RuntimeWorkspaceKindProjection {
 
     let operationID = reference.split(separator: "@").first.map(String.init) ?? reference
     switch operationID {
-    case "debug.hap", "deploy.native-library.app-owned", "port-forward.create",
-      "port-forward.remove":
+    case "debug.hap", "debug.template", "deploy.native-library.app-owned",
+      "port-forward.create", "port-forward.remove":
       return .debug
     case "input.tap", "input.long-press", "input.swipe", "capture.screen-sequence":
       return .device

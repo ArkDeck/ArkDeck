@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "arkdeck.app-debug-template-verification/1",
+  "date": "2026-09-02",
+  "task": "TASK-AIN-021",
+  "classification": "real-device-app-xpc-runtime-job",
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "build": {
+    "baseRevision": "7cac48fcb67c27a4fcc9eb00727ac64926852fa2",
+    "releaseAppExecutableSHA256": "fd27541ee86ffd9e2f40c1b8b9e9342f5863e12cccd8cdc24370d18442c66c53",
+    "signature": "Developer ID Application: Hanfeng Fu (8AQTYW5FKR)",
+    "signatureVerification": "validOnDiskAndSatisfiesDesignatedRequirement",
+    "cliBuildIdentity": "sha256:f14a3fd5abfd78a0eb428547229e716c637631d37c2eacebf9c13483e9da5295",
+    "daemonSHA256": "9bd3fb89c0e1c89da6be3ee3593f17c1964138355ffadbde9ece08dd13dbcc42"
+  },
+  "target": {
+    "targetID": "TGT-958780b2ffb7",
+    "bindingRevision": 4,
+    "stableIdentitySHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "toolVersion": "3.2.0f",
+    "firmware": "OpenHarmony-7.0.0.37"
+  },
+  "discoveredProjectionDefect": {
+    "jobID": "job-b43a9b9c687f8b76cbd58183b2cf858c",
+    "runtimeState": "succeeded",
+    "runtimeArtifactCount": 2,
+    "appState": "terminal-visible-artifacts-missing",
+    "rootCause": "debug.template@1 was omitted from the Debug workspace job decoder",
+    "resolution": "include the typed operation in the exact Debug job allowlist and cover it with a decoder contract test"
+  },
+  "acceptedJob": {
+    "jobID": "job-60fa9ca0dacfbdabba52db0d116ba691",
+    "clientName": "ArkDeckApp.DebugWorkspace.Commands",
+    "operationReference": "debug.template@1",
+    "templateID": "device.packageInventory",
+    "providerID": "hdc",
+    "actualEffect": "readOnly",
+    "executionMode": "execute",
+    "materializedPlanDigest": "5797c9e74aa2f9de84d07ffd65960a1a95a6ae60125f8cb0dd9079302291ed0e",
+    "startedAtUTC": "2026-09-02T13:45:23Z",
+    "finishedAtUTC": "2026-09-02T13:45:24Z",
+    "terminalState": "succeeded",
+    "outcomeUnknown": false,
+    "outstandingResidueCount": 0,
+    "evidenceBlockers": [],
+    "artifacts": [
+      {
+        "artifactID": "ART-d3274f2a0ef417942a608fc2d3f4954f",
+        "name": "template-output.txt",
+        "byteCount": 1138,
+        "sha256": "2a5ea14ecd9944b53b273378f335e3b70d378881a49fb2a391fba86ce3c12921",
+        "privacy": "sensitive",
+        "status": "published",
+        "bytesVerified": true
+      },
+      {
+        "artifactID": "ART-3efc59f43f92008f9f8ffd2c865ff7b9",
+        "name": "template-report.json",
+        "byteCount": 445,
+        "sha256": "ddc5292c8d9750093190f18b199dc49cf4bd8ff718e3824ca49d2cbd36978776",
+        "privacy": "standard",
+        "status": "published",
+        "bytesVerified": true
+      }
+    ]
+  },
+  "appProjection": {
+    "language": "zh-Hans",
+    "visibleFacts": [
+      "target TGT-958780b2ffb7 and binding r4",
+      "debug.template@1 provider available",
+      "closed device.packageInventory template selected",
+      "job-60fa9ca0dacfbdabba52db0d116ba691 succeeded with known outcome",
+      "both published artifacts with byte counts, digest prefixes, privacy and export actions",
+      "no free-form command, argv or path input"
+    ],
+    "accessibilityIdentifiers": [
+      "debug.commands.run",
+      "debug.commands.export.ART-d3274f2a0ef417942a608fc2d3f4954f",
+      "debug.commands.export.ART-3efc59f43f92008f9f8ffd2c865ff7b9"
+    ],
+    "screenshotSHA256": "8621e4dc11cc1638cfafe915b86e6d4443613e0af20487e8dfaa0ab2ed2f1ee4",
+    "rawScreenshotCommitted": false,
+    "visualInspection": "passed"
+  },
+  "boundaries": [
+    "The App used its production XPC transport and the installed Runtime; no UI or device fixture was enabled.",
+    "The request was readOnly and did not create, modify or consume a RuntimeCapability.",
+    "Raw Artifact content and the screenshot remain local; only bounded metadata and SHA-256 values are recorded.",
+    "This closes the Debug template App projection, not the remaining per-operation coverage or the USB replug HAR."
+  ]
+}

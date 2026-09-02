@@ -1024,7 +1024,7 @@ const S = {
     {pkg:"com.demo.gallery",     ver:"0.9.1", running:false, pid:0}
   ],
   fwd:[], forwardDirection:"forward",
-  cmd:{val:"device.packageInventory", hist:[]},
+  cmd:{val:"device.packageInventory", job:null},
   flashPrerequisitesReady:true, loaderBound:true, flashJob:null, flashImage:null, flashView:"idle",
   // One closed scenario token drives the states the App reaches from real
   // Runtime facts: availability, whether a target exists, image import and
@@ -3973,11 +3973,22 @@ const CMDS={
     argv:"hdc -t TGT-9587… shell uptime",out:"up 4 days, 02:17,  load average: 0.41 0.38 0.35"}
 };
 function runCmd(){
+  if(S.cmd.job?.state==="running")return;
   const t=CMDS[S.cmd.val];
-  S.cmd.hist=[{c:S.cmd.val,label:t.label,argv:t.argv,exit:0,ms:148,out:t.out,
-    sha:"b2c40e91f7a5d3086c1e4b77a09fd521"}];
+  const job=addJob({title:lc("运行 approved Debug 模板","Run approved Debug template"),kind:'debug',operation:'debug.template@1',
+    mode:"execute",dev:"DAYU200",target:"TGT-9587…",bindingRevision:12,actualEffect:"readOnly",outcomeUnknown:false,state:"running",
+    phases:["Admission","Provider lowering","Bounded read","Publish Artifacts"],phaseIdx:0,safeBoundary:1,tick:420,
+    log:["→ job.submit","→ job.run","→ Admission"],pages:["debug"],inputs:{templateId:S.cmd.val},
+    artifacts:[
+      {id:"artifact-debug-template-output",name:"debug-template-output.txt",role:"raw",privacy:"standard",status:"published",sourceOperation:"debug.template@1",mediaType:"text/plain",byteCount:t.out.length,sha256:"5c49dfe9…6eb2"},
+      {id:"artifact-debug-template-report",name:"debug-template-report.json",role:"derived",privacy:"standard",status:"published",sourceOperation:"debug.template@1",mediaType:"application/json",byteCount:1264,sha256:"b2c40e91…d521"}
+    ],
+    doneMsg:lc("完成：Runtime 已发布有界输出与 lowering 报告。","Complete: Runtime published bounded output and its lowering report.")});
+  S.cmd.job=job;
+  startJob(job);
   renderPage();
 }
+function cancelCmd(){if(S.cmd.job?.state==="running"){S.cmd.job.cancelled=true;renderPage();}}
 
 const DEBUG_HAP_STEPS=[
   [
@@ -4339,37 +4350,41 @@ function pDebug(){
   }
 
   if(tb==="cmd"){
-    const selected=CMDS[S.cmd.val],h=S.cmd.hist[0];
+    const selected=CMDS[S.cmd.val],h=S.cmd.job,cmdActive=h?.state==="running",terminal=h&&!cmdActive;
     body=`<div class="debug-shell">
-      <div class="warnbox">${icon("warning",true)} ${lc("App 只提交 approved typed template 与 schema 定义的输入。下方 executable / argv 是 Provider lowering 的只读预览，不是输入框。","The App submits only approved typed templates with schema-defined inputs. The executable / argv below is a read-only preview of provider lowering, not an input field.")}</div>
+      <div class="warnbox">${icon("warning",true)} ${lc("App 只通过 debug.template@1 提交 approved typed template。Runtime 会把请求记录为持久 Job，并发布有界 Artifact。","The App submits approved typed templates only through debug.template@1. Runtime records the request as a durable Job and publishes bounded Artifacts.")}</div>
       <div class="debug-cols">
         <section class="gsec">
           <h2 class="sechead">${lc("选择 approved 模板","Select an approved template")}</h2>
           ${Object.entries(CMDS).map(([id,t])=>`<button class="debug-entry${S.cmd.val===id?" on":""}" aria-pressed="${S.cmd.val===id}"
-            onclick="S.cmd.val='${id}';S.cmd.hist=[];renderPage()"><span aria-hidden="true">◉</span>
+            ${cmdActive?'disabled':''} onclick="S.cmd.val='${id}';S.cmd.job=null;renderPage()"><span aria-hidden="true">◉</span>
             <span class="nm">${esc(id)}</span><span class="sz">${esc(t.effect)}</span></button>`).join("")}
         </section>
         <div class="debug-stack">
           <section class="gsec">
-            <h2 class="sechead">${lc("Provider 调用披露","Provider invocation disclosure")}<span class="acc"><span class="effect read">${esc(selected.effect)}</span></span></h2>
+            <h2 class="sechead">${lc("Typed Runtime 请求","Typed Runtime request")}<span class="acc"><span class="chip">debug.template@1</span></span></h2>
             <dl class="kv"><dt>catalog</dt><dd>arkdeck-remote-operations@1.0.0</dd>
-              <dt>actionId</dt><dd>${esc(S.cmd.val)}</dd>
+              <dt>operation</dt><dd>debug.template@1</dd>
+              <dt>templateId</dt><dd>${esc(S.cmd.val)}</dd>
+              <dt>Effect</dt><dd><span class="effect read">${esc(selected.effect)}</span></dd>
               <dt>${lc("精确目标设备","Exact target")}</dt><dd>TGT-9587… · binding r12</dd></dl>
             <p class="hint">${lc("此模板没有用户参数。","This template declares no user parameters.")}</p>
-            <dl class="kv"><dt>Executable</dt><dd>${h?esc(h.argv.split(" ")[0])+" · sha256:3f9a11c7d240":lc("未生成——没有已准入 Runtime operation","Not generated — no admitted Runtime operation")}</dd>
-              <dt>${lc("参数","Arguments")}</dt><dd>${h?esc(h.argv.split(" ").slice(1).join(" ")):lc("未生成——没有已准入 Runtime operation","Not generated — no admitted Runtime operation")}</dd>
-              ${h?`<dt>lowering sha256</dt><dd>${esc(h.sha)}</dd>`:""}</dl>
-            <p class="hint">${lc("只有 provider 可在 Runtime 准入后将 typed action 降级为 executable + argv;UI 不猜测也不拼接 shell 命令。","Only the Provider lowers admitted typed actions to an executable and argv. The UI does not infer or compose shell commands.")}</p>
-            <div class="debug-selection"><button class="btn pri" data-sync-id="debug.commands.run" onclick="runCmd()"
-              title="${lc("不提供 PTY、密码提示、sudo 或交互会话","No PTY, password prompt, sudo, or interactive session")}">${lc("运行一次","Run once")}</button></div>
+            <p class="hint">${lc("只有 provider 可在 Runtime 准入后将此 typed input 降级为 executable + argv。Job 的派生报告会披露 lowering；UI 不猜测也不拼接 shell 命令。","Only the provider may lower this typed input into executable + argv after Runtime admission. The Job's derived report discloses that lowering; the UI never guesses or concatenates a shell command.")}</p>
+            <div class="debug-selection">${cmdActive
+              ?`<button class="btn" data-sync-id="debug.commands.cancel" onclick="cancelCmd()">${lc("当前步骤后停止","Stop after the current step")}</button><span class="hint mono">${esc(h.id)}</span>`
+              :`<button class="btn pri" data-sync-id="debug.commands.run" onclick="runCmd()" title="${lc("不提供 PTY、密码提示、sudo 或交互会话","No PTY, password prompt, sudo, or interactive session")}">${lc("运行一次","Run once")}</button>`}</div>
           </section>
           <section class="gsec">
-            <h2 class="sechead">${lc("一次性执行结果","One-shot result")}</h2>
-            <dl class="kv"><dt>${lc("退出码","Exit code")}</dt><dd>${h?h.exit:"—"}</dd><dt>${lc("耗时","Duration")}</dt><dd>${h?h.ms+" ms":"—"}</dd></dl>
-            <div class="logtail">${h?esc(h.out):lc("没有结果","No result")}</div>
+            <h2 class="sechead">${lc("Runtime Job 结果","Runtime Job result")}</h2>
+            ${h?`<dl class="kv"><dt>Job</dt><dd class="mono">${esc(h.id)}</dd><dt>${lc("状态","State")}</dt><dd>${esc(h.state)}</dd><dt>${lc("结果确定性","Outcome")}</dt><dd>${h.outcomeUnknown?lc("未知——检查 Runtime recovery","Unknown — inspect Runtime recovery"):lc("已知","Known")}</dd><dt>${lc("最新事件","Latest event")}</dt><dd class="mono">${esc(h.log.at(-1)||'—')}</dd></dl>`:`<p class="hint">${lc("没有结果","No result")}</p>`}
           </section>
         </div>
       </div>
+      <section class="gsec"><h2 class="sechead">${lc("Runtime Job Artifact","Runtime Job Artifacts")}</h2>
+        ${terminal?h.artifacts.map(artifact=>`<article class="card"><b class="mono">${esc(artifact.name)}</b><span class="hint">${esc(artifact.role)} · ${esc(artifact.privacy)} · ${esc(artifact.status)}</span><button class="btn" style="align-self:flex-start" onclick="exportModal('${esc(h.id)}','${esc(artifact.name)}')">${lc("导出…","Export…")}</button></article>`).join(''):`<p class="hint">${lc("没有已发布的模板 Artifact。运行 approved 模板后，Runtime 会发布有界输出与报告。","No published template Artifacts. Run an approved template to publish its bounded output and report.")}</p>`}
+      </section>
+      <section class="gsec"><h2 class="sechead">${lc("最近的 Runtime Job","Recent Runtime jobs")}</h2>
+        ${h?`<p class="mono">${esc(h.id)} · debug.template@1 · ${esc(h.state)}</p>`:`<p class="hint">${lc("Runtime 未报告相关 Job。","Runtime reports no related jobs.")}</p>`}</section>
       <p class="hint" data-sync-id="debug.commands.footer">${lc("不存在自由文本 command / argv / path 字段；PTY 与 raw shell 不属于此界面。","There is no free-text command, argv or path field; PTY and raw shell do not belong to this surface.")}</p>
     </div>`;
   }

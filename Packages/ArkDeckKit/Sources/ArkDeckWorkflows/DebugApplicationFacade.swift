@@ -603,10 +603,10 @@ public protocol DebugApplicationProviding: Sendable {
     rule: DebugValidatedPortRule,
     removing: Bool
   ) async -> DebugLogJobSubmissionResult
-  func runTemplate(
+  func submitTemplate(
     target: DebugTargetPresentation,
     templateID: String
-  ) async -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure>
+  ) async -> DebugLogJobSubmissionResult
 }
 
 enum DebugHAPSubmission {
@@ -828,6 +828,95 @@ enum DebugHAPRequestBuilder {
   }
 }
 
+enum DebugTemplateRequestBuilder {
+  static func request(
+    targetID: String,
+    bindingRevision: Int,
+    templateID: String,
+    nonce: String = UUID().uuidString.lowercased()
+  ) throws -> RuntimeOperationRequest {
+    guard !targetID.isEmpty, bindingRevision > 0 else {
+      throw DebugXPCReadFailure.transport(
+        "Debug template request is outside published target bounds")
+    }
+    guard DebugRuntimeCommandTemplate(rawValue: templateID) != nil else {
+      throw DebugXPCReadFailure.transport("Unknown Debug template")
+    }
+    return try RuntimeOperationRequest(
+      requestID: "debug-template-ui-\(nonce)",
+      idempotencyKey: "debug-template-ui-\(nonce)",
+      target: DurableTargetReference(
+        targetID: targetID, expectedBindingRevision: bindingRevision),
+      operation: RuntimeOperationReference(id: "debug.template", version: 1),
+      inputs: ["templateId": .string(templateID)],
+      requestedOutputs: [.rawArtifacts, .derivedArtifacts],
+      clientContext: RuntimeWorkspaceThread.clientContext(
+        clientName: ArkDeckAgentClientName.debugCommandsWorkspace, targetID: targetID))
+  }
+}
+
+enum DebugTemplateJobSubmission {
+  typealias Request =
+    @Sendable (String, [String: JSONValue]?) async
+    -> Result<Data, DebugXPCReadFailure>
+
+  static func submit(
+    targetID: String,
+    bindingRevision: Int,
+    templateID: String,
+    send: Request = { await DebugXPCReadTransport.request(method: $0, params: $1) }
+  ) async -> DebugLogJobSubmissionResult {
+    do {
+      let request = try DebugTemplateRequestBuilder.request(
+        targetID: targetID, bindingRevision: bindingRevision, templateID: templateID)
+      let requestData = try CanonicalJSONEncoders.canonical().encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed Debug template request")
+      }
+      let result = try DebugRuntimeResponseDecoding.resultObject(
+        await send("job.submit", ["requestJson": .string(requestJSON)]))
+      guard let jobID = result["jobId"] as? String, !jobID.isEmpty else {
+        return .failed("Runtime accepted the Debug template without returning a Job ID")
+      }
+      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+}
+
+enum DebugTemplateJobExecution {
+  static func run(
+    targetID: String,
+    bindingRevision: Int,
+    templateID: String,
+    send: DebugTemplateJobSubmission.Request = {
+      await DebugXPCReadTransport.request(method: $0, params: $1)
+    }
+  ) async -> DebugLogJobRunResult {
+    switch await DebugTemplateJobSubmission.submit(
+      targetID: targetID, bindingRevision: bindingRevision,
+      templateID: templateID, send: send)
+    {
+    case .failed(let failure):
+      return .failed(failure)
+    case .submitted(let acceptance):
+      do {
+        let result = try DebugRuntimeResponseDecoding.resultObject(
+          await send("job.run", ["jobId": .string(acceptance.jobID)]))
+        return .completed(
+          try DebugRuntimeResponseDecoding.terminal(result, jobID: acceptance.jobID))
+      } catch let failure as DebugXPCReadFailure {
+        return .failed(failure.message)
+      } catch {
+        return .failed(String(describing: error))
+      }
+    }
+  }
+}
+
 enum DebugNativeLibraryRequestBuilder {
   static func request(
     target: DebugTargetPresentation,
@@ -873,6 +962,7 @@ enum DebugNativeLibraryRequestBuilder {
 
 public enum DebugApplicationFacade {
   public static let debugHAPReference = "debug.hap@1"
+  public static let debugTemplateReference = "debug.template@1"
   public static let nativeLibraryReference = "deploy.native-library.app-owned@1"
   public static let captureDiagnosticsReference = "capture.diagnostics@1"
   public static let createPortForwardReference = "port-forward.create@1"
@@ -881,6 +971,7 @@ public enum DebugApplicationFacade {
   static let descriptors: [CatalogOperationDescriptor] = [
     RuntimeOperationCatalog.descriptor(reference: captureDiagnosticsReference),
     RuntimeOperationCatalog.descriptor(reference: debugHAPReference),
+    RuntimeOperationCatalog.descriptor(reference: debugTemplateReference),
     RuntimeOperationCatalog.descriptor(reference: nativeLibraryReference),
     RuntimeOperationCatalog.descriptor(reference: createPortForwardReference),
     RuntimeOperationCatalog.descriptor(reference: removePortForwardReference),
@@ -1389,21 +1480,13 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     }
   }
 
-  func runTemplate(
+  func submitTemplate(
     target: DebugTargetPresentation,
     templateID: String
-  ) async -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure> {
-    guard DebugRuntimeCommandTemplate(rawValue: templateID) != nil else {
-      return .failure(.transport("Unknown Debug template"))
-    }
-    return DebugRuntimeResponseDecoding.command(
-      await DebugXPCReadTransport.request(
-        method: "debug.template.run",
-        params: [
-          "targetId": .string(target.id),
-          "templateId": .string(templateID),
-        ]),
-      target: target, templateID: templateID)
+  ) async -> DebugLogJobSubmissionResult {
+    await DebugTemplateJobSubmission.submit(
+      targetID: target.id, bindingRevision: target.bindingRevision,
+      templateID: templateID)
   }
 }
 
@@ -1513,6 +1596,7 @@ enum DebugWorkspaceResponseDecoding {
               || operation == DebugApplicationFacade.nativeLibraryReference
               || operation == DebugApplicationFacade.createPortForwardReference
               || operation == DebugApplicationFacade.removePortForwardReference
+              || operation == DebugApplicationFacade.debugTemplateReference
           else { continue }
           guard
             let id = entry["jobId"] as? String,
@@ -1691,45 +1775,6 @@ enum DebugRuntimeResponseDecoding {
     }
   }
 
-  static func command(
-    _ response: Result<Data, DebugXPCReadFailure>,
-    target: DebugTargetPresentation,
-    templateID: String
-  ) -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure> {
-    do {
-      let result = try resultObject(response)
-      guard result["targetId"] as? String == target.id,
-        result["bindingRevision"] as? Int == target.bindingRevision,
-        result["templateId"] as? String == templateID,
-        result["effect"] as? String == "readOnly",
-        result["executable"] as? String == "hdc",
-        let executableSHA256 = result["executableSha256"] as? String,
-        executableSHA256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
-        let arguments = result["arguments"] as? [String],
-        arguments.first == "-t", arguments.dropFirst().first == "<redacted-connect-key>",
-        let loweringSHA256 = result["loweringSha256"] as? String,
-        loweringSHA256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
-        let durationMilliseconds = result["durationMilliseconds"] as? Int,
-        durationMilliseconds >= 0,
-        let stdout = result["stdout"] as? String,
-        let stderr = result["stderr"] as? String,
-        let outputTruncated = result["outputTruncated"] as? Bool
-      else { return .failure(.transport("Runtime returned mismatched Debug command facts")) }
-      let exitCode = result["exitCode"] as? Int
-      return .success(
-        DebugRuntimeCommandResult(
-          targetID: target.id, bindingRevision: target.bindingRevision,
-          templateID: templateID, effect: "readOnly", executable: "hdc",
-          executableSHA256: executableSHA256, argumentDisclosure: arguments,
-          loweringSHA256: loweringSHA256, exitCode: exitCode,
-          durationMilliseconds: durationMilliseconds,
-          stdout: stdout, stderr: stderr, outputTruncated: outputTruncated))
-    } catch let failure as DebugXPCReadFailure {
-      return .failure(failure)
-    } catch {
-      return .failure(.transport(String(describing: error)))
-    }
-  }
 }
 
 private struct DebugResponseFailure: Error {

@@ -268,7 +268,14 @@ struct DebugWorkspaceView: View {
         runtimeProbe: model.workspace.runtimeProbe,
         probeFailure: model.workspace.probeFailure)
     case .commands:
-      DebugCommandsWorkspace(model: model, target: selectedTarget)
+      DebugCommandsWorkspace(
+        model: model,
+        operation: model.workspace.operation(DebugApplicationFacade.debugTemplateReference),
+        target: selectedTarget,
+        relatedJobs: relatedJobs(for: DebugApplicationFacade.debugTemplateReference),
+        runtimeArtifacts: model.runtimeArtifactRows(
+          operationReference: DebugApplicationFacade.debugTemplateReference,
+          targetID: selectedTarget?.id))
     }
   }
 
@@ -299,6 +306,7 @@ struct DebugWorkspaceView: View {
         DebugApplicationFacade.removePortForwardReference:
         .network
       case DebugApplicationFacade.captureDiagnosticsReference: .logs
+      case DebugApplicationFacade.debugTemplateReference: .commands
       default: .artifacts
       }
     activateTab(tab)
@@ -364,7 +372,7 @@ private struct DebugAccessibilityStatus: Equatable {
 /// not expose as a stable live-region modifier. This bridge observes only the
 /// coarse Native Debug state, so live HiLog lines are never announced one by
 /// one.
-private struct DebugNativeLibraryAnnouncementBridge: View {
+private struct DebugAccessibilityAnnouncementBridge: View {
   let status: DebugAccessibilityStatus?
 
   var body: some View {
@@ -674,7 +682,7 @@ private struct DebugArtifactsWorkspace: View {
       }
       reviewAndRun
         .background {
-          DebugNativeLibraryAnnouncementBridge(status: currentAccessibilityStatus)
+          DebugAccessibilityAnnouncementBridge(status: currentAccessibilityStatus)
         }
       productionBoundary
       if !runtimeArtifacts.isEmpty { resultArtifacts }
@@ -2452,10 +2460,15 @@ private struct DebugNetworkWorkspace: View {
 
 private struct DebugCommandsWorkspace: View {
   var model: DebugWorkspaceViewModel
+  let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
+  let relatedJobs: [DebugJobPresentation]
+  let runtimeArtifacts: [DebugRuntimeArtifactRow]
 
   @State private var selectedTemplateID =
     DebugApplicationFacade.approvedCommandTemplates.first?.id
+  @State private var pendingExport: DebugRuntimeArtifactRow?
+  @State private var isExportPreviewPresented = false
 
   private var selectedTemplate: DebugCommandTemplatePresentation? {
     DebugApplicationFacade.approvedCommandTemplates.first { $0.id == selectedTemplateID }
@@ -2465,21 +2478,42 @@ private struct DebugCommandsWorkspace: View {
     model.commandFeedbackMatches(target: target, templateID: selectedTemplateID)
   }
 
-  private var currentCommandResult: DebugRuntimeCommandResult? {
-    guard feedbackMatchesSelection, let target, let selectedTemplateID,
-      let result = model.commandResult,
-      result.targetID == target.id,
-      result.bindingRevision == target.bindingRevision,
-      result.templateID == selectedTemplateID
-    else { return nil }
-    return result
+  private var operationIsAvailable: Bool {
+    guard let operation else { return false }
+    if case .available = operation.availability { return true }
+    return false
+  }
+
+  private var scopedActiveJobID: String? {
+    feedbackMatchesSelection ? model.activeCommandJobID : nil
+  }
+
+  private var scopedTerminal: DebugLogJobTerminalPresentation? {
+    feedbackMatchesSelection ? model.commandTerminal : nil
+  }
+
+  private var currentAccessibilityStatus: DebugAccessibilityStatus? {
+    if feedbackMatchesSelection, let failure = model.commandFailure {
+      return DebugAccessibilityStatus(message: failure, isUrgent: true)
+    }
+    if let jobID = scopedActiveJobID {
+      return DebugAccessibilityStatus(
+        message: DebugL10n.text("debug.commands.job.running") + " " + jobID,
+        isUrgent: false)
+    }
+    if let terminal = scopedTerminal {
+      return DebugAccessibilityStatus(
+        message: "\(terminal.state) · \(terminal.jobID)",
+        isUrgent: terminal.outcomeUnknown)
+    }
+    return nil
   }
 
   var body: some View {
     WorkspacePage(maximumWidth: WorkspaceMetrics.pageMaxWidth) {
       // The whole tab's contract, stated before any template is chosen: a
-      // closed template set with schema-defined inputs, and the argv below is
-      // provider lowering echoed read-only, never an input.
+      // closed template set with schema-defined inputs, admitted and executed
+      // through the same durable Runtime Job path as every device workflow.
       WorkspaceNotice(
         tone: .warning, symbol: "exclamationmark.shield",
         identifier: "debug.commands.typedOnly"
@@ -2499,6 +2533,11 @@ private struct DebugCommandsWorkspace: View {
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("debug.commands.footer")
+      artifactsSection
+      DebugRecentJobsSection(model: model, jobs: relatedJobs)
+    }
+    .background {
+      DebugAccessibilityAnnouncementBridge(status: currentAccessibilityStatus)
     }
     .onChange(of: selectedTemplateID) { _, _ in model.clearCommandResult() }
   }
@@ -2512,12 +2551,13 @@ private struct DebugCommandsWorkspace: View {
     ) {
       ForEach(DebugApplicationFacade.approvedCommandTemplates, id: \.id) { template in
         Button {
-          selectedTemplateID = template.id
+          selectTemplate(template)
         } label: {
           DebugCommandTemplateRow(
             template: template, isSelected: selectedTemplateID == template.id)
         }
         .buttonStyle(.plain)
+        .disabled(model.isSubmittingCommand)
         .accessibilityIdentifier("debug.commands.template.\(template.id)")
       }
     }
@@ -2535,33 +2575,22 @@ private struct DebugCommandsWorkspace: View {
     }
   }
 
-  /// The template's identity and the provider's lowering of it are the same
-  /// subject — what exactly will be invoked — so they are one section instead
-  /// of two stacked cards repeating the action ID.
+  /// The App publishes only the typed request. Provider lowering stays inside
+  /// the admitted Job and is available afterward in the report Artifact.
   private func invocationSection(_ template: DebugCommandTemplatePresentation) -> some View {
     WorkspaceSection(
       Text(DebugL10n.text("debug.commands.argv.title")),
       accessory: {
-        WorkspaceChip(
-          text: Text(template.effect),
-          tone: template.effect == "readOnly" ? .neutral : .warning,
-          symbol: effectSymbol(template.effect))
+        DebugAvailabilityStatus(operation: operation)
       }
     ) {
+      DebugAvailabilityNotice(operation: operation)
       templateIdentity(template)
       Divider()
       DebugCodeRow(
-        label: DebugL10n.text("debug.commands.executable"),
-        value: currentCommandResult.map {
-          "\($0.executable) · sha256:\($0.executableSHA256.prefix(12))"
-        } ?? DebugL10n.text("debug.commands.notGenerated"))
-      DebugCodeRow(
-        label: DebugL10n.text("debug.commands.arguments"),
-        value: currentCommandResult?.argumentDisclosure.joined(separator: " ")
-          ?? DebugL10n.text("debug.commands.notGenerated"))
-      if let result = currentCommandResult {
-        DebugCodeRow(label: "lowering sha256", value: result.loweringSHA256)
-      }
+        label: DebugL10n.text("debug.availability.operation"),
+        value: DebugApplicationFacade.debugTemplateReference)
+      DebugCodeRow(label: "templateId", value: template.id)
       Text(DebugL10n.text("debug.commands.argv.note"))
         .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
@@ -2574,6 +2603,10 @@ private struct DebugCommandsWorkspace: View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
       DebugCodeRow(label: "catalog", value: "arkdeck-remote-operations@1.0.0")
       DebugCodeRow(label: "actionId", value: template.id)
+      LabeledContent(DebugL10n.text("debug.commands.effect")) {
+        Label(template.effect, systemImage: effectSymbol(template.effect))
+          .foregroundStyle(.secondary)
+      }
       LabeledContent(DebugL10n.text("debug.commands.target")) {
         Text(target?.id ?? DebugL10n.text("debug.target.none"))
           .font(WorkspaceFont.monospacedValue)
@@ -2588,16 +2621,31 @@ private struct DebugCommandsWorkspace: View {
     VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
       Divider()
       HStack(spacing: WorkspaceMetrics.contentGap) {
-        Button(DebugL10n.text("debug.commands.run")) {
-          guard let target else { return }
-          model.runTemplate(target: target, templateID: template.id)
+        if scopedActiveJobID != nil {
+          Button(DebugL10n.text("debug.action.cancel"), action: model.cancelCommand)
+            .disabled(model.isCancellingCommand)
+            .accessibilityIdentifier("debug.commands.cancel")
+        } else {
+          Button(DebugL10n.text("debug.commands.run")) {
+            runTemplate(template)
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(
+            target == nil || !operationIsAvailable || !template.isRunnable
+              || model.isSubmittingCommand
+          )
+          .help(DebugL10n.text("debug.commands.noPTY"))
+          .accessibilityIdentifier("debug.commands.run")
         }
-        .buttonStyle(.borderedProminent)
-        .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
-        .help(DebugL10n.text("debug.commands.noPTY"))
-        .accessibilityIdentifier("debug.commands.run")
-        if feedbackMatchesSelection && model.isRunningCommand {
+        if feedbackMatchesSelection && model.isSubmittingCommand {
           ProgressView().controlSize(.small)
+        }
+        if let jobID = scopedActiveJobID {
+          Text(jobID)
+            .font(WorkspaceFont.monospacedDense)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
         }
         Spacer(minLength: 0)
       }
@@ -2613,27 +2661,145 @@ private struct DebugCommandsWorkspace: View {
 
   private func resultSection() -> some View {
     WorkspaceSection(Text(DebugL10n.text("debug.commands.result.title"))) {
-      HStack {
+      if let terminal = scopedTerminal {
         DebugCodeRow(
-          label: DebugL10n.text("debug.commands.result.exitCode"),
-          value: currentCommandResult?.exitCode.map(String.init) ?? "—")
-        Spacer()
+          label: DebugL10n.text("debug.commands.job.id"), value: terminal.jobID)
         DebugCodeRow(
-          label: DebugL10n.text("debug.commands.result.duration"),
-          value: currentCommandResult.map { "\($0.durationMilliseconds) ms" } ?? "—")
-      }
-      Divider()
-      LabeledContent(DebugL10n.text("debug.commands.result.stdout")) {
-        Text(currentCommandResult?.stdout ?? DebugL10n.text("debug.commands.result.none"))
-          .font(WorkspaceFont.monospacedValue)
-          .textSelection(.enabled)
-      }
-      LabeledContent(DebugL10n.text("debug.commands.result.stderr")) {
-        Text(currentCommandResult?.stderr ?? DebugL10n.text("debug.commands.result.none"))
-          .font(WorkspaceFont.monospacedValue)
-          .textSelection(.enabled)
+          label: DebugL10n.text("debug.commands.job.state"), value: terminal.state)
+        DebugCodeRow(
+          label: DebugL10n.text("debug.commands.job.outcome"),
+          value: terminal.outcomeUnknown
+            ? DebugL10n.text("debug.commands.job.unknown")
+            : DebugL10n.text("debug.commands.job.known"))
+        if let failure = terminal.operationFailure {
+          Label(
+            DebugL10n.text("debug.failure.\(failure.code.rawValue)"),
+            systemImage: "exclamationmark.triangle")
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        if let latest = terminal.timeline.last {
+          Divider()
+          LabeledContent(DebugL10n.text("debug.commands.job.latest")) {
+            Text(latest)
+              .font(WorkspaceFont.monospacedValue)
+              .textSelection(.enabled)
+          }
+        }
+      } else {
+        Text(DebugL10n.text("debug.commands.result.none"))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
       }
     }
+  }
+
+  private var artifactsSection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.commands.artifacts.title"))) {
+      if runtimeArtifacts.isEmpty {
+        ContentUnavailableView {
+          Label(
+            DebugL10n.text("debug.commands.artifacts.empty"),
+            systemImage: "doc.badge.clock")
+        } description: {
+          Text(DebugL10n.text("debug.commands.artifacts.empty.detail"))
+        }
+        .frame(minHeight: 110)
+      } else {
+        ForEach(runtimeArtifacts) { row in
+          artifactRow(row)
+        }
+      }
+    }
+    .confirmationDialog(
+      DebugL10n.text("debug.logs.exportPreview.title"),
+      isPresented: $isExportPreviewPresented,
+      presenting: pendingExport
+    ) { row in
+      Button(
+        DebugL10n.text(
+          row.artifact.privacy == "sensitive"
+            ? "debug.logs.exportSensitive" : "debug.logs.exportConfirm")
+      ) {
+        chooseExportDestination(for: row)
+      }
+      Button(DebugL10n.text("debug.logs.exportCancel"), role: .cancel) {}
+    } message: { row in
+      Text(
+        String(
+          localized: LocalizedStringResource.DebugLocalizable
+            .debugLogsExportPreviewMessage(
+              row.artifact.name,
+              ByteCountFormatter.string(
+                fromByteCount: row.artifact.byteCount, countStyle: .file),
+              row.artifact.privacy,
+              row.artifact.sha256)))
+    }
+  }
+
+  private func artifactRow(_ row: DebugRuntimeArtifactRow) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: WorkspaceMetrics.contentGap) {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+        Text(row.artifact.name).font(WorkspaceFont.monospacedValue)
+        Text("\(row.artifact.status) · \(row.artifact.privacy) · \(row.jobID)")
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: WorkspaceMetrics.contentGap)
+      Text(
+        ByteCountFormatter.string(
+          fromByteCount: row.artifact.byteCount, countStyle: .file)
+      )
+      .font(WorkspaceFont.monospacedDense.monospacedDigit())
+      Text(String(row.artifact.sha256.prefix(12)))
+        .font(WorkspaceFont.monospacedDense)
+        .help(row.artifact.sha256)
+      Button(DebugL10n.text("debug.logs.export")) {
+        pendingExport = row
+        isExportPreviewPresented = true
+      }
+      .controlSize(.small)
+      .disabled(
+        row.artifact.status != "published"
+          || model.exportStatesByArtifactID[row.artifact.id] == .exporting
+      )
+      .accessibilityIdentifier("debug.commands.export.\(row.artifact.id)")
+      if model.exportStatesByArtifactID[row.artifact.id] == .exporting {
+        ProgressView()
+          .controlSize(.small)
+          .accessibilityLabel(DebugL10n.text("debug.logs.exporting"))
+      }
+    }
+  }
+
+  private func selectTemplate(_ template: DebugCommandTemplatePresentation) {
+    selectedTemplateID = template.id
+  }
+
+  private func runTemplate(_ template: DebugCommandTemplatePresentation) {
+    guard let target else { return }
+    model.submitTemplate(target: target, templateID: template.id)
+  }
+
+  private func chooseExportDestination(for row: DebugRuntimeArtifactRow) {
+    let panel = NSSavePanel()
+    panel.canCreateDirectories = true
+    panel.isExtensionHidden = false
+    panel.nameFieldStringValue = safeExportName(row.artifact.name)
+    Task { @MainActor in
+      guard await panel.begin() == .OK, let url = panel.url else { return }
+      model.exportArtifact(
+        jobID: row.jobID,
+        artifact: row.artifact,
+        destinationURL: url,
+        allowSensitive: row.artifact.privacy == "sensitive")
+    }
+  }
+
+  private func safeExportName(_ value: String) -> String {
+    let sanitized = value.replacing("/", with: "_").replacing(":", with: "_")
+    return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
   }
 }
 
@@ -2910,8 +3076,10 @@ final class DebugWorkspaceViewModel {
   private(set) var activeLogJobID: String?
   private(set) var logTerminal: DebugLogJobTerminalPresentation?
   private(set) var logFailure: String?
-  private(set) var isRunningCommand = false
-  private(set) var commandResult: DebugRuntimeCommandResult?
+  private(set) var isSubmittingCommand = false
+  private(set) var isCancellingCommand = false
+  private(set) var activeCommandJobID: String?
+  private(set) var commandTerminal: DebugLogJobTerminalPresentation?
   private(set) var commandFailure: String?
   private(set) var isMutatingPortRule = false
   private(set) var isCancellingPortRule = false
@@ -3391,6 +3559,7 @@ final class DebugWorkspaceViewModel {
     case DebugApplicationFacade.debugHAPReference: hapFailure = message
     case DebugApplicationFacade.captureDiagnosticsReference: logFailure = message
     case DebugApplicationFacade.nativeLibraryReference: nativeLibraryFailure = message
+    case DebugApplicationFacade.debugTemplateReference: commandFailure = message
     default: portRuleFailure = message
     }
   }
@@ -3450,28 +3619,61 @@ final class DebugWorkspaceViewModel {
     }
   }
 
-  func runTemplate(target: DebugTargetPresentation, templateID: String) {
-    guard !isRunningCommand else { return }
+  func submitTemplate(target: DebugTargetPresentation, templateID: String) {
+    guard !isSubmittingCommand else { return }
     commandFeedbackScope = CommandFeedbackScope(
       target: TargetBindingScope(target: target), templateID: templateID)
-    isRunningCommand = true
-    commandResult = nil
+    isSubmittingCommand = true
+    activeCommandJobID = nil
+    commandTerminal = nil
     commandFailure = nil
     let provider = provider
     Task { [weak self] in
-      let result = await provider.runTemplate(target: target, templateID: templateID)
-      guard let self else { return }
-      self.isRunningCommand = false
-      switch result {
-      case .success(let command): self.commandResult = command
-      case .failure(let failure): self.commandFailure = failure.message
+      let submitted = await provider.submitTemplate(target: target, templateID: templateID)
+      guard let self, !Task.isCancelled else { return }
+      switch submitted {
+      case .failed(let failure):
+        self.commandFailure = failure
+        self.isSubmittingCommand = false
+      case .submitted(let acceptance):
+        self.activeCommandJobID = acceptance.jobID
+        let polling = Task { @MainActor [weak self] in
+          while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled else { break }
+            self?.refresh(targetID: target.id)
+          }
+        }
+        let result = await provider.run(jobID: acceptance.jobID)
+        polling.cancel()
+        guard !Task.isCancelled else { return }
+        self.activeCommandJobID = nil
+        self.isSubmittingCommand = false
+        switch result {
+        case .completed(let terminal): self.commandTerminal = terminal
+        case .failed(let failure): self.commandFailure = failure
+        }
+        self.refresh(targetID: target.id)
       }
     }
   }
 
+  func cancelCommand() {
+    guard let jobID = activeCommandJobID, !isCancellingCommand else { return }
+    isCancellingCommand = true
+    let provider = provider
+    Task { [weak self] in
+      let accepted = await provider.cancel(jobID: jobID)
+      guard let self else { return }
+      self.isCancellingCommand = false
+      if !accepted { self.commandFailure = "Runtime refused the cancellation request" }
+    }
+  }
+
   func clearCommandResult() {
+    guard activeCommandJobID == nil else { return }
     commandFeedbackScope = nil
-    commandResult = nil
+    commandTerminal = nil
     commandFailure = nil
   }
 }

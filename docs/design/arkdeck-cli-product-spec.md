@@ -1571,8 +1571,10 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `direct` 131、`local` 94、`presentation` 21、`internal` 18、`refused` 10、`platformService` 4、
   `generic` 1（`flash.dayu200` alias），`blocked` 0，`summary.fullFunction = true`。
 - Golden Journey headless 闭环：2026-09-02 在 digest `508783ac…` 上按 `cli-golden-journey-headless-runbook.md` headless 复跑：GJ-1/GJ-2/GJ-3/GJ-4/GJ-5 均 `REAL_DEVICE_PASS`（含 §2.1 HAR crash-resume 与 `debug.template@1` smoke），29 个 canonical operation 的真机覆盖矩阵 12 `realDevicePass` / 17 `notExercised`，记录见 `references/v1.6-goal/gj-headless-rerun-2026-09-02.json` 与 `real-device-validation.md`。
-- 0.2 版 §13.2 列出的 12 个 daemon-ready 方法中 11 个已有一等 leaf；唯一例外 `debug.template.run`
-  是 App 直连路径，coverage 记为 `direct` + `deprecated`，CLI 经 `debug.template@1` 到达同一模板集。
+- 0.2 版 §13.2 列出的 12 个 daemon-ready 方法均已有一等 leaf。App 的 Debug Commands 与
+  Overview 也经 `debug.template@1` 的 Runtime Job 路径运行模板；App XPC 不再转发
+  `debug.template.run`。该方法只作为 Unix control plane 的 deprecated 兼容面保留，CLI 与 App
+  均不调用。
 
 ### 13.2 尚未闭合的目标面
 
