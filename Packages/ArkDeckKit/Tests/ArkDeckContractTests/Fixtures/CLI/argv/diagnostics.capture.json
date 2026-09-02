@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "diagnostics",
+        "capture"
+      ],
+      "expected": {
+        "command": "diagnostics.capture",
+        "handlerArguments": [
+          "diagnostics",
+          "capture"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "capture",
+        "--help"
+      ],
+      "expected": {
+        "command": "diagnostics.capture",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "capture",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.capture",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "capture",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.capture",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "capture",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "diagnostics.capture",
+        "handlerArguments": [
+          "diagnostics",
+          "capture",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "diagnostics.capture",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "diagnostics",
+    "capture"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

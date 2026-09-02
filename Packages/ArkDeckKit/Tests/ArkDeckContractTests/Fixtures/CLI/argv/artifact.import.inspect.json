@@ -1,0 +1,125 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "inspect",
+        "--import-request-id",
+        "ctl-fixture-0001"
+      ],
+      "expected": {
+        "command": "artifact.import.inspect",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "inspect",
+          "--import-request-id",
+          "ctl-fixture-0001"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "inspect",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.import.inspect",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "inspect",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "inspect"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "inspect",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "inspect",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.import.inspect",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "inspect",
+          "--import-request-id",
+          "ctl-fixture-0001",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.import.inspect",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "artifact",
+    "import",
+    "inspect"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

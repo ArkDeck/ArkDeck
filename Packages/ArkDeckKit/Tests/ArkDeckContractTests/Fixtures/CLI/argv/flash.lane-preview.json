@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "lane-preview",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--archive-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "expected": {
+        "command": "flash.lane-preview",
+        "handlerArguments": [
+          "flash",
+          "lane-preview",
+          "--target",
+          "sample",
+          "--device-profile",
+          "sample",
+          "--archive-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "lane-preview",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.lane-preview",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "lane-preview",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--archive-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.lane-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "lane-preview",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--archive-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.lane-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "lane-preview"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.lane-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "flash",
+        "lane-preview",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--archive-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.lane-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "lane-preview",
+        "--target",
+        "sample",
+        "--device-profile",
+        "sample",
+        "--archive-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.lane-preview",
+        "handlerArguments": [
+          "flash",
+          "lane-preview",
+          "--target",
+          "sample",
+          "--device-profile",
+          "sample",
+          "--archive-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.lane-preview",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "lane-preview"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

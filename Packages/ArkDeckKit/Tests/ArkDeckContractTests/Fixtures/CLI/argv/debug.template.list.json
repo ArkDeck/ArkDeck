@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "debug",
+        "template",
+        "list"
+      ],
+      "expected": {
+        "command": "debug.template.list",
+        "handlerArguments": [
+          "debug",
+          "template",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "debug.template.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.template.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.template.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "debug",
+        "template",
+        "list",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.template.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "debug.template.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "debug",
+    "template",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

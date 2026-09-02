@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "list"
+      ],
+      "expected": {
+        "command": "runtime.tool.list",
+        "handlerArguments": [
+          "runtime",
+          "tool",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.tool.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "list",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.tool.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "tool",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

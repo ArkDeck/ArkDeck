@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "recovery",
+        "cleanup",
+        "list"
+      ],
+      "expected": {
+        "command": "recovery.cleanup.list",
+        "handlerArguments": [
+          "recovery",
+          "cleanup",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "recovery",
+        "cleanup",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "recovery.cleanup.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "recovery",
+        "cleanup",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.cleanup.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "recovery",
+        "cleanup",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.cleanup.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "recovery",
+        "cleanup",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "recovery.cleanup.list",
+        "handlerArguments": [
+          "recovery",
+          "cleanup",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "recovery.cleanup.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "recovery",
+    "cleanup",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

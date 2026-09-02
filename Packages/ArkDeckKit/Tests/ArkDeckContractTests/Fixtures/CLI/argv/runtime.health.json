@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "health"
+      ],
+      "expected": {
+        "command": "runtime.health",
+        "handlerArguments": [
+          "runtime",
+          "health"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "health",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.health",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "health",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.health",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "health",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.health",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "health",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.health",
+        "handlerArguments": [
+          "runtime",
+          "health",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.health",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "health"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

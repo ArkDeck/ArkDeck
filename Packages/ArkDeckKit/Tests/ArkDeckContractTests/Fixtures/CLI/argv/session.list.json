@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "session",
+        "list"
+      ],
+      "expected": {
+        "command": "session.list",
+        "handlerArguments": [
+          "session",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "session",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "session.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "session",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "session",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "session",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "session.list",
+        "handlerArguments": [
+          "session",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "session.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "session",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

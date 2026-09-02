@@ -1,0 +1,12 @@
+{
+  "kind": "cleanup",
+  "owner": {
+    "id": "job-0f3c2a7e-4d1b-4c0a-9e2d-5b6a7c8d9e0f",
+    "kind": "job"
+  },
+  "reasonCode": "recovery.cleanupDebt",
+  "resource": {
+    "id": "debt-3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+    "kind": "cleanupDebt"
+  }
+}

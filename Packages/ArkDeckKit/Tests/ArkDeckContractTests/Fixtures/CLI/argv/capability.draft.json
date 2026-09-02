@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "capability",
+        "draft"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidCommand",
+        "command": "capability.draft",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "capability",
+        "draft",
+        "--help"
+      ],
+      "expected": {
+        "command": "capability.draft",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "capability.draft",
+  "kind": "refused",
+  "lifecycleStatus": "current",
+  "path": [
+    "capability",
+    "draft"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

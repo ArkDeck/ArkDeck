@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "operation",
+        "example",
+        "--operation",
+        "sample"
+      ],
+      "expected": {
+        "command": "operation.example",
+        "handlerArguments": [
+          "operation",
+          "example",
+          "--operation",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "operation",
+        "example",
+        "--help"
+      ],
+      "expected": {
+        "command": "operation.example",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "operation",
+        "example",
+        "--operation",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.example",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "operation",
+        "example",
+        "--operation",
+        "sample",
+        "--operation",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.example",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "operation",
+        "example"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.example",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "operation",
+        "example",
+        "--operation",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.example",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "operation",
+        "example",
+        "--operation",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "operation.example",
+        "handlerArguments": [
+          "operation",
+          "example",
+          "--operation",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "operation.example",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "operation",
+    "example"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

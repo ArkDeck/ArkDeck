@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "preview"
+      ],
+      "expected": {
+        "command": "session.cleanup.preview",
+        "handlerArguments": [
+          "session",
+          "cleanup",
+          "preview"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "preview",
+        "--help"
+      ],
+      "expected": {
+        "command": "session.cleanup.preview",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "preview",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.cleanup.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "preview",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.cleanup.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "preview",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "session.cleanup.preview",
+        "handlerArguments": [
+          "session",
+          "cleanup",
+          "preview",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "session.cleanup.preview",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "session",
+    "cleanup",
+    "preview"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

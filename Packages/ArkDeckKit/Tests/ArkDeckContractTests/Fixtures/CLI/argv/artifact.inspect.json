@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "inspect",
+        "--artifact",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.inspect",
+        "handlerArguments": [
+          "artifact",
+          "inspect",
+          "--artifact",
+          "sample",
+          "--job",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "inspect",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.inspect",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "inspect",
+        "--artifact",
+        "sample",
+        "--job",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "inspect",
+        "--artifact",
+        "sample",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "inspect"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "artifact",
+        "inspect",
+        "--artifact",
+        "sample",
+        "--job",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "inspect",
+        "--artifact",
+        "sample",
+        "--job",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.inspect",
+        "handlerArguments": [
+          "artifact",
+          "inspect",
+          "--artifact",
+          "sample",
+          "--job",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.inspect",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "artifact",
+    "inspect"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

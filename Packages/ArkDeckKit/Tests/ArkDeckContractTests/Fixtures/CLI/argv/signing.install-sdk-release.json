@@ -1,0 +1,163 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release",
+        "--sdk",
+        "sample",
+        "--java",
+        "sample",
+        "--bundle-name",
+        "sample"
+      ],
+      "expected": {
+        "command": "signing.install-sdk-release",
+        "handlerArguments": [
+          "signing",
+          "install-sdk-release",
+          "--sdk",
+          "sample",
+          "--java",
+          "sample",
+          "--bundle-name",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release",
+        "--help"
+      ],
+      "expected": {
+        "command": "signing.install-sdk-release",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release",
+        "--sdk",
+        "sample",
+        "--java",
+        "sample",
+        "--bundle-name",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.install-sdk-release",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing install-sdk-release"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release",
+        "--sdk",
+        "sample",
+        "--java",
+        "sample",
+        "--bundle-name",
+        "sample",
+        "--sdk",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.install-sdk-release",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing install-sdk-release"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.install-sdk-release",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing install-sdk-release"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release",
+        "--sdk",
+        "sample",
+        "--java",
+        "sample",
+        "--bundle-name",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.install-sdk-release",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing install-sdk-release"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "signing",
+        "install-sdk-release",
+        "--sdk",
+        "sample",
+        "--java",
+        "sample",
+        "--bundle-name",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "signing.install-sdk-release",
+        "exitCode": 64,
+        "lifecycleStatus": "deprecated",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck runtime signing install-sdk-release"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "signing.install-sdk-release",
+  "kind": "executable",
+  "lifecycleStatus": "deprecated",
+  "path": [
+    "signing",
+    "install-sdk-release"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "analyze",
+        "crash-signature"
+      ],
+      "expected": {
+        "command": "analyze.crash-signature",
+        "handlerArguments": [
+          "analyze",
+          "crash-signature"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "analyze",
+        "crash-signature",
+        "--help"
+      ],
+      "expected": {
+        "command": "analyze.crash-signature",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "analyze",
+        "crash-signature",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "analyze.crash-signature",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "analyze",
+        "crash-signature",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "analyze.crash-signature",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "analyze",
+        "crash-signature",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "analyze.crash-signature",
+        "handlerArguments": [
+          "analyze",
+          "crash-signature",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "analyze.crash-signature",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "analyze",
+    "crash-signature"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

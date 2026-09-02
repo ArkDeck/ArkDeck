@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "agent",
+        "chat"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "commandRemoved",
+        "command": "agent.chat",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "agent",
+        "chat",
+        "--help"
+      ],
+      "expected": {
+        "command": "agent.chat",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "agent.chat",
+  "kind": "tombstone",
+  "lifecycleStatus": "removed",
+  "path": [
+    "agent",
+    "chat"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

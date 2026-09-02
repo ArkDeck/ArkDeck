@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "analyze",
+        "trace-summary"
+      ],
+      "expected": {
+        "command": "analyze.trace-summary",
+        "handlerArguments": [
+          "analyze",
+          "trace-summary"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "analyze",
+        "trace-summary",
+        "--help"
+      ],
+      "expected": {
+        "command": "analyze.trace-summary",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "analyze",
+        "trace-summary",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "analyze.trace-summary",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "analyze",
+        "trace-summary",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "analyze.trace-summary",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "analyze",
+        "trace-summary",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "analyze.trace-summary",
+        "handlerArguments": [
+          "analyze",
+          "trace-summary",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "analyze.trace-summary",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "analyze",
+    "trace-summary"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

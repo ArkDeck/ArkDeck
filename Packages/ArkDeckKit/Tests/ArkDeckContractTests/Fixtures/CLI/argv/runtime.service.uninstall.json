@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "uninstall"
+      ],
+      "expected": {
+        "command": "runtime.service.uninstall",
+        "handlerArguments": [
+          "runtime",
+          "service",
+          "uninstall"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "uninstall",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.service.uninstall",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "uninstall",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.uninstall",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "uninstall",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.uninstall",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "uninstall",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.uninstall",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.service.uninstall",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "service",
+    "uninstall"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

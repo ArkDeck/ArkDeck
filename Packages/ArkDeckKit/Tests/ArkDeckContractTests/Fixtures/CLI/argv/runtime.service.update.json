@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "update"
+      ],
+      "expected": {
+        "command": "runtime.service.update",
+        "handlerArguments": [
+          "runtime",
+          "service",
+          "update"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "update",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.service.update",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "update",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "update",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "update",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.service.update",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "service",
+    "update"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

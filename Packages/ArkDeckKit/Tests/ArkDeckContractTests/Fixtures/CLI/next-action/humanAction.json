@@ -1,0 +1,14 @@
+{
+  "expiresAt": "2026-08-30T12:00:00Z",
+  "kind": "humanAction",
+  "owner": {
+    "id": "exec-7a1d3f52-2c9e-4b8a-a1d0-3e4f5a6b7c8d",
+    "kind": "agentExecution"
+  },
+  "reasonCode": "device.trustPending",
+  "resource": {
+    "id": "har-2b3c4d5e-6f70-4a8b-9c0d-1e2f3a4b5c6d",
+    "kind": "humanAction"
+  },
+  "resumeReference": "resume-9d8c7b6a-5f4e-4d3c-b2a1-0f9e8d7c6b5a"
+}

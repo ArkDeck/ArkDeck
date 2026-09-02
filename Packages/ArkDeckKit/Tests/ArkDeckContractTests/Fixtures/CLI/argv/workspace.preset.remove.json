@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "workspace.preset.remove",
+        "handlerArguments": [
+          "workspace",
+          "preset",
+          "remove",
+          "--mutation-request-id",
+          "sample",
+          "--project",
+          "sample",
+          "--preset",
+          "sample",
+          "--expected-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.preset.remove",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--mutation-request-id",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "remove",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.preset.remove",
+        "handlerArguments": [
+          "workspace",
+          "preset",
+          "remove",
+          "--mutation-request-id",
+          "sample",
+          "--project",
+          "sample",
+          "--preset",
+          "sample",
+          "--expected-generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.preset.remove",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "preset",
+    "remove"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "control-action",
+        "show",
+        "--control-action",
+        "sample"
+      ],
+      "expected": {
+        "command": "control-action.show",
+        "handlerArguments": [
+          "control-action",
+          "show",
+          "--control-action",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "control-action",
+        "show",
+        "--help"
+      ],
+      "expected": {
+        "command": "control-action.show",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "control-action",
+        "show",
+        "--control-action",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "control-action",
+        "show",
+        "--control-action",
+        "sample",
+        "--control-action",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "control-action",
+        "show"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "control-action",
+        "show",
+        "--control-action",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "control-action",
+        "show",
+        "--control-action",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "control-action.show",
+        "handlerArguments": [
+          "control-action",
+          "show",
+          "--control-action",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "control-action.show",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "control-action",
+    "show"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "cancel"
+      ],
+      "expected": {
+        "command": "runtime.update.cancel",
+        "handlerArguments": [
+          "runtime",
+          "update",
+          "cancel"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "cancel",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.update.cancel",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "cancel",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.cancel",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "cancel",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.cancel",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "cancel",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.update.cancel",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.update.cancel",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "update",
+    "cancel"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

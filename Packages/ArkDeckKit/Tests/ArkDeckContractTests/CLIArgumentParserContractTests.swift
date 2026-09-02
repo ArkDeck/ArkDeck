@@ -783,10 +783,14 @@ final class CLIArgumentParserContractTests: XCTestCase {
     ] {
       XCTAssertNotNil(fields[key], "§12 requires \(key) to be reported separately")
     }
-    // A component this build cannot produce is `null`, never a version copied
-    // out of the spec: `--version` describes this client, not the document.
-    XCTAssertEqual(fields["pageSchemaVersion"], .null)
-    XCTAssertEqual(fields["nextActionSchemaVersion"], .null)
+    // A component this build cannot produce would be `null`, never a version
+    // copied out of the spec: `--version` describes this client, not the
+    // document. The page and next-action shapes are published since the §14
+    // bundle exists, and the value is the constant the bundle's schema files
+    // are titled with, so the two cannot disagree.
+    XCTAssertEqual(fields["pageSchemaVersion"], .string(CLIMachineContracts.pageSchemaVersion))
+    XCTAssertEqual(
+      fields["nextActionSchemaVersion"], .string(CLIMachineContracts.nextActionSchemaVersion))
     // The event schema is the other way round, and the distinction is the
     // point of this field: `job watch --output jsonl` really does emit
     // `arkdeck.cli.event/1`, so a consumer can pin the shape it parses. That

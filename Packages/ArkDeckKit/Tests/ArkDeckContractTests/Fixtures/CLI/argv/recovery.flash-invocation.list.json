@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "list"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.list",
+        "handlerArguments": [
+          "recovery",
+          "flash-invocation",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.list",
+        "handlerArguments": [
+          "recovery",
+          "flash-invocation",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "recovery.flash-invocation.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "recovery",
+    "flash-invocation",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

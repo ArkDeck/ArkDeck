@@ -16,6 +16,17 @@ enum DebugWorkspaceTab: String, CaseIterable, Hashable {
     DebugL10n.text("debug.tab.\(rawValue)")
   }
 
+  /// §14: the tab's stable product capability in the shared registry.
+  var productCapability: AppDebugTabCapability {
+    switch self {
+    case .artifacts: .artifacts
+    case .logs: .logs
+    case .apps: .apps
+    case .network: .network
+    case .commands: .commands
+    }
+  }
+
   var symbol: String {
     switch self {
     case .artifacts: "shippingbox.and.arrow.backward"

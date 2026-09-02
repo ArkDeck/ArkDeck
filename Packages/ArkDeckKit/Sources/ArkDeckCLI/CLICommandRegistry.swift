@@ -2948,7 +2948,51 @@ enum CLICommandRegistry {
   private static let maintainerNode = CLINodeSpec(
     token: "maintainer",
     summary: "release maintenance tooling; never touches a private key",
-    groups: [maintainerUpdateFeedNode])
+    groups: [maintainerUpdateFeedNode, maintainerContractsNode])
+
+  /// §14's machine-contract bundle. Both leaves are local: they read the
+  /// registries compiled into this binary and touch no Runtime or device.
+  private static let maintainerContractsNode = CLINodeSpec(
+    token: "contracts",
+    summary: "the language-neutral machine-contract bundle generated from this build's registries",
+    leaves: [
+      CLILeafSpec(
+        token: "export",
+        canonicalCommand: "maintainer.contracts.export",
+        summary: "write every §14 contract product and argv fixture from the compiled registries",
+        options: [
+          CLIOptionSpec(
+            name: "--contracts-directory",
+            form: .value(placeholder: "directory", grammar: .opaque),
+            summary: "absolute `openspec/contracts` directory to write into",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--fixtures-directory",
+            form: .value(placeholder: "directory", grammar: .opaque),
+            summary: "absolute CLI fixture directory to write into",
+            isRequired: true),
+          outputOption,
+        ],
+        outputModes: [.human, .json]),
+      CLILeafSpec(
+        token: "check",
+        canonicalCommand: "maintainer.contracts.check",
+        summary: "fail unless the checked-in bundle equals what this build would export",
+        options: [
+          CLIOptionSpec(
+            name: "--contracts-directory",
+            form: .value(placeholder: "directory", grammar: .opaque),
+            summary: "absolute `openspec/contracts` directory to compare",
+            isRequired: true),
+          CLIOptionSpec(
+            name: "--fixtures-directory",
+            form: .value(placeholder: "directory", grammar: .opaque),
+            summary: "absolute CLI fixture directory to compare",
+            isRequired: true),
+          outputOption,
+        ],
+        outputModes: [.human, .json]),
+    ])
 
   private static let maintainerUpdateFeedNode = CLINodeSpec(
     token: "update-feed",

@@ -1,0 +1,200 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1"
+      ],
+      "expected": {
+        "command": "workspace.preset.register",
+        "handlerArguments": [
+          "workspace",
+          "preset",
+          "register",
+          "--registration-request-id",
+          "sample",
+          "--project",
+          "sample",
+          "--kind",
+          "build",
+          "--template",
+          "sample",
+          "--timeout-seconds",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.preset.register",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--registration-request-id",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.preset.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.preset.register",
+        "handlerArguments": [
+          "workspace",
+          "preset",
+          "register",
+          "--registration-request-id",
+          "sample",
+          "--project",
+          "sample",
+          "--kind",
+          "build",
+          "--template",
+          "sample",
+          "--timeout-seconds",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.preset.register",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "preset",
+    "register"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

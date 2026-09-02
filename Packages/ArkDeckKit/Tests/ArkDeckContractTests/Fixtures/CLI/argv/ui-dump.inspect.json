@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "ui-dump",
+        "inspect",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "command": "ui-dump.inspect",
+        "handlerArguments": [
+          "ui-dump",
+          "inspect",
+          "--job",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "inspect",
+        "--help"
+      ],
+      "expected": {
+        "command": "ui-dump.inspect",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "inspect",
+        "--job",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "inspect",
+        "--job",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "inspect"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "inspect",
+        "--job",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "inspect",
+        "--job",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "ui-dump.inspect",
+        "handlerArguments": [
+          "ui-dump",
+          "inspect",
+          "--job",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "ui-dump.inspect",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "ui-dump",
+    "inspect"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,138 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect",
+        "--bundle",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.bundle.inspect",
+        "handlerArguments": [
+          "runtime",
+          "bundle",
+          "inspect",
+          "--bundle",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.bundle.inspect",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect",
+        "--bundle",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect",
+        "--bundle",
+        "sample",
+        "--bundle",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect",
+        "--bundle",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "bundle",
+        "inspect",
+        "--bundle",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.bundle.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.bundle.inspect",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "bundle",
+    "inspect"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

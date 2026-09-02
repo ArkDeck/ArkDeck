@@ -1,0 +1,184 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "debug",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "sample",
+        "--build-sha256",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.evaluate",
+        "handlerArguments": [
+          "debug",
+          "evaluate",
+          "--invocation",
+          "sample",
+          "--action-file",
+          "sample",
+          "--source-sha256",
+          "sample",
+          "--build-sha256",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "debug",
+        "evaluate",
+        "--help"
+      ],
+      "expected": {
+        "command": "debug.evaluate",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "debug",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "sample",
+        "--build-sha256",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.evaluate",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation evaluate --invocation <id> ..."
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "sample",
+        "--build-sha256",
+        "sample",
+        "--invocation",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.evaluate",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation evaluate --invocation <id> ..."
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "evaluate"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.evaluate",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation evaluate --invocation <id> ..."
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "debug",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "sample",
+        "--build-sha256",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.evaluate",
+        "exitCode": 64,
+        "lifecycleStatus": "legacy",
+        "outcome": "failure",
+        "replacementArgvPattern": "arkdeck recovery flash-invocation evaluate --invocation <id> ..."
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "debug",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "sample",
+        "--build-sha256",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.evaluate",
+        "handlerArguments": [
+          "debug",
+          "evaluate",
+          "--invocation",
+          "sample",
+          "--action-file",
+          "sample",
+          "--source-sha256",
+          "sample",
+          "--build-sha256",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "debug.evaluate",
+  "kind": "executable",
+  "lifecycleStatus": "legacy",
+  "path": [
+    "debug",
+    "evaluate"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

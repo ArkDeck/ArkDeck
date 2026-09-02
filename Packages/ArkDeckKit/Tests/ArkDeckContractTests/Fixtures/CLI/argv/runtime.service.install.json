@@ -1,0 +1,174 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install",
+        "--bundle",
+        "sample",
+        "--bundle-generation",
+        "1",
+        "--tool",
+        "sample",
+        "--tool-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "runtime.service.install",
+        "handlerArguments": [
+          "runtime",
+          "service",
+          "install",
+          "--bundle",
+          "sample",
+          "--bundle-generation",
+          "1",
+          "--tool",
+          "sample",
+          "--tool-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.service.install",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install",
+        "--bundle",
+        "sample",
+        "--bundle-generation",
+        "1",
+        "--tool",
+        "sample",
+        "--tool-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install",
+        "--bundle",
+        "sample",
+        "--bundle-generation",
+        "1",
+        "--tool",
+        "sample",
+        "--tool-generation",
+        "1",
+        "--bundle",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install",
+        "--bundle",
+        "sample",
+        "--bundle-generation",
+        "1",
+        "--tool",
+        "sample",
+        "--tool-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "service",
+        "install",
+        "--bundle",
+        "sample",
+        "--bundle-generation",
+        "1",
+        "--tool",
+        "sample",
+        "--tool-generation",
+        "1",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.service.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.service.install",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "service",
+    "install"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

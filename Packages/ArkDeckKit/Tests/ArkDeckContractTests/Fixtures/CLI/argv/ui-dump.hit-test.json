@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test",
+        "--job",
+        "sample",
+        "--x",
+        "0",
+        "--y",
+        "0"
+      ],
+      "expected": {
+        "command": "ui-dump.hit-test",
+        "handlerArguments": [
+          "ui-dump",
+          "hit-test",
+          "--job",
+          "sample",
+          "--x",
+          "0",
+          "--y",
+          "0"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test",
+        "--help"
+      ],
+      "expected": {
+        "command": "ui-dump.hit-test",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test",
+        "--job",
+        "sample",
+        "--x",
+        "0",
+        "--y",
+        "0",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.hit-test",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test",
+        "--job",
+        "sample",
+        "--x",
+        "0",
+        "--y",
+        "0",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.hit-test",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.hit-test",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test",
+        "--job",
+        "sample",
+        "--x",
+        "0",
+        "--y",
+        "0",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "ui-dump.hit-test",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "ui-dump",
+        "hit-test",
+        "--job",
+        "sample",
+        "--x",
+        "0",
+        "--y",
+        "0",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "ui-dump.hit-test",
+        "handlerArguments": [
+          "ui-dump",
+          "hit-test",
+          "--job",
+          "sample",
+          "--x",
+          "0",
+          "--y",
+          "0",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "ui-dump.hit-test",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "ui-dump",
+    "hit-test"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

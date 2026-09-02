@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "artifact.import.abort",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "abort",
+          "--import-request-id",
+          "ctl-fixture-0001",
+          "--expected-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.import.abort",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--expected-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.abort",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--expected-generation",
+        "1",
+        "--import-request-id",
+        "ctl-fixture-0001"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.abort",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.abort",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--expected-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.abort",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "ctl-fixture-0001",
+        "--expected-generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.import.abort",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "abort",
+          "--import-request-id",
+          "ctl-fixture-0001",
+          "--expected-generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.import.abort",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "artifact",
+    "import",
+    "abort"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

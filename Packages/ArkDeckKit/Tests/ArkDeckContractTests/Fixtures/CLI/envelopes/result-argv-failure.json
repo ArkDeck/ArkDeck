@@ -1,0 +1,1 @@
+{"command":"job.status","error":{"attentionRequired":false,"code":"invalidOption","controlRequestRetryable":false,"details":{"command":"job.status","option":"--job"},"message":"`job status` requires --job <job-id>"},"meta":{"cliVersion":"0.1.0","controlRequestId":"ctl-fixture-0001"},"ok":false,"schemaVersion":"arkdeck.cli.result/1"}

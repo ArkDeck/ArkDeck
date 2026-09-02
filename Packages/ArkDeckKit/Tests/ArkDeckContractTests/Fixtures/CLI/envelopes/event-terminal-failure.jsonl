@@ -1,0 +1,1 @@
+{"command":"job.wait","controlRequestId":"ctl-fixture-0001","error":{"attentionRequired":false,"code":"runtimeUnavailable","controlRequestRetryable":true,"details":{"endpoint":"local","newDispatchCount":0},"message":"the local Runtime did not answer"},"exitCode":69,"lastCursor":null,"ok":false,"schemaVersion":"arkdeck.cli.event/1","sequence":1,"type":"terminal"}

@@ -1,0 +1,138 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc"
+      ],
+      "expected": {
+        "command": "runtime.tool.register",
+        "handlerArguments": [
+          "runtime",
+          "tool",
+          "register",
+          "--kind",
+          "hdc"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.tool.register",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--kind",
+        "hdc"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.register",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.tool.register",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "tool",
+    "register"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

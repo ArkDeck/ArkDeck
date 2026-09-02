@@ -1,0 +1,172 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart",
+        "--control-action",
+        "sample",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "expected": {
+        "command": "runtime.hdc.restart",
+        "handlerArguments": [
+          "runtime",
+          "hdc",
+          "restart",
+          "--control-action",
+          "sample",
+          "--preview-id",
+          "sample",
+          "--preview-digest",
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.hdc.restart",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart",
+        "--control-action",
+        "sample",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.restart",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart",
+        "--control-action",
+        "sample",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--control-action",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.restart",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.restart",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart",
+        "--control-action",
+        "sample",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.restart",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "restart",
+        "--control-action",
+        "sample",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.hdc.restart",
+        "handlerArguments": [
+          "runtime",
+          "hdc",
+          "restart",
+          "--control-action",
+          "sample",
+          "--preview-id",
+          "sample",
+          "--preview-digest",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.hdc.restart",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "hdc",
+    "restart"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

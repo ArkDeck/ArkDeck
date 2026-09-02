@@ -1,0 +1,144 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start",
+        "--request-file",
+        "sample"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.start",
+        "handlerArguments": [
+          "recovery",
+          "flash-invocation",
+          "start",
+          "--request-file",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start",
+        "--help"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.start",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start",
+        "--request-file",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.start",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start",
+        "--request-file",
+        "sample",
+        "--request-file",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.start",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.start",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start",
+        "--request-file",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.start",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "start",
+        "--request-file",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.start",
+        "handlerArguments": [
+          "recovery",
+          "flash-invocation",
+          "start",
+          "--request-file",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "recovery.flash-invocation.start",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "recovery",
+    "flash-invocation",
+    "start"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

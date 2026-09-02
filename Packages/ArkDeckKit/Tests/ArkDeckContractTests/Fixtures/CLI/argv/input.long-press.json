@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "input",
+        "long-press"
+      ],
+      "expected": {
+        "command": "input.long-press",
+        "handlerArguments": [
+          "input",
+          "long-press"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "input",
+        "long-press",
+        "--help"
+      ],
+      "expected": {
+        "command": "input.long-press",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "input",
+        "long-press",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "input.long-press",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "input",
+        "long-press",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "input.long-press",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "input",
+        "long-press",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "input.long-press",
+        "handlerArguments": [
+          "input",
+          "long-press",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "input.long-press",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "input",
+    "long-press"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

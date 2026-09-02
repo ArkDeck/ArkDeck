@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "job",
+        "submit"
+      ],
+      "expected": {
+        "command": "job.submit",
+        "handlerArguments": [
+          "job",
+          "submit"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "job",
+        "submit",
+        "--help"
+      ],
+      "expected": {
+        "command": "job.submit",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "job",
+        "submit",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.submit",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "job",
+        "submit",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.submit",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "job",
+        "submit",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.submit",
+        "handlerArguments": [
+          "job",
+          "submit",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "job.submit",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "job",
+    "submit"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

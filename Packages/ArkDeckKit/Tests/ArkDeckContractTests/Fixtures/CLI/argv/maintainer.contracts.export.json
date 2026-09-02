@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export",
+        "--contracts-directory",
+        "sample",
+        "--fixtures-directory",
+        "sample"
+      ],
+      "expected": {
+        "command": "maintainer.contracts.export",
+        "handlerArguments": [
+          "maintainer",
+          "contracts",
+          "export",
+          "--contracts-directory",
+          "sample",
+          "--fixtures-directory",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export",
+        "--help"
+      ],
+      "expected": {
+        "command": "maintainer.contracts.export",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export",
+        "--contracts-directory",
+        "sample",
+        "--fixtures-directory",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.contracts.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export",
+        "--contracts-directory",
+        "sample",
+        "--fixtures-directory",
+        "sample",
+        "--contracts-directory",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.contracts.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.contracts.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export",
+        "--contracts-directory",
+        "sample",
+        "--fixtures-directory",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.contracts.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "maintainer",
+        "contracts",
+        "export",
+        "--contracts-directory",
+        "sample",
+        "--fixtures-directory",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "maintainer.contracts.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "maintainer.contracts.export",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "maintainer",
+    "contracts",
+    "export"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "debug",
+        "native",
+        "deploy"
+      ],
+      "expected": {
+        "command": "debug.native.deploy",
+        "handlerArguments": [
+          "debug",
+          "native",
+          "deploy"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "debug",
+        "native",
+        "deploy",
+        "--help"
+      ],
+      "expected": {
+        "command": "debug.native.deploy",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "debug",
+        "native",
+        "deploy",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.native.deploy",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "debug",
+        "native",
+        "deploy",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "debug.native.deploy",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "debug",
+        "native",
+        "deploy",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "debug.native.deploy",
+        "handlerArguments": [
+          "debug",
+          "native",
+          "deploy",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "debug.native.deploy",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "debug",
+    "native",
+    "deploy"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

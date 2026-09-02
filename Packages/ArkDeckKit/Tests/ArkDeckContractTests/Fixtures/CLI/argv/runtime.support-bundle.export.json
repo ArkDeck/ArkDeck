@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "expected": {
+        "command": "runtime.support-bundle.export",
+        "handlerArguments": [
+          "runtime",
+          "support-bundle",
+          "export",
+          "--destination",
+          "sample",
+          "--preview-digest",
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.support-bundle.export",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.support-bundle.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--destination",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.support-bundle.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.support-bundle.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.support-bundle.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.support-bundle.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.support-bundle.export",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "support-bundle",
+    "export"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

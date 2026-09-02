@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "postflight"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "commandRemoved",
+        "command": "flash.postflight",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "postflight",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.postflight",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.postflight",
+  "kind": "tombstone",
+  "lifecycleStatus": "removed",
+  "path": [
+    "flash",
+    "postflight"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

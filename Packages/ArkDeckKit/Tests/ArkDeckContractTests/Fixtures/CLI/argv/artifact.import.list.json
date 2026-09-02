@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "list"
+      ],
+      "expected": {
+        "command": "artifact.import.list",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.import.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.import.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "import",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.import.list",
+        "handlerArguments": [
+          "artifact",
+          "import",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.import.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "artifact",
+    "import",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

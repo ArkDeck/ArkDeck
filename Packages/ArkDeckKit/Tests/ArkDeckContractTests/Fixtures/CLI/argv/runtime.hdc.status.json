@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "status"
+      ],
+      "expected": {
+        "command": "runtime.hdc.status",
+        "handlerArguments": [
+          "runtime",
+          "hdc",
+          "status"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "status",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.hdc.status",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "status",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "status",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "status",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.hdc.status",
+        "handlerArguments": [
+          "runtime",
+          "hdc",
+          "status",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.hdc.status",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "hdc",
+    "status"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

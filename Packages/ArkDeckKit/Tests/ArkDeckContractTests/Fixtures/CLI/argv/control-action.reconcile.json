@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "control-action",
+        "reconcile",
+        "--control-action",
+        "sample"
+      ],
+      "expected": {
+        "command": "control-action.reconcile",
+        "handlerArguments": [
+          "control-action",
+          "reconcile",
+          "--control-action",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "control-action",
+        "reconcile",
+        "--help"
+      ],
+      "expected": {
+        "command": "control-action.reconcile",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "control-action",
+        "reconcile",
+        "--control-action",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.reconcile",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "control-action",
+        "reconcile",
+        "--control-action",
+        "sample",
+        "--control-action",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.reconcile",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "control-action",
+        "reconcile"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.reconcile",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "control-action",
+        "reconcile",
+        "--control-action",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.reconcile",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "control-action",
+        "reconcile",
+        "--control-action",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "control-action.reconcile",
+        "handlerArguments": [
+          "control-action",
+          "reconcile",
+          "--control-action",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "control-action.reconcile",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "control-action",
+    "reconcile"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

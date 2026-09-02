@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco",
+        "--build-profile",
+        "sample",
+        "--daemon",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.signing.migrate-deveco",
+        "handlerArguments": [
+          "runtime",
+          "signing",
+          "migrate-deveco",
+          "--build-profile",
+          "sample",
+          "--daemon",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.signing.migrate-deveco",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco",
+        "--build-profile",
+        "sample",
+        "--daemon",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.migrate-deveco",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco",
+        "--build-profile",
+        "sample",
+        "--daemon",
+        "sample",
+        "--build-profile",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.migrate-deveco",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.migrate-deveco",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco",
+        "--build-profile",
+        "sample",
+        "--daemon",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.migrate-deveco",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "signing",
+        "migrate-deveco",
+        "--build-profile",
+        "sample",
+        "--daemon",
+        "sample",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.signing.migrate-deveco",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.signing.migrate-deveco",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "signing",
+    "migrate-deveco"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

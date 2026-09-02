@@ -1,0 +1,12 @@
+{
+  "kind": "reconcile",
+  "owner": {
+    "id": "job-0f3c2a7e-4d1b-4c0a-9e2d-5b6a7c8d9e0f",
+    "kind": "job"
+  },
+  "reasonCode": "recovery.outcomeUnknown",
+  "resource": {
+    "id": "job-0f3c2a7e-4d1b-4c0a-9e2d-5b6a7c8d9e0f",
+    "kind": "job"
+  }
+}

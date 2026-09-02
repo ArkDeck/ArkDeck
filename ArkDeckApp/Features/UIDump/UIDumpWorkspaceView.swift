@@ -1189,6 +1189,17 @@ private struct ViewerSearchTextField: NSViewRepresentable {
 enum ViewerInspectorTab: String {
   case properties, layout, accessibility, rawDump, advancedDump
   var id: String { rawValue }
+
+  /// §14: the tab's stable product capability in the shared registry.
+  var productCapability: AppViewerTabCapability {
+    switch self {
+    case .properties: .properties
+    case .layout: .layout
+    case .accessibility: .accessibility
+    case .rawDump: .rawDump
+    case .advancedDump: .advancedDump
+    }
+  }
   var title: String {
     switch self {
     case .properties: ViewerInspectorCopy.properties

@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "operation",
+        "validate",
+        "--operation",
+        "sample",
+        "--inputs-file",
+        "sample"
+      ],
+      "expected": {
+        "command": "operation.validate",
+        "handlerArguments": [
+          "operation",
+          "validate",
+          "--operation",
+          "sample",
+          "--inputs-file",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "operation",
+        "validate",
+        "--help"
+      ],
+      "expected": {
+        "command": "operation.validate",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "operation",
+        "validate",
+        "--operation",
+        "sample",
+        "--inputs-file",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.validate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "operation",
+        "validate",
+        "--operation",
+        "sample",
+        "--inputs-file",
+        "sample",
+        "--operation",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.validate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "operation",
+        "validate"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.validate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "operation",
+        "validate",
+        "--operation",
+        "sample",
+        "--inputs-file",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "operation.validate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "operation",
+        "validate",
+        "--operation",
+        "sample",
+        "--inputs-file",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "operation.validate",
+        "handlerArguments": [
+          "operation",
+          "validate",
+          "--operation",
+          "sample",
+          "--inputs-file",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "operation.validate",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "operation",
+    "validate"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

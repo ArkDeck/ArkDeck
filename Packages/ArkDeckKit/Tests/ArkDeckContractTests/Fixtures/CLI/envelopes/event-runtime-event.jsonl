@@ -1,0 +1,1 @@
+{"command":"job.watch","controlRequestId":"ctl-fixture-0001","cursor":"evc-1.job-0f3c2a7e.12","data":{"outcome":"verified","stepId":"observe-device"},"eventId":"evt-6c5b4a39-2817-4f0e-9d8c-7b6a5f4e3d2c","runtimeRevision":"12","schemaVersion":"arkdeck.cli.event/1","sequence":1,"streamPosition":"12","type":"job.stepCompleted"}

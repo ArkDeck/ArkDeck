@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "capability",
+        "install"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidCommand",
+        "command": "capability.install",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "capability",
+        "install",
+        "--help"
+      ],
+      "expected": {
+        "command": "capability.install",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "capability.install",
+  "kind": "refused",
+  "lifecycleStatus": "current",
+  "path": [
+    "capability",
+    "install"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -2,8 +2,9 @@
 
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness、批准载体或平台符合性声明。
 > 状态：目标规格；文中“目标命令”不代表当前版本已经实现。
-> 规格版本：0.4（2026-09-02，按 DEC-013 让 `source` 族退役并新增 `platformService` 分类；
-> 0.3 同日按 protected `main` `d28d57a3` 重算 §13；0.2 为 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
+> 规格版本：0.5（2026-09-02，§14 机器契约产物由 `TASK-AIN-026` 落地，§13 按 protected `main`
+> `4bde4749` 重算；0.4 同日按 DEC-013 让 `source` 族退役并新增 `platformService` 分类；
+> 0.3 同日按 `d28d57a3` 重算 §13；0.2 为 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
 > local control protocol `1.0.0`。实现与验收仍必须 pin exact Catalog digest，不能只比较数量。
 > 权威边界：Constitution Safety invariants / POL-*、`PRODUCT-LOOP.md`、accepted specs、
 > contracts、当前 `Catalog/` 与 Runtime 行为高于本文。发生冲突时本文失效，不能用本文修改
@@ -1516,15 +1517,17 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 ## 13. 当前实现差距
 
-> 本节按 protected `main` `d28d57a3`（2026-09-02）重算。命令面的事实源是
-> `arkdeck commands --output json`（`arkdeck.cli.command-registry/1`）；本节的数字都可以由它
-> 重新得出，不再手数 Swift。
+> 本节按 protected `main` `4bde4749`（2026-09-02）重算。命令面的事实源是
+> `arkdeck commands --output json`（`arkdeck.cli.command-registry/1`），coverage 的事实源是
+> `openspec/contracts/cli-feature-coverage.json`；本节的数字都可以由它们重新得出，不再手数 Swift。
 
 ### 13.1 已实现面
 
-- registry：33 个一级入口、212 个 leaf = 203 个 executable + 6 个 parse-only tombstone
+- registry：33 个一级入口、219 个 leaf = 210 个 executable + 6 个 parse-only tombstone
   （`agent chat`、`flash plan/preview/execute/continue/postflight`）+ 3 个永久拒绝桩
-  （`capability draft/install/revoke`）。executable 中包含 §12 的 legacy/deprecated 兼容拼写
+  （`capability draft/install/revoke`）；lifecycle 182 `current`、16 `deprecated`、15 `legacy`、
+  6 `removed`，projection 对每个 leaf 都投影 `lifecycleStatus`/`replacementArgvPattern`。
+  executable 中包含 §12 的 legacy/deprecated 兼容拼写
   （`device list/show/adopt`、`artifact import-*`、`flash install-binding/status/reconcile`、
   `legacy flash *`、`debug start/evaluate/status`、`cleanup-debt *`、`agentd/signing/update-feed *`）；
   它们运行时在 `meta.lifecycle` 报告 `legacy|deprecated` 与 replacement，但按 §12 不计 target
@@ -1556,17 +1559,26 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   `history filter *`、`trace cache status/purge`、`ui-dump inspect/hit-test`、
   `diagnostics inspect/preview/export`、`trace inspect/export`。各面的实现契约见
   `docs/design/cli-*.md`。
+- §14 机器契约产物已落地（`TASK-AIN-026`，实现见 `cli-machine-contracts.md`）：
+  `arkdeck maintainer contracts export|check` 从 Swift 事实源生成全部十项
+  `openspec/contracts/` 产物与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**`
+  （219 个 argv fixture、envelope/page/`nextAction` 样本），`CLIMachineContractTests` 以零漂移、
+  fixture 回放与 schema 正反例把产物钉在 protected `main` 上；`--version` 的
+  `pageSchemaVersion`/`nextActionSchemaVersion` 为 `arkdeck.cli.page/1`/`arkdeck.cli.next-action/1`。
+  `cli-feature-coverage.json` 共 279 条（daemon 119、Catalog 30、App 68、CLI 62）：
+  `direct` 131、`local` 94、`presentation` 21、`internal` 18、`refused` 10、`platformService` 4、
+  `generic` 1（`flash.dayu200` alias），`blocked` 0，`summary.fullFunction = true`。
 - 0.2 版 §13.2 列出的 12 个 daemon-ready 方法中 11 个已有一等 leaf；唯一例外 `debug.template.run`
-  见 13.2。
+  是 App 直连路径，coverage 记为 `direct` + `deprecated`，CLI 经 `debug.template@1` 到达同一模板集。
 
 ### 13.2 尚未闭合的目标面
 
 下表是 §18 的 macOS「全功能」结论仍被阻断的全部原因。每行都必须由对应载体解除，不得在 CLI 内
-补隐藏执行器绕过 Runtime。
+补隐藏执行器绕过 Runtime。机器门（coverage manifest 无 `blocked`、无 classification/target 分歧）
+已由 §14 产物闭合；剩余项都是真机证据与平台范围，不是命令面缺口。
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| §14 机器契约产物 | `openspec/contracts/cli-*`、`cli-feature-coverage.json`、`app-product-capability-registry.yaml`、`Tests/Fixtures/CLI/**` 均不存在；`--version` 的 `pageSchemaVersion`/`nextActionSchemaVersion` 为 `null` | `openspec/contracts/**` 不在 `TASK-AIN-021` 的 Allowed paths 内，需先定义新 Task（定义 PR 与使用 PR 分家），再在同一垂直任务内交付 generator、产物与 CI fail-closed 校验 | A |
 | GJ-1～GJ-5 的 CLI headless 闭环 | 上一 digest `b8c7148f…` 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交）；`CHG-2026-073` 发布 `debug.template@1` 后 digest 变更，按 `PRODUCT-LOOP.md` 这些记录只证明历史，且仍没有按四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内在当前 digest 上用 CLI 完整复跑并按四态记录 | A/B |
 | Windows（Slice D） | 未开始 | 不阻断 macOS-only claim；阻断跨平台 claim | D |
 
@@ -1582,9 +1594,6 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
   一条已发布 leaf 带着的缺陷。
 - 1.x 兼容 wire path 的 `artifact.read` 仍把 `maxBytes` clamp 到 1…4 MiB；2.x target handler 已按
   §7.6 拒绝越界。前者按 §12 冻结，不再修改。
-- `commands --output json` 只对 tombstone 投影 `lifecycleStatus`/`replacementArgvPattern`；
-  legacy/deprecated 拼写在 projection 与 help 里不可辨，只有运行时 `meta.lifecycle` 可辨。生成 §14
-  的 `cli-command-registry.yaml` 时必须补齐。
 - `help device` 中 `show` 的 summary 与 `list` 相同（"list durable targets…"），registry 文案错误。
 
 ### 13.4 纯展示与平台服务，不是 CLI 阻塞项
@@ -1616,8 +1625,13 @@ openspec/contracts/cli-canonical-json-vectors.json
 openspec/contracts/cli-feature-coverage.json
 openspec/contracts/app-product-capability-registry.yaml
 openspec/contracts/runtime-control-plane.schema.json
-Packages/ArkDeckKit/Tests/Fixtures/CLI/**
+Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**
 ```
+
+0.5 起这些产物由 `arkdeck maintainer contracts export` 从 Swift 事实源生成，
+`arkdeck maintainer contracts check` 与 `CLIMachineContractTests` 钉零漂移；fixture 目录放在合约测试
+target 既有的 `Fixtures/` 下，与其他 fixture 族共用同一 `#filePath` 相对定位。实现契约、每项产物的
+事实源与 fixture case 清单见 `cli-machine-contracts.md`。
 
 `cli-feature-coverage.json` 为每个能力记录：
 
@@ -1625,17 +1639,24 @@ Packages/ArkDeckKit/Tests/Fixtures/CLI/**
 {
   "feature": "job.evidence",
   "source": "daemon:job.evidence",
-  "classification": "blocked",
+  "classification": "direct",
   "targetClassification": "direct",
-  "targetCommand": "job evidence",
+  "lifecycle": "current",
+  "targetCommand": "arkdeck job evidence --job <job-id>",
+  "equivalentCommands": [],
   "requiredPlatforms": ["macos", "windows"],
   "implementationStatusByPlatform": {
-    "macos": "partial",
+    "macos": "implemented",
     "windows": "notImplemented"
   },
-  "conformanceFixture": "job-evidence-success"
+  "conformanceFixture": "argv/job.evidence.json"
 }
 ```
+
+`source` 是唯一键（`daemon:`/`catalog:`/`app:`/`cli:` 四个前缀），`feature` 是自然名；
+`targetCommand` 是完整 argv pattern（path + required option 占位符），`equivalentCommands`
+列出到达同一能力的兼容拼写或替代 leaf；App 条目另带 `owner`，其余可选 `note`。同一 daemon
+method 缺 CLI 而只能记 `blocked` 时，`macos` 为 `partial`：
 
 `classification` 只使用下列闭集，并表示当前产品事实；`targetClassification` 表示本规格
 要求的落点，不能把 target 写成已实现：
@@ -1712,7 +1733,10 @@ registry、generated Catalog index、declarative CLI registry，以及
 10. macOS/Windows normalized request/result equivalence。
 
 fixture 输入是 argv array、stdin bytes、logical files、daemon response frames 与预期 stdout/stderr/
-exit；不得以 shell script 的 quoting 作为共享事实源。
+exit；不得以 shell script 的 quoting 作为共享事实源。0.5 起第 1、2、4、5、7 条与 tombstone/
+lifecycle 行由 `Fixtures/CLI/**` 的生成基线覆盖（每个 leaf 一个 argv fixture，`expected` 只记
+invocation 种类或 error code/category/exit，不记 prose）；第 3、8、9 条仍由
+`CLIProcessGoldenContractTests` 与各族合约测试覆盖，第 10 条等 Windows port。
 
 ### 15.2 契约测试
 
@@ -1787,7 +1811,8 @@ exit；不得以 shell script 的 quoting 作为共享事实源。
 - 完整 `operation list/describe/example/validate` descriptor/availability projection；
 - `runtime health`、HDC status、device candidates、真正的 target show；
 - job evidence/result、Artifact quota/range read；
-- stable request identity/idempotency、page/`nextAction` schema；
+- stable request identity/idempotency、page/`nextAction` schema（§14 十项产物与 fixture 基线已由
+  `TASK-AIN-026` 交付，见 §13.1）；
 - Runtime-owned AgentExecution/HAR persistence、`agent list/status/abandon`、`human-action list/show/resume`；
 - process-level golden 与 GJ-1 真机验收。
 
@@ -2086,7 +2111,9 @@ CLI 称为“全功能”；macOS 达成不表示 Windows 已实现，Windows �
   需要反向推断 Swift CLI 的手写 parser、App facade 或 macOS API。
 
 在此之前，准确表述是“Runtime operation coverage 完整，CLI 产品面尚未完全闭合”，不能只因为
-`agent run` 能泛化调用 Catalog 就声称 CLI 已全功能。
+`agent run` 能泛化调用 Catalog 就声称 CLI 已全功能。第一条的机器判据是
+`cli-feature-coverage.json` 的 `summary.fullFunction`（0.5 起在 macOS 为 `true`）；第二条仍以
+§13.2 的真机记录为准，机器门成立不等于 Journey 成立。
 
 ## 19. 权威参考
 

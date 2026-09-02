@@ -154,11 +154,15 @@ struct ArkDeckCommandLine {
         // §12's compatibility spelling of `maintainer update-feed`.
         try runUpdateFeed(arguments, spelledAs: "update-feed")
       case "maintainer":
-        guard arguments.first == "update-feed" else {
+        switch arguments.first {
+        case "update-feed":
+          try runUpdateFeed(Array(arguments.dropFirst()), spelledAs: "maintainer.update-feed")
+        case "contracts":
+          try RuntimeCLI.runMaintainerContracts(Array(arguments.dropFirst()))
+        default:
           throw CLIError(
-            exitCode: EX_USAGE, message: "missing maintainer subcommand (update-feed)")
+            exitCode: EX_USAGE, message: "missing maintainer subcommand (update-feed|contracts)")
         }
-        try runUpdateFeed(Array(arguments.dropFirst()), spelledAs: "maintainer.update-feed")
       case "legacy":
         // §6.3's explicit compatibility namespace. It holds the historical
         // flash archive and nothing else: these decode and settle records that

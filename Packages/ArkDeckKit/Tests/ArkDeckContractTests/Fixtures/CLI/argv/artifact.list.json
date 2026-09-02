@@ -1,0 +1,116 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "artifact",
+        "list",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.list",
+        "handlerArguments": [
+          "artifact",
+          "list",
+          "--job",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "artifact",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "artifact.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "artifact",
+        "list",
+        "--job",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "artifact",
+        "list"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "artifact",
+        "list",
+        "--job",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "artifact.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "artifact",
+        "list",
+        "--job",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "artifact.list",
+        "handlerArguments": [
+          "artifact",
+          "list",
+          "--job",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "artifact.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "artifact",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
