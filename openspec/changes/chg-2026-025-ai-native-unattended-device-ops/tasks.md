@@ -3750,19 +3750,20 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
 ## TASK-AIN-021 — App 生产可观察性与 typed 调试闭环收口
 
 - Status:in-progress（2026-09-02 对账：本 Task 名下的 CLI/App 产品 PR 已连续合入
-  protected `main`（至 #1686）。`arkdeck commands --output json` 实测 33 个一级入口、
-  214 个 leaf = 205 executable + 6 tombstone + 3 refused，28 个 canonical Catalog
+  protected `main`（至 #1688）。`arkdeck commands --output json` 实测 33 个一级入口、
+  217 个 leaf = 208 executable + 6 tombstone + 3 refused，29 个 canonical Catalog
   operation 均有一等领域 leaf；`session export preview/apply` 已随 #1686 与
-  `CHG-2026-072`（`session.export.preview/apply`、`RuntimeSessionExportRecordStore`、
-  根级 `evidence/runs/TASK-SEP-001/`）发布。产品规格 §6 目标命令树中只剩
-  `debug template list/run`、`debug logs` 与 `source` namespace 未发布：debug template
-  须先由独立 approved operation change 发布 typed Catalog mapping，source 需维护者裁决
-  为 typed resource 还是平台服务。§14 机器契约产物（`openspec/contracts/cli-*`、
-  feature coverage、App capability registry、`Tests/Fixtures/CLI/**`）不在本 Task
-  Allowed paths 内，需另立 Task。当前 Catalog digest `b8c7148f…` 上已有 CLI/App 发起的
-  observe、diagnostics、HAP、native 与 canonical Flash 真机成功记录
-  （`docs/design/references/v1.6-goal/`），但 GJ-1～GJ-5 的 CLI headless 逐步闭环尚未
-  按四态记录，最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`。差距正本见
+  `CHG-2026-072` 发布，`debug template list/run` 与 `debug logs` 已随 #1688 与
+  `CHG-2026-073`（新 operation `debug.template@1`、`capture.diagnostics@1` 的 HiLog-only
+  preset、根级 `evidence/runs/TASK-DTO-001/`）发布，`debug` 族已按规格 §6.2 全部落地。
+  产品规格 §6 目标命令树中只剩 `source` namespace 未发布，需维护者裁决为 typed resource
+  还是平台服务。§14 机器契约产物（`openspec/contracts/cli-*`、feature coverage、App
+  capability registry、`Tests/Fixtures/CLI/**`）不在本 Task Allowed paths 内，需另立
+  Task。`CHG-2026-073` 使 Catalog digest 变为 `508783ac…`；上一 digest `b8c7148f…` 上
+  CLI/App 发起的 observe、diagnostics、HAP、native 与 canonical Flash 真机成功记录
+  （`docs/design/references/v1.6-goal/`）按 `PRODUCT-LOOP.md` 只证明历史，GJ-1～GJ-5
+  的 CLI headless 逐步闭环尚未按四态记录，最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧
+  digest `d76ad775…`。App 侧 `debug.template.run` 直跑路径尚未迁到 Job。差距正本见
   `docs/design/arkdeck-cli-product-spec.md` §13）
 - Golden Journey:GJ-4 为首要阻塞；同时关闭 GJ-1/GJ-2/GJ-3/GJ-5 已有生产数据只差
   App/facade 投影的断点
