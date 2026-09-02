@@ -2,8 +2,9 @@
 
 > 类型：产品实现规格，不是新的 OpenSpec Task、Change、Readiness、批准载体或平台符合性声明。
 > 状态：目标规格；文中“目标命令”不代表当前版本已经实现。
-> 规格版本：0.5（2026-09-02，§14 机器契约产物由 `TASK-AIN-026` 落地，§13 按 protected `main`
-> `4bde4749` 重算；0.4 同日按 DEC-013 让 `source` 族退役并新增 `platformService` 分类；
+> 规格版本：0.6（2026-09-02，按 `PRODUCT-LOOP.md` §6 重述 §15.3 的 GJ-1/GJ-3/GJ-5 判据，并在
+> §13.2 要求 operation 真机覆盖矩阵；0.5 同日由 `TASK-AIN-026` 落地 §14 机器契约产物、§13 按
+> protected `main` `4bde4749` 重算；0.4 同日按 DEC-013 让 `source` 族退役并新增 `platformService` 分类；
 > 0.3 同日按 `d28d57a3` 重算 §13；0.2 为 2026-08-30）；盘点基线为 29 个 canonical Catalog operation、1 个 alias、
 > local control protocol `1.0.0`。实现与验收仍必须 pin exact Catalog digest，不能只比较数量。
 > 权威边界：Constitution Safety invariants / POL-*、`PRODUCT-LOOP.md`、accepted specs、
@@ -1579,7 +1580,7 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 | 目标面 | 现状 | 解除条件 | slice |
 |---|---|---|---|
-| GJ-1～GJ-5 的 CLI headless 闭环 | 上一 digest `b8c7148f…` 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交）；`CHG-2026-073` 发布 `debug.template@1` 后 digest 变更，按 `PRODUCT-LOOP.md` 这些记录只证明历史，且仍没有按四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内在当前 digest 上用 CLI 完整复跑并按四态记录 | A/B |
+| GJ-1～GJ-5 的 CLI headless 闭环 | 上一 digest `b8c7148f…` 上已有 `observe.device`、`capture.diagnostics`、`debug.hap`、`deploy.native-library.app-owned` 与 canonical `flash.full-restore` 的真机成功记录（`references/v1.6-goal/real-device-validation.md`，其中 canonical Flash 经已发布 CLI 提交）；`CHG-2026-073` 发布 `debug.template@1` 后 digest 变更，按 `PRODUCT-LOOP.md` 这些记录只证明历史，且仍没有按四态逐条记录的 headless 闭环；最近一次 GJ-5 `REAL_DEVICE_PASS` 仍在旧 digest `d76ad775…`（`chg-2026-064` TASK-AND-002 r2） | 设备窗口内按 `cli-golden-journey-headless-runbook.md` 在当前 digest 上用 CLI 完整复跑并按四态记录，附 29 个 canonical operation 的真机覆盖矩阵（`realDevicePass`/`notExercised`），其中 `debug.template@1` 至少一条 smoke | A/B |
 | Windows（Slice D） | 未开始 | 不阻断 macOS-only claim；阻断跨平台 claim | D |
 
 ### 13.3 已发布 leaf 的残留缺陷
@@ -1784,20 +1785,31 @@ invocation 种类或 error code/category/exit，不记 prose）；第 3、8、9 
 
 ### 15.3 Golden Journey 验收
 
-只有当前 Catalog digest 的真实设备结果可以记 `REAL_DEVICE_PASS`：
+只有当前 Catalog digest 的真实设备结果可以记 `REAL_DEVICE_PASS`。Journey 的跳数与顺序以
+`PRODUCT-LOOP.md` §6 为准；判据只包含 CLI/Runtime 可验的确定性事实（terminal state、evidence、
+Artifact digest、台账计数、HAR 状态）。执行者是人还是外部 Agent，以及执行者的修复智能，都不进入
+四态：
 
 - GJ-1：`doctor` → `device candidates` → `target adopt` →
-  `agent run --operation observe.device@1`
-  → `job result`；
+  `agent run --operation observe.device@1` →
+  `agent run --operation capture.diagnostics@1`（设备级 bounded HiLog + UI Dump，`readOnly`）
+  → `job result` → daemon 重启后仍可读；并在同一 Journey 内证明 HAR crash-resume：zero-candidate
+  discovery 产生的 `physicalConnection` HAR，客户进程丢弃 receipt 后仅凭 execution ID 经
+  `agent status` / `human-action show` / `agent resume` 继续到 terminal；
 - GJ-2：import HAP → `agent run --operation debug.hap@1` → liveness/evidence/Artifact；
-- GJ-3：发现 project/preset refs → typed workspace inspect/patch/build/test/sign → deploy/debug →
-  diagnostics/analysis；
+- GJ-3：import native library → `debug native deploy`（`deploy.native-library.app-owned@1`）→
+  ELF/ABI/hash、staging、原子发布、进程重启、`hashProcessAndMaps` 全部 verified → 失败 rollback 腿
+  同样 verified；
 - GJ-4：Flash bundle import → prerequisites/plan →
   `agent run --operation flash.full-restore@1`
   → postflight evidence；
-- GJ-5：外部 Agent 只用 operation/device/target/job/agent/artifact/HAR 完成闭环，客户进程
-  在 HAR 前后崩溃都能用 execution ID 重取并继续，不打开 App。
+- GJ-5：外部 Agent 只用 operation/device/target/job/agent/artifact/HAR 完成有界闭环：发现
+  project/preset refs → 复现 → `analyzer.extract-crash-signature@1` → workspace isolate/patch/build/sign
+  → 部署修补构建并一次复验 → 负向 `revisionConflict` 零派发；补丁是固定输入物料，
+  `PRODUCT-LOOP.md` §6 的九项预算随任务书保存并记录实际消耗；不打开 App，不使用任何未发布面；
+  客户进程崩溃后的 execution 重取复用 GJ-1 已证明的同一机制。
 
+每次复跑另附当前 digest 的 operation 真机覆盖矩阵（§13.2）。
 机器契约测试不替代真机；真机不替代 contract/negative test。
 
 ## 16. 分阶段落地
@@ -2049,7 +2061,7 @@ reference、typed constraints 与 availability；注册后不得暴露 host root
 的字符串示例不是 discovery API。
 
 **Acceptance：** 不打开 App/不使用 legacy daemon path flag 即可注册 project + typed toolchain/
-signing preset，经 list/show 发现并用于 GJ-3 request；same registration ID retry 幂等，generation/
+signing preset，经 list/show 发现并用于 GJ-5 request；same registration ID retry 幂等，generation/
 active-reference drift 有稳定 reason；registration 外 caller path 和 raw build command 全部在 dispatch
 前拒绝，remove 不删除源码。
 
