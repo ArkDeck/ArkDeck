@@ -6,6 +6,14 @@
 
 set -eu
 
+# Every lane writes its output to a mktemp file that run_lane removes once it
+# has read the numbers back. An interrupted lane never reached that line and
+# left the file in $TMPDIR, so the removal is tied to the shell's exit, and a
+# signal is turned into an exit that still runs it.
+trap 'rm -f "${log:-}"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 lane=${1:-}
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 swiftpm="$root/Packages/ArkDeckKit/Scripts/run-swiftpm.sh"
@@ -93,7 +101,8 @@ case "$lane" in
       echo "usage: sh Packages/ArkDeckKit/Scripts/run-test-lane.sh focus <test-filter>" >&2
       exit 64
     }
-    run_lane focus "$swiftpm" test --parallel --num-workers "$workers" --filter "$2"
+    lane_filter=$2
+    run_lane focus "$swiftpm" test --parallel --num-workers "$workers" --filter "$lane_filter"
     ;;
   full)
     # Wall-clock growth ratios are meaningful only when their two samples are

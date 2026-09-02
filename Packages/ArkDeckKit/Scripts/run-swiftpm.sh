@@ -31,6 +31,13 @@ override the architecture. It also owns --package-path, --scratch-path, and
 --cache-path so every worktree sees the same logical source and build paths.
 The source mirror contains tracked and non-ignored untracked files; ignored
 files stay local.
+The cache root is the only build state this runner creates, and it persists
+on purpose: every worktree on the machine shares it, and deleting it costs a
+cold build of the whole package. Point ARKDECK_SWIFTPM_CACHE_ROOT elsewhere
+only for isolation you will delete afterwards; a root left in a scratch
+directory nobody cleans is a stranded copy of the whole build. Running swift
+build or swift test --package-path directly in a worktree bypasses this
+runner and leaves a private .build of one to two gigabytes in that worktree.
 Every target treats Swift's DeprecatedDeclaration diagnostic group as an
 error so local and CI test runs enforce the current SDK surface.
 EOF

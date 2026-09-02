@@ -5039,10 +5039,6 @@ final class AgentDaemonContractTests: XCTestCase {
 }
 
 final class ManualUIFlashBridgeContractTests: XCTestCase {
-  private static let moduleCache = FileManager.default.temporaryDirectory
-    .appending(
-      path: "manual-ui-xpc-modules-\(UUID().uuidString)", directoryHint: .isDirectory)
-
   private var repositoryRoot: URL {
     var root = URL(filePath: #filePath)
     for _ in 0..<5 { root.deleteLastPathComponent() }
@@ -5077,14 +5073,13 @@ final class ManualUIFlashBridgeContractTests: XCTestCase {
       source[bridgeStart..<bridgeEnd].contains(
         "let protectedMainCommitOID = try protectedMainActuatorCommit()"))
 
-    try FileManager.default.createDirectory(
-      at: Self.moduleCache, withIntermediateDirectories: true)
+    let moduleCache = try ManualUIFlashFixtures.sharedModuleCache()
     let output = Pipe()
     let errors = Pipe()
     let process = Process()
     process.executableURL = URL(filePath: "/usr/bin/xcrun")
     process.arguments = [
-      "swift", "-module-cache-path", Self.moduleCache.path,
+      "swift", "-module-cache-path", moduleCache.path,
       driverURL.path, "--validate-xpc-interface",
     ]
     process.standardOutput = output
