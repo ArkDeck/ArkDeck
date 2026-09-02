@@ -205,6 +205,18 @@ package enum ArkDeckAgentXPC {
     "runtime.storage.root",
   ]
 
+  /// Session discovery and pinning share the daemon-owned storage catalog.
+  /// Inputs are closed at the XPC boundary: callers can name only one Session,
+  /// a bounded opaque page cursor, or the exact catalog generation they read.
+  package static let forwardableSessionMethods: Set<String> = [
+    "session.cleanup.apply",
+    "session.cleanup.preview",
+    "session.list",
+    "session.pin",
+    "session.show",
+    "session.unpin",
+  ]
+
   /// These names are generic in the daemon protocol. The XPC endpoint must
   /// additionally prove one of the closed App-owned typed requests and bind
   /// the returned Job identifier before forwarding run or cancel.
@@ -223,6 +235,7 @@ package enum ArkDeckAgentXPC {
     .union(forwardableHistoryFilterMethods)
     .union(forwardableTraceCacheMethods)
     .union(forwardableRuntimeStorageMethods)
+    .union(forwardableSessionMethods)
     .union(gatedAppJobMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.

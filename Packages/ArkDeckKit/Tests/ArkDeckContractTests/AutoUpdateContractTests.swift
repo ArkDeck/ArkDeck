@@ -991,6 +991,184 @@ final class AutoUpdateContractTests: XCTestCase {
     }
   }
 
+  func testRuntimeUpdateFacadeContinuesOneLifecycleAcrossFreshOwners() async throws {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let stateDirectory = storage.root.appending(path: "Lifecycle", directoryHint: .isDirectory)
+    let streamer = FakeUpdateStreamer(feed: signed.envelope, artifact: signed.artifactBytes)
+    let replayStore = MemoryReplayStore()
+    let preferences = MemoryUpdatePreferences()
+    let validator = FakeArtifactValidator()
+    let revealer = RecordingArtifactRevealer()
+    let fixedNow = now
+
+    func facade() throws -> RuntimeUpdateApplicationFacade {
+      try RuntimeUpdateApplicationFacade(
+        streamer: streamer,
+        verifier: UpdateFeedVerifier(trust: signed.trust, replayStore: replayStore),
+        artifactStore: storage.store,
+        artifactValidator: validator,
+        preferences: preferences,
+        stateStore: RuntimeUpdateStateStore(directory: stateDirectory, now: { fixedNow }))
+    }
+
+    let first = try facade()
+    guard case .available = try await first.checkManually(
+      identity: verificationIdentity(), now: fixedNow)
+    else { return XCTFail("check must publish a durable available state") }
+
+    let second = try facade()
+    let availableStatus = try await second.status()
+    XCTAssertEqual(availableStatus.phase, "available")
+    guard case .awaitingConsent = try await second.downloadAvailableUpdate() else {
+      return XCTFail("a fresh owner must continue the durable download transition")
+    }
+
+    let third = try facade()
+    let awaiting = try await third.status()
+    XCTAssertEqual(awaiting.phase, "awaitingConsent")
+    XCTAssertEqual(awaiting.artifactSHA256, UpdateFeedCodec.sha256(signed.artifactBytes))
+    XCTAssertFalse(String(describing: awaiting).contains(storage.root.path))
+    guard case .handedOff = try await third.handoff(
+      explicitConsent: true, revealer: revealer)
+    else { return XCTFail("a third owner must continue the consent-bound handoff") }
+    XCTAssertEqual(revealer.count, 1)
+    let handedOffStatus = try await third.status()
+    XCTAssertEqual(handedOffStatus.phase, "handedOff")
+  }
+
+  func testRuntimeUpdateFacadeObservesCrossProcessCancellationAndSettlesDurably()
+    async throws
+  {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let stateDirectory = storage.root.appending(path: "Lifecycle", directoryHint: .isDirectory)
+    let fixedNow = now
+    let stateStore = RuntimeUpdateStateStore(directory: stateDirectory, now: { fixedNow })
+    let streamer = CancellableArtifactStreamer(
+      feed: signed.envelope,
+      partialArtifact: Data(signed.artifactBytes.prefix(5)))
+    let facade = try RuntimeUpdateApplicationFacade(
+      streamer: streamer,
+      verifier: UpdateFeedVerifier(
+        trust: signed.trust, replayStore: MemoryReplayStore()),
+      artifactStore: storage.store,
+      artifactValidator: FakeArtifactValidator(),
+      preferences: MemoryUpdatePreferences(),
+      stateStore: stateStore)
+    _ = try await facade.checkManually(identity: verificationIdentity(), now: now)
+
+    let download = Task { try await facade.downloadAvailableUpdate() }
+    try await waitUntil { streamer.artifactStarted }
+    let cancellation = try RuntimeUpdateStateStore(directory: stateDirectory)
+      .requestCancellation()
+    XCTAssertTrue(cancellation.cancellationRequested)
+
+    switch await download.result {
+    case .success:
+      XCTFail("a cross-process cancellation must not publish a verified artifact")
+    case .failure(let error):
+      XCTAssertEqual(error as? UpdateDownloadError, .cancelled)
+    }
+    try await waitUntil { streamer.artifactTerminated }
+    let settled = try await facade.status()
+    XCTAssertEqual(settled.phase, "cancelled")
+    XCTAssertFalse(settled.isBusy)
+    XCTAssertFalse(settled.cancellationRequested)
+    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+  }
+
+  func testRuntimeUpdateFacadeRecoversCrashedVerificationOwnerWithoutLivenessGuessing()
+    async throws
+  {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let downloaded = try await storage.store.writeVerified(
+      stream: stream([signed.artifactBytes]),
+      expectedLength: UInt64(signed.artifactBytes.count),
+      expectedSHA256: UpdateFeedCodec.sha256(signed.artifactBytes))
+    let stateDirectory = storage.root.appending(path: "Lifecycle", directoryHint: .isDirectory)
+    let stateStore = RuntimeUpdateStateStore(directory: stateDirectory)
+    _ = try stateStore.replace(
+      expectedGeneration: 0,
+      state: .verifying(downloaded),
+      activeOperationID: UUID())
+
+    let facade = try RuntimeUpdateApplicationFacade(
+      streamer: FakeUpdateStreamer(feed: signed.envelope, artifact: signed.artifactBytes),
+      verifier: UpdateFeedVerifier(
+        trust: signed.trust, replayStore: MemoryReplayStore()),
+      artifactStore: storage.store,
+      artifactValidator: FakeArtifactValidator(),
+      preferences: MemoryUpdatePreferences(),
+      stateStore: RuntimeUpdateStateStore(directory: stateDirectory))
+    try await facade.recoverOrphanPartials()
+
+    let recovered = try await facade.status()
+    XCTAssertEqual(recovered.phase, "cancelled")
+    XCTAssertFalse(recovered.isBusy)
+    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+  }
+
+  func testRuntimeUpdateFacadeReportsHandoffWhenCancellationArrivesAfterFinderReveal()
+    async throws
+  {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let stateDirectory = storage.root.appending(path: "Lifecycle", directoryHint: .isDirectory)
+    let stateStore = RuntimeUpdateStateStore(directory: stateDirectory)
+    let facade = try RuntimeUpdateApplicationFacade(
+      streamer: FakeUpdateStreamer(feed: signed.envelope, artifact: signed.artifactBytes),
+      verifier: UpdateFeedVerifier(
+        trust: signed.trust, replayStore: MemoryReplayStore()),
+      artifactStore: storage.store,
+      artifactValidator: FakeArtifactValidator(),
+      preferences: MemoryUpdatePreferences(),
+      stateStore: stateStore)
+    _ = try await facade.checkManually(identity: verificationIdentity(), now: now)
+    _ = try await facade.downloadAvailableUpdate()
+
+    let revealer = CancellingArtifactRevealer(stateStore: stateStore)
+    guard case .handedOff = try await facade.handoff(
+      explicitConsent: true, revealer: revealer)
+    else { return XCTFail("a reveal that completed is a handed-off outcome") }
+    let settled = try await facade.status()
+    XCTAssertEqual(settled.phase, "handedOff")
+    XCTAssertFalse(settled.isBusy)
+    XCTAssertFalse(settled.cancellationRequested)
+    XCTAssertEqual(revealer.count, 1)
+  }
+
+  func testRuntimeUpdateCleanupExplicitlyDiscardsAwaitingConsentArtifact() async throws {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let foreignDMG = storage.store.directory.appending(path: "keep-me.dmg")
+    try Data("not updater-owned".utf8).write(to: foreignDMG)
+    let stateDirectory = storage.root.appending(path: "Lifecycle", directoryHint: .isDirectory)
+    let facade = try RuntimeUpdateApplicationFacade(
+      streamer: FakeUpdateStreamer(feed: signed.envelope, artifact: signed.artifactBytes),
+      verifier: UpdateFeedVerifier(
+        trust: signed.trust, replayStore: MemoryReplayStore()),
+      artifactStore: storage.store,
+      artifactValidator: FakeArtifactValidator(),
+      preferences: MemoryUpdatePreferences(),
+      stateStore: RuntimeUpdateStateStore(directory: stateDirectory))
+    _ = try await facade.checkManually(identity: verificationIdentity(), now: now)
+    _ = try await facade.downloadAvailableUpdate()
+    XCTAssertEqual(try cachedArtifacts(in: storage.store).filter { $0.hasSuffix(".dmg") }.count, 2)
+
+    let receipt = try await facade.cleanup()
+
+    XCTAssertEqual(receipt.status.phase, "idle")
+    XCTAssertEqual(receipt.removedVerifiedArtifacts, 1)
+    XCTAssertEqual(try cachedArtifacts(in: storage.store), ["keep-me.dmg"])
+  }
+
   private func waitUntil(
     attempts: Int = 2_000,
     condition: () -> Bool
@@ -1314,6 +1492,23 @@ private final class RecordingArtifactRevealer: UpdateArtifactRevealing, @uncheck
   @MainActor
   func revealInFinder(_ url: URL) throws {
     lock.withLock { internalCount += 1 }
+  }
+}
+
+private final class CancellingArtifactRevealer: UpdateArtifactRevealing, @unchecked Sendable {
+  private let lock = NSLock()
+  private let stateStore: RuntimeUpdateStateStore
+  private var internalCount = 0
+  var count: Int { lock.withLock { internalCount } }
+
+  init(stateStore: RuntimeUpdateStateStore) {
+    self.stateStore = stateStore
+  }
+
+  @MainActor
+  func revealInFinder(_ url: URL) throws {
+    lock.withLock { internalCount += 1 }
+    _ = try stateStore.requestCancellation()
   }
 }
 

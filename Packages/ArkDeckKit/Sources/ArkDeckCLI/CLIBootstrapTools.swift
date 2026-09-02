@@ -1,11 +1,16 @@
 import ArkDeckAgentClient
+import ArkDeckBootstrap
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckWorkflows
 import Foundation
 
 extension RuntimeCLI {
-  static func runBootstrapTool(_ arguments: [String], registry supplied: BootstrapToolRegistry? = nil) throws {
+  static func runBootstrapTool(
+    _ arguments: [String],
+    registry supplied: BootstrapToolRegistry? = nil,
+    devecoRegistry suppliedDevEco: BootstrapDevEcoToolchainRegistry? = nil
+  ) throws {
     guard let verb = arguments.first else { throw CLIError(exitCode: 64, message: "tool subcommand is required") }
     var rest = Array(arguments.dropFirst())
     var session = runtimeSession(
@@ -46,27 +51,54 @@ extension RuntimeCLI {
           BootstrapToolRegistry.PublishedIdentity(version: $0.version, profileReferences: $0.profileReferences)
         }
       })
+      let devecoRegistry = suppliedDevEco
+        ?? BootstrapDevEcoToolchainRegistry(owner: registry.sharedOwner)
       switch verb {
       case "register":
-        guard options.value("--kind") == "hdc", let path = options.value("--file"), path.hasPrefix("/"),
-          !path.utf8.contains(0), !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
-          throw session.fail(.invalidInput, "HDC registration requires an absolute local --file path")
+        let kind = options.value("--kind")
+        let file = options.value("--file")
+        let root = options.value("--root")
+        guard [file, root].compactMap({ $0 }).allSatisfy({ path in
+          path.hasPrefix("/") && !path.utf8.contains(0)
+            && !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." })
+        }) else {
+          throw session.fail(.invalidInput, "tool registration paths must be canonical absolute local paths")
         }
-        session.emit(try registry.register(file: URL(filePath: path)))
+        switch (kind, file, root) {
+        case ("hdc", .some(let path), nil):
+          session.emit(try registry.register(file: URL(filePath: path)))
+        case ("deveco", nil, .some(let path)):
+          session.emit(try devecoRegistry.register(root: URL(filePath: path, directoryHint: .isDirectory)))
+        default:
+          throw session.fail(
+            .invalidInput,
+            "HDC registration requires only --file; DevEco registration requires only --root")
+        }
       case "inspect":
         guard let reference = options.value("--tool") else { throw session.fail(.invalidInput, "exact --tool reference is required") }
-        session.emit(try registry.inspect(reference))
+        session.emit(
+          try reference.hasPrefix("toolchain:sha256:")
+            ? devecoRegistry.inspect(reference) : registry.inspect(reference))
       case "remove":
         guard let reference = options.value("--tool"), let generation = options.value("--expected-generation") else {
           throw session.fail(.invalidInput, "remove requires exact --tool and --expected-generation")
         }
-        session.emit(try registry.remove(reference, expectedGeneration: generation))
+        session.emit(
+          try reference.hasPrefix("toolchain:sha256:")
+            ? devecoRegistry.remove(reference, expectedGeneration: generation)
+            : registry.remove(reference, expectedGeneration: generation))
       case "list":
         let size = Int(options.value("--page-size") ?? "100") ?? 0
-        let result = try registry.list { directory, items in
-          try RuntimeSnapshotPager(directory: directory).page(method: "runtime.tool.list", filters: [:],
-            order: "toolRef:asc", pageSize: size, cursor: options.value("--cursor"), items: { items })
+        let inventory = try devecoRegistry.combinedInventory(with: registry)
+        let items = try inventory.values.sorted { left, right in
+          guard case .object(let leftFields) = left, case .string(let leftRef)? = leftFields["toolRef"],
+            case .object(let rightFields) = right, case .string(let rightRef)? = rightFields["toolRef"]
+          else { throw session.fail(.recordUnreadable, "tool inventory contains a malformed reference") }
+          return leftRef < rightRef
         }
+        let result = try RuntimeSnapshotPager(directory: inventory.snapshotDirectory).page(
+          method: "runtime.tool.list", filters: [:], order: "toolRef:asc",
+          pageSize: size, cursor: options.value("--cursor"), items: { items })
         session.emit(result)
       default: throw session.fail(.invalidCommand, "unsupported tool subcommand")
       }

@@ -25,6 +25,175 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     if let root { try? FileManager.default.removeItem(at: root) }
   }
 
+  func testCredentialOwnerPublishesPathFreeReferenceAndPinsExactOwners() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    let (receipt, installed) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+
+    XCTAssertTrue(installed.credentialRef.hasPrefix("credential:sha256-"))
+    XCTAssertEqual(installed.credentialRef.utf8.count, 82)
+    XCTAssertEqual(installed.projectRef, receipt.projectRef)
+    XCTAssertEqual(installed.referenceCount, 0)
+    XCTAssertEqual(try owner.current(), installed)
+    let publicBytes = try PortableCanonicalJSON.canonicalBytes(installed.projection)
+    let publicText = String(decoding: publicBytes, as: UTF8.self)
+    XCTAssertFalse(publicText.contains(root.path))
+    XCTAssertFalse(publicText.contains(receipt.keystore.path))
+    XCTAssertFalse(publicText.contains("keystore-secret"))
+    XCTAssertFalse(publicText.contains("key-secret"))
+
+    let presetRef = "preset-signing-fixture"
+    try owner.acquire(installed.credentialRef, owner: presetRef)
+    try owner.acquire(installed.credentialRef, owner: presetRef)
+    XCTAssertEqual(try owner.current().referenceCount, 1)
+    XCTAssertEqual(
+      try owner.resolve(installed.credentialRef, owner: presetRef), receipt)
+    XCTAssertThrowsError(
+      try owner.resolve(installed.credentialRef, owner: "preset-not-an-owner"))
+    try owner.release(installed.credentialRef, owner: presetRef)
+    XCTAssertEqual(try owner.current().referenceCount, 0)
+  }
+
+  func testCredentialOwnerBlocksReplacementAndRemovalWhilePinned() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    let (_, installed) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    try owner.acquire(installed.credentialRef, owner: "preset-signing-fixture")
+
+    var replacementRan = false
+    XCTAssertThrowsError(
+      try owner.replace {
+        replacementRan = true
+      } as (Void, OpenHarmonySigningCredentialResource))
+    XCTAssertFalse(replacementRan)
+    var removalRan = false
+    XCTAssertThrowsError(
+      try owner.remove {
+        removalRan = true
+      } as Void)
+    XCTAssertFalse(removalRan)
+    XCTAssertEqual(try owner.current().credentialRef, installed.credentialRef)
+  }
+
+  func testCredentialOwnerRecoversMutationMarkerAndRejectsLedgerDrift() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    let (_, installed) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    let ledgerURL = fixture.store.credentialOwnerRootURL.appending(
+      path: "credential-owner-v1.json")
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+    document["state"] = "replacing"
+    try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]).write(
+      to: ledgerURL, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
+    XCTAssertEqual(try owner.current().credentialRef, installed.credentialRef)
+
+    document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+    document["credentialRef"] = "credential:sha256-" + String(repeating: "0", count: 64)
+    try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]).write(
+      to: ledgerURL, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
+    XCTAssertThrowsError(try owner.current()) { error in
+      XCTAssertTrue("\(error)".contains("ledger does not match"), "\(error)")
+    }
+  }
+
+  func testWorkspaceSigningPresetResolvesOnlyItsPinnedCredentialReference() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    let (receipt, resource) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    let workspacePresetRef = "preset-signing-owned"
+    try owner.acquire(resource.credentialRef, owner: workspacePresetRef)
+    let configured = try WorkspaceSigningPreset(
+      presetID: workspacePresetRef, credentialRef: resource.credentialRef,
+      timeoutSeconds: 600)
+    let attempts = try OpenHarmonySigningAttemptStore(
+      rootURL: root.appending(path: "owned-signing-attempts"))
+    let provider = try makeProvider(
+      store: fixture.store, attemptStore: attempts,
+      credentialOwner: owner, workspaceSigningPreset: configured)
+    let input = root.appending(path: "owned-signing-input.hap")
+    let bytes = Data([0x50, 0x4b, 0x03, 0x04]) + Data("input".utf8)
+    try bytes.write(to: input)
+    let context = ProviderExecutionContext(
+      jobID: "job-owned-signing", stepID: "sign-workspace-hap",
+      targetID: "TGT-SIGN", bindingRevision: nil,
+      nowUTC: "2026-08-10T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "ART-INPUT", fileURL: input,
+        sha256: sha256(bytes), byteCount: bytes.count))
+
+    let action = try signingAction(
+      provider: provider.provider, context: context,
+      presetRef: workspacePresetRef)
+    guard case .workspace(.signOpenHarmonyHap(let signing)) = action else {
+      return XCTFail("expected exact signing action")
+    }
+    XCTAssertEqual(signing.selectedSigningPresetRef, workspacePresetRef)
+    XCTAssertEqual(signing.preset, receipt)
+    XCTAssertThrowsError(
+      try signingAction(
+        provider: provider.provider, context: context,
+        presetRef: receipt.presetID))
+  }
+
+  func testRegisteredProfileWithoutSigningPresetNeverFallsBackToFixedReceipt() throws {
+    let fixture = try makeFixture(mode: "success")
+    try installSecrets(in: fixture)
+    let attempts = try OpenHarmonySigningAttemptStore(
+      rootURL: root.appending(path: "registered-no-signing-attempts"))
+    let provider = try makeProvider(
+      store: fixture.store, attemptStore: attempts,
+      allowsLegacySigningPresetFallback: false)
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(
+        reference: OpenHarmonyLocalSigning.operationReference))
+    XCTAssertEqual(
+      provider.provider.runtimeAvailability(for: descriptor),
+      .unavailable(
+        code: .workspacePresetUnavailable,
+        reason: "workspace.presetUnavailable"))
+
+    let input = root.appending(path: "registered-no-signing-input.hap")
+    let bytes = Data([0x50, 0x4b, 0x03, 0x04]) + Data("input".utf8)
+    try bytes.write(to: input)
+    let context = ProviderExecutionContext(
+      jobID: "job-registered-no-signing", stepID: "sign-workspace-hap",
+      targetID: "TGT-SIGN", bindingRevision: nil,
+      nowUTC: "2026-08-10T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "ART-INPUT", fileURL: input,
+        sha256: sha256(bytes), byteCount: bytes.count))
+    XCTAssertThrowsError(
+      try signingAction(provider: provider.provider, context: context)) { error in
+        XCTAssertTrue("\(error)".contains("workspace.presetUnavailable"), "\(error)")
+      }
+  }
+
   func testLoginKeychainReadsUseOnlyModernNonInteractiveAuthenticationContext() throws {
     let options = LoginKeychainSigningSecretStore.nonInteractiveReadOptions()
     let context = try XCTUnwrap(
@@ -1102,7 +1271,8 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       .signOpenHarmonyHap(
         WorkspaceOpenHarmonySigningAction(
           jobID: signingAction.jobID, projectRef: signingAction.projectRef,
-          preset: signingAction.preset, inputArtifactID: signingAction.inputArtifactID,
+          signingPresetRef: nil, preset: signingAction.preset,
+          inputArtifactID: signingAction.inputArtifactID,
           inputFilePath: signingAction.inputFilePath, inputSHA256: signingAction.inputSHA256,
           inputByteCount: signingAction.inputByteCount, output: legacyOutput)))
     let recovered = try await provider.provider.reconcile(
@@ -1312,7 +1482,10 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
 
   private func makeProvider(
     store: OpenHarmonySigningPresetStore,
-    attemptStore: OpenHarmonySigningAttemptStore
+    attemptStore: OpenHarmonySigningAttemptStore,
+    credentialOwner: OpenHarmonySigningCredentialOwner? = nil,
+    workspaceSigningPreset: WorkspaceSigningPreset? = nil,
+    allowsLegacySigningPresetFallback: Bool = true
   ) throws -> SigningProvider {
     let workspace = root.appending(path: "workspace", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
@@ -1326,20 +1499,24 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       projectRef: OpenHarmonyLocalSigning.defaultProjectRef,
       projectRoot: workspace.path, allowedFileGlobs: ["Sources/**"],
       inspectionPreset: inspection, patchPreset: patch,
-      buildPresets: [:], testPresets: [:], symbolPresets: [:])
+      buildPresets: [:], testPresets: [:], symbolPresets: [:],
+      signingPresets: workspaceSigningPreset.map { [$0.presetID: $0] } ?? [:],
+      allowsLegacySigningPresetFallback: allowsLegacySigningPresetFallback)
     return SigningProvider(
       profile: profile,
       provider: WorkspaceOperationsProvider(
         profile: profile,
         attemptStore: try WorkspacePatchAttemptStore(
           rootURL: root.appending(path: "patch-attempts-\(UUID().uuidString)")),
-        signingPresetStore: store, signingAttemptStore: attemptStore,
+        signingPresetStore: store, signingCredentialOwner: credentialOwner,
+        signingAttemptStore: attemptStore,
         nowUTC: { "2026-08-10T00:00:00Z" }))
   }
 
   private func signingAction(
     provider: WorkspaceOperationsProvider,
-    context: ProviderExecutionContext
+    context: ProviderExecutionContext,
+    presetRef: String = OpenHarmonyLocalSigning.defaultPresetID
   ) throws -> TypedProviderAction {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(
@@ -1348,7 +1525,7 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       for: try XCTUnwrap(descriptor.steps.first), operation: descriptor,
       inputs: [
         "projectRef": .string(OpenHarmonyLocalSigning.defaultProjectRef),
-        "signingPresetRef": .string(OpenHarmonyLocalSigning.defaultPresetID),
+        "signingPresetRef": .string(presetRef),
         "unsignedHapArtifactLease": .string("lease-v1:test:input"),
       ], context: context)
   }

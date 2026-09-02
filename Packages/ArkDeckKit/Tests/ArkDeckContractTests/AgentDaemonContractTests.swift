@@ -1004,6 +1004,98 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(try projectStore.list().isEmpty)
   }
 
+  func testTargetCLIRegistersUpdatesAndRemovesATypedWorkspacePreset() throws {
+    var root = stateDirectory.appending(path: "preset-project", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    guard let canonical = realpath(root.path, nil) else { throw POSIXError(.ENOENT) }
+    defer { free(canonical) }
+    root = URL(filePath: String(cString: canonical), directoryHint: .isDirectory)
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory.appending(path: "preset-owner", directoryHint: .isDirectory),
+      toolchainPinning: RuntimeWorkspaceToolchainPinning(
+        acquire: { _, _, _ in }, release: { _, _ in }),
+      nowUTC: { "2026-09-01T12:00:00.000Z" })
+    let project = try store.register(
+      requestID: "preset-cli-project", kind: "openharmony", rootPath: root.path)
+    let (handler, _) = try makeStack(workspaceProjectStore: store)
+    let server = try startServer(handler)
+    let firstToolchain = "toolchain:sha256:" + String(repeating: "d", count: 64)
+    let secondToolchain = "toolchain:sha256:" + String(repeating: "e", count: 64)
+
+    let (registerExit, registerEnvelope) = try runObservationCLI([
+      "workspace", "preset", "register",
+      "--registration-request-id", "preset-cli-registration",
+      "--project", project.projectRef, "--kind", "build",
+      "--template", "openharmony.hvigor-build@1",
+      "--toolchain", firstToolchain, "--toolchain-generation", "1",
+      "--timeout-seconds", "1800", "--module", "entry",
+      "--product", "default", "--build-mode", "debug",
+    ], server: server)
+    XCTAssertEqual(registerExit, 0)
+    guard case .object(let registered)? = registerEnvelope["result"],
+      case .string(let presetRef)? = registered["presetRef"]
+    else { return XCTFail("preset registration must return its typed resource") }
+    XCTAssertEqual(registered["schemaVersion"], .string("arkdeck.workspace-preset/1"))
+    XCTAssertEqual(registered["generation"], .string("1"))
+    XCTAssertEqual(registered["toolchainRef"], .string(firstToolchain))
+    XCTAssertEqual(registered["configurationStatus"], .string("runtimeRestartRequired"))
+    let rendered = String(
+      decoding: try JSONEncoder().encode(registerEnvelope), as: UTF8.self)
+    XCTAssertFalse(rendered.contains(root.path))
+    XCTAssertFalse(rendered.contains("argv"))
+    XCTAssertFalse(rendered.contains("executable"))
+
+    let (listExit, listEnvelope) = try runObservationCLI([
+      "workspace", "preset", "list", "--project", project.projectRef,
+      "--kind", "build",
+    ], server: server)
+    XCTAssertEqual(listExit, 0)
+    guard case .object(let listed)? = listEnvelope["result"],
+      case .array(let presets)? = listed["presets"]
+    else { return XCTFail("target preset list must be a versioned collection") }
+    XCTAssertEqual(listed["schemaVersion"], .string("arkdeck.workspace-preset-list/1"))
+    XCTAssertEqual(presets.count, 1)
+
+    let (showExit, showEnvelope) = try runObservationCLI([
+      "workspace", "preset", "show", "--project", project.projectRef,
+      "--preset", presetRef,
+    ], server: server)
+    XCTAssertEqual(showExit, 0)
+    guard case .object(let shown)? = showEnvelope["result"] else {
+      return XCTFail("preset show must return the owner projection")
+    }
+    XCTAssertEqual(shown["presetRef"], .string(presetRef))
+
+    let (updateExit, updateEnvelope) = try runObservationCLI([
+      "workspace", "preset", "update", "--mutation-request-id", "preset-cli-update",
+      "--project", project.projectRef, "--preset", presetRef,
+      "--expected-generation", "1", "--kind", "build",
+      "--template", "openharmony.hvigor-build@1",
+      "--toolchain", secondToolchain, "--toolchain-generation", "1",
+      "--timeout-seconds", "1200", "--module", "entry",
+      "--product", "default", "--build-mode", "debug",
+    ], server: server)
+    XCTAssertEqual(updateExit, 0)
+    guard case .object(let updated)? = updateEnvelope["result"] else {
+      return XCTFail("preset update must return its advanced generation")
+    }
+    XCTAssertEqual(updated["generation"], .string("2"))
+    XCTAssertEqual(updated["toolchainRef"], .string(secondToolchain))
+
+    let (removeExit, removeEnvelope) = try runObservationCLI([
+      "workspace", "preset", "remove", "--mutation-request-id", "preset-cli-remove",
+      "--project", project.projectRef, "--preset", presetRef,
+      "--expected-generation", "2",
+    ], server: server)
+    XCTAssertEqual(removeExit, 0)
+    guard case .object(let removed)? = removeEnvelope["result"] else {
+      return XCTFail("preset remove must return its tombstone")
+    }
+    XCTAssertEqual(removed["generation"], .string("3"))
+    XCTAssertEqual(removed["configurationStatus"], .string("removed"))
+    XCTAssertTrue(try store.listPresets(projectRef: project.projectRef).isEmpty)
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     targetObservations: TargetObservationCoordinator? = nil,

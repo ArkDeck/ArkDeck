@@ -3,6 +3,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCLI
+@testable import ArkDeckBootstrap
 @testable import ArkDeckCore
 @testable import ArkDeckLaunchAgent
 @testable import ArkDeckWorkflows
@@ -61,6 +62,33 @@ final class BootstrapBundleRegistryContractTests: XCTestCase {
     XCTAssertTrue(FileManager.default.fileExists(atPath: stored.path))
     assertFailure("resourceConflict") { _ = try registry().acquire(reference, expectedGeneration: "1", owner: dependency) }
     assertFailure("resourceConflict") { _ = try registry().remove(reference, expectedGeneration: "2") }
+  }
+
+  func testSuccessfulServiceInstallRetainsOnlyItsExactBundleAndUninstallReleasesIt() throws {
+    let owner = registry()
+    let first = try object(owner.register(file: bundle("First", payload: "first")))
+    let second = try object(owner.register(file: bundle("Second", payload: "second")))
+    let firstReference = try string(first["bundleRef"])
+    let secondReference = try string(second["bundleRef"])
+    let installation = try BootstrapBundleRegistry.ReferenceOwner(
+      kind: .installation, id: "runtime-service-installation")
+
+    _ = try owner.acquire(firstReference, expectedGeneration: "1", owner: installation)
+    _ = try owner.acquire(secondReference, expectedGeneration: "1", owner: installation)
+    try owner.retainOnly(secondReference, owner: installation)
+
+    guard case .array(let firstOwners)? = try object(owner.inspect(firstReference))["references"],
+      case .array(let secondOwners)? = try object(owner.inspect(secondReference))["references"]
+    else { return XCTFail("bundle reference projection is malformed") }
+    XCTAssertEqual(firstOwners, [])
+    XCTAssertEqual(secondOwners.count, 1)
+    XCTAssertNoThrow(try owner.remove(firstReference, expectedGeneration: "1"))
+    assertFailure("resourceConflict") {
+      _ = try owner.remove(secondReference, expectedGeneration: "1")
+    }
+
+    try owner.releaseAll(owner: installation)
+    XCTAssertNoThrow(try owner.remove(secondReference, expectedGeneration: "1"))
   }
 
   func testQuarantineIsPreservedAndPartOfExactContentIdentity() throws {

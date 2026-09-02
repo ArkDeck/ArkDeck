@@ -47,6 +47,7 @@ final class CLICommandRegistryCoverageContractTests: XCTestCase {
       + source("Sources/ArkDeckCLI/CLIBootstrapBundles.swift")
       + source("Sources/ArkDeckCLI/CLIHDCControlActions.swift")
       + source("Sources/ArkDeckCLI/CLIBootstrapTools.swift")
+      + source("Sources/ArkDeckCLI/CLIRuntimeUpdate.swift")
       + source("Sources/ArkDeckCLI/CLIWorkspaceContinuation.swift")
   }
 

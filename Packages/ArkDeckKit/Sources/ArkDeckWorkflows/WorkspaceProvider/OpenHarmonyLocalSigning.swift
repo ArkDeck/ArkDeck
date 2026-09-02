@@ -519,6 +519,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   }
 
   package var receiptPath: String { receiptURL.path }
+  package var credentialOwnerRootURL: URL { rootURL }
 
   public func install(
     configuration: OpenHarmonySigningPresetConfiguration,
@@ -1425,12 +1426,17 @@ package final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
 public struct WorkspaceOpenHarmonySigningAction: Sendable, Equatable, Codable {
   let jobID: String
   let projectRef: String
+  /// Workspace preset selected by the caller. Older persisted actions did
+  /// not carry it because their fixed receipt ID was also the public preset.
+  let signingPresetRef: String?
   let preset: OpenHarmonySigningPresetReceipt
   let inputArtifactID: String
   let inputFilePath: String
   let inputSHA256: String
   let inputByteCount: Int
   let output: OpenHarmonySigningAttemptPaths
+
+  var selectedSigningPresetRef: String { signingPresetRef ?? preset.presetID }
 
   var signArguments: [String] {
     [
@@ -1649,7 +1655,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
     let summary: [String: String] = [
       "verification": "verified",
       "projectRef": action.projectRef,
-      "signingPresetRef": action.preset.presetID,
+      "signingPresetRef": action.selectedSigningPresetRef,
       "sourceArtifactId": action.inputArtifactID,
       "sourceSha256": action.inputSHA256,
       "sourceByteCount": String(action.inputByteCount),
@@ -1690,7 +1696,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
     guard record.schemaVersion == "arkdeck-openharmony-signing-result/v1",
       record.summary["sourceArtifactId"] == action.inputArtifactID,
       record.summary["sourceSha256"] == action.inputSHA256,
-      record.summary["signingPresetRef"] == action.preset.presetID,
+      record.summary["signingPresetRef"] == action.selectedSigningPresetRef,
       let expected = record.summary["signedHapSha256"]
     else { throw OpenHarmonySigningError.ioFailure("signing result record is malformed") }
     let signed = try measuredHAP(at: action.output.signedHAP, maximumBytes: 64 * 1_024 * 1_024)

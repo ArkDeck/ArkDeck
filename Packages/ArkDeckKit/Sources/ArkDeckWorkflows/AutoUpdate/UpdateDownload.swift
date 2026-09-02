@@ -13,7 +13,7 @@ public enum UpdateDownloadError: Error, Equatable, Sendable {
   case unsafeArtifact
 }
 
-public struct UpdateFileIdentity: Equatable, Sendable {
+public struct UpdateFileIdentity: Codable, Equatable, Sendable {
   public let device: UInt64
   public let inode: UInt64
   public let byteLength: UInt64
@@ -44,7 +44,7 @@ public struct UpdateFileIdentity: Equatable, Sendable {
   }
 }
 
-public struct DownloadedUpdateArtifact: Equatable, Sendable {
+public struct DownloadedUpdateArtifact: Codable, Equatable, Sendable {
   public let url: URL
   public let byteLength: UInt64
   public let sha256: String
@@ -67,8 +67,7 @@ public struct UpdateArtifactStore: Sendable {
   }
 
   public static func production() throws -> UpdateArtifactStore {
-    let caches = try FileManager.default.url(
-      for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    let caches = try AutoUpdateFilesystemLayout.cachesDirectory()
     return UpdateArtifactStore(
       directory: caches.appending(path: "ArkDeck-Updates", directoryHint: .isDirectory))
   }
@@ -91,10 +90,44 @@ public struct UpdateArtifactStore: Sendable {
     try fullSync(directoryDescriptor)
   }
 
+  /// Removes verified cache entries that are not retained by the durable lifecycle owner.
+  /// Only random-name `.dmg` children of this store are eligible; caller paths are never accepted.
+  @discardableResult
+  public func removeUnreferencedArtifacts(keeping retained: Set<String>) throws -> Int {
+    let directoryDescriptor = try openSecureDirectory()
+    defer { Darwin.close(directoryDescriptor) }
+    let names: [String]
+    do {
+      names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    } catch {
+      throw UpdateDownloadError.fileOperationFailed(errno: Self.posixErrorCode(for: error))
+    }
+    var removed = 0
+    for name in names where Self.isOwnedVerifiedArtifactName(name) && !retained.contains(name) {
+      if unlinkat(directoryDescriptor, name, 0) == 0 {
+        removed += 1
+      } else if errno != ENOENT {
+        throw UpdateDownloadError.fileOperationFailed(errno: errno)
+      }
+    }
+    try fullSync(directoryDescriptor)
+    return removed
+  }
+
+  private static func isOwnedVerifiedArtifactName(_ name: String) -> Bool {
+    guard name == URL(filePath: name).lastPathComponent, name.hasSuffix(".dmg") else {
+      return false
+    }
+    let stem = String(name.dropLast(4))
+    guard let identity = UUID(uuidString: stem) else { return false }
+    return stem == identity.uuidString.lowercased()
+  }
+
   public func writeVerified(
     stream: AsyncThrowingStream<Data, any Error>,
     expectedLength: UInt64,
-    expectedSHA256: String
+    expectedSHA256: String,
+    cancellationRequested: @escaping @Sendable () -> Bool = { false }
   ) async throws -> DownloadedUpdateArtifact {
     guard expectedLength > 0 else { throw UpdateDownloadError.truncated }
     let directoryDescriptor = try openSecureDirectory()
@@ -119,7 +152,7 @@ public struct UpdateArtifactStore: Sendable {
     var received: UInt64 = 0
     do {
       for try await chunk in stream {
-        if Task.isCancelled { throw UpdateDownloadError.cancelled }
+        if Task.isCancelled || cancellationRequested() { throw UpdateDownloadError.cancelled }
         guard UInt64(chunk.count) <= expectedLength - min(expectedLength, received) else {
           throw UpdateDownloadError.responseOverflow
         }
@@ -130,7 +163,7 @@ public struct UpdateArtifactStore: Sendable {
     } catch is CancellationError {
       throw UpdateDownloadError.cancelled
     }
-    if Task.isCancelled { throw UpdateDownloadError.cancelled }
+    if Task.isCancelled || cancellationRequested() { throw UpdateDownloadError.cancelled }
     guard received == expectedLength else { throw UpdateDownloadError.truncated }
     let actualDigest = SHA256Hex.hexString(hasher.finalize())
     guard actualDigest == expectedSHA256 else { throw UpdateDownloadError.digestMismatch }

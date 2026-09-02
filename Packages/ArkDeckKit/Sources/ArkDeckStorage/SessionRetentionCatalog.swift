@@ -8,6 +8,7 @@ package enum SessionRetentionCatalogError: Error, Equatable, Sendable {
   case metadataUnavailable
   case metadataCorrupt
   case staleGeneration(expected: UInt64, actual: UInt64)
+  case staleSnapshot
   case generationOverflow
   case unknownSession(String)
   case unsafeSession(String)
@@ -54,6 +55,13 @@ public struct SessionRetentionCatalogEntry: Equatable, Sendable {
   public let policyGeneration: UInt64
 }
 
+package struct SessionRetentionCatalogArtifact: Equatable, Sendable {
+  package let artifactID: String
+  package let role: String
+  package let byteCount: UInt64
+  package let sha256: String
+}
+
 package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   public let catalogGeneration: UInt64?
   public let sessions: [RetainedSession]
@@ -63,6 +71,7 @@ package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   public let unknownSessionIDs: [String]
   public let rootIdentity: SessionCatalogRootIdentity
   public let volumeIdentity: VolumeIdentity
+  package let artifactsBySession: [String: [SessionRetentionCatalogArtifact]]
 
   public var pinnedBytes: UInt64 {
     sessions.filter(\.isPinned).reduce(UInt64(0)) {
@@ -203,6 +212,29 @@ package struct SessionRetentionCatalog: Sendable {
     }
   }
 
+  /// Revalidates and applies a retention plan while holding the same catalog
+  /// lock used by pin transitions. No concurrent pin or catalog publication
+  /// can land between the final equality check and the anchored deletions.
+  package func applyRetention(
+    _ plan: SessionRetentionPlan,
+    expectedSnapshot: SessionRetentionCatalogSnapshot,
+    retentionDays: UInt64,
+    policyGeneration: UInt64,
+    controller: SessionRetentionController
+  ) throws -> SessionRetentionCatalogSnapshot {
+    let retentionDays = try validatedRetentionDays(retentionDays)
+    return try withLockedRoot { root in
+      let current = try scanLocked(
+        root, retentionDays: retentionDays, policyGeneration: policyGeneration)
+      guard current == expectedSnapshot else {
+        throw SessionRetentionCatalogError.staleSnapshot
+      }
+      try controller.apply(plan, sessions: current.sessions, sessionsRoot: sessionsRoot)
+      return try scanLocked(
+        root, retentionDays: retentionDays, policyGeneration: policyGeneration)
+    }
+  }
+
   private func scanLocked(
     _ root: LockedRoot,
     retentionDays: Int,
@@ -227,7 +259,7 @@ package struct SessionRetentionCatalog: Sendable {
       return snapshot(
         root: root, generation: nil, sessions: [], entries: [],
         currentBytes: tree.currentBytes, unknownPressure: unknownPressure,
-        unknownIDs: unknownIDs)
+        unknownIDs: unknownIDs, scannedSessions: tree.sessions)
 
     case .missing:
       var document = PersistentCatalog(generation: 0, entries: [])
@@ -253,7 +285,8 @@ package struct SessionRetentionCatalog: Sendable {
       return snapshot(
         root: root, generation: document.generation, sessions: sessions,
         entries: entrySnapshots, currentBytes: tree.currentBytes,
-        unknownPressure: unknownPressure, unknownIDs: unknownIDs)
+        unknownPressure: unknownPressure, unknownIDs: unknownIDs,
+        scannedSessions: tree.sessions)
 
     case .valid(var document):
       var changed = false
@@ -314,7 +347,8 @@ package struct SessionRetentionCatalog: Sendable {
         sessions: sessions.sorted {
           $0.sessionID < $1.sessionID
         }, entries: entrySnapshots, currentBytes: tree.currentBytes,
-        unknownPressure: unknownPressure, unknownIDs: unknownIDs)
+        unknownPressure: unknownPressure, unknownIDs: unknownIDs,
+        scannedSessions: tree.sessions)
     }
   }
 
@@ -325,9 +359,11 @@ package struct SessionRetentionCatalog: Sendable {
     entries: [SessionRetentionCatalogEntry],
     currentBytes: UInt64,
     unknownPressure: Bool,
-    unknownIDs: Set<String>
+    unknownIDs: Set<String>,
+    scannedSessions: [ScannedSession]
   ) -> SessionRetentionCatalogSnapshot {
-    SessionRetentionCatalogSnapshot(
+    let retainedIDs = Set(sessions.map(\.sessionID))
+    return SessionRetentionCatalogSnapshot(
       catalogGeneration: generation,
       sessions: sessions,
       entries: entries.sorted { $0.sessionID < $1.sessionID },
@@ -335,7 +371,13 @@ package struct SessionRetentionCatalog: Sendable {
       unknownPressure: unknownPressure,
       unknownSessionIDs: unknownIDs.sorted(),
       rootIdentity: root.identity,
-      volumeIdentity: root.volumeIdentity)
+      volumeIdentity: root.volumeIdentity,
+      artifactsBySession: Dictionary(
+        uniqueKeysWithValues: scannedSessions.compactMap { session in
+          retainedIDs.contains(session.sessionID)
+            ? (session.sessionID, session.artifacts)
+            : nil
+        }))
   }
 
   private func scanTree(_ root: LockedRoot) throws -> ScannedTree {
@@ -463,7 +505,12 @@ package struct SessionRetentionCatalog: Sendable {
       .appending(path: sessionID, directoryHint: .isDirectory)
     return ScannedSession(
       sessionID: sessionID, root: root, sizeBytes: size,
-      completedAt: manifest.completedAt)
+      completedAt: manifest.completedAt,
+      artifacts: manifest.artifacts.map {
+        SessionRetentionCatalogArtifact(
+          artifactID: $0.id, role: $0.role.rawValue,
+          byteCount: $0.size, sha256: $0.sha256)
+      }.sorted { $0.artifactID < $1.artifactID })
   }
 
   private func recordUnknown(
@@ -998,6 +1045,7 @@ private struct ScannedSession {
   let root: URL
   let sizeBytes: UInt64
   let completedAt: Date
+  let artifacts: [SessionRetentionCatalogArtifact]
 }
 
 private struct ScannedTree {

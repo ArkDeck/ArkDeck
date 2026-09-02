@@ -1,12 +1,13 @@
 import ArkDeckRuntime
 import Foundation
 
-public enum AutoUpdateFailureCode: String, Equatable, Sendable {
+public enum AutoUpdateFailureCode: String, Codable, Equatable, Sendable {
   case network
   case feed
   case download
   case artifact
   case handoff
+  case storage
 }
 
 public enum AutoUpdateServiceError: Error, Equatable, Sendable {
@@ -17,7 +18,7 @@ public enum AutoUpdateServiceError: Error, Equatable, Sendable {
   case artifactChangedAfterVerification
 }
 
-public enum AutoUpdateState: Equatable, Sendable {
+public enum AutoUpdateState: Codable, Equatable, Sendable {
   case idle
   case checking
   case available(VerifiedUpdateFeed)
@@ -81,8 +82,10 @@ public actor AutoUpdateService {
   private let artifactValidator: any UpdateArtifactValidating
   private let preferences: any AutoUpdatePreferenceStoring
   private let eventLogger: any AutoUpdateEventLogging
-  private var internalState: AutoUpdateState = .idle
+  private let cancellationRequested: @Sendable () -> Bool
+  private var internalState: AutoUpdateState
   private var activeOperationID: UUID?
+  private var activeCheckTask: Task<Data, any Error>?
   private var activeDownloadTask: Task<DownloadedUpdateArtifact, any Error>?
 
   public init(
@@ -91,7 +94,9 @@ public actor AutoUpdateService {
     artifactStore: UpdateArtifactStore,
     artifactValidator: any UpdateArtifactValidating,
     preferences: any AutoUpdatePreferenceStoring,
-    eventLogger: any AutoUpdateEventLogging = NoOpAutoUpdateEventLogger()
+    eventLogger: any AutoUpdateEventLogging = NoOpAutoUpdateEventLogger(),
+    initialState: AutoUpdateState = .idle,
+    cancellationRequested: @escaping @Sendable () -> Bool = { false }
   ) {
     self.streamer = streamer
     self.verifier = verifier
@@ -99,6 +104,8 @@ public actor AutoUpdateService {
     self.artifactValidator = artifactValidator
     self.preferences = preferences
     self.eventLogger = eventLogger
+    self.internalState = initialState
+    self.cancellationRequested = cancellationRequested
   }
 
   public var state: AutoUpdateState { internalState }
@@ -164,12 +171,13 @@ public actor AutoUpdateService {
         try await artifactStore.writeVerified(
           stream: stream,
           expectedLength: feed.payload.artifact.byteLength,
-          expectedSHA256: feed.payload.artifact.sha256)
+          expectedSHA256: feed.payload.artifact.sha256,
+          cancellationRequested: cancellationRequested)
       }
       activeDownloadTask = downloadTask
       let materialized = try await downloadTask.value
       downloaded = materialized
-      guard activeOperationID == operationID else {
+      guard activeOperationID == operationID, !cancellationRequested() else {
         artifactStore.remove(materialized)
         throw UpdateDownloadError.cancelled
       }
@@ -177,7 +185,7 @@ public actor AutoUpdateService {
       internalState = .verifying(materialized)
       eventLogger.record(.verificationStarted)
       let validated = try artifactValidator.validate(materialized)
-      guard activeOperationID == operationID else {
+      guard activeOperationID == operationID, !cancellationRequested() else {
         artifactStore.remove(materialized)
         throw UpdateDownloadError.cancelled
       }
@@ -212,6 +220,7 @@ public actor AutoUpdateService {
       throw AutoUpdateServiceError.invalidTransition
     }
     do {
+      guard !cancellationRequested() else { throw UpdateDownloadError.cancelled }
       let revalidated = try artifactValidator.validate(approved.downloaded)
       guard revalidated == approved else {
         throw AutoUpdateServiceError.artifactChangedAfterVerification
@@ -222,10 +231,16 @@ public actor AutoUpdateService {
       else {
         throw AutoUpdateServiceError.artifactChangedAfterVerification
       }
+      guard !cancellationRequested() else { throw UpdateDownloadError.cancelled }
       try await revealer.revealInFinder(revalidated.downloaded.url)
       internalState = .handedOff(revalidated.downloaded.url)
       eventLogger.record(.handedOff)
       return internalState
+    } catch let error as UpdateDownloadError where error == .cancelled {
+      artifactStore.remove(approved.downloaded)
+      internalState = .cancelled
+      eventLogger.record(.cancelled)
+      throw error
     } catch {
       artifactStore.remove(approved.downloaded)
       internalState = .failed(.handoff)
@@ -237,6 +252,8 @@ public actor AutoUpdateService {
   public func cancel() {
     switch internalState {
     case .checking, .downloading, .verifying:
+      activeCheckTask?.cancel()
+      activeCheckTask = nil
       activeDownloadTask?.cancel()
       activeDownloadTask = nil
       activeOperationID = nil
@@ -266,16 +283,22 @@ public actor AutoUpdateService {
       let request = try UpdateRequestFactory.feedRequest(identity: identity)
       let stream = streamer.stream(
         for: request, maximumBytes: UInt64(UpdateFeedCodec.maximumFeedBytes))
-      var feedData = Data()
-      for try await chunk in stream {
-        if Task.isCancelled || activeOperationID != operationID {
-          throw CancellationError()
+      let cancellationRequested = self.cancellationRequested
+      let checkTask = Task { () throws -> Data in
+        var feedData = Data()
+        for try await chunk in stream {
+          if Task.isCancelled || cancellationRequested() { throw CancellationError() }
+          guard chunk.count <= UpdateFeedCodec.maximumFeedBytes - feedData.count else {
+            throw UpdateFeedError.feedTooLarge
+          }
+          feedData.append(chunk)
         }
-        guard chunk.count <= UpdateFeedCodec.maximumFeedBytes - feedData.count else {
-          throw UpdateFeedError.feedTooLarge
-        }
-        feedData.append(chunk)
+        if Task.isCancelled || cancellationRequested() { throw CancellationError() }
+        return feedData
       }
+      activeCheckTask = checkTask
+      let feedData = try await checkTask.value
+      activeCheckTask = nil
       let result = try verifier.verify(
         feedData,
         context: UpdateVerificationContext(
@@ -283,7 +306,9 @@ public actor AutoUpdateService {
           systemVersion: identity.osVersion,
           architecture: identity.architecture),
         now: now)
-      guard activeOperationID == operationID else { throw CancellationError() }
+      guard activeOperationID == operationID, !cancellationRequested() else {
+        throw CancellationError()
+      }
       activeOperationID = nil
       switch result {
       case .update(let verified):
@@ -310,6 +335,7 @@ public actor AutoUpdateService {
     event: AutoUpdateLogEvent
   ) {
     guard activeOperationID == operationID else { return }
+    activeCheckTask = nil
     activeDownloadTask = nil
     activeOperationID = nil
     internalState = state
@@ -329,9 +355,10 @@ public actor AutoUpdateService {
 }
 
 public enum AutoUpdateApplicationFacade {
-  public static func make() throws -> AutoUpdateService {
+  public static func make() throws -> RuntimeUpdateApplicationFacade {
     let artifactStore = try UpdateArtifactStore.production()
     let replayStore = try FileUpdateReplayStore.production()
+    let stateStore = try RuntimeUpdateStateStore.production()
     let trust = try UpdateFeedTrust.production
     let preferences = UserDefaultsAutoUpdatePreferences()
     let eventLogger: any AutoUpdateEventLogging
@@ -347,13 +374,14 @@ public enum AutoUpdateApplicationFacade {
     } catch {
       eventLogger = NoOpAutoUpdateEventLogger()
     }
-    return AutoUpdateService(
+    return try RuntimeUpdateApplicationFacade(
       streamer: URLSessionUpdateHTTPStreamer(),
       verifier: UpdateFeedVerifier(
         trust: trust, replayStore: replayStore),
       artifactStore: artifactStore,
       artifactValidator: SystemUpdateArtifactValidator(),
       preferences: preferences,
+      stateStore: stateStore,
       eventLogger: eventLogger)
   }
 

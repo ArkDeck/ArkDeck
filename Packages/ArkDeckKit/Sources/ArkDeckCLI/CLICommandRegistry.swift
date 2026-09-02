@@ -496,7 +496,7 @@ enum CLICommandRegistry {
 
   private static let declaredNodes: [CLINodeSpec] = [
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
-    jobNode, historyNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
+    jobNode, sessionNode, historyNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
     flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
@@ -759,6 +759,7 @@ enum CLICommandRegistry {
                   placeholder: "build|test|signing|symbol",
                   grammar: .enumeration(["build", "test", "signing", "symbol"])),
                 summary: "narrow to one preset kind"),
+              targetProtocolOption,
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -772,6 +773,33 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "preset-ref", grammar: .opaque),
                 summary: "preset reference from `workspace preset list`",
                 isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "register",
+            canonicalCommand: "workspace.preset.register",
+            summary: "register one typed preset against a project and exact toolchain generation",
+            options: runtimeClientOptions(
+              [workspacePresetRegistrationRequestOption, workspaceProjectRefOption]
+                + workspacePresetDefinitionOptions + [targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "update",
+            canonicalCommand: "workspace.preset.update",
+            summary: "replace one exact preset generation with a typed definition",
+            options: runtimeClientOptions(
+              [workspacePresetMutationRequestOption, workspaceProjectRefOption,
+                workspacePresetRefOption, generationOption]
+                + workspacePresetDefinitionOptions + [targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "remove",
+            canonicalCommand: "workspace.preset.remove",
+            summary: "remove one unused exact preset generation",
+            options: runtimeClientOptions([
+              workspacePresetMutationRequestOption, workspaceProjectRefOption,
+              workspacePresetRefOption, generationOption, targetProtocolOption,
             ]),
             connectsToRuntime: true),
         ]),
@@ -813,6 +841,68 @@ enum CLICommandRegistry {
     form: .value(placeholder: "project-ref", grammar: .opaque),
     summary: "registered project reference from `workspace project list`",
     isRequired: true)
+
+  private static let workspacePresetRefOption = CLIOptionSpec(
+    name: "--preset",
+    form: .value(placeholder: "preset-ref", grammar: .opaque),
+    summary: "preset reference from `workspace preset list`",
+    isRequired: true)
+
+  private static let workspacePresetRegistrationRequestOption = CLIOptionSpec(
+    name: "--registration-request-id",
+    form: .value(placeholder: "id", grammar: .opaque),
+    summary: "caller-stable preset registration identity",
+    isRequired: true)
+
+  private static let workspacePresetMutationRequestOption = CLIOptionSpec(
+    name: "--mutation-request-id",
+    form: .value(placeholder: "id", grammar: .opaque),
+    summary: "caller-stable update or removal identity",
+    isRequired: true)
+
+  private static var workspacePresetDefinitionOptions: [CLIOptionSpec] {
+    [
+      CLIOptionSpec(
+        name: "--kind",
+        form: .value(
+          placeholder: "build|test|signing|symbol",
+          grammar: .enumeration(["build", "test", "signing", "symbol"])),
+        summary: "closed preset family", isRequired: true),
+      CLIOptionSpec(
+        name: "--template",
+        form: .value(placeholder: "template-ref", grammar: .opaque),
+        summary: "closed template reference for this preset kind", isRequired: true),
+      CLIOptionSpec(
+        name: "--toolchain",
+        form: .value(placeholder: "toolchain-ref", grammar: .opaque),
+        summary: "registered DevEco toolchain reference"),
+      CLIOptionSpec(
+        name: "--toolchain-generation",
+        form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+        summary: "exact registered toolchain generation"),
+      CLIOptionSpec(
+        name: "--credential",
+        form: .value(placeholder: "credential-ref", grammar: .opaque),
+        summary: "registered credential reference; secrets are never accepted"),
+      CLIOptionSpec(
+        name: "--timeout-seconds",
+        form: .value(placeholder: "1...3600", grammar: .positiveInteger(1...3_600)),
+        summary: "bounded execution timeout", isRequired: true),
+      CLIOptionSpec(
+        name: "--module", form: .value(placeholder: "module", grammar: .opaque),
+        summary: "typed Hvigor module constraint"),
+      CLIOptionSpec(
+        name: "--product", form: .value(placeholder: "product", grammar: .opaque),
+        summary: "typed Hvigor product constraint"),
+      CLIOptionSpec(
+        name: "--build-mode", form: .value(placeholder: "mode", grammar: .opaque),
+        summary: "typed Hvigor build mode constraint"),
+      CLIOptionSpec(
+        name: "--relative-source-map",
+        form: .value(placeholder: "relative-path", grammar: .opaque),
+        summary: "project-relative source-map output for a symbol preset"),
+    ]
+  }
 
   private static let workspaceContinuationSourceOption = CLIOptionSpec(
     name: "--source-job",
@@ -981,6 +1071,7 @@ enum CLICommandRegistry {
       runtimeBundleNode,
       runtimeToolNode,
       runtimeSupportBundleNode,
+      runtimeUpdateNode,
       runtimeStorageNode,
     ])
 
@@ -1017,6 +1108,45 @@ enum CLICommandRegistry {
             isRequired: true),
           outputOption, jsonOption, controlRequestIDOption,
         ]),
+    ])
+
+  private static let runtimeUpdateNode = CLINodeSpec(
+    token: "update",
+    summary: "check, verify, and hand off a signed ArkDeck update without installing it",
+    leaves: [
+      CLILeafSpec(
+        token: "check", canonicalCommand: "runtime.update.check",
+        summary: "fetch and verify the signed update feed; never download the artifact",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "download", canonicalCommand: "runtime.update.download",
+        summary: "download and verify the available signed artifact; never install it",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "handoff", canonicalCommand: "runtime.update.handoff",
+        summary: "reverify and reveal the exact artifact in Finder after explicit consent",
+        options: [
+          CLIOptionSpec(
+            name: "--consent",
+            form: .value(
+              placeholder: "reveal-in-finder",
+              grammar: .enumeration(["reveal-in-finder"])),
+            summary: "explicit final consent to reveal the verified artifact; does not install",
+            isRequired: true),
+          outputOption, jsonOption, controlRequestIDOption,
+        ]),
+      CLILeafSpec(
+        token: "status", canonicalCommand: "runtime.update.status",
+        summary: "read the durable cross-process update lifecycle without exposing cache paths",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "cancel", canonicalCommand: "runtime.update.cancel",
+        summary: "request cancellation of the active check, download, or verification",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
+      CLILeafSpec(
+        token: "cleanup", canonicalCommand: "runtime.update.cleanup",
+        summary: "recover a crashed owner and remove unreferenced update cache entries",
+        options: [outputOption, jsonOption, controlRequestIDOption]),
     ])
 
   private static let runtimeStorageNode = CLINodeSpec(
@@ -1104,12 +1234,14 @@ enum CLICommandRegistry {
     token: "tool", summary: "register, inspect and safely select typed host tool candidates",
     leaves: [
       CLILeafSpec(token: "register", canonicalCommand: "runtime.tool.register",
-        summary: "copy a native HDC candidate and inspect its signature and published identity",
+        summary: "register a bounded native tool or installed SDK root without selecting it",
         options: [
-          CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdc", grammar: .enumeration(["hdc"])), summary: "closed host tool role", isRequired: true),
-          CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "native executable source, used only during registration", isRequired: true),
+          CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdc|deveco", grammar: .enumeration(["hdc", "deveco"])), summary: "closed host tool or toolchain role", isRequired: true),
+          CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "HDC executable source, used only during registration"),
+          CLIOptionSpec(name: "--root", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "DevEco app Contents root, used only during registration"),
           outputOption, jsonOption, controlRequestIDOption,
-        ]),
+        ],
+        mutuallyExclusive: [["--file", "--root"]]),
       CLILeafSpec(token: "list", canonicalCommand: "runtime.tool.list",
         summary: "read an immutable snapshot of registered tool candidates",
         options: snapshotPageOptions + [outputOption, jsonOption, controlRequestIDOption]),
@@ -1135,8 +1267,8 @@ enum CLICommandRegistry {
     ])
 
   private static let bootstrapToolRefOption = CLIOptionSpec(
-    name: "--tool", form: .value(placeholder: "tool:sha256:digest", grammar: .opaque),
-    summary: "exact content-addressed host tool reference", isRequired: true)
+    name: "--tool", form: .value(placeholder: "tool-reference", grammar: .opaque),
+    summary: "exact content-addressed host tool or toolchain reference", isRequired: true)
 
   private static let targetDisplayNameNode = CLINodeSpec(
     token: "display-name",
@@ -1521,6 +1653,90 @@ enum CLICommandRegistry {
     form: .value(placeholder: "positive-integer", grammar: .positiveInteger(1...Int.max)),
     summary: "exact generation returned by history filter list",
     isRequired: true)
+
+  private static let sessionCatalogGenerationOption = CLIOptionSpec(
+    name: "--expected-generation",
+    form: .value(placeholder: "non-negative-integer", grammar: .nonNegativeInteger(0...Int.max)),
+    summary: "exact Session catalog generation returned by list or show",
+    isRequired: true)
+
+  private static let sessionNode = CLINodeSpec(
+    token: "session",
+    summary: "Runtime-owned diagnostic Session resources",
+    leaves: [
+      CLILeafSpec(
+        token: "list",
+        canonicalCommand: "session.list",
+        summary: "read one immutable page of Sessions from the Runtime-selected root",
+        options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "show",
+        canonicalCommand: "session.show",
+        summary: "inspect one Session without exposing its private storage path",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "exact Session identity", isRequired: true),
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "pin",
+        canonicalCommand: "session.pin",
+        summary: "pin one Session using catalog generation compare-and-swap",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "exact Session identity", isRequired: true),
+          sessionCatalogGenerationOption,
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
+        token: "unpin",
+        canonicalCommand: "session.unpin",
+        summary: "restore retention eligibility without deleting Session or Artifact data",
+        options: runtimeClientOptions([
+          CLIOptionSpec(
+            name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
+            summary: "exact Session identity", isRequired: true),
+          sessionCatalogGenerationOption,
+          targetProtocolOption,
+        ]),
+        connectsToRuntime: true),
+    ],
+    groups: [
+      CLINodeSpec(
+        token: "cleanup",
+        summary: "generation-bound Runtime Session retention",
+        leaves: [
+          CLILeafSpec(
+            token: "preview",
+            canonicalCommand: "session.cleanup.preview",
+            summary: "persist the exact Sessions and Artifacts eligible for retention cleanup",
+            options: runtimeClientOptions([targetProtocolOption]),
+            connectsToRuntime: true),
+          CLILeafSpec(
+            token: "apply",
+            canonicalCommand: "session.cleanup.apply",
+            summary: "apply one unexpired cleanup preview without a separate confirmation token",
+            options: runtimeClientOptions([
+              CLIOptionSpec(
+                name: "--preview-id",
+                form: .value(placeholder: "id", grammar: .opaque),
+                summary: "exact immutable cleanup preview identity",
+                isRequired: true),
+              CLIOptionSpec(
+                name: "--preview-digest",
+                form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
+                summary: "exact canonical cleanup preview digest",
+                isRequired: true),
+              targetProtocolOption,
+            ]),
+            connectsToRuntime: true),
+        ]),
+    ])
 
   private static let historyNode = CLINodeSpec(
     token: "history",
@@ -2472,6 +2688,15 @@ enum CLICommandRegistry {
     form: .value(placeholder: "1...300", grammar: .positiveInteger(1...300)),
     summary: "client-side wait budget in seconds")
 
+  private static let runtimeServiceBundleGenerationOption = CLIOptionSpec(
+    name: "--bundle-generation",
+    form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+    summary: "exact available daemon bundle generation", isRequired: true)
+  private static let runtimeServiceToolGenerationOption = CLIOptionSpec(
+    name: "--tool-generation",
+    form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
+    summary: "exact available HDC tool generation", isRequired: true)
+
   private static let runtimeServiceNode = CLINodeSpec(
     token: "service",
     summary: "the local Runtime service for the current user",
@@ -2479,8 +2704,12 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "install",
         canonicalCommand: "runtime.service.install",
-        summary: "install the daemon as a user-domain service",
-        options: agentdInstallOptions + [outputOption, jsonOption]),
+        summary: "install exact registered daemon and HDC resources as a user-domain service",
+        options: [
+          bootstrapBundleRefOption, runtimeServiceBundleGenerationOption,
+          bootstrapToolRefOption, runtimeServiceToolGenerationOption,
+          outputOption, jsonOption,
+        ]),
       CLILeafSpec(
         token: "update",
         canonicalCommand: "runtime.service.update",
@@ -2532,7 +2761,13 @@ enum CLICommandRegistry {
     token: "agentd",
     summary: "superseded spelling of `runtime service`",
     leaves: compatibilitySpelling(
-      of: runtimeServiceNode.leaves, as: "agentd", replacedBy: "runtime service"))
+      of: [
+        CLILeafSpec(
+          token: "install", canonicalCommand: "runtime.service.install",
+          summary: "install the daemon from compatibility path inputs",
+          options: agentdInstallOptions + [outputOption, jsonOption]),
+      ] + Array(runtimeServiceNode.leaves.dropFirst(1)),
+      as: "agentd", replacedBy: "runtime service"))
 
   private static let runtimeSigningNode = CLINodeSpec(
     token: "signing",

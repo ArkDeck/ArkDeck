@@ -16,6 +16,7 @@ let package = Package(
     .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
     .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
+    .library(name: "ArkDeckBootstrap", targets: ["ArkDeckBootstrap"]),
     .library(name: "ArkDeckLaunchAgent", targets: ["ArkDeckLaunchAgent"]),
     .executable(name: "arkdeck-agentd", targets: ["ArkDeckAgentDaemonMain"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
@@ -111,7 +112,7 @@ let package = Package(
       name: "ArkDeckCLI",
       dependencies: [
         "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
-        "ArkDeckAgentClient", "ArkDeckLaunchAgent",
+        "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
       ]
     ),
     .target(
@@ -121,6 +122,14 @@ let package = Package(
     .target(
       name: "ArkDeckAgentClient",
       dependencies: ["ArkDeckCore"]
+    ),
+    // Current-user, pre-daemon typed bundle/tool registry shared by both
+    // executable composition roots. It owns no launchd command surface and
+    // grants no Runtime execution authority.
+    .target(
+      name: "ArkDeckBootstrap",
+      dependencies: ["ArkDeckCore"],
+      linkerSettings: [.linkedFramework("Security")]
     ),
     .target(
       name: "ArkDeckLaunchAgent",
@@ -137,7 +146,8 @@ let package = Package(
       name: "ArkDeckAgentDaemonMain",
       dependencies: [
         "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
-        "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckTraceAdapter",
+        "ArkDeckBootstrap", "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage",
+        "ArkDeckTraceAdapter",
         "ArkDeckWorkflows",
       ]
     ),
@@ -157,7 +167,10 @@ let package = Package(
     ),
     .executableTarget(
       name: "ArkDeckEngineCrashFixture",
-      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows", "ArkDeckLaunchAgent"],
+      dependencies: [
+        "ArkDeckBootstrap", "ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage",
+        "ArkDeckWorkflows", "ArkDeckLaunchAgent",
+      ],
       path: "Tests/ArkDeckEngineCrashFixture"
     ),
     .executableTarget(
@@ -194,6 +207,7 @@ let package = Package(
         "ArkDeckStorage",
         "ArkDeckAgentDaemon",
         "ArkDeckAgentClient",
+        "ArkDeckBootstrap",
         "ArkDeckLaunchAgent",
         // The engine-lane campaign dispatcher lives in the CLI composition
         // root (it needs the campaign protocol and the daemon transport, and

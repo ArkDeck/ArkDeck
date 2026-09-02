@@ -57,15 +57,17 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       "ArkDeckWorkflows", "ArkDeckAgentClient",
     ],
     "ArkDeckAgentClient": ["ArkDeckCore"],
+    "ArkDeckBootstrap": ["ArkDeckCore"],
     "ArkDeckLaunchAgent": ["ArkDeckCore"],
     "ArkDeckAgentDaemon": ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"],
     "ArkDeckCLI": [
       "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
-      "ArkDeckAgentClient", "ArkDeckLaunchAgent",
+      "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
     ],
     "ArkDeckAgentDaemonMain": [
       "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
-      "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckTraceAdapter",
+      "ArkDeckBootstrap", "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage",
+      "ArkDeckTraceAdapter",
       "ArkDeckWorkflows",
     ],
   ]
@@ -83,6 +85,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
     ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
     ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
+    ("ArkDeckBootstrap", "Sources/ArkDeckBootstrap", []),
     ("ArkDeckLaunchAgent", "LaunchAgents", ["ArkDeckCore"]),
     ("ArkDeckAgentDaemon", "Sources/ArkDeckAgentDaemon", []),
     ("ArkDeckCLI", "Sources/ArkDeckCLI", []),

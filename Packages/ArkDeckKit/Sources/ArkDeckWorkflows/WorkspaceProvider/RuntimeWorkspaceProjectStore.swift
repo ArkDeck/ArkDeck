@@ -34,9 +34,101 @@ public struct RuntimeWorkspaceProjectFailure: Error, Equatable, Sendable {
   }
 }
 
+public struct RuntimeWorkspacePresetConstraints: Codable, Equatable, Sendable {
+  public let module: String?
+  public let product: String?
+  public let buildMode: String?
+  public let relativeSourceMap: String?
+
+  public init(
+    module: String? = nil, product: String? = nil, buildMode: String? = nil,
+    relativeSourceMap: String? = nil
+  ) {
+    self.module = module
+    self.product = product
+    self.buildMode = buildMode
+    self.relativeSourceMap = relativeSourceMap
+  }
+
+  package var projection: JSONValue {
+    var fields: [String: JSONValue] = [:]
+    if let module { fields["module"] = .string(module) }
+    if let product { fields["product"] = .string(product) }
+    if let buildMode { fields["buildMode"] = .string(buildMode) }
+    if let relativeSourceMap { fields["relativeSourceMap"] = .string(relativeSourceMap) }
+    return .object(fields)
+  }
+}
+
+public struct RuntimeWorkspacePresetResource: Equatable, Sendable {
+  public let presetRef: String
+  public let generation: UInt64
+  public let projectRef: String
+  public let kind: String
+  public let templateRef: String
+  public let toolchainRef: String?
+  public let toolchainGeneration: UInt64?
+  public let credentialRef: String?
+  public let timeoutSeconds: Int
+  public let constraints: RuntimeWorkspacePresetConstraints
+  public let registeredAtUTC: String
+  public let updatedAtUTC: String
+  public let configurationStatus: String
+
+  package var projection: JSONValue {
+    .object([
+      "schemaVersion": .string("arkdeck.workspace-preset/1"),
+      "presetRef": .string(presetRef),
+      "generation": .string(String(generation)),
+      "projectRef": .string(projectRef),
+      "kind": .string(kind),
+      "templateRef": .string(templateRef),
+      "toolchainRef": toolchainRef.map(JSONValue.string) ?? .null,
+      "toolchainGeneration": toolchainGeneration.map { .string(String($0)) } ?? .null,
+      "credentialRef": credentialRef.map(JSONValue.string) ?? .null,
+      "timeoutSeconds": .integer(Int64(timeoutSeconds)),
+      "constraints": constraints.projection,
+      "registeredAtUtc": .string(registeredAtUTC),
+      "updatedAtUtc": .string(updatedAtUTC),
+      "configurationStatus": .string(configurationStatus),
+    ])
+  }
+}
+
+package struct RuntimeWorkspacePresetComposition: Sendable, Equatable {
+  package let resource: RuntimeWorkspacePresetResource
+}
+
+package struct RuntimeWorkspaceToolchainPinning: Sendable {
+  package let acquire: @Sendable (_ toolchainRef: String, _ generation: UInt64, _ presetRef: String) throws -> Void
+  package let release: @Sendable (_ toolchainRef: String, _ presetRef: String) throws -> Void
+
+  package init(
+    acquire: @escaping @Sendable (String, UInt64, String) throws -> Void,
+    release: @escaping @Sendable (String, String) throws -> Void
+  ) {
+    self.acquire = acquire
+    self.release = release
+  }
+}
+
+package struct RuntimeWorkspaceCredentialPinning: Sendable {
+  package let acquire: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
+  package let release: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
+
+  package init(
+    acquire: @escaping @Sendable (String, String) throws -> Void,
+    release: @escaping @Sendable (String, String) throws -> Void
+  ) {
+    self.acquire = acquire
+    self.release = release
+  }
+}
+
 package struct RuntimeWorkspaceProjectUseToken: Sendable {
   fileprivate let id: UUID
   fileprivate let projectRef: String
+  fileprivate let presetRefs: [String]
 }
 
 /// The private half of one registered workspace project.
@@ -88,41 +180,131 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     var updatedAtUTC: String
   }
 
+  private struct PresetRecord: Codable, Equatable {
+    let presetRef: String
+    var generation: UInt64
+    let projectRef: String
+    var kind: String
+    var templateRef: String
+    var toolchainRef: String?
+    var toolchainGeneration: UInt64?
+    var credentialRef: String?
+    var timeoutSeconds: Int
+    var constraints: RuntimeWorkspacePresetConstraints
+    let registrationRequestID: String
+    let registrationProjectRef: String
+    let registrationKind: String
+    let registrationTemplateRef: String
+    let registrationToolchainRef: String?
+    let registrationToolchainGeneration: UInt64?
+    let registrationCredentialRef: String?
+    let registrationTimeoutSeconds: Int
+    let registrationConstraints: RuntimeWorkspacePresetConstraints
+    let registrationDigest: String
+    var currentDefinitionDigest: String
+    let registeredAtUTC: String
+    var updatedAtUTC: String
+    var state: String
+    var lastMutationRequestID: String
+    var lastMutationDigest: String
+  }
+
+  /// Kept under the historical `pendingToolchainMutation` document key so
+  /// stores written by the first workspace-preset release remain readable.
+  /// Optional credential fields extend the same crash-recovered transaction
+  /// to all external preset dependencies.
+  private struct PendingDependencyMutation: Codable, Equatable {
+    let action: String
+    let toolchainRef: String?
+    let toolchainGeneration: UInt64?
+    let credentialRef: String?
+    let presetRef: String
+    let proposedRecord: PresetRecord?
+    let releaseAfterAcquireRef: String?
+    let releaseAfterAcquireCredentialRef: String?
+  }
+
   private struct Document: Codable, Equatable {
-    var schemaVersion = "arkdeck.workspace-project-store/1"
+    var schemaVersion = "arkdeck.workspace-project-store/3"
     var records: [Record] = []
+    var presets: [PresetRecord] = []
+    var pendingToolchainMutation: PendingDependencyMutation?
+
+    private enum CodingKeys: String, CodingKey {
+      case schemaVersion, records, presets, pendingToolchainMutation
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+      let values = try decoder.container(keyedBy: CodingKeys.self)
+      schemaVersion = try values.decode(String.self, forKey: .schemaVersion)
+      records = try values.decode([Record].self, forKey: .records)
+      presets = try values.decodeIfPresent([PresetRecord].self, forKey: .presets) ?? []
+      pendingToolchainMutation = try values.decodeIfPresent(
+        PendingDependencyMutation.self, forKey: .pendingToolchainMutation)
+    }
   }
 
   private static let documentName = "projects.json"
   private static let lockName = ".projects.lock"
   private static let maximumDocumentBytes = 1 * 1_024 * 1_024
   private static let maximumProjects = 64
+  private static let maximumPresets = 256
   private static let kinds: Set<String> = ["arkdeck", "openharmony"]
+  private static let presetTemplates: [String: String] = [
+    "build": "openharmony.hvigor-build@1",
+    "test": "openharmony.hvigor-test@1",
+    "signing": "openharmony.local-sign@1",
+    "symbol": "openharmony.arkts-symbol@1",
+  ]
 
   private let directoryURL: URL
   private let nowUTC: @Sendable () -> String
   private let processLock = NSLock()
   private var uses: [String: Set<UUID>] = [:]
+  private var presetUses: [String: Set<UUID>] = [:]
   private var appliedGenerations: [String: UInt64]
+  private var appliedPresetGenerations: [String: UInt64]
+  private let toolchainPinning: RuntimeWorkspaceToolchainPinning?
+  private let credentialPinning: RuntimeWorkspaceCredentialPinning?
 
   package init(
     rootURL: URL,
     appliedGenerations: [String: UInt64] = [:],
+    appliedPresetGenerations: [String: UInt64] = [:],
+    toolchainPinning: RuntimeWorkspaceToolchainPinning? = nil,
+    credentialPinning: RuntimeWorkspaceCredentialPinning? = nil,
     nowUTC: @escaping @Sendable () -> String = {
       ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
     }
   ) throws {
     directoryURL = rootURL.appending(path: "workspace-projects", directoryHint: .isDirectory)
     self.appliedGenerations = appliedGenerations
+    self.appliedPresetGenerations = appliedPresetGenerations
+    self.toolchainPinning = toolchainPinning
+    self.credentialPinning = credentialPinning
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
       at: directoryURL, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     try Self.validateOwnerDirectory(directoryURL)
+    try processLock.withLock {
+      try withDocument { _, _ in () }
+    }
   }
 
   package func markApplied(_ generations: [String: UInt64]) {
     processLock.withLock { appliedGenerations = generations }
+  }
+
+  package func markApplied(
+    projects: [String: UInt64], presets: [String: UInt64]
+  ) {
+    processLock.withLock {
+      appliedGenerations = projects
+      appliedPresetGenerations = presets
+    }
   }
 
   package func list() throws -> [RuntimeWorkspaceProjectResource] {
@@ -143,6 +325,314 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
             "workspaceReferenceNotFound", "workspace project is not registered")
         }
         return try resource(record)
+      }
+    }
+  }
+
+  package func listPresets(
+    projectRef: String? = nil, kind: String? = nil
+  ) throws -> [RuntimeWorkspacePresetResource] {
+    if let projectRef { try validateProjectRef(projectRef) }
+    if let kind { try validatePresetKind(kind) }
+    return try processLock.withLock {
+      try withDocument { _, document in
+        if let projectRef,
+          !document.records.contains(where: { $0.projectRef == projectRef })
+        {
+          throw RuntimeWorkspaceProjectFailure(
+            "workspaceReferenceNotFound", "workspace project is not registered")
+        }
+        return try document.presets
+          .filter { $0.state == "available" }
+          .filter { projectRef == nil || $0.projectRef == projectRef }
+          .filter { kind == nil || $0.kind == kind }
+          .map { try presetResource($0) }
+          .sorted { $0.presetRef < $1.presetRef }
+      }
+    }
+  }
+
+  package func inspectPreset(
+    projectRef: String, presetRef: String
+  ) throws -> RuntimeWorkspacePresetResource {
+    try validateProjectRef(projectRef)
+    try validatePresetRef(presetRef)
+    return try processLock.withLock {
+      try withDocument { _, document in
+        guard let record = document.presets.first(where: {
+          $0.projectRef == projectRef && $0.presetRef == presetRef && $0.state == "available"
+        }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "workspaceReferenceNotFound", "workspace preset is not registered")
+        }
+        return try presetResource(record)
+      }
+    }
+  }
+
+  package func presetCompositionRecords() throws -> [RuntimeWorkspacePresetComposition] {
+    try processLock.withLock {
+      try withDocument { _, document in
+        try document.presets.filter { $0.state == "available" }.map {
+          RuntimeWorkspacePresetComposition(resource: try presetResource($0))
+        }.sorted { $0.resource.presetRef < $1.resource.presetRef }
+      }
+    }
+  }
+
+  package func registerPreset(
+    requestID: String, projectRef: String, kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints
+  ) throws -> RuntimeWorkspacePresetResource {
+    try validateRequestID(requestID)
+    try validateProjectRef(projectRef)
+    try validatePresetDefinition(
+      kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints)
+    let digest = try Self.presetDigest(
+      projectRef: projectRef, kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints)
+    let presetRef = Self.presetRef(requestID: requestID)
+    return try processLock.withLock {
+      try withDocument { rootFD, document in
+        var next = document
+        if let existing = next.presets.first(where: { $0.registrationRequestID == requestID }) {
+          guard existing.registrationDigest == digest, existing.presetRef == presetRef else {
+            throw RuntimeWorkspaceProjectFailure(
+              "idempotencyConflict", "registration request identity belongs to another preset")
+          }
+          return try presetResource(existing)
+        }
+        guard next.records.contains(where: { $0.projectRef == projectRef }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "workspaceReferenceNotFound", "workspace project is not registered")
+        }
+        guard next.presets.count < Self.maximumPresets else {
+          throw RuntimeWorkspaceProjectFailure(
+            "quotaExceeded", "workspace preset registration limit is reached")
+        }
+        let timestamp = try validTimestamp()
+        let record = PresetRecord(
+          presetRef: presetRef, generation: 1, projectRef: projectRef,
+          kind: kind, templateRef: templateRef,
+          toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+          credentialRef: credentialRef, timeoutSeconds: timeoutSeconds,
+          constraints: constraints, registrationRequestID: requestID,
+          registrationProjectRef: projectRef, registrationKind: kind,
+          registrationTemplateRef: templateRef,
+          registrationToolchainRef: toolchainRef,
+          registrationToolchainGeneration: toolchainGeneration,
+          registrationCredentialRef: credentialRef,
+          registrationTimeoutSeconds: timeoutSeconds,
+          registrationConstraints: constraints,
+          registrationDigest: digest, currentDefinitionDigest: digest,
+          registeredAtUTC: timestamp, updatedAtUTC: timestamp,
+          state: "available", lastMutationRequestID: requestID,
+          lastMutationDigest: digest)
+        if toolchainRef != nil || credentialRef != nil {
+          try requireDependencyOwners(
+            toolchainRef: toolchainRef, credentialRef: credentialRef)
+          next.pendingToolchainMutation = PendingDependencyMutation(
+            action: "acquire", toolchainRef: toolchainRef,
+            toolchainGeneration: toolchainGeneration, credentialRef: credentialRef,
+            presetRef: presetRef, proposedRecord: record,
+            releaseAfterAcquireRef: nil,
+            releaseAfterAcquireCredentialRef: nil)
+          try save(next, rootFD: rootFD)
+          next = try reconcileDependencyMutation(next, rootFD: rootFD)
+        } else {
+          next.presets.append(record)
+          next.presets.sort { $0.presetRef < $1.presetRef }
+          try save(next, rootFD: rootFD)
+        }
+        guard let published = next.presets.first(where: { $0.presetRef == presetRef }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "outcomeUnknown", "workspace preset publication could not be verified")
+        }
+        return try presetResource(published)
+      }
+    }
+  }
+
+  package func updatePreset(
+    requestID: String, projectRef: String, presetRef: String,
+    expectedGeneration: UInt64, kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints,
+    requireNoActiveReference: (String) throws -> Void
+  ) throws -> RuntimeWorkspacePresetResource {
+    try validateRequestID(requestID)
+    try validateProjectRef(projectRef)
+    try validatePresetRef(presetRef)
+    try validateGeneration(expectedGeneration)
+    try validatePresetDefinition(
+      kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints)
+    let mutationDigest = try Self.presetMutationDigest(
+      verb: "update", projectRef: projectRef, presetRef: presetRef,
+      expectedGeneration: expectedGeneration, kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints)
+    return try processLock.withLock {
+      try requireNoPresetUse(presetRef)
+      try requireNoActiveReference(presetRef)
+      return try withDocument { rootFD, document in
+        var next = document
+        guard let index = next.presets.firstIndex(where: {
+          $0.projectRef == projectRef && $0.presetRef == presetRef
+        }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "workspaceReferenceNotFound", "workspace preset is not registered")
+        }
+        let current = next.presets[index]
+        if current.lastMutationRequestID == requestID {
+          guard current.lastMutationDigest == mutationDigest else {
+            throw RuntimeWorkspaceProjectFailure(
+              "idempotencyConflict", "mutation request identity belongs to another preset update")
+          }
+          return try presetResource(current)
+        }
+        guard current.state == "available", current.generation == expectedGeneration else {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "workspace preset generation changed")
+        }
+        let advanced = expectedGeneration.addingReportingOverflow(1)
+        guard !advanced.overflow, advanced.partialValue <= UInt64(Int64.max) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "workspace preset generation is exhausted")
+        }
+        let proposed = PresetRecord(
+          presetRef: current.presetRef, generation: advanced.partialValue,
+          projectRef: current.projectRef, kind: kind, templateRef: templateRef,
+          toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+          credentialRef: credentialRef, timeoutSeconds: timeoutSeconds,
+          constraints: constraints, registrationRequestID: current.registrationRequestID,
+          registrationProjectRef: current.registrationProjectRef,
+          registrationKind: current.registrationKind,
+          registrationTemplateRef: current.registrationTemplateRef,
+          registrationToolchainRef: current.registrationToolchainRef,
+          registrationToolchainGeneration: current.registrationToolchainGeneration,
+          registrationCredentialRef: current.registrationCredentialRef,
+          registrationTimeoutSeconds: current.registrationTimeoutSeconds,
+          registrationConstraints: current.registrationConstraints,
+          registrationDigest: current.registrationDigest,
+          currentDefinitionDigest: try Self.presetDigest(
+            projectRef: current.projectRef, kind: kind, templateRef: templateRef,
+            toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+            credentialRef: credentialRef, timeoutSeconds: timeoutSeconds,
+            constraints: constraints),
+          registeredAtUTC: current.registeredAtUTC, updatedAtUTC: try validTimestamp(),
+          state: "available", lastMutationRequestID: requestID,
+          lastMutationDigest: mutationDigest)
+        if toolchainRef != current.toolchainRef
+          || toolchainGeneration != current.toolchainGeneration
+          || credentialRef != current.credentialRef
+        {
+          if toolchainRef != nil || credentialRef != nil {
+            try requireDependencyOwners(
+              toolchainRef: toolchainRef, credentialRef: credentialRef)
+            next.pendingToolchainMutation = PendingDependencyMutation(
+              action: "acquire", toolchainRef: toolchainRef,
+              toolchainGeneration: toolchainGeneration, credentialRef: credentialRef,
+              presetRef: presetRef, proposedRecord: proposed,
+              releaseAfterAcquireRef: current.toolchainRef == toolchainRef
+                ? nil : current.toolchainRef,
+              releaseAfterAcquireCredentialRef: current.credentialRef == credentialRef
+                ? nil : current.credentialRef)
+            try save(next, rootFD: rootFD)
+            next = try reconcileDependencyMutation(next, rootFD: rootFD)
+          } else {
+            next.presets[index] = proposed
+            if current.toolchainRef != nil || current.credentialRef != nil {
+              try requireDependencyOwners(
+                toolchainRef: current.toolchainRef,
+                credentialRef: current.credentialRef)
+              next.pendingToolchainMutation = PendingDependencyMutation(
+                action: "release", toolchainRef: current.toolchainRef,
+                toolchainGeneration: current.toolchainGeneration,
+                credentialRef: current.credentialRef, presetRef: presetRef,
+                proposedRecord: nil, releaseAfterAcquireRef: nil,
+                releaseAfterAcquireCredentialRef: nil)
+            }
+            try save(next, rootFD: rootFD)
+            next = try reconcileDependencyMutation(next, rootFD: rootFD)
+          }
+        } else {
+          next.presets[index] = proposed
+          try save(next, rootFD: rootFD)
+        }
+        guard let published = next.presets.first(where: { $0.presetRef == presetRef }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "outcomeUnknown", "workspace preset update could not be verified")
+        }
+        return try presetResource(published)
+      }
+    }
+  }
+
+  package func removePreset(
+    requestID: String, projectRef: String, presetRef: String,
+    expectedGeneration: UInt64, requireNoActiveReference: (String) throws -> Void
+  ) throws -> RuntimeWorkspacePresetResource {
+    try validateRequestID(requestID)
+    try validateProjectRef(projectRef)
+    try validatePresetRef(presetRef)
+    try validateGeneration(expectedGeneration)
+    let mutationDigest = Self.removalDigest(
+      requestID: requestID, projectRef: projectRef, presetRef: presetRef,
+      expectedGeneration: expectedGeneration)
+    return try processLock.withLock {
+      try requireNoPresetUse(presetRef)
+      try requireNoActiveReference(presetRef)
+      return try withDocument { rootFD, document in
+        var next = document
+        guard let index = next.presets.firstIndex(where: {
+          $0.projectRef == projectRef && $0.presetRef == presetRef
+        }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "workspaceReferenceNotFound", "workspace preset is not registered")
+        }
+        let current = next.presets[index]
+        if current.lastMutationRequestID == requestID {
+          guard current.lastMutationDigest == mutationDigest else {
+            throw RuntimeWorkspaceProjectFailure(
+              "idempotencyConflict", "mutation request identity belongs to another preset removal")
+          }
+          return try presetResource(current)
+        }
+        guard current.state == "available", current.generation == expectedGeneration else {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "workspace preset generation changed")
+        }
+        let advanced = expectedGeneration.addingReportingOverflow(1)
+        guard !advanced.overflow, advanced.partialValue <= UInt64(Int64.max) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "workspace preset generation is exhausted")
+        }
+        next.presets[index].generation = advanced.partialValue
+        next.presets[index].state = "removed"
+        next.presets[index].updatedAtUTC = try validTimestamp()
+        next.presets[index].lastMutationRequestID = requestID
+        next.presets[index].lastMutationDigest = mutationDigest
+        if current.toolchainRef != nil || current.credentialRef != nil {
+          try requireDependencyOwners(
+            toolchainRef: current.toolchainRef,
+            credentialRef: current.credentialRef)
+          next.pendingToolchainMutation = PendingDependencyMutation(
+            action: "release", toolchainRef: current.toolchainRef,
+            toolchainGeneration: current.toolchainGeneration,
+            credentialRef: current.credentialRef, presetRef: presetRef,
+            proposedRecord: nil, releaseAfterAcquireRef: nil,
+            releaseAfterAcquireCredentialRef: nil)
+        }
+        try save(next, rootFD: rootFD)
+        next = try reconcileDependencyMutation(next, rootFD: rootFD)
+        appliedPresetGenerations.removeValue(forKey: presetRef)
+        return try presetResource(next.presets[index])
       }
     }
   }
@@ -262,6 +752,14 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           throw RuntimeWorkspaceProjectFailure(
             "resourceConflict", "workspace project generation changed")
         }
+        guard next.records[index].kind == kind
+          || !next.presets.contains(where: {
+            $0.projectRef == projectRef && $0.state == "available"
+          })
+        else {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "remove project presets before changing the project kind")
+        }
         guard !next.records.enumerated().contains(where: { offset, record in
           offset != index && record.root == root
         }) else {
@@ -303,6 +801,12 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           throw RuntimeWorkspaceProjectFailure(
             "resourceConflict", "workspace project generation changed")
         }
+        guard !next.presets.contains(where: {
+          $0.projectRef == projectRef && $0.state == "available"
+        }) else {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "remove project presets before removing the project")
+        }
         next.records.remove(at: index)
         try save(next, rootFD: rootFD)
         appliedGenerations.removeValue(forKey: projectRef)
@@ -311,8 +815,15 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     }
   }
 
-  package func acquireUse(projectRef: String) throws -> RuntimeWorkspaceProjectUseToken {
+  package func acquireUse(
+    projectRef: String, presetRefs: [String] = []
+  ) throws -> RuntimeWorkspaceProjectUseToken {
     try validateProjectRef(projectRef)
+    for presetRef in presetRefs { try validatePresetRef(presetRef) }
+    guard Set(presetRefs).count == presetRefs.count else {
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace Job repeats a preset reference")
+    }
     return try processLock.withLock {
       try withDocument { _, document in
         guard let record = document.records.first(where: { $0.projectRef == projectRef }) else {
@@ -329,9 +840,25 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
             "operationUnavailable",
             "workspace project configuration changed; restart the Runtime before submitting a Job")
         }
+        let registered = document.presets.filter {
+          $0.projectRef == projectRef && $0.state == "available"
+        }
+        for presetRef in presetRefs {
+          guard let preset = registered.first(where: { $0.presetRef == presetRef }) else {
+            throw RuntimeWorkspaceProjectFailure(
+              "workspaceReferenceNotFound", "workspace preset is not registered for this project")
+          }
+          guard appliedPresetGenerations[presetRef] == preset.generation else {
+            throw RuntimeWorkspaceProjectFailure(
+              "operationUnavailable",
+              "workspace preset configuration changed; restart the Runtime before submitting a Job")
+          }
+        }
       }
-      let token = RuntimeWorkspaceProjectUseToken(id: UUID(), projectRef: projectRef)
+      let token = RuntimeWorkspaceProjectUseToken(
+        id: UUID(), projectRef: projectRef, presetRefs: presetRefs.sorted())
       uses[projectRef, default: []].insert(token.id)
+      for presetRef in presetRefs { presetUses[presetRef, default: []].insert(token.id) }
       return token
     }
   }
@@ -340,6 +867,10 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     processLock.withLock {
       uses[token.projectRef]?.remove(token.id)
       if uses[token.projectRef]?.isEmpty == true { uses.removeValue(forKey: token.projectRef) }
+      for presetRef in token.presetRefs {
+        presetUses[presetRef]?.remove(token.id)
+        if presetUses[presetRef]?.isEmpty == true { presetUses.removeValue(forKey: presetRef) }
+      }
     }
   }
 
@@ -347,6 +878,13 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     guard uses[projectRef]?.isEmpty != false else {
       throw RuntimeWorkspaceProjectFailure(
         "resourceConflict", "workspace project is being materialized by a Job")
+    }
+  }
+
+  private func requireNoPresetUse(_ presetRef: String) throws {
+    guard presetUses[presetRef]?.isEmpty != false else {
+      throw RuntimeWorkspaceProjectFailure(
+        "resourceConflict", "workspace preset is being materialized by a Job")
     }
   }
 
@@ -365,6 +903,319 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
       configurationStatus: forcedStatus
         ?? (appliedGenerations[record.projectRef] == record.generation
           ? "active" : "runtimeRestartRequired"))
+  }
+
+  private func presetResource(
+    _ record: PresetRecord
+  ) throws -> RuntimeWorkspacePresetResource {
+    guard ISO8601Timestamps.parse(record.registeredAtUTC) != nil,
+      ISO8601Timestamps.parse(record.updatedAtUTC) != nil
+    else {
+      throw RuntimeWorkspaceProjectFailure(
+        "recordUnreadable", "workspace preset timestamps are invalid")
+    }
+    return RuntimeWorkspacePresetResource(
+      presetRef: record.presetRef, generation: record.generation,
+      projectRef: record.projectRef, kind: record.kind, templateRef: record.templateRef,
+      toolchainRef: record.toolchainRef, toolchainGeneration: record.toolchainGeneration,
+      credentialRef: record.credentialRef, timeoutSeconds: record.timeoutSeconds,
+      constraints: record.constraints, registeredAtUTC: record.registeredAtUTC,
+      updatedAtUTC: record.updatedAtUTC,
+      configurationStatus: record.state == "removed"
+        ? "removed"
+        : (appliedPresetGenerations[record.presetRef] == record.generation
+          ? "active" : "runtimeRestartRequired"))
+  }
+
+  private func requireDependencyOwners(
+    toolchainRef: String?, credentialRef: String?
+  ) throws {
+    if toolchainRef != nil, toolchainPinning == nil {
+      throw RuntimeWorkspaceProjectFailure(
+        "operationUnavailable", "DevEco toolchain reference owner is unavailable")
+    }
+    if credentialRef != nil, credentialPinning == nil {
+      throw RuntimeWorkspaceProjectFailure(
+        "operationUnavailable", "signing credential reference owner is unavailable")
+    }
+  }
+
+  private func reconcileDependencyMutation(
+    _ document: Document, rootFD: Int32
+  ) throws -> Document {
+    guard let pending = document.pendingToolchainMutation else { return document }
+    try requireDependencyOwners(
+      toolchainRef: pending.toolchainRef, credentialRef: pending.credentialRef)
+    var next = document
+    switch pending.action {
+    case "acquire":
+      guard let proposed = pending.proposedRecord,
+        proposed.presetRef == pending.presetRef,
+        proposed.toolchainRef == pending.toolchainRef,
+        proposed.toolchainGeneration == pending.toolchainGeneration,
+        proposed.credentialRef == pending.credentialRef,
+        pending.toolchainRef != nil || pending.credentialRef != nil,
+        proposed.state == "available"
+      else {
+        throw RuntimeWorkspaceProjectFailure(
+          "recordUnreadable", "workspace preset acquire transaction is inconsistent")
+      }
+      try validatePresetRecord(proposed, projects: document.records)
+      if let toolchainRef = pending.toolchainRef,
+        let toolchainGeneration = pending.toolchainGeneration
+      {
+        try toolchainPinning!.acquire(
+          toolchainRef, toolchainGeneration, pending.presetRef)
+      }
+      if let credentialRef = pending.credentialRef {
+        try credentialPinning!.acquire(credentialRef, pending.presetRef)
+      }
+      if let index = next.presets.firstIndex(where: { $0.presetRef == pending.presetRef }) {
+        next.presets[index] = proposed
+      } else {
+        next.presets.append(proposed)
+        next.presets.sort { $0.presetRef < $1.presetRef }
+      }
+      if pending.releaseAfterAcquireRef != nil
+        || pending.releaseAfterAcquireCredentialRef != nil
+      {
+        next.pendingToolchainMutation = PendingDependencyMutation(
+          action: "release", toolchainRef: pending.releaseAfterAcquireRef,
+          toolchainGeneration: pending.releaseAfterAcquireRef == nil ? nil : 1,
+          credentialRef: pending.releaseAfterAcquireCredentialRef,
+          presetRef: pending.presetRef, proposedRecord: nil,
+          releaseAfterAcquireRef: nil,
+          releaseAfterAcquireCredentialRef: nil)
+      } else {
+        next.pendingToolchainMutation = nil
+      }
+      try save(next, rootFD: rootFD)
+      if next.pendingToolchainMutation != nil {
+        return try reconcileDependencyMutation(next, rootFD: rootFD)
+      }
+      return next
+    case "release":
+      guard pending.proposedRecord == nil, pending.releaseAfterAcquireRef == nil,
+        pending.releaseAfterAcquireCredentialRef == nil,
+        pending.toolchainRef != nil || pending.credentialRef != nil
+      else {
+        throw RuntimeWorkspaceProjectFailure(
+          "recordUnreadable", "workspace preset release transaction is inconsistent")
+      }
+      guard let retained = document.presets.first(where: {
+        $0.presetRef == pending.presetRef
+      })
+      else {
+        throw RuntimeWorkspaceProjectFailure(
+          "recordUnreadable", "workspace preset release does not match its durable record")
+      }
+      let toolchainMatches = pending.toolchainRef.map { reference in
+        (retained.state == "removed" && retained.toolchainRef == reference)
+          || (retained.state == "available" && retained.toolchainRef != reference)
+      } ?? true
+      let credentialMatches = pending.credentialRef.map { reference in
+        (retained.state == "removed" && retained.credentialRef == reference)
+          || (retained.state == "available" && retained.credentialRef != reference)
+      } ?? true
+      guard toolchainMatches, credentialMatches else {
+        throw RuntimeWorkspaceProjectFailure(
+          "recordUnreadable", "workspace preset release does not match its durable record")
+      }
+      if let toolchainRef = pending.toolchainRef {
+        try toolchainPinning!.release(toolchainRef, pending.presetRef)
+      }
+      if let credentialRef = pending.credentialRef {
+        try credentialPinning!.release(credentialRef, pending.presetRef)
+      }
+      next.pendingToolchainMutation = nil
+      try save(next, rootFD: rootFD)
+      return next
+    default:
+      throw RuntimeWorkspaceProjectFailure(
+        "recordUnreadable", "workspace preset transaction action is invalid")
+    }
+  }
+
+  private func validatePresetDefinition(
+    kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints
+  ) throws {
+    try validatePresetKind(kind)
+    guard Self.presetTemplates[kind] == templateRef else {
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace preset template does not match its kind")
+    }
+    guard (1...3_600).contains(timeoutSeconds) else {
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace preset timeout must be between 1 and 3600 seconds")
+    }
+    if let toolchainGeneration { try validateGeneration(toolchainGeneration) }
+    guard (toolchainRef == nil) == (toolchainGeneration == nil) else {
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace preset toolchain reference and generation are inseparable")
+    }
+    if let toolchainRef {
+      guard Self.validToolchainRef(toolchainRef) else {
+        throw RuntimeWorkspaceProjectFailure(
+          "invalidInput", "workspace preset toolchain reference is malformed")
+      }
+    }
+    if let credentialRef {
+      guard Self.validCredentialRef(credentialRef) else {
+        throw RuntimeWorkspaceProjectFailure(
+          "invalidInput", "workspace preset credential reference is malformed")
+      }
+    }
+    switch kind {
+    case "build", "test":
+      guard toolchainRef != nil, credentialRef == nil,
+        constraints.module.map({ Self.validIdentifier($0, maximumBytes: 128) }) == true,
+        constraints.product.map({ Self.validIdentifier($0, maximumBytes: 128) }) == true,
+        constraints.buildMode.map({ Self.validIdentifier($0, maximumBytes: 64) }) == true,
+        constraints.relativeSourceMap == nil
+      else {
+        throw RuntimeWorkspaceProjectFailure(
+          "invalidInput",
+          "build and test presets require a toolchain, module, product and build mode")
+      }
+    case "signing":
+      guard toolchainRef != nil, credentialRef != nil,
+        constraints.module == nil, constraints.product == nil,
+        constraints.buildMode == nil, constraints.relativeSourceMap == nil
+      else {
+        throw RuntimeWorkspaceProjectFailure(
+          "invalidInput", "signing presets require only toolchain and credential references")
+      }
+    case "symbol":
+      guard toolchainRef == nil, credentialRef == nil,
+        constraints.module == nil, constraints.product == nil,
+        constraints.buildMode == nil,
+        constraints.relativeSourceMap.map(Self.validRelativePath) == true
+      else {
+        throw RuntimeWorkspaceProjectFailure(
+          "invalidInput", "symbol presets require one bounded relative source-map path")
+      }
+    default:
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace preset kind is unsupported")
+    }
+  }
+
+  private func validatePresetRecord(
+    _ preset: PresetRecord, projects: [Record]
+  ) throws {
+    try validatePresetRef(preset.presetRef)
+    try validateProjectRef(preset.projectRef)
+    try validateGeneration(preset.generation)
+    try validateRequestID(preset.registrationRequestID)
+    try validateRequestID(preset.lastMutationRequestID)
+    try validatePresetDefinition(
+      kind: preset.registrationKind, templateRef: preset.registrationTemplateRef,
+      toolchainRef: preset.registrationToolchainRef,
+      toolchainGeneration: preset.registrationToolchainGeneration,
+      credentialRef: preset.registrationCredentialRef,
+      timeoutSeconds: preset.registrationTimeoutSeconds,
+      constraints: preset.registrationConstraints)
+    try validatePresetDefinition(
+      kind: preset.kind, templateRef: preset.templateRef,
+      toolchainRef: preset.toolchainRef,
+      toolchainGeneration: preset.toolchainGeneration,
+      credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
+      constraints: preset.constraints)
+    guard (preset.state == "available" && preset.generation >= 1)
+      || (preset.state == "removed" && preset.generation >= 2)
+    else {
+      throw RuntimeWorkspaceProjectFailure(
+        "recordUnreadable", "workspace preset state and generation are inconsistent")
+    }
+    let registrationDigest = try Self.presetDigest(
+      projectRef: preset.registrationProjectRef, kind: preset.registrationKind,
+      templateRef: preset.registrationTemplateRef,
+      toolchainRef: preset.registrationToolchainRef,
+      toolchainGeneration: preset.registrationToolchainGeneration,
+      credentialRef: preset.registrationCredentialRef,
+      timeoutSeconds: preset.registrationTimeoutSeconds,
+      constraints: preset.registrationConstraints)
+    let currentDigest = try Self.presetDigest(
+      projectRef: preset.projectRef, kind: preset.kind,
+      templateRef: preset.templateRef, toolchainRef: preset.toolchainRef,
+      toolchainGeneration: preset.toolchainGeneration,
+      credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
+      constraints: preset.constraints)
+    let lastMutationDigest: String
+    if preset.state == "removed" {
+      lastMutationDigest = Self.removalDigest(
+        requestID: preset.lastMutationRequestID, projectRef: preset.projectRef,
+        presetRef: preset.presetRef, expectedGeneration: preset.generation - 1)
+    } else if preset.generation == 1 {
+      lastMutationDigest = registrationDigest
+    } else {
+      lastMutationDigest = try Self.presetMutationDigest(
+        verb: "update", projectRef: preset.projectRef, presetRef: preset.presetRef,
+        expectedGeneration: preset.generation - 1,
+        kind: preset.kind, templateRef: preset.templateRef,
+        toolchainRef: preset.toolchainRef,
+        toolchainGeneration: preset.toolchainGeneration,
+        credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
+        constraints: preset.constraints)
+    }
+    guard projects.contains(where: { $0.projectRef == preset.projectRef }),
+      preset.registrationProjectRef == preset.projectRef,
+      preset.registrationDigest == registrationDigest,
+      preset.currentDefinitionDigest == currentDigest,
+      preset.lastMutationDigest == lastMutationDigest,
+      preset.generation > 1 || preset.lastMutationRequestID == preset.registrationRequestID,
+      let registered = ISO8601Timestamps.parse(preset.registeredAtUTC),
+      let updated = ISO8601Timestamps.parse(preset.updatedAtUTC), updated >= registered
+    else {
+      throw RuntimeWorkspaceProjectFailure(
+        "recordUnreadable", "workspace preset store record is inconsistent")
+    }
+  }
+
+  private static func presetDigest(
+    projectRef: String, kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints
+  ) throws -> String {
+    try SHA256Hex.string(of: PortableCanonicalJSON.canonicalBytes(.object([
+      "schemaVersion": .string("arkdeck.workspace-preset-definition/1"),
+      "projectRef": .string(projectRef), "kind": .string(kind),
+      "templateRef": .string(templateRef),
+      "toolchainRef": toolchainRef.map(JSONValue.string) ?? .null,
+      "toolchainGeneration": toolchainGeneration.map { .string(String($0)) } ?? .null,
+      "credentialRef": credentialRef.map(JSONValue.string) ?? .null,
+      "timeoutSeconds": .integer(Int64(timeoutSeconds)),
+      "constraints": constraints.projection,
+    ])))
+  }
+
+  private static func presetMutationDigest(
+    verb: String, projectRef: String, presetRef: String, expectedGeneration: UInt64,
+    kind: String, templateRef: String,
+    toolchainRef: String?, toolchainGeneration: UInt64?, credentialRef: String?,
+    timeoutSeconds: Int, constraints: RuntimeWorkspacePresetConstraints
+  ) throws -> String {
+    let definition = try presetDigest(
+      projectRef: projectRef, kind: kind, templateRef: templateRef,
+      toolchainRef: toolchainRef, toolchainGeneration: toolchainGeneration,
+      credentialRef: credentialRef, timeoutSeconds: timeoutSeconds, constraints: constraints)
+    return SHA256Hex.string(of: Data(
+      "\(verb)\u{0}\(projectRef)\u{0}\(presetRef)\u{0}\(expectedGeneration)\u{0}\(definition)".utf8))
+  }
+
+  private static func removalDigest(
+    requestID: String, projectRef: String, presetRef: String, expectedGeneration: UInt64
+  ) -> String {
+    SHA256Hex.string(of: Data(
+      "remove\u{0}\(requestID)\u{0}\(projectRef)\u{0}\(presetRef)\u{0}\(expectedGeneration)".utf8))
+  }
+
+  private static func presetRef(requestID: String) -> String {
+    let digest = SHA256.hash(data: Data(requestID.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return "preset-" + String(digest.prefix(24))
   }
 
   private func validTimestamp() throws -> String {
@@ -399,7 +1250,9 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
         "resourceConflict", "workspace project store lock cannot be acquired")
     }
     defer { _ = flock(lockFD, LOCK_UN) }
-    return try body(rootFD, load(rootFD: rootFD))
+    let loaded = try load(rootFD: rootFD)
+    let reconciled = try reconcileDependencyMutation(loaded, rootFD: rootFD)
+    return try body(rootFD, reconciled)
   }
 
   private func load(rootFD: Int32) throws -> Document {
@@ -435,10 +1288,20 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
       var duplicateValidator = StrictJSONDuplicateValidator(data: data)
       try duplicateValidator.validate()
       let document = try JSONDecoder().decode(Document.self, from: data)
-      guard document.schemaVersion == "arkdeck.workspace-project-store/1",
+      guard [
+        "arkdeck.workspace-project-store/1", "arkdeck.workspace-project-store/2",
+        "arkdeck.workspace-project-store/3",
+      ]
+        .contains(document.schemaVersion),
         document.records.count <= Self.maximumProjects,
+        document.presets.count <= Self.maximumPresets,
         Set(document.records.map(\.projectRef)).count == document.records.count,
-        Set(document.records.map(\.registrationRequestID)).count == document.records.count
+        Set(document.records.map(\.registrationRequestID)).count == document.records.count,
+        Set(document.presets.map(\.presetRef)).count == document.presets.count,
+        Set(document.presets.map(\.registrationRequestID)).count == document.presets.count,
+        ["arkdeck.workspace-project-store/2", "arkdeck.workspace-project-store/3"]
+          .contains(document.schemaVersion)
+          || (document.presets.isEmpty && document.pendingToolchainMutation == nil)
       else {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace project store document has an invalid shape")
@@ -466,7 +1329,101 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
         throw RuntimeWorkspaceProjectFailure(
           "recordUnreadable", "workspace project store contains duplicate roots")
       }
-      return document
+      for preset in document.presets {
+        try validatePresetRef(preset.presetRef)
+        try validateGeneration(preset.generation)
+        try validateRequestID(preset.registrationRequestID)
+        try validateRequestID(preset.lastMutationRequestID)
+        guard (preset.state == "available" && preset.generation >= 1)
+          || (preset.state == "removed" && preset.generation >= 2)
+        else {
+          throw RuntimeWorkspaceProjectFailure(
+            "recordUnreadable", "workspace preset state and generation are inconsistent")
+        }
+        try validatePresetDefinition(
+          kind: preset.registrationKind,
+          templateRef: preset.registrationTemplateRef,
+          toolchainRef: preset.registrationToolchainRef,
+          toolchainGeneration: preset.registrationToolchainGeneration,
+          credentialRef: preset.registrationCredentialRef,
+          timeoutSeconds: preset.registrationTimeoutSeconds,
+          constraints: preset.registrationConstraints)
+        let expectedRegistrationDigest = try Self.presetDigest(
+          projectRef: preset.registrationProjectRef, kind: preset.registrationKind,
+          templateRef: preset.registrationTemplateRef,
+          toolchainRef: preset.registrationToolchainRef,
+          toolchainGeneration: preset.registrationToolchainGeneration,
+          credentialRef: preset.registrationCredentialRef,
+          timeoutSeconds: preset.registrationTimeoutSeconds,
+          constraints: preset.registrationConstraints)
+        let expectedCurrentDigest = try Self.presetDigest(
+          projectRef: preset.projectRef, kind: preset.kind,
+          templateRef: preset.templateRef, toolchainRef: preset.toolchainRef,
+          toolchainGeneration: preset.toolchainGeneration,
+          credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
+          constraints: preset.constraints)
+        let expectedLastMutationDigest: String
+        if preset.state == "removed" {
+          expectedLastMutationDigest = Self.removalDigest(
+            requestID: preset.lastMutationRequestID, projectRef: preset.projectRef,
+            presetRef: preset.presetRef, expectedGeneration: preset.generation - 1)
+        } else if preset.generation == 1 {
+          expectedLastMutationDigest = expectedRegistrationDigest
+        } else {
+          expectedLastMutationDigest = try Self.presetMutationDigest(
+            verb: "update", projectRef: preset.projectRef, presetRef: preset.presetRef,
+            expectedGeneration: preset.generation - 1,
+            kind: preset.kind, templateRef: preset.templateRef,
+            toolchainRef: preset.toolchainRef,
+            toolchainGeneration: preset.toolchainGeneration,
+            credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
+            constraints: preset.constraints)
+        }
+        guard document.records.contains(where: { $0.projectRef == preset.projectRef }),
+          ["available", "removed"].contains(preset.state),
+          preset.registrationProjectRef == preset.projectRef,
+          preset.registrationDigest == expectedRegistrationDigest,
+          preset.currentDefinitionDigest == expectedCurrentDigest,
+          preset.lastMutationDigest == expectedLastMutationDigest,
+          (preset.state == "available" && preset.generation >= 1)
+            || (preset.state == "removed" && preset.generation >= 2),
+          preset.generation > 1 || preset.lastMutationRequestID == preset.registrationRequestID,
+          ISO8601Timestamps.parse(preset.registeredAtUTC) != nil,
+          let updated = ISO8601Timestamps.parse(preset.updatedAtUTC),
+          let registered = ISO8601Timestamps.parse(preset.registeredAtUTC),
+          updated >= registered
+        else {
+          throw RuntimeWorkspaceProjectFailure(
+            "recordUnreadable", "workspace preset store record is inconsistent")
+        }
+        try validateProjectRef(preset.projectRef)
+        try validatePresetDefinition(
+          kind: preset.kind, templateRef: preset.templateRef,
+          toolchainRef: preset.toolchainRef,
+          toolchainGeneration: preset.toolchainGeneration,
+          credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
+          constraints: preset.constraints)
+      }
+      if let pending = document.pendingToolchainMutation {
+        try validatePresetRef(pending.presetRef)
+        if let generation = pending.toolchainGeneration {
+          try validateGeneration(generation)
+        }
+        guard ["acquire", "release"].contains(pending.action),
+          (pending.toolchainRef == nil) == (pending.toolchainGeneration == nil),
+          pending.toolchainRef.map(Self.validToolchainRef) ?? true,
+          pending.credentialRef.map(Self.validCredentialRef) ?? true,
+          pending.toolchainRef != nil || pending.credentialRef != nil,
+          pending.releaseAfterAcquireRef.map(Self.validToolchainRef) ?? true,
+          pending.releaseAfterAcquireCredentialRef.map(Self.validCredentialRef) ?? true
+        else {
+          throw RuntimeWorkspaceProjectFailure(
+            "recordUnreadable", "workspace preset transaction is inconsistent")
+        }
+      }
+      var migrated = document
+      migrated.schemaVersion = "arkdeck.workspace-project-store/3"
+      return migrated
     } catch let failure as RuntimeWorkspaceProjectFailure {
       throw failure
     } catch {
@@ -598,6 +1555,20 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     }
   }
 
+  private func validatePresetKind(_ value: String) throws {
+    guard Self.presetTemplates[value] != nil else {
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace preset kind must be build, test, signing or symbol")
+    }
+  }
+
+  private func validatePresetRef(_ value: String) throws {
+    guard value.hasPrefix("preset-"), Self.validIdentifier(value, maximumBytes: 128) else {
+      throw RuntimeWorkspaceProjectFailure(
+        "invalidInput", "workspace preset reference is malformed")
+    }
+  }
+
   private func validateGeneration(_ value: UInt64) throws {
     guard value > 0, value <= UInt64(Int64.max) else {
       throw RuntimeWorkspaceProjectFailure(
@@ -611,6 +1582,31 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
         scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar)
           || scalar == "-" || scalar == "_" || scalar == ".")
       }
+  }
+
+  private static func validToolchainRef(_ value: String) -> Bool {
+    let prefix = "toolchain:sha256:"
+    let digest = String(value.dropFirst(prefix.count))
+    return value.hasPrefix(prefix) && validSHA256(digest)
+  }
+
+  private static func validSHA256(_ value: String) -> Bool {
+    value.count == 64 && value.utf8.allSatisfy {
+      (48...57).contains($0) || (97...102).contains($0)
+    }
+  }
+
+  private static func validCredentialRef(_ value: String) -> Bool {
+    let prefix = "credential:"
+    return value.hasPrefix(prefix)
+      && validIdentifier(String(value.dropFirst(prefix.count)), maximumBytes: 128)
+  }
+
+  private static func validRelativePath(_ value: String) -> Bool {
+    guard !value.isEmpty, value.utf8.count <= 1_024, !value.hasPrefix("/"),
+      !value.utf8.contains(0), URL(filePath: value).standardized.path == value
+    else { return false }
+    return !value.split(separator: "/").contains("..")
   }
 
   private static func validateOwnerDirectory(_ url: URL) throws {

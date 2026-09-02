@@ -317,9 +317,7 @@ package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Senda
 
   public static func production() throws -> FileUpdateReplayStore {
     do {
-      let support = try FileManager.default.url(
-        for: .applicationSupportDirectory, in: .userDomainMask,
-        appropriateFor: nil, create: true)
+      let support = try AutoUpdateFilesystemLayout.applicationSupportDirectory()
       return FileUpdateReplayStore(
         directory: support.appending(
           path: "ArkDeck/AutoUpdateReplay", directoryHint: .isDirectory))
@@ -557,7 +555,7 @@ public struct UpdateVerificationContext: Equatable, Sendable {
   }
 }
 
-public struct VerifiedUpdateFeed: Equatable, Sendable {
+public struct VerifiedUpdateFeed: Codable, Equatable, Sendable {
   public let payload: UpdateFeedPayload
   public let canonicalPayload: Data
   public let payloadSHA256: String
@@ -569,7 +567,7 @@ public struct VerifiedUpdateFeed: Equatable, Sendable {
   }
 }
 
-public enum UpdateNoUpdateReason: Equatable, Sendable {
+public enum UpdateNoUpdateReason: String, Codable, Equatable, Sendable {
   case currentVersion
   case unsupportedSystem
   case unsupportedArchitecture

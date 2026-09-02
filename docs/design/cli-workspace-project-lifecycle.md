@@ -55,6 +55,7 @@ directory replacement fails as `factsDrifted` before a Job is admitted.
 The legacy `ARKDECK_WORKSPACE_PROJECTS` daemon flag is a compatibility reader.
 Recognized built-in entries are migrated idempotently into the same private
 store and subsequent target discovery reads that store. Preset and toolchain
-registration remain a separate CLI-REQ-022 slice; an OpenHarmony project whose
-typed toolchain/preset is not yet available is truthfully published as
-unavailable rather than accepting a raw command escape.
+registration are implemented by
+[CLI workspace preset and DevEco toolchain lifecycle](cli-workspace-preset-toolchain-lifecycle.md).
+An OpenHarmony project whose exact typed toolchain/preset cannot resolve is
+truthfully published as unavailable rather than accepting a raw command escape.

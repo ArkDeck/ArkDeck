@@ -44,6 +44,8 @@ enum CLIControlMethodRegistry {
     "runtime.hdc-status",
     "runtime.hdc.status",
     "runtime.storage.status",
+    "session.list",
+    "session.show",
     "operation.list",
     "operation.describe",
     "device.candidates",
@@ -134,9 +136,16 @@ enum CLIControlMethodRegistry {
     "history.filter.save",
     "runtime.storage.policy",
     "runtime.storage.root",
+    "session.cleanup.apply",
+    "session.cleanup.preview",
+    "session.pin",
+    "session.unpin",
     "workspace.project.register",
     "workspace.project.update",
     "workspace.project.remove",
+    "workspace.preset.register",
+    "workspace.preset.update",
+    "workspace.preset.remove",
     // Lease-aware local deletion of inactive derived Trace databases. A lost
     // response cannot prove which entries were removed, so callers reconcile
     // through trace.cache.status before making another explicit request.
@@ -270,12 +279,26 @@ enum CLIControlFailureMapper {
       ["invalidInput", "resourceConflict", "operationUnavailable", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["session.list", "session.show", "session.pin", "session.unpin",
+        "session.cleanup.preview", "session.cleanup.apply"].contains(method),
+      evidence.phase == "sessionOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "invalidCursor", "resourceConflict", "resourceNotFound",
+        "operationUnavailable", "inputTooLarge", "recordUnreadable", "quotaExceeded",
+        "ioFailure", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
     if ["workspace.project.list", "workspace.project.show", "workspace.project.register",
         "workspace.project.update", "workspace.project.remove"].contains(method),
       evidence.phase == "workspaceProjectOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "resourceConflict", "workspaceReferenceNotFound", "idempotencyConflict",
         "recordUnreadable", "quotaExceeded", "ioFailure", "factsDrifted", "outcomeUnknown",
         "operationUnavailable"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if ["workspace.preset.list", "workspace.preset.show", "workspace.preset.register",
+        "workspace.preset.update", "workspace.preset.remove"].contains(method),
+      evidence.phase == "workspacePresetOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceConflict", "workspaceReferenceNotFound", "idempotencyConflict",
+        "recordUnreadable", "quotaExceeded", "ioFailure", "factsDrifted", "outcomeUnknown",
+        "operationUnavailable", "resourceNotFound", "admissionDenied"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     if ["trace.cache.status", "trace.cache.purge"].contains(method),
       evidence.phase == "traceCacheOwner", evidence.newDispatchCount == 0,

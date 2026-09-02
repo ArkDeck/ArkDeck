@@ -323,6 +323,80 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ])
   }
 
+  func testWaterFlowProfileLowersRegisteredPresetConstraintsWithoutLegacyFallback() throws {
+    let project = root.appending(path: "RegisteredWaterFlow", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: project.appending(path: "entry/src/main", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(
+      to: project.appending(path: "entry/src/main/module.json5"))
+    let script = project.appending(path: "hvigorw.js")
+    try Data("// fixture".utf8).write(to: script)
+    let manifest = project.appending(path: "sdk-pkg.json")
+    let manifestData = Data("{\"version\":\"fixture\"}".utf8)
+    try manifestData.write(to: manifest)
+    let verifiedResource = ResolvedExecutableResource(
+      path: manifest.path, sha256: SHA256Hex.string(of: manifestData),
+      byteCount: manifestData.count, requireExecutable: false)
+    let resource = RuntimeWorkspacePresetResource(
+      presetRef: "preset-registered-build", generation: 1,
+      projectRef: "registered-demo", kind: "build",
+      templateRef: "openharmony.hvigor-build@1",
+      toolchainRef: "toolchain:sha256:" + String(repeating: "a", count: 64),
+      toolchainGeneration: 1, credentialRef: nil, timeoutSeconds: 900,
+      constraints: RuntimeWorkspacePresetConstraints(
+        module: "entry", product: "release", buildMode: "release"),
+      registeredAtUTC: "2026-09-01T00:00:00.000Z",
+      updatedAtUTC: "2026-09-01T00:00:00.000Z", configurationStatus: "active")
+    let production = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, projectRef: resource.projectRef,
+      registeredPresets: [
+        RuntimeWorkspaceResolvedPreset(
+          resource: resource, nodePath: "/usr/bin/true",
+          hvigorScriptPath: script.path, sdkRootPath: "/private/sdk",
+          verifiedResources: [verifiedResource]),
+      ])
+    XCTAssertNil(production.buildPresets["waterflow-debug"])
+    let build = try XCTUnwrap(production.buildPresets[resource.presetRef])
+    XCTAssertEqual(build.timeoutSeconds, 900)
+    XCTAssertEqual(build.verifiedResources, [verifiedResource])
+    XCTAssertEqual(
+      build.fixedArguments,
+      [
+        script.path, "assembleHap", "--mode", "module",
+        "-p", "module=entry@release", "-p", "product=release",
+        "-p", "buildMode=release", "--analyze=normal", "--parallel",
+        "--incremental", "--no-daemon",
+      ])
+    XCTAssertEqual(
+      production.buildProducts[resource.presetRef],
+      "entry/build/release/outputs/release/entry-release-unsigned.hap")
+
+    let operationProvider = WorkspaceOperationsProvider(
+      profile: production,
+      attemptStore: try WorkspacePatchAttemptStore(
+        rootURL: state.appending(
+          path: "registered-preset-attempts", directoryHint: .isDirectory)),
+      nowUTC: { "2026-09-01T00:00:00Z" })
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.build-openharmony@1"))
+    let action = try operationProvider.action(
+      for: descriptor.steps[0], operation: descriptor,
+      inputs: [
+        "projectRef": .string(resource.projectRef),
+        "buildPresetRef": .string(resource.presetRef),
+      ], context: executionContext())
+    let executable = try WorkspaceActionExecutableResolver(profile: production)
+      .resolveExecutable(for: action)
+    XCTAssertEqual(executable.verifiedResources, [verifiedResource])
+
+    let readOnly = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, projectRef: "registered-read-only", registeredPresets: [])
+    XCTAssertTrue(readOnly.buildPresets.isEmpty)
+    XCTAssertTrue(readOnly.testPresets.isEmpty)
+  }
+
   func testDispatcherOverlaysProfileEnvironmentOnlyOnTheChild() async throws {
     let key = "ARKDECK_TEST_CHILD_SDK_HOME"
     let value = "/private/tmp/arkdeck-sdk"
@@ -352,7 +426,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ], context: executionContext())
     let environmentDispatcher = DescriptorBoundProcessDispatcher(
       resolver: WorkspaceActionExecutableResolver(profile: environmentProfile),
-      childEnvironment: [key: value])
+      childEnvironment: [key: "wrong-default"],
+      childEnvironmentByExecutablePath: [env.path: [key: value]])
     let receipt = try await environmentDispatcher.dispatch(
       try environmentProvider.lower(action: action, context: executionContext()))
     let lines = String(decoding: receipt.stdout, as: UTF8.self).split(separator: "\n")

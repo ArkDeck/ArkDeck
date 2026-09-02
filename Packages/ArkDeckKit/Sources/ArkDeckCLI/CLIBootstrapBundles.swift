@@ -1,3 +1,4 @@
+import ArkDeckBootstrap
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckWorkflows
@@ -10,7 +11,10 @@ extension RuntimeCLI {
     let session = runtimeSession(&rest, command: "runtime.bundle.\(verb)", connectsToRuntime: false)
     do {
       let options = try CLIOptions(rest)
-      let registry = try supplied ?? BootstrapBundleRegistry()
+      let registry = try supplied ?? BootstrapBundleRegistry(validateBundle: { candidate in
+        _ = try LaunchAgentService.validateProductionDaemonBundle(
+          candidate, fileManager: .default)
+      })
       switch verb {
       case "register":
         guard options.value("--kind") == "daemon-bundle", let path = options.value("--file"), path.hasPrefix("/"), !path.utf8.contains(0),

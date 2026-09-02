@@ -1,3 +1,4 @@
+import ArkDeckBootstrap
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import Darwin

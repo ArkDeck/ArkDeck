@@ -3,6 +3,7 @@ import Darwin
 import XCTest
 
 @testable import ArkDeckAgentComposition
+@testable import ArkDeckBootstrap
 @testable import ArkDeckCLI
 @testable import ArkDeckCore
 @testable import ArkDeckLaunchAgent
@@ -291,7 +292,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     try RuntimeCLI.runAgentDaemon(
       ["update", "--daemon", daemonBundle.path, "--hdc", hdc.path, "--json"],
-      service: service,
+      spelledAs: "agentd", service: service,
       beforeBootstrap: {
         XCTAssertFalse(
           commandRunner.commands.contains { $0.first == "bootstrap" },
@@ -321,6 +322,98 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ])
   }
 
+  func testTargetServiceInstallsRegisteredResourcesOnlyOnTheZeroRuntimePath() throws {
+    let bootstrapOwner = BootstrapBundleRegistry(
+      root: root.appending(path: "bootstrap"), validateBundle: { _ in })
+    let tools = BootstrapToolRegistry(
+      owner: bootstrapOwner,
+      knownIdentity: { _ in
+        BootstrapToolRegistry.PublishedIdentity(
+          version: "fixture-1", profileReferences: ["fixture-profile"])
+      })
+    let nativeHDC = root.appending(path: "registered-hdc")
+    try FileManager.default.copyItem(
+      at: Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
+        .appending(path: "ArkDeckFakeHDCFixture"),
+      to: nativeHDC)
+    let firstBundle = try object(bootstrapOwner.register(file: daemonBundle))
+    let tool = try object(tools.register(file: nativeHDC))
+    let firstBundleReference = try string(firstBundle["bundleRef"])
+    let toolReference = try string(tool["toolRef"])
+
+    XCTAssertThrowsError(
+      try RuntimeCLI.runAgentDaemon(
+        ["install", "--daemon", daemonBundle.path, "--hdc", nativeHDC.path],
+        spelledAs: "runtime.service", service: service,
+        bundleRegistry: bootstrapOwner, toolRegistry: tools))
+    XCTAssertTrue(runner.commands.isEmpty, "raw target inputs must fail before launchctl")
+
+    XCTAssertThrowsError(
+      try RuntimeCLI.runAgentDaemon(
+        [
+          "install", "--bundle", firstBundleReference, "--bundle-generation", "2",
+          "--tool", toolReference, "--tool-generation", "1",
+        ],
+        spelledAs: "runtime.service", service: service,
+        bundleRegistry: bootstrapOwner, toolRegistry: tools))
+    guard case .array(let ownersBeforeAcquire)? = try object(
+      bootstrapOwner.inspect(firstBundleReference))["references"]
+    else { return XCTFail("bundle reference projection is malformed") }
+    XCTAssertEqual(ownersBeforeAcquire, [])
+    XCTAssertNil(try tools.startupSelection())
+
+    XCTAssertThrowsError(
+      try RuntimeCLI.runAgentDaemon(
+        [
+          "install", "--bundle", firstBundleReference, "--bundle-generation", "1",
+          "--tool", toolReference, "--tool-generation", "2",
+        ],
+        spelledAs: "runtime.service", service: service,
+        bundleRegistry: bootstrapOwner, toolRegistry: tools))
+    guard case .array(let retainedAfterToolFailure)? = try object(
+      bootstrapOwner.inspect(firstBundleReference))["references"]
+    else { return XCTFail("bundle reference projection is malformed") }
+    XCTAssertEqual(retainedAfterToolFailure.count, 1)
+    XCTAssertNil(try tools.startupSelection())
+    XCTAssertTrue(runner.commands.isEmpty, "generation drift must fail before launchctl")
+
+    try RuntimeCLI.runAgentDaemon(
+      [
+        "install", "--bundle", firstBundleReference, "--bundle-generation", "1",
+        "--tool", toolReference, "--tool-generation", "1",
+      ],
+      spelledAs: "runtime.service", service: service,
+      bundleRegistry: bootstrapOwner, toolRegistry: tools)
+    XCTAssertEqual(try XCTUnwrap(tools.startupSelection()).toolRef, toolReference)
+    guard case .array(let firstOwners)? = try object(
+      bootstrapOwner.inspect(firstBundleReference))["references"]
+    else { return XCTFail("installed bundle omitted its durable reference") }
+    XCTAssertEqual(firstOwners.count, 1)
+    XCTAssertEqual(try service.status().hdcSHA256, try digest(nativeHDC))
+
+    runner.removeAllCommands()
+    XCTAssertThrowsError(
+      try RuntimeCLI.runAgentDaemon(
+        [
+          "install", "--bundle", firstBundleReference, "--bundle-generation", "1",
+          "--tool", toolReference, "--tool-generation", "1",
+        ],
+        spelledAs: "runtime.service", service: service,
+        bundleRegistry: bootstrapOwner, toolRegistry: tools)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("zero-Runtime bootstrap path"), "\(error)")
+    }
+    XCTAssertEqual(
+      runner.commands, [["print", "gui/501/\(ArkDeckLaunchAgent.label)"]],
+      "an existing service must be read, then refused without lifecycle mutation")
+
+    try RuntimeCLI.runAgentDaemon(
+      ["uninstall"], spelledAs: "runtime.service", service: service,
+      bundleRegistry: bootstrapOwner, toolRegistry: tools)
+    XCTAssertNoThrow(
+      try bootstrapOwner.remove(firstBundleReference, expectedGeneration: "1"))
+  }
+
   func testInstallPinsArkTraceDescriptorAndUpdatePreservesOrExplicitlyRemovesIt() throws {
     let descriptor = root.appending(path: "ArkTrace/distribution-descriptor.json")
     try makeArkTraceDescriptor(descriptor)
@@ -342,7 +435,8 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(try service.status().arkTraceDescriptor, expected)
 
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemonBundle.path, "--json"], service: service)
+      ["update", "--daemon", daemonBundle.path, "--json"],
+      spelledAs: "agentd", service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     XCTAssertEqual(environment["ARKDECK_ARKTRACE_DESCRIPTOR"], physicalDescriptorPath)
@@ -352,7 +446,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       [
         "update", "--daemon", daemonBundle.path,
         "--arktrace-descriptor", "none", "--json",
-      ], service: service)
+      ], spelledAs: "agentd", service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     XCTAssertNil(environment["ARKDECK_ARKTRACE_DESCRIPTOR"])
@@ -430,7 +524,8 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       "unexpected diagnostics: \(status.diagnostics)")
     XCTAssertThrowsError(
       try RuntimeCLI.runAgentDaemon(
-        ["update", "--daemon", daemonBundle.path, "--json"], service: service)
+        ["update", "--daemon", daemonBundle.path, "--json"],
+        spelledAs: "agentd", service: service)
     ) { error in
       XCTAssertTrue(
         "\(error)".contains("pass --arktrace-descriptor explicitly"),
@@ -527,7 +622,8 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     try makeExecutable(daemon, bytes: "daemon-v2")
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemonBundle.path, "--json"], service: service)
+      ["update", "--daemon", daemonBundle.path, "--json"],
+      spelledAs: "agentd", service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
@@ -564,7 +660,8 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     ).write(to: paths.plist, options: .atomic)
 
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemonBundle.path, "--json"], service: service)
+      ["update", "--daemon", daemonBundle.path, "--json"],
+      spelledAs: "agentd", service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     for removed in [
@@ -586,7 +683,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
           "install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
           "--workspace-project", root.path,
         ],
-        service: service)
+        spelledAs: "agentd", service: service)
     ) { error in
       XCTAssertTrue("\(error)".contains("--workspace-project and --deveco-sdk together"))
     }
@@ -634,7 +731,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       XCTAssertThrowsError(
         try RuntimeCLI.runAgentDaemon(
           ["install", "--daemon", daemonBundle.path, "--hdc", hdc.path, removed, "x"],
-          service: service)
+          spelledAs: "agentd", service: service)
       ) { error in
         XCTAssertTrue("\(error)".contains("removed by CHG-2026-064"), "\(error)")
       }
@@ -814,6 +911,20 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     try Data(bytes.utf8).write(to: url, options: .atomic)
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o700], ofItemAtPath: url.path)
+  }
+
+  private func object(_ value: JSONValue) throws -> [String: JSONValue] {
+    guard case .object(let fields) = value else {
+      throw CredentialRefreshFixtureError.refused
+    }
+    return fields
+  }
+
+  private func string(_ value: JSONValue?) throws -> String {
+    guard case .string(let text)? = value else {
+      throw CredentialRefreshFixtureError.refused
+    }
+    return text
   }
 
   private func makeDaemonBundle(_ url: URL) throws {

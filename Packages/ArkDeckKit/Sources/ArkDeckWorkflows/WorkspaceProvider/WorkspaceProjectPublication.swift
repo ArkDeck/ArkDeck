@@ -125,6 +125,12 @@ extension WorkspaceProjectPublication {
             presetRef: preset.presetID, kind: kind, timeoutSeconds: preset.timeoutSeconds))
       }
     }
+    for (_, preset) in profile.signingPresets {
+      presets.append(
+        Preset(
+          presetRef: preset.presetID, kind: "signing",
+          timeoutSeconds: preset.timeoutSeconds))
+    }
     // Sorted so two reads of an unchanged configuration agree byte for byte.
     presets.sort { ($0.kind, $0.presetRef) < ($1.kind, $1.presetRef) }
 

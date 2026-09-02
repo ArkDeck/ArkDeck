@@ -7,6 +7,7 @@
 // operation even in principle, only ask the daemon to.
 
 import ArkDeckAgentClient
+import ArkDeckBootstrap
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckRuntime
@@ -43,6 +44,13 @@ enum RuntimeCLI {
     // Read only to return a precise migration error for one compatibility
     // cycle; they can no longer construct a lane.
     "--arkforged", "--arkforged-sha256", "--arkforge-profile",
+  ]
+
+  /// The target service surface consumes immutable registry references. Raw
+  /// executable paths stay available only on the deprecated `agentd`
+  /// compatibility spelling for its bounded migration cycle.
+  static let runtimeServiceInstallOptions: Set<String> = [
+    "--bundle", "--bundle-generation", "--tool", "--tool-generation",
   ]
 
   static func defaultSocketPath() -> String {
@@ -232,6 +240,8 @@ enum RuntimeCLI {
   static func runAgentDaemon(
     _ arguments: [String], spelledAs canonicalPrefix: String = "runtime.service",
     service: LaunchAgentService = LaunchAgentService(),
+    bundleRegistry suppliedBundleRegistry: BootstrapBundleRegistry? = nil,
+    toolRegistry suppliedToolRegistry: BootstrapToolRegistry? = nil,
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws {
     guard let subcommand = arguments.first else {
@@ -249,26 +259,94 @@ enum RuntimeCLI {
     switch subcommand {
     case "install", "update":
       let options = try CLIOptions(rest)
-      try options.validateAllowed(Self.agentdInstallOptions)
-      let previousStatus = subcommand == "update" ? try? service.status() : nil
-      let daemonBundlePath = options.value("--daemon") ?? defaultAgentDaemonBundlePath()
-      let configuredHDC: String?
-      if let supplied = options.value("--hdc") {
-        configuredHDC = supplied
-      } else if subcommand == "update" {
-        configuredHDC = previousStatus?.hdcPath
+      let targetSurface = canonicalPrefix == "runtime.service"
+      let typedInitialInstall = targetSurface && subcommand == "install"
+      try options.validateAllowed(
+        typedInitialInstall ? Self.runtimeServiceInstallOptions : Self.agentdInstallOptions)
+
+      var selectedBundleRegistry: BootstrapBundleRegistry?
+      var selectedBundleReference: String?
+      var selectedBundleGeneration: String?
+      var selectedTool: BootstrapToolRegistry.StartupSelection?
+      var previousStatus: LaunchAgentStatus?
+      let daemonBundlePath: String
+      let hdcPath: String
+      if typedInitialInstall {
+        let existing = try service.status()
+        guard !existing.installed, !existing.loaded, !existing.socketPresent else {
+          throw session.fail(
+            .resourceConflict,
+            "runtime service install is only the zero-Runtime bootstrap path; use the reviewed "
+              + "service update lifecycle for an existing installation",
+            details: ["newDispatchCount": .integer(0)])
+        }
+        do {
+          guard let bundleReference = options.value("--bundle"),
+            let bundleGeneration = options.value("--bundle-generation")
+          else {
+            throw session.fail(
+              .invalidInput,
+              "\(spelling) \(subcommand) requires an exact bundle and bundle generation")
+          }
+          let bundles = try suppliedBundleRegistry ?? BootstrapBundleRegistry()
+          let tools = suppliedToolRegistry ?? BootstrapToolRegistry(
+            owner: bundles,
+            knownIdentity: { sha256 in
+              HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
+                BootstrapToolRegistry.PublishedIdentity(
+                  version: $0.version, profileReferences: $0.profileReferences)
+              }
+            })
+          let installation = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .installation, id: "runtime-service-installation")
+          // Pin and revalidate the exact bundle generation before publishing
+          // an initial tool selection. A later failure leaves this candidate
+          // retained for explicit retry/reconciliation, never dangling.
+          let retained = try bundles.acquire(
+            bundleReference, expectedGeneration: bundleGeneration, owner: installation)
+          guard let toolReference = options.value("--tool"),
+            let toolGeneration = options.value("--tool-generation")
+          else {
+            throw session.fail(
+              .invalidInput,
+              "\(spelling) install requires an exact tool and tool generation")
+          }
+          let selection = try tools.initializeServiceSelection(
+            reference: toolReference, expectedGeneration: toolGeneration)
+          selectedBundleRegistry = bundles
+          selectedBundleReference = bundleReference
+          selectedBundleGeneration = bundleGeneration
+          selectedTool = selection
+          daemonBundlePath = retained.path
+          hdcPath = selection.resolved.executableURL.path
+        } catch let error as CLIRegistryError {
+          throw session.stamped(error)
+        } catch let error as AgentExecutionControlFailure {
+          throw session.fail(
+            CLIErrorCode(rawValue: error.code) ?? .recordUnreadable, error.message,
+            details: ["newDispatchCount": .integer(0)])
+        } catch {
+          throw session.fail(
+            .recordUnreadable,
+            "typed Runtime service resources could not be resolved: \(error)",
+            details: ["newDispatchCount": .integer(0)])
+        }
       } else {
-        configuredHDC = nil
-      }
-      guard let hdcPath = configuredHDC, hdcPath.hasPrefix("/") else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "agentd \(subcommand) requires --hdc with an absolute executable path")
-      }
-      guard daemonBundlePath.hasPrefix("/") else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "agentd \(subcommand) requires an absolute ArkDeckAgent.app path")
+        daemonBundlePath = options.value("--daemon") ?? defaultAgentDaemonBundlePath()
+        previousStatus = subcommand == "update" ? try? service.status() : nil
+        guard let configuredHDC = options.value("--hdc") ?? previousStatus?.hdcPath,
+          configuredHDC.hasPrefix("/")
+        else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "\(spelling) \(subcommand) requires --hdc with an absolute executable path")
+        }
+        guard daemonBundlePath.hasPrefix("/") else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "\(spelling) \(subcommand) requires an absolute ArkDeckAgent.app path")
+        }
+        hdcPath = configuredHDC
       }
       let workspaceProject =
         options.value("--workspace-project") ?? previousStatus?.workspaceProjectPath
@@ -277,7 +355,7 @@ enum RuntimeCLI {
         throw CLIError(
           exitCode: EX_USAGE,
           message:
-            "agentd \(subcommand) requires --workspace-project and --deveco-sdk together")
+            "\(spelling) \(subcommand) requires --workspace-project and --deveco-sdk together")
       }
       if let workspaceProject, !workspaceProject.hasPrefix("/") {
         throw CLIError(
@@ -372,7 +450,34 @@ enum RuntimeCLI {
         arkTraceDescriptor: arkTraceDescriptor,
         arkForgeLane: arkForgeLane,
         beforeBootstrap: beforeBootstrap)
-      session.emit(try encodedJSON(receipt))
+      if let bundles = selectedBundleRegistry,
+        let bundleReference = selectedBundleReference,
+        let bundleGeneration = selectedBundleGeneration,
+        let tool = selectedTool
+      {
+        do {
+          try bundles.retainOnly(
+            bundleReference,
+            owner: BootstrapBundleRegistry.ReferenceOwner(
+              kind: .installation, id: "runtime-service-installation"))
+        } catch let error as AgentExecutionControlFailure {
+          throw session.fail(
+            CLIErrorCode(rawValue: error.code) ?? .recordUnreadable,
+            "service started, but its durable bundle reference could not be finalized: \(error.message)",
+            details: ["newDispatchCount": .integer(0)])
+        }
+        session.emit(
+          .object([
+            "schemaVersion": .string("arkdeck.runtime-service-installation/1"),
+            "installed": .bool(true),
+            "bundleRef": .string(bundleReference),
+            "bundleGeneration": .string(bundleGeneration),
+            "activeToolRef": .string(tool.toolRef),
+            "activeToolSelectionGeneration": .string(String(tool.activeGeneration)),
+          ]))
+      } else {
+        session.emit(try encodedJSON(receipt))
+      }
 
     case "restart":
       let options = try CLIOptions(rest)
@@ -569,10 +674,22 @@ enum RuntimeCLI {
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "\(spelling) uninstall accepts only --json")
       }
-      session.emit(try encodedJSON(service.uninstall()))
+      let removal = try service.uninstall()
+      do {
+        let bundles = try suppliedBundleRegistry ?? BootstrapBundleRegistry()
+        try bundles.releaseAll(
+          owner: BootstrapBundleRegistry.ReferenceOwner(
+            kind: .installation, id: "runtime-service-installation"))
+      } catch let error as AgentExecutionControlFailure {
+        throw session.fail(
+          CLIErrorCode(rawValue: error.code) ?? .recordUnreadable,
+          "service was removed, but its durable bundle references could not be released: \(error.message)",
+          details: ["newDispatchCount": .integer(0)])
+      }
+      session.emit(try encodedJSON(removal))
 
     default:
-      throw CLIError(exitCode: EX_USAGE, message: "unsupported agentd subcommand")
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported \(spelling) subcommand")
     }
   }
 
@@ -718,7 +835,8 @@ enum RuntimeCLI {
     // official public password, while private presets read the old envelope
     // only when an actual daemon-identity/access-schema migration is required.
     guard FileManager.default.fileExists(atPath: store.receiptPath) else { return }
-    try store.refreshDaemonKeychainIdentity()
+    let owner = OpenHarmonySigningCredentialOwner(store: store)
+    try owner.maintain { try store.refreshDaemonKeychainIdentity() }
   }
 
   /// Installs the single published OpenHarmony signing preset. Passwords are
@@ -736,6 +854,7 @@ enum RuntimeCLI {
       suppliedStore
       ?? OpenHarmonySigningPresetStore(
         secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    let credentialOwner = OpenHarmonySigningCredentialOwner(store: store)
     var rest = Array(arguments.dropFirst())
     let session = runtimeSession(&rest, command: "\(canonicalPrefix).install-sdk-release")
     session.warnIfLegacy()
@@ -760,14 +879,16 @@ enum RuntimeCLI {
     let installer = OpenHarmonySDKReleasePresetInstaller(
       store: store,
       materialParentURL: materialParentURL ?? OpenHarmonyLocalSigning.defaultRootURL())
-    let receipt = try await installer.install(
-      configuration: OpenHarmonySDKReleasePresetConfiguration(
-        projectRef: options.value("--project-ref")
-          ?? OpenHarmonyLocalSigning.defaultProjectRef,
-        bundleName: try required("--bundle-name"),
-        javaExecutable: URL(filePath: java),
-        sdkRoot: URL(filePath: sdk)))
-    session.emit(try encodedJSON(receipt))
+    let (_, resource) = try await credentialOwner.replace {
+      try await installer.install(
+        configuration: OpenHarmonySDKReleasePresetConfiguration(
+          projectRef: options.value("--project-ref")
+            ?? OpenHarmonyLocalSigning.defaultProjectRef,
+          bundleName: try required("--bundle-name"),
+          javaExecutable: URL(filePath: java),
+          sdkRoot: URL(filePath: sdk)))
+    }
+    session.emit(try encodedJSON(resource.projection))
   }
 
   static func runSigning(
@@ -778,6 +899,7 @@ enum RuntimeCLI {
       suppliedStore
       ?? OpenHarmonySigningPresetStore(
         secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    let credentialOwner = OpenHarmonySigningCredentialOwner(store: store)
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
@@ -828,25 +950,37 @@ enum RuntimeCLI {
       var normalizedKeyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         keyPassword, keystore: keystoreURL)
       defer { normalizedKeyPassword.resetBytes(in: 0..<normalizedKeyPassword.count) }
-      let receipt = try store.install(
-        configuration: OpenHarmonySigningPresetConfiguration(
-          projectRef: options.value("--project-ref")
-            ?? OpenHarmonyLocalSigning.defaultProjectRef,
-          javaExecutable: URL(filePath: java),
-          signerJAR: URL(filePath: jar),
-          keystore: keystoreURL,
-          appCertificate: URL(filePath: certificate),
-          signedProfile: URL(filePath: profile),
-          keyAlias: try required("--key-alias")),
-        keystorePassword: normalizedKeystorePassword,
-        keyPassword: normalizedKeyPassword)
-      session.emit(try encodedJSON(receipt))
+      let (_, resource) = try credentialOwner.replace {
+        try store.install(
+          configuration: OpenHarmonySigningPresetConfiguration(
+            projectRef: options.value("--project-ref")
+              ?? OpenHarmonyLocalSigning.defaultProjectRef,
+            javaExecutable: URL(filePath: java),
+            signerJAR: URL(filePath: jar),
+            keystore: keystoreURL,
+            appCertificate: URL(filePath: certificate),
+            signedProfile: URL(filePath: profile),
+            keyAlias: try required("--key-alias")),
+          keystorePassword: normalizedKeystorePassword,
+          keyPassword: normalizedKeyPassword)
+      }
+      session.emit(try encodedJSON(resource.projection))
 
     case "normalize":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "\(spelling) normalize accepts only --json")
       }
-      session.emit(try encodedJSON(store.normalizeDevEcoSecrets()))
+      let normalization = try credentialOwner.maintain {
+        try store.normalizeDevEcoSecrets()
+      }
+      let resource = try credentialOwner.current()
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-maintenance/1"),
+        "operation": .string("normalize"),
+        "credential": resource.projection,
+        "normalizedKeystorePassword": .bool(normalization.normalizedKeystorePassword),
+        "normalizedKeyPassword": .bool(normalization.normalizedKeyPassword),
+      ])))
 
     case "migrate-deveco":
       let options = try CLIOptions(rest)
@@ -908,11 +1042,19 @@ enum RuntimeCLI {
       var keyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         encrypted.key, keystore: materialAnchor)
       defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
-      session.emit(
-        try encodedJSON(
-          migrationStore.migrateToSecretEnvelope(
-            keystorePassword: keystorePassword, keyPassword: keyPassword,
-            keyAlias: options.value("--key-alias"))))
+      let migrationOwner = OpenHarmonySigningCredentialOwner(store: migrationStore)
+      let (migration, resource) = try migrationOwner.replace {
+        try migrationStore.migrateToSecretEnvelope(
+          keystorePassword: keystorePassword, keyPassword: keyPassword,
+          keyAlias: options.value("--key-alias"))
+      }
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-maintenance/1"),
+        "operation": .string("migrate-deveco"),
+        "credential": resource.projection,
+        "migrated": .bool(migration.migrated),
+        "legacyAccountCount": .integer(Int64(migration.legacyAccountCount)),
+      ])))
 
     case "status":
       guard rest.isEmpty else {
@@ -925,13 +1067,40 @@ enum RuntimeCLI {
         suppliedStore
         ?? OpenHarmonySigningPresetStore(
           secrets: LoginKeychainSigningSecretStore())
-      session.emit(try encodedJSON(statusStore.status()))
+      let status = statusStore.status()
+      let statusOwner = OpenHarmonySigningCredentialOwner(store: statusStore)
+      let resource: OpenHarmonySigningCredentialResource?
+      var diagnostics = status.ready
+        ? []
+        : [status.installed
+          ? "signingCredentialUnavailable" : "signingCredentialNotInstalled"]
+      do { resource = try statusOwner.current() }
+      catch {
+        resource = nil
+        if status.installed { diagnostics.append("signingCredentialOwnerUnavailable") }
+      }
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-status/1"),
+        "installed": .bool(status.installed),
+        "ready": .bool(status.ready && resource != nil),
+        "credential": resource?.projection ?? .null,
+        "diagnostics": .array(diagnostics.map(JSONValue.string)),
+      ])))
 
     case "remove":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "\(spelling) remove accepts only --json")
       }
-      session.emit(try encodedJSON(store.remove()))
+      let removal = try credentialOwner.remove { try store.remove() }
+      session.emit(try encodedJSON(JSONValue.object([
+        "schemaVersion": .string("arkdeck.signing-credential-removal/1"),
+        "state": .string("removed"),
+        "removedReceipt": .bool(removal.removedReceipt),
+        "removedKeystorePassword": .bool(removal.removedKeystorePassword),
+        "removedKeyPassword": .bool(removal.removedKeyPassword),
+        "removedManagedMaterial": .bool(removal.removedManagedMaterial),
+        "preservedSourceCount": .integer(Int64(removal.preservedSourcePaths.count)),
+      ])))
 
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported signing subcommand")
@@ -1652,7 +1821,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing runtime subcommand (health|hdc|service|signing|storage|support-bundle)")
+        message: "missing runtime subcommand (health|hdc|service|signing|storage|support-bundle|update)")
     }
     var rest = Array(arguments.dropFirst())
     switch subcommand {
@@ -1668,6 +1837,8 @@ enum RuntimeCLI {
       try await runSigningAsync(rest, spelledAs: "runtime.signing")
     case "support-bundle":
       try await runRuntimeSupportBundle(rest)
+    case "update":
+      try await runRuntimeUpdate(rest)
     case "storage":
       try runRuntimeStorage(rest)
     case "health":
@@ -3485,8 +3656,8 @@ params))
     var rest = Array(arguments.dropFirst())
     var session = runtimeSession(&rest, command: "workspace.\(group).\(verb)")
     let options = try CLIOptions(rest)
-    if group == "project" {
-      try session.negotiate(requiredMajor: 2, forMethod: "workspace.project.\(verb)")
+    if group == "project" || group == "preset" {
+      try session.negotiate(requiredMajor: 2, forMethod: "workspace.\(group).\(verb)")
     }
     var params: [String: JSONValue] = [:]
     if let projectRef = options.value("--project") {
@@ -3497,16 +3668,30 @@ params))
     if let requestID = options.value("--registration-request-id") {
       params["registrationRequestId"] = .string(requestID)
     }
+    if let requestID = options.value("--mutation-request-id") {
+      params["mutationRequestId"] = .string(requestID)
+    }
     if let root = options.value("--root") { params["root"] = .string(root) }
     if let generation = options.value("--expected-generation") {
       params["expectedGeneration"] = .string(generation)
+    }
+    for (option, field) in [
+      ("--template", "templateRef"), ("--toolchain", "toolchainRef"),
+      ("--toolchain-generation", "toolchainGeneration"),
+      ("--credential", "credentialRef"), ("--timeout-seconds", "timeoutSeconds"),
+      ("--module", "module"), ("--product", "product"),
+      ("--build-mode", "buildMode"),
+      ("--relative-source-map", "relativeSourceMap"),
+    ] {
+      if let value = options.value(option) { params[field] = .string(value) }
     }
 
     switch (group, verb) {
     case ("project", "list"):
       session.emit(try session.request("workspace.project.list"))
     case ("project", "show"), ("project", "update"), ("project", "remove"),
-      ("preset", "list"), ("preset", "show"):
+      ("preset", "list"), ("preset", "show"), ("preset", "register"),
+      ("preset", "update"), ("preset", "remove"):
       guard params["projectRef"] != nil else {
         throw CLIError(
           exitCode: EX_USAGE,
