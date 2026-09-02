@@ -435,9 +435,19 @@ public actor RuntimeAgentExecutionCoordinator {
       throw AgentExecutionControlFailure("humanActionExpired", "the human-action deadline expired", details: error.details)
     }
     let selected = choice?.observation ?? action.observation
+    // A physical reconnect deliberately invalidates the old USB attachment
+    // observation. Following that stale observation would turn a successful
+    // reconnect into an identity-selection HAR even when the fresh probe has
+    // exactly one independently related candidate. Start a new observation
+    // chain for connectDevice; resolveSnapshot still requires the fresh USB
+    // relation, direct identity readback and target-store adoption before the
+    // action can be marked resolved. Trust and explicit-selection actions keep
+    // following their exact observation so a replaced attachment cannot
+    // inherit either authority.
+    let selectedForResolution = action.kind == .connectDevice ? nil : selected
     let snapshot: TargetObservationSnapshot
     do {
-      snapshot = try await observations.snapshot(following: selected?.reference)
+      snapshot = try await observations.snapshot(following: selectedForResolution?.reference)
       if action.kind == .selectDevice, let selected, snapshot.generation != selected.generation {
         throw TargetObservationFailure("resourceConflict", "candidate selection generation changed")
       }
@@ -450,7 +460,9 @@ public actor RuntimeAgentExecutionCoordinator {
       return record.projection
     }
     try budget.check()
-    guard let target = try await resolveSnapshot(snapshot, record: &record, budget: budget, selected: selected) else {
+    guard let target = try await resolveSnapshot(
+      snapshot, record: &record, budget: budget, selected: selectedForResolution
+    ) else {
       return record.projection
     }
     // The original action becomes resolved only after the exact fresh probe
