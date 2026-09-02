@@ -5093,6 +5093,45 @@ final class ManualUIFlashBridgeContractTests: XCTestCase {
     XCTAssertTrue(String(decoding: stdout, as: UTF8.self).contains("XPC_INTERFACE_VALID: aot"))
     XCTAssertFalse(errorText.contains("NSInvalidArgumentException"))
   }
+
+  func testAOTCompileRemovesStaleDigestDirectoriesAndNothingElse() throws {
+    let driverURL = repositoryRoot.appending(
+      path: "scripts/manual_ui_flash/manual_ui_flash.swift")
+    // The driver derives this root the same way; a digest no source can name
+    // and a directory that is not digest-shaped are planted next to the real
+    // one, and only the former may be gone afterwards.
+    let root = FileManager.default.temporaryDirectory.standardizedFileURL
+      .appendingPathComponent("arkdeck-manual-ui-flash-aot", isDirectory: true)
+    let stale = root.appendingPathComponent(String(repeating: "f", count: 64), isDirectory: true)
+    let unrelated = root.appendingPathComponent("not-a-digest", isDirectory: true)
+    for directory in [root, stale, unrelated] {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    }
+    defer {
+      try? FileManager.default.removeItem(at: stale)
+      try? FileManager.default.removeItem(at: unrelated)
+    }
+
+    let errors = Pipe()
+    let process = Process()
+    process.executableURL = URL(filePath: "/usr/bin/xcrun")
+    process.arguments = ["swift", driverURL.path, "--validate-xpc-interface"]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = errors
+    try process.run()
+    let stderr = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0, String(decoding: stderr, as: UTF8.self))
+
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: stale.path),
+      "a digest directory no current source names must be removed after publication")
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: unrelated.path),
+      "removal is limited to digest-shaped names")
+  }
 }
 
 final class HeadlessHDCServerHostContractTests: XCTestCase {
