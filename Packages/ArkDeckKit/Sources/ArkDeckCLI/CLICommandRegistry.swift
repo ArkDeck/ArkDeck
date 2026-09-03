@@ -1474,7 +1474,7 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "show",
         canonicalCommand: "device.show",
-        summary: "list durable targets and their binding revisions",
+        summary: "show the frozen legacy target-list projection",
         options: runtimeClientOptions([]),
         connectsToRuntime: true),
       CLILeafSpec(

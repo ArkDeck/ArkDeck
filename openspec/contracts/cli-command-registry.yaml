@@ -3185,7 +3185,7 @@
     "positionals": []
     "replacementArgvPattern": "arkdeck target show --target <id>"
     "requiresExactlyOneOf": []
-    "summary": "list durable targets and their binding revisions"
+    "summary": "show the frozen legacy target-list projection"
   - "catalogOperation": null
     "command": "device.candidates"
     "connectsToRuntime": true
