@@ -6,6 +6,7 @@
 // lets Workflow code retain its typed job model without gaining raw SQLite
 // access.
 
+import ArkDeckCore
 import Foundation
 import SQLite3
 
@@ -43,9 +44,8 @@ package struct RuntimePersistedJob: Sendable, Equatable {
 
 package struct RuntimeJobRepositoryPage: Sendable, Equatable {
   public let jobs: [RuntimePersistedJob]
-  /// Opaque SQLite row cursor.  It is intentionally not a job ID: callers
-  /// cannot skip or repeat records when IDs are hash-shaped rather than
-  /// chronologically sortable.
+  /// Opaque logical cursor over the complete creation-time / Job-ID order.
+  /// It never exposes a SQLite row identity or another storage position.
   public let nextCursor: String?
 }
 
@@ -61,8 +61,18 @@ package enum RuntimeJobRepositoryError: Error, Equatable, Sendable {
 /// a committed admission transaction.
 package final class RuntimeJobRepository: @unchecked Sendable {
   package static let filename = "runtime-jobs.sqlite3"
-  private static let schemaVersion = 1
+  private static let schemaVersion = 2
   private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+  private static let listCursorPrefix = "rjh1."
+  private static let oldestFirstOrder = "oldestFirst"
+  private static let newestFirstOrder = "newestFirst"
+
+  private struct ListCursor: Codable, Equatable {
+    let version: Int
+    let order: String
+    let createdAtOrderKey: String
+    let jobID: String
+  }
 
   private let url: URL
   private let lock = NSLock()
@@ -171,16 +181,25 @@ package final class RuntimeJobRepository: @unchecked Sendable {
         }
         return storedHash == requestHash ? .duplicate(jobID: existingID) : .conflict
       }
+      guard let admissionSequence = try query(
+        "SELECT COALESCE(MAX(admission_sequence), 0) + 1 AS next_sequence FROM runtime_job"
+      ).first?.integer("next_sequence") else {
+        throw RuntimeJobRepositoryError.corrupt(
+          "Runtime admission sequence cannot advance")
+      }
       try run(
         """
         INSERT INTO runtime_job(
-          job_id, idempotency_key, request_hash, state, created_at_utc,
-          updated_at_utc, version, initial_record_json
-        ) VALUES(?, ?, ?, ?, ?, ?, 1, ?)
+          job_id, idempotency_key, request_hash, state, admission_sequence,
+          created_at_utc, created_at_order_key, updated_at_utc, version, initial_record_json
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """,
         [
           .text(jobID), .text(idempotencyKey), .text(requestHash), .text(initialState),
-          .text(createdAtUTC), .text(createdAtUTC), .blob(initialRecordData),
+          .integer(admissionSequence), .text(createdAtUTC),
+          .text(try Self.creationOrderKey(
+            createdAtUTC: createdAtUTC, initialRecordData: initialRecordData)),
+          .text(createdAtUTC), .blob(initialRecordData),
         ])
       return .admitted
     }
@@ -213,7 +232,7 @@ package final class RuntimeJobRepository: @unchecked Sendable {
       SELECT job_id, idempotency_key, request_hash, state, created_at_utc,
              updated_at_utc, version, initial_record_json
       FROM runtime_job
-      ORDER BY created_at_utc, job_id
+      ORDER BY created_at_order_key, job_id COLLATE BINARY
       """
     ).map(persistedJob)
   }
@@ -282,7 +301,7 @@ package final class RuntimeJobRepository: @unchecked Sendable {
              updated_at_utc, version, initial_record_json
       FROM runtime_job
       WHERE state NOT IN ('planned', 'succeeded', 'recovered', 'failed', 'cancelled', 'interrupted')
-      ORDER BY created_at_utc, job_id
+      ORDER BY created_at_order_key, job_id COLLATE BINARY
       """
     ).map(persistedJob)
   }
@@ -306,62 +325,213 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     guard (1...1_000).contains(pageSize) else {
       throw RuntimeJobRepositoryError.corrupt("pageSize must be between 1 and 1000")
     }
-    let cursorRowID: Int64?
-    if let cursor {
-      guard let parsed = Int64(cursor), parsed >= 0 else {
-        throw RuntimeJobRepositoryError.corrupt("malformed Runtime job history cursor")
-      }
-      cursorRowID = parsed
-    } else {
-      cursorRowID = nil
+    let decodedCursor = try cursor.map {
+      try Self.decodeListCursor($0, newestFirst: newestFirst)
     }
     lock.lock()
     defer { lock.unlock() }
     let rows: [Row]
     if newestFirst {
-      if let cursorRowID {
+      if let decodedCursor {
         rows = try query(
           """
-          SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
+          SELECT created_at_order_key, job_id, idempotency_key, request_hash, state,
                  created_at_utc, updated_at_utc, version, initial_record_json
           FROM runtime_job
-          WHERE rowid < ?
-          ORDER BY rowid DESC
+          WHERE created_at_order_key < ?
+             OR (created_at_order_key = ? AND job_id COLLATE BINARY > ?)
+          ORDER BY created_at_order_key DESC, job_id COLLATE BINARY ASC
           LIMIT ?
           """,
-          [.integer(cursorRowID), .integer(Int64(pageSize + 1))])
+          [
+            .text(decodedCursor.createdAtOrderKey), .text(decodedCursor.createdAtOrderKey),
+            .text(decodedCursor.jobID), .integer(Int64(pageSize + 1)),
+          ])
       } else {
         rows = try query(
           """
-          SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
+          SELECT created_at_order_key, job_id, idempotency_key, request_hash, state,
                  created_at_utc, updated_at_utc, version, initial_record_json
           FROM runtime_job
-          ORDER BY rowid DESC
+          ORDER BY created_at_order_key DESC, job_id COLLATE BINARY ASC
           LIMIT ?
           """,
           [.integer(Int64(pageSize + 1))])
       }
+    } else if let decodedCursor {
+      rows = try query(
+        """
+        SELECT created_at_order_key, job_id, idempotency_key, request_hash, state,
+               created_at_utc, updated_at_utc, version, initial_record_json
+        FROM runtime_job
+        WHERE created_at_order_key > ?
+           OR (created_at_order_key = ? AND job_id COLLATE BINARY > ?)
+        ORDER BY created_at_order_key ASC, job_id COLLATE BINARY ASC
+        LIMIT ?
+        """,
+        [
+          .text(decodedCursor.createdAtOrderKey), .text(decodedCursor.createdAtOrderKey),
+          .text(decodedCursor.jobID), .integer(Int64(pageSize + 1)),
+        ])
     } else {
       rows = try query(
         """
-        SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
+        SELECT created_at_order_key, job_id, idempotency_key, request_hash, state,
                created_at_utc, updated_at_utc, version, initial_record_json
         FROM runtime_job
-        WHERE rowid > ?
-        ORDER BY rowid
+        ORDER BY created_at_order_key ASC, job_id COLLATE BINARY ASC
         LIMIT ?
         """,
-        [.integer(cursorRowID ?? 0), .integer(Int64(pageSize + 1))])
+        [.integer(Int64(pageSize + 1))])
     }
     let pageRows = rows.prefix(pageSize)
     let jobs = try pageRows.map(persistedJob)
     let nextCursor: String?
-    if rows.count > pageSize, let last = pageRows.last?.integer("storage_row_id") {
-      nextCursor = String(last)
+    if rows.count > pageSize, let last = pageRows.last,
+      let createdAtOrderKey = last.text("created_at_order_key"),
+      let jobID = last.text("job_id")
+    {
+      nextCursor = try Self.encodeListCursor(
+        createdAtOrderKey: createdAtOrderKey, jobID: jobID, newestFirst: newestFirst)
     } else {
       nextCursor = nil
     }
     return RuntimeJobRepositoryPage(jobs: jobs, nextCursor: nextCursor)
+  }
+
+  /// Protocol-1 compatibility preserves its insertion-order page and decimal
+  /// cursor without consulting SQLite's physical row identity. New product
+  /// surfaces must use `listJobs`, whose logical compound order is portable.
+  package func listLegacyJobs(
+    pageSize: Int, cursor: String?, newestFirst: Bool = false
+  ) throws -> RuntimeJobRepositoryPage {
+    guard (1...1_000).contains(pageSize) else {
+      throw RuntimeJobRepositoryError.corrupt("pageSize must be between 1 and 1000")
+    }
+    let cursorSequence: Int64?
+    if let cursor {
+      guard let parsed = Int64(cursor), parsed >= 0 else {
+        throw RuntimeJobRepositoryError.corrupt("malformed legacy Runtime job history cursor")
+      }
+      cursorSequence = parsed
+    } else {
+      cursorSequence = nil
+    }
+    lock.lock()
+    defer { lock.unlock() }
+    let comparison = newestFirst ? "<" : ">"
+    let direction = newestFirst ? "DESC" : "ASC"
+    let rows = try query(
+      """
+      SELECT admission_sequence, job_id, idempotency_key, request_hash, state,
+             created_at_utc, updated_at_utc, version, initial_record_json
+      FROM runtime_job
+      WHERE ? = 1 OR admission_sequence \(comparison) ?
+      ORDER BY admission_sequence \(direction)
+      LIMIT ?
+      """,
+      [
+        .integer(cursorSequence == nil ? 1 : 0), .integer(cursorSequence ?? 0),
+        .integer(Int64(pageSize + 1)),
+      ])
+    let pageRows = rows.prefix(pageSize)
+    let jobs = try pageRows.map(persistedJob)
+    let nextCursor: String?
+    if rows.count > pageSize, let sequence = pageRows.last?.integer("admission_sequence") {
+      nextCursor = String(sequence)
+    } else {
+      nextCursor = nil
+    }
+    return RuntimeJobRepositoryPage(jobs: jobs, nextCursor: nextCursor)
+  }
+
+  private static func encodeListCursor(
+    createdAtOrderKey: String, jobID: String, newestFirst: Bool
+  ) throws -> String {
+    guard createdAtOrderKey.count == 16, validJobID(jobID) else {
+      throw RuntimeJobRepositoryError.corrupt(
+        "Runtime job history row cannot form a bounded logical cursor")
+    }
+    let value = ListCursor(
+      version: 1,
+      order: newestFirst ? newestFirstOrder : oldestFirstOrder,
+      createdAtOrderKey: createdAtOrderKey,
+      jobID: jobID)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return listCursorPrefix + (try encoder.encode(value)).base64URLEncodedString()
+  }
+
+  private static func decodeListCursor(
+    _ cursor: String, newestFirst: Bool
+  ) throws -> ListCursor {
+    guard cursor.utf8.count <= 1_024, cursor.hasPrefix(listCursorPrefix),
+      let data = Data(base64URLString: String(cursor.dropFirst(listCursorPrefix.count))),
+      let decoded = try? JSONDecoder().decode(ListCursor.self, from: data),
+      decoded.version == 1,
+      decoded.order == (newestFirst ? newestFirstOrder : oldestFirstOrder),
+      decoded.createdAtOrderKey.count == 16,
+      decoded.createdAtOrderKey.utf8.allSatisfy({
+        (48...57).contains($0) || (97...102).contains($0)
+      }),
+      validJobID(decoded.jobID),
+      try encodeListCursor(
+        createdAtOrderKey: decoded.createdAtOrderKey,
+        jobID: decoded.jobID,
+        newestFirst: newestFirst) == cursor
+    else {
+      throw RuntimeJobRepositoryError.corrupt("malformed Runtime job history cursor")
+    }
+    return decoded
+  }
+
+  /// Foundation parses every accepted Runtime timestamp to an instant before
+  /// SQLite sees it. The monotonic IEEE-754 transform preserves `Date` order
+  /// as a fixed-width ASCII key, including timestamps whose different RFC
+  /// 3339 spellings would sort incorrectly as raw text.
+  private static func creationOrderKey(
+    createdAtUTC: String, initialRecordData: Data?
+  ) throws -> String {
+    let timestamp: String
+    if createdAtUTC == RuntimePersistedJob.legacyCreatedAtUTC {
+      guard let initialRecordData,
+        let object = try? JSONSerialization.jsonObject(with: initialRecordData),
+        let fields = object as? [String: Any],
+        let recordCreatedAtUTC = fields["createdAtUTC"] as? String
+      else {
+        throw RuntimeJobRepositoryError.corrupt(
+          "legacy Runtime job row lacks its authoritative creation timestamp")
+      }
+      timestamp = recordCreatedAtUTC
+    } else {
+      timestamp = createdAtUTC
+    }
+    guard let date = ISO8601Timestamps.parse(timestamp) else {
+      throw RuntimeJobRepositoryError.corrupt(
+        "Runtime job row has an invalid creation timestamp")
+    }
+    var interval = date.timeIntervalSinceReferenceDate
+    if interval == 0 { interval = 0 }  // Normalize negative zero.
+    guard interval.isFinite else {
+      throw RuntimeJobRepositoryError.corrupt(
+        "Runtime job row has an invalid creation instant")
+    }
+    let signMask: UInt64 = 1 << 63
+    let bits = interval.bitPattern
+    let orderedBits = bits & signMask == 0 ? bits ^ signMask : ~bits
+    let hex = String(orderedBits, radix: 16, uppercase: false)
+    return String(repeating: "0", count: 16 - hex.count) + hex
+  }
+
+  private static func validJobID(_ value: String) -> Bool {
+    (1...128).contains(value.utf8.count)
+      && value.utf8.first.map {
+        (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+      } == true
+      && value.utf8.allSatisfy {
+        (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+          || [45, 46, 95].contains($0)
+      }
   }
 
   // MARK: - Setup and one-time migration
@@ -384,24 +554,93 @@ package final class RuntimeJobRepository: @unchecked Sendable {
         "Runtime job repository schema \(version) is newer than supported \(Self.schemaVersion)")
     }
     guard version < Self.schemaVersion else { return }
-    try transaction {
-      try execute(
+    if version == 0 {
+      try transaction {
+        try execute(
+          """
+          CREATE TABLE runtime_job(
+            job_id TEXT PRIMARY KEY,
+            idempotency_key TEXT NOT NULL UNIQUE,
+            request_hash TEXT NOT NULL,
+            state TEXT NOT NULL,
+            admission_sequence INTEGER NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            created_at_order_key TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK(version >= 1),
+            initial_record_json BLOB
+          );
+          CREATE INDEX runtime_job_updated_idx
+            ON runtime_job(updated_at_utc DESC, job_id);
+          CREATE INDEX runtime_job_created_idx
+            ON runtime_job(created_at_order_key, job_id COLLATE BINARY);
+          CREATE UNIQUE INDEX runtime_job_admission_sequence_idx
+            ON runtime_job(admission_sequence);
+          """
+        )
+        try execute("PRAGMA user_version=\(Self.schemaVersion)")
+      }
+      return
+    }
+    if version == 1 {
+      try transaction {
+        try execute("ALTER TABLE runtime_job ADD COLUMN admission_sequence INTEGER")
+        // Copy the historical protocol-1 position exactly once. Runtime reads
+        // never consult the physical identity after this migration.
+        try execute("UPDATE runtime_job SET admission_sequence = rowid")
+        try execute("ALTER TABLE runtime_job ADD COLUMN created_at_order_key TEXT")
+        try migrateCreationOrderKeys()
+        try execute(
+          "CREATE INDEX runtime_job_created_idx "
+            + "ON runtime_job(created_at_order_key, job_id COLLATE BINARY)")
+        try execute(
+          "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx "
+            + "ON runtime_job(admission_sequence)")
+        try execute("PRAGMA user_version=\(Self.schemaVersion)")
+      }
+    }
+  }
+
+  /// Upgrade v1 history in bounded Job-ID batches. The retired importer is
+  /// the only source of a `legacy` column value; its record bytes carry the
+  /// timestamp that the old table omitted.
+  private func migrateCreationOrderKeys() throws {
+    var afterJobID = ""
+    while true {
+      let rows = try query(
         """
-        CREATE TABLE runtime_job(
-          job_id TEXT PRIMARY KEY,
-          idempotency_key TEXT NOT NULL UNIQUE,
-          request_hash TEXT NOT NULL,
-          state TEXT NOT NULL,
-          created_at_utc TEXT NOT NULL,
-          updated_at_utc TEXT NOT NULL,
-          version INTEGER NOT NULL CHECK(version >= 1),
-          initial_record_json BLOB
-        );
-        CREATE INDEX runtime_job_updated_idx
-          ON runtime_job(updated_at_utc DESC, job_id);
-        """
-      )
-      try execute("PRAGMA user_version=\(Self.schemaVersion)")
+        SELECT job_id, created_at_utc
+        FROM runtime_job
+        WHERE job_id COLLATE BINARY > ?
+        ORDER BY job_id COLLATE BINARY ASC
+        LIMIT 256
+        """,
+        [.text(afterJobID)])
+      guard !rows.isEmpty else { return }
+      for row in rows {
+        guard let jobID = row.text("job_id"), let createdAtUTC = row.text("created_at_utc") else {
+          throw RuntimeJobRepositoryError.corrupt(
+            "Runtime job row has missing creation-order columns")
+        }
+        let initialRecordData: Data?
+        if createdAtUTC == RuntimePersistedJob.legacyCreatedAtUTC {
+          initialRecordData = try query(
+            "SELECT initial_record_json FROM runtime_job WHERE job_id = ? LIMIT 1",
+            [.text(jobID)]).first?.blob("initial_record_json")
+        } else {
+          initialRecordData = nil
+        }
+        let key = try Self.creationOrderKey(
+          createdAtUTC: createdAtUTC, initialRecordData: initialRecordData)
+        guard try run(
+          "UPDATE runtime_job SET created_at_order_key = ? WHERE job_id = ?",
+          [.text(key), .text(jobID)]) == 1
+        else {
+          throw RuntimeJobRepositoryError.corrupt(
+            "cannot migrate Runtime job creation order for \(jobID)")
+        }
+        afterJobID = jobID
+      }
     }
   }
 
@@ -553,5 +792,33 @@ package final class RuntimeJobRepository: @unchecked Sendable {
   private func failure(_ operation: String, code: Int32? = nil) -> RuntimeJobRepositoryError {
     let suffix = code.map { " [\($0)]" } ?? ""
     return .ioFailure("\(operation)\(suffix): \(String(cString: sqlite3_errmsg(requiredHandle())))")
+  }
+}
+
+extension Data {
+  fileprivate func base64URLEncodedString() -> String {
+    base64EncodedString()
+      .replacingOccurrences(of: "+", with: "-")
+      .replacingOccurrences(of: "/", with: "_")
+      .replacingOccurrences(of: "=", with: "")
+  }
+
+  fileprivate init?(base64URLString value: String) {
+    guard !value.isEmpty,
+      value.utf8.allSatisfy({
+        (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+          || $0 == 45 || $0 == 95
+      })
+    else { return nil }
+    let remainder = value.utf8.count % 4
+    guard remainder != 1 else { return nil }
+    let standard = value
+      .replacingOccurrences(of: "-", with: "+")
+      .replacingOccurrences(of: "_", with: "/")
+      + String(repeating: "=", count: remainder == 0 ? 0 : 4 - remainder)
+    guard let decoded = Data(base64Encoded: standard),
+      decoded.base64URLEncodedString() == value
+    else { return nil }
+    self = decoded
   }
 }

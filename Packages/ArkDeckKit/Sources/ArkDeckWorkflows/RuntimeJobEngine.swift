@@ -5235,6 +5235,24 @@ public actor RuntimeJobEngine {
     let indexes = await recoveryEpochIndexes()
     let page = try admissionService.listJobs(
       pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
+    return try statusPage(page, indexes: indexes)
+  }
+
+  /// Frozen protocol-1 insertion order. Its durable sequence is a compatibility
+  /// projection only; current CLI resources use the logical compound order.
+  package func listLegacyJobs(
+    pageSize: Int, cursor: String? = nil, newestFirst: Bool = false
+  ) async throws -> RuntimeJobStatusPage {
+    let indexes = await recoveryEpochIndexes()
+    let page = try admissionService.listLegacyJobs(
+      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
+    return try statusPage(page, indexes: indexes)
+  }
+
+  private func statusPage(
+    _ page: RuntimeJobRepositoryPage,
+    indexes: RecoveryEpochIndexes
+  ) throws -> RuntimeJobStatusPage {
     let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
       let record = try decodePersistedRecord(persisted)
       return status(

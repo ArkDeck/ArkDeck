@@ -1604,8 +1604,12 @@ resource 共用的 daemon-owned `RuntimeSessionStorageStore`；读取持有同�
 进程自己的 `UserDefaults`。该 leaf 仍是本地历史归档读取、保持冻结参数面且零设备派发；候选
 结论待维护者 review 后进入 protected `main`。
 
-- `job list` 的 newest/oldest 分页仍以 SQLite `rowid` 作 cursor 与同 timestamp tie-break
-  （`RuntimeJobRepository.listJobs`）；§7.3 compound order 未落地，Windows portable 前必须替换。
+同日后续候选把 `RuntimeJobRepository.listJobs` 改为解析后的 UTC instant + ASCII Job ID
+compound order，cursor 同时绑定 order/time/identity 且不再暴露 SQLite 物理位置。SQLite schema v2
+持久化平台无关的 instant order key，并原子迁移 v1 历史（包括 `legacy` timestamp sentinel）；冻结的
+protocol-1 insertion-order page 改由显式 `admission_sequence` 兼容，不再在正常查询中读取 `rowid`。
+该结论待维护者 review 后进入 protected `main`。
+
 - 1.x 兼容 wire path 的 `artifact.read` 仍把 `maxBytes` clamp 到 1…4 MiB；2.x target handler 已按
   §7.6 拒绝越界。前者按 §12 冻结，不再修改。
 - `help device` 中 `show` 的 summary 与 `list` 相同（"list durable targets…"），registry 文案错误。
