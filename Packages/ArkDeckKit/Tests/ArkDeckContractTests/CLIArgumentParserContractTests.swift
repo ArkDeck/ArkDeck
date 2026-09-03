@@ -1036,6 +1036,15 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(leaves.first { $0.path == ["target", "show"] }?.leaf.lifecycle, .current)
     XCTAssertEqual(leaves.first { $0.path == ["device", "list"] }?.leaf.lifecycle, .legacy)
     XCTAssertEqual(leaves.first { $0.path == ["device", "show"] }?.leaf.lifecycle, .legacy)
+    XCTAssertEqual(
+      leaves.first { $0.path == ["device", "show"] }?.leaf.summary,
+      "show the frozen legacy target-list projection")
+    guard let deviceNode = CLICommandRegistry.node("device") else {
+      return XCTFail("device node must remain registered")
+    }
+    XCTAssertTrue(
+      CLIHelpRenderer.node(deviceNode).contains(
+        "show                      show the frozen legacy target-list projection"))
     // `device candidates` is the target spelling (§6.1), so it is `current`
     // even though its 1.x response still lacks the snapshot generation the
     // target contract wants. Lifecycle answers "is there a newer spelling?";

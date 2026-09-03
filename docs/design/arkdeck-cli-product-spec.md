@@ -1612,7 +1612,9 @@ protocol-1 insertion-order page 改由显式 `admission_sequence` 兼容，不�
 
 - 1.x 兼容 wire path 的 `artifact.read` 仍把 `maxBytes` clamp 到 1…4 MiB；2.x target handler 已按
   §7.6 拒绝越界。前者按 §12 冻结，不再修改。
-- `help device` 中 `show` 的 summary 与 `list` 相同（"list durable targets…"），registry 文案错误。
+同日最后一个 CLI 文案候选把 `help device` 中 `show` 的复制错误改为明确的 frozen legacy
+target-list projection；它不谎称支持单 target，也不改变 §12 冻结的 1.x request/effect shape。
+该结论待维护者 review 后进入 protected `main`。
 
 ### 13.4 纯展示与平台服务，不是 CLI 阻塞项
 
