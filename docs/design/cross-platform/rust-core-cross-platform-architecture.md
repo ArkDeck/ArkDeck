@@ -1,7 +1,7 @@
 # ArkDeck 下一阶段跨平台架构设计与可执行任务规划
 
-> Status：draft v0.1（design input，非 normative；2026-09-04）。本文是 `openspec/changes/chg-2026-074-shared-rust-runtime-core/` 的设计输入，不是 accepted spec 或 ADR；`CHG-2026-074` 与 `TASK-XPA-*` 只有在维护者合并该 change 的 proposal PR 后才成立。
-> 基线：protected `main` = `238a2fb2`（2026-09-04），Catalog digest `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，ratified baseline CORE-3.0.0（candidate CORE-4.0.0）。
+> Status：draft v0.2（design input，非 normative；2026-09-04 起草，2026-09-05 随 CHG-2026-074 r2 修订 §I）。本文是 `openspec/changes/chg-2026-074-shared-rust-runtime-core/` 的设计输入，不是 accepted spec 或 ADR；`CHG-2026-074` 与 `TASK-XPA-*` 只有在维护者合并该 change 的 proposal PR 后才成立。
+> 基线：protected `main` = `ad94b32e`（2026-09-05；§I 的实测与车道引用以此为准，其余章节写于 `238a2fb2`），Catalog digest `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，ratified baseline CORE-3.0.0（candidate CORE-4.0.0）。
 > 边界：本文不修改生产代码、Catalog、accepted specs、baseline、Profile 或安全策略。按 `openspec/architecture/core-portability.md:30,34`，本方案要开工必须先经维护者批准一个 architecture/platform change，即 `CHG-2026-074`（proposal、tasks、verification、design、spec-impact 见该 change 目录）。
 > 引用约定：仓库事实用 `path:line`（相对仓库根，`Sources/…`/`Tests/…` 省略 `Packages/ArkDeckKit/` 前缀）；外部仓库 ArkForge 以 `ArkForge/<path>:line` 标注（本地只读 checkout，git tip `5a369a2`）；平台/工具链判断引用官方一手资料 URL。
 > 阅读顺序：A 结论 → B 事实与冲突 → C 决策矩阵 → D 目标架构 → E/F 边界与契约 → G 迁移 → H UX parity → I 性能 → J 任务 DAG → K 风险 → L 维护者决策。
@@ -583,36 +583,75 @@ flowchart LR
 | Viewer 规模 | 5k vs 20k 节点，CPU 时间比值 ≤ 9.0（build/rows/search/hit-test）；显式拒绝墙钟预算 | `ViewerScalePerformanceTests.swift:9-28,41,70,94,116` | 硬断言（比值） |
 | Viewer 交互 | 256 行 Advanced Dump 查询 < 2 s | `ViewerUITests.swift:389-406` | 硬断言（UI） |
 | 交互设备控制实测 | 裸点击 p95 396 ms；每帧 543–765 ms（瓶颈 display readback ~490 ms）；`shell_echo` n=50 p50 102.8 / p95 113.0 ms；`list targets -v` p50 40 ms | `chg-2026-071/tasks.md:13-18,75-77,262`；`…/data/latency.json` | 证据记录 |
-| soak | 24 h、RSS 增长 ≤ 32 MiB、fd 增长 ≤ 16 | `Tests/ArkDeckRuntimeSoakFixture/main.swift:30,209-210,512-518` | 硬门但**零调用方** |
+| soak | 24 h、RSS 增长 ≤ 32 MiB、fd 增长 ≤ 16 | `Tests/ArkDeckRuntimeSoakFixture/main.swift:30,209-210,512-518` | 硬门；#1714 修复其 2026-08-12 起的 `jobNotFound` 中止并由 `rust-perf.yml` 接为**首个调用方** |
 | 车道 | nightly slow lanes 实测 artifact 73 s / runtime 38 s / journal 52 s，峰值 RSS ~1.2 GB；UI 35 tests ~500 s | `.github/workflows/swift-slow-lanes.yml:39-41,71-72` | 注释记录 |
-| 归档比对 | 无（无 upload-artifact） | `.github/workflows/` grep | 缺失 |
+| 归档比对 | soak 指标经 `actions/upload-artifact` 归档 | `.github/workflows/rust-perf.yml` | 部分：§I.2 百分位表尚无车道（等 `scripts/bench` 落地） |
 
-结论：仓库有意避免墙钟门（`ViewerScalePerformanceTests.swift:9-19` 的教训），但也因此没有任何跨 run 的回归检测；daemon 启动、IPC 分位、artifact 吞吐、cancel 往返、idle 资源均无基线。
+结论：仓库有意避免墙钟门（`ViewerScalePerformanceTests.swift:9-19` 的教训），因此长期没有任何跨 run 的回归检测。SPK-1（2026-09-04）已补上 daemon 冷启动、UDS IPC 分位与 idle 资源三项 macOS 基线（见 §I.2）；XPC 与 named pipe 分位、artifact 吞吐、cancel 往返仍无基线。
 
 ### I.2 指标、基线、预算、门
 
-约定：**硬件/OS/构建**统一为两组参考主机：macOS = Apple M3 / 8 核 / 16 GB / macOS 26.6 / Xcode 26.6 release（本机实测配置）；Windows = 待 SPK-3 选定的 Windows 11 x64（推荐 8 核/16 GB）与 ARM64 各一台，release 构建；数据规模在表内注明。预算标「拟」表示无基线依据，由 SPK-1 取得基线后按下述规则定稿：**预算 = 基线 p95 × 1.5 与产品上限二者取小**；回归阈值 = 相对已归档基线中位数 +20%（PR 微基准）/ +10%（nightly）。
+约定：**硬件/OS/构建**统一为两组参考主机：macOS = Apple M3 / 8 核 / 16 GB / macOS 26.6 / Xcode 26.6 release（本机实测配置）；Windows = 待 SPK-3 选定的 Windows 11 x64（推荐 8 核/16 GB）与 ARM64 各一台，release 构建；数据规模在表内注明。预算标「拟」表示无基线依据，由 SPK-1 取得基线后按下述规则定稿：**预算 = 基线 p95 × 1.5 与产品上限二者取小**；回归阈值 = 相对已归档基线中位数 +20%（PR 微基准）/ +10%（nightly）。计数类指标的推导预算取 `ceil(p95 × 1.5)`；时延类取推导值向上保留三位有效数字。
+
+SPK-1 已在 macOS 参考主机执行（2026-09-04，release 构建，静机，3 次独立 run，p95 波动最大 5.8%），结果与逐条设计缺口见 `docs/design/cross-platform/spk-1-macos-performance-baseline.md`。它暴露了上述定稿规则的两个边界，一并在此收口：
+
+- **量测下限**：基线 p95 落在仪器分辨率上时（如 idle CPU 用 `ps` 读到 0.0%），`p95 × 1.5` 推出 0，没有实现能满足。此时**产品上限原样保留**，不做推导。
+- **数据规模**：预算只在取得它的数据规模上成立。基线文档 SHALL 记录该规模；某行的实测规模小于表内规定规模时，实测值只作该规模的预算，表内规定规模仍用「拟」上限，直到按规定规模测出为止。
 
 | 指标 | 当前基线或取得方式 | 数据规模 | 建议预算与理由 | 回归阈值 | 门 | macOS/Windows 可比方法 |
 |---|---|---|---|---|---|---|
-| daemon 冷启动（进程起 → `health` ok） | 无；SPK-1：`runtime service restart` 后循环 `health`，≥ 50 次 | 状态目录含 10k 终态 job | 拟 ≤ 500 ms p95（Rust 无 JIT；不重放终态历史，`RuntimeJobEngineContractTests:1082-1084` 的 5 s 是上限） | +20% | nightly | 两端同一 `arkdeck runtime service restart --output json` 计时 |
+| daemon 冷启动（进程起 → `health` ok） | **实测 p50 48.53 / p95 49.93 / p99 53.45 ms**（SPK-1，50 次/run，约 30 个终态 job 的状态目录） | 实测规模约 30 个终态 job；表定规模 10k 终态 job | **≤ 74.9 ms p95（该实测规模）**；10k 规模仍为拟 ≤ 500 ms p95，待 10k 生成器就位后重测（Rust 无 JIT；不重放终态历史，`RuntimeJobEngineContractTests:1082-1084` 的 5 s 是上限） | +20% | nightly | 两端同一隔离 daemon 起停计时 |
 | daemon 热启动 + 恢复 | 10k 事件恢复 1.56 s 实测 | 10k 事件 journal / 10k job | ≤ 5 s 硬（现有）；目标 ≤ 2 s | +10% | nightly（现有 slow lane 移植到 Rust） | 同一 fixture 生成器 |
 | App time-to-interactive | 0.994 s 独立实测（macOS） | 1 设备、10 条历史 | ≤ 2 s p95（现有门），两端相同 | +20% | nightly UI 车道（macOS 现有 signpost）；Windows 用 ETW/`Application` 启动事件 | 同一 `startup-seconds` 证据文件语义 |
-| IPC 请求 p50/p95/p99（`health`、`job.status`） | 无；SPK-1：UDS/XPC/pipe 各 ≥ 1,000 样本 | 帧 < 4 KiB | 拟 UDS/pipe ≤ 2/5/10 ms，XPC ≤ 3/8/15 ms | +20% | PR 微基准（`cargo bench`，对照校准负载比值以抗噪）+ nightly 绝对值 | 同一 Rust bench 客户端 |
+| IPC 请求 p50/p95/p99，定长回包（`health`、`job.status`） | **实测 UDS `health` 0.099/0.113/0.119 ms、`job.status` 0.339/0.364/0.393 ms**（SPK-1，1,000 样本/run）；XPC 与 pipe 仍无基线 | 帧 < 4 KiB | **UDS `health` ≤ 0.169 ms p95、`job.status` ≤ 0.546 ms p95**；XPC 拟 ≤ 3/8/15 ms、pipe 拟 ≤ 2/5/10 ms | +20% | PR 微基准（对照校准负载比值以抗噪）+ nightly 绝对值 | 同一 bench 客户端 |
+| IPC 请求 p50/p95/p99，分页投影（`job.list`、`artifact.list` 等逐行 projection） | **实测 UDS `job.list` 12.55/13.57/13.64 ms**（SPK-1，约 30 行、`pageSize` 50） | 实测约 30 行；`pageSize` 上限 1,000 | **≤ 20.4 ms p95（约 30 行）**。原「定长回包」行的 5 ms p95 上限对逐行 projection 不成立：实测已超 2.7 倍，按 `min(p95×1.5, 上限)` 反而会给出低于实测值的预算。逐行成本约 0.45 ms/行，`pageSize` 1,000 外推约 450 ms，**需要一条独立的每行预算与一次 `nextAction` 逐行成本调查**（见 §I.2 注 1） | +20% | nightly 绝对值 | 同一 bench 客户端与同一播种规模 |
 | Job event/日志流吞吐 | journal append 3.6–5.3 ms/事件（macOS APFS `F_FULLFSYNC`） | 1 job 持续 1,000 事件 | append ≤ 10 ms p95；`job.events` 1,000 行页 ≤ 50 ms p95；`job.events.wait` 空转 CPU ≤ 1% | +10% | nightly；Windows 需 SPK-5 先测 `FlushFileBuffers` | 同 fixture |
 | 大 Artifact 传输 | 128 MiB 流式 RSS < 48 MiB（现有）；无吞吐数 | 128 MiB、1 GiB | 分页 base64 ≥ 200 MB/s 有效吞吐、拷贝 ≤ 3；fd/handle 路径 ≥ 1 GB/s、拷贝 0；RSS 增长上限沿用 48/64 MiB | +20% | nightly | 同一 artifact fixture，`artifact read`/`artifact.open` 计时 |
 | 10k journal/history recovery | 见上 | 10k | 同上 | — | — | — |
-| idle/busy CPU、RSS、线程、fd/handle | 无；soak fixture 门存在但未跑 | idle 60 s；busy = GJ-1 循环 | idle CPU ≤ 0.5%、RSS ≤ 64 MiB（拟）、线程 ≤ 16、fd ≤ 64；24 h 增长 ≤ 32 MiB / ≤ 16 fd（现有） | 硬门 | nightly soak（把 `ArkDeckRuntimeSoakFixture` 语义移植为 `arkdeck-soak`，两端跑） | 同一指标 schema `arkdeck-runtime-soak/v1` |
+| idle/busy CPU、RSS、线程、fd/handle | **实测 CPU 0.0%、RSS 62.24 MB、线程 5、fd 15**（SPK-1，60 s/run，但采样窗口紧接 3,000 次 IPC 往返、同一进程，故是「服役后静置」而非冷 idle，见 §I.2 注 2；soak fixture 已修复并接入 `rust-perf.yml`） | 服役后静置 60 s；冷 idle 与 busy = GJ-1 循环均未测 | CPU **≤ 0.5%（落在量测下限，上限原样保留）**、**RSS 仍为拟 ≤ 64 MiB（不据本次实测定稿，理由见注 2）**、线程 ≤ 8（推导）且硬上限 16、fd ≤ 23（推导）且硬上限 64；24 h 增长 ≤ 32 MiB / ≤ 16 fd（现有） | 硬门 | nightly soak（把 `ArkDeckRuntimeSoakFixture` 语义移植为 `arkdeck-soak`，两端跑） | 同一指标 schema `arkdeck-runtime-soak/v1` |
 | cancel/reconcile latency | 子进程 cancel < 1.5 s（现有）；`job.cancel` 往返无数据 | 1 运行中 readOnly job | `cancelRequested` 确认 ≤ 100 ms p95；到 `cancelled` 终态 ≤ 1.5 s + step 安全边界；`job.reconcile` 10k 事件 ≤ 2 s | +20% | nightly + 真机（HDC 子进程） | 同 |
 | Viewer 大数据构建/搜索/hit-test/滚动 | 比值 ≤ 9.0（现有）；`[viewer-scale]` CPU ms 只记录 | 20k 节点 | 构建 ≤ 500 ms、搜索 ≤ 100 ms、hit-test ≤ 16 ms、滚动 p95 帧 ≤ 16.7 ms（拟，参考主机） | +20% | nightly UI；保留比值门为 PR 门 | 同一 20k fixture；若走 FFI，则两端同一实现 |
 | UI 帧响应 | 无 | History 10k 行、Viewer 20k 节点 | 主线程无 > 100 ms 停顿；滚动 p95 ≤ 16.7 ms | 硬门 | nightly UI（macOS Instruments/`os_signpost` 采样；Windows ETW + WinUI 帧计数） | 同一交互脚本 |
 | 安装包体积与更新增量 | 无 | release | 拟 macOS DMG ≤ 60 MB、Windows MSIX self-contained ≤ 150 MB；更新增量以 MSIX 块图为准 | +10% | release gate | 各自 CI 记录 |
 
+注 1（分页投影的每行成本，**仍需维护者裁决**）：`job.list` 在 2.0.0 上走 `RuntimeJobResourceReader` →
+`RuntimeJobReadProjection`，每行都要算一次 `nextAction`。约 30 行 13.57 ms p95，即约 0.45 ms/行，而同一
+连接上的定长 `health` 只要 0.113 ms。`pageSize` 上限是 1,000（`RuntimeJobReadProjection.swift` 的封闭选项
+校验），线性外推约 450 ms，History 这类要翻页的面会直接吃到。
+
+本修订**只做一件不需要裁决的事**：把定长回包与分页投影拆成两行，因为原行的 `≤ 2/5/10 ms` 是照定长回包
+写的，`job.list` 从未被它覆盖过。表内的 `≤ 20.4 ms p95` 是**临时值**，两个理由使它还不能定稿：
+
+- 它按 `min(p95 × 1.5, 上限)` 推导时没有可用的产品上限——沿用定长行的 5 ms 会得出低于实测值 2.7 倍的
+  预算，那不是预算而是已知无法满足的门；
+- 它依赖的行数（约 30）没有被基线文档机械记录，只能从 harness 的 `--restart-interval-seconds 1` 覆盖反推
+  （fixture 默认 300 s 时只跑一个 cycle = 10 行）。行数在 20/30/40 之间时每行成本是 0.68/0.45/0.34 ms。
+
+**待办（属 XPA-023 后续实现 PR）**：让 harness 把 `job.list` 实际返回的行数写进基线文档，再据此定一条
+「固定开销 + 每行成本」的两段预算；同时调查 `nextAction` 的逐行成本是否可缓存或延迟计算。在此之前本行
+只作实测规模上的回归基准，不作发布门。
+
+注 2（idle RSS：本次实测**不足以**定稿，**需要维护者裁决**）：SPK-1 的 62.24 MB 不是冷 idle。harness 在
+同一个 daemon 进程上先跑 50 次冷启动、再跑 3,000 次 IPC 往返（其中 1,000 次是分页投影），然后才开始 60 s
+的资源采样，所以这个数是「服役后静置」的常驻集，冷 idle 只会更低且未被测。线程 5 与 fd 15 同样是服役后
+读数，但它们对上限而言是保守的（真实冷 idle 不会更高），故按推导定稿；RSS 用来和一个上限比对时，方向反
+了——用偏高的数去论证余量不足并不成立。
+
+可以确定的是量级：服役后静置的 62.24 MB 已占拟定 64 MiB（67.11 MB）的 92.7%，余量 4.87 MB；按
+`min(p95 × 1.5, 上限)` 推导值为 93.4 MB，高于上限。这意味着 XPA-012~017 的 Rust owner 迁移**很可能没有
+多少 RSS 余量**，但确切余量要等冷 idle 被单独测出来才知道。
+
+因此本修订**保持该行为「拟 ≤ 64 MiB」不变**，不据本次实测定稿。裁决项已登记为 §L.1 第 15 条，两条出路：
+(a) 维持 64 MiB 作为端口硬预算（等价于要求 Rust 侧不得比 Swift 侧更重）；(b) 以冷 idle 实测重设上限，把
+64 MiB 降级为长期削减目标。**合入本修订不选任何一条**；在冷 idle 补测（harness 需在采样窗口前重启
+daemon，属 XPA-023 后续实现 PR）之前，`TASK-XPA-012~017` 不得以任一选项为前置。
+
 ### I.3 基线 Spike（SPK-1）的通过/失败判据
 
-- 通过：上表全部 12 项在 macOS 参考主机得到 ≥ 3 次独立 run 的 p50/p95/p99（或 RSS/fd 计数），产出 `perf-baseline-<date>.json` 并由新 nightly 工作流以 `actions/upload-artifact` 归档、与提交的基线文件比对；任何一项不可测量则记录「设计缺口」并转为对应任务的 AC。
+- 通过：上表全部 13 项（原 12 项，IPC 行按注 1 拆为定长回包与分页投影两行）在 macOS 参考主机得到 ≥ 3 次独立 run 的 p50/p95/p99（或 RSS/fd 计数），产出 `perf-baseline-<date>.json` 并由新 nightly 工作流以 `actions/upload-artifact` 归档、与提交的基线文件比对；任何一项不可测量则记录「设计缺口」并转为对应任务的 AC。
 - 失败：三次 run 之间 p95 波动 > 30%（说明测量方法受负载影响，需改为 CPU 时间或配对轮次，沿用 `ViewerScalePerformanceTests` 的做法）。
 - 解除的决策：预算数字定稿；`artifact.open` 零拷贝是否值得做；FFI Viewer 索引是否需要。
+- **2026-09-04 结论**：SPK-1 在 macOS 参考主机通过——4 行（8 项产品指标，另有 1 项校准负载不计入）取得实测值且全部稳定（p95 波动最大 5.8%，远低于 30% 失败线），其余各行按上一条的逃生口记为设计缺口并写明阻断者，无一被静默丢弃。预算数字已按上表定稿；本条判据里的行数由本次修订从 12 改为 13（IPC 行拆分的机械后果，`< 30%` 失败线与「不可测量 → 设计缺口」逃生口均未改动）；把各设计缺口转为对应任务 AC 的动作留待各任务的实现 PR。`artifact.open` 的取舍**仍未解除**——该方法根本不存在，而 SPK-1 被要求为「它是否值得做」提供基线，这是循环依赖，只能在它先被实现或先被裁掉之后再谈；FFI Viewer 索引同样未解除，它依赖 Viewer 滚动与 UI 帧两行，两者都要 UI 车道。
 
 ---
 
@@ -690,7 +729,7 @@ flowchart TD
 
 | Spike | 目的 | 通过 | 失败 | 解除的决策 | 需要 |
 |---|---|---|---|---|---|
-| SPK-1 | macOS 基线（§I.3） | 12 项指标三次 run 稳定 | 波动 > 30% | 预算定稿、零拷贝与 FFI 取舍 | 本机 |
+| SPK-1 | macOS 基线（§I.3） | 13 项指标三次 run 稳定 | 波动 > 30% | 预算定稿（`artifact.open` 零拷贝与 FFI 取舍未解除，见 §I.3） | 本机 |
 | SPK-2 | Rust 进程经 libxpc C API 作为 launchd Mach service `com.arkdeck.agentd` 被沙箱 App 访问；peer code-signing requirement 生效；帧回显 | 现有 entitlements 不变即可连通；非法签名 peer 被拒；1,000 次往返 p95 ≤ 8 ms | 需要新增 entitlement 或 NSXPC 专有语义无法复刻 | XPA-003 可行性；XPC 传输设计 | 本机、Developer ID 签名 |
 | SPK-3 | Windows W0（`windows/profile.md:71-81`）+ Rust daemon named pipe + `hdc.exe list targets -v` 解析真机 | 跨账户连接被拒（Win32 error 5）；packaged App 与 unpackaged CLI 都能连 pipe；MotW/SmartScreen 行为记录；DAYU200 在 hdc.exe 可见；Golden fixture 解析一致 | 驱动需要静默提权或 pipe 从 packaged App 不可达 | Windows 最低支持格、打包形态、驱动引导文案 | Windows 11 x64 主机 + DAYU200 |
 | SPK-4 | WinUI 3 门（§H.4 淘汰条件 a–e） | 全部通过 | 任一失败且两周内不可修 | WinUI vs WPF | Windows 主机（x64 + ARM64） |
@@ -946,7 +985,7 @@ flowchart TD
 组 1 与组 2 共享 `arkdeck-durable/runtime/provider-*` 代码，建议同一 crate 先在 Windows 走通再回流 macOS（Windows 没有旧字节负担，macOS 有 differential 负担）。
 
 **最值得立即执行的三项**：
-1. **SPK-1 基线测量**（一周内产出，解除全部预算数字与零拷贝/FFI 决策）；
+1. ~~**SPK-1 基线测量**~~（2026-09-04 已完成；多数预算数字已定稿，分页投影与 idle RSS 两行、以及零拷贝/FFI 取舍未解除，见 §I.2 注 1/注 2 与 §L.1）；
 2. **XPA-001 协议 2.1.0 essentials + per-method schemas**（一切客户端与 Windows 的前置，且能让 macOS GJ 首次在纯 2.x 上 PASS）；
 3. **XPA-002 Rust 契约 kernel + Windows doctor/candidates**（最早在真实 Windows 主机上证伪或证实整个论题；同时产出 macOS façade 所需的传输代码），与 SPK-2/SPK-3 并行。
 
@@ -1007,12 +1046,14 @@ flowchart TD
 12. **FFI kernel 是否立项**（XPA-024）：仅当 §I 测量证明需要。
 13. **ADR-0009 悬案**：决策 2/4 今日承载点仍未裁决（`0009:3-14`），Rust 移植 recovery 前必须定案，否则 Rust 会固化一个未裁决语义。
 14. **硬件与主机**：新增 Windows 11 x64 与 ARM64 验证主机；DAYU200 窗口与 HardwareCampaign 授权（GJ-4）。
+15. **idle RSS 上限**（r2 新增，见 §I.2 注 2）：(a) 维持拟定 64 MiB 作为 Rust 端口的硬预算，(b) 待冷 idle 补测后以实测重设上限、把 64 MiB 降级为削减目标。服役后静置实测 62.24 MB 已占 92.7%，但冷 idle 未测，故 r2 不选任何一条、保持该行「拟」。
+16. **分页投影预算**（r2 新增，见 §I.2 注 1）：定长回包与分页投影已拆为两行；分页行需要一条「固定开销 + 每行成本」的两段预算，且要先让 harness 机械记录返回行数。r2 的 `≤ 20.4 ms p95` 只作实测规模上的回归基准，不作发布门。
 
 ### L.2 缺失证据（本文无法从仓库或官方资料取得）
 
 | 缺失 | 影响 | 取得方式 |
 |---|---|---|
-| macOS daemon 冷/热启动、IPC 分位、artifact 吞吐、cancel 往返、idle 资源基线 | §I 预算全部标「拟」 | SPK-1 |
+| macOS daemon 热启动、XPC/named-pipe IPC 分位、artifact 吞吐、cancel 往返、**冷** idle 资源基线 | §I 的 Viewer、UI 帧、安装包体积、分页投影与 idle RSS 等行仍标「拟」 | SPK-1 已覆盖冷启动、UDS IPC 分位与服役后静置资源；其余待后续车道 |
 | Windows 主机上的任何实测（pipe、驱动、SmartScreen、耐久语义、WinUI 性能） | Windows 链的全部假设 | SPK-3/4/5 |
 | ArkForge AF-W1 真实 Windows 结果 | GJ-4 Windows | ArkForge 仓（外部） |
 | `xpc_connection_set_peer_code_signing_requirement` 的可用性与行为（官方页面为脚本渲染，本次未能抓取正文） | XPC 硬化设计 | SPK-2 直接实测 + 文档复核：<https://developer.apple.com/documentation/xpc/xpc_connection_set_peer_code_signing_requirement(_:_:)> |

@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 1
+revision: 2
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -147,6 +147,54 @@ change and the `Core strategy` value change; (2) Rust dependency policy (vetted 
 zero-dependency); (3) control-plane peer hardening; (4) Golden Journey re-pass rule on runtime
 replacement; (9) Windows support tuple (Windows 11 x64 + ARM64); (10) MSIX packaged + self-contained
 Windows App SDK; (13) ADR-0009 open ruling before recovery is ported.
+
+## Revision 2 — SPK-1 outcome and one Allowed-paths correction
+
+Revision 2 changes no scope, no Requirement, no Acceptance Scenario and no
+platform disposition. It records what the first delivery under this change
+measured, and repairs one defect in its own task table.
+
+1. **`TASK-XPA-023` Allowed paths gained `scripts/README.md`.** The task
+   authorises `scripts/bench/**`, but `scripts/README.md` is a boundary map
+   that must name every first-level entry under `scripts/`, enforced by
+   `scripts/test_check_pr_paths.py::AutomationConfigTests::test_readme_boundary_map_covers_every_first_level_scripts_entry`.
+   Creating `scripts/bench/` without editing that map fails the gate, and
+   editing it without this line fails `check_pr_paths.py`. As written the two
+   rules could not both be satisfied, so the task could not deliver its own
+   harness at all. The widening is held to the one boundary-map row this change
+   is entitled to add by an annotation on the Allowed-paths line, following
+   `chg-2026-008`; annotations are masked before the checker scans path tokens,
+   so the restriction is documentation rather than machine-enforced, as
+   `tasks.md` says of Forbidden paths generally.
+2. **Most design section I.2 budgets are finalised** from the SPK-1 baseline
+   taken on the macOS reference host on 2026-09-04 (release build, quiet host,
+   three independent runs, widest p95 movement 5.8%): daemon cold start, the two
+   constant-size UDS round trips, and idle CPU, thread and descriptor counts.
+   The IPC row is split into constant-size replies and paged projections,
+   because the single `<= 2/5/10 ms` ceiling was written for the former and a
+   per-row projection costs 2.7x more than it allows. Two general rule gaps the
+   spike exposed — a budget derived at the measurement floor, and a budget
+   quoted at a data scale it was not measured at — are closed in the same
+   section.
+
+   **Two rows are deliberately not finalised**, and are registered as design
+   section L.1 items 15 and 16 rather than decided here:
+   - the paged-projection budget, because the row count every per-row figure
+     divides by is not machine-recorded in the baseline document yet;
+   - the idle resident-set ceiling, because SPK-1's 62.24 MB is not a cold-idle
+     reading at all — the harness samples resources on the same daemon process
+     immediately after 3,000 IPC round trips. That row keeps its provisional
+     `<= 64 MiB`. Merging this revision selects neither option; the fix
+     (restart the daemon before the sampling window) is follow-up work in
+     `TASK-XPA-023`.
+
+   For transparency: splitting the IPC row also edits SPK-1's own pass
+   criterion in section I.3 from 12 rows to 13. The `< 30%` failure line and
+   the "unmeasurable becomes a design gap" escape hatch are untouched; the
+   count is a mechanical consequence of the split.
+
+The pinned design blob in `design.md` is re-pinned in this revision, as that
+file requires.
 
 ## Compatibility note
 
