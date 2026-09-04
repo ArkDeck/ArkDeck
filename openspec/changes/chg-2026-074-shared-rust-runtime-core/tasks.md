@@ -998,7 +998,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-023 — Performance regression lanes on both platforms
 
-- Status:ready（may start only after the CHG-2026-074 proposal PR is merged; SPK-1 is its first deliverable）
+- Status:done（SPK-1 measured on the macOS reference host 2026-09-04 and passed; harness, committed baseline and the PR/nightly/soak lanes delivered. Evidence: `evidence/runs/TASK-XPA-023/`. Two rows are deliberately not finalised and carry §L.1 items 15–16; CI lanes archive without gating until a baseline for the runner's own host is committed）
 - Platform:macos and windows
 - Requirements:design §I.2 budgets; `openspec/specs/workflow-journal-recovery/spec.md:296-298` clock contract
 - Acceptance:XPA-AC-5

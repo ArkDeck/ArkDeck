@@ -13,20 +13,23 @@ name: Performance lanes
 # shape as swift-slow-lanes.yml. A red run here is a signal to file a product
 # defect.
 #
-# Scope note: TASK-XPA-023 also delivers a percentile baseline harness for the
-# design section I.2 metric table, and this file is where its PR and nightly
-# jobs belong. That harness lives under `scripts/bench/`, which the task's
-# Allowed paths authorise but which cannot be created without also listing the
-# new first-level entry in `scripts/README.md` — a path the same Allowed paths
-# exclude, and an omission `test_check_pr_paths.py` fails on. The measurement
-# jobs therefore land once that contradiction is resolved; the soak job below
-# stands on its own.
+# The measurement jobs below drive `scripts/bench`, which starts its own daemon
+# on a private state directory. Nothing here contacts a device, and a host
+# result is never platform or hardware evidence (POL-VERIFY-001, POL-MODE-001).
 
 on:
   schedule:
-    # 03:00 UTC Sunday, clear of swift-slow-lanes.yml's nightly 18:00 UTC slot:
-    # both are load-sensitive and neither is a merge gate.
+    # 17:00 UTC nightly, an hour ahead of swift-slow-lanes.yml, so the two
+    # load-sensitive lanes never share a runner.
+    - cron: "0 17 * * *"
+    # 03:00 UTC Sunday for the long soak.
     - cron: "0 3 * * 0"
+  pull_request:
+    paths:
+      - "scripts/bench/**"
+      - "rust/**"
+      - ".github/workflows/rust-perf.yml"
+      - "Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/**"
   workflow_dispatch:
     inputs:
       soak-hours:
@@ -41,11 +44,179 @@ permissions:
   contents: read
 
 concurrency:
-  group: rust-perf-soak
+  group: rust-perf-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  harness-tests:
+    # Percentile maths, the stability verdict, the resident-set split, the
+    # threshold comparison and the redaction gate: no build, no daemon.
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          git rev-parse HEAD
+      - name: Baseline harness unit tests
+        working-directory: scripts
+        run: python3 -m unittest discover -s bench -t .
+
+  microbenchmarks:
+    # The PR lane. Ratio mode against the calibration workload measured in the
+    # same run, +20% per design section I.2: a runner that is uniformly slower
+    # moves both numbers and reads as no change.
+    if: github.event_name == 'pull_request'
+    needs: harness-tests
+    runs-on: macos-26
+    # Measured locally (warm build, release): three runs at the reduced PR
+    # sample counts take about two minutes. 40 minutes covers a cold build.
+    timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          git rev-parse HEAD
+      - name: Configure read-only ArkForge package access
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Build the measured executables
+        run: |
+          set -eu
+          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --product arkdeck-agentd
+          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --product ArkDeckRuntimeSoakFixture
+      - name: Remove ArkForge package credential
+        if: always()
+        run: sh scripts/ci/arkforge-package-auth.sh cleanup
+      - name: Capture a candidate baseline
+        run: |
+          set -eu
+          BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --show-bin-path | tail -1)"
+          cd scripts
+          # A shared CI runner is never provably quiet, so the document records
+          # itself as advisory rather than claiming baseline eligibility.
+          python3 -m bench capture \
+            --daemon "$BIN/arkdeck-agentd" \
+            --soak "$BIN/ArkDeckRuntimeSoakFixture" \
+            --build-configuration release \
+            --out-dir "$RUNNER_TEMP/perf" \
+            --runs 3 --cold-start-samples 10 --ipc-samples 200 \
+            --idle-seconds 20 --calibration-samples 100 --seed-seconds 4 \
+            --allow-loaded-host
+      - name: Compare against the committed baseline (ratio, +20%)
+        # `pipefail` matters here: without it the exit status of the pipeline is
+        # `tee`'s, and a reported regression would leave the step green. The
+        # first run of this lane did exactly that.
+        run: |
+          set -euo pipefail
+          cd scripts
+          CANDIDATE="$(ls "$RUNNER_TEMP"/perf/perf-baseline-*.json | tail -1)"
+          COMMITTED="$(ls bench/baselines/perf-baseline-*.json | tail -1)"
+          python3 -m bench compare \
+            --committed "$COMMITTED" --candidate "$CANDIDATE" \
+            --mode ratio --threshold 0.20 \
+            --on-host-mismatch skip \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+  nightly:
+    # The nightly lane: the first archived percentile measurement this
+    # repository has had, plus a tighter +10% ratio comparison on its own
+    # runner.
+    #
+    # Neither this lane nor the PR lane compares across machines. Design
+    # section I.2 pins the budgets to a named reference host, and a
+    # GitHub-hosted runner is not that host: absolute values obviously do not
+    # transfer, and a ratio against a CPU-bound calibration does not either,
+    # because IPC latency is dominated by scheduling rather than CPU. So
+    # `bench compare` refuses a cross-host comparison, and these lanes pass
+    # `--on-host-mismatch skip`, which archives the measurement and reports
+    # that it did not gate. They start gating as soon as a baseline for the
+    # runner's own host is committed; that is an open gap in the SPK-1 report.
+    if: github.event_name == 'schedule' && github.event.schedule == '0 17 * * *'
+    needs: harness-tests
+    runs-on: macos-26
+    # Measured locally (warm build, release): three runs at full sample counts
+    # take about nine minutes, most of it the 120 s resource window per run.
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          git rev-parse HEAD
+      - name: Configure read-only ArkForge package access
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Build the measured executables
+        run: |
+          set -eu
+          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --product arkdeck-agentd
+          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --product ArkDeckRuntimeSoakFixture
+      - name: Remove ArkForge package credential
+        if: always()
+        run: sh scripts/ci/arkforge-package-auth.sh cleanup
+      - name: Capture a candidate baseline
+        run: |
+          set -eu
+          BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --show-bin-path | tail -1)"
+          cd scripts
+          # A shared CI runner is never provably quiet, so the document records
+          # itself as advisory rather than claiming baseline eligibility.
+          python3 -m bench capture \
+            --daemon "$BIN/arkdeck-agentd" \
+            --soak "$BIN/ArkDeckRuntimeSoakFixture" \
+            --build-configuration release \
+            --out-dir "$RUNNER_TEMP/perf" \
+            --allow-loaded-host
+      - name: Archive the measurement
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: perf-baseline-${{ github.run_id }}
+          path: ${{ runner.temp }}/perf/perf-baseline-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Compare against the committed baseline (ratio, +10%)
+        # See the PR lane: `pipefail` is what makes a reported regression fail
+        # the step rather than being swallowed by `tee`.
+        run: |
+          set -euo pipefail
+          cd scripts
+          CANDIDATE="$(ls "$RUNNER_TEMP"/perf/perf-baseline-*.json | tail -1)"
+          COMMITTED="$(ls bench/baselines/perf-baseline-*.json | tail -1)"
+          python3 -m bench compare \
+            --committed "$COMMITTED" --candidate "$CANDIDATE" \
+            --mode ratio --threshold 0.10 \
+            --on-host-mismatch skip \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   soak:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0')
+      || github.event_name == 'workflow_dispatch'
+    needs: harness-tests
     runs-on: macos-26
     # A GitHub-hosted job is capped at six hours, so the design's 24-hour
     # weekly soak cannot run here. Four hours plus a cold build fits with the
@@ -87,12 +258,24 @@ jobs:
           # short; the fixture says so in its own start-up error.
           STATE="$(mktemp -d /tmp/adksoak.XXXX)"
           echo "soak hours: $SOAK_HOURS"
+          # The fixture writes its metrics snapshot after every cycle and
+          # enforces its gates from them, so the document exists — and matters
+          # most — precisely when the run fails. Copying it under `set -e`
+          # after the fixture would skip the copy on exactly that path and
+          # archive nothing. Capture the status, keep the evidence, then
+          # propagate.
+          status=0
           "$BIN/ArkDeckRuntimeSoakFixture" \
             --state-directory "$STATE" \
             --duration-seconds "$((SOAK_HOURS * 3600))" \
             --restart-interval-seconds 300 \
-            --jobs-per-cycle 10
-          cp "$STATE/runtime-soak-metrics.json" "$RUNNER_TEMP/"
+            --jobs-per-cycle 10 || status=$?
+          if [ -f "$STATE/runtime-soak-metrics.json" ]; then
+            cp "$STATE/runtime-soak-metrics.json" "$RUNNER_TEMP/"
+          else
+            echo "soak produced no metrics document" >&2
+          fi
+          exit "$status"
       - name: Archive the soak metrics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
