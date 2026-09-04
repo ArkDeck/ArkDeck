@@ -1,8 +1,8 @@
 # ArkDeck 下一阶段跨平台架构设计与可执行任务规划
 
-> Status：draft v0.1（design input，非 normative；2026-09-04）。本文是维护者裁决用的设计输入，不是 accepted spec、ADR、change 或 Task；其中所有 Proposed ID（`CHG-2026-074`、`TASK-XPA-*`、`SPK-*`）均未获批准。
+> Status：draft v0.1（design input，非 normative；2026-09-04）。本文是 `openspec/changes/chg-2026-074-shared-rust-runtime-core/` 的设计输入，不是 accepted spec 或 ADR；`CHG-2026-074` 与 `TASK-XPA-*` 只有在维护者合并该 change 的 proposal PR 后才成立。
 > 基线：protected `main` = `238a2fb2`（2026-09-04），Catalog digest `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，ratified baseline CORE-3.0.0（candidate CORE-4.0.0）。
-> 边界：本文与同目录 `change-draft/` 不修改生产代码、Catalog、accepted specs、baseline、Profile 或安全策略。按 `openspec/architecture/core-portability.md:30,34`，本方案要开工必须先经维护者批准一个 architecture/platform change；`change-draft/` 是该 change 的可直接搬入 `openspec/changes/` 的草稿。
+> 边界：本文不修改生产代码、Catalog、accepted specs、baseline、Profile 或安全策略。按 `openspec/architecture/core-portability.md:30,34`，本方案要开工必须先经维护者批准一个 architecture/platform change，即 `CHG-2026-074`（proposal、tasks、verification、design、spec-impact 见该 change 目录）。
 > 引用约定：仓库事实用 `path:line`（相对仓库根，`Sources/…`/`Tests/…` 省略 `Packages/ArkDeckKit/` 前缀）；外部仓库 ArkForge 以 `ArkForge/<path>:line` 标注（本地只读 checkout，git tip `5a369a2`）；平台/工具链判断引用官方一手资料 URL。
 > 阅读顺序：A 结论 → B 事实与冲突 → C 决策矩阵 → D 目标架构 → E/F 边界与契约 → G 迁移 → H UX parity → I 性能 → J 任务 DAG → K 风险 → L 维护者决策。
 
@@ -620,7 +620,7 @@ flowchart LR
 
 ### J.1 载体与命名（均为 Proposed，未批准）
 
-- 建议一个 change：`CHG-2026-074-shared-rust-runtime-core`（class `platform`，`core_change_level: none`，`platforms: [macos, windows]`），携带架构决策反转（更新 `core-portability.md`、三份 Profile 的 `Core strategy`、Windows Profile 到 0.2.0、`PLATFORM-PROFILES.lock.yaml` 的 W0 启动）与下列 Task。理由：`core-portability.md:30` 明文要求 architecture/platform change；Windows Profile 更新属四类审批之「新 integration/device profile」邻域；不改任何 Core REQ/AC。
+- 载体 change：`CHG-2026-074-shared-rust-runtime-core`（class `platform`，`core_change_level: none`，`platforms: [macos, windows]`），携带架构决策反转（更新 `core-portability.md`、三份 Profile 的 `Core strategy`、Windows Profile 到 0.2.0、`PLATFORM-PROFILES.lock.yaml` 的 W0 启动）与下列 Task。理由：`core-portability.md:30` 明文要求 architecture/platform change；Windows Profile 更新属四类审批之「新 integration/device profile」邻域；不改任何 Core REQ/AC。
 - Task ID 前缀 `TASK-XPA-NNN`（cross-platform architecture）。Spike 用 `SPK-n`，不是 Task，不占 PR。
 - 每个 Task 一个 PR，含生产代码、测试、适用真机验证、最小文档、完成结论。禁止 readiness/status/evidence/archive-only PR。
 - 与现有任务的去重：不与 `TASK-AIN-021/026`、`TASK-AFG-002` 重叠；XPA-001 的契约补齐若 AIN-026 仍 in-progress，则并入 AIN-026 的 Allowed paths 提交而不另立。
@@ -1023,6 +1023,6 @@ flowchart TD
 
 ### L.3 本文未做与刻意不做
 
-- 未修改任何生产代码、Catalog、specs、baseline、Profile、lock 文件；未创建 change/Task；本文与 `change-draft/` 位于 `docs/design/` 草稿区，未创建正式 change package。
+- 未修改任何生产代码、Catalog、specs、baseline、Profile、lock 文件；change package `CHG-2026-074` 只有在维护者合并其 proposal PR 后才生效。
 - 未把 simulation、fixture 或本文的推断记为真机或平台验收；Windows 的所有 GJ 状态在本文中都是 `NOT_STARTED`。
 - 未提出放宽任何 accepted requirement、Safety invariant 或 AC 来让 Windows 通过；Windows 不能满足之处一律以 `unavailable`/`nonConformant`/`deferred` 表达。

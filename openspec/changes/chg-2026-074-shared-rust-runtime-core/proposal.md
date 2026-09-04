@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 0
-status: proposed
+revision: 1
+status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
 owner: fuhanfeng
@@ -11,11 +11,10 @@ platforms: [macos, windows]
 
 # CHG-2026-074 — Shared Rust runtime core with native SwiftUI and WinUI 3 clients
 
-> **Draft, not a change package.** This file lives under `docs/design/cross-platform/change-draft/`
-> and has no governance effect. It becomes a change only when a maintainer moves it to
-> `openspec/changes/chg-2026-074-shared-rust-runtime-core/` (with an `evidence/` directory) and
-> merges that approval PR. Nothing here approves itself, and no `TASK-XPA-*` may be declared by an
-> implementation PR before that merge (`scripts/check_pr_paths.py` refuses head-only tasks).
+> **This file does not approve itself.** The change is approved only if a human maintainer
+> reviews and merges this proposal PR into protected `main`. Nothing here creates authority:
+> every `TASK-XPA-*` below stays `blocked` or `ready` until that merge, and `scripts/check_pr_paths.py`
+> refuses any implementation PR that declares a task not yet present on `main`.
 
 > **Four-category declaration.** This change publishes no new Catalog operation, no new provider ID,
 > no new integration/device profile and no destructive admission policy change. It is a `platform`
@@ -28,8 +27,9 @@ platforms: [macos, windows]
 
 > **Design input.** The complete analysis, decision matrix, diagrams, migration plan, UX parity
 > contract, performance plan and task DAG are in
-> `docs/design/cross-platform/rust-core-cross-platform-architecture.md` (sections A–L). This
-> proposal only carries the governance-facing summary.
+> `docs/design/cross-platform/rust-core-cross-platform-architecture.md` (sections A–L), pinned by
+> `design.md` in this directory. This proposal only carries the governance-facing summary.
+> The same content was first filed as a draft in PR #1712; this change supersedes that draft.
 
 ## Governance loop
 
@@ -53,7 +53,9 @@ platforms: [macos, windows]
    semantics in C# would create two authority implementations; putting the runtime into a client
    library would put authority into the sandboxed App and turn Rust aborts into UI crashes. The
    decision matrix is section C of the design document.
-4. **Why the scope is finite and reversible.** The migration is a strangler: a Rust control-plane
+4. **No unattended claim.** No task carries a `D0` decision grade; every task is human-gated
+   (D1) or destructive (D2), so `scripts/host_loop` can claim nothing from this change.
+5. **Why the scope is finite and reversible.** The migration is a strangler: a Rust control-plane
    façade first, then durable stores move owner one at a time, then providers move family by
    family, and the Swift daemon is retired last. Every macOS step is releasable and rolls back by
    pointing the LaunchAgent at the Swift daemon again; no durable schema is bumped before the Swift
@@ -149,8 +151,9 @@ Windows App SDK; (13) ADR-0009 open ruling before recovery is ported.
 ## Compatibility note
 
 `PRODUCT-LOOP.md:99-116` forbids new proposals during the product-loop phase except for the
-safety kernel and the four repository approval categories. This draft is filed because
+safety kernel and the four repository approval categories. This change is filed because
 `core-portability.md:30` makes an architecture/platform change the only lawful carrier for a shared
 runtime, and because `openspec/platforms/windows/profile.md:15-21` reserves the Windows engineering
-decisions for a Windows platform change/ADR. It is delivered as a draft under `docs/design/` so that
-no change directory, task or status exists before the maintainer decides.
+decisions for a Windows platform change/ADR. The change ships no readiness, status, evidence or
+archive-only follow-ups: approval is the merge of this PR, and every task delivers as one vertical
+implementation PR that rides with a Golden Journey hop or re-pass.
