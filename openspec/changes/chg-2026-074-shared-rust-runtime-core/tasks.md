@@ -1,11 +1,10 @@
-# Tasks — CHG-2026-074 (draft)
+# Tasks — CHG-2026-074
 
-> **Draft.** This file is a design input under `docs/design/cross-platform/change-draft/`. It defines
-> no task until a maintainer moves it into `openspec/changes/chg-2026-074-shared-rust-runtime-core/`
-> and merges the approval PR. Until then every task below is `blocked` and no PR may declare a
-> `TASK-XPA-*` token. Task semantics, DAG, sizes and gates are explained in
-> `docs/design/cross-platform/rust-core-cross-platform-architecture.md` §J; this file is the
-> template-shaped projection the repository tooling expects.
+> Approval is the maintainer's merge of the proposal PR. Before that merge no `TASK-XPA-*` may be
+> declared by an implementation PR (`scripts/check_pr_paths.py` refuses head-only tasks). After the
+> merge, `ready` tasks may start; `blocked` tasks wait for the listed dependency or spike and flip
+> to `ready` inside the PR that instantiates their readiness pins. Task semantics, DAG, sizes and
+> gates are explained in `docs/design/cross-platform/rust-core-cross-platform-architecture.md` §J.
 
 Conventions shared by every task:
 
@@ -19,6 +18,10 @@ Conventions shared by every task:
   placeholders (`yaml pin-example`).
 - Sizes: S ≤ one engineer-week, M two to three weeks, L four to eight weeks (assumption: one senior
   engineer per lane, AI-assisted, hardware windows excluded).
+- No task in this change carries a `D0` decision grade: none is suitable for the unattended
+  repository loop (`scripts/host_loop`, AGENTS.md control-plane section), because each needs a
+  Windows host, a reference measurement host, real hardware or UI review. A maintainer may regrade
+  a task later.
 
 ## Spikes (not tasks, no PR; results are recorded as evidence under the approving task)
 
@@ -32,24 +35,27 @@ Conventions shared by every task:
 
 ## TASK-XPA-001 — Publish protocol 2.1.0 essentials with per-method typed schemas
 
-- Status:blocked（awaits maintainer approval of CHG-2026-074）
+- Status:ready（may start only after the CHG-2026-074 proposal PR is merged; no readiness PR is needed）
 - Platform:macos（contract is platform-neutral）
 - Requirements:CLI-REQ-013, CLI-REQ-014, CLI-REQ-025 (`docs/design/arkdeck-cli-product-spec.md:1994-2008,2111-2123`); no Core REQ edited
 - Acceptance:XPA-AC-3; existing negotiation matrix in `Tests/ArkDeckContractTests/ControlProtocolNegotiationContractTests.swift`
 - Depends on:none（SPK-1 may run in parallel）
-- Readiness input pins（非载体示例）:
+- Readiness input pins:
 
-  ```yaml pin-example
+  ```yaml pins
   - path: Packages/ArkDeckKit/Contracts/control-negotiation.json
-    blob: <40-hex git OID>
+    blob: 91f25f3be0980d08764e0be4c06c9e4a7840a943
   - path: openspec/contracts/runtime-control-plane.schema.json
-    blob: <40-hex git OID>
+    blob: 40573d3c1fea0d87c70786d2afc2a22c6ebec1be
+  - path: openspec/contracts/journal-event.schema.json
+    blob: d25b7a55e9970d301558430febd235ccc910d8b7
   ```
 
 - Applicable failure patterns:AF-004, AF-006, AF-014
 - Production reachability:`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` (`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift:293-341`) → protocol 2.1.0 method table → existing handlers; no new effect, no new dispatch point
 - Trusted fact sources:method set and versions come only from `Packages/ArkDeckKit/Contracts/control-negotiation.json` through the generator; per-method schemas are derived from recorded frames in existing contract tests and validated against them; callers cannot widen the method set
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `Packages/ArkDeckKit/Contracts/**`
   - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
@@ -88,7 +94,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-002 — Rust contract kernel and the first Windows GJ-1 hops (doctor, device candidates)
 
-- Status:blocked（awaits CHG-2026-074 approval and SPK-3）
+- Status:blocked（awaits merge of the proposal PR and SPK-3 on a Windows host）
 - Platform:windows（the same crates run read-only on macOS as a shadow tool）
 - Requirements:`toolchain-hdc-server` REQ-HDC-006/REQ-HDC-009 (unchanged), CLI-REQ-001/005/006/013/014
 - Acceptance:XPA-AC-1, XPA-AC-3, XPA-AC-6; Windows GJ-1 `NOT_STARTED → IMPLEMENTING`
@@ -110,10 +116,17 @@ Conventions shared by every task:
   - `spec/**`
   - `.github/workflows/rust-ci.yml`
   - `scripts/catalog_gen/**`
+  - `openspec/architecture/core-portability.md`
+  - `openspec/platforms/windows/profile.md`
+  - `openspec/platforms/macos/profile.md`
+  - `openspec/platforms/linux/profile.md`
+  - `openspec/platforms/PLATFORM-PROFILES.lock.yaml`
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/**` production sources（this task changes no Swift semantics）
   - `openspec/specs/**`、`openspec/constitution.md`、`Catalog/operations/**`
+  - any Core strategy wording that overrides or relaxes a Core Requirement (POL-PLATFORM-001)
 - Risk:medium（new toolchain and CI lane; read-only surface）
 - Hardware required:yes（Windows 11 x64 host + DAYU200）
 - Decision-Grade:D1
@@ -139,7 +152,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-003 — Rust control-plane façade on macOS with peer hardening
 
-- Status:blocked（awaits CHG-2026-074 approval and SPK-2）
+- Status:blocked（awaits merge of the proposal PR and SPK-2）
 - Platform:macos
 - Requirements:ADR-0005 decisions 1–4 (transport, versioned frames, transport-free handler, single instance); no Core REQ edited
 - Acceptance:XPA-AC-3, XPA-AC-5, XPA-AC-6, XPA-AC-7
@@ -341,7 +354,7 @@ Conventions shared by every task:
   - `rust/**` runtime semantics、`Packages/**`、`openspec/specs/**`
 - Risk:medium
 - Hardware required:no（Windows host; device optional）
-- Decision-Grade:D0
+- Decision-Grade:D1（human-gated: needs a Windows host, a reference measurement host or UI review; not claimable by `scripts/host_loop`）
 
 ### Deliverables
 
@@ -825,7 +838,7 @@ Conventions shared by every task:
   - `rust/**` runtime semantics、`openspec/specs/**`
 - Risk:medium
 - Hardware required:no（UI tests; real device only where an AC requires App presentation）
-- Decision-Grade:D0
+- Decision-Grade:D1（human-gated: needs a Windows host, a reference measurement host or UI review; not claimable by `scripts/host_loop`）
 
 ### Deliverables / Verification
 
@@ -928,16 +941,18 @@ Conventions shared by every task:
 
 ## TASK-XPA-023 — Performance regression lanes on both platforms
 
-- Status:blocked（awaits SPK-1）
+- Status:ready（may start only after the CHG-2026-074 proposal PR is merged; SPK-1 is its first deliverable）
 - Platform:macos and windows
 - Requirements:design §I.2 budgets; `openspec/specs/workflow-journal-recovery/spec.md:296-298` clock contract
 - Acceptance:XPA-AC-5
 - Depends on:SPK-1
-- Readiness input pins（非载体示例）:
+- Readiness input pins:
 
-  ```yaml pin-example
+  ```yaml pins
   - path: .github/workflows/swift-slow-lanes.yml
-    blob: <40-hex git OID>
+    blob: 29c438c4f0f82511b52047ed0ae36eb40c42e964
+  - path: Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/main.swift
+    blob: 113e34039bec66f2e2dc2750fe39acc3dd99e2be
   ```
 
 - Applicable failure patterns:AF-007, AF-010, AF-011
@@ -953,7 +968,7 @@ Conventions shared by every task:
   - `openspec/specs/**`
 - Risk:low
 - Hardware required:no（device-bound metrics run in the real-device lane）
-- Decision-Grade:D0
+- Decision-Grade:D1（human-gated: needs a Windows host, a reference measurement host or UI review; not claimable by `scripts/host_loop`）
 
 ### Deliverables / Verification
 
@@ -985,7 +1000,7 @@ Conventions shared by every task:
   - `openspec/specs/**`
 - Risk:low
 - Hardware required:no
-- Decision-Grade:D0
+- Decision-Grade:D1（human-gated: needs a Windows host, a reference measurement host or UI review; not claimable by `scripts/host_loop`）
 
 ### Deliverables / Verification
 

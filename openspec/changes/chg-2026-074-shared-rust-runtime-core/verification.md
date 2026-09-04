@@ -1,6 +1,6 @@
-# Verification — CHG-2026-074 (draft)
+# Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r0（draft under `docs/design/cross-platform/change-draft/`）
+> Change:CHG-2026-074-shared-rust-runtime-core@r1
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
