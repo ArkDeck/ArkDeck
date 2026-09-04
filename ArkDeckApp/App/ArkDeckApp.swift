@@ -653,7 +653,6 @@ private struct AppShellView: View {
   @State private var isJobInspectorExpanded = false
   @State private var renamingDeviceConnectKey: String?
   @State private var pendingDeviceName = ""
-  @State private var workspaceSize = CGSize.zero
   private let models: ArkDeckAppModelStore
   private let autoUpdate: AutoUpdateViewModel
   private let runtimeHistory: RuntimeHistoryViewModel
@@ -811,9 +810,19 @@ private struct AppShellView: View {
       .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
       .navigationTitle("app.shell.title")
     } detail: {
-      workspaceWithRecovery(availableSize: workspaceSize)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onGeometryChange(for: CGSize.self, of: { $0.size }) { workspaceSize = $0 }
+      // The recovery banner needs the detail container's proposed size, not
+      // the workspace's ideal size. Measuring the workspace itself creates a
+      // feedback loop on macOS 26: NavigationSplitView exposes the resulting
+      // unconstrained ideal height through AX, placing otherwise visible
+      // controls above the window. GeometryReader is the constraint boundary
+      // here; the explicit frame keeps both layout and accessibility geometry
+      // tied to the visible detail pane.
+      GeometryReader { geometry in
+        workspaceWithRecovery(availableSize: geometry.size)
+          .frame(
+            width: geometry.size.width, height: geometry.size.height,
+            alignment: .topLeading)
+      }
       .navigationTitle(detailTitle)
       .toolbar { UpdateAttentionToolbarContent(model: autoUpdate) }
     }

@@ -58,7 +58,6 @@ struct RuntimeHistoryView: View {
   @State private var pendingExportArtifact: RuntimeArtifactPresentation?
   @State private var pendingExportJobID: String?
   @State private var isExportPreviewPresented = false
-  @State private var workspaceWidth: CGFloat = 0
   @State private var cachedFilterProjectionInput: FilterProjectionInput?
   @State private var cachedFilteredJobs: [RuntimeJobSummaryPresentation] = []
   @State private var filterReferenceDate = Date.now
@@ -265,8 +264,8 @@ struct RuntimeHistoryView: View {
           .accessibilityIdentifier("history.empty.description")
       }
     } else {
-      Group {
-        if workspaceWidth >= 890 {
+      GeometryReader { workspace in
+        if workspace.size.width >= 890 {
           HSplitView {
             filterSidebar
               .frame(minWidth: 200, idealWidth: 230, maxWidth: 280, maxHeight: .infinity)
@@ -275,21 +274,24 @@ struct RuntimeHistoryView: View {
             detail
               .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
           }
+          .frame(width: workspace.size.width, height: workspace.size.height)
         } else {
           VStack(spacing: 0) {
             compactFilters
             Divider()
-            HSplitView {
-              jobTable
-                .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
-              detail
-                .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+            GeometryReader { panes in
+              HSplitView {
+                jobTable
+                  .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+                detail
+                  .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+              }
+              .frame(width: panes.size.width, height: panes.size.height)
             }
           }
+          .frame(width: workspace.size.width, height: workspace.size.height)
         }
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { workspaceWidth = $0 }
     }
   }
 

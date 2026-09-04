@@ -523,14 +523,19 @@ struct UIDumpWorkspaceView: View {
               .opacity(selected ? 0.85 : 0.55)
               .fixedSize()
           }
+
+          // A Spacer makes the label itself occupy the advertised Button
+          // frame. Without it AppKit publishes the widened accessibility
+          // frame, but SwiftUI keeps pointer hit testing on the short text.
+          Spacer(minLength: 0)
         }
         // Padding attached outside a plain Button is not clickable. The
         // label owns the remaining row area; the disclosure has a separate,
         // non-overlapping hit target at the same tree indentation.
         .padding(.trailing, 8)
-        .frame(minHeight: Self.treeRowHeight, alignment: .leading)
         .frame(
           minWidth: max(0, viewportWidth - 12 - leadingIndent - disclosureWidth - 6),
+          minHeight: Self.treeRowHeight,
           alignment: .leading)
         .contentShape(.rect)
       }

@@ -733,7 +733,7 @@ final class AppShellUITests: XCTestCase {
         inspectorRuntimeFacts: "Runtime facts",
         debugPanels: [
           "Build Artifact", "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
-          "Provider invocation disclosure",
+          "Typed Runtime request",
         ],
         viewerEmptyTitle: "No verified capture",
         traceAvailable: "Ready",
@@ -783,7 +783,7 @@ final class AppShellUITests: XCTestCase {
         inspectorRuntimeFacts: "Runtime 事实",
         debugPanels: [
           "编译产物", "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则",
-          "Provider 调用披露",
+          "Typed Runtime 请求",
         ],
         viewerEmptyTitle: "没有已验证的 capture",
         traceAvailable: "可以抓取",
