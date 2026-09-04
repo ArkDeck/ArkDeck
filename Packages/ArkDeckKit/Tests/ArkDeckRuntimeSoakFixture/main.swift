@@ -286,6 +286,17 @@ private func runJob(_ client: AgentClient, jobID: String) throws -> String {
   return state
 }
 
+private func jobState(_ client: AgentClient, jobID: String) throws -> String {
+  guard
+    case .object(let fields) = try client.request(
+      method: "job.status", params: ["jobId": .string(jobID)]),
+    case .string(let state)? = fields["state"]
+  else {
+    throw SoakFixtureError.protocolFailure("daemon returned no job state for \(jobID)")
+  }
+  return state
+}
+
 private func observationRequest(runID: String, cycle: Int, offset: Int) -> Data {
   Data(
     """
@@ -339,12 +350,15 @@ private func executeCycle(
   for offset in 0..<configuration.jobsPerCycle {
     let jobID = try submittedJobID(
       client, request: observationRequest(runID: runID, cycle: cycle, offset: offset))
-    // Cancel one deterministic job per eleven.  The following run persists
-    // the cancellation outcome; other cycles leave a deterministic job in
-    // preflight so the next fresh Runtime has to recover it from disk.
+    // Cancel one deterministic job per eleven.  Cancelling a never-started Job
+    // is itself the durable zero-dispatch decision: the engine transitions it
+    // to `cancelled`, persists the record and releases the in-memory runtime,
+    // so the outcome is read back rather than run.  Other cycles leave a
+    // deterministic job in preflight so the next fresh Runtime has to recover
+    // it from disk.
     if offset % 11 == 0 {
       _ = try client.request(method: "job.cancel", params: ["jobId": .string(jobID)])
-      let state = try runJob(client, jobID: jobID)
+      let state = try jobState(client, jobID: jobID)
       guard state == JobState.cancelled.rawValue else {
         throw SoakFixtureError.unexpectedState(jobID: jobID, state: state)
       }
