@@ -1,0 +1,118 @@
+name: Performance lanes
+
+# ArkDeckRuntimeSoakFixture carries hard gates — resident growth <= 32 MiB,
+# descriptor growth <= 16, no torn journal tail, no outstanding cleanup debt —
+# and design section I.1 of the cross-platform architecture already records it
+# as "硬门但零调用方". This workflow is that caller.
+#
+# The understatement mattered. As committed the fixture never reached any of
+# its gates: it aborted on its first cancelled Job, and had done so for 23 days,
+# because nothing ran it. A gate with no caller is not a gate.
+#
+# Semantics: scheduled regression detection, NOT a merge gate, in the same
+# shape as swift-slow-lanes.yml. A red run here is a signal to file a product
+# defect.
+#
+# Scope note: TASK-XPA-023 also delivers a percentile baseline harness for the
+# design section I.2 metric table, and this file is where its PR and nightly
+# jobs belong. That harness lives under `scripts/bench/`, which the task's
+# Allowed paths authorise but which cannot be created without also listing the
+# new first-level entry in `scripts/README.md` — a path the same Allowed paths
+# exclude, and an omission `test_check_pr_paths.py` fails on. The measurement
+# jobs therefore land once that contradiction is resolved; the soak job below
+# stands on its own.
+
+on:
+  schedule:
+    # 03:00 UTC Sunday, clear of swift-slow-lanes.yml's nightly 18:00 UTC slot:
+    # both are load-sensitive and neither is a merge gate.
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      soak-hours:
+        description: >-
+          Soak duration in hours. A GitHub-hosted job is capped at six hours, so
+          the design's 24-hour weekly soak needs a long-lived runner; the hosted
+          lane runs a bounded soak instead.
+        required: false
+        default: "4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-perf-soak
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    runs-on: macos-26
+    # A GitHub-hosted job is capped at six hours, so the design's 24-hour
+    # weekly soak cannot run here. Four hours plus a cold build fits with the
+    # margin the slow lanes use; the full 24-hour figure is recorded as an open
+    # gap in the SPK-1 report.
+    timeout-minutes: 330
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          git rev-parse HEAD
+      - name: Configure read-only ArkForge package access
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Build the soak fixture
+        run: |
+          set -eu
+          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --product ArkDeckRuntimeSoakFixture
+      - name: Remove ArkForge package credential
+        if: always()
+        run: sh scripts/ci/arkforge-package-auth.sh cleanup
+      - name: Run the Runtime soak
+        env:
+          SOAK_HOURS: ${{ github.event.inputs.soak-hours || '4' }}
+        run: |
+          set -eu
+          BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
+            --show-bin-path | tail -1)"
+          # The fixture's daemon socket is <state-dir>/d/agentd.sock and
+          # Darwin's sun_path is 104 bytes, so the state directory must be
+          # short; the fixture says so in its own start-up error.
+          STATE="$(mktemp -d /tmp/adksoak.XXXX)"
+          echo "soak hours: $SOAK_HOURS"
+          "$BIN/ArkDeckRuntimeSoakFixture" \
+            --state-directory "$STATE" \
+            --duration-seconds "$((SOAK_HOURS * 3600))" \
+            --restart-interval-seconds 300 \
+            --jobs-per-cycle 10
+          cp "$STATE/runtime-soak-metrics.json" "$RUNNER_TEMP/"
+      - name: Archive the soak metrics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: runtime-soak-${{ github.run_id }}
+          path: ${{ runner.temp }}/runtime-soak-metrics.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "Runtime soak: production engine, SQLite repository, durable"
+            echo "journals and Artifact store driven through a simulated"
+            echo "provider that opens no device transport and spawns no child"
+            echo "process. Not hardware evidence (POL-MODE-001)."
+            echo ""
+            echo "Gates enforced by the fixture: resident growth <= 32 MiB,"
+            echo "open-descriptor growth <= 16, no torn journal tail, no"
+            echo "outstanding cleanup debt, every Job terminal."
+            echo ""
+            echo "Red here = file a product defect; this job is not a merge gate."
+          } >> "$GITHUB_STEP_SUMMARY"
