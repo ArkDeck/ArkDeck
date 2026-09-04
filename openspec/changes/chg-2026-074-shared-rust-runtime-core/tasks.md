@@ -27,7 +27,7 @@ Conventions shared by every task:
 
 | Spike | Purpose | Pass | Fail | Unlocks |
 | --- | --- | --- | --- | --- |
-| SPK-1 | macOS performance baseline for the 12 metrics in design §I.2 | ≥3 runs with stable p50/p95/p99 (< 30% p95 spread), `perf-baseline-<date>.json` archived | spread > 30% | budgets in §I.2, `artifact.open` and FFI decisions |
+| SPK-1 | macOS performance baseline for the 13 metrics in design §I.2 | ≥3 runs with stable p50/p95/p99 (< 30% p95 spread), `perf-baseline-<date>.json` archived | spread > 30% | most budgets in §I.2 (the paged-projection and idle-RSS rows and the `artifact.open` / FFI decisions stay open, see §I.2 notes 1–2 and §L.1 items 15–16) |
 | SPK-2 | A Rust process vends the launchd Mach service `com.arkdeck.agentd` through the libxpc C API; the sandboxed App connects with the existing entitlements; peer code-signing requirement enforced | connect without entitlement changes; wrongly signed peer refused; 1,000 round trips p95 ≤ 8 ms | new entitlement needed or NSXPC-only semantics cannot be reproduced | TASK-XPA-003 |
 | SPK-3 | Windows W0 (`openspec/platforms/windows/profile.md:71-81`) plus a Rust named-pipe daemon and `hdc.exe list targets -v` against a DAYU200 | cross-account connect refused (Win32 error 5); packaged App and unpackaged CLI both reach the pipe; MotW/SmartScreen behaviour recorded; Golden fixtures parse identically | driver needs silent elevation or pipe unreachable from a packaged App | TASK-XPA-002, Windows support tuple, packaging |
 | SPK-4 | WinUI 3 gate (design §H.4 a–e) | all pass | any fails and cannot be fixed in two weeks | WinUI 3 vs WPF |
@@ -190,7 +190,7 @@ Conventions shared by every task:
 ### Verification
 
 - XPA-AC-3 → `AgentDaemonContractTests`/`AgentXPCTransportContractTests` black-box subset against the façade → green.
-- XPA-AC-5 → IPC p95 delta ≤ 1 ms against the SPK-1 baseline.
+- XPA-AC-5 → IPC p95 within +20% of the SPK-1 baseline, compared per row: constant-size replies and paged projections are separate rows since design §I.2 note 1.
 - XPA-AC-6 → foreign-euid UDS peer refused; wrongly signed XPC peer refused.
 - XPA-AC-7 → kill façade / kill Swift daemon → structured client error, zero dispatch, journal unchanged.
 - Real device → GJ-1..5 headless `REAL_DEVICE_PASS`; rollback drill (`runtime service update --daemon <swift>`) recorded.
@@ -963,6 +963,7 @@ Conventions shared by every task:
   - `.github/workflows/rust-perf.yml`
   - `Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/**`
   - `scripts/bench/**`
+  - `scripts/README.md`（仅新增恰一个 boundary-map 表行，对应 `scripts/bench/`）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`

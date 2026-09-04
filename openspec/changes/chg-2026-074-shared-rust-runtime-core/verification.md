@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r1
+> Change:CHG-2026-074-shared-rust-runtime-core@r2
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -25,7 +25,7 @@
 | XPA-AC-2 admission and lowering semantics | contract tests against the Rust daemon: published admission order, `-t <connectKey>` on every device-scoped argv, plan-only zero dispatch, `job.plan` digest equality with Swift | identical pass/fail; zero dispatch in plan-only and in every refusal | `TASK-XPA-005/`, `TASK-XPA-014/` |
 | XPA-AC-3 control-plane compatibility | negotiation and frame matrices (`AgentDaemonContractTests.swift:1840-1917` black-box, parameterised by `ARKDECK_DAEMON_UNDER_TEST`); old client/new daemon and new client/old daemon | structural refusals only; 1.x frames byte-frozen; 2.1.0 additive | `TASK-XPA-001/`, `TASK-XPA-003/` |
 | XPA-AC-4 capability authority | capability minted only by the Rust authority from fresh facts and a fully materialised plan; zero consumption when provider/plan unavailable; lineage chain continues | no caller-provided capability accepted; ledger decodes in Swift | `TASK-XPA-008/`, `TASK-XPA-014/` |
-| XPA-AC-5 performance budgets | design §I.2 metrics on the reference hosts, release builds, stated data scales; archived and compared to the committed baseline | every budget met on both platforms; regression thresholds respected for 30 days | `TASK-XPA-023/` nightly artefacts |
+| XPA-AC-5 performance budgets | design §I.2 metrics on the reference hosts, release builds, stated data scales; archived and compared to the committed baseline. Since r2 the constant-size and paged-projection IPC rows are budgeted separately, and two rows (paged projection, idle resident set) carry provisional ceilings pending design §L.1 items 15–16 | every finalised budget met on both platforms; regression thresholds respected for 30 days; a provisional row is a regression baseline, not a release gate | `TASK-XPA-023/` nightly artefacts |
 | XPA-AC-6 local IPC identity | foreign-euid UDS peer, wrongly signed XPC peer, cross-account named pipe client, remote pipe client | all refused before any handler runs; TCP/HTTP endpoints do not exist | `TASK-XPA-002/`, `TASK-XPA-003/`, `TASK-XPA-022/` |
 | XPA-AC-7 crash windows and recovery | kill matrix (Rust authority / Swift sidecar × before and after intent, before and after consume); daemon restart; `outcomeUnknown` lanes carried across owner changes | fail closed; zero replay; `recoverActiveJobs` dispatches nothing | `TASK-XPA-005/`, `TASK-XPA-013/`, `TASK-XPA-014/` |
 | XPA-AC-8 UX parity | AX (macOS) and UIA (Windows) semantic snapshots for the same fixtures; bilingual catalog generation; keyboard, live region, high contrast, text scaling checks | same names, states, actions and next-action intents; no disabled placeholder; AC-I18N-001-01 passes on both | `TASK-XPA-007/`, `TASK-XPA-019/`, `TASK-XPA-020/` |
@@ -51,7 +51,8 @@
 
 Any deviation must be written here and confirmed in PR review; no implicit exemption. Known
 candidates for maintainer ruling: Windows Trace Viewer scope (design decision 5), Windows daemon
-lifecycle (decision 11), FFI kernel adoption (decision 12).
+lifecycle (decision 11), FFI kernel adoption (decision 12), the idle resident-set ceiling
+(decision 15, added in r2) and the paged-projection budget (decision 16, added in r2).
 
 ## Result gate
 
