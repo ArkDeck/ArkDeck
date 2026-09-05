@@ -55,7 +55,13 @@ resident-set finding behind design section L.1 item 15, is
 ## CI
 
 The first two executions of `rust-perf.yml` found three defects in what this
-task shipped; all three are fixed and recorded in the PR body. The lane now
+task shipped; all three are fixed and recorded in the PR body. A fourth, handed
+over from the CHG-2026-074 r3 design review, was fixed in the same PR and then
+hardened in a follow-up: the soak job's state directory is chosen in its own
+step and exported through `GITHUB_ENV`, so the `always()` archive addresses it
+without depending on the soak step reaching its end — which matters on a
+four-hour soak under a 330-minute job timeout, not only on a clean gate
+failure. The lane now
 captures, archives, and reports that it does not gate, because a GitHub-hosted
 runner is not the reference host design section I.2 pins the budgets to.
 
