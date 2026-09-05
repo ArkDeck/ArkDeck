@@ -116,7 +116,7 @@ final class AgentDeviceOperationContractTests: XCTestCase {
     XCTAssertEqual(
       facts.terminalJobStates,
       Set(JobState.allCases.filter(\.isTerminal).map(\.rawValue)).subtracting(recoveryStates))
-    XCTAssertEqual(JobState.schemaVersion, "2.0.0")
+    XCTAssertEqual(JobState.schemaVersion, "1.0.0")
     XCTAssertTrue(facts.jobStates.isDisjoint(with: recoveryStates))
     XCTAssertEqual(facts.operationIDs.count, 15)
     XCTAssertEqual(facts.humanCategories.count, 8)

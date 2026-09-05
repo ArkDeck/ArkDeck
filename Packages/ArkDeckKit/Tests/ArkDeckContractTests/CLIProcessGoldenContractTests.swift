@@ -304,43 +304,19 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     XCTAssertEqual(error["code"] as? String, "runtimeUnavailable")
   }
 
-  /// §18 requires JSON conformance across the surface, and these leaves used
-  /// to answer only in prose — so `--output json` had to be refused on them,
-  /// which is a hole in the contract rather than a property of the commands.
-  func testTheFlashArchiveLeavesAnswerInMachineForm() throws {
-    let result = try run(["flash", "reconcile", "--output", "json"])
-    XCTAssertEqual(result.exitCode, 0)
-    XCTAssertEqual(jsonDocumentCount(result.stdout), 1)
-    let payload = try XCTUnwrap(try decoded(result.stdout)["result"] as? [String: Any])
-    // The same shape whether or not there is anything to report: a caller that
-    // has to branch on "did it print the empty sentence" is parsing prose.
-    XCTAssertNotNil(payload["findings"])
-    XCTAssertNotNil(payload["orphanedReservations"])
-    XCTAssertNotNil(payload["requiresAttention"])
-
-    // §12 marks these as legacy compatibility leaves, and a caller has to be
-    // able to see that without reading the source.
-    let meta = try XCTUnwrap(try decoded(result.stdout)["meta"] as? [String: Any])
-    let lifecycle = try XCTUnwrap(meta["lifecycle"] as? [String: Any])
-    XCTAssertEqual(lifecycle["status"] as? String, "legacy")
-  }
-
-  /// A leaf whose success is JSON and whose failure is prose on stderr is only
-  /// half migrated. The archive publishes exactly three failures, so all three
-  /// carry a §8.4 code.
-  func testAMissingCampaignFailsInTheShapeTheCallerAskedFor() throws {
-    let result = try run([
-      "flash", "status", "--campaign-id", "ECAMP-does-not-exist", "--output", "json",
-    ])
-    XCTAssertEqual(result.exitCode, 65)
-    XCTAssertEqual(jsonDocumentCount(result.stdout), 1)
-    let error = try XCTUnwrap(try decoded(result.stdout)["error"] as? [String: Any])
-    XCTAssertEqual(error["code"] as? String, "resourceNotFound")
-
-    let human = try run(["flash", "status", "--campaign-id", "ECAMP-does-not-exist"])
-    XCTAssertEqual(human.exitCode, 65)
-    XCTAssertTrue(human.stdout.isEmpty)
-    XCTAssertFalse(human.stderr.isEmpty)
+  func testRetiredFlashArchiveCommandsFailWithoutReadingHistoricalState() throws {
+    for path in [
+      ["flash", "status", "--campaign-id", "ECAMP-historical"],
+      ["flash", "reconcile"],
+      ["legacy", "flash", "status", "--campaign-id", "ECAMP-historical"],
+      ["legacy", "flash", "reconcile"],
+    ] {
+      let result = try run(path + ["--output", "json"])
+      XCTAssertEqual(result.exitCode, 64, path.joined(separator: " "))
+      XCTAssertEqual(jsonDocumentCount(result.stdout), 1)
+      let error = try XCTUnwrap(try decoded(result.stdout)["error"] as? [String: Any])
+      XCTAssertEqual(error["code"] as? String, "invalidCommand")
+    }
   }
 
   /// Only the two surfaces §8.1 exempts may refuse a machine mode: help is
@@ -410,7 +386,7 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     XCTAssertNil(meta["lifecycle"])
   }
 
-  /// The same §12 contract, over all four families renamed at once, through
+  /// The same §12 contract, over the remaining renamed families, through
   /// the real binary.
   ///
   /// The parser-level tests already prove the registry declares this. What a
@@ -420,14 +396,9 @@ final class CLIProcessGoldenContractTests: XCTestCase {
   /// lookup misses, lifecycle falls back to `current`, and the alias stops
   /// warning while every other test still passes.
   func testEveryRenamedFamilyWarnsUnderItsAliasAndIsSilentUnderItsTarget() throws {
-    // `flash reconcile` is superseded *and* frozen, so its warning says
-    // `legacy` rather than `deprecated`. Both are §12 statuses that mean "not
-    // the published spelling"; what has to be identical across the four is
-    // that the alias names its exact replacement and the target does not warn.
     let renamed: [(alias: [String], target: [String], status: String)] = [
       (["agentd", "status"], ["runtime", "service", "status"], "deprecated"),
       (["signing", "status"], ["runtime", "signing", "status"], "deprecated"),
-      (["flash", "reconcile"], ["legacy", "flash", "reconcile"], "legacy"),
       (
         ["update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o"],
         ["maintainer", "update-feed", "assemble", "--payload", "p", "--signature", "s",
@@ -464,9 +435,7 @@ final class CLIProcessGoldenContractTests: XCTestCase {
         family.alias.joined(separator: " "))
       XCTAssertTrue(lifecycle["removalVersion"] is NSNull, "§12 forbids guessing a date")
 
-      // The target spelling says nothing: `legacy flash` is the exception,
-      // because it is published *and* frozen, so it keeps a `legacy` status
-      // with no replacement to point at.
+      // The current spelling carries no deprecation lifecycle.
       let targetHuman = try run(family.target)
       XCTAssertFalse(
         targetHuman.stderr.contains("deprecated"),
@@ -474,15 +443,9 @@ final class CLIProcessGoldenContractTests: XCTestCase {
 
       let targetMachine = try run(family.target + ["--output", "json"])
       let targetMeta = try XCTUnwrap(try decoded(targetMachine.stdout)["meta"] as? [String: Any])
-      if family.target.first == "legacy" {
-        let targetLifecycle = try XCTUnwrap(targetMeta["lifecycle"] as? [String: Any])
-        XCTAssertEqual(targetLifecycle["status"] as? String, "legacy")
-        XCTAssertTrue(targetLifecycle["replacementArgvPattern"] is NSNull)
-      } else {
-        XCTAssertNil(
-          targetMeta["lifecycle"],
-          "`\(family.target.joined(separator: " "))` is the destination and carries none")
-      }
+      XCTAssertNil(
+        targetMeta["lifecycle"],
+        "Current command must not carry a deprecation lifecycle")
     }
   }
 

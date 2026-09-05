@@ -74,9 +74,7 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let materializedBindingRevision: Int?
   public var state: String = "queued"
   public var outcomeUnknown: Bool = false
-  /// Durable machine-readable failure facts. Older records decode this as
-  /// nil and receive a conservative state-based compatibility projection;
-  /// no caller needs to parse `timeline` to classify the outcome.
+  /// Durable machine-readable failure facts, absent until the Job has a failure.
   public var operationFailure: RuntimeOperationFailure?
   public var recoveryStepID: String?
   var recoveryAction: PersistedTypedProviderAction?
@@ -112,17 +110,11 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
       let submitted: RuntimeOperationRequest
       if let originalSubmissionRequest {
         submitted = originalSubmissionRequest
-      } else if SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(request)) == fingerprint {
-        return true
       } else {
-        // Older Runtime records did not keep the pre-authorization request.
-        // Only an exact hash match proves that its authorization was absent;
-        // never discard an input, identity, output request or caller context.
-        submitted = try RuntimeOperationRequest(
-          requestID: request.requestID, idempotencyKey: request.idempotencyKey,
-          target: request.target, operation: request.operation, inputs: request.inputs,
-          requestedOutputs: request.requestedOutputs, authorization: nil,
-          clientContext: request.clientContext)
+        // No reconstruction of historical pre-authorization requests. An
+        // absent snapshot can prove only an exact match to the stored request.
+        return SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(request))
+          == fingerprint
       }
       guard SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(submitted)) == fingerprint else { return false }
       let execution = try RuntimeOperationRequest(
@@ -154,5 +146,105 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
 
   static func sha256Hex(_ data: Data) -> String {
     SHA256Hex.string(of: data)
+  }
+}
+
+extension RuntimeJobRecord {
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.jobID = try container.decode(String.self, forKey: .jobID)
+    self.request = try container.decode(RuntimeOperationRequest.self, forKey: .request)
+    self.originalSubmissionRequest = try container.decodeIfPresent(
+      RuntimeOperationRequest.self, forKey: .originalSubmissionRequest)
+    self.operationReference = try container.decode(String.self, forKey: .operationReference)
+    self.catalogDigest = try container.decode(String.self, forKey: .catalogDigest)
+    self.providerID = try container.decode(String.self, forKey: .providerID)
+    self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
+    self.actualEffect = try container.decodeIfPresent(String.self, forKey: .actualEffect)
+    self.admissionEvidence = try container.decodeIfPresent(
+      RuntimeAdmissionEvidence.self, forKey: .admissionEvidence)
+    self.materializedPlanDigest = try container.decodeIfPresent(
+      String.self, forKey: .materializedPlanDigest)
+    self.materializedStableTargetIdentitySHA256 = try container.decodeIfPresent(
+      String.self, forKey: .materializedStableTargetIdentitySHA256)
+    self.materializedBindingRevision = try container.decodeIfPresent(
+      Int.self, forKey: .materializedBindingRevision)
+    self.state = try container.decode(String.self, forKey: .state)
+    self.outcomeUnknown = try container.decode(Bool.self, forKey: .outcomeUnknown)
+    self.operationFailure = try container.decodeIfPresent(
+      RuntimeOperationFailure.self, forKey: .operationFailure)
+    self.recoveryStepID = try container.decodeIfPresent(String.self, forKey: .recoveryStepID)
+    self.recoveryAction = try container.decodeIfPresent(
+      PersistedTypedProviderAction.self, forKey: .recoveryAction)
+    self.recoveryIntentEventID = try container.decodeIfPresent(
+      String.self, forKey: .recoveryIntentEventID)
+    self.timeline = try container.decode([String].self, forKey: .timeline)
+    self.evidencePreflight = try container.decodeIfPresent(
+      RuntimeEvidencePreflightAccumulator.self, forKey: .evidencePreflight)
+    self.evidenceObservation = try container.decodeIfPresent(
+      RuntimeEvidenceObservation.self, forKey: .evidenceObservation)
+    self.traceProbeBefore = try container.decodeIfPresent(
+      TraceRuntimeProbeSnapshot.self, forKey: .traceProbeBefore)
+    self.traceProbeAfter = try container.decodeIfPresent(
+      TraceRuntimeProbeSnapshot.self, forKey: .traceProbeAfter)
+    self.actualStepKinds = try container.decodeIfPresent([String].self, forKey: .actualStepKinds)
+    self.startedAtUTC = try container.decodeIfPresent(String.self, forKey: .startedAtUTC)
+    self.firstEvidenceStepAtUTC = try container.decodeIfPresent(
+      String.self, forKey: .firstEvidenceStepAtUTC)
+    self.finishedAtUTC = try container.decodeIfPresent(String.self, forKey: .finishedAtUTC)
+    self.ringCoverage = try container.decodeIfPresent(
+      RuntimeRingCoverage.self, forKey: .ringCoverage)
+    self.screenSequence = try container.decodeIfPresent(
+      RuntimeScreenSequence.self, forKey: .screenSequence)
+    self.skipReasons = try container.decode([String: String].self, forKey: .skipReasons)
+    self.outstandingResidueCount = try container.decodeIfPresent(
+      Int.self, forKey: .outstandingResidueCount)
+    let supplied = try JSONValue(from: decoder)
+    let current = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(self))
+    guard supplied == current else {
+      throw DecodingError.dataCorrupted(
+        .init(
+          codingPath: decoder.codingPath, debugDescription: "unsupported durable Job field shape"))
+    }
+    guard request.authorization == nil || originalSubmissionRequest != nil else {
+      throw DecodingError.dataCorrupted(.init(
+        codingPath: decoder.codingPath,
+        debugDescription: "authorized Job lacks its original submission"))
+    }
+    if let evidence = admissionEvidence {
+      let hasCapability = evidence.kind == .runtimeCapability
+      guard hasCapability == (evidence.runtimeCapabilityCorrelation != nil),
+        hasCapability == (evidence.consumptionFingerprintSHA256 != nil),
+        !hasCapability || evidence.validUntilUTC != nil,
+        !hasCapability || originalSubmissionRequest != nil
+      else {
+        throw DecodingError.dataCorrupted(
+          .init(
+            codingPath: decoder.codingPath,
+            debugDescription: "incomplete current Runtime admission correlation"))
+      }
+      if let correlation = evidence.runtimeCapabilityCorrelation {
+        func digest(_ value: String) -> Bool {
+          value.utf8.count == 64 && value.utf8.allSatisfy {
+            (48...57).contains($0) || (97...102).contains($0)
+          }
+        }
+        let bindingDigest = Self.sha256Hex(Data(
+          "\(materializedStableTargetIdentitySHA256 ?? "-")\n\(materializedBindingRevision.map(String.init) ?? "-")".utf8))
+        guard evidence.reference == request.authorization?.capabilityID,
+          correlation.reservationID == request.idempotencyKey,
+          correlation.useOrdinal > 0,
+          correlation.planDigestSHA256 == materializedPlanDigest,
+          digest(correlation.planDigestSHA256), digest(correlation.stepSetDigestSHA256),
+          correlation.targetBindingDigestSHA256 == bindingDigest,
+          correlation.artifactSHA256.map(digest) ?? true,
+          evidence.consumptionFingerprintSHA256.map(digest) == true
+        else {
+          throw DecodingError.dataCorrupted(.init(
+            codingPath: decoder.codingPath,
+            debugDescription: "Runtime admission correlation does not match its Job"))
+        }
+      }
+    }
   }
 }

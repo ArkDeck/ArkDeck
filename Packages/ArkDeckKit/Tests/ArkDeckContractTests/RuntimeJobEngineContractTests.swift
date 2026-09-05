@@ -319,6 +319,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
     powerActivityController: PowerActivityController? = nil,
     stateRoot: URL? = nil,
+    validateMutationState: @escaping @Sendable () throws -> Void = {},
     testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let stateRoot = stateRoot ?? self.stateDirectory!
@@ -340,8 +341,73 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
       powerActivityController: powerActivityController,
+      validateMutationState: validateMutationState,
       nowUTC: engineNowUTC ?? { nowUTC })
     return (engine, capabilityStore)
+  }
+
+  func testStateContinuityBlockerPreservesReadOnlyAndRefusesNewMutationBeforeAdmission()
+    async throws
+  {
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, store) = try makeEngine(
+      dispatcher: dispatcher,
+      validateMutationState: { throw RuntimeJobRepositoryError.corrupt("state continuity fixture") }
+    )
+    let accepted = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-read-before-blocker"))
+    _ = try await engine.run(jobID: accepted.jobID)
+    let dispatchCount = dispatcher.dispatchCount
+    let before = try await engine.listJobs(pageSize: 10)
+    let lease = try await publishHAPLease()
+    do {
+      _ = try await engine.submit(
+        hapRequest(
+          lease: lease, requestID: "req-state-blocked", idempotencyKey: "idem-state-blocked"))
+      XCTFail("state continuity must block mutation")
+    } catch {}
+    XCTAssertEqual(dispatcher.dispatchCount, dispatchCount)
+    let after = try await engine.listJobs(pageSize: 10)
+    XCTAssertEqual(after.jobs.map(\.jobID), before.jobs.map(\.jobID))
+    let capabilities = try await store.list()
+    XCTAssertTrue(capabilities.isEmpty)
+  }
+
+  func testStateContinuityIsRecheckedAtFinalCapabilityCommit() async throws {
+    final class Continuity: @unchecked Sendable {
+      private let lock = NSLock()
+      private var blocked = false
+      func block() { lock.withLock { blocked = true } }
+      func validate() throws {
+        if lock.withLock({ blocked }) {
+          throw RuntimeJobRepositoryError.corrupt("state continuity changed after admission")
+        }
+      }
+    }
+    let continuity = Continuity()
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, store) = try makeEngine(
+      dispatcher: dispatcher,
+      validateMutationState: { try continuity.validate() },
+      testHooks: .init(beforeMutationCapabilityCommit: { _ in continuity.block() }))
+    let lease = try await publishHAPLease()
+    let accepted = try await engine.submit(
+      hapRequest(
+        lease: lease, requestID: "req-state-commit", idempotencyKey: "idem-state-commit"))
+    let before = try await store.list()
+    XCTAssertEqual(before.count, 1)
+    XCTAssertEqual(before.first?.consumptionCount, 0)
+    let result = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(result.state, JobState.failed.rawValue)
+    let after = try await store.list()
+    XCTAssertEqual(after.first?.consumptionCount, 0)
+    XCTAssertEqual(after.first?.remainingUses, before.first?.remainingUses)
+    let journal = try DurableJournalRecovery.inspect(
+      url: stateDirectory.appending(path: "jobs/\(accepted.jobID)/journal.jsonl"))
+    XCTAssertFalse(
+      journal.events.contains {
+        $0.kind == .stepIntent && ($0.stepEffect.map { $0 >= .deviceMutation } ?? false)
+      })
   }
 
   func testHDCLifecycleInterlockClosesAlreadyMaterializingJobAdmissionRace()
@@ -811,44 +877,20 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
   }
 
-  func testSchemaV1HistoryMigratesToLogicalCreationOrderIncludingLegacyRows() throws {
+  func testOldSchemaV1HistoryIsRefusedWithoutRewritingBytes() throws {
     do {
       let repository = try RuntimeJobRepository(stateDirectory: stateDirectory)
       XCTAssertEqual(
         try repository.admit(
           jobID: "job-current", idempotencyKey: "idem-current", requestHash: "hash-current",
           initialState: JobState.preflight.rawValue,
-          createdAtUTC: "2026-08-03T00:00:00.100Z", initialRecordData: Data("{}".utf8)),
-        .admitted)
-      XCTAssertEqual(
-        try repository.admit(
-          jobID: "job-legacy", idempotencyKey: "idem-legacy", requestHash: "hash-legacy",
-          initialState: JobState.succeeded.rawValue,
-          createdAtUTC: RuntimePersistedJob.legacyCreatedAtUTC,
-          initialRecordData: Data(
-            #"{"createdAtUTC":"2026-08-03T00:00:00Z"}"#.utf8)),
-        .admitted)
+          createdAtUTC: "2026-08-03T00:00:00.100Z", initialRecordData: Data("{}".utf8)), .admitted)
     }
     try RuntimeJobSQLiteTestSupport.rewriteAsSchemaV1(stateDirectory: stateDirectory)
-
-    let migrated = try RuntimeJobRepository(stateDirectory: stateDirectory)
-    let page = try migrated.listJobs(pageSize: 10, cursor: nil)
-    XCTAssertEqual(page.jobs.map(\.jobID), ["job-legacy", "job-current"])
-    XCTAssertEqual(page.jobs.first?.createdAtUTC, RuntimePersistedJob.legacyCreatedAtUTC)
-    XCTAssertNil(page.nextCursor)
-
-    XCTAssertEqual(
-      try migrated.admit(
-        jobID: "job-after", idempotencyKey: "idem-after", requestHash: "hash-after",
-        initialState: JobState.preflight.rawValue,
-        createdAtUTC: "2026-08-03T00:00:01Z", initialRecordData: Data("{}".utf8)),
-      .admitted)
-    let legacyFirst = try migrated.listLegacyJobs(pageSize: 2, cursor: nil)
-    XCTAssertEqual(legacyFirst.jobs.map(\.jobID), ["job-current", "job-legacy"])
-    let legacyLast = try migrated.listLegacyJobs(
-      pageSize: 2, cursor: try XCTUnwrap(legacyFirst.nextCursor))
-    XCTAssertEqual(legacyLast.jobs.map(\.jobID), ["job-after"])
-    XCTAssertNil(legacyLast.nextCursor)
+    let url = stateDirectory.appending(path: RuntimeJobRepository.filename)
+    let original = try Data(contentsOf: url)
+    XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: stateDirectory))
+    XCTAssertEqual(try Data(contentsOf: url), original)
   }
 
   func testUnreadablePersistedRecordIsDistinctFromMissingAcrossHistoryReads() async throws {
@@ -993,58 +1035,18 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(expectedActiveIDs.count, expectedJobCount - expectedTerminalCount)
   }
 
-  /// Upgrade regression for the retired idempotency ledger generation. Its
-  /// importer never deleted the file, so residue whose keys the SQLite table
-  /// already carries must keep opening; a key the table has never admitted
-  /// means unconsumed history and must block admission outright — silently
-  /// ignoring it could replay a used key as a fresh device mutation.
-  func testRetiredIdempotencyLedgerBlocksOnlyUnconsumedKeys() throws {
-    let root = stateDirectory.appending(
-      path:
-        "retired-ledger-\(UUID().uuidString)", directoryHint: .isDirectory)
+  func testRetiredLedgerAlwaysBlocksWithoutCreatingAnEmptyIndex() throws {
+    let root = stateDirectory.appending(path: "retired-ledger")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    let ledgerURL = root.appending(path: "idempotency.json")
-
-    // Consumed residue: the previous release imported this key into SQLite
-    // and left the file behind. The repository must keep opening.
-    do {
-      let repository = try RuntimeJobRepository(stateDirectory: root)
-      XCTAssertEqual(
-        try repository.admit(
-          jobID: "job-legacy-1", idempotencyKey: "idem-legacy-1",
-          requestHash: "hash-1", initialState: JobState.preflight.rawValue,
-          createdAtUTC: "2026-08-11T00:00:00Z", initialRecordData: Data("{}".utf8)),
-        .admitted)
+    let ledger = root.appending(path: "idempotency.json")
+    for bytes in [Data(#"{"entries":[]}"#.utf8), Data("not json".utf8)] {
+      try bytes.write(to: ledger)
+      XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: root))
+      XCTAssertEqual(try Data(contentsOf: ledger), bytes)
+      XCTAssertFalse(
+        FileManager.default.fileExists(
+          atPath: root.appending(path: RuntimeJobRepository.filename).path))
     }
-    try Data(
-      #"{"entries":[{"idempotencyKey":"idem-legacy-1","jobID":"job-legacy-1","requestFingerprintSHA256":"hash-1"}]}"#
-        .utf8
-    ).write(to: ledgerURL)
-    XCTAssertNoThrow(try RuntimeJobRepository(stateDirectory: root))
-
-    // Unconsumed key: never admitted by this database. Must refuse to open.
-    try Data(
-      #"{"entries":[{"idempotencyKey":"idem-never-imported","jobID":"job-x","requestFingerprintSHA256":"hash-x"}]}"#
-        .utf8
-    ).write(to: ledgerURL)
-    XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: root)) { error in
-      guard case RuntimeJobRepositoryError.corrupt(let detail) = error else {
-        return XCTFail("expected corrupt, got \(error)")
-      }
-      XCTAssertTrue(detail.contains("idem-never-imported"), detail)
-    }
-
-    // Undecodable ledger: consumption cannot be proven. Must refuse to open.
-    try Data("not json".utf8).write(to: ledgerURL)
-    XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: root)) { error in
-      guard case RuntimeJobRepositoryError.corrupt(let detail) = error else {
-        return XCTFail("expected corrupt, got \(error)")
-      }
-      XCTAssertTrue(detail.contains("undecodable"), detail)
-    }
-
-    try FileManager.default.removeItem(at: ledgerURL)
-    XCTAssertNoThrow(try RuntimeJobRepository(stateDirectory: root))
   }
 
   /// Startup must be driven by the active-job index, not by total terminal
@@ -1569,15 +1571,12 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         materializedBindingRevision: 7)
 
       XCTAssertTrue(RuntimeJobEngine.isDayu200Flash(record))
-      XCTAssertEqual(
-        RuntimeJobEngine.journalSchemaVersion(of: record),
-        JournalEvent.completeOverwriteRecoverySchemaVersion)
 
       let journalURL = stateDirectory.appending(
         path:
           "flash-schema-\(index)-journal.jsonl")
       let journal = try FileDurableJournal(url: journalURL)
-      let schemaVersion = RuntimeJobEngine.journalSchemaVersion(of: record)
+      let schemaVersion = JournalEvent.schemaVersion
       try journal.appendAndSynchronize(
         try JournalEvent.jobCreated(
           eventID: "created", sequence: 0, sessionID: record.sessionID,
@@ -1590,10 +1589,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
           from: .queued, to: .preflight, reason: "fixture",
           schemaVersion: schemaVersion))
       let replay = try DurableJournalRecovery.inspect(url: journalURL)
-      XCTAssertEqual(replay.schemaVersion, JournalEvent.completeOverwriteRecoverySchemaVersion)
+      XCTAssertEqual(replay.schemaVersion, JournalEvent.schemaVersion)
       XCTAssertTrue(
         replay.events.allSatisfy {
-          $0.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion
+          $0.schemaVersion == JournalEvent.schemaVersion
         })
     }
   }
@@ -1710,7 +1709,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       parkedLedgerBytes
       .split(separator: 0x0A, omittingEmptySubsequences: true)
       .filter { !String(decoding: $0, as: UTF8.self).contains("\"kind\":\"outcome\"") }
-      .reduce(into: Data()) { $0.append(Data($1)); $0.append(0x0A) }
+      .reduce(into: Data()) {
+        $0.append(Data($1))
+        $0.append(0x0A)
+      }
     XCTAssertLessThan(
       consumeOnlyLedger.count, parkedLedgerBytes.count,
       "fixture assumption: the parked ledger carries at least one outcome append")

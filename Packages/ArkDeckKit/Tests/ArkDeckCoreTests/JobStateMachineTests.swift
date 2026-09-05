@@ -59,19 +59,11 @@ final class JobStateMachineTests: XCTestCase {
     let stateDefinition = try XCTUnwrap(definitions["jobState"] as? [String: Any])
     let contractStates = try XCTUnwrap(stateDefinition["enum"] as? [String])
 
-    let recoveryStates: Set<String> = [
-      JobState.recoveringByCompleteOverwrite.rawValue,
-      JobState.recovered.rawValue,
-    ]
-    XCTAssertEqual(JobState.schemaVersion, "2.0.0")
-    XCTAssertEqual(
-      Set(JobState.allCases.map(\.rawValue)).subtracting(recoveryStates),
-      Set(contractStates))
-    XCTAssertTrue(Set(contractStates).isDisjoint(with: recoveryStates))
+    XCTAssertEqual(JobState.schemaVersion, "1.0.0")
+    XCTAssertEqual(Set(JobState.allCases.map(\.rawValue)), Set(contractStates))
   }
 
-  func testCoreTransitionGraphVersionsRecoveryEdgesWithoutMutatingTheLockedJournalContract() throws
-  {
+  func testCurrentJournalContainsTheCompleteRuntimeTransitionGraph() throws {
     let contractPairs = try loadContractTransitionPairs()
     let swiftPairs = Set(
       JobExecutionMode.allCases.flatMap { mode in
@@ -82,17 +74,7 @@ final class JobStateMachineTests: XCTestCase {
         }
       })
 
-    let recoveryPairs: Set<StateTransitionPair> = [
-      .init(from: .running, to: .recoveringByCompleteOverwrite),
-      .init(from: .waitingForRecovery, to: .recoveringByCompleteOverwrite),
-      .init(from: .reconciling, to: .recoveringByCompleteOverwrite),
-      .init(from: .recoveringByCompleteOverwrite, to: .cancelRequested),
-      .init(from: .recoveringByCompleteOverwrite, to: .finalizing),
-      .init(from: .recoveringByCompleteOverwrite, to: .waitingForRecovery),
-      .init(from: .finalizing, to: .recovered),
-    ]
-    XCTAssertEqual(swiftPairs.subtracting(recoveryPairs), contractPairs)
-    XCTAssertEqual(swiftPairs.subtracting(contractPairs), recoveryPairs)
+    XCTAssertEqual(swiftPairs, contractPairs)
   }
 
   func testResumeMarkerDestinationSetsIncludeBothApprovedSafetyExits() {

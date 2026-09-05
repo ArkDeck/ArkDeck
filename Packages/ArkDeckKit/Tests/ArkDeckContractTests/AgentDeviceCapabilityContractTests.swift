@@ -557,7 +557,13 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
       ] {
         let relativePath = try XCTUnwrap(vector[pair.0] as? String)
         let expectedHash = try XCTUnwrap(vector[pair.1] as? String)
-        let url = Self.repositoryRoot.appending(path: relativePath)
+        // This historical corpus pins the retired v1 bytes, not the active
+        // contract path now owned by the current single-v1 writer.
+        let pinnedPath = version == "1.x"
+          ? "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/RetiredDurableFormats/"
+            + (pair.0 == "journalSchema" ? "journal-event" : "manifest") + ".schema.v1-retired.json"
+          : relativePath
+        let url = Self.repositoryRoot.appending(path: pinnedPath)
         XCTAssertTrue(
           url.standardizedFileURL.path.hasPrefix(Self.repositoryRoot.standardizedFileURL.path))
         let bytes = try Data(contentsOf: url)

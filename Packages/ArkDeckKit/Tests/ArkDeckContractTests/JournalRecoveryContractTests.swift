@@ -143,315 +143,33 @@ final class JournalRecoveryContractTests: XCTestCase {
       ])
   }
 
-  func testAgentAuthorityV22RoundTripsE0E1E2AndRejectsUsageDrift() throws {
-    let references: [(AgentExecutionAuthorityReference, String?, WorkflowEffect)] = [
-      (
-        try .validatedReadyTask(
-          changeID: "CHG-2026-025", taskID: "TASK-AIN-010",
-          mainCommitOID: String(repeating: "a", count: 40),
-          taskBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 754),
-        nil, .readOnly
-      ),
-      (
-        try .validatedDeviceCapability(
-          capabilityID: "CAP-E1-FIXTURE",
-          mainCommitOID: String(repeating: "c", count: 40),
-          capabilityBlobOID: String(repeating: "d", count: 40), approvalPRNumber: 750),
-        "ain010-fixture", .deviceMutation
-      ),
-      (
-        try historicalStandingAuthority(
-          authorizationID: "AUTH-FIXTURE",
-          mainCommitOID: String(repeating: "e", count: 40),
-          authorizationBlobOID: String(repeating: "f", count: 40), approvalPRNumber: 700),
-        "reservation-fixture", .destructive
-      ),
-      (
-        try historicalChatAuthority(
-          confirmationDigestSHA256: String(repeating: "1", count: 64),
-          planDigestSHA256: String(repeating: "2", count: 64),
-          archiveDigestSHA256: String(repeating: "3", count: 64),
-          stepSetDigestSHA256: String(repeating: "4", count: 64),
-          targetDigestSHA256: String(repeating: "5", count: 64),
-          confirmedAt: timestamp),
-        "chat-reservation-fixture", .destructive
-      ),
-    ]
-    for (offset, item) in references.enumerated() {
-      let directory = try temporaryDirectory()
-      defer { try? FileManager.default.removeItem(at: directory) }
-      let journalURL = directory.appending(path: "agent-v22-\(offset).jsonl")
-      let journal = try FileDurableJournal(url: journalURL)
-      try journal.appendAndSynchronize(
-        JournalEvent.jobCreated(
-          eventID: "created-\(offset)", sequence: 0, sessionID: "session-\(offset)",
-          jobID: "job-\(offset)", timestamp: timestamp, executionMode: "execute",
-          executionAuthority: "authorizedAgent",
-          schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-          agentAuthorizationRef: item.0, usageReservationID: item.1))
-      try journal.appendAndSynchronize(
-        JournalEvent.stateTransition(
-          eventID: "preflight-\(offset)", sequence: 1, sessionID: "session-\(offset)",
-          jobID: "job-\(offset)", timestamp: timestamp, from: .queued, to: .preflight,
-          reason: "fixture", schemaVersion: JournalEvent.agentAuthoritySchemaVersion))
-      try journal.appendAndSynchronize(
-        JournalEvent.stateTransition(
-          eventID: "running-\(offset)", sequence: 2, sessionID: "session-\(offset)",
-          jobID: "job-\(offset)", timestamp: timestamp, from: .preflight, to: .running,
-          reason: "fixture", schemaVersion: JournalEvent.agentAuthoritySchemaVersion))
-      let step = try agentAuthorityStep(effect: item.2, suffix: "\(offset)")
-      try journal.appendAndSynchronize(
-        JournalEvent.stepIntent(
-          eventID: "intent-\(offset)", sequence: 3, sessionID: "session-\(offset)",
-          jobID: "job-\(offset)", timestamp: timestamp, step: step,
-          target: JournalTarget(
-            scope: "device", targetID: "target-\(offset)", connectKey: "fixture",
-            identitySnapshotHash: String(repeating: "1", count: 64)),
-          attempt: 1, bindingRevision: 1,
-          schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-          agentAuthorizationRef: item.0, usageReservationID: item.1))
-      try journal.appendAndSynchronize(
-        JournalEvent.stepOutcome(
-          eventID: "outcome-\(offset)", sequence: 4, sessionID: "session-\(offset)",
-          jobID: "job-\(offset)", timestamp: timestamp, stepID: step.id, attempt: 1,
-          correlatesToIntentEventID: "intent-\(offset)", result: "succeeded",
-          outcomeCertainty: .confirmed,
-          schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-          agentAuthorizationRef: item.0, usageReservationID: item.1))
-      let replay = try DurableJournalRecovery.inspect(url: journalURL)
-      XCTAssertEqual(replay.schemaVersion, JournalEvent.agentAuthoritySchemaVersion)
-      XCTAssertEqual(replay.agentExecutionAuthorityReference, item.0)
-      XCTAssertEqual(replay.authorizationReference, item.0.legacyStandingAuthorizationReference)
-      XCTAssertEqual(replay.usageReservationID, item.1)
-      XCTAssertTrue(replay.outstandingIntents.isEmpty)
+  func testOnlyCurrentJournalFormatAndAuthorityFreeShapeAreReadable() throws {
+    let event = try makeJobCreated(sequence: 0)
+    let bytes = try JournalEventCodec.encode(event)
+    XCTAssertEqual(try JournalEventCodec.decode(bytes), event)
+    let root = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+    for version in ["2.0.0", "2.1.0", "2.2.0", "3.0.0", "1.7.3"] {
+      var retired = root
+      retired["schemaVersion"] = version
+      XCTAssertThrowsError(
+        try JournalEventCodec.decode(JSONSerialization.data(withJSONObject: retired)))
     }
-
-    let e0 = references[0].0
-    XCTAssertThrowsError(
-      try JournalEvent.jobCreated(
-        eventID: "bad-e0", sequence: 0, sessionID: "bad-session", jobID: "bad-job",
-        timestamp: timestamp, executionMode: "execute",
-        executionAuthority: "authorizedAgent",
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-        agentAuthorizationRef: e0, usageReservationID: "ghost-usage"))
-    let e1 = references[1].0
-    XCTAssertThrowsError(
-      try JournalEvent.jobCreated(
-        eventID: "bad-e1", sequence: 0, sessionID: "bad-session", jobID: "bad-job",
-        timestamp: timestamp, executionMode: "execute",
-        executionAuthority: "authorizedAgent",
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-        agentAuthorizationRef: e1))
-  }
-
-  func testAgentAuthorityV22CorrelatesExternalCompensationRefAndUsage() throws {
-    let reference = try AgentExecutionAuthorityReference.validatedDeviceCapability(
-      capabilityID: "CAP-E1-COMPENSATION",
-      mainCommitOID: String(repeating: "a", count: 40),
-      capabilityBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 750)
-    let arguments: [String: JSONValue] = [
-      "captureStepId": .string("capture-1"),
-      "stopPolicy": .string("gracefulThenForce"),
-    ]
-    let descriptor = try CompensationDescriptor(
-      id: "stop-capture", kind: .stopRemoteCapture,
-      declaredEffect: .deviceMutation, declaredCancellation: .atSafeBoundary,
-      declaredBindingRequirement: .confirmedDevice, trigger: .onFailure,
-      arguments: arguments,
-      argumentsHash: try JournalCanonicalJSON.argumentsHash(arguments))
-    let directory = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appending(path: "agent-v22-compensation.jsonl")
-    let journal = try FileDurableJournal(url: url)
-    try journal.appendAndSynchronize(
-      JournalEvent.jobCreated(
-        eventID: "created", sequence: 0, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, executionMode: "execute",
-        executionAuthority: "authorizedAgent",
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-        agentAuthorizationRef: reference, usageReservationID: "ain010-compensation"))
-    try journal.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion))
-    try journal.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion))
-    try journal.appendAndSynchronize(
-      JournalEvent.compensationIntent(
-        eventID: "compensation-intent", sequence: 3, sessionID: "session-1",
-        jobID: "job-1", timestamp: timestamp, compensationOfStepID: "capture-1",
-        descriptor: descriptor,
-        target: JournalTarget(
-          scope: "device", targetID: "target-1", connectKey: "fixture",
-          identitySnapshotHash: String(repeating: "1", count: 64)),
-        attempt: 1, bindingRevision: 1,
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-        agentAuthorizationRef: reference, usageReservationID: "ain010-compensation"))
-    try journal.appendAndSynchronize(
-      JournalEvent.compensationOutcome(
-        eventID: "compensation-outcome", sequence: 4, sessionID: "session-1",
-        jobID: "job-1", timestamp: timestamp, compensationOfStepID: "capture-1",
-        descriptorID: descriptor.id, attempt: 1,
-        correlatesToIntentEventID: "compensation-intent", result: "succeeded",
-        outcomeCertainty: .confirmed,
-        schemaVersion: JournalEvent.agentAuthoritySchemaVersion,
-        agentAuthorizationRef: reference, usageReservationID: "ain010-compensation"))
-    let replay = try DurableJournalRecovery.inspect(url: url)
-    XCTAssertTrue(replay.outstandingIntents.isEmpty)
-    XCTAssertEqual(replay.agentExecutionAuthorityReference, reference)
-  }
-
-  func testAuthorizedAgentV2JournalRoundTripsAndCorrelatesDestructiveIntentOutcome() throws {
-    let directory = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let reference = try authorizationReference()
-    let journalURL = directory.appending(path: "authorized-v2.jsonl")
-    let journal = try FileDurableJournal(url: journalURL)
-    let created = try JournalEvent.jobCreated(
-      eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
-      timestamp: timestamp, executionMode: "execute", executionAuthority: "authorizedAgent",
-      schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-      authorizationRef: reference, usageReservationID: "reservation-1")
-    XCTAssertEqual(try JournalEventCodec.decode(JournalEventCodec.encode(created)), created)
-    try journal.appendAndSynchronize(created)
-    try journal.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "v2-preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    try journal.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "v2-running", sequence: 2, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    try journal.appendAndSynchronize(
-      makeFlashIntent(
-        sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-        authorizationRef: reference, usageReservationID: "reservation-1"))
-    try journal.appendAndSynchronize(
-      makeOutcome(
-        sequence: 4, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-        authorizationRef: reference, usageReservationID: "reservation-1"))
-
-    let replay = try DurableJournalRecovery.inspect(url: journalURL)
-    XCTAssertEqual(replay.schemaVersion, "2.0.0")
-    XCTAssertEqual(replay.executionAuthority, "authorizedAgent")
-    XCTAssertEqual(replay.authorizationReference, reference)
-    XCTAssertEqual(replay.usageReservationID, "reservation-1")
-    XCTAssertTrue(replay.outstandingIntents.isEmpty)
-    print("TEST-AIN-CONTRACT-001 journal-v2=PASS device_dispatch=0 external_process=0")
-  }
-
-  func testAuthorizedAgentV2JournalRejectsMissingDriftGhostAndMixedVersionCorrelation() throws {
-    let reference = try authorizationReference()
-    let drifted = try AuthorizationReference(
-      authorizationID: "authorization-2", mainCommitOID: String(repeating: "a", count: 40),
-      authorizationBlobOID: String(repeating: "c", count: 40), approvalPRNumber: 299)
-
-    func seededJournal(_ suffix: String) throws -> FileDurableJournal {
-      let directory = try temporaryDirectory()
-      let journal = try FileDurableJournal(
-        url: directory.appending(path: "authorized-\(suffix).jsonl"))
-      try journal.appendAndSynchronize(
-        JournalEvent.jobCreated(
-          eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
-          timestamp: timestamp, executionMode: "execute", executionAuthority: "authorizedAgent",
-          schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-          authorizationRef: reference, usageReservationID: "reservation-1"))
-      try journal.appendAndSynchronize(
-        JournalEvent.stateTransition(
-          eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
-          timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
-          schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-      try journal.appendAndSynchronize(
-        JournalEvent.stateTransition(
-          eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
-          timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
-          schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-      return journal
+    for key in [
+      "authorizationRef", "usageReservationId", "standingAuthorization", "campaignReservation",
+    ] {
+      var collision = root
+      var payload = try XCTUnwrap(collision["payload"] as? [String: Any])
+      payload[key] = NSNull()
+      collision["payload"] = payload
+      XCTAssertThrowsError(
+        try JournalEventCodec.decode(JSONSerialization.data(withJSONObject: collision)), key)
     }
-
-    let missing = try seededJournal("missing")
+    var retiredAuthority = root
+    var payload = try XCTUnwrap(root["payload"] as? [String: Any])
+    payload["executionAuthority"] = "authorizedAgent"
+    retiredAuthority["payload"] = payload
     XCTAssertThrowsError(
-      try missing.appendAndSynchronize(
-        makeFlashIntent(
-          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion)))
-
-    let drift = try seededJournal("drift")
-    XCTAssertThrowsError(
-      try drift.appendAndSynchronize(
-        makeFlashIntent(
-          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-          authorizationRef: drifted, usageReservationID: "reservation-1")))
-
-    let mixed = try seededJournal("mixed")
-    XCTAssertThrowsError(
-      try mixed.appendAndSynchronize(
-        JournalEvent.stateTransition(
-          eventID: "mixed", sequence: 3, sessionID: "session-1", jobID: "job-1",
-          timestamp: timestamp, from: .running, to: .waitingForRecovery,
-          reason: "forged v1")))
-
-    let outcomeDrift = try seededJournal("outcome-drift")
-    try outcomeDrift.appendAndSynchronize(
-      makeFlashIntent(
-        sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-        authorizationRef: reference, usageReservationID: "reservation-1"))
-    XCTAssertThrowsError(
-      try outcomeDrift.appendAndSynchronize(
-        makeOutcome(
-          sequence: 4, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-          authorizationRef: drifted, usageReservationID: "reservation-1")))
-
-    let standard = try FileDurableJournal(
-      url: try temporaryDirectory().appending(path: "standard-v2.jsonl"))
-    try standard.appendAndSynchronize(
-      JournalEvent.jobCreated(
-        eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, executionMode: "execute", executionAuthority: "standardAgent",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    try standard.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    try standard.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    XCTAssertThrowsError(
-      try standard.appendAndSynchronize(
-        makeFlashIntent(
-          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion)))
-
-    let simulated = try FileDurableJournal(
-      url: try temporaryDirectory().appending(path: "simulated-v2.jsonl"))
-    try simulated.appendAndSynchronize(
-      JournalEvent.jobCreated(
-        eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, executionMode: "simulated", executionAuthority: "authorizedAgent",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-        authorizationRef: reference, usageReservationID: "reservation-1"))
-    try simulated.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    try simulated.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
-        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
-        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
-    XCTAssertThrowsError(
-      try simulated.appendAndSynchronize(
-        makeFlashIntent(
-          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
-          authorizationRef: reference, usageReservationID: "reservation-1")))
+      try JournalEventCodec.decode(JSONSerialization.data(withJSONObject: retiredAuthority)))
   }
 
   func testLockedJournalContractCoversEveryClosedEventKind() throws {
@@ -1147,9 +865,7 @@ final class JournalRecoveryContractTests: XCTestCase {
     sequence: Int,
     eventID: String = "flash-intent",
     stepID: String = "flash-step",
-    schemaVersion: String = JournalEvent.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = JournalEvent.schemaVersion
   ) throws -> JournalEvent {
     let step = try WorkflowStep(
       id: stepID, kind: .flashPartition, declaredEffect: .destructive,
@@ -1170,30 +886,20 @@ final class JournalRecoveryContractTests: XCTestCase {
       target: JournalTarget(
         scope: "device", targetID: "device-1", connectKey: "fixture-only",
         identitySnapshotHash: String(repeating: "b", count: 64)),
-      attempt: 1, bindingRevision: 1, schemaVersion: schemaVersion,
-      authorizationRef: authorizationRef, usageReservationID: usageReservationID)
+      attempt: 1, bindingRevision: 1, schemaVersion: schemaVersion)
   }
 
   private func makeOutcome(
     sequence: Int,
     outcomeCertainty: JournalOutcomeCertainty = .confirmed,
-    schemaVersion: String = JournalEvent.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = JournalEvent.schemaVersion
   ) throws -> JournalEvent {
     try JournalEvent.stepOutcome(
       eventID: "flash-outcome-\(sequence)", sequence: sequence,
       sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
       stepID: "flash-step", attempt: 1, correlatesToIntentEventID: "flash-intent",
       result: "succeeded", outcomeCertainty: outcomeCertainty,
-      schemaVersion: schemaVersion, authorizationRef: authorizationRef,
-      usageReservationID: usageReservationID)
-  }
-
-  private func authorizationReference() throws -> AuthorizationReference {
-    try AuthorizationReference(
-      authorizationID: "authorization-1", mainCommitOID: String(repeating: "a", count: 40),
-      authorizationBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 299)
+      schemaVersion: schemaVersion)
   }
 
   private func checkpoint(sequence: Int, state: JobState) throws -> JournalCheckpoint {

@@ -122,6 +122,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
 
   private func makeFixture(unknownStepID: String) throws -> Fixture {
     let state = root.appending(path: "state", directoryHint: .isDirectory)
+    _ = try RuntimeJobRepository(stateDirectory: state)
     let applicationSupport = root.appending(
       path:
         "application-support", directoryHint: .isDirectory)
@@ -213,6 +214,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
       materializedPlanDigest: String(repeating: "9", count: 64),
       materializedStableTargetIdentitySHA256: target.stablePhysicalIdentitySHA256,
       materializedBindingRevision: target.bindingRevision)
+    record.originalSubmissionRequest = record.request
     record.state = JobState.waitingForRecovery.rawValue
     record.outcomeUnknown = true
     record.startedAtUTC = timestamp
@@ -233,7 +235,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
         eventID: "waiting-\(jobID)", sequence: sequence,
         sessionID: record.sessionID, jobID: jobID, timestamp: timestamp,
         from: .running, to: .waitingForRecovery, reason: "fixture outcome unknown",
-        schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion))
+        schemaVersion: JournalEvent.schemaVersion))
     return directory
   }
 
@@ -244,14 +246,14 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     let request = try flashRequest(jobID: jobID, target: target)
     let planDigest = String(repeating: "a", count: 64)
     let correlation = RuntimeCapabilityEvidenceCorrelation(
-      reservationID: "reservation-alias-recovery", useOrdinal: 1,
+      reservationID: request.idempotencyKey, useOrdinal: 1,
       planDigestSHA256: planDigest,
       stepSetDigestSHA256: String(repeating: "b", count: 64),
-      targetBindingDigestSHA256: String(repeating: "c", count: 64),
+      targetBindingDigestSHA256: RuntimeJobRecord.sha256Hex(Data("\(target.stablePhysicalIdentitySHA256)\n\(target.bindingRevision)".utf8)),
       artifactSHA256: String(repeating: "d", count: 64))
     let evidence = RuntimeAdmissionEvidence(
-      kind: .runtimeCapability, reference: "CAP-RT-ALIAS-RECOVERY",
-      admittedAtUTC: startedAtUTC, validUntilUTC: nil,
+      kind: .runtimeCapability, reference: "CAP-RT-ALIAS-FIXTURE",
+      admittedAtUTC: startedAtUTC, validUntilUTC: "2026-12-31T00:00:00Z",
       consumptionFingerprintSHA256: String(repeating: "e", count: 64),
       runtimeCapabilityCorrelation: correlation)
     var record = RuntimeJobRecord(
@@ -262,6 +264,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
       materializedPlanDigest: planDigest,
       materializedStableTargetIdentitySHA256: target.stablePhysicalIdentitySHA256,
       materializedBindingRevision: target.bindingRevision)
+    record.originalSubmissionRequest = record.request
     record.state = JobState.succeeded.rawValue
     record.startedAtUTC = startedAtUTC
     record.finishedAtUTC = finishedAtUTC
@@ -288,7 +291,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
           sessionID: record.sessionID, jobID: jobID, timestamp: finishedAtUTC,
           stepID: stepID, attempt: 1, correlatesToIntentEventID: intentID,
           result: "succeeded", outcomeCertainty: .confirmed,
-          schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion))
+          schemaVersion: JournalEvent.schemaVersion))
       sequence += 1
     }
     try journal.appendAndSynchronize(
@@ -296,20 +299,20 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
         eventID: "finalizing-\(jobID)", sequence: sequence,
         sessionID: record.sessionID, jobID: jobID, timestamp: finishedAtUTC,
         from: .running, to: .finalizing, reason: "fixture steps complete",
-        schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion))
+        schemaVersion: JournalEvent.schemaVersion))
     sequence += 1
     try journal.appendAndSynchronize(
       try JournalEvent.stateTransition(
         eventID: "succeeded-\(jobID)", sequence: sequence,
         sessionID: record.sessionID, jobID: jobID, timestamp: finishedAtUTC,
         from: .finalizing, to: .succeeded, reason: "fixture finalized",
-        schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion))
+        schemaVersion: JournalEvent.schemaVersion))
   }
 
   private func appendRunningPrefix(
     journal: FileDurableJournal, record: RuntimeJobRecord, timestamp: String
   ) throws -> Int {
-    let schema = JournalEvent.completeOverwriteRecoverySchemaVersion
+    let schema = JournalEvent.schemaVersion
     try journal.appendAndSynchronize(
       try JournalEvent.jobCreated(
         eventID: "created-\(record.jobID)", sequence: 0,
@@ -342,7 +345,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
         connectKey: "fixture-connect-key",
         identitySnapshotHash: record.materializedStableTargetIdentitySHA256!),
       attempt: 1, bindingRevision: record.materializedBindingRevision,
-      schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion)
+      schemaVersion: JournalEvent.schemaVersion)
   }
 
   private func workflowStep(_ stepID: String) throws -> WorkflowStep {

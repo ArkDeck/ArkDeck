@@ -417,8 +417,7 @@ enum CLICommandRegistry {
   private static let legacyCompatibilityCommands: Set<String> = [
     "device.list", "device.show",
     "debug.start", "debug.evaluate", "debug.status",
-    "flash.install-binding", "flash.status", "flash.reconcile",
-    "legacy.flash.status", "legacy.flash.reconcile",
+    "flash.install-binding",
   ]
 
   /// The compatibility spelling of a family §12 is migrating.
@@ -491,7 +490,7 @@ enum CLICommandRegistry {
     doctorNode, runtimeNode, operationNode, deviceNode, targetNode, targetlessTraceNode,
     jobNode, sessionNode, historyNode, artifactNode, agentNode, humanActionNode, controlActionNode, capabilityNode, recoveryNode, screenNode, inputNode,
     diagnosticsNode, analyzeNode, portForwardNode, workspaceNode, cleanupDebtNode, debugNode,
-    flashNode, legacyNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
+    flashNode, maintainerNode, uiDumpNode, agentdNode, signingNode, updateFeedNode,
   ]
 
   /// A first-class name for one published operation (§6.2).
@@ -2407,54 +2406,6 @@ enum CLICommandRegistry {
         ])
     ])
 
-  /// §6.3/§12's `legacy` namespace: the macOS historical-archive surface.
-  ///
-  /// These two are the whole of it, and they are here rather than under
-  /// `flash` because §12 draws a line that a shared prefix blurs. `flash` is
-  /// where a caller reaches a device; these only decode and settle records
-  /// that already exist, create no campaign and dispatch nothing, and are
-  /// explicitly not required of the portable core. Naming that separation is
-  /// what stops "the flash commands" from being read as one surface with one
-  /// conformance story.
-  ///
-  /// They stay `legacy` under the new spelling too: the rename moves where a
-  /// caller types them, not what they are. §12 forbids counting either as
-  /// target conformance, so promoting them to `current` on the way across
-  /// would have quietly bought conformance with a rename.
-  private static let legacyFlashNode = CLINodeSpec(
-    token: "flash",
-    summary: "historical campaign archive; decode and settle only, never dispatch",
-    leaves: [
-      CLILeafSpec(
-        token: "status",
-        canonicalCommand: "legacy.flash.status",
-        summary: "decode one historical campaign record; cannot dispatch",
-        options: [
-          CLIOptionSpec(
-            name: "--campaign-id",
-            form: .value(placeholder: "ECAMP-id", grammar: .opaque),
-            summary: "historical campaign identity",
-            isRequired: true),
-          outputOption,
-        ]),
-      CLILeafSpec(
-        token: "reconcile",
-        canonicalCommand: "legacy.flash.reconcile",
-        summary: "decode interrupted flash session journals; zero device dispatch",
-        options: [
-          CLIOptionSpec(
-            name: "--session",
-            form: .value(placeholder: "session-id", grammar: .opaque),
-            summary: "inspect one session instead of every unresolved one"),
-          outputOption,
-        ]),
-    ])
-
-  private static let legacyNode = CLINodeSpec(
-    token: "legacy",
-    summary: "explicit compatibility surfaces; frozen 1.x shape, never target conformance",
-    groups: [legacyFlashNode])
-
   /// §6.3's `ui-dump` family.
   ///
   /// `inspect` and `hit-test` are §6.2 deterministic local derivations: they
@@ -2503,7 +2454,7 @@ enum CLICommandRegistry {
 
   private static let flashNode = CLINodeSpec(
     token: "flash",
-    summary: "durable device binding and historical campaign archive",
+    summary: "durable device binding and Runtime-owned full restore",
     leaves: [
       CLILeafSpec(
         token: "install-binding",
@@ -2517,8 +2468,6 @@ enum CLICommandRegistry {
           outputOption,
         ])
     ]
-      + compatibilitySpelling(
-        of: legacyFlashNode.leaves, as: "flash", replacedBy: "legacy flash")
       + [
       domainLeaf(
         "run", "flash.run", "flash.full-restore@1",

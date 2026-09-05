@@ -1,3 +1,5 @@
+import Foundation
+
 // Runtime Capability model (CHG-2026-046, T03).
 //
 // Replaces per-task (changeId/taskId) authorization for the Device Agent
@@ -424,6 +426,14 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
         DecodingError.Context(
           codingPath: decoder.codingPath,
           debugDescription: "capability violates model invariants: \(error)"))
+    }
+    let supplied = try JSONValue(from: decoder)
+    let current = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(self))
+    guard supplied == current else {
+      throw DecodingError.dataCorrupted(
+        .init(
+          codingPath: decoder.codingPath,
+          debugDescription: "unsupported current capability field shape"))
     }
   }
 

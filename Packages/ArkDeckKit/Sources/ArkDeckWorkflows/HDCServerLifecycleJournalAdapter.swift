@@ -535,7 +535,7 @@ package actor DurableHDCServerLifecycleAuditStore:
           "kind": .string("serverLifecycle"),
           "scopeHash": .string(confirmation.scopeHash),
           "decision": .string(confirmation.decision),
-          "actor": .string(confirmation.actor),
+          "actor": .object(["kind": .string("interactiveUser")]),
           "decidedAt": .string(confirmation.decidedAt),
           "relatedStepIds": .array(
             confirmation.relatedStepIDs.map(JSONValue.string)),

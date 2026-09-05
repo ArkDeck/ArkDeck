@@ -96,13 +96,11 @@
         "cancellingAtSafeBoundary",
         "waitingForRecovery",
         "reconciling",
-        "recoveringByCompleteOverwrite",
         "resumeAtConfirmedSafeBoundary",
         "userAbandonRequested",
         "finalizing",
         "planned",
         "succeeded",
-        "recovered",
         "failed",
         "cancelled",
         "interrupted"
@@ -112,18 +110,17 @@
       "oneOf": [
         { "properties": { "from": { "const": "queued" }, "to": { "enum": ["preflight", "cancelRequested", "finalizing"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "preflight" }, "to": { "enum": ["running", "planning", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "running" }, "to": { "enum": ["recoveringByCompleteOverwrite", "waitingForDevice", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "running" }, "to": { "enum": ["waitingForDevice", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "waitingForDevice" }, "to": { "enum": ["running", "awaitingRebindConfirmation", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "awaitingRebindConfirmation" }, "to": { "enum": ["waitingForDevice", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "planning" }, "to": { "enum": ["cancelRequested", "finalizing"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "cancelRequested" }, "to": { "enum": ["cancellingAtSafeBoundary", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "cancellingAtSafeBoundary" }, "to": { "enum": ["cancelled", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "waitingForRecovery" }, "to": { "enum": ["recoveringByCompleteOverwrite", "reconciling", "userAbandonRequested"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "reconciling" }, "to": { "enum": ["recoveringByCompleteOverwrite", "resumeAtConfirmedSafeBoundary", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "waitingForRecovery" }, "to": { "enum": ["reconciling", "userAbandonRequested"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "reconciling" }, "to": { "enum": ["resumeAtConfirmedSafeBoundary", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "resumeAtConfirmedSafeBoundary" }, "to": { "enum": ["running", "planning", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "userAbandonRequested" }, "to": { "enum": ["interrupted", "waitingForRecovery"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "recoveringByCompleteOverwrite" }, "to": { "enum": ["cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "finalizing" }, "to": { "enum": ["planned", "succeeded", "recovered", "failed"] } }, "required": ["from", "to"] }
+        { "properties": { "from": { "const": "finalizing" }, "to": { "enum": ["planned", "succeeded", "failed"] } }, "required": ["from", "to"] }
       ]
     },
     "outcomeCertainty": {
@@ -555,11 +552,8 @@
             "result": {
               "enum": [
                 "resumeAtConfirmedSafeBoundary",
-                "resumeHostOnlyAtConfirmedSafeBoundary",
                 "waitingForRecovery",
                 "finalizeConfirmedFailure",
-                "finalizeHostOnlyConfirmedFailure",
-                "finalizeLanePostflightRecovered",
                 "noAction"
               ]
             },
@@ -583,15 +577,6 @@
             },
             {
               "properties": {
-                "result": { "const": "resumeHostOnlyAtConfirmedSafeBoundary" },
-                "nextState": { "const": "resumeAtConfirmedSafeBoundary" },
-                "outcomeCertainty": { "const": "confirmed" },
-                "safeBoundaryConfirmed": { "const": true }
-              },
-              "required": ["result", "nextState", "outcomeCertainty", "safeBoundaryConfirmed"]
-            },
-            {
-              "properties": {
                 "result": { "const": "waitingForRecovery" },
                 "nextState": { "const": "waitingForRecovery" }
               },
@@ -599,9 +584,7 @@
             },
             {
               "properties": {
-                "result": {
-                  "enum": ["finalizeConfirmedFailure", "finalizeHostOnlyConfirmedFailure", "finalizeLanePostflightRecovered"]
-                },
+                "result": { "const": "finalizeConfirmedFailure" },
                 "nextState": { "const": "finalizing" },
                 "outcomeCertainty": { "const": "confirmed" },
                 "safeBoundaryConfirmed": { "const": true }
@@ -623,11 +606,7 @@
           "if": {
             "properties": {
               "payload": {
-                "properties": {
-                  "result": {
-                    "enum": ["resumeAtConfirmedSafeBoundary", "finalizeConfirmedFailure", "finalizeLanePostflightRecovered"]
-                  }
-                },
+                "properties": { "result": { "const": "resumeAtConfirmedSafeBoundary" } },
                 "required": ["result"]
               }
             },
@@ -635,24 +614,15 @@
           },
           "then": {
             "properties": {
-              "bindingRevision": { "type": "integer", "minimum": 1 }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
+              "bindingRevision": { "type": "integer", "minimum": 1 },
               "payload": {
                 "properties": {
-                  "result": {
-                    "enum": ["resumeHostOnlyAtConfirmedSafeBoundary", "finalizeHostOnlyConfirmedFailure"]
-                  }
+                  "nextState": { "const": "resumeAtConfirmedSafeBoundary" },
+                  "outcomeCertainty": { "const": "confirmed" },
+                  "safeBoundaryConfirmed": { "const": true }
                 }
               }
             }
-          },
-          "then": {
-            "properties": { "bindingRevision": { "type": "null" } }
           }
         }
       ]
@@ -759,7 +729,7 @@
           "required": ["terminalStatus", "manifestSha256", "outcomeCertainty"],
           "properties": {
             "terminalStatus": {
-              "enum": ["planned", "succeeded", "recovered", "failed", "cancelled", "interrupted"]
+              "enum": ["planned", "succeeded", "failed", "cancelled", "interrupted"]
             },
             "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "outcomeCertainty": {

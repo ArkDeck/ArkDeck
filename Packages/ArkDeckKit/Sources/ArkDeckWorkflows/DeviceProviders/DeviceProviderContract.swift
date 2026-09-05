@@ -1447,10 +1447,9 @@ public struct ProviderFacts: Sendable, Equatable {
   public let toolVersion: String
   public let toolSHA256: String
   public let serverFacts: [String: String]
-  /// Correlation fields are optional for compatibility with pre-V3 fact
-  /// producers. Hardware evidence treats every absent field as
-  /// incomplete; the runtime never fills one from a target ID or caller
-  /// input.
+  /// Host-only facts may have no device correlation. Device admission and
+  /// evidence treat every absent field as incomplete; the Runtime never
+  /// invents one from a target ID or caller input.
   public let targetID: String?
   public let bindingRevision: Int?
   public let deviceIdentitySHA256: String?

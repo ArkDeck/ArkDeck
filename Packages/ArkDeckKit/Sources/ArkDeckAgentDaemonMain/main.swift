@@ -1136,14 +1136,6 @@ Task.detached {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: resolvedStateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: utcNow)
-    // Historical authority records remain mounted read-only for versioned
-    // decode/export. New admission never reserves or consumes this ledger.
-    let usageRoot = try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask,
-      appropriateFor: nil, create: true
-    )
-    .appending(path: "ArkDeck", directoryHint: .isDirectory)
-    .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
     // The ArkForge lane. Absent unless an operator installed one validated
     // release bundle, and absence is written to the log with what it means for
     // the product — a daemon with no lane and a daemon that failed to build one
@@ -1231,6 +1223,11 @@ Task.detached {
       hdcProvider, arkForgeProvider, workspaceProvider, analyzerProvider,
     ])
 
+    let runtimeSessionStorage = try RuntimeSessionStorageStore(
+      ownerRoot: resolvedStateDirectory,
+      defaultSessionsRoot: rockchipRoot.appending(
+        path: "Sessions", directoryHint: .isDirectory))
+
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: resolvedStateDirectory, arkForgeLane: arkForgeLane,
@@ -1242,7 +1239,12 @@ Task.detached {
       workspaceProjectStore: workspaceProjectStore,
       traceRuntimeProbe: traceRuntimeProbe,
       powerActivityController: PowerActivityController(),
-      agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
+      validateMutationState: {
+        try RuntimeStateContinuity.requireMutationState(
+          selectedRoot: resolvedStateDirectory,
+          defaultRoot: ArkDeckAgentFilesystemLayout.defaultStateDirectory(),
+          sessionRoots: [URL(filePath: try runtimeSessionStorage.status().rootPath)])
+      },
       nowUTC: utcNow, nowPreciseUTC: utcNowPrecise)
     // The engine is the reference ledger for sweep testimony; it exists
     // only now, so the handle the dispatcher already holds is filled here.
@@ -1406,10 +1408,6 @@ Task.detached {
       }
     }
     let historyFilterStore = RuntimeHistoryFilterStore(rootURL: resolvedStateDirectory)
-    let runtimeSessionStorage = try RuntimeSessionStorageStore(
-      ownerRoot: resolvedStateDirectory,
-      defaultSessionsRoot: rockchipRoot.appending(
-        path: "Sessions", directoryHint: .isDirectory))
     let traceCacheDirectory =
       resolvedStateDirectory.standardizedFileURL == defaultStateDirectory.standardizedFileURL
       ? ArkDeckTraceConfiguration.appContainerCachesDirectory()

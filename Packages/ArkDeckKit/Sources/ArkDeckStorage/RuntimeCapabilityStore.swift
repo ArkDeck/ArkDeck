@@ -64,7 +64,7 @@ public struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
   public let targetStableIdentitySHA256: String?
   public let bindingRevision: Int?
   public let materializedPlanDigest: String?
-  package let authorizationScopeFingerprintSHA256: String?
+  package let authorizationScopeFingerprintSHA256: String
   package let queryFingerprintSHA256: String
   package let remainingUsesAfter: Int
   package let previousLineageSHA256: String?
@@ -121,7 +121,7 @@ private struct StoredConsumption: Equatable, Codable {
   let targetStableIdentitySHA256: String?
   let bindingRevision: Int?
   let materializedPlanDigest: String?
-  let authorizationScopeFingerprintSHA256: String?
+  let authorizationScopeFingerprintSHA256: String
   let queryFingerprintSHA256: String
   let remainingUsesAfter: Int
   let previousLineageSHA256: String?
@@ -144,13 +144,9 @@ private struct StoredRecord: Equatable, Codable {
 }
 
 private struct StoreDocument: Equatable, Codable {
-  static let currentSchemaVersion = "2.0.0"
+  static let currentSchemaVersion = "1.0.0"
   var schemaVersion: String
   var records: [StoredRecord]
-}
-
-private struct StoreVersionHeader: Decodable {
-  let schemaVersion: String
 }
 
 /// One durable change to a capability's use lineage.
@@ -528,7 +524,7 @@ public actor RuntimeCapabilityStore {
     let targetStableIdentitySHA256: String?
     let bindingRevision: Int?
     let materializedPlanDigest: String?
-    let authorizationScopeFingerprintSHA256: String?
+    let authorizationScopeFingerprintSHA256: String
     let queryFingerprintSHA256: String
     let remainingUsesAfter: Int
     let previousLineageSHA256: String?
@@ -694,19 +690,11 @@ public actor RuntimeCapabilityStore {
     if let first = record.consumptions.first,
       !permitsWorkspaceStandingMaterialization(record.capability)
     {
-      if let expectedScope = first.authorizationScopeFingerprintSHA256 {
-        guard expectedScope == authorizationScopeFingerprint(of: query) else {
-          throw RuntimeCapabilityStoreError.lineageBlocked(
-            "operation, effect, target, binding or typed inputs drifted from "
-              + "authorization lineage use 1")
-        }
-      } else {
-        // Pre-upgrade lineage nodes did not persist a plan-independent scope
-        // fingerprint. Preserve their stricter exact-query behavior.
-        guard first.queryFingerprintSHA256 == fingerprint(of: query) else {
-          throw RuntimeCapabilityStoreError.lineageBlocked(
-            "legacy authorization lineage scope cannot be proven unchanged")
-        }
+      guard first.authorizationScopeFingerprintSHA256 == authorizationScopeFingerprint(of: query)
+      else {
+        throw RuntimeCapabilityStoreError.lineageBlocked(
+          "operation, effect, target, binding or typed inputs drifted from authorization lineage use 1"
+        )
       }
     }
     if case .failure(let denial) = record.capability.authorizes(
@@ -786,7 +774,8 @@ public actor RuntimeCapabilityStore {
     }
     switch event.kind {
     case "consumed":
-      guard let consumption = event.consumption else {
+      guard let consumption = event.consumption, event.reservationID == nil, event.outcome == nil
+      else {
         throw RuntimeCapabilityStoreError.storeCorrupted("ledger consume carries no use")
       }
       guard
@@ -800,7 +789,9 @@ public actor RuntimeCapabilityStore {
       document.records[index].consumptions.append(consumption)
       document.records[index].remainingUses = consumption.remainingUsesAfter
     case "outcome":
-      guard let reservationID = event.reservationID, let outcome = event.outcome else {
+      guard let reservationID = event.reservationID, let outcome = event.outcome,
+        event.consumption == nil
+      else {
         throw RuntimeCapabilityStoreError.storeCorrupted("ledger outcome carries no record")
       }
       guard
@@ -835,11 +826,10 @@ public actor RuntimeCapabilityStore {
     guard !data.isEmpty else { return [] }
     var lines = data.split(separator: 0x0A, omittingEmptySubsequences: false)
     if data.last != 0x0A { lines.removeLast() }
-    let decoder = JSONDecoder()
     return try lines.compactMap { line -> StoredLedgerEvent? in
       guard !line.isEmpty else { return nil }
       do {
-        return try decoder.decode(StoredLedgerEvent.self, from: Data(line))
+        return try CurrentDurableJSON.decode(StoredLedgerEvent.self, from: Data(line))
       } catch {
         throw RuntimeCapabilityStoreError.storeCorrupted(
           "undecodable capability ledger event: \(error)")
@@ -850,10 +840,17 @@ public actor RuntimeCapabilityStore {
   private func loadCheckpoint() throws -> StoreDocument {
     let data: Data
     do {
+      try DurableFilePrimitives.rejectSymbolicLink(documentURL)
+      try DurableFilePrimitives.rejectSymbolicLink(ledgerURL)
       data = try Data(contentsOf: documentURL)
     } catch let error as NSError
       where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError
     {
+      guard !FileManager.default.fileExists(atPath: ledgerURL.path) else {
+        throw RuntimeCapabilityStoreError.storeCorrupted(
+          "capability checkpoint is missing beside an existing ledger; original state is preserved at \(directoryURL.path)"
+        )
+      }
       return StoreDocument(schemaVersion: StoreDocument.currentSchemaVersion, records: [])
     } catch {
       throw RuntimeCapabilityStoreError.ioFailure("cannot read capability store: \(error)")
@@ -864,26 +861,12 @@ public actor RuntimeCapabilityStore {
     } catch {
       throw RuntimeCapabilityStoreError.storeCorrupted("duplicate or malformed JSON: \(error)")
     }
-    let version: String
-    do {
-      version = try JSONDecoder().decode(StoreVersionHeader.self, from: data).schemaVersion
-    } catch {
-      throw RuntimeCapabilityStoreError.storeCorrupted(
-        "store has no readable schema version: \(error)")
-    }
     let document: StoreDocument
     do {
-      switch version {
-      case StoreDocument.currentSchemaVersion:
-        document = try JSONDecoder().decode(StoreDocument.self, from: data)
-      default:
-        throw RuntimeCapabilityStoreError.storeCorrupted(
-          "unsupported schema version \(version)")
-      }
-    } catch let error as RuntimeCapabilityStoreError {
-      throw error
+      document = try CurrentDurableJSON.decode(StoreDocument.self, from: data)
     } catch {
-      throw RuntimeCapabilityStoreError.storeCorrupted("undecodable store document: \(error)")
+      throw RuntimeCapabilityStoreError.storeCorrupted(
+        "undecodable current store document: \(error)")
     }
     try Self.validate(document)
     return document
@@ -893,6 +876,10 @@ public actor RuntimeCapabilityStore {
     guard document.schemaVersion == StoreDocument.currentSchemaVersion else {
       throw RuntimeCapabilityStoreError.storeCorrupted(
         "unsupported schema version \(document.schemaVersion)")
+    }
+    guard Set(document.records.map { $0.capability.capabilityID }).count == document.records.count
+    else {
+      throw RuntimeCapabilityStoreError.storeCorrupted("duplicate capability identity")
     }
     for record in document.records {
       guard record.remainingUses >= 0,
@@ -906,7 +893,9 @@ public actor RuntimeCapabilityStore {
       var reservations = Set<String>()
       for (offset, use) in record.consumptions.enumerated() {
         let expectedOrdinal = offset + 1
-        guard use.ordinal == expectedOrdinal,
+        guard isLowercaseSHA256(use.authorizationScopeFingerprintSHA256),
+          isLowercaseSHA256(use.queryFingerprintSHA256),
+          use.ordinal == expectedOrdinal,
           use.remainingUsesAfter == record.capability.maximumUses - expectedOrdinal,
           use.previousLineageSHA256 == expectedPrevious,
           reservations.insert(use.reservationID).inserted

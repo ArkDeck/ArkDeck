@@ -291,7 +291,7 @@ final class ImportLifecycleContractTests: XCTestCase {
     }
   }
 
-  func testAuthorizedJobKeepsOriginalInputFingerprintAcrossRestartAndLegacyRecords() async throws {
+  func testAuthorizedJobKeepsOriginalInputFingerprintAndRefusesHistoricalReconstruction() async throws {
     let imported = try await imported(); let engine = try engine()
     let accepted = try await engine.submit(request(imported, hap: true))
     let repository = try RuntimeJobRepository(stateDirectory: root.appending(path: "engine"))
@@ -307,10 +307,10 @@ final class ImportLifecycleContractTests: XCTestCase {
     var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
     legacy.removeValue(forKey: "originalSubmissionRequest")
     let legacyBytes = try JSONSerialization.data(withJSONObject: legacy)
-    let oldRecord = try JSONDecoder().decode(RuntimeJobRecord.self, from: legacyBytes)
-    XCTAssertTrue(oldRecord.hasVerifiedSubmissionFingerprint(saved.requestHash), "an exact hash proves the older pre-authorization request")
+    XCTAssertThrowsError(try JSONDecoder().decode(RuntimeJobRecord.self, from: legacyBytes))
     try repository.updateJobState(jobID: accepted.jobID, state: saved.state, updatedAtUTC: saved.updatedAtUTC, recordData: legacyBytes)
-    await conflict { _ = try await engine.releaseImport(id: imported.id, generation: 2) }
+    do { _ = try await engine.releaseImport(id: imported.id, generation: 2); XCTFail("missing original request was reconstructed") }
+    catch let failure as AgentExecutionControlFailure { XCTAssertEqual(failure.code, "recordUnreadable") }
 
     for field in ["request", "originalSubmissionRequest"] {
       var corrupt = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])

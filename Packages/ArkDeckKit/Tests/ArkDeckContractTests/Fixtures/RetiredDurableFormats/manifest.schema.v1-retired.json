@@ -184,21 +184,6 @@
       },
       "then": {
         "properties": {
-          "steps": {
-            "items": {
-              "if": {
-                "properties": { "effect": { "const": "destructive" } },
-                "required": ["effect"]
-              },
-              "then": {
-                "properties": {
-                  "disposition": { "enum": ["notExecuted(planned)", "skipped"] },
-                  "outcomeCertainty": { "const": "notApplicable" },
-                  "semanticResult": { "const": "notRun" }
-                }
-              }
-            }
-          },
           "originalTarget": {
             "allOf": [
               { "$ref": "#/$defs/target" },
@@ -720,7 +705,7 @@
         "kind": { "enum": ["deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary"] },
         "scopeHash": { "$ref": "#/$defs/sha256" },
         "decision": { "enum": ["accepted", "rejected"] },
-        "actor": { "type": "object", "additionalProperties": false, "required": ["kind"], "properties": { "kind": { "const": "interactiveUser" } } },
+        "actor": { "const": "user" },
         "decidedAt": { "type": "string", "format": "date-time" },
         "relatedStepIds": {
           "type": "array",
