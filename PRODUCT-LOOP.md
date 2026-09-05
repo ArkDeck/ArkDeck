@@ -3,7 +3,7 @@
 > Status:current(2026-07-30 由维护者签发;合并进受保护 `main` 即批准生效)
 > 定位:本文件是当前阶段所有 AI 开发任务的执行优先级正本,在 `AGENTS.md` 权威顺序中列于
 > Constitution 安全不变量之下、其余一切治理流程文档之上。
-> 安全边界:本指令不突破设备安全边界、不绕过副作用授权(E1/E2)、不降低错误设备防护能力;
+> 安全边界:本指令不突破设备安全边界、不绕过 Runtime 副作用准入、不降低错误设备防护能力;
 > `AGENTS.md`「Agent 禁令」与 Constitution Safety invariants / POL-* 全部保留,任何条款不得
 > 被本指令解释为放宽。
 
@@ -161,7 +161,7 @@ AI 自动完成:
 
 1. 可能对刷错设备;
 2. 可能向错误设备部署文件;
-3. 可能绕过 E1/E2 授权;
+3. 可能绕过 RuntimeCapability 副作用准入;
 4. 可能重复执行未知结果的副作用;
 5. 可能导致系统分区或用户数据不可逆损坏;
 6. 可能破坏 durable intent、journal 或 recovery 语义;
@@ -243,16 +243,14 @@ HDC 命令没有绑定 connectKey,可能操作默认设备。
 
 ## 5. 禁止重复任务定义
 
-创建任何新任务前,必须搜索:
+创建新任务前,先按当前问题的关键词、相关路径和目标产品结果,查找相关 Backlog、
+实现和测试。根据任务范围补充检索:
 
-- 当前产品 Backlog;
-- 已打开 PR;
-- 最近合入提交;
-- 当前 Operation Catalog(`Catalog/operations/`);
-- Runtime Provider(`Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/`);
-- 旧 OpenSpec Task;
-- 已存在测试;
-- 相关脚本。
+- 涉及 Operation 或 Provider 时,查对应 Catalog、Provider 和相关脚本;
+- 存在同题任务或近期实现线索时,查对应 OpenSpec Task 和最近相关提交;
+- 准备创建 PR,或发现可能有同题在途工作时,查相关已打开 PR。
+
+以足以判断是否重复为准,不要求逐项读取无关目录、历史任务或未变化内容。
 
 发现已有任务或实现覆盖当前问题时:
 
@@ -392,7 +390,7 @@ PID 或应用状态 readback
 ```text
 设备身份确认
     ↓
-E2 精确计划授权
+Runtime 为精确计划生成并校验 RuntimeCapability
     ↓
 执行刷机
     ↓
@@ -774,21 +772,23 @@ Runtime Plane 负责:
 - 插入 USB;
 - 设备侧首次信任;
 - 系统权限授权;
-- 多设备歧义选择;
-- E1/E2 Capability 批准;
-- outcomeUnknown 人工决策。
+- 无法机械消除的多设备歧义选择。
 
-完成首次接管后,普通 E0 Debug 的人工操作预算必须为:
-
-```text
-0
-```
-
-普通 E1 Debug 在 Capability 有效时,人工操作预算必须为:
+完成首次接管后,满足 bounded 默认只读准入的 `hostOnly`/`readOnly` Debug,
+以及通过 Runtime 准入的 `deviceMutation` Debug,人工操作预算必须为:
 
 ```text
 0
 ```
+
+`deviceMutation`/`destructive` 的 RuntimeCapability 仅由 protected-main Runtime 根据
+已发布 Catalog policy、fresh trusted facts 和完整 materialized plan 生成、reserve 和
+consume。具体约束遵循 `POL-AGENT-002`;Agent、caller 和人工确认不提供或扩大该 authority,
+也不要求每轮聊天确认。
+
+`outcomeUnknown` 的原始 intent 永不 replay。只有 `POL-RECOVERY-001` 的完整机械证明
+成立时,Runtime 才可发起独立 complete-overwrite recovery;缺失证明时零新 dispatch,
+用户确认不能替代证明。
 
 以下行为均视为产品失败:
 
@@ -958,46 +958,29 @@ verify
 
 ## 18. 检测到治理循环时的强制退出机制
 
-出现以下任意信号,视为已经进入治理循环:
+只有当前已授权任务被与其交付无关的治理动作阻塞时,才触发本节。例如:
 
-- 连续两个任务没有修改生产 Runtime;
-- 连续两个 PR 只有文档、Evidence 或状态修改;
-- 为一个产品 Bug 创建两个以上治理任务;
-- 因 Acceptance Schema 不足而停止真实设备修复;
-- 重新扫描旧 Task 后开始重复规划;
-- 准备创建 readiness-only 或 archive-only PR;
-- Fake 测试大量增加,但 Golden Journey 状态没有变化;
-- 新增了治理类型,但没有减少任何人工步骤;
-- 最近五个提交中,产品代码提交少于两个;
-- 同一能力在 Catalog、OpenSpec 和 Backlog 中出现多个活跃任务。
+- 因旧 Task 状态、readiness 或 archive 未更新而停止当前实现;
+- 为表达已有结果反复补充 Schema、Evidence 或状态任务,却不继续当前修复;
+- 反复扫描和重新规划已明确的同一问题,没有处理当前任务的实际阻塞。
 
-触发后必须立即执行:
+触发后,停止无关治理动作,回到当前任务的目标行为、完成条件和实际阻塞,继续完成
+该任务所需的实现或文档。按实际改动和验收目标执行必要验证,仅在真机验收适用时执行
+真实设备验证。不得因此改选其他产品缺陷、扩大任务范围或要求无关生产代码改动。
 
-```text
-1. 停止创建新治理任务;
-2. 列出当前唯一阻塞 Golden Journey 的产品缺陷;
-3. 选择最高优先级产品缺陷;
-4. 直接修改生产代码;
-5. 增加最小必要测试;
-6. 执行真实设备验证;
-7. 不再重新规划整套项目。
-```
+安全不变量、Runtime 准入与恢复证明、规定的 Repo 审批仍按现行规则执行,不得作为
+无关治理动作跳过。完成条件满足后直接交付,不再重新规划整套项目。
 
 ---
 
 ## 19. 每轮执行后的简洁汇报格式
 
-每轮完成后只汇报以下两部分。不得固定展示 Golden Journey 全表、治理循环检查、
-重复任务检查或其他无变化状态。
+每轮完成后,简要报告实际结果、必要验证和实际阻塞。没有文件修改或未执行检查时
+如实说明。不得固定展示 Golden Journey 全表、治理循环检查、重复任务检查或其他
+无变化状态。
 
-### 本轮修改
-
-简要列出本轮实际完成的修改和必要验证。没有修改时明确写「无」。
-
-### 下一轮建议
-
-只列与当前请求直接相关的下一步建议;默认给出一个,确有并列依赖时最多三个。
-不得重新输出完整项目规划或无关状态。
+任务已完成时直接说明完成。只有当前请求仍有真实未完工作时,才列出相关下一步;
+不为填充汇报格式制造后续任务,也不重新输出完整项目规划或无关状态。
 
 ---
 
@@ -1079,6 +1062,6 @@ Golden Journey 前进 > Task 数量增长
   `openspec/README.md` 旧「Agent 执行入口」步骤 2,自本指令生效起对产品闭环工作不再适用;
   各文件留有兼容注记。
 - 恰四类 Repo 审批不变:新 operation 或对已发布 operation 的破坏性修改、新 provider、
-  新 integration/device profile、E2 安全策略变化——仍走 OpenSpec change + 维护者 PR review,
+  新 integration/device profile、destructive 准入安全策略变化——仍走 OpenSpec change + 维护者 PR review,
   且必须与对应 Golden Journey 交付同车,不得独立成为治理项目。
 - 与旧治理文档的其余冲突,按 §2 的兼容说明规则处理:一行注记,继续工作。
