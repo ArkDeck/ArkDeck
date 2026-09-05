@@ -16,6 +16,12 @@ Conventions shared by every task:
   decides mechanically once the task exists on `main`. `Forbidden paths` are for humans.
 - Readiness pins are instantiated when a task moves from `blocked` to `ready`; the blocks below are
   placeholders (`yaml pin-example`).
+- Every task's Allowed paths include `openspec/changes/chg-2026-074-shared-rust-runtime-core/**` (r3). The
+  implementing PR flips its own `Status`, instantiates its readiness pins and writes
+  `evidence/runs/<task-id>/`, and `scripts/check_pr_paths.py` reads Allowed paths from the base
+  tree, so a task that omits the directory cannot deliver the record this file demands. Verified on
+  2026-09-05 with synthetic commits on `main`: an evidence path declared under `TASK-XPA-003` or
+  `TASK-XPA-012` was refused, the same path under `TASK-XPA-002` was accepted.
 - Sizes: S ≤ one engineer-week, M two to three weeks, L four to eight weeks (assumption: one senior
   engineer per lane, AI-assisted, hardware windows excluded).
 - No task in this change carries a `D0` decision grade: none is suitable for the unattended
@@ -110,14 +116,17 @@ Conventions shared by every task:
 
 - Applicable failure patterns:AF-002, AF-003, AF-004, AF-007, AF-011
 - Production reachability:`arkdeck.exe doctor` / `device candidates` → user-private named pipe → `arkdeck-control` → `doctor` / `device.candidates` → `hdc.exe list targets -v` as an argument array with handle-bound hash verification → parser → projection; read-only, no durable write, no capability
-- Trusted fact sources:catalog digest from `Catalog/operations/*.json` via the generator; canonical JSON/CBOR/digest vectors from `openspec/contracts/cli-canonical-json-vectors.json` and the permit vectors; HDC output classification from the hash-pinned Golden/Probe fixtures; pipe peer identity from the logon SID DACL plus server-side SID/elevation check
+- Trusted fact sources:catalog digest from `Catalog/operations/*.json` via the generator; canonical JSON/CBOR/digest vectors from `openspec/contracts/cli-canonical-json-vectors.json` and the permit vectors; HDC output classification from the hash-pinned Golden/Probe fixtures; pipe peer identity from the logon SID DACL plus server-side SID/elevation check; pipe **server** identity from the pipe object's owner SID read by the client (design §F.2, r3)
 - Allowed paths:
   - `rust/**`
   - `spec/**`
   - `.github/workflows/rust-ci.yml`
+  - `.github/workflows/swift-ci.yml`（wire the planner's `rust` output to a hosted job; no other edit）
+  - `scripts/ci/plan.py`
+  - `scripts/ci/test_plan.py`
   - `scripts/catalog_gen/**`
   - `openspec/architecture/core-portability.md`
-  - `openspec/platforms/windows/profile.md`
+  - `openspec/platforms/windows/**`（profile 0.2.0 and the skeleton of `conformance-cases.yaml`）
   - `openspec/platforms/macos/profile.md`
   - `openspec/platforms/linux/profile.md`
   - `openspec/platforms/PLATFORM-PROFILES.lock.yaml`
@@ -136,6 +145,8 @@ Conventions shared by every task:
 - Rust workspace (`arkdeck-contract`, `arkdeck-platform`, `arkdeck-control`, `arkdeck-provider-hdc` parsers, `arkdeck-client`, `arkdeck-cli`, `arkdeck-agentd`) with `cargo deny`/`cargo vet` in CI.
 - Catalog generator emits Rust alongside Swift; digest equality asserted.
 - Named pipe transport (`FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_REJECT_REMOTE_CLIENTS`, logon-SID DACL, client SQOS identification, server SID/elevation check) and UDS transport (0700/0600, peer euid check).
+- Client-side server authentication on the pipe (r3): after `CreateFileW` with `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION` the client reads the pipe object's owner SID (`GetSecurityInfo`, `OWNER_SECURITY_INFORMATION`) and sends no frame unless it equals its own token owner SID — the client-side semantics of .NET `PipeOptions.CurrentUserOnly` (`NamedPipeClientStream.ValidateRemotePipeUser`), which also covers elevation because an elevated token's owner is the Administrators group. `FILE_FLAG_FIRST_PIPE_INSTANCE` only makes the *second* instance fail (`ERROR_ACCESS_DENIED`); a squatted name therefore fails daemon start closed, and `doctor` names the holder instead of retrying.
+- CI planner lane (r3): `scripts/ci/plan.py` gains a `rust` lane selected by `rust/**`, `spec/**` and `.github/workflows/rust-ci.yml` and included in the planner/workflow self-validation branch; `--run-local` runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace` and `cargo deny check`; the hosted job keys off the same planner output. Today `classify_paths` selects no lane for a diff confined to `rust/**` (checked mechanically on 2026-09-05), so without this the local gate passes without compiling the new code.
 - Windows `doctor`, `operation list`, `device candidates` with machine output byte-equal to the macOS fixtures.
 
 ### Verification
@@ -143,11 +154,13 @@ Conventions shared by every task:
 - XPA-AC-1 → vectors and fixtures replayed in Rust → all equal.
 - XPA-AC-3 → negotiation and frame-limit matrix against the Rust daemon → structural refusals, zero dispatch.
 - XPA-AC-6 → cross-account pipe connect → refused.
+- XPA-AC-6 → pipe name squatted before daemon start (foreign account, and same-account unelevated process) → daemon start refused with `ERROR_ACCESS_DENIED` and reported by `doctor`; the client sends zero frames and reports the untrusted server (r3).
+- Planner → `scripts/ci/test_plan.py` asserts that `rust/**` selects the rust lane, that the self-validation branch includes it, and that a `rust/**`-only diff selecting no lane fails (r3).
 - Real device → `device candidates` lists the DAYU200 on a Windows 11 x64 host; recorded as Windows GJ-1 `IMPLEMENTING` in `docs/design/references/v1.6-goal/`.
 
 ### Notes / handoff
 
-- Stop condition: any raw path/argv enters a contract; any durable write.
+- Stop condition: any raw path/argv enters a contract; any durable write; a `rust/**`-only diff for which the planner selects no lane.
 - Size: L.
 
 ## TASK-XPA-003 — Rust control-plane façade on macOS with peer hardening
@@ -165,12 +178,14 @@ Conventions shared by every task:
   ```
 
 - Applicable failure patterns:AF-002, AF-007, AF-014, AF-018
-- Production reachability:client → Rust façade (UDS + Mach service) → forwarded frame to the Swift daemon on a private socket → existing admission; the façade negotiates, admits by peer identity and frame shape, and never interprets, caches or rewrites a frame
-- Trusted fact sources:peer euid from `getpeereid`; App identity from the XPC peer code-signing requirement; the private socket is reachable only by the façade (0700 directory, pairing secret)
+- Production reachability:client → Rust façade (UDS + Mach service) → forwarded frame to the Swift daemon on a private socket → existing admission; the façade negotiates, admits by peer identity and frame shape, and never interprets, caches or rewrites a frame. **Origin context (r3):** the Swift daemon derives `RuntimeControlRequestContext` for every frame from kernel facts of the accepted socket (`AgentDaemon.swift:5095,5149-5194`: peer euid, `LOCAL_PEERPID`, the peer's process group equals its controlling terminal's foreground group, stdin/stderr are that terminal, start time re-checked) and issues the interactive impact-approval challenge only for `unixSocket && hasForegroundConsole` (`:3978`), otherwise returning the HAR unchanged (`:4007-4010`). Behind a transparent forwarder that peer would be the façade — a background daemon with no terminal — and console confirmation would never work again. Therefore the façade derives the same facts on its own accepted descriptor at the moment it forwards each frame and writes to the private socket one origin line `{arkdeckOrigin:1, transport:"unixSocket"|"appXPC", foregroundConsole, peerEUID, peerPID, frameSHA256}` followed by the raw frame bytes; the Swift private listener accepts origin lines only on the private socket, checks `frameSHA256` against the following line, and builds the context from it. No request field participates; an `arkdeckOrigin` object inside a client frame is an ordinary unknown field.
+- Trusted fact sources:peer euid from `getpeereid`; App identity from the XPC peer code-signing requirement; the private socket is reachable only by the façade (0700 directory, pairing secret, `getpeereid` equal to the daemon euid); the origin line, which only the façade can write on that socket
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/LaunchAgents/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`（private-socket listener and origin-line → context construction only; the handler and admission code are untouched, r3）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
@@ -191,13 +206,16 @@ Conventions shared by every task:
 
 - XPA-AC-3 → `AgentDaemonContractTests`/`AgentXPCTransportContractTests` black-box subset against the façade → green.
 - XPA-AC-5 → IPC p95 within +20% of the SPK-1 baseline, compared per row: constant-size replies and paged projections are separate rows since design §I.2 note 1.
-- XPA-AC-6 → foreign-euid UDS peer refused; wrongly signed XPC peer refused.
-- XPA-AC-7 → kill façade / kill Swift daemon → structured client error, zero dispatch, journal unchanged.
+- XPA-AC-6 → foreign-euid UDS peer refused; wrongly signed XPC peer refused; an origin line written to the public socket is `malformedFrame`; a foreign process on the private socket path (0700 directory, no pairing secret) refused.
+- Origin context (r3) → through the façade, a CLI on a foreground terminal gets the console challenge from `human-action.resume` (`interactionOrigin == interactiveConsole`) and a redirected-stdin or background CLI gets the HAR unchanged, with the same reason strings as today; a client frame carrying a forged `arkdeckOrigin` object is refused as an unknown field with zero dispatch; XPC clients keep `appXPC` (no console semantics exist for them today, `AgentDaemon.swift:22`).
+- XPA-AC-7, before forward (r3) → façade killed after accept or negotiation but before the frame is written to the private socket → structured transport error; provably zero dispatch: the Swift daemon received no bytes and the journal is unchanged.
+- XPA-AC-7, after forward (r3) → façade killed after the frame was written but before the reply is relayed, or the Swift daemon killed mid-request → structured interruption error **without** the `details.phase` / `newDispatchCount` proof (that proof is issued only by named owner refusals, `AgentDaemon.swift:4116-4125`, and the façade must never synthesise it); the durable state is whatever the Swift daemon wrote (journal intact and readable, possibly with intent and outcome); the façade never re-sends a forwarded frame; the client resolves the outcome by `job.status`/`job.list` read-back (a `job.submit` idempotency key makes re-submission safe). Test: no duplicate Job, no replay, journal consistent.
 - Real device → GJ-1..5 headless `REAL_DEVICE_PASS`; rollback drill (`runtime service update --daemon <swift>`) recorded.
 
 ### Notes / handoff
 
-- Stop condition: any authority or durable write in the façade; any entitlement widening.
+- Stop condition: any authority or durable write in the façade; any entitlement widening; any reply that claims zero dispatch for a frame the façade had already forwarded.
+- Rejected alternative (r3): handing the accepted descriptor to the Swift daemon with `SCM_RIGHTS` keeps the kernel facts first-hand but hides every later frame from the façade, which TASK-XPA-012 needs in order to serve host-only methods locally.
 - Size: M.
 
 ## TASK-XPA-004 — Windows target adopt with durable binding and human trust stop
@@ -218,6 +236,7 @@ Conventions shared by every task:
 - Production reachability:CLI → pipe → `target.adopt` → `arkdeck-runtime::bootstrap` (closed four-action observation vocabulary) → `targets/` under `.targets.lock`
 - Trusted fact sources:stable identity = SHA-256 of the normalised serial exactly as Swift computes it; no serial fails closed; candidate lists come only from the pinned parser
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `spec/**`
   - `docs/design/**`
@@ -261,6 +280,7 @@ Conventions shared by every task:
 - Production reachability:CLI → `job.submit` (default read-only policy) → SQLite v2 admission + `job-record.json` + journal `jobCreated` → `stepIntent` → `hdc.exe -t <connectKey> …` through the single `deviceArguments` injection point → semantic verify → `stepOutcome` → artifact index → `job.events/status/result`
 - Trusted fact sources:target facts from the durable binding; tool identity from handle-bound hash; the plan digest from canonical JSON of the materialised plan; callers provide only the operation reference, typed inputs and target reference
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `spec/**`
   - `docs/design/**`
@@ -304,6 +324,8 @@ Conventions shared by every task:
 - Production reachability:`agent.run` with a durable execution record → capture lowering (hilog/hidumper families) → missing products recorded as `missing(reason)` → `artifact.read` bounded pages / `artifact.export` refusing overwrite and symlinks → `agent status` / `human-action show` / `agent resume` after a client crash
 - Trusted fact sources:artifact identity = job ID + declared name + SHA-256; sensitive products require explicit opt-in; execution identity from the durable execution store, not from the caller
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
+  - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
   - `docs/design/**`
@@ -346,9 +368,14 @@ Conventions shared by every task:
 - Production reachability:WinUI → `ArkDeck.ClientKit` (generated records) → named pipe → read-only methods and the typed `job.submit` gate; the App holds no runtime semantics and no executable
 - Trusted fact sources:all state is daemon projection (`job.status`, `operation.list`, HAR documents); strings come from the shared bilingual source generated into `.resw` and `.xcstrings`
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `windows/**`
   - `spec/ui-semantics/**`
   - `ArkDeckApp/Resources/**`（generated content only, values unchanged）
+  - `.github/workflows/swift-ci.yml`（wire the planner's `windows` output to a hosted job; no other edit）
+  - `.github/workflows/windows-*.yml`
+  - `scripts/ci/plan.py`
+  - `scripts/ci/test_plan.py`
   - `docs/design/**`
 - Forbidden paths:
   - `rust/**` runtime semantics、`Packages/**`、`openspec/specs/**`
@@ -359,11 +386,14 @@ Conventions shared by every task:
 ### Deliverables
 
 - MSIX project, UIA names, live region for Job state changes, keyboard paths, bilingual catalog generator (one source → `.resw` + `.xcstrings`).
+- CI planner lane (r3): `scripts/ci/plan.py` gains a `windows` lane selected by `windows/**` that builds and tests the WinUI/ClientKit solution on a Windows runner; on a non-Windows host `--run-local` reports the lane as not runnable and exits non-zero instead of passing silently.
 
 ### Verification
 
 - XPA-AC-8 → UIA tree snapshot semantically equal to the macOS AX snapshot for the same fixture; Narrator reads Job state changes; no disabled placeholder for unimplemented capabilities.
 - AC-I18N-001-01 → long text and missing keys on Windows.
+- XPA-AC-6 (r3) → `ArkDeck.ClientKit` refuses a pipe whose owner SID is not the current user's and shows the daemon-unavailable recovery banner instead of data from an impostor server.
+- Planner (r3) → `scripts/ci/test_plan.py` covers `windows/**`.
 
 ### Notes / handoff
 
@@ -388,6 +418,8 @@ Conventions shared by every task:
 - Production reachability:`artifact.import.*` (2 MiB chunks, durable Import owner) → lease → deviceMutation admission where the protected Runtime generates, reserves, consumes and settles the `RuntimeCapability` → lowering → install/launch/pid readback → cleanup
 - Trusted fact sources:capability minted only from fresh target/binding/tool facts and the full materialised plan; callers may only reference a capability by ID; lineage chain (`previousLineageSHA256`) identical to the macOS format
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
+  - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
   - `windows/**`（Debug Apps/Logs tabs）
@@ -432,6 +464,8 @@ Conventions shared by every task:
 - Production reachability:ELF/ABI/Build-ID/hash validation (pure Rust) → staging → remote hash → atomic publish → process restart → `hashProcessAndMaps` verified → rollback leg on failure
 - Trusted fact sources:library facts from the artifact store; device trust of the signing container is observed, never assumed
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
+  - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
   - `windows/**`（Debug Artifacts tab）
@@ -473,6 +507,8 @@ Conventions shared by every task:
 - Production reachability:`arkdeck-provider-arkforge` → `arkforge-client` + `arkforge-arkdeck-adapter` → `arkforged.exe` spawned by the daemon with a stdin pairing secret → StepPermit (CBOR vectors) → readback / rebind / postflight → recovery epoch
 - Trusted fact sources:destructive capability pins operation/version, stable identity, binding revision, exact inputs, plan digest, archive digest, expiry, budgets; 16 epochs / 4 h / concurrency one; unknown intents are never replayed
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
+  - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
   - `windows/**`（Flash surface）
@@ -516,6 +552,8 @@ Conventions shared by every task:
 - Production reachability:workspace provider (git / node+hvigor / hap-sign-tool through registered toolchain references; keystore password in Credential Manager; presence gate through the HAR console challenge) and analyzer provider (crash signature, hilog summary) → `agent run` budgets → negative `revisionConflict` with zero dispatch
 - Trusted fact sources:toolchain identity from registered references, never from PATH; secrets never in argv/env/receipts
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
+  - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
   - `windows/**`
@@ -558,6 +596,7 @@ Conventions shared by every task:
 - Production reachability:the façade serves session storage, history filters, display names, trace cache, tool/bundle registry and storage policy locally; lock file names and JSON shapes unchanged; the Swift daemon no longer opens these stores
 - Trusted fact sources:generation-CAS documents under the same lock discipline; the App's `UserDefaults` record remains a one-shot migration candidate only
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（disable the Swift owner of these stores）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
@@ -576,7 +615,7 @@ Conventions shared by every task:
 
 ### Verification
 
-- XPA-AC-1 → Swift decoders read Rust-written documents.
+- XPA-AC-1 → Swift's current strict decoders read Rust-written documents; the key set of every record equals the Swift `CodingKeys`; a negative vector with one extra key is refused by Swift (field-set freeze, design §G.2, r3).
 - XPA-AC-7 → lock contention and CAS conflicts fail closed.
 - XPA-AC-9 → rollback drill recorded.
 
@@ -603,6 +642,7 @@ Conventions shared by every task:
 - Production reachability:import/lease/read/export/quota/retention/cleanup-debt served by Rust; the Swift engine publishes through a private `artifact.publish` method authenticated by the pairing secret; GC only reclaims expired, unreferenced, unpinned entries
 - Trusted fact sources:artifact identity and payload verification document unchanged; quota refuses new work and never evicts
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
@@ -621,7 +661,7 @@ Conventions shared by every task:
 
 ### Verification
 
-- XPA-AC-1 → `index.json` and payload-verification bytes equal for the same publication.
+- XPA-AC-1 → `index.json` and payload-verification bytes equal for the same publication; Artifact records and derived provenance carry exactly the Swift key sets (`ArtifactStorage.swift:73-79,1736-1741` reject anything else); negative vector with one extra key refused (r3).
 - XPA-AC-7 → kill either process mid-publish → index consistent or product recorded missing; never a half-record.
 - XPA-AC-10 → quota/retention/export rules unchanged.
 
@@ -649,6 +689,7 @@ Conventions shared by every task:
 - Production reachability:Rust admission in the published order → journal intent → private `executor.step.execute{jobId, stepId, typedAction, planDigest, targetFacts, useOrdinal}` → Swift lowering + process + semantic verify → receipt → Rust outcome and artifact publication; plan-only never reaches the executor
 - Trusted fact sources:the Rust authority alone reads fresh target/binding/tool facts, materialises the plan, mints/reserves/consumes capabilities and writes intents; the Swift sidecar receives typed actions only and cannot alter operation, target, plan or step set
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
@@ -671,6 +712,7 @@ Conventions shared by every task:
 ### Verification
 
 - XPA-AC-2 → `job.plan` digest equal between Swift and Rust for every operation (plan-only, zero dispatch).
+- XPA-AC-1 → journal envelopes and payloads, checkpoints, recovery manifests and the authorization ledger written by Rust decode with the Swift strict validators (`JournalEventValidation.swift:651-660`, `DurableFiles.swift:485-487`, `RecoveryManifestContract.swift`, `AuthorizationUsageLedger.swift:208-218`); negative vector with one extra key refused (r3).
 - XPA-AC-7 → crash-window matrix (Rust/Swift × before/after intent, before/after consume) → all fail closed; `outcomeUnknown` lanes carried over and never replayed.
 - XPA-AC-9 → cutover and rollback drills recorded with journal/SQLite byte checks.
 - Real device → GJ-1..5 headless `REAL_DEVICE_PASS` on the Rust authority.
@@ -698,6 +740,7 @@ Conventions shared by every task:
 - Production reachability:Rust analyzer and workspace providers replace the sidecar for those families; Keychain through the `SecItem*` C API; presence gate through the HAR console challenge; `/usr/bin/git` replaced by a registered toolchain reference
 - Trusted fact sources:toolchain identity from registered references; secrets never leave the credential store into argv/env/receipts
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（sidecar coverage shrink only）
   - `Packages/ArkDeckKit/Tests/**`
@@ -730,6 +773,7 @@ Conventions shared by every task:
 - Production reachability:Rust HDC provider (parsers, probe registries, supervisor observation through libproc, `posix_spawn` with the `/.vol/<dev>/<ino>` launch path, PTY secret exchange, persistent shell channel) replaces the sidecar for device-scoped operations
 - Trusted fact sources:server identity/generation from commandless platform observation; executable identity from hash plus inode; Golden/Probe fixtures replayed in full
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `Packages/ArkDeckKit/Tests/**`
@@ -750,7 +794,7 @@ Conventions shared by every task:
 - Platform:macos
 - Requirements:REQ-FLASH-007/015/016/017/018, POL-AGENT-002, POL-RECOVERY-001, `docs/ArchitectureRules.md` sections 1–4
 - Acceptance:AC-FLASH-014-01, XPA-AC-1, XPA-AC-4, XPA-AC-6, XPA-AC-9; macOS GJ-1..5 on the pure Rust daemon
-- Depends on:TASK-XPA-016
+- Depends on:TASK-XPA-016, TASK-XPA-018, TASK-XPA-019（r3: both clients must be decoupled before anything is deleted）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -759,14 +803,18 @@ Conventions shared by every task:
   ```
 
 - Applicable failure patterns:AF-002, AF-005, AF-008, AF-014, AF-015
-- Production reachability:the Rust ArkForge lane consumes `arkforge-client` directly; the Swift sidecar is deleted together with `ArkDeckAgentDaemon`, `ArkDeckAgentDaemonMain`, the engine part of `ArkDeckWorkflows`, `ArkDeckStorage`, `ArkDeckProcess` and `ArkDeckOpenHarmony`; the LaunchAgent points permanently at the Rust binary
+- Production reachability:the Rust ArkForge lane consumes `arkforge-client` directly; the Swift sidecar is deleted together with `ArkDeckAgentDaemon`, `ArkDeckAgentDaemonMain`, the engine part of `ArkDeckWorkflows`, `ArkDeckStorage`, `ArkDeckProcess` and `ArkDeckOpenHarmony`; the LaunchAgent points permanently at the Rust binary. Deletion is legal only when nothing links the targets: `ArkDeckCLI` links `ArkDeckWorkflows` and `ArkDeckAgentComposition` (`Packages/ArkDeckKit/Package.swift:112-116`) and is removed by TASK-XPA-018; the App links the `ArkDeckWorkflows` product (`ArkDeck.xcodeproj/project.pbxproj:889`) and drops it in TASK-XPA-019; the Swift fixtures `ArkDeckJournalCrashFixture`, `ArkDeckEngineCrashFixture` and `ArkDeckRuntimeSoakFixture` go together with their targets once their Rust equivalents exist (TASK-XPA-014, TASK-XPA-023)
 - Trusted fact sources:unchanged; the repository now holds exactly one runtime implementation and one ArkForge codec
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/**`
   - `Packages/ArkDeckKit/LaunchAgents/**`
   - `ArkDeck.xcodeproj/**`
   - `docs/ArchitectureRules.md`
+  - `openspec/platforms/macos/**`（macOS re-verified on the pure Rust daemon, r3）
+  - `openspec/platforms/PLATFORM-PROFILES.lock.yaml`
+  - `openspec/verification/traceability.md`（macOS column only）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`、`openspec/constitution.md`、`Catalog/**`
@@ -776,7 +824,8 @@ Conventions shared by every task:
 
 ### Deliverables / Verification
 
-- No second runtime implementation in the repository; structural tests guard "Swift holds no runtime semantics"; release DMG contains the Rust daemon as nested code with empty entitlements; GJ-1..5 `REAL_DEVICE_PASS`. Size: L.
+- No second runtime implementation in the repository; structural tests guard "Swift holds no runtime semantics"; release DMG contains the Rust daemon as nested code with empty entitlements; GJ-1..5 `REAL_DEVICE_PASS`; the macOS column of `openspec/verification/traceability.md` and the lock file flip here and nowhere earlier. Size: L.
+- r3 note: r1/r2 depended on TASK-XPA-016 alone, which would have deleted modules the Swift CLI and the App still linked — an unreleasable intermediate state. The order is now decouple (018 ∥ 019), then delete.
 
 ## TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 
@@ -784,7 +833,7 @@ Conventions shared by every task:
 - Platform:macos（Windows already uses the Rust CLI）
 - Requirements:CLI-REQ-001..025, `docs/design/arkdeck-cli-product-spec.md` §14/§15/§18
 - Acceptance:XPA-AC-3; `cli-feature-coverage.json` `fullFunction` on both platforms
-- Depends on:TASK-XPA-002（continuous）, TASK-XPA-017（final）
+- Depends on:TASK-XPA-002（continuous）, TASK-XPA-016（final: every leaf, including the macOS in-process compatibility leaves, is served by the Rust daemon or tombstoned per CLI spec §12; r3 — previously the final dependency was TASK-XPA-017, which is the wrong way round because `ArkDeckCLI` links the modules TASK-XPA-017 deletes）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -796,6 +845,7 @@ Conventions shared by every task:
 - Production reachability:`arkdeck` (Rust) → same wire methods; `maintainer contracts export` produced by Rust must equal the published bundle before the fact source flips
 - Trusted fact sources:219 argv fixtures, envelope/page/nextAction samples and the published contract bundle are the oracle until parity, then Rust becomes the oracle
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/**`（Swift CLI removal）
   - `openspec/contracts/cli-*.yaml`、`openspec/contracts/cli-*.json`、`openspec/contracts/runtime-control-plane.schema.json`
@@ -808,7 +858,7 @@ Conventions shared by every task:
 
 ### Deliverables / Verification
 
-- Byte-equal fixtures; zero-drift export from Rust; Swift CLI deleted; GJ-1..5 headless with the Rust CLI. Size: L.
+- Byte-equal fixtures; zero-drift export from Rust; Swift CLI deleted; GJ-1..5 headless with the Rust CLI. Must complete before TASK-XPA-017 (r3). Size: L.
 
 ## TASK-XPA-019 — macOS App consumes ArkDeckClientKit and drops ArkDeckWorkflows
 
@@ -828,6 +878,7 @@ Conventions shared by every task:
 - Production reachability:App → `ArkDeckClientKit` (generated typed models, `xpc_connection` transport, presentation adapters) → Mach service; the App no longer links `ArkDeckWorkflows`
 - Trusted fact sources:daemon projections and `spec/ui-semantics`; the App derives no state
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `ArkDeckApp/**`
   - `ArkDeckAppUITests/**`
   - `ArkDeck.xcodeproj/**`
@@ -842,7 +893,7 @@ Conventions shared by every task:
 
 ### Deliverables / Verification
 
-- `ArkDeckApp` has no `import ArkDeckWorkflows`; 59 UI tests pass; each facade switch is releasable. Size: L (S/M per facade).
+- `ArkDeckApp` has no `import ArkDeckWorkflows`; 59 UI tests pass; each facade switch is releasable. Must complete before TASK-XPA-017 (r3). Size: L (S/M per facade).
 
 ## TASK-XPA-020 — WinUI surfaces to parity (Debug, Flash, Viewer, Diagnostics, Settings, Device)
 
@@ -862,6 +913,7 @@ Conventions shared by every task:
 - Production reachability:WinUI → ClientKit → pipe; every surface renders daemon projections; unimplemented capabilities show `unavailable(reasonCode)` with the CLI-equivalent path, never a disabled placeholder
 - Trusted fact sources:as TASK-XPA-007
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `windows/**`
   - `spec/ui-semantics/**`
   - `docs/design/**`
@@ -893,6 +945,7 @@ Conventions shared by every task:
 - Production reachability:`trace_streamer` Windows build (upstream smartperf artefact, licence and provenance verified in-repo) → analyzer operations on Windows → `trace inspect/export` parity; viewer per decision
 - Trusted fact sources:parser/engine version and SHA pinned as on macOS
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `windows/**`
   - `Packages/ArkDeckKit/ThirdParty/**`
@@ -925,9 +978,13 @@ Conventions shared by every task:
 - Production reachability:MSIX packaged + self-contained Windows App SDK; Azure Artifact Signing with timestamp; App Installer feed; daemon and CLI also as xcopy artefacts for CI
 - Trusted fact sources:package identity and signature; clean-host matrix results recorded as evidence
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `windows/**`
   - `.github/workflows/windows-*.yml`
   - `docs/release/**`
+  - `openspec/platforms/windows/**`（final `conformance-cases.yaml` and profile status, r3）
+  - `openspec/platforms/PLATFORM-PROFILES.lock.yaml`
+  - `openspec/verification/traceability.md`（Windows column only）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`、`openspec/platforms/macos/**`
@@ -937,7 +994,7 @@ Conventions shared by every task:
 
 ### Deliverables / Verification
 
-- Signed x64 and ARM64 packages; clean-host TRUST matrix; update channel; clean uninstall. Size: M.
+- Signed x64 and ARM64 packages; clean-host TRUST matrix; update channel; clean uninstall; the Windows column of `openspec/verification/traceability.md` and the lock file's `verified` tuples flip here and nowhere earlier (r3). Size: M.
 
 ## TASK-XPA-023 — Performance regression lanes on both platforms
 
@@ -959,6 +1016,7 @@ Conventions shared by every task:
 - Production reachability:not applicable（measurement only; no runtime effect）
 - Trusted fact sources:benchmarks run on the reference hosts in release builds; results archived as workflow artefacts and compared against the committed baseline
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`（benchmarks and soak）
   - `.github/workflows/rust-perf.yml`
   - `Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/**`
@@ -993,6 +1051,7 @@ Conventions shared by every task:
 - Production reachability:not applicable for effects（pure functions; no I/O, no process, no capability）
 - Trusted fact sources:inputs are daemon-served artifacts already verified by digest; the FFI computes projections only
 - Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`（`arkdeck-contract-ffi`）
   - `Packages/ArkDeckKit/**`（`ArkDeckClientKit` binary target）
   - `windows/**`
@@ -1010,5 +1069,5 @@ Conventions shared by every task:
 ## Critical path, parallel groups, first three
 
 - Critical path to "Windows/macOS supported": SPK-3 → XPA-001 → XPA-002 → XPA-004 → XPA-005 → XPA-006 → XPA-008 → XPA-010 (external: ArkForge AF-W1) → XPA-022 → gates G1–G10.
-- Parallel groups: (1) Windows GJ chain; (2) macOS store cutover chain XPA-003/012/013/014/015/016/017; (3) client chain XPA-007/019/020; (4) infrastructure SPK-1, XPA-023, XPA-022.
+- Parallel groups: (1) Windows GJ chain; (2) macOS store cutover chain XPA-003/012/013/014/015/016, then XPA-018 ∥ XPA-019, then XPA-017 (r3: clients decouple before the Swift targets are deleted); (3) client chain XPA-007/019/020; (4) infrastructure SPK-1, XPA-023, XPA-022.
 - First three: SPK-1, TASK-XPA-001, TASK-XPA-002 (with SPK-2/SPK-3 in parallel).

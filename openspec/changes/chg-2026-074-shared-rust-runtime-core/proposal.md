@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 2
+revision: 3
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -130,8 +130,8 @@ platforms: [macos, windows]
 - Data/schema compatibility: every durable format (SQLite `runtime_job` v2, journal JSONL
   1.0.0–3.0.0, `job-record.json`, artifact `index.json`, capability document 2.0.0 and ledger,
   recovery epochs, evidence V1–V6) is read and written by Rust at the same schema version; no
-  `user_version` or schema bump before the Swift daemon is retired; legacy generations stay
-  decode-only. `outcomeUnknown` lanes are carried over unchanged and never replayed
+  `user_version` or schema bump before the Swift daemon is retired, and no field is added to any
+  durable record while the Swift decoders stay strict (r3); legacy generations stay decode-only. `outcomeUnknown` lanes are carried over unchanged and never replayed
   (POL-RECOVERY-001).
 - Platform impact: macOS `needsReverification` (already) and must re-verify on the Rust daemon;
   Windows starts W0; Linux remains `planned` with no support claim.
@@ -195,6 +195,73 @@ measured, and repairs one defect in its own task table.
 
 The pinned design blob in `design.md` is re-pinned in this revision, as that
 file requires.
+
+## Revision 3 — design review repairs (2026-09-05)
+
+Revision 3 changes no scope, no Requirement, no Acceptance Scenario and no platform
+disposition. An external design review of r2 raised eight findings; each was verified
+against the code, the checker and the official platform documentation before being
+repaired here. Seven are repaired in this revision; the eighth belongs to an open
+`TASK-XPA-023` PR.
+
+1. **Transparent forwarding loses the CLI's console origin (P1).** The Swift daemon derives
+   the per-frame request context from kernel facts of the accepted socket
+   (`AgentDaemon.swift:5095,5149-5194`) and issues the interactive impact-approval challenge
+   only for a foreground-terminal UDS peer (`:3978`). Behind the façade that peer would be the
+   façade itself. `TASK-XPA-003` now specifies a per-frame origin line that only the façade
+   can write on the private socket, bound to the frame by digest, and the tests that prove
+   console confirmation still works through it; design §F.2 gained the row, and the task's
+   Allowed paths gained `Sources/ArkDeckAgentDaemon/**` for the private listener.
+2. **The façade crash acceptance promised "zero dispatch" for both windows (P1).** Only the
+   pre-forward window can prove it; after the frame is forwarded the client can only learn
+   that the outcome is unknown. The acceptance is split into two windows, the façade is
+   forbidden to synthesise the `details.phase`/`newDispatchCount` proof or to re-send a
+   forwarded frame, and read-back is the resolution path (design §G.5, `TASK-XPA-003`,
+   XPA-AC-7).
+3. **"Additive fields are ignored on rollback" contradicts the decoders (P1).** Journal,
+   Artifact, checkpoint, recovery-manifest, ledger, audit and toolchain records reject unknown
+   keys (`JournalEventValidation.swift:651-660`, `ArtifactStorage.swift:73-79` and others
+   listed in design §G.2). The migration now freezes every durable field set; Rust must write
+   exactly the Swift key sets, conformance keeps a negative vector, and a new field requires a
+   tolerant-reader Swift release first or a post-`TASK-XPA-017` change (design §G.2/§G.4/§G.5,
+   XPA-AC-1/AC-9, `TASK-XPA-012/013/014`).
+4. **Swift targets were deleted before the clients stopped linking them (P1).**
+   `ArkDeckCLI` links `ArkDeckWorkflows`/`ArkDeckAgentComposition` (`Package.swift:112-116`) and
+   the App links `ArkDeckWorkflows` (`project.pbxproj:889`), yet `TASK-XPA-017` depended on
+   `TASK-XPA-016` alone and `TASK-XPA-018` on `TASK-XPA-017`. The order is now decouple
+   (`TASK-XPA-018` ∥ `TASK-XPA-019`, both final on `TASK-XPA-016`) and then delete
+   (`TASK-XPA-017`); the DAG, the parallel groups and `design.md` follow.
+5. **The Windows pipe had no client-side server authentication (P1).**
+   `FILE_FLAG_FIRST_PIPE_INSTANCE` only makes the second instance fail (`ERROR_ACCESS_DENIED`,
+   Microsoft `CreateNamedPipe` reference). The client now reads the pipe object's owner SID
+   (`GetSecurityInfo`, `OWNER_SECURITY_INFORMATION`) and refuses any server not owned by its
+   own token owner — the client-side semantics of .NET `PipeOptions.CurrentUserOnly`
+   (`NamedPipeClientStream.ValidateRemotePipeUser`) — with `SECURITY_SQOS_PRESENT |
+   SECURITY_IDENTIFICATION` on `CreateFile`; a squatted name fails daemon start closed and is
+   reported by `doctor`. Negative tests are in `TASK-XPA-002/007` and XPA-AC-6; risk R16 added.
+6. **Most tasks could not submit their own status or evidence (P2).** Only `TASK-XPA-001/002`
+   listed this change directory in Allowed paths, which `scripts/check_pr_paths.py` reads from
+   the base tree; a synthetic commit confirmed that evidence under `TASK-XPA-003` or
+   `TASK-XPA-012` is refused. Every task now lists the directory, and the final conformance and
+   traceability edits have named owners: `openspec/platforms/windows/**`, the lock file and the
+   Windows traceability column by `TASK-XPA-022` (conformance rows by the Windows Golden Journey
+   tasks), `openspec/platforms/macos/**`, the lock file and the macOS column by `TASK-XPA-017`.
+7. **The new toolchains were not wired into the unified CI planner (P2).**
+   `scripts/ci/plan.py::classify_paths` selects no lane for a diff confined to `rust/**` or
+   `windows/**`, so `plan.py --run-local` would pass without compiling the new code.
+   `TASK-XPA-002` now delivers a `rust` lane (planner, tests, hosted wiring) and
+   `TASK-XPA-007` a `windows` lane that fails loudly on a non-Windows host; both tasks' Allowed
+   paths gained `scripts/ci/plan.py`, `scripts/ci/test_plan.py` and the workflow file, and a
+   `rust/**`-only diff selecting no lane is a stop condition.
+8. **The soak workflow loses its metrics exactly when a gate fails (P2).** Confirmed on `main`
+   and on the open `TASK-XPA-023` PR: the fixture persists metrics before evaluating its gates,
+   but the `cp` after it runs under `set -eu` and the `always()` upload watches the copied path.
+   `.github/workflows/rust-perf.yml` is outside this governance PR and inside `TASK-XPA-023`;
+   the fix (state directory in a separate step, upload from that directory) was handed to that
+   PR and is not part of this revision.
+
+No maintainer decision is added or removed by this revision; item 16 of design §L.1 and the
+provisional budgets stand as in r2. The pinned design blob in `design.md` is re-pinned.
 
 ## Compatibility note
 

@@ -16,7 +16,7 @@
 2. **macOS 保留 SwiftUI App**，通过 launchd Mach service（XPC C API）访问 daemon；**Windows 用 WinUI 3 / Windows App SDK 2.x**，通过 user-private Named Pipe 访问同一 Rust daemon；CLI 改为单一 Rust 实现，两端同一二进制源码。
 3. **FFI 只允许一个 crate `arkdeck-contract-ffi`**，内容限定为确定性纯计算：canonical JSON/CBOR、digest、schema/文档校验、离线 journal/artifact index 解码、（按需）Viewer 大树索引。它没有任何 authority、I/O 或副作用；panic 在边界捕获并返回错误码。它是可选优化，不是架构依赖。
 4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 Swift 为旧字节的 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
-5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK。每一步 macOS 都可发布、可通过 LaunchAgent 指回 Swift daemon 回滚，数据 schema 在迁移期零升版。
+5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。每一步 macOS 都可发布、可通过 LaunchAgent 指回 Swift daemon 回滚，数据 schema 在迁移期零升版。
 6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。
 
 淘汰理由摘要：方案 2（进程内 cdylib）把 authority 放进每个客户端进程，破坏「唯一 owner / 单写者」与 crash isolation，且沙箱 App 在结构上不能拥有设备副作用；方案 1（纯 daemon、零 FFI）与推荐方案只差一个可选的纯计算 kernel，差异在 Viewer/离线解析的跨平台一致性与性能，因此推荐方案吸收方案 1 为骨干、把 FFI 收窄为「无 authority 的纯函数」。详见 §C 决策矩阵。
@@ -423,7 +423,8 @@ flowchart TB
 | 项 | 规范 |
 |---|---|
 | 传输 | macOS：UDS（目录 0700、socket 0600）+ launchd Mach service（沙箱 App）；Windows：`\\.\pipe\arkdeck-agentd-<logon SID>` byte-mode；**禁止** localhost TCP/HTTP（CLI-REQ-013） |
-| 身份验证 | UDS：`getpeereid` 必须等于 daemon euid，否则在 accept 后立即关闭（收紧 ADR-0005 的 MVP 立场，见 §L）；XPC：`xpc_connection_get_euid` 等于自身 + peer code-signing requirement（Team ID + bundle id；API 可用性在 SPK-2 验证）；Pipe：DACL 仅 logon SID，`PIPE_REJECT_REMOTE_CLIENTS`，`FILE_FLAG_FIRST_PIPE_INSTANCE`，客户端 `SECURITY_IDENTIFICATION` SQOS，服务端用 `GetNamedPipeClientProcessId` 打开 token 比对用户 SID 与 elevation（与 .NET `PipeOptions.CurrentUserOnly` 语义一致） |
+| 身份验证 | UDS：`getpeereid` 必须等于 daemon euid，否则在 accept 后立即关闭（收紧 ADR-0005 的 MVP 立场，见 §L）；XPC：`xpc_connection_get_euid` 等于自身 + peer code-signing requirement（Team ID + bundle id；API 可用性在 SPK-2 验证）；Pipe：DACL 仅 logon SID，`PIPE_REJECT_REMOTE_CLIENTS`，`FILE_FLAG_FIRST_PIPE_INSTANCE`，客户端 `SECURITY_IDENTIFICATION` SQOS，服务端用 `GetNamedPipeClientProcessId` 打开 token 比对用户 SID 与 elevation（与 .NET `PipeOptions.CurrentUserOnly` 服务端语义一致）；**Pipe 客户端必须认证服务端（r3）**：`CreateFile` 带 `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION`，连接后以 `GetSecurityInfo(hPipe, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION)` 读 pipe 对象 owner SID，不等于自身 token owner SID 即关闭、零帧发送——这是 .NET `PipeOptions.CurrentUserOnly` 的客户端语义（`NamedPipeClientStream.ValidateRemotePipeUser` 比较 pipe owner 与 `WindowsIdentity.Owner`；提权 token 的 owner 是 Administrators，故同时覆盖 elevation）。`FILE_FLAG_FIRST_PIPE_INSTANCE` 只保证第二个实例创建失败（`ERROR_ACCESS_DENIED`），不认证服务端；名字被先占时 daemon 启动 fail-closed 并由 `doctor` 报告持有者，客户端靠 owner 检查拒绝假服务端。pipe 默认安全描述符给 Everyone 读权限，DACL 必须显式 |
+| 来源上下文（r3） | 今日 Swift daemon 对**每一帧**从 accept 的 socket 推导 `RuntimeControlRequestContext`（`AgentDaemon.swift:5095,5149-5194`：peer euid、`LOCAL_PEERPID`、peer 进程组等于其控制终端的前台组、stdin/stderr 即该终端、start time 复核），`human-action.resume` 只在 `unixSocket && hasForegroundConsole` 时发放交互式 impact 挑战（`:3978`），否则原样返回 HAR（`:4007-4010`）；CLI 端还要求 `isatty` 与 `interactionOrigin == interactiveConsole`（`CLIAgentExecutions.swift:138-140`）。透明转发会让 Swift 看到的对端变成 façade（后台 daemon、无控制终端），交互确认永久失效。规范：façade 在转发每一帧的时刻用**同一组内核事实**在自己 accept 的描述符上推导来源，向私有 socket 写一行 origin 前导 `{arkdeckOrigin:1, transport:"unixSocket"|"appXPC", foregroundConsole, peerEUID, peerPID, frameSHA256}` 再写原帧字节；Swift 私有监听器只在私有 socket（0700 目录 + pairing secret + `getpeereid` 等于自身 euid）上接受 origin 行，校验 `frameSHA256` 与随后一行相等后构造 context；公共 socket 上同一行是 `malformedFrame`；请求字段不参与（保持 `:5145-5148` 的规则），客户端帧里的 `arkdeckOrigin` 只是普通未知字段。已否决：`SCM_RIGHTS` 描述符移交——内核直取，但 façade 从此看不到后续帧，与 XPA-012 起 façade 本地处理部分方法冲突 |
 | 帧 | 保持 LF 分隔 JSON 行；请求 `{protocolVersion,id,method,params}`；响应 `{id,ok,result\|error}`；入站 4 MiB、响应 8 MiB、bootstrap 64 KiB；超限结构化拒绝（Windows 与 macOS 一致：daemon 关闭连接前先回 `malformedFrame` 是一个可选收紧点） |
 | 版本协商 | 沿用 `protocol.negotiate`（highest common exact version within required major）；Windows daemon **只实现 2.x**，1.x legacy 表只在 macOS 保留到 Swift CLI 退役；因此 44 个 1.x-only 方法中 Windows 必需者以 **2.1.0 additive** 发布（§J XPA-001） |
 | 流式数据 | 保持 pull 分页（`job.events` cursor，AEAD 封装）；2.x 追加 `job.events.wait{afterCursor,maxWaitMs≤30000}`：一请求一响应、超时返回空页，消除 250 ms 轮询延迟又不违反 CLI-REQ-025 |
@@ -494,7 +495,7 @@ flowchart LR
 | 历史 Session 输出根（`ArkDeck/Sessions/`）、AuthorizationUsage、hardware evidence V1–V6 | decode-only 世代 | Rust 只解码，永不重编码；缺失字段/未知世代 fail loud | 解码向量由 Swift 测试导出 |
 | session-storage、targets、history filters、display names | JSON + lock 文件 | 不变 | — |
 
-硬规则：**迁移期（到 XPA-017 之前）禁止任何 schema/`user_version` 升版**；需要新字段时只能 additive 且旧读者可忽略。这保证任意时刻回滚到 Swift 都能读。
+硬规则：**迁移期（到 XPA-017 之前）禁止任何 schema/`user_version` 升版，也禁止向任何 durable 记录追加字段**（r3）。理由：现有解码器不是「忽略未知键」而是拒绝——journal envelope 与 23 处 payload 校验（`JournalEventValidation.swift:651-660`）、Artifact record（`ArtifactStorage.swift:73-79`）、derived provenance（`:1736-1741`）、checkpoint（`DurableFiles.swift:485-487`）、recovery manifest（`RecoveryManifestContract.swift:41-50,280-290`）、authorization ledger（`AuthorizationUsageLedger.swift:208-218`）、session audit（`SessionAudit.swift:74-79`）、toolchain identity（`SessionManifest.swift:1124-1130`）、workflow step 与 HAR 文档（`WorkflowStep.swift:1466-1468`、`HumanActionRequired.swift:391-393`）全部对多余键抛错。因此 Rust 写出的每一种记录必须与 Swift `CodingKeys` 的键集合逐记录相等，`arkdeck-conformance` 以 Swift 解码器为 oracle 断言键集合，并保留「多一个键 → Swift 拒绝」的负向向量。确需新字段只有两条路：先以独立 PR 发布把该记录解码器放宽为 tolerant reader 的 Swift 版本并随 GJ 复跑，待其成为已安装基线后 Rust 才可写；或等 XPA-017 之后经 change 升版。这保证任意时刻回滚到 Swift 都能读。r1/r2 写的「additive 且旧读者可忽略」与代码相反，r3 改正。
 
 ### G.3 Shadow / differential 的白名单
 
@@ -506,7 +507,7 @@ flowchart LR
 - **outcomeUnknown lane**：不是切换阻断项，而是必须**原样承接**的 durable 状态。Rust owner 启动时读到 `waitingForRecovery`/`outcomeUnknown` job 保持不变，只允许 `job.reconcile` 读回或 POL-RECOVERY-001 的完整机械证明路径；绝不因 owner 更换而重放（AGENTS `:49-51`）。
 - **未决 intent**：由 preflight 排除；若崩溃窗口留下「intent 已落、无 outcome」，新 owner 按 journal 分类为 outcomeUnknown（与 `recoverActiveJobs` 语义相同）。
 - **recovery epoch**：epoch 文档是 owner 无关的 durable 事实；新 owner 继续从已有最高 epoch 计数。
-- **回滚**：同样的 preflight；Swift 读回 Rust 写入的同版本字节；若 Rust 曾以 additive 字段写入，Swift 忽略。
+- **回滚**：同样的 preflight；Swift 用**当前的严格解码器**读回 Rust 写入的同版本、同键集合字节；不存在「Rust 追加字段、Swift 忽略」的路径（§G.2，r3）。
 - **备份**：切换前 `runtime service update` 自动做状态目录快照（macOS APFS `clonefile`，Windows 停机复制），记录快照 SHA-256 列表到 receipt；快照只用于取证与回滚，不是常规恢复路径。
 
 ### G.5 兼容矩阵与测试
@@ -518,7 +519,8 @@ flowchart LR
 | 新客户端（2.1.0）→ 旧 daemon（2.0.0） | `protocolVersionUnsupported`/`unknownMethod`，dispatch 0 | 现有 `:1409-1428` 用例扩展 |
 | Windows 客户端 → Windows daemon | 只有 2.x | Windows CI |
 | crash-window | Rust owner 在 intent 落盘后、dispatch 前被 kill → 重启 outcomeUnknown；sidecar 被 kill 于 step 中 → owner 记 outcomeUnknown；owner 被 kill 于 admission 提交后 record 写前 → `restoreInitialAdmissionProjectionIfNeeded` 等价（`RuntimeRecoveryService.swift:520-585`） | Rust 版 `EngineCrashFixture`/`JournalCrashFixture` + 跨进程 kill 矩阵 |
-| schema/协议升级与回滚 | 迁移期零升版；升版只在 XPA-017 后经 change | contract 测试断言 `user_version==2`、journal 版本集合不变 |
+| schema/协议升级与回滚 | 迁移期零升版且字段集冻结；升版只在 XPA-017 后经 change | contract 测试断言 `user_version==2`、journal 版本集合不变；conformance 断言每种 durable 记录的键集合等于 Swift `CodingKeys`，负向向量（多一键）被 Swift 拒绝（r3） |
+| façade crash-window（XPA-003，r3） | 转发前被杀 → 客户端结构化传输错误，可证明零派发（Swift 未收到任何字节、journal 不变）；转发后回包前被杀，或 Swift daemon 中途被杀 → 客户端得到**不带** `details.phase`/`newDispatchCount` 证明的结构化中断错误，durable 状态以 Swift 已写内容为准（journal 完整可读，可能含 intent/outcome），façade 绝不重发已转发帧，客户端以 `job.status`/`job.list` 读回（`job.submit` 幂等键使重提安全） | 跨进程 kill 矩阵 + 私有 socket 字节计数断言；façade 不得伪造 `AgentDaemon.swift:4116-4125` 只由 named owner refusal 发出的零派发证明 |
 
 ---
 
@@ -710,10 +712,13 @@ flowchart TD
   X006 --> X008 --> X009 --> X010
   X008 --> X011
   X003 --> X012 --> X013 --> X014
-  X014 --> X015 --> X016 --> X017
+  X014 --> X015 --> X016
+  X016 --> X017
+  X018 --> X017
+  X019 --> X017
   X005 --> X015
   X002 --> X018
-  X017 --> X018
+  X016 --> X018
   X001 --> X019
   X014 --> X019
   X007 --> X020
@@ -760,10 +765,10 @@ flowchart TD
 - 缺口：仓内无 Rust workspace、无 Windows daemon；B.1 #23。
 - 依赖：XPA-001、SPK-3；并行：XPA-003 的 façade 代码同源。
 - Production reachability：`arkdeck.exe` → named pipe → `arkdeck-control` → `doctor/device.candidates` → `hdc.exe list targets -v`（argv 数组、句柄绑定 hash）→ 解析 → 投影。读-only，无 effect。
-- 模块/路径：新 `rust/**`（`arkdeck-contract`、`arkdeck-platform`、`arkdeck-control`、`arkdeck-provider-hdc`（parsers）、`arkdeck-client`、`arkdeck-cli`、`arkdeck-agentd`）、`spec/**`、`.github/workflows/rust-ci.yml`、`scripts/catalog_gen/generate.py`（生成 Rust）；Forbidden `Packages/**` 生产源码（本任务不改 Swift 语义）。
-- 交付物：JCS/CBOR/digest 向量全过；catalog digest 与 Swift 相等；negotiation 矩阵；HDC Golden/Probe fixtures 回放；Windows pipe（DACL/REJECT_REMOTE/FIRST_INSTANCE/SID 校验）；macOS UDS（peer euid）。
-- AC：`operation list` 返回 30 descriptor 与同 digest；`device candidates` 在 Windows 真机列出 DAYU200，同 fixture 输出与 macOS 字节相等；跨账户 pipe 连接被拒；非 2.x 帧结构化拒绝。
-- 验证：contract、differential（Swift CLI 与 Rust CLI 对同 fixture 的 envelope）、fault-injection（帧上限、畸形帧）、Windows 真机。
+- 模块/路径：新 `rust/**`（`arkdeck-contract`、`arkdeck-platform`、`arkdeck-control`、`arkdeck-provider-hdc`（parsers）、`arkdeck-client`、`arkdeck-cli`、`arkdeck-agentd`）、`spec/**`、`.github/workflows/rust-ci.yml`、`scripts/catalog_gen/generate.py`（生成 Rust）、`scripts/ci/plan.py` + `scripts/ci/test_plan.py` + `.github/workflows/swift-ci.yml`（r3：新增 `rust` 车道并接入统一入口——今日 `classify_paths` 对 `rust/**` 全部车道为 false，只改 Rust 的 PR 本地闸会空转通过）、`openspec/platforms/windows/**`；Forbidden `Packages/**` 生产源码（本任务不改 Swift 语义）。
+- 交付物：JCS/CBOR/digest 向量全过；catalog digest 与 Swift 相等；negotiation 矩阵；HDC Golden/Probe fixtures 回放；Windows pipe（DACL/REJECT_REMOTE/FIRST_INSTANCE/SID 校验）+ 客户端对服务端的 owner SID 认证（§F.2，r3）；macOS UDS（peer euid）；planner `rust` 车道（r3）。
+- AC：`operation list` 返回 30 descriptor 与同 digest；`device candidates` 在 Windows 真机列出 DAYU200，同 fixture 输出与 macOS 字节相等；跨账户 pipe 连接被拒；假服务端先占 pipe 名 → daemon 启动 fail-closed 并由 `doctor` 报告、客户端零帧发送（r3）；`rust/**`-only diff 至少选中一条车道（r3）；非 2.x 帧结构化拒绝。
+- 验证：contract、differential（Swift CLI 与 Rust CLI 对同 fixture 的 envelope）、fault-injection（帧上限、畸形帧、pipe 名先占）、Windows 真机。
 - 硬件：Windows 11 x64 主机 + DAYU200。
 - Stop：任何 raw path/argv 进入契约；任何写入 durable 存储（本任务只读）。
 - Rollback：无生产切换（Windows 无既有用户）。
@@ -775,10 +780,11 @@ flowchart TD
 - 缺口：Rust 尚未处在生产路径；ADR-0005 的 peer 硬化未做（B.1 #17）。
 - 依赖：XPA-002、SPK-2。并行：Windows 链。
 - Production reachability：客户端 → Rust façade（UDS/XPC）→ 转发到 Swift daemon 私有 socket → 既有 admission；façade 不解释语义、不缓存、不改帧（只做 negotiation 与准入）。
-- 路径：`rust/**`、`Packages/ArkDeckKit/LaunchAgents/**`（plist 与 service 指向）、`Sources/ArkDeckAgentDaemonMain/**`（私有 socket 参数）、`Sources/ArkDeckWorkflows/XPCConnectionBox.swift`（改 xpc C API）、`ArkDeckApp/**`（仅 transport）、`Tests/**`。
+- 来源上下文（r3）：每帧前置一行 origin 前导（§F.2「来源上下文」行）；否则 Swift 看到的对端是 façade，`human-action.resume` 的交互式 impact 确认永久失效。
+- 路径：`rust/**`、`Packages/ArkDeckKit/LaunchAgents/**`（plist 与 service 指向）、`Sources/ArkDeckAgentDaemonMain/**`（私有 socket 参数）、`Sources/ArkDeckAgentDaemon/**`（r3：私有监听器与 origin 行 → context，不动 handler/admission）、`Sources/ArkDeckWorkflows/XPCConnectionBox.swift`（改 xpc C API）、`ArkDeckApp/**`（仅 transport）、`Tests/**`。
 - 交付物：façade daemon；`runtime service install/update` 支持双二进制；黑盒契约测试参数化。
 - AC：现有 `AgentDaemonContractTests`/`AgentXPCTransportContractTests` 黑盒子集对 façade 全绿；IPC p95 增量 ≤ 1 ms（SPK-1 基线）；GJ-1～5 headless PASS；回滚演练通过。
-- 验证：contract、differential（façade 前后帧字节相等）、fault-injection（杀 façade/杀 Swift daemon 两个方向，客户端得到结构化错误、零派发）、UI test（App 经 XPC 的 Overview/History）。
+- 验证：contract、differential（façade 前后帧字节相等）、fault-injection（r3 分两窗：转发前杀 façade → 结构化错误且可证明零派发；转发后回包前杀 façade / 中途杀 Swift daemon → 不带零派发证明的结构化中断错误、durable 状态以 Swift 已写为准、façade 不重发、客户端读回裁决，见 §G.5）、来源上下文契约（前台终端 CLI 经 façade 拿到 console 挑战，后台/重定向 CLI 拿回原 HAR，伪造 `arkdeckOrigin` 的客户端帧被拒、零派发）、UI test（App 经 XPC 的 Overview/History）。
 - 硬件：DAYU200。
 - Stop：façade 出现任何 authority/durable 写；XPC 需放宽 entitlements。
 - Rollback：plist 指回 Swift 二进制。
@@ -829,10 +835,10 @@ flowchart TD
 - 平台/GJ：Windows GJ-1 的 App 呈现 AC（AC-UX-001/003/004 在 Windows 首次可验）。
 - 依赖：XPA-006、SPK-4。
 - Reachability：WinUI → `ArkDeck.ClientKit`（生成 records）→ pipe → 只读方法 + `job.submit` typed 门。
-- 路径：新 `windows/**`（App 与 ClientKit）、`spec/ui-semantics/**`、生成器脚本、`ArkDeckApp/Resources/*.xcstrings`（改为生成物，但内容不变）。
+- 路径：新 `windows/**`（App 与 ClientKit）、`spec/ui-semantics/**`、生成器脚本、`ArkDeckApp/Resources/*.xcstrings`（改为生成物，但内容不变）、`scripts/ci/plan.py` + `scripts/ci/test_plan.py` + `.github/workflows/swift-ci.yml`/`windows-*.yml`（r3：新增 `windows` 车道；非 Windows 主机上 `--run-local` 对该车道显式报不可运行、非零退出，而非静默绿）。
 - 交付物：MSIX 工程、UIA 名称、live region、键盘路径、双语。
 - AC：UIA 树快照与 macOS AX 快照语义一致（导航项/状态/动作）；Narrator 读出 Job 状态变化；无 disabled 占位。
-- 验证：UI 自动化（WinAppDriver/UIA）、契约（fixture 渲染）。
+- 验证：UI 自动化（WinAppDriver/UIA）、契约（fixture 渲染）、ClientKit 拒绝 owner SID 不符的 pipe（r3）。
 - 硬件：Windows 主机（真机可选）。
 - Stop：App 内出现任何 Runtime 语义实现。
 - 规模：L。
@@ -929,21 +935,21 @@ flowchart TD
 
 #### TASK-XPA-017 — Port the ArkForge lane and retire the Swift daemon, engine and storage targets
 - 平台/GJ：macOS GJ-4 re-pass；GJ-1～5 全部在纯 Rust daemon 上 PASS。
-- 依赖：XPA-016。
-- 要点：删除 `ArkDeckAgentDaemon/DaemonMain/Workflows(引擎部分)/Storage/Process/OpenHarmony` targets；LaunchAgent 永久指向 Rust；ArkForge Swift SDK 从 `Package.swift` 移除；`ArchitectureBoundaryContractTests` 改为守卫「Swift 无 Runtime 语义」。
+- 依赖：XPA-016、XPA-018、XPA-019（r3：两个客户端先脱钩——`ArkDeckCLI` 链接 `ArkDeckWorkflows/AgentComposition`（`Package.swift:112-116`），App 链接 `ArkDeckWorkflows` 产品（`project.pbxproj:889`）；r1/r2 只依赖 XPA-016，会出现客户端仍链接已删模块的不可发布中间态）。
+- 要点：删除 `ArkDeckAgentDaemon/DaemonMain/Workflows(引擎部分)/Storage/Process/OpenHarmony` targets 与其 Swift fixtures（`JournalCrashFixture/EngineCrashFixture/RuntimeSoakFixture`，其 Rust 等价物由 XPA-014/023 先行）；macOS 列 traceability 与 lock 在此翻转；LaunchAgent 永久指向 Rust；ArkForge Swift SDK 从 `Package.swift` 移除；`ArchitectureBoundaryContractTests` 改为守卫「Swift 无 Runtime 语义」。
 - AC：仓内无第二份 Runtime 语义实现；ArkForge codec 只有 Rust 一份；GJ 全 PASS；发布 DMG 含 Rust daemon（nested code，空 entitlements，Developer ID+Hardened Runtime，AFD-0003 先例）。
 - 规模：L。
 
 #### TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 - 平台/GJ：macOS GJ-1～5 headless 用 Rust CLI re-pass；Windows 已用。
-- 依赖：XPA-002 起持续，最终依赖 XPA-017。
+- 依赖：XPA-002 起持续，最终依赖 XPA-016（所有 leaf 含 macOS 进程内兼容 leaf 由 Rust daemon 服务或按 CLI 规格 §12 tombstone）；必须先于 XPA-017 完成（r3）。
 - AC：219 argv fixtures 与 envelope/page/nextAction 样本字节相等；`maintainer contracts export` 由 Rust 生成并与已发布 bundle 零漂移；`cli-feature-coverage.json` 在两平台 `fullFunction`；Swift CLI 删除。
 - 规模：L。
 
 #### TASK-XPA-019 — macOS App consumes ArkDeckClientKit and drops ArkDeckWorkflows
 - 用户结果：App 行为不变；App 只依赖生成的 typed 模型与 XPC 传输。
 - 平台/GJ：macOS App 呈现 AC（按 AGENTS 只在 AC 要求 App 时跑 UI）。
-- 依赖：XPA-001（schemas）、XPA-014（投影服务端化）；可逐 facade 分 13 个子 PR。
+- 依赖：XPA-001（schemas）、XPA-014（投影服务端化）；可逐 facade 分 13 个子 PR；必须先于 XPA-017 完成（r3）。
 - AC：`ArkDeckApp` 无 `import ArkDeckWorkflows`；59 个 UI test 通过；presentation 语义由 daemon 投影或 `ui-semantics` 生成。
 - 规模：L（分批 S/M）。
 
@@ -979,7 +985,7 @@ flowchart TD
 
 **可并行组**：
 1. Windows GJ 链（XPA-002/004/005/006/008/009/010/011）；
-2. macOS store 搬迁链（XPA-003/012/013/014/015/016/017）；
+2. macOS store 搬迁链（XPA-003/012/013/014/015/016 → XPA-018 ∥ XPA-019 → XPA-017；r3：客户端先脱钩再删 Swift target）；
 3. 客户端链（XPA-007/019/020，双语目录）；
 4. 基础设施（SPK-1、XPA-023、XPA-022）。
 组 1 与组 2 共享 `arkdeck-durable/runtime/provider-*` 代码，建议同一 crate 先在 Windows 走通再回流 macOS（Windows 没有旧字节负担，macOS 有 differential 负担）。
@@ -1024,6 +1030,7 @@ flowchart TD
 | R13 | 口令/凭据在 Windows 的存在性门（`LAContext` 等价）不可从 daemon 触发 | 中/中 | `UserConsentVerifier` 需窗口 | HAR console challenge 路径复用（已存在 `human-action.resume` 门） | XPA-011/015 |
 | R14 | Trace Viewer 在 Windows 无法对等，形成「隐藏缺口」 | 高/中 | 决策 5 未定 | 诚实 `unavailable` + CLI 等价路径；支持声明按 capability 范围 | XPA-021 |
 | R15 | 迁移拖长导致 macOS 修复要在 Swift 与 Rust 双做 | 高/中 | 同一缺陷两处修 | 先 Windows 走通再回流；sidecar 期尽量短；每族 provider 一 PR | 组 2 顺序 |
+| R16（r3） | Windows pipe 名被先占（假服务端）；façade 丢失来源上下文 | 低/高 | 客户端 owner SID 不符；经 façade 的 `human-action.resume` 拿不到 console 挑战 | 客户端对服务端 owner SID 认证 + `FIRST_PIPE_INSTANCE` fail-closed + `doctor` 报告；origin 前导行（§F.2）+ 经 façade 的交互确认契约测试 | XPA-002/003 |
 | R16 | 文档漂移（entitlements 注释、Profile 最低 macOS、journal 契约版本） | 已发生/低 | 本文 B.1 | 随相关 Task 的最小文档更新一并修正，不单独开文档 PR | XPA-001/003 |
 
 ---
