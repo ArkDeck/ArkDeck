@@ -9,13 +9,14 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: eb63a84724b96d811685570dcb802d816deae668
-  sha256: 3dad24dcc4f8e50e979f0863c4c8dd174a1f270ec83e619481744c870631ebaa
+  blob: 27961bc489dfe1079e093779279159d41d86e052
+  sha256: 638b919f97043a55eea38934544f7cf1a76578475b81e8caa4dfa793148fda3c
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
-maintainer approved. Revision 2 re-pins it for the section I.2 budget finalisation described in
-`proposal.md`; sections A–H and J–L are unchanged.
+maintainer approved. Revision 2 re-pinned it for the section I.2 budget finalisation described in
+`proposal.md`. Revision 3 re-pins it for the design review repairs described there: sections A
+(item 5), F.2, G.2, G.4, G.5, J.2, J.4, J.5 and K changed; sections B–E, H, I and L are unchanged.
 
 ## Decision
 
@@ -29,12 +30,14 @@ document validation, offline decoding, Viewer indexing) with no authority, I/O o
 ```text
 Human / external agent / App click
   → arkdeck-control (transport-free handler; UDS 0600 + peer euid, Mach service + peer
-    code-signing requirement, named pipe + logon-SID DACL + client SID/elevation check;
+    code-signing requirement, named pipe + logon-SID DACL + client SID/elevation check +
+    client-side pipe-owner check; origin line from the façade during migration;
     4 MiB frames; closed method table; per-method typed schema)
   → arkdeck-runtime (published admission order: descriptor → provider registered → fresh
     target facts → full materialisation → lowering coverage → plan digest → capability)
   → arkdeck-durable (journal intent-before-effect with the same fsync discipline, SQLite v2,
-    capability ledger, recovery epochs; no schema bump before the Swift daemon is retired)
+    capability ledger, recovery epochs; no schema bump and no added field before the Swift
+    daemon is retired — the Swift decoders reject unknown keys)
   → provider crates (hdc / workspace / analyzer / arkforge) → arkdeck-platform (posix_spawn with
     inode-bound path or CreateProcessW with handle-bound verification; argv arrays only)
   → hdc / arkforged / git / hvigor / hap-sign-tool → device
@@ -70,15 +73,15 @@ materialisation.
 3. Read-only shadow validation, then durable stores move owner one at a time: host-only stores →
    artifact store → admission/job/capability/recovery, with the Swift engine reduced to an executor
    sidecar under per-step typed permits.
-4. Providers move family by family (analyzer/workspace → HDC → ArkForge lane); the Swift daemon,
-   engine and storage targets are retired; the Rust CLI reaches full fixture parity; the App moves
-   to `ArkDeckClientKit`.
+4. Providers move family by family (analyzer/workspace → HDC → ArkForge lane); the Rust CLI
+   reaches full fixture parity and the App moves to `ArkDeckClientKit`; only then are the Swift
+   daemon, engine and storage targets retired (r3: nothing may still link a deleted target).
 5. Windows starts from the thinnest real GJ-1 walking skeleton and proceeds to GJ-2..5; the WinUI
    3 client follows the same daemon projections.
 
-Every macOS step is releasable and rolls back by pointing the LaunchAgent at the Swift daemon;
-cutover preflight refuses active jobs and pending intents; `outcomeUnknown` lanes are carried
-across owners unchanged.
+Every macOS step is releasable and rolls back by pointing the LaunchAgent at the Swift daemon,
+which reads Rust-written bytes with its current strict decoders; cutover preflight refuses active
+jobs and pending intents; `outcomeUnknown` lanes are carried across owners unchanged.
 
 ## Alternatives rejected (design §C)
 
