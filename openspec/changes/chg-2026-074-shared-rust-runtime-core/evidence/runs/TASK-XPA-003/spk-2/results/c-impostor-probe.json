@@ -1,0 +1,57 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-impostor",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2Impostor.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 39997,
+    "sandboxContainer" : "com.arkdeck.spk2-impostor",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+        "Developer ID Application: Hanfeng Fu (8AQTYW5FKR)",
+        "Developer ID Certification Authority",
+        "Apple Root CA"
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65536,
+      "identifier" : "com.arkdeck.spk2-impostor",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : "8AQTYW5FKR"
+    }
+  },
+  "connectionEvents" : [
+    {
+      "description" : "Connection invalid",
+      "error" : "XPC_ERROR_CONNECTION_INVALID",
+      "tMs" : 521233678.78654099
+    }
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "mode" : "probe",
+  "probe" : {
+    "detail" : {
+      "description" : "Connection interrupted",
+      "error" : "XPC_ERROR_CONNECTION_INTERRUPTED",
+      "tMs" : 521233368.58258301
+    },
+    "elapsedMs" : 1.923292,
+    "outcome" : "error"
+  },
+  "protocolVersion" : "1.0.0",
+  "requestID" : "44D153F6-7232-453A-BD8E-07FECDA4F8F6",
+  "service" : "com.arkdeck.agentd"
+}

@@ -1,0 +1,44 @@
+{
+  "client" : {
+    "bundleIdentifier" : null,
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/spk2-bare",
+    "pid" : 45710,
+    "sandboxContainer" : null,
+    "signing" : {
+      "certificateChain" : [
+
+      ],
+      "entitlementKeys" : [
+
+      ],
+      "flags" : 2,
+      "identifier" : "com.arkdeck.spk2-bare",
+      "teamIdentifier" : null
+    }
+  },
+  "connectionEvents" : [
+    {
+      "description" : "Connection invalid",
+      "error" : "XPC_ERROR_CONNECTION_INVALID",
+      "tMs" : 522537412.80895799
+    }
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "mode" : "probe",
+  "probe" : {
+    "detail" : {
+      "description" : "Connection interrupted",
+      "error" : "XPC_ERROR_CONNECTION_INTERRUPTED",
+      "tMs" : 522537103.44375002
+    },
+    "elapsedMs" : 1.29,
+    "outcome" : "error"
+  },
+  "protocolVersion" : "1.0.0",
+  "requestID" : "216E8F1F-52FD-4535-9348-C5A2D25533BE",
+  "service" : "com.arkdeck.agentd"
+}

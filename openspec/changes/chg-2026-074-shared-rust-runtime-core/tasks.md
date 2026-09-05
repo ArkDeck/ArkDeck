@@ -41,7 +41,7 @@ Conventions shared by every task:
 | Spike | Purpose | Pass | Fail | Unlocks |
 | --- | --- | --- | --- | --- |
 | SPK-1 | macOS performance baseline for the 13 metrics in design §I.2 | ≥3 runs with stable p50/p95/p99 (< 30% p95 spread), `perf-baseline-<date>.json` archived | spread > 30% | most budgets in §I.2 (the paged-projection and idle-RSS rows and the `artifact.open` / FFI decisions stay open, see §I.2 notes 1–2 and §L.1 items 15–16) |
-| SPK-2 | A Rust process vends the launchd Mach service `com.arkdeck.agentd` through the libxpc C API; the sandboxed App connects with the existing entitlements; peer code-signing requirement enforced | connect without entitlement changes; wrongly signed peer refused; 1,000 round trips p95 ≤ 8 ms | new entitlement needed or NSXPC-only semantics cannot be reproduced | TASK-XPA-003 |
+| SPK-2 | A Rust process vends the launchd Mach service `com.arkdeck.agentd` through the libxpc C API; the sandboxed App connects with the existing entitlements; peer code-signing requirement enforced | connect without entitlement changes; wrongly signed peer refused; 1,000 round trips p95 ≤ 8 ms | new entitlement needed or NSXPC-only semantics cannot be reproduced | TASK-XPA-003（r7: passed on 2026-09-05 on the macOS reference host, `evidence/runs/TASK-XPA-003/spk-2-run.md`; XPA-003 now waits on TASK-XPA-002 and maintainer review only）|
 | SPK-3 | Windows W0 (`openspec/platforms/windows/profile.md:71-81`) plus a Rust named-pipe daemon and `hdc.exe list targets -v` against a DAYU200 | cross-account connect refused (Win32 error 5); packaged App and unpackaged CLI both reach the pipe; MotW/SmartScreen behaviour recorded; Golden fixtures parse identically | driver needs silent elevation or pipe unreachable from a packaged App | TASK-XPA-002, Windows support tuple, packaging |
 | SPK-4 | WinUI 3 gate (design §H.4 a–e) | all pass | any fails and cannot be fixed in two weeks | WinUI 3 vs WPF |
 | SPK-5 | NTFS durability primitives (`FlushFileBuffers`, `MoveFileExW` write-through, `LockFileEx`, torn-tail exhaustive test) | torn-tail matrix passes; append p95 recorded | atomic replace cannot be proven | TASK-XPA-005 write path design |
@@ -165,7 +165,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-003 — Rust control-plane façade on macOS with peer hardening
 
-- Status:blocked（awaits merge of the proposal PR and SPK-2）
+- Status:blocked（awaits maintainer review of the proposal and TASK-XPA-002; SPK-2 passed on 2026-09-05, r7, `evidence/runs/TASK-XPA-003/spk-2-run.md`）
 - Platform:macos
 - Requirements:ADR-0005 decisions 1–4 (transport, single-v1 frames, transport-free handler, single instance); no Core REQ edited
 - Acceptance:XPA-AC-3, XPA-AC-5, XPA-AC-6, XPA-AC-7

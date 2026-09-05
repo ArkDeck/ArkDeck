@@ -1,0 +1,74 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-client",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2Client.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 38075,
+    "sandboxContainer" : "com.arkdeck.spk2-client",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+        "Developer ID Application: Hanfeng Fu (8AQTYW5FKR)",
+        "Developer ID Certification Authority",
+        "Apple Root CA"
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65536,
+      "identifier" : "com.arkdeck.spk2-client",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : "8AQTYW5FKR"
+    }
+  },
+  "connectionPerRequest" : {
+    "count" : 200,
+    "latency" : {
+      "max" : 0.71466600000000002,
+      "mean" : 0.31180087499999998,
+      "min" : 0.26991700000000002,
+      "n" : 200,
+      "p50" : 0.28995900000000002,
+      "p95" : 0.43554199999999998,
+      "p99" : 0.63108299999999995,
+      "unit" : "milliseconds"
+    }
+  },
+  "count" : 1000,
+  "errors" : [
+
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "method" : "target.list",
+  "mode" : "nsxpc",
+  "persistentConnection" : {
+    "max" : 0.89466599999999996,
+    "mean" : 0.23394813899999997,
+    "min" : 0.22412499999999999,
+    "n" : 1000,
+    "p50" : 0.229959,
+    "p95" : 0.24337500000000001,
+    "p99" : 0.27404099999999998,
+    "unit" : "milliseconds"
+  },
+  "protocolVersion" : "1.0.0",
+  "refusals" : [
+
+  ],
+  "replyBytes" : 387,
+  "replySample" : "{\"id\":\"38833F53-608F-4A23-922A-E81E7774C9A4\",\"ok\":true,\"result\":[{\"adoptedAtUtc\":\"2026-07-31T02:43:19Z\",\"bindingRevision\":4,\"displayName\":null,\"displayNameGeneration\":\"1\",\"targetId\":\"TGT-958780b2ffb7\",\"toolVersion\":\"3.2.0f\"},{\"adoptedAtUtc\"",
+  "service" : "com.arkdeck.agentd",
+  "warmup" : 100
+}

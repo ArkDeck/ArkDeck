@@ -1,0 +1,431 @@
+{"t_ms":0.019,"event":"listener.starting","pid":44162,"euid":501,"service":"com.arkdeck.agentd","requirement":"anchor apple generic and certificate leaf[subject.OU] = 8AQTYW5FKR and (identifier com.arkdeck.spk2-client or identifier com.arkdeck.spk2-adhoc or identifier com.arkdeck.spk2-devcert or identifier com.arkdeck.spk2-nolookup or identifier com.arkdeck.desktop)","replyMode":"respond","launchdVended":"com.arkdeck.agentd"}
+{"t_ms":0.284,"event":"listener.activated","service":"com.arkdeck.agentd"}
+{"t_ms":0.023,"event":"listener.starting","pid":45748,"euid":501,"service":"com.arkdeck.agentd","requirement":"none","replyMode":"respond","launchdVended":"com.arkdeck.agentd"}
+{"t_ms":0.806,"event":"listener.activated","service":"com.arkdeck.agentd"}
+{"t_ms":1036.755,"event":"peer.accepted","peer":1,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1036.802,"event":"peer.message","peer":1,"pid":45756,"message":1,"bytes":119,"mode":"respond","refusal":null}
+{"t_ms":1036.903,"event":"peer.accepted","peer":2,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1036.890,"event":"peer.error","peer":1,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1036.942,"event":"peer.message","peer":2,"pid":45756,"message":2,"bytes":119,"mode":"respond","refusal":null}
+{"t_ms":1037.086,"event":"peer.error","peer":2,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1037.112,"event":"peer.accepted","peer":3,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.185,"event":"peer.message","peer":3,"pid":45756,"message":3,"bytes":119,"mode":"respond","refusal":null}
+{"t_ms":1037.249,"event":"peer.error","peer":3,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1037.264,"event":"peer.accepted","peer":4,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.372,"event":"peer.error","peer":4,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1037.385,"event":"peer.accepted","peer":5,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.479,"event":"peer.error","peer":5,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1037.489,"event":"peer.accepted","peer":6,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.594,"event":"peer.error","peer":6,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1037.601,"event":"peer.accepted","peer":7,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.710,"event":"peer.accepted","peer":8,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.720,"event":"peer.error","peer":7,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1037.804,"event":"peer.accepted","peer":9,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1037.993,"event":"peer.error","peer":8,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.034,"event":"peer.error","peer":9,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.070,"event":"peer.accepted","peer":10,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.130,"event":"peer.error","peer":10,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.146,"event":"peer.accepted","peer":11,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.216,"event":"peer.error","peer":11,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.241,"event":"peer.accepted","peer":12,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.296,"event":"peer.error","peer":12,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.314,"event":"peer.accepted","peer":13,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.374,"event":"peer.error","peer":13,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.393,"event":"peer.accepted","peer":14,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.444,"event":"peer.error","peer":14,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.467,"event":"peer.accepted","peer":15,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.523,"event":"peer.error","peer":15,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.543,"event":"peer.accepted","peer":16,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.594,"event":"peer.error","peer":16,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.617,"event":"peer.accepted","peer":17,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.666,"event":"peer.error","peer":17,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.687,"event":"peer.accepted","peer":18,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.737,"event":"peer.error","peer":18,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.757,"event":"peer.accepted","peer":19,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.806,"event":"peer.error","peer":19,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.826,"event":"peer.accepted","peer":20,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.877,"event":"peer.error","peer":20,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.897,"event":"peer.accepted","peer":21,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1038.945,"event":"peer.error","peer":21,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1038.966,"event":"peer.accepted","peer":22,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.014,"event":"peer.error","peer":22,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.035,"event":"peer.accepted","peer":23,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.083,"event":"peer.error","peer":23,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.103,"event":"peer.accepted","peer":24,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.151,"event":"peer.error","peer":24,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.169,"event":"peer.accepted","peer":25,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.239,"event":"peer.error","peer":25,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.244,"event":"peer.accepted","peer":26,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.342,"event":"peer.accepted","peer":27,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.371,"event":"peer.error","peer":26,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.406,"event":"peer.accepted","peer":28,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.414,"event":"peer.error","peer":27,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.511,"event":"peer.error","peer":28,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.519,"event":"peer.accepted","peer":29,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.633,"event":"peer.accepted","peer":30,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.656,"event":"peer.error","peer":29,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.701,"event":"peer.error","peer":30,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.708,"event":"peer.accepted","peer":31,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.785,"event":"peer.accepted","peer":32,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.805,"event":"peer.error","peer":31,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.854,"event":"peer.accepted","peer":33,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.865,"event":"peer.error","peer":32,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.899,"event":"peer.error","peer":33,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1039.945,"event":"peer.accepted","peer":34,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1039.995,"event":"peer.error","peer":34,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.016,"event":"peer.accepted","peer":35,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.071,"event":"peer.error","peer":35,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.084,"event":"peer.accepted","peer":36,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.153,"event":"peer.accepted","peer":37,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.173,"event":"peer.error","peer":36,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.222,"event":"peer.accepted","peer":38,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.242,"event":"peer.error","peer":37,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.297,"event":"peer.accepted","peer":39,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.366,"event":"peer.accepted","peer":40,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.385,"event":"peer.error","peer":39,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.447,"event":"peer.accepted","peer":41,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.469,"event":"peer.error","peer":40,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.520,"event":"peer.accepted","peer":42,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.540,"event":"peer.error","peer":41,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.602,"event":"peer.accepted","peer":43,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.622,"event":"peer.error","peer":42,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.671,"event":"peer.accepted","peer":44,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.691,"event":"peer.error","peer":43,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.737,"event":"peer.accepted","peer":45,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.757,"event":"peer.error","peer":44,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.784,"event":"peer.error","peer":38,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.810,"event":"peer.accepted","peer":46,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.853,"event":"peer.error","peer":45,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.915,"event":"peer.accepted","peer":47,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1040.915,"event":"peer.error","peer":46,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1040.993,"event":"peer.error","peer":47,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.019,"event":"peer.accepted","peer":48,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.073,"event":"peer.error","peer":48,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.092,"event":"peer.accepted","peer":49,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.141,"event":"peer.error","peer":49,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.164,"event":"peer.accepted","peer":50,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.213,"event":"peer.error","peer":50,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.237,"event":"peer.accepted","peer":51,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.283,"event":"peer.error","peer":51,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.303,"event":"peer.accepted","peer":52,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.355,"event":"peer.error","peer":52,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.380,"event":"peer.accepted","peer":53,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.428,"event":"peer.error","peer":53,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.451,"event":"peer.accepted","peer":54,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.505,"event":"peer.error","peer":54,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.545,"event":"peer.accepted","peer":55,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.600,"event":"peer.error","peer":55,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.630,"event":"peer.accepted","peer":56,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.687,"event":"peer.error","peer":56,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.699,"event":"peer.accepted","peer":57,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.747,"event":"peer.error","peer":57,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.769,"event":"peer.accepted","peer":58,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.818,"event":"peer.error","peer":58,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.836,"event":"peer.accepted","peer":59,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.883,"event":"peer.error","peer":59,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.901,"event":"peer.accepted","peer":60,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1041.951,"event":"peer.error","peer":60,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1041.970,"event":"peer.accepted","peer":61,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.015,"event":"peer.error","peer":61,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.034,"event":"peer.accepted","peer":62,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.079,"event":"peer.error","peer":62,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.097,"event":"peer.accepted","peer":63,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.142,"event":"peer.error","peer":63,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.160,"event":"peer.accepted","peer":64,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.206,"event":"peer.error","peer":64,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.224,"event":"peer.accepted","peer":65,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.270,"event":"peer.error","peer":65,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.286,"event":"peer.accepted","peer":66,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.344,"event":"peer.error","peer":66,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.363,"event":"peer.accepted","peer":67,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.428,"event":"peer.accepted","peer":68,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.425,"event":"peer.error","peer":67,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.504,"event":"peer.error","peer":68,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.527,"event":"peer.accepted","peer":69,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.598,"event":"peer.error","peer":69,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.629,"event":"peer.accepted","peer":70,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.682,"event":"peer.error","peer":70,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.700,"event":"peer.accepted","peer":71,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.745,"event":"peer.error","peer":71,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.764,"event":"peer.accepted","peer":72,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.808,"event":"peer.error","peer":72,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.825,"event":"peer.accepted","peer":73,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.871,"event":"peer.error","peer":73,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.889,"event":"peer.accepted","peer":74,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.933,"event":"peer.error","peer":74,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1042.950,"event":"peer.accepted","peer":75,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1042.994,"event":"peer.error","peer":75,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.012,"event":"peer.accepted","peer":76,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.058,"event":"peer.error","peer":76,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.075,"event":"peer.accepted","peer":77,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.120,"event":"peer.error","peer":77,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.138,"event":"peer.accepted","peer":78,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.182,"event":"peer.error","peer":78,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.200,"event":"peer.accepted","peer":79,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.248,"event":"peer.error","peer":79,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.266,"event":"peer.accepted","peer":80,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.312,"event":"peer.error","peer":80,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.329,"event":"peer.accepted","peer":81,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.374,"event":"peer.error","peer":81,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.392,"event":"peer.accepted","peer":82,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.435,"event":"peer.error","peer":82,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.452,"event":"peer.accepted","peer":83,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.496,"event":"peer.error","peer":83,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.514,"event":"peer.accepted","peer":84,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.577,"event":"peer.accepted","peer":85,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.583,"event":"peer.error","peer":84,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.646,"event":"peer.accepted","peer":86,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.648,"event":"peer.error","peer":85,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.724,"event":"peer.error","peer":86,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.760,"event":"peer.accepted","peer":87,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.828,"event":"peer.error","peer":87,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.846,"event":"peer.accepted","peer":88,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.890,"event":"peer.error","peer":88,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.908,"event":"peer.accepted","peer":89,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1043.953,"event":"peer.error","peer":89,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1043.971,"event":"peer.accepted","peer":90,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.016,"event":"peer.error","peer":90,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.032,"event":"peer.accepted","peer":91,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.077,"event":"peer.error","peer":91,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.095,"event":"peer.accepted","peer":92,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.140,"event":"peer.error","peer":92,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.156,"event":"peer.accepted","peer":93,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.205,"event":"peer.error","peer":93,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.221,"event":"peer.accepted","peer":94,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.267,"event":"peer.error","peer":94,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.285,"event":"peer.accepted","peer":95,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.334,"event":"peer.error","peer":95,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.349,"event":"peer.accepted","peer":96,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.395,"event":"peer.error","peer":96,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.413,"event":"peer.accepted","peer":97,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.457,"event":"peer.error","peer":97,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.476,"event":"peer.accepted","peer":98,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.537,"event":"peer.error","peer":98,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.540,"event":"peer.accepted","peer":99,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.636,"event":"peer.accepted","peer":100,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.633,"event":"peer.error","peer":99,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.714,"event":"peer.error","peer":100,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.744,"event":"peer.accepted","peer":101,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.810,"event":"peer.error","peer":101,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.830,"event":"peer.accepted","peer":102,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.875,"event":"peer.error","peer":102,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.892,"event":"peer.accepted","peer":103,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.936,"event":"peer.error","peer":103,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1044.953,"event":"peer.accepted","peer":104,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1044.998,"event":"peer.error","peer":104,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.016,"event":"peer.accepted","peer":105,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.060,"event":"peer.error","peer":105,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.078,"event":"peer.accepted","peer":106,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.122,"event":"peer.error","peer":106,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.138,"event":"peer.accepted","peer":107,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.197,"event":"peer.error","peer":107,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.213,"event":"peer.accepted","peer":108,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.256,"event":"peer.error","peer":108,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.273,"event":"peer.accepted","peer":109,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.317,"event":"peer.error","peer":109,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.335,"event":"peer.accepted","peer":110,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.379,"event":"peer.error","peer":110,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.397,"event":"peer.accepted","peer":111,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.440,"event":"peer.error","peer":111,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.458,"event":"peer.accepted","peer":112,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.502,"event":"peer.error","peer":112,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.519,"event":"peer.accepted","peer":113,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.562,"event":"peer.error","peer":113,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.578,"event":"peer.accepted","peer":114,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.621,"event":"peer.error","peer":114,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.638,"event":"peer.accepted","peer":115,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.680,"event":"peer.error","peer":115,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.696,"event":"peer.accepted","peer":116,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.758,"event":"peer.accepted","peer":117,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.760,"event":"peer.error","peer":116,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.816,"event":"peer.error","peer":117,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.858,"event":"peer.accepted","peer":118,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.923,"event":"peer.error","peer":118,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1045.941,"event":"peer.accepted","peer":119,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1045.986,"event":"peer.error","peer":119,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.004,"event":"peer.accepted","peer":120,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.053,"event":"peer.error","peer":120,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.071,"event":"peer.accepted","peer":121,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.115,"event":"peer.error","peer":121,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.132,"event":"peer.accepted","peer":122,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.179,"event":"peer.error","peer":122,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.198,"event":"peer.accepted","peer":123,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.242,"event":"peer.error","peer":123,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.259,"event":"peer.accepted","peer":124,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.304,"event":"peer.error","peer":124,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.322,"event":"peer.accepted","peer":125,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.367,"event":"peer.error","peer":125,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.383,"event":"peer.accepted","peer":126,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.428,"event":"peer.error","peer":126,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.444,"event":"peer.accepted","peer":127,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.489,"event":"peer.error","peer":127,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.505,"event":"peer.accepted","peer":128,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.549,"event":"peer.error","peer":128,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.566,"event":"peer.accepted","peer":129,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.616,"event":"peer.error","peer":129,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.627,"event":"peer.accepted","peer":130,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.692,"event":"peer.error","peer":130,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.701,"event":"peer.accepted","peer":131,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.766,"event":"peer.error","peer":131,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.775,"event":"peer.accepted","peer":132,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.840,"event":"peer.error","peer":132,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.849,"event":"peer.accepted","peer":133,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.914,"event":"peer.error","peer":133,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1046.923,"event":"peer.accepted","peer":134,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1046.995,"event":"peer.error","peer":134,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.004,"event":"peer.accepted","peer":135,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.068,"event":"peer.error","peer":135,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.077,"event":"peer.accepted","peer":136,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.143,"event":"peer.error","peer":136,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.152,"event":"peer.accepted","peer":137,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.217,"event":"peer.error","peer":137,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.225,"event":"peer.accepted","peer":138,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.290,"event":"peer.error","peer":138,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.300,"event":"peer.accepted","peer":139,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.365,"event":"peer.error","peer":139,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.374,"event":"peer.accepted","peer":140,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.438,"event":"peer.error","peer":140,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.448,"event":"peer.accepted","peer":141,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.518,"event":"peer.error","peer":141,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.524,"event":"peer.accepted","peer":142,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.598,"event":"peer.error","peer":142,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.606,"event":"peer.accepted","peer":143,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.672,"event":"peer.error","peer":143,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.681,"event":"peer.accepted","peer":144,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.745,"event":"peer.error","peer":144,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.754,"event":"peer.accepted","peer":145,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.819,"event":"peer.error","peer":145,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.828,"event":"peer.accepted","peer":146,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.892,"event":"peer.error","peer":146,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.902,"event":"peer.accepted","peer":147,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1047.973,"event":"peer.error","peer":147,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1047.984,"event":"peer.accepted","peer":148,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.056,"event":"peer.error","peer":148,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.068,"event":"peer.accepted","peer":149,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.117,"event":"peer.error","peer":149,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.129,"event":"peer.accepted","peer":150,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.178,"event":"peer.error","peer":150,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.189,"event":"peer.accepted","peer":151,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.237,"event":"peer.error","peer":151,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.248,"event":"peer.accepted","peer":152,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.296,"event":"peer.error","peer":152,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.308,"event":"peer.accepted","peer":153,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.356,"event":"peer.error","peer":153,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.368,"event":"peer.accepted","peer":154,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.416,"event":"peer.error","peer":154,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.427,"event":"peer.accepted","peer":155,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.474,"event":"peer.error","peer":155,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.485,"event":"peer.accepted","peer":156,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.534,"event":"peer.error","peer":156,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.546,"event":"peer.accepted","peer":157,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.593,"event":"peer.error","peer":157,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.605,"event":"peer.accepted","peer":158,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.652,"event":"peer.error","peer":158,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.664,"event":"peer.accepted","peer":159,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.711,"event":"peer.error","peer":159,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.722,"event":"peer.accepted","peer":160,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.771,"event":"peer.error","peer":160,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.782,"event":"peer.accepted","peer":161,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.835,"event":"peer.error","peer":161,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.847,"event":"peer.accepted","peer":162,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.896,"event":"peer.error","peer":162,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.907,"event":"peer.accepted","peer":163,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1048.954,"event":"peer.error","peer":163,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1048.966,"event":"peer.accepted","peer":164,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.014,"event":"peer.error","peer":164,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.025,"event":"peer.accepted","peer":165,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.073,"event":"peer.error","peer":165,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.085,"event":"peer.accepted","peer":166,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.133,"event":"peer.error","peer":166,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.144,"event":"peer.accepted","peer":167,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.192,"event":"peer.error","peer":167,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.203,"event":"peer.accepted","peer":168,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.258,"event":"peer.error","peer":168,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.263,"event":"peer.accepted","peer":169,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.324,"event":"peer.error","peer":169,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.335,"event":"peer.accepted","peer":170,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.384,"event":"peer.error","peer":170,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.401,"event":"peer.accepted","peer":171,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.450,"event":"peer.error","peer":171,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.463,"event":"peer.accepted","peer":172,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.511,"event":"peer.error","peer":172,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.524,"event":"peer.accepted","peer":173,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.570,"event":"peer.error","peer":173,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.582,"event":"peer.accepted","peer":174,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.630,"event":"peer.error","peer":174,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.641,"event":"peer.accepted","peer":175,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.711,"event":"peer.error","peer":175,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.720,"event":"peer.accepted","peer":176,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.780,"event":"peer.error","peer":176,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.790,"event":"peer.accepted","peer":177,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.837,"event":"peer.error","peer":177,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.849,"event":"peer.accepted","peer":178,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.896,"event":"peer.error","peer":178,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.908,"event":"peer.accepted","peer":179,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1049.955,"event":"peer.error","peer":179,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1049.966,"event":"peer.accepted","peer":180,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.014,"event":"peer.error","peer":180,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.026,"event":"peer.accepted","peer":181,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.074,"event":"peer.error","peer":181,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.085,"event":"peer.accepted","peer":182,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.141,"event":"peer.error","peer":182,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.163,"event":"peer.accepted","peer":183,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.224,"event":"peer.error","peer":183,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.235,"event":"peer.accepted","peer":184,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.298,"event":"peer.error","peer":184,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.307,"event":"peer.accepted","peer":185,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.380,"event":"peer.error","peer":185,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.389,"event":"peer.accepted","peer":186,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.461,"event":"peer.error","peer":186,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.468,"event":"peer.accepted","peer":187,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.542,"event":"peer.error","peer":187,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.549,"event":"peer.accepted","peer":188,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.626,"event":"peer.error","peer":188,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.633,"event":"peer.accepted","peer":189,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.706,"event":"peer.error","peer":189,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.713,"event":"peer.accepted","peer":190,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.786,"event":"peer.error","peer":190,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.794,"event":"peer.accepted","peer":191,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.865,"event":"peer.error","peer":191,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.873,"event":"peer.accepted","peer":192,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1050.945,"event":"peer.error","peer":192,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1050.953,"event":"peer.accepted","peer":193,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.025,"event":"peer.error","peer":193,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.032,"event":"peer.accepted","peer":194,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.103,"event":"peer.error","peer":194,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.115,"event":"peer.accepted","peer":195,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.174,"event":"peer.error","peer":195,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.186,"event":"peer.accepted","peer":196,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.244,"event":"peer.error","peer":196,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.256,"event":"peer.accepted","peer":197,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.318,"event":"peer.error","peer":197,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.325,"event":"peer.accepted","peer":198,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.407,"event":"peer.error","peer":198,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.415,"event":"peer.accepted","peer":199,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.489,"event":"peer.error","peer":199,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.495,"event":"peer.accepted","peer":200,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.570,"event":"peer.error","peer":200,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.578,"event":"peer.accepted","peer":201,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.653,"event":"peer.error","peer":201,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.660,"event":"peer.accepted","peer":202,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.736,"event":"peer.error","peer":202,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.748,"event":"peer.accepted","peer":203,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.808,"event":"peer.error","peer":203,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.820,"event":"peer.accepted","peer":204,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.880,"event":"peer.error","peer":204,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.888,"event":"peer.accepted","peer":205,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1051.960,"event":"peer.error","peer":205,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1051.968,"event":"peer.accepted","peer":206,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1052.038,"event":"peer.error","peer":206,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1052.046,"event":"peer.accepted","peer":207,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1052.117,"event":"peer.error","peer":207,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1052.129,"event":"peer.accepted","peer":208,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1052.188,"event":"peer.error","peer":208,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1052.199,"event":"peer.accepted","peer":209,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1052.258,"event":"peer.error","peer":209,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1052.269,"event":"peer.accepted","peer":210,"pid":45756,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1052.330,"event":"peer.error","peer":210,"pid":45756,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}
+{"t_ms":1074.959,"event":"peer.accepted","peer":211,"pid":45758,"euid":501,"egid":20,"asid":100025,"requirement":"none","requirementSet":0,"requirementSetMicros":0}
+{"t_ms":1079.019,"event":"peer.message","peer":211,"pid":45758,"message":500,"bytes":119,"mode":"respond","refusal":null}
+{"t_ms":1085.750,"event":"peer.message","peer":211,"pid":45758,"message":1000,"bytes":119,"mode":"respond","refusal":null}
+{"t_ms":1091.072,"event":"peer.error","peer":211,"pid":45758,"error":"XPC_ERROR_CONNECTION_INVALID","description":"Connection invalid"}

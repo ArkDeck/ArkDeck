@@ -1,0 +1,57 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-client",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2Client.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 38318,
+    "sandboxContainer" : "com.arkdeck.spk2-client",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+        "Developer ID Application: Hanfeng Fu (8AQTYW5FKR)",
+        "Developer ID Certification Authority",
+        "Apple Root CA"
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65536,
+      "identifier" : "com.arkdeck.spk2-client",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : "8AQTYW5FKR"
+    }
+  },
+  "connectionEvents" : [
+    {
+      "description" : "Connection invalid",
+      "error" : "XPC_ERROR_CONNECTION_INVALID",
+      "tMs" : 520726716.214791
+    }
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "mode" : "probe",
+  "pinServer" : "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.spk2-listener\"",
+  "pinServerResult" : 0,
+  "probe" : {
+    "elapsedMs" : 4.1961250000000003,
+    "outcome" : "reply",
+    "replyBytes" : 112,
+    "replyID" : "A6080CA3-23C7-4067-9330-20330C2B76C2",
+    "replySample" : "{\"id\":\"A6080CA3-23C7-4067-9330-20330C2B76C2\",\"ok\":true,\"result\":{\"listener\":\"spk2-rust-libxpc\",\"echoBytes\":119}}"
+  },
+  "protocolVersion" : "1.0.0",
+  "requestID" : "A6080CA3-23C7-4067-9330-20330C2B76C2",
+  "service" : "com.arkdeck.agentd"
+}

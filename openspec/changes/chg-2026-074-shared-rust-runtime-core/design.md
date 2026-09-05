@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 2800fbf1fde7a1b1e3939f334c77a221cc9b27e1
-  sha256: 23a72588f6fd7e5bbb36310beed9fea38f5a4fd4ed88aa2bd2e67fb80829e064
+  blob: 6294cfc3def9eabe13fe879779cf6817b167fd98
+  sha256: 65d56982fcd47fea1029ff41a4be13bb97dd3a765d60853bf1c13d44cec40b58
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
@@ -25,6 +25,9 @@ Revision 6 re-pins the dependency correction: CHG-2026-075's TASK-SVC-001..004 f
 one current v1 contract; XPA-001 then publishes its per-method schemas for Rust. The target
 contract, storage, ABI, parity, DAG and rollout sections use that post-SVC baseline. Old scan
 facts and revision history remain evidence of the earlier design, not implementation targets.
+Revision 7 re-pins it for the SPK-2 outcome: the section F.2 identity row, the section J.3 SPK-2
+row, risk R3 in section K, one section L open-items row and the notes on items 3 and 6 of section
+L.1 changed; nothing else.
 
 ## Single-v1 prerequisite
 

@@ -1,0 +1,139 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-client",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2Client.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 38309,
+    "sandboxContainer" : "com.arkdeck.spk2-client",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+        "Developer ID Application: Hanfeng Fu (8AQTYW5FKR)",
+        "Developer ID Certification Authority",
+        "Apple Root CA"
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65536,
+      "identifier" : "com.arkdeck.spk2-client",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : "8AQTYW5FKR"
+    }
+  },
+  "connectionEvents" : [
+
+  ],
+  "count" : 100,
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "mode" : "sizes",
+  "protocolVersion" : "1.0.0",
+  "replies" : [
+    {
+      "errors" : 0,
+      "latency" : {
+        "max" : 0.012458,
+        "mean" : 0.0091300099999999992,
+        "min" : 0.0086660000000000001,
+        "n" : 100,
+        "p50" : 0.0089999999999999993,
+        "p95" : 0.0094579999999999994,
+        "p99" : 0.012458,
+        "unit" : "milliseconds"
+      },
+      "replyBytes" : 112,
+      "replyTarget" : 0
+    },
+    {
+      "errors" : 0,
+      "latency" : {
+        "max" : 0.028375000000000001,
+        "mean" : 0.012435790000000007,
+        "min" : 0.011583,
+        "n" : 100,
+        "p50" : 0.012,
+        "p95" : 0.014874999999999999,
+        "p99" : 0.015542,
+        "unit" : "milliseconds"
+      },
+      "replyBytes" : 4096,
+      "replyTarget" : 4096
+    },
+    {
+      "errors" : 0,
+      "latency" : {
+        "max" : 0.050375000000000003,
+        "mean" : 0.043418389999999987,
+        "min" : 0.037124999999999998,
+        "n" : 100,
+        "p50" : 0.043416999999999997,
+        "p95" : 0.046625,
+        "p99" : 0.049959000000000003,
+        "unit" : "milliseconds"
+      },
+      "replyBytes" : 65536,
+      "replyTarget" : 65536
+    },
+    {
+      "errors" : 0,
+      "latency" : {
+        "max" : 0.61758400000000002,
+        "mean" : 0.58378202999999995,
+        "min" : 0.56054199999999998,
+        "n" : 100,
+        "p50" : 0.575959,
+        "p95" : 0.61150000000000004,
+        "p99" : 0.61716700000000002,
+        "unit" : "milliseconds"
+      },
+      "replyBytes" : 1048576,
+      "replyTarget" : 1048576
+    },
+    {
+      "errors" : 0,
+      "latency" : {
+        "max" : 2.6651669999999998,
+        "mean" : 2.5515599999999989,
+        "min" : 2.476,
+        "n" : 100,
+        "p50" : 2.5514589999999999,
+        "p95" : 2.6405829999999999,
+        "p99" : 2.6559170000000001,
+        "unit" : "milliseconds"
+      },
+      "replyBytes" : 4194304,
+      "replyTarget" : 4194304
+    }
+  ],
+  "requests" : [
+    {
+      "elapsedMs" : 0.29475000000000001,
+      "outcome" : {
+        "idEcho" : true,
+        "reply" : true,
+        "replyBytes" : 116
+      },
+      "requestBytes" : 4194304
+    },
+    {
+      "elapsedMs" : 0.030332999999999999,
+      "outcome" : {
+        "transportRefusal" : "frameSizeOutOfRange"
+      },
+      "requestBytes" : 4194305
+    }
+  ],
+  "service" : "com.arkdeck.agentd"
+}
