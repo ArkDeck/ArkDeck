@@ -1,0 +1,4 @@
+{"method":"target.list","ok":true,"protocolVersion":"1.0.0","result":[]}
+{"method":"target.list","ok":true,"protocolVersion":"1.0.0","result":[{"adoptedAtUtc":"2026-08-08T00:00:00Z","bindingRevision":1,"displayName":null,"displayNameGeneration":"1","targetId":"TGT-bbbbbbbbbbbb","toolVersion":"3.2.0f"}]}
+{"method":"target.list","ok":true,"protocolVersion":"1.0.0","result":[{"adoptedAtUtc":"2026-09-01T00:00:00Z","bindingRevision":1,"displayName":"Lab device","displayNameGeneration":"2","targetId":"TGT-dddddddddddd","toolVersion":"3.2.0f"}]}
+{"error":{"code":"internalError","message":"target store is not configured"},"method":"target.list","ok":false,"protocolVersion":"1.0.0"}

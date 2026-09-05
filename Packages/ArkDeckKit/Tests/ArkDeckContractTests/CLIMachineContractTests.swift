@@ -367,6 +367,28 @@ final class CLIMachineContractTests: XCTestCase {
     XCTAssertEqual(methods, expectedMethods)
     XCTAssertEqual(version, .string(ArkDeckControlProtocol.currentVersion))
     XCTAssertEqual(fields["x-arkdeck-currentProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
+    XCTAssertEqual(fields["x-arkdeck-contractIdentity"], .string(ArkDeckControlProtocol.contractIdentity))
+    XCTAssertEqual(
+      fields["x-arkdeck-methodSchemaDirectory"],
+      .string(CLIMachineContracts.controlMethodSchemaDirectory))
+
+    // Every row of the method table points at its typed schema under
+    // `spec/control/methods/`, and the file it names exists.
+    guard case .array(let rows)? = fields["x-arkdeck-methods"] else {
+      return XCTFail("control-plane schema lost its method table")
+    }
+    XCTAssertEqual(rows.count, expectedMethods.count)
+    for row in rows {
+      guard case .object(let entry) = row, case .string(let method)? = entry["method"] else {
+        return XCTFail("method row lost its shape")
+      }
+      XCTAssertEqual(entry["published"], .bool(true), method)
+      let path = "\(CLIMachineContracts.controlMethodSchemaDirectory)/\(method).json"
+      XCTAssertEqual(entry["schema"], .string(path), method)
+      XCTAssertTrue(
+        FileManager.default.fileExists(atPath: Self.repositoryRoot.appending(path: path).path),
+        "\(path) is missing; derive it from a recorded contract-test run")
+    }
   }
 
   func testVersionPinsAreSingleSourced() throws {

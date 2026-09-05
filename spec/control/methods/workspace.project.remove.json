@@ -1,0 +1,107 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedGeneration": {
+          "type": "string"
+        },
+        "projectRef": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedFileGlobs": {
+          "type": "array"
+        },
+        "availability": {
+          "type": "string"
+        },
+        "configurationStatus": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operations": {
+          "type": "array"
+        },
+        "presetRefs": {
+          "type": "array"
+        },
+        "projectRef": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reasonCode": {
+          "type": "string"
+        },
+        "registeredAtUtc": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "updatedAtUtc": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowedFileGlobs",
+        "availability",
+        "configurationStatus",
+        "generation",
+        "kind",
+        "operations",
+        "presetRefs",
+        "projectRef",
+        "reason",
+        "reasonCode",
+        "registeredAtUtc",
+        "schemaVersion",
+        "updatedAtUtc"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/workspace.project.remove.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `workspace.project.remove` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/workspace.project.remove",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "workspace.project.remove",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 1,
+    "request": 2,
+    "result": 1
+  }
+}

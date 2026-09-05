@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "artifactIntegrityFailed",
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "outcomeUnknown",
+        "recordUnreadable",
+        "rejected",
+        "resourceConflict",
+        "sensitiveAccessDenied",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "allowSensitive": {
+          "type": "boolean"
+        },
+        "artifactId": {
+          "type": "string"
+        },
+        "destinationDirectory": {
+          "type": "string"
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactDigest": {
+          "type": "string"
+        },
+        "artifactId": {
+          "type": "string"
+        },
+        "byteCount": {
+          "type": "integer"
+        },
+        "exportedPath": {
+          "type": "string"
+        },
+        "overwritten": {
+          "type": "boolean"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "privacy": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifactDigest",
+        "artifactId",
+        "byteCount",
+        "exportedPath",
+        "overwritten",
+        "owner",
+        "privacy",
+        "schemaVersion"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/artifact.export.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `artifact.export` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/artifact.export",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "artifact.export",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 8,
+    "request": 13,
+    "result": 5
+  }
+}

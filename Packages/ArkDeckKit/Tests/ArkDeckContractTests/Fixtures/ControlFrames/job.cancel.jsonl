@@ -1,0 +1,3 @@
+{"method":"job.cancel","ok":true,"params":{"jobId":"job-2f1a15168a6441f11924d327d6a6e472"},"protocolVersion":"1.0.0","result":{"cancelRequested":true}}
+{"error":{"code":"notFound","message":"unknown job JOB-DOES-NOT-EXIST"},"method":"job.cancel","ok":false,"params":{"jobId":"JOB-DOES-NOT-EXIST"},"protocolVersion":"1.0.0"}
+{"error":{"code":"invalidParams","message":"jobId is required"},"method":"job.cancel","ok":false,"params":{},"protocolVersion":"1.0.0"}

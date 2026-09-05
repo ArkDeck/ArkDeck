@@ -1,0 +1,1 @@
+{"error":{"code":"operationUnavailable","details":{"newDispatchCount":0,"phase":"preAdmission"},"message":"AgentExecution owner is unavailable"},"method":"agent.list","ok":false,"params":{},"protocolVersion":"1.0.0"}

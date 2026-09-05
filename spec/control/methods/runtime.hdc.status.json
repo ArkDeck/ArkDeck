@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "type": "string"
+        },
+        "clientVersion": {
+          "type": "null"
+        },
+        "clientVersionSource": {
+          "type": "null"
+        },
+        "configuredExecutableSHA256": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "daemonVersion": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "endpoint": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "endpointSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "executablePath": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "executableSHA256": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "executableSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "generation": {
+          "type": "null"
+        },
+        "healthReasonCode": {
+          "type": "string"
+        },
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "observedAt": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "ownership": {
+          "type": "string"
+        },
+        "processId": {
+          "type": "null"
+        },
+        "reasonCode": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "serverEndpointRef": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "serverHealth": {
+          "type": "string"
+        },
+        "serverVersion": {
+          "type": "null"
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
+        },
+        "startupVersions": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client": {
+                  "type": "string"
+                },
+                "server": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client",
+                "server"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "availability",
+        "clientVersion",
+        "clientVersionSource",
+        "configuredExecutableSHA256",
+        "daemonVersion",
+        "endpoint",
+        "endpointSource",
+        "executablePath",
+        "executableSHA256",
+        "executableSource",
+        "generation",
+        "healthReasonCode",
+        "newDispatchCount",
+        "observedAt",
+        "ownership",
+        "processId",
+        "reasonCode",
+        "schemaVersion",
+        "serverEndpointRef",
+        "serverHealth",
+        "serverVersion",
+        "signature",
+        "startupVersions"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/runtime.hdc.status.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `runtime.hdc.status` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/runtime.hdc.status",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "runtime.hdc.status",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 2,
+    "request": 7,
+    "result": 5
+  }
+}

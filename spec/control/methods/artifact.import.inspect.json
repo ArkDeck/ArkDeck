@@ -1,0 +1,257 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "resourceNotFound",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "importId": {
+          "type": "string"
+        },
+        "importRequestId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAtUtc": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "importId": {
+          "type": "string"
+        },
+        "importRequestId": {
+          "type": "string"
+        },
+        "maximumChunkBytes": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": false,
+          "properties": {
+            "bindingRevision": {
+              "type": "string"
+            },
+            "byteCount": {
+              "type": "string"
+            },
+            "deviceProfile": {
+              "type": "null"
+            },
+            "importRequestId": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "targetId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bindingRevision",
+            "byteCount",
+            "deviceProfile",
+            "importRequestId",
+            "kind",
+            "name",
+            "schemaVersion",
+            "sha256",
+            "targetId"
+          ],
+          "type": "object"
+        },
+        "metadataFingerprint": {
+          "type": "string"
+        },
+        "nextOffset": {
+          "type": "string"
+        },
+        "receipt": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "artifactDigest": {
+                  "type": "string"
+                },
+                "artifactId": {
+                  "type": "string"
+                },
+                "bindingRevision": {
+                  "type": "string"
+                },
+                "byteCount": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "string"
+                },
+                "importId": {
+                  "type": "string"
+                },
+                "importRequestId": {
+                  "type": "string"
+                },
+                "lease": {
+                  "type": "string"
+                },
+                "mediaType": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "privacy": {
+                  "type": "string"
+                },
+                "schemaVersion": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "validation": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "container": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "container",
+                    "kind"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "artifactDigest",
+                "artifactId",
+                "bindingRevision",
+                "byteCount",
+                "generation",
+                "importId",
+                "importRequestId",
+                "lease",
+                "mediaType",
+                "name",
+                "owner",
+                "privacy",
+                "schemaVersion",
+                "targetId",
+                "validation"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "updatedAtUtc": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "createdAtUtc",
+        "generation",
+        "importId",
+        "importRequestId",
+        "maximumChunkBytes",
+        "metadata",
+        "metadataFingerprint",
+        "nextOffset",
+        "receipt",
+        "schemaVersion",
+        "state",
+        "updatedAtUtc"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/artifact.import.inspect.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `artifact.import.inspect` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/artifact.import.inspect",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "artifact.import.inspect",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 8,
+    "request": 16,
+    "result": 8
+  }
+}

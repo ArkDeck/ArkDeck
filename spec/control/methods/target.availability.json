@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "targetId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "binding": {
+          "additionalProperties": false,
+          "properties": {
+            "adoptedAtUtc": {
+              "type": "string"
+            },
+            "bindingRevision": {
+              "type": "integer"
+            },
+            "stablePhysicalIdentitySha256": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "toolVersion": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "adoptedAtUtc",
+            "bindingRevision",
+            "stablePhysicalIdentitySha256",
+            "state",
+            "toolVersion"
+          ],
+          "type": "object"
+        },
+        "observedAtUtc": {
+          "type": "string"
+        },
+        "operations": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "availability": {
+                    "type": "string"
+                  },
+                  "reasonCodes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "reasons": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "reference": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "availability",
+                  "reasonCodes",
+                  "reasons",
+                  "reference"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "targetResolution": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "items",
+            "reason",
+            "reasonCode",
+            "scope",
+            "targetResolution"
+          ],
+          "type": "object"
+        },
+        "presence": {
+          "additionalProperties": false,
+          "properties": {
+            "observationHealth": {
+              "type": "null"
+            },
+            "observedAtUtc": {
+              "type": "null"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "observationHealth",
+            "observedAtUtc",
+            "reason",
+            "reasonCode",
+            "state"
+          ],
+          "type": "object"
+        },
+        "profile": {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "reasonCode",
+            "state"
+          ],
+          "type": "object"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "tool": {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "reasonCode",
+            "state"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "binding",
+        "observedAtUtc",
+        "operations",
+        "presence",
+        "profile",
+        "targetId",
+        "tool"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/target.availability.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `target.availability` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/target.availability",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "target.availability",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 3,
+    "request": 4,
+    "result": 1
+  }
+}

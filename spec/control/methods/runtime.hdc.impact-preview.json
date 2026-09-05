@@ -1,0 +1,407 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "newDispatchCount"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "actionRequestId": {
+          "type": "string"
+        },
+        "expectedServerGeneration": {
+          "type": "string"
+        },
+        "serverEndpointRef": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "actionRequestId": {
+          "type": "string"
+        },
+        "blockerReasonCode": {
+          "type": "null"
+        },
+        "catalogDigest": {
+          "type": "string"
+        },
+        "controlActionId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "dispatchCount": {
+          "type": "integer"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "fingerprintAlgorithm": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "humanAction": {
+          "type": "null"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "lastObservedAt": {
+          "type": "string"
+        },
+        "nextAction": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "owner": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "resource": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "kind",
+            "owner",
+            "reasonCode",
+            "resource"
+          ],
+          "type": "object"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "preview": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "affectedDeviceObservations": {
+              "type": "array"
+            },
+            "affectedJobIds": {
+              "type": "array"
+            },
+            "affectedTargetIds": {
+              "type": "array"
+            },
+            "confirmationRequired": {
+              "type": "boolean"
+            },
+            "controlActionId": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "criticalJobGate": {
+              "additionalProperties": false,
+              "properties": {
+                "blocking": {
+                  "type": "array"
+                },
+                "reasonCode": {
+                  "type": "null"
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "blocking",
+                "reasonCode",
+                "state"
+              ],
+              "type": "object"
+            },
+            "detectedOtherClientIds": {
+              "type": "array"
+            },
+            "digestAlgorithm": {
+              "type": "string"
+            },
+            "dispatchCount": {
+              "type": "integer"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "expiresAt": {
+              "type": "string"
+            },
+            "interruption": {
+              "additionalProperties": false,
+              "properties": {
+                "affectsAllParticipants": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "affectsAllParticipants",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "otherClientsMayExist": {
+              "type": "boolean"
+            },
+            "owner": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "previewDigest": {
+              "type": "string"
+            },
+            "previewId": {
+              "type": "string"
+            },
+            "recovery": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "replayAllowed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "kind",
+                "replayAllowed"
+              ],
+              "type": "object"
+            },
+            "schemaVersion": {
+              "type": "string"
+            },
+            "serverEndpointRef": {
+              "type": "string"
+            },
+            "serverGeneration": {
+              "type": "string"
+            },
+            "serverHealth": {
+              "type": "string"
+            },
+            "serverOwnership": {
+              "type": "string"
+            },
+            "serverVersion": {
+              "type": "string"
+            },
+            "tool": {
+              "additionalProperties": false,
+              "properties": {
+                "executablePath": {
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "null"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "signature": {
+                  "type": "null"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "trust": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "executablePath",
+                "reference",
+                "sha256",
+                "signature",
+                "source",
+                "trust",
+                "version"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "action",
+            "affectedDeviceObservations",
+            "affectedJobIds",
+            "affectedTargetIds",
+            "confirmationRequired",
+            "controlActionId",
+            "createdAt",
+            "criticalJobGate",
+            "detectedOtherClientIds",
+            "digestAlgorithm",
+            "dispatchCount",
+            "endpoint",
+            "expiresAt",
+            "interruption",
+            "kind",
+            "otherClientsMayExist",
+            "owner",
+            "previewDigest",
+            "previewId",
+            "recovery",
+            "schemaVersion",
+            "serverEndpointRef",
+            "serverGeneration",
+            "serverHealth",
+            "serverOwnership",
+            "serverVersion",
+            "tool"
+          ],
+          "type": "object"
+        },
+        "requestFingerprint": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "actionRequestId",
+        "blockerReasonCode",
+        "catalogDigest",
+        "controlActionId",
+        "createdAt",
+        "dispatchCount",
+        "expiresAt",
+        "fingerprintAlgorithm",
+        "generation",
+        "humanAction",
+        "kind",
+        "lastObservedAt",
+        "nextAction",
+        "owner",
+        "preview",
+        "requestFingerprint",
+        "schemaVersion",
+        "state"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/runtime.hdc.impact-preview.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `runtime.hdc.impact-preview` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/runtime.hdc.impact-preview",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "runtime.hdc.impact-preview",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 1,
+    "request": 3,
+    "result": 2
+  }
+}

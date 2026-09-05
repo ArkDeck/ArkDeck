@@ -1,0 +1,1 @@
+{"error":{"code":"invalidInput","details":{"newDispatchCount":0,"phase":"preAdmission"},"message":"an exact Job identity and closed read options are required"},"method":"job.timeline","ok":false,"params":{},"protocolVersion":"1.0.0"}

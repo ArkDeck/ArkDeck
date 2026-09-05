@@ -1,0 +1,1 @@
+{"error":{"code":"invalidParams","message":"capabilityId is required"},"method":"capability.inspect","ok":false,"params":{},"protocolVersion":"1.0.0"}

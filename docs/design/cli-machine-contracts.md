@@ -43,12 +43,45 @@ tooling and are macOS-only until a Windows profile is ratified.
 | `cli-page.schema.json` | §7.3 | `pageKind` conditionals: event pages fix `order` and always carry a cursor; exhausted snapshots carry `null` |
 | `cli-event.schema.json` | `CLIEventEnvelope` | terminal frame vs Runtime event frame |
 | `cli-next-action.schema.json` | §7.3 union | one closed branch per `kind`; resource kind mirrors owner kind where the spec says so |
-| `runtime-control-plane.schema.json` | `AgentWireProtocol`, `ArkDeckControlProtocol` | request/response frames; `method` enum is the exact current classified method set, with version and identity constants |
+| `runtime-control-plane.schema.json` | `AgentWireProtocol`, `ArkDeckControlProtocol` | request/response frames; `method` enum is the exact current classified method set, with version and identity constants; every row of the method table names its typed schema under `spec/control/methods/` (`x-arkdeck-methodSchemaDirectory`) |
 
 `--version --output json` reports `pageSchemaVersion` and
 `nextActionSchemaVersion` as `arkdeck.cli.page/1` and
 `arkdeck.cli.next-action/1`; both constants live in `CLIMachineContracts` and
 are the titles of the corresponding schema files.
+
+## Per-method typed schemas (`spec/control/methods/`)
+
+`TASK-XPA-001` publishes one typed contract per method of the single current
+control protocol: `spec/control/methods/<method>.json` carries `$defs.request`
+(the parameters a caller may send), `$defs.result` (the Runtime's reply),
+`$defs.errorCode` and `$defs.errorDetails` (the structured evidence a refusal
+attaches), plus `x-arkdeck-protocolVersion` and `x-arkdeck-contractIdentity`,
+the exact registry it was derived under. The control-plane schema's method
+table points at these files by relative path (`x-arkdeck-methodSchemaDirectory`).
+
+These files are not restated by hand either. They are derived from frames the
+daemon really answered: a debug build of the daemon records every dispatched
+request and response as one canonical JSON line when
+`ARKDECK_CONTROL_FRAME_LOG=<directory>` is set (release builds never read the
+variable), and
+
+```bash
+ARKDECK_CONTROL_FRAME_LOG=/tmp/arkdeck-frames sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test
+python3 Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas /tmp/arkdeck-frames
+```
+
+rewrites the schemas and selects the committed corpus
+`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/<method>.jsonl`
+(the smallest frame of every distinct request and response shape). Results and
+error details are closed to the fields the daemon emitted; request parameters
+are closed to the fields a contract test exercised, so a parameter no test
+sends is not published. `ControlMethodSchemaContractTests` holds every corpus
+frame to its schema, requires a schema for exactly the published methods under
+the build's contract identity, and validates a freshly recorded directory when
+the variable is set for the test run itself. A registry change therefore
+changes every schema's identity, and the test names the re-derivation as the
+fix rather than accepting schemas from another contract.
 
 ## Feature coverage
 

@@ -1,0 +1,2 @@
+{"method":"session.show","ok":true,"params":{"sessionId":"session-cli"},"protocolVersion":"1.0.0","result":{"completedAtUtc":"2026-08-02T00:00:00Z","expiresAtUtc":"2026-10-31T00:00:00Z","generation":"0","pinned":false,"policyGeneration":"1","schemaVersion":"arkdeck.session/1","sessionId":"session-cli","sizeBytes":"1222"}}
+{"error":{"code":"operationUnavailable","details":{"newDispatchCount":0,"phase":"sessionOwner"},"message":"Runtime Session storage is not configured"},"method":"session.show","ok":false,"params":{},"protocolVersion":"1.0.0"}

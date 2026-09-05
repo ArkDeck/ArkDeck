@@ -1,0 +1,2 @@
+{"method":"flash.bootloader-status","ok":true,"protocolVersion":"1.0.0","result":{"bindingRevision":null,"disposition":"unbound","mode":"loader","observationCount":1,"targetId":null}}
+{"error":{"code":"internalError","message":"Rockchip bootloader status observation is not configured"},"method":"flash.bootloader-status","ok":false,"params":{},"protocolVersion":"1.0.0"}

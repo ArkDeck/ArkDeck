@@ -1,0 +1,2 @@
+{"error":{"code":"internalError","message":"History filter store is not configured"},"method":"history.filter.list","ok":false,"params":{},"protocolVersion":"1.0.0"}
+{"method":"history.filter.list","ok":true,"protocolVersion":"1.0.0","result":{"filters":[],"generation":"1","schemaVersion":"arkdeck.history-filter-list/1","updatedAtUtc":null}}

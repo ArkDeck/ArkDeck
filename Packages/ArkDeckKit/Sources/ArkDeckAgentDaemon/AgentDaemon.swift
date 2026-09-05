@@ -129,6 +129,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let durableImportFlashPolicy: FlashBundleImportPolicy
   private let workspaceProjects: [WorkspaceProjectPublication]
   private let methodObserver: (@Sendable (String) -> Void)?
+  /// Test seam: receives every dispatched request with its response. Production
+  /// passes nil; a debug build may install the environment-driven recorder
+  /// (`ControlFrameRecorder`) so a contract-test run leaves the frame corpus the
+  /// per-method schemas are derived from and checked against.
+  private let frameObserver: (@Sendable (ControlFrameRecord) -> Void)?
 
   public init(
     engine: RuntimeJobEngine,
@@ -223,7 +228,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
     workspaceProjects: [WorkspaceProjectPublication] = [],
-    methodObserver: (@Sendable (String) -> Void)?
+    methodObserver: (@Sendable (String) -> Void)?,
+    frameObserver: (@Sendable (ControlFrameRecord) -> Void)? = nil
   ) {
     self.engine = engine
     self.capabilityStore = capabilityStore
@@ -255,6 +261,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.durableImportFlashPolicy = flashBundleImportPolicy
     self.workspaceProjects = workspaceProjects.sorted { $0.projectRef < $1.projectRef }
     self.methodObserver = methodObserver
+    self.frameObserver = frameObserver ?? ControlFrameRecorder.environmentObserver()
   }
 
   public func handleLine(_ line: Data) async -> Data {
@@ -304,6 +311,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   private func dispatch(
+    _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
+  ) async -> AgentWireProtocol.Response {
+    let response = await dispatchUnobserved(request, context: context)
+    frameObserver?(ControlFrameRecord(request: request, response: response))
+    return response
+  }
+
+  private func dispatchUnobserved(
     _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
   ) async -> AgentWireProtocol.Response {
     methodObserver?(request.method)
