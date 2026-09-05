@@ -6,6 +6,13 @@
 > to `ready` inside the PR that instantiates their readiness pins. Task semantics, DAG, sizes and
 > gates are explained in `docs/design/cross-platform/rust-core-cross-platform-architecture.md` §J.
 
+Revision 6 consumes [CHG-2026-075](../chg-2026-075-single-v1-contracts/proposal.md).
+Its prerequisite implementation is TASK-SVC-001..004. This PR proposes the r6 dependency and
+scope correction for maintainer review; the existing proposal status does not approve r6.
+Every later reference to the Swift oracle, unchanged schema, rollback or a frozen field set
+means the latest Swift single-v1 baseline after those tasks. Historical pre-SVC formats,
+negotiation and authority branches must not be revived by a Rust port.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -39,34 +46,24 @@ Conventions shared by every task:
 | SPK-4 | WinUI 3 gate (design §H.4 a–e) | all pass | any fails and cannot be fixed in two weeks | WinUI 3 vs WPF |
 | SPK-5 | NTFS durability primitives (`FlushFileBuffers`, `MoveFileExW` write-through, `LockFileEx`, torn-tail exhaustive test) | torn-tail matrix passes; append p95 recorded | atomic replace cannot be proven | TASK-XPA-005 write path design |
 
-## TASK-XPA-001 — Publish protocol 2.1.0 essentials with per-method typed schemas
+## TASK-XPA-001 — Publish per-method typed schemas from the single v1 contract for Rust consumers
 
-- Status:ready（may start only after the CHG-2026-074 proposal PR is merged; no readiness PR is needed）
+- Status:blocked（awaits TASK-SVC-001, TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004; this r6 task revision requires maintainer review）
 - Platform:macos（contract is platform-neutral）
-- Requirements:CLI-REQ-013, CLI-REQ-014, CLI-REQ-025 (`docs/design/arkdeck-cli-product-spec.md:1994-2008,2111-2123`); no Core REQ edited
-- Acceptance:XPA-AC-3; existing negotiation matrix in `Tests/ArkDeckContractTests/ControlProtocolNegotiationContractTests.swift`
-- Depends on:none（SPK-1 may run in parallel）
-- Readiness input pins:
-
-  ```yaml pins
-  - path: Packages/ArkDeckKit/Contracts/control-negotiation.json
-    blob: 91f25f3be0980d08764e0be4c06c9e4a7840a943
-  - path: openspec/contracts/runtime-control-plane.schema.json
-    blob: 40573d3c1fea0d87c70786d2afc2a22c6ebec1be
-  - path: openspec/contracts/journal-event.schema.json
-    blob: d25b7a55e9970d301558430febd235ccc910d8b7
-  ```
-
+- Requirements:CLI-REQ-013, CLI-REQ-014, CLI-REQ-025 as aligned by CHG-2026-075; no Core REQ edited by this task
+- Acceptance:XPA-AC-1, XPA-AC-3; the post-SVC single-v1 positive and negative frame corpus
+- Depends on:TASK-SVC-001, TASK-SVC-002, TASK-SVC-003, TASK-SVC-004
+- Readiness input pins:record the merged post-SVC commit, current contract sources, generated schemas and conformance corpus when the dependencies complete. The old r1–r5 protocol/journal blobs are historical inputs, not this task's baseline; no placeholder is an executable pin.
 - Applicable failure patterns:AF-004, AF-006, AF-014
-- Production reachability:`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` (`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift:293-341`) → protocol 2.1.0 method table → existing handlers; no new effect, no new dispatch point
-- Trusted fact sources:method set and versions come only from `Packages/ArkDeckKit/Contracts/control-negotiation.json` through the generator; per-method schemas are derived from recorded frames in existing contract tests and validated against them; callers cannot widen the method set
+- Production reachability:`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` → the single v1 method table → existing handlers; no new effect or dispatch point
+- Trusted fact sources:the method set and current document shapes come from the protected-main Swift implementation after SVC-001..004 and its canonical generators; per-method schemas are checked against actual request/result/error frames; callers cannot widen the method set
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `Packages/ArkDeckKit/Contracts/**`
   - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
-  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/**`（r4: the target-major version predicate in the transport library only — the negotiated `2.1.0` and `2.0.0` must both select the target branches; no new method, transport or effect）
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/**`（generated single-v1 schema consumption only; no version selection or fallback）
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `openspec/contracts/runtime-control-plane.schema.json`
@@ -75,28 +72,28 @@ Conventions shared by every task:
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/constitution.md`、`openspec/specs/**`、`Catalog/**`、`openspec/platforms/**`
-  - any change to a protocol 1.x frame shape or to the effect of any method
-- Risk:low（additive methods; 1.x table frozen byte-for-byte）
-- Hardware required:yes（DAYU200 for the 2.x-only headless rerun of GJ-1..5）
+  - changing the post-SVC frame/document shape or any method's effect; reintroducing multi-version negotiation, downgrade, legacy readers or old authority
+- Risk:low（publishes typed schemas for the existing single-v1 behavior）
+- Hardware required:yes（DAYU200 for the headless rerun of GJ-1..5）
 - Decision-Grade:D1
 
 ### Deliverables
 
-- `supportedExactVersions = ["2.1.0","2.0.0","1.0.0"]`; 2.1.0 additive publication of the 44 methods that exist only on 1.x today (`job.cancel`, `job.reconcile`, `operation.list/describe`, `device.candidates`, `target.list/availability`, `artifact.quota`, `cleanupDebt.*`, `runtime.hdc-status`, read-only `flash.*`, …), except methods the CLI spec §12 tombstones.
-- `spec/control/methods/<method>.json` (request / result / error-details) for every target method; the control-plane schema references them.
-- Journal contract records the generations 2.0.0, 2.1.0, 2.2.0 and 3.0.0 that Swift already accepts.
-- CLI target leaves negotiate 2.1.0; legacy leaves unchanged.
+- `spec/control/methods/<method>.json` with request/result/error-details for every method in the final single-v1 table; the control-plane schema references them.
+- Generate Swift/Rust/client contract inputs from one canonical method/schema source, preserving the post-SVC wire and durable bytes and the current method effects.
+- Publish the single current journal contract for Rust consumption; do not restore the historical generation union or change the cleanup delivered by CHG-2026-075.
+- Record the post-SVC baseline commit, contract digests and corpus used by every later XPA differential test.
 
 ### Verification
 
-- XPA-AC-3 → schema positive/negative cases over every recorded frame; negotiation matrix (malformed, no-common, cross-major, old 1.0.0) → all pass with zero dispatch.
-- Differential → the same request on 2.0.0 and 2.1.0 yields byte-identical results.
-- Real device → `docs/design/cli-golden-journey-headless-runbook.md` with `--require-protocol 2` and no legacy leaf: GJ-1..5 `REAL_DEVICE_PASS` on the current digest.
+- XPA-AC-3 → every current recorded frame validates; malformed/unsupported-version/unknown-method frames fail structurally with zero dispatch; no negotiation or downgrade path exists.
+- XPA-AC-1 → generated schema and Swift runtime agree on current request/result/error and durable document shapes; historical inputs stay rejected or isolated according to CHG-2026-075.
+- Real device → `docs/design/cli-golden-journey-headless-runbook.md` using the normal single-v1 CLI: GJ-1..5 `REAL_DEVICE_PASS` on the current digest; this re-pass does not replace SVC-005.
 
 ### Notes / handoff
 
-- Stop condition: any 1.x frame shape changes, or any method changes effect under 2.1.0.
-- Rollback: daemon binary revert; clients negotiate back to 2.0.0.
+- Stop condition: any mismatch against the pinned post-SVC contract, loss of a required method, changed effect, or return of compatibility logic removed by CHG-2026-075.
+- Rollback: revert this schema-publication change as a unit; migration rollback pairs clients with the post-SVC Swift daemon of the same release, never selects an older protocol.
 - Size: M.
 
 ## TASK-XPA-002 — Rust contract kernel and the first Windows GJ-1 hops (doctor, device candidates)
@@ -154,7 +151,7 @@ Conventions shared by every task:
 ### Verification
 
 - XPA-AC-1 → vectors and fixtures replayed in Rust → all equal.
-- XPA-AC-3 → negotiation and frame-limit matrix against the Rust daemon → structural refusals, zero dispatch.
+- XPA-AC-3 → single-v1 validation and frame-limit matrix against the Rust daemon → structural refusals, zero dispatch.
 - XPA-AC-6 → cross-account pipe connect → refused.
 - XPA-AC-6 → pipe name squatted before daemon start: by a foreign account → the client refuses on the owner SID and sends zero frames; by a same-account process with a different image, with layer 2 available → the client refuses on instance identity and sends zero frames; by a same-account process with layer 2 unavailable → daemon start refused with `ERROR_ACCESS_DENIED` and `doctor` reports the held name, and no client-side claim is made (r5).
 - SPK-3 → `GetNamedPipeServerProcessId` on a `CreateFileW` client handle returns the connection's server PID: recorded as pass or fail; a fail flips the boundary statement above and design §F.2 (r5).
@@ -170,7 +167,7 @@ Conventions shared by every task:
 
 - Status:blocked（awaits merge of the proposal PR and SPK-2）
 - Platform:macos
-- Requirements:ADR-0005 decisions 1–4 (transport, versioned frames, transport-free handler, single instance); no Core REQ edited
+- Requirements:ADR-0005 decisions 1–4 (transport, single-v1 frames, transport-free handler, single instance); no Core REQ edited
 - Acceptance:XPA-AC-3, XPA-AC-5, XPA-AC-6, XPA-AC-7
 - Depends on:TASK-XPA-002
 - Readiness input pins（非载体示例）:
@@ -181,7 +178,7 @@ Conventions shared by every task:
   ```
 
 - Applicable failure patterns:AF-002, AF-007, AF-014, AF-018
-- Production reachability:client → Rust façade (UDS + Mach service) → forwarded frame to the Swift daemon on a private socket → existing admission; the façade negotiates, admits by peer identity and frame shape, and never interprets, caches or rewrites a frame. **Origin context (r3):** the Swift daemon derives `RuntimeControlRequestContext` for every frame from kernel facts of the accepted socket (`AgentDaemon.swift:5095,5149-5194`: peer euid, `LOCAL_PEERPID`, the peer's process group equals its controlling terminal's foreground group, stdin/stderr are that terminal, start time re-checked) and issues the interactive impact-approval challenge only for `unixSocket && hasForegroundConsole` (`:3978`), otherwise returning the HAR unchanged (`:4007-4010`). Behind a transparent forwarder that peer would be the façade — a background daemon with no terminal — and console confirmation would never work again. Therefore the façade derives the same facts on its own accepted descriptor at the moment it forwards each frame and writes to the private socket one origin line `{arkdeckOrigin:1, transport:"unixSocket"|"appXPC", foregroundConsole, peerEUID, peerPID, frameSHA256}` followed by the raw frame bytes; the Swift private listener accepts origin lines only on the private socket, checks `frameSHA256` against the following line, and builds the context from it. No request field participates; an `arkdeckOrigin` object inside a client frame is an ordinary unknown field.
+- Production reachability:client → Rust façade (UDS + Mach service) → forwarded frame to the Swift daemon on a private socket → existing admission; the façade validates the single-v1 frame, admits by peer identity and frame shape, and never interprets, caches or rewrites a frame. **Origin context (r3):** the Swift daemon derives `RuntimeControlRequestContext` for every frame from kernel facts of the accepted socket (`AgentDaemon.swift:5095,5149-5194`: peer euid, `LOCAL_PEERPID`, the peer's process group equals its controlling terminal's foreground group, stdin/stderr are that terminal, start time re-checked) and issues the interactive impact-approval challenge only for `unixSocket && hasForegroundConsole` (`:3978`), otherwise returning the HAR unchanged (`:4007-4010`). Behind a transparent forwarder that peer would be the façade — a background daemon with no terminal — and console confirmation would never work again. Therefore the façade derives the same facts on its own accepted descriptor at the moment it forwards each frame and writes to the private socket one origin line `{arkdeckOrigin:1, transport:"unixSocket"|"appXPC", foregroundConsole, peerEUID, peerPID, frameSHA256}` followed by the raw frame bytes; the Swift private listener accepts origin lines only on the private socket, checks `frameSHA256` against the following line, and builds the context from it. No request field participates; an `arkdeckOrigin` object inside a client frame is an ordinary unknown field.
 - Trusted fact sources:peer euid from `getpeereid`; App identity from the XPC peer code-signing requirement; the private socket is reachable only by the façade (0700 directory, pairing secret, `getpeereid` equal to the daemon euid); the origin line, which only the façade can write on that socket
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
@@ -212,7 +209,7 @@ Conventions shared by every task:
 - XPA-AC-5 → IPC p95 within +20% of the SPK-1 baseline, compared per row: constant-size replies and paged projections are separate rows since design §I.2 note 1.
 - XPA-AC-6 → foreign-euid UDS peer refused; wrongly signed XPC peer refused; an origin line written to the public socket is `malformedFrame`; a foreign process on the private socket path (0700 directory, no pairing secret) refused.
 - Origin context (r3) → through the façade, a CLI on a foreground terminal gets the console challenge from `human-action.resume` (`interactionOrigin == interactiveConsole`) and a redirected-stdin or background CLI gets the HAR unchanged, with the same reason strings as today; a client frame carrying a forged `arkdeckOrigin` object is refused as an unknown field with zero dispatch; XPC clients keep `appXPC` (no console semantics exist for them today, `AgentDaemon.swift:22`).
-- XPA-AC-7, before forward (r3) → façade killed after accept or negotiation but before the frame is written to the private socket → structured transport error; provably zero dispatch: the Swift daemon received no bytes and the journal is unchanged.
+- XPA-AC-7, before forward (r3) → façade killed after accept or single-v1 validation but before the frame is written to the private socket → structured transport error; provably zero dispatch: the Swift daemon received no bytes and the journal is unchanged.
 - XPA-AC-7, after forward (r3) → façade killed after the frame was written but before the reply is relayed, or the Swift daemon killed mid-request → structured interruption error **without** the `details.phase` / `newDispatchCount` proof (that proof is issued only by named owner refusals, `AgentDaemon.swift:4116-4125`, and the façade must never synthesise it); the durable state is whatever the Swift daemon wrote (journal intact and readable, possibly with intent and outcome); the façade never re-sends a forwarded frame; the client resolves the outcome by `job.status`/`job.list` read-back (a `job.submit` idempotency key makes re-submission safe). Test: no duplicate Job, no replay, journal consistent.
 - XPA-AC-9 (r5) → rollback drill = `runtime service update --daemon <swift>` followed by the **updated App** against the rolled-back Swift daemon of the same release: `AgentXPCTransportContractTests` black-box subset against the raw-xpc Swift listener, a live App smoke (Overview/History) under UI test, and the headless CLI drill; a daemon of another release → the App reports the mismatch and the remedy, no hang.
 - Real device → GJ-1..5 headless `REAL_DEVICE_PASS`; rollback drill (`runtime service update --daemon <swift>`) recorded.
@@ -282,7 +279,7 @@ Conventions shared by every task:
   ```
 
 - Applicable failure patterns:AF-002, AF-003, AF-004, AF-010, AF-011
-- Production reachability:CLI → `job.submit` (default read-only policy) → SQLite v2 admission + `job-record.json` + journal `jobCreated` → `stepIntent` → `hdc.exe -t <connectKey> …` through the single `deviceArguments` injection point → semantic verify → `stepOutcome` → artifact index → `job.events/status/result`
+- Production reachability:CLI → `job.submit` (default read-only policy) → post-SVC SQLite v1 admission + `job-record.json` + journal `jobCreated` → `stepIntent` → `hdc.exe -t <connectKey> …` through the single `deviceArguments` injection point → semantic verify → `stepOutcome` → artifact index → `job.events/status/result`
 - Trusted fact sources:target facts from the durable binding; tool identity from handle-bound hash; the plan digest from canonical JSON of the materialised plan; callers provide only the operation reference, typed inputs and target reference
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
@@ -297,7 +294,7 @@ Conventions shared by every task:
 
 ### Deliverables
 
-- `arkdeck-durable` (journal fsync discipline, tail cursor, torn-tail repair, atomic replace, SQLite `runtime_job` v2 without `user_version` bump), admission pipeline in the published order, observe lowering, minimal artifact store, `job.events` cursor pages, `recoverActiveJobs` read-back with zero dispatch.
+- `arkdeck-durable` (journal fsync discipline, tail cursor, torn-tail repair, atomic replace, SQLite `runtime_job` in the pinned post-SVC layout without `user_version` drift), admission pipeline in the published order, observe lowering, minimal artifact store, `job.events` cursor pages, `recoverActiveJobs` read-back with zero dispatch.
 
 ### Verification
 
@@ -1067,7 +1064,7 @@ Conventions shared by every task:
 
 ### Deliverables / Verification
 
-- ABI version function, `catch_unwind` on every export, 24 h fuzz without crash, `unsafe` confined to one ClientKit file, C# `LibraryImport`; index results byte-equal on both platforms. Size: M.
+- Fixed-v1 ABI identity function with no version negotiation, `catch_unwind` on every export, 24 h fuzz without crash, `unsafe` confined to one ClientKit file, C# `LibraryImport`; index results byte-equal on both platforms. Size: M.
 
 ## TASK-XPA-025 — Port the performance lanes to the Rust daemon and a Rust soak fixture
 

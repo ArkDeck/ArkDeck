@@ -4,22 +4,36 @@
 
 The complete design (sections A–L: executive recommendation, facts and conflicts with
 `path:line` citations, decision matrix, target architecture and diagrams, crate/port mapping,
-API/IPC/FFI/versioning and data ownership, persistence migration, UX parity contract, performance
+API/IPC/FFI/contracts and data ownership, persistence migration, UX parity contract, performance
 SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 41275e48293147f5dc343c12b1ea4474a93fe902
-  sha256: 245ad90fb70fed0abf3e77dc6221a82b2c398cc4fe7ad087421928ffaa9d3bd7
+  blob: 2800fbf1fde7a1b1e3939f334c77a221cc9b27e1
+  sha256: 23a72588f6fd7e5bbb36310beed9fea38f5a4fd4ed88aa2bd2e67fb80829e064
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
-maintainer approved. Revision 2 re-pinned it for the section I.2 budget finalisation described in
+maintainer reviews; r6 is a proposed revision and does not approve itself. Revision 2 re-pinned
+it for the section I.2 budget finalisation described in
 `proposal.md`. Revision 3 re-pins it for the design review repairs described there: sections A
 (item 5), F.2, G.2, G.4, G.5, J.2, J.4, J.5 and K changed; sections B–E, H, I and L are unchanged.
 Revision 4 re-pinned it for the `TASK-XPA-001` Allowed-paths correction described there: only the
 section J.4 path line of that task changed. Revision 5 re-pins it for the second review round:
 sections F.2, G.1, G.4, G.5, J.2, J.4, J.5, K and L.1 (item 17) changed.
+Revision 6 re-pins the dependency correction: CHG-2026-075's TASK-SVC-001..004 first deliver
+one current v1 contract; XPA-001 then publishes its per-method schemas for Rust. The target
+contract, storage, ABI, parity, DAG and rollout sections use that post-SVC baseline. Old scan
+facts and revision history remain evidence of the earlier design, not implementation targets.
+
+## Single-v1 prerequisite
+
+[CHG-2026-075](../chg-2026-075-single-v1-contracts/proposal.md) owns removal of the pre-release
+protocol/document generations and development compatibility. TASK-XPA-001 depends on
+TASK-SVC-001..004 and records their final Swift commit, schemas and corpus. Every current-byte
+freeze, strict-decoder oracle and same-release rollback below starts from that single-v1
+baseline. No XPA task restores legacy negotiation/readers/authority. SVC-005 remains the
+single-v1 release acceptance; XPA tasks add their separate cross-platform/migration evidence.
 
 ## Decision
 
@@ -39,7 +53,7 @@ Human / external agent / App click
     4 MiB frames; closed method table; per-method typed schema)
   → arkdeck-runtime (published admission order: descriptor → provider registered → fresh
     target facts → full materialisation → lowering coverage → plan digest → capability)
-  → arkdeck-durable (journal intent-before-effect with the same fsync discipline, SQLite v2,
+  → arkdeck-durable (journal intent-before-effect with the same fsync discipline, post-SVC SQLite v1,
     capability ledger, recovery epochs; no schema bump and no added field before the Swift
     daemon is retired — the Swift decoders reject unknown keys)
   → provider crates (hdc / workspace / analyzer / arkforge) → arkdeck-platform (posix_spawn with
@@ -70,8 +84,8 @@ materialisation.
 
 ## Migration order (design §G)
 
-1. Rust contract kernel with byte-for-byte differential tests (Swift stays the oracle for legacy
-   bytes until Rust proves equality per asset).
+1. After SVC-001..004, XPA-001 publishes per-method typed schemas; the Rust contract kernel
+   proves byte-for-byte equality with the pinned post-SVC Swift oracle per current asset.
 2. Rust control-plane façade owns UDS/Mach service and forwards to the Swift daemon on a private
    socket; peer hardening; the Swift daemon's Mach service speaks the same raw libxpc frames so
    the App and daemon of one release roll back together.
@@ -86,7 +100,7 @@ materialisation.
    3 client follows the same daemon projections.
 
 Every macOS step is releasable and rolls back by pointing the LaunchAgent at the Swift daemon of
-the same release, which reads Rust-written bytes with its current strict decoders; cutover
+the same release after SVC, which reads Rust-written bytes with the pinned strict decoders; cutover
 preflight refuses in-flight jobs and pending intents while parked `waitingForRecovery` jobs and
 `outcomeUnknown` lanes are carried across owners unchanged.
 

@@ -18,10 +18,12 @@
 - **`openspec/platforms/PLATFORM-PROFILES.lock.yaml`**: Windows leaves `not_started_platforms`
   when W0 starts; `verified` may only be recorded for the exact OS/arch/build tuples evidenced;
   macOS stays `needsReverification` until GJ-1..5 pass on the pure Rust daemon.
-- **`openspec/contracts/**`**: additive only. `runtime-control-plane.schema.json` gains protocol
-  2.1.0 methods and per-method typed schemas; `journal-event.schema.json` records generations
-  2.0.0–3.0.0 already accepted by Swift; new language-neutral assets under `spec/` (state table,
-  registries, UI semantics, bilingual messages) are generated from the Swift oracle and frozen.
+- **`openspec/contracts/**`**: TASK-XPA-001 depends on TASK-SVC-001..004 from
+  [CHG-2026-075](../chg-2026-075-single-v1-contracts/proposal.md). It exports per-method typed
+  schemas and language-neutral assets under `spec/` from the final single-v1 Swift baseline.
+  This change adds no supported protocol version and restores no historical document generation.
+  Swift/Rust differential and migration field-set freezes begin with that post-SVC baseline;
+  the pre-release compatibility removal and its Core/schema impact belong to CHG-2026-075.
 - **`Catalog/**`**: zero operation additions, removals or edits; the digest stays
   `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684` until an unrelated change
   publishes a new operation.
@@ -31,7 +33,7 @@
   proposals) and `core-portability.md:30` (architecture change required) is recorded as a one-line
   compatibility note in the proposal; the Golden Journey re-pass rule on runtime replacement is
   requested as a maintainer decision, not asserted.
-- **ADR-0005**: the transport-free handler and versioned frame decisions are kept; the MVP stance
+- **ADR-0005**: the transport-free handler and explicit single-v1 frame decisions are kept; the MVP stance
   "same user reachable equals authorised" is proposed to be tightened (peer euid, XPC peer
   code-signing requirement, named-pipe SID/elevation check). An amendment note is delivered with
   `TASK-XPA-003` if the maintainer accepts decision 3.
