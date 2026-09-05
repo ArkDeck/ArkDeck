@@ -4,6 +4,8 @@
 > 基线：protected `main` = `ad94b32e`（2026-09-05；§I 的实测与车道引用以此为准，其余章节写于 `238a2fb2`），Catalog digest `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，ratified baseline CORE-3.0.0（candidate CORE-4.0.0）。
 > 边界：本文不修改生产代码、Catalog、accepted specs、baseline、Profile 或安全策略。按 `openspec/architecture/core-portability.md:30,34`，本方案要开工必须先经维护者批准一个 architecture/platform change，即 `CHG-2026-074`（proposal、tasks、verification、design、spec-impact 见该 change 目录）。
 > 引用约定：仓库事实用 `path:line`（相对仓库根，`Sources/…`/`Tests/…` 省略 `Packages/ArkDeckKit/` 前缀）；外部仓库 ArkForge 以 `ArkForge/<path>:line` 标注（本地只读 checkout，git tip `5a369a2`）；平台/工具链判断引用官方一手资料 URL。
+> r6 修订边界（待本 PR 维护者 review）：先完成 [CHG-2026-075 的 TASK-SVC-001..004](../../../openspec/changes/chg-2026-075-single-v1-contracts/tasks.md)，再由 XPA-001 从最终单 v1 契约发布逐 method typed schema。本文的 Swift oracle、字段冻结、互读、回滚基线均指 SVC 完成后的最新 Swift 实现；不得恢复被移除的协议、历史格式、authority 或开发期兼容。SVC-005 单独承担单 v1 发布验收，XPA 各任务保留迁移与平台验收。
+> 历史事实范围：§B 的扫描表、§I 已有实测和 r1–r5 修订说明保留原时间点与原始数字；其中旧协议/存储代际是历史输入，不是现行目标。以下 F/G/J 已按 r6 单 v1 前置重写。
 > 阅读顺序：A 结论 → B 事实与冲突 → C 决策矩阵 → D 目标架构 → E/F 边界与契约 → G 迁移 → H UX parity → I 性能 → J 任务 DAG → K 风险 → L 维护者决策。
 
 ---
@@ -15,8 +17,8 @@
 1. **权威执行层整体迁入 Rust 进程 `arkdeck-agentd`**（保留现有 launchd label `com.arkdeck.agentd` 与二进制名，避免安装面变化）。admission、Job/journal/recovery、capability、artifact、provider lowering、进程执行全部只在这一个进程内，单实例、单写者。它是现有 Swift `arkdeck-agentd` 的逐店铺（store-by-store）替换，不是重写。
 2. **macOS 保留 SwiftUI App**，通过 launchd Mach service（XPC C API）访问 daemon；**Windows 用 WinUI 3 / Windows App SDK 2.x**，通过 user-private Named Pipe 访问同一 Rust daemon；CLI 改为单一 Rust 实现，两端同一二进制源码。
 3. **FFI 只允许一个 crate `arkdeck-contract-ffi`**，内容限定为确定性纯计算：canonical JSON/CBOR、digest、schema/文档校验、离线 journal/artifact index 解码、（按需）Viewer 大树索引。它没有任何 authority、I/O 或副作用；panic 在边界捕获并返回错误码。它是可选优化，不是架构依赖。
-4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 Swift 为旧字节的 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
-5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。每一步 macOS 都可发布、可通过 LaunchAgent 指回 Swift daemon 回滚，数据 schema 在迁移期零升版。
+4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 SVC 完成后的最新 Swift 单 v1 字节为 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
+5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。每一步 macOS 都可发布、可通过 LaunchAgent 指回 Swift daemon 回滚，数据 schema 从 SVC 完成后的基线起在迁移期保持不变。
 6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。
 
 淘汰理由摘要：方案 2（进程内 cdylib）把 authority 放进每个客户端进程，破坏「唯一 owner / 单写者」与 crash isolation，且沙箱 App 在结构上不能拥有设备副作用；方案 1（纯 daemon、零 FFI）与推荐方案只差一个可选的纯计算 kernel，差异在 Viewer/离线解析的跨平台一致性与性能，因此推荐方案吸收方案 1 为骨干、把 FFI 收窄为「无 authority 的纯函数」。详见 §C 决策矩阵。
@@ -81,7 +83,7 @@
 
 ### B.2 裁决与假设
 
-- **冲突裁决**：#9 架构文档 header 的 CORE-2.0.0 视为历史记录，行文以 `config.yaml` 的 CORE-3.0.0 为准；#19 以代码为准，entitlements 注释视为文档漂移；#21 以工程文件（macOS 26）为当前事实，Profile 的「macOS 14」为历史，需维护者对齐（§L）；#29 以 Swift 五代为当前事实，契约需补记（§F）。
+- **冲突裁决**：#9 架构文档 header 的 CORE-2.0.0 视为历史记录，行文以 `config.yaml` 的 CORE-3.0.0 为准；#19 以代码为准，entitlements 注释视为文档漂移；#21 以工程文件（macOS 26）为当前事实，Profile 的「macOS 14」为历史，需维护者对齐（§L）；#29 的五代属于此次历史扫描事实；r6 由 SVC-002 先收敛为唯一当前 v1，XPA 只消费其结果（§F）。
 - **假设 A1**：Windows 首发支持格为 Windows 11 x64 + ARM64（Prism x64 仿真只在 Win11，且 Rust `aarch64-pc-windows-msvc` 已 Tier 1）。
 - **假设 A2**：验证硬件沿用 DAYU200 `TGT-958780b2ffb7`（binding r4，固件 7.0.0.37）；新增一台 Windows 11 x64 主机与一台 ARM64 主机是新的硬件前置。
 - **假设 A3**：ArkDeck Rust workspace 不继承 ArkForge 的零依赖政策，改为经审查的依赖白名单（`cargo deny`/`cargo vet`），但所有安全相关编码（JCS、CBOR、SHA-256）保留自有实现并以向量钉死。需维护者确认（§L）。
@@ -111,8 +113,8 @@ P4/P5 不在题目要求的三方案之内，但它们是「不做 Rust」的两
 |---|---|---|---|---|---|
 | 安全 authority 与 single-writer | ◎ 与 ADR-0005/ArchitectureRules 一致：唯一 daemon、flock 单实例（`SingleInstance.swift:26-49`）、每 store 唯一 owner | ✕ authority 进入每个客户端进程；沙箱 App 持有 capability/journal 写权违反 `ArchitectureRules.md:94-104`「事实源唯一」与 AGENTS「UI 只消费 use case」 | ◎ 同 P1；FFI kernel 无 authority、无 I/O，结构上不能派发 | ○ 同 P1 的进程形态，但 Windows 上需重写 Darwin 绑定的 Process/Storage/OpenHarmony（§E.1 密度） | △ 两套 authority 实现（Swift/C#），语义漂移由 121 条 AC + 219 fixture 兜底，但 recovery/crash 长尾无向量（ArkForge AFD-0005 已证明「跨语言契约太薄」） |
 | crash isolation / journal recovery / unknown outcome | ◎ daemon 崩溃不伤客户端；launchd `KeepAlive` 重启（`com.arkdeck.agentd.plist`）→ `recoverActiveJobs` 只读回不派发（`RuntimeJobEngine.swift:5523-5561`）；Rust `panic=abort` 等价于今日 fixture 已测的崩溃窗 | ✕ Rust panic/abort 直接杀 App；一个 UI 崩溃就是一次 outcomeUnknown | ◎ daemon 同 P1；FFI 以 `panic=unwind`+`catch_unwind` 转错误码，且只处理纯输入 | ○ 同 P1 | ○ 各自实现 |
-| ABI/API/协议版本演进 | ◎ 沿用 JSON-lines + `protocol.negotiate`（`ControlProtocolNegotiation.swift:36-143`），已有兼容测试（`AgentDaemonContractTests.swift:1840-1917`） | △ C ABI 需自建版本函数、buffer 所有权、错误结构；Swift/C# 两套 binding 随每次 ABI 变更同步 | ○ 协议同 P1；FFI 面极窄（JSON in/out + ABI version），变更频率低 | ○ 协议同 P1 | ○ 协议同 P1，但两套 handler 实现 |
-| async stream / 取消 / backpressure / 订阅 | ○ 现行 pull 分页（`job.events`）保持 CLI-REQ-025；可在 2.x 追加有界 long-poll unary（一请求一响应） | △ 进程内回调看似方便，实则要在 UI 进程内实现取消与背压，且和「一响应」契约无关 | ○ 同 P1 | ○ 同 P1 | ○ 同 P1 |
+| ABI/API/协议契约 | ◎ 消费 SVC 完成后的单 v1 JSON-lines 契约与拒绝无效帧测试，不协商版本 | △ C ABI 需定义固定 v1 标识、buffer 所有权和错误结构；Swift/C# binding 同步生成 | ○ 协议同 P1；FFI 面极窄（JSON in/out + 固定 v1 ABI） | ○ 协议同 P1 | ○ 协议同 P1，但两套 handler 实现 |
+| async stream / 取消 / backpressure / 订阅 | ○ 现行 pull 分页（`job.events`）保持 CLI-REQ-025；可在同一当前契约内追加有界 long-poll unary（一请求一响应） | △ 进程内回调看似方便，实则要在 UI 进程内实现取消与背压，且和「一响应」契约无关 | ○ 同 P1 | ○ 同 P1 | ○ 同 P1 |
 | 大 Artifact 传输、复制次数、内存 | ○ 今日 `artifact.read` 内联 base64 分页 4 MiB（`AgentDaemon.swift:2040-2096`，`ArtifactResourceContract.swift:29`）≈3–4 次拷贝；可追加 fd/handle 传递做零拷贝（UDS `SCM_RIGHTS`、XPC `xpc_fd_create`、Windows `DuplicateHandle`） | ◎ 零拷贝天然，但代价是 authority 进程内 | ○ 同 P1；Viewer 大树若走 FFI 则索引在 UI 进程内零拷贝 | ○ | ○ |
 | App Sandbox / 签名 / 公证 / MSIX 与更新 | ◎ macOS：daemon 是 LaunchAgent nested code（AFD-0003 先例，空 entitlements，Developer ID+Hardened Runtime）；Windows：daemon 与 CLI 可 xcopy/自包含，App 走 MSIX；Rust 二进制只需 Authenticode/Developer ID | △ cdylib 必须随 App 一起签名/公证，dylib 进沙箱；Windows 上 NativeAOT/trim 与 P/Invoke 组合尚需验证 | ○ 同 P1；FFI 静态库进 App 一起签名，面窄 | △ Swift 运行时在 Windows 的分发与签名体验不成熟 | ○ |
 | Swift、C#、Rust 调试与测试成本 | ○ 三种语言但边界清晰：Rust 单元/契约测试 + 黑盒 daemon 测试；Swift/C# 只测 UI 与 SDK | ✕ 崩溃在 UI 进程内跨语言栈；符号化、内存所有权问题最难调 | ○ 同 P1；FFI 有独立 fuzz 与向量 | △ Swift on Windows 的调试/覆盖率工具链弱 | ○ 两套 Runtime 测试全套翻倍 |
@@ -139,7 +141,7 @@ P4/P5 不在题目要求的三方案之内，但它们是「不做 Rust」的两
 flowchart TB
   subgraph SPEC["spec/ 语言无关事实源（生成后冻结，Rust conformance 为 oracle）"]
     CAT[Catalog/operations + schema]
-    CTRL[control: envelope, negotiation, per-method typed schemas]
+    CTRL[control: single-v1 envelope, validation, per-method typed schemas]
     SM[job-state-machine.yaml + reason codes + effects]
     JRN[journal / manifest / artifact-index / capability schemas 1.0.0–3.0.0]
     VEC[canonical vectors: JCS, CBOR, digests, CLI argv fixtures]
@@ -252,7 +254,7 @@ sequenceDiagram
   participant P as provider（lowering）
   participant OS as arkdeck-platform（process/pipe/usb）
   UI->>KIT: 用户动作（operation ref + typed inputs + target ref + 预算）
-  KIT->>CP: JSON line {protocolVersion 2.x, id, method job.submit, params}
+  KIT->>CP: JSON line {protocolVersion 1.0.0, id, method job.submit, params}
   CP->>RT: 校验 envelope、method 白名单、params 按 method schema
   RT->>RT: descriptor 查找 → provider 注册 → fresh target facts → 完整 materialize → lowering 覆盖 → plan digest → capability 检查（POL-AGENT-002）
   RT->>D: SQLite admission（BEGIN IMMEDIATE）+ job-record.json + journal jobCreated
@@ -352,8 +354,8 @@ flowchart TB
 | ArkDeckRuntime：v2 请求 DTO、`HumanActionRequired`、crash-ledger schema、`AgentStrictJSON` | **migrate** | `spec/` + `arkdeck-contract` | HAR 文档（`HumanActionRequired.swift:81-113`）先固化为 schema（CLI 规格 §19 已要求 Windows 不得以该 Swift 文件为规范） |
 | ArkDeckRuntime：`RuntimeClocks`、`PowerActivity`、`SingleInstance`、`SystemLogger` | **migrate** | `arkdeck-platform` | 双时钟语义（`RuntimeClocks.swift:18,32`）：macOS `mach_continuous_time`/`mach_absolute_time`，Windows `GetTickCount64`（含睡眠）/`QueryUnbiasedInterruptTime`（不含）；契约测试证明睡眠行为，符合 `platform-ports.md:20-21` |
 | ArkDeckRuntime：`Activation`（CFMessagePort 二次实例激活） | **retain** | App / ClientKit | 属 App 自身 `PORT-ACTIVATION-001`，与 daemon 无关 |
-| ArkDeckStorage：`DurableFiles`、`JournalEvent/Replay/Validation`、`JournalEventPages`、`RuntimeJobRepository`（SQLite）、`RuntimeCapabilityStore`、`RecoveryCoordination`、`SessionManifest/Layout`、`ArtifactStorage`、`RetentionAndExport` | **migrate** | `arkdeck-durable` | 字节级兼容：同 schema 版本、同 fsync 纪律、同 lock 文件名；SQLite 用 `rusqlite`（bundled）读写 schema v2、`PRAGMA user_version` 拒绝更新版本（`RuntimeJobRepository.swift:550-556`） |
-| ArkDeckStorage：`AuthorizationUsageLedger` 封闭世代、`HardwareEvidence` V1–V6 解码 | **migrate（decode-only）** | `arkdeck-durable::legacy` | 只解码、不迁移、不再编码（`HardwareEvidenceProjector.swift:942-960`；`AuthorizationUsageLedger.swift:1381-1464`） |
+| ArkDeckStorage：`DurableFiles`、`JournalEvent/Replay/Validation`、`JournalEventPages`、`RuntimeJobRepository`（SQLite）、`RuntimeCapabilityStore`、`RecoveryCoordination`、`SessionManifest/Layout`、`ArtifactStorage`、`RetentionAndExport` | **migrate** | `arkdeck-durable` | 字节级兼容：同 schema 版本、同 fsync 纪律、同 lock 文件名；SQLite 用 `rusqlite`（bundled）读写 SVC-002 完成后的 v1 布局；`PRAGMA user_version` 精确校验 pinned baseline，不移植旧迁移路径 |
+| ArkDeckStorage：旧 authority 与历史 evidence 格式 | **do not port** | CHG-075 隔离/保留策略 | 只移植 SVC-002/003 完成后的当前安全模型；保留原始历史字节不要求恢复旧解码、writer 或 authority |
 | ArkDeckStorage：`HostStorage`（volume identity / free space） | **migrate** | `arkdeck-platform` | `PORT-VOLUME-001`/`PORT-STORAGE-001`：`statfs f_fsid` vs `GetVolumeInformationByHandleW`+`FileIdInfo` |
 | ArkDeckOpenHarmony：parsers（`list targets -v`、version、checkserver）、probe registries、trace probe adapter、authorization polling | **migrate** | `arkdeck-provider-hdc` | 现有 Golden/Probe fixtures（37 文件，hash 钉死）直接复用为 Rust 测试向量 |
 | ArkDeckOpenHarmony：supervisor observation（libproc/sysctl/socket 归属） | **migrate + platform port** | `arkdeck-platform::procscan` | Windows：`CreateToolhelp32Snapshot`/`QueryFullProcessImageNameW`/`GetProcessTimes` + `GetExtendedTcpTable(TCP_TABLE_OWNER_PID_LISTENER)`；语义与 `HDCSupervisorObservationProbeRegistry.swift:310-401` 一致 |
@@ -371,7 +373,7 @@ flowchart TB
 | ArkDeckWorkflows：`RemoteBuildSource`（Citadel/NIOSSH，Keychain SSH 凭据） | **retain（DEC-013 platformService）** | Swift App 侧 | CLI 等价路径已定义（`arkdeck-cli-product-spec.md:1625-1627`）；Windows 首版不提供 |
 | ArkDeckWorkflows：`DeviceRecordingBudget`、AVFoundation `.mov` 合成 | **split** | 预算/帧率语义 → `arkdeck-runtime`；视频合成 → 平台 App | Windows 用 Media Foundation 或先只交付帧序列 |
 | ArkDeckAgentDaemon：`RuntimeControlPlaneHandler`、`AgentXPCListener`、server | **migrate** | `arkdeck-control` + `arkdeck-platform::ipc` + `arkdeck-agentd` | handler 保持 transport-free（`AgentDaemon.swift:89`；ADR-0005 第 3 条） |
-| ArkDeckAgentClient | **split** | `arkdeck-client`（Rust，供 CLI）+ `ArkDeckClientKit`/`ArkDeck.ClientKit`（生成） | 现有 deadline/negotiation 契约测试改为黑盒对 Rust daemon 复跑 |
+| ArkDeckAgentClient | **split** | `arkdeck-client`（Rust，供 CLI）+ `ArkDeckClientKit`/`ArkDeck.ClientKit`（生成） | SVC 完成后的 deadline、单 v1 验证和失败语义契约测试改为黑盒对 Rust daemon 复跑 |
 | ArkDeckCLI | **migrate** | `arkdeck-cli` | 219 argv fixtures + envelope/page/nextAction 样本是现成回归面；`maintainer contracts export` 移到 Rust 后事实源翻转 |
 | ArkDeckAgentComposition | **migrate / 部分 retire** | `arkdeck-runtime::workspace` | campaign host 已随 CHG-2026-065/066 退役（ADR-0009 注记），只保留 Runtime-owned isolated workspace |
 | ArkDeckBootstrap、ArkDeckLaunchAgent | **migrate** | `arkdeck-cli::service` + `arkdeck-platform::service` | macOS `launchctl` argv；Windows Task Scheduler（COM）/客户端自启动；ArkForge.bundle 校验逻辑（`LaunchAgentService.swift:176-261`）同迁 |
@@ -380,7 +382,7 @@ flowchart TB
 | ArkForge | **retain（外部 Rust）**，消费方式 **wrap → 直连** | — | 由 Swift SDK 中转改为 Rust crate 直连 |
 | Citadel / swift-nio-ssh（fork `Wellz26/swift-nio-ssh` 0.3.4） | **retain（App 侧）**，供应链复审 | — | `Package.swift:30-35`；daemon 不再链接 |
 | swift-crypto / CryptoKit | daemon **retire**；App **retain** | — | Rust 用自有 sha2 向量；App 更新验签仍用 CryptoKit |
-| 系统 sqlite3 | **migrate** | `rusqlite` bundled | schema v2 字节/语义兼容测试 |
+| 系统 sqlite3 | **migrate** | `rusqlite` bundled | post-SVC 当前 v1 布局字节/语义互读测试 |
 | ArkDeckContractTests（101k 行） | **split** | 黑盒 transport/协议测试 → 参数化到 Rust daemon 复跑；引擎内测试 → 逐步 Rust 化；旧字节解码测试 → 转 fixture | 详见 §G.5 |
 
 ### E.3 「Rust core」到底包含什么
@@ -407,16 +409,16 @@ flowchart TB
 | 资产 | 今日事实源 | 目标事实源 | 迁移动作 |
 |---|---|---|---|
 | Catalog descriptor + digest | `Catalog/operations/*.json`，Python 生成 Swift（`scripts/catalog_gen/generate.py:974-978`） | 不变；生成器改为同时生成 Rust（`RuntimeOperationCatalogGenerated.rs`）并断言 digest 相等 | 零漂移检查扩到两种语言 |
-| 控制协议 envelope/negotiation | `Packages/ArkDeckKit/Contracts/control-negotiation.json` → Swift 生成物 | 移到 `spec/control/control-negotiation.json`，生成 Swift/Rust/C# | 帧上限常量（4 MiB/8 MiB/64 KiB）从代码常量升为契约字段 |
-| 逐 method typed schema | 不存在（`params` 只是 `object`） | `spec/control/methods/<method>.json`（request/result/error details 三段），由现有 Swift 记录帧反推并用 193 个契约测试的录制帧验证 | 新增；Windows 与 ClientKit 生成依赖它 |
+| 单 v1 控制协议 envelope | SVC-001 完成后的 canonical contract 与 Swift 生成物 | `spec/control/` 中唯一当前契约，生成 Swift/Rust/C# | 保留最终 request/result/error、帧上限和错误语义；不恢复 negotiation bootstrap |
+| 逐 method typed schema | SVC 完成后的单 v1 方法表与实际录制帧 | `spec/control/methods/<method>.json`（request/result/error details 三段） | XPA-001 补全 typed schemas；Windows 与 ClientKit 从同一输入生成 |
 | Job 状态机/终态/转换 | Swift `switch` | `spec/job-state-machine.yaml`（states、terminal、mode×state→destinations、directives、invariant violations） | Swift 测试导出并断言相等后冻结；Rust 直接加载 |
 | reason codes / error registry / exit codes | `cli-error-registry.yaml`（45 码）、Swift `RuntimeAvailabilityReasonCode`（7）、`cli-next-action.schema.json`（7） | 合并为 `spec/registries/*.yaml` | 从 Swift 导出一次后冻结 |
-| journal/manifest/artifact-index/capability schema | `openspec/contracts/*.schema.json`（journal 仅 1.0.0） | 补记 2.0.0/2.1.0/2.2.0/3.0.0 世代与 `capability-store 2.0.0`、`artifact-index 1.0.0`、`recovery-epoch 1.0.0`、`SQLite runtime_job v2` | 契约补齐 = 契约 change（不改语义） |
+| journal/manifest/artifact-index/capability schema | SVC-002/003 完成后的 current contracts 与 Swift strict decoders | 从最终单 v1 文档结构生成语言无关契约；SQLite 采用该基线布局 | 不补记或移植旧代际；XPA-001 记录最终 commit、schema/corpus digest |
 | canonical vectors | `cli-canonical-json-vectors.json`、CBOR permit vectors、HDC Golden/Probes | 不变，加入 `arkdeck-conformance` 回放 | Rust 与 Swift 都必须逐向量通过 |
-| CLI argv fixtures | 219 个（`Tests/ArkDeckContractTests/Fixtures/CLI/**`） | 不变 | Rust CLI 逐 fixture 字节相等 |
+| CLI argv fixtures | SVC-001..004 完成后重建的 current corpus（`Tests/ArkDeckContractTests/Fixtures/CLI/**`） | pin 该单 v1 corpus | Rust CLI 逐 fixture 字节相等，不恢复 retired/legacy argv |
 | UI 语义 | 分散在 13 个 facade 与 1,546 个 xcstrings 键 | `spec/ui-semantics/*.json`：名称、危险等级、effect 徽章、next-action 意图、双语消息 | 生成 xcstrings 与 `.resw` |
 
-事实源翻转规则：**任一资产在 Rust 通过全部向量与 differential 之前，Swift 保持 oracle；通过之后由 `arkdeck-conformance` 生成 fixture 并提交，Swift 变为消费方**。同一语义在仓内只能有一个可执行实现加若干 decode-only shim。
+事实源翻转规则：**任一资产在 Rust 通过全部向量与 differential 之前，Swift 保持 oracle；通过之后由 `arkdeck-conformance` 生成 fixture 并提交，Swift 变为消费方**。Swift/Rust 迁移期间仅保留两个实现对同一当前契约的对照；不得新增历史格式 decode-only shim。
 
 ### F.2 IPC 规范（正式本地控制面）
 
@@ -425,26 +427,26 @@ flowchart TB
 | 传输 | macOS：UDS（目录 0700、socket 0600）+ launchd Mach service（沙箱 App）；Windows：`\\.\pipe\arkdeck-agentd-<logon SID>` byte-mode；**禁止** localhost TCP/HTTP（CLI-REQ-013） |
 | 身份验证 | UDS：`getpeereid` 必须等于 daemon euid，否则在 accept 后立即关闭（收紧 ADR-0005 的 MVP 立场，见 §L）；XPC：`xpc_connection_get_euid` 等于自身 + peer code-signing requirement（Team ID + bundle id；API 可用性在 SPK-2 验证）；Pipe：DACL 仅 logon SID，`PIPE_REJECT_REMOTE_CLIENTS`，`FILE_FLAG_FIRST_PIPE_INSTANCE`，客户端 `SECURITY_IDENTIFICATION` SQOS，服务端用 `GetNamedPipeClientProcessId` 打开 token 比对用户 SID 与 elevation（与 .NET `PipeOptions.CurrentUserOnly` 服务端语义一致）；**Pipe 客户端必须认证服务端，两层（r3/r5）**：第一层「账号」——`CreateFile` 带 `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION`，连接后以 `GetSecurityInfo(hPipe, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION)` 读 pipe 对象 owner SID，不等于自身 token owner SID 即关闭、零帧发送（.NET `PipeOptions.CurrentUserOnly` 的客户端语义：`NamedPipeClientStream.ValidateRemotePipeUser` 比较 pipe owner 与 `WindowsIdentity.Owner`；提权 token 的 owner 是 Administrators，故同时覆盖 elevation）；这一层**分不出同用户的冒充者**，其 pipe 的 owner SID 相同。第二层「实例」——客户端取**本连接**的服务端 PID（`GetNamedPipeServerProcessId`；官方页写「句柄必须由 `CreateNamedPipe` 创建」，与该函数的用途矛盾，SPK-3 必须在 `CreateFile` 句柄上实测），`OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` 后要求映像路径等于已安装 daemon 路径、Authenticode 发布者或 MSIX 包身份等于本产品，并在连接存续期内保持进程句柄打开以钉住 PID。**信任边界声明**：同用户、同完整性级别且就是本产品签名 daemon 二进制的进程按构造可信；同用户任意代码在两平台都在信任边界之外——ADR-0005 决策 1 对 UDS 已如此表述，macOS 上同 uid 进程同样可以替换 0700 目录里的 socket 文件（§L.1 第 17 条请维护者确认）。`FILE_FLAG_FIRST_PIPE_INSTANCE` 只保证第二个实例创建失败（`ERROR_ACCESS_DENIED`），不认证服务端；若 SPK-3 证明服务端 PID 不能从客户端句柄取得，第二层不可用，同账号抢占只能由 daemon 侧 fail-closed + `doctor` 报告发现，客户端不再声称能识别（r5 撤回 r3 的「同账号抢占零帧发送」）。pipe 默认安全描述符给 Everyone 读权限，DACL 必须显式 |
 | 来源上下文（r3） | 今日 Swift daemon 对**每一帧**从 accept 的 socket 推导 `RuntimeControlRequestContext`（`AgentDaemon.swift:5095,5149-5194`：peer euid、`LOCAL_PEERPID`、peer 进程组等于其控制终端的前台组、stdin/stderr 即该终端、start time 复核），`human-action.resume` 只在 `unixSocket && hasForegroundConsole` 时发放交互式 impact 挑战（`:3978`），否则原样返回 HAR（`:4007-4010`）；CLI 端还要求 `isatty` 与 `interactionOrigin == interactiveConsole`（`CLIAgentExecutions.swift:138-140`）。透明转发会让 Swift 看到的对端变成 façade（后台 daemon、无控制终端），交互确认永久失效。规范：façade 在转发每一帧的时刻用**同一组内核事实**在自己 accept 的描述符上推导来源，向私有 socket 写一行 origin 前导 `{arkdeckOrigin:1, transport:"unixSocket"|"appXPC", foregroundConsole, peerEUID, peerPID, frameSHA256}` 再写原帧字节；Swift 私有监听器只在私有 socket（0700 目录 + pairing secret + `getpeereid` 等于自身 euid）上接受 origin 行，校验 `frameSHA256` 与随后一行相等后构造 context；公共 socket 上同一行是 `malformedFrame`；请求字段不参与（保持 `:5145-5148` 的规则），客户端帧里的 `arkdeckOrigin` 只是普通未知字段。已否决：`SCM_RIGHTS` 描述符移交——内核直取，但 façade 从此看不到后续帧，与 XPA-012 起 façade 本地处理部分方法冲突 |
-| 帧 | 保持 LF 分隔 JSON 行；请求 `{protocolVersion,id,method,params}`；响应 `{id,ok,result\|error}`；入站 4 MiB、响应 8 MiB、bootstrap 64 KiB；超限结构化拒绝（Windows 与 macOS 一致：daemon 关闭连接前先回 `malformedFrame` 是一个可选收紧点） |
-| 版本协商 | 沿用 `protocol.negotiate`（highest common exact version within required major）；Windows daemon **只实现 2.x**，1.x legacy 表只在 macOS 保留到 Swift CLI 退役；因此 44 个 1.x-only 方法中 Windows 必需者以 **2.1.0 additive** 发布（§J XPA-001） |
-| 流式数据 | 保持 pull 分页（`job.events` cursor，AEAD 封装）；2.x 追加 `job.events.wait{afterCursor,maxWaitMs≤30000}`：一请求一响应、超时返回空页，消除 250 ms 轮询延迟又不违反 CLI-REQ-025 |
+| 帧 | 保持 SVC-001 最终单 v1 LF JSON 帧 `{protocolVersion,id,method,params}` 与 `{id,ok,result\|error}`；保留其请求/响应上限、单响应与拒绝语义；不携带版本协商 bootstrap |
+| 单一协议 | macOS/Windows 的 Swift/Rust 只接受同一当前 v1 契约；固定 `protocolVersion: 1.0.0`，无 supported-version 列表、required-major、旧方法表或 downgrade；非 v1 与未知方法在 dispatch 前结构化拒绝 |
+| 流式数据 | 保持 pull 分页（`job.events` cursor，AEAD 封装）；当前契约内追加 `job.events.wait{afterCursor,maxWaitMs≤30000}`：一请求一响应、超时返回空页，消除 250 ms 轮询延迟又不违反 CLI-REQ-025 |
 | 取消 | `job.cancel` 只返回 `cancelRequested`；终态由 status/events 观察；critical step 不强杀（UX 规格 §4.1） |
 | 背压 | 连接内串行 + pageSize 上限 1000 + 响应 8 MiB 上限；客户端只有一连接一请求；daemon 对同一 job 的 `job.run` 保持 one-shot 门（`AgentXPCListener.swift:72-95`） |
-| 大数据 | 内联 base64 分页保留为通用路径；2.x 追加 `artifact.open`：返回只读描述符/句柄（UDS `SCM_RIGHTS`；XPC `xpc_fd_create`；Windows `DuplicateHandle` 到已校验的客户端 PID），带 `transportCapabilities` 标志，客户端不支持时回退分页；digest 校验由客户端 SDK 在读完后强制执行 |
+| 大数据 | 内联 base64 分页保留为通用路径；当前契约内追加 `artifact.open`：返回只读描述符/句柄（UDS `SCM_RIGHTS`；XPC `xpc_fd_create`；Windows `DuplicateHandle` 到已校验的客户端 PID），带 `transportCapabilities` 标志，客户端不支持时回退分页；digest 校验由客户端 SDK 在读完后强制执行 |
 | 错误映射 | 保持 `WireError{code,message,details}`；`details.phase` + `newDispatchCount` 证明零派发的约定升为 schema；`retryability` 留在 `job.status.failure`；HAR 三路（status 标志、`human-action.*`、error details）不变 |
-| 旧客户端/新 daemon 与新客户端/旧 daemon | 复用 `AgentDaemonContractTests.swift:1840-1917` 的两个矩阵，参数化到 Rust daemon 黑盒运行；Windows 无旧 daemon，矩阵只含 2.x |
+| Swift/Rust 实现互通 | 以 SVC 完成后的同一 v1 契约测试两种客户端与 daemon 组合；旧构建/旧帧拒绝且不协商回退；跨 release 配对仍由安装 identity/receipt 约束 |
 
 ### F.3 FFI 规范（仅 `arkdeck-contract-ffi`，可选）
 
 | 项 | 规范 |
 |---|---|
 | 形态 | `crate-type = ["staticlib","cdylib"]`；macOS 以 staticlib 进 `ArkDeckClientKit` 的 binary target（artifactbundle），Windows 以 `arkdeck_contract.dll` 随 App 包 |
-| ABI | 全部 `extern "C"`、`#[repr(C)]`；`arkdeck_ffi_abi_version() -> u32`（major<<16 | minor）；调用方在任何调用前检查 major 相等 |
+| ABI | 全部 `extern "C"`、`#[repr(C)]`；需要标识时 `arkdeck_ffi_abi_version() -> u32` 固定返回 1；调用方只接受 1，不实现 major/minor 选择或旧 ABI fallback |
 | 数据 | 输入 `(const uint8_t*, size_t)` UTF-8 JSON；输出 `arkdeck_buf{ptr,len,cap}` 由库分配、`arkdeck_buf_free` 释放；无结构体跨 ABI、无字符串所有权歧义 |
 | 句柄 | 只有一个 opaque 类型 `arkdeck_index`（Viewer 树索引），`_create/_query/_hit_test/_free`；线程安全：不可变句柄可跨线程读 |
 | 回调 | v1 无回调（避免重入与生命周期问题） |
 | 错误 | `arkdeck_status{code,detail_buf}`；`ARKDECK_FFI_PANIC` 表示已捕获 panic；库内无全局可变状态 |
-| 版本 | ABI major 与 daemon 协议无耦合；语义版本随 `spec/` 向量版本 |
+| 契约标识 | ABI 和 daemon 各自只有一个当前 v1 形态；向量变化以提交/digest 追踪，安装产品按同 release 配对，不预置并行版本支持 |
 | Swift | `strictMemorySafety()` 下所有调用点标 `unsafe`，封装在 ClientKit 一处；C# 用 `[LibraryImport]` + `byte*`，NativeAOT 兼容 |
 | 禁止 | 文件/网络/进程/线程创建、环境变量、时钟（除纯计算）、任何 authority 或 capability 语义 |
 
@@ -469,7 +471,8 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  S0["S0 Swift baseline 测量<br/>SPK-1"] --> S1["S1 Rust 契约 kernel<br/>+ byte-for-byte differential<br/>XPA-001/002"]
+  SV["SVC-001..004 完成<br/>单 v1 Swift 基线"] --> S1["S1 单 v1 typed schemas + Rust 契约 kernel<br/>byte-for-byte differential<br/>XPA-001/002"]
+  S0["SPK-1 Swift baseline 测量"] --> S1
   S1 --> S2["S2 Rust 控制面 façade<br/>拥有 UDS/XPC，转发一切给 Swift daemon<br/>XPA-003"]
   S2 --> S3["S3 只读 shadow validation<br/>Rust 解码 durable 文件与 Swift 投影比对<br/>随 XPA-012 交付"]
   S3 --> S4["S4 store owner 逐个搬迁<br/>host-only → artifact → authority(job/capability/recovery)<br/>XPA-012/013/014"]
@@ -480,22 +483,22 @@ flowchart LR
   S1 --> W1
 ```
 
-每一步 macOS 都可发布：S2 之后的任何时刻，`arkdeck runtime service update --daemon <swift-binary>` 把 LaunchAgent 指回 Swift daemon 即回滚（`LaunchAgentService.swift` 已有 executable identity 校验与 receipt）。**回滚对象是同一 release 的 Swift daemon**（r5）：daemon 从 App 包内嵌的 helper 安装（`ArkDeckRuntimeCommands.swift:1258` → `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，receipt 记 `daemonSHA256`），App 与 daemon 按 release 成对。App 一旦改用 `xpc_connection`（§L.1 第 6 条），仍提供 `NSXPCListener`（`AgentXPCListener.swift:26`）的 Swift daemon 就无法为它服务——CLI 能回滚，更新后的 App 却断连。因此 XPA-003 必须在同一 PR 内把 Swift daemon 的 Mach service 监听器换成与 façade 相同的 raw libxpc 帧监听器，并把「新 App → 回滚后的 Swift daemon」列为回滚验收（XPC 契约测试 + App UI smoke），不只做 headless 演练；LaunchAgent 指向其它 release 的 daemon 时由 receipt/executable identity 检出并提示 `runtime service update`，不得静默挂起。
+每一步 macOS 都可发布：S2 之后的任何时刻，`arkdeck runtime service update --daemon <swift-binary>` 把 LaunchAgent 指回 Swift daemon 即回滚（`LaunchAgentService.swift` 已有 executable identity 校验与 receipt）。**回滚对象是同一 release、SVC 完成后的 Swift daemon**（r5）：daemon 从 App 包内嵌的 helper 安装（`ArkDeckRuntimeCommands.swift:1258` → `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，receipt 记 `daemonSHA256`），App 与 daemon 按 release 成对。App 一旦改用 `xpc_connection`（§L.1 第 6 条），仍提供 `NSXPCListener`（`AgentXPCListener.swift:26`）的 Swift daemon 就无法为它服务——CLI 能回滚，更新后的 App 却断连。因此 XPA-003 必须在同一 PR 内把 Swift daemon 的 Mach service 监听器换成与 façade 相同的 raw libxpc 帧监听器，并把「新 App → 回滚后的 Swift daemon」列为回滚验收（XPC 契约测试 + App UI smoke），不只做 headless 演练；LaunchAgent 指向其它 release 的 daemon 时由 receipt/executable identity 检出并提示 `runtime service update`，不得静默挂起。
 
-### G.2 兼容策略（逐存储）
+### G.2 当前单 v1 基线互读（逐存储）
 
-| 存储 | 今日格式 | 迁移期规则 | Rust 首次写入的前置 |
+| 存储 | SVC 完成后的基线 | 迁移期规则 | Rust 首次写入的前置 |
 |---|---|---|---|
-| SQLite `runtime-jobs.sqlite3` | schema v2、WAL、`synchronous=FULL`、`user_version` 守卫、`BEGIN IMMEDIATE`（`RuntimeJobRepository.swift:539-581,738`） | Rust 用 `rusqlite` 打开同一文件，**不升 `user_version`**；SQL 文本与索引名逐字复刻；`legacy` 时间哨兵行保留 | differential：Swift 与 Rust 对同一 DB 的 `listJobs` 分页（含 cursor）字节相等 |
-| journal JSONL | 每行 canonical JSON + LF；schemaVersion 1.0.0–3.0.0；tail cursor；torn tail 修复 | Rust 写入与 Swift 同 schemaVersion（新 job 由 owner 决定版本，沿用 Swift 今日选择的版本值）；fsync 纪律等价（macOS `F_FULLFSYNC`，Windows `FlushFileBuffers` + 目录句柄 flush） | conformance：撕裂尾部穷举（ArkForge 已有此套件形态）、Swift 读 Rust 写与反向 |
+| SQLite `runtime-jobs.sqlite3` | SVC-002 最终 v1 布局、WAL、`synchronous=FULL`、`user_version` 守卫、`BEGIN IMMEDIATE` | Rust 用 `rusqlite` 打开同一基线文件，SQL/索引与 `user_version` 不漂移；不恢复旧迁移分支或 legacy 时间哨兵 | differential：Swift 与 Rust 对同一 DB 的 `listJobs` 分页（含 cursor）字节相等 |
+| journal JSONL | SVC-002 最终单 v1 canonical JSON + LF、tail cursor、torn-tail 修复 | Rust 写同一 schemaVersion 和键集合；fsync 纪律等价（macOS `F_FULLFSYNC`、Windows `FlushFileBuffers` + 目录句柄 flush） | 撕裂尾部穷举；Swift 读 Rust 写与反向 |
 | `job-record.json`、`manifest.json` | temp+fsync+rename+dirsync，sortedKeys pretty | 同；Windows 用 `MoveFileExW(MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)`（SPK-5 验证原子性） | 字节相等（pretty 格式也要相等，因为 Swift 会 `sha256Hex` 记录） |
 | artifact `index.json` + payload verification + cleanup-debt | schema 1.0.0；32-hex ID；symlink 拒绝 | 不变 | 同上 |
-| capability doc + ledger | doc 2.0.0；ledger 128 事件 checkpoint；lineage SHA 链 | 不变；Rust 必须能续写 ledger 链（`previousLineageSHA256` 精确） | 链校验向量 |
+| capability doc + ledger | SVC-002 最终当前 RuntimeCapability 文档与 lineage/checkpoint 布局 | 精确保留链校验和 reservation/outcome 语义；不恢复旧 authority、旧 checkpoint 或迁移路径 | 当前 baseline 链校验与安全拒绝向量 |
 | recovery epoch doc | 1.0.0，1 MiB 上限 | 不变 | — |
-| 历史 Session 输出根（`ArkDeck/Sessions/`）、AuthorizationUsage、hardware evidence V1–V6 | decode-only 世代 | Rust 只解码，永不重编码；缺失字段/未知世代 fail loud | 解码向量由 Swift 测试导出 |
+| 历史 Session/authority/evidence 与隔离开发数据 | SVC-002/003 规定的保留原始字节与隔离边界 | 不进入 Rust 当前 store，也不重新加入旧 reader/writer；未知结果仍不得清除、解释为安全或自动 replay | 当前格式正例及旧输入隔离/拒绝、零新 dispatch 负例 |
 | session-storage、targets、history filters、display names | JSON + lock 文件 | 不变 | — |
 
-硬规则：**迁移期（到 XPA-017 之前）禁止任何 schema/`user_version` 升版，也禁止向任何 durable 记录追加字段**（r3）。理由：现有解码器不是「忽略未知键」而是拒绝——journal envelope 与 23 处 payload 校验（`JournalEventValidation.swift:651-660`）、Artifact record（`ArtifactStorage.swift:73-79`）、derived provenance（`:1736-1741`）、checkpoint（`DurableFiles.swift:485-487`）、recovery manifest（`RecoveryManifestContract.swift:41-50,280-290`）、authorization ledger（`AuthorizationUsageLedger.swift:208-218`）、session audit（`SessionAudit.swift:74-79`）、toolchain identity（`SessionManifest.swift:1124-1130`）、workflow step 与 HAR 文档（`WorkflowStep.swift:1466-1468`、`HumanActionRequired.swift:391-393`）全部对多余键抛错。因此 Rust 写出的每一种记录必须与 Swift `CodingKeys` 的键集合逐记录相等，`arkdeck-conformance` 以 Swift 解码器为 oracle 断言键集合，并保留「多一个键 → Swift 拒绝」的负向向量。确需新字段只有两条路：先以独立 PR 发布把该记录解码器放宽为 tolerant reader 的 Swift 版本并随 GJ 复跑，待其成为已安装基线后 Rust 才可写；或等 XPA-017 之后经 change 升版。这保证任意时刻回滚到 Swift 都能读。r1/r2 写的「additive 且旧读者可忽略」与代码相反，r3 改正。
+硬规则：**TASK-SVC-001..004 完成后，由 XPA-001 钉住最新 Swift 的唯一当前 v1 契约；此后到 XPA-017 之前禁止 schema/`user_version` 漂移和 durable 键集合变化**（r6）。冻结不约束 CHG-075 的前置清理，也不要求 Rust 移植历史多代 schema、旧 authority 或旧配置。Rust 写出的每种记录必须由该 post-SVC Swift strict decoder 读取，反向亦然；conformance 检查精确键集合并保留「多一键 → 拒绝」负例。需要修改字段时，先在同一当前契约下同步修改双方与全部向量并重新 pin，经相应范围 review 后才能切换；不能自行添加 tolerant reader、版本协商或兼容分支。回滚只回到同 release 的这个 Swift baseline。历史 raw evidence 不改写，隔离开发数据不接入新 Runtime；unknown lane 的拒绝和保留仍遵守 CHG-075 与 POL-RECOVERY-001。
 
 ### G.3 Shadow / differential 的白名单
 
@@ -507,21 +510,21 @@ flowchart LR
 - **outcomeUnknown lane**：不是切换阻断项，而是必须**原样承接**的 durable 状态。Rust owner 启动时读到 `waitingForRecovery`/`outcomeUnknown` job 保持不变，只允许 `job.reconcile` 读回或 POL-RECOVERY-001 的完整机械证明路径；绝不因 owner 更换而重放（AGENTS `:49-51`）。
 - **未决 intent**：由 preflight 排除；若崩溃窗口留下「intent 已落、无 outcome」，新 owner 按 journal 分类为 outcomeUnknown（与 `recoverActiveJobs` 语义相同）。
 - **recovery epoch**：epoch 文档是 owner 无关的 durable 事实；新 owner 继续从已有最高 epoch 计数。
-- **回滚**：同样的 preflight；Swift 用**当前的严格解码器**读回 Rust 写入的同版本、同键集合字节；不存在「Rust 追加字段、Swift 忽略」的路径（§G.2，r3）。
+- **回滚**：同样的 preflight；Swift 用**post-SVC 基线的严格解码器**读回 Rust 写入的同版本、同键集合字节；不存在「Rust 追加字段、Swift 忽略」的路径（§G.2，r3）。
 - **备份**：切换前 `runtime service update` 自动做状态目录快照（macOS APFS `clonefile`，Windows 停机复制），记录快照 SHA-256 列表到 receipt；快照只用于取证与回滚，不是常规恢复路径。
 
-### G.5 兼容矩阵与测试
+### G.5 单 v1 实现互读与失败矩阵
 
 | 组合 | 期望 | 测试载体 |
 |---|---|---|
-| 旧 Swift CLI（协议 1.0.0/2.0.0）→ Rust daemon | 全部通过现有 `AgentDaemonContractTests` 的黑盒子集 | 新增 `ARKDECK_DAEMON_UNDER_TEST=<rust binary>` 参数化 |
+| post-SVC Swift CLI（单 v1）→ Rust daemon | 全部通过最终单 v1 控制面黑盒契约；同输入同结果 | `ARKDECK_DAEMON_UNDER_TEST=<rust binary>` 参数化 |
 | 旧 App（NSXPC）→ Rust daemon | **不支持也不会发生**：daemon 从 App 包内嵌 helper 安装，App 与 daemon 按 release 成对；跨 release 配对由 receipt/executable identity 检出并提示 `runtime service update`（r5） | `LaunchAgentService` receipt 校验 + App 错误态 UI test |
 | 更新后的 App（`xpc_connection`）→ 回滚后的同 release Swift daemon（raw libxpc 帧监听器） | 与 façade 等价：`AgentXPCTransportContractTests` 黑盒子集全绿；App UI smoke（Overview/History）通过（r5，XPA-003 回滚验收） | 同上，`ARKDECK_DAEMON_UNDER_TEST=<swift binary>` |
-| Rust CLI → Swift daemon（迁移期） | 2.0.0 方法全部工作；1.x legacy leaf 只在 macOS 兼容表 | 同上反向 |
-| 新客户端（2.1.0）→ 旧 daemon（2.0.0） | `protocolVersionUnsupported`/`unknownMethod`，dispatch 0 | 现有 `:1409-1428` 用例扩展 |
-| Windows 客户端 → Windows daemon | 只有 2.x | Windows CI |
+| Rust CLI → post-SVC Swift daemon（迁移期） | 同一单 v1 方法表全部工作；不设 macOS legacy 例外 | 同上反向 |
+| 旧版本/未知版本帧 → 当前 daemon | 结构化拒绝、dispatch 0，不协商、不重试旧方法 | SVC 单 v1 负向矩阵扩展到 Rust |
+| Windows 客户端 → Windows daemon | 同一当前单 v1 契约 | Windows CI |
 | crash-window | Rust owner 在 intent 落盘后、dispatch 前被 kill → 重启 outcomeUnknown；sidecar 被 kill 于 step 中 → owner 记 outcomeUnknown；owner 被 kill 于 admission 提交后 record 写前 → `restoreInitialAdmissionProjectionIfNeeded` 等价（`RuntimeRecoveryService.swift:520-585`） | Rust 版 `EngineCrashFixture`/`JournalCrashFixture` + 跨进程 kill 矩阵 |
-| schema/协议升级与回滚 | 迁移期零升版且字段集冻结；升版只在 XPA-017 后经 change | contract 测试断言 `user_version==2`、journal 版本集合不变；conformance 断言每种 durable 记录的键集合等于 Swift `CodingKeys`，负向向量（多一键）被 Swift 拒绝（r3） |
+| 当前 schema/协议冻结与回滚 | 从 SVC-001..004 完成后的 baseline 起，迁移期只保留当前 v1 与精确字段集 | 断言 SQLite/current document 与 pinned baseline 一致；Swift/Rust 互读；额外键、旧代际输入拒绝；回滚至同 release 的 post-SVC Swift |
 | façade crash-window（XPA-003，r3） | 转发前被杀 → 客户端结构化传输错误，可证明零派发（Swift 未收到任何字节、journal 不变）；转发后回包前被杀，或 Swift daemon 中途被杀 → 客户端得到**不带** `details.phase`/`newDispatchCount` 证明的结构化中断错误，durable 状态以 Swift 已写内容为准（journal 完整可读，可能含 intent/outcome），façade 绝不重发已转发帧，客户端以 `job.status`/`job.list` 读回（`job.submit` 幂等键使重提安全） | 跨进程 kill 矩阵 + 私有 socket 字节计数断言；façade 不得伪造 `AgentDaemon.swift:4116-4125` 只由 named owner refusal 发出的零派发证明 |
 
 ---
@@ -661,12 +664,12 @@ daemon，属 XPA-023 后续实现 PR）之前，`TASK-XPA-012~017` 不得以任�
 
 ## J. Vertical task DAG and detailed task table
 
-### J.1 载体与命名（均为 Proposed，未批准）
+### J.1 载体与命名（r6 修订待维护者 review）
 
 - 载体 change：`CHG-2026-074-shared-rust-runtime-core`（class `platform`，`core_change_level: none`，`platforms: [macos, windows]`），携带架构决策反转（更新 `core-portability.md`、三份 Profile 的 `Core strategy`、Windows Profile 到 0.2.0、`PLATFORM-PROFILES.lock.yaml` 的 W0 启动）与下列 Task。理由：`core-portability.md:30` 明文要求 architecture/platform change；Windows Profile 更新属四类审批之「新 integration/device profile」邻域；不改任何 Core REQ/AC。
 - Task ID 前缀 `TASK-XPA-NNN`（cross-platform architecture）。Spike 用 `SPK-n`，不是 Task，不占 PR。
 - 每个 Task 一个 PR，含生产代码、测试、适用真机验证、最小文档、完成结论。禁止 readiness/status/evidence/archive-only PR。
-- 与现有任务的去重：不与 `TASK-AIN-021/026`、`TASK-AFG-002` 重叠；XPA-001 的契约补齐若 AIN-026 仍 in-progress，则并入 AIN-026 的 Allowed paths 提交而不另立。
+- 与现有任务的去重：CHG-075 的 SVC-001..004 独占单 v1 收敛；XPA-001 在它们完成后只发布逐 method typed schemas 供 Rust 消费，不再执行 2.1 发布、旧 1.x 冻结或历史 journal 补记。SVC-005 承担单 v1 发布验收；XPA 真机验收仍负责迁移与平台对等。
 
 ### J.2 DAG
 
@@ -677,7 +680,9 @@ flowchart TD
   SPK3[SPK-3 Windows W0 + named pipe + hdc.exe]
   SPK4[SPK-4 WinUI 3 评估]
   SPK5[SPK-5 Windows 耐久原语]
-  X001[XPA-001 协议 2.1.0 essentials + per-method schemas]
+  SVC[SVC-001..004 单 v1 收敛完成]
+  X001[XPA-001 单 v1 per-method typed schemas]
+  SVC --> X001
   X002[XPA-002 Rust 契约 kernel + Windows doctor/candidates]
   X003[XPA-003 macOS Rust 控制面 façade]
   X004[XPA-004 Windows target adopt]
@@ -750,20 +755,20 @@ flowchart TD
 
 每条按同一模板：**用户结果 / 平台与 GJ / 根因或缺口 / 依赖·并行 / production reachability / 模块与路径 / 交付物 / AC / 验证 / 硬件 / 安全 stop condition / rollback·cutover / 规模**。「Allowed paths」是建议，最终由 change 的 tasks.md 与 `check_pr_paths.py` 机械裁定。
 
-#### TASK-XPA-001 — Publish protocol 2.1.0 essentials with per-method typed schemas
-- 用户结果：macOS GJ-1～GJ-5 headless 全程只用 target 2.x leaf（`--require-protocol 2` 下不再依赖任何 1.x 方法）；外部 agent 与未来 Windows 客户端得到逐 method 的 typed 契约。
-- 平台/GJ：macOS GJ-1～5（re-pass，2.x-only）；为 Windows GJ-1 前置。
-- 根因：44 个方法只在 1.x（`ControlProtocolGenerated.swift:11`），`params` 无 schema（B.1 #14/#15）。
-- 依赖/并行：依赖 SPK-1 无（可并行）；与 XPA-002 并行开发但 XPA-002 依赖其契约。
-- Production reachability：`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler`（`AgentDaemon.swift:293-341`）→ 2.1.0 方法表 → 既有 handler；不新增 effect。
-- 模块/路径：Allowed `Packages/ArkDeckKit/Contracts/**`、`Packages/ArkDeckKit/Scripts/generate-control-contract.py`、`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、`Sources/ArkDeckAgentDaemon/**`、`Sources/ArkDeckAgentClient/**`（r4：仅目标 major 的版本谓词——协商到 `2.1.0` 与 `2.0.0` 都必须走 target 分支；不新增方法、传输或 effect）、`Sources/ArkDeckCLI/**`、`Tests/ArkDeckContractTests/**`、`openspec/contracts/runtime-control-plane.schema.json` 及新 `spec/control/**`；Forbidden `openspec/specs/**`、`openspec/constitution.md`、`Catalog/**`。
-- 交付物：`supportedExactVersions=["2.1.0","2.0.0","1.0.0"]`；2.1.0 additive 方法集；`spec/control/methods/*.json`；契约补记 journal 2.0.0–3.0.0 等世代；CLI target leaf 迁到 2.x。
-- AC：每个录制帧（现有契约测试）对 schema 校验通过；1.x 表字节不变（CLI-REQ-025）；`arkdeck --version` 列出三版本；headless runbook 在 2.x-only 下 GJ-1～5 `REAL_DEVICE_PASS`。
-- 验证：contract（schema 正反例、negotiation 矩阵）、differential（2.0 与 2.1 对同一请求结果相等）、fault-injection（未知 method/major）、真机 headless 复跑。
-- 硬件：DAYU200（headless 复跑）。
-- Stop condition：任何 1.x 帧形状改变；任何方法在 2.1.0 下改变 effect。
-- Rollback：daemon 二进制回退；客户端协商回 2.0.0。
-- 规模：M（假设：一人两周，含复跑）。
+#### TASK-XPA-001 — Publish per-method typed schemas from the single v1 contract for Rust consumers
+- 用户结果：外部 agent、Swift/Rust CLI 与未来 Windows 客户端消费同一当前 v1 的逐 method typed 契约，方法与 effect 和 SVC 完成后的实现一致。
+- 平台/GJ：macOS GJ-1～5 re-pass；Windows GJ-1 前置。
+- 根因：语言无关 per-method request/result/error schemas 尚需从最终单 v1 实现补全；历史 1.x-only 分流由 SVC-001 解决。
+- 依赖：TASK-SVC-001、TASK-SVC-002、TASK-SVC-003、TASK-SVC-004；Status:blocked，依赖完成后记录最新 protected-main commit、契约与 corpus digest。
+- Production reachability：`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` → 单 v1 方法表 → 既有 handler；不新增 effect。
+- 模块/路径：以本 change `tasks.md` 的 TASK-XPA-001 Allowed paths 为准：current Contracts、生成器、Core/daemon/client/CLI schema 消费、contract tests、`spec/**` 与最小设计文档；不得修改 Core/Catalog 或恢复版本选择。
+- 交付物：每个当前 method 的 `spec/control/methods/*.json`；单一 canonical source 生成的 Swift/Rust/client inputs；最终 current journal 契约；供后续 XPA 共用的 post-SVC baseline pins。
+- AC：当前实际帧通过 schema；额外/缺失字段、未知版本/方法结构化拒绝且 dispatch 0；无协商/降级/历史方法表；同一输入的 Swift/runtime/schema 一致。
+- 验证：contract 正反例、生成物零漂移、normal single-v1 CLI headless GJ-1～5；不使用 `--require-protocol 2`，不以本任务替代 SVC-005。
+- 硬件：DAYU200，真实结果按 current Catalog digest 记录。
+- Stop condition：与 post-SVC 契约不符、漏方法、改变 effect，或恢复 CHG-075 已删除的兼容逻辑。
+- Rollback：整体回退 typed schema 发布；迁移期客户端与同 release 的 post-SVC Swift daemon 配对，不协商旧协议。
+- 规模：M。
 
 #### TASK-XPA-002 — Rust contract kernel and the first Windows GJ-1 hops (doctor, device candidates)
 - 用户结果：Windows 工程师运行 `arkdeck doctor --deep` 与 `arkdeck device candidates` 看到 DAYU200，机器输出与 macOS fixture 字节一致。
@@ -772,8 +777,8 @@ flowchart TD
 - 依赖：XPA-001、SPK-3；并行：XPA-003 的 façade 代码同源。
 - Production reachability：`arkdeck.exe` → named pipe → `arkdeck-control` → `doctor/device.candidates` → `hdc.exe list targets -v`（argv 数组、句柄绑定 hash）→ 解析 → 投影。读-only，无 effect。
 - 模块/路径：新 `rust/**`（`arkdeck-contract`、`arkdeck-platform`、`arkdeck-control`、`arkdeck-provider-hdc`（parsers）、`arkdeck-client`、`arkdeck-cli`、`arkdeck-agentd`）、`spec/**`、`.github/workflows/rust-ci.yml`、`scripts/catalog_gen/generate.py`（生成 Rust）、`scripts/ci/plan.py` + `scripts/ci/test_plan.py` + `.github/workflows/swift-ci.yml` + `scripts/test_agent_pr_workflow.py`（r3/r5：新增 `rust` 车道并接入统一入口——今日 `classify_paths` 对 `rust/**` 全部车道为 false，只改 Rust 的 PR 本地闸会空转通过；新车道必须折进 `swift` 聚合 job 的 `needs`，而 `test_agent_pr_workflow.py:412-421` 逐字钉住该列表，须同 PR 更新）、`openspec/platforms/windows/**`；Forbidden `Packages/**` 生产源码（本任务不改 Swift 语义）。
-- 交付物：JCS/CBOR/digest 向量全过；catalog digest 与 Swift 相等；negotiation 矩阵；HDC Golden/Probe fixtures 回放；Windows pipe（DACL/REJECT_REMOTE/FIRST_INSTANCE/SID 校验）+ 客户端对服务端的两层认证（owner SID + 本连接服务端 PID 的映像/签名实例认证，§F.2，r3/r5）；macOS UDS（peer euid）；planner `rust` 车道（r3）折进 `swift` 聚合器（r5）。
-- AC：`operation list` 返回 30 descriptor 与同 digest；`device candidates` 在 Windows 真机列出 DAYU200，同 fixture 输出与 macOS 字节相等；跨账户 pipe 连接被拒；假服务端先占 pipe 名：跨账号 → 客户端按 owner SID 拒绝、零帧；同账号不同映像且第二层可用 → 客户端按实例身份拒绝、零帧；同账号且第二层不可用 → 仅 daemon 侧 fail-closed + `doctor` 报告，客户端不作声称（r5）；SPK-3 记录 `GetNamedPipeServerProcessId` 在客户端句柄上的可用性；`rust/**`-only diff 至少选中一条车道（r3）；非 2.x 帧结构化拒绝。
+- 交付物：JCS/CBOR/digest 向量全过；catalog digest 与 Swift 相等；单 v1 帧验证矩阵；HDC Golden/Probe fixtures 回放；Windows pipe（DACL/REJECT_REMOTE/FIRST_INSTANCE/SID 校验）+ 客户端对服务端的两层认证（owner SID + 本连接服务端 PID 的映像/签名实例认证，§F.2，r3/r5）；macOS UDS（peer euid）；planner `rust` 车道（r3）折进 `swift` 聚合器（r5）。
+- AC：`operation list` 返回 30 descriptor 与同 digest；`device candidates` 在 Windows 真机列出 DAYU200，同 fixture 输出与 macOS 字节相等；跨账户 pipe 连接被拒；假服务端先占 pipe 名：跨账号 → 客户端按 owner SID 拒绝、零帧；同账号不同映像且第二层可用 → 客户端按实例身份拒绝、零帧；同账号且第二层不可用 → 仅 daemon 侧 fail-closed + `doctor` 报告，客户端不作声称（r5）；SPK-3 记录 `GetNamedPipeServerProcessId` 在客户端句柄上的可用性；`rust/**`-only diff 至少选中一条车道（r3）；非 v1 帧结构化拒绝。
 - 验证：contract、differential（Swift CLI 与 Rust CLI 对同 fixture 的 envelope）、fault-injection（帧上限、畸形帧、pipe 名先占）、Windows 真机。
 - 硬件：Windows 11 x64 主机 + DAYU200。
 - Stop：任何 raw path/argv 进入契约；任何写入 durable 存储（本任务只读）。
@@ -785,7 +790,7 @@ flowchart TD
 - 平台/GJ：macOS GJ-1～5 re-pass（假设 A4）。
 - 缺口：Rust 尚未处在生产路径；ADR-0005 的 peer 硬化未做（B.1 #17）。
 - 依赖：XPA-002、SPK-2。并行：Windows 链。
-- Production reachability：客户端 → Rust façade（UDS/XPC）→ 转发到 Swift daemon 私有 socket → 既有 admission；façade 不解释语义、不缓存、不改帧（只做 negotiation 与准入）。
+- Production reachability：客户端 → Rust façade（UDS/XPC）→ 转发到 Swift daemon 私有 socket → 既有 admission；façade 不解释语义、不缓存、不改帧（只做单 v1 帧校验与准入）。
 - 来源上下文（r3）：每帧前置一行 origin 前导（§F.2「来源上下文」行）；否则 Swift 看到的对端是 façade，`human-action.resume` 的交互式 impact 确认永久失效。
 - 路径：`rust/**`、`Packages/ArkDeckKit/LaunchAgents/**`（plist 与 service 指向）、`Sources/ArkDeckAgentDaemonMain/**`（私有 socket 参数）、`Sources/ArkDeckAgentDaemon/**`（r3：私有监听器与 origin 行 → context，不动 handler/admission）、`Sources/ArkDeckWorkflows/XPCConnectionBox.swift`（改 xpc C API）、`ArkDeckApp/**`（仅 transport）、`Tests/**`。
 - 交付物：façade daemon；`runtime service install/update` 支持双二进制；黑盒契约测试参数化；**同 PR 内**把 Swift daemon 的 `NSXPCListener` 换成与 façade 相同的 raw libxpc 帧监听器并把 App 换到 `xpc_connection`（r5，见 §G.1 回滚段）。
@@ -815,9 +820,9 @@ flowchart TD
 - 平台/GJ：Windows GJ-1 hop 6、9、10。
 - 缺口：Rust 无 job store/journal/admission/HDC observe lowering/artifact publish。
 - 依赖：XPA-004、SPK-5。并行：XPA-015 复用 analyzer 无关。
-- Reachability：CLI → `job.submit`（E0 默认只读策略）→ SQLite v2 + journal + record → `hdc.exe -t <connectKey> …`（`deviceArguments` 唯一注入点）→ 语义 verify → artifact index → `job.events/status/result`。
+- Reachability：CLI → `job.submit`（E0 默认只读策略）→ post-SVC SQLite v1 + journal + record → `hdc.exe -t <connectKey> …`（`deviceArguments` 唯一注入点）→ 语义 verify → artifact index → `job.events/status/result`。
 - 路径：`rust/**`（`arkdeck-durable`、`arkdeck-runtime`、`arkdeck-provider-hdc`）。
-- 交付物：durable 层（journal fsync、tail cursor、torn tail、atomic replace、SQLite v2）、admission 顺序（§D.3）、observe lowering、artifact store 最小面、`job.events` 分页。
+- 交付物：durable 层（journal fsync、tail cursor、torn tail、atomic replace、post-SVC SQLite v1）、admission 顺序（§D.3）、observe lowering、artifact store 最小面、`job.events` 分页。
 - AC：Fake 测试断言真实 argv（含 `-t`）；journal 撕裂尾部穷举；`recoverActiveJobs` 只读回零派发；重启后 `job show/result` 一致；Windows 真机 observe 成功。
 - 验证：contract、differential（Windows 生成的 journal/record/index 由 Swift 解码器读取通过）、crash-window（kill 于 intent 后）、真机。
 - 硬件：Windows + DAYU200。
@@ -995,7 +1000,7 @@ flowchart TD
 
 ### J.5 Critical path、并行组、前三项、release gates
 
-**Critical path（到「Windows/macOS supported」）**：SPK-3 → XPA-001 → XPA-002 → XPA-004 → XPA-005 → XPA-006 → XPA-008 → XPA-010（外部依赖 ArkForge AF-W1）→ XPA-022 → gate。GJ-3/5 与 XPA-020/021 并行汇入。
+**Critical path（到「Windows/macOS supported」）**：SVC-001..004 → XPA-001；XPA-001 与 SPK-3 → XPA-002 → XPA-004 → XPA-005 → XPA-006 → XPA-008 → XPA-010（外部依赖 ArkForge AF-W1）→ XPA-022 → gate。GJ-3/5 与 XPA-020/021 并行汇入。
 
 **可并行组**：
 1. Windows GJ 链（XPA-002/004/005/006/008/009/010/011）；
@@ -1006,7 +1011,7 @@ flowchart TD
 
 **最值得立即执行的三项**：
 1. ~~**SPK-1 基线测量**~~（2026-09-04 已完成；多数预算数字已定稿，分页投影与 idle RSS 两行、以及零拷贝/FFI 取舍未解除，见 §I.2 注 1/注 2 与 §L.1）；
-2. **XPA-001 协议 2.1.0 essentials + per-method schemas**（一切客户端与 Windows 的前置，且能让 macOS GJ 首次在纯 2.x 上 PASS）；
+2. **SVC-001..004 完成 → XPA-001 单 v1 per-method typed schemas**（后续 Rust/Windows 的共同前置；单 v1 收敛与其发布验收归 CHG-075）；
 3. **XPA-002 Rust 契约 kernel + Windows doctor/candidates**（最早在真实 Windows 主机上证伪或证实整个论题；同时产出 macOS façade 所需的传输代码），与 SPK-2/SPK-3 并行。
 
 **Release gates（macOS-only → Windows/macOS supported）**：
@@ -1021,7 +1026,7 @@ flowchart TD
 | G7 性能 | §I.2 全部预算在两端参考主机通过；回归车道运行 ≥ 30 天无未解释回归 | nightly 归档 |
 | G8 可访问性/双语 | UIA/AX 语义快照一致；AC-I18N-001 两端；无 disabled 占位 | UI 自动化 |
 | G9 分发 | 签名/公证（macOS）与 Azure Artifact Signing + MSIX（Windows）；干净主机矩阵；更新通道验证 | release 文档 |
-| G10 数据 | 旧状态目录（含 outcomeUnknown lane、V1–V6 evidence）在新 owner 下解码与恢复演练通过 | conformance fixtures |
+| G10 数据 | post-SVC 当前 v1 状态目录（含 outcomeUnknown lane）在新 owner 下互读与恢复演练通过；pre-SVC evidence/旧状态保持隔离与零新 dispatch | 当前 conformance fixtures 与历史输入隔离负例 |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 5
+revision: 6
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -30,6 +30,17 @@ platforms: [macos, windows]
 > `docs/design/cross-platform/rust-core-cross-platform-architecture.md` (sections A–L), pinned by
 > `design.md` in this directory. This proposal only carries the governance-facing summary.
 > The same content was first filed as a draft in PR #1712; this change supersedes that draft.
+
+## Revision 6 dependency and review boundary
+
+This revision is proposed for maintainer review; the retained `approved` front-matter value
+records the existing change state and does not approve r6. It consumes
+[CHG-2026-075 — single v1 contracts](../chg-2026-075-single-v1-contracts/proposal.md).
+TASK-XPA-001 waits for TASK-SVC-001..004 and publishes typed schemas from their final single-v1
+contract. All later Swift/Rust parity and rollback targets are that post-SVC Swift baseline.
+Earlier scan facts and revision notes below describe pre-SVC history, not an obligation to
+restore old protocol/document generations. SVC-005 owns the single-v1 release acceptance;
+XPA tasks retain their separate hardware parity and migration acceptance.
 
 ## Governance loop
 
@@ -90,7 +101,7 @@ platforms: [macos, windows]
   - A Rust workspace under `rust/` (crates listed in design section D.1/E.4), a Rust CLI, a Windows
     WinUI 3 client under `windows/`, a Swift `ArkDeckClientKit`, and the strangler migration of the
     macOS daemon.
-  - Protocol 2.1.0 additive methods so that Windows never needs protocol 1.x.
+  - Per-method typed schemas derived from the post-SVC single-v1 protocol for both platforms; no multi-version protocol publication.
 - Out of scope:
   - Any change to Core Requirements, Acceptance Scenarios, Safety invariants, `Catalog/`
     operations, provider IDs or destructive admission policy.
@@ -111,10 +122,10 @@ platforms: [macos, windows]
   REQ-DIAG-001/002, REQ-I18N-001).
 - Acceptance: the current CORE-CONFORMANCE suite (121 scenarios) becomes a target obligation on
   Windows; change-level acceptance `XPA-AC-1..10` is defined in `verification.md`.
-- Contracts/schemas: additive only. `runtime-control-plane.schema.json` gains protocol 2.1.0
-  methods and per-method schemas; `journal-event.schema.json` records the generations 2.0.0–3.0.0
-  that Swift already accepts (`Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEvent.swift:65-69`);
-  new `spec/` assets are generated from the Swift oracle and frozen.
+- Contracts/schemas: XPA-001 derives per-method schemas and language-neutral `spec/` assets from
+  the final single-v1 control and durable contracts delivered by TASK-SVC-001..004. It does not
+  publish 2.1.0, freeze pre-SVC 1.x frames or supplement the old journal generation union. The
+  pre-release compatibility removal belongs to CHG-2026-075; this change preserves its outcome.
 - Core baseline bump: **no** (`core_change_level: none`). Platform disposition: macOS stays
   `needsReverification` until GJ-1..5 pass on the pure Rust daemon; Windows moves from
   `notStarted` to in progress and may not claim support before gates G1–G10.
@@ -127,15 +138,16 @@ platforms: [macos, windows]
   crash-window matrices and a Rust conformance generator); Rust panic (daemon `panic=abort` plus
   restart recovery; FFI `catch_unwind` returning an error code); protocol mismatch
   (`protocolVersionUnsupported`, zero dispatch).
-- Data/schema compatibility: every durable format (SQLite `runtime_job` v2, journal JSONL
-  1.0.0–3.0.0, `job-record.json`, artifact `index.json`, capability document 2.0.0 and ledger,
-  recovery epochs, evidence V1–V6) is read and written by Rust at the same schema version; no
-  `user_version` or schema bump before the Swift daemon is retired, and no field is added to any
-  durable record while the Swift decoders stay strict (r3); legacy generations stay decode-only. `outcomeUnknown` lanes are carried over unchanged and never replayed
-  (POL-RECOVERY-001).
+- Data/schema compatibility: Rust reads and writes the exact post-SVC Swift single-v1 durable
+  formats, including SQLite layout, journal/manifest, job records, artifact indexes, capability
+  ledger, recovery and current evidence. No schema/`user_version` drift or added durable field is
+  permitted during the Swift/Rust owner migration. This freeze begins after SVC-001..004, so it
+  cannot prevent that prerequisite cleanup or revive old decode-only generations. Raw historical
+  evidence and isolated development stores remain under CHG-2026-075's preservation policy;
+  `outcomeUnknown` lanes in the accepted baseline retain their outcome and never replay.
 - Platform impact: macOS `needsReverification` (already) and must re-verify on the Rust daemon;
   Windows starts W0; Linux remains `planned` with no support claim.
-- Rollback/migration: LaunchAgent points back to the Swift daemon; state directory snapshot before
+- Rollback/migration: LaunchAgent points back to the post-SVC Swift daemon of the same release; state directory snapshot before
   each cutover; Windows has no installed base to migrate.
 - Privacy: no change to POL-PRIVACY-001; secrets never enter argv/env/receipts on either platform;
   Windows credentials go to Credential Manager (DPAPI) with the same redaction rules.
@@ -148,6 +160,11 @@ zero-dependency); (3) control-plane peer hardening; (4) Golden Journey re-pass r
 replacement; (9) Windows support tuple (Windows 11 x64 + ARM64); (10) MSIX packaged + self-contained
 Windows App SDK; (13) ADR-0009 open ruling before recovery is ported; (17) the same-user trust
 boundary statement (r5).
+
+## Historical revisions 2–5
+
+The following entries preserve review history. Their old protocol publication, compatibility
+and generation-preservation targets are superseded by the r6 dependency boundary above.
 
 ## Revision 2 — SPK-1 outcome and one Allowed-paths correction
 
