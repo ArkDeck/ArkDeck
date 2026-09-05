@@ -197,6 +197,11 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIMachineContracts.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
+  - `openspec/contracts/cli-command-registry.yaml`
+  - `openspec/contracts/cli-feature-coverage.json`
   - `openspec/contracts/journal-event.schema.json`
   - `openspec/contracts/manifest.schema.json`
   - `openspec/contracts/runtime-control-plane.schema.json`
@@ -217,6 +222,12 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `AGENTS.md`
 - Risk:high
 - Hardware required:no
+
+### Scope supplement
+
+补充现有CLI入口、命令注册表、daemon组合入口及两个CLI生成契约，覆盖已review的
+旧archive消费者删除与mutation state continuity接线。实现仍随本Task同车交付；
+本补充合入main后，生产实现才能通过读取base Task范围的路径检查。
 
 ### Deliverables
 
